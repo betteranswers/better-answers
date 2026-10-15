@@ -157,7 +157,7 @@ source file is listed.
 | `kibo-ui/empty-action.tsx` | `empty/actions/empty-actions-1.tsx` | `b6b0ab3e7bc394cc` | `36cef032c7a8ee57` |
 | | `empty/search/empty-search-2.tsx` | `fe2894413f5fe4d0` | |
 | | `empty/standard/empty-standard-6.tsx` | `25f2152a598a1fe5` | |
-| `kibo-ui/row-actions.tsx` | `dropdown-menu/actions/dropdown-menu-actions-2.tsx` | `58e26bf9f81588b0` | `6b15bd63236adbec` |
+| `kibo-ui/row-actions.tsx` | `dropdown-menu/actions/dropdown-menu-actions-2.tsx` | `58e26bf9f81588b0` | `b05e9f9c7e38a58d` |
 | `kibo-ui/counted-switch.tsx` | `tabs/advanced/tabs-advanced-1.tsx` | `06e57ae8224ceace` | `4bcfd6e2c84fa4f9` |
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
@@ -404,6 +404,11 @@ The edits made on 10 October 2026 for BA-98, which made the dark theme reachable
 - `command.tsx`: the input's row draws its rule in `--input`, the only edge Jump to's field has.
 - `kibo-ui/qr-code.tsx` draws its modules in `--grey-900` on `--grey-0`, not the page's ink on the
   page: in dark those flip, and a scanner wants dark modules on a light field.
+
+The edit made on 14 October 2026 for BA-49, on the row menu Groups draws on:
+
+- `kibo-ui/row-actions.tsx`: the trigger takes a `triggerId`, so a dialog opened from the menu can
+  hand focus back to the trigger rather than hunting for it by its name.
 
 The edit made on 10 October 2026 for BA-121, under the symbols rule the design system's readme
 held until 13 October 2026:

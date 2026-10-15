@@ -1683,9 +1683,11 @@ test.describe("the People page's words", () => {
     await said("the Requests tab once the request is approved");
 
     await page.goto(GROUPS_PAGE);
-    const naming = page.getByRole("textbox", { name: "New Group Name" });
-    await naming.fill("Site leads");
-    await naming.press("Enter");
+    const creating = page.getByRole("dialog", { name: "Create a Group" });
+    await page.getByRole("button", { name: "Create a Group" }).click();
+    await creating.getByLabel("New Group Name").fill("Site leads");
+    await creating.getByLabel("New Group Name").press("Enter");
+    await expect(creating).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Site leads", exact: true })).toBeFocused();
     await said(`${GROUPS_PAGE}, a group created`);
     await page.getByRole("button", { name: "Site leads", exact: true }).click();

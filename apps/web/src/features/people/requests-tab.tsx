@@ -1,20 +1,24 @@
-import { useId, useRef, useState } from "react";
+import { useTable } from "@tanstack/react-table";
+import { useId, useMemo, useRef, useState, type RefObject } from "react";
 
-import { Address } from "@/shared/address.tsx";
+import { FilterRow } from "@/shared/filter-row.tsx";
+import { GridTable } from "@/shared/grid-table.tsx";
+import { useKeystroke } from "@/shared/keystrokes.tsx";
+import { ListRead, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
-import { useReadSaid } from "@/shared/read-said.ts";
-import { Button } from "@/shared/ui/button.tsx";
-import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { TableCell } from "@/shared/ui/table.tsx";
+import { useSearchedList } from "@/shared/searched-list.ts";
+import { Card } from "@/shared/ui/card.tsx";
+import { CLEAR_WORDS, counted } from "@/shared/words.ts";
 
 import { ApproveRequest } from "./approve-request.tsx";
 import { EMPTY_LINES } from "./empty-lines.ts";
 import { approvedOutcome } from "./invitation-words.ts";
 import { InviteAction } from "./invite-action.tsx";
 import type { Role } from "./people-api.ts";
-import { PEOPLE_KEYSTROKES, PEOPLE_SELECT_FIRST } from "./people-state.ts";
+import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfRequestFailure } from "./refusal.tsx";
+import { REQUESTS_FIELDS, REQUESTS_LIST } from "./requests-address.ts";
 import {
   requesterName,
   useApproveRequest,
@@ -22,167 +26,104 @@ import {
   useRequests,
   type WaitingRequest,
 } from "./requests-api.ts";
+import { REQUESTS_COLUMNS, RequestsActionsContext, requestsFeatures } from "./requests-columns.tsx";
 import { aRole } from "./role-meanings.ts";
-import {
-  DayCell,
-  NothingWaiting,
-  useKeystrokeOnHeld,
-  WaitingRow,
-  WaitingTable,
-} from "./waiting-list.tsx";
 
-const COLUMNS = ["Person", "Reason", "State", "Asked", "Actions"] as const;
+const REQUESTS_HEADING = "Requests";
 
-const NOTHING_HELD = selectFirst(PEOPLE_SELECT_FIRST.request);
+const SEARCH_LABEL = "Search by name or address";
 
-const countOf = (requests: readonly WaitingRequest[]): string =>
-  requests.length === 1 ? "1 request waiting" : `${requests.length} requests waiting`;
+const LOADING = "The requests are still loading.";
 
-function Requester(properties: { readonly request: WaitingRequest }) {
-  const { name, email } = properties.request.requester;
-  return (
-    <span className="flex min-w-0 flex-col items-start leading-tight">
-      {name === "" ? (
-        <span className="text-muted-foreground">No display name yet</span>
-      ) : (
-        <span className="font-medium">{name}</span>
-      )}
-      {/* Still `anywhere`: a cell is as wide as its longest part, which would scroll the table at 320px. */}
-      <Address address={email} className="text-xs text-muted-foreground" />
-    </span>
-  );
-}
+const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.request);
 
-type RequestActions = {
-  readonly onHeld: (request: WaitingRequest | undefined) => void;
-  readonly onApprove: (request: WaitingRequest) => void;
-  readonly onDecline: (request: WaitingRequest) => void;
+const NO_ONE: readonly WaitingRequest[] = [];
+
+const countOf = (waiting: number): string =>
+  counted(waiting, "request waiting", "requests waiting");
+
+const saidOfCount = (shown: number, total: number, search: string): string =>
+  search === ""
+    ? countOf(total)
+    : `${String(shown)} of ${counted(total, "request", "requests")} match “${search}”.`;
+
+const matching = (search: string) => {
+  const sought = search.toLowerCase();
+  return (request: WaitingRequest): boolean =>
+    `${requesterName(request)} ${request.requester.email}`.toLowerCase().includes(sought);
 };
 
-function RequestRow(properties: {
-  readonly request: WaitingRequest;
-  readonly actions: RequestActions;
-  readonly consequenceId: string;
-}) {
-  const { request, actions, consequenceId } = properties;
-  const name = requesterName(request);
+const useNarrowedRequests = () => {
+  const list = useSearchedList(REQUESTS_LIST, REQUESTS_FIELDS);
+  const read = useRequests();
+  const listed = read.data ?? NO_ONE;
+  const { search } = list;
+  const data = useMemo(() => listed.filter(matching(search)), [listed, search]);
+  return { ...list, read, listed, data };
+};
 
+type Narrowed = ReturnType<typeof useNarrowedRequests>;
+
+/** A keystroke acts on the row in focus, and says which row to pick when none is. */
+const useInFocusKeystrokes = (properties: {
+  readonly inFocus: WaitingRequest | undefined;
+  readonly approve: (request: WaitingRequest) => void;
+  readonly decline: (request: WaitingRequest) => void;
+  readonly nothingInFocus: () => void;
+}) => {
+  const { inFocus, nothingInFocus } = properties;
+  const onTheRowInFocus = (act: (request: WaitingRequest) => void) => () => {
+    if (inFocus === undefined) nothingInFocus();
+    else act(inFocus);
+  };
+  useKeystroke(KEY.approve, onTheRowInFocus(properties.approve));
+  useKeystroke(KEY.decline, onTheRowInFocus(properties.decline));
+};
+
+function NoneShown(properties: {
+  readonly narrowed: Narrowed;
+  readonly focusAfterClear: RefObject<HTMLElement | null>;
+}) {
+  const { narrowed } = properties;
+  if (narrowed.search === "") {
+    return <ListState state={{ kind: "empty", words: EMPTY_LINES.requests, action: undefined }} />;
+  }
   return (
-    <WaitingRow item={request} onHeld={actions.onHeld}>
-      <TableCell className="whitespace-normal">
-        <Requester request={request} />
-      </TableCell>
-      <TableCell className="max-w-measure whitespace-normal wrap-anywhere">
-        {request.reason}
-      </TableCell>
-      <TableCell>
-        <Pill>Waiting</Pill>
-      </TableCell>
-      <DayCell instant={request.askedAt} />
-      <TableCell>
-        <span className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            aria-haspopup="dialog"
-            aria-label={`Approve Request from ${name}`}
-            aria-describedby={consequenceId}
-            aria-keyshortcuts={PEOPLE_KEYSTROKES.approve.key}
-            onClick={() => {
-              actions.onApprove(request);
-            }}
-          >
-            Approve
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-label={`Decline Request from ${name}`}
-            aria-describedby={consequenceId}
-            aria-keyshortcuts={PEOPLE_KEYSTROKES.decline.key}
-            onClick={() => {
-              actions.onDecline(request);
-            }}
-          >
-            Decline
-          </Button>
-        </span>
-      </TableCell>
-    </WaitingRow>
+    <ListState
+      state={{
+        kind: "emptied",
+        words: `No results found for “${narrowed.search}”.`,
+        clearWords: CLEAR_WORDS.search,
+        onClear: narrowed.clear,
+        focusAfterClear: properties.focusAfterClear,
+      }}
+    />
   );
 }
 
-function RequestList(properties: {
-  readonly requests: readonly WaitingRequest[];
-  readonly onOutcome: (outcome: Outcome) => void;
-  readonly onApprove: (request: WaitingRequest) => void;
-  readonly onDeclined: () => void;
+function RequestsList(properties: {
+  readonly headingId: string;
+  readonly heading: RefObject<HTMLHeadingElement | null>;
 }) {
-  const { requests, onOutcome, onApprove } = properties;
-  const [held, setHeld] = useState<WaitingRequest>();
-  const decline = useDeclineRequest();
-  const consequenceId = useId();
-
-  const declined = (request: WaitingRequest) => {
-    setHeld(undefined);
-    properties.onDeclined();
-    onOutcome({
-      tone: "said",
-      words: `The request from ${requesterName(request)} has been declined. They can ask again.`,
-    });
-    decline.mutate(
-      { requestId: request.id },
-      {
-        onError: (failure) => {
-          onOutcome(outcomeOfRequestFailure(failure, "action"));
-        },
-      },
-    );
-  };
-
-  const nothingHeld = () => {
-    onOutcome(NOTHING_HELD);
-  };
-  useKeystrokeOnHeld(PEOPLE_KEYSTROKES.approve, held, onApprove, nothingHeld);
-  useKeystrokeOnHeld(PEOPLE_KEYSTROKES.decline, held, declined, nothingHeld);
-
-  const actions: RequestActions = { onHeld: setHeld, onApprove, onDecline: declined };
-
-  return (
-    <>
-      {requests.length === 0 ? (
-        <NothingWaiting line={EMPTY_LINES.requests} />
-      ) : (
-        <>
-          <p id={consequenceId} className="mt-1 text-muted-foreground">
-            Approving a request sends the person an invitation. Declining sends nothing.
-          </p>
-          <WaitingTable caption="Requests to join this workspace." columns={COLUMNS}>
-            {requests.map((request) => (
-              <RequestRow
-                key={request.id}
-                request={request}
-                actions={actions}
-                consequenceId={consequenceId}
-              />
-            ))}
-          </WaitingTable>
-        </>
-      )}
-    </>
-  );
-}
-
-export function RequestsTab() {
-  const requests = useRequests();
-  const said = useReadSaid(requests);
-  const readRefused = said.error === null ? undefined : outcomeOfRequestFailure(said.error, "read");
-  const approve = useApproveRequest();
+  const { heading } = properties;
+  const narrowed = useNarrowedRequests();
+  const { read, listed, search, data } = narrowed;
+  const [inFocusId, setInFocusId] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
   const [approving, setApproving] = useState<WaitingRequest>();
-  const headingId = useId();
-  const heading = useRef<HTMLHeadingElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const openedFrom = useRef<HTMLElement | null>(null);
+  const consequenceId = useId();
+  const approve = useApproveRequest();
+  const decline = useDeclineRequest();
+  const inFocus = listed.find((request) => request.id === inFocusId);
+
+  const table = useTable({
+    features: requestsFeatures,
+    columns: REQUESTS_COLUMNS,
+    data,
+    getRowId: (request) => request.id,
+  });
 
   // Read when the dialog opens, by a click or a key, since either leaves focus where the action began.
   const toApprove = (request: WaitingRequest) => {
@@ -216,32 +157,77 @@ export function RequestsTab() {
     );
   };
 
+  /** The row leaves before the api answers, and comes back if the api refuses the decision. */
+  const declined = (request: WaitingRequest) => {
+    heading.current?.focus();
+    setOutcome({
+      tone: "said",
+      words: `The request from ${requesterName(request)} has been declined. They can ask again.`,
+    });
+    decline.mutate(
+      { requestId: request.id },
+      {
+        onError: (failure) => {
+          setOutcome(outcomeOfRequestFailure(failure, "action"));
+        },
+      },
+    );
+  };
+
+  useInFocusKeystrokes({
+    inFocus,
+    approve: toApprove,
+    decline: declined,
+    nothingInFocus: () => {
+      setOutcome(NOTHING_IN_FOCUS);
+    },
+  });
+
   return (
-    <section aria-labelledby={headingId} className="mt-6">
-      {/* Its heading is focusable, so a decided row's focus lands there rather than on the page. */}
+    <>
       <ListHead
-        heading="Requests"
-        headingId={headingId}
+        heading={REQUESTS_HEADING}
+        headingId={properties.headingId}
         headingRef={heading}
-        count={
-          requests.data === undefined || requests.data.length === 0 ? "" : countOf(requests.data)
-        }
+        count={read.data === undefined ? "" : saidOfCount(data.length, listed.length, search)}
         action={<InviteAction />}
       />
-      <OutcomeLine outcome={readRefused ?? outcome} className="mt-2" />
-      <div aria-live="polite">
-        {said.isPending ? <p className="mt-2">The requests are still loading.</p> : null}
-      </div>
-      {requests.data === undefined ? null : (
-        <RequestList
-          requests={requests.data}
-          onOutcome={setOutcome}
-          onApprove={toApprove}
-          onDeclined={() => {
-            heading.current?.focus();
+      <OutcomeLine outcome={outcome} className="mt-2" />
+
+      <Card className="mt-4">
+        <FilterRow
+          search={{
+            label: SEARCH_LABEL,
+            value: search,
+            onChange: narrowed.setSearch,
+            keystroke: KEY.searchRequests,
+            inputRef: searchRef,
           }}
         />
-      )}
+        <ListRead
+          read={read}
+          loading={LOADING}
+          failed={(failure) => outcomeOfRequestFailure(failure, "read").words}
+          focusAfterRetry={searchRef}
+        >
+          <p id={consequenceId} className="px-3 pt-3 text-muted-foreground">
+            Approving a request sends the person an invitation. Declining sends nothing.
+          </p>
+          <RequestsActionsContext
+            value={{ consequenceId, onApprove: toApprove, onDecline: declined }}
+          >
+            <GridTable
+              table={table}
+              caption="Requests to join this workspace."
+              onRowFocus={(request) => {
+                setInFocusId(request?.id);
+              }}
+              empty={<NoneShown narrowed={narrowed} focusAfterClear={searchRef} />}
+            />
+          </RequestsActionsContext>
+        </ListRead>
+      </Card>
+
       {approving === undefined ? null : (
         <ApproveRequest
           key={approving.id}
@@ -255,6 +241,18 @@ export function RequestsTab() {
           onFocusBack={focusBack}
         />
       )}
+    </>
+  );
+}
+
+export function RequestsTab() {
+  const headingId = useId();
+  const heading = useRef<HTMLHeadingElement>(null);
+
+  return (
+    <section aria-labelledby={headingId} className="mt-6">
+      {/* Its heading is focusable, so a decided row's focus lands there rather than on the page. */}
+      <RequestsList headingId={headingId} heading={heading} />
     </section>
   );
 }

@@ -4,34 +4,29 @@ import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
 import { RowSheet } from "@/shared/row-sheet.tsx";
 import { SheetPart } from "@/shared/sheet-part.tsx";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/shared/ui/alert-dialog.tsx";
+import { AlertDialog, AlertDialogTrigger } from "@/shared/ui/alert-dialog.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
 
+import { DeleteGroupWarning } from "./delete-group-warning.tsx";
 import { GroupChecklist } from "./group-checklist.tsx";
 import { consequenceOfDeleting, membersWord } from "./group-words.ts";
 import { useRenameGroup, type ListedGroup } from "./groups-api.ts";
 import { MEMBERS_LOADING } from "./member-action-words.ts";
 import { useMembers } from "./people-api.ts";
-import { outcomeOfFailure, outcomeOfGroupFailure } from "./refusal.tsx";
+import { outcomeOfFailure } from "./refusal.tsx";
+import { submitRename } from "./rename-group-form.ts";
 import { nameOf } from "./words.tsx";
 
 /** Where focus lands when the sheet opens: on the group, or straight on one of its actions. */
 export type GroupOpenedAt = "group" | "members" | "rename" | "delete";
 
 export const groupButtonId = (groupId: string): string => `group-${groupId}`;
+
+/** The row menu's trigger, so a dialog opened from the menu hands focus back to it. */
+export const groupMenuId = (groupId: string): string => `group-actions-${groupId}`;
 
 function GroupMembers(properties: {
   readonly group: ListedGroup;
@@ -92,23 +87,8 @@ function RenameGroup(properties: {
   // Never disabled: the button a reader pressed keeps focus while the answer comes back.
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const asked = new FormData(event.currentTarget).get("name");
-    if (typeof asked !== "string") return;
-    const was = group.name;
-    const name = asked.trim();
-    if (name === was) {
-      setOutcome({ tone: "said", words: `The group is already called ${was}.` });
-      return;
-    }
     setOutcome(undefined);
-    void renameGroup.mutateAsync({ groupId: group.id, name }).then(
-      () => {
-        setOutcome({ tone: "said", words: `${was} has been renamed to ${name} successfully.` });
-      },
-      (failure: Error) => {
-        setOutcome(outcomeOfGroupFailure(failure, "action"));
-      },
-    );
+    submitRename({ group, form: event.currentTarget, renameGroup, say: setOutcome });
   };
 
   return (
@@ -144,34 +124,17 @@ function DeleteGroup(properties: {
   readonly onDelete: (group: ListedGroup) => void;
 }) {
   const { group, buttonRef, onDelete } = properties;
-  const consequence = consequenceOfDeleting(group);
 
   return (
     <SheetPart title="Delete">
-      <p className="text-sm">{consequence}</p>
+      <p className="text-sm">{consequenceOfDeleting(group)}</p>
       <AlertDialog>
         <AlertDialogTrigger asChild>
           <Button ref={buttonRef} variant="outline" className="justify-self-start">
             Delete Group
           </Button>
         </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {group.name}</AlertDialogTitle>
-            <AlertDialogDescription>{consequence}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep Group</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() => {
-                onDelete(group);
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
+        <DeleteGroupWarning group={group} onDelete={onDelete} />
       </AlertDialog>
     </SheetPart>
   );

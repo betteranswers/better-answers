@@ -11,6 +11,7 @@ export const PEOPLE_SELECT_FIRST = {
 
 export const PEOPLE_KEYSTROKES = {
   search: { key: "/", action: "Search the Members by Name or Address" },
+  searchRequests: { key: "/", action: "Search the Requests by Name or Address" },
   open: { key: "o", action: "Open the Member in Focus" },
   changeRole: { key: "c", action: "Change the Role of the Member in Focus" },
   endEverySignInAndToken: {
@@ -60,6 +61,7 @@ export const MEMBER_PAGE_KEYSTROKES = {
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const GROUPS_KEYSTROKES = {
+  search: { key: "/", action: "Search the Groups by Name" },
   create: { key: "n", action: "Create a Group" },
   open: { key: "o", action: "Open the Group in Focus" },
   changeMembers: { key: "m", action: "Change the Members of the Group in Focus" },

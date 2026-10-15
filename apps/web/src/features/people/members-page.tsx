@@ -64,7 +64,7 @@ const TABS: readonly Tab[] = [
     id: "requests",
     name: "Requests",
     content: RequestsTab,
-    keystrokes: [KEY.invite, KEY.approve, KEY.decline],
+    keystrokes: [KEY.searchRequests, KEY.invite, KEY.approve, KEY.decline],
   },
 ];
 

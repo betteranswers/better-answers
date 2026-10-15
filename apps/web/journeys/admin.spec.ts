@@ -123,9 +123,12 @@ const addedToGroup = async (page: Page, names: readonly string[], group: string)
 
 const groupMade = async (page: Page, name: string): Promise<void> => {
   await page.goto(GROUPS);
-  const naming = groupsRegion(page).getByRole("textbox", { name: "New Group Name" });
+  const creating = page.getByRole("dialog", { name: "Create a Group" });
+  await groupsRegion(page).getByRole("button", { name: "Create a Group" }).click();
+  const naming = creating.getByRole("textbox", { name: "New Group Name" });
   await naming.fill(name);
   await naming.press("Enter");
+  await expect(creating).toHaveCount(0);
   await expect(groupButton(page, name)).toBeFocused();
 };
 
