@@ -1,4 +1,4 @@
-import { ASK, type Page } from "@/shared/navigation.ts";
+import type { Page } from "@/shared/navigation.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
@@ -63,24 +63,17 @@ export const ROLE_UNREAD = STOCK.notLoaded;
 export const goHome = (home: Page | undefined): string =>
   home === undefined ? "Go to Your Home Page" : `Go to ${home.name}`;
 
-/** A role's home says what that role will do there, not only that it is unbuilt. */
-const WHILE_UNBUILT: ReadonlyMap<Page, string> = new Map([
-  [
-    ASK.home,
-    "Ask through your assistant for now. Your questions and their answers will be listed here.",
-  ],
-]);
+/** Said by a role's home while it is unbuilt. */
+export const UNBUILT_LINE = "This page is coming soon.";
 
-export const unbuiltLineOf = (home: Page): string =>
-  WHILE_UNBUILT.get(home) ?? "This page is coming soon.";
-
-/** Claude is the one assistant admitted. Revisit or remove once S2b's Ask is built. */
+/** Claude is the one assistant admitted. A read-only tool left unallowed asks before every question. */
 export const CONNECT_ASSISTANT = {
   heading: "Connect Claude as Your Assistant",
   steps: [
     "In Claude, open “Settings”, then “Connectors”, and choose “Add custom connector”.",
     `Name it ${PRODUCT_NAME}, give it this address, and choose “Add”.`,
     "Choose “Connect”, sign in here if you’re asked to, then choose “Connect” again.",
+    `In the connector’s settings, set its read-only tools to “Always allow”, so Claude doesn’t ask before each question.`,
   ],
   copy: "Copy Address",
   copied: "Address copied successfully.",

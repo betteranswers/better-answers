@@ -25,10 +25,18 @@ const searchIsReached = async (page: Page, gate: Gate): Promise<void> => {
   await gate();
 };
 
-/** A release whose page and published resource differ would send a person's assistant nowhere. */
-const askShowsThePublishedAddress = async (page: Page): Promise<void> => {
+/**
+ * One link from New question. A release whose page and published resource differ would send a
+ * person's assistant nowhere.
+ */
+const connectShowsThePublishedAddress = async (page: Page, gate: Gate): Promise<void> => {
+  await page.getByRole("main").getByRole("link", { name: "connect Claude" }).click();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Connect Claude as Your Assistant" }),
+  ).toBeVisible();
   const address = await publishedAddressOf(page);
   await expect(page.getByRole("main").getByText(address, { exact: true })).toBeVisible();
+  await gate();
 };
 
 /** An Editor or a Viewer: they reach their home and Search, and an Admin's page says it was never there. */
@@ -44,7 +52,8 @@ export const aMembersJourney = async (
     return member;
   });
 
-  await test.step("The address to connect an assistant", () => askShowsThePublishedAddress(page));
+  await test.step("The address to connect an assistant", () =>
+    connectShowsThePublishedAddress(page, gate));
 
   await test.step("The workspace switcher", () =>
     theSwitcherListsOneWorkspace(page, workspace.name, role));
@@ -57,7 +66,7 @@ export const aMembersJourney = async (
     await page.goto(HOMES.Admin.path);
     await notFoundOfferingHome(page, role);
     await gate();
-    await page.getByRole("link", { name: "Go to Ask" }).click();
+    await page.getByRole("link", { name: "Go to New Question" }).click();
     await landedAtHome(page, role);
   });
 

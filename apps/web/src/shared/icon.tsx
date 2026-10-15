@@ -29,6 +29,7 @@ import {
   MagnifyingGlass,
   NotePencil,
   Path,
+  PlugsConnected,
   Pulse,
   Question,
   Scroll,
@@ -62,6 +63,7 @@ export type IconName =
   | "spending-limit"
   | "columns"
   | "conflicts"
+  | "connect"
   | "console"
   | "control-centre"
   | "database"
@@ -117,6 +119,7 @@ const GLYPHS = {
   "spending-limit": Gauge,
   columns: Columns,
   conflicts: Warning,
+  connect: PlugsConnected,
   console: Globe,
   "control-centre": SlidersHorizontal,
   database: Database,

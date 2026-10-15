@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { CONNECT_ASSISTANT, unbuiltLineOf } from "@/app/words.ts";
-import { HOMES } from "@/shared/navigation.ts";
+import { CONNECT_ASSISTANT } from "@/app/words.ts";
+import { ASK, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
 
 import { clipboardAnswering } from "./clipboard-stand-in.ts";
@@ -14,20 +14,21 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const askOpened = async () => {
+const CONNECT_CLAUDE = pageNamed(menuGroupIn(ASK, "ask"), "Connect Claude");
+
+const connectOpened = async () => {
   vi.stubGlobal("fetch", answeringAs("Viewer"));
-  await openApp(HOMES.Viewer.path);
+  await openApp(CONNECT_CLAUDE.path);
   return within(await screen.findByRole("main"));
 };
 
 /** The page holds other status regions, so the copy's outcome is read inside the steps. */
 const steps = (main: ReturnType<typeof within>) => within(main.getByRole("list"));
 
-describe("Ask while it is unbuilt", () => {
-  it("names the steps and the address it is served from", async () => {
-    const main = await askOpened();
+describe("Ask › Connect Claude", () => {
+  it("names the steps, Always allow among them, and the address", async () => {
+    const main = await connectOpened();
 
-    expect(main.getByText(unbuiltLineOf(HOMES.Viewer))).toBeDefined();
     expect(
       main.getByRole("heading", { level: 2, name: "Connect Claude as Your Assistant" }),
     ).toBeDefined();
@@ -36,13 +37,14 @@ describe("Ask while it is unbuilt", () => {
         .getAllByRole("listitem")
         .map((step) => step.firstElementChild?.textContent),
     ).toEqual(CONNECT_ASSISTANT.steps);
+    expect(steps(main).getByText(/Always allow/)).toBeDefined();
     expect(main.getByText(`${window.location.origin}/mcp`)).toBeDefined();
     expect(main.getByText(CONNECT_ASSISTANT.asYou)).toBeDefined();
   });
 
   it("copies the address and says it was copied", async () => {
     const written = clipboardAnswering(() => Promise.resolve());
-    const main = await askOpened();
+    const main = await connectOpened();
 
     fireEvent.click(main.getByRole("button", { name: "Copy Address" }));
 
@@ -55,7 +57,7 @@ describe("Ask while it is unbuilt", () => {
 
   it("says what to do when the browser refuses the copy", async () => {
     clipboardAnswering(() => Promise.reject(new Error("refused")));
-    const main = await askOpened();
+    const main = await connectOpened();
 
     fireEvent.click(main.getByRole("button", { name: "Copy Address" }));
 

@@ -156,7 +156,7 @@ describe("a person the api will not answer about", () => {
     });
 
     expect(heading()).toBe("Page Not Found");
-    expect(screen.getByRole("link", { name: "Go to Ask" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Go to New Question" })).toBeDefined();
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByRole("button", { name: INVITE })).toBeNull();
   });

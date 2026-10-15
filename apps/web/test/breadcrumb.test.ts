@@ -53,8 +53,11 @@ describe("the band's breadcrumb", () => {
     ]);
   });
 
-  it("names Ask once, with no group part", () => {
-    expect(partsAt("Viewer", "/ask")).toEqual([{ name: "Ask", to: undefined }]);
+  it("names Ask and its page, with no group part", () => {
+    expect(partsAt("Viewer", "/ask/new-question")).toEqual([
+      { name: "Ask", to: "/ask/new-question" },
+      { name: "New Question", to: undefined },
+    ]);
   });
 
   it("names the console's area, group and page", () => {

@@ -65,6 +65,7 @@ test("offers a way out, shell intact, when a page throws", async ({
 
   await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Areas" }).getByRole("link")).toHaveText([
+    "Ask",
     "Knowledge",
     "Control Centre",
   ]);

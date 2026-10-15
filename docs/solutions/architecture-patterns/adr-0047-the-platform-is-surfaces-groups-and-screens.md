@@ -64,7 +64,7 @@ The utilities sit at the rail's foot: Keyboard shortcuts today, and help and set
 
 | Area | Group | Pages (built today in bold) | Seen by |
 |---|---|---|---|
-| Ask | (none) | New question · Your questions | every role (home of Editor and Viewer) |
+| Ask | (none) | **New question** · Your questions · **Connect Claude** | every role (New question is the home of Editor and Viewer) |
 | Knowledge | Browse · Curation | **Search** · Guides · All knowledge · Due for verification · Conflicts · Kinds · Collections and owners · Exports | Browse: every role. Curation: Admins and owners |
 | Inbox | (none) | Waiting on you | Admins and owners |
 | Control Centre | Overview | Overview | Admin |
@@ -95,7 +95,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 - Waiting suggestions are decided in Control Centre › Suggestions › To decide. A person's Inbox holds their own items and points into it.
 - Control Centre is for Admins alone, so an Editor sees no Questions page there. An Editor who owns the `Answer` collection reaches its promotions through their Inbox. An Editor who owns nothing sees neither.
 - An area, group or page that is not built appears nowhere: not in the rail, the menu or jump-to.
-- A role's home always shows. Until it is built, it says plainly that it is on its way. Today that is Ask, for Editors and Viewers. An Admin's home is People › Members until Control Centre › Overview is built.
+- A role's home always shows. Until it is built, it says plainly that it is on its way. An Editor's and a Viewer's home is Ask › New question. An Admin's home is People › Members until Control Centre › Overview is built.
 - An address that is not built, or that the person may not see, shows the same not-found page as an address that never existed, and offers the person's home. A member sees it inside the frame, named in the breadcrumb; anyone else sees it in the sign-in pages' layout, and a signed-out visitor is offered sign-in instead.
 - Whether a page is hidden is decided when the person arrives at it. A role that changes while they are on it takes effect at their next move, so an Admin who demotes themself still sees the action confirmed. While the role cannot be read, a page draws its own loading or failed state. A page reached in that state is decided when the role arrives, as though the person arrived then. From that point it keeps its verdict until their next move, like any other.
 - Hiding is navigation only. The api still refuses every action by role.
@@ -119,7 +119,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 
 | Area | Built | v0.1 | Next, Then and Later |
 |---|---|---|---|
-| Ask | none; the home says it is on its way | New question, Your questions (S2b) | none yet |
+| Ask | New question, Connect Claude | Your questions (S2b) | none yet |
 | Knowledge | Search, and the concept page, its detail | Guides, All knowledge, Kinds, Collections and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
@@ -175,3 +175,5 @@ Amended 10/10/2026 by the screen review's page heads plan (`docs/plans/2026-10-1
 Amended 12/10/2026 by the vocabulary gate plan (`docs/plans/2026-10-12-1202-chore-remove-vocabulary-gate-plan.md`, KTD5). The words test and its list of old words are removed. An old word now leaves the glossary and no list of old words is kept in the tree. No gate refuses an old word, in reader text or in code: review holds a rename, staged or whole. The direction for every name, and every rule above, stand.
 
 Amended 13/10/2026 by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, KTD16). Two pages' heads carry no count on their list's row: Control Centre › Questions › *Questions asked* and Ask › *Your questions*. The route gives *Questions asked* no totals, and a count on its row is one. *Your questions* lists the same records for one reader and follows it. What is given up is seeing at a glance how many questions were asked. Every other page keeps the head rule of 10/10/2026, and the four levels stand.
+
+Amended 15/10/2026 by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, U18). Ask › *New question* is built and is an Editor's and a Viewer's home. Ask's own address, `/ask`, stood as that home while none of the area's pages was built; it now leads to New question for every role, and no area keeps an address of its own. The steps to connect Claude left the home's body for a page of their own, Ask › *Connect Claude*, one link from New question (BA-112). Every role sees Ask, an Admin too. The four levels and every rule above stand.

@@ -50,14 +50,14 @@ const namesIn = (region: HTMLElement, role: "link" | "heading" = "link") =>
     .map((each) => each.textContent);
 
 describe("the shell's regions", () => {
-  it("names only an Admin's areas in the icon rail", async () => {
+  it("names an Admin's areas, Ask among them, in the rail", async () => {
     await openAs("Admin", "/people/members");
 
-    expect(namesIn(rail())).toEqual(["Knowledge", "Control Centre"]);
+    expect(namesIn(rail())).toEqual(["Ask", "Knowledge", "Control Centre"]);
   });
 
   it("names Ask and Knowledge in a Viewer's icon rail", async () => {
-    await openAs("Viewer", "/ask");
+    await openAs("Viewer", "/ask/new-question");
 
     expect(namesIn(rail())).toEqual(["Ask", "Knowledge"]);
   });
@@ -194,7 +194,7 @@ describe("the shell's regions", () => {
     await openAs("Admin", "/system/not-a-page");
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Page Not Found");
-    expect(namesIn(rail())).toEqual(["Knowledge", "Control Centre"]);
+    expect(namesIn(rail())).toEqual(["Ask", "Knowledge", "Control Centre"]);
     expect(screen.getByRole("banner")).toBeDefined();
     expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
   });

@@ -13,6 +13,7 @@ import {
 import type { ReactElement, ReactNode } from "react";
 import { z } from "zod";
 
+import { NewQuestionPage } from "@/features/ask/new-question-page.tsx";
 import { AcceptInvitationPage } from "@/features/auth/accept-invitation-page.tsx";
 import { AccountPage } from "@/features/auth/account-page.tsx";
 import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
@@ -88,6 +89,7 @@ import type { PageToolbar } from "@/shared/page-toolbar.tsx";
 import { ConsoleFrame } from "./console-frame.tsx";
 import { FailedPage } from "./failed-page.tsx";
 import { WorkspaceFrame } from "./frame.tsx";
+import { ConnectClaudePage } from "./pages/connect-assistant.tsx";
 import { MODELS_AND_SPEND_TOOLBAR, ModelsAndSpendPage } from "./pages/models-and-spend-page.tsx";
 import { UnbuiltPage } from "./pages/unbuilt-page.tsx";
 import type { AppClients } from "./providers.tsx";
@@ -99,6 +101,8 @@ type BuiltPage = { readonly draw: () => ReactElement; readonly toolbar?: PageToo
 
 /** The list decides which pages are built; this map only says by what, and with what in hand. */
 const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>([
+  ["/ask/new-question", { draw: NewQuestionPage }],
+  ["/ask/connect-claude", { draw: ConnectClaudePage }],
   ["/knowledge/search", { draw: SearchPage }],
   ["/sources/connected-sources", { draw: ConnectedSourcesPage }],
   ["/models/models-and-spend", { draw: ModelsAndSpendPage, toolbar: MODELS_AND_SPEND_TOOLBAR }],

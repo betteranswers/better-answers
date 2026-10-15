@@ -1,18 +1,15 @@
-import { unbuiltLineOf } from "@/app/words.ts";
-import { ASK, headingOf, type Page } from "@/shared/navigation.ts";
+import { UNBUILT_LINE } from "@/app/words.ts";
+import { headingOf, type Page } from "@/shared/navigation.ts";
 import { Card } from "@/shared/ui/card.tsx";
 
-import { ConnectAssistant } from "./connect-assistant.tsx";
-
-/** Only a role's home is routed while unbuilt, so its line and Ask's way to connect are all it says. */
+/** Only a role's home is routed while unbuilt, so its line is all it says. */
 export function UnbuiltPage(properties: { readonly home: Page }) {
   return (
     <>
       <h1>{headingOf(properties.home)}</h1>
       <Card asChild className="mt-2 p-4">
-        <p>{unbuiltLineOf(properties.home)}</p>
+        <p>{UNBUILT_LINE}</p>
       </Card>
-      {properties.home === ASK.home ? <ConnectAssistant /> : null}
     </>
   );
 }

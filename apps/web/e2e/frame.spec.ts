@@ -53,7 +53,7 @@ const AN_ADMINS_PAGES = [
   ["System", "Audit Log", pageNamed(SYSTEM, "Audit Log").path],
 ] as const;
 
-const AREA_NAMES = ["Knowledge", "Control Centre"];
+const AREA_NAMES = ["Ask", "Knowledge", "Control Centre"];
 
 const PAGE_NAMES = AN_ADMINS_PAGES.map(([, name]) => name);
 
@@ -450,12 +450,15 @@ test("marks Members current on a member page, adding no entry", async ({ page, r
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 });
 
-test("lists a Viewer's home as the nav's one entry", async ({ page, request }) => {
+test("marks a Viewer's home, New question, in Ask's nav", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
 
   const nav = page.getByRole("navigation", { name: "Ask" });
-  await expect(nav.getByRole("link")).toHaveText(["Ask"]);
-  await expect(nav.getByRole("link", { name: "Ask" })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link")).toHaveText(["New Question", "Connect Claude"]);
+  await expect(nav.getByRole("link", { name: "New Question" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
 
   await closerOf(page).click();
   await expect(nav).toHaveCount(0);
@@ -543,12 +546,13 @@ test("links each part but the last, the current page", async ({ page, request })
   await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}$`));
 });
 
-test("names Ask once, with no group, on a Viewer's home", async ({ page, request }) => {
+test("names Ask and its page on a Viewer's home", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
 
-  await expect(crumbsOf(page).getByRole("listitem")).toHaveText(["Ask"]);
-  await expect(crumbOf(page, "Ask")).toHaveAttribute("aria-current", "page");
-  await expect(crumbOf(page, "Ask")).not.toHaveAttribute("href");
+  await expect(crumbsOf(page).getByRole("listitem")).toHaveText(["Ask", "New Question"]);
+  await expect(crumbOf(page, "Ask")).toHaveAttribute("href", HOMES.Viewer.path);
+  await expect(crumbOf(page, "New Question")).toHaveAttribute("aria-current", "page");
+  await expect(crumbOf(page, "New Question")).not.toHaveAttribute("href");
 });
 
 test("keeps band, rail and nav mounted between pages, focus kept", async ({ page, request }) => {

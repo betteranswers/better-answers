@@ -93,19 +93,21 @@ describe("what jump-to lists", () => {
     expect(jumpsIn(treeOf("Viewer", STUB), undefined, AT_ROOT)).toEqual([]);
   });
 
-  it("lists a Viewer's Ask once, with no members or actions", () => {
+  it("lists a Viewer's areas and pages, no members or actions", () => {
     expect(outline(jumpsIn(treeOf("Viewer"), undefined, AT_ROOT))).toEqual([
       ["Areas", ["Ask", "Knowledge"]],
-      ["Pages", ["Search"]],
+      ["Pages", ["New Question", "Connect Claude", "Search"]],
     ]);
   });
 
   it("lists an Admin's built pages, the invite action and members", () => {
     expect(outline(jumpsIn(treeOf("Admin"), [PRIYA, NAMELESS], AT_ROOT))).toEqual([
-      ["Areas", ["Knowledge", "Control Centre"]],
+      ["Areas", ["Ask", "Knowledge", "Control Centre"]],
       [
         "Pages",
         [
+          "New Question",
+          "Connect Claude",
           "Search",
           "Connected Sources",
           "Models and Spend",

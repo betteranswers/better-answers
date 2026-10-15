@@ -2,10 +2,13 @@ import { useId, useState } from "react";
 
 import { CONNECT_ASSISTANT } from "@/app/words.ts";
 import { copiedToTheClipboard } from "@/features/auth/clipboard.ts";
+import { ASK, headingOf, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
+
+const CONNECT_CLAUDE = pageNamed(menuGroupIn(ASK, "ask"), "Connect Claude");
 
 /** The api serves this page only on its public origin, which is the resource's origin too. */
 const ADDRESS = `${window.location.origin}/mcp`;
@@ -13,10 +16,10 @@ const ADDRESS = `${window.location.origin}/mcp`;
 const copyOutcome = (copied: boolean): Outcome =>
   copied ? { tone: "said", words: CONNECT_ASSISTANT.copied } : refusedWith(STOCK.copy);
 
-export function ConnectAssistant() {
+export function ConnectClaudePage() {
   const addressId = useId();
   const [outcome, setOutcome] = useState<Outcome | undefined>(undefined);
-  const [first, second, third] = CONNECT_ASSISTANT.steps;
+  const [first, second, ...rest] = CONNECT_ASSISTANT.steps;
 
   const copy = () => {
     setOutcome(undefined);
@@ -25,7 +28,8 @@ export function ConnectAssistant() {
 
   return (
     <>
-      <h2 className="mt-8">{CONNECT_ASSISTANT.heading}</h2>
+      <h1>{headingOf(CONNECT_CLAUDE)}</h1>
+      <h2 className="mt-6">{CONNECT_ASSISTANT.heading}</h2>
       <ol className="mt-3 grid list-decimal gap-3 pl-5">
         <li>
           <p>{first}</p>
@@ -48,9 +52,11 @@ export function ConnectAssistant() {
           </div>
           <OutcomeLine outcome={outcome} className="mt-2" />
         </li>
-        <li>
-          <p>{third}</p>
-        </li>
+        {rest.map((step) => (
+          <li key={step}>
+            <p>{step}</p>
+          </li>
+        ))}
       </ol>
       <p className="mt-4">{CONNECT_ASSISTANT.asYou}</p>
     </>

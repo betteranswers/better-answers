@@ -178,8 +178,8 @@ export const A_ROLE = {
 /** A role's home: its page's first heading, and the link the not-found page offers back to it. */
 const HOME_NAMES = {
   Admin: { heading: "People", link: "Go to Members" },
-  Editor: { heading: "Ask", link: "Go to Ask" },
-  Viewer: { heading: "Ask", link: "Go to Ask" },
+  Editor: { heading: "Ask", link: "Go to New Question" },
+  Viewer: { heading: "Ask", link: "Go to New Question" },
 } as const satisfies Readonly<Record<Role, { readonly heading: string; readonly link: string }>>;
 
 /** The address is read off the navigation list, so moving a role's home moves it here. */

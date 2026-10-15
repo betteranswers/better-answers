@@ -1,7 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import { ROLES } from "@/features/people/role-meanings.ts";
-import { HOMES, type Role } from "@/shared/navigation.ts";
+import { ASK, HOMES, menuGroupIn, pageNamed, type Role } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -23,10 +23,14 @@ import {
 
 const READ_BUDGET_MS = 1000;
 
-/** Each role's home, as the rail's link and the way home name it. */
-const HOME_NAMED = { Admin: "Members", Editor: "Ask", Viewer: "Ask" } as const satisfies Readonly<
-  Record<Role, string>
->;
+const CONNECT_CLAUDE = pageNamed(menuGroupIn(ASK, "ask"), "Connect Claude");
+
+/** Each role's home, as the way home names it. */
+const HOME_NAMED = {
+  Admin: "Members",
+  Editor: "New Question",
+  Viewer: "New Question",
+} as const satisfies Readonly<Record<Role, string>>;
 
 /** Every role joins the same way, so the Admin here differs from the others by role alone. */
 const signedInAs = async (page: Page, api: APIRequestContext, role: Role) => {
@@ -95,8 +99,17 @@ test("offers a Viewer's home from an unknown page, shell kept", async ({
   await homeOfferedInTheShell(page, "Viewer", passesTheAccessibilityGate);
 });
 
+/** One link from New question, where an Editor and a Viewer land. */
+const connectStepsOpened = async (page: Page) => {
+  await page.getByRole("main").getByRole("link", { name: "connect Claude" }).click();
+  await expect(page).toHaveURL(new RegExp(`${CONNECT_CLAUDE.path}$`));
+};
+
 for (const role of ["Editor", "Viewer"] as const) {
-  test(`shows ${A_ROLE[role]} Ask on its way, and Knowledge`, async ({ page, request }) => {
+  test(`shows ${A_ROLE[role]} Ask and Knowledge, asking on New question`, async ({
+    page,
+    request,
+  }) => {
     await signedInAs(page, request, role);
     await landedAtHome(page, role);
 
@@ -110,11 +123,29 @@ for (const role of ["Editor", "Viewer"] as const) {
             - link "Knowledge"
     `);
     await expect(controlCentreMenu(page)).toHaveCount(0);
+    await expect(page.getByRole("main")).toMatchAriaSnapshot(`
+      - main "Page":
+        - heading "Ask" [level=1]
+        - paragraph:
+          - link "connect Claude"
+        - region "New Question":
+          - heading "New Question" [level=2]
+          - textbox "Question"
+          - button "Ask"
+          - status
+    `);
+  });
+
+  test(`shows ${A_ROLE[role]} the steps to connect Claude`, async ({ page, request }) => {
+    await signedInAs(page, request, role);
+    await landedAtHome(page, role);
+
+    await connectStepsOpened(page);
+
     const address = await askShowsTheServedAddress(page);
     await expect(page.getByRole("main")).toMatchAriaSnapshot(`
       - main "Page":
         - heading "Ask" [level=1]
-        - paragraph
         - heading "Connect Claude as Your Assistant" [level=2]
         - list:
           - /children: equal
@@ -127,11 +158,13 @@ for (const role of ["Editor", "Viewer"] as const) {
             - status
           - listitem:
             - paragraph
+          - listitem:
+            - paragraph
         - paragraph
     `);
   });
 
-  test(`copies the address on ${A_ROLE[role]} Ask by keyboard`, async ({
+  test(`copies the address on ${A_ROLE[role]} connect steps by keyboard`, async ({
     page,
     context,
     request,
@@ -139,6 +172,7 @@ for (const role of ["Editor", "Viewer"] as const) {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await signedInAs(page, request, role);
     await landedAtHome(page, role);
+    await connectStepsOpened(page);
     const address = await askShowsTheServedAddress(page);
 
     const copy = page.getByRole("button", { name: "Copy Address" });
@@ -154,12 +188,12 @@ for (const role of ["Editor", "Viewer"] as const) {
     await landedAtHome(page, role);
 
     await page.goto("/people/not-a-page");
-    await expect(page.getByRole("link", { name: "Go to Ask" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to New Question" })).toBeVisible();
     const neverExisted = await page.getByRole("main").ariaSnapshot();
 
     await page.goto(HOMES.Admin.path);
 
-    await expect(page.getByRole("link", { name: "Go to Ask" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to New Question" })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
     expect(await page.getByRole("main").ariaSnapshot(), "a hidden page gives itself away").toBe(
       neverExisted,
@@ -172,7 +206,7 @@ for (const role of ["Editor", "Viewer"] as const) {
   });
 }
 
-test("draws a Viewer's Ask within a second of arriving", async ({ page, request }) => {
+test("draws a Viewer's home within a second of arriving", async ({ page, request }) => {
   const home = HOMES.Viewer;
   await signedInAs(page, request, "Viewer");
   await landedAtHome(page, "Viewer");
@@ -180,21 +214,22 @@ test("draws a Viewer's Ask within a second of arriving", async ({ page, request 
   const started = Date.now();
   await page.goto(home.path);
   await expect(
-    page.getByRole("heading", { level: 2, name: "Connect Claude as Your Assistant" }),
+    page.getByRole("region", { name: "New Question" }).getByRole("textbox", { name: "Question" }),
   ).toBeVisible();
   const elapsedMs = Date.now() - started;
 
-  test.info().annotations.push({ type: "Ask drawn", description: `${elapsedMs} ms` });
-  expect(elapsedMs, "Ask was not drawn within its second").toBeLessThan(READ_BUDGET_MS);
+  test.info().annotations.push({ type: "New question drawn", description: `${elapsedMs} ms` });
+  expect(elapsedMs, "New question was not drawn within its second").toBeLessThan(READ_BUDGET_MS);
 });
 
-test("lists the shell's keystrokes alone on Ask and unknown pages", async ({
+test("lists the shell's keystrokes alone on Connect Claude, unknown pages", async ({
   page,
   request,
   passesTheAccessibilityGate,
 }) => {
   await signedInAs(page, request, "Viewer");
   await landedAtHome(page, "Viewer");
+  await connectStepsOpened(page);
   const theShells = ["Show This List", "Jump To"];
   // The list always says where single keys work; a page with none of its own adds a line.
   const addsNoLine = "the list adds no line for a page with no keystrokes of its own";
@@ -203,11 +238,11 @@ test("lists the shell's keystrokes alone on Ask and unknown pages", async ({
     .getByRole("navigation", { name: "Areas" })
     .getByRole("button", { name: "Keyboard Shortcuts" })
     .click();
-  const onAsk = page.getByRole("dialog", { name: "Keyboard Shortcuts on Ask" });
-  await expect(onAsk.getByRole("paragraph"), addsNoLine).toHaveCount(2);
-  await expect(onAsk.getByRole("definition")).toHaveText(theShells);
+  const onConnect = page.getByRole("dialog", { name: "Keyboard Shortcuts on Connect Claude" });
+  await expect(onConnect.getByRole("paragraph"), addsNoLine).toHaveCount(2);
+  await expect(onConnect.getByRole("definition")).toHaveText(theShells);
   await passesTheAccessibilityGate();
-  await keystrokesDismissed(page, onAsk);
+  await keystrokesDismissed(page, onConnect);
 
   // Hidden from a Viewer, so it is the page that never existed.
   await page.goto(HOMES.Admin.path);
