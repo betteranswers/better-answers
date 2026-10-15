@@ -105,7 +105,15 @@ describe("what jump-to lists", () => {
       ["Areas", ["Knowledge", "Control Centre"]],
       [
         "Pages",
-        ["Search", "Connected Sources", "Models and Spend", "Members", "Groups", "Audit Log"],
+        [
+          "Search",
+          "Connected Sources",
+          "Models and Spend",
+          "Questions Asked",
+          "Members",
+          "Groups",
+          "Audit Log",
+        ],
       ],
       ["Actions", [INVITE]],
       ["Members", ["Priya Shah", "new@example.test"]],

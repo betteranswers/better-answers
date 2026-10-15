@@ -351,6 +351,41 @@ export const seedConcepts = (
   input: { workspaceId: string; userId: string; concepts: readonly SeedConcept[] },
 ) => ask(api, "/concepts", input, seededConcepts);
 
+/** A flag closed or not; a disputed sentence names the concept it rested on. */
+type SeedFlag = {
+  readonly reason: "wrong" | "out-of-date" | "incomplete" | "should-not-have-shown";
+  readonly note?: string;
+  readonly disputedSentence?: string;
+  readonly disputedConcept?: string;
+  readonly closedAs?: "fixed-in-the-knowledge" | "no-fault-in-the-knowledge";
+};
+
+/** `askedBy` left out is an asker an erasure renamed; a null question is content it removed. */
+export type SeedRecord = {
+  readonly askedBy?: string;
+  readonly transport?: "mcp" | "trpc";
+  readonly collections?: readonly string[];
+  readonly question: string | null;
+  readonly verdict: "ok" | "warn" | "refuse" | "related";
+  readonly judgeState?: "not-judged" | "judged" | "judging-failed";
+  readonly concepts?: readonly {
+    readonly iri: string;
+    readonly tier?: "unverified" | "machine-confirmed" | "human-reviewed";
+    readonly judged?: "yes" | "no";
+  }[];
+  readonly flags?: readonly SeedFlag[];
+};
+
+const seededQuestions = z.object({
+  records: z.array(z.object({ recordId: z.string(), flagIds: z.array(z.string()) })),
+});
+
+/** Listed oldest first, a second apart, so the last is the newest. */
+export const seedQuestions = (
+  api: APIRequestContext,
+  input: { workspaceId: string; records: readonly SeedRecord[] },
+) => ask(api, "/questions", input, seededQuestions);
+
 const syncMoved = z.object({ jobId: z.string() });
 
 /**

@@ -31,6 +31,8 @@ const MODELS = menuGroupIn(CONTROL_CENTRE, "models");
 
 const MODELS_AND_SPEND = pageNamed(MODELS, "Models and Spend");
 
+const QUESTIONS = menuGroupIn(CONTROL_CENTRE, "questions");
+
 const PEOPLE = menuGroupIn(CONTROL_CENTRE, "people");
 
 const MEMBERS = pageNamed(PEOPLE, "Members");
@@ -44,6 +46,7 @@ const SYSTEM = menuGroupIn(CONTROL_CENTRE, "system");
 const AN_ADMINS_PAGES = [
   ["Sources", "Connected Sources", pageNamed(SOURCES, "Connected Sources").path],
   ["Models", "Models and Spend", MODELS_AND_SPEND.path],
+  ["Questions", "Questions Asked", pageNamed(QUESTIONS, "Questions Asked").path],
   ["People", "Members", MEMBERS.path],
   ["People", "Groups", pageNamed(PEOPLE, "Groups").path],
   ["System", "Audit Log", pageNamed(SYSTEM, "Audit Log").path],
@@ -386,6 +389,10 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
       - list:
         - listitem:
           - link "Models and Spend"
+      - heading "Questions" [level=3]
+      - list:
+        - listitem:
+          - link "Questions Asked"
       - heading "People" [level=3]
       - list:
         - listitem:

@@ -123,7 +123,7 @@ describe("the one navigation list", () => {
     ]);
   });
 
-  it("calls only today's nine pages built", () => {
+  it("calls only today's ten pages built", () => {
     expect(
       pagesOf([...AREAS, CONSOLE])
         .filter((each) => each.built)
@@ -132,6 +132,7 @@ describe("the one navigation list", () => {
       "/knowledge/search",
       "/sources/connected-sources",
       "/models/models-and-spend",
+      "/questions/questions-asked",
       "/people/members",
       "/people/groups",
       "/system/audit-log",
@@ -191,6 +192,7 @@ describe("what each person is shown", () => {
         [
           ["Sources", ["Connected Sources"]],
           ["Models", ["Models and Spend"]],
+          ["Questions", ["Questions Asked"]],
           ["People", ["Members", "Groups"]],
           ["System", ["Audit Log"]],
         ],

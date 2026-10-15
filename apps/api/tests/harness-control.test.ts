@@ -107,7 +107,7 @@ const aSeedOf = (workspaceId: string, document: Readonly<Record<string, unknown>
 });
 
 const heldIn = async (
-  table: "connected_source" | "model_choice",
+  table: "connected_source" | "model_choice" | "question_asked",
   workspaceId: string,
 ): Promise<number> => {
   const counted = await app().database.superuser.query<{ held: number }>(
@@ -158,6 +158,28 @@ describe("a seed the browser suite's harness cannot write", () => {
       said: { constraint: "model_choice_workspace_purpose_unique" },
     });
     expect(await heldIn("model_choice", workspaceId)).toBe(0);
+  });
+
+  it("leaves no question when a seed's flag is refused", async () => {
+    const { workspaceId } = await app().provision();
+
+    const answered = await asked("/__harness/questions", {
+      workspaceId,
+      records: [
+        { question: "How long are audit logs kept?", verdict: "ok" },
+        {
+          question: "Who reviews the logs?",
+          verdict: "related",
+          flags: [{ reason: "wrong", disputedSentence: "Nobody does." }],
+        },
+      ],
+    });
+
+    expect(answered).toMatchObject({
+      status: 400,
+      said: { constraint: "question_feedback_flag_check" },
+    });
+    expect(await heldIn("question_asked", workspaceId)).toBe(0);
   });
 
   it("answers 400 naming an unreadable reason that holds a space", async () => {
