@@ -256,7 +256,7 @@ the band moves, to the pixel. The band has no primary-action slot: a page's prim
 action sits in that page's own row. The breadcrumb names the area, the group, the
 page and the open tab at every width, and every part but the last links to its place;
 only the wide band's cell may truncate the middle parts. A name the next part repeats is
-said once, by the deeper part, so Ask's home reads "Ask" alone. When a switch of
+said once, by the deeper part. When a switch of
 workspace is pending or fails, the band's outcome line says so in words, with the next
 step — never a toast.
 
