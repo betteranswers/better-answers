@@ -33,6 +33,7 @@ Better Auth runs in-process as a library. The api is its own OAuth 2.1 authoriza
 - Its rate limiter is off. The api counts every endpoint it mounts, the email-code ones among them, and nothing counts discovery or a page of the application (ADR 0034). The library's count is a run of requests, not a window: it resets only once a whole window passes with none. A password, sign-up, social or email-verification path turned on later needs a ceiling of its own, because the library's rules for those paths are off with the rest.
 - A person has one platform-minted id (ADR 0035). Revocation has two scopes: a workspace Admin's, in that workspace, and the operator's, everywhere.
 - A token's workspace is fixed at consent, as Better Auth's `referenceId`. A person who wants another workspace consents again.
+- A session runs for thirty days and renews once a day has passed while the person keeps using it. Its confirmation stamp is the one freshness rule: the operator's console writes, an Admin's high-impact acts (removing a member, changing a role, revoking access, an audit export, inviting an Admin, and the bulk acts) and a person's own factor changes, where they already hold a factor, each ask for a confirmation within the hour and refuse as `confirmation-too-old`. A first factor is trusted on first use. A caller whose claims name no session — a personal token, an MCP bearer — holds no stamp, so no such act is reachable by token.
 
 The seam, which `packages/core` never crosses:
 
@@ -64,7 +65,7 @@ The operator:
 
 - `admin()` is refused for good.
 - The operator is a third principal kind, beside a user and the platform: a mark on the person's `user` row that only an ops command sets or clears, and that erasure clears.
-- It is built only from a signed-in session, never from an OAuth or personal token. Revoke everywhere and a display-name correction need a session created within the hour.
+- It is built only from a signed-in session, never from an OAuth or personal token. Revoke everywhere and a display-name correction follow the shared freshness rule above: a session that confirmed within the hour, however long ago it was signed in.
 - It has one cross-workspace read: people, with the workspaces and role each holds, and workspaces with their member counts, over the identity set alone.
 - A person who has lost every factor and every recovery code is restored by `pnpm ops restore-sign-in`, never from a page, once the operator has checked who they are by a route other than their email. Under the person's lock it ends their factors, codes and sessions, keeps a one-time restore code's hash for 24 hours, records the action and sends the notice. It prints the code, which the operator hands over by that same route.
 
