@@ -9,7 +9,7 @@ import {
   type PrincipalRefusal,
   type UserPrincipal,
 } from "@better-answers/core/kernel";
-import type { CallSize, CallSpent, ModelClient } from "@better-answers/core/llm";
+import type { CallSize, CallSpent, ModelClient, StreamingClient } from "@better-answers/core/llm";
 import { withHeldPrincipal, withPrincipalRead, type Tx } from "@better-answers/core/store/postgres";
 import type { JudgeState, QuestionVerdict } from "@better-answers/schema";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
@@ -85,11 +85,14 @@ const verifiedAs = (claims: {
 const failedLine = z.object({ entry: z.string(), err: z.object({ code: z.string() }) });
 
 /** No probe calls a model: one that did would fail its call here. */
-const NO_MODEL: ModelClient = {
+const NO_MODEL: ModelClient & StreamingClient = {
   callModel: () => {
     throw new Error("a probe called a model");
   },
   decide: () => {
+    throw new Error("a probe called a model");
+  },
+  streamModel: () => {
     throw new Error("a probe called a model");
   },
 };

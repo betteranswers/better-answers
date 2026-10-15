@@ -63,7 +63,7 @@ export type RecordedConcept = {
   readonly judged?: CandidateVerdict;
 };
 
-type DraftedSentence = {
+export type DraftedSentence = {
   readonly sentence: string;
   readonly concepts: readonly ConceptIri[];
 };
@@ -143,4 +143,42 @@ export const completeRecord = async (
       record.asked_at,
       JSON.stringify(input.drafted),
     ]);
+  });
+
+/** Joined on the record's own `asked_at`, so the content's partition is found by its key. */
+const DRAFT_KEPT = `UPDATE question_content AS content SET drafted = $3
+    FROM question_asked AS record
+   WHERE record.workspace_id = $1 AND record.id = $2 AND record.completed_at IS NOT NULL
+     AND content.workspace_id = record.workspace_id AND content.record_id = record.id
+     AND content.asked_at = record.asked_at`;
+
+export type DraftKeeping = {
+  readonly recordId: string;
+  /** Every sentence drafted for the question so far, which replaces what was kept before. */
+  readonly drafted: readonly DraftedSentence[];
+  /** The drafting call's reservation, settled first. */
+  readonly settled: { readonly reservationId: string; readonly calls: readonly CallSpent[] };
+  readonly now: Date;
+};
+
+/**
+ * Settles one drafting call and keeps the prose drafted so far on a completed record, in the
+ * caller's transaction. A record not completed, or not there, answers an error.
+ */
+export const keepDraft = async (
+  asker: UserPrincipal,
+  tx: Tx,
+  input: DraftKeeping,
+): Promise<Result<void, Error>> =>
+  attempt(async () => {
+    const settled = await settleSpend(asker, tx, { ...input.settled, now: input.now });
+    if (!settled.ok) throw settled.error;
+    const kept = await tx.query(DRAFT_KEPT, [
+      asker.workspaceId,
+      input.recordId,
+      JSON.stringify(input.drafted),
+    ]);
+    if (kept.rowCount !== 1) {
+      throw new Error(`answering: no completed record ${input.recordId} to keep a draft on`);
+    }
   });

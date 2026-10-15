@@ -40,6 +40,8 @@ import { type GatedSessionReader, PENDING_PROCEDURES, refusalFor } from "../seco
 type TrpcContext = {
   readonly doors: Doors;
   readonly modelDoors: ModelDoors;
+  /** The longest an answer's stream stays quiet before it sends a keep-alive. */
+  readonly askKeepAliveMs: number;
   readonly clock: Clock;
   readonly readSession: GatedSessionReader;
   readonly headers: Headers;
@@ -330,6 +332,9 @@ const onItsOwnTransactions = (ceiling?: RoadCeiling) =>
 
     return next({ ctx: { principal: resolved.value.value, doors: ctx.doors } });
   });
+
+/** What a procedure on the own-transaction road is handed: the member, and no transaction. */
+export type AskingContext = TrpcContext & { readonly principal: UserPrincipal };
 
 export const ownTransactionProcedure = onItsOwnTransactions();
 

@@ -8,25 +8,42 @@ import {
   ask,
   askInput,
   completeRecord,
+  keepDraft,
   openRecord,
   planAnswer,
+  reserveDrafting,
   reserveJudge,
   type AnswerResult,
   type AskCaps,
   type AskSteps,
+  type DraftSteps,
 } from "../src/answering/index.ts";
-import type { PrincipalRefusal, Result, UserPrincipal } from "../src/kernel/index.ts";
-import { openCredentials, type Credentials, type ModelClient } from "../src/llm/index.ts";
+import type {
+  PlatformPrincipal,
+  PrincipalRefusal,
+  Result,
+  UserPrincipal,
+} from "../src/kernel/index.ts";
+import {
+  openCredentials,
+  openModelKeySetting,
+  type Credentials,
+  type LlmPurpose,
+  type ModelClient,
+  type StreamModel,
+} from "../src/llm/index.ts";
 import {
   openPostgres,
   withMember,
   withMemberUnheld,
   type Tx,
 } from "../src/store/postgres/index.ts";
+import { setModelKey, setModelPrice, setSpendingLimit } from "../src/workspaces/index.ts";
+import { bootstrap, provisionedWorkspace } from "./platform.ts";
 import { conceptCiting, type SourcedConcept } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
 import { answered, seedingWith } from "./suite-postgres.ts";
-import type { Scenario } from "./workspace-with-bundle.ts";
+import { principalFor, type Scenario } from "./workspace-with-bundle.ts";
 
 const flat = <Value, Inner, Outer>(
   opened: Result<Result<Value, Inner>, Outer>,
@@ -74,6 +91,32 @@ export const stepsFor = (
       flat(
         await withMember(asker, door, (member, tx) =>
           completeRecord(member, tx, { ...completion, completedAt: new Date() }),
+        ),
+      ),
+  };
+};
+
+/** The drafter's steps as a transport hands them: each a transaction of its own, as the asker. */
+export const draftStepsFor = (
+  pool: pg.Pool,
+  asker: UserPrincipal,
+  streamModel: StreamModel,
+): DraftSteps<PrincipalRefusal> => {
+  const door = openPostgres(pool);
+  const credentials = openCredentials(SUITE_ENVELOPE_KEY);
+  return {
+    read: async (work) => flat(await withMemberUnheld(asker, door, (_member, tx) => work(tx))),
+    reserve: async (reserving) =>
+      flat(
+        await withMember(asker, door, (member, tx) =>
+          reserveDrafting(member, tx, credentials, { ...reserving, now: new Date() }),
+        ),
+      ),
+    streamModel,
+    keepDraft: async (kept) =>
+      flat(
+        await withMember(asker, door, (member, tx) =>
+          keepDraft(member, tx, { ...kept, now: new Date() }),
         ),
       ),
   };
@@ -192,6 +235,73 @@ export const conceptSeeded = (
     }
     return ids.conceptIri.parse(indexed.iri);
   });
+
+/** One at a time: the seeder numbers each concept's path as it writes it. */
+export const conceptsSeeded = async (
+  db: MigratedPostgres,
+  workspaceId: string,
+  shapes: readonly SeededConcept[],
+): Promise<readonly ConceptIri[]> => {
+  const iris: ConceptIri[] = [];
+  for (const shape of shapes) iris.push(await conceptSeeded(db, workspaceId, shape));
+  return iris;
+};
+
+const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-ops" };
+
+const SONNET = "claude-sonnet-5-5";
+
+type SonnetSetUp = {
+  /** The purpose Sonnet is chosen for; none is chosen where it is null. */
+  readonly purpose: LlmPurpose | null;
+  /** No limit is set where it is null. */
+  readonly limitGbp: string | null;
+  /** The envelope key the model key is sealed under; none is set where it is null. */
+  readonly sealedUnder: Uint8Array | null;
+  readonly key: string;
+};
+
+/** A workspace whose Admin asks, with Sonnet priced, chosen, its key sealed and a limit set. */
+export const aSonnetWorkspace = async (
+  db: MigratedPostgres,
+  { purpose, limitGbp, sealedUnder, key }: SonnetSetUp,
+) => {
+  const workspace = await provisionedWorkspace(db, "Acme");
+  const { workspaceId } = workspace;
+  const asker = await principalFor(db, workspaceId, workspace.adminUserId);
+  const door = openPostgres(db.pool);
+  answered(
+    await setModelPrice(PLATFORM, door, {
+      provider: "anthropic",
+      model: SONNET,
+      effectiveFrom: "2026-01-01",
+      gbpPerMillionIn: "3",
+      gbpPerMillionOut: "15",
+    }),
+  );
+  if (purpose !== null) {
+    await seedingWith(db.pool, (seed) =>
+      seed.modelChoice({
+        id: `${purpose}-${workspaceId}`,
+        workspaceId,
+        purpose,
+        provider: "anthropic",
+        model: SONNET,
+        dimensions: null,
+      }),
+    );
+  }
+  if (sealedUnder !== null) {
+    const setting = openModelKeySetting(sealedUnder);
+    answered(
+      await setModelKey(bootstrap, door, setting, { workspaceId, provider: "anthropic", key }),
+    );
+  }
+  if (limitGbp !== null) {
+    answered(await setSpendingLimit(PLATFORM, door, { workspaceId, gbp: limitGbp }));
+  }
+  return { workspaceId, asker };
+};
 
 export type WrittenAnswer = {
   readonly collection: string;

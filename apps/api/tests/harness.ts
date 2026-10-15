@@ -349,6 +349,9 @@ export type TestAppOptions = {
 
   /** Null serves with none, as an api whose envelope key would not read. */
   readonly envelopeKey?: Uint8Array | null | undefined;
+
+  /** Shortens the quiet an answer's stream keeps before a keep-alive, so a test need not wait. */
+  readonly askKeepAliveMs?: number | undefined;
 };
 
 const envelopeKeyOf = ({ envelopeKey }: TestAppOptions): Uint8Array | undefined =>
@@ -398,6 +401,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     },
     fetchModel: options.fetchModel ?? noModelWire,
     envelopeKey: envelopeKeyOf(options),
+    askKeepAliveMs: options.askKeepAliveMs,
     logger,
     webRoot: options.webRoot,
   });
