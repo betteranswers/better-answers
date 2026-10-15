@@ -2,8 +2,8 @@ import { z } from "zod";
 
 import { dayWords } from "@/shared/words.ts";
 
-import type { Concept } from "./knowledge-api.ts";
-import { CONCEPT_WORDS as WORDS } from "./knowledge-words.ts";
+import { CONCEPT_WORDS as WORDS } from "./concept-words.ts";
+import type { Concept } from "./knowledge-reads.ts";
 
 type Frontmatter = Concept["frontmatter"];
 

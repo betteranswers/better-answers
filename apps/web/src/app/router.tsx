@@ -46,7 +46,6 @@ import { EveryonePage } from "@/features/console/everyone-page.tsx";
 import { NamesWaitingPage } from "@/features/console/names-waiting-page.tsx";
 import { isTheOperator, mustSignInForTheConsole } from "@/features/console/operator.ts";
 import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
-import { CONCEPT_IRI } from "@/features/knowledge/concept-address.ts";
 import { ConceptPage } from "@/features/knowledge/concept-page.tsx";
 import { SearchPage } from "@/features/knowledge/search-page.tsx";
 import { AuditLogPage } from "@/features/people/audit-log-page.tsx";
@@ -59,6 +58,7 @@ import { QuestionsAskedPage } from "@/features/questions/questions-asked-page.ts
 import { ConnectedSourcesPage } from "@/features/sources/connected-sources-page.tsx";
 import type { FailedDuring } from "@/shared/api/query-client.ts";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
+import { CONCEPT_IRI } from "@/shared/knowledge/concept-address.ts";
 import {
   memberRefusal,
   NEEDS_A_PICK,

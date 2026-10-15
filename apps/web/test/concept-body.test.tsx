@@ -6,7 +6,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { ConceptBody } from "@/features/knowledge/concept-body.tsx";
+import { ConceptBody } from "@/shared/knowledge/concept-body.tsx";
 
 import { openPages } from "./address-router.tsx";
 

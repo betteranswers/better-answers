@@ -17,8 +17,8 @@ import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet.tsx";
 import { conceptPageOf } from "./concept-address.ts";
 import { ConceptBody, LINK } from "./concept-body.tsx";
 import { kindOf, titleOf } from "./concept-frontmatter.ts";
-import { useConcept, usePassage, type Opening } from "./knowledge-api.ts";
-import { CONCEPT_WORDS, EVIDENCE_WORDS, SEARCH_WORDS } from "./knowledge-words.ts";
+import { CONCEPT_WORDS, EVIDENCE_WORDS } from "./concept-words.ts";
+import { useConcept, usePassage, type Opening } from "./knowledge-reads.ts";
 import { failedReadWords } from "./refusal.tsx";
 
 /** `unmapped` is a match no concept rests on, which the panel says beside the passage's sensitivity. */
@@ -61,7 +61,7 @@ const tabsOff = (event: KeyPress<HTMLElement>): boolean => {
 export function SensitivityTag(properties: { readonly sensitivity: string }) {
   return (
     <Pill>
-      {SEARCH_WORDS.notCompanyKnowledge} · {properties.sensitivity}
+      {CONCEPT_WORDS.notCompanyKnowledge} · {properties.sensitivity}
     </Pill>
   );
 }

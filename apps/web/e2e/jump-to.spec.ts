@@ -1,6 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
+import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 import { ASK, CONSOLE, CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";

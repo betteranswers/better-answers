@@ -1,13 +1,13 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
-import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 import { QUERY_MAX } from "@/features/knowledge/knowledge-state.ts";
 import { MEMBERS_PAGE } from "@/features/people/members-address.ts";
 import { useMembers } from "@/features/people/people-api.ts";
 import { askingHere, type Here } from "@/shared/address-ask.ts";
 import { Icon, type IconName } from "@/shared/icon.tsx";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
+import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 import {
   detailAt,
   placeAt,

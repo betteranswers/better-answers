@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
+import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 import { HOMES } from "@/shared/navigation.ts";
 
 import {

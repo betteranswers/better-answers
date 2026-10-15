@@ -5,6 +5,38 @@ import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
 import { RowLink } from "@/shared/grid-table.tsx";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
+import {
+  BROWSE,
+  conceptMatchKey,
+  conceptPageOf,
+  OPENED_FROM,
+  searchAt,
+} from "@/shared/knowledge/concept-address.ts";
+import { ConceptBody, LINK, type MarkOpening } from "@/shared/knowledge/concept-body.tsx";
+import {
+  dayOf,
+  descriptionOf,
+  furtherKeysOf,
+  kindOf,
+  tagsOf,
+  titleOf,
+  verifiedEventsOf,
+} from "@/shared/knowledge/concept-frontmatter.ts";
+import { CONCEPT_WORDS as WORDS } from "@/shared/knowledge/concept-words.ts";
+import {
+  EvidenceInline,
+  EvidenceSheet,
+  type Heading,
+  type Opened,
+} from "@/shared/knowledge/evidence-panel.tsx";
+import {
+  openingOf,
+  useConcept,
+  type Concept,
+  type Evidence,
+} from "@/shared/knowledge/knowledge-reads.ts";
+import { SAID_OF_KNOWLEDGE } from "@/shared/knowledge/refusal-words.ts";
+import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { ListState } from "@/shared/list-pages.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
@@ -14,29 +46,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { useRoomBeside } from "@/shared/wide-layout.ts";
 
-import {
-  BROWSE,
-  conceptMatchKey,
-  conceptPageOf,
-  OPENED_FROM,
-  searchAt,
-} from "./concept-address.ts";
-import { ConceptBody, LINK, type MarkOpening } from "./concept-body.tsx";
-import {
-  dayOf,
-  descriptionOf,
-  furtherKeysOf,
-  kindOf,
-  tagsOf,
-  titleOf,
-  verifiedEventsOf,
-} from "./concept-frontmatter.ts";
-import { EvidenceInline, EvidenceSheet, type Heading, type Opened } from "./evidence-panel.tsx";
-import { openingOf, useConcept, type Concept, type Evidence } from "./knowledge-api.ts";
 import { CONCEPT_KEYSTROKES as KEY } from "./knowledge-state.ts";
-import { CONCEPT_WORDS as WORDS, RELATION_WORDS } from "./knowledge-words.ts";
-import { SAID_OF_KNOWLEDGE } from "./refusal-words.ts";
-import { failedReadWords } from "./refusal.tsx";
+import { RELATION_WORDS } from "./knowledge-words.ts";
 
 const LISTED = Object.values(KEY);
 
