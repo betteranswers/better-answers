@@ -798,6 +798,7 @@ describe("a model call's attempts", () => {
 const deadlineClient = (wire: Wire, attemptMs: readonly number[], lateMs = 0) => {
   const elapsed = { ms: 0 };
   const timeouts: number[] = [];
+  const waits: number[] = [];
   const client = openModelClient({
     fetch: async (input, init) => {
       elapsed.ms += attemptMs[wire.sent.length] ?? 0;
@@ -806,6 +807,7 @@ const deadlineClient = (wire: Wire, attemptMs: readonly number[], lateMs = 0) =>
     clock: { now: () => new Date(NOW.getTime() + elapsed.ms) },
     log: { info: () => {} },
     wait: async (ms) => {
+      waits.push(ms);
       elapsed.ms += ms + lateMs;
     },
     timeout: (ms) => {
@@ -814,7 +816,7 @@ const deadlineClient = (wire: Wire, attemptMs: readonly number[], lateMs = 0) =>
       return new AbortController().signal;
     },
   });
-  return { client, timeouts };
+  return { client, timeouts, waits };
 };
 
 const WITHIN_150_S: ModelCall<z.output<typeof verdicts>> = { ...A_CALL, withinMs: 150_000 };
@@ -842,12 +844,13 @@ describe("a call's own deadline", () => {
 
   it("skips a retry the deadline would leave under ten seconds", async () => {
     const wire = theWire(OVERLOADED, ANSWERED);
-    const { client } = deadlineClient(wire, [138_001, 0]);
+    const { client, waits } = deadlineClient(wire, [138_001, 0]);
 
     const called = await client.callModel(TO_SONNET, WITHIN_150_S);
 
     expect(called.outcome).toBe("failed");
     expect(wire.sent).toHaveLength(1);
+    expect(waits).toEqual([]);
   });
 
   it("retries with exactly ten seconds left after its wait", async () => {
