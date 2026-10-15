@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { AskedRecord } from "@/features/questions/questions-api.ts";
-import { groupedForReading } from "@/features/questions/questions-grouping.ts";
+import { groupedForReading, latestOfEach } from "@/features/questions/questions-grouping.ts";
 
 type Shape = Pick<AskedRecord, "id" | "askedAt" | "verdict" | "flagged"> &
   Partial<Pick<AskedRecord, "refusedUnder">>;
@@ -75,5 +75,20 @@ describe("the questions asked grouping", () => {
       [null, ["n2", "n1"]],
     ]);
     expect(grouped.others).toEqual([]);
+  });
+});
+
+describe("the records a read has served", () => {
+  it("keeps one copy of a record two pages served", () => {
+    const flaggedThen = aRecord({ id: "x", askedAt: at(1), verdict: "ok", flagged: true });
+    const closedSince = aRecord({ id: "x", askedAt: at(1), verdict: "ok", flagged: false });
+    const other = aRecord({ id: "y", askedAt: at(2), verdict: "ok", flagged: false });
+
+    const served = latestOfEach([flaggedThen, other, closedSince]);
+
+    expect(served.map((record) => [record.id, record.flagged])).toEqual([
+      ["x", false],
+      ["y", false],
+    ]);
   });
 });

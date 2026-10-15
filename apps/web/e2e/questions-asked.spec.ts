@@ -16,6 +16,7 @@ import {
   notFoundOfferingHome,
   person,
   provision,
+  saysARefusal,
   seedConcepts,
   seedQuestions,
   signIn,
@@ -188,10 +189,10 @@ test.describe("Questions asked", () => {
     const notAnswered = groupNamed(page, "Not Answered");
     await expect(notAnswered.getByRole("heading", { level: 4 })).toHaveText([
       "audits",
-      "No collection",
+      "No Collection",
     ]);
     await expect(rowsOf(groupNamed(page, "audits"))).toHaveText(["Matched the audit logs"]);
-    await expect(rowsOf(groupNamed(page, "No collection"))).toHaveText([
+    await expect(rowsOf(groupNamed(page, "No Collection"))).toHaveText([
       "Matched the secret plans",
       "Matched nothing at all",
     ]);
@@ -259,6 +260,31 @@ test.describe("Questions asked", () => {
       FLAGGED_QUESTION,
     ]);
     await expect(groupNamed(page, "Flagged")).toHaveCount(0);
+  });
+
+  test("a refused closing puts the flag back and says so", async ({ page, request }) => {
+    const at = await aWorkspaceWithConcepts(request, "Colne Refusals");
+    await seedQuestions(request, {
+      workspaceId: at.workspaceId,
+      records: aFlagAndANewerQuestion(at),
+    });
+    await signedInAtTheQuestions(page, request, at);
+    await page.route(
+      (url) => url.pathname.includes("questions.closeFlag"),
+      (route) => route.abort(),
+    );
+
+    await rowsOf(groupNamed(page, "Flagged")).first().click();
+    const record = recordOf(page, FLAGGED_QUESTION);
+    const closing = record.getByRole("group", { name: "Close This Flag" });
+    await closing.getByRole("button", { name: "No Fault in the Knowledge" }).click();
+
+    await saysARefusal(record.getByRole("alert"));
+    await expect(closing.getByRole("button", { name: "Fixed in the Knowledge" })).toBeFocused();
+    // The sheet is modal, so the list is read once it closes.
+    await page.keyboard.press("Escape");
+    await expect(record).toHaveCount(0);
+    await expect(rowsOf(groupNamed(page, "Flagged"))).toHaveText([FLAGGED_QUESTION]);
   });
 
   test("renders a page of rows within the list budget", async ({ page, request }) => {

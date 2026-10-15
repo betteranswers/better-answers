@@ -37,7 +37,7 @@ export const useQuestionsAsked = () => {
 
 export type QuestionsAsked = ReturnType<typeof useQuestionsAsked>;
 
-type Closing = { readonly feedbackId: string; readonly closedAs: FlagClosing };
+export type Closing = { readonly feedbackId: string; readonly closedAs: FlagClosing };
 
 /** Shown until the read answers again with the instant the api recorded. */
 const nowSaid = (): string => new Date().toISOString();
@@ -61,8 +61,14 @@ const pageClosed = (page: QuestionsAskedPage, closing: Closing, at: string): Que
     ? { ...page, records: page.records.map((record) => closedIn(record, closing, at)) }
     : page;
 
-/** A closing reads as done within a tenth of a second: the record leaves the flagged group at once. */
-export const useCloseFlag = () => {
+/** What a closing says once answered; held by the hook, so a sheet closed meanwhile loses nothing. */
+type ClosingSaid = {
+  readonly onClosed: (closing: Closing) => void;
+  readonly onRefused: (failure: ApiError) => void;
+};
+
+/** Reads as done at once. Its undo restores a whole snapshot, so a caller runs one closing at a time. */
+export const useCloseFlag = (said: ClosingSaid) => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   const optimistic = useOptimistic();
@@ -77,8 +83,12 @@ export const useCloseFlag = () => {
             : held,
         );
       },
-      onError: (_refusal: ApiError, _closing: Closing, taken: Undo | undefined) => {
+      onSuccess: (_closed, closing: Closing) => {
+        said.onClosed(closing);
+      },
+      onError: (refusal: ApiError, _closing: Closing, taken: Undo | undefined) => {
         taken?.undo();
+        said.onRefused(refusal);
       },
       onSettled: () => queryClient.invalidateQueries({ queryKey }),
     }),

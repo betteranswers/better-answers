@@ -100,6 +100,8 @@ export const QUESTIONS_WORDS = {
   others: "Other Questions",
   notAnswered: "Not Answered",
   noCollection: "No collection",
+  /** The group for none, in a heading's casing. */
+  noCollectionHeading: "No Collection",
   more: "More Questions",
   removed: "Question removed by an erasure",
   verdict: (verdict: AskedRecord["verdict"]): string =>

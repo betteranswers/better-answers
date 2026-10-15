@@ -2,6 +2,7 @@ import { useId, useMemo, useRef, useState } from "react";
 
 import { usePageKeystrokes, useKeystroke } from "@/shared/keystrokes.tsx";
 import { useLanding, useLandingLine, type Landing } from "@/shared/landing.ts";
+import { useLastRead } from "@/shared/last-read.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
@@ -13,14 +14,20 @@ import { Card } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { instantWords } from "@/shared/words.ts";
 
-import { QuestionSheet, askerWords, questionWords, recordButtonId } from "./question-sheet.tsx";
+import {
+  QuestionSheet,
+  askerWords,
+  questionWords,
+  recordButtonId,
+  useFlagClosing,
+} from "./question-sheet.tsx";
 import {
   isOpen,
   useQuestionsAsked,
   type AskedRecord,
   type QuestionsAsked,
 } from "./questions-api.ts";
-import { groupedForReading } from "./questions-grouping.ts";
+import { groupedForReading, latestOfEach } from "./questions-grouping.ts";
 import { QUESTIONS_KEYSTROKES as KEY } from "./questions-state.ts";
 import { QUESTIONS_WORDS as WORDS } from "./questions-words.ts";
 
@@ -34,7 +41,7 @@ const { outcomeOfFailure } = refusalsOf({});
 const NOTHING_IN_FOCUS = selectFirst(WORDS.selectFirst);
 
 const recordsOf = (data: QuestionsAsked["data"]): readonly AskedRecord[] =>
-  data?.pages.flatMap((page) => page.records) ?? [];
+  latestOfEach(data?.pages.flatMap((page) => page.records) ?? []);
 
 type RowActions = {
   readonly open: (recordId: string) => void;
@@ -122,7 +129,7 @@ function NotAnswered(properties: {
       {groups.map((group) => (
         <RecordGroup
           key={group.collection ?? ""}
-          title={group.collection ?? WORDS.noCollection}
+          title={group.collection ?? WORDS.noCollectionHeading}
           level="h4"
           records={group.records}
           actions={actions}
@@ -141,6 +148,9 @@ function Records(properties: { readonly asked: QuestionsAsked }) {
   const [inFocus, setInFocus] = useState<string>();
   const [openedId, setOpenedId] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
+  // A closing can carry its record past the loaded pages; its sheet stays on the last read.
+  const opened = useLastRead(records, openedId);
+  const closing = useFlagClosing();
 
   useKeystroke(KEY.open, () => {
     const held = records.some((record) => record.id === inFocus);
@@ -161,7 +171,6 @@ function Records(properties: { readonly asked: QuestionsAsked }) {
     servedAt,
     landing,
   };
-  const opened = records.find((record) => record.id === openedId);
 
   return (
     <>
@@ -186,6 +195,7 @@ function Records(properties: { readonly asked: QuestionsAsked }) {
         <QuestionSheet
           key={opened.id}
           record={opened}
+          closing={closing}
           onClose={() => {
             setOpenedId(undefined);
           }}

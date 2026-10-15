@@ -6,6 +6,7 @@ import { Address } from "@/shared/address.tsx";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
+import { useLastRead } from "@/shared/last-read.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
 import { RowSheetButton } from "@/shared/row-sheet.tsx";
@@ -101,17 +102,6 @@ type Opened = { readonly personId: string; readonly at: OpenedAt };
 const reopened = (arrived: Arrival): Opened | undefined =>
   arrived.personId === undefined ? undefined : { personId: arrived.personId, at: arrived.action };
 
-/** Correcting a name can take its person out of the search; their sheet stays on the last read. */
-const useLastRead = (
-  people: readonly ListedPerson[],
-  personId: string | undefined,
-): ListedPerson | undefined => {
-  const found = people.find((listed) => listed.id === personId);
-  const [lastRead, setLastRead] = useState(found);
-  if (found !== undefined && found !== lastRead) setLastRead(found);
-  return found ?? (lastRead?.id === personId ? lastRead : undefined);
-};
-
 function OpenedSheet(properties: {
   readonly opened: Opened | undefined;
   readonly people: readonly ListedPerson[];
@@ -119,6 +109,7 @@ function OpenedSheet(properties: {
   readonly returnFocus: (personId: string) => void;
 }) {
   const { opened } = properties;
+  // Correcting a name can take its person out of the search; their sheet stays on the last read.
   const person = useLastRead(properties.people, opened?.personId);
   if (opened === undefined || person === undefined) return null;
   return (

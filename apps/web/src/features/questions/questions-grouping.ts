@@ -12,6 +12,11 @@ export type Grouped = {
   readonly notAnswered: readonly RefusalGroup[];
 };
 
+/** A flag closed after its page was served lets a later page serve its record again; the later copy wins. */
+export const latestOfEach = (served: readonly AskedRecord[]): readonly AskedRecord[] => [
+  ...new Map(served.map((record) => [record.id, record])).values(),
+];
+
 const newestFirst = (left: AskedRecord, right: AskedRecord): number =>
   right.askedAt.localeCompare(left.askedAt) || right.id.localeCompare(left.id);
 

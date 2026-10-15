@@ -126,16 +126,30 @@ function DraftedPart(properties: { readonly drafted: AskedRecord["drafted"] }) {
   );
 }
 
-function CloseActions(properties: { readonly onClose: (closedAs: FlagClosing) => void }) {
+const focusOnArrival = (line: HTMLElement | null): void => {
+  line?.focus();
+};
+
+function CloseActions(properties: {
+  readonly pending: boolean;
+  /** Focus comes back to the first button when a refused closing puts the flag back. */
+  readonly landsHere: boolean;
+  readonly onClose: (closedAs: FlagClosing) => void;
+}) {
+  const { pending, landsHere } = properties;
   return (
     <fieldset className="grid gap-2">
       <legend className="mb-2 font-medium">{WORDS.closeTheFlag}</legend>
       <div className="flex flex-wrap gap-2">
-        {CLOSINGS.map((closing) => (
+        {CLOSINGS.map((closing, at) => (
           <Button
             key={closing}
+            ref={at === 0 && landsHere && !pending ? focusOnArrival : undefined}
             variant="outline"
             size="sm"
+            // Not `disabled`: a disabled button drops the focus the keyboard left on it.
+            aria-disabled={pending ? true : undefined}
+            className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
             onClick={() => {
               properties.onClose(closing);
             }}
@@ -147,10 +161,6 @@ function CloseActions(properties: { readonly onClose: (closedAs: FlagClosing) =>
     </fieldset>
   );
 }
-
-const focusOnArrival = (line: HTMLElement | null): void => {
-  line?.focus();
-};
 
 /** Given only where the reader may read the concept the sentence rested on; an erasure clears the sentence. */
 function DisputedRows(properties: {
@@ -193,6 +203,7 @@ function FlagItem(properties: {
   readonly feedback: Feedback;
   readonly concepts: readonly ConceptRead[];
   readonly landsHere: boolean;
+  readonly pending: boolean;
   readonly onClose: (closedAs: FlagClosing) => void;
 }) {
   const { feedback } = properties;
@@ -205,48 +216,73 @@ function FlagItem(properties: {
         <DisputedRows disputed={feedback.disputed} concepts={properties.concepts} />
         <ClosedRow feedback={feedback} landsHere={properties.landsHere} />
       </dl>
-      {feedback.closedAt === null ? <CloseActions onClose={properties.onClose} /> : null}
+      {feedback.closedAt === null ? (
+        <CloseActions
+          pending={properties.pending}
+          landsHere={properties.landsHere}
+          onClose={properties.onClose}
+        />
+      ) : null}
     </li>
   );
 }
 
-function FeedbackPart(properties: { readonly record: AskedRecord }) {
-  const { record } = properties;
-  const closeFlag = useCloseFlag();
+/** The page's closing of a flag: it outlives the sheet, so an answer landing after it closes is kept. */
+export type FlagClosingState = {
+  readonly pending: boolean;
+  /** The record and flag the reader last asked to close. */
+  readonly last: { readonly recordId: string; readonly feedbackId: string } | undefined;
+  readonly outcome: Outcome | undefined;
+  readonly close: (recordId: string, feedbackId: string, closedAs: FlagClosing) => void;
+};
+
+export const useFlagClosing = (): FlagClosingState => {
+  const [last, setLast] = useState<FlagClosingState["last"]>();
   const [outcome, setOutcome] = useState<Outcome>();
-  const [landOn, setLandOn] = useState<string>();
+  const closeFlag = useCloseFlag({
+    onClosed: ({ closedAs }) => {
+      setOutcome({ tone: "said", words: WORDS.closedSaid[closedAs] });
+    },
+    onRefused: (failure) => {
+      setOutcome(outcomeOfFailure(failure, "action"));
+    },
+  });
+  return {
+    pending: closeFlag.isPending,
+    last,
+    outcome,
+    close: (recordId, feedbackId, closedAs) => {
+      if (closeFlag.isPending) return;
+      setLast({ recordId, feedbackId });
+      setOutcome(undefined);
+      closeFlag.mutate({ feedbackId, closedAs });
+    },
+  };
+};
+
+function FeedbackPart(properties: {
+  readonly record: AskedRecord;
+  readonly closing: FlagClosingState;
+}) {
+  const { record, closing } = properties;
+  if (record.feedback.length === 0) return null;
   const flags = record.feedback.filter(isAFlag);
   const helpful = record.feedback.filter((feedback) => !isAFlag(feedback));
-  if (record.feedback.length === 0) return null;
-
-  const close = (feedbackId: string, closedAs: FlagClosing) => {
-    setOutcome(undefined);
-    setLandOn(feedbackId);
-    closeFlag.mutate(
-      { feedbackId, closedAs },
-      {
-        onSuccess: () => {
-          setOutcome({ tone: "said", words: WORDS.closedSaid[closedAs] });
-        },
-        onError: (failure) => {
-          setOutcome(outcomeOfFailure(failure, "action"));
-        },
-      },
-    );
-  };
+  const closingHere = closing.last?.recordId === record.id ? closing.last : undefined;
 
   return (
     <SheetPart title={WORDS.parts.feedback}>
-      <OutcomeLine outcome={outcome} />
+      <OutcomeLine outcome={closingHere === undefined ? undefined : closing.outcome} />
       <ul className="grid gap-3">
         {flags.map((feedback) => (
           <FlagItem
             key={feedback.id}
             feedback={feedback}
             concepts={record.concepts}
-            landsHere={landOn === feedback.id}
+            landsHere={closingHere?.feedbackId === feedback.id}
+            pending={closing.pending}
             onClose={(closedAs) => {
-              close(feedback.id, closedAs);
+              closing.close(record.id, feedback.id, closedAs);
             }}
           />
         ))}
@@ -274,6 +310,7 @@ function AskedLine(properties: { readonly record: AskedRecord }) {
 /** One record over its list: what was asked, what `ask` gave, and the flags on it. */
 export function QuestionSheet(properties: {
   readonly record: AskedRecord;
+  readonly closing: FlagClosingState;
   readonly onClose: () => void;
 }) {
   const { record } = properties;
@@ -299,7 +336,7 @@ export function QuestionSheet(properties: {
         </SheetDescription>
       </SheetHeader>
       <div className="grid gap-4 px-4 pb-4">
-        <FeedbackPart record={record} />
+        <FeedbackPart record={record} closing={properties.closing} />
         <AnswerPart record={record} />
         <ConceptsPart concepts={record.concepts} />
         <DraftedPart drafted={record.drafted} />
