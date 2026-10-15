@@ -1,20 +1,28 @@
 import { describe, expect, it } from "vitest";
 
-import { conceptIriOf } from "@better-answers/schema";
-
 import {
   ASK_CAPS,
   decisionJudgeCall,
   type AskCaps,
   type DecisionThresholds,
-  type ReturnedConcept,
 } from "../src/answering/index.ts";
 import type { PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
-import { openModelClient, openModelKeySetting } from "../src/llm/index.ts";
+import { openModelKeySetting } from "../src/llm/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
 import { setModelKey, setModelPrice, setSpendingLimit } from "../src/workspaces/index.ts";
-import { asked, conceptSeeded, SUITE_ENVELOPE_KEY, type SeededConcept } from "./asking.ts";
-import { decisionCandidatesIn, decisionReplyTo } from "./judge-wire.ts";
+import {
+  asked,
+  conceptSeeded,
+  reservationsRead,
+  SUITE_ENVELOPE_KEY,
+  type SeededConcept,
+} from "./asking.ts";
+import {
+  A_CANDIDATE,
+  clientAnswering,
+  decisionCandidatesIn,
+  decisionReplyTo,
+} from "./judge-wire.ts";
 import { bootstrap, provisionedWorkspace } from "./platform.ts";
 import { answered, postgresForSuite, seedingWith } from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
@@ -92,26 +100,15 @@ const SUPPLIER = anAnswer(
 
 const QUESTION = "How do buyers access audit information?";
 
-type Sent = { readonly url: string; readonly body: string };
-
 /** Workers AI at the wire, answering each candidate the probability `yes` holds for its title. */
 const decidingWire = (
   yes: ReadonlyMap<string, number>,
   during: () => Promise<void> = async () => {},
-) => {
-  const sent: Sent[] = [];
-  const client = openModelClient({
-    fetch: async (input, init) => {
-      const body = typeof init?.body === "string" ? init.body : "";
-      sent.push({ url: input instanceof Request ? input.url : input.toString(), body });
-      await during();
-      return new Response(decisionReplyTo(yes, body), { status: 200 });
-    },
-    clock: { now: () => new Date() },
-    log: { info: () => {} },
+) =>
+  clientAnswering(async (body) => {
+    await during();
+    return new Response(decisionReplyTo(yes, body), { status: 200 });
   });
-  return { sent, client };
-};
 
 type Wire = ReturnType<typeof decidingWire>;
 
@@ -137,24 +134,25 @@ const spendOf = async (workspaceId: string) => {
 const titlesOf = (concepts: readonly { readonly title: string }[]) =>
   concepts.map(({ title }) => title).toSorted();
 
+/** How judging stood, what was sent, and what is left reserved or spent. */
+const outcomeOf = async (
+  answer: { readonly verdict: string; readonly judgeState: string },
+  wire: Wire,
+  workspaceId: string,
+) => ({
+  judged: [answer.verdict, answer.judgeState],
+  sent: wire.sent,
+  spend: await spendOf(workspaceId),
+});
+
+const FAILED_UNSENT = {
+  judged: ["related", "judging-failed"],
+  sent: [],
+  spend: { open: 0, calls: [] },
+};
+
 describe("the decision judge's call", () => {
-  const candidate: ReturnedConcept = {
-    iri: conceptIriOf("01J6AAAAAAAAAAAAAAAAAAAAAA"),
-    url: "/knowledge/search/01J6AAAAAAAAAAAAAAAAAAAAAA",
-    kind: "Answer",
-    title: "How long are audit logs kept?",
-    collection: "audits",
-    body: "Audit logs are kept for thirteen months.\n",
-    trust: {
-      tier: "unverified",
-      status: "current",
-      verifiedBy: null,
-      verifiedAt: null,
-      rider: null,
-    },
-    trustWords: "Unverified",
-    evidence: [],
-  };
+  const candidate = A_CANDIDATE;
   const ASK =
     "Does this approved answer answer the question in the state as it was asked? It does not if it answers a different question, a narrower or a wider one, or one about another product, module, plan or audience than the question names.";
 
@@ -256,9 +254,7 @@ describe("ask with a decision model", () => {
 
     const answer = await askedWith(asker, wire, { ...ASK_CAPS, decisionThresholds: elsewhere });
 
-    expect([answer.verdict, answer.judgeState]).toEqual(["related", "judging-failed"]);
-    expect(wire.sent).toEqual([]);
-    expect(await spendOf(workspaceId)).toEqual({ open: 0, calls: [] });
+    expect(await outcomeOf(answer, wire, workspaceId)).toEqual(FAILED_UNSENT);
   });
 
   it("fails judging, sending nothing, over the model's window", async () => {
@@ -269,9 +265,7 @@ describe("ask with a decision model", () => {
 
     const answer = await askedWith(asker, wire);
 
-    expect([answer.verdict, answer.judgeState]).toEqual(["related", "judging-failed"]);
-    expect(wire.sent).toEqual([]);
-    expect(await spendOf(workspaceId)).toEqual({ open: 0, calls: [] });
+    expect(await outcomeOf(answer, wire, workspaceId)).toEqual(FAILED_UNSENT);
   });
 
   it("sends twenty candidates at the longest Answer's placeholder length", async () => {
@@ -297,16 +291,9 @@ describe("ask with a decision model", () => {
   it("reserves the decision call's size, not the Messages call's", async () => {
     const { workspaceId, asker } = await aDecidingWorkspace();
     await seededIn(workspaceId, [USERS, SUPPLIER]);
-    const reserved: unknown[] = [];
-    const readReservation = async () => {
-      const open = await db().pool.query(
-        "SELECT tokens_out FROM spend_reservation WHERE workspace_id = $1",
-        [workspaceId],
-      );
-      reserved.push(...open.rows.map((row) => row.tokens_out));
-    };
+    const { reserved, read } = reservationsRead(db(), workspaceId);
 
-    await askedWith(asker, decidingWire(new Map(), readReservation));
+    await askedWith(asker, decidingWire(new Map(), read));
 
     expect(reserved).toEqual([32]);
   });

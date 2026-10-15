@@ -3,14 +3,7 @@ import { z } from "zod";
 
 import { conceptIriOf, type ConceptIri } from "@better-answers/schema";
 
-import {
-  ask,
-  askInput,
-  ASK_CAPS,
-  judgeCall,
-  type AskCaps,
-  type ReturnedConcept,
-} from "../src/answering/index.ts";
+import { ask, askInput, ASK_CAPS, judgeCall, type AskCaps } from "../src/answering/index.ts";
 import type { PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
 import {
   openModelClient,
@@ -24,12 +17,19 @@ import { setModelKey, setModelPrice, setSpendingLimit } from "../src/workspaces/
 import {
   asked,
   conceptSeeded,
+  reservationsRead,
   stepsFor,
   SUITE_ENVELOPE_KEY,
   type Asking,
   type SeededConcept,
 } from "./asking.ts";
-import { candidatesIn, judgeReplyTo, promptOf } from "./judge-wire.ts";
+import {
+  A_CANDIDATE,
+  candidatesIn,
+  clientAnswering,
+  judgeReplyTo,
+  promptOf,
+} from "./judge-wire.ts";
 import { bootstrap, provisionedWorkspace } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
 import {
@@ -127,35 +127,21 @@ const RETENTION = anAnswer(
 
 const QUESTION = "How do buyers access audit information?";
 
-type Sent = { readonly headers: unknown; readonly body: string };
-
 type Wire = {
-  readonly sent: Sent[];
+  readonly sent: readonly { readonly headers: unknown; readonly body: string }[];
   readonly client: ModelClient;
 };
 
 /** A judge at the wire saying yes to the candidates written for `fits`, and no to the rest. */
-const judgeSaying = (
-  fits: readonly string[],
-  during: () => Promise<void> = async () => {},
-): Wire => {
-  const sent: Sent[] = [];
-  const client = openModelClient({
-    fetch: async (_input, init) => {
-      const body = typeof init?.body === "string" ? init.body : "";
-      sent.push({ headers: init?.headers, body });
-      await during();
-      return new Response(judgeReplyTo(fits, body), { status: 200 });
-    },
-    clock: { now: () => new Date() },
-    log: { info: () => {} },
+const judgeSaying = (fits: readonly string[], during: () => Promise<void> = async () => {}): Wire =>
+  clientAnswering(async (body) => {
+    await during();
+    return new Response(judgeReplyTo(fits, body), { status: 200 });
   });
-  return { sent, client };
-};
 
 /** Every attempt times out, as `fetch` does once its signal has fired. */
 const judgeTimingOut = (): Wire => {
-  const sent: Sent[] = [];
+  const sent: { readonly headers: unknown; readonly body: string }[] = [];
   const client = openModelClient({
     fetch: async (_input, init) => {
       sent.push({ headers: init?.headers, body: typeof init?.body === "string" ? init.body : "" });
@@ -238,23 +224,7 @@ const NOT_AN_ANSWER: SeededConcept = {
 };
 
 describe("the judge's call", () => {
-  const candidate: ReturnedConcept = {
-    iri: conceptIriOf("01J6AAAAAAAAAAAAAAAAAAAAAA"),
-    url: "/knowledge/search/01J6AAAAAAAAAAAAAAAAAAAAAA",
-    kind: "Answer",
-    title: "How long are audit logs kept?",
-    collection: "audits",
-    body: "Audit logs are kept for thirteen months.\n",
-    trust: {
-      tier: "unverified",
-      status: "current",
-      verifiedBy: null,
-      verifiedAt: null,
-      rider: null,
-    },
-    trustWords: "Unverified",
-    evidence: [],
-  };
+  const candidate = A_CANDIDATE;
 
   it("holds each candidate apart, numbered, with its collection", () => {
     const call = judgeCall("How long are audit logs kept?", [
@@ -539,15 +509,8 @@ describe("ask with a judge", () => {
 
   it("sends as max_tokens the tokens out it reserved", async () => {
     const { workspaceId, asker } = await arranged([USERS]);
-    const reserved: unknown[] = [];
-    const readReservation = async () => {
-      const open = await db().pool.query(
-        "SELECT tokens_out FROM spend_reservation WHERE workspace_id = $1",
-        [workspaceId],
-      );
-      reserved.push(...open.rows.map((row) => row.tokens_out));
-    };
-    const wire = judgeSaying([USERS.title], readReservation);
+    const { reserved, read } = reservationsRead(db(), workspaceId);
+    const wire = judgeSaying([USERS.title], read);
 
     await askedWith(asker, { question: QUESTION }, wire);
 

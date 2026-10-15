@@ -1,24 +1,31 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { ASK_CAPS, askInput, find, planAnswer } from "../../src/answering/index.ts";
+import { ASK_CAPS, askInput, planAnswer } from "../../src/answering/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { openModelClient, type ModelClient, type ModelToCall } from "../../src/llm/index.ts";
 import { inMs, recordFigures, type Figure } from "../figures.ts";
 import {
+  conceptsFoundBy,
   landRecallSet,
   paraphrasesOf,
   RECALL_DEPTH,
   theBuyerQuestions,
   theRecallSet,
-  type Recall,
+  worded,
   type RecallSet,
 } from "../recall.ts";
 import { visibilitySuite } from "../sourced-concept.ts";
 import { inputOf } from "../suite-input.ts";
 import { answered } from "../suite-postgres.ts";
 import { readEntryScoring, type EntryPoint, type EntryScoring } from "./entry-scoring.ts";
-import { readReuse, theReuseSet, type ReuseReading, type ReuseSet } from "./reuse-set.ts";
+import {
+  poundsOf,
+  readReuse,
+  recordReuseReading,
+  theReuseSet,
+  type ReuseSet,
+} from "./reuse-set.ts";
 
 /** List prices in US dollars per million tokens in; Clef charges nothing out. Check the price page before a run. */
 const MODELS = [
@@ -43,8 +50,6 @@ const owner = z.object({
 
 type Told = z.infer<typeof owner>;
 
-const pounds = (usd: number, rate: number): string => (usd * rate).toFixed(6);
-
 const clientFor = (): ModelClient =>
   openModelClient({
     fetch,
@@ -57,22 +62,6 @@ const toldByTheOwner = (): Told => {
   if (!read.success) throw new Error(z.prettifyError(read.error));
   return read.data;
 };
-
-const outOf = (yes: number, named: number, unsent: number): string =>
-  `${yes} of ${named}, ${unsent} never sent to the judge`;
-
-const reuseFigures = (reading: ReuseReading, priced: string): readonly Figure[] => [
-  ["fits found", outOf(reading.fits.yes, reading.fits.named, reading.fits.unsent)],
-  [
-    "hard negatives wrongly taken",
-    outOf(reading.negatives.yes, reading.negatives.named, reading.negatives.unsent),
-  ],
-  ["other Answers taken", String(reading.othersTaken)],
-  ["questions the judge answered", `${reading.judged} of ${reading.asked}`],
-  ["spend", `£${reading.spentGbp}`],
-  ["judge latency", `median ${inMs(reading.judgeMs.median)}, worst ${inMs(reading.judgeMs.worst)}`],
-  ["priced at", priced],
-];
 
 const { db, arrange, reading } = visibilitySuite();
 
@@ -89,33 +78,27 @@ describe("the owner's decision reading on reuse", () => {
     for (const threshold of THRESHOLDS) {
       it(`reads ${name} at threshold ${String(threshold)}`, async () => {
         const rate = told.READING_GBP_PER_USD;
-        const reading = await readReuse(db(), set, {
+        const judged = await readReuse(db(), set, {
           provider: "cloudflare",
           model,
-          gbpPerMillionIn: pounds(usdIn, rate),
+          gbpPerMillionIn: poundsOf(usdIn, rate),
           gbpPerMillionOut: "0",
           key: told.READING_WORKERS_AI_KEY,
           decide: clientFor().decide,
           threshold,
         });
         const priced = `$${usdIn} in per million tokens and nothing out, at £${rate} to the dollar`;
-        await recordFigures(
-          `Reuse reading, ${name} at threshold ${String(threshold)}`,
-          reuseFigures(reading, priced),
-        );
-        process.stdout.write(reading.misses.map((miss) => `  ${miss}\n`).join(""));
+        const heading = `Reuse reading, ${name} at threshold ${String(threshold)}`;
+        await recordReuseReading(heading, judged, priced);
 
-        // A refused key fails every call, and a run that judged nothing has no figures to record.
-        expect(reading.judged).toBeGreaterThan(0);
+        // A refused key fails every call, and a run that decided nothing has no figures to record.
+        expect(judged.judged).toBeGreaterThan(0);
       });
     }
   }
 });
 
 const NOW = new Date("2026-10-09T12:00:00.000Z");
-
-const worded = ({ recall, recalled, asked }: Recall, counted: string): string =>
-  `${(recall * 100).toFixed(1)} %, for ${recalled} of ${asked} ${counted}`;
 
 const entryFigures = (name: string, scoring: EntryScoring, priced: string): readonly Figure[] => [
   [`${name} in find's first ${RECALL_DEPTH}`, worded(scoring.byFind.byAnswer, "Answers named")],
@@ -151,17 +134,6 @@ const entryPointsFor =
     }));
   };
 
-const foundFor =
-  (person: UserPrincipal) =>
-  async (question: string): Promise<readonly string[]> => {
-    const found = answered(
-      await reading(person, (reader, tx) =>
-        find(reader, tx, { query: question, limit: RECALL_DEPTH }, NOW),
-      ),
-    );
-    return found.matches.flatMap((match) => (match.layer === "bundles" ? [match.iri] : []));
-  };
-
 describe("the owner's decision reading at the entry step", () => {
   let set: RecallSet;
   let landed: ReadonlyMap<string, string>;
@@ -187,7 +159,7 @@ describe("the owner's decision reading at the entry step", () => {
       };
       const { decide } = clientFor();
       const doors = {
-        found: foundFor(viewer),
+        found: conceptsFoundBy(reading, viewer, NOW),
         planned: entryPointsFor(viewer),
         decide: (call: Parameters<typeof decide>[1]) => decide(to, call),
       };

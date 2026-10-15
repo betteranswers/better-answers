@@ -81,6 +81,19 @@ export const stepsFor = (
 
 export type Asking = z.input<typeof askInput>;
 
+/** The tokens out each open reservation of the workspace holds, as `read` finds them when called. */
+export const reservationsRead = (db: MigratedPostgres, workspaceId: string) => {
+  const reserved: unknown[] = [];
+  const read = async (): Promise<void> => {
+    const open = await db.pool.query(
+      "SELECT tokens_out FROM spend_reservation WHERE workspace_id = $1",
+      [workspaceId],
+    );
+    reserved.push(...open.rows.map((row) => row.tokens_out));
+  };
+  return { reserved, read };
+};
+
 export type Told = { readonly caps?: AskCaps; readonly now?: Date; readonly judging?: Judging };
 
 /** Asks as `asker` through steps on the runtime pool; `now` is this instant unless told. */

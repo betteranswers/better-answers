@@ -6,7 +6,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { openModelClient } from "../../src/llm/index.ts";
-import { decisionCandidatesIn, decisionReplyTo, judgeReplyTo, promptOf } from "../judge-wire.ts";
+import {
+  clientAnswering,
+  decisionCandidatesIn,
+  decisionReplyTo,
+  judgeReplyTo,
+  promptOf,
+} from "../judge-wire.ts";
 import { postgresForSuite } from "../suite-postgres.ts";
 import {
   readReuse,
@@ -135,18 +141,13 @@ describe("the reuse reading", () => {
   }, 300_000);
 
   it("reads a decision model's verdicts at its given threshold", async () => {
-    const client = openModelClient({
-      fetch: async (_input, init) => {
-        const body = typeof init?.body === "string" ? init.body : "";
-        const state = z.object({ state: z.string() }).parse(JSON.parse(body)).state;
-        const asked = set.questions.find(({ question }) => question === state);
-        const fits = titlesOf(set, asked?.fits ?? []);
-        const yes = new Map([...decisionCandidatesIn(body).keys()].map((title) => [title, 0.6]));
-        for (const title of fits) yes.set(title, 0.8);
-        return new Response(decisionReplyTo(yes, body), { status: 200 });
-      },
-      clock: { now: () => new Date() },
-      log: { info: () => {} },
+    const { client } = clientAnswering(async (body) => {
+      const state = z.object({ state: z.string() }).parse(JSON.parse(body)).state;
+      const asked = set.questions.find(({ question }) => question === state);
+      const fits = titlesOf(set, asked?.fits ?? []);
+      const yes = new Map([...decisionCandidatesIn(body).keys()].map((title) => [title, 0.6]));
+      for (const title of fits) yes.set(title, 0.8);
+      return new Response(decisionReplyTo(yes, body), { status: 200 });
     });
     const reading = (threshold: number) =>
       readReuse(db(), set, {

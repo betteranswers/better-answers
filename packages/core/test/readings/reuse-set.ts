@@ -22,7 +22,7 @@ import {
   setSpendingLimit,
 } from "../../src/workspaces/index.ts";
 import { asked, conceptSeeded, SUITE_ENVELOPE_KEY, type Told } from "../asking.ts";
-import { percentile } from "../figures.ts";
+import { inMs, percentile, recordFigures, type Figure } from "../figures.ts";
 import { bootstrap, provisionedWorkspace } from "../platform.ts";
 import { readAs } from "../recall.ts";
 import { answered, seedingWith } from "../suite-postgres.ts";
@@ -353,6 +353,35 @@ export const readReuse = async (
     judgeMs: { median: percentile(times, 0.5), worst: Math.max(0, ...times) },
     misses: read.flatMap((one) => ("unjudged" in one ? [one.unjudged] : one.misses)),
   };
+};
+
+/** A list price in US dollars, in pounds at `rate`, as a price is set. */
+export const poundsOf = (usd: number, rate: number): string => (usd * rate).toFixed(6);
+
+const outOf = (yes: number, named: number, unsent: number): string =>
+  `${yes} of ${named}, ${unsent} never sent to the judge`;
+
+const figuresOf = (reading: ReuseReading, priced: string): readonly Figure[] => [
+  ["fits found", outOf(reading.fits.yes, reading.fits.named, reading.fits.unsent)],
+  [
+    "hard negatives wrongly taken",
+    outOf(reading.negatives.yes, reading.negatives.named, reading.negatives.unsent),
+  ],
+  ["other Answers taken", String(reading.othersTaken)],
+  ["questions the judge answered", `${reading.judged} of ${reading.asked}`],
+  ["spend", `£${reading.spentGbp}`],
+  ["judge latency", `median ${inMs(reading.judgeMs.median)}, worst ${inMs(reading.judgeMs.worst)}`],
+  ["priced at", priced],
+];
+
+/** Records a reading's figures under `heading`, then prints one line for each miss. */
+export const recordReuseReading = async (
+  heading: string,
+  reading: ReuseReading,
+  priced: string,
+): Promise<void> => {
+  await recordFigures(heading, figuresOf(reading, priced));
+  process.stdout.write(reading.misses.map((miss) => `  ${miss}\n`).join(""));
 };
 
 /** The effort levels a reading may ask for; `undefined` sends none, so the model's default stands. */

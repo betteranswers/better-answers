@@ -13,6 +13,7 @@ import {
   type Credentials,
   type DecisionModelCall,
   type ModelCall,
+  type ModelClient,
   type ModelOutcome,
   type ModelToCall,
   type NoulInstructions,
@@ -45,18 +46,15 @@ type JudgeReserving = {
 
 export type JudgeRefusal = KernelRefusal<"spending-limit-met"> | Error;
 
-/** What `ask` is handed to judge with, beside the steps that keep its record. */
-export type JudgeSteps<Refused = never> = {
+/**
+ * What `ask` is handed to judge with, beside the steps that keep its record. The model client's
+ * calls run with no transaction open.
+ */
+export type JudgeSteps<Refused = never> = ModelClient & {
   /** Commits before it answers; `undefined` where the workspace has no judge to call. */
   readonly reserve: (
     reserving: JudgeReserving,
   ) => Promise<Result<JudgeReserved | undefined, Refused | JudgeRefusal>>;
-  /** Called with no transaction open, as `decide` is. */
-  readonly callModel: <T>(to: ModelToCall, call: ModelCall<T>) => Promise<ModelOutcome<T>>;
-  readonly decide: (
-    to: ModelToCall,
-    call: DecisionModelCall,
-  ) => Promise<ModelOutcome<Probabilities>>;
 };
 
 /**

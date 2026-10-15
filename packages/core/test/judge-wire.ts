@@ -1,5 +1,50 @@
 import { z } from "zod";
 
+import { conceptIriOf } from "@better-answers/schema";
+
+import type { ReturnedConcept } from "../src/answering/index.ts";
+import { openModelClient, type ModelClient } from "../src/llm/index.ts";
+
+/** One `Answer` a judge is asked about, as `ask` returns it. */
+export const A_CANDIDATE: ReturnedConcept = {
+  iri: conceptIriOf("01J6AAAAAAAAAAAAAAAAAAAAAA"),
+  url: "/knowledge/search/01J6AAAAAAAAAAAAAAAAAAAAAA",
+  kind: "Answer",
+  title: "How long are audit logs kept?",
+  collection: "audits",
+  body: "Audit logs are kept for thirteen months.\n",
+  trust: {
+    tier: "unverified",
+    status: "current",
+    verifiedBy: null,
+    verifiedAt: null,
+    rider: null,
+  },
+  trustWords: "Unverified",
+  evidence: [],
+};
+
+/** A request as the fake wire saw it. */
+export type WireSent = { readonly url: string; readonly headers: unknown; readonly body: string };
+
+/** A model client whose wire keeps what it is sent and answers each request as `answer` does. */
+export const clientAnswering = (
+  answer: (body: string) => Promise<Response>,
+): { readonly sent: WireSent[]; readonly client: ModelClient } => {
+  const sent: WireSent[] = [];
+  const client = openModelClient({
+    fetch: async (input, init) => {
+      const body = typeof init?.body === "string" ? init.body : "";
+      const url = input instanceof Request ? input.url : input.toString();
+      sent.push({ url, headers: init?.headers, body });
+      return answer(body);
+    },
+    clock: { now: () => new Date() },
+    log: { info: () => {} },
+  });
+  return { sent, client };
+};
+
 const messagesBody = z.object({ messages: z.array(z.object({ content: z.string() })) });
 
 /** The prompt a Messages request body carried. */
