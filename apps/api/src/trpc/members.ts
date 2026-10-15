@@ -161,15 +161,19 @@ type Moving<Asked, Moved> = (
 
 /** Once the move committed, tells each person it promoted what can confirm their sign-in. */
 const movedThenTold =
-  <Asked, Moved extends object, Answer>(
-    action: Moving<Asked, Moved>,
+  <Asked extends object, Moved extends object, Answer>(
+    action: Moving<Asked & { readonly at: Date }, Moved>,
     told: (moved: Moved) => { readonly promoted: readonly string[]; readonly answer: Answer },
   ) =>
   async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
     const moved = await crossing(
       ctx,
       action.name,
-      given(input, (asked) => committedAs(ctx, (principal, tx) => action(principal, tx, asked))),
+      given(input, (asked) =>
+        committedAs(ctx, (principal, tx) =>
+          action(principal, tx, { ...asked, at: ctx.clock.now() }),
+        ),
+      ),
     );
     const { promoted, answer } = told(moved);
     for (const personId of promoted) void sendPromotionNotice(ctx, personId);
@@ -222,7 +226,12 @@ export const membersRouter = router({
       crossing(
         ctx,
         exportAuditLog.name,
-        given(input, (asked) => exportAuditLog(ctx.principal, ctx.doors.postgres, asked)),
+        given(input, (asked) =>
+          exportAuditLog(ctx.principal, ctx.doors.postgres, {
+            ...asked,
+            at: ctx.clock.now(),
+          }),
+        ),
       ),
     ),
   invitations: queryProcedure
@@ -264,7 +273,7 @@ export const membersRouter = router({
     .mutation(answeredAt(bulkRemoveMembers)),
   bulkAddToGroup: mutationProcedure
     .input(parsedBy(bulkAddToGroupInput))
-    .mutation(answeredBy(bulkAddToGroup)),
+    .mutation(answeredAt(bulkAddToGroup)),
 
   /** A constant answer: whether a flag was raised or already waited is the operator's to know. */
   flagDisplayName: ownTransactionProcedure

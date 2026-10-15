@@ -365,9 +365,9 @@ const inTheOperatorsTransaction = (resolve: typeof withOperator) =>
     const resolved = await attempt(() =>
       resolve(
         ctx.doors.postgres,
-        // The row's own creation: the library's refresh moves only its update and expiry, so the
-        // hour the operator's writes allow runs from the sign-in itself.
-        { userId: user.id, issuedAt: session.createdAt },
+        // The session the cookie names: its confirmation is what the operator's writes ask for,
+        // and its creation still anchors the revocation rule.
+        { userId: user.id, issuedAt: session.createdAt, sessionId: session.id },
         async (operator, tx) =>
           thrownIfFailed(await next({ ctx: { operator, tx, doors: undefined } })),
       ),

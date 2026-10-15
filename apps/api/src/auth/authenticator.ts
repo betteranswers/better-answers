@@ -3,7 +3,11 @@ import type { Context, Hono } from "hono";
 import { z } from "zod";
 
 import { attempt } from "@better-answers/core/kernel";
-import { recordAuthenticatorSetUp, type SecondFactorHeld } from "@better-answers/core/workspaces";
+import {
+  factorChangeStale,
+  recordAuthenticatorSetUp,
+  type SecondFactorHeld,
+} from "@better-answers/core/workspaces";
 
 import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
@@ -57,7 +61,11 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
     if (waitsOnTheRestoreCode(held)) {
       return context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409);
     }
-    return mayReplace(held) ? context.json(REFUSALS.replacementSetupNeeded, 409) : undefined;
+    if (mayReplace(held)) return context.json(REFUSALS.replacementSetupNeeded, 409);
+    // A person already holding a factor re-confirms before adding another, so no key is minted.
+    return factorChangeStale(held, clock.now())
+      ? context.json(PERSON_ROUTE_REFUSALS.confirmationTooOld, 412)
+      : undefined;
   };
 
   const start = async (context: Context, person: SignedIn): Promise<Response> => {
