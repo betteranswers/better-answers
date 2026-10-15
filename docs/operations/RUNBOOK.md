@@ -474,7 +474,7 @@ The command writes nothing when it refuses. `malformed` is a workspace id that i
 
 ## Set a model's price and a workspace's spending limit
 
-A workspace's question calls a model only when three things stand: a model choice for the purpose, a price for that model on the day of the call, and a spending limit for the workspace. With any of them missing, `ask` calls no model and answers with its evidence. Two commands on the `api` service set the price and the limit, and no page can. Money is in pounds sterling: prices, the ledger's `cost_gbp` and the limit are all in pounds, and no exchange rate is read when a call is made. Until the release that brings the judge, `ask` calls no model whatever is set, so both can be set ahead of it.
+A workspace's question calls a model only when three things stand: a model choice for the purpose, a price for that model on the day of the call, and a spending limit for the workspace. With any of them missing, `ask` calls no model and answers with its evidence. Three commands on the `api` service set the price, the limit and the model choice, and no page can. Money is in pounds sterling: prices, the ledger's `cost_gbp` and the limit are all in pounds, and no exchange rate is read when a call is made. Until the release that brings the judge, `ask` calls no model whatever is set, so both can be set ahead of it.
 
 1. **Price the model, once per estate and again whenever the provider's price or the exchange rate moves.** Read the provider's list price in US dollars from its own price page on the day, convert it to pounds at that day's rate, and set it from that day:
 
@@ -491,8 +491,15 @@ A workspace's question calls a model only when three things stand: a model choic
    ```
 
    A second run replaces the limit, and each run records `platform.workspace.spending_limit_set` in the workspace's audit log under the platform's own actor id; the amount is the setting itself, read as below. Spend counts from the first of each month, and last month's calls never count against this one. At the limit `ask` refuses with `spending-limit-met`, a precondition, and its sentence tells the person their Admin can ask better-answers to raise it. `find` and `open` call no model and keep working.
+3. **Choose the workspace's model for a purpose,** once the model has a price in effect today:
 
-Each command writes nothing when it refuses. `malformed` is a sum that is not a decimal of pounds, a model name that is not lower case letters, digits, dots and hyphens, a day the calendar does not have, a model provider outside the two, or a workspace id that is not one. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached.
+   ```sh
+   docker exec "$api" pnpm ops set-model-choice --workspace <id> --purpose judging --provider anthropic --model claude-sonnet-5-5
+   ```
+
+   A second run for the same purpose replaces the model in place. The provider must be one the DPIA names as a sub-processor, and the model must have a price on or before today; a call also needs the workspace's model key for that provider (§ Set a workspace's model key). Each run records `platform.workspace.model_choice_set` in the workspace's audit log under the platform's own actor id, with the purpose, the provider and the model. The embedding model is fixed and no command changes it.
+
+Each command writes nothing when it refuses. For `set-model-choice`, `no-sub-processor` is a provider the DPIA does not name as a sub-processor, `local` included, `no-model-price` is a model with no price in effect today, and `fixed-model-choice` is the embedding purpose. `malformed` is a sum that is not a decimal of pounds, a model name that is not lower case letters, digits, dots and hyphens, a day the calendar does not have, a model provider outside the two, or a workspace id that is not one. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached.
 
 **How a call is counted.** Before a model call, `ask` reserves the most the call may cost, at that day's price, in the same transaction that would refuse it, so two questions cannot both pass the last of the limit. When the call ends the reservation becomes one `llm_call` row per attempt at what was spent, and the rest is released. A reservation lives ten minutes. If the `api` stops mid-call, the daily sweep settles a reservation past its ten minutes as one failed `llm_call` row at the whole reserved cost, since the provider may have billed the call: the pass's log line counts them as `reservations_settled`, and names a workspace whose settling was refused under `refusals` with the sweep `spend`. Until then an open reservation still counts against the limit.
 

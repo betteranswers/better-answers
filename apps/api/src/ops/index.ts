@@ -34,7 +34,12 @@ import {
   type RefusalClass,
   type Result,
 } from "@better-answers/core/kernel";
-import type { ModelKeySetting } from "@better-answers/core/llm";
+import {
+  CHOOSABLE_PROVIDERS,
+  FIXED_PURPOSE,
+  LLM_PURPOSES,
+  type ModelKeySetting,
+} from "@better-answers/core/llm";
 import {
   ensureTestWorkspace,
   INVENTED_MEMBERS,
@@ -67,6 +72,7 @@ import {
   provisionWorkspace,
   renameWorkspace,
   restoreSignIn,
+  setModelChoice,
   setModelKey,
   setModelPrice,
   setOperatorMark,
@@ -75,6 +81,7 @@ import {
   type AddPersonRefusal,
   type ProvisionRefusal,
   type RenameRefusal,
+  type SetModelChoiceRefusal,
   type SetModelKeyRefusal,
   type SetSpendingLimitRefusal,
   type SignInRestored,
@@ -91,6 +98,7 @@ import {
   job,
   llmCall,
   MODEL_PROVIDERS,
+  modelChoice,
   modelKey,
   modelPrice,
   REBUILD_REASONS,
@@ -196,6 +204,7 @@ const NEEDS = {
   "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
   "set-model-key": [modelKey],
   "set-spending-limit": [llmCall, spendReservation],
+  "set-model-choice": [modelChoice, modelPrice],
 };
 
 type SliceCommand = keyof typeof NEEDS;
@@ -208,6 +217,9 @@ const REBUILD_DEFAULT_REASON = "drill";
 
 const WAIT_SECONDS = 120;
 const WAIT_POLL_MS = 2_000;
+
+/** The embedding model is fixed, so it is never offered. */
+const CHOSEN_PURPOSES = LLM_PURPOSES.filter((purpose) => purpose !== FIXED_PURPOSE);
 
 const USAGE_TEXT = `usage: pnpm ops <command> [options]
   replay-erasures --since <dump stamp | ISO instant>      re-apply every erasure completed after a dump (mandatory in every restore)
@@ -240,6 +252,8 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   set-model-key --workspace <id> --provider <${MODEL_PROVIDERS.join("|")}>
                                                             stdin: the workspace's key for that model provider, sealed and never printed; a second run replaces it
   set-spending-limit --workspace <id> --gbp <pounds>        the most the workspace's model calls may spend each calendar month; a second run replaces it, and with none set no model is called
+  set-model-choice --workspace <id> --purpose <${CHOSEN_PURPOSES.join("|")}> --provider <${[...CHOOSABLE_PROVIDERS].join("|")}> --model <model>
+                                                            the model the workspace calls for that purpose, priced and named by the DPIA; a second run replaces it
   set-model-price --provider <${MODEL_PROVIDERS.join("|")}> --model <model> --from <yyyy-mm-dd> --gbp-per-million-in <pounds> --gbp-per-million-out <pounds>
                                                             what a model costs from that day on, per million tokens sent and returned; a model with no price is never called
   operator --email <email> --grant|--revoke                 a signed-in person made the platform's operator, or no longer; each change on the identity-set audit log
@@ -1429,6 +1443,53 @@ const setSpendingLimitCommand = async (
   return DONE;
 };
 
+const MODEL_CHOICE_FLAGS = ["purpose", "provider", "model"] as const;
+
+const MODEL_CHOICE_USAGE = `set-model-choice: --workspace <id>, --purpose <${CHOSEN_PURPOSES.join("|")}>, --provider <provider> and --model <model> are required`;
+
+const modelChoiceReason = (
+  refusal: SetModelChoiceRefusal | Error,
+  asked: { readonly workspaceId: string; readonly provider: string; readonly model: string },
+): string => {
+  if (refusal instanceof Error) return refusal.message;
+  switch (refusal) {
+    case "malformed":
+      return `malformed: give --workspace a workspace id, --purpose one of ${CHOSEN_PURPOSES.join(" · ")}, and --provider and --model in lower case letters, digits, dots and hyphens`;
+    case "no-such-workspace":
+      return noSuchWorkspace(asked.workspaceId);
+    case "fixed-model-choice":
+      return "fixed-model-choice: the embedding model is fixed, since the index's vectors are its own; nothing changed";
+    case "no-sub-processor":
+      return `no-sub-processor: ${asked.provider} is no model provider the DPIA names as a sub-processor (${[...CHOOSABLE_PROVIDERS].join(" · ")}); nothing changed`;
+    case "no-model-price":
+      return `no-model-price: ${asked.provider} ${asked.model} has no price in effect today; set one with set-model-price first; nothing changed`;
+  }
+};
+
+const setModelChoiceCommand = async (
+  doors: Doors,
+  workspaceId: string,
+  flags: Flags,
+  io: OpsIo,
+): Promise<number> => {
+  const [purpose, provider, model] = MODEL_CHOICE_FLAGS.map((name) => flagValue(flags, name));
+  if (purpose === undefined || provider === undefined || model === undefined) {
+    io.say(MODEL_CHOICE_USAGE);
+    return USAGE;
+  }
+  const asked = { workspaceId, purpose, provider, model };
+  const set = await setModelChoice(BOOTSTRAP, doors.postgres, { ...asked, now: doors.clock.now() });
+  if (!set.ok) {
+    io.say(`set-model-choice: REFUSED — ${modelChoiceReason(set.error, asked)}`);
+    return exitOf(set.error);
+  }
+  const chosen = set.value;
+  io.say(
+    `set-model-choice: done — workspace ${workspaceId} calls ${chosen.provider} ${chosen.model} for ${chosen.purpose}`,
+  );
+  return DONE;
+};
+
 const MODEL_PRICE_FLAGS = [
   "provider",
   "model",
@@ -1568,6 +1629,7 @@ const SLICE_RUNNERS = {
   "import-bundle": importBundleCommand,
   "set-model-key": setModelKeyCommand,
   "set-spending-limit": setSpendingLimitCommand,
+  "set-model-choice": setModelChoiceCommand,
 } satisfies Readonly<
   Record<
     SliceCommand,

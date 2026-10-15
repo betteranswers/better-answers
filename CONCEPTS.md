@@ -858,6 +858,13 @@ it.
 Fetch-shaped, so a local model and a hosted one take one code path, and a test fakes the seam at
 its wire while our own code is never mocked.
 
+### wire shape
+
+_Internal._ how one family of model APIs takes a call and answers it: the request the *model
+client* sends, and how it reads the reply as an outcome.
+
+Kept per *model provider*; a provider no wire shape speaks has no model to call.
+
 ### model provider
 
 _Internal._ who hosts the model a *model choice* names (Anthropic, Mistral): the *model client*

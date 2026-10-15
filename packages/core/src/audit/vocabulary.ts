@@ -12,6 +12,7 @@ import {
   GBP,
   GIT_SHA,
   IRI,
+  llmPurpose,
   MODEL_NAME,
   MODEL_PROVIDERS,
   type ModelProvider,
@@ -99,6 +100,8 @@ export const DETAIL_KINDS = {
   modelProvider: (value: DetailValue) =>
     typeof value === "string" && MODEL_PROVIDERS.some((provider) => provider === value),
   modelName: (value: DetailValue) => typeof value === "string" && MODEL_NAME.test(value),
+  llmPurpose: (value: DetailValue) =>
+    typeof value === "string" && llmPurpose.enumValues.some((purpose) => purpose === value),
   day: (value: DetailValue) => typeof value === "string" && CALENDAR_DAY.test(value),
   gbp: (value: DetailValue) => typeof value === "string" && GBP.test(value),
   flagClosing: (value: DetailValue) =>

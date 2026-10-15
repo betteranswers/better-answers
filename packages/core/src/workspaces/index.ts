@@ -66,6 +66,8 @@ export {
 } from "./display-name.ts";
 export type { SetDisplayNameRefusal } from "./display-name.ts";
 export { listWorkspaces } from "./listing.ts";
+export { setModelChoice } from "./model-choice.ts";
+export type { SetModelChoiceRefusal } from "./model-choice.ts";
 export { setModelKey } from "./model-key.ts";
 export type { SetModelKeyRefusal } from "./model-key.ts";
 export { setModelPrice } from "./model-price.ts";
