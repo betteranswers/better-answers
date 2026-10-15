@@ -1,7 +1,6 @@
 import type { JudgeState, QuestionVerdict } from "@better-answers/schema";
 
 import { JUDGE_WORDS, REASON_WORDS } from "@/shared/answer-words.ts";
-import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 
 import type { Phase } from "./ask-api.ts";
 
@@ -39,7 +38,6 @@ export const ASK_WORDS = {
   judge: JUDGE_WORDS satisfies Readonly<Record<JudgeState, string>>,
   noCollection: "No Collection",
   unmapped: "Unmapped Passages",
-  notCompanyKnowledge: CONCEPT_WORDS.notCompanyKnowledge,
   /** A drafted part that says no prose was drafted, and why. */
   unwritten: {
     refused: "Nothing was drafted, because no sentence could cite this knowledge.",

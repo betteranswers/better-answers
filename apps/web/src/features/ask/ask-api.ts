@@ -22,17 +22,6 @@ export type FeedbackInput = inferInput<Api["ask"]["giveFeedback"]>;
 
 type Told = Exclude<AskEvent, { readonly kind: "keep-alive" }>;
 
-type Asking = {
-  /** Until the stream ends, however it ends. */
-  readonly streaming: boolean;
-  /** What the stream said, with no keep-alive: phases, the result, then the prose. */
-  readonly told: readonly Told[];
-  /** Why the stream ended without its result, or partway through its prose. */
-  readonly failure: Error | ApiError | undefined;
-};
-
-const NOT_ASKED: Asking = { streaming: false, told: [], failure: undefined };
-
 /** The first phase is said before the api says it, so the press shows at once. */
 const FIRST_PHASE = "reading" satisfies Phase;
 
@@ -44,22 +33,24 @@ const phaseOf = (told: readonly Told[]): Phase => {
 const isTold = (event: AskEvent): event is Told => event.kind !== "keep-alive";
 
 export type Answering = {
+  /** Until the stream ends, however it ends. */
   readonly streaming: boolean;
   readonly phase: Phase;
   readonly answer: Asked<AskResult> | undefined;
+  /** Why the stream ended without its result, or partway through its prose. */
   readonly failure: Error | ApiError | undefined;
   /** Asks nothing while an answer still streams, so a second press starts no second question. */
   readonly ask: (input: AskInput) => void;
 };
 
 /**
- * The plain client with no query around it, so neither a refocus nor a failure asks again.
+ * A mutation, never a query: nothing asks again, and the app's failure listener hears a refusal.
  * Leaving the page ends the stream.
  */
 export const useAnswering = (): Answering => {
   const client = useTRPCClient();
-  const [asking, setAsking] = useState<Asking>(NOT_ASKED);
-  /** Held apart from the state, so two presses in one task still start one question. */
+  const [told, setTold] = useState<readonly Told[]>([]);
+  /** Held apart from the mutation's state, so two presses in one task still start one question. */
   const reading = useRef<AbortController | undefined>(undefined);
 
   useEffect(
@@ -69,34 +60,34 @@ export const useAnswering = (): Answering => {
     [],
   );
 
-  const read = async (input: AskInput, controller: AbortController): Promise<void> => {
-    try {
-      const events = await client.ask.question.mutate(input, { signal: controller.signal });
-      for await (const event of events) {
-        if (controller.signal.aborted) return;
-        if (isTold(event)) setAsking((held) => ({ ...held, told: [...held.told, event] }));
+  const asking = useMutation({
+    mutationFn: async ({ input, controller }: { input: AskInput; controller: AbortController }) => {
+      try {
+        const events = await client.ask.question.mutate(input, { signal: controller.signal });
+        for await (const event of events) {
+          if (controller.signal.aborted) return;
+          if (isTold(event)) setTold((held) => [...held, event]);
+        }
+      } catch (failure) {
+        // Leaving the page ends the stream, which is no failure of the answer's.
+        if (!controller.signal.aborted) throw failure;
+      } finally {
+        if (reading.current === controller) reading.current = undefined;
       }
-      setAsking((held) => ({ ...held, streaming: false }));
-    } catch (failure) {
-      if (controller.signal.aborted) return;
-      const said = failure instanceof Error ? failure : new Error(String(failure));
-      setAsking((held) => ({ ...held, streaming: false, failure: said }));
-    } finally {
-      if (reading.current === controller) reading.current = undefined;
-    }
-  };
+    },
+  });
 
   return {
-    streaming: asking.streaming,
-    phase: phaseOf(asking.told),
-    answer: askedFrom<AskResult>(asking.told),
-    failure: asking.failure,
+    streaming: asking.isPending,
+    phase: phaseOf(told),
+    answer: askedFrom<AskResult>(told),
+    failure: asking.error ?? undefined,
     ask: (input) => {
       if (reading.current !== undefined) return;
       const controller = new AbortController();
       reading.current = controller;
-      setAsking({ streaming: true, told: [], failure: undefined });
-      void read(input, controller);
+      setTold([]);
+      asking.mutate({ input, controller });
     },
   };
 };

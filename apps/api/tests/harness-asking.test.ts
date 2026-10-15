@@ -29,14 +29,23 @@ const POLICY = {
 const harness = (path: string, init?: RequestInit) =>
   new Hono().route("/", harnessControl(app(), models)).request(path, init);
 
-const scripted = async (script: Readonly<Record<string, unknown>>) => {
-  const answered = await harness("/__harness/asking", {
+const posted = (path: string, body: Readonly<Record<string, unknown>>) =>
+  harness(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(script),
+    body: JSON.stringify(body),
   });
-  expect(answered.status).toBe(200);
+
+const scripted = async (script: Readonly<Record<string, unknown>>) => {
+  expect((await posted("/__harness/asking", script)).status).toBe(200);
 };
+
+const released = (workspaceId: string) => posted("/__harness/asking/releases", { workspaceId });
+
+const SENTENCE = "Buyers use the console's audit page.";
+
+/** The policy is the one concept no judge is asked about, so the drafter cites it. */
+const DRAFTING = { writes: [{ citing: POLICY.title, sentence: SENTENCE }] };
 
 const calls = z.object({ judge: z.number(), draft: z.number() });
 
@@ -58,6 +67,17 @@ const anAdminAsking = async () => {
 };
 
 type Web = Awaited<ReturnType<typeof anAdminAsking>>["api"];
+
+const kept = z.object({ drafted: z.array(z.unknown()).nullable() });
+
+/** The prose a record keeps, none while drafting goes on. */
+const draftedOn = async (recordId: string): Promise<readonly unknown[]> => {
+  const found = await app().database.superuser.query(
+    "SELECT drafted FROM question_content WHERE record_id = $1",
+    [recordId],
+  );
+  return kept.parse(found.rows[0] ?? { drafted: null }).drafted ?? [];
+};
 
 const streamed = async (api: Web) => {
   const events = [];
@@ -83,18 +103,17 @@ describe("the browser suite's scripted model", () => {
 
   it("drafts the scripted sentence, cited by its concept's number", async () => {
     const { workspaceId, api } = await anAdminAsking();
-    const sentence = "Buyers use the console's audit page.";
-    await scripted({
-      workspaceId,
-      judging: { fits: [] },
-      drafting: { writes: [{ citing: POLICY.title, sentence }] },
-    });
+    await scripted({ workspaceId, judging: { fits: [] }, drafting: DRAFTING });
 
     const asked = await streamed(api);
 
     const policy = asked?.related.find(({ title }) => title === POLICY.title)?.iri;
     expect(asked?.prose).toEqual([
-      { collection: "audits", sentences: [{ sentence, concepts: [policy] }], outcome: "drafted" },
+      {
+        collection: "audits",
+        sentences: [{ sentence: SENTENCE, concepts: [policy] }],
+        outcome: "drafted",
+      },
     ]);
     expect(await callsTo(workspaceId)).toEqual({ judge: 1, draft: 1 });
   });
@@ -110,14 +129,43 @@ describe("the browser suite's scripted model", () => {
     });
     await until(async () => (await callsTo(workspaceId)).judge === 1);
     expect(answered).toBe(false);
-    const released = await harness("/__harness/asking/releases", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ workspaceId }),
-    });
+    const release = await released(workspaceId);
 
-    expect(await released.json()).toEqual({ released: true });
+    expect(await release.json()).toEqual({ released: true });
     expect(await asking).toMatchObject({ verdict: "ok" });
+  });
+
+  it("holds the draft after its first sentence until released", async () => {
+    const { workspaceId, api } = await anAdminAsking();
+    await scripted({ workspaceId, judging: { fits: [] }, drafting: DRAFTING, holds: "draft" });
+    let recordId = "";
+    const keptWhileHeld: number[] = [];
+
+    for await (const event of await api.ask.question.mutate({ question: QUESTION })) {
+      if (event.kind === "result") recordId = event.result.recordId;
+      if (event.kind !== "sentence") continue;
+      // A part's prose is kept once its model call ends, so none is kept while the call is held.
+      keptWhileHeld.push((await draftedOn(recordId)).length);
+      await released(workspaceId);
+    }
+
+    expect(keptWhileHeld).toEqual([0]);
+    expect(await draftedOn(recordId)).toHaveLength(1);
+  });
+
+  it("ends a held judge's call when its caller leaves", async () => {
+    const workspaceId = "a-workspace-no-api-asks-in";
+    models.script({ workspaceId, judging: { fits: [] }, holds: "judge" });
+    const leaving = new AbortController();
+
+    const call = models.fetch("https://model.example/v1/messages", {
+      headers: { "x-api-key": `sk-test-browser-${workspaceId}` },
+      body: "{}",
+      signal: leaving.signal,
+    });
+    leaving.abort();
+
+    await expect(call).rejects.toThrow("aborted");
   });
 
   it("fails a call the script says fails, at once", async () => {

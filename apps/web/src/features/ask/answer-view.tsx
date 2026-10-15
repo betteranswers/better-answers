@@ -155,6 +155,10 @@ function FittingAnswer(properties: {
   );
 }
 
+/** A title wraps on a line of its own where the tags beside it leave too little room. */
+const OPENER =
+  "h-auto min-w-0 grow basis-48 justify-start px-0 text-left font-medium break-words whitespace-normal";
+
 /** A concept by its line; its title opens it in the panel, and an `Answer` shows its words. */
 function ConceptItem(properties: { readonly concept: ShownConcept }) {
   const { concept } = properties;
@@ -168,7 +172,7 @@ function ConceptItem(properties: { readonly concept: ShownConcept }) {
           id={openerId}
           variant="link"
           aria-expanded={opened?.openerId === openerId}
-          className="h-auto min-w-0 justify-start px-0 text-left font-medium whitespace-normal"
+          className={OPENER}
           onClick={() => {
             open({
               key: concept.iri,
@@ -330,6 +334,7 @@ function Fitting(properties: {
   readonly recordId: string | undefined;
 }) {
   const { answer, recordId } = properties;
+  const { close } = usePanel();
   return (
     <>
       {groupsOf(answer.answers, []).map((group) => (
@@ -340,7 +345,12 @@ function Fitting(properties: {
         </CollectionSection>
       ))}
       {answer.related.length === 0 ? null : (
-        <Collapsible>
+        <Collapsible
+          // Folding the list takes away what opened the panel, and the panel's only way back.
+          onOpenChange={(open) => {
+            if (!open) close();
+          }}
+        >
           <CollapsibleTrigger asChild>
             <Button variant="outline" size="sm" className="justify-self-start">
               {WORDS.verdictHeading.related}
@@ -379,7 +389,7 @@ function PassageItem(properties: { readonly passage: ShownAnswer["unmappedPassag
           id={openerId}
           variant="link"
           aria-expanded={opened?.openerId === openerId}
-          className="h-auto min-w-0 justify-start px-0 text-left font-medium whitespace-normal"
+          className={OPENER}
           onClick={() => {
             open({
               key: passage.locator,

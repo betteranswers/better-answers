@@ -21,6 +21,7 @@ import {
   railOf,
   releaseTheModel,
   saysARefusal,
+  saysSomethingNew,
   scriptAsking,
   seedConcepts,
   seedConnectedSources,
@@ -140,6 +141,18 @@ const asked = async (page: Page, question = QUESTION): Promise<void> => {
   await questionBox(page).press("Enter");
 };
 
+const NOTE = "It leaves out the LMS.";
+
+/** Flags the answer as incomplete with a note, answering its popover. */
+const flagSent = async (page: Page, result: Locator): Promise<Locator> => {
+  await result.getByRole("button", { name: "Flag This Answer" }).click();
+  const flagging = page.getByRole("dialog", { name: "Flag This Answer" });
+  await flagging.getByRole("radio", { name: "Incomplete" }).check();
+  await flagging.getByRole("textbox", { name: "Note" }).fill(NOTE);
+  await flagging.getByRole("button", { name: "Send Flag" }).click();
+  return flagging;
+};
+
 /** Counts each ask the page sends from here on. */
 const asksCounted = (page: Page): string[] => {
   const sent: string[] = [];
@@ -197,7 +210,9 @@ test.describe("Ask › New question", () => {
     await theActionLandedWithinItsBudget(page, "ask");
 
     await expect(said(page)).toHaveText(/\S/);
+    const whileReading = await said(page).innerText();
     await expect.poll(async () => (await modelCallsIn(request, workspaceId)).judge).toBe(1);
+    await saysSomethingNew(said(page), whileReading);
     await expect(answered(page, "Answered")).toHaveCount(0);
     const whileJudging = await said(page).innerText();
     await releaseTheModel(request, workspaceId);
@@ -224,6 +239,7 @@ test.describe("Ask › New question", () => {
     });
   }
 
+  // The streaming budget: the first sentence is on the page while the model still holds the rest.
   test("shows the first drafted sentence before the stream ends", async ({ page, request }) => {
     const { workspaceId } = await aViewerAsking(page, request, {
       judging: { fits: [] },
@@ -238,25 +254,29 @@ test.describe("Ask › New question", () => {
     await expect(audits.getByText(DRAFTED)).toBeVisible();
     const elapsed = Date.now() - started;
 
-    test.info().annotations.push({ type: "first sentence", description: `${elapsed} ms` });
+    test
+      .info()
+      .annotations.push({ type: "first sentence, streamed", description: `${elapsed} ms` });
     await expect(askButton(page), "the stream had ended").toHaveAttribute("aria-disabled", "true");
     await expect(audits.getByRole("button", { name: `Cites ${POLICY.title}` })).toBeVisible();
     await releaseTheModel(request, workspaceId);
     await expect(askButton(page)).not.toHaveAttribute("aria-disabled", "true");
   });
 
-  for (const [how, script] of [
-    ["fails", { judging: { fits: [] }, drafting: "fails" }],
-    ["pauses", { drafting: DRAFTING, limitGbp: "0.001" }],
+  // A failed draft was asked of the model once and not again; a paused one never reached it.
+  for (const [how, script, calls] of [
+    ["fails", { judging: { fits: [] }, drafting: "fails" }, { judge: 1, draft: 1 }],
+    ["pauses", { drafting: DRAFTING, limitGbp: "0.001" }, { judge: 0, draft: 0 }],
   ] as const) {
     test(`keeps the evidence when drafting ${how}, saying so`, async ({ page, request }) => {
-      await aViewerAsking(page, request, script);
+      const { workspaceId } = await aViewerAsking(page, request, script);
 
       await asked(page);
 
       const audits = collectionIn(answered(page, "Related Knowledge"), "audits");
       await expect(audits.getByRole("button", { name: POLICY.title, exact: true })).toBeVisible();
       await expect(askButton(page)).not.toHaveAttribute("aria-disabled", "true");
+      expect(await modelCallsIn(request, workspaceId)).toEqual(calls);
       await expect(audits.getByText(DRAFTED)).toHaveCount(0);
       await expect(audits).toMatchAriaSnapshot(`
         - region "audits":
@@ -281,8 +301,11 @@ test.describe("Ask › New question", () => {
     await audits.getByRole("button", { name: `Flag “${DRAFTED}”` }).click();
     const flagging = page.getByRole("dialog", { name: `Flag “${DRAFTED}”` });
     await flagging.getByRole("radio", { name: "Wrong" }).check();
+    const sending = page.waitForResponse((response) => response.url().includes("ask.giveFeedback"));
     await flagging.getByRole("button", { name: "Send Flag" }).click();
     await expect(audits.getByRole("button", { name: "Flagged" })).toBeVisible();
+    // Shown flagged at the press; leaving before the api answers would cancel the send.
+    expect((await sending).ok(), "the flag was not stored").toBe(true);
 
     await page.goto(QUESTIONS_ASKED.path);
     await page
@@ -300,16 +323,49 @@ test.describe("Ask › New question", () => {
     await asked(page);
     const result = answered(page, "Answered");
 
-    await result.getByRole("button", { name: "Flag This Answer" }).click();
-    const flagging = page.getByRole("dialog", { name: "Flag This Answer" });
-    await flagging.getByRole("radio", { name: "Incomplete" }).check();
-    await flagging.getByRole("textbox", { name: "Note" }).fill("It leaves out the LMS.");
-    await flagging.getByRole("button", { name: "Send Flag" }).click();
+    const flagging = await flagSent(page, result);
 
     await expect(flagging).toHaveCount(0);
     await expect(result.getByRole("button", { name: "Flagged" })).toBeVisible();
     await expect(result.getByRole("button", { name: "Flag This Answer" })).toHaveCount(0);
     await expect(result.getByRole("status").last()).toHaveText(/\S/);
+  });
+
+  test("reopens a refused flag with its draft and the refusal", async ({ page, request }) => {
+    await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
+    await asked(page);
+    const result = answered(page, "Answered");
+    await page.route(
+      (url) => url.pathname.includes("ask.giveFeedback"),
+      (route) => route.abort(),
+    );
+
+    const flagging = await flagSent(page, result);
+
+    await saysARefusal(result.getByRole("alert"));
+    await expect(result.getByRole("button", { name: "Flagged" })).toHaveCount(0);
+    await expect(flagging.getByRole("radio", { name: "Incomplete" })).toBeChecked();
+    await expect(flagging.getByRole("textbox", { name: "Note" })).toHaveValue(NOTE);
+  });
+
+  test("asks for a reason before a flag is sent", async ({ page, request }) => {
+    await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
+    await asked(page);
+    const result = answered(page, "Answered");
+    const sent: string[] = [];
+    page.on("request", (each) => {
+      if (each.url().includes("ask.giveFeedback")) sent.push(each.url());
+    });
+
+    await result.getByRole("button", { name: "Flag This Answer" }).click();
+    const flagging = page.getByRole("dialog", { name: "Flag This Answer" });
+    await flagging.getByRole("button", { name: "Send Flag" }).click();
+
+    await saysARefusal(flagging.getByRole("alert"));
+    await expect(flagging.getByRole("radiogroup")).toHaveAttribute("aria-invalid", "true");
+    await flagging.getByRole("radio", { name: "Wrong" }).check();
+    await expect(flagging.getByRole("alert")).toHaveCount(0);
+    expect(sent, "a flag with no reason was sent").toEqual([]);
   });
 
   test("shows an Answer in no collection under that word", async ({ page, request }) => {
@@ -378,10 +434,28 @@ test.describe("Ask › New question", () => {
   });
 
   test("says the spending limit in the refusal's sentence", async ({ page, request }) => {
-    await aViewerAsking(page, request, { judging: { fits: [USERS.title] }, limitGbp: "0.001" });
+    const { workspaceId } = await aViewerAsking(page, request, {
+      judging: { fits: [USERS.title] },
+      limitGbp: "0.001",
+    });
+    // Streamed, so the refusal is a line of the body; the browser keeps no streamed body to read.
+    const refused = Promise.withResolvers<string>();
+    await page.route(
+      (url) => url.pathname.includes("ask.question"),
+      async (route) => {
+        const response = await route.fetch();
+        const body = await response.text();
+        refused.resolve(body);
+        await route.fulfill({ response, body });
+      },
+    );
 
     await asked(page);
 
+    expect(await refused.promise, "the api did not refuse at the spending limit").toContain(
+      "spending-limit-met",
+    );
+    expect(await modelCallsIn(request, workspaceId)).toEqual({ judge: 0, draft: 0 });
     await saysARefusal(alerted(page));
     await expect(answered(page, "Answered")).toHaveCount(0);
     await expect(answered(page, "Related Knowledge")).toHaveCount(0);
@@ -454,6 +528,53 @@ test.describe("Ask › New question", () => {
     await expect(collections.getByRole("checkbox", { name: "audits" })).toBeVisible();
   });
 
+  test("asks within the collection the reader ticked", async ({ page, request }) => {
+    const asking = await aWorkspaceToAsk(request, {});
+    await seedConcepts(request, {
+      workspaceId: asking.workspaceId,
+      userId: asking.adminId,
+      concepts: [
+        {
+          title: "How do buyers access audit information in the LMS?",
+          collection: "lms",
+          kind: "Policy",
+          body: "The LMS exports its audit trail to buyers.",
+        },
+      ],
+    });
+    await signedInAsTheViewer(page, request, asking);
+    await asked(page);
+    const result = answered(page, "Related Knowledge");
+    await expect(collectionIn(result, "lms")).toBeVisible();
+
+    await newQuestion(page)
+      .getByRole("group", { name: "Collections" })
+      .getByRole("checkbox", { name: "audits" })
+      .check();
+    const sent = page.waitForRequest((each) => each.url().includes("ask.question"));
+    await askButton(page).click();
+
+    expect((await sent).postData(), "the ask named no collection").toContain(
+      '"collections":["audits"]',
+    );
+    await expect(collectionIn(result, "audits")).toBeVisible();
+    await expect(collectionIn(result, "lms")).toHaveCount(0);
+  });
+
+  test("asks nothing for a blank question, saying so", async ({ page, request }) => {
+    await aViewerAsking(page, request, {});
+    const asks = asksCounted(page);
+
+    await questionBox(page).press("Enter");
+
+    await saysARefusal(alerted(page));
+    await expect(questionBox(page)).toHaveAttribute("aria-invalid", "true");
+    await questionBox(page).fill("How do buyers");
+    await questionBox(page).press("Shift+Enter");
+    await expect(questionBox(page)).toHaveValue("How do buyers\n");
+    expect(asks, "a question was asked").toEqual([]);
+  });
+
   test("clears the question and its result on a workspace switch", async ({ page, request }) => {
     const { first, second } = await inTwoWorkspaces(
       page,
@@ -491,6 +612,8 @@ test.describe("Ask › New question", () => {
 
     await page.keyboard.press(KEY.helpful.key);
     await expect(result.getByRole("button", { name: "Marked Helpful" })).toBeVisible();
+    // Said once the api has kept it; the button changes as it is pressed.
+    await expect(result.getByRole("status").filter({ hasText: /\S/ })).toHaveCount(1);
     await page.keyboard.press(KEY.flag.key);
     await expect(page.getByRole("dialog", { name: "Flag This Answer" })).toBeVisible();
   });
@@ -514,6 +637,24 @@ test.describe("Ask › New question", () => {
 
     await tabUntilFocused(page, opener, 4);
     await expect(panel).toBeVisible();
+  });
+
+  test("opens a cited concept beneath its sentence at 320 px", async ({ page, request }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await aViewerAsking(page, request, { judging: { fits: [] }, drafting: DRAFTING });
+    await asked(page);
+    const audits = collectionIn(answered(page, "Related Knowledge"), "audits");
+    const footnote = audits.getByRole("button", { name: `Cites ${POLICY.title}` });
+
+    await footnote.click();
+
+    const inline = audits.getByRole("region", { name: POLICY.title });
+    await expect(inline.getByText(POLICY.body)).toBeVisible();
+    await expect(inline.getByRole("heading", { name: POLICY.title })).toBeFocused();
+    expect(await scrolledSideways(page), "the page scrolls sideways at 320 px").toBe(0);
+    await page.keyboard.press("Escape");
+    await expect(inline).toHaveCount(0);
+    await expect(footnote).toBeFocused();
   });
 
   test("draws the answer at 320 px with nothing sideways", async ({ page, request }) => {

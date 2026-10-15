@@ -28,12 +28,21 @@ const focusOnArrival = (control: HTMLButtonElement | null): void => {
   control?.focus();
 };
 
+/** What the reader has written into a flag, kept by its control so a refused send loses none of it. */
+type Draft = { readonly reason: Reason | undefined; readonly note: string };
+
+const NO_DRAFT: Draft = { reason: undefined, note: "" };
+
 /** No reason is chosen for the reader: the api takes none without one, so sending says so. */
-function FlagForm(properties: { readonly onSend: (reason: Reason, note: string) => void }) {
+function FlagForm(properties: {
+  readonly draft: Draft;
+  readonly onDraft: (draft: Draft) => void;
+  readonly onSend: (reason: Reason, note: string) => void;
+}) {
   const id = useId();
-  const [reason, setReason] = useState<Reason>();
+  const { draft, onDraft } = properties;
+  const { reason, note } = draft;
   const [unchosen, setUnchosen] = useState(false);
-  const [note, setNote] = useState("");
   const send = (event: FormEvent) => {
     event.preventDefault();
     if (reason === undefined) {
@@ -51,7 +60,7 @@ function FlagForm(properties: { readonly onSend: (reason: Reason, note: string) 
           aria-invalid={unchosen ? true : undefined}
           aria-describedby={unchosen ? `${id}-unchosen` : undefined}
           onValueChange={(value) => {
-            setReason(reasonOf(value));
+            onDraft({ ...draft, reason: reasonOf(value) });
             setUnchosen(false);
           }}
         >
@@ -76,7 +85,7 @@ function FlagForm(properties: { readonly onSend: (reason: Reason, note: string) 
           maxLength={NOTE_MAX}
           value={note}
           onChange={(event) => {
-            setNote(event.target.value);
+            onDraft({ ...draft, note: event.target.value });
           }}
         />
         <p id={`${id}-note-help`} className="text-muted-foreground">
@@ -107,7 +116,7 @@ function OpensOnItsKey(properties: { readonly onOpen: () => void }) {
 }
 
 /**
- * Shown sent when pressed, and put back with the refusal if refused. Its own mutation keeps one
+ * Shown sent when pressed; a refused send reopens with its draft. Its own mutation keeps one
  * control's answer from another's callbacks.
  */
 export function FlagControl(properties: Flagging) {
@@ -115,6 +124,7 @@ export function FlagControl(properties: Flagging) {
   const giving = useGiveFeedback();
   const [open, setOpen] = useState(false);
   const [sent, setSent] = useState(false);
+  const [draft, setDraft] = useState<Draft>(NO_DRAFT);
   const [outcome, setOutcome] = useState<Outcome>();
 
   const send = (reason: Reason, note: string) => {
@@ -131,10 +141,12 @@ export function FlagControl(properties: Flagging) {
     setOutcome(undefined);
     giving.mutate(flag, {
       onSuccess: () => {
+        setDraft(NO_DRAFT);
         setOutcome({ tone: "said", words: WORDS.flagSaid });
       },
       onError: (failure) => {
         setSent(false);
+        setOpen(true);
         setOutcome(outcomeOfFailure(failure, "action"));
       },
     });
@@ -167,7 +179,7 @@ export function FlagControl(properties: Flagging) {
             </Button>
           </PopoverTrigger>
           <PopoverContent aria-label={name} align="start" className="w-80 max-w-[calc(100vw-2rem)]">
-            <FlagForm onSend={send} />
+            <FlagForm draft={draft} onDraft={setDraft} onSend={send} />
           </PopoverContent>
         </Popover>
       )}

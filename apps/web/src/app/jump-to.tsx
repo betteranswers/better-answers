@@ -74,12 +74,9 @@ const areaJump = (area: VisibleArea): Jump =>
     kind: "place",
   });
 
-/** An area standing in for its own unbuilt home is listed once, as the area. */
 const placedIn = (area: VisibleArea): readonly Placed[] =>
   area.menuGroups.flatMap((menuGroup) =>
-    menuGroup.pages
-      .filter((page) => page !== area.opensAt || page.name !== area.name)
-      .map((page) => ({ area, menuGroup, page })),
+    menuGroup.pages.map((page) => ({ area, menuGroup, page })),
   );
 
 const pageJump = ({ area, menuGroup, page }: Placed): Jump =>

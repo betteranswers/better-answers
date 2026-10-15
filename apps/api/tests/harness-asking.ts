@@ -7,7 +7,7 @@ import {
   streamedResponse,
 } from "@better-answers/core/testing/judge-wire";
 
-import { judgeSaying, judgingSetUp } from "./harness-model.ts";
+import { endedWith, judgeSaying, judgingSetUp } from "./harness-model.ts";
 import type { TestApp } from "./harness.ts";
 
 /** Each workspace's key names it at the wire, so specs running side by side never share a script. */
@@ -81,11 +81,16 @@ const drafted = (scripted: Scripted, body: string, signal: AbortSignal | null | 
   });
 };
 
-const judged = async (scripted: Scripted, body: string): Promise<Response> => {
+/** A held judge still ends as a real fetch does when its caller aborts. */
+const judged = async (
+  scripted: Scripted,
+  body: string,
+  signal: AbortSignal | null | undefined,
+): Promise<Response> => {
   const { judging, holds } = scripted.script;
-  if (holds === "judge") await scripted.held.promise;
+  if (holds === "judge") await Promise.race([scripted.held.promise, endedWith(signal)]);
   if (judging === undefined || judging === "fails") return failed();
-  return judgeSaying(judging.fits)({ url: "", headers: undefined, body, signal: undefined });
+  return judgeSaying(judging.fits)({ url: "", headers: undefined, body, signal });
 };
 
 /**
@@ -108,7 +113,7 @@ export const scriptedModels = () => {
         return drafted(scripted, body, init?.signal);
       }
       scripted.calls.judge += 1;
-      return judged(scripted, body);
+      return judged(scripted, body, init?.signal);
     },
     script: (script: AskingScript): void => {
       scripts.set(script.workspaceId, {

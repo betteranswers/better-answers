@@ -484,9 +484,9 @@ export const pageNamed = <Held extends MenuGroup>(
   return page;
 };
 
-/** Where each reader lands, and the way back offered when they are lost. */
 const NEW_QUESTION = pageNamed(menuGroupIn(ASK, "ask"), "New Question");
 
+/** Where each reader lands, and the way back offered when they are lost. */
 export const HOMES = {
   Admin: pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members"),
   Editor: NEW_QUESTION,
