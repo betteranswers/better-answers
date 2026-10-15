@@ -515,6 +515,16 @@ describe("a call's own deadline", () => {
     expect(wire.sent).toHaveLength(1);
   });
 
+  it("skips a retry whose wait uses the deadline up", async () => {
+    const wire = theWire(OVERLOADED, ANSWERED);
+    const { client } = deadlineClient(wire, [148_000, 0]);
+
+    const called = await client.callModel(TO_SONNET, WITHIN_150_S);
+
+    expect(called.outcome).toBe("failed");
+    expect(wire.sent).toHaveLength(1);
+  });
+
   it("answers rate limited rather than wait past the deadline", async () => {
     const wire = theWire(RATE_LIMITED, ANSWERED);
     const { client } = deadlineClient(wire, [146_000, 0]);
