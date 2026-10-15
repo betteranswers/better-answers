@@ -171,6 +171,20 @@ test.describe("Ask › New question", () => {
     await expect(questionBox(page), "focus left the question").toBeFocused();
   });
 
+  test("keeps the related knowledge one disclosure under the fit", async ({ page, request }) => {
+    await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
+    await asked(page);
+    const result = answered(page, "Answered");
+    const disclosure = result.getByRole("button", { name: "Related Knowledge" });
+    await expect(disclosure).toHaveAttribute("aria-expanded", "false");
+
+    await disclosure.click();
+
+    await expect(disclosure).toHaveAttribute("aria-expanded", "true");
+    await expect(result.getByText(SUPPLIER.body)).toBeVisible();
+    await expect(result.getByRole("button", { name: POLICY.title, exact: true })).toBeVisible();
+  });
+
   test("says its phase within the action budget, before the verdict", async ({ page, request }) => {
     const { workspaceId } = await aViewerAsking(page, request, {
       judging: { fits: [USERS.title] },

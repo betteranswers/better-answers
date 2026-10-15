@@ -12,7 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group.tsx";
 import { Textarea } from "@/shared/ui/textarea.tsx";
 
 import { useGiveFeedback, type FeedbackInput } from "./ask-api.ts";
-import { ASK_KEYSTROKES as KEY } from "./ask-state.ts";
+import { ASK_KEYSTROKES as KEY, NOTE_MAX } from "./ask-state.ts";
 import { ASK_WORDS as WORDS } from "./ask-words.ts";
 
 /** A flag on a sentence or an `Answer` names it and the concept it rested on. */
@@ -73,7 +73,7 @@ function FlagForm(properties: { readonly onSend: (reason: Reason, note: string) 
         <Textarea
           id={`${id}-note`}
           aria-describedby={`${id}-note-help`}
-          maxLength={2000}
+          maxLength={NOTE_MAX}
           value={note}
           onChange={(event) => {
             setNote(event.target.value);
