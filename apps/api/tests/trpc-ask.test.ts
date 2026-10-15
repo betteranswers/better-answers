@@ -5,7 +5,14 @@ import { askedFrom } from "../../web/src/shared/api/ask-stream.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { connectAsHost } from "./flow.ts";
 import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
-import { aModelWire, judgeSaying, judgingSetUp } from "./harness-model.ts";
+import {
+  aModelWire,
+  AUDIT_ANSWERS,
+  AUDIT_QUESTION as QUESTION,
+  judgeSaying,
+  judgingSetUp,
+} from "./harness-model.ts";
+import { feedbackKeptOn as feedbackOf, recordsIn as recordsOf } from "./harness-questions.ts";
 import { structured, toolAnswered, type Rpc } from "./mcp-call.ts";
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
 import { refusalOfCall, webClientOf } from "./web-client.ts";
@@ -16,23 +23,7 @@ const { clock, stopTheClock } = aStoppableClock();
 
 const app = appForSuite({ fetchModel: wire.fetch, clock });
 
-const USERS = {
-  title: "How do buyers access audit information about their users' actions?",
-  collection: "audits",
-  body: "Buyers download their users' audit log from the console.",
-};
-const SUPPLIER = {
-  title: "How do buyers access audit information about the supplier's actions?",
-  collection: "audits",
-  body: "The supplier sends its own audit report on request.",
-};
-const RETENTION = {
-  title: "How long is audit information kept for buyers?",
-  collection: "audits",
-  body: "Audit information is kept for thirteen months.",
-};
-
-const QUESTION = "How do buyers access audit information?";
+const { users: USERS, supplier: SUPPLIER, retention: RETENTION } = AUDIT_ANSWERS;
 
 const A_NOTE = "The period changed in May.";
 
@@ -83,15 +74,7 @@ const streamed = async (web: Web, asking: Asking) => {
   return events;
 };
 
-const recordsIn = async (workspaceId: string) => {
-  const kept = await app().database.superuser.query(
-    `SELECT r.transport, r.verdict, r.judge_state, r.completed_at IS NOT NULL AS completed, c.question
-       FROM question_asked r JOIN question_content c ON c.record_id = r.id
-      WHERE r.workspace_id = $1`,
-    [workspaceId],
-  );
-  return kept.rows;
-};
+const recordsIn = (workspaceId: string) => recordsOf(app(), workspaceId);
 
 /** The spend a workspace holds: reservations not yet settled, and the calls settled. */
 const spendIn = async (workspaceId: string) => {
@@ -103,14 +86,7 @@ const spendIn = async (workspaceId: string) => {
   return counted.rows[0];
 };
 
-const feedbackKeptOn = async (recordId: string) => {
-  const kept = await app().database.superuser.query(
-    `SELECT given_by, verdict, reason, note, disputed_sentence, disputed_concept
-       FROM question_feedback WHERE record_id = $1 ORDER BY given_at, id`,
-    [recordId],
-  );
-  return kept.rows;
-};
+const feedbackKeptOn = (recordId: string) => feedbackOf(app(), recordId);
 
 const ANSWERED_IN_FULL = {
   verdict: "ok",
@@ -179,7 +155,8 @@ describe("ask over tRPC", () => {
     const folded = askedFrom(await streamed(web, asking));
     const overMcp = await mcp("ask", asking);
 
-    const { recordId: webRecord, prose, ...onTheWeb } = folded ?? { recordId: "", prose: [] };
+    if (folded === undefined) throw new Error("the stream carried no event");
+    const { recordId: webRecord, prose, ...onTheWeb } = folded;
     const { recordId: mcpRecord, ...overTheWire } = inCoreTerms(overMcp, app().publicUrl);
     expect(onTheWeb).toEqual(overTheWire);
     expect(onTheWeb).toMatchObject(ANSWERED_IN_FULL);

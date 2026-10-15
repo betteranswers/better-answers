@@ -279,12 +279,22 @@ const consumeCeiling = async (
 export type RoadCeiling = { readonly budget: string; readonly rule: CounterRule };
 
 /** The count comes before the transaction, so a call held at its ceiling holds no connection. */
+const claimsCounted = async (
+  ctx: TrpcContext,
+  path: string,
+  type: TRPCProcedureType,
+  ceiling: RoadCeiling | undefined,
+): Promise<Claims> => {
+  const claims = await claimsInTheTabsWorkspace(ctx, path, type);
+  if (ceiling !== undefined) {
+    await consumeCeiling(ctx, path, `${ceiling.budget}:${claims.userId}`, ceiling.rule);
+  }
+  return claims;
+};
+
 const inTheResolversTransaction = (resolve: typeof withPrincipal, ceiling?: RoadCeiling) =>
   trpc.procedure.use(async ({ ctx, path, type, next }) => {
-    const claims = await claimsInTheTabsWorkspace(ctx, path, type);
-    if (ceiling !== undefined) {
-      await consumeCeiling(ctx, path, `${ceiling.budget}:${claims.userId}`, ceiling.rule);
-    }
+    const claims = await claimsCounted(ctx, path, type, ceiling);
 
     const resolved = await attempt(() =>
       resolve(ctx.doors.postgres, claims, async (principal, tx) =>
@@ -310,10 +320,7 @@ export const mutationProcedure = inTheResolversTransaction(withHeldPrincipal);
  */
 const onItsOwnTransactions = (ceiling?: RoadCeiling) =>
   trpc.procedure.use(async ({ ctx, path, type, next }) => {
-    const claims = await claimsInTheTabsWorkspace(ctx, path, type);
-    if (ceiling !== undefined) {
-      await consumeCeiling(ctx, path, `${ceiling.budget}:${claims.userId}`, ceiling.rule);
-    }
+    const claims = await claimsCounted(ctx, path, type, ceiling);
 
     const resolved = await attempt(() =>
       withPrincipal(ctx.doors.postgres, claims, async (principal) => principal),
@@ -326,7 +333,7 @@ const onItsOwnTransactions = (ceiling?: RoadCeiling) =>
 
 export const ownTransactionProcedure = onItsOwnTransactions();
 
-/** As ownTransactionProcedure, counted with the queries built on `queryCeiling(ceiling)`. */
+/** As ownTransactionProcedure, its procedures counted together against `ceiling`. */
 export const ownTransactionCounted = (ceiling: RoadCeiling) => onItsOwnTransactions(ceiling);
 
 /** Answers only once the action committed, so a follow-up such as an email never outruns the write. */
