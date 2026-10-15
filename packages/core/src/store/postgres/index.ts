@@ -418,7 +418,9 @@ const MEMBER_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS person_
             COALESCE((SELECT array_agg(gm.group_id ORDER BY gm.group_id)
                         FROM group_member gm
                        WHERE gm.workspace_id = m.workspace_id AND gm.user_id = m.user_id),
-                     '{}') AS group_ids
+                     '{}') AS group_ids,
+            (SELECT s.second_factor_confirmed_at FROM session s
+              WHERE s.id = $3 AND s.user_id = m.user_id) AS "confirmedAt"
      FROM member m
      JOIN "user" u ON u.id = m.user_id
     WHERE m.workspace_id = $1 AND m.user_id = $2`;
@@ -436,6 +438,9 @@ type MemberRow = {
   readonly person_revoked_at: Date | null;
   readonly member_revoked_at: Date | null;
   readonly group_ids: readonly string[];
+
+  /** The named session's confirmation, read beside the rows; null where the claims name none. */
+  readonly confirmedAt: Date | null;
 };
 
 const resolveClaims = async <T>(
@@ -455,13 +460,18 @@ const resolveClaims = async <T>(
     door,
     workspaceId.data,
     userId.data,
+    claims.sessionId ?? null,
     credentialIssuedAtMs,
     (row) => {
       const refusal = refuse(row, credentialIssuedAtMs);
       if (!refusal.ok) return refusal;
 
-      return claims.role === undefined || claims.role === refusal.value.role
-        ? refusal
+      const resolved: ResolvedMember = {
+        ...refusal.value,
+        confirmedAtMs: refusal.value.confirmedAt?.getTime() ?? null,
+      };
+      return claims.role === undefined || claims.role === resolved.role
+        ? ok(resolved)
         : err("role-disagrees");
     },
     work,
@@ -509,12 +519,18 @@ const withMemberQuery = async <T>(
     door,
     principal.workspaceId,
     principal.userId,
+    null,
     principal.credentialIssuedAtMs,
     (row) => {
       const refusal = refuse(row, principal.credentialIssuedAtMs);
       if (!refusal.ok) return refusal;
 
-      return refusal.value.role === principal.role ? refusal : err("role-disagrees");
+      // The session is not named again: its confirmation travels with the principal that read it.
+      const resolved: ResolvedMember = {
+        ...refusal.value,
+        confirmedAtMs: principal.secondFactorConfirmedAtMs,
+      };
+      return resolved.role === principal.role ? ok(resolved) : err("role-disagrees");
     },
     work,
     query,
@@ -546,8 +562,9 @@ const resolveScoped = async <T>(
   door: PostgresDoor,
   workspaceId: WorkspaceId,
   userId: UserId,
+  sessionId: string | null,
   credentialIssuedAtMs: number,
-  refusalFor: (row: MemberRow | undefined) => Result<ResolvedMember, PrincipalRefusal>,
+  resolve: (row: MemberRow | undefined) => Result<ResolvedMember, PrincipalRefusal>,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
   query: string,
   opening: Opening,
@@ -557,8 +574,8 @@ const resolveScoped = async <T>(
     async (tx): Promise<Opened<T>> => {
       await scopeTo(tx, workspaceId);
 
-      const member = await tx.query<MemberRow>(query, [workspaceId, userId]);
-      const resolved = refusalFor(member.rows[0]);
+      const member = await tx.query<MemberRow>(query, [workspaceId, userId, sessionId]);
+      const resolved = resolve(member.rows[0]);
       if (!resolved.ok) return err(resolved.error);
 
       const principal: UserPrincipal = {
@@ -571,6 +588,7 @@ const resolveScoped = async <T>(
           boundarySchemas.group.select.shape.id.parse(id),
         ),
         credentialIssuedAtMs,
+        secondFactorConfirmedAtMs: resolved.value.confirmedAtMs,
       };
       return ok(await work(principal, tx));
     },
@@ -578,12 +596,14 @@ const resolveScoped = async <T>(
     opening,
   );
 
-type ResolvedMember = MemberRow & { readonly role: Role };
+type ResolvedMember = MemberRow & { readonly role: Role; readonly confirmedAtMs: number | null };
+
+type AdmittedMember = MemberRow & { readonly role: Role };
 
 const refuse = (
   row: MemberRow | undefined,
   credentialIssuedAtMs: number,
-): Result<ResolvedMember, PrincipalRefusal> => {
+): Result<AdmittedMember, PrincipalRefusal> => {
   if (row === undefined) return err("not-a-member");
 
   if (!isRole(row.role)) return err("role-unknown");
@@ -600,6 +620,9 @@ type OperatorRow = {
   readonly id: string;
   readonly operator: boolean;
   readonly revoked_at: Date | null;
+
+  /** The named session's confirmation; null where the claims name no session. */
+  readonly confirmedAt: Date | null;
 };
 
 const carriesTheMark = (
@@ -612,7 +635,7 @@ const carriesTheMark = (
 
 const resolveOperator = async <T>(
   door: PostgresDoor,
-  claims: Pick<Claims, "userId" | "issuedAt">,
+  claims: Pick<Claims, "userId" | "issuedAt" | "sessionId">,
   work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
   opening: Opening,
 ): Promise<Result<T, OperatorRefusal>> => {
@@ -622,8 +645,11 @@ const resolveOperator = async <T>(
     door,
     async (tx): Promise<Result<T, OperatorRefusal>> => {
       const found = await tx.query<OperatorRow>(
-        'SELECT id, operator, credentials_revoked_at AS revoked_at FROM "user" WHERE id = $1',
-        [claims.userId],
+        `SELECT id, operator, credentials_revoked_at AS revoked_at,
+                (SELECT s.second_factor_confirmed_at FROM session s
+                  WHERE s.id = $2 AND s.user_id = "user".id) AS "confirmedAt"
+           FROM "user" WHERE id = $1`,
+        [claims.userId, claims.sessionId ?? null],
       );
       const row = found.rows[0];
       if (!carriesTheMark(row, credentialIssuedAtMs)) return err("not-the-operator");
@@ -632,6 +658,7 @@ const resolveOperator = async <T>(
         kind: "operator",
         userId: boundarySchemas.user.select.shape.id.parse(row.id),
         credentialIssuedAtMs,
+        secondFactorConfirmedAtMs: row.confirmedAt?.getTime() ?? null,
       };
       return ok(await work(operator, tx));
     },
@@ -647,14 +674,14 @@ const resolveOperator = async <T>(
  */
 export const withOperator = async <T>(
   door: PostgresDoor,
-  claims: Pick<Claims, "userId" | "issuedAt">,
+  claims: Pick<Claims, "userId" | "issuedAt" | "sessionId">,
   work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
 ): Promise<Result<T, OperatorRefusal>> => resolveOperator(door, claims, work, "BEGIN");
 
 /** As withOperator, but read-only: a write inside the work fails at its own statement. */
 export const withOperatorRead = async <T>(
   door: PostgresDoor,
-  claims: Pick<Claims, "userId" | "issuedAt">,
+  claims: Pick<Claims, "userId" | "issuedAt" | "sessionId">,
   work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
 ): Promise<Result<T, OperatorRefusal>> => resolveOperator(door, claims, work, "BEGIN READ ONLY");
 

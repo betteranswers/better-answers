@@ -12,8 +12,9 @@ export const KERNEL_REFUSALS = {
   // nothing else.
   "not-the-operator": "forbidden",
 
-  // The operator's writes ask for a recent sign-in; signing in again is the whole remedy.
-  "sign-in-too-old": "unauthenticated",
+  // A high-impact act asks for a recent confirmation; confirming the second factor again is the
+  // whole remedy, which a fresh sign-in alone is not.
+  "confirmation-too-old": "precondition",
 
   // Signing in again would only meet it again: the remedy is confirming the second factor.
   "second-factor-pending": "precondition",

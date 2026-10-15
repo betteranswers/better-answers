@@ -13,6 +13,7 @@ import {
   err,
   ok,
   type PlatformPrincipal,
+  requireFreshConfirmation,
   type Result,
   type Role,
   type SecondFactorStanding,
@@ -324,13 +325,18 @@ const passkeysOf = async (tx: Tx, personId: UserId): Promise<readonly PasskeyHel
 
 type SessionRow = {
   readonly confirmed: boolean;
+  readonly confirmedAt: Date | null;
   readonly setupGranted: boolean;
 
   /** The name of the session's workspace when the person is an Admin there. */
   readonly adminOf: string | null;
 };
 
-type ThisSession = SessionRow & { readonly standing: SecondFactorStanding };
+/** As the wire carries it: the session's confirmation named by an ISO instant. */
+type ThisSession = Omit<SessionRow, "confirmedAt"> & {
+  readonly confirmedAt: string | null;
+  readonly standing: SecondFactorStanding;
+};
 
 export type SecondFactorHeld = {
   readonly mustHoldOne: boolean;
@@ -381,12 +387,18 @@ export const SETUP_GRANTED = `
 
 const THIS_SESSION = `
   SELECT second_factor_confirmed_at IS NOT NULL AS confirmed,
+         second_factor_confirmed_at AS "confirmedAt",
          ${SETUP_GRANTED} AS "setupGranted",
          (SELECT w.name FROM workspace w JOIN member m ON m.workspace_id = w.id
            WHERE w.id = s.active_workspace_id AND m.user_id = $2 AND m.role = $3) AS "adminOf"
     FROM session s WHERE id = $1 AND user_id = $2`;
 
-const NEITHER: SessionRow = { confirmed: false, setupGranted: false, adminOf: null };
+const NEITHER: SessionRow = {
+  confirmed: false,
+  confirmedAt: null,
+  setupGranted: false,
+  adminOf: null,
+};
 
 const thisSessionOf = async (
   tx: Tx,
@@ -398,7 +410,11 @@ const thisSessionOf = async (
     (await tx.query<SessionRow>(THIS_SESSION, [sessionId, facts.personId, ADMIN])).rows[0] ??
     NEITHER;
   const holdsAFactor = facts.passkeys > 0 || facts.authenticator === "set-up";
-  return { ...row, standing: standingOf({ ...row, mustHoldOne: facts.mustHoldOne, holdsAFactor }) };
+  return {
+    ...row,
+    confirmedAt: row.confirmedAt?.toISOString() ?? null,
+    standing: standingOf({ ...row, mustHoldOne: facts.mustHoldOne, holdsAFactor }),
+  };
 };
 
 type ReadSecondFactorInput = {
@@ -468,6 +484,20 @@ const credentialsOf = async (tx: Tx, personId: UserId): Promise<CredentialsHeld 
   }));
   return { address, passkeys, authenticator: facts.authenticator === "set-up" };
 };
+
+/** What the held read says of the acting session's confirmation, as the freshness rule reads it. */
+const confirmedAtMsOf = (held: SecondFactorHeld): number | null => {
+  const confirmedAt = held.thisSession?.confirmedAt;
+  return confirmedAt === undefined || confirmedAt === null ? null : Date.parse(confirmedAt);
+};
+
+/**
+ * A person who already holds a factor confirms within the hour before changing one; a first
+ * factor has nothing to confirm against and needs none.
+ */
+export const factorChangeStale = (held: SecondFactorHeld, at: Date): boolean =>
+  (held.passkeys.length > 0 || held.authenticator === "set-up") &&
+  !requireFreshConfirmation({ secondFactorConfirmedAtMs: confirmedAtMsOf(held) }, at).ok;
 
 /** What a promotion's notice lists: the address, and every credential that can confirm a sign-in. */
 export const readCredentialsHeld = (

@@ -135,6 +135,13 @@ export const CROSS_OWNER_TABLE_ACCESS = [
   },
   {
     table: "public.session",
+    by: POSTGRES_DOOR,
+    access: "read",
+    reason:
+      "The resolver reads the named session's confirmation beside the member and user rows it already reads, so the principal carries how fresh it is: the one rule a high-impact act and an operator's write judge on, and a caller whose claims name no session holds none.",
+  },
+  {
+    table: "public.session",
     by: "workspaces",
     access: "read and write",
     reason:

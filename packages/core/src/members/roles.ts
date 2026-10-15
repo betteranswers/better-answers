@@ -14,6 +14,7 @@ import {
   type PlatformPrincipal,
   type Result,
   type Role,
+  requireFreshConfirmation,
   type UserId,
   type UserPrincipal,
   type WorkspaceId,
@@ -34,17 +35,30 @@ const ROLE = boundarySchemas.member.select.shape.role;
 /** The role is any text, so a role outside the three reaches the action and is refused in its word. */
 export const changeRoleInput = memberKeyed.extend({ role: z.string() });
 
-export type ChangeRoleInput = z.output<typeof changeRoleInput>;
+/** When the action happens: a confirmation older than an hour makes the change wait on a re-confirm. */
+export type ChangeRoleInput = z.output<typeof changeRoleInput> & { readonly at: Date };
 
 const changeRoleAction = declareAction({
   admits: ADMIN_ALONE,
   input: changeRoleInput,
-  refuses: ["role-forbids", "no-such-role", "no-such-member", "last-admin", "changed-meanwhile"],
+  refuses: [
+    "role-forbids",
+    "no-such-role",
+    "no-such-member",
+    "last-admin",
+    "confirmation-too-old",
+    "changed-meanwhile",
+  ],
 });
 
 export type ChangeRoleRefusal =
   | MemberRefusal<
-      "role-forbids" | "no-such-role" | "no-such-member" | "last-admin" | "changed-meanwhile"
+      | "role-forbids"
+      | "no-such-role"
+      | "no-such-member"
+      | "last-admin"
+      | "confirmation-too-old"
+      | "changed-meanwhile"
     >
   | Error;
 
@@ -140,8 +154,9 @@ export const changeRole = async (
 ): Promise<Result<RoleMoved, ChangeRoleRefusal>> => {
   const admitted = admit(changeRoleAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
+  const fresh = requireFreshConfirmation(admitted.value, input.at);
+  if (!fresh.ok) return err(fresh.error);
   const role = ROLE.safeParse(input.role);
   if (!role.success) return err("no-such-role");
-
-  return roleSetUnderTheLock(admitted.value, tx, { personId: input.personId, role: role.data });
+  return roleSetUnderTheLock(fresh.value, tx, { personId: input.personId, role: role.data });
 };

@@ -10,6 +10,7 @@ import {
   declareAction,
   err,
   ok,
+  requireFreshConfirmation,
   type AdminUserPrincipal,
   type GroupId,
   type RefusedItems,
@@ -46,19 +47,27 @@ const ROLE = boundarySchemas.member.select.shape.role;
 /** The role is any text, so a role outside the three reaches the action and is refused in its word. */
 export const bulkChangeRoleInput = z.object({ personIds: TICKED, role: z.string() });
 
-export type BulkChangeRoleInput = z.output<typeof bulkChangeRoleInput>;
+/** When the action happens: a confirmation older than an hour makes the move wait on a re-confirm. */
+export type BulkChangeRoleInput = z.output<typeof bulkChangeRoleInput> & { readonly at: Date };
 
 const bulkChangeRoleAction = declareAction({
   admits: ADMIN_ALONE,
   input: bulkChangeRoleInput,
-  refuses: ["role-forbids", "no-such-role", "no-such-member", "last-admin", "changed-meanwhile"],
+  refuses: [
+    "role-forbids",
+    "no-such-role",
+    "no-such-member",
+    "last-admin",
+    "confirmation-too-old",
+    "changed-meanwhile",
+  ],
 });
 
 /** Each person the move made hold a second factor for the first time. */
 type BulkPromoted = { readonly promoted: readonly UserId[] };
 
 export type BulkChangeRoleRefusal =
-  | MemberRefusal<"role-forbids" | "no-such-role" | "changed-meanwhile">
+  | MemberRefusal<"role-forbids" | "no-such-role" | "confirmation-too-old" | "changed-meanwhile">
   | RefusedItems<MemberRefusal<"no-such-member" | "last-admin">>
   | Error;
 
@@ -76,7 +85,9 @@ export const bulkChangeRole = async (
   if (!admitted.ok) return err(admitted.error);
   const role = ROLE.safeParse(input.role);
   if (!role.success) return err("no-such-role");
-  const admin = admitted.value;
+  const fresh = requireFreshConfirmation(admitted.value, input.at);
+  if (!fresh.ok) return err(fresh.error);
+  const admin = fresh.value;
   const personIds = distinct(input.personIds);
 
   return withMembersHeld(admin, tx, personIds, async (held) => {
@@ -120,11 +131,11 @@ export type BulkRemoveMembersInput = z.output<typeof bulkRemoveMembersInput> & {
 const bulkRemoveMembersAction = declareAction({
   admits: ADMIN_ALONE,
   input: bulkRemoveMembersInput,
-  refuses: ["role-forbids", "last-admin", "changed-meanwhile"],
+  refuses: ["role-forbids", "last-admin", "confirmation-too-old", "changed-meanwhile"],
 });
 
 export type BulkRemoveMembersRefusal =
-  | MemberRefusal<"role-forbids" | "changed-meanwhile">
+  | MemberRefusal<"role-forbids" | "confirmation-too-old" | "changed-meanwhile">
   | RefusedItems<MemberRefusal<"last-admin">>
   | Error;
 
@@ -139,18 +150,18 @@ export const bulkRemoveMembers = async (
 ): Promise<Result<BulkOutcome, BulkRemoveMembersRefusal>> => {
   const admitted = admit(bulkRemoveMembersAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
-  const admin = admitted.value;
-  const personIds = distinct(input.personIds);
+  const fresh = requireFreshConfirmation(admitted.value, input.at);
+  if (!fresh.ok) return err(fresh.error);
 
-  return withMembersHeld(admin, tx, personIds, async (held) => {
+  return withMembersHeld(fresh.value, tx, distinct(input.personIds), async (held) => {
     const refused = refusedItemsOf(namedEach(lastAdminsAmong(held, held.rows), "last-admin"));
     if (refused !== undefined) return err(refused);
 
     const removedAt = { at: input.at, batchId: batchIdFor(held.rows.length) };
-    for (const row of held.rows) await memberRemovedHere(admin, tx, row, removedAt);
+    for (const row of held.rows) await memberRemovedHere(fresh.value, tx, row, removedAt);
     return ok(
       outcomeOf(
-        personIds,
+        input.personIds,
         held.rows.map((row) => row.personId),
       ),
     );
@@ -162,16 +173,23 @@ export const bulkAddToGroupInput = z.object({
   personIds: TICKED,
 });
 
-export type BulkAddToGroupInput = z.output<typeof bulkAddToGroupInput>;
+/** When the action happens: a confirmation older than an hour makes the adds wait on a re-confirm. */
+export type BulkAddToGroupInput = z.output<typeof bulkAddToGroupInput> & { readonly at: Date };
 
 const bulkAddToGroupAction = declareAction({
   admits: ADMIN_ALONE,
   input: bulkAddToGroupInput,
-  refuses: ["role-forbids", "no-such-group", "no-such-member", "changed-meanwhile"],
+  refuses: [
+    "role-forbids",
+    "no-such-group",
+    "no-such-member",
+    "confirmation-too-old",
+    "changed-meanwhile",
+  ],
 });
 
 export type BulkAddToGroupRefusal =
-  | MemberRefusal<"role-forbids" | "no-such-group" | "changed-meanwhile">
+  | MemberRefusal<"role-forbids" | "no-such-group" | "confirmation-too-old" | "changed-meanwhile">
   | RefusedItems<MemberRefusal<"no-such-member">>
   | Error;
 
@@ -214,8 +232,10 @@ export const bulkAddToGroup = async (
 ): Promise<Result<BulkOutcome, BulkAddToGroupRefusal>> => {
   const admitted = admit(bulkAddToGroupAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
+  const fresh = requireFreshConfirmation(admitted.value, input.at);
+  if (!fresh.ok) return err(fresh.error);
   const asked = { groupId: input.groupId, personIds: distinct(input.personIds) };
 
-  const done = await attempt(() => addedUnderKeyShare(admitted.value, tx, asked));
+  const done = await attempt(() => addedUnderKeyShare(fresh.value, tx, asked));
   return done.ok ? done.value : err(refusalOfDeadlock(done.error));
 };

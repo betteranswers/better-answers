@@ -10,6 +10,7 @@ import {
   declareAction,
   err,
   ok,
+  requireFreshConfirmation,
   type AdmittedOf,
   type RefusalOf,
   type Result,
@@ -37,7 +38,7 @@ export type EndEverySignInAndTokenHereInput = z.output<typeof endEverySignInAndT
 const endEverySignInAndTokenHereAction = declareAction({
   admits: ADMIN_ALONE,
   input: endEverySignInAndTokenHereInput,
-  refuses: ["role-forbids", "no-such-member", "changed-meanwhile"],
+  refuses: ["role-forbids", "no-such-member", "confirmation-too-old", "changed-meanwhile"],
 });
 
 export type EndEverySignInAndTokenHereRefusal =
@@ -96,7 +97,8 @@ export const endEverySignInAndTokenHere = async (
 ): Promise<Result<CredentialsRevokedHere, EndEverySignInAndTokenHereRefusal>> => {
   const admitted = admit(endEverySignInAndTokenHereAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
-
-  const revoked = await attempt(() => revokedHere(admitted.value, tx, input));
+  const fresh = requireFreshConfirmation(admitted.value, input.at);
+  if (!fresh.ok) return err(fresh.error);
+  const revoked = await attempt(() => revokedHere(fresh.value, tx, input));
   return revoked.ok ? revoked.value : err(refusalOfDeadlock(revoked.error));
 };

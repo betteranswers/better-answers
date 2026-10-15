@@ -10,7 +10,7 @@ import {
   ok,
   type OperatorPrincipal,
   type PlatformPrincipal,
-  requireFreshSignIn,
+  requireFreshConfirmation,
   type Result,
   type UserId,
   ulid,
@@ -167,7 +167,7 @@ type CorrectDisplayNameInput = z.output<typeof correctDisplayNameInput> & {
 
 type CorrectDisplayNameRefusal =
   | DisplayNameRefusal
-  | WorkspaceRefusal<"no-such-user" | "sign-in-too-old">;
+  | WorkspaceRefusal<"no-such-user" | "confirmation-too-old">;
 
 /**
  * Replaces a person's display name under the rule their own name follows, and records it under
@@ -179,7 +179,7 @@ export const correctDisplayName = async (
   tx: Tx,
   input: CorrectDisplayNameInput,
 ): Promise<Result<DisplayNameSet, CorrectDisplayNameRefusal | Error>> => {
-  const fresh = requireFreshSignIn(operator, input.at);
+  const fresh = requireFreshConfirmation(operator, input.at);
   if (!fresh.ok) return err(fresh.error);
   const { personId } = input;
   const displayName = applyDisplayNameRule(input.displayName);

@@ -44,7 +44,8 @@ export {
 } from "./actor.ts";
 export type { ActorId } from "./actor.ts";
 export type { AdminUserPrincipal } from "./role.ts";
-export { requireFreshSignIn } from "./freshness.ts";
+export { requireFreshConfirmation } from "./freshness.ts";
+export type { FreshnessRefusal } from "./freshness.ts";
 export {
   isPending,
   mayTake,
