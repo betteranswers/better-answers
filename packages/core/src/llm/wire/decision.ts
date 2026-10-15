@@ -61,10 +61,8 @@ export const decisionRequest = (call: DecisionCall): WireRequest => {
 const utf8 = new TextEncoder();
 
 /** Whether a request's body fits its model's window; one with no published window never does. */
-export const fitsWindow = (model: string, body: string): boolean => {
-  const window = WINDOW_TOKENS.get(model);
-  return window !== undefined && Math.ceil(utf8.encode(body).length / BYTES_PER_TOKEN) <= window;
-};
+export const fitsWindow = (model: string, body: string): boolean =>
+  Math.ceil(utf8.encode(body).length / BYTES_PER_TOKEN) <= (WINDOW_TOKENS.get(model) ?? 0);
 
 /** The probability of yes, by question id. */
 export type Probabilities = Readonly<Record<string, number>>;

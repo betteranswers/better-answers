@@ -257,6 +257,16 @@ describe("ask with a decision model", () => {
     expect(await outcomeOf(answer, wire, workspaceId)).toEqual(FAILED_UNSENT);
   });
 
+  it("fails judging, sending nothing, with the thresholds as shipped", async () => {
+    const { workspaceId, asker } = await aDecidingWorkspace();
+    await seededIn(workspaceId, [USERS]);
+    const wire = decidingWire(new Map([[USERS.title, 1]]));
+
+    const answer = await askedWith(asker, wire, ASK_CAPS);
+
+    expect(await outcomeOf(answer, wire, workspaceId)).toEqual(FAILED_UNSENT);
+  });
+
   it("fails judging, sending nothing, over the model's window", async () => {
     const { workspaceId, asker } = await aDecidingWorkspace();
     const long = (title: string) => anAnswer(title, `${"Audit information. ".repeat(1_400)}\n`);

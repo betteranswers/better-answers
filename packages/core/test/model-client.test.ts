@@ -485,24 +485,40 @@ describe("the decision shape", () => {
       success: false,
     });
 
-    expect(await deciding(theWire({ status: 200, body: unwrapped }))).toEqual({
-      outcome: "failed",
-      spent: [NOTHING_SPENT],
-    });
-    expect(await deciding(theWire({ status: 200, body: unsuccessful }))).toEqual({
-      outcome: "failed",
-      spent: [NOTHING_SPENT],
-    });
+    for (const body of [unwrapped, unsuccessful]) {
+      const { client, lines } = clientOn(theWire({ status: 200, body }));
+
+      expect(await client.decide(TO_CLEF_FLASH, A_DECISION)).toEqual({
+        outcome: "failed",
+        spent: [NOTHING_SPENT],
+      });
+      expect(lines.map(({ line }) => line.read)).toEqual(["failed"]);
+    }
   });
 
   it("reads the daily allocation spent as a spend cap", async () => {
     const wire = theWire({
       status: 429,
-      body: cloudflareError(3036, "You have used up your daily free allocation of 10,000 neurons."),
+      body: JSON.stringify({
+        result: null,
+        success: false,
+        errors: [
+          { code: 1000, message: "Workers AI is limited." },
+          { code: 3036, message: "You have used up your daily free allocation of 10,000 neurons." },
+        ],
+        messages: [],
+      }),
     });
 
     expect(await deciding(wire)).toEqual({ outcome: "spend-cap", spent: [NOTHING_SPENT] });
     expect(wire.sent).toHaveLength(1);
+  });
+
+  it("tries a rate limit with no JSON body again", async () => {
+    const wire = theWire({ status: 429, body: "<html>Too many requests</html>" }, DECIDED);
+
+    expect((await deciding(wire)).outcome).toBe("answered");
+    expect(wire.sent).toHaveLength(2);
   });
 
   it("tries capacity exceeded again after the wait asked", async () => {
@@ -532,9 +548,14 @@ describe("the decision shape", () => {
 
   it("fails a refused request once", async () => {
     const wire = theWire({ status: 400, body: cloudflareError(5007, "No such model") });
+    const { client, lines } = clientOn(wire);
 
-    expect(await deciding(wire)).toEqual({ outcome: "failed", spent: [NOTHING_SPENT] });
+    expect(await client.decide(TO_CLEF_FLASH, A_DECISION)).toEqual({
+      outcome: "failed",
+      spent: [NOTHING_SPENT],
+    });
     expect(wire.sent).toHaveLength(1);
+    expect(lines.map(({ line }) => line.read)).toEqual(["failed"]);
   });
 
   it("logs the reply's ray as its request id", async () => {
@@ -627,20 +648,21 @@ describe("a decision model's window", () => {
 });
 
 describe("a model of the other wire shape", () => {
-  it("sends a decision model no Messages call", async () => {
-    const wire = theWire(ANSWERED);
+  it.each([
+    ["a decision model no Messages call", ANSWERED, "callModel"],
+    ["a Messages model no decision call", DECIDED, "decide"],
+  ] as const)("sends %s", async (_case, reply, method) => {
+    const wire = theWire(reply);
     const { client, lines } = clientOn(wire);
 
-    expect(await client.callModel(TO_CLEF_FLASH, A_CALL)).toEqual({ outcome: "failed", spent: [] });
+    const called =
+      method === "callModel"
+        ? await client.callModel(TO_CLEF_FLASH, A_CALL)
+        : await client.decide(TO_SONNET, A_DECISION);
+
+    expect(called).toEqual({ outcome: "failed", spent: [] });
     expect(wire.sent).toEqual([]);
     expect(lines.map(({ line }) => line.read)).toEqual(["another-shape"]);
-  });
-
-  it("sends a Messages model no decision call", async () => {
-    const wire = theWire(DECIDED);
-
-    expect(await deciding(wire, A_DECISION, TO_SONNET)).toEqual({ outcome: "failed", spent: [] });
-    expect(wire.sent).toEqual([]);
   });
 });
 
