@@ -15,6 +15,12 @@ import { testData } from "@better-answers/schema/testing";
 
 import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
 import { authenticatorKeyOf, holdAnAuthenticator, savedRecoveryCodes } from "./factor-harness.ts";
+import {
+  askingNamed,
+  askingScripting,
+  setUpAsking,
+  type ScriptedModels,
+} from "./harness-asking.ts";
 import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
 import {
   accessAsking,
@@ -129,6 +135,12 @@ const personIdOf = async (app: TestApp, email: string): Promise<string> => {
   return id;
 };
 
+/** @throws when the TestApp was started with no scripted wire, which only the suite's own api has. */
+const modelsOf = (models: ScriptedModels | undefined): ScriptedModels => {
+  if (models === undefined) throw new Error("the harness was started with no scripted model wire");
+  return models;
+};
+
 const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> =>
   schema.parse(await request.json());
 
@@ -148,8 +160,11 @@ const whyNotWritten = (error: Error) => {
   return undefined;
 };
 
-/** Routes under `/__harness` through which the browser suite drives the TestApp as a test would. */
-export const harnessControl = (app: TestApp): Hono => {
+/**
+ * Routes under `/__harness` through which the browser suite drives the TestApp as a test would;
+ * `models` is the wire its model calls reach.
+ */
+export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
   const control = new Hono();
   const enrolled = enrolments(app);
 
@@ -254,6 +269,23 @@ export const harnessControl = (app: TestApp): Hono => {
   control.post(`${HARNESS_PREFIX}/concepts`, async (context) => {
     const asked = await readBody(context.req.raw, conceptsSeeding);
     return context.json(await seedConcepts(app, asked));
+  });
+
+  // The owner's own ops commands set the models; the wire answers each workspace as its spec says.
+  control.post(`${HARNESS_PREFIX}/asking`, async (context) => {
+    const asked = await readBody(context.req.raw, askingScripting);
+    await setUpAsking(app, modelsOf(models), asked);
+    return context.json({ scripted: true });
+  });
+
+  control.post(`${HARNESS_PREFIX}/asking/releases`, async (context) => {
+    const asked = await readBody(context.req.raw, askingNamed);
+    return context.json({ released: modelsOf(models).release(asked.workspaceId) });
+  });
+
+  control.get(`${HARNESS_PREFIX}/asking/calls`, (context) => {
+    const workspaceId = context.req.query("workspaceId") ?? "";
+    return context.json(modelsOf(models).callsTo(workspaceId));
   });
 
   control.post(`${HARNESS_PREFIX}/questions`, async (context) => {

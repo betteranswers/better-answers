@@ -56,8 +56,6 @@ export type Area = {
   readonly name: string;
   readonly icon: IconName;
   readonly menuGroups: readonly MenuGroup[];
-  /** An address of the area's own, standing as a role's home while none of its pages is built. */
-  readonly home?: Page;
 };
 
 const EVERY_ROLE = ["Admin", "Editor", "Viewer"] as const satisfies readonly Role[];
@@ -70,7 +68,6 @@ export const ASK = {
   id: "ask",
   name: "Ask",
   icon: "ask",
-  home: { name: "Ask", path: "/ask", icon: "ask", built: false, seenBy: EVERY_ROLE },
   menuGroups: [
     {
       id: "ask",
@@ -79,14 +76,22 @@ export const ASK = {
           name: "New Question",
           path: "/ask/new-question",
           icon: "new-question",
-          built: false,
+          built: true,
           seenBy: EVERY_ROLE,
+          movedFrom: ["/ask"],
         },
         {
           name: "Your Questions",
           path: "/ask/your-questions",
           icon: "history",
           built: false,
+          seenBy: EVERY_ROLE,
+        },
+        {
+          name: "Connect Claude",
+          path: "/ask/connect-claude",
+          icon: "connect",
+          built: true,
           seenBy: EVERY_ROLE,
         },
       ],
@@ -453,9 +458,7 @@ type Declared =
   | typeof CONSOLE;
 
 /** Every declared address, so a link written outside the list stops compiling when it moves. */
-export type PagePath =
-  | Declared["menuGroups"][number]["pages"][number]["path"]
-  | (typeof ASK)["home"]["path"];
+export type PagePath = Declared["menuGroups"][number]["pages"][number]["path"];
 
 type MenuGroupOf<Held extends Area> = Held["menuGroups"][number];
 
@@ -481,11 +484,13 @@ export const pageNamed = <Held extends MenuGroup>(
   return page;
 };
 
+const NEW_QUESTION = pageNamed(menuGroupIn(ASK, "ask"), "New Question");
+
 /** Where each reader lands, and the way back offered when they are lost. */
 export const HOMES = {
   Admin: pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members"),
-  Editor: ASK.home,
-  Viewer: ASK.home,
+  Editor: NEW_QUESTION,
+  Viewer: NEW_QUESTION,
   operator: pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every Workspace"),
 } as const satisfies { readonly [who in RoleOrOperator]: Page };
 
@@ -519,11 +524,9 @@ const shownOf = (
   seen: (page: Page) => boolean,
   home: Page,
 ): VisibleArea | undefined => {
-  const groups = area.menuGroups
+  const shown = area.menuGroups
     .map((group) => ({ ...group, pages: group.pages.filter(seen) }))
     .filter((group) => group.pages.length > 0);
-  // A home standing in for unbuilt pages is the area's one entry.
-  const shown = area.home === home ? [{ id: area.id, pages: [home] }, ...groups] : groups;
   const first = shown[0]?.pages[0];
   if (first === undefined) return undefined;
 
@@ -558,14 +561,11 @@ export type Place<Held extends Area = Area> = {
   readonly detail?: string;
 };
 
-const placesIn = <Held extends Area>(area: Held): readonly Place<Held>[] => [
-  ...(area.home === undefined ? [] : [{ area, menuGroup: undefined, page: area.home }]),
-  ...area.menuGroups.flatMap((menuGroup) =>
+const placesIn = <Held extends Area>(area: Held): readonly Place<Held>[] =>
+  area.menuGroups.flatMap((menuGroup) =>
     menuGroup.pages.map((page) => ({ area, menuGroup, page })),
-  ),
-];
+  );
 
-/** An area's own home first: a visible area carries none, so it adds nothing there. */
 export const pagesOf = (areas: readonly Area[]): readonly Page[] =>
   areas.flatMap(placesIn).map(({ page }) => page);
 

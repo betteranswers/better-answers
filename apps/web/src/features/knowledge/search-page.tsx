@@ -5,6 +5,21 @@ import { useAsked } from "@/shared/address-ask.ts";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { RowLink } from "@/shared/grid-table.tsx";
 import { usePageKeystrokes } from "@/shared/keystrokes.tsx";
+import {
+  BROWSE,
+  conceptMatchKey,
+  conceptPageOf,
+  RETURNED_TO,
+  SEARCH_PAGE,
+} from "@/shared/knowledge/concept-address.ts";
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
+import {
+  EvidenceInline,
+  EvidenceSheet,
+  SensitivityTag,
+  type Opened,
+} from "@/shared/knowledge/evidence-panel.tsx";
+import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { useLanding, useLandingLine, type Landing } from "@/shared/landing.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { ListPages, ListState } from "@/shared/list-pages.tsx";
@@ -14,14 +29,6 @@ import { Card } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { useRoomBeside } from "@/shared/wide-layout.ts";
 
-import {
-  BROWSE,
-  conceptMatchKey,
-  conceptPageOf,
-  RETURNED_TO,
-  SEARCH_PAGE,
-} from "./concept-address.ts";
-import { EvidenceInline, EvidenceSheet, SensitivityTag, type Opened } from "./evidence-panel.tsx";
 import {
   asksNothing,
   useMatches,
@@ -37,7 +44,6 @@ import {
   SEARCH_LIST,
 } from "./knowledge-state.ts";
 import { SEARCH_WORDS as WORDS } from "./knowledge-words.ts";
-import { failedReadWords } from "./refusal.tsx";
 
 const LISTED = Object.values(KEY);
 
@@ -103,7 +109,7 @@ function ConceptLine(properties: { readonly match: ConceptMatch; readonly readin
           {match.title}
         </RowLink>
       )}
-      <Pill>{match.collection ?? WORDS.noCollection}</Pill>
+      <Pill>{match.collection ?? CONCEPT_WORDS.noCollection}</Pill>
       <Pill>{match.trustWords}</Pill>
     </div>
   );

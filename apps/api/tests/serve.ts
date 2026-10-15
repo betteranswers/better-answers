@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import { openObjectStore } from "@better-answers/core/testing/warm-objects";
 
 import { logger } from "../src/logger.ts";
+import { scriptedModels } from "./harness-asking.ts";
 import { harnessControl } from "./harness-control.ts";
 import { startApp } from "./harness.ts";
 
@@ -20,7 +21,11 @@ const objects = await openObjectStore("browser-suite");
 /** No email reaches this domain, so a spec meets an invitation whose email did not go. */
 const UNREACHABLE = "@unreachable.example";
 
+/** Each workspace's model calls are answered as its spec scripted them. */
+const models = scriptedModels();
+
 const app = await startApp({
+  fetchModel: models.fetch,
   onEmail: (message) => {
     if (message.to.endsWith(UNREACHABLE)) throw new Error("the address is unreachable");
   },
@@ -44,7 +49,7 @@ const listening = serve(
 
 function withHarnessControl(): Hono {
   const outer = new Hono();
-  outer.route("/", harnessControl(app));
+  outer.route("/", harnessControl(app, models));
   outer.all("/*", (context) => app.server.fetch(context.req.raw));
   return outer;
 }

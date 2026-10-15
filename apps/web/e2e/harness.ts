@@ -412,6 +412,37 @@ export const seedQuestions = (
   input: { workspaceId: string; records: readonly SeedRecord[] },
 ) => ask(api, "/questions", input, seededQuestions);
 
+/** A sentence the drafter writes for the concept titled `citing`, which its footnote cites. */
+type ScriptedSentence = { readonly citing: string; readonly sentence: string };
+
+/**
+ * A model left out is not chosen. A hold waits for `releaseTheModel`: the judge's answer, or the
+ * draft after its first sentence.
+ */
+export type AskingScript = {
+  readonly workspaceId: string;
+  readonly judging?: { readonly fits: readonly string[] } | "fails";
+  readonly drafting?: { readonly writes: readonly ScriptedSentence[] } | "fails";
+  readonly limitGbp?: string;
+  readonly holds?: "judge" | "draft";
+};
+
+/** Set as the owner sets the workspace's models, so `ask` judges and drafts as the script says. */
+export const scriptAsking = (api: APIRequestContext, script: AskingScript) =>
+  ask(api, "/asking", script, z.object({ scripted: z.literal(true) }));
+
+export const releaseTheModel = (api: APIRequestContext, workspaceId: string) =>
+  ask(api, "/asking/releases", { workspaceId }, z.object({ released: z.literal(true) }));
+
+const modelCalls = z.object({ judge: z.number(), draft: z.number() });
+
+/** The calls the workspace's model has answered, or holds, so far. */
+export const modelCallsIn = async (api: APIRequestContext, workspaceId: string) => {
+  const answered = await api.get(`${HARNESS}/asking/calls`, { params: { workspaceId } });
+  expect(answered.ok(), `the calls answered ${answered.status()}`).toBe(true);
+  return modelCalls.parse(await answered.json());
+};
+
 const syncMoved = z.object({ jobId: z.string() });
 
 /**

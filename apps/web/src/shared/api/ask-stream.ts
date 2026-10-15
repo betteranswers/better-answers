@@ -20,7 +20,7 @@ export type AskStreamEvent<Result extends object> =
     };
 
 /** One collection's prose; its outcome is undefined while it is still being drafted. */
-type ProsePart = {
+export type ProsePart = {
   readonly collection: string | null;
   readonly sentences: readonly DraftedSentence[];
   readonly outcome: DraftOutcome | undefined;

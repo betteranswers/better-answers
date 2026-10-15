@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { failedReadWords } from "@/features/knowledge/refusal.tsx";
+import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 
 import { carrying } from "./stubbed-api.ts";
 

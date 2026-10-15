@@ -25,8 +25,8 @@ import {
 } from "@/shared/ui/table.tsx";
 
 import { conceptPageOf } from "./concept-address.ts";
-import { openingOf, type Evidence } from "./knowledge-api.ts";
-import { CONCEPT_WORDS as WORDS } from "./knowledge-words.ts";
+import { CONCEPT_WORDS as WORDS } from "./concept-words.ts";
+import { openingOf, type Evidence } from "./knowledge-reads.ts";
 
 type Element = NonNullable<ExtraProps["node"]>;
 

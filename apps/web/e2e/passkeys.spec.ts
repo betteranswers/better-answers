@@ -1,6 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import { passkeyNameFor } from "@/features/auth/account-words.ts";
+import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -383,7 +384,7 @@ test("a Viewer's offer ends on a trip through All workspaces", async ({ page, re
 
 test("the offer's link lands on the Account page's add", async ({ page, request }) => {
   await aVirtualAuthenticator(page);
-  await aMemberSignedInAt(page, request, "Editor", "/ask");
+  await aMemberSignedInAt(page, request, "Editor", HOMES.Editor.path);
 
   await page.getByRole("link", { name: "Add a Passkey" }).click();
 
@@ -394,7 +395,7 @@ test("the offer's link lands on the Account page's add", async ({ page, request 
 
 test("a browser without WebAuthn keeps the email path alone", async ({ page, request }) => {
   await withoutWebAuthn(page);
-  await aMemberSignedInAt(page, request, "Viewer", "/ask");
+  await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
   await expect(offerOf(page)).toHaveCount(0);
 
   await signedOut(page);

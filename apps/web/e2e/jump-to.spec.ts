@@ -1,7 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
-import { ASK, CONSOLE, CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
+import { CONSOLE, CONTROL_CENTRE, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -124,14 +124,14 @@ const typed = async (page: Page, words: string) => {
 };
 
 test("hides People from a Viewer, reading no members", async ({ page, request }) => {
-  await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
+  await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
   const membersReads: string[] = [];
   page.on("request", (sent) => {
     if (theMembersRead(new URL(sent.url()))) membersReads.push(sent.url());
   });
 
   await opened(page, "Control+k");
-  await expect(optionOf(page, "Ask")).toBeVisible();
+  await expect(optionOf(page, /^Ask$/)).toBeVisible();
   await typed(page, "people");
 
   await expect(saidIn(page)).toContainText("people");
@@ -274,7 +274,7 @@ for (const [what, words] of [
   ["a quoted phrase", '"audit logs"'],
 ] as const) {
   test(`carries ${what} from jump-to to Search as typed`, async ({ page, request }) => {
-    await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
+    await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
 
     await opened(page, "Control+k");
     await typed(page, words);
@@ -289,7 +289,7 @@ for (const [what, words] of [
 }
 
 test("takes a search written into the address by hand", async ({ page, request }) => {
-  await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
+  await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
 
   await page.goto(`${SEARCH.path}?search=audit`);
   await expect(searchBoxOf(page)).toHaveValue("audit");
@@ -298,7 +298,7 @@ test("takes a search written into the address by hand", async ({ page, request }
 });
 
 test("reaches the search row by the arrow keys", async ({ page, request }) => {
-  await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
+  await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
 
   await opened(page, "Control+k");
   await typed(page, "search");
@@ -330,28 +330,28 @@ test("opens a member who loads after the search row", async ({ page, request }) 
 });
 
 test("offers no search row with nothing typed", async ({ page, request }) => {
-  await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
+  await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
 
   await opened(page, "Control+k");
-  await expect(optionOf(page, "Ask")).toBeVisible();
+  await expect(optionOf(page, /^Ask$/)).toBeVisible();
   await expect(searchRowOf(page)).toHaveCount(0);
 
   await typed(page, "audit");
   await expect(searchRowOf(page)).toHaveText(["Search for “audit”"]);
   await typed(page, "");
-  await expect(optionOf(page, "Ask")).toBeVisible();
+  await expect(optionOf(page, /^Ask$/)).toBeVisible();
   await expect(searchRowOf(page)).toHaveCount(0);
 });
 
 test("offers no search row for spaces alone", async ({ page, request }) => {
-  await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
+  await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
 
   await opened(page, "Control+k");
   await typed(page, "audit");
   await expect(searchRowOf(page)).toHaveCount(1);
   await typed(page, "   ");
 
-  await expect(optionOf(page, "Ask")).toBeVisible();
+  await expect(optionOf(page, /^Ask$/)).toBeVisible();
   await expect(searchRowOf(page)).toHaveCount(0);
   await expect(saidIn(page)).toBeEmpty();
 });

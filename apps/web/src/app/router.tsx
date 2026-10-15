@@ -13,6 +13,7 @@ import {
 import type { ReactElement, ReactNode } from "react";
 import { z } from "zod";
 
+import { NewQuestionPage } from "@/features/ask/new-question-page.tsx";
 import { AcceptInvitationPage } from "@/features/auth/accept-invitation-page.tsx";
 import { AccountPage } from "@/features/auth/account-page.tsx";
 import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
@@ -47,7 +48,6 @@ import { EveryonePage } from "@/features/console/everyone-page.tsx";
 import { NamesWaitingPage } from "@/features/console/names-waiting-page.tsx";
 import { isTheOperator, mustSignInForTheConsole } from "@/features/console/operator.ts";
 import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
-import { CONCEPT_IRI } from "@/features/knowledge/concept-address.ts";
 import { ConceptPage } from "@/features/knowledge/concept-page.tsx";
 import { SearchPage } from "@/features/knowledge/search-page.tsx";
 import { AuditLogPage } from "@/features/people/audit-log-page.tsx";
@@ -60,6 +60,7 @@ import { QuestionsAskedPage } from "@/features/questions/questions-asked-page.ts
 import { ConnectedSourcesPage } from "@/features/sources/connected-sources-page.tsx";
 import type { FailedDuring } from "@/shared/api/query-client.ts";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
+import { CONCEPT_IRI } from "@/shared/knowledge/concept-address.ts";
 import {
   memberRefusal,
   NEEDS_A_PICK,
@@ -89,6 +90,7 @@ import type { PageToolbar } from "@/shared/page-toolbar.tsx";
 import { ConsoleFrame } from "./console-frame.tsx";
 import { FailedPage } from "./failed-page.tsx";
 import { WorkspaceFrame } from "./frame.tsx";
+import { ConnectClaudePage } from "./pages/connect-assistant.tsx";
 import { MODELS_AND_SPEND_TOOLBAR, ModelsAndSpendPage } from "./pages/models-and-spend-page.tsx";
 import { UnbuiltPage } from "./pages/unbuilt-page.tsx";
 import type { AppClients } from "./providers.tsx";
@@ -100,6 +102,8 @@ type BuiltPage = { readonly draw: () => ReactElement; readonly toolbar?: PageToo
 
 /** The list decides which pages are built; this map only says by what, and with what in hand. */
 const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>([
+  ["/ask/new-question", { draw: NewQuestionPage }],
+  ["/ask/connect-claude", { draw: ConnectClaudePage }],
   ["/knowledge/search", { draw: SearchPage }],
   ["/sources/connected-sources", { draw: ConnectedSourcesPage }],
   ["/models/models-and-spend", { draw: ModelsAndSpendPage, toolbar: MODELS_AND_SPEND_TOOLBAR }],

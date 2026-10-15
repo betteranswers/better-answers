@@ -1,11 +1,11 @@
 import type { APIRequestContext, Locator, Page, Request, Route } from "@playwright/test";
 
-import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 import {
   MATCHES_A_PAGE,
   QUERY_MAX,
   SEARCH_KEYSTROKES as KEY,
 } from "@/features/knowledge/knowledge-state.ts";
+import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";

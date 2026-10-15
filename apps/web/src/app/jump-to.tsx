@@ -1,13 +1,13 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
-import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 import { QUERY_MAX } from "@/features/knowledge/knowledge-state.ts";
 import { MEMBERS_PAGE } from "@/features/people/members-address.ts";
 import { useMembers } from "@/features/people/people-api.ts";
 import { askingHere, type Here } from "@/shared/address-ask.ts";
 import { Icon, type IconName } from "@/shared/icon.tsx";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
+import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 import {
   detailAt,
   placeAt,
@@ -74,12 +74,9 @@ const areaJump = (area: VisibleArea): Jump =>
     kind: "place",
   });
 
-/** An area standing in for its own unbuilt home is listed once, as the area. */
 const placedIn = (area: VisibleArea): readonly Placed[] =>
   area.menuGroups.flatMap((menuGroup) =>
-    menuGroup.pages
-      .filter((page) => page !== area.opensAt || page.name !== area.name)
-      .map((page) => ({ area, menuGroup, page })),
+    menuGroup.pages.map((page) => ({ area, menuGroup, page })),
   );
 
 const pageJump = ({ area, menuGroup, page }: Placed): Jump =>

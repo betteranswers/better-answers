@@ -1,7 +1,7 @@
 import type { APIRequestContext, Locator, Page, Request } from "@playwright/test";
 
-import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 import { CONCEPT_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
+import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 
 import { expect, test } from "./browser.ts";
 import {

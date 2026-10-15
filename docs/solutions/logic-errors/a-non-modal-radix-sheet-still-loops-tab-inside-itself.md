@@ -45,7 +45,7 @@ The plan's evidence panel (KTD10 in `docs/plans/2026-10-09-1344-feat-s2a-search-
 
 ## Solution
 
-Handle Tab on `SheetContent` itself, and on Tab off either edge, move focus to the control that opened the panel (`tabsOff` and the `onKeyDown` in `apps/web/src/features/knowledge/evidence-panel.tsx`):
+Handle Tab on `SheetContent` itself, and on Tab off either edge, move focus to the control that opened the panel (`tabsOff` and the `onKeyDown` in `apps/web/src/shared/knowledge/evidence-panel.tsx`):
 
 ```tsx
 const TABBABLE =

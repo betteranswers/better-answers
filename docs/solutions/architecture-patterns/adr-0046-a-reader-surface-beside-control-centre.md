@@ -23,8 +23,8 @@ tags:
 ## The decision
 
 - **Ask** is an area in the one rail, beside Knowledge, Inbox and Control Centre (ADR 0047). It was first drawn apart from Control Centre, as a reader area in regions of its own. It is now one entry in the same rail.
-- Ask has two pages, *New question* (the default) and *Your questions*, at `/ask`.
-- An Editor's and a Viewer's home is Ask. They land there after signing in, and the not-found page offers it back. Until Ask is built, it opens a page saying plainly that it is on its way.
+- Ask has three pages under `/ask/`: *New question* (the default), *Your questions* and *Connect Claude*.
+- An Editor's and a Viewer's home is Ask › New question. They land there after signing in, and the not-found page offers it back.
 - An Admin lands on People › Members until Control Centre › Overview is built.
 - Control Centre stays the one Admin area, shown to Admins alone. Questions keeps *Questions asked* and the answer tests. Their names and addresses stayed until BA-29 renamed the first in the reader's words, on 07/10/2026.
 - What this record first set aside as a filtered Control Centre is now the decision, one level up: one rail, filtered page by page by role or by ownership of a collection (ADR 0047). Control Centre itself stays Admin-only, so a reader's home is never in it.
@@ -55,3 +55,5 @@ The full record as first written, with no amendments: `docs/archive/adr/0046-a-r
 Edited 30/09/2026 with ADR 0047, after the archived record was frozen: the reader area became the Ask area in one rail, the filtered Control Centre it had set aside became the decision, and two of its three open questions were answered, who reads *Questions asked* and where an owning Editor decides. The filename keeps the old words so references still resolve.
 
 Edited 07/10/2026 with BA-29's knowledge words: the Questions page that holds every answer given is named *Questions asked*, in the reader's words, at a new address. The decision to keep its name and address gave way to the glossary; who reads it is unchanged. The rejected rename to *Answers* stays rejected.
+
+Edited 15/10/2026 with the S2b ask plan's U18 (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`): New question is built and is an Editor's and a Viewer's home, `/ask` leads there, and Ask holds a third page, Connect Claude, one link from New question (ADR 0047's amendment of the same day). Until then Ask's home opened a page saying it was on its way.

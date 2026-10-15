@@ -1,22 +1,8 @@
+import { JUDGE_WORDS, REASON_WORDS, VERDICT_WORDS } from "@/shared/answer-words.ts";
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import { dayWords } from "@/shared/words.ts";
 
 import type { AskedRecord, ConceptRead, Feedback, FlagClosing } from "./questions-api.ts";
-
-type Verdict = NonNullable<AskedRecord["verdict"]>;
-
-/** Related knowledge is never called an answer, so its word says only what it is. */
-const VERDICT_WORDS = {
-  ok: "Answered",
-  warn: "Answered with a warning",
-  refuse: "Not answered",
-  related: "Related knowledge",
-} as const satisfies Readonly<Record<Verdict, string>>;
-
-const JUDGE_WORDS = {
-  "not-judged": "Not judged",
-  judged: "Judged",
-  "judging-failed": "Judging failed",
-} as const satisfies Readonly<Record<NonNullable<AskedRecord["judgeState"]>, string>>;
 
 const JUDGED_WORDS = {
   yes: "Yes, it answers the question",
@@ -27,13 +13,6 @@ const WHERE_WORDS = {
   mcp: "Through an assistant",
   trpc: "On the Ask page",
 } as const satisfies Readonly<Record<AskedRecord["transport"], string>>;
-
-const REASON_WORDS = {
-  wrong: "Wrong",
-  "out-of-date": "Out of date",
-  incomplete: "Incomplete",
-  "should-not-have-shown": "Should not have shown",
-} as const satisfies Readonly<Record<NonNullable<Feedback["reason"]>, string>>;
 
 const CLOSING_WORDS = {
   "fixed-in-the-knowledge": "Fixed in the knowledge",
@@ -99,7 +78,7 @@ export const QUESTIONS_WORDS = {
   flagged: "Flagged",
   others: "Other Questions",
   notAnswered: "Not Answered",
-  noCollection: "No collection",
+  noCollection: CONCEPT_WORDS.noCollection,
   /** The group for none, in a heading's casing. */
   noCollectionHeading: "No Collection",
   more: "More Questions",

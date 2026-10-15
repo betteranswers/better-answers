@@ -80,6 +80,12 @@ The file was written from the registry item as
 table names, as the banner's was. It brought no dependency. Its arrival edits are listed below
 with the others.
 
+S2b's U18 added shadcn's `textarea` on **15 October 2026**, for the question on Ask's New question
+and the note on a flag. The file was written from the registry item as
+`https://ui.shadcn.com/r/styles/new-york-v4/textarea.json` served it that day, whose item digest
+the table names, as the card's was. It brought no dependency. Its arrival edits are listed below
+with the others.
+
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
 lockfile, which is where a reader reads them and where Renovate moves them.
@@ -136,6 +142,7 @@ the pin.
 | `item.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/item.json | `b8ad17f300d4de1d` | `ca3434e1a4223f13` |
 | `kibo-ui/banner.tsx` | https://www.kibo-ui.com/r/banner.json | `77b8679e257a6712` | `a7dd5fee14228771` |
 | `card.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/card.json | `c7ebaa49ba2a0613` | `fb5eeec5da002628` |
+| `textarea.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/textarea.json | `2367d3964326b19c` | `80049d59f7302850` |
 
 The Kibo UI patterns, each read at commit `3d63cdb15b79d972e3dc38a10997987672f9b263` of
 [shadcnblocks/kibo](https://github.com/shadcnblocks/kibo) (MIT), under `packages/patterns/`. The
@@ -375,6 +382,13 @@ The arrival edits on `card`:
 - `CardFooter` is the sunken strip a card's provenance sits in, under a hairline.
 - `CardHeader` declares its second row only when it holds a description, so a header with a title
   alone is one row and keeps no empty gap below the title.
+
+The arrival edits on `textarea`:
+
+- The `cn` import repointed at `@/shared/lib/utils.ts` and the dependency on `cn` dropped, and the
+  file given this repository's format.
+- The field fills with the page surface, `bg-background`, rather than nothing, as `input.tsx` does,
+  and its `dark:` utilities are gone, as every other field's are: the tokens flip each colour.
 
 The edits made on 10 October 2026 for BA-98, which made the dark theme reachable:
 

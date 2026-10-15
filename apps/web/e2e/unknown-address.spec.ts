@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { ASK } from "@/shared/navigation.ts";
+import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -18,6 +18,9 @@ import {
 const NOWHERE = "/nothing-here";
 
 const NOT_FOUND = "Page Not Found";
+
+/** Not built, so hidden from every role, an Admin too. */
+const GUIDES = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Guides");
 
 const notFound = (page: Page) => page.getByRole("heading", { level: 1, name: NOT_FOUND });
 
@@ -62,7 +65,7 @@ test("draws an unknown address inside a member's shell", async ({
 
 test("names a hidden page's absence in the band", async ({ page, request }) => {
   await anAdminAtHome(page, request);
-  await page.goto(ASK.home.path);
+  await page.goto(GUIDES.path);
 
   await notFoundOfferingHome(page, "Admin");
   await expect(crumbOf(page, NOT_FOUND)).toBeVisible();

@@ -7,8 +7,8 @@ import {
   tagsOf,
   titleOf,
   verifiedEventsOf,
-} from "@/features/knowledge/concept-frontmatter.ts";
-import { CONCEPT_WORDS } from "@/features/knowledge/knowledge-words.ts";
+} from "@/shared/knowledge/concept-frontmatter.ts";
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 
 describe("what a concept page reads from a file's frontmatter", () => {
   it("names a file with no title as untitled", () => {

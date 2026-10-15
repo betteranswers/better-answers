@@ -15,34 +15,6 @@ export const SEARCH_WORDS = {
   passageLeft: "The passage you had open is no longer listed.",
   more: "More Matches",
   document: "Document",
-  noCollection: "No collection",
-  notCompanyKnowledge: "Not company knowledge",
-} as const;
-
-export const EVIDENCE_WORDS = {
-  loading: "The passage is still loading.",
-  close: "Close",
-} as const;
-
-export const CONCEPT_WORDS = {
-  loading: "The concept is still loading.",
-  untitled: "Untitled Concept",
-  toSearch: "Back to Search",
-  sources: "Sources",
-  verification: "Verification",
-  links: "Links",
-  details: "Details from the File",
-  footnotes: "Footnotes",
-  backToTheClaim: "Back to the Claim",
-  tags: "Tags",
-  /** A citation mark and its entry in the sources list are named alike, by the file’s own label. */
-  sourceNamed: (place: number, label: string): string => `Source ${place}: ${label}`,
-  neverVerified: "No verification recorded",
-  verifiedOn: (day: string, byAPerson: boolean): string =>
-    byAPerson ? `${day} · by a person` : `${day} · automatically`,
-  place: (at: string): string => `· ${at}`,
-  noLinks: "No links you can read",
-  ownPage: "Open This Concept’s Page",
 } as const;
 
 /** A relation's kind as the map names it, in a reader's words; any other kind is shown untagged. */
