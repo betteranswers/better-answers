@@ -43,7 +43,11 @@ export type RecallSet = z.infer<typeof recallSet>;
 export const answersOf = (set: RecallSet): readonly (RecallAnswer & { group: string })[] =>
   set.groups.flatMap(({ group, answers }) => answers.map((answer) => ({ ...answer, group })));
 
-const readAs = async <Held>(path: string, shape: z.ZodType<Held>): Promise<Result<Held, Error>> => {
+/** The JSON at `path` as `shape`, refused when it cannot be read, is not JSON or is not `shape`. */
+export const readAs = async <Held>(
+  path: string,
+  shape: z.ZodType<Held>,
+): Promise<Result<Held, Error>> => {
   const text = await attempt(() => readFile(path, "utf8"));
   if (!text.ok) return text;
   const json = await attempt(async (): Promise<unknown> => JSON.parse(text.value));
