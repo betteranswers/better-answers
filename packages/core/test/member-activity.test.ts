@@ -101,7 +101,7 @@ const roleChanged = (
   role: Role,
 ) =>
   as(workspace, actor, (principal, tx) =>
-    changeRole(principal, tx, inputOf(changeRoleInput, { personId, role })),
+    changeRole(principal, tx, { ...inputOf(changeRoleInput, { personId, role }), at: new Date() }),
   );
 
 const accepted = async (personId: string, invitationId: string) =>

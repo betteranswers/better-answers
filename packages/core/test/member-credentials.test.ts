@@ -36,7 +36,7 @@ const revoking = (principal: UserPrincipal, tx: Tx, personId: string, at = AT) =
   });
 
 const revokedBy = (workspace: ProvisionedWorkspace, actor: string, personId: string, at = AT) =>
-  heldAs(workspace, actor, (principal, tx) => revoking(principal, tx, personId, at));
+  heldAs(workspace, actor, (principal, tx) => revoking(principal, tx, personId, at), at);
 
 const instantHeld = async (
   workspace: ProvisionedWorkspace,
@@ -229,6 +229,7 @@ describe("what ending a member's sign-ins and tokens refuses", () => {
       workspace,
       [workspace.adminUserId, fellowAdmin],
       revoking,
+      AT,
     );
 
     const [refused, ...others] = answered.filter((answer) => !answer.ok);

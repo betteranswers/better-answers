@@ -11,6 +11,7 @@ import {
 } from "../src/kernel/index.ts";
 import { openPostgres, withPrincipal, type PostgresDoor } from "../src/store/postgres/index.ts";
 import { bundlesForSuite } from "./bundle.ts";
+import { confirmedSessionFor } from "./identity-rows.ts";
 import { provisionedWorkspace } from "./platform.ts";
 import { postgresForSuite, seedingWith } from "./suite-postgres.ts";
 
@@ -37,14 +38,22 @@ export const suiteWithBundles = () => {
   return { db, bundles, arrange: (): Promise<Scenario> => arrangeWorkspace(db(), bundles()) };
 };
 
+/** Resolves the member; `confirmed` names a session confirmed now, and a scenario's principal names none, or the erasure map would count its row. */
 export const principalFor = async (
   db: MigratedPostgres,
   workspaceId: string,
   userId: string,
+  confirmed = false,
 ): Promise<UserPrincipal> => {
+  const sessionId = confirmed ? await confirmedSessionFor(db.pool, userId) : undefined;
   const resolved = await withPrincipal(
     openPostgres(db.runtimePool),
-    { workspaceId, userId, issuedAt: new Date() },
+    {
+      workspaceId,
+      userId,
+      issuedAt: new Date(),
+      ...(sessionId === undefined ? {} : { sessionId }),
+    },
     async (principal) => principal,
   );
   if (!resolved.ok) throw new Error(`the principal did not resolve: ${resolved.error}`);

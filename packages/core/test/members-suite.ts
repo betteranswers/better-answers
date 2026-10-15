@@ -8,23 +8,34 @@ import {
   type Tx,
   withHeldPrincipal,
 } from "../src/store/postgres/index.ts";
-import { endedGrants, type NamedGrants } from "./identity-rows.ts";
+import { confirmedSessionFor, endedGrants, type NamedGrants } from "./identity-rows.ts";
 import type { ProvisionedWorkspace } from "./platform.ts";
 import { seedingWith } from "./suite-postgres.ts";
 
-/** As the transport holds a mutation's caller: their own member row `FOR SHARE` until commit. */
+/**
+ * As the transport holds a mutation's caller: their own member row `FOR SHARE` until commit, on a
+ * session confirmed as the clock reads now.
+ */
 export const heldAs = async <T>(
   workspace: ProvisionedWorkspace,
   userId: string,
   work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
-): Promise<Folded<T>> =>
-  folded<T>(
+  confirmedAt: Date = new Date(),
+): Promise<Folded<T>> => {
+  const sessionId = await confirmedSessionFor(workspace.door.pool, userId, confirmedAt);
+  return folded<T>(
     await withHeldPrincipal(
       workspace.door,
-      { workspaceId: workspace.workspaceId, userId, issuedAt: new Date() },
+      {
+        workspaceId: workspace.workspaceId,
+        userId,
+        issuedAt: confirmedAt,
+        sessionId,
+      },
       work,
     ),
   );
+};
 
 /**
  * Each writes to the other once both hold their own member row, so each waits on the other's: a
@@ -34,16 +45,22 @@ export const bothHoldingTheirOwnRow = <T>(
   workspace: ProvisionedWorkspace,
   callers: readonly [string, string],
   action: (principal: UserPrincipal, tx: Tx, other: string) => Promise<Foldable<T>>,
+  confirmedAt: Date = new Date(),
 ): Promise<readonly [Folded<T>, Folded<T>]> => {
   const bothHold = Promise.withResolvers<undefined>();
   let holding = 0;
   const actingOn = (caller: string, other: string) =>
-    heldAs(workspace, caller, async (principal, tx) => {
-      holding += 1;
-      if (holding === 2) bothHold.resolve(undefined);
-      await bothHold.promise;
-      return action(principal, tx, other);
-    });
+    heldAs(
+      workspace,
+      caller,
+      async (principal, tx) => {
+        holding += 1;
+        if (holding === 2) bothHold.resolve(undefined);
+        await bothHold.promise;
+        return action(principal, tx, other);
+      },
+      confirmedAt,
+    );
   const [first, second] = callers;
   return Promise.all([actingOn(first, second), actingOn(second, first)]);
 };

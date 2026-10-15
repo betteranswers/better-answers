@@ -473,9 +473,25 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
   };
 
   const endEverySignInAndToken: TestApp["endEverySignInAndToken"] = async (userId, at) => {
+    // The harness's own action runs as the operator's confirmed session would, never pending.
+    const operatorId = await operatorsId();
+    const client = await database.superuser.connect();
+    let confirmedId: string;
+    try {
+      confirmedId = (
+        await testData(client).session({
+          userId: operatorId,
+          createdAt: at,
+          updatedAt: at,
+          secondFactorConfirmedAt: at,
+        })
+      ).id;
+    } finally {
+      client.release();
+    }
     const opened = await withOperator(
       door,
-      { userId: await operatorsId(), issuedAt: at },
+      { userId: operatorId, issuedAt: at, sessionId: confirmedId },
       (operator, tx) =>
         endEverySignInAndToken_(operator, tx, {
           personId: boundarySchemas.user.select.shape.id.parse(userId),

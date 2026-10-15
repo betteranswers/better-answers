@@ -17,6 +17,7 @@ import {
   withOperator,
 } from "../src/store/postgres/index.ts";
 import { provisionWorkspace } from "../src/workspaces/index.ts";
+import { sessionFor } from "./identity-rows.ts";
 
 export const personIdOf = (id: string) => boundarySchemas.user.select.shape.id.parse(id);
 
@@ -36,6 +37,7 @@ export const principalOf = (
   role,
   groups: [],
   credentialIssuedAtMs: Date.now(),
+  secondFactorConfirmedAtMs: Date.now(),
 });
 
 export type ProvisionedWorkspace = {
@@ -83,9 +85,15 @@ export const asANewOperator = async <T>(
   work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
 ) => {
   const operatorId = await seedPerson(db.pool, { operator: true });
+  const sessionId = await sessionFor(db.pool, operatorId, {
+    createdAt: signedInAt,
+    lastUsedAt: signedInAt,
+    expiresAt: new Date(signedInAt.getTime() + 30 * 24 * 60 * 60_000),
+    confirmedAt: signedInAt,
+  });
   const answered = await withOperator(
     openPostgres(db.runtimePool),
-    { userId: operatorId, issuedAt: signedInAt },
+    { userId: operatorId, issuedAt: signedInAt, sessionId },
     work,
   );
   return { operatorId, answered };

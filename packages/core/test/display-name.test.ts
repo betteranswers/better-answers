@@ -310,7 +310,7 @@ describe("correcting a display name, as the operator", () => {
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
-  it("refuses a sign-in over an hour old, changing nothing", async () => {
+  it("refuses a confirmation over an hour old, changing nothing", async () => {
     const personId = await seedPerson(db().pool, { name: "Rude Name" });
 
     const { answered } = await correcting(
@@ -318,12 +318,12 @@ describe("correcting a display name, as the operator", () => {
       new Date("2026-09-26T10:59:59.999Z"),
     );
 
-    expect(answered).toEqual({ ok: true, value: { ok: false, error: "sign-in-too-old" } });
+    expect(answered).toEqual({ ok: true, value: { ok: false, error: "confirmation-too-old" } });
     expect(await displayNameHeld(personId)).toBe("Rude Name");
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
-  it("admits a sign-in exactly an hour old", async () => {
+  it("admits a confirmation exactly an hour old", async () => {
     const personId = await seedPerson(db().pool, { name: "Rude Name" });
 
     const { answered } = await correcting(

@@ -24,6 +24,7 @@ const person = (role: UserPrincipal["role"]): UserPrincipal => ({
   role,
   groups: [],
   credentialIssuedAtMs: Date.now(),
+  secondFactorConfirmedAtMs: Date.now(),
 });
 
 const bootstrap: PlatformPrincipal = {

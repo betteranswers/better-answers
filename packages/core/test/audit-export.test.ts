@@ -12,6 +12,7 @@ import {
 } from "../src/members/index.ts";
 import type { PostgresDoor, Tx } from "../src/store/postgres/index.ts";
 import { auditEventsIn } from "./audit-rows.ts";
+import { confirmedSessionFor } from "./identity-rows.ts";
 import { provisionedWorkspace, seedPerson, type ProvisionedWorkspace } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
 import { answered, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
@@ -39,7 +40,11 @@ const principalOf = async (
   answered(
     await readingAs(
       db().runtimePool,
-      { workspaceId: workspace.workspaceId, userId },
+      {
+        workspaceId: workspace.workspaceId,
+        userId,
+        sessionId: await confirmedSessionFor(db().pool, userId),
+      },
       async (p) => p,
     ),
   );
@@ -49,11 +54,10 @@ const exportAs = async (
   userId: string,
   asked: z.input<typeof exportAuditLogInput> = {},
 ) =>
-  exportAuditLog(
-    await principalOf(workspace, userId),
-    workspace.door,
-    inputOf(exportAuditLogInput, asked),
-  );
+  exportAuditLog(await principalOf(workspace, userId), workspace.door, {
+    ...inputOf(exportAuditLogInput, asked),
+    at: new Date(),
+  });
 
 const exported = (made: Result<AuditExport, unknown>): AuditExport => {
   if (!made.ok) throw new Error(`the export was refused: ${String(made.error)}`);
@@ -341,7 +345,10 @@ describe("the audit log's export", () => {
       [workspace.workspaceId, workspace.adminUserId],
     );
 
-    const made = await exportAuditLog(principal, workspace.door, inputOf(exportAuditLogInput, {}));
+    const made = await exportAuditLog(principal, workspace.door, {
+      ...inputOf(exportAuditLogInput, {}),
+      at: new Date(),
+    });
 
     expect(made).toEqual({ ok: false, error: "role-disagrees" });
     expect(await exportEvents(workspace)).toEqual([]);
@@ -389,11 +396,10 @@ const doorWith = (
 };
 
 const exportThrough = async (workspace: ProvisionedWorkspace, door: PostgresDoor) =>
-  exportAuditLog(
-    await principalOf(workspace, workspace.adminUserId),
-    door,
-    inputOf(exportAuditLogInput, {}),
-  );
+  exportAuditLog(await principalOf(workspace, workspace.adminUserId), door, {
+    ...inputOf(exportAuditLogInput, {}),
+    at: new Date(),
+  });
 
 describe("an export under way", () => {
   it.each([1, 2])("answers the store failing on connection %i", async (failing) => {
@@ -431,14 +437,17 @@ describe("an export under way", () => {
     await waitingOnTheGroupTable();
     const changed = await readingAs(
       db().runtimePool,
-      { workspaceId: workspace.workspaceId, userId: bea },
+      {
+        workspaceId: workspace.workspaceId,
+        userId: bea,
+        sessionId: await confirmedSessionFor(db().pool, bea),
+      },
       async (principal, tx) => {
         await tx.query("SET LOCAL lock_timeout = '2s'");
-        return changeRole(
-          principal,
-          tx,
-          inputOf(changeRoleInput, { personId: cal, role: "Editor" }),
-        );
+        return changeRole(principal, tx, {
+          ...inputOf(changeRoleInput, { personId: cal, role: "Editor" }),
+          at: new Date(),
+        });
       },
     );
     await held.released();

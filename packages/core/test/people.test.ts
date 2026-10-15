@@ -212,6 +212,7 @@ describe("the operator's list of people", () => {
       kind: "operator",
       userId: personIdOf(ulid()),
       credentialIssuedAtMs: Date.now(),
+      secondFactorConfirmedAtMs: Date.now(),
     };
 
     expect([

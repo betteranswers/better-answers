@@ -13,7 +13,7 @@ import { appRouter } from "../src/trpc/router.ts";
 import { connectAsHost, refresh, revokeAtEndpoint, signIn } from "./flow.ts";
 import { CLAUDE_CLIENT_ID, capturingLogger } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
-import { displayNameHeldBy, sessionsSignedInOverAnHourAgo } from "./provoke.ts";
+import { confirmationsAgedOverAnHourAgo, displayNameHeldBy } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 import { refusalOfCall, webSignedIn } from "./web-client.ts";
 
@@ -514,26 +514,26 @@ describe("ending every sign-in and token everywhere, from the console", () => {
     });
   });
 
-  it("refuses the operator's sign-in over an hour old, writing nothing", async () => {
+  it("refuses the operator's hour-old confirmation, writing nothing", async () => {
     const { workspace, api } = await theOperatorOnTheWeb();
     const person = await app().person();
-    await sessionsSignedInOverAnHourAgo(app(), workspace.admin.id);
+    await confirmationsAgedOverAnHourAgo(app(), workspace.admin.id);
 
     const refused = await refusalOfCall(
       api.console.people.endEverySignInAndToken.mutate({ personId: person.id }),
     );
 
     expect(refused).toMatchObject({
-      data: { httpStatus: 401, refusal: { word: "sign-in-too-old", class: "unauthenticated" } },
+      data: { httpStatus: 412, refusal: { word: "confirmation-too-old", class: "precondition" } },
     });
     expect(await revokedAtOf(person.id)).toEqual([{ credentials_revoked_at: null }]);
     expect(await revocationRowsOf(person.id)).toEqual([]);
   });
 
-  it("admits the operator again after a fresh sign-in", async () => {
+  it("admits the operator again after a fresh sign-in's confirmation", async () => {
     const { workspace } = await theOperatorOnTheWeb();
     const person = await app().person();
-    await sessionsSignedInOverAnHourAgo(app(), workspace.admin.id);
+    await confirmationsAgedOverAnHourAgo(app(), workspace.admin.id);
 
     const { api } = await webSignedIn(app(), workspace.admin.email);
     const revoked = await api.console.people.endEverySignInAndToken.mutate({ personId: person.id });
@@ -649,24 +649,24 @@ describe("correcting a flagged display name, from the console", () => {
     expect(await correctionRowsOf(person.id)).toEqual([]);
   });
 
-  it("refuses the operator's sign-in over an hour old, writing nothing", async () => {
+  it("refuses the operator's hour-old confirmation, writing nothing", async () => {
     const { api, workspace, person } = await theOperatorAndAFlaggedPerson();
-    await sessionsSignedInOverAnHourAgo(app(), workspace.admin.id);
+    await confirmationsAgedOverAnHourAgo(app(), workspace.admin.id);
 
     const refused = await refusalOfCall(
       api.console.people.correctDisplayName.mutate({ personId: person.id, displayName: "Sam" }),
     );
 
     expect(refused).toMatchObject({
-      data: { httpStatus: 401, refusal: { word: "sign-in-too-old", class: "unauthenticated" } },
+      data: { httpStatus: 412, refusal: { word: "confirmation-too-old", class: "precondition" } },
     });
     expect(await displayNameHeldBy(app(), person.id)).toBe(RUDE_NAME);
     expect(await correctionRowsOf(person.id)).toEqual([]);
   });
 
-  it("admits the operator again after a fresh sign-in", async () => {
+  it("admits the operator again after a fresh sign-in's confirmation", async () => {
     const { workspace, person } = await theOperatorAndAFlaggedPerson();
-    await sessionsSignedInOverAnHourAgo(app(), workspace.admin.id);
+    await confirmationsAgedOverAnHourAgo(app(), workspace.admin.id);
 
     const { api } = await webSignedIn(app(), workspace.admin.email);
     const corrected = await api.console.people.correctDisplayName.mutate({

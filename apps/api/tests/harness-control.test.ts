@@ -42,6 +42,7 @@ describe("the browser suite's second-factor harness", () => {
     await confirmWithTheAuthenticator(client, key);
     expect((await webClientOf(client).api.person.secondFactor.query()).thisSession).toEqual({
       confirmed: true,
+      confirmedAt: expect.any(String),
       setupGranted: false,
       adminOf: null,
       standing: "not-required",

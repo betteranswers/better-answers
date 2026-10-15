@@ -39,6 +39,7 @@ import {
   removeRepository,
 } from "./bundle.ts";
 import { gitStarts } from "./git-starts.ts";
+import { confirmedSessionFor } from "./identity-rows.ts";
 import { conceptCiting, connectedSourceHolding } from "./sourced-concept.ts";
 import {
   abortTheTransaction,
@@ -139,7 +140,8 @@ const recordedCommits = async (workspaceId: string): Promise<readonly string[]> 
 };
 
 const reading = <T>(
-  principal: UserPrincipal,
+  /** A session the principal names, for an act that asks how fresh its confirmation is. */
+  principal: UserPrincipal & { readonly sessionId?: string },
   work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
 ): Promise<Folded<T>> => readingAs(db().runtimePool, principal, work);
 
@@ -1631,8 +1633,13 @@ describe("opening a concept by IRI", () => {
 
     expect(await verifiedBy()).toBe("Priya Anand");
 
-    const removed = await reading(scenario.admin, (principal, tx) =>
-      removeMember(principal, tx, { personId: priya.id, at: new Date() }),
+    // The removal asks how fresh the confirmation is, so the Admin acts from a confirmed session.
+    const removed = await reading(
+      {
+        ...scenario.admin,
+        sessionId: await confirmedSessionFor(db().pool, scenario.admin.userId),
+      },
+      (principal, tx) => removeMember(principal, tx, { personId: priya.id, at: new Date() }),
     );
 
     expect(removed).toMatchObject({ ok: true });

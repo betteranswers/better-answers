@@ -21,7 +21,7 @@ const roleChangesIn = (workspace: ProvisionedWorkspace) =>
   auditRowsOf(workspace, "people.member.role_changed");
 
 const changing = (principal: UserPrincipal, tx: Tx, personId: string, role: string) =>
-  changeRole(principal, tx, inputOf(changeRoleInput, { personId, role }));
+  changeRole(principal, tx, { ...inputOf(changeRoleInput, { personId, role }), at: new Date() });
 
 const roleChangedBy = (
   workspace: ProvisionedWorkspace,
