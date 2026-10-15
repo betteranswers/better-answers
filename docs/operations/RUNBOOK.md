@@ -535,7 +535,7 @@ Each run prints its figures under *Reuse reading*, then one line for each miss:
 
 A run whose judge answered nothing, as with a key the provider refuses, fails. The check suite holds every fit and every hard negative reaching the judge, so a figure of *never sent* above zero is something to report, not to read past.
 
-**What it costs.** A run makes 34 calls of about 2,000 tokens in. All four runs together cost about £1 at a rate near 0.75, almost all of it Sonnet 5.5 at its default effort. The most they can cost, with every call spending its whole allowance of about 12,300 tokens out, is about £7. Each run's workspace has a spending limit of £20, so a run cannot spend past that.
+**What it costs.** A run makes 34 calls of about 2,000 tokens in. All four runs together cost about £1 at a rate near 0.75, almost all of it Sonnet 5.5 at its default effort. The most they can cost, with every call spending its whole allowance of 16,000 tokens out, is about £9. Each run's workspace has a spending limit of £20, so a run cannot spend past that.
 
 **The key.** It is sealed into the container's database as production seals a workspace's key, and is gone when the run ends and the container is removed. The reading never prints or logs it.
 
