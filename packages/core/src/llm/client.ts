@@ -185,6 +185,9 @@ const answerOf = <T>(
   return parsed === undefined ? undefined : { answer: parsed };
 };
 
+/** Shorter than this, a retry would be cut off before a reply could come, yet might be billed. */
+const SHORTEST_ATTEMPT_MS = 10_000;
+
 /** A retry the deadline leaves no room for ends the call as the attempt before it read. */
 const outOfTime = (read: AttemptRead): Unanswered =>
   read.read === "rate-limited" ? "rate-limited" : "failed";
@@ -272,8 +275,12 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
       if (answered !== undefined) return { outcome: "answered", answer: answered.answer, spent };
       const step = stepAfter(tried.read, attempted);
       if ("outcome" in step) return { outcome: step.outcome, spent };
-      if (step.waitMs >= leftMs()) return { outcome: outOfTime(tried.read), spent };
+      if (step.waitMs + SHORTEST_ATTEMPT_MS > leftMs()) {
+        return { outcome: outOfTime(tried.read), spent };
+      }
       await wait(step.waitMs);
+      // A timer can fire late, so the room is measured again after it.
+      if (leftMs() < SHORTEST_ATTEMPT_MS) return { outcome: outOfTime(tried.read), spent };
       return from(attempted + 1, spent);
     };
 

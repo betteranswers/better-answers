@@ -470,8 +470,8 @@ describe("a model call's attempts", () => {
   });
 });
 
-/** A clock each attempt moves by `attemptMs[n]` and each wait by its own length. */
-const deadlineClient = (wire: Wire, attemptMs: readonly number[]) => {
+/** A wait runs `lateMs` over, as a late timer does; a negative timeout throws, as `AbortSignal.timeout`'s does. */
+const deadlineClient = (wire: Wire, attemptMs: readonly number[], lateMs = 0) => {
   const elapsed = { ms: 0 };
   const timeouts: number[] = [];
   const client = openModelClient({
@@ -482,9 +482,10 @@ const deadlineClient = (wire: Wire, attemptMs: readonly number[]) => {
     clock: { now: () => new Date(NOW.getTime() + elapsed.ms) },
     log: { info: () => {} },
     wait: async (ms) => {
-      elapsed.ms += ms;
+      elapsed.ms += ms + lateMs;
     },
     timeout: (ms) => {
+      if (ms < 0) throw new RangeError(`a timeout of ${String(ms)} ms`);
       timeouts.push(ms);
       return new AbortController().signal;
     },
@@ -515,9 +516,39 @@ describe("a call's own deadline", () => {
     expect(wire.sent).toHaveLength(1);
   });
 
-  it("skips a retry whose wait uses the deadline up", async () => {
+  it("skips a retry the deadline would leave under ten seconds", async () => {
     const wire = theWire(OVERLOADED, ANSWERED);
-    const { client } = deadlineClient(wire, [148_000, 0]);
+    const { client } = deadlineClient(wire, [138_001, 0]);
+
+    const called = await client.callModel(TO_SONNET, WITHIN_150_S);
+
+    expect(called.outcome).toBe("failed");
+    expect(wire.sent).toHaveLength(1);
+  });
+
+  it("retries with exactly ten seconds left after its wait", async () => {
+    const wire = theWire(OVERLOADED, ANSWERED);
+    const { client, timeouts } = deadlineClient(wire, [138_000, 0]);
+
+    const called = await client.callModel(TO_SONNET, WITHIN_150_S);
+
+    expect(called.outcome).toBe("answered");
+    expect(timeouts).toEqual([120_000, 10_000]);
+  });
+
+  it("gives up when a late timer leaves under ten seconds", async () => {
+    const wire = theWire(OVERLOADED, ANSWERED);
+    const { client } = deadlineClient(wire, [138_000, 0], 1);
+
+    const called = await client.callModel(TO_SONNET, WITHIN_150_S);
+
+    expect(called.outcome).toBe("failed");
+    expect(wire.sent).toHaveLength(1);
+  });
+
+  it("sets no negative timeout when a timer overruns the deadline", async () => {
+    const wire = theWire(OVERLOADED, ANSWERED);
+    const { client } = deadlineClient(wire, [100_000, 0], 49_000);
 
     const called = await client.callModel(TO_SONNET, WITHIN_150_S);
 
