@@ -59,7 +59,8 @@ export type MessagesRead =
 const count = z.number().int().nonnegative();
 
 const reply = z.object({
-  content: z.array(z.object({ type: z.string(), text: z.string().optional() })),
+  // Only a text block carries `text`; a thinking block's is under `thinking`.
+  content: z.array(z.object({ text: z.string().optional() })),
   stop_reason: z.string().nullable(),
   usage: z.object({
     input_tokens: count,
@@ -117,19 +118,15 @@ const answeredRead = (text: string): MessagesRead => {
   const spent = spentOf(parsed.usage);
   if (parsed.stop_reason === "refusal") return { read: "refused", spent };
   if (parsed.stop_reason !== "end_turn") return { read: "cut-off", spent };
-  const said = parsed.content.flatMap((block) =>
-    block.type === "text" && block.text !== undefined ? [block.text] : [],
-  );
+  const said = parsed.content.map((block) => block.text ?? "");
   return { read: "answered", text: said.join(""), spent };
 };
 
 const SECOND_MS = 1000;
 
-/** `retry-after` is whole seconds; anything else is no instruction. */
-const retryAfterMsOf = (header: string | null): number | undefined => {
-  const seconds = header?.trim() ?? "";
-  return /^\d+$/.test(seconds) ? Number(seconds) * SECOND_MS : undefined;
-};
+/** `retry-after` is whole seconds, as `Headers` hands it over trimmed; anything else is none. */
+const retryAfterMsOf = (header: string | null): number | undefined =>
+  /^\d+$/.test(header ?? "") ? Number(header) * SECOND_MS : undefined;
 
 const rateLimitedRead = (text: string, retryAfter: string | null): MessagesRead =>
   jsonAs(errorReply, text)?.error.details?.error_code === TIER_SPEND_CAP

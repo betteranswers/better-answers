@@ -60,7 +60,8 @@ export type ModelToCall = {
   readonly key: ModelKey;
 };
 
-type ChoiceRow = { readonly id: string; readonly provider: string; readonly model: string };
+/** A row naming a provider no wire shape speaks is no model to call. */
+const spokenChoice = z.object({ id: z.string(), provider: spoken, model: z.string() });
 
 /**
  * The model the workspace chose for `purpose`, with its key; `undefined` when there is none to
@@ -73,22 +74,16 @@ export const resolveModel = async (
   purpose: LlmPurpose,
 ): Promise<Result<ModelToCall | undefined, OpenEnvelopeRefusal | Error>> =>
   attemptResult(async (): Promise<Result<ModelToCall | undefined, OpenEnvelopeRefusal>> => {
-    const found = await tx.query<ChoiceRow>(
+    const found = await tx.query(
       "SELECT id, provider, model FROM model_choice WHERE workspace_id = $1 AND purpose = $2",
       [asker.workspaceId, purpose],
     );
-    const choice = found.rows[0];
-    const provider = spoken.safeParse(choice?.provider);
-    if (choice === undefined || !provider.success) return ok(undefined);
-    const key = await credentials.readModelKey(tx, provider.data);
+    const choice = spokenChoice.safeParse(found.rows[0]);
+    if (!choice.success) return ok(undefined);
+    const { id, provider, model } = choice.data;
+    const key = await credentials.readModelKey(tx, provider);
     if (!key.ok || key.value === undefined) return key.ok ? ok(undefined) : key;
-    return ok({
-      purpose,
-      modelChoiceId: choice.id,
-      provider: provider.data,
-      model: choice.model,
-      key: key.value,
-    });
+    return ok({ purpose, modelChoiceId: id, provider, model, key: key.value });
   });
 
 /** One call: what to say, the answer's shape, and the size its reservation holds. */

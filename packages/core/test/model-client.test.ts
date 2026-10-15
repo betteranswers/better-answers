@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import type { PlatformPrincipal } from "../src/kernel/index.ts";
@@ -89,9 +89,11 @@ const sentOf = (input: string | URL | Request, init: RequestInit = {}): Sent => 
   body: typeof init.body === "string" ? init.body : "",
 });
 
+/** Past its replies the wire answers a teapot, so an attempt too many shows in what was spent. */
+const NO_MORE: Reply = { status: 418, body: "" };
+
 /** A hung attempt rejects once its timeout has fired, as `fetch` does on an aborted signal. */
-const answering = (next: Answer | undefined, signal: AbortSignal | null | undefined) => {
-  if (next === undefined) throw new Error("the wire was sent more attempts than it answers");
+const answering = (next: Answer, signal: AbortSignal | null | undefined) => {
   if (next === "unreachable") throw new TypeError("fetch failed");
   if (next !== "hang") {
     return new Response(next.body, { status: next.status, headers: next.headers ?? {} });
@@ -105,7 +107,7 @@ const theWire = (...replies: readonly Answer[]) => {
   const sent: Sent[] = [];
   const fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     sent.push(sentOf(input, init));
-    return answering(replies[sent.length - 1], init?.signal);
+    return answering(replies[sent.length - 1] ?? NO_MORE, init?.signal);
   };
   return { sent, fetch };
 };
@@ -128,6 +130,8 @@ const clientOn = (
     log: { info: (line, message) => lines.push({ line, message }) },
     wait: async (ms) => {
       waits.push(ms);
+      if (waits.length >= MAX_ATTEMPTS)
+        throw new Error("the call waited more than its attempts allow");
     },
     timeout: (ms) => {
       timeouts.push(ms);
@@ -301,7 +305,7 @@ describe("the Messages shape", () => {
   });
 
   it("fails an answer cut off at its token limit, once", async () => {
-    const wire = theWire({ status: 200, body: reply('{"fits":[', "max_tokens") });
+    const wire = theWire({ status: 200, body: reply('{"fits":[]}', "max_tokens") });
 
     expect(await calling(wire)).toEqual({
       outcome: "failed",
@@ -381,7 +385,7 @@ describe("a model call's attempts", () => {
   });
 
   it("reads a retry-after that is not whole seconds as none", async () => {
-    const wire = theWire({ ...RATE_LIMITED, headers: { "retry-after": "soon" } }, ANSWERED);
+    const wire = theWire({ ...RATE_LIMITED, headers: { "retry-after": "12.5" } }, ANSWERED);
     const { client, waits } = clientOn(wire);
 
     await client.callModel(TO_SONNET, A_CALL);
@@ -480,6 +484,70 @@ describe("what a model call logs", () => {
     await client.callModel(TO_SONNET, A_CALL);
 
     expect(lines.map(({ line }) => [line.status, line.read])).toEqual([[null, "timed-out"]]);
+  });
+
+  it("logs what each attempt's reply read as", async () => {
+    const reads = async (...replies: readonly Answer[]) => {
+      const { client, lines } = clientOn(theWire(...replies));
+      await client.callModel(TO_SONNET, A_CALL);
+      return lines.map(({ line }) => [line.status, line.read]);
+    };
+
+    expect(await reads({ status: 404, body: errorReply("not_found_error", "model: x") })).toEqual([
+      [404, "failed"],
+    ]);
+    expect(await reads({ status: 200, body: "not json" })).toEqual([[200, "failed"]]);
+    expect(await reads({ status: 400, body: errorReply("invalid_request_error", "bad") })).toEqual([
+      [400, "failed"],
+    ]);
+    expect(await reads({ status: 200, body: reply('{"fits":[]}', "max_tokens") })).toEqual([
+      [200, "cut-off"],
+    ]);
+    expect(await reads("unreachable", OVERLOADED, ANSWERED)).toEqual([
+      [null, "unavailable"],
+      [529, "unavailable"],
+      [200, "answered"],
+    ]);
+  });
+});
+
+describe("a reply a proxy wrote", () => {
+  it("tries a rate limit with no JSON body again", async () => {
+    const wire = theWire({ status: 429, body: "<html>Too Many Requests</html>" }, ANSWERED);
+
+    expect((await calling(wire)).outcome).toBe("answered");
+    expect(wire.sent).toHaveLength(2);
+  });
+
+  it("fails a bad request with no JSON body, once", async () => {
+    const wire = theWire({ status: 400, body: "<html>Bad Request</html>" });
+
+    expect(await calling(wire)).toEqual({ outcome: "failed", spent: [NOTHING_SPENT] });
+  });
+});
+
+describe("the client's own clock", () => {
+  it("waits its backoff on the timer when none is injected", async () => {
+    vi.useFakeTimers();
+    try {
+      const wire = theWire(OVERLOADED, ANSWERED);
+      const client = openModelClient({
+        fetch: wire.fetch,
+        clock: { now: () => NOW },
+        log: { info: () => undefined },
+      });
+
+      const called = client.callModel(TO_SONNET, A_CALL);
+      await vi.advanceTimersByTimeAsync(1999);
+      const before = wire.sent.length;
+      await vi.advanceTimersByTimeAsync(1);
+
+      expect(before).toBe(1);
+      expect((await called).outcome).toBe("answered");
+      expect(wire.sent).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
