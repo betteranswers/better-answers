@@ -357,3 +357,43 @@ describe("a workspace's model key", () => {
     });
   });
 });
+
+/** Invented: an account id is 32 hexadecimal digits, and the token follows its colon. */
+const A_WORKERS_AI_KEY = "0123456789abcdef0123456789abcdef:invented_Token-u15";
+
+const NOT_A_WORKERS_AI_KEY = [
+  ["a token with no account id", "invented_Token-u15"],
+  ["an account id with no token", "0123456789abcdef0123456789abcdef:"],
+  ["an account id one digit short", "0123456789abcdef0123456789abcde:invented_Token-u15"],
+  ["an account id in capitals", "0123456789ABCDEF0123456789ABCDEF:invented_Token-u15"],
+  ["a token holding a second colon", "0123456789abcdef0123456789abcdef:invented:Token"],
+  ["text before the account id", "x0123456789abcdef0123456789abcdef:invented"],
+] as const;
+
+describe("a Workers AI key", () => {
+  it("stores an account id and a token as one key", async () => {
+    const workspaceId = await aWorkspace();
+
+    const set = await setting(workspaceId, A_WORKERS_AI_KEY, "cloudflare");
+
+    expect(set).toEqual({ ok: true, value: { workspaceId, provider: "cloudflare" } });
+    expect(await revealedIn(workspaceId, "cloudflare")).toBe(A_WORKERS_AI_KEY);
+  });
+
+  it.each(NOT_A_WORKERS_AI_KEY)("refuses %s, storing nothing", async (_case, key) => {
+    const workspaceId = await aWorkspace();
+
+    expect(await setting(workspaceId, key, "cloudflare")).toEqual({
+      ok: false,
+      error: "malformed",
+    });
+    expect(await rowsOf(workspaceId)).toEqual([]);
+    expect(await eventsOf(workspaceId)).toEqual([]);
+  });
+
+  it("holds another provider's key to no such form", async () => {
+    const workspaceId = await aWorkspace();
+
+    expect((await setting(workspaceId, "invented_Token-u15", "anthropic")).ok).toBe(true);
+  });
+});

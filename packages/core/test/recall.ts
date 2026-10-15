@@ -5,9 +5,30 @@ import { z } from "zod";
 
 import type { ConceptIri } from "@better-answers/schema";
 
+import { find } from "../src/answering/index.ts";
 import { writeConcept } from "../src/concepts/index.ts";
-import { attempt, err, ok, type Result } from "../src/kernel/index.ts";
+import { attempt, err, ok, type Result, type UserPrincipal } from "../src/kernel/index.ts";
+import type { visibilitySuite } from "./sourced-concept.ts";
+import { answered } from "./suite-postgres.ts";
 import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
+
+type ReadingAs = ReturnType<typeof visibilitySuite>["reading"];
+
+/** `find`'s concept matches for a question, best first, as `person` reads them on `now`. */
+export const conceptsFoundBy =
+  (reading: ReadingAs, person: UserPrincipal, now: Date) =>
+  async (question: string): Promise<readonly string[]> => {
+    const found = answered(
+      await reading(person, (reader, tx) =>
+        find(reader, tx, { query: question, limit: RECALL_DEPTH }, now),
+      ),
+    );
+    return found.matches.flatMap((match) => (match.layer === "bundles" ? [match.iri] : []));
+  };
+
+/** A recall as a figure reads it. */
+export const worded = ({ recall, recalled, asked }: Recall, counted: string): string =>
+  `${(recall * 100).toFixed(1)} %, for ${recalled} of ${asked} ${counted}`;
 
 const RECALL_SET = fileURLToPath(new URL("./fixtures/recall-set.json", import.meta.url));
 

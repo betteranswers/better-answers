@@ -1614,7 +1614,7 @@ describe("5 — the inferred type is pinned", () => {
     };
     modelKey: {
       workspaceId: WorkspaceId;
-      provider: "anthropic" | "mistral";
+      provider: "anthropic" | "mistral" | "cloudflare";
       sealed: Uint8Array<ArrayBuffer>;
     };
     llmCall: {
@@ -1649,7 +1649,7 @@ describe("5 — the inferred type is pinned", () => {
       answerId: string | null;
     };
     modelPrice: {
-      provider: "anthropic" | "mistral";
+      provider: "anthropic" | "mistral" | "cloudflare";
       model: string;
       effectiveFrom: string;
       gbpPerMillionIn: string;

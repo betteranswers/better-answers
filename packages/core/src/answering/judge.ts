@@ -7,14 +7,27 @@ import {
   checkTypedText,
   reserveSpend,
   resolveModel,
+  wireShapeOf,
   type CallSize,
+  type CallSpent,
   type Credentials,
+  type DecisionModelCall,
   type ModelCall,
+  type ModelClient,
   type ModelOutcome,
   type ModelToCall,
+  type NoulInstructions,
+  type Probabilities,
+  type WireShapeName,
 } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import type { AnswerPlan, RelatedConcept, ReturnedConcept } from "./plan.ts";
+import type {
+  AnswerPlan,
+  AskCaps,
+  DecisionThresholds,
+  RelatedConcept,
+  ReturnedConcept,
+} from "./plan.ts";
 import type { RecordCompletion } from "./record.ts";
 
 /** Each candidate's verdict, keyed by the number the prompt gave it. */
@@ -26,20 +39,22 @@ type JudgeReserved = { readonly to: ModelToCall; readonly reservationId: string 
 type JudgeReserving = {
   /** The record of the question the call serves. */
   readonly answerId: string;
-  readonly most: CallSize;
+  /** By wire shape, since the model and so its shape are read only as the reservation is taken. */
+  readonly most: Readonly<Record<WireShapeName, CallSize>>;
   readonly now: Date;
 };
 
 export type JudgeRefusal = KernelRefusal<"spending-limit-met"> | Error;
 
-/** What `ask` is handed to judge with, beside the steps that keep its record. */
-export type JudgeSteps<Refused = never> = {
+/**
+ * What `ask` is handed to judge with, beside the steps that keep its record. The model client's
+ * calls run with no transaction open.
+ */
+export type JudgeSteps<Refused = never> = ModelClient & {
   /** Commits before it answers; `undefined` where the workspace has no judge to call. */
   readonly reserve: (
     reserving: JudgeReserving,
   ) => Promise<Result<JudgeReserved | undefined, Refused | JudgeRefusal>>;
-  /** Called with no transaction open. */
-  readonly callModel: <T>(to: ModelToCall, call: ModelCall<T>) => Promise<ModelOutcome<T>>;
 };
 
 /**
@@ -62,7 +77,8 @@ export const reserveJudge = async (
     );
   }
   if (to.value === undefined) return ok(undefined);
-  const reserved = await reserveSpend(asker, tx, { ...reserving, purpose: "judging" });
+  const most = reserving.most[wireShapeOf(to.value)];
+  const reserved = await reserveSpend(asker, tx, { ...reserving, most, purpose: "judging" });
   if (!reserved.ok) return reserved;
   if (!reserved.value.reserved) return ok(undefined);
   return ok({ to: to.value, reservationId: reserved.value.reservationId });
@@ -147,6 +163,76 @@ export const judgeCall = (
   };
 };
 
+const DECISION_ASK =
+  "Does this approved answer answer the question in the state as it was asked? It does not if it answers a different question, a narrower or a wider one, or one about another product, module, plan or audience than the question names.";
+
+/** A decision model answers each question with a probability and writes no text. */
+const DECISION_TOKENS_OUT_EACH = 16;
+
+/** A decision call, and the most it may cost, reserved before the model is known. */
+type DecisionJudgeCall = DecisionModelCall & { readonly most: CallSize };
+
+/**
+ * The question as the state, after the typed-text check, and one true-or-false question per
+ * candidate holding it apart. A request is no longer than this JSON and its framing.
+ */
+export const decisionJudgeCall = (
+  question: string,
+  candidates: readonly ReturnedConcept[],
+): DecisionJudgeCall => {
+  const state = checkTypedText(question);
+  const questions = Object.fromEntries(
+    candidates.map((candidate, place): [string, NoulInstructions] => [
+      String(place + 1),
+      {
+        ask: DECISION_ASK,
+        collection: candidate.collection ?? NO_COLLECTION,
+        written_for: candidate.title,
+        answer: candidate.body.trimEnd(),
+      },
+    ]),
+  );
+  return {
+    state,
+    questions,
+    withinMs: JUDGE_WITHIN_MS,
+    most: {
+      tokensIn: utf8.encode(JSON.stringify({ state, questions })).length + FRAMING_TOKENS,
+      tokensOut: DECISION_TOKENS_OUT_EACH * candidates.length,
+    },
+  };
+};
+
+/** At the threshold is a yes: the threshold names the least probability that is a fit. */
+const verdictsAt = (probabilities: Probabilities, threshold: number): Verdicts =>
+  Object.fromEntries(
+    Object.entries(probabilities).map(([place, yes]) => [place, yes >= threshold ? "yes" : "no"]),
+  );
+
+type JudgeCalls = { readonly messages: ModelCall<Verdicts>; readonly decision: DecisionJudgeCall };
+
+type Heard = { readonly verdicts: Verdicts | undefined; readonly spent: readonly CallSpent[] };
+
+const heardOf = <T>(called: ModelOutcome<T>, verdicts: (answer: T) => Verdicts): Heard => ({
+  verdicts: called.outcome === "answered" ? verdicts(called.answer) : undefined,
+  spent: called.spent,
+});
+
+/** A decision model with no stored threshold is never called, and its judging fails. */
+const heardFrom = async <Refused>(
+  steps: JudgeSteps<Refused>,
+  to: ModelToCall,
+  calls: JudgeCalls,
+  thresholds: DecisionThresholds,
+): Promise<Heard> => {
+  if (wireShapeOf(to) === "messages") {
+    return heardOf(await steps.callModel(to, calls.messages), (verdicts) => verdicts);
+  }
+  const threshold = thresholds.get(to.provider)?.get(to.model);
+  if (threshold === undefined) return { verdicts: undefined, spent: [] };
+  return heardOf(await steps.decide(to, calls.decision), (said) => verdictsAt(said, threshold));
+};
+
 const byIri = (
   candidates: readonly ReturnedConcept[],
   verdicts: Verdicts,
@@ -196,23 +282,25 @@ export const judgedBy = async <Refused>(
   steps: JudgeSteps<Refused>,
   plan: AnswerPlan,
   asked: { readonly question: string; readonly answerId: string; readonly now: Date },
-  cap: number,
+  caps: Pick<AskCaps, "candidates" | "decisionThresholds">,
 ): Promise<Result<Judged, Refused | JudgeRefusal>> => {
-  const candidates = candidatesOf(plan.answer.related, cap);
+  const candidates = candidatesOf(plan.answer.related, caps.candidates);
   if (candidates.length === 0) return ok(plan);
-  const call = judgeCall(asked.question, candidates);
+  const calls: JudgeCalls = {
+    messages: judgeCall(asked.question, candidates),
+    decision: decisionJudgeCall(asked.question, candidates),
+  };
   const reserved = await steps.reserve({
     answerId: asked.answerId,
-    most: call.most,
+    most: { messages: calls.messages.most, decision: calls.decision.most },
     now: asked.now,
   });
   if (!reserved.ok) return reserved;
   if (reserved.value === undefined) return ok(plan);
   const { to, reservationId } = reserved.value;
-  const called = await steps.callModel(to, call);
-  const verdicts = called.outcome === "answered" ? called.answer : undefined;
+  const heard = await heardFrom(steps, to, calls, caps.decisionThresholds);
   return ok({
-    ...judgedPlan(plan, candidates, verdicts),
-    settled: { reservationId, calls: called.spent },
+    ...judgedPlan(plan, candidates, heard.verdicts),
+    settled: { reservationId, calls: heard.spent },
   });
 };

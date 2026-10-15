@@ -16,15 +16,15 @@ import type { Credentials, ModelKey } from "./credentials.ts";
 import type { LlmPurpose } from "./index.ts";
 import type { CallSize, CallSpent } from "./spend.ts";
 import {
-  jsonAs,
-  messagesRead,
-  messagesRequest,
-  type AnswerSchema,
-  type MessagesCall,
-  type MessagesRead,
-  type MessagesRequest,
-  type TokensSpent,
-} from "./wire/messages.ts";
+  decisionRead,
+  decisionRequest,
+  fitsWindow,
+  probabilitiesFor,
+  type NoulInstructions,
+  type Probabilities,
+} from "./wire/decision.ts";
+import { messagesRead, messagesRequest, type AnswerSchema } from "./wire/messages.ts";
+import { jsonAs, type TokensSpent, type WireRead, type WireRequest } from "./wire/read.ts";
 
 export const MAX_ATTEMPTS = 3;
 export const ATTEMPT_TIMEOUT_MS = 2 * 60_000;
@@ -35,21 +35,29 @@ export const RETRY_WAITS_MS = [2_000, 8_000] as const;
 /** A rate limit asking a longer wait than this is answered at once; the reservation would lapse. */
 export const LONGEST_RETRY_WAIT_MS = 30_000;
 
-type WireShape = {
-  readonly request: (call: MessagesCall) => MessagesRequest;
-  readonly read: (status: number, text: string, retryAfter: string | null) => MessagesRead;
+/** How a reply is read, and the header it names its request by. */
+type WireShape<Said> = {
+  readonly read: (status: number, text: string, retryAfter: string | null) => WireRead<Said>;
+  readonly requestIdHeader: string;
 };
 
+const MESSAGES: WireShape<string> = { read: messagesRead, requestIdHeader: "request-id" };
+const DECISION: WireShape<unknown> = { read: decisionRead, requestIdHeader: "cf-ray" };
+
+export type WireShapeName = "messages" | "decision";
+
 /** The model providers a wire shape speaks; any other has no model to call. */
-const SPOKEN = ["anthropic"] as const satisfies readonly ModelProvider[];
+const SPOKEN = ["anthropic", "cloudflare"] as const satisfies readonly ModelProvider[];
 
 type SpokenProvider = (typeof SPOKEN)[number];
 
 const spoken = z.enum(SPOKEN);
 
-const WIRE_SHAPES = {
-  anthropic: { request: messagesRequest, read: messagesRead },
-} as const satisfies Record<SpokenProvider, WireShape>;
+/** The registry: the one wire shape each provider speaks. */
+const SPEAKS = {
+  anthropic: "messages",
+  cloudflare: "decision",
+} as const satisfies Record<SpokenProvider, WireShapeName>;
 
 /** Everything one call needs, read in a transaction and carried out of it. */
 export type ModelToCall = {
@@ -59,6 +67,9 @@ export type ModelToCall = {
   readonly model: string;
   readonly key: ModelKey;
 };
+
+/** The wire shape the model is called through, which decides the call a caller builds for it. */
+export const wireShapeOf = (to: ModelToCall): WireShapeName => SPEAKS[to.provider];
 
 /** A row naming a provider no wire shape speaks is no model to call. */
 const spokenChoice = z.object({ id: z.string(), provider: spoken, model: z.string() });
@@ -86,13 +97,21 @@ export const resolveModel = async (
     return ok({ purpose, modelChoiceId: id, provider, model, key: key.value });
   });
 
-/** One call: what to say, the answer's shape, and the size its reservation holds. */
+/** One call through the Messages shape: what to say, the answer's shape, and its reservation's size. */
 export type ModelCall<T> = {
   readonly system: string;
   readonly prompt: string;
   readonly answer: z.ZodType<T>;
   /** Its `tokensOut` is each attempt's `max_tokens`, so no attempt spends past the reservation. */
   readonly most: CallSize;
+  /** The whole call's wall clock, every attempt and wait inside it; none where it is absent. */
+  readonly withinMs?: number;
+};
+
+/** One call through the decision shape. A decision model writes no text, so no output size is asked for. */
+export type DecisionModelCall = {
+  readonly state: string;
+  readonly questions: Readonly<Record<string, NoulInstructions>>;
   /** The whole call's wall clock, every attempt and wait inside it; none where it is absent. */
   readonly withinMs?: number;
 };
@@ -104,7 +123,10 @@ export type ModelOutcome<T> =
   | { readonly outcome: "answered"; readonly answer: T; readonly spent: readonly CallSpent[] }
   | { readonly outcome: Unanswered; readonly spent: readonly CallSpent[] };
 
-type AttemptRead = MessagesRead | { readonly read: "timed-out" };
+type AttemptRead<Said = unknown> = WireRead<Said> | { readonly read: "timed-out" };
+
+/** Never sent: the model speaks another shape, or the request is longer than its window. */
+type Unsent = "another-shape" | "over-window";
 
 /** Every field a log line about a call may hold: never a prompt, an answer, a body or a key. */
 export type ModelAttemptLine = {
@@ -113,7 +135,7 @@ export type ModelAttemptLine = {
   readonly model: string;
   readonly attempt: number;
   readonly status: number | null;
-  readonly read: AttemptRead["read"];
+  readonly read: AttemptRead["read"] | Unsent;
   readonly seconds: number;
   readonly request_id: string | null;
 };
@@ -127,12 +149,17 @@ type ModelClientDoors = {
   readonly timeout?: (ms: number) => AbortSignal;
 };
 
+/** Each method calls a model of its own wire shape, and sends nothing to a model of the other. */
 export type ModelClient = {
   readonly callModel: <T>(to: ModelToCall, call: ModelCall<T>) => Promise<ModelOutcome<T>>;
+  readonly decide: (
+    to: ModelToCall,
+    call: DecisionModelCall,
+  ) => Promise<ModelOutcome<Probabilities>>;
 };
 
-type Attempted = {
-  readonly read: AttemptRead;
+type Attempted<Said = unknown> = {
+  readonly read: AttemptRead<Said>;
   readonly status: number | null;
   readonly requestId: string | null;
   readonly seconds: number;
@@ -175,14 +202,16 @@ const stepAfter = (read: AttemptRead, attempted: number): Step => {
   return { outcome: "failed" };
 };
 
-/** The answer, when the attempt answered with JSON of the shape the call asked for. */
-const answerOf = <T>(
-  read: AttemptRead,
-  answer: z.ZodType<T>,
+/** What reads an answered attempt as the answer the call asked for, or `undefined` for none. */
+type Accept<Said, T> = (said: Said) => T | undefined;
+
+const answerOf = <Said, T>(
+  read: AttemptRead<Said>,
+  accept: Accept<Said, T>,
 ): { readonly answer: T } | undefined => {
   if (read.read !== "answered") return undefined;
-  const parsed = jsonAs(answer, read.text);
-  return parsed === undefined ? undefined : { answer: parsed };
+  const accepted = accept(read.said);
+  return accepted === undefined ? undefined : { answer: accepted };
 };
 
 /** Shorter than this, a retry would be cut off before a reply could come, yet might be billed. */
@@ -192,7 +221,7 @@ const SHORTEST_ATTEMPT_MS = 10_000;
 const outOfTime = (read: AttemptRead): Unanswered =>
   read.read === "rate-limited" ? "rate-limited" : "failed";
 
-const lostTo = (signal: AbortSignal, otherwise: AttemptRead): AttemptRead =>
+const lostTo = <Said>(signal: AbortSignal, otherwise: AttemptRead<Said>): AttemptRead<Said> =>
   signal.aborted ? { read: "timed-out" } : otherwise;
 
 const spentBy = (tried: Attempted, answered: boolean): CallSpent => ({
@@ -208,18 +237,18 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
   const secondsSince = (started: number): number =>
     (doors.clock.now().getTime() - started) / MS_PER_SECOND;
 
-  const attemptOnce = async (
-    shape: WireShape,
-    request: MessagesRequest,
+  const attemptOnce = async <Said>(
+    shape: WireShape<Said>,
+    request: WireRequest,
     timeoutMs: number,
-  ): Promise<Attempted> => {
+  ): Promise<Attempted<Said>> => {
     const started = doors.clock.now().getTime();
     const signal = timeout(timeoutMs);
     const { url, ...init } = request;
     const replied = await attempt(() => doors.fetch(url, { ...init, signal }));
     if (!replied.ok) {
       // A failed connection may be tried again; a timed-out one may have been billed, so it is not.
-      const read = lostTo(signal, { read: "unavailable" });
+      const read = lostTo<Said>(signal, { read: "unavailable" });
       return { read, status: null, requestId: null, seconds: secondsSince(started) };
     }
     const response = replied.value;
@@ -230,7 +259,7 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     const read = body.ok
       ? shape.read(status, body.value, retryAfter)
       : lostTo(signal, shape.read(status, "", retryAfter));
-    const requestId = response.headers.get("request-id");
+    const requestId = response.headers.get(shape.requestIdHeader);
     return { read, status, requestId, seconds: secondsSince(started) };
   };
 
@@ -250,19 +279,34 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     );
   };
 
-  const callModel = async <T>(to: ModelToCall, call: ModelCall<T>): Promise<ModelOutcome<T>> => {
-    const shape = WIRE_SHAPES[to.provider];
-    const request = shape.request({
-      model: to.model,
-      key: to.key.reveal(),
-      system: call.system,
-      prompt: call.prompt,
-      answerSchema: answerSchemaOf(call.answer),
-      tokensOut: call.most.tokensOut,
-    });
+  /** Logged as an attempt that was never made, so a judge that failed unsent says why. */
+  const unsent = <T>(to: ModelToCall, read: Unsent): ModelOutcome<T> => {
+    doors.log.info(
+      {
+        purpose: to.purpose,
+        provider: to.provider,
+        model: to.model,
+        attempt: 0,
+        status: null,
+        read,
+        seconds: 0,
+        request_id: null,
+      },
+      "llm: a model call never sent",
+    );
+    return { outcome: "failed", spent: [] };
+  };
+
+  const called = async <Said, T>(
+    to: ModelToCall,
+    shape: WireShape<Said>,
+    request: WireRequest,
+    accept: Accept<Said, T>,
+    withinMs: number | undefined,
+  ): Promise<ModelOutcome<T>> => {
     const startedMs = doors.clock.now().getTime();
     const leftMs = (): number =>
-      (call.withinMs ?? Number.POSITIVE_INFINITY) - (doors.clock.now().getTime() - startedMs);
+      (withinMs ?? Number.POSITIVE_INFINITY) - (doors.clock.now().getTime() - startedMs);
 
     const from = async (
       attempted: number,
@@ -270,7 +314,7 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     ): Promise<ModelOutcome<T>> => {
       const tried = await attemptOnce(shape, request, Math.min(ATTEMPT_TIMEOUT_MS, leftMs()));
       logged(to, attempted, tried);
-      const answered = answerOf(tried.read, call.answer);
+      const answered = answerOf(tried.read, accept);
       const spent = [...before, spentBy(tried, answered !== undefined)];
       if (answered !== undefined) return { outcome: "answered", answer: answered.answer, spent };
       const step = stepAfter(tried.read, attempted);
@@ -287,5 +331,35 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     return from(1, []);
   };
 
-  return { callModel };
+  const callModel = async <T>(to: ModelToCall, call: ModelCall<T>): Promise<ModelOutcome<T>> => {
+    if (SPEAKS[to.provider] !== "messages") return unsent(to, "another-shape");
+    const request = messagesRequest({
+      model: to.model,
+      key: to.key.reveal(),
+      system: call.system,
+      prompt: call.prompt,
+      answerSchema: answerSchemaOf(call.answer),
+      tokensOut: call.most.tokensOut,
+    });
+    return called(to, MESSAGES, request, (text) => jsonAs(call.answer, text), call.withinMs);
+  };
+
+  /** A request longer than the model's window is never sent: the provider would cut it unsaid. */
+  const decide = async (
+    to: ModelToCall,
+    call: DecisionModelCall,
+  ): Promise<ModelOutcome<Probabilities>> => {
+    if (SPEAKS[to.provider] !== "decision") return unsent(to, "another-shape");
+    const request = decisionRequest({
+      model: to.model,
+      key: to.key.reveal(),
+      state: call.state,
+      questions: call.questions,
+    });
+    if (!fitsWindow(to.model, request.body)) return unsent(to, "over-window");
+    const answers = probabilitiesFor(Object.keys(call.questions));
+    return called(to, DECISION, request, (said) => answers.safeParse(said).data, call.withinMs);
+  };
+
+  return { callModel, decide };
 };

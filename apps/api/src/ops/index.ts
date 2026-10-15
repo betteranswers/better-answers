@@ -1372,7 +1372,7 @@ const modelKeyReason = (refusal: SetModelKeyRefusal | Error, workspaceId: string
   if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
     case "malformed":
-      return `malformed: give --workspace a workspace id, --provider one of ${MODEL_PROVIDERS.join(" · ")}, and on standard input one key with no space or line break in it`;
+      return `malformed: give --workspace a workspace id, --provider one of ${MODEL_PROVIDERS.join(" · ")}, and on standard input one key with no space or line break in it, for cloudflare the account id, a colon, then the API token`;
     case "no-such-workspace":
       return noSuchWorkspace(workspaceId);
   }

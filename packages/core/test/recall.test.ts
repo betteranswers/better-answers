@@ -6,12 +6,13 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ASK_CAPS, askInput, find, planAnswer } from "../src/answering/index.ts";
+import { ASK_CAPS, askInput, planAnswer } from "../src/answering/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { recordFigures, type Figure } from "./figures.ts";
 import { theReuseSet } from "./readings/reuse-set.ts";
 import {
   answersOf,
+  conceptsFoundBy,
   landRecallSet,
   paraphrasesOf,
   readBuyerQuestions,
@@ -20,8 +21,8 @@ import {
   RECALL_DEPTH,
   theBuyerQuestions,
   theRecallSet,
+  worded,
   type BuyerQuestions,
-  type Recall,
   type RecallAnswer,
   type RecallQuestion,
   type Recalls,
@@ -49,15 +50,7 @@ const kept = <Asking extends readonly unknown[]>(rank: (...asking: Asking) => Ra
 };
 
 /** `find`'s concept matches for a question, best first, as `person` reads them. */
-const conceptsFound = (person: UserPrincipal) =>
-  kept(async (question: string) => {
-    const found = answered(
-      await reading(person, (reader, tx) =>
-        find(reader, tx, { query: question, limit: RECALL_DEPTH }, NOW),
-      ),
-    );
-    return found.matches.flatMap((match) => (match.layer === "bundles" ? [match.iri] : []));
-  });
+const conceptsFound = (person: UserPrincipal) => kept(conceptsFoundBy(reading, person, NOW));
 
 /** Entry points alone only while the set's map holds no edge, which a test below holds. */
 const conceptsPlanned = (person: UserPrincipal) =>
@@ -70,9 +63,6 @@ const conceptsPlanned = (person: UserPrincipal) =>
     );
     return planned.related.map(({ iri }) => iri);
   });
-
-const worded = ({ recall, recalled, asked }: Recall, counted: string): string =>
-  `${(recall * 100).toFixed(1)} %, for ${recalled} of ${asked} ${counted}`;
 
 /** By `Answer` named leads: it is the figure a cap is sized from. */
 const figuresOf = (

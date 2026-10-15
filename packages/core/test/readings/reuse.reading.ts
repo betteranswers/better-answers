@@ -2,14 +2,14 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { openModelClient } from "../../src/llm/index.ts";
-import { inMs, recordFigures, type Figure } from "../figures.ts";
 import { postgresForSuite } from "../suite-postgres.ts";
 import {
+  poundsOf,
   readReuse,
+  recordReuseReading,
   theReuseSet,
   withEffort,
   type Effort,
-  type ReuseReading,
   type ReuseSet,
 } from "./reuse-set.ts";
 
@@ -38,24 +38,6 @@ const owner = z.object({
     .transform(Number),
 });
 
-const pounds = (usd: number, rate: number): string => (usd * rate).toFixed(6);
-
-const outOf = (yes: number, named: number, unsent: number): string =>
-  `${yes} of ${named}, ${unsent} never sent to the judge`;
-
-const figuresOf = (reading: ReuseReading, priced: string): readonly Figure[] => [
-  ["fits found", outOf(reading.fits.yes, reading.fits.named, reading.fits.unsent)],
-  [
-    "hard negatives wrongly taken",
-    outOf(reading.negatives.yes, reading.negatives.named, reading.negatives.unsent),
-  ],
-  ["other Answers taken", String(reading.othersTaken)],
-  ["questions the judge answered", `${reading.judged} of ${reading.asked}`],
-  ["spend", `£${reading.spentGbp}`],
-  ["judge latency", `median ${inMs(reading.judgeMs.median)}, worst ${inMs(reading.judgeMs.worst)}`],
-  ["priced at", priced],
-];
-
 const db = postgresForSuite();
 
 describe("the owner's reuse reading", () => {
@@ -81,17 +63,13 @@ describe("the owner's reuse reading", () => {
         });
         const reading = await readReuse(db(), set, {
           model,
-          gbpPerMillionIn: pounds(usdIn, rate),
-          gbpPerMillionOut: pounds(usdOut, rate),
+          gbpPerMillionIn: poundsOf(usdIn, rate),
+          gbpPerMillionOut: poundsOf(usdOut, rate),
           key: told.READING_ANTHROPIC_KEY,
           callModel: client.callModel,
         });
         const priced = `$${usdIn} in and $${usdOut} out per million tokens, at £${rate} to the dollar`;
-        await recordFigures(
-          `Reuse reading, ${name} at effort ${asked}`,
-          figuresOf(reading, priced),
-        );
-        process.stdout.write(reading.misses.map((miss) => `  ${miss}\n`).join(""));
+        await recordReuseReading(`Reuse reading, ${name} at effort ${asked}`, reading, priced);
 
         // A refused key fails every call, and a run that judged nothing has no figures to record.
         expect(reading.judged).toBeGreaterThan(0);

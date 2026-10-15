@@ -78,6 +78,7 @@ export { findCursor, type FindPosition } from "./cursor.ts";
 export {
   ASK_CAPS,
   type AskCaps,
+  type DecisionThresholds,
   type MapState,
   type PlannedAnswer,
   type PreviewedConcept,
@@ -86,7 +87,7 @@ export {
   type ReturnedConcept,
 } from "./plan.ts";
 export { completeRecord, openRecord } from "./record.ts";
-export { judgeCall, reserveJudge, type JudgeRefusal } from "./judge.ts";
+export { decisionJudgeCall, judgeCall, reserveJudge, type JudgeRefusal } from "./judge.ts";
 export {
   closeFlag,
   closeFlagInput,
@@ -519,12 +520,7 @@ export const ask = async <Refused = never>(
   const { recordId } = opened.value;
   const plan = await answerPlanned(admitted.value, steps.read, input, now, caps);
   if (!plan.ok) return plan;
-  const judged = await judgedBy(
-    steps,
-    plan.value,
-    { question, answerId: recordId, now },
-    caps.candidates,
-  );
+  const judged = await judgedBy(steps, plan.value, { question, answerId: recordId, now }, caps);
   if (!judged.ok) return judged;
   const { answer, concepts, settled } = judged.value;
   const completed = await steps.completeRecord({

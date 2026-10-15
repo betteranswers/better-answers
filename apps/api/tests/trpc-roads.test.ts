@@ -96,7 +96,10 @@ const wire = z.object({ error: z.object({ data: z.object({ refusal: z.unknown() 
 /** No procedure built here asks, so none calls a model. */
 const NO_MODEL = {
   credentials: undefined,
-  models: { callModel: () => Promise.reject(new Error("no procedure here calls a model")) },
+  models: {
+    callModel: () => Promise.reject(new Error("no procedure here calls a model")),
+    decide: () => Promise.reject(new Error("no procedure here calls a model")),
+  },
 };
 
 const contextOf = (

@@ -83,6 +83,7 @@ export const stepsFor = (
           reserveJudge(member, tx, credentials, reserving),
         ),
   callModel: models.callModel,
+  decide: models.decide,
   completeRecord: (completion) =>
     steppedAs(withMember, door, asker, (member, tx) =>
       completeRecord(member, tx, { ...completion, completedAt: clock.now() }),
