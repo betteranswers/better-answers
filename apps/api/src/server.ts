@@ -116,6 +116,18 @@ export function createServer(dependencies: ServerDependencies): Hono {
     }),
   );
 
+  const modelDoors = {
+    credentials:
+      dependencies.envelopeKey === undefined
+        ? undefined
+        : openCredentials(dependencies.envelopeKey),
+    models: openModelClient({
+      fetch: dependencies.fetchModel ?? fetch,
+      clock: doors.clock,
+      log: logger.child({ module: "llm" }),
+    }),
+  };
+
   const mcp = createMcpSurface({
     door,
     verifier: createTokenVerifier({
@@ -129,15 +141,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
     serverVersion: dependencies.serverVersion ?? "0.1.0",
     clock: doors.clock,
     entries: entriesAt(dependencies.publicUrl),
-    credentials:
-      dependencies.envelopeKey === undefined
-        ? undefined
-        : openCredentials(dependencies.envelopeKey),
-    models: openModelClient({
-      fetch: dependencies.fetchModel ?? fetch,
-      clock: doors.clock,
-      log: logger.child({ module: "llm" }),
-    }),
+    ...modelDoors,
   });
 
   server.all("/mcp", (context) => mcp(context.req.raw));
@@ -147,6 +151,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
     createTrpcRoutes({
       auth,
       doors,
+      modelDoors,
       logger,
       mail: { send: dependencies.sendEmail, publicUrl: dependencies.publicUrl },
     }),

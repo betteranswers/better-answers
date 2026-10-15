@@ -25,6 +25,7 @@ import {
 } from "@better-answers/core/sources";
 import { readMember, standingAsOperator } from "@better-answers/core/workspaces";
 
+import { askRouter } from "./ask.ts";
 import {
   answeredBy,
   crossing,
@@ -60,6 +61,7 @@ export const appRouter = router({
   console: consoleRouter,
   members: membersRouter,
   knowledge: knowledgeRouter,
+  ask: askRouter,
   questions: questionsRouter,
   modelChoices: router({
     list: queryProcedure.query(({ ctx }) =>

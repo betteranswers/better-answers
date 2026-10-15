@@ -51,6 +51,8 @@ type PathsAnsweringAResult<Leaves> = [ResultAnswering<Leaves>] extends [never]
 describe("what a procedure may answer the wire", () => {
   it("reaches every router procedure by the path its caller names", () => {
     expect(Object.keys(appRouter._def.procedures).sort()).toEqual([
+      "ask.giveFeedback",
+      "ask.question",
       "console.people.correctDisplayName",
       "console.people.endEverySignInAndToken",
       "console.people.inspect",
@@ -167,6 +169,8 @@ describe("what a procedure may answer the wire", () => {
       | "members.declineRequest"
       | "knowledge.find"
       | "knowledge.open"
+      | "ask.question"
+      | "ask.giveFeedback"
       | "questions.asked"
       | "questions.closeFlag"
       | "modelChoices.list"

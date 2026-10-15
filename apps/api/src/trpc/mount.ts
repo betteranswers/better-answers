@@ -4,6 +4,7 @@ import type { Logger } from "pino";
 
 import { CeilingMet } from "@better-answers/core/kernel";
 
+import type { ModelDoors } from "../ask-steps.ts";
 import type { Auth } from "../auth/index.ts";
 import { TRPC_IP_RULE } from "../auth/index.ts";
 import type { Doors } from "../doors.ts";
@@ -20,6 +21,7 @@ const UNCACHED = "private, no-store";
 type TrpcRoutesDependencies = {
   readonly auth: Auth;
   readonly doors: Doors;
+  readonly modelDoors: ModelDoors;
   readonly logger: Logger;
   readonly mail: Mail;
 };
@@ -53,6 +55,7 @@ export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
       endpoint: TRPC_ENDPOINT,
       createContext: (_options, context) => ({
         doors: deps.doors,
+        modelDoors: deps.modelDoors,
         clock: deps.doors.clock,
         readSession: readOncePerRequest(),
         headers: context.req.raw.headers,

@@ -30,6 +30,7 @@ import {
 } from "@better-answers/core/store/postgres";
 import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 
+import type { ModelDoors } from "../ask-steps.ts";
 import { sessionClaims } from "../auth/verify.ts";
 import type { Doors } from "../doors.ts";
 import type { Mail } from "../email.ts";
@@ -38,6 +39,7 @@ import { type GatedSessionReader, PENDING_PROCEDURES, refusalFor } from "../seco
 
 type TrpcContext = {
   readonly doors: Doors;
+  readonly modelDoors: ModelDoors;
   readonly clock: Clock;
   readonly readSession: GatedSessionReader;
   readonly headers: Headers;
@@ -274,7 +276,7 @@ const consumeCeiling = async (
 };
 
 /** One count per person that every procedure built on the road spends. */
-type RoadCeiling = { readonly budget: string; readonly rule: CounterRule };
+export type RoadCeiling = { readonly budget: string; readonly rule: CounterRule };
 
 /** The count comes before the transaction, so a call held at its ceiling holds no connection. */
 const inTheResolversTransaction = (resolve: typeof withPrincipal, ceiling?: RoadCeiling) =>
@@ -286,7 +288,9 @@ const inTheResolversTransaction = (resolve: typeof withPrincipal, ceiling?: Road
 
     const resolved = await attempt(() =>
       resolve(ctx.doors.postgres, claims, async (principal, tx) =>
-        thrownIfFailed(await next({ ctx: { principal, tx, doors: undefined } })),
+        thrownIfFailed(
+          await next({ ctx: { principal, tx, doors: undefined, modelDoors: undefined } }),
+        ),
       ),
     );
     return settled(ctx, RESOLVER, resolved);
@@ -304,17 +308,26 @@ export const mutationProcedure = inTheResolversTransaction(withHeldPrincipal);
  * A Principal outlives the transaction that resolved it only here; never the request, and the
  * action's own door re-judges it.
  */
-export const ownTransactionProcedure = trpc.procedure.use(async ({ ctx, path, type, next }) => {
-  const claims = await claimsInTheTabsWorkspace(ctx, path, type);
+const onItsOwnTransactions = (ceiling?: RoadCeiling) =>
+  trpc.procedure.use(async ({ ctx, path, type, next }) => {
+    const claims = await claimsInTheTabsWorkspace(ctx, path, type);
+    if (ceiling !== undefined) {
+      await consumeCeiling(ctx, path, `${ceiling.budget}:${claims.userId}`, ceiling.rule);
+    }
 
-  const resolved = await attempt(() =>
-    withPrincipal(ctx.doors.postgres, claims, async (principal) => principal),
-  );
-  if (!resolved.ok) throw failed(ctx.log, RESOLVER, resolved.error);
-  if (!resolved.value.ok) throw refused(ctx.log, RESOLVER, resolved.value.error);
+    const resolved = await attempt(() =>
+      withPrincipal(ctx.doors.postgres, claims, async (principal) => principal),
+    );
+    if (!resolved.ok) throw failed(ctx.log, RESOLVER, resolved.error);
+    if (!resolved.value.ok) throw refused(ctx.log, RESOLVER, resolved.value.error);
 
-  return next({ ctx: { principal: resolved.value.value, doors: ctx.doors } });
-});
+    return next({ ctx: { principal: resolved.value.value, doors: ctx.doors } });
+  });
+
+export const ownTransactionProcedure = onItsOwnTransactions();
+
+/** As ownTransactionProcedure, counted with the queries built on `queryCeiling(ceiling)`. */
+export const ownTransactionCounted = (ceiling: RoadCeiling) => onItsOwnTransactions(ceiling);
 
 /** Answers only once the action committed, so a follow-up such as an email never outruns the write. */
 export const committedAs = async <Value, Refused>(
@@ -369,7 +382,9 @@ const inTheOperatorsTransaction = (resolve: typeof withOperator) =>
         // hour the operator's writes allow runs from the sign-in itself.
         { userId: user.id, issuedAt: session.createdAt },
         async (operator, tx) =>
-          thrownIfFailed(await next({ ctx: { operator, tx, doors: undefined } })),
+          thrownIfFailed(
+            await next({ ctx: { operator, tx, doors: undefined, modelDoors: undefined } }),
+          ),
       ),
     );
     return settled(ctx, OPERATOR_RESOLVER, resolved);

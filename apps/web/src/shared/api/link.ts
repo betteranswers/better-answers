@@ -1,4 +1,10 @@
-import { httpBatchLink, httpLink, isNonJsonSerializable, splitLink } from "@trpc/client";
+import {
+  httpBatchLink,
+  httpBatchStreamLink,
+  httpLink,
+  isNonJsonSerializable,
+  splitLink,
+} from "@trpc/client";
 import type { OperationContext } from "@trpc/client";
 
 import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
@@ -64,6 +70,9 @@ type ApiLinkOptions = Pick<Parameters<typeof httpBatchLink>[0], "url" | "fetch">
  */
 const BATCH_URL_CEILING = 2083;
 
+/** Answered as a stream: its result first, then prose as it is drafted. */
+const STREAMED_PATH = "ask.question";
+
 export const apiLink = ({ uploadFetch, heldWorkspace, ...options }: ApiLinkOptions) => {
   const uploading = uploadFetch === undefined ? options : { ...options, fetch: uploadFetch };
   const namingTheWorkspace = (sent: Headers): Headers => {
@@ -78,10 +87,19 @@ export const apiLink = ({ uploadFetch, heldWorkspace, ...options }: ApiLinkOptio
       ...uploading,
       headers: ({ op }) => namingTheWorkspace(uploadHeadersOf(op.context)),
     }),
-    false: httpBatchLink({
-      ...options,
-      maxURLLength: BATCH_URL_CEILING,
-      headers: () => namingTheWorkspace(new Headers()),
+    false: splitLink({
+      condition: (op) => op.path === STREAMED_PATH,
+      // Alone in its request, so no other call waits on the stream's end.
+      true: httpBatchStreamLink({
+        ...options,
+        maxItems: 1,
+        headers: () => namingTheWorkspace(new Headers()),
+      }),
+      false: httpBatchLink({
+        ...options,
+        maxURLLength: BATCH_URL_CEILING,
+        headers: () => namingTheWorkspace(new Headers()),
+      }),
     }),
   });
 };

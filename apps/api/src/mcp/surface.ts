@@ -13,38 +13,22 @@ import {
 import type { Logger } from "pino";
 import type { z } from "zod";
 
-import {
-  completeRecord,
-  openRecord,
-  reserveJudge,
-  type AskSteps,
-} from "@better-answers/core/answering";
-import {
-  err,
-  ok,
-  type Claims,
-  type Clock,
-  type Result,
-  type UserPrincipal,
-} from "@better-answers/core/kernel";
-import type { Credentials, ModelClient } from "@better-answers/core/llm";
+import { err, type Claims, type Clock } from "@better-answers/core/kernel";
 import {
   consumeCall,
   folded,
   readWorkspaceConfig,
   withHeldPrincipal,
-  withMember,
-  withMemberUnheld,
   withPrincipal,
   withPrincipalRead,
   type PostgresDoor,
-  type Tx,
 } from "@better-answers/core/store/postgres";
 import {
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "@better-answers/core/workspaces";
 
+import { stepsFor, type ModelDoors, type StepDoors } from "../ask-steps.ts";
 import {
   MCP_REQUIRED_SCOPE,
   MCP_SCOPES,
@@ -55,9 +39,9 @@ import { bearerOf } from "../auth/verify.ts";
 import { countByAddress, tooManyRequests } from "../ingress/limits.ts";
 import { refusalLogged, refusalOf, type RefusalAnswer } from "../refusal.ts";
 import { crossing } from "./crossing.ts";
-import type { Entry, StepRefusal } from "./entries/define.ts";
+import type { Entry } from "./entries/define.ts";
 
-export type McpSurfaceDependencies = {
+export type McpSurfaceDependencies = ModelDoors & {
   readonly door: PostgresDoor;
   readonly verifier: OAuthTokenVerifier;
   readonly publicUrl: string;
@@ -67,10 +51,6 @@ export type McpSurfaceDependencies = {
 
   readonly clock: Clock;
   readonly entries: readonly Entry<z.ZodObject, z.ZodType>[];
-
-  /** Absent where the api holds no envelope key: no model key opens, so no judge is called. */
-  readonly credentials: Credentials | undefined;
-  readonly models: ModelClient;
 };
 
 const THE_BEARER = "the bearer";
@@ -97,62 +77,12 @@ export const doorOf = ({ readOnlyHint }: ToolAnnotations): typeof withPrincipal 
 
 type ServedEntry = Entry<z.ZodObject, z.ZodType>;
 
-/** What a road opens its transactions with and calls a model through; an entry is handed none. */
-type RoadDoors = Pick<McpSurfaceDependencies, "door" | "clock" | "credentials" | "models">;
-
-/** Both readings come sorted from the one member query, so they agree place by place or not at all. */
-const inTheSameGroups = (resolved: UserPrincipal, readBack: UserPrincipal): boolean =>
-  resolved.groups.length === readBack.groups.length &&
-  resolved.groups.every((group, place) => group === readBack.groups[place]);
-
-/**
- * Reads the member again through `open`, which refuses a moved role. Moved groups would read
- * under another predicate than the record keeps.
- */
-const steppedAs = async <Value, Refused>(
-  open: typeof withMember,
-  door: PostgresDoor,
-  asker: UserPrincipal,
-  work: (member: UserPrincipal, tx: Tx) => Promise<Result<Value, Refused>>,
-): Promise<Result<Value, Refused | StepRefusal>> => {
-  const opened = await open(
-    asker,
-    door,
-    async (member, tx): Promise<Result<Value, Refused | StepRefusal>> =>
-      inTheSameGroups(asker, member) ? work(member, tx) : err("changed-meanwhile"),
-  );
-  return opened.ok ? opened.value : opened;
-};
-
-/** Only the read lends its transaction, and that one opens read-only. */
-const stepsFor = (
-  { door, clock, credentials, models }: RoadDoors,
-  asker: UserPrincipal,
-): AskSteps<StepRefusal> => ({
-  openRecord: (opening) =>
-    steppedAs(withMember, door, asker, (member, tx) =>
-      openRecord(member, tx, { ...opening, transport: "mcp" }),
-    ),
-  read: (work) => steppedAs(withMemberUnheld, door, asker, (_member, tx) => work(tx)),
-  reserve: async (reserving) =>
-    credentials === undefined
-      ? ok(undefined)
-      : steppedAs(withMember, door, asker, (member, tx) =>
-          reserveJudge(member, tx, credentials, reserving),
-        ),
-  callModel: models.callModel,
-  completeRecord: (completion) =>
-    steppedAs(withMember, door, asker, (member, tx) =>
-      completeRecord(member, tx, { ...completion, completedAt: clock.now() }),
-    ),
-});
-
 /**
  * One transaction holds the first road's entry. The own-transaction road's member outlives the
  * transaction that resolved it, and each step re-judges it.
  */
 const answeredOnItsRoad = async (
-  doors: RoadDoors,
+  doors: StepDoors,
   entry: ServedEntry,
   claims: Claims,
   args: z.infer<z.ZodObject>,
@@ -167,7 +97,7 @@ const answeredOnItsRoad = async (
   const resolved = await withPrincipalRead(doors.door, claims, async (principal) => principal);
   if (!resolved.ok) return resolved;
   const asker = resolved.value;
-  return entry.run(asker, stepsFor(doors, asker), args, doors.clock.now());
+  return entry.run(asker, stepsFor(doors, asker, "mcp"), args, doors.clock.now());
 };
 
 export const createMcpSurface = (
