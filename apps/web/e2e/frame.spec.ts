@@ -47,6 +47,7 @@ const AN_ADMINS_PAGES = [
   ["Sources", "Connected Sources", pageNamed(SOURCES, "Connected Sources").path],
   ["Models", "Models and Spend", MODELS_AND_SPEND.path],
   ["Questions", "Questions Asked", pageNamed(QUESTIONS, "Questions Asked").path],
+  ["Questions", "Answer Tests", pageNamed(QUESTIONS, "Answer Tests").path],
   ["People", "Members", MEMBERS.path],
   ["People", "Groups", pageNamed(PEOPLE, "Groups").path],
   ["System", "Audit Log", pageNamed(SYSTEM, "Audit Log").path],
@@ -393,6 +394,8 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
       - list:
         - listitem:
           - link "Questions Asked"
+        - listitem:
+          - link "Answer Tests"
       - heading "People" [level=3]
       - list:
         - listitem:

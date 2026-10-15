@@ -504,3 +504,13 @@ Each command writes nothing when it refuses. For `set-model-choice`, `no-sub-pro
 **How a call is counted.** Before a model call, `ask` reserves the most the call may cost, at that day's price, in the same transaction that would refuse it, so two questions cannot both pass the last of the limit. When the call ends the reservation becomes one `llm_call` row per attempt at what was spent, and the rest is released. A reservation lives ten minutes. If the `api` stops mid-call, the daily sweep settles a reservation past its ten minutes as one failed `llm_call` row at the whole reserved cost, since the provider may have billed the call: the pass's log line counts them as `reservations_settled`, and names a workspace whose settling was refused under `refusals` with the sweep `spend`. Until then an open reservation still counts against the limit.
 
 **Reading the spend.** Through the browsing login: this month's spend for a workspace is `SELECT sum(cost_gbp) FROM llm_call WHERE workspace_id = '<id>' AND called_at >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`, and the limit is `SELECT value FROM workspace_config WHERE workspace_id = '<id>' AND key = 'llm.spending_limit_gbp'`. A row names the question it served by `answer_id`, and never holds the prompt or the completion. After the release that adds these tables, run the browsing role's file again (§ Browse production, step 3).
+
+## Read a workspace's unmapped-passage rate
+
+The rate is the second reading that can bring vectors in, beside recall at ten on the customer's answer tests. It is read per workspace on the `api` service:
+
+```sh
+docker exec "$api" pnpm ops unmapped-passage-rate --workspace <id>
+```
+
+It prints one JSON line, such as `{"flagged_incomplete":3,"showed_unmapped_passages":2}`. The first count is the workspace's *Questions asked* records that hold a flag whose reason is *incomplete*, open or closed, a record flagged twice counted once. The second is how many of them showed at least one unmapped passage. Read the two together, never as one percentage. The command runs in a read-only transaction scoped to that workspace and prints no question, note or passage. The operator's console cannot read a workspace's records, which is why this is a command and not a console page. `malformed`, exit 2, is a workspace id that is not one; an id no workspace holds reads as two zeros. `not built`, exit 3, is a database the migration has not reached.

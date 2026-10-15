@@ -54,6 +54,7 @@ import { GroupsPage } from "@/features/people/groups-page.tsx";
 import { MemberPage } from "@/features/people/member-page.tsx";
 import { PERSON_ID } from "@/features/people/members-address.ts";
 import { MEMBERS_TOOLBAR, MembersPage } from "@/features/people/members-page.tsx";
+import { AnswerTestsPage } from "@/features/questions/answer-tests-page.tsx";
 import { QuestionsAskedPage } from "@/features/questions/questions-asked-page.tsx";
 import { ConnectedSourcesPage } from "@/features/sources/connected-sources-page.tsx";
 import type { FailedDuring } from "@/shared/api/query-client.ts";
@@ -102,6 +103,7 @@ const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>
   ["/sources/connected-sources", { draw: ConnectedSourcesPage }],
   ["/models/models-and-spend", { draw: ModelsAndSpendPage, toolbar: MODELS_AND_SPEND_TOOLBAR }],
   ["/questions/questions-asked", { draw: QuestionsAskedPage }],
+  ["/questions/answer-tests", { draw: AnswerTestsPage }],
   ["/people/members", { draw: MembersPage, toolbar: MEMBERS_TOOLBAR }],
   ["/people/groups", { draw: GroupsPage }],
   ["/system/audit-log", { draw: AuditLogPage }],

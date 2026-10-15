@@ -2,6 +2,7 @@ import { getTableName, type Table } from "drizzle-orm";
 import type { Logger } from "pino";
 
 import type { Sensitivity } from "@better-answers/core/access";
+import { ANSWER_MEASURES, unmappedPassageRate } from "@better-answers/core/answering";
 import {
   MAP_MAINTENANCE,
   mapCounts,
@@ -101,6 +102,8 @@ import {
   modelChoice,
   modelKey,
   modelPrice,
+  questionAsked,
+  questionFeedback,
   REBUILD_REASONS,
   ROLES,
   SENSITIVITIES,
@@ -197,6 +200,7 @@ const NEEDS = {
   "map-rebuild": [...MAP_TABLES, job],
   "map-sweep": MAP_TABLES,
   "map-counts": MAP_TABLES,
+  "unmapped-passage-rate": [questionAsked, questionFeedback],
   "reconcile-watermark": [conceptIndex, bundleCommit],
   "object-store-orphans": [sourceDocument],
   "reindex-connected-sources": [connectedSource, job],
@@ -229,6 +233,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
     --wait-seconds <n>  the same, for a whole number of seconds an operator names instead
   map-sweep --workspace <id>                                delete every generation of the map but the live one
   map-counts --workspace <id>                               nodes per label and edges, as JSON, for the drill's diff
+  unmapped-passage-rate --workspace <id>                    the records flagged incomplete, and how many of them showed unmapped passages, as JSON
   reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed
   object-store-orphans --workspace <id> [--list]            recovery order step 5: remove the originals a failed connect or a lost race left, past a ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace, that no document row names
     --list         say how many there are, removing none
@@ -1616,10 +1621,29 @@ const restoreSignInCommand = async (doors: Doors, flags: Flags, io: OpsIo): Prom
   return DONE;
 };
 
+const unmappedPassageRateCommand = async (
+  doors: Doors,
+  workspaceId: string,
+  io: OpsIo,
+): Promise<number> => {
+  const counted = await unmappedPassageRate(ANSWER_MEASURES, doors.postgres, { workspaceId });
+  if (!counted.ok) return refused("unmapped-passage-rate", workspaceId, counted.error, io);
+  const { flaggedIncomplete, showedUnmappedPassages } = counted.value;
+  io.say(
+    JSON.stringify({
+      flagged_incomplete: flaggedIncomplete,
+      showed_unmapped_passages: showedUnmappedPassages,
+    }),
+  );
+  return DONE;
+};
+
 const SLICE_RUNNERS = {
   "map-rebuild": mapRebuildCommand,
   "map-sweep": (doors, workspaceId, _flags, io) => mapSweepCommand(doors, workspaceId, io),
   "map-counts": (doors, workspaceId, _flags, io) => mapCountsCommand(doors, workspaceId, io),
+  "unmapped-passage-rate": (doors, workspaceId, _flags, io) =>
+    unmappedPassageRateCommand(doors, workspaceId, io),
   "reconcile-watermark": (doors, workspaceId, _flags, io) =>
     reconcileWatermark(doors, workspaceId, io),
   "object-store-orphans": objectStoreOrphans,
