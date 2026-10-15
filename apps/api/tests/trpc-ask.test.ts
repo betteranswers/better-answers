@@ -1,5 +1,12 @@
+import { trpcServer } from "@hono/trpc-server";
+import { createTRPCClient, httpBatchStreamLink } from "@trpc/client";
+import { initTRPC } from "@trpc/server";
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+
+import { until } from "@better-answers/core/testing/postgres";
+import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 
 import { askedFrom } from "../../web/src/shared/api/ask-stream.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
@@ -13,6 +20,7 @@ import {
   judgingSetUp,
 } from "./harness-model.ts";
 import { feedbackKeptOn as feedbackOf, recordsIn as recordsOf } from "./harness-questions.ts";
+import { servedOnLoopback } from "./loopback-port.ts";
 import { structured, toolAnswered, type Rpc } from "./mcp-call.ts";
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
 import { refusalOfCall, webClientOf } from "./web-client.ts";
@@ -125,7 +133,7 @@ describe("ask over tRPC", () => {
   });
 
   it("refuses a person past their knowledge ceiling, answering another", async () => {
-    const { workspace, web } = await anAdminAsking();
+    const { workspace, web, client } = await anAdminAsking();
     const colleague = await app().person();
     await app().addMember(workspace.workspaceId, colleague.id, "Viewer");
     const theirs = await bothWays(colleague, workspace.workspaceId);
@@ -136,11 +144,23 @@ describe("ask over tRPC", () => {
       Array.from({ length: READS_A_MINUTE }, () => web.knowledge.find.query({ query: QUESTION })),
     );
     const refused = await refusalOfCall(streamed(web, { question: QUESTION }));
+    const onTheWire = await client.fetch(`${TRPC_ENDPOINT}/ask.question?batch=1`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "trpc-accept": "application/jsonl",
+        [TAB_WORKSPACE_HEADER]: workspace.workspaceId,
+      },
+      body: JSON.stringify({ 0: { question: QUESTION } }),
+    });
     const answered = await streamed(theirs.web, { question: QUESTION });
 
     expect(refused).toMatchObject({
       data: { code: "TOO_MANY_REQUESTS", retryAfterSeconds: expect.any(Number) },
     });
+    // A stream sends its status before any call settles, so the wait rides in the error alone.
+    expect([onTheWire.status, onTheWire.headers.get("retry-after")]).toEqual([200, null]);
+    expect(await onTheWire.text()).toContain('"retryAfterSeconds"');
     expect(answered.map(({ result }) => result.verdict)).toEqual(["ok"]);
     expect(await recordsIn(workspace.workspaceId)).toEqual([
       expect.objectContaining({ transport: "trpc", completed: true }),
@@ -184,22 +204,24 @@ describe("ask over tRPC", () => {
     ]);
   });
 
-  it("completes its record and settles when its client leaves", async () => {
+  it("completes its record and settles when its client leaves mid-ask", async () => {
     const { workspace, web } = await anAdminAsking();
-    wire.answerWith(judgeSaying([USERS.title]));
+    const judging = Promise.withResolvers<void>();
+    const called = Promise.withResolvers<void>();
+    wire.answerWith(async (sent) => {
+      called.resolve();
+      await judging.promise;
+      return judgeSaying([USERS.title])(sent);
+    });
     const leaving = new AbortController();
-    const events: unknown[] = [];
 
-    for await (const event of await web.ask.question.mutate(
-      { question: QUESTION },
-      { signal: leaving.signal },
-    )) {
-      events.push(event);
-      leaving.abort();
-      break;
-    }
+    // In process, an abort never errors the body the client reads, so only the server's side is awaited.
+    void refusalOfCall(web.ask.question.mutate({ question: QUESTION }, { signal: leaving.signal }));
+    await called.promise;
+    leaving.abort();
+    judging.resolve();
+    await until(async () => (await spendIn(workspace.workspaceId))?.["called"] === 1);
 
-    expect(events).toHaveLength(1);
     expect(await recordsIn(workspace.workspaceId)).toEqual([
       {
         transport: "trpc",
@@ -274,3 +296,31 @@ const inCoreTerms = (answered: Rpc, origin: string) => {
   };
   return { ...rest, answers: answers.map(core), related: related.map(core) };
 };
+
+describe("a streamed mutation through the Hono mount", () => {
+  it("delivers its first event while the next is held", async () => {
+    const held = Promise.withResolvers<void>();
+    const t = initTRPC.create();
+    const streaming = t.router({
+      twice: t.procedure.mutation(async function* () {
+        yield "first";
+        await held.promise;
+        yield "second";
+      }),
+    });
+    const mount = new Hono();
+    mount.use(`${TRPC_ENDPOINT}/*`, trpcServer({ router: streaming, endpoint: TRPC_ENDPOINT }));
+
+    await servedOnLoopback(mount, async (origin) => {
+      const streamed = createTRPCClient<typeof streaming>({
+        links: [httpBatchStreamLink({ url: `${origin}${TRPC_ENDPOINT}` })],
+      });
+      const events = (await streamed.twice.mutate())[Symbol.asyncIterator]();
+      const first = await events.next();
+      held.resolve();
+      const second = await events.next();
+
+      expect([first.value, second.value]).toEqual(["first", "second"]);
+    });
+  });
+});

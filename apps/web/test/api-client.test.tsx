@@ -131,7 +131,7 @@ const anApiHearingAsks = () => {
   const heard: Heard[] = [];
   vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
     const address = addressOf(input);
-    if (!address.pathname.endsWith("/ask.question")) {
+    if (!address.pathname.includes("ask.question")) {
       return answered([{ result: { data: { workspace: { id: "w" } } } }]);
     }
     heard.push({
@@ -160,6 +160,18 @@ describe("an ask the web sends", () => {
     expect(sent?.address.href).not.toMatch(/audit|logs|kept/i);
     expect(decodeURIComponent(sent?.address.href ?? "")).not.toContain(A_QUESTION);
     expect(sent?.body).toContain(A_QUESTION);
+  });
+
+  it("is sent alone, though another action leaves with it", async () => {
+    const heard = anApiHearingAsks();
+    const clients = createAppClients();
+
+    await Promise.allSettled([
+      clients.apiClient.ask.question.mutate({ question: A_QUESTION }),
+      groupMade(clients),
+    ]);
+
+    expect(heard.map(({ address }) => address.pathname)).toEqual([`${TRPC_ENDPOINT}/ask.question`]);
   });
 
   it("is sent once, though the api failed it", async () => {
