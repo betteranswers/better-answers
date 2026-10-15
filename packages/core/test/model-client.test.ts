@@ -275,6 +275,19 @@ describe("the Messages shape", () => {
     expect((await calling(theWire(limited))).outcome).toBe("rate-limited");
   });
 
+  it("reads a credit balance too low as a spend cap", async () => {
+    const wire = theWire({
+      status: 400,
+      body: errorReply(
+        "invalid_request_error",
+        "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
+      ),
+    });
+
+    expect(await calling(wire)).toEqual({ outcome: "spend-cap", spent: [NOTHING_SPENT] });
+    expect(wire.sent).toHaveLength(1);
+  });
+
   it("fails a bad request that names no spend limit, once", async () => {
     const wire = theWire({
       status: 400,
