@@ -456,13 +456,17 @@ describe("a drafted sentence's check", () => {
     const { sent, retention, exported } = await sentOf(({ a, b }) => [
       `Claims close within 30 days.[^${a}]\n`,
       `Receipts are kept.[^${b}][^${a}][^${b}]\n`,
-      `Exports run nightly [^${b}].\n`,
+      `Exports run nightly  [^${b}].\n`,
+      `Logs are kept 1.5 years.[^${a}]\n`,
+      `Kept for 13[^${a}]-month terms.[^${b}]\n`,
     ]);
 
     expect(sent).toEqual([
       { sentence: "Claims close within 30 days.", concepts: [retention] },
       { sentence: "Receipts are kept.", concepts: [exported, retention] },
       { sentence: "Exports run nightly.", concepts: [exported] },
+      { sentence: "Logs are kept 1.5 years.", concepts: [retention] },
+      { sentence: "Kept for 13-month terms.", concepts: [retention, exported] },
     ]);
   });
 
@@ -483,24 +487,24 @@ describe("a drafted sentence's check", () => {
 
 describe("where a drafted sentence ends", () => {
   it("ends a sentence with its line, or after spaced marks", async () => {
-    const { sent } = await sentOf(({ a, b }) => [
+    const { sent, retention, exported } = await sentOf(({ a, b }) => [
       `Claims close.[^${a}] Receipts are kept.[^${b}]\nExports run.[^${b}]\n`,
       `Logs are kept.[^${a}] [^${b}] Then deleted [^${a}]. Done.[^${b}]\n`,
     ]);
 
-    expect(sent.map(({ sentence }) => sentence)).toEqual([
-      "Claims close.",
-      "Receipts are kept.",
-      "Exports run.",
-      "Logs are kept.",
-      "Then deleted.",
-      "Done.",
+    expect(sent).toEqual([
+      { sentence: "Claims close.", concepts: [retention] },
+      { sentence: "Receipts are kept.", concepts: [exported] },
+      { sentence: "Exports run.", concepts: [exported] },
+      { sentence: "Logs are kept.", concepts: [retention, exported] },
+      { sentence: "Then deleted.", concepts: [retention] },
+      { sentence: "Done.", concepts: [exported] },
     ]);
   });
 
   it("waits across pieces for the marks a sentence ends with", async () => {
     const { sent, retention, exported } = await sentOf(({ a, b }) => [
-      `Claims close.[^${a}]`,
+      `Claims close.[^${a}] `,
       `[^${b}]`,
       " Receipts are",
       ` kept.[^${b}]`,
