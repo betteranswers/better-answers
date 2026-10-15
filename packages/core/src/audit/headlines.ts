@@ -8,6 +8,7 @@ export const ACTION_HEADLINES = {
   "knowledge.check.imported": "Verification imported",
   "knowledge.concept.class_overridden": "Sensitivity overridden",
   "knowledge.concept.committed": "Concept saved",
+  "knowledge.feedback.closed": "Flag on an answer closed",
   "knowledge.manifest.written": "Knowledge base description updated",
   "knowledge.suggestion.accepted": "Suggestion accepted",
   "knowledge.suggestion.declined": "Suggestion declined",

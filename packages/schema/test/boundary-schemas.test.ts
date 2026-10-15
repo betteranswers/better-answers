@@ -653,6 +653,8 @@ const acceptedRows = {
       note: "The period changed in May.",
       disputedSentence: "Audit logs are kept for a year.",
       disputedConcept: CONCEPT_IRI,
+      closedAs: "no-fault-in-the-knowledge",
+      closedAt: NOW,
     },
   ],
   conceptIdentity: [{ workspaceId: WS_ID, iri: CONCEPT_IRI, mergeKey: "policy:expenses" }],
@@ -1304,6 +1306,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.questionFeedback[1], reason: "rude" },
       { ...acceptedRows.questionFeedback[1], note: "   " },
       { ...acceptedRows.questionFeedback[1], disputedConcept: "expenses" },
+      { ...acceptedRows.questionFeedback[1], closedAs: "fixed" },
     ],
   } as const;
 
@@ -2255,6 +2258,8 @@ describe("5 — the inferred type is pinned", () => {
       note: string | null;
       disputedSentence: string | null;
       disputedConcept: ConceptIri | null;
+      closedAs: "fixed-in-the-knowledge" | "no-fault-in-the-knowledge" | null;
+      closedAt: Date | null;
     };
   };
 

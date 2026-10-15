@@ -85,6 +85,13 @@ export {
   type ReturnedConcept,
 } from "./plan.ts";
 export { completeRecord, openRecord } from "./record.ts";
+export {
+  closeFlag,
+  closeFlagInput,
+  questionsAskedInput,
+  readQuestionsAsked,
+  type QuestionsAskedInput,
+} from "./records.ts";
 
 export {
   TRUST_RIDERS,

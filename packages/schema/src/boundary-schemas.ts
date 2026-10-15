@@ -101,6 +101,7 @@ import {
   CANDIDATE_VERDICTS,
   FEEDBACK_REASONS,
   FEEDBACK_VERDICTS,
+  FLAG_CLOSINGS,
   JUDGE_STATES,
   QUESTION_TRANSPORTS,
   QUESTION_VERDICTS,
@@ -854,6 +855,7 @@ const questionFeedbackRefinements = {
   note: (schema: z.ZodString) => schema.trim().min(1),
   disputedSentence: (schema: z.ZodString) => schema.trim().min(1),
   disputedConcept: conceptIri,
+  closedAs: (schema: z.ZodString) => schema.pipe(z.enum(FLAG_CLOSINGS)),
 };
 
 const questionFeedbackSelect = createSelectSchema(questionFeedback, questionFeedbackRefinements);

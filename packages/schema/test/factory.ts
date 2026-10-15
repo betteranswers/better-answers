@@ -1000,6 +1000,8 @@ export const testData = (client: pg.PoolClient): TestData => {
       note: null,
       disputedSentence: null,
       disputedConcept: null,
+      closedAs: null,
+      closedAt: null,
       ...overrides,
       workspaceId,
       recordId,

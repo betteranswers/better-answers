@@ -9,6 +9,7 @@ import { withRollback } from "./harness.ts";
 import { postgresForSuite, privilegesHeld, refusalOf, refusesEach } from "./probes.ts";
 import { contentPartitionOf, contentPartitions, inTheMonth } from "./question-months.ts";
 import {
+  A_CLOSED_QUESTION_FEEDBACK,
   A_COMPLETED_QUESTION_RECORD,
   A_QUESTION,
   A_QUESTION_RECORD,
@@ -354,6 +355,26 @@ describe("what feedback refuses", () => {
       expect(await given(client, id, ["helpful", null, null, null, A_CONCEPT])).toBe(
         "question_feedback_flag_check",
       );
+    });
+  });
+
+  it("closes only a flag, with a listed word and instant", async () => {
+    await withRollback(db().pool, async (client) => {
+      const { id } = await testData(client).questionAsked({ workspaceId: WS_A });
+      const closed = async (values: readonly unknown[]) =>
+        refusalOf(client, () =>
+          client.query(A_CLOSED_QUESTION_FEEDBACK, [WS_A, ulid(), id, AN_ASKER, ...values]),
+        );
+      const shape = "question_feedback_closed_check";
+      const at = new Date();
+
+      expect(await closed(["flag", "wrong", "fixed-in-the-knowledge", at])).toBe("admitted");
+      expect(await closed(["flag", "wrong", "no-fault-in-the-knowledge", at])).toBe("admitted");
+      expect(await closed(["flag", "wrong", null, null])).toBe("admitted");
+      expect(await closed(["helpful", null, "no-fault-in-the-knowledge", at])).toBe(shape);
+      expect(await closed(["flag", "wrong", "fixed", at])).toBe(shape);
+      expect(await closed(["flag", "wrong", "fixed-in-the-knowledge", null])).toBe(shape);
+      expect(await closed(["flag", "wrong", null, at])).toBe(shape);
     });
   });
 });

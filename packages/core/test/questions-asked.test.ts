@@ -1,9 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import { boundarySchemas, conceptIriOf, ulid } from "@better-answers/schema";
+import {
+  boundarySchemas,
+  conceptIriOf,
+  ulid,
+  type ConceptIri,
+  type FlagClosing,
+} from "@better-answers/schema";
 import { contentPartitionOf, contentPartitions, inTheMonth } from "@better-answers/schema/testing";
 
-import { completeRecord, openRecord } from "../src/answering/index.ts";
+import {
+  closeFlag,
+  completeRecord,
+  openRecord,
+  questionsAskedInput,
+  readQuestionsAsked,
+  type QuestionsAskedInput,
+} from "../src/answering/index.ts";
 import type { Trust } from "../src/concepts/index.ts";
 import { actorIdOfPerson, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
@@ -327,5 +340,386 @@ describe("completing a record", () => {
 
     expect(again).toEqual({ ok: false, error: expect.any(Error) });
     expect(await skeletonOf(recordId)).toEqual([expect.objectContaining({ verdict: "refuse" })]);
+  });
+});
+
+const KEPT_TRUST = { tier: "unverified", status: "current", verifiedAt: null, rider: null };
+
+/** As the api reads and writes, under the reader's own scope and predicate. */
+const asked = (reader: UserPrincipal, input: Partial<QuestionsAskedInput> = {}) =>
+  readingAs(db().runtimePool, reader, (principal, tx) =>
+    readQuestionsAsked(principal, tx, questionsAskedInput.parse(input)),
+  );
+
+const closing = (closer: UserPrincipal, feedbackId: string, closedAs: FlagClosing) =>
+  readingAs(db().runtimePool, closer, (principal, tx) =>
+    closeFlag(principal, tx, { feedbackId, closedAs }, new Date()),
+  );
+
+type Seeded = { readonly iri: ConceptIri; readonly contentHash: string };
+
+type RecordShape = {
+  readonly askedAt?: Date;
+  readonly verdict?: "related" | "refuse";
+  readonly cited?: readonly Seeded[];
+  readonly drafted?: readonly { sentence: string; concepts: readonly Seeded[] }[];
+};
+
+const draftedOf = (drafted: RecordShape["drafted"]) =>
+  drafted?.map(({ sentence, concepts }) => ({
+    sentence,
+    concepts: concepts.map(({ iri }) => iri),
+  }));
+
+/** A completed record the Admin asked, with its question, citing `cited` in order. */
+const aRecord = (admin: UserPrincipal, shape: RecordShape = {}) =>
+  seedingWith(db().pool, async (seed) => {
+    const record = await seed.questionAsked({
+      workspaceId: admin.workspaceId,
+      askedAt: shape.askedAt ?? new Date(),
+      askedBy: actorIdOfPerson(admin.userId),
+      completedAt: new Date(),
+      verdict: shape.verdict ?? "related",
+      judgeState: "not-judged",
+      concepts: (shape.cited ?? []).map(({ iri, contentHash }) => ({
+        iri,
+        contentHash,
+        trust: KEPT_TRUST,
+      })),
+    });
+    await seed.questionContent({
+      workspaceId: admin.workspaceId,
+      recordId: record.id,
+      askedAt: record.askedAt,
+      question: QUESTION,
+      drafted: draftedOf(shape.drafted) ?? null,
+    });
+    return record;
+  });
+
+const aFlagOn = (
+  admin: UserPrincipal,
+  recordId: string,
+  disputed?: { readonly sentence: string; readonly concept: Seeded },
+) =>
+  seedingWith(db().pool, (seed) =>
+    seed.questionFeedback({
+      workspaceId: admin.workspaceId,
+      recordId,
+      givenBy: actorIdOfPerson(admin.userId),
+      verdict: "flag",
+      reason: "wrong",
+      disputedSentence: disputed?.sentence ?? null,
+      disputedConcept: disputed?.concept.iri ?? null,
+    }),
+  );
+
+/** A concept in `collection` that every member reads. */
+const aConceptIn = (admin: UserPrincipal, collection: string) =>
+  seedingWith(db().pool, (seed) =>
+    seed.conceptIndex({
+      workspaceId: admin.workspaceId,
+      path: `knowledge/${collection}/${ulid().toLowerCase()}.md`,
+    }),
+  );
+
+/** A concept in `collection` narrowed to a group the Admin is not in. */
+const aConceptNarrowedIn = (admin: UserPrincipal, collection: string) =>
+  seedingWith(db().pool, async (seed) => {
+    const group = await seed.group({ workspaceId: admin.workspaceId });
+    return seed.conceptIndex({
+      workspaceId: admin.workspaceId,
+      path: `knowledge/${collection}/${ulid().toLowerCase()}.md`,
+      audience: "groups",
+      audienceGroups: [group.id],
+    });
+  });
+
+const aMemberOf = async (admin: UserPrincipal, role: "Editor" | "Viewer") => {
+  const member = await seedingWith(db().pool, (seed) =>
+    seed.member({ workspaceId: admin.workspaceId, role }),
+  );
+  return principalFor(db(), admin.workspaceId, member.userId);
+};
+
+/** The first two pages of one record each, the second read from the first's cut. */
+const pagesOfOne = async (admin: UserPrincipal) => {
+  const first = answered(await asked(admin, { limit: 1 }));
+  const next = answered(await asked(admin, { limit: 1, cursor: first.nextCursor ?? undefined }));
+  return [first, next];
+};
+
+/** An Admin with one record asked and one open flag on it. */
+const anOpenFlag = async () => {
+  const admin = await anAsker();
+  const record = await aRecord(admin);
+  const flag = await aFlagOn(admin, record.id);
+  return { admin, record, flag };
+};
+
+const closingOf = async (feedbackId: string) => {
+  const read = await db().pool.query(
+    "SELECT closed_as, closed_at IS NOT NULL AS stamped FROM question_feedback WHERE id = $1",
+    [feedbackId],
+  );
+  return read.rows;
+};
+
+const eventsOn = async (feedbackId: string) => {
+  const read = await db().pool.query(
+    "SELECT action, actor, subject_kind, detail FROM audit_event WHERE subject_id = $1",
+    [feedbackId],
+  );
+  return read.rows;
+};
+
+describe("reading the questions asked", () => {
+  it.each(["Editor", "Viewer"] as const)("refuses an %s the read", async (role) => {
+    const admin = await anAsker();
+    await aRecord(admin);
+
+    expect(await asked(await aMemberOf(admin, role))).toEqual({ ok: false, error: "role-forbids" });
+  });
+
+  it("puts a flagged record before an unflagged newer one", async () => {
+    const admin = await anAsker();
+    const flagged = await aRecord(admin, { askedAt: new Date(Date.now() - 60_000) });
+    const newer = await aRecord(admin);
+    await aFlagOn(admin, flagged.id);
+
+    const { records } = answered(await asked(admin));
+
+    expect(records.map((record) => [record.id, record.flagged])).toEqual([
+      [flagged.id, true],
+      [newer.id, false],
+    ]);
+  });
+
+  it("names the next page only when another follows", async () => {
+    const admin = await anAsker();
+    const older = await aRecord(admin, { askedAt: new Date(Date.now() - 60_000) });
+    const newer = await aRecord(admin);
+
+    const pages = await pagesOfOne(admin);
+
+    expect(pages.map((page) => [page.records.map(({ id }) => id), page.nextCursor])).toEqual([
+      [[newer.id], { id: newer.id, flagged: false }],
+      [[older.id], null],
+    ]);
+  });
+
+  it("pages from the last flagged record into the unflagged", async () => {
+    const admin = await anAsker();
+    const unflagged = await aRecord(admin);
+    const flagged = await aRecord(admin, { askedAt: new Date(Date.now() - 60_000) });
+    await aFlagOn(admin, flagged.id);
+
+    const pages = await pagesOfOne(admin);
+
+    expect(pages.map((page) => page.records.map(({ id }) => id))).toEqual([
+      [flagged.id],
+      [unflagged.id],
+    ]);
+  });
+
+  it("keeps its place when the cut record's flag closes", async () => {
+    const admin = await anAsker();
+    const [earlier, later] = [
+      await aRecord(admin, { askedAt: new Date(Date.now() - 60_000) }),
+      await aRecord(admin),
+    ];
+    await aFlagOn(admin, earlier.id);
+    const laterFlag = await aFlagOn(admin, later.id);
+    const first = answered(await asked(admin, { limit: 1 }));
+    answered(await closing(admin, laterFlag.id, "no-fault-in-the-knowledge"));
+
+    const next = answered(await asked(admin, { limit: 1, cursor: first.nextCursor ?? undefined }));
+
+    expect([first, next].map((page) => page.records.map(({ id }) => id))).toEqual([
+      [later.id],
+      [earlier.id],
+    ]);
+  });
+
+  it("shows a record as asked, with its asker and question", async () => {
+    const admin = await anAsker();
+    const cited = await aConceptIn(admin, "audits");
+    const record = await aRecord(admin, { cited: [cited] });
+
+    const { records } = answered(await asked(admin));
+
+    expect(records).toEqual([
+      {
+        id: record.id,
+        askedAt: record.askedAt.toISOString(),
+        askedBy: expect.objectContaining({ kind: "person" }),
+        transport: "mcp",
+        collectionsNamed: [],
+        question: QUESTION,
+        verdict: "related",
+        judgeState: "not-judged",
+        flagged: false,
+        concepts: [
+          {
+            iri: cited.iri,
+            kind: "Policy",
+            title: "Expenses",
+            collection: "audits",
+            trustThen: KEPT_TRUST,
+          },
+        ],
+        drafted: null,
+        feedback: [],
+      },
+    ]);
+  });
+
+  it("leaves out an unreadable concept, with no hint", async () => {
+    const admin = await anAsker();
+    const readable = await aConceptIn(admin, "audits");
+    const narrowed = await aConceptNarrowedIn(admin, "board");
+    await aRecord(admin, {
+      cited: [narrowed, readable],
+      drafted: [
+        { sentence: "The board meets monthly.", concepts: [narrowed] },
+        { sentence: "Audit logs are kept for a year.", concepts: [readable] },
+        { sentence: "Both say so.", concepts: [readable, narrowed] },
+      ],
+    });
+
+    const [record] = answered(await asked(admin)).records;
+
+    expect(record?.concepts.map(({ iri }) => iri)).toEqual([readable.iri]);
+    expect(record?.drafted).toEqual([
+      { sentence: "Audit logs are kept for a year.", concepts: [readable.iri] },
+    ]);
+    expect(JSON.stringify(record)).not.toContain(narrowed.iri);
+  });
+
+  it("shows a flag without its sentence on an unreadable concept", async () => {
+    const admin = await anAsker();
+    const narrowed = await aConceptNarrowedIn(admin, "board");
+    const record = await aRecord(admin, { cited: [narrowed] });
+    const flag = await aFlagOn(admin, record.id, {
+      sentence: "The board meets monthly.",
+      concept: narrowed,
+    });
+
+    const [read] = answered(await asked(admin)).records;
+
+    expect(read?.feedback).toEqual([
+      {
+        id: flag.id,
+        givenAt: flag.givenAt.toISOString(),
+        verdict: "flag",
+        reason: "wrong",
+        note: null,
+        closedAs: null,
+        closedAt: null,
+      },
+    ]);
+  });
+
+  it("puts a refusal matching nothing in the group for none", async () => {
+    const admin = await anAsker();
+    await aRecord(admin, { verdict: "refuse" });
+
+    const [record] = answered(await asked(admin)).records;
+
+    expect(record).toEqual(expect.objectContaining({ verdict: "refuse", refusedUnder: null }));
+  });
+
+  it("groups a refusal under the first collection the Admin reads", async () => {
+    const admin = await anAsker();
+    const narrowed = await aConceptNarrowedIn(admin, "board");
+    const readable = await aConceptIn(admin, "audits");
+    const related = await aRecord(admin, {
+      askedAt: new Date(Date.now() - 60_000),
+      cited: [readable],
+    });
+    const refused = await aRecord(admin, { verdict: "refuse", cited: [narrowed, readable] });
+
+    const { records } = answered(await asked(admin));
+
+    expect(records.map((record) => [record.id, record.refusedUnder])).toEqual([
+      [refused.id, "audits"],
+      [related.id, undefined],
+    ]);
+  });
+});
+
+describe("closing a flag", () => {
+  it("stores no fault, audits it once, and unflags the record", async () => {
+    const { admin, record, flag } = await anOpenFlag();
+
+    const closed = await closing(admin, flag.id, "no-fault-in-the-knowledge");
+
+    expect(closed).toEqual({
+      ok: true,
+      value: { feedbackId: flag.id, recordId: record.id, closedAs: "no-fault-in-the-knowledge" },
+    });
+    expect(await closingOf(flag.id)).toEqual([
+      { closed_as: "no-fault-in-the-knowledge", stamped: true },
+    ]);
+    expect(await eventsOn(flag.id)).toEqual([
+      {
+        action: "knowledge.feedback.closed",
+        actor: actorIdOfPerson(admin.userId),
+        subject_kind: "feedback",
+        detail: { recordId: record.id, closedAs: "no-fault-in-the-knowledge" },
+      },
+    ]);
+    const [read] = answered(await asked(admin)).records;
+    expect(read?.flagged).toBe(false);
+  });
+
+  it("stores fixed in the knowledge as its outcome", async () => {
+    const { admin, flag } = await anOpenFlag();
+
+    answered(await closing(admin, flag.id, "fixed-in-the-knowledge"));
+
+    expect(await closingOf(flag.id)).toEqual([
+      { closed_as: "fixed-in-the-knowledge", stamped: true },
+    ]);
+  });
+
+  it("refuses a flag already closed, changing nothing", async () => {
+    const { admin, flag } = await anOpenFlag();
+    answered(await closing(admin, flag.id, "fixed-in-the-knowledge"));
+
+    const again = await closing(admin, flag.id, "no-fault-in-the-knowledge");
+
+    expect(again).toEqual({ ok: false, error: "already-decided" });
+    expect(await closingOf(flag.id)).toEqual([
+      { closed_as: "fixed-in-the-knowledge", stamped: true },
+    ]);
+    expect(await eventsOn(flag.id)).toHaveLength(1);
+  });
+
+  it("answers not-found for helpful feedback and an unknown id", async () => {
+    const admin = await anAsker();
+    const record = await aRecord(admin);
+    const helpful = await seedingWith(db().pool, (seed) =>
+      seed.questionFeedback({ workspaceId: admin.workspaceId, recordId: record.id }),
+    );
+
+    const refused = [
+      await closing(admin, helpful.id, "fixed-in-the-knowledge"),
+      await closing(admin, ulid(), "fixed-in-the-knowledge"),
+    ];
+
+    expect(refused).toEqual([
+      { ok: false, error: "not-found" },
+      { ok: false, error: "not-found" },
+    ]);
+  });
+
+  it.each(["Editor", "Viewer"] as const)("refuses an %s the closing", async (role) => {
+    const { admin, flag } = await anOpenFlag();
+
+    const refused = await closing(await aMemberOf(admin, role), flag.id, "fixed-in-the-knowledge");
+
+    expect(refused).toEqual({ ok: false, error: "role-forbids" });
+    expect(await closingOf(flag.id)).toEqual([{ closed_as: null, stamped: false }]);
   });
 });

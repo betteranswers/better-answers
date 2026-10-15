@@ -31,6 +31,10 @@ export const FEEDBACK_REASONS = [
   "should-not-have-shown",
 ] as const;
 
+/** How an Admin closes a flag: the knowledge was at fault and is fixed, or it was not at fault. */
+export const FLAG_CLOSINGS = ["fixed-in-the-knowledge", "no-fault-in-the-knowledge"] as const;
+export type FlagClosing = (typeof FLAG_CLOSINGS)[number];
+
 /**
  * A record's skeleton, kept for good. `concepts` names each by IRI with no foreign key, so a
  * record outlives a concept it returned.
@@ -62,6 +66,12 @@ export const questionAsked = withRLS(
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
     index("question_asked_workspace_id_asked_by_idx").on(table.workspaceId, table.askedBy),
+    /** Questions asked pages newest first, so a page reads its rows and not the workspace's. */
+    index("question_asked_workspace_id_asked_at_id_idx").on(
+      table.workspaceId,
+      table.askedAt.desc(),
+      table.id.desc(),
+    ),
 
     check("question_asked_asked_by_check", sql.raw(`asked_by ~ '^${ACTOR_ID_PATTERN}$'`)),
     check(
@@ -137,6 +147,10 @@ export const questionFeedback = withRLS(
     disputedSentence: text("disputed_sentence"),
     /** The IRI the disputed sentence rested on, with no foreign key. */
     disputedConcept: text("disputed_concept"),
+
+    /** Who closed it is the audit event's actor alone: the row is kept for good. */
+    closedAs: text("closed_as"),
+    closedAt: stamp("closed_at"),
   },
   "workspaceId",
   (table) => [
@@ -148,6 +162,9 @@ export const questionFeedback = withRLS(
     }),
     index("question_feedback_workspace_id_record_id_idx").on(table.workspaceId, table.recordId),
     index("question_feedback_workspace_id_given_by_idx").on(table.workspaceId, table.givenBy),
+    index("question_feedback_open_flag_idx")
+      .on(table.workspaceId, table.recordId)
+      .where(sql.raw(`verdict = '${FEEDBACK_FLAG_VERDICT}' AND closed_at IS NULL`)),
 
     check("question_feedback_given_by_check", sql.raw(`given_by ~ '^${ACTOR_ID_PATTERN}$'`)),
     check("question_feedback_verdict_check", sql.raw(`verdict IN (${listed(FEEDBACK_VERDICTS)})`)),
@@ -163,6 +180,14 @@ export const questionFeedback = withRLS(
          AND (note IS NULL OR verdict = '${FEEDBACK_FLAG_VERDICT}')
          AND (disputed_concept IS NULL OR verdict = '${FEEDBACK_FLAG_VERDICT}')
          AND (disputed_sentence IS NULL OR disputed_concept IS NOT NULL)`,
+      ),
+    ),
+    check(
+      "question_feedback_closed_check",
+      sql.raw(
+        `(closed_as IS NULL) = (closed_at IS NULL)
+         AND (closed_as IS NULL OR closed_as IN (${listed(FLAG_CLOSINGS)}))
+         AND (closed_as IS NULL OR verdict = '${FEEDBACK_FLAG_VERDICT}')`,
       ),
     ),
   ],
