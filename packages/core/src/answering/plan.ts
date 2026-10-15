@@ -2,6 +2,7 @@ import {
   ids,
   type ConceptIri,
   type JudgeState,
+  type ModelProvider,
   type QuestionVerdict,
 } from "@better-answers/schema";
 
@@ -96,7 +97,14 @@ export type AskCaps = {
   readonly unmappedPassages: number;
   /** The `Answer`s the judge is asked about, in the order they bear; any beyond stay related. */
   readonly candidates: number;
+  readonly decisionThresholds: DecisionThresholds;
 };
+
+/**
+ * The least probability of yes that is a fit, by provider, then model. A model with none cannot
+ * judge; none is calibrated before a reading.
+ */
+export type DecisionThresholds = ReadonlyMap<ModelProvider, ReadonlyMap<string, number>>;
 
 /**
  * Each applies to what the reader may read. `related` exceeds `entryPoints`, or the walk has no
@@ -107,6 +115,7 @@ export const ASK_CAPS: AskCaps = {
   related: 28,
   unmappedPassages: 3,
   candidates: 20,
+  decisionThresholds: new Map(),
 };
 
 /** Runs `work` in a short read-only transaction of its own, and answers what it answered. */

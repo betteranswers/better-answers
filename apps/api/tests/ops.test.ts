@@ -2878,7 +2878,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     const MALFORMED =
-      "set-model-key: REFUSED — malformed: give --workspace a workspace id, --provider one of anthropic · mistral, and on standard input one key with no space or line break in it";
+      "set-model-key: REFUSED — malformed: give --workspace a workspace id, --provider one of anthropic · mistral · cloudflare, and on standard input one key with no space or line break in it, for cloudflare the account id, a colon, then the API token";
 
     it("seals the key typed on standard input, recording the provider", async () => {
       const { workspaceId } = await app().provision();
@@ -2952,6 +2952,29 @@ describe("pnpm ops — the restore scripts' commands", () => {
         lines: ["set-model-key: REFUSED — KEK must be set to the envelope key; nothing changed"],
       });
       expect(await rowsHeld(app(), workspaceId)).toEqual([]);
+    });
+
+    it("refuses a Workers AI key lacking its account id, unsaid", async () => {
+      const { workspaceId } = await app().provision();
+      const tokenAlone = "invented_Token-u15";
+
+      const refused = await setting(app(), workspaceId, tokenAlone, ["--provider", "cloudflare"]);
+      const accepted = await setting(
+        app(),
+        workspaceId,
+        `0123456789abcdef0123456789abcdef:${tokenAlone}`,
+        ["--provider", "cloudflare"],
+      );
+
+      expect({ exitCode: refused.exitCode, lines: refused.lines }).toEqual({
+        exitCode: 2,
+        lines: [MALFORMED],
+      });
+      expect(JSON.stringify(refused)).not.toContain(tokenAlone);
+      expect(accepted.exitCode).toBe(0);
+      expect(await rowsOfAction(app(), workspaceId, ACTION)).toEqual([
+        setEvent(workspaceId, "cloudflare"),
+      ]);
     });
 
     /** The real entrypoint in a process of its own, so its whole output is read and no part is injected. */
@@ -3046,7 +3069,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual([
-        "set-model-key: --workspace <id> and --provider <anthropic|mistral> are required, with the key on standard input",
+        "set-model-key: --workspace <id> and --provider <anthropic|mistral|cloudflare> are required, with the key on standard input",
       ]);
       expect(await rowsHeld(app(), workspaceId)).toEqual([]);
     });
@@ -3055,7 +3078,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await ops(app(), ["help"]);
 
       expect(run.lines.join("\n")).toContain(
-        "set-model-key --workspace <id> --provider <anthropic|mistral>",
+        "set-model-key --workspace <id> --provider <anthropic|mistral|cloudflare>",
       );
     });
   });
@@ -3189,7 +3212,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.lines.join("\n")).toContain("set-spending-limit --workspace <id> --gbp <pounds>");
       expect(run.lines.join("\n")).toContain(
-        "set-model-price --provider <anthropic|mistral> --model <model> --from <yyyy-mm-dd>",
+        "set-model-price --provider <anthropic|mistral|cloudflare> --model <model> --from <yyyy-mm-dd>",
       );
     });
   });

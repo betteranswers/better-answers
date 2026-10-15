@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { jsonAs, retryAfterMsOf, type WireRead, type WireRequest } from "./read.ts";
+
 /** Each a value the provider publishes; the version pins the shape this file reads and writes. */
 const MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const MESSAGES_VERSION = "2023-06-01";
@@ -16,18 +18,11 @@ export type MessagesCall = {
   readonly tokensOut: number;
 };
 
-export type MessagesRequest = {
-  readonly url: string;
-  readonly method: "POST";
-  readonly headers: Readonly<Record<string, string>>;
-  readonly body: string;
-};
-
 /**
  * No `thinking` and no sampling field: a model choice may name a model that refuses either, and
  * each model's default stands.
  */
-export const messagesRequest = (call: MessagesCall): MessagesRequest => ({
+export const messagesRequest = (call: MessagesCall): WireRequest => ({
   url: MESSAGES_URL,
   method: "POST",
   headers: {
@@ -44,17 +39,8 @@ export const messagesRequest = (call: MessagesCall): MessagesRequest => ({
   }),
 });
 
-export type TokensSpent = { readonly tokensIn: number; readonly tokensOut: number };
-
-/** What one attempt's reply says, before the caller reads the answer it carries. */
-export type MessagesRead =
-  | { readonly read: "answered"; readonly text: string; readonly spent: TokensSpent }
-  | { readonly read: "refused"; readonly spent: TokensSpent }
-  | { readonly read: "cut-off"; readonly spent: TokensSpent }
-  | { readonly read: "rate-limited"; readonly retryAfterMs: number | undefined }
-  | { readonly read: "spend-cap" }
-  | { readonly read: "unavailable" }
-  | { readonly read: "failed" };
+/** An answer is the text of the reply's blocks, which the caller reads as JSON. */
+type MessagesRead = WireRead<string>;
 
 const count = z.number().int().nonnegative();
 
@@ -95,19 +81,8 @@ const RATE_LIMITED = 429;
 const BAD_REQUEST = 400;
 const ANSWERED = 200;
 
-/** `text` read as JSON of `shape`, or `undefined`: a parse error quotes the text, so none leaves. */
-export const jsonAs = <T>(shape: z.ZodType<T>, text: string): T | undefined => {
-  try {
-    const parsed = shape.safeParse(JSON.parse(text));
-    return parsed.success ? parsed.data : undefined;
-  } catch {
-    // Not JSON: the reader answers that as a failure, never with the message, which quotes the text.
-    return undefined;
-  }
-};
-
 /** Cached input is billed too, at its own rate, so every input token is counted. */
-const spentOf = (usage: z.output<typeof reply>["usage"]): TokensSpent => ({
+const spentOf = (usage: z.output<typeof reply>["usage"]) => ({
   tokensIn:
     usage.input_tokens +
     (usage.cache_creation_input_tokens ?? 0) +
@@ -122,14 +97,8 @@ const answeredRead = (text: string): MessagesRead => {
   if (parsed.stop_reason === "refusal") return { read: "refused", spent };
   if (parsed.stop_reason !== "end_turn") return { read: "cut-off", spent };
   const said = parsed.content.map((block) => block.text ?? "");
-  return { read: "answered", text: said.join(""), spent };
+  return { read: "answered", said: said.join(""), spent };
 };
-
-const SECOND_MS = 1000;
-
-/** `retry-after` is whole seconds, as `Headers` hands it over trimmed; anything else is none. */
-const retryAfterMsOf = (header: string | null): number | undefined =>
-  /^\d+$/.test(header ?? "") ? Number(header) * SECOND_MS : undefined;
 
 const rateLimitedRead = (text: string, retryAfter: string | null): MessagesRead =>
   jsonAs(errorReply, text)?.error.details?.error_code === TIER_SPEND_CAP

@@ -12,6 +12,8 @@ import {
   RESERVATION_LIFETIME_MS,
   resolveModel,
   RETRY_WAITS_MS,
+  wireShapeOf,
+  type DecisionModelCall,
   type ModelAttemptLine,
   type ModelCall,
   type ModelToCall,
@@ -345,6 +347,306 @@ describe("the Messages shape", () => {
     expect(called).toEqual({ outcome: "failed", spent: [NOTHING_SPENT] });
     expect(wire.sent).toHaveLength(1);
     expect(timeouts).toEqual([120_000]);
+  });
+});
+
+/** Invented: an account id, a colon, then a token. */
+const ACCOUNT_ID = "0123456789abcdef0123456789abcdef";
+const A_WORKERS_AI_KEY = `${ACCOUNT_ID}:invented_Token-u15`;
+
+const TO_CLEF_FLASH: ModelToCall = {
+  purpose: "judging",
+  modelChoiceId: "judge-2",
+  provider: "cloudflare",
+  model: "clef-flash",
+  key: { reveal: () => A_WORKERS_AI_KEY },
+};
+
+const A_DECISION: DecisionModelCall = {
+  state: QUESTION,
+  questions: {
+    "1": { ask: "Does this answer it?", answer: "Kept for thirteen months." },
+    "2": { ask: "Does this answer it?", answer: "Admins read it." },
+  },
+};
+
+const decisionReply = (
+  answers: Record<string, unknown>,
+  usage = { input_tokens: 412, output_tokens: 2 },
+) =>
+  JSON.stringify({
+    result: { model: "clef-flash", answers, usage },
+    success: true,
+    errors: [],
+    messages: [],
+  });
+
+const DECIDED: Reply = {
+  status: 200,
+  body: decisionReply({ "1": { type: "noul", noul: 0.93 }, "2": { type: "noul", noul: 0.04 } }),
+  headers: { "cf-ray": "8f1e2d3c4b5a6978-LHR" },
+};
+
+const cloudflareError = (code: number, message: string) =>
+  JSON.stringify({ result: null, success: false, errors: [{ code, message }], messages: [] });
+
+const deciding = (wire: Wire, call: DecisionModelCall = A_DECISION, to = TO_CLEF_FLASH) =>
+  clientOn(wire).client.decide(to, call);
+
+/** Bytes of the body Workers AI is sent for `model`, an empty state and one question. */
+const emptyBodyBytes = (model: string): number =>
+  Buffer.byteLength(
+    JSON.stringify({
+      model,
+      state: "",
+      questions: { "1": { type: "noul", instructions: { ask: "Is it?" } } },
+    }),
+  );
+
+/** Clef-flash's window of 24,576 tokens, at three bytes a token. */
+const WINDOW_BYTES = 73_728;
+
+/** A call of one question whose body for `model` is exactly `bytes` long. */
+const callOfBytes = (bytes: number, model = "clef-flash"): DecisionModelCall => ({
+  state: "s".repeat(bytes - emptyBodyBytes(model)),
+  questions: { "1": { ask: "Is it?" } },
+});
+
+describe("the decision shape", () => {
+  it("sends the state and one true-or-false question per id", async () => {
+    const wire = theWire(DECIDED);
+
+    await deciding(wire);
+
+    expect(wire.sent).toHaveLength(1);
+    const [sent] = wire.sent;
+    expect(sent?.url).toBe(
+      "https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/run/@cf/cloudflare/clef-flash",
+    );
+    expect(sent?.init.method).toBe("POST");
+    expect(sent?.init.headers).toEqual({
+      "content-type": "application/json",
+      authorization: "Bearer invented_Token-u15",
+    });
+    expect(JSON.parse(sent?.body ?? "")).toEqual({
+      model: "clef-flash",
+      state: "How long are audit logs kept?",
+      questions: {
+        "1": {
+          type: "noul",
+          instructions: { ask: "Does this answer it?", answer: "Kept for thirteen months." },
+        },
+        "2": {
+          type: "noul",
+          instructions: { ask: "Does this answer it?", answer: "Admins read it." },
+        },
+      },
+    });
+  });
+
+  it("answers each question's probability of yes and its tokens", async () => {
+    const called = await clientOn(theWire(DECIDED), { secondsPerRead: 0.5 }).client.decide(
+      TO_CLEF_FLASH,
+      A_DECISION,
+    );
+
+    expect(called).toEqual({
+      outcome: "answered",
+      answer: { "1": 0.93, "2": 0.04 },
+      spent: [{ tokensIn: 412, tokensOut: 2, seconds: 0.5, outcome: "succeeded" }],
+    });
+  });
+
+  it("fails a reply skipping a question, keeping its tokens", async () => {
+    const wire = theWire({
+      status: 200,
+      body: decisionReply({ "1": { type: "noul", noul: 0.93 } }),
+    });
+
+    expect(await deciding(wire)).toEqual({
+      outcome: "failed",
+      spent: [{ tokensIn: 412, tokensOut: 2, seconds: 0, outcome: "failed" }],
+    });
+  });
+
+  it("fails a probability outside nought to one", async () => {
+    const wire = theWire({
+      status: 200,
+      body: decisionReply({ "1": { type: "noul", noul: 1.2 }, "2": { type: "noul", noul: 0 } }),
+    });
+
+    expect((await deciding(wire)).outcome).toBe("failed");
+  });
+
+  it("fails a reply that is not the envelope's JSON", async () => {
+    const unwrapped = JSON.stringify({ answers: {}, usage: { input_tokens: 1, output_tokens: 0 } });
+    const unsuccessful = JSON.stringify({
+      result: { answers: {}, usage: { input_tokens: 1, output_tokens: 0 } },
+      success: false,
+    });
+
+    expect(await deciding(theWire({ status: 200, body: unwrapped }))).toEqual({
+      outcome: "failed",
+      spent: [NOTHING_SPENT],
+    });
+    expect(await deciding(theWire({ status: 200, body: unsuccessful }))).toEqual({
+      outcome: "failed",
+      spent: [NOTHING_SPENT],
+    });
+  });
+
+  it("reads the daily allocation spent as a spend cap", async () => {
+    const wire = theWire({
+      status: 429,
+      body: cloudflareError(3036, "You have used up your daily free allocation of 10,000 neurons."),
+    });
+
+    expect(await deciding(wire)).toEqual({ outcome: "spend-cap", spent: [NOTHING_SPENT] });
+    expect(wire.sent).toHaveLength(1);
+  });
+
+  it("tries capacity exceeded again after the wait asked", async () => {
+    const outOfCapacity: Reply = {
+      status: 429,
+      body: cloudflareError(3040, "Capacity temporarily exceeded, please try again."),
+      headers: { "retry-after": "4" },
+    };
+    const wire = theWire(outOfCapacity, DECIDED);
+    const { client, waits } = clientOn(wire);
+
+    expect((await client.decide(TO_CLEF_FLASH, A_DECISION)).outcome).toBe("answered");
+    expect(waits).toEqual([4_000]);
+  });
+
+  it("tries each of the provider's own faults again", async () => {
+    for (const status of [500, 502, 503, 504]) {
+      const wire = theWire(
+        { status, body: cloudflareError(3043, "Internal server error") },
+        DECIDED,
+      );
+
+      expect((await deciding(wire)).outcome).toBe("answered");
+      expect(wire.sent).toHaveLength(2);
+    }
+  });
+
+  it("fails a refused request once", async () => {
+    const wire = theWire({ status: 400, body: cloudflareError(5007, "No such model") });
+
+    expect(await deciding(wire)).toEqual({ outcome: "failed", spent: [NOTHING_SPENT] });
+    expect(wire.sent).toHaveLength(1);
+  });
+
+  it("logs the reply's ray as its request id", async () => {
+    const wire = theWire(DECIDED);
+    const { client, lines } = clientOn(wire);
+
+    await client.decide(TO_CLEF_FLASH, A_DECISION);
+
+    expect(lines).toEqual([
+      {
+        line: {
+          purpose: "judging",
+          provider: "cloudflare",
+          model: "clef-flash",
+          attempt: 1,
+          status: 200,
+          read: "answered",
+          seconds: 0,
+          request_id: "8f1e2d3c4b5a6978-LHR",
+        },
+        message: "llm: a model call's attempt",
+      },
+    ]);
+  });
+});
+
+describe("a decision model's window", () => {
+  it("sends a request exactly as long as the window", async () => {
+    const wire = theWire(DECIDED);
+
+    await deciding(wire, callOfBytes(WINDOW_BYTES));
+
+    expect(wire.sent.map(({ body }) => Buffer.byteLength(body))).toEqual([WINDOW_BYTES]);
+  });
+
+  it("never sends a request one byte over the window", async () => {
+    const wire = theWire(DECIDED);
+    const { client, lines } = clientOn(wire);
+
+    const called = await client.decide(TO_CLEF_FLASH, callOfBytes(WINDOW_BYTES + 1));
+
+    expect(called).toEqual({ outcome: "failed", spent: [] });
+    expect(wire.sent).toEqual([]);
+    expect(lines).toEqual([
+      {
+        line: {
+          purpose: "judging",
+          provider: "cloudflare",
+          model: "clef-flash",
+          attempt: 0,
+          status: null,
+          read: "over-window",
+          seconds: 0,
+          request_id: null,
+        },
+        message: "llm: a model call never sent",
+      },
+    ]);
+  });
+
+  it("counts a two-byte character as two bytes", async () => {
+    const wire = theWire(DECIDED);
+    const call = callOfBytes(WINDOW_BYTES);
+
+    await deciding(wire, { ...call, state: `${call.state.slice(1)}£` });
+
+    expect(wire.sent).toEqual([]);
+  });
+
+  it("holds Clef to its own larger window", async () => {
+    const wire = theWire(DECIDED, DECIDED);
+    const toClef = { ...TO_CLEF_FLASH, model: "clef" };
+    // 65,536 tokens at three bytes a token.
+    const clefBytes = 196_608;
+
+    await deciding(wire, callOfBytes(clefBytes, "clef"), toClef);
+    await deciding(wire, callOfBytes(clefBytes + 1, "clef"), toClef);
+
+    expect(wire.sent.map(({ body }) => Buffer.byteLength(body))).toEqual([clefBytes]);
+  });
+
+  it("never sends a model with no published window", async () => {
+    const wire = theWire(DECIDED);
+
+    const called = await deciding(wire, A_DECISION, { ...TO_CLEF_FLASH, model: "clef-pro" });
+
+    expect(called).toEqual({ outcome: "failed", spent: [] });
+    expect(wire.sent).toEqual([]);
+  });
+});
+
+describe("a model of the other wire shape", () => {
+  it("sends a decision model no Messages call", async () => {
+    const wire = theWire(ANSWERED);
+    const { client, lines } = clientOn(wire);
+
+    expect(await client.callModel(TO_CLEF_FLASH, A_CALL)).toEqual({ outcome: "failed", spent: [] });
+    expect(wire.sent).toEqual([]);
+    expect(lines.map(({ line }) => line.read)).toEqual(["another-shape"]);
+  });
+
+  it("sends a Messages model no decision call", async () => {
+    const wire = theWire(DECIDED);
+
+    expect(await deciding(wire, A_DECISION, TO_SONNET)).toEqual({ outcome: "failed", spent: [] });
+    expect(wire.sent).toEqual([]);
+  });
+});
+
+describe("a model of the decision shape", () => {
+  it("is called through the decision shape, and Sonnet through Messages", () => {
+    expect([wireShapeOf(TO_CLEF_FLASH), wireShapeOf(TO_SONNET)]).toEqual(["decision", "messages"]);
   });
 });
 
@@ -842,6 +1144,17 @@ describe("setting a model choice", () => {
     const { workspaceId } = await aWorkspace(undefined, false);
 
     expect(await choosing(workspaceId, "openai", "gpt-6")).toEqual({
+      ok: false,
+      error: "no-sub-processor",
+    });
+    expect(await choicesOf(workspaceId)).toEqual([]);
+  });
+
+  it("refuses priced Workers AI until the DPIA names it", async () => {
+    await priced("cloudflare", "clef-flash", "2026-10-01");
+    const { workspaceId } = await aWorkspace(undefined, false);
+
+    expect(await choosing(workspaceId, "cloudflare", "clef-flash")).toEqual({
       ok: false,
       error: "no-sub-processor",
     });

@@ -451,7 +451,7 @@ The command changes nothing for an address no person holds (`REFUSED — no-such
 A workspace calls a model provider with a key of its own, its model key. One command on the `api` service sets it and replaces it, and no page can. Nothing reads a model provider's key from the environment (`SECRETS.md` § A workspace's model key).
 
 1. **Once per estate: the envelope key.** The `api` service's `KEK` is 64 hexadecimal characters, the 32 bytes every model key is sealed under. `openssl rand -hex 32` makes one. It goes into the escrow vault before it is set, because a row sealed under a lost key is lost with it. Nothing read `KEK` before this command and the release that brings the judge, so check the value the estate holds before the first run. A value of any other shape is replaced and the `api` service redeployed, which loses nothing while no model key is set. While `KEK` is absent or of another shape the command refuses, saying `KEK must be set to the envelope key`, and the `api` service starts but logs `no model will be called` and calls none.
-2. **Run `pnpm ops set-model-key --workspace <id> --provider <anthropic|mistral>` on the `api` service, with the key on standard input.** The key is never an argument, so it reaches no shell history and no process list. From a shell on the box, with `$api` the service's container:
+2. **Run `pnpm ops set-model-key --workspace <id> --provider <anthropic|mistral|cloudflare>` on the `api` service, with the key on standard input.** The key is never an argument, so it reaches no shell history and no process list. From a shell on the box, with `$api` the service's container:
 
    ```sh
    read -rs MODEL_KEY && printf '%s' "$MODEL_KEY" | docker exec -i "$api" pnpm ops set-model-key --workspace <id> --provider anthropic; unset MODEL_KEY
@@ -459,10 +459,12 @@ A workspace calls a model provider with a key of its own, its model key. One com
 
    `read -rs` takes the pasted key without showing it, and `printf` is the shell's own, so no process carries the key as an argument. The done line names the workspace and the model provider, and never the key. Each run records `platform.workspace.model_key_set` in the workspace's audit log under the platform's own actor id, naming the model provider.
 
+   **A Cloudflare key** is for Workers AI, which runs the decision models. Cloudflare names the account in each call's address, so the key is the account id, a colon, then an API token allowed to run Workers AI: `<account id>:<API token>`, as in `0123456789abcdef0123456789abcdef:<token>`. The account id is the 32 lower-case hexadecimal characters on the Cloudflare dashboard's account page. A key in any other form is refused as `malformed` when it is set, and nothing is stored.
+
 3. **To rotate,** issue a new key at the model provider, run the command again, then revoke the old key at the model provider. A second run replaces the key, and a workspace holds one for each model provider. On a leak, revoke first.
 4. **After this release, run the browsing role's file again** (§ Browse production, step 3), as after any release that adds a table. It withholds the sealed key from `browse_ro` and leaves each row's `workspace_id` and `provider` readable. Run it after the release and not before: before the migration it finds no `model_key`, fails whole and grants nothing.
 
-The command writes nothing when it refuses. `malformed` is a workspace id that is not one, a model provider outside the two, or a standard input that is empty or holds a space or a line break. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached. A workspace with no key for a model provider has no model available from that provider.
+The command writes nothing when it refuses. `malformed` is a workspace id that is not one, a model provider outside the three, a standard input that is empty or holds a space or a line break, or a Cloudflare key not in the form above. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached. A workspace with no key for a model provider has no model available from that provider.
 
 **Which workspaces hold a key.** No command lists them. Through the browsing login, `SELECT workspace_id, provider FROM model_key ORDER BY 1, 2` names every pair that holds a row. A workspace's audit log names each time a key was set, as `platform.workspace.model_key_set` with its model provider.
 
@@ -483,6 +485,8 @@ A workspace's question calls a model only when three things stand: a model choic
      --from <yyyy-mm-dd> --gbp-per-million-in <the input price in pounds> --gbp-per-million-out <the output price in pounds>
    ```
 
+   A decision model on Workers AI charges for input alone, so its price out is nought: `--provider cloudflare --model clef-flash --gbp-per-million-out 0`, with the input price converted as above.
+
    A price is a fact about the provider, so it holds for every workspace that calls the model. A call is priced by the latest price on or before its day, by UTC, so a price set for a later day changes nothing until that day. When the dollar price or the rate moves, set a new price from the day it moves rather than editing an old one, so past calls keep the price they were made at. A second run for the same day replaces that day's price. The done line names the provider, the model and the day. Each run records `platform.model.priced` in the identity-set audit log under the platform's own actor id, with the provider, the model, the day and both rates: a price belongs to no workspace, so no workspace's audit log holds it.
 2. **Set the workspace's limit,** the most its model calls may spend in a calendar month, by UTC:
 
@@ -499,7 +503,9 @@ A workspace's question calls a model only when three things stand: a model choic
 
    A second run for the same purpose replaces the model in place. The provider must be one the DPIA names as a sub-processor, and the model must have a price on or before today; a call also needs the workspace's model key for that provider (§ Set a workspace's model key). Each run records `platform.workspace.model_choice_set` in the workspace's audit log under the platform's own actor id, with the purpose, the provider and the model. The embedding model is fixed and no command changes it.
 
-Each command writes nothing when it refuses. For `set-model-choice`, `no-sub-processor` is a provider the DPIA does not name as a sub-processor, `local` included, `no-model-price` is a model with no price in effect today, and `fixed-model-choice` is the embedding purpose. `malformed` is a sum that is not a decimal of pounds, a model name that is not lower case letters, digits, dots and hyphens, a day the calendar does not have, a model provider outside the two, or a workspace id that is not one. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached.
+A decision model cannot be chosen yet. `set-model-choice` refuses `cloudflare` as `no-sub-processor` until the DPIA names Cloudflare as a sub-processor. After that, the model also needs a threshold set in the code, from the owner's decision reading (§ Read the decision models), or its judging fails and it is never called.
+
+Each command writes nothing when it refuses. For `set-model-choice`, `no-sub-processor` is a provider the DPIA does not name as a sub-processor, `local` and `cloudflare` included, `no-model-price` is a model with no price in effect today, and `fixed-model-choice` is the embedding purpose. `malformed` is a sum that is not a decimal of pounds, a model name that is not lower case letters, digits, dots and hyphens, a day the calendar does not have, a model provider outside the three, or a workspace id that is not one. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached.
 
 **How a call is counted.** Before a model call, `ask` reserves the most the call may cost, at that day's price, in the same transaction that would refuse it, so two questions cannot both pass the last of the limit. When the call ends the reservation becomes one `llm_call` row per attempt at what was spent, and the rest is released. A reservation lives ten minutes. If the `api` stops mid-call, the daily sweep settles a reservation past its ten minutes as one failed `llm_call` row at the whole reserved cost, since the provider may have billed the call: the pass's log line counts them as `reservations_settled`, and names a workspace whose settling was refused under `refusals` with the sweep `spend`. Until then an open reservation still counts against the limit.
 
@@ -540,6 +546,34 @@ A run whose judge answered nothing, as with a key the provider refuses, fails. T
 **The key.** It is sealed into the container's database as production seals a workspace's key, and is gone when the run ends and the container is removed. The reading never prints or logs it.
 
 **Recording the figures.** Copy each run's figures into S2b's entry on the route (`docs/specs/v01-route.md`), with the day, the rate and the commit the reading ran at.
+
+## Read the decision models
+
+The decision reading measures Clef-flash and Clef, the decision models on Cloudflare's Workers AI, in two ways. It runs as the reuse reading does: on the owner's machine with the owner's own key, over synthetic content alone, in a throwaway Postgres container, and never in `check`.
+
+- **On reuse,** as the judge's decision backend. It asks the reuse set's 34 questions through the product's own `ask` at four thresholds: 0.3, 0.5, 0.7 and 0.9. No threshold is calibrated, and this reading is how one is chosen. Its figures are the reuse reading's, under *Reuse reading, Clef-flash at threshold 0.7* and the like.
+- **At the entry step,** against S2a's recall baseline. For each question of both recall sets, the 340 paraphrases and the 154 buyer-worded questions, it takes the entry step's first 20 points and asks the model whether each answers the question. It reorders the points by that probability and reports recall in the first ten beside `find`'s and the entry step's own, under *Entry step reading*. The product's entry step calls no model, and this reading changes nothing in it.
+
+The judging workspace's model choice is seeded in the container, because `set-model-choice` refuses Cloudflare until the DPIA names it. Only synthetic content is sent.
+
+1. **Have Docker running** and the checkout installed (`pnpm install`).
+2. **Make a Workers AI key:** an API token allowed to run Workers AI on the account, written as `<account id>:<API token>` (§ Set a workspace's model key). Read the day's exchange rate, pounds per US dollar. The list prices in dollars are written in `packages/core/test/readings/decision.reading.ts`; check them against each model's page on Cloudflare's site first.
+3. **Run it from `packages/core`:**
+
+   ```sh
+   cd packages/core
+   read -rs READING_WORKERS_AI_KEY && export READING_WORKERS_AI_KEY
+   READING_GBP_PER_USD=<pounds per dollar> pnpm reading:decision
+   unset READING_WORKERS_AI_KEY
+   ```
+
+   To take one model, one threshold or one way alone, add a filter on the run's name, such as `pnpm reading:decision -t "Clef-flash"`, `-t "threshold 0.7"` or `-t "entry step"`.
+
+A run that judged or scored nothing, as with a key the provider refuses, fails. An entry point the model could not score keeps the entry step's own order, and the figures count those points.
+
+**What it costs.** Clef-flash costs $0.038 and Clef $0.24 per million tokens in, and neither charges for output. All the runs together send a few million tokens, well under £1. The reuse runs' workspaces each have a spending limit of £20. The entry step's calls are made outside any workspace, and the window of each call bounds them to about £3 in all.
+
+**Recording the figures.** Copy each run's figures into S2b's entry on the route, with the day, the rate and the commit. The owner then decides which threshold, if any, a decision model's judging would run at, and the route records which backend the first customer's workspace runs, and why.
 
 ## Read a workspace's unmapped-passage rate
 

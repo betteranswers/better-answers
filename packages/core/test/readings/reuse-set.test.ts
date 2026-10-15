@@ -3,9 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { openModelClient } from "../../src/llm/index.ts";
-import { judgeReplyTo, promptOf } from "../judge-wire.ts";
+import { decisionCandidatesIn, decisionReplyTo, judgeReplyTo, promptOf } from "../judge-wire.ts";
 import { postgresForSuite } from "../suite-postgres.ts";
 import {
   readReuse,
@@ -131,6 +132,42 @@ describe("the reuse reading", () => {
         'judge judging-failed: "On the Enterprise plan, can we choose the region where our data is hosted?"',
       ],
     });
+  }, 300_000);
+
+  it("reads a decision model's verdicts at its given threshold", async () => {
+    const client = openModelClient({
+      fetch: async (_input, init) => {
+        const body = typeof init?.body === "string" ? init.body : "";
+        const state = z.object({ state: z.string() }).parse(JSON.parse(body)).state;
+        const asked = set.questions.find(({ question }) => question === state);
+        const fits = titlesOf(set, asked?.fits ?? []);
+        const yes = new Map([...decisionCandidatesIn(body).keys()].map((title) => [title, 0.6]));
+        for (const title of fits) yes.set(title, 0.8);
+        return new Response(decisionReplyTo(yes, body), { status: 200 });
+      },
+      clock: { now: () => new Date() },
+      log: { info: () => {} },
+    });
+    const reading = (threshold: number) =>
+      readReuse(db(), set, {
+        provider: "cloudflare",
+        model: "clef-flash",
+        gbpPerMillionIn: "0.03",
+        gbpPerMillionOut: "0",
+        key: "0123456789abcdef0123456789abcdef:invented_Token-u15",
+        decide: client.decide,
+        threshold,
+      });
+
+    const [atSevenTenths, atHalf] = [await reading(0.7), await reading(0.5)];
+
+    expect([atSevenTenths.fits, atSevenTenths.negatives]).toEqual([
+      { named: 32, yes: 32, no: 0, unsent: 0 },
+      { named: 36, yes: 0, no: 36, unsent: 0 },
+    ]);
+    expect(atHalf.negatives).toEqual({ named: 36, yes: 36, no: 0, unsent: 0 });
+    // 34 calls of 2,400 tokens in at £0.03 a million.
+    expect(atSevenTenths.spentGbp).toBe("0.002448");
   }, 300_000);
 
   it("sends a lower effort beside the answer's format", async () => {

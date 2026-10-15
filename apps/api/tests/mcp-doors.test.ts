@@ -89,6 +89,9 @@ const NO_MODEL: ModelClient = {
   callModel: () => {
     throw new Error("a probe called a model");
   },
+  decide: () => {
+    throw new Error("a probe called a model");
+  },
 };
 
 /** Called through the surface as a workspace's Admin, the probe standing for `declared`. */
@@ -198,7 +201,7 @@ describe("every entry the server composes", () => {
 describe("the steps the own-transaction road hands an entry", () => {
   it("are the record's writes, a read, a reservation, a call", () => {
     expectTypeOf<keyof Steps>().toEqualTypeOf<
-      "openRecord" | "read" | "reserve" | "callModel" | "completeRecord"
+      "openRecord" | "read" | "reserve" | "callModel" | "decide" | "completeRecord"
     >();
   });
 
@@ -229,7 +232,7 @@ describe("the steps the own-transaction road hands an entry", () => {
       [
         reserving: {
           readonly answerId: string;
-          readonly most: CallSize;
+          readonly most: Readonly<Record<"messages" | "decision", CallSize>>;
           readonly now: Date;
         },
       ]

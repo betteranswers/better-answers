@@ -28,7 +28,7 @@ export const llmPurpose = pgEnum("llm_purpose", [
 ]);
 
 /** Who hosts a model a model choice names; a model key is held for one of these and no other. */
-export const MODEL_PROVIDERS = ["anthropic", "mistral"] as const;
+export const MODEL_PROVIDERS = ["anthropic", "mistral", "cloudflare"] as const;
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
 
 const sealedFrame = customType<{ data: Uint8Array; driverData: Buffer }>({

@@ -24,14 +24,18 @@ export {
   openModelClient,
   resolveModel,
   RETRY_WAITS_MS,
+  wireShapeOf,
 } from "./client.ts";
 export type {
+  DecisionModelCall,
   ModelAttemptLine,
   ModelCall,
   ModelClient,
   ModelOutcome,
   ModelToCall,
+  WireShapeName,
 } from "./client.ts";
+export type { NoulInstructions, Probabilities } from "./wire/decision.ts";
 export { openCredentials, openModelKeySetting } from "./credentials.ts";
 export type { Credentials, ModelKeySetting } from "./credentials.ts";
 export { CHOOSABLE_PROVIDERS, SUB_PROCESSORS } from "./sub-processors.ts";

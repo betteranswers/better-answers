@@ -39,6 +39,7 @@ export const SUITE_ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index)
 export type Judging = {
   readonly credentials?: Credentials;
   readonly callModel?: ModelClient["callModel"];
+  readonly decide?: ModelClient["decide"];
 };
 
 const NO_MODEL_CALL = (): never => {
@@ -68,6 +69,7 @@ export const stepsFor = (
         ),
       ),
     callModel: judging.callModel ?? NO_MODEL_CALL,
+    decide: judging.decide ?? NO_MODEL_CALL,
     completeRecord: async (completion) =>
       flat(
         await withMember(asker, door, (member, tx) =>
@@ -79,7 +81,7 @@ export const stepsFor = (
 
 export type Asking = z.input<typeof askInput>;
 
-type Told = { readonly caps?: AskCaps; readonly now?: Date; readonly judging?: Judging };
+export type Told = { readonly caps?: AskCaps; readonly now?: Date; readonly judging?: Judging };
 
 /** Asks as `asker` through steps on the runtime pool; `now` is this instant unless told. */
 export const askedAsIs = async (

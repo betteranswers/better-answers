@@ -28,6 +28,43 @@ const messagesReplyOf = (text: string): string =>
     usage: { input_tokens: 1_580, output_tokens: 96 },
   });
 
+const decisionBody = z.object({
+  questions: z.record(
+    z.string(),
+    z.object({ instructions: z.object({ written_for: z.string() }) }),
+  ),
+});
+
+/** Each candidate's question id, by the question it was written for, as a decision call names them. */
+export const decisionCandidatesIn = (body: string): ReadonlyMap<string, string> =>
+  new Map(
+    Object.entries(decisionBody.parse(JSON.parse(body)).questions).map(([id, question]) => [
+      question.instructions.written_for,
+      id,
+    ]),
+  );
+
+/**
+ * Workers AI's reply giving each candidate the probability of yes `yes` holds for its title, and
+ * nought to the rest.
+ */
+export const decisionReplyTo = (yes: ReadonlyMap<string, number>, body: string): string =>
+  JSON.stringify({
+    result: {
+      model: "clef-flash",
+      answers: Object.fromEntries(
+        [...decisionCandidatesIn(body)].map(([title, id]) => [
+          id,
+          { type: "noul", noul: yes.get(title) ?? 0 },
+        ]),
+      ),
+      usage: { input_tokens: 2_400, output_tokens: 3 },
+    },
+    success: true,
+    errors: [],
+    messages: [],
+  });
+
 /** The reply of a judge saying yes to each candidate written for one of `fits`, no to the rest. */
 export const judgeReplyTo = (fits: readonly string[], body: string): string =>
   messagesReplyOf(

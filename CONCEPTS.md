@@ -867,8 +867,8 @@ Kept per *model provider*; a provider no wire shape speaks has no model to call.
 
 ### model provider
 
-_Internal._ who hosts the model a *model choice* names (Anthropic, Mistral): the *model client*
-calls its API. One of a closed set, and never the *provider* of a connected source.
+_Internal._ who hosts the model a *model choice* names (Anthropic, Mistral, Cloudflare): the
+*model client* calls its API. One of a closed set, and never the *provider* of a connected source.
 
 ### model key
 
@@ -1114,6 +1114,15 @@ It runs on the judging model choice. Every answer says how its judge stood, in o
 was a candidate; *Judged*; and *Judging failed*, where the call failed and its candidates are
 returned as related knowledge. Their keys on the wire are `not-judged`, `judged` and
 `judging-failed`.
+
+### decision model
+
+_Internal._ a model that answers a typed question with a probability for each allowed answer, and
+writes no text. The *judge* may run on one, asking it of each candidate whether it answers the
+question.
+
+A probability at or above the model's **threshold** is a yes. A decision model with no threshold
+set cannot judge, and its judging fails.
 
 ### match
 

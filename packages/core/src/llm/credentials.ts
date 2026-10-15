@@ -14,6 +14,7 @@ import {
   type WorkspaceId,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import { isWorkersAiKey } from "./wire/decision.ts";
 
 /**
  * Reached through `reveal` alone, so a logger, an error or a JSON body handed this value prints no
@@ -44,8 +45,8 @@ export type Credentials = {
 /** What the audited action is handed: a key is stored only with the event that records it. */
 export type ModelKeySetting = {
   /**
-   * Replaces any key `of` held, then awaits `recorded`. Refuses a key that is not one header
-   * value, never repeating it.
+   * Replaces any key `of` held, then awaits `recorded`. Refuses, never repeating it, a key that is
+   * not one header value or not its provider's form.
    */
   readonly storeModelKey: (
     tx: Tx,
@@ -62,6 +63,16 @@ const MODEL_KEY_MAX = 1024;
  * sent, in an error quoting it.
  */
 const ONE_HEADER_VALUE = /^[!-~]+$/;
+
+/** A provider whose key carries more than a secret has its form checked as it is stored. */
+const KEY_FORMS: ReadonlyMap<ModelProvider, (key: string) => boolean> = new Map([
+  ["cloudflare", isWorkersAiKey],
+]);
+
+const keyOfItsForm = (provider: ModelProvider, key: string): boolean =>
+  key.length <= MODEL_KEY_MAX &&
+  ONE_HEADER_VALUE.test(key) &&
+  (KEY_FORMS.get(provider)?.(key) ?? true);
 
 const LINE = "\n";
 
@@ -142,7 +153,7 @@ export const openModelKeySetting = (envelopeKey: Uint8Array): ModelKeySetting =>
   const sealer = envelopeKeyHeld(envelopeKey);
   return {
     storeModelKey: async (tx, of, key, recorded) => {
-      if (key.length > MODEL_KEY_MAX || !ONE_HEADER_VALUE.test(key)) return err(MALFORMED);
+      if (!keyOfItsForm(of.provider, key)) return err(MALFORMED);
       await tx.query(
         `INSERT INTO model_key (workspace_id, provider, sealed) VALUES ($1, $2, $3)
          ON CONFLICT (workspace_id, provider) DO UPDATE SET sealed = EXCLUDED.sealed`,
