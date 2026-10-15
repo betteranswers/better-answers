@@ -316,7 +316,7 @@ export const CONTROL_CENTRE = {
           name: "Answer Tests",
           path: "/questions/answer-tests",
           icon: "tests",
-          built: false,
+          built: true,
           seenBy: ADMINS,
         },
       ],

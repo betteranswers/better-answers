@@ -95,6 +95,7 @@ describe("the shell's regions", () => {
       "Connected Sources",
       "Models and Spend",
       "Questions Asked",
+      "Answer Tests",
       "Members",
       "Groups",
       "Audit Log",

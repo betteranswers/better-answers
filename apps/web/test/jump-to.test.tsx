@@ -110,6 +110,7 @@ describe("what jump-to lists", () => {
           "Connected Sources",
           "Models and Spend",
           "Questions Asked",
+          "Answer Tests",
           "Members",
           "Groups",
           "Audit Log",
