@@ -104,6 +104,8 @@ type JudgingSet = {
   readonly chosen?: boolean;
   /** Sets an answering model too, so an evidence result is drafted over. */
   readonly drafting?: boolean;
+  /** The workspace's model key, which the wire reads back on every call. */
+  readonly key?: string;
 };
 
 const modelChosen = (app: TestApp, workspaceId: string, purpose: string) =>
@@ -123,10 +125,10 @@ const modelChosen = (app: TestApp, workspaceId: string, purpose: string) =>
 export const judgingSetUp = async (
   app: TestApp,
   workspaceId: string,
-  { limitGbp = "100", chosen = true, drafting = false }: JudgingSet = {},
+  { limitGbp = "100", chosen = true, drafting = false, key = A_MODEL_KEY }: JudgingSet = {},
 ): Promise<void> => {
   const workspace = ["--workspace", workspaceId];
-  await opsRun(app, ["set-model-key", ...workspace, "--provider", "anthropic"], A_MODEL_KEY);
+  await opsRun(app, ["set-model-key", ...workspace, "--provider", "anthropic"], key);
   await opsRun(app, [
     "set-model-price",
     "--provider",
