@@ -24,6 +24,7 @@ import {
   makeGroups,
   nameFlagging,
 } from "./harness-people.ts";
+import { questionsSeeding, seedQuestions } from "./harness-questions.ts";
 import {
   connectedSourcesSeeding,
   inOneTransaction,
@@ -253,6 +254,11 @@ export const harnessControl = (app: TestApp): Hono => {
   control.post(`${HARNESS_PREFIX}/concepts`, async (context) => {
     const asked = await readBody(context.req.raw, conceptsSeeding);
     return context.json(await seedConcepts(app, asked));
+  });
+
+  control.post(`${HARNESS_PREFIX}/questions`, async (context) => {
+    const asked = await readBody(context.req.raw, questionsSeeding);
+    return context.json({ records: await seedQuestions(app, asked) });
   });
 
   // The ops command's own action under its own principal, so the mark lands as the owner's would.

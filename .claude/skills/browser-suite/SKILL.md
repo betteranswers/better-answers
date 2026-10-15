@@ -99,10 +99,11 @@ the side that counts. Read the numbers off those files rather than from here.
 ## The harness's actions
 
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
-`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Nineteen actions
+`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Twenty actions
 call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources two from
-`apps/api/tests/harness-sources.ts`, the People three from `apps/api/tests/harness-people.ts` and the
-Knowledge one from `apps/api/tests/harness-knowledge.ts`:
+`apps/api/tests/harness-sources.ts`, the People three from `apps/api/tests/harness-people.ts`, the
+Knowledge one from `apps/api/tests/harness-knowledge.ts` and the Questions one from
+`apps/api/tests/harness-questions.ts`:
 
 | Action | What it does |
 | --- | --- |
@@ -125,6 +126,7 @@ Knowledge one from `apps/api/tests/harness-knowledge.ts`:
 | `askToJoin` | A person's ask to join a workspace by its short name, with a reason, through the members slice's own action and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own action and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* page |
 | `seedConcepts` | Concepts a named Admin, or an Editor asking no override, writes in order through the concepts slice's own write, so each is in the repository, the index and the map as a member's write leaves it. Each takes a kind, a sensitivity and further frontmatter keys, and links to concepts earlier in the list. A source is a document's passages, a concept earlier in the list, or a place such as `p.4` that opens nothing; a document may take a label, the file's own name for it, apart from its title. Each source gets a citation mark `[^source-N]` after the body's last word, unless the body places that mark itself. A document may be held at a sensitivity of its own, and where that differs from the concept's the Admin's override shares the concept beyond its evidence. A trust tier other than `unverified` is a verification row written straight to the store, because the slice has no verify action. A `"groups"` audience is the Admin's own override to one group holding the members `groupMemberIds` names, and nobody outside that group reads the concept, its Admin included. It answers each concept's IRI, path and cited documents |
+| `seedQuestions` | *Questions asked* records as `ask` and `give_feedback` leave them, listed oldest first and a second apart: a verdict, a judge state, the concepts it returned by IRI with each one's trust then and judge's word, and flags open or closed. A concept is named by IRI alone, so a refusal can hold concepts `ask` keeps on none today. An asker left out is one an erasure renamed, and a null question is content an erasure removed. It answers each record's id and its flags' ids |
 
 A seed the harness cannot write answers 400. A body or a row that a schema refuses names each
 field and its rule, and a write that trips a constraint names the constraint. The action's failure
@@ -135,7 +137,7 @@ A body is checked before anything is written. What a refusal after that leaves d
 writes the rows:
 
 - **The harness writes them itself**, in one transaction, so a refused seed leaves nothing behind:
-  `seedModelChoices` and `seedConnectedSources`.
+  `seedModelChoices`, `seedConnectedSources` and `seedQuestions`.
 - **A slice's own action writes them**, and each action opens a transaction of its own on the api's
   connections, so a refusal part-way leaves what was written before it. `makeGroups` commits each
   group and each member as it goes. `seedConcepts` commits each concept as it goes: its connected

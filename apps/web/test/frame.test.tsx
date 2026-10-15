@@ -84,10 +84,17 @@ describe("the shell's regions", () => {
   it("lists the open area's groups over their pages", async () => {
     await openAs("Admin", "/system/audit-log");
 
-    expect(namesIn(menu(), "heading")).toEqual(["Sources", "Models", "People", "System"]);
+    expect(namesIn(menu(), "heading")).toEqual([
+      "Sources",
+      "Models",
+      "Questions",
+      "People",
+      "System",
+    ]);
     expect(namesIn(menu())).toEqual([
       "Connected Sources",
       "Models and Spend",
+      "Questions Asked",
       "Members",
       "Groups",
       "Audit Log",

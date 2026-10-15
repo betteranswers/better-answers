@@ -309,7 +309,7 @@ export const CONTROL_CENTRE = {
           name: "Questions Asked",
           path: "/questions/questions-asked",
           icon: "question",
-          built: false,
+          built: true,
           seenBy: ADMINS,
         },
         {
