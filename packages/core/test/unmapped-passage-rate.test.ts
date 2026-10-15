@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ANSWER_MEASURES, unmappedPassageRate } from "../src/answering/index.ts";
+import type { PostgresDoor } from "../src/store/postgres/index.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
 import { postgresForSuite, seedingWith } from "./suite-postgres.ts";
 
@@ -32,6 +33,22 @@ const aRecordFlagged = (
 
 const rateOf = (workspace: ProvisionedWorkspace, workspaceId: string = workspace.workspaceId) =>
   unmappedPassageRate(ANSWER_MEASURES, workspace.door, { workspaceId });
+
+/** The workspace's door, keeping the text of every statement its connections run. */
+const doorKeepingStatements = (workspace: ProvisionedWorkspace) => {
+  const { pool } = workspace.door;
+  const statements: string[] = [];
+  const connect = async () => {
+    const client = await pool.connect();
+    const query = (text: string, values?: unknown[]) => {
+      statements.push(text);
+      return client.query(text, values);
+    };
+    return Object.assign(Object.create(client), { query });
+  };
+  const door: PostgresDoor = { pool: Object.assign(Object.create(pool), { connect }) };
+  return { door, statements };
+};
 
 describe("the unmapped-passage rate", () => {
   it("reports two of three incomplete records showing unmapped passages", async () => {
@@ -71,6 +88,16 @@ describe("the unmapped-passage rate", () => {
       ok: true,
       value: { flaggedIncomplete: 0, showedUnmappedPassages: 0 },
     });
+  });
+
+  it("reads in a read-only transaction", async () => {
+    const workspace = await provisionedWorkspace(db(), "Read only");
+    const { door, statements } = doorKeepingStatements(workspace);
+
+    expect(
+      await unmappedPassageRate(ANSWER_MEASURES, door, { workspaceId: workspace.workspaceId }),
+    ).toEqual({ ok: true, value: { flaggedIncomplete: 0, showedUnmappedPassages: 0 } });
+    expect(statements[0]).toBe("BEGIN READ ONLY");
   });
 
   it("refuses malformed for a workspace id that is not one", async () => {

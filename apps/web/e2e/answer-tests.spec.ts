@@ -47,13 +47,15 @@ test.describe("the Answer Tests page", () => {
     await anAdminSignedIn(page, request, "Teesdale Brackets");
 
     // A fresh document, so nothing the page draws is already in its cache.
-    const started = Date.now();
+    const startedAtMs = Date.now();
     await page.goto(ANSWER_TESTS.path);
     await expect(answerTests(page)).toHaveText(/\S/);
-    const elapsed = Date.now() - started;
+    const elapsedMs = Date.now() - startedAtMs;
 
-    test.info().annotations.push({ type: "answer tests page", description: `${elapsed} ms` });
-    expect(elapsed, "the Answer Tests page rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
+    test.info().annotations.push({ type: "answer tests page", description: `${elapsedMs} ms` });
+    expect(elapsedMs, "the Answer Tests page rendered past its budget").toBeLessThan(
+      LIST_BUDGET_MS,
+    );
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
