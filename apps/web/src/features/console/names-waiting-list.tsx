@@ -14,11 +14,10 @@ import { CorrectNameDialog } from "./correct-name-dialog.tsx";
 import { correctWords } from "./correcting-words.ts";
 import { countOf, NothingListed, ReadSaid, useNarrowedRows } from "./list-parts.tsx";
 import { NAMES_WAITING_WORDS as WORDS } from "./list-words.ts";
-import { arrival, backToTheName, EVERYONE_PATH, NAMES_WAITING_PATH } from "./people-address.ts";
+import { arrival, EVERYONE_PATH, NAMES_WAITING_PATH } from "./people-address.ts";
 import { useNamesWaiting, type NameWaiting } from "./people-api.ts";
 import { NAMES_WAITING_KEYSTROKES } from "./people-keystrokes.ts";
 import { At } from "./person-words.tsx";
-import { SignInAgain } from "./sign-in-again.tsx";
 import { useCorrecting } from "./use-correcting.ts";
 import { NO_NAME_IN_FOCUS } from "./words.ts";
 
@@ -124,17 +123,6 @@ function NothingWaits() {
   );
 }
 
-/** `staleFor` names the person refused over a sign-in too old; the way on takes focus. */
-function WayOn(properties: { readonly staleFor: string | undefined }) {
-  const { staleFor } = properties;
-  if (staleFor === undefined) return null;
-  return (
-    <p className="mt-1">
-      <SignInAgain back={backToTheName(staleFor)} linkRef={focusOnArrival} />
-    </p>
-  );
-}
-
 type Correcting = ReturnType<typeof useCorrecting>;
 
 function DialogFor(properties: {
@@ -225,7 +213,6 @@ export function NamesWaitingList() {
       />
       <ReadSaid read={listed} loading={WORDS.loading} />
       <OutcomeLine outcome={said ?? correcting.outcome} className="mt-2" />
-      <WayOn staleFor={correcting.staleFor} />
 
       <Card className="mt-4">
         {/* Drawn whatever the read says, so a refused read of it again takes no focus from the search. */}

@@ -5,11 +5,9 @@ import { SheetPart } from "@/shared/sheet-part.tsx";
 
 import { CorrectNameDialog } from "./correct-name-dialog.tsx";
 import { CORRECT_DISPLAY_NAME } from "./correcting-words.ts";
-import { backTo } from "./people-address.ts";
 import type { ListedPerson } from "./people-api.ts";
 import { nameOf } from "./person-words.tsx";
 import { SheetActionButton } from "./sheet-action.tsx";
-import { SignInAgain } from "./sign-in-again.tsx";
 import { useCorrecting } from "./use-correcting.ts";
 
 export function CorrectDisplayName(properties: {
@@ -44,7 +42,6 @@ export function CorrectDisplayName(properties: {
         {CORRECT_DISPLAY_NAME}
       </SheetActionButton>
       <OutcomeLine outcome={correcting.outcome} />
-      {correcting.staleFor === undefined ? null : <SignInAgain back={backTo(person, "correct")} />}
 
       {asking ? (
         <CorrectNameDialog

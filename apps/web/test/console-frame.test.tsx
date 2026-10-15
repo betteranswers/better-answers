@@ -76,12 +76,37 @@ const answering =
 
     const answerTo = (name: string): Answer => {
       if (name === "session.operator") return standing;
-      return refused.get(name) ?? { result: { data: held[name] ?? [] } };
+      // The shell reads the second factor wherever it draws, and the dialog shares that read.
+      return (
+        refused.get(name) ?? {
+          result: { data: held[name] ?? (name === "person.secondFactor" ? NOTHING_HELD : []) },
+        }
+      );
     };
     return answered(pathname.replace("/trpc/", "").split(",").map(answerTo));
   };
 
 const THE_OPERATOR: Answer = { result: { data: { operator: true, name: "Ada" } } };
+
+/** The shell's own second-factor read, answered as a person holding nothing is. */
+const NOTHING_HELD = {
+  mustHoldOne: false,
+  operator: false,
+  promoted: false,
+  passkeys: [],
+  authenticator: "none",
+  codesAcknowledged: true,
+  passkeyOfferDismissed: false,
+  restoreRequired: false,
+  waits: { authenticator: 0, "recovery-code": 0, "restore-code": 0 },
+  thisSession: {
+    confirmed: false,
+    confirmedAt: null,
+    setupGranted: false,
+    adminOf: null,
+    standing: "not-required",
+  },
+};
 
 const ACME = {
   id: "01K5T0000000000000000000A1",

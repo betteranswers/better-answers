@@ -6,12 +6,10 @@ import { SheetPart } from "@/shared/sheet-part.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { instantWords } from "@/shared/words.ts";
 
-import { backTo } from "./people-address.ts";
 import { useEndEverySignInEverywhere, type ListedPerson } from "./people-api.ts";
 import { nameOf } from "./person-words.tsx";
 import { SheetActionButton } from "./sheet-action.tsx";
-import { SignInAgain } from "./sign-in-again.tsx";
-import { refusedAsStale, revocationRefused } from "./words.ts";
+import { revocationRefused } from "./words.ts";
 
 type Revocation = ReturnType<typeof useEndEverySignInEverywhere>;
 
@@ -61,7 +59,6 @@ export function EndEverySignInEverywhere(properties: {
         End Every Sign-In and Token
       </SheetActionButton>
       <OutcomeLine outcome={outcomeOf(revocation, name)} />
-      {refusedAsStale(revocation.error) ? <SignInAgain back={backTo(person, "revoke")} /> : null}
 
       <ActionDialog
         open={confirming}
