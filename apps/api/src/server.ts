@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Logger } from "pino";
 
 import { attempt } from "@better-answers/core/kernel";
+import { openCredentials, openModelClient } from "@better-answers/core/llm";
 
 import { createClientMetadataFetcher } from "../lifts/better-auth-cimd-node/index.ts";
 import {
@@ -19,6 +20,9 @@ import { entriesAt } from "./mcp/entries/index.ts";
 import { createMcpSurface } from "./mcp/surface.ts";
 import { createTrpcRoutes } from "./trpc/mount.ts";
 
+/** The shape of `fetch`, so a test hands the server a fake at the wire. */
+type Fetching = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
 export type ServerDependencies = {
   readonly doors: Doors;
 
@@ -29,10 +33,13 @@ export type ServerDependencies = {
   readonly sendEmail: EmailSender;
   readonly logger?: Logger;
 
-  readonly fetchClientMetadataResource?: (
-    input: string | URL | Request,
-    init?: RequestInit,
-  ) => Promise<Response>;
+  readonly fetchClientMetadataResource?: Fetching;
+
+  /** How a model provider is reached; `fetch` unless a test hands a fake. */
+  readonly fetchModel?: Fetching;
+
+  /** The key each workspace's model key is sealed under; with none, no model is called. */
+  readonly envelopeKey?: Uint8Array | undefined;
   readonly serverVersion?: string;
 
   readonly webRoot?: string | undefined;
@@ -122,6 +129,15 @@ export function createServer(dependencies: ServerDependencies): Hono {
     serverVersion: dependencies.serverVersion ?? "0.1.0",
     clock: doors.clock,
     entries: entriesAt(dependencies.publicUrl),
+    credentials:
+      dependencies.envelopeKey === undefined
+        ? undefined
+        : openCredentials(dependencies.envelopeKey),
+    models: openModelClient({
+      fetch: dependencies.fetchModel ?? fetch,
+      clock: doors.clock,
+      log: logger.child({ module: "llm" }),
+    }),
   });
 
   server.all("/mcp", (context) => mcp(context.req.raw));

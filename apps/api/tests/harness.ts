@@ -261,6 +261,13 @@ const cimdFixture = async (input: string | URL | Request): Promise<Response> => 
   return new Response("no such document", { status: 404 });
 };
 
+/** Invented: it seals nothing outside the suites. */
+export const HARNESS_ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => 31 - index);
+
+/** No suite reaches a model provider: a call no test set a wire for fails, and is never tried again. */
+const noModelWire = async (): Promise<Response> =>
+  new Response("no model provider answers in the suites", { status: 418 });
+
 type DoorOptions = {
   readonly gitStoreDir?: string | undefined;
   readonly objectStore?: ObjectStoreSettings | undefined;
@@ -285,6 +292,8 @@ export const serverFor = (
     authSecret: AUTH_SECRET,
     sendEmail: async () => {},
     fetchClientMetadataResource: cimdFixture,
+    fetchModel: noModelWire,
+    envelopeKey: HARNESS_ENVELOPE_KEY,
     logger: options.logger ?? pino({ level: "silent" }),
     imageDigest: options.imageDigest,
   });
@@ -332,7 +341,18 @@ export type TestAppOptions = {
    * runtime pool is small.
    */
   readonly poolSize?: number | undefined;
+
+  /** The model provider's wire; with none, every model call fails at once. */
+  readonly fetchModel?:
+    | ((input: string | URL | Request, init?: RequestInit) => Promise<Response>)
+    | undefined;
+
+  /** Null serves with none, as an api whose envelope key would not read. */
+  readonly envelopeKey?: Uint8Array | null | undefined;
 };
+
+const envelopeKeyOf = ({ envelopeKey }: TestAppOptions): Uint8Array | undefined =>
+  envelopeKey === null ? undefined : (envelopeKey ?? HARNESS_ENVELOPE_KEY);
 
 /**
  * A healthy TestApp over a fresh migrated database and git root; `stop` removes both.
@@ -376,6 +396,8 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
       metadataFetches.push(input instanceof Request ? input.url : String(input));
       return cimdFixture(input);
     },
+    fetchModel: options.fetchModel ?? noModelWire,
+    envelopeKey: envelopeKeyOf(options),
     logger,
     webRoot: options.webRoot,
   });

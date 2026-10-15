@@ -13,14 +13,21 @@ import {
 import type { Logger } from "pino";
 import type { z } from "zod";
 
-import { completeRecord, openRecord, type AskSteps } from "@better-answers/core/answering";
+import {
+  completeRecord,
+  openRecord,
+  reserveJudge,
+  type AskSteps,
+} from "@better-answers/core/answering";
 import {
   err,
+  ok,
   type Claims,
   type Clock,
   type Result,
   type UserPrincipal,
 } from "@better-answers/core/kernel";
+import type { Credentials, ModelClient } from "@better-answers/core/llm";
 import {
   consumeCall,
   folded,
@@ -60,6 +67,10 @@ export type McpSurfaceDependencies = {
 
   readonly clock: Clock;
   readonly entries: readonly Entry<z.ZodObject, z.ZodType>[];
+
+  /** Absent where the api holds no envelope key: no model key opens, so no judge is called. */
+  readonly credentials: Credentials | undefined;
+  readonly models: ModelClient;
 };
 
 const THE_BEARER = "the bearer";
@@ -86,8 +97,8 @@ export const doorOf = ({ readOnlyHint }: ToolAnnotations): typeof withPrincipal 
 
 type ServedEntry = Entry<z.ZodObject, z.ZodType>;
 
-/** What a road opens its transactions with; an entry is handed neither. */
-type RoadDoors = Pick<McpSurfaceDependencies, "door" | "clock">;
+/** What a road opens its transactions with and calls a model through; an entry is handed none. */
+type RoadDoors = Pick<McpSurfaceDependencies, "door" | "clock" | "credentials" | "models">;
 
 /** Both readings come sorted from the one member query, so they agree place by place or not at all. */
 const inTheSameGroups = (resolved: UserPrincipal, readBack: UserPrincipal): boolean =>
@@ -114,12 +125,22 @@ const steppedAs = async <Value, Refused>(
 };
 
 /** Only the read lends its transaction, and that one opens read-only. */
-const stepsFor = ({ door, clock }: RoadDoors, asker: UserPrincipal): AskSteps<StepRefusal> => ({
+const stepsFor = (
+  { door, clock, credentials, models }: RoadDoors,
+  asker: UserPrincipal,
+): AskSteps<StepRefusal> => ({
   openRecord: (opening) =>
     steppedAs(withMember, door, asker, (member, tx) =>
       openRecord(member, tx, { ...opening, transport: "mcp" }),
     ),
   read: (work) => steppedAs(withMemberUnheld, door, asker, (_member, tx) => work(tx)),
+  reserve: async (reserving) =>
+    credentials === undefined
+      ? ok(undefined)
+      : steppedAs(withMember, door, asker, (member, tx) =>
+          reserveJudge(member, tx, credentials, reserving),
+        ),
+  callModel: models.callModel,
   completeRecord: (completion) =>
     steppedAs(withMember, door, asker, (member, tx) =>
       completeRecord(member, tx, { ...completion, completedAt: clock.now() }),

@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 
 import {
+  readEnvelopeKey,
   readHeadCheck,
   readObjectStore,
   readSweeps,
@@ -20,6 +21,11 @@ const bootstrap = requireBootstrap("the api");
 const identity = requireIdentityBootstrap("the api");
 const image = requireRunningImage("the api");
 const objectStore = readObjectStore();
+const envelopeKey = readEnvelopeKey();
+// Without it no model key opens; the api still serves, and `ask` answers with no judge.
+if (!envelopeKey.ok) {
+  logger.warn({ reason: envelopeKey.error.message }, "no model will be called");
+}
 
 const doors = openDoors({
   database: bootstrap.databaseUrl,
@@ -50,6 +56,7 @@ serve(
       sendEmail,
       webRoot: bootstrap.webRoot,
       imageDigest: image.digest,
+      envelopeKey: envelopeKey.ok ? envelopeKey.value : undefined,
     }).fetch,
     port: bootstrap.port,
   },

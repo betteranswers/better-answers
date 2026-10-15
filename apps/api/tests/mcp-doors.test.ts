@@ -9,6 +9,7 @@ import {
   type PrincipalRefusal,
   type UserPrincipal,
 } from "@better-answers/core/kernel";
+import type { CallSize, CallSpent, ModelClient } from "@better-answers/core/llm";
 import { withHeldPrincipal, withPrincipalRead, type Tx } from "@better-answers/core/store/postgres";
 import type { JudgeState, QuestionVerdict } from "@better-answers/schema";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
@@ -83,6 +84,13 @@ const verifiedAs = (claims: {
 
 const failedLine = z.object({ entry: z.string(), err: z.object({ code: z.string() }) });
 
+/** No probe calls a model: one that did would fail its call here. */
+const NO_MODEL: ModelClient = {
+  callModel: () => {
+    throw new Error("a probe called a model");
+  },
+};
+
 /** Called through the surface as a workspace's Admin, the probe standing for `declared`. */
 const calledAsAnAdmin = async (declared: Declared) => {
   const workspace = await app().provision();
@@ -97,6 +105,8 @@ const calledAsAnAdmin = async (declared: Declared) => {
     serverVersion: "0.0.0",
     clock: app().doors.clock,
     entries: [writing(declared, key)],
+    credentials: undefined,
+    models: NO_MODEL,
   });
 
   const answer = await toolAnswered(
@@ -186,8 +196,10 @@ describe("every entry the server composes", () => {
 });
 
 describe("the steps the own-transaction road hands an entry", () => {
-  it("are the record's two writes and one read", () => {
-    expectTypeOf<keyof Steps>().toEqualTypeOf<"openRecord" | "read" | "completeRecord">();
+  it("are the record's writes, a read, a reservation, a call", () => {
+    expectTypeOf<keyof Steps>().toEqualTypeOf<
+      "openRecord" | "read" | "reserve" | "callModel" | "completeRecord"
+    >();
   });
 
   it("take a record's data, never a transaction to write through", () => {
@@ -206,7 +218,22 @@ describe("the steps the own-transaction road hands an entry", () => {
       readonly verdict: QuestionVerdict;
       readonly judgeState: JudgeState;
       readonly unmappedPassages: readonly { readonly locator: string }[];
+      readonly settled?:
+        | {
+            readonly reservationId: string;
+            readonly calls: readonly CallSpent[];
+          }
+        | undefined;
     }>();
+    expectTypeOf<Parameters<Steps["reserve"]>>().toEqualTypeOf<
+      [
+        reserving: {
+          readonly answerId: string;
+          readonly most: CallSize;
+          readonly now: Date;
+        },
+      ]
+    >();
     expectTypeOf<keyof Completion["concepts"][number]>().toEqualTypeOf<
       "iri" | "contentHash" | "trust" | "judged"
     >();

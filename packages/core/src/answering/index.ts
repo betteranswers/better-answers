@@ -48,6 +48,7 @@ import {
   type PassageView,
 } from "./boundary.ts";
 import { cursorOf, type FindPosition, type FindRun } from "./cursor.ts";
+import { judgedBy, type JudgeRefusal, type JudgeSteps } from "./judge.ts";
 import {
   ANSWER_KIND,
   answerPlanned,
@@ -85,6 +86,7 @@ export {
   type ReturnedConcept,
 } from "./plan.ts";
 export { completeRecord, openRecord } from "./record.ts";
+export { judgeCall, reserveJudge, type JudgeRefusal } from "./judge.ts";
 export {
   closeFlag,
   closeFlagInput,
@@ -462,15 +464,16 @@ const askAction = declareAction({
 export type AskRefusal = RefusalOf<typeof askAction> | Error;
 
 /**
- * `ask` is handed these in place of a door. Its transport runs each in its own transaction, so
- * none stays open across a later step.
+ * `ask` is handed these in place of a door. Each runs in a transaction of its own, so none stays
+ * open across the judge's call.
  */
-export type AskSteps<Refused = never> = {
+export type AskSteps<Refused = never> = JudgeSteps<Refused> & {
   /** Commits before it answers: a question refused later is still on record. */
   readonly openRecord: (
     opening: Omit<RecordOpening, "transport">,
   ) => Promise<Result<{ readonly recordId: string }, Refused | Error>>;
   readonly read: ReadStep<Refused>;
+  /** Settles the judge's reservation, when one was taken, in the same transaction. */
   readonly completeRecord: (
     completion: Omit<RecordCompletion, "completedAt" | "drafted">,
   ) => Promise<Result<void, Refused | Error>>;
@@ -495,9 +498,10 @@ export const planAnswer = async <Refused = never>(
 };
 
 /**
- * Opens the question's record, reads what bears on it, and completes the record with what it
- * returns. No model is called: every `Answer` it finds is related knowledge, and no judge ran.
- * `now` decides which concepts are past their shelf life.
+ * Opens the question's record, reads what bears on it, has the workspace's judge say which
+ * `Answer`s fit, and completes the record. With no judge to call, every `Answer` is related
+ * knowledge. At the spending limit it refuses, leaving the record open. `now` decides which
+ * concepts are past their shelf life.
  */
 export const ask = async <Refused = never>(
   principal: UserPrincipal,
@@ -505,7 +509,7 @@ export const ask = async <Refused = never>(
   input: AskInput,
   now: Date,
   caps: AskCaps = ASK_CAPS,
-): Promise<Result<AnswerResult, AskRefusal | Refused>> => {
+): Promise<Result<AnswerResult, AskRefusal | JudgeRefusal | Refused>> => {
   const admitted = admit(askAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
 
@@ -515,13 +519,21 @@ export const ask = async <Refused = never>(
   const { recordId } = opened.value;
   const plan = await answerPlanned(admitted.value, steps.read, input, now, caps);
   if (!plan.ok) return plan;
-  const { answer, concepts } = plan.value;
+  const judged = await judgedBy(
+    steps,
+    plan.value,
+    { question, answerId: recordId, now },
+    caps.candidates,
+  );
+  if (!judged.ok) return judged;
+  const { answer, concepts, settled } = judged.value;
   const completed = await steps.completeRecord({
     recordId,
     verdict: answer.verdict,
     judgeState: answer.judgeState,
     concepts,
     unmappedPassages: answer.unmappedPassages,
+    settled,
   });
   if (!completed.ok) return completed;
   return ok({ ...answer, recordId });
@@ -657,12 +669,25 @@ const unmappedText = (passage: PassageView): readonly string[] => [
   `— ${passage.source} (${passage.locator})`,
 ];
 
+const FITS_THEN_RELATED =
+  "**Related knowledge, which the judge did not find answers the question as asked.**";
+
+/** Each `Answer` that fits in full first, so an assistant reads the fits before what only bears. */
+const answeredText = (answer: PlannedAnswer<string>): readonly string[] =>
+  answer.answers.length === 0
+    ? relatedText(answer.related)
+    : [
+        ...answer.answers.flatMap(returnedText),
+        ...(answer.related.length === 0 ? [] : ["", FITS_THEN_RELATED]),
+        ...relatedText(answer.related),
+      ];
+
 export const renderAnswer = (answer: PlannedAnswer<string>): string =>
   [
     VERDICT_LINES[answer.verdict],
     `_${JUDGE_WORDS[answer.judgeState]} · ${mapWords(answer.map)}_`,
     `Collections considered: ${namedOrNone(answer.collections)}`,
     `Collections you may name: ${namedOrNone(answer.readableCollections)}`,
-    ...relatedText(answer.related),
+    ...answeredText(answer),
     ...answer.unmappedPassages.flatMap(unmappedText),
   ].join("\n");

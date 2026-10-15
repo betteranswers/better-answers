@@ -81,8 +81,11 @@ const errorReply = z.object({
 /** A tier's own monthly cap: a 429 that waiting does not lift. */
 const TIER_SPEND_CAP = "enforced_spend_limit_reached";
 
-/** How the provider begins a refusal at a spend limit the organisation or a workspace set. */
-const OWN_SPEND_LIMIT = "You have reached your specified";
+/**
+ * How the provider begins a 400 that only the account's billing lifts: a spend limit the
+ * organisation or a workspace set, or credit run out.
+ */
+const BILLED_OUT = ["You have reached your specified", "Your credit balance is too low"] as const;
 
 /** The provider's own faults and overload, which another attempt may get past. */
 const UNAVAILABLE_STATUSES: ReadonlySet<number> = new Set([500, 504, 529]);
@@ -133,10 +136,12 @@ const rateLimitedRead = (text: string, retryAfter: string | null): MessagesRead 
     ? { read: "spend-cap" }
     : { read: "rate-limited", retryAfterMs: retryAfterMsOf(retryAfter) };
 
-const badRequestRead = (text: string): MessagesRead =>
-  jsonAs(errorReply, text)?.error.message.startsWith(OWN_SPEND_LIMIT) === true
+const badRequestRead = (text: string): MessagesRead => {
+  const message = jsonAs(errorReply, text)?.error.message ?? "";
+  return BILLED_OUT.some((begins) => message.startsWith(begins))
     ? { read: "spend-cap" }
     : { read: "failed" };
+};
 
 /** Reads one reply by its status first, then its body, which it never hands on beyond the answer. */
 export const messagesRead = (

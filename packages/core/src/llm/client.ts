@@ -97,7 +97,7 @@ export type ModelCall<T> = {
 type Unanswered = "rate-limited" | "spend-cap" | "refused" | "failed";
 
 /** Each attempt is one `CallSpent`, which settles the call's reservation as it stands. */
-type ModelOutcome<T> =
+export type ModelOutcome<T> =
   | { readonly outcome: "answered"; readonly answer: T; readonly spent: readonly CallSpent[] }
   | { readonly outcome: Unanswered; readonly spent: readonly CallSpent[] };
 
@@ -124,7 +124,7 @@ type ModelClientDoors = {
   readonly timeout?: (ms: number) => AbortSignal;
 };
 
-type ModelClient = {
+export type ModelClient = {
   readonly callModel: <T>(to: ModelToCall, call: ModelCall<T>) => Promise<ModelOutcome<T>>;
 };
 

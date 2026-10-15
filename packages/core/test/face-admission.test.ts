@@ -15,6 +15,8 @@ const HOLDS_NO_ACTION = ["access", "kernel", "refusals", "store"];
 const STEPS: Readonly<Record<string, string>> = {
   "answering/completeRecord": "a step of ask, which admits the asker before it completes a record",
   "answering/openRecord": "a step of ask, which admits the asker before it opens a record",
+  "answering/reserveJudge":
+    "a step of ask, which admits the asker before it reserves its judge's call",
   "audit/eventsNewestFirst": "the audit log's read calls it after admitting an Admin",
   "audit/eventsSoughtNewestFirst":
     "the audit log's read and a member's activity call it after admitting an Admin",

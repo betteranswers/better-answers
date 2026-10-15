@@ -8,6 +8,7 @@ import type {
 
 import type { Trust } from "../concepts/index.ts";
 import { actorIdOf, attempt, ulid, type Result, type UserPrincipal } from "../kernel/index.ts";
+import { settleSpend, type CallSpent } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 /** One statement, so the content's month is its record's own `asked_at`. */
@@ -98,12 +99,19 @@ export type RecordCompletion = {
   readonly unmappedPassages: readonly { readonly locator: string }[];
   /** Given only when the platform drafted. */
   readonly drafted?: readonly DraftedSentence[];
+  /** Undefined where no model was called for the question; else its reservation, settled first. */
+  readonly settled?:
+    | {
+        readonly reservationId: string;
+        readonly calls: readonly CallSpent[];
+      }
+    | undefined;
 };
 
 /**
- * Completes an open record once: a record already completed, or one that is not there, answers
- * an error and changes nothing. An unmapped passage is kept as its locator alone, and a concept
- * as its IRI, hash and trust, never its text.
+ * Completes an open record once: one completed or not there answers an error and changes
+ * nothing. A settle the sweep beat leaves the record open, since both share the transaction. A
+ * passage is kept as its locator, and a concept as its IRI, hash and trust, never its text.
  */
 export const completeRecord = async (
   asker: UserPrincipal,
@@ -111,6 +119,10 @@ export const completeRecord = async (
   input: RecordCompletion,
 ): Promise<Result<void, Error>> =>
   attempt(async () => {
+    if (input.settled !== undefined) {
+      const settled = await settleSpend(asker, tx, { ...input.settled, now: input.completedAt });
+      if (!settled.ok) throw settled.error;
+    }
     const completed = await tx.query<{ asked_at: string }>(COMPLETED, [
       asker.workspaceId,
       input.recordId,

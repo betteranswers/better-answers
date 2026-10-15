@@ -158,6 +158,25 @@ export const isBlockedOnTable = async (pool: pg.Pool, table: string): Promise<bo
   return (found.rowCount ?? 0) > 0;
 };
 
+/** Those `ask` touches: NOWAIT fails at once on a lock a transaction open across the model's call holds. */
+const ASKS_TABLES = `member, "user", group_member, question_asked, question_content,
+  spend_reservation, llm_call, workspace_config, model_choice, model_key`;
+
+/** "locked" when every table `ask` touches can be locked at once, else why not. */
+export const asksTablesLockedAtOnce = async (pool: pg.Pool): Promise<string> => {
+  const contender = await pool.connect();
+  try {
+    await contender.query("BEGIN");
+    await contender.query(`LOCK TABLE ${ASKS_TABLES} IN ACCESS EXCLUSIVE MODE NOWAIT`);
+    return "locked";
+  } catch (cause) {
+    return cause instanceof Error ? cause.message : String(cause);
+  } finally {
+    await contender.query("ROLLBACK");
+    contender.release();
+  }
+};
+
 /** Holds an ACCESS EXCLUSIVE lock on `table`, from a connection of its own, while `work` runs. */
 export const holdingTable = async <T>(
   pool: pg.Pool,

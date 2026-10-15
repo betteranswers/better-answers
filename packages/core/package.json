@@ -31,7 +31,8 @@
     "./testing/documents": "./test/suite-documents.ts",
     "./testing/worker-process": "./test/worker-process.ts",
     "./testing/cross-tier": "./test/cross-tier-fixture.ts",
-    "./testing/restore-code": "./test/restore-code.ts"
+    "./testing/restore-code": "./test/restore-code.ts",
+    "./testing/judge-wire": "./test/judge-wire.ts"
   },
   "scripts": {
     "generate:audit-actions": "node scripts/generate-audit-actions.ts",
