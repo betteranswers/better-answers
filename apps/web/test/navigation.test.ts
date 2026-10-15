@@ -193,8 +193,7 @@ describe("what each person is shown", () => {
         [
           ["Sources", ["Connected Sources"]],
           ["Models", ["Models and Spend"]],
-          ["Questions", ["Questions Asked"]],
-          ["Questions", ["Answer Tests"]],
+          ["Questions", ["Questions Asked", "Answer Tests"]],
           ["People", ["Members", "Groups"]],
           ["System", ["Audit Log"]],
         ],
