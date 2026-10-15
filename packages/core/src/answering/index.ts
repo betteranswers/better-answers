@@ -87,7 +87,6 @@ export {
 } from "./plan.ts";
 export { completeRecord, openRecord } from "./record.ts";
 export {
-  JUDGE_SYSTEM,
   judgeCall,
   reserveJudge,
   type JudgeRefusal,

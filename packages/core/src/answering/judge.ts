@@ -81,7 +81,7 @@ export const candidatesOf = (
 ): readonly ReturnedConcept[] =>
   related.flatMap((concept) => ("body" in concept ? [concept] : [])).slice(0, cap);
 
-export const JUDGE_SYSTEM = `You judge whether each candidate answers a question as it was asked.
+const JUDGE_SYSTEM = `You judge whether each candidate answers a question as it was asked.
 Each candidate is an approved answer from a company's knowledge, shown with the question it was written for and the collection it is filed under.
 Say "yes" for a candidate that answers the question as asked. Say "no" for one that answers a different question, a narrower or a wider one, or one about another product, module, plan or audience than the question names.
 Judge each candidate on its own. More than one candidate may be "yes", and none may be. Never weigh one candidate against another.

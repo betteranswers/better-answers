@@ -258,11 +258,15 @@ describe("the answer's rendering", () => {
       answer({ verdict: "ok", judgeState: "judged", answers: [returned()], related: [] }),
     );
 
-    expect(rendered).not.toContain("Related knowledge");
-    expect(linesOf(rendered).slice(4, 7)).toEqual([
+    expect(linesOf(rendered).slice(4)).toEqual([
       "",
       "## Answer · audits",
       "Question: How long are audit logs kept?",
+      "_Unverified_",
+      "",
+      "Audit logs are kept for thirteen months.",
+      "",
+      "https://better-answers.com/c/01A — https://app.example/knowledge/search/01A",
     ]);
   });
 
