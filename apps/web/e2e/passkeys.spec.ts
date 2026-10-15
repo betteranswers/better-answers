@@ -179,7 +179,7 @@ test("a second passkey from the same device is refused", async ({ page, request 
   await passkeyAdded(page);
 
   await saysARefusal(page.getByRole("alert"));
-  await expect(page.getByRole("listitem")).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Passkeys" }).getByRole("listitem")).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Add Passkey" })).toBeFocused();
 });
 

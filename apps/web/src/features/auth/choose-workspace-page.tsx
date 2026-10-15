@@ -165,7 +165,8 @@ export function ChooseWorkspacePage() {
     openWorkspace(sole);
   };
 
-  const decided = settled && !pick.isPending && !resume.isPending && !wentNowhere;
+  // Resumed once: an answered resume is leaving the page, and another would ask consent again.
+  const decided = settled && !pick.isPending && resume.isIdle && !wentNowhere;
   useEffect(() => {
     if (!decided) return;
     if (signedOut) {
