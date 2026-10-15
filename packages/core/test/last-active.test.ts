@@ -1,3 +1,4 @@
+import pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,11 +9,11 @@ import {
 } from "../src/members/index.ts";
 import { openPostgres, withHeldPrincipal, withPrincipalRead } from "../src/store/postgres/index.ts";
 import { heldAs, membersSuite } from "./members-suite.ts";
-import { provisionedWorkspace } from "./platform.ts";
+import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
 import {
   countWaitingOnLocks,
-  holdingTable,
+  holdingRows,
   postgresForSuite,
   seedingWith,
   until,
@@ -28,12 +29,24 @@ const { joining } = membersSuite(db);
 
 const HOUR_MS = 3_600_000;
 
-/** Resolves the member's claims and answers their role, as every door on a request does. */
-const resolvedIn = async (workspaceId: string, userId: string) => {
+const TEN_MINUTES_MS = 10 * 60_000;
+
+/**
+ * Resolves the member's claims and answers their role, as every door on a request does.
+ * `meanwhile` runs as the request's own work, inside its transaction.
+ */
+const resolvedIn = async (
+  workspaceId: string,
+  userId: string,
+  meanwhile: () => Promise<unknown> = () => Promise.resolve(),
+) => {
   const opened = await withPrincipalRead(
     door(),
     { workspaceId, userId, issuedAt: new Date() },
-    async (principal) => principal.role,
+    async (principal) => {
+      await meanwhile();
+      return principal.role;
+    },
   );
   return opened;
 };
@@ -54,15 +67,40 @@ const stampedIn = async (workspaceId: string, userId: string): Promise<Date | un
     )
   ).rows[0]?.at;
 
-/** A row ten minutes old, so no request within the hour writes it again. */
-const stampedTenMinutesAgo = (workspaceId: string, userId: string) =>
+/** A row `agoMs` old: within the hour no request writes it again, past the hour the next one does. */
+const stampedAgo = (workspaceId: string, userId: string, agoMs: number) =>
   seedingWith(db().pool, async (seed) =>
     seed.workspaceLastActive({
       workspaceId,
       userId,
-      at: new Date(Date.now() - 10 * 60_000),
+      at: new Date(Date.now() - agoMs),
     }),
   );
+
+/** Holds the member's own last-active row, from a connection of its own, while `work` runs. */
+const holdingTheStamp = <T>(workspaceId: string, userId: string, work: () => Promise<T>) =>
+  holdingRows(
+    db().pool,
+    "SELECT 1 FROM workspace_last_active WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE",
+    [workspaceId, userId],
+    work,
+  );
+
+/** The workspace's Admin removes the member, as the transport holds the Admin. */
+const removing = (workspace: ProvisionedWorkspace, personId: string) =>
+  heldAs(workspace, workspace.adminUserId, (principal, tx) =>
+    removeMember(principal, tx, { ...inputOf(removeMemberInput, { personId }), at: new Date() }),
+  );
+
+/** Whether any transaction has locked or written the row since it was seeded: its xmax stays 0 until one does. */
+const rowEverLocked = async (workspaceId: string, userId: string): Promise<boolean> =>
+  (
+    await db().pool.query<{ locked: boolean }>(
+      `SELECT xmax::text <> '0' AS locked FROM workspace_last_active
+        WHERE workspace_id = $1 AND user_id = $2`,
+      [workspaceId, userId],
+    )
+  ).rows[0]?.locked ?? true;
 
 describe("stamping a member's last activity", () => {
   it("writes the row on the member's first request", async () => {
@@ -80,7 +118,7 @@ describe("stamping a member's last activity", () => {
   it("stamps once within the hour, and again after it", async () => {
     const workspace = await provisionedWorkspace(db(), "HourlyStamp");
     const viewer = await joining(workspace, "Viewer");
-    const seeded = (await stampedTenMinutesAgo(workspace.workspaceId, viewer)).at;
+    const seeded = (await stampedAgo(workspace.workspaceId, viewer, TEN_MINUTES_MS)).at;
 
     for (let request = 0; request < 3; request += 1) {
       await resolvedIn(workspace.workspaceId, viewer);
@@ -144,8 +182,9 @@ describe("stamping a member's last activity", () => {
     const workspace = await provisionedWorkspace(db(), "BulkPastAStamp");
     const viewer = await joining(workspace, "Viewer");
     const editor = await joining(workspace, "Editor");
+    const stale = (await stampedAgo(workspace.workspaceId, workspace.adminUserId, 2 * HOUR_MS)).at;
 
-    const acted = await holdingTable(db().pool, "workspace_last_active", () =>
+    const acted = await holdingTheStamp(workspace.workspaceId, workspace.adminUserId, () =>
       heldAs(workspace, workspace.adminUserId, (principal, tx) =>
         bulkChangeRole(principal, tx, {
           ...inputOf(bulkChangeRoleInput, { personIds: [viewer, editor], role: "Viewer" }),
@@ -157,8 +196,8 @@ describe("stamping a member's last activity", () => {
     expect(acted.ok ? acted.value.changed : acted.error).toEqual([editor]);
     expect(
       await stampedIn(workspace.workspaceId, workspace.adminUserId),
-      "the stamp was skipped, not waited on",
-    ).toBeUndefined();
+      "the stamp was dropped, not waited on",
+    ).toEqual(stale);
   });
 
   it("never lets a stamp wait on a bulk act", async () => {
@@ -203,15 +242,69 @@ describe("stamping a member's last activity", () => {
     await resolvedIn(ours.workspaceId, viewer);
     await resolvedIn(theirs.workspaceId, viewer);
 
-    const removed = await heldAs(ours, ours.adminUserId, (principal, tx) =>
-      removeMember(principal, tx, {
-        ...inputOf(removeMemberInput, { personId: viewer }),
-        at: new Date(),
-      }),
-    );
+    const removed = await removing(ours, viewer);
 
     expect(removed.ok).toBe(true);
     expect(await stampedIn(ours.workspaceId, viewer)).toBeUndefined();
     expect(await stampedIn(theirs.workspaceId, viewer)).toBeDefined();
+  });
+
+  it("locks no row stamped within the hour", async () => {
+    const workspace = await provisionedWorkspace(db(), "FreshStampUnlocked");
+    const viewer = await joining(workspace, "Viewer");
+    await stampedAgo(workspace.workspaceId, viewer, TEN_MINUTES_MS);
+
+    for (let request = 0; request < 3; request += 1) {
+      await resolvedIn(workspace.workspaceId, viewer);
+    }
+
+    expect(
+      await rowEverLocked(workspace.workspaceId, viewer),
+      "a request within the hour reads the row and opens no write",
+    ).toBe(false);
+  });
+
+  it("leaves the request answered when the pool has ended", async () => {
+    const workspace = await provisionedWorkspace(db(), "PoolEnded");
+    const viewer = await joining(workspace, "Viewer");
+    const pool = new pg.Pool({
+      connectionString: db().connectionUri,
+      max: 2,
+      options: "-c role=app_rt",
+    });
+    let ending: Promise<void> = Promise.resolve();
+
+    const answered = await withPrincipalRead(
+      openPostgres(pool),
+      { workspaceId: workspace.workspaceId, userId: viewer, issuedAt: new Date() },
+      async (principal) => {
+        // A shutdown mid-request: the request's own connection serves until it is released.
+        ending = pool.end();
+        return principal.role;
+      },
+    );
+    await ending;
+
+    expect(answered.ok ? answered.value : answered.error).toBe("Viewer");
+    expect(
+      await stampedIn(workspace.workspaceId, viewer),
+      "no connection was left for the stamp, and it was let go",
+    ).toBeUndefined();
+  });
+
+  it("writes no row for a member removed mid-request", async () => {
+    const workspace = await provisionedWorkspace(db(), "RemovedMidRequest");
+    const viewer = await joining(workspace, "Viewer");
+
+    const read = await resolvedIn(workspace.workspaceId, viewer, async () => {
+      const removed = await removing(workspace, viewer);
+      expect(removed.ok).toBe(true);
+    });
+
+    expect(read.ok ? read.value : read.error).toBe("Viewer");
+    expect(
+      await stampedIn(workspace.workspaceId, viewer),
+      "the person had left before the stamp",
+    ).toBeUndefined();
   });
 });

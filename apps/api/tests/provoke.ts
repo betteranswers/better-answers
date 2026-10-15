@@ -7,6 +7,7 @@ import { restoreSignIn, SIGN_IN_CODE_PREFIX } from "@better-answers/core/workspa
 import { testData } from "@better-answers/schema/testing";
 import { authenticatorCodeAt, keyIn } from "@better-answers/schema/testing/authenticator-code";
 
+import { SESSION_LIFETIME_SECONDS } from "../src/auth/constants.ts";
 import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
 import { authOver } from "./auth-instance.ts";
 import { signIn, signInByEmailOnly } from "./flow.ts";
@@ -221,17 +222,21 @@ export const revocationHeldOpen = async (app: TestApp, userId: string): Promise<
   return { land: () => end("COMMIT"), abandon: () => end("ROLLBACK") };
 };
 
-/** One session the person holds, as a browser leaves it, answered by its id. */
+/**
+ * One session the person holds, as a browser leaves it, answered by its id. It runs for the
+ * library's lifetime unless `expiresAt` says otherwise.
+ */
 export const aSeededSessionFor = async (
   app: TestApp,
   personId: string,
   agent: { readonly userAgent?: string | null },
+  expiresAt?: Date,
 ): Promise<string> => {
   const now = new Date();
   return sessionFor(app.database.superuser, personId, {
     createdAt: now,
     lastUsedAt: now,
-    expiresAt: now,
+    expiresAt: expiresAt ?? new Date(now.getTime() + SESSION_LIFETIME_SECONDS * 1000),
     ipAddress: "203.0.113.7",
     ...(agent.userAgent === undefined || agent.userAgent === null
       ? {}

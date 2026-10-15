@@ -33,7 +33,22 @@ const LATER = new Date("2026-10-02T10:41:00.000Z");
 
 const EXPIRES = new Date("2026-10-09T10:41:00.000Z");
 
+/** When the acts run: the seeded sessions are live, and one seeded expired is an hour past. */
+const NOW = new Date("2026-10-03T09:00:00.000Z");
+
+const EXPIRED = new Date("2026-10-03T08:00:00.000Z");
+
 type Seeded = { readonly personId: string; readonly sessionIds: readonly string[] };
+
+/** One more session of the person's, already past its expiry when the acts run. */
+const anExpiredSessionOf = (seeded: Seeded): Promise<string> =>
+  sessionFor(db().pool, seeded.personId, {
+    createdAt: STARTED,
+    lastUsedAt: EXPIRED,
+    expiresAt: EXPIRED,
+    userAgent: MAC_CHROME,
+    ipAddress: A_BROWSER_ADDRESS,
+  });
 
 /** A person holding `count` sessions, each seeded with an agent and an address. */
 const aPersonWith = async (count: number, userAgent: string = MAC_CHROME): Promise<Seeded> => {
@@ -61,13 +76,29 @@ const sessionAt = (seeded: Seeded, at: number): string => {
 };
 
 const read = (seeded: Seeded, at: number) =>
-  readSessions(bootstrap, door(), { personId: seeded.personId, sessionId: sessionAt(seeded, at) });
-
-/** Signs the seeded session at `at` out, as the page's own one does. */
-const signOut = (seeded: Seeded, at: number) =>
-  endOneSession(bootstrap, door(), {
-    ...inputOf(endOneSessionInput, { sessionId: sessionAt(seeded, at) }),
+  readSessions(bootstrap, door(), {
     personId: seeded.personId,
+    sessionId: sessionAt(seeded, at),
+    now: NOW,
+  });
+
+/** Signs the session `sessionId` out of the seeded person's, as the page's own one does. */
+const signOutOf = (seeded: Seeded, sessionId: string) =>
+  endOneSession(bootstrap, door(), {
+    ...inputOf(endOneSessionInput, { sessionId }),
+    personId: seeded.personId,
+    now: NOW,
+  });
+
+/** Signs the seeded session at `at` out. */
+const signOut = (seeded: Seeded, at: number) => signOutOf(seeded, sessionAt(seeded, at));
+
+/** Signs every session out but the seeded one at `at`, as the page's dialog commits it. */
+const signOutOthers = (seeded: Seeded, at: number) =>
+  endOtherSessions(bootstrap, door(), {
+    personId: seeded.personId,
+    sessionId: sessionAt(seeded, at),
+    now: NOW,
   });
 
 /** The session an act ended, named as its record names it. */
@@ -169,10 +200,22 @@ describe("reading a person's own sessions", () => {
   it("refuses an id the boundary does not name", async () => {
     await aPersonWith(1);
 
-    expect(await readSessions(bootstrap, door(), { personId: "x", sessionId: "y" })).toEqual({
+    expect(
+      await readSessions(bootstrap, door(), { personId: "x", sessionId: "y", now: NOW }),
+    ).toEqual({
       ok: false,
       error: "malformed",
     });
+  });
+
+  it("leaves a session past its expiry unlisted", async () => {
+    const person = await aPersonWith(1);
+    const expired = await anExpiredSessionOf(person);
+
+    const held = answered(await read(person, 0));
+
+    expect(held.map((session) => session.id)).toEqual([sessionAt(person, 0)]);
+    expect(await idsHeld(person.personId), "the row is the sweep's to delete").toContain(expired);
   });
 });
 
@@ -193,10 +236,7 @@ describe("signing one session out", () => {
     const person = await aPersonWith(1);
     const elsewhere = await aPersonWith(1);
 
-    const refused = await endOneSession(bootstrap, door(), {
-      ...inputOf(endOneSessionInput, { sessionId: sessionAt(elsewhere, 0) }),
-      personId: person.personId,
-    });
+    const refused = await signOutOf(person, sessionAt(elsewhere, 0));
 
     expect(refused).toEqual({ ok: false, error: "session-gone" });
     expect(await idsHeld(person.personId)).toEqual(person.sessionIds);
@@ -207,13 +247,21 @@ describe("signing one session out", () => {
   it("refuses a session no one holds, ending nothing", async () => {
     const person = await aPersonWith(1);
 
-    const refused = await endOneSession(bootstrap, door(), {
-      ...inputOf(endOneSessionInput, { sessionId: NOBODY_HOLDING }),
-      personId: person.personId,
-    });
+    const refused = await signOutOf(person, NOBODY_HOLDING);
 
     expect(refused).toEqual({ ok: false, error: "session-gone" });
     expect(await idsHeld(person.personId)).toEqual(person.sessionIds);
+  });
+
+  it("refuses an expired session, leaving it to the sweep", async () => {
+    const person = await aPersonWith(1);
+    const expired = await anExpiredSessionOf(person);
+
+    const refused = await signOutOf(person, expired);
+
+    expect(refused).toEqual({ ok: false, error: "session-gone" });
+    expect(await idsHeld(person.personId)).toContain(expired);
+    expect(await recordsOf(person.personId)).toEqual([]);
   });
 });
 
@@ -221,10 +269,7 @@ describe("signing every other session out", () => {
   it("ends the rest, keeps the current one, and records each", async () => {
     const person = await aPersonWith(3);
 
-    const ended = await endOtherSessions(bootstrap, door(), {
-      personId: person.personId,
-      sessionId: sessionAt(person, 1),
-    });
+    const ended = await signOutOthers(person, 1);
 
     expect(ended).toEqual({ ok: true, value: { ended: 2 } });
     expect(await idsHeld(person.personId)).toEqual([sessionAt(person, 1)]);
@@ -236,10 +281,7 @@ describe("signing every other session out", () => {
   it("writes no record when this session is alone", async () => {
     const person = await aPersonWith(1);
 
-    const ended = await endOtherSessions(bootstrap, door(), {
-      personId: person.personId,
-      sessionId: sessionAt(person, 0),
-    });
+    const ended = await signOutOthers(person, 0);
 
     expect(ended).toEqual({ ok: true, value: { ended: 0 } });
     expect(await recordsOf(person.personId)).toEqual([]);
@@ -262,10 +304,7 @@ describe("signing every other session out", () => {
       return { refresh, access };
     });
 
-    const ended = await endOtherSessions(bootstrap, door(), {
-      personId: person.personId,
-      sessionId: sessionAt(person, 0),
-    });
+    const ended = await signOutOthers(person, 0);
 
     expect(ended.ok && ended.value.ended).toBe(1);
     const held = await db().pool.query<{ revoked: Date | null }>(
@@ -277,5 +316,20 @@ describe("signing every other session out", () => {
       grants.access.id,
     ]);
     expect(accessHeld.rowCount).toBe(1);
+  });
+
+  it("ends the live sessions alone, and records those", async () => {
+    const person = await aPersonWith(2);
+    const expired = await anExpiredSessionOf(person);
+
+    const ended = await signOutOthers(person, 0);
+
+    expect(ended).toEqual({ ok: true, value: { ended: 1 } });
+    expect(new Set(await idsHeld(person.personId))).toEqual(
+      new Set([sessionAt(person, 0), expired]),
+    );
+    expect(await recordsOf(person.personId)).toEqual([
+      aSignOutRecord(person.personId, [endedSession(person, 1)]),
+    ]);
   });
 });

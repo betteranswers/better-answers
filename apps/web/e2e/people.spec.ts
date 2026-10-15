@@ -5,9 +5,9 @@ import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  A_ROLE,
   ACTION_SAMPLES,
   actionClocked,
-  A_ROLE,
   addMember,
   aMemberSignedInAt,
   anAddress,
@@ -17,6 +17,7 @@ import {
   countOf,
   crumbOf,
   editorPickedByKeyboard,
+  holdingTheFirstAnswer,
   invite,
   keepsItsWordOffThePage,
   keyListed,
@@ -1421,30 +1422,18 @@ test.describe("removing a member from their page", () => {
     const confirm = removal.getByRole("button", { name: "Remove", exact: true });
 
     // The first removal reaches the api and its answer is held, so a second press meets it done.
-    const done = Promise.withResolvers<void>();
-    const answered = Promise.withResolvers<void>();
-    let asked = 0;
-    await page.route(REMOVAL, async (route) => {
-      asked += 1;
-      const first = asked === 1;
-      const response = await route.fetch();
-      if (first) {
-        done.resolve();
-        await answered.promise;
-      }
-      await route.fulfill({ response });
-    });
+    const held = await holdingTheFirstAnswer(page, REMOVAL);
 
     await confirm.focus();
     await page.keyboard.press("Enter");
-    await done.promise;
+    await held.reached;
     await expect(confirm).toHaveAttribute("aria-disabled", "true");
     await page.keyboard.press("Enter");
-    answered.resolve();
+    held.release();
 
     await expect(page).toHaveURL(/\/no-workspace$/);
     await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
-    expect(asked, "the second press asked the api again").toBe(1);
+    expect(held.asked(), "the second press asked the api again").toBe(1);
   });
 
   test("removes a member by keyboard alone", async ({ page, request }) => {

@@ -88,35 +88,35 @@ const idsOf = (input: { readonly personId: string; readonly sessionId: string })
     : undefined;
 };
 
-/** The current session first, then the rest newest first. No address is read. */
+/** The current session first, then the rest newest first. No address is read; an expired row is the sweep's. */
 const SESSIONS_OF_PERSON = `SELECT id, user_agent AS "userAgent", updated_at AS "lastActiveAt"
-                       FROM session WHERE user_id = $1
+                       FROM session WHERE user_id = $1 AND expires_at > $3
                       ORDER BY (id = $2) DESC, updated_at DESC, id DESC`;
 
 export type ReadSessionsRefusal = WorkspaceRefusal<"malformed"> | Error;
 
 /**
- * The person's own sessions alone, in the order the Sessions section shows them. The address a
- * session came from never leaves the store.
+ * The person's own live sessions alone, in the order the Sessions section shows them. The address
+ * a session came from never leaves the store.
  */
 export const readSessions = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  input: { readonly personId: string; readonly sessionId: string },
+  input: { readonly personId: string; readonly sessionId: string; readonly now: Date },
 ): Promise<Result<readonly SessionShown[], ReadSessionsRefusal>> => {
   const ids = idsOf(input);
   if (ids === undefined) return err("malformed");
 
   const read = await attempt(() =>
     withIdentityRead(platform, door, async (tx) =>
-      (await tx.query<SessionRow>(SESSIONS_OF_PERSON, [ids.personId, ids.sessionId])).rows.map(
-        (row) => ({
-          id: row.id,
-          device: deviceOf(row.userAgent),
-          lastActiveAt: row.lastActiveAt.toISOString(),
-          current: row.id === ids.sessionId,
-        }),
-      ),
+      (
+        await tx.query<SessionRow>(SESSIONS_OF_PERSON, [ids.personId, ids.sessionId, input.now])
+      ).rows.map((row) => ({
+        id: row.id,
+        device: deviceOf(row.userAgent),
+        lastActiveAt: row.lastActiveAt.toISOString(),
+        current: row.id === ids.sessionId,
+      })),
     ),
   );
   return read;
@@ -154,14 +154,15 @@ const recording = (
 
 const RETURNED_ENDED = `RETURNING id, user_agent AS "userAgent", updated_at AS "lastActiveAt"`;
 
-/** $1 binds the session the read runs in, and $2 the person whose sessions they are. */
-const GONE = `DELETE FROM session WHERE`;
+/** $1 binds the read's own session, $2 the person, $3 the instant: an expired row is the sweep's, never an act's. */
+const GONE = `DELETE FROM session WHERE expires_at > $3 AND`;
 
-/** Holds the person's row, ends the sessions `rest` names, and records the act naming them. */
+/** Holds the person's row, ends the live sessions `rest` names, and records the act naming them. */
 const ending = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   ids: { readonly personId: UserId; readonly sessionId: string },
+  now: Date,
   rest: string,
 ): Promise<Result<readonly EndedRow[], "person-gone" | Error>> => {
   const ended = await attempt(() =>
@@ -173,6 +174,7 @@ const ending = async (
         const gone = await tx.query<EndedRow>(`${GONE} ${rest} ${RETURNED_ENDED}`, [
           ids.sessionId,
           ids.personId,
+          now,
         ]);
         await recording(platform, tx, ids.personId, gone.rows);
         return ok(gone.rows);
@@ -192,12 +194,12 @@ export type EndOneSessionRefusal =
 export const endOneSession = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  input: { readonly personId: string } & z.output<typeof endOneSessionInput>,
+  input: { readonly personId: string; readonly now: Date } & z.output<typeof endOneSessionInput>,
 ): Promise<Result<SessionsEnded, EndOneSessionRefusal>> => {
   const ids = idsOf(input);
   if (ids === undefined) return err("malformed");
 
-  const ended = await ending(platform, door, ids, `id = $1 AND user_id = $2`);
+  const ended = await ending(platform, door, ids, input.now, `id = $1 AND user_id = $2`);
   if (!ended.ok) return err(ended.error);
   const [row] = ended.value;
   return row === undefined ? err("session-gone") : ok({ ended: 1 });
@@ -212,11 +214,11 @@ export type EndOtherSessionsRefusal = WorkspaceRefusal<"malformed" | "person-gon
 export const endOtherSessions = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  input: { readonly personId: string; readonly sessionId: string },
+  input: { readonly personId: string; readonly sessionId: string; readonly now: Date },
 ): Promise<Result<SessionsEnded, EndOtherSessionsRefusal>> => {
   const ids = idsOf(input);
   if (ids === undefined) return err("malformed");
 
-  const ended = await ending(platform, door, ids, `user_id = $2 AND id <> $1`);
+  const ended = await ending(platform, door, ids, input.now, `user_id = $2 AND id <> $1`);
   return ended.ok ? ok({ ended: ended.value.length }) : err(ended.error);
 };

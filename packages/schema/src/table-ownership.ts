@@ -303,9 +303,9 @@ export const CROSS_OWNER_TABLE_ACCESS = [
   {
     table: "public.workspace_last_active",
     by: POSTGRES_DOOR,
-    access: "write",
+    access: "read and write",
     reason:
-      "The claims resolution stamps the member's last activity in the workspace it resolved them in, one conditional write in its own short transaction under that workspace's scope, so every door — the tRPC roads and the MCP surface alike — counts a use; a removal or an erasure deletes the row through the members slice that owns it.",
+      "The claims resolution reads whether the member's last-active row here is an hour old, in the claims transaction, and stamps it only then, one conditional write in its own short transaction under that workspace's scope, so every door — the tRPC roads and the MCP surface alike — counts a use; a removal or an erasure deletes the row through the members slice that owns it.",
   },
   {
     table: "public.question_asked",

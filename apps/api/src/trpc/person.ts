@@ -167,6 +167,7 @@ export const personRouter = router({
       readSessions(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
         personId: ctx.personId,
         sessionId: ctx.sessionId,
+        now: ctx.clock.now(),
       }),
     ),
   ),
@@ -178,6 +179,7 @@ export const personRouter = router({
         endOneSession(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
           ...asked,
           personId: ctx.personId,
+          now: ctx.clock.now(),
         }),
       ),
     ),
@@ -189,6 +191,7 @@ export const personRouter = router({
       endOtherSessions(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
         personId: ctx.personId,
         sessionId: ctx.sessionId,
+        now: ctx.clock.now(),
       }),
     ),
   ),

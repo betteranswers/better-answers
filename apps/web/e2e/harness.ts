@@ -685,3 +685,28 @@ export const signedInWithNoWorkspace = async (page: Page, api: APIRequestContext
   await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
   return signedIn;
 };
+
+/** The first matching call reaches the api and its answer is held until released; later calls answer at once. */
+export const holdingTheFirstAnswer = async (
+  page: Page,
+  matches: (url: URL) => boolean,
+): Promise<{
+  readonly reached: Promise<void>;
+  readonly release: () => void;
+  readonly asked: () => number;
+}> => {
+  const reached = Promise.withResolvers<void>();
+  const released = Promise.withResolvers<void>();
+  let asked = 0;
+  await page.route(matches, async (route) => {
+    asked += 1;
+    const first = asked === 1;
+    const response = await route.fetch();
+    if (first) {
+      reached.resolve();
+      await released.promise;
+    }
+    await route.fulfill({ response });
+  });
+  return { reached: reached.promise, release: released.resolve, asked: () => asked };
+};

@@ -56,6 +56,7 @@ import {
 import { inputOf } from "./suite-input.ts";
 import {
   countWaitingOnLocks,
+  holdingRows,
   statementsWaitingOnALock,
   until,
   whileActionsWaitAt,
@@ -126,24 +127,17 @@ const passageRowsAreHeld = async (
  * No action under test holds a passage row, so the probe's `true` branch needs this control to stay
  * honest.
  */
-const whileAPassageRowIsHeld = async <T>(
+const whileAPassageRowIsHeld = <T>(
   workspaceId: string,
   connectedSourceId: string,
   work: () => Promise<T>,
-): Promise<T> => {
-  const holder = await db().pool.connect();
-  try {
-    await holder.query("BEGIN");
-    await holder.query(
-      `SELECT 1 FROM "index".passage WHERE workspace_id = $1 AND connected_source_id = $2 FOR UPDATE`,
-      [workspaceId, connectedSourceId],
-    );
-    return await work();
-  } finally {
-    await holder.query("ROLLBACK");
-    holder.release();
-  }
-};
+): Promise<T> =>
+  holdingRows(
+    db().pool,
+    `SELECT 1 FROM "index".passage WHERE workspace_id = $1 AND connected_source_id = $2 FOR UPDATE`,
+    [workspaceId, connectedSourceId],
+    work,
+  );
 
 /** A second connected source under a held id fails the transaction after the action has landed every row. */
 const landedThenTheTransactionFailed = (

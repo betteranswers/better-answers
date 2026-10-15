@@ -2,18 +2,19 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { expect, test } from "./browser.ts";
 import {
-  aSessionOn,
   anAddress,
   aPkcePair,
+  aSessionOn,
   catchClaudesRedirect,
   claudeExchanges,
   claudeRefreshes,
   claudesAuthorizeUrl,
+  holdingTheFirstAnswer,
   landedAtHome,
   provision,
+  signedInWithNoWorkspace,
   signIn,
   signInHeading,
-  signedInWithNoWorkspace,
 } from "./harness.ts";
 
 const sessionsRegion = (page: Page) => page.getByRole("region", { name: "Sessions" });
@@ -193,4 +194,67 @@ test("everywhere else asks first and keeps a personal token working", async ({
   const refreshed = await claudeRefreshes(request, { origin, refreshToken });
 
   expect(refreshed.refreshToken).not.toBe("");
+});
+
+const SAFARI_ON_IOS =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+
+const EDGE_ON_WINDOWS =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0";
+
+const SIGN_OUT_ONE = (url: URL): boolean => url.pathname.includes("person.signOutSession");
+
+const SIGN_OUT_OTHERS = (url: URL): boolean => url.pathname.includes("person.signOutOtherSessions");
+
+test("a second sign-out waits for the first to answer", async ({ page, request }) => {
+  const person = await aPersonOnTheAccountPage(page, request, "twice");
+  await aSessionOn(request, person.id, SAFARI_ON_IOS);
+  await aSessionOn(request, person.id, EDGE_ON_WINDOWS);
+  await page.reload();
+  await expect(rowsIn(page)).toHaveCount(3);
+  const safari = rowOf(page, "Safari on iOS").getByRole("button", {
+    name: "Sign out Safari on iOS",
+  });
+
+  // The first sign-out reaches the api and its answer is held, so the second press meets it pending.
+  const held = await holdingTheFirstAnswer(page, SIGN_OUT_ONE);
+
+  await rowOf(page, "Edge on Windows")
+    .getByRole("button", { name: "Sign out Edge on Windows" })
+    .click();
+  await held.reached;
+  await expect(rowOf(page, "Edge on Windows")).toHaveCount(0);
+  await expect(safari).toHaveAttribute("aria-disabled", "true");
+  // Forced past the actionability wait: the press lands on the unavailable button and is ignored.
+  await safari.click({ force: true });
+  held.release();
+
+  await expect(saidIn(page)).toHaveText("Signed out Edge on Windows.");
+  await expect(rowOf(page, "Safari on iOS"), "the second press sent nothing").toBeVisible();
+  await expect(safari).toHaveAttribute("aria-disabled", "false");
+  await expect(safari, "the first answer still lands focus on the next row").toBeFocused();
+  expect(held.asked(), "the second press asked the api again").toBe(1);
+});
+
+test("a refused everywhere-else sign-out lands on the heading", async ({ page, request }) => {
+  const person = await aPersonOnTheAccountPage(page, request, "refused-everywhere");
+  await aSessionOn(request, person.id, SAFARI_ON_IOS);
+  await page.reload();
+  await expect(rowsIn(page)).toHaveCount(2);
+  await page.route(SIGN_OUT_OTHERS, (route) => route.abort());
+
+  await sessionsRegion(page).getByRole("button", { name: "Sign Out Everywhere Else" }).click();
+  await page
+    .getByRole("dialog", { name: "Sign out of 1 other session" })
+    .getByRole("button", { name: "Sign out 1 session" })
+    .click();
+
+  await expect(rowOf(page, "Safari on iOS"), "the rows come back").toBeVisible();
+  await expect(sessionsRegion(page).getByRole("alert")).toHaveText(
+    "There was a problem processing your request. Please try again.",
+  );
+  await expect(
+    sessionsRegion(page).getByRole("heading", { name: "Sessions" }),
+    "focus lands where a sign-out that landed puts it",
+  ).toBeFocused();
 });

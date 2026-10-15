@@ -54,6 +54,8 @@ function CurrentSession(properties: { readonly session: SessionShown }) {
 function AnotherSession(properties: {
   readonly session: SessionShown;
   readonly landsAt: LandsAt;
+  /** A sign-out in flight: a second one sent now would drop the first's answer. */
+  readonly pending: boolean;
   readonly onSignOut: (session: SessionShown) => void;
 }) {
   const { session } = properties;
@@ -69,7 +71,7 @@ function AnotherSession(properties: {
         <ItemActions>
           <ActionButton
             actionRef={properties.landsAt(`session:${session.id}`)}
-            unavailable={false}
+            unavailable={properties.pending}
             label={signOutNamed(session.device)}
             onAction={() => {
               properties.onSignOut(session);
@@ -95,6 +97,7 @@ export function SessionsSection() {
 
   const sessions = heldAfter(read, taken);
   const others = sessions.filter((session) => !session.current);
+  const pending = signOut.isPending || signOutOthers.isPending;
 
   const take = (ids: readonly string[]) => {
     setTaken((held) => new Set([...held, ...ids]));
@@ -144,6 +147,7 @@ export function SessionsSection() {
       },
       onError: (failure) => {
         bringBack(ending);
+        landing.expect("sessions");
         const refusal = refusalOf(failure);
         setRefused(refusal === undefined ? STOCK.tryAgain : saidOfASignOutRefusal(refusal));
       },
@@ -173,6 +177,7 @@ export function SessionsSection() {
               key={session.id}
               session={session}
               landsAt={landing.at}
+              pending={pending}
               onSignOut={signOutOne}
             />
           ),
@@ -181,7 +186,7 @@ export function SessionsSection() {
       {others.length === 0 ? null : (
         <div className="mt-3">
           <ActionButton
-            unavailable={signOutOthers.isPending}
+            unavailable={pending}
             label={SESSIONS_WORDS.signOutEverywhereElse}
             onAction={() => {
               setConfirming(true);
