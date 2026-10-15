@@ -79,6 +79,27 @@ describe("the unmapped-passage rate", () => {
     });
   });
 
+  it("counts a record whose incomplete flag an Admin closed", async () => {
+    const workspace = await provisionedWorkspace(db(), "Closed flag");
+    const { workspaceId } = workspace;
+    const record = await aRecordFlagged(workspaceId, [], [A_PASSAGE]);
+    await seedingWith(db().pool, (seed) =>
+      seed.questionFeedback({
+        workspaceId,
+        recordId: record.id,
+        verdict: "flag",
+        reason: "incomplete",
+        closedAs: "no-fault-in-the-knowledge",
+        closedAt: new Date(),
+      }),
+    );
+
+    expect(await rateOf(workspace)).toEqual({
+      ok: true,
+      value: { flaggedIncomplete: 1, showedUnmappedPassages: 1 },
+    });
+  });
+
   it("counts only the named workspace's records", async () => {
     const workspace = await provisionedWorkspace(db(), "Quiet");
     const elsewhere = await provisionedWorkspace(db(), "Busy");
