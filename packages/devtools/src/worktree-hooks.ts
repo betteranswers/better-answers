@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -107,6 +107,40 @@ export type HookRun = {
   readonly status: number | null;
   readonly stdout: string;
   readonly stderr: string;
+};
+
+export type Decoy = {
+  readonly pid: number;
+  readonly alive: () => boolean;
+  readonly stop: () => void;
+};
+
+const IDLE = "setInterval(() => {}, 1000)";
+
+const alive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Named by the physical path, as the hooks resolve it; `orphaned` leaves it to pid 1 at once. */
+export const decoyWorker = (worktree: string, orphaned: boolean): Decoy => {
+  const marker = path.join(realpathSync(worktree), "node_modules/vitest/dist/workers/forks.js");
+  if (orphaned) {
+    const started = spawnSync(
+      "sh",
+      ["-c", `node -e '${IDLE}' '${marker}' >/dev/null 2>&1 & echo $!`],
+      { encoding: "utf8" },
+    );
+    const pid = Number(started.stdout.trim());
+    return { pid, alive: () => alive(pid), stop: () => process.kill(pid) };
+  }
+  const child = spawn(process.execPath, ["-e", IDLE, marker], { stdio: "ignore" });
+  const pid = child.pid ?? -1;
+  return { pid, alive: () => alive(pid), stop: () => child.kill() };
 };
 
 /** Runs `script` under bash, with `env` laid over this process's environment. */

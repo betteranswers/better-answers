@@ -4,7 +4,8 @@ set -uo pipefail
 # Claude Code fires the remove hook only for a worktree whose agent changed nothing, so one that
 # committed outlives its merge. Other agents are at work in the worktrees beside those it removes.
 SAY_AS="sweep-worktrees"
-. "$(dirname "${BASH_SOURCE[0]}")/worktree-lib.sh"
+HOOKS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+. "$HOOKS/worktree-lib.sh"
 
 USAGE="Usage: sweep-worktrees.sh [<main-checkout>]"
 COMMON="$(git -C "${1:-.}" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
@@ -74,10 +75,26 @@ refresh_doc_index() {
   done < <(doc_indexes)
 }
 
+# A run killed under an agent leaves its workers behind, each burning a core, in any tree of the
+# estate: the main checkout's too.
+kill_orphaned_test_workers() {
+  test_workers_under "$ROOT/" orphaned | kill_test_workers
+}
+
+# The containers are the machine's, not a tree's, so the reaper beside this script is the one to run.
+reap_containers() {
+  command -v node >/dev/null 2>&1 || { say "node absent — stopped test containers kept"; return 0; }
+  node "$HOOKS/../../scripts/reap-containers.mjs" 2>&1 | while IFS= read -r line; do
+    say "reap-containers: $line"
+  done
+}
+
 WORKTREES="$(unlocked_worktrees)"
 while IFS= read -r wt; do
   [ -z "$wt" ] || sweep_one "$wt" </dev/null
 done <<<"$WORKTREES"
 
+kill_orphaned_test_workers
+reap_containers
 drop_orphan_doc_indexes "$UNDER"
 refresh_doc_index

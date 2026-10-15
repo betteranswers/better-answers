@@ -2,12 +2,14 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { gitIn, writeUnder } from "@better-answers/devtools/throwaway-tree";
 import {
   commitIn,
+  type Decoy,
+  decoyWorker,
   hookScript,
   mergeOnOrigin,
   originAndClone,
@@ -42,8 +44,20 @@ type Estate = {
   readonly primary: string;
   readonly worktrees: Readonly<Record<Name, string>>;
   readonly log: string;
+  readonly orphan: Decoy;
+  readonly attached: Decoy;
   readonly run: HookRun;
 };
+
+const STALE_ID = "stale0000000000000000000000000000000000000000000000000000000000ab";
+const LIVE_ID = "live00000000000000000000000000000000000000000000000000000000000cd";
+
+/** Every sweep here runs over this `docker`, so none reaches the machine's own daemon. */
+const dockerStub = (log: string): string =>
+  recordsItsArgv(log, [
+    `[ "$1" = ps ] && printf '%s\\n' '{"id":"${STALE_ID}","name":"stale","state":"exited","session":"s1","ryuk":""}'`,
+    `[ "$1" = ps ] && printf '%s\\n' '{"id":"${LIVE_ID}","name":"live","state":"running","session":"s2","ryuk":""}'`,
+  ]);
 
 /** jCodeMunch names each worktree `local/<name>`; gh says `t-squashed`'s head merged by squash. */
 const stubTools = (
@@ -72,6 +86,7 @@ const stubTools = (
       `[ "$1" = index-local ] && printf '{"success": true}'`,
     ]),
     gh: `case "$*" in *"--head t-squashed"*) printf '%s' '${merged}' ;; *) printf '[]' ;; esac\n`,
+    docker: dockerStub(`${log}-docker`),
   });
 };
 
@@ -104,6 +119,8 @@ const arrangeAndSweep = (): Estate => {
 
   const log = path.join(scratch, "jcodemunch-argv");
   const bin = stubTools(primary, worktrees, squashedHead, log);
+  const orphan = decoyWorker(worktrees.fresh, true);
+  const attached = decoyWorker(worktrees.fresh, false);
   const run = runHook(sweep, {
     argv: [primary],
     env: {
@@ -111,7 +128,7 @@ const arrangeAndSweep = (): Estate => {
       DOC_INDEX_PATH: path.join(scratch, "doc-store"),
     },
   });
-  return { primary, worktrees, log, run };
+  return { primary, worktrees, log, orphan, attached, run };
 };
 
 const branchListed = (primary: string, branch: string): boolean =>
@@ -122,9 +139,34 @@ describe("the sweep over worktrees left beside running agents", () => {
   beforeAll(() => {
     estate = arrangeAndSweep();
   }, 60_000);
+  afterAll(() => {
+    for (const decoy of [estate.orphan, estate.attached]) {
+      if (decoy.alive()) decoy.stop();
+    }
+  });
 
   it("exits 0 over an estate it partly keeps", () => {
     expect(estate.run.status).toBe(0);
+  });
+
+  it("kills an orphaned vitest worker in a worktree it keeps", async () => {
+    await vi.waitFor(() => {
+      expect(estate.orphan.alive()).toBe(false);
+    });
+    expect(estate.run.stderr).toContain(`killed the vitest workers ${String(estate.orphan.pid)}`);
+  });
+
+  it("leaves a vitest worker whose run is still there", () => {
+    expect(estate.attached.alive()).toBe(true);
+    expect(estate.run.stderr).not.toContain(String(estate.attached.pid));
+  });
+
+  it("removes the stopped container no Ryuk serves, no running one", () => {
+    const removed = readFileSync(`${estate.log}-docker`, "utf8")
+      .split("\n")
+      .filter((line) => line.startsWith("rm "));
+    expect(removed).toEqual([`rm --force --volumes ${STALE_ID}`]);
+    expect(estate.run.stderr).toContain("reap-containers: 1 removed, 1 spared");
   });
 
   it("removes a clean worktree merged over an hour ago", () => {
@@ -195,6 +237,7 @@ describe("the sweep under a PATH without the user's tool folders", () => {
     mkdirSync(path.join(home, ".local"), { recursive: true });
     stubsOnPath(path.join(home, ".local/bin"), {
       "jdocmunch-mcp": recordsItsArgv(docLog, [`[ "$1" = watch-status ] && printf '{"repos":[]}'`]),
+      docker: dockerStub(path.join(scratch, "bare-docker-argv")),
     });
     run = runHook(sweep, {
       argv: [primary],
@@ -225,6 +268,7 @@ describe("the sweep when jdocmunch-mcp refuses the refresh", () => {
         "exit 0",
         "",
       ].join("\n"),
+      docker: dockerStub(path.join(scratch, "refused-docker-argv")),
     });
     const run = runHook(sweep, {
       argv: [primary],
@@ -263,7 +307,13 @@ describe.skipIf(!jdocmunchInstalled)("the sweep after docs change through git un
     gitIn(primary, "switch", "-q", "-");
     gitIn(primary, "merge", "-q", "--ff-only", "side");
     before = titles(store, name);
-    swept = runHook(sweep, { argv: [primary], env: { DOC_INDEX_PATH: store } });
+    const bin = stubsOnPath(path.join(scratch, "docs-bin"), {
+      docker: dockerStub(path.join(scratch, "docs-docker-argv")),
+    });
+    swept = runHook(sweep, {
+      argv: [primary],
+      env: { PATH: `${bin}${path.delimiter}${process.env["PATH"] ?? ""}`, DOC_INDEX_PATH: store },
+    });
   }, 120_000);
 
   it("leaves the main checkout's outline matching the files on disk", () => {

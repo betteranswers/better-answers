@@ -1,6 +1,6 @@
 # shellcheck shell=bash # sourced by the worktree hooks, so it carries no shebang of its own
 # Appended, so a tool already on PATH wins. A hook the desktop client starts has launchd's bare PATH.
-PATH="$PATH:$HOME/Library/pnpm:$HOME/.local/bin:/opt/homebrew/bin"
+PATH="$PATH:$HOME/Library/pnpm:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"
 
 say() {
   echo "$SAY_AS: $*" >&2
@@ -88,12 +88,49 @@ pr_merged_at() {
   return 0
 }
 
+# A vitest fork worker names its tree in its arguments. The patterns reach awk through the
+# environment, exported in a subshell so the whole pipeline sees them: a prefix assignment binds to
+# ps alone, and BSD awk finds an empty string in every line. Neither pipeline process names the
+# folder, so neither matches itself.
+# $1: a folder path ending in `/`; $2, when given: list only workers whose parent has gone.
+test_workers_under() {
+  [ -n "$1" ] || return 0
+  (
+    export WORKERS_UNDER="$1" WORKERS_ORPHANED="${2:-}" WORKERS_MARK="vitest/dist/workers/"
+    ps -axwwo pid=,ppid=,args= 2>/dev/null | awk '
+      length(ENVIRON["WORKERS_UNDER"]) > 0 \
+        && index($0, ENVIRON["WORKERS_UNDER"]) && index($0, ENVIRON["WORKERS_MARK"]) \
+        && (ENVIRON["WORKERS_ORPHANED"] == "" || $2 == 1) { print $1 }'
+  )
+}
+
+# Reads pids, one per line, and takes only a plain number above 1 that is not this shell. A worker
+# that outlived its run has been seen to ignore TERM, so KILL follows for any still there. Bash
+# 3.2, which a desktop-started hook runs under, has no arrays here.
+kill_test_workers() {
+  local line pids="" pid
+  while IFS= read -r line; do
+    case "$line" in '' | *[!0-9]*) continue ;; esac
+    [ "$line" -gt 1 ] && [ "$line" != "$$" ] && pids="$pids$line
+"
+  done
+  [ -n "$pids" ] || return 0
+  while IFS= read -r pid; do [ -z "$pid" ] || kill "$pid" 2>/dev/null; done <<<"$pids"
+  sleep 2
+  while IFS= read -r pid; do
+    [ -z "$pid" ] || { kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null; }
+  done <<<"$pids"
+  say "killed the vitest workers $(printf '%s' "$pids" | tr '\n' ' ')"
+}
+
 remove_worktree() {
   local root="$1" worktree="$2" branch="$3" real
   # Before the removal: a path cannot be resolved once its directory has gone.
   real="$(cd "$worktree" && pwd -P)" || return 1
   git -C "$root" worktree remove "$worktree" >&2 2>&1 || return 1
   say "removed $worktree"
+  # After the removal, so a refused one leaves a live run alone; the slash keeps siblings apart.
+  test_workers_under "$real/" | kill_test_workers
   drop_index "$real"
   [ -n "$branch" ] || return 0
   # `-d` weighs a branch by its upstream, else by the main checkout's HEAD, which lags origin/main.

@@ -1,11 +1,12 @@
 import { existsSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { gitIn, writeUnder } from "@better-answers/devtools/throwaway-tree";
 import {
   commitIn,
+  decoyWorker,
   hookScript,
   mergeOnOrigin,
   originAndClone,
@@ -82,6 +83,50 @@ describe("the jCodeMunch index a removed worktree leaves behind", () => {
     expect(existsSync(worktree)).toBe(true);
     expect(argvLines(log)).toEqual([]);
     expect(run.stderr).toContain("keeping");
+  });
+
+  it("kills the removed worktree's vitest workers, not a neighbour's", async () => {
+    const { root, worktree } = worktreeOf("workers");
+    const neighbour = worktreeUnder(scratch, root, "workers-neighbour");
+    const own = decoyWorker(worktree, false);
+    const next = decoyWorker(neighbour, false);
+    try {
+      const run = removeHook(
+        worktree,
+        stubTools("workers", worktree, path.join(scratch, "w-argv")),
+      );
+
+      expect(run.status).toBe(0);
+      expect(existsSync(worktree)).toBe(false);
+      await vi.waitFor(() => {
+        expect(own.alive()).toBe(false);
+      });
+      expect(run.stderr).toContain(`killed the vitest workers ${String(own.pid)}`);
+      expect(next.alive()).toBe(true);
+    } finally {
+      for (const decoy of [own, next]) {
+        if (decoy.alive()) decoy.stop();
+      }
+    }
+  });
+
+  it("leaves the vitest workers of a worktree it keeps", () => {
+    const { worktree } = worktreeOf("kept-workers");
+    writeFileSync(path.join(worktree, "half-done.txt"), "work in progress\n");
+    const own = decoyWorker(worktree, false);
+    try {
+      const run = removeHook(
+        worktree,
+        stubTools("kept-workers", worktree, path.join(scratch, "kw")),
+      );
+
+      expect(run.status).toBe(0);
+      expect(existsSync(worktree)).toBe(true);
+      expect(own.alive()).toBe(true);
+      expect(run.stderr).not.toContain("killed");
+    } finally {
+      own.stop();
+    }
   });
 
   it("removes a worktree holding only a .scratch link, notes intact", () => {
