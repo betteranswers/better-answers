@@ -73,6 +73,8 @@ import {
   OAUTH_SCOPES,
   PASSKEY_VERIFY_PATH,
   REFRESH_TOKEN_LIFETIME_SECONDS,
+  SESSION_LIFETIME_SECONDS,
+  SESSION_RENEWAL_AGE_SECONDS,
   SIGN_IN_PATH,
 } from "./constants.ts";
 import { codeHashOf } from "./link-token.ts";
@@ -557,6 +559,8 @@ export const createAuth = (deps: AuthDependencies) => {
     session: {
       /** Our confirmation stamp is the one freshness rule, so the library's own never refuses. */
       freshAge: 0,
+      expiresIn: SESSION_LIFETIME_SECONDS,
+      updateAge: SESSION_RENEWAL_AGE_SECONDS,
       additionalFields: {
         secondFactorConfirmedAt: { type: "date", required: false, input: false, returned: false },
         pendingSince: { type: "date", required: false, input: false, returned: false },

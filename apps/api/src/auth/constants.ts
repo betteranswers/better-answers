@@ -121,6 +121,12 @@ export const PASSKEY_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10
 /** The sign-in page asks once as it opens, for the browser's autofill, and again per press. */
 export const PASSKEY_SIGN_IN_IP_RULE: CounterRule = { windowMs: 60_000, max: 30 };
 
+/** A session lives this long, renewed while the person keeps using it. */
+export const SESSION_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
+
+/** The library moves a session's expiry on a day again once this much of its life has passed. */
+export const SESSION_RENEWAL_AGE_SECONDS = 24 * 60 * 60;
+
 export const MCP_UNAUTHENTICATED_IP_RULE: CounterRule = { windowMs: 60_000, max: 60 };
 
 export const TRPC_IP_RULE: CounterRule = { windowMs: 60_000, max: 120 };
