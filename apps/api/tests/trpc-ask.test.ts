@@ -315,12 +315,19 @@ describe("a streamed mutation through the Hono mount", () => {
       const streamed = createTRPCClient<typeof streaming>({
         links: [httpBatchStreamLink({ url: `${origin}${TRPC_ENDPOINT}` })],
       });
-      const events = (await streamed.twice.mutate())[Symbol.asyncIterator]();
-      const first = await events.next();
+      const waited = Promise.withResolvers<"still held">();
+      const timer = setTimeout(() => waited.resolve("still held"), 5_000);
+      const events = (async () => (await streamed.twice.mutate())[Symbol.asyncIterator]())();
+      // A buffered mount sends nothing until the second is released, so the race ends it.
+      const first = await Promise.race([events.then((stream) => stream.next()), waited.promise]);
+      clearTimeout(timer);
       held.resolve();
-      const second = await events.next();
+      const second = await (await events).next();
 
-      expect([first.value, second.value]).toEqual(["first", "second"]);
+      expect([first, second]).toEqual([
+        { done: false, value: "first" },
+        { done: false, value: "second" },
+      ]);
     });
   });
 });
