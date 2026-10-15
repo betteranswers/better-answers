@@ -94,13 +94,20 @@ export type AskCaps = {
   /** The concepts an answer returns: entry points first, then what the walk reached. */
   readonly related: number;
   readonly unmappedPassages: number;
+  /** The `Answer`s the judge is asked about, in the order they bear; any beyond stay related. */
+  readonly candidates: number;
 };
 
 /**
  * Each applies to what the reader may read. `related` exceeds `entryPoints`, or the walk has no
  * slot; a host's largest result bounds it.
  */
-export const ASK_CAPS: AskCaps = { entryPoints: 20, related: 28, unmappedPassages: 3 };
+export const ASK_CAPS: AskCaps = {
+  entryPoints: 20,
+  related: 28,
+  unmappedPassages: 3,
+  candidates: 20,
+};
 
 /** Runs `work` in a short read-only transaction of its own, and answers what it answered. */
 export type ReadStep<Refused = never> = <Read, Failure>(

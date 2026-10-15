@@ -25,7 +25,13 @@ export {
   resolveModel,
   RETRY_WAITS_MS,
 } from "./client.ts";
-export type { ModelAttemptLine, ModelCall, ModelToCall } from "./client.ts";
+export type {
+  ModelAttemptLine,
+  ModelCall,
+  ModelClient,
+  ModelOutcome,
+  ModelToCall,
+} from "./client.ts";
 export { openCredentials, openModelKeySetting } from "./credentials.ts";
 export type { Credentials, ModelKeySetting } from "./credentials.ts";
 export { CHOOSABLE_PROVIDERS, SUB_PROCESSORS } from "./sub-processors.ts";

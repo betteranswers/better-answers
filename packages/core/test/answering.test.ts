@@ -225,6 +225,47 @@ describe("the answer's rendering", () => {
     ]);
   });
 
+  it("renders each fit before the related knowledge, under its line", () => {
+    const fit = returned({ title: "Who reads the audit log?", body: "Admins read it.\n" });
+    const rendered = renderAnswer(
+      answer({ verdict: "ok", judgeState: "judged", answers: [fit], related: [returned()] }),
+    );
+
+    expect(linesOf(rendered).slice(4)).toEqual([
+      "",
+      "## Answer · audits",
+      "Question: Who reads the audit log?",
+      "_Unverified_",
+      "",
+      "Admins read it.",
+      "",
+      "https://better-answers.com/c/01A — https://app.example/knowledge/search/01A",
+      "",
+      "**Related knowledge, which the judge did not find answers the question as asked.**",
+      "",
+      "## Answer · audits",
+      "Question: How long are audit logs kept?",
+      "_Unverified_",
+      "",
+      "Audit logs are kept for thirteen months.",
+      "",
+      "https://better-answers.com/c/01A — https://app.example/knowledge/search/01A",
+    ]);
+  });
+
+  it("renders fits with no related line when nothing else bears", () => {
+    const rendered = renderAnswer(
+      answer({ verdict: "ok", judgeState: "judged", answers: [returned()], related: [] }),
+    );
+
+    expect(rendered).not.toContain("Related knowledge");
+    expect(linesOf(rendered).slice(4, 7)).toEqual([
+      "",
+      "## Answer · audits",
+      "Question: How long are audit logs kept?",
+    ]);
+  });
+
   it("lists any other concept after the `Answer`s, to open", () => {
     const policy: PreviewedConcept<string> = {
       iri: "https://better-answers.com/c/01B",
@@ -627,7 +668,7 @@ describe("what the slice's four actions answer", () => {
     expectTypeOf(find).returns.resolves.toEqualTypeOf<Result<FindResult, "role-forbids" | Error>>();
     expectTypeOf(open).returns.resolves.toEqualTypeOf<Result<OpenResult, "role-forbids" | Error>>();
     expectTypeOf(ask<"credentials-revoked">).returns.resolves.toEqualTypeOf<
-      Result<AnswerResult, "role-forbids" | "credentials-revoked" | Error>
+      Result<AnswerResult, "role-forbids" | "spending-limit-met" | "credentials-revoked" | Error>
     >();
     expectTypeOf(giveFeedback).returns.resolves.toEqualTypeOf<
       Result<FeedbackReceipt, "role-forbids" | "not-found" | Malformed | Error>
@@ -651,7 +692,13 @@ describe("what the slice's four actions answer", () => {
     const aStepRan = (): never => {
       throw new Error("a step ran for a person ask never admitted");
     };
-    const noStep: AskSteps = { openRecord: aStepRan, read: aStepRan, completeRecord: aStepRan };
+    const noStep: AskSteps = {
+      openRecord: aStepRan,
+      read: aStepRan,
+      reserve: aStepRan,
+      callModel: aStepRan,
+      completeRecord: aStepRan,
+    };
 
     const receipt = await acting(reader, (principal, tx) =>
       giveFeedback(stranger(principal), tx, { recordId: A_RECORD, verdict: "helpful" }, now),

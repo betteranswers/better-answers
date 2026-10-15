@@ -10,11 +10,13 @@ import {
   completeRecord,
   openRecord,
   planAnswer,
+  reserveJudge,
   type AnswerResult,
   type AskCaps,
   type AskSteps,
 } from "../src/answering/index.ts";
 import type { PrincipalRefusal, Result, UserPrincipal } from "../src/kernel/index.ts";
+import { openCredentials, type Credentials, type ModelClient } from "../src/llm/index.ts";
 import {
   openPostgres,
   withMember,
@@ -30,9 +32,27 @@ const flat = <Value, Inner, Outer>(
   opened: Result<Result<Value, Inner>, Outer>,
 ): Result<Value, Inner | Outer> => (opened.ok ? opened.value : opened);
 
+/** Invented: it seals nothing outside the suites. */
+export const SUITE_ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => 255 - index);
+
+/** The judge's model client, and the keys it opens; a call with no client set fails its test. */
+export type Judging = {
+  readonly credentials?: Credentials;
+  readonly callModel?: ModelClient["callModel"];
+};
+
+const NO_MODEL_CALL = (): never => {
+  throw new Error("a model was called where the test set up no model client");
+};
+
 /** The steps a transport hands `ask`: each one a transaction of its own, as the asker. */
-export const stepsFor = (pool: pg.Pool, asker: UserPrincipal): AskSteps<PrincipalRefusal> => {
+export const stepsFor = (
+  pool: pg.Pool,
+  asker: UserPrincipal,
+  judging: Judging = {},
+): AskSteps<PrincipalRefusal> => {
   const door = openPostgres(pool);
+  const credentials = judging.credentials ?? openCredentials(SUITE_ENVELOPE_KEY);
   return {
     openRecord: async (opening) =>
       flat(
@@ -41,6 +61,13 @@ export const stepsFor = (pool: pg.Pool, asker: UserPrincipal): AskSteps<Principa
         ),
       ),
     read: async (work) => flat(await withMemberUnheld(asker, door, (_member, tx) => work(tx))),
+    reserve: async (reserving) =>
+      flat(
+        await withMember(asker, door, (member, tx) =>
+          reserveJudge(member, tx, credentials, reserving),
+        ),
+      ),
+    callModel: judging.callModel ?? NO_MODEL_CALL,
     completeRecord: async (completion) =>
       flat(
         await withMember(asker, door, (member, tx) =>
@@ -52,16 +79,24 @@ export const stepsFor = (pool: pg.Pool, asker: UserPrincipal): AskSteps<Principa
 
 export type Asking = z.input<typeof askInput>;
 
-type Told = { readonly caps?: AskCaps; readonly now?: Date };
+type Told = { readonly caps?: AskCaps; readonly now?: Date; readonly judging?: Judging };
 
 /** Asks as `asker` through steps on the runtime pool; `now` is this instant unless told. */
 export const askedAsIs = async (
   db: MigratedPostgres,
   asker: UserPrincipal,
   asking: Asking,
-  { caps, now = new Date() }: Told = {},
+  { caps, now = new Date(), judging }: Told = {},
 ): Promise<AnswerResult> =>
-  answered(await ask(asker, stepsFor(db.runtimePool, asker), inputOf(askInput, asking), now, caps));
+  answered(
+    await ask(
+      asker,
+      stepsFor(db.runtimePool, asker, judging),
+      inputOf(askInput, asking),
+      now,
+      caps,
+    ),
+  );
 
 /** As `askedAsIs`, the map's tables counted first. */
 export const asked = async (
