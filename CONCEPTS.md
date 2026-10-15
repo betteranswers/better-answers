@@ -1285,6 +1285,12 @@ not, the `Answer` it must or must not reuse, the expected verdict.
 The workspace's tests are replayed retrieval-only when the answer path changes and weekly; a test is
 *stale* when a concept it names is deprecated.
 
+### unmapped-passage rate
+
+_Internal._ of a workspace's *Questions asked* records flagged *incomplete*, how many showed unmapped
+passages: two counts, never one percentage. With recall at ten on the answer tests, it is one of the
+two readings that bring vectors in.
+
 ### audit event
 
 The record of one action by an Admin, the platform or a person acting on their own identity — what was

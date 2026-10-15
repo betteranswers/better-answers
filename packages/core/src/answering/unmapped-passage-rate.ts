@@ -1,0 +1,61 @@
+import { z } from "zod";
+
+import {
+  boundarySchemas,
+  FEEDBACK_FLAG_VERDICT,
+  type FEEDBACK_REASONS,
+} from "@better-answers/schema";
+
+import { attempt, err, ok, type PlatformPrincipal, type Result } from "../kernel/index.ts";
+import { withScopeRead, type PostgresDoor } from "../store/postgres/index.ts";
+
+const MEASURES_ACTOR = "process:better-answers-measures";
+
+export type AnswerMeasuresPrincipal = PlatformPrincipal & {
+  readonly actorId: typeof MEASURES_ACTOR;
+};
+
+export const ANSWER_MEASURES: AnswerMeasuresPrincipal = {
+  kind: "platform",
+  actorId: MEASURES_ACTOR,
+};
+
+const INCOMPLETE = "incomplete" satisfies (typeof FEEDBACK_REASONS)[number];
+
+const theCounts = z.object({
+  /** Records holding at least one flag whose reason is incomplete, open or closed. */
+  flaggedIncomplete: z.number().int(),
+  /** Of those, the records whose result showed at least one unmapped passage. */
+  showedUnmappedPassages: z.number().int(),
+});
+
+/** Two counts and never their quotient: no reading of it is a single percentage. */
+export type UnmappedPassageRate = z.output<typeof theCounts>;
+
+const THE_COUNTS = `SELECT count(*)::int AS "flaggedIncomplete",
+         count(*) FILTER (WHERE cardinality(a.unmapped_passages) > 0)::int
+           AS "showedUnmappedPassages"
+    FROM question_asked a
+   WHERE a.workspace_id = $1
+     AND EXISTS (SELECT 1 FROM question_feedback f
+                  WHERE f.workspace_id = a.workspace_id AND f.record_id = a.id
+                    AND f.verdict = '${FEEDBACK_FLAG_VERDICT}' AND f.reason = '${INCOMPLETE}')`;
+
+/**
+ * Of a workspace's records flagged incomplete, how many showed unmapped passages: one of the two
+ * readings that bring vectors in. It reads in a read-only transaction scoped to that workspace.
+ */
+export const unmappedPassageRate = async (
+  platform: AnswerMeasuresPrincipal,
+  door: PostgresDoor,
+  input: { readonly workspaceId: string },
+): Promise<Result<UnmappedPassageRate, "malformed" | Error>> => {
+  const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
+  if (!workspace.success) return err("malformed");
+  const counted = await attempt(() =>
+    withScopeRead(platform, door, workspace.data, async (tx) =>
+      theCounts.parse((await tx.query(THE_COUNTS, [workspace.data])).rows[0]),
+    ),
+  );
+  return counted.ok ? ok(counted.value) : err(counted.error);
+};

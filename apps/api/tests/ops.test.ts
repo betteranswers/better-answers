@@ -59,6 +59,8 @@ import {
   modelChoice,
   modelKey,
   modelPrice,
+  questionAsked,
+  questionFeedback,
   sourceDocument,
   spendReservation,
   suppression,
@@ -214,6 +216,7 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "map-rebuild": [mapGeneration, mapNode, mapEdge, job],
   "map-sweep": [mapGeneration, mapNode, mapEdge],
   "map-counts": [mapGeneration, mapNode, mapEdge],
+  "unmapped-passage-rate": [questionAsked, questionFeedback],
   "reconcile-watermark": [conceptIndex, bundleCommit],
   "object-store-orphans": [sourceDocument],
   "reindex-connected-sources": [connectedSource, job],
@@ -1462,6 +1465,54 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("answers usage to a non-id workspace before reading anything", async () => {
       const run = await ops(app(), ["map-counts", "--workspace", "ws_synthetic"]);
+
+      expect(run.exitCode).toBe(2);
+    });
+  });
+
+  describe("unmapped-passage-rate — the records flagged incomplete, as JSON", () => {
+    const flaggedIncomplete = async (
+      app: TestApp,
+      workspaceId: string,
+      unmappedPassages: readonly string[],
+    ): Promise<void> => {
+      const client = await app.database.superuser.connect();
+      try {
+        const seed = testData(client);
+        const record = await seed.questionAsked({
+          workspaceId,
+          completedAt: new Date(),
+          verdict: "related",
+          judgeState: "not-judged",
+          unmappedPassages: [...unmappedPassages],
+        });
+        await seed.questionFeedback({
+          workspaceId,
+          recordId: record.id,
+          verdict: "flag",
+          reason: "incomplete",
+        });
+      } finally {
+        client.release();
+      }
+    };
+
+    it("reports two of three records showing unmapped passages", async () => {
+      const { workspaceId } = await app().provision();
+      await flaggedIncomplete(app(), workspaceId, ["documents/handbook.pdf#page=4"]);
+      await flaggedIncomplete(app(), workspaceId, ["documents/handbook.pdf#page=9"]);
+      await flaggedIncomplete(app(), workspaceId, []);
+
+      const run = await ops(app(), ["unmapped-passage-rate", "--workspace", workspaceId]);
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 0,
+        lines: ['{"flagged_incomplete":3,"showed_unmapped_passages":2}'],
+      });
+    });
+
+    it("answers usage to a non-id workspace before reading anything", async () => {
+      const run = await ops(app(), ["unmapped-passage-rate", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
     });

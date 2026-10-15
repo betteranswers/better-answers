@@ -40,6 +40,7 @@ import {
   withPrincipal,
   withPrincipalRead,
   withScope,
+  withScopeRead,
   type Answered,
   type PostgresDoor,
   type Tx,
@@ -338,6 +339,28 @@ describe("a read door", () => {
       ok: true,
       value: "landed",
     });
+  });
+
+  it("refuses a write in a workspace's scope at its statement", async () => {
+    const { workspaceId } = await seedMember();
+    const door = openPostgres(db().runtimePool);
+    const key = `probe-${ulid()}`;
+    const probe = async (tx: Tx) => {
+      await configProbeWritten(tx, workspaceId, key);
+      return "landed";
+    };
+
+    await expect(withScopeRead(bootstrap, door, workspaceId, probe)).rejects.toMatchObject({
+      code: "25006",
+    });
+    const kept = () =>
+      db().pool.query("SELECT 1 FROM workspace_config WHERE workspace_id = $1 AND key = $2", [
+        workspaceId,
+        key,
+      ]);
+    expect((await kept()).rowCount).toBe(0);
+    expect(await withScope(bootstrap, door, workspaceId, probe)).toBe("landed");
+    expect((await kept()).rowCount).toBe(1);
   });
 });
 

@@ -182,6 +182,15 @@ const scopeTo = async (tx: Tx, workspaceId: string): Promise<void> => {
   await tx.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
 };
 
+type ScopedWork<T> = (tx: Tx, platform: PlatformPrincipal) => Promise<T>;
+
+const scopedTo =
+  <T>(platform: PlatformPrincipal, workspaceId: string, work: ScopedWork<T>) =>
+  async (tx: Tx): Promise<T> => {
+    await scopeTo(tx, workspaceId);
+    return work(tx, platform);
+  };
+
 /**
  * Runs `work` in one transaction scoped to `workspaceId`. It rolls back when `work` throws or
  * answers a refused Result.
@@ -190,12 +199,17 @@ export const withScope = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
   workspaceId: string,
-  work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
+  work: ScopedWork<T>,
+): Promise<T> => transaction(door, scopedTo(platform, workspaceId, work));
+
+/** As withScope, but read-only: a write inside the work fails at its own statement. */
+export const withScopeRead = async <T>(
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  workspaceId: string,
+  work: ScopedWork<T>,
 ): Promise<T> =>
-  transaction(door, async (tx) => {
-    await scopeTo(tx, workspaceId);
-    return work(tx, platform);
-  });
+  transaction(door, scopedTo(platform, workspaceId, work), answersARefusal, "BEGIN READ ONLY");
 
 /** A connection whose unlock failed may still hold its session lock, so it is destroyed, not pooled. */
 const failedUnlocks = new WeakMap<pg.PoolClient, Error>();

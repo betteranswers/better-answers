@@ -92,6 +92,7 @@ export {
   readQuestionsAsked,
   type QuestionsAskedInput,
 } from "./records.ts";
+export { ANSWER_MEASURES, unmappedPassageRate } from "./unmapped-passage-rate.ts";
 
 export {
   TRUST_RIDERS,
