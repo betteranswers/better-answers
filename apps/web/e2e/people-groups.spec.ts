@@ -317,7 +317,7 @@ test.describe("a group's actions", () => {
     await passesTheAccessibilityGate();
   });
 
-  test("searches the groups by name, and clears back to them all", async ({ page, request }) => {
+  test("searches the groups by name, then clears the search", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Aire Weir");
 
     await page.keyboard.press(GROUPS_KEYSTROKES.search.key);
@@ -339,10 +339,7 @@ test.describe("a group's actions", () => {
     await expect(countOf(groupsRegion(page))).toHaveText(/\b2\b/);
   });
 
-  test("keeps focus in the search box as a created row leaves and returns", async ({
-    page,
-    request,
-  }) => {
+  test("keeps search focus as a created row leaves and returns", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Esk Weir");
     await groupsRegion(page).getByRole("button", { name: "Create a Group" }).click();
     await nameField(page).fill("Site leads");
@@ -357,10 +354,7 @@ test.describe("a group's actions", () => {
     await expect(searchBox(page), "the returning row took focus").toBeFocused();
   });
 
-  test("hands focus to the heading when a rename takes the row out of the search", async ({
-    page,
-    request,
-  }) => {
+  test("focuses the heading once a rename hides the row", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Ure Weir");
     await searchBox(page).fill("HR");
     await expect(groupRows(page)).toHaveCount(1);
@@ -380,10 +374,7 @@ test.describe("a group's actions", () => {
     ).toBeFocused();
   });
 
-  test("says a group already has the name, and keeps the dialog open", async ({
-    page,
-    request,
-  }) => {
+  test("says the group already has the name, dialog open", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Swale Weir");
     const renaming = await renamingFromTheRowMenu(page, "HR team");
 

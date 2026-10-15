@@ -1,4 +1,4 @@
-import type { APIRequestContext, Locator, Page } from "@playwright/test";
+import type { APIRequestContext, Locator, Page, Route } from "@playwright/test";
 
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
@@ -77,22 +77,32 @@ const DECLINE_FORBIDDEN = {
   },
 };
 
-/** Held until the returned call, so the row's leaving is seen before the api's answer lands. */
-const refusingTheDeclineOnRelease = async (page: Page): Promise<() => void> => {
+/** A route answered only once the returned call is made, so what the page does meanwhile is seen. */
+const heldUntilReleased = async (
+  page: Page,
+  procedure: string,
+  answer: (route: Route) => Promise<void>,
+): Promise<() => void> => {
   let release = () => {};
   const released = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route(asks("members.declineRequest"), async (route) => {
+  await page.route(asks(procedure), async (route) => {
     await released;
-    await route.fulfill({ json: [DECLINE_FORBIDDEN] });
+    await answer(route);
   });
   return release;
 };
 
-/** Never answered, so only the undo can bring a row back: the read after a refusal would too. */
+/** The decline, refused once released, so the row's leaving is seen before the api's answer lands. */
+const refusingTheDeclineOnRelease = (page: Page) =>
+  heldUntilReleased(page, "members.declineRequest", (route) =>
+    route.fulfill({ json: [DECLINE_FORBIDDEN] }),
+  );
+
+/** The read, answered once released: only the undo restores a row meanwhile, and the act settles on it. */
 const holdingTheRequestsRead = (page: Page) =>
-  page.route(asks("members.requests"), () => undefined);
+  heldUntilReleased(page, "members.requests", (route) => route.continue());
 
 /** A role select is described by its role's meaning, so a pick shows in a description that changed. */
 const describedAfresh = async (select: Locator, pick: () => Promise<void>): Promise<void> => {
@@ -279,7 +289,7 @@ test.describe("the People page's Requests tab", () => {
     await anAdminAtRequests(page, request, "Nidd Weir", [{ displayName: "Priya Shah" }]);
     await openRequests(page);
     await expect(rowOf(page, "Priya Shah")).toHaveCount(1);
-    await holdingTheRequestsRead(page);
+    const answerTheRead = await holdingTheRequestsRead(page);
     const refuse = await refusingTheDeclineOnRelease(page);
 
     await rowOf(page, "Priya Shah")
@@ -288,8 +298,10 @@ test.describe("the People page's Requests tab", () => {
     await expect(rowOf(page, "Priya Shah"), "the row waited for the api").toHaveCount(0);
 
     refuse();
-    await saysARefusal(requestsRegion(page).getByRole("alert"));
     await expect(rowOf(page, "Priya Shah"), "the refused decline left the row gone").toHaveCount(1);
+    answerTheRead();
+    await saysARefusal(requestsRegion(page).getByRole("alert"));
+    await expect(rowOf(page, "Priya Shah")).toHaveCount(1);
   });
 
   test("an Admin decides requests by keyboard alone", async ({
