@@ -346,7 +346,13 @@ export type TestAppOptions = {
   readonly fetchModel?:
     | ((input: string | URL | Request, init?: RequestInit) => Promise<Response>)
     | undefined;
+
+  /** Null serves with none, as an api whose envelope key would not read. */
+  readonly envelopeKey?: Uint8Array | null | undefined;
 };
+
+const envelopeKeyOf = ({ envelopeKey }: TestAppOptions): Uint8Array | undefined =>
+  envelopeKey === null ? undefined : (envelopeKey ?? HARNESS_ENVELOPE_KEY);
 
 /**
  * A healthy TestApp over a fresh migrated database and git root; `stop` removes both.
@@ -391,7 +397,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
       return cimdFixture(input);
     },
     fetchModel: options.fetchModel ?? noModelWire,
-    envelopeKey: HARNESS_ENVELOPE_KEY,
+    envelopeKey: envelopeKeyOf(options),
     logger,
     webRoot: options.webRoot,
   });

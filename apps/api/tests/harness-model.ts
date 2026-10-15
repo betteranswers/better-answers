@@ -17,7 +17,7 @@ export type SentToModel = {
   readonly body: string;
 };
 
-type Answering = (sent: SentToModel) => Response;
+type Answering = (sent: SentToModel) => Response | Promise<Response>;
 
 /** The provider's side of the wire: each request kept, each answered as the test last said. */
 export const aModelWire = () => {
@@ -37,7 +37,7 @@ export const aModelWire = () => {
         body: typeof init?.body === "string" ? init.body : "",
       };
       sent.push(one);
-      return answering.current(one);
+      return await answering.current(one);
     },
   };
 };

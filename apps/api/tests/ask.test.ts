@@ -98,6 +98,38 @@ describe("ask, judged over MCP", () => {
     expect(text).toContain(`Record of this question: ${answer.recordId}`);
   });
 
+  it("holds no connection while the judge is called", async () => {
+    const { asking } = await anAdminAsking();
+    const contended: string[] = [];
+    // NOWAIT fails at once on any lock a transaction open across the call would hold.
+    const contender = async () => {
+      const client = await app().database.superuser.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(
+          `LOCK TABLE member, "user", group_member, question_asked, question_content,
+                      spend_reservation, llm_call, workspace_config, model_choice, model_key
+             IN ACCESS EXCLUSIVE MODE NOWAIT`,
+        );
+        contended.push("locked");
+      } catch (cause) {
+        contended.push(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        await client.query("ROLLBACK");
+        client.release();
+      }
+    };
+    wire.answerWith(async (sent) => {
+      await contender();
+      return judgeSaying([USERS.title])(sent);
+    });
+
+    const answer = judged.parse(structured(await asking({ question: QUESTION })));
+
+    expect(contended).toEqual(["locked"]);
+    expect(answer.verdict).toBe("ok");
+  });
+
   it("AE9: refuses at the spending limit and keeps the question", async () => {
     const { workspaceId, asking } = await anAdminAsking("0.001");
     wire.answerWith(judgeSaying([USERS.title]));

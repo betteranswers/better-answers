@@ -43,7 +43,7 @@ const A_KEY = "sk-test-u13-invented-key-0001";
 
 type Judging = {
   /** No limit is set where it is null. */
-  readonly limit?: string | null;
+  readonly limitGbp?: string | null;
   readonly chosen?: boolean;
   /** The envelope key the model key is sealed under; none is set where it is null. */
   readonly sealedUnder?: Uint8Array | null;
@@ -54,7 +54,7 @@ const ANOTHER_ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => i
 
 /** A workspace whose Admin asks, judging on Sonnet with a key, priced, under a limit. */
 const aJudgingWorkspace = async ({
-  limit = "100",
+  limitGbp = "100",
   chosen = true,
   sealedUnder = SUITE_ENVELOPE_KEY,
 }: Judging = {}) => {
@@ -91,9 +91,9 @@ const aJudgingWorkspace = async ({
       }),
     );
   }
-  if (limit !== null) {
+  if (limitGbp !== null) {
     answered(
-      await setSpendingLimit(PLATFORM, openPostgres(db().pool), { workspaceId, gbp: limit }),
+      await setSpendingLimit(PLATFORM, openPostgres(db().pool), { workspaceId, gbp: limitGbp }),
     );
   }
   return { workspaceId, asker };
@@ -406,7 +406,7 @@ describe("ask with a judge", () => {
   });
 
   it("AE9: refuses at the limit, calls nothing, keeps the question", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace({ limit: "0.01" });
+    const { workspaceId, asker } = await aJudgingWorkspace({ limitGbp: "0.01" });
     await seededIn(workspaceId, [USERS]);
     const wire = judgeSaying([USERS.title]);
 
@@ -430,7 +430,7 @@ describe("ask with a judge", () => {
   });
 
   it("answers at the limit where no `Answer` is a candidate", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace({ limit: "0.01" });
+    const { workspaceId, asker } = await aJudgingWorkspace({ limitGbp: "0.01" });
     await seededIn(workspaceId, [
       { collection: "audits", title: "Audit information access", body: "Buyers ask support.\n" },
     ]);
@@ -461,7 +461,7 @@ describe("ask with a judge", () => {
 
   it.each([
     ["no key", { sealedUnder: null }],
-    ["no limit", { limit: null }],
+    ["no limit", { limitGbp: null }],
   ] as const)("reserves and calls nothing for a workspace with %s", async (_case, judging) => {
     const { workspaceId, asker } = await aJudgingWorkspace(judging);
     await seededIn(workspaceId, [USERS]);
@@ -580,8 +580,8 @@ describe("ask with a judge", () => {
       try {
         await client.query("BEGIN");
         await client.query(
-          `LOCK TABLE question_asked, question_content, spend_reservation, llm_call,
-                      workspace_config, model_choice, model_key
+          `LOCK TABLE member, "user", group_member, question_asked, question_content,
+                      spend_reservation, llm_call, workspace_config, model_choice, model_key
              IN ACCESS EXCLUSIVE MODE NOWAIT`,
         );
         contended.push("locked");
