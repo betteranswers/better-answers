@@ -2,8 +2,9 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { jumpsIn, linesOf, matching, searchGroup, type JumpGroup } from "@/app/jump-to.tsx";
-import { findWhat, JUMP_TO, nothingMatches } from "@/app/words.ts";
+import { findWhat, JUMP_TO } from "@/app/words.ts";
 import { CONSOLE, readerOf, AREAS, visibleTo, type Role, type Area } from "@/shared/navigation.ts";
+import { nothingMatches } from "@/shared/words.ts";
 
 import { openApp } from "./open-app.tsx";
 import { answeringAs } from "./stubbed-api.ts";

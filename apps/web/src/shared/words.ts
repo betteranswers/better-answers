@@ -26,6 +26,8 @@ export const counted = (count: number, one: string, many: string): string =>
 /** A list a search or a filter emptied names what its button clears: the search where it has that alone. */
 export const CLEAR_WORDS = { search: "Clear Search", filters: "Clear Filters" } as const;
 
+export const nothingMatches = (typed: string): string => `No results found for “${typed}”.`;
+
 /** Rounded up, so the reader never asks again before a ceiling lifts. */
 export const minutesUntil = (seconds: number): string =>
   counted(Math.max(1, Math.ceil(seconds / 60)), "minute", "minutes");

@@ -1,4 +1,4 @@
-import type { APIRequestContext, Locator, Page } from "@playwright/test";
+import type { APIRequestContext, Locator, Page, Route } from "@playwright/test";
 
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
@@ -40,8 +40,9 @@ const requestsRegion = (page: Page) => page.getByRole("region", { name: "Request
 /** The region's outcome line: its count is a status too, and stands before it. */
 const saidIn = (page: Page): Locator => requestsRegion(page).getByRole("status").last();
 
-/** An empty list is one paragraph, which says so, where a list of requests draws a table. */
-const emptyLine = (page: Page): Locator => requestsRegion(page).getByRole("paragraph");
+/** An empty list is the empty state's title, where a list of requests draws a table. */
+const emptyLine = (page: Page): Locator =>
+  requestsRegion(page).locator("[data-slot='empty-title']");
 
 /** The output in the row under the Requests region's heading: the count of requests. */
 const THE_COUNT = "//section[h2='Requests']/div/output";
@@ -56,6 +57,52 @@ const rowOf = (page: Page, name: string): Locator => requestRows(page).filter({ 
 
 const approveDialog = (page: Page, name: string) =>
   page.getByRole("dialog", { name: `Approve Request from ${name}` });
+
+/** A batch's address names its procedures, so a call is matched by its name alone. */
+const asks =
+  (procedure: string) =>
+  (url: URL): boolean =>
+    url.pathname.replace("/trpc/", "").split(",").includes(procedure);
+
+/** A refusal that leaves the request waiting on the api, unlike one that says it was decided. */
+const DECLINE_FORBIDDEN = {
+  error: {
+    message: "role-forbids",
+    code: -32_003,
+    data: {
+      code: "FORBIDDEN",
+      httpStatus: 403,
+      refusal: { word: "role-forbids", class: "forbidden" },
+    },
+  },
+};
+
+/** A route answered only once the returned call is made, so what the page does meanwhile is seen. */
+const heldUntilReleased = async (
+  page: Page,
+  procedure: string,
+  answer: (route: Route) => Promise<void>,
+): Promise<() => void> => {
+  let release = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(asks(procedure), async (route) => {
+    await released;
+    await answer(route);
+  });
+  return release;
+};
+
+/** The decline, refused once released, so the row's leaving is seen before the api's answer lands. */
+const refusingTheDeclineOnRelease = (page: Page) =>
+  heldUntilReleased(page, "members.declineRequest", (route) =>
+    route.fulfill({ json: [DECLINE_FORBIDDEN] }),
+  );
+
+/** The read, answered once released: only the undo restores a row meanwhile, and the act settles on it. */
+const holdingTheRequestsRead = (page: Page) =>
+  heldUntilReleased(page, "members.requests", (route) => route.continue());
 
 /** A role select is described by its role's meaning, so a pick shows in a description that changed. */
 const describedAfresh = async (select: Locator, pick: () => Promise<void>): Promise<void> => {
@@ -152,7 +199,8 @@ test.describe("the People page's Requests tab", () => {
     await expect(approving).toHaveCount(0);
     await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeFocused();
     await expect(saidIn(page)).toContainText(priya);
-    await expect(requestRows(page)).toHaveCount(0);
+    // The empty state draws as a row, so the request's own row is the one counted.
+    await expect(rowOf(page, "Priya Shah")).toHaveCount(0);
     await expect(emptyLine(page)).toHaveText(/\S/);
 
     await page.getByRole("tab", { name: "Invitations" }).click();
@@ -185,23 +233,75 @@ test.describe("the People page's Requests tab", () => {
     await expect(requestRows(page).nth(2)).toContainText("Ola Nowak");
   });
 
-  test("an empty tab says so in one line, inviting once", async ({ page, request }) => {
+  test("an empty tab says so, inviting once", async ({ page, request }) => {
     await anAdminAtRequests(page, request, "Swale Presswork", []);
     await openRequests(page);
 
     await expect(requestsRegion(page)).toMatchAriaSnapshot(`
       - region "Requests":
-        - /children: equal
         - heading "Requests" [level=2]
         - status
         - button "Invite a Person"
         - status
-        - paragraph: /\\S/
+        - searchbox "Search by name or address"
+        - table:
+          - caption
+          - rowgroup:
+            - row "Person Reason State Asked Actions"
+          - rowgroup:
+            - row:
+              - cell "No requests waiting"
     `);
     await expect(invitingButtons(page), "the head's action is the one way to invite").toHaveCount(
       1,
     );
     await expect(page.getByRole("button", { name: "Invite a Person", exact: true })).toBeVisible();
+  });
+
+  test("searches the requests by name and by address", async ({ page, request }) => {
+    await anAdminAtRequests(page, request, "Aire Weir", [
+      { displayName: "Priya Shah" },
+      { displayName: "Sam Okafor" },
+      { displayName: "Ola Nowak" },
+    ]);
+    await openRequests(page);
+    await expect(requestRows(page)).toHaveCount(3);
+
+    const search = requestsRegion(page).getByRole("searchbox", {
+      name: "Search by name or address",
+    });
+    await search.fill("Priya");
+    await expect(requestRows(page)).toHaveCount(1);
+    await expect(rowOf(page, "Priya Shah")).toHaveCount(1);
+    await expect(countOf(requestsRegion(page))).toHaveText(/1 of 3 requests match/);
+    await expect(page).toHaveURL(/requests\.search=Priya/);
+
+    await search.fill("ola-");
+    await expect(requestRows(page)).toHaveCount(1);
+    await expect(rowOf(page, "Ola Nowak")).toHaveCount(1);
+
+    await search.fill("");
+    await expect(requestRows(page)).toHaveCount(3);
+    await expect(countOf(requestsRegion(page))).toHaveText(/3 requests waiting/);
+  });
+
+  test("brings a request back when the api refuses its decline", async ({ page, request }) => {
+    await anAdminAtRequests(page, request, "Nidd Weir", [{ displayName: "Priya Shah" }]);
+    await openRequests(page);
+    await expect(rowOf(page, "Priya Shah")).toHaveCount(1);
+    const answerTheRead = await holdingTheRequestsRead(page);
+    const refuse = await refusingTheDeclineOnRelease(page);
+
+    await rowOf(page, "Priya Shah")
+      .getByRole("button", { name: "Decline Request from Priya Shah" })
+      .click();
+    await expect(rowOf(page, "Priya Shah"), "the row waited for the api").toHaveCount(0);
+
+    refuse();
+    await expect(rowOf(page, "Priya Shah"), "the refused decline left the row gone").toHaveCount(1);
+    answerTheRead();
+    await saysARefusal(requestsRegion(page).getByRole("alert"));
+    await expect(rowOf(page, "Priya Shah")).toHaveCount(1);
   });
 
   test("an Admin decides requests by keyboard alone", async ({
@@ -281,6 +381,7 @@ test.describe("the People page's Requests tab", () => {
         - status: /\\b1\\b/
         - button "Invite a Person"
         - status: /approved-\\d+/
+        - searchbox "Search by name or address"
         - paragraph
         - table:
           - caption
@@ -322,7 +423,7 @@ test.describe("the People page's Requests tab", () => {
     await rowOf(elsewhere, "Priya Shah")
       .getByRole("button", { name: "Decline Request from Priya Shah" })
       .click();
-    await expect(requestRows(elsewhere)).toHaveCount(0);
+    await expect(rowOf(elsewhere, "Priya Shah")).toHaveCount(0);
     await expect(emptyLine(elsewhere)).toHaveText(/\S/);
     await elsewhere.close();
 
@@ -332,7 +433,7 @@ test.describe("the People page's Requests tab", () => {
     expect(await refused).toMatchObject({ word: "already-decided" });
     await expect(approving).toHaveCount(0);
     await saysARefusal(requestsRegion(page).getByRole("alert"));
-    await expect(requestRows(page)).toHaveCount(0);
+    await expect(rowOf(page, "Priya Shah")).toHaveCount(0);
     await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeFocused();
     await expect(page.locator("body"), "the refusal").not.toContainText(NAMES_AN_ORGANISATION);
   });

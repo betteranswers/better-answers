@@ -14,6 +14,7 @@ import { Review } from "@/features/sources/review.tsx";
 import type { ListedConnectedSource } from "@/features/sources/sources-api.ts";
 import { REVIEW_WORDS } from "@/features/sources/words.ts";
 
+import { openPages } from "./address-router.tsx";
 import { regionsSeen } from "./regions-seen.tsx";
 
 beforeEach(() => {
@@ -59,8 +60,23 @@ const A_CONNECTED_SOURCE: ListedConnectedSource = {
 };
 
 describe("a page's read, said after its region mounts", () => {
-  it("fills a loading region beside a refusal line after mount", () => {
-    const seen = mounted(REGION, <GroupsPage />);
+  it("fills a loading state beside a refusal line after mount", async () => {
+    // The list's loading line is the empty state's title, and the page reads its search from the
+    // address, so it renders inside a router.
+    const { seen, Seen } = regionsSeen("[data-slot='empty-title'] output");
+    await openPages(
+      {
+        "/people/groups": () => (
+          <Seen>
+            <GroupsPage />
+          </Seen>
+        ),
+      },
+      ["/people/groups"],
+      function Routed(properties: { readonly children: ReactNode }) {
+        return <Providers clients={createAppClients()}>{properties.children}</Providers>;
+      },
+    );
 
     expect(seen[0]).toBe("");
     expect(seen.at(-1)).toMatch(HOLDS_TEXT);

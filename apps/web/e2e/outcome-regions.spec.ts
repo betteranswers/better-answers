@@ -38,24 +38,32 @@ test.describe("an action's outcome region", () => {
       "the groups are still unread",
     ).toHaveCount(1);
 
-    // The section's read outcome stands beside the list's action outcome, so the page holds two.
+    // The create dialog's outcome is its own, behind its scrim, and closes with the dialog.
     const onThePage = emptyStatusIn(groupsRegion(page));
-    await expect(onThePage, "the page's outcome regions are out of the tree").toHaveCount(2);
+    await expect(onThePage, "the page's outcome region is out of the tree").toHaveCount(1);
     for (const status of await onThePage.all()) {
       await standsWithoutRoom(status);
     }
     const standing = await onThePage.elementHandles();
 
-    await groupsRegion(page).getByRole("textbox", { name: "New Group Name" }).fill("Site leads");
-    await groupsRegion(page).getByRole("button", { name: "Create Group" }).click();
+    await groupsRegion(page).getByRole("button", { name: "Create a Group" }).click();
+    const creating = page.getByRole("dialog", { name: "Create a Group" });
+    const inTheDialog = emptyStatusIn(creating);
+    await expect(inTheDialog, "the dialog's outcome region is out of the tree").toHaveCount(1);
+    for (const status of await inTheDialog.all()) {
+      await standsWithoutRoom(status);
+    }
+    await creating.getByRole("textbox", { name: "New Group Name" }).fill("Site leads");
+    await creating.getByRole("button", { name: "Create Group" }).click();
 
     await expect
       .poll(() => Promise.all(standing.map((status) => status.textContent())), {
         message: "the outcome came in a region that was not there while it was empty",
       })
       .toContainEqual(expect.stringContaining("Site leads"));
+    await expect(creating).toHaveCount(0);
     await expect(
       groupsRegion(page).getByRole("button", { name: "Site leads", exact: true }),
-    ).toBeVisible();
+    ).toBeFocused();
   });
 });

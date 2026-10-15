@@ -4,6 +4,7 @@ import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { EmptyAction } from "@/shared/ui/kibo-ui/empty-action.tsx";
 import { PaginationCounter } from "@/shared/ui/kibo-ui/pagination-counter.tsx";
+import { CLEAR_WORDS } from "@/shared/words.ts";
 
 type FocusTarget = RefObject<HTMLElement | null>;
 
@@ -98,6 +99,29 @@ export function ListState(properties: { readonly state: State }) {
         />
       );
   }
+}
+
+/** A table's body with no row: nothing matches what was typed, or `children` with nothing typed. */
+export function NothingListed(properties: {
+  readonly search: string;
+  readonly noneMatch: (search: string) => string;
+  readonly onClear: () => void;
+  readonly searchRef: RefObject<HTMLInputElement | null>;
+  readonly children: ReactNode;
+}) {
+  const { search } = properties;
+  if (search === "") return properties.children;
+  return (
+    <ListState
+      state={{
+        kind: "emptied",
+        words: properties.noneMatch(search),
+        clearWords: CLEAR_WORDS.search,
+        onClear: properties.onClear,
+        focusAfterClear: properties.searchRef,
+      }}
+    />
+  );
 }
 
 type Read<Failure> = {

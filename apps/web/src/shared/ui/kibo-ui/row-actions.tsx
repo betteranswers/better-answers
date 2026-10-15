@@ -21,10 +21,12 @@ export type RowAction = {
 export type RowActionsProps = {
   label: string;
   actions: readonly RowAction[];
+  /** The trigger's id, so an act opened from the menu can hand focus back to it. */
+  triggerId?: string | undefined;
 };
 
 /** A destructive action sits apart, below the rest and one separator, whatever order a caller lists. */
-export const RowActions = ({ label, actions }: RowActionsProps) => {
+export const RowActions = ({ label, actions, triggerId }: RowActionsProps) => {
   // The open menu holds focus inside it, so an action's own focus lands only once it has shut.
   const chosen = useRef<RowAction>(undefined);
   const rest = actions.filter((action) => action.destructive !== true);
@@ -54,7 +56,7 @@ export const RowActions = ({ label, actions }: RowActionsProps) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button className="size-8" size="icon" variant="ghost" aria-label={label}>
+        <Button id={triggerId} className="size-8" size="icon" variant="ghost" aria-label={label}>
           <DotsThreeVertical aria-hidden className="size-4" />
         </Button>
       </DropdownMenuTrigger>

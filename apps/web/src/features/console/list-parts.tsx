@@ -1,9 +1,7 @@
-import { useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
-import { ListState } from "@/shared/list-pages.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
-import { CLEAR_WORDS } from "@/shared/words.ts";
 
 import { readRefused } from "./words.ts";
 
@@ -47,26 +45,3 @@ export const countOf = (words: CountWords, read: number, narrowed: Narrowed): st
   narrowed.search === ""
     ? words.counted(read)
     : words.matching(narrowed.shown.length, narrowed.search);
-
-/** A table's body with no row: nothing matches what was typed, or `children` with nothing typed. */
-export function NothingListed(properties: {
-  readonly search: string;
-  readonly noneMatch: (search: string) => string;
-  readonly onClear: () => void;
-  readonly searchRef: RefObject<HTMLInputElement | null>;
-  readonly children: ReactNode;
-}) {
-  const { search } = properties;
-  if (search === "") return properties.children;
-  return (
-    <ListState
-      state={{
-        kind: "emptied",
-        words: properties.noneMatch(search),
-        clearWords: CLEAR_WORDS.search,
-        onClear: properties.onClear,
-        focusAfterClear: properties.searchRef,
-      }}
-    />
-  );
-}

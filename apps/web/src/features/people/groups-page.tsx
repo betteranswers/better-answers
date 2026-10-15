@@ -1,38 +1,42 @@
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
-import { useId, useMemo, useRef, useState, type FormEvent, type RefObject } from "react";
+import { createContext, useContext, useId, useMemo, useRef, useState } from "react";
 
-import { EmptyState } from "@/shared/empty-state.tsx";
+import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
+import { ListRead, ListState, NothingListed } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page-head.tsx";
-import { useReadSaid } from "@/shared/read-said.ts";
+import { RowMenu } from "@/shared/row-menu.tsx";
 import { RowSheetButton } from "@/shared/row-sheet.tsx";
-import { Button } from "@/shared/ui/button.tsx";
+import { useSearchedList } from "@/shared/searched-list.ts";
 import { Card } from "@/shared/ui/card.tsx";
-import { Input } from "@/shared/ui/input.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { Label } from "@/shared/ui/label.tsx";
-import { counted } from "@/shared/words.ts";
+import { counted, nothingMatches } from "@/shared/words.ts";
 
+import { CreateGroupAction } from "./create-group-action.tsx";
+import { DeleteGroupDialog } from "./delete-group-dialog.tsx";
 import { EMPTY_LINES } from "./empty-lines.ts";
-import { GroupSheet, groupButtonId, type GroupOpenedAt } from "./group-sheet.tsx";
-import {
-  useCreateGroup,
-  useDeleteGroup,
-  useGroups,
-  usePendingGroupNames,
-  type ListedGroup,
-} from "./groups-api.ts";
+import { GroupSheet, groupButtonId, groupMenuId, type GroupOpenedAt } from "./group-sheet.tsx";
+import { GROUP_WORDS } from "./group-words.ts";
+import { GROUPS_FIELDS, GROUPS_LIST } from "./groups-address.ts";
+import { useDeleteGroup, useGroups, usePendingGroupNames, type ListedGroup } from "./groups-api.ts";
 import { GROUPS_LOADING } from "./member-action-words.ts";
 import { inNameOrder, useMembers } from "./people-api.ts";
 import { GROUPS_KEYSTROKES, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfGroupFailure } from "./refusal.tsx";
+import { RenameGroupDialog } from "./rename-group-dialog.tsx";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
 
 const LISTED = Object.values(GROUPS_KEYSTROKES);
+
+const GROUPS_HEADING = "Groups";
+
+const SEARCH_LABEL = "Search by name";
+
+const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.group);
 
 /** A row is a group, or a name asked for whose group the api has not answered yet. */
 type GroupRow = {
@@ -65,21 +69,24 @@ const column = createColumnHelper<typeof features, GroupRow>();
 type GroupActions = {
   readonly open: (groupId: string) => void;
   readonly focusedOn: (groupId: string) => void;
-  /** The group just created: its button takes focus as it arrives. */
+  /** The group just created: its button takes focus as its row arrives, once. */
   readonly landOn: string | undefined;
+  readonly landed: (button: HTMLButtonElement | null) => void;
 };
 
-const focusOnArrival = (button: HTMLButtonElement | null) => {
-  button?.focus();
-};
+/** Read by each cell, so a change of what the page does leaves the columns, and their cells, standing. */
+const GroupActionsContext = createContext<GroupActions | undefined>(undefined);
 
-function GroupCell(properties: { readonly row: GroupRow; readonly actions: GroupActions }) {
-  const { row, actions } = properties;
-  if (row.group === undefined) return <span className="font-medium">{row.name}</span>;
+function GroupCell(properties: { readonly row: GroupRow }) {
+  const { row } = properties;
+  const actions = useContext(GroupActionsContext);
+  if (row.group === undefined || actions === undefined) {
+    return <span className="font-medium">{row.name}</span>;
+  }
   const groupId = row.group.id;
   return (
     <RowSheetButton
-      ref={groupId === actions.landOn ? focusOnArrival : undefined}
+      ref={groupId === actions.landOn ? actions.landed : undefined}
       id={groupButtonId(groupId)}
       onFocus={() => {
         actions.focusedOn(groupId);
@@ -93,114 +100,89 @@ function GroupCell(properties: { readonly row: GroupRow; readonly actions: Group
   );
 }
 
-/** The group's own cell opens it, so its actions ride into the columns. */
-const columnsFor = (actions: GroupActions) =>
-  column.columns([
-    column.accessor("name", {
-      header: "Group",
-      cell: ({ row }) => <GroupCell row={row.original} actions={actions} />,
-    }),
-    column.accessor("memberCount", {
-      header: "Members",
-      cell: ({ getValue }) => <Pill>{counted(getValue(), "member", "members")}</Pill>,
-    }),
-  ]);
+const COLUMNS = column.columns([
+  column.accessor("name", {
+    header: "Group",
+    cell: ({ row }) => <GroupCell row={row.original} />,
+  }),
+  column.accessor("memberCount", {
+    header: "Members",
+    cell: ({ getValue }) => <Pill>{counted(getValue(), "member", "members")}</Pill>,
+  }),
+]);
 
-const CREATE_KEYSTROKE = GROUPS_KEYSTROKES.create;
+const matching = (search: string) => {
+  const sought = search.toLowerCase();
+  return (row: GroupRow): boolean => row.name.toLowerCase().includes(sought);
+};
 
-function CreateGroupForm(properties: {
-  readonly fieldRef: RefObject<HTMLInputElement | null>;
-  readonly onAsked: () => void;
-  readonly onCreated: (groupId: string, name: string) => void;
-  readonly onRefused: (outcome: Outcome) => void;
-}) {
-  const { fieldRef, onAsked, onCreated, onRefused } = properties;
-  const createGroup = useCreateGroup();
-  const fieldId = useId();
+const useNarrowedGroups = (rows: readonly GroupRow[]) => {
+  const list = useSearchedList(GROUPS_LIST, GROUPS_FIELDS);
+  const data = useMemo(() => rows.filter(matching(list.search)), [rows, list.search]);
+  return { ...list, data };
+};
 
-  // Never disabled: the field keeps the name and focus while the answer comes back.
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const asked = new FormData(form).get("name");
-    if (typeof asked !== "string") return;
-    const name = asked.trim();
-    onAsked();
-    void createGroup.mutateAsync({ name }).then(
-      ({ groupId }) => {
-        form.reset();
-        onCreated(groupId, name);
-      },
-      (failure: Error) => {
-        onRefused(outcomeOfGroupFailure(failure, "action"));
-      },
-    );
-  };
-
-  return (
-    <form
-      aria-label={CREATE_KEYSTROKE.action}
-      onSubmit={submit}
-      className="flex flex-wrap items-end gap-2 border-b border-border p-3"
-    >
-      <div className="grid gap-1.5">
-        <Label htmlFor={fieldId}>New Group Name</Label>
-        <Input
-          ref={fieldRef}
-          id={fieldId}
-          name="name"
-          required
-          autoComplete="off"
-          aria-keyshortcuts={CREATE_KEYSTROKE.key}
-          className="w-64"
-        />
-      </div>
-      <Button type="submit">Create Group</Button>
-    </form>
-  );
-}
-
-const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.group);
+const saidOfCount = (shown: number, total: number, search: string): string =>
+  search === ""
+    ? counted(total, "group", "groups")
+    : `${String(shown)} of ${counted(total, "group", "groups")} match “${search}”.`;
 
 type Opened = { readonly groupId: string; readonly at: GroupOpenedAt };
 
-function GroupList(properties: {
-  readonly groups: readonly ListedGroup[];
-  readonly headingRef: RefObject<HTMLHeadingElement | null>;
-}) {
-  const { groups, headingRef } = properties;
+/** Read once the groups are listed: sooner, it rides the request a switch's follow waits on. */
+function MembersRead() {
+  useMembers();
+  return null;
+}
+
+function GroupsList(properties: { readonly headingId: string }) {
+  const read = useGroups();
   const pending = usePendingGroupNames();
+  const heading = useRef<HTMLHeadingElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [inFocus, setInFocus] = useState<string>();
   const [opened, setOpened] = useState<Opened>();
+  const [renaming, setRenaming] = useState<ListedGroup>();
+  const [deleting, setDeleting] = useState<ListedGroup>();
   const [outcome, setOutcome] = useState<Outcome>();
   const [landOn, setLandOn] = useState<string>();
-  const fieldRef = useRef<HTMLInputElement>(null);
-  // Set before the deleted row leaves the cache, so the sheet does not hand focus to it meanwhile.
-  const closingOnADeletion = useRef(false);
   const deleteGroup = useDeleteGroup();
-  // Read with the list, so a sheet opened on its members has boxes to land focus on.
-  useMembers();
+  // Set before the deleted row leaves the cache, so nothing hands focus to it meanwhile.
+  const closingOnADeletion = useRef(false);
 
-  const columns = useMemo(
-    () =>
-      columnsFor({
-        open: (groupId) => {
-          setOpened({ groupId, at: "group" });
-        },
-        focusedOn: setInFocus,
-        landOn,
-      }),
-    [landOn],
-  );
+  const rows = useMemo(() => rowsOf(read.data ?? [], pending), [read.data, pending]);
+  const narrowed = useNarrowedGroups(rows);
+  const { search, data } = narrowed;
+
+  const actions: GroupActions = {
+    open: (groupId) => {
+      setOpened({ groupId, at: "group" });
+    },
+    focusedOn: setInFocus,
+    landOn,
+    // Cleared as the button takes focus, so the row's later remounts under a search take none.
+    landed: (button) => {
+      if (button === null) return;
+      button.focus();
+      setLandOn(undefined);
+    },
+  };
 
   const table = useTable({
     features,
-    columns,
-    data: useMemo(() => rowsOf(groups, pending), [groups, pending]),
+    columns: COLUMNS,
+    data,
     getRowId: (row) => row.key,
   });
 
-  const groupOf = (groupId: string | undefined) => groups.find((group) => group.id === groupId);
+  const groupOf = (groupId: string | undefined) =>
+    (read.data ?? []).find((group) => group.id === groupId);
+
+  /** A row the search hides, or that another Admin deleted meanwhile, has nothing to land on. */
+  const landOnOrHeading = (elementId: string | undefined) => {
+    const target = elementId === undefined ? null : document.getElementById(elementId);
+    (target ?? heading.current)?.focus();
+  };
 
   /** A letter pressed outside the list still needs a group, so the one last in focus stands. */
   const openInFocus = (at: GroupOpenedAt) => {
@@ -208,10 +190,6 @@ function GroupList(properties: {
     setOutcome(group === undefined ? NOTHING_IN_FOCUS : undefined);
     if (group !== undefined) setOpened({ groupId: group.id, at });
   };
-  const toTheNameField = () => {
-    fieldRef.current?.focus();
-  };
-  useKeystroke(GROUPS_KEYSTROKES.create, toTheNameField);
   useKeystroke(GROUPS_KEYSTROKES.open, () => {
     openInFocus("group");
   });
@@ -225,13 +203,38 @@ function GroupList(properties: {
     openInFocus("delete");
   });
 
+  /** A name the api has not answered yet has no group to act on. */
+  const rowMenuOf = (row: GroupRow) =>
+    row.group === undefined ? null : (
+      <RowMenu
+        name={row.name}
+        triggerId={groupMenuId(row.group.id)}
+        actions={[
+          {
+            label: "Rename",
+            onSelect: () => {
+              setRenaming(row.group);
+            },
+          },
+          {
+            label: "Delete",
+            destructive: true,
+            onSelect: () => {
+              closingOnADeletion.current = false;
+              setDeleting(row.group);
+            },
+          },
+        ]}
+      />
+    );
+
   const remove = (group: ListedGroup) => {
     closingOnADeletion.current = true;
     setOpened(undefined);
     setOutcome(undefined);
     void deleteGroup.mutateAsync({ groupId: group.id }).then(
       () => {
-        setOutcome({ tone: "said", words: `${group.name} has been deleted successfully.` });
+        setOutcome({ tone: "said", words: GROUP_WORDS.deleted(group.name) });
       },
       (failure: Error) => {
         setOutcome(outcomeOfGroupFailure(failure, "action"));
@@ -243,25 +246,62 @@ function GroupList(properties: {
 
   return (
     <>
+      <ListHead
+        heading={GROUPS_HEADING}
+        headingId={properties.headingId}
+        headingRef={heading}
+        count={read.data === undefined ? "" : saidOfCount(data.length, read.data.length, search)}
+        action={
+          <CreateGroupAction
+            onCreated={(groupId, name) => {
+              setOutcome({ tone: "said", words: GROUP_WORDS.created(name) });
+              setLandOn(groupId);
+            }}
+          />
+        }
+      />
       <OutcomeLine outcome={outcome} className="mt-2" />
 
       <Card className="mt-4">
-        <CreateGroupForm
-          fieldRef={fieldRef}
-          onAsked={() => {
-            setOutcome(undefined);
+        <FilterRow
+          search={{
+            label: SEARCH_LABEL,
+            value: search,
+            onChange: narrowed.setSearch,
+            keystroke: GROUPS_KEYSTROKES.search,
+            inputRef: searchRef,
           }}
-          onCreated={(groupId, name) => {
-            setOutcome({ tone: "said", words: `${name} has been created successfully.` });
-            setLandOn(groupId);
-          }}
-          onRefused={setOutcome}
         />
-        <GridTable
-          table={table}
-          caption="Groups in this workspace."
-          empty={<EmptyState line={EMPTY_LINES.groups} className="px-4 py-10" />}
-        />
+        <ListRead
+          read={read}
+          loading={GROUPS_LOADING}
+          failed={(failure) => outcomeOfGroupFailure(failure, "read").words}
+          focusAfterRetry={searchRef}
+        >
+          <MembersRead />
+          <GroupActionsContext value={actions}>
+            <GridTable
+              table={table}
+              caption="Groups in this workspace."
+              rowMenu={rowMenuOf}
+              onRowFocus={(row) => {
+                setInFocus(row?.group?.id);
+              }}
+              empty={
+                <NothingListed
+                  search={search}
+                  noneMatch={nothingMatches}
+                  onClear={narrowed.clear}
+                  searchRef={searchRef}
+                >
+                  <ListState
+                    state={{ kind: "empty", words: EMPTY_LINES.groups, action: undefined }}
+                  />
+                </NothingListed>
+              }
+            />
+          </GroupActionsContext>
+        </ListRead>
       </Card>
 
       {opened === undefined || openedGroup === undefined ? null : (
@@ -273,55 +313,55 @@ function GroupList(properties: {
             setOpened(undefined);
           }}
           returnFocus={() => {
-            const row = closingOnADeletion.current
-              ? null
-              : document.getElementById(groupButtonId(openedGroup.id));
+            const row = closingOnADeletion.current ? undefined : groupButtonId(openedGroup.id);
             closingOnADeletion.current = false;
-            // A group another Admin deleted meanwhile has no row either.
-            (row ?? headingRef.current)?.focus();
+            landOnOrHeading(row);
           }}
           onDelete={remove}
+        />
+      )}
+      {renaming === undefined ? null : (
+        <RenameGroupDialog
+          key={renaming.id}
+          group={renaming}
+          onRenamed={setOutcome}
+          onClose={() => {
+            setRenaming(undefined);
+          }}
+          onFocusBack={() => {
+            landOnOrHeading(groupMenuId(renaming.id));
+          }}
+        />
+      )}
+      {deleting === undefined ? null : (
+        <DeleteGroupDialog
+          key={deleting.id}
+          group={deleting}
+          onDelete={remove}
+          onClose={() => {
+            setDeleting(undefined);
+          }}
+          onFocusBack={() => {
+            const trigger = closingOnADeletion.current ? undefined : groupMenuId(deleting.id);
+            closingOnADeletion.current = false;
+            landOnOrHeading(trigger);
+          }}
         />
       )}
     </>
   );
 }
 
-function GroupsSection() {
-  const groups = useGroups();
-  const said = useReadSaid(groups);
-  const headingId = useId();
-  const headingRef = useRef<HTMLHeadingElement>(null);
-
-  return (
-    <section aria-labelledby={headingId} className="mt-6">
-      <ListHead
-        heading="Groups"
-        headingId={headingId}
-        headingRef={headingRef}
-        count={groups.data === undefined ? "" : counted(groups.data.length, "group", "groups")}
-      />
-      <OutcomeLine
-        outcome={said.error === null ? undefined : outcomeOfGroupFailure(said.error, "read")}
-        className="mt-2"
-      />
-      <div aria-live="polite">
-        {said.isPending ? <p className="mt-2">{GROUPS_LOADING}</p> : null}
-      </div>
-      {groups.data === undefined ? null : (
-        <GroupList groups={groups.data} headingRef={headingRef} />
-      )}
-    </section>
-  );
-}
-
 export function GroupsPage() {
   usePageKeystrokes(LISTED);
+  const headingId = useId();
 
   return (
     <>
       <PageHead heading={people.name} summary={people.summary} />
-      <GroupsSection />
+      <section aria-labelledby={headingId} className="mt-6">
+        <GroupsList headingId={headingId} />
+      </section>
     </>
   );
 }

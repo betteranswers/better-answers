@@ -46,8 +46,6 @@ export const JUMP_TO = {
   membersUnread: "The members didn’t load. Please close this and try again.",
 } as const;
 
-export const nothingMatches = (typed: string): string => `No results found for “${typed}”.`;
-
 /** The one row that leaves the list: it takes what is typed to Knowledge's Search. */
 export const searchFor = (typed: string): string => `Search for “${typed}”`;
 

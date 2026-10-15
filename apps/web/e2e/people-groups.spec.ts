@@ -12,6 +12,7 @@ import {
   aMemberSignedInAt,
   anAddress,
   clockTheNextKey,
+  countOf,
   keepsItsWordOffThePage,
   keyListed,
   keystrokesDismissed,
@@ -23,6 +24,7 @@ import {
   saysARefusal,
   signIn,
   skipLinkReachesThePage,
+  tabUntilFocused,
   theActionLandedWithinItsBudget,
   theActionsLandedWithinTheirBudget,
 } from "./harness.ts";
@@ -55,10 +57,27 @@ const rowOf = (page: Page, name: string): Locator =>
 const groupButton = (page: Page, name: string): Locator =>
   groupsRegion(page).getByRole("button", { name, exact: true });
 
+const createDialog = (page: Page): Locator => page.getByRole("dialog", { name: "Create a Group" });
+
 const nameField = (page: Page): Locator =>
-  groupsRegion(page).getByRole("textbox", { name: "New Group Name" });
+  createDialog(page).getByRole("textbox", { name: "New Group Name" });
 
 const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", { name });
+
+const searchBox = (page: Page): Locator =>
+  groupsRegion(page).getByRole("searchbox", { name: "Search by name" });
+
+const renameDialog = (page: Page, name: string): Locator =>
+  page.getByRole("dialog", { name: `Rename ${name}` });
+
+/** Opens a group's row menu and picks Rename, as a pointer would. */
+const renamingFromTheRowMenu = async (page: Page, name: string): Promise<Locator> => {
+  await rowOf(page, name)
+    .getByRole("button", { name: `Actions for ${name}` })
+    .click();
+  await page.getByRole("menuitem", { name: "Rename" }).click();
+  return renameDialog(page, name);
+};
 
 /** The action a keystroke list sets beside a key: the definition after the key's term. */
 const actionBeside = (keystrokes: Locator, key: string): Locator =>
@@ -75,14 +94,30 @@ const SHEET_COUNT = "//div[@role='dialog']//h2/following-sibling::p[1]";
 
 const LIST_COUNT = "//section[h2[normalize-space(.)='Groups']]/div/output";
 
+/** The warning before a group is deleted: what it says of the members it takes, and where focus sits. */
+const warnedOfDeleting = async (page: Page, name: string, members: number) => {
+  const confirming = page.getByRole("alertdialog", { name: `Delete ${name}` });
+  await expect(
+    confirming,
+    "the confirmation counts no member the deletion takes",
+  ).toHaveAccessibleDescription(new RegExp(`\\b${String(members)}\\b`));
+  await expect(confirming.getByRole("button", { name: "Keep Group" })).toBeFocused();
+  return confirming;
+};
+
+/** Confirms the open deletion warning by its key, timed from the key to the row leaving. */
+const confirmedAtAKey = async (page: Page, confirming: Locator, left: number) => {
+  await confirming.getByRole("button", { name: "Delete", exact: true }).focus();
+  await clockTheNextKey(page, { at: LIST_COUNT, reads: String(left) });
+  await page.keyboard.press("Enter");
+};
+
 /** Deletes an empty group through its sheet, answering how long its confirming key took to land. */
 const deletedAtAKey = async (page: Page, name: string, left: number): Promise<number> => {
   await groupButton(page, name).click();
   await sheetOf(page, name).getByRole("button", { name: "Delete Group" }).click();
   const confirming = page.getByRole("alertdialog", { name: `Delete ${name}` });
-  await confirming.getByRole("button", { name: "Delete", exact: true }).focus();
-  await clockTheNextKey(page, { at: LIST_COUNT, reads: String(left) });
-  await page.keyboard.press("Enter");
+  await confirmedAtAKey(page, confirming, left);
   await expect(groupRows(page)).toHaveCount(left);
   return actionClocked(page);
 };
@@ -166,24 +201,29 @@ test.describe("the People group's Groups page", () => {
       - region "Groups":
         - heading "Groups" [level=2]
         - status: /\\b2\\b/
-        - form "Create a Group":
-          - textbox "New Group Name"
-          - button "Create Group"
+        - button "Create a Group"
+        - status
+        - searchbox "Search by name"
         - table:
           - caption
           - rowgroup:
-            - row "Group Members":
+            - row /Group Members/:
               - columnheader "Group"
               - columnheader "Members"
+              - columnheader "Actions"
           - rowgroup:
             - row /Bid writers/:
               - cell "Bid writers":
                 - button "Bid writers"
               - cell /\\b0\\b/
+              - cell:
+                - button "Actions for Bid writers"
             - row /HR team/:
               - cell "HR team":
                 - button "HR team"
               - cell /\\b2\\b/
+              - cell:
+                - button "Actions for HR team"
     `);
     // A name alone does not say that its row opens, so each name carries a caret at rest.
     for (const name of ["Bid writers", "HR team"]) {
@@ -225,20 +265,21 @@ test.describe("the People group's Groups page", () => {
 });
 
 test.describe("a group's actions", () => {
-  test("lets an Admin create a group that lands at once", async ({ page, request }) => {
+  test("creates a group from the toolbar act's dialog", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Aire Valley Tooling");
 
+    await groupsRegion(page).getByRole("button", { name: "Create a Group" }).click();
     await nameField(page).fill("Site leads");
     await clockTheNextKey(page, { at: countCellOf("Site leads"), reads: "0" });
     await nameField(page).press("Enter");
 
     await theActionLandedWithinItsBudget(page, "create a group");
+    await expect(createDialog(page)).toHaveCount(0);
     await expect(groupButton(page, "Site leads")).toBeFocused();
     await expect(groupsRegion(page).getByRole("status").filter({ hasText: /\S/ })).toHaveText([
       /\b3\b/,
       /Site leads/,
     ]);
-    await expect(nameField(page)).toHaveValue("");
 
     await page.reload();
     await expect(rowOf(page, "Site leads").getByRole("cell").nth(1)).toHaveText(/^0\b/);
@@ -251,16 +292,145 @@ test.describe("a group's actions", () => {
   }) => {
     await anAdminAtGroups(page, request, "Wharfe Fabrication");
 
+    await groupsRegion(page).getByRole("button", { name: "Create a Group" }).click();
     await nameField(page).fill("HR team");
     const refused = refusalAnswering(page, "members.createGroup");
-    await groupsRegion(page).getByRole("button", { name: "Create Group" }).click();
+    await createDialog(page).getByRole("button", { name: "Create Group" }).click();
 
     expect(await refused).toMatchObject({ word: "name-taken" });
-    await saysARefusal(groupsRegion(page).getByRole("alert"));
+    // The dialog stays open on a refusal, so its line is the dialog's own.
+    await saysARefusal(createDialog(page).getByRole("alert"));
     await keepsItsWordOffThePage(page, "name-taken");
     await expect(nameField(page)).toHaveValue("HR team");
+    await createDialog(page).getByRole("button", { name: "Close" }).click();
     await expect(groupRows(page)).toHaveCount(2);
+
+    // Opened by its key this time, the dialog carries nothing of the refused try.
+    await page.keyboard.press(GROUPS_KEYSTROKES.create.key);
+    await expect(nameField(page)).toBeFocused();
+    await expect(
+      createDialog(page).getByRole("alert"),
+      "the last refusal greets the reader",
+    ).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(createDialog(page)).toHaveCount(0);
     await passesTheAccessibilityGate();
+  });
+
+  test("searches the groups by name, then clears the search", async ({ page, request }) => {
+    await anAdminAtGroups(page, request, "Aire Weir");
+
+    await page.keyboard.press(GROUPS_KEYSTROKES.search.key);
+    await expect(searchBox(page)).toBeFocused();
+    await page.keyboard.type("HR");
+    await expect(rowOf(page, "HR team")).toHaveCount(1);
+    await expect(rowOf(page, "Bid writers")).toHaveCount(0);
+    await expect(countOf(groupsRegion(page))).toHaveText(/1 of 2 groups match/);
+    await expect(page).toHaveURL(/groups\.search=HR/);
+
+    await searchBox(page).fill("Payroll");
+    await expect(rowOf(page, "HR team")).toHaveCount(0);
+    await expect(groupsRegion(page).locator("[data-slot='empty-title']")).toHaveText(
+      /No results found/,
+    );
+    await groupsRegion(page).getByRole("button", { name: "Clear Search" }).click();
+    await expect(groupRows(page)).toHaveCount(2);
+    await expect(searchBox(page), "the clear left focus on the page").toBeFocused();
+    await expect(countOf(groupsRegion(page))).toHaveText(/\b2\b/);
+  });
+
+  test("keeps search focus as a created row leaves and returns", async ({ page, request }) => {
+    await anAdminAtGroups(page, request, "Esk Weir");
+    await groupsRegion(page).getByRole("button", { name: "Create a Group" }).click();
+    await nameField(page).fill("Site leads");
+    await nameField(page).press("Enter");
+    await expect(groupButton(page, "Site leads")).toBeFocused();
+
+    await searchBox(page).fill("Bid");
+    await expect(rowOf(page, "Site leads")).toHaveCount(0);
+    await searchBox(page).fill("");
+
+    await expect(rowOf(page, "Site leads")).toHaveCount(1);
+    await expect(searchBox(page), "the returning row took focus").toBeFocused();
+  });
+
+  test("focuses the heading once a rename hides the row", async ({ page, request }) => {
+    await anAdminAtGroups(page, request, "Ure Weir");
+    await searchBox(page).fill("HR");
+    await expect(groupRows(page)).toHaveCount(1);
+
+    const renaming = await renamingFromTheRowMenu(page, "HR team");
+    const name = renaming.getByRole("textbox", { name: "Name" });
+    await name.fill("People team");
+    await name.press("Enter");
+
+    await expect(renaming).toHaveCount(0);
+    await expect(rowOf(page, "People team"), "the search let the renamed row through").toHaveCount(
+      0,
+    );
+    await expect(
+      groupsRegion(page).getByRole("heading", { name: "Groups" }),
+      "focus fell off the page",
+    ).toBeFocused();
+  });
+
+  test("says the group already has the name, dialog open", async ({ page, request }) => {
+    await anAdminAtGroups(page, request, "Swale Weir");
+    const renaming = await renamingFromTheRowMenu(page, "HR team");
+
+    await renaming.getByRole("textbox", { name: "Name" }).press("Enter");
+
+    await expect(renaming.getByRole("status")).toHaveText(/already called HR team/);
+    await expect(renaming.getByRole("textbox", { name: "Name" })).toHaveValue("HR team");
+    await page.keyboard.press("Escape");
+    await expect(renaming).toHaveCount(0);
+    await expect(
+      rowOf(page, "HR team").getByRole("button", { name: "Actions for HR team" }),
+    ).toBeFocused();
+    await expect(
+      groupsRegion(page).getByRole("status").filter({ hasText: /\S/ }),
+      "the dialog's line reached the page",
+    ).toHaveCount(1);
+  });
+
+  test("renames a group from its row menu, in place", async ({ page, request }) => {
+    await anAdminAtGroups(page, request, "Nidd Mills");
+
+    const renaming = await renamingFromTheRowMenu(page, "HR team");
+    const name = renaming.getByRole("textbox", { name: "Name" });
+    await name.fill("People team");
+    await clockTheNextKey(page, { at: countCellOf("People team"), reads: "2" });
+    await name.press("Enter");
+
+    await theActionLandedWithinItsBudget(page, "rename a group");
+    await expect(renaming).toHaveCount(0);
+    await expect(rowOf(page, "People team").getByRole("cell").nth(1)).toHaveText(/^2\b/);
+    await expect(groupsRegion(page).getByRole("status").filter({ hasText: /\S/ })).toHaveText([
+      /\b2\b/,
+      /HR team.*People team/,
+    ]);
+  });
+
+  test("deletes a group from its row menu, warned first", async ({ page, request }) => {
+    await anAdminAtGroups(page, request, "Ure Forge");
+
+    await rowOf(page, "HR team").getByRole("button", { name: "Actions for HR team" }).click();
+    await page.getByRole("menuitem", { name: "Delete" }).click();
+
+    const confirming = await warnedOfDeleting(page, "HR team", 2);
+    await confirmedAtAKey(page, confirming, 1);
+
+    await expect(confirming).toHaveCount(0);
+    await expect(groupRows(page)).toHaveCount(1);
+    await expect(groupsRegion(page).getByRole("heading", { name: "Groups" })).toBeFocused();
+    await expect(groupsRegion(page).getByRole("status").filter({ hasText: /\S/ })).toHaveText([
+      /\b1\b/,
+      /HR team/,
+    ]);
+
+    await page.reload();
+    await expect(groupRows(page)).toHaveCount(1);
+    await expect(rowOf(page, "Bid writers")).toBeVisible();
   });
 
   test("lets an Admin rename a group, and members' rows follow", async ({ page, request }) => {
@@ -314,16 +484,9 @@ test.describe("a group's actions", () => {
     ).toHaveText(/\b2\b/);
     await sheet.getByRole("button", { name: "Delete Group" }).click();
 
-    const confirming = page.getByRole("alertdialog", { name: "Delete HR team" });
-    await expect(
-      confirming,
-      "the confirmation counts no member the deletion takes",
-    ).toHaveAccessibleDescription(/\b2\b/);
-    await expect(confirming.getByRole("button", { name: "Keep Group" })).toBeFocused();
+    const confirming = await warnedOfDeleting(page, "HR team", 2);
     await passesTheAccessibilityGate();
-    await confirming.getByRole("button", { name: "Delete", exact: true }).focus();
-    await clockTheNextKey(page, { at: LIST_COUNT, reads: "1" });
-    await page.keyboard.press("Enter");
+    await confirmedAtAKey(page, confirming, 1);
 
     await expect(sheet).toHaveCount(0);
     samples.push(await actionClocked(page));
@@ -473,6 +636,41 @@ test.describe("a group's actions", () => {
   });
 });
 
+test.describe("a group's row menu by keyboard", () => {
+  test("renames a group, and focus returns to the menu's trigger", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await anAdminAtGroups(page, request, "Calder Weir");
+    await expect(groupRows(page)).toHaveCount(2);
+
+    await tabUntilFocused(
+      page,
+      rowOf(page, "HR team").getByRole("button", { name: "Actions for HR team" }),
+    );
+    await page.keyboard.press("Enter");
+    await page.getByRole("menuitem", { name: "Rename" }).focus();
+    await page.keyboard.press("Enter");
+
+    const renaming = page.getByRole("dialog", { name: "Rename HR team" });
+    await expect(renaming.getByRole("textbox", { name: "Name" })).toBeFocused();
+    await page.keyboard.press("ControlOrMeta+A");
+    await page.keyboard.type("People team");
+    await clockTheNextKey(page, { at: countCellOf("People team"), reads: "2" });
+    await renaming.getByRole("button", { name: "Rename Group" }).press("Enter");
+
+    await theActionLandedWithinItsBudget(page, "rename a group from its row menu");
+    await expect(renaming).toHaveCount(0);
+    await expect(
+      rowOf(page, "People team").getByRole("button", { name: "Actions for People team" }),
+      "focus did not return to the menu's trigger",
+    ).toBeFocused();
+    await expect(rowOf(page, "People team").getByRole("cell").nth(1)).toHaveText(/^2\b/);
+    await passesTheAccessibilityGate();
+  });
+});
+
 test.describe("the keystrokes listed across the People group", () => {
   test("changes the keystrokes listed on moving from Members to Groups", async ({
     page,
@@ -592,19 +790,23 @@ test.describe("a member's groups, on their row and their page", () => {
       - region "Groups":
         - heading "Groups" [level=2]
         - status: /\\b0\\b/
-        - form "Create a Group":
-          - textbox "New Group Name"
-          - button "Create Group"
+        - button "Create a Group"
+        - status
+        - searchbox "Search by name"
         - table:
+          - caption
           - rowgroup:
-            - row "Group Members"
+            - row /Group Members/:
+              - columnheader "Group"
+              - columnheader "Members"
+              - columnheader "Actions"
           - rowgroup:
             - row:
               - cell /\\S/
     `);
     await expect(
       groupsRegion(page).getByRole("button"),
-      "the form above holds the one create action",
+      "the head holds the one create act",
     ).toHaveCount(1);
     await page.keyboard.press(GROUPS_KEYSTROKES.create.key);
     await expect(nameField(page)).toBeFocused();
