@@ -31,7 +31,16 @@ export type MessagesStreamCall = Omit<MessagesCall, "answerSchema">;
  * No `thinking` and no sampling field: a model choice may name a model that refuses either, and
  * each model's default stands.
  */
-const requestWith = (call: MessagesStreamCall, asking: object): WireRequest => ({
+/** What the reply is asked to be: JSON of a schema, or prose streamed as it is written. */
+type Asking =
+  | {
+      readonly output_config: {
+        readonly format: { readonly type: "json_schema"; readonly schema: AnswerSchema };
+      };
+    }
+  | { readonly stream: true };
+
+const requestWith = (call: MessagesStreamCall, asking: Asking): WireRequest => ({
   url: MESSAGES_URL,
   method: "POST",
   headers: {

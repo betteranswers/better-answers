@@ -91,6 +91,12 @@ const OVERLOADED: Answering = () =>
 
 const PIECES = ["Audit logs are kept", " for thirteen months.[^1]\n"];
 
+/** Its input as the reply opened with it, and its output at the size reserved, never counted. */
+const FAILED_AT_FULL_SIZE = {
+  outcome: "failed",
+  spent: [{ tokensIn: 2_100, tokensOut: 16_000, seconds: 0, outcome: "failed" }],
+};
+
 describe("the streamed Messages shape", () => {
   it("sends the model, its key and a streamed body", async () => {
     const wire = theWire(streaming(streamedEventsOf(PIECES)));
@@ -170,10 +176,7 @@ describe("the streamed Messages shape", () => {
     const { texts, ended, lines } = await drained(wire);
 
     expect(texts).toEqual([PIECES[0]]);
-    expect(ended).toEqual({
-      outcome: "failed",
-      spent: [{ tokensIn: 2_100, tokensOut: 16_000, seconds: 0, outcome: "failed" }],
-    });
+    expect(ended).toEqual(FAILED_AT_FULL_SIZE);
     expect(wire.sent).toHaveLength(1);
     expect(lines.map(({ read, status }) => [read, status])).toEqual([["failed", 200]]);
   });
@@ -183,10 +186,7 @@ describe("the streamed Messages shape", () => {
 
     const { ended } = await drained(wire);
 
-    expect(ended).toEqual({
-      outcome: "failed",
-      spent: [{ tokensIn: 2_100, tokensOut: 16_000, seconds: 0, outcome: "failed" }],
-    });
+    expect(ended).toEqual(FAILED_AT_FULL_SIZE);
   });
 
   it("fails a reply cut off at its token limit, once", async () => {
@@ -195,10 +195,7 @@ describe("the streamed Messages shape", () => {
 
     const { ended, lines } = await drained(wire);
 
-    expect(ended).toEqual({
-      outcome: "failed",
-      spent: [{ tokensIn: 2_100, tokensOut: 16_000, seconds: 0, outcome: "failed" }],
-    });
+    expect(ended).toEqual(FAILED_AT_FULL_SIZE);
     expect(lines.map(({ read }) => read)).toEqual(["cut-off"]);
   });
 
@@ -232,6 +229,16 @@ describe("the streamed Messages shape", () => {
   });
 });
 
+/** A judge's call, with no stream, that `signal` may end. */
+const judgedUntil = (doors: ReturnType<typeof doorsOn>["doors"], signal: AbortSignal) =>
+  openModelClient(doors).callModel(TO_SONNET, {
+    system: SYSTEM,
+    prompt: PROMPT,
+    answer: z.object({}),
+    most: MOST,
+    signal,
+  });
+
 describe("a caller's abort", () => {
   it("ends the streamed request and tries no other", async () => {
     const leaving = new AbortController();
@@ -250,14 +257,11 @@ describe("a caller's abort", () => {
 
     expect(wire.sent[0]?.init.signal?.aborted).toBe(true);
     expect(texts).toEqual([PIECES[0]]);
-    expect(ended).toEqual({
-      outcome: "failed",
-      spent: [{ tokensIn: 2_100, tokensOut: 16_000, seconds: 0, outcome: "failed" }],
-    });
+    expect(ended).toEqual(FAILED_AT_FULL_SIZE);
     expect(lines.map(({ read }) => read)).toEqual(["abandoned"]);
   });
 
-  it("ends the judge's request and tries no other", async () => {
+  it("settles a judge's request it ended at the reserved size", async () => {
     const leaving = new AbortController();
     const wire = theWire(async (signal) => {
       leaving.abort();
@@ -266,20 +270,26 @@ describe("a caller's abort", () => {
     });
     const { doors, lines } = doorsOn(wire);
 
-    const ended = await openModelClient(doors).callModel(TO_SONNET, {
-      system: SYSTEM,
-      prompt: PROMPT,
-      answer: z.object({}),
-      most: MOST,
-      signal: leaving.signal,
-    });
+    const ended = await judgedUntil(doors, leaving.signal);
 
     expect(ended).toEqual({
       outcome: "failed",
-      spent: [{ tokensIn: 0, tokensOut: 0, seconds: 0, outcome: "failed" }],
+      spent: [{ tokensIn: 40_000, tokensOut: 16_000, seconds: 0, outcome: "failed" }],
     });
     expect(wire.sent).toHaveLength(1);
     expect(lines.map(({ read }) => read)).toEqual(["abandoned"]);
+  });
+
+  it("settles a request ended before it was sent at nothing", async () => {
+    const wire = theWire(async (signal) => {
+      if (signal?.aborted === true) throw new DOMException("aborted", "AbortError");
+      return new Response("", { status: 500 });
+    });
+    const { doors } = doorsOn(wire);
+
+    const ended = await judgedUntil(doors, AbortSignal.abort());
+
+    expect(ended.spent).toEqual([{ tokensIn: 0, tokensOut: 0, seconds: 0, outcome: "failed" }]);
   });
 
   it("makes no attempt after an abort during its wait", async () => {
@@ -293,13 +303,7 @@ describe("a caller's abort", () => {
       },
     };
 
-    const ended = await openModelClient(waited).callModel(TO_SONNET, {
-      system: SYSTEM,
-      prompt: PROMPT,
-      answer: z.object({}),
-      most: MOST,
-      signal: leaving.signal,
-    });
+    const ended = await judgedUntil(waited, leaving.signal);
 
     expect(ended.outcome).toBe("failed");
     expect(wire.sent).toHaveLength(1);

@@ -291,6 +291,12 @@ describe("ask over tRPC", () => {
     await until(async () => (await spendIn(workspace.workspaceId))?.["called"] === 1);
 
     expect(sent.signal?.aborted).toBe(true);
+    // Cut off after it was sent, the judge's call may have been billed: it counts at full size.
+    const billed = await app().database.superuser.query(
+      "SELECT tokens_out FROM llm_call WHERE workspace_id = $1",
+      [workspace.workspaceId],
+    );
+    expect(billed.rows).toEqual([{ tokens_out: 16_000 }]);
     expect(await recordsIn(workspace.workspaceId)).toEqual([
       {
         transport: "trpc",

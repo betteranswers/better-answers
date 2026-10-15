@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import type { ConceptIri } from "@better-answers/schema";
-
-import { draftAnswer, type AnswerResult, type DraftEvent } from "../src/answering/index.ts";
-import type { PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
-import { openModelKeySetting, openStreamingClient } from "../src/llm/index.ts";
-import { openPostgres } from "../src/store/postgres/index.ts";
-import { setModelKey, setModelPrice, setSpendingLimit } from "../src/workspaces/index.ts";
 import {
+  draftAnswer,
+  type AnswerResult,
+  type DraftEvent,
+  type DraftSteps,
+} from "../src/answering/index.ts";
+import { err, type PrincipalRefusal, type UserPrincipal } from "../src/kernel/index.ts";
+import { openStreamingClient } from "../src/llm/index.ts";
+import {
+  aSonnetWorkspace,
   asked,
-  conceptSeeded,
+  conceptsSeeded,
   draftStepsFor,
   SUITE_ENVELOPE_KEY,
   type SeededConcept,
@@ -20,15 +22,10 @@ import {
   streamedEventsOf,
   streamedResponse,
 } from "./judge-wire.ts";
-import { bootstrap, provisionedWorkspace } from "./platform.ts";
-import { answered, postgresForSuite, seedingWith } from "./suite-postgres.ts";
-import { principalFor } from "./workspace-with-bundle.ts";
+import { postgresForSuite } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
-const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-ops" };
-
-const SONNET = "claude-sonnet-5-5";
 const A_KEY = "sk-test-u17-invented-key-0002";
 
 const QUESTION = "How long are audit logs kept?";
@@ -65,41 +62,10 @@ const SUPPLIER_ANSWER = anAnswer(
   "The supplier keeps its own audit logs for seven years.\n",
 );
 
-/** A workspace whose Admin asks, drafting on Sonnet with a key, priced, under `limitGbp`. */
-const aDraftingWorkspace = async (limitGbp = "100") => {
-  const workspace = await provisionedWorkspace(db(), "Acme");
-  const { workspaceId } = workspace;
-  const asker = await principalFor(db(), workspaceId, workspace.adminUserId);
-  answered(
-    await setModelPrice(PLATFORM, openPostgres(db().pool), {
-      provider: "anthropic",
-      model: SONNET,
-      effectiveFrom: "2026-01-01",
-      gbpPerMillionIn: "3",
-      gbpPerMillionOut: "15",
-    }),
-  );
-  await seedingWith(db().pool, (seed) =>
-    seed.modelChoice({
-      id: `answering-${workspaceId}`,
-      workspaceId,
-      purpose: "answering",
-      provider: "anthropic",
-      model: SONNET,
-      dimensions: null,
-    }),
-  );
-  answered(
-    await setModelKey(bootstrap, openPostgres(db().pool), openModelKeySetting(SUITE_ENVELOPE_KEY), {
-      workspaceId,
-      provider: "anthropic",
-      key: A_KEY,
-    }),
-  );
-  answered(
-    await setSpendingLimit(PLATFORM, openPostgres(db().pool), { workspaceId, gbp: limitGbp }),
-  );
-  return { workspaceId, asker };
+type Drafting = {
+  readonly limitGbp?: string;
+  /** Whether an answering model is chosen at all. */
+  readonly chosen?: boolean;
 };
 
 type Writing = (numbers: ReadonlyMap<string, string>, prompt: string) => readonly string[];
@@ -112,7 +78,11 @@ type Streamed = {
 /** A drafting model at the wire, writing each reply's lines from the numbers its prompt gave. */
 const aDrafter = (
   writing: Writing,
-  options: { readonly status?: number; readonly before?: (at: number) => Promise<void> } = {},
+  options: {
+    readonly status?: number;
+    readonly before?: (at: number) => Promise<void>;
+    readonly outputTokens?: number;
+  } = {},
 ) => {
   const streamed: Streamed = { prompts: [], signals: [] };
   const client = openStreamingClient({
@@ -122,7 +92,8 @@ const aDrafter = (
       streamed.signals.push(init?.signal);
       if (options.status !== undefined) return new Response("", { status: options.status });
       const lines = writing(numbersIn(prompt), prompt);
-      return streamedResponse(streamedEventsOf(lines), {
+      const usage = { input_tokens: 2_100, output_tokens: options.outputTokens ?? 140 };
+      return streamedResponse(streamedEventsOf(lines, usage), {
         signal: init?.signal,
         ...(options.before === undefined ? {} : { before: options.before }),
       });
@@ -136,10 +107,16 @@ const aDrafter = (
 
 type Drafter = ReturnType<typeof aDrafter>;
 
-const seededIn = async (workspaceId: string, shapes: readonly SeededConcept[]) => {
-  const iris: ConceptIri[] = [];
-  for (const shape of shapes) iris.push(await conceptSeeded(db(), workspaceId, shape));
-  return iris;
+/** The titles of the concepts each drafting request gave the model. */
+const titlesSent = (drafter: Drafter) =>
+  drafter.streamed.prompts.map((prompt) => [...numbersIn(prompt).keys()]);
+
+type Steps = DraftSteps<PrincipalRefusal>;
+
+type Told = {
+  readonly signal?: AbortSignal;
+  /** Changes a step, as a store fault or a reader's lost access would. */
+  readonly steps?: (steps: Steps) => Steps;
 };
 
 /** Every event a draft sends, in order. */
@@ -147,12 +124,12 @@ const draftOf = async (
   asker: UserPrincipal,
   result: AnswerResult,
   drafter: Drafter,
-  signal?: AbortSignal,
+  { signal, steps = (given) => given }: Told = {},
 ) => {
   const events: DraftEvent[] = [];
   const drafting = draftAnswer(
     asker,
-    draftStepsFor(db().runtimePool, asker, drafter.client.streamModel),
+    steps(draftStepsFor(db().runtimePool, asker, drafter.client.streamModel)),
     result,
     { question: QUESTION, ...(signal === undefined ? {} : { signal }) },
   );
@@ -184,12 +161,23 @@ const spendOf = async (workspaceId: string) => {
 };
 
 /** An evidence result over `shapes`, with no judge to call. */
-const arranged = async (shapes: readonly SeededConcept[], limitGbp?: string) => {
-  const { workspaceId, asker } = await aDraftingWorkspace(limitGbp);
-  const iris = await seededIn(workspaceId, shapes);
+const arranged = async (
+  shapes: readonly SeededConcept[],
+  { limitGbp = "100", chosen = true }: Drafting = {},
+) => {
+  const { workspaceId, asker } = await aSonnetWorkspace(db(), {
+    purpose: chosen ? "answering" : null,
+    limitGbp,
+    sealedUnder: SUITE_ENVELOPE_KEY,
+    key: A_KEY,
+  });
+  const iris = await conceptsSeeded(db(), workspaceId, shapes);
   const result = await asked(db(), asker, { question: QUESTION });
   return { workspaceId, asker, iris, result };
 };
+
+/** Where a reply's second text delta sits among its events. */
+const SECOND_DELTA = streamedEventsOf(["a", "b"]).findIndex((event) => event.includes('"b"'));
 
 const numberOf = (numbers: ReadonlyMap<string, string>, shape: SeededConcept) =>
   numbers.get(shape.title) ?? "none";
@@ -227,10 +215,7 @@ describe("the drafter", () => {
 
     const { events } = await draftOf(asker, result, drafter);
 
-    expect(drafter.streamed.prompts.map((prompt) => [...numbersIn(prompt).keys()])).toEqual([
-      [RETENTION.title],
-      [LMS_LOGS.title],
-    ]);
+    expect(titlesSent(drafter)).toEqual([[RETENTION.title], [LMS_LOGS.title]]);
     expect(events.map((event) => [event.kind, event.collection])).toEqual([
       ["sentence", "audits"],
       ["part", "audits"],
@@ -256,7 +241,9 @@ describe("the drafter", () => {
   it("sends its first sentence before the reply has ended", async () => {
     const { asker, result } = await arranged([RETENTION]);
     const held = Promise.withResolvers<void>();
-    const firstSentenceAt = 3;
+    const firstSentenceAt = streamedEventsOf(["x"]).findIndex((event) =>
+      event.includes("text_delta"),
+    );
     const drafter = aDrafter(
       (numbers) => [
         `Kept thirteen months.[^${numberOf(numbers, RETENTION)}]\n`,
@@ -296,7 +283,9 @@ describe("the drafter", () => {
   });
 
   it("pauses at the spending limit, sending nothing to the model", async () => {
-    const { workspaceId, asker, result } = await arranged([RETENTION, LMS_LOGS], "0.0001");
+    const { workspaceId, asker, result } = await arranged([RETENTION, LMS_LOGS], {
+      limitGbp: "0.0001",
+    });
     const drafter = aDrafter(() => ["Never written.[^1]\n"]);
 
     const { events, ended } = await draftOf(asker, result, drafter);
@@ -338,12 +327,12 @@ describe("the drafter", () => {
       (numbers) => [`Kept.[^${[...numbers.values()].join("")}]\n`, "More.\n"],
       {
         before: async (at) => {
-          if (at === 4) leaving.abort();
+          if (at === SECOND_DELTA) leaving.abort();
         },
       },
     );
 
-    const { events } = await draftOf(asker, result, drafter, leaving.signal);
+    const { events } = await draftOf(asker, result, drafter, { signal: leaving.signal });
 
     expect(drafter.streamed.signals.map((signal) => signal?.aborted)).toEqual([true]);
     expect(events.at(-1)).toEqual({ kind: "part", collection: "audits", outcome: "failed" });
@@ -351,6 +340,93 @@ describe("the drafter", () => {
       open: 0,
       calls: [{ purpose: "answering", outcome: "failed" }],
     });
+  });
+});
+
+/** As if the concept were gone from the index: no reader can read it any longer. */
+const unreadable = async (shape: SeededConcept, result: AnswerResult) => {
+  const iri = result.related.find((concept) => concept.title === shape.title)?.iri;
+  await db().pool.query("DELETE FROM concept_index WHERE iri = $1", [iri]);
+};
+
+describe("what the drafter reads and keeps", () => {
+  it("drafts only from concepts the reader can still read", async () => {
+    const { asker, result } = await arranged([RETENTION, EXPORT, LMS_LOGS]);
+    await unreadable(EXPORT, result);
+    await unreadable(LMS_LOGS, result);
+    const drafter = aDrafter((numbers) => [
+      `Kept thirteen months.[^${numberOf(numbers, RETENTION)}]\n`,
+      `Exported as CSV.[^${String(result.related.findIndex(({ title }) => title === EXPORT.title) + 1)}]\n`,
+    ]);
+
+    const { events } = await draftOf(asker, result, drafter);
+
+    expect(titlesSent(drafter)).toEqual([[RETENTION.title]]);
+    expect(
+      events.map((event) => (event.kind === "sentence" ? event.sentence : event.kind)),
+    ).toEqual(["Kept thirteen months.", "part"]);
+  });
+
+  it("drafts nothing where no answering model is chosen", async () => {
+    const { asker, result } = await arranged([RETENTION], { chosen: false });
+    const drafter = aDrafter(() => ["Never written.[^1]\n"]);
+
+    const { events, ended } = await draftOf(asker, result, drafter);
+
+    expect([events, drafter.streamed.prompts, ended.ok]).toEqual([[], [], true]);
+  });
+
+  it("pauses a later part, keeping the earlier part's prose", async () => {
+    const { workspaceId, asker, result } = await arranged([RETENTION, LMS_LOGS], {
+      limitGbp: "0.40",
+    });
+    const drafter = aDrafter((numbers) => [`Kept.[^${[...numbers.values()].join("")}]\n`], {
+      outputTokens: 16_000,
+    });
+
+    const { events } = await draftOf(asker, result, drafter);
+
+    expect(events.map((event) => [event.kind, event.collection])).toEqual([
+      ["sentence", "audits"],
+      ["part", "audits"],
+      ["part", "lms"],
+    ]);
+    expect(events.at(-1)).toMatchObject({ outcome: "paused" });
+    expect(await draftKept(result.recordId)).toEqual([
+      { sentence: "Kept.", concepts: [result.related[0]?.iri] },
+    ]);
+    expect((await spendOf(workspaceId)).calls).toHaveLength(1);
+  });
+
+  it("ends drafting failed when a part's prose cannot be kept", async () => {
+    const { asker, result } = await arranged([RETENTION, LMS_LOGS]);
+    const drafter = aDrafter((numbers) => [`Kept.[^${[...numbers.values()].join("")}]\n`]);
+    const lost = new Error("the record's store is gone");
+
+    const { events, ended } = await draftOf(asker, result, drafter, {
+      steps: (given) => ({ ...given, keepDraft: async () => err(lost) }),
+    });
+
+    expect(events.at(-1)).toEqual({ kind: "part", collection: "audits", outcome: "failed" });
+    expect([ended, drafter.streamed.prompts.length]).toEqual([err(lost), 1]);
+  });
+
+  it("ends drafting failed when a read or reserve fails", async () => {
+    const { asker, result } = await arranged([RETENTION]);
+    const drafter = aDrafter(() => ["Never written.[^1]\n"]);
+    const lost = new Error("the store is gone");
+
+    const read = await draftOf(asker, result, drafter, {
+      steps: (given) => ({ ...given, read: async () => err("not-a-member" as const) }),
+    });
+    const reserved = await draftOf(asker, result, drafter, {
+      steps: (given) => ({ ...given, reserve: async () => err(lost) }),
+    });
+
+    const failed = [{ kind: "part", collection: "audits", outcome: "failed" }];
+    expect([read.events, read.ended]).toEqual([failed, err("not-a-member")]);
+    expect([reserved.events, reserved.ended]).toEqual([failed, err(lost)]);
+    expect(drafter.streamed.prompts).toEqual([]);
   });
 });
 
@@ -398,6 +474,7 @@ describe("a drafted sentence's check", () => {
       `[^${a}]: https://example.test/policy\n`,
       ` [^${a}] [^${b}] \n`,
       `Type \`[^${a}]\` to cite.\n`,
+      `Refunds are always free. Claims close in 30 days.[^${a}]\n`,
     ]);
 
     expect(sent).toEqual([]);

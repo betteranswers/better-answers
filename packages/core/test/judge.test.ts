@@ -1,22 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { conceptIriOf, type ConceptIri } from "@better-answers/schema";
+import { conceptIriOf } from "@better-answers/schema";
 
 import { ask, askInput, ASK_CAPS, judgeCall, type AskCaps } from "../src/answering/index.ts";
 import type { PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
 import {
   openModelClient,
-  openModelKeySetting,
   RESERVATION_LIFETIME_MS,
   settleExpiredSpend,
   type ModelClient,
 } from "../src/llm/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
-import { setModelKey, setModelPrice, setSpendingLimit } from "../src/workspaces/index.ts";
 import {
+  aSonnetWorkspace,
   asked,
-  conceptSeeded,
+  conceptsSeeded,
   reservationsRead,
   stepsFor,
   SUITE_ENVELOPE_KEY,
@@ -30,21 +29,13 @@ import {
   judgeReplyTo,
   promptOf,
 } from "./judge-wire.ts";
-import { bootstrap, provisionedWorkspace } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
-import {
-  answered,
-  asksTablesLockedAtOnce,
-  postgresForSuite,
-  seedingWith,
-} from "./suite-postgres.ts";
-import { principalFor } from "./workspace-with-bundle.ts";
+import { answered, asksTablesLockedAtOnce, postgresForSuite } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
 const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-ops" };
 
-const SONNET = "claude-sonnet-5-5";
 const A_KEY = "sk-test-u13-invented-key-0001";
 
 type Judging = {
@@ -59,51 +50,12 @@ type Judging = {
 const ANOTHER_ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => index);
 
 /** A workspace whose Admin asks, judging on Sonnet with a key, priced, under a limit. */
-const aJudgingWorkspace = async ({
+const aJudgingWorkspace = ({
   limitGbp = "100",
   chosen = true,
   sealedUnder = SUITE_ENVELOPE_KEY,
-}: Judging = {}) => {
-  const workspace = await provisionedWorkspace(db(), "Acme");
-  const { workspaceId } = workspace;
-  const asker = await principalFor(db(), workspaceId, workspace.adminUserId);
-  answered(
-    await setModelPrice(PLATFORM, openPostgres(db().pool), {
-      provider: "anthropic",
-      model: SONNET,
-      effectiveFrom: "2026-01-01",
-      gbpPerMillionIn: "3",
-      gbpPerMillionOut: "15",
-    }),
-  );
-  if (chosen) {
-    await seedingWith(db().pool, (seed) =>
-      seed.modelChoice({
-        id: `judge-${workspaceId}`,
-        workspaceId,
-        purpose: "judging",
-        provider: "anthropic",
-        model: SONNET,
-        dimensions: null,
-      }),
-    );
-  }
-  if (sealedUnder !== null) {
-    answered(
-      await setModelKey(bootstrap, openPostgres(db().pool), openModelKeySetting(sealedUnder), {
-        workspaceId,
-        provider: "anthropic",
-        key: A_KEY,
-      }),
-    );
-  }
-  if (limitGbp !== null) {
-    answered(
-      await setSpendingLimit(PLATFORM, openPostgres(db().pool), { workspaceId, gbp: limitGbp }),
-    );
-  }
-  return { workspaceId, asker };
-};
+}: Judging = {}) =>
+  aSonnetWorkspace(db(), { purpose: chosen ? "judging" : null, limitGbp, sealedUnder, key: A_KEY });
 
 const anAnswer = (title: string, body: string, collection = "audits"): SeededConcept => ({
   collection,
@@ -169,12 +121,8 @@ const askedOutright = (asker: UserPrincipal, wire: Wire) =>
     new Date(),
   );
 
-/** One at a time: the seeder numbers each concept's path as it writes it. */
-const seededIn = async (workspaceId: string, shapes: readonly SeededConcept[]) => {
-  const iris: ConceptIri[] = [];
-  for (const shape of shapes) iris.push(await conceptSeeded(db(), workspaceId, shape));
-  return iris;
-};
+const seededIn = (workspaceId: string, shapes: readonly SeededConcept[]) =>
+  conceptsSeeded(db(), workspaceId, shapes);
 
 /** A judging workspace holding `shapes`, and a judge at the wire saying yes to `fits`. */
 const arranged = async (
