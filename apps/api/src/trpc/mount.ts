@@ -5,6 +5,7 @@ import type { Logger } from "pino";
 import { CeilingMet } from "@better-answers/core/kernel";
 
 import type { ModelDoors } from "../ask-steps.ts";
+import { ASK_KEEP_ALIVE_MS } from "../ask-stream.ts";
 import type { Auth } from "../auth/index.ts";
 import { TRPC_IP_RULE } from "../auth/index.ts";
 import type { Doors } from "../doors.ts";
@@ -22,6 +23,7 @@ type TrpcRoutesDependencies = {
   readonly auth: Auth;
   readonly doors: Doors;
   readonly modelDoors: ModelDoors;
+  readonly askKeepAliveMs?: number | undefined;
   readonly logger: Logger;
   readonly mail: Mail;
 };
@@ -56,6 +58,7 @@ export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
       createContext: (_options, context) => ({
         doors: deps.doors,
         modelDoors: deps.modelDoors,
+        askKeepAliveMs: deps.askKeepAliveMs ?? ASK_KEEP_ALIVE_MS,
         clock: deps.doors.clock,
         readSession: readOncePerRequest(),
         headers: context.req.raw.headers,

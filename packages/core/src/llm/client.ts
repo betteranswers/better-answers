@@ -106,6 +106,8 @@ export type ModelCall<T> = {
   readonly most: CallSize;
   /** The whole call's wall clock, every attempt and wait inside it; none where it is absent. */
   readonly withinMs?: number;
+  /** The caller's: once it aborts, the attempt in flight ends and no other is made. */
+  readonly signal?: AbortSignal;
 };
 
 /** One call through the decision shape. A decision model writes no text, so no output size is asked for. */
@@ -114,16 +116,22 @@ export type DecisionModelCall = {
   readonly questions: Readonly<Record<string, NoulInstructions>>;
   /** The whole call's wall clock, every attempt and wait inside it; none where it is absent. */
   readonly withinMs?: number;
+  /** The caller's: once it aborts, the attempt in flight ends and no other is made. */
+  readonly signal?: AbortSignal;
 };
 
-type Unanswered = "rate-limited" | "spend-cap" | "refused" | "failed";
+export type Unanswered = "rate-limited" | "spend-cap" | "refused" | "failed";
 
 /** Each attempt is one `CallSpent`, which settles the call's reservation as it stands. */
 export type ModelOutcome<T> =
   | { readonly outcome: "answered"; readonly answer: T; readonly spent: readonly CallSpent[] }
   | { readonly outcome: Unanswered; readonly spent: readonly CallSpent[] };
 
-type AttemptRead<Said = unknown> = WireRead<Said> | { readonly read: "timed-out" };
+/** `abandoned` is an attempt its caller's signal ended; `timed-out`, one its own timeout did. */
+export type AttemptRead<Said = unknown> =
+  | WireRead<Said>
+  | { readonly read: "timed-out" }
+  | { readonly read: "abandoned" };
 
 /** Never sent: the model speaks another shape, or the request is longer than its window. */
 type Unsent = "another-shape" | "over-window";
@@ -140,7 +148,7 @@ export type ModelAttemptLine = {
   readonly request_id: string | null;
 };
 
-type ModelClientDoors = {
+export type ModelClientDoors = {
   /** The shape of `fetch`, so a test hands the client a fake at the wire. */
   readonly fetch: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
   readonly clock: Clock;
@@ -163,13 +171,15 @@ type Attempted<Said = unknown> = {
   readonly status: number | null;
   readonly requestId: string | null;
   readonly seconds: number;
+  /** Whether the request went out: one its caller ended before sending reached no provider. */
+  readonly sent: boolean;
 };
 
 const NO_TOKENS: TokensSpent = { tokensIn: 0, tokensOut: 0 };
 
-const MS_PER_SECOND = 1000;
+export const MS_PER_SECOND = 1000;
 
-const waitFor = (ms: number): Promise<void> =>
+export const waitFor = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
@@ -221,14 +231,79 @@ const SHORTEST_ATTEMPT_MS = 10_000;
 const outOfTime = (read: AttemptRead): Unanswered =>
   read.read === "rate-limited" ? "rate-limited" : "failed";
 
-const lostTo = <Said>(signal: AbortSignal, otherwise: AttemptRead<Said>): AttemptRead<Said> =>
-  signal.aborted ? { read: "timed-out" } : otherwise;
+/**
+ * How the call ends after an attempt, or `undefined` to try again. A wait the deadline leaves no
+ * room for, or a caller who left during it, ends the call.
+ */
+export const afterAttempt = async (
+  read: AttemptRead,
+  attempted: number,
+  leftMs: () => number,
+  caller: AbortSignal | undefined,
+  wait: (ms: number) => Promise<void>,
+): Promise<Unanswered | undefined> => {
+  const step = stepAfter(read, attempted);
+  if ("outcome" in step) return step.outcome;
+  if (step.waitMs + SHORTEST_ATTEMPT_MS > leftMs()) return outOfTime(read);
+  await wait(step.waitMs);
+  if (caller?.aborted === true) return "failed";
+  // A timer can fire late, so the room is measured again after it.
+  return leftMs() < SHORTEST_ATTEMPT_MS ? outOfTime(read) : undefined;
+};
 
-const spentBy = (tried: Attempted, answered: boolean): CallSpent => ({
-  ...("spent" in tried.read ? tried.read.spent : NO_TOKENS),
+/** An attempt's own signal, which its timeout or its caller's aborts. */
+export const attemptSignal = (
+  timedOut: AbortSignal,
+  caller: AbortSignal | undefined,
+): AbortSignal => (caller === undefined ? timedOut : AbortSignal.any([timedOut, caller]));
+
+/** What an attempt cut short reads as: its caller's leaving, its timeout, or else `otherwise`. */
+export const lostTo = <Said>(
+  signal: AbortSignal,
+  caller: AbortSignal | undefined,
+  otherwise: AttemptRead<Said>,
+): AttemptRead<Said> => {
+  if (caller?.aborted === true) return { read: "abandoned" };
+  return signal.aborted ? { read: "timed-out" } : otherwise;
+};
+
+/** Every field of one attempt's log line, the same for each wire shape and form. */
+export const attemptLine = (
+  to: ModelToCall,
+  attempted: number,
+  tried: Pick<Attempted, "status" | "requestId" | "seconds"> & {
+    readonly read: ModelAttemptLine["read"];
+  },
+): ModelAttemptLine => ({
+  purpose: to.purpose,
+  provider: to.provider,
+  model: to.model,
+  attempt: attempted,
+  status: tried.status,
+  read: tried.read,
   seconds: tried.seconds,
-  outcome: answered ? "succeeded" : "failed",
+  request_id: tried.requestId,
 });
+
+/**
+ * An attempt its caller ended after sending it may have been billed, so it counts at `cutAt`,
+ * the size reserved for it.
+ */
+const spentBy = (tried: Attempted, answered: boolean, cutAt: TokensSpent): CallSpent => {
+  const cut = tried.read.read === "abandoned" && tried.sent;
+  return {
+    ...("spent" in tried.read ? tried.read.spent : cut ? cutAt : NO_TOKENS),
+    seconds: tried.seconds,
+    outcome: answered ? "succeeded" : "failed",
+  };
+};
+
+/** What a call carries beside its request: its deadline, its caller's signal, its reserved size. */
+type Calling = {
+  readonly withinMs: number | undefined;
+  readonly signal: AbortSignal | undefined;
+  readonly cutAt: TokensSpent;
+};
 
 export const openModelClient = (doors: ModelClientDoors): ModelClient => {
   const wait = doors.wait ?? waitFor;
@@ -241,15 +316,17 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     shape: WireShape<Said>,
     request: WireRequest,
     timeoutMs: number,
+    caller: AbortSignal | undefined,
   ): Promise<Attempted<Said>> => {
     const started = doors.clock.now().getTime();
-    const signal = timeout(timeoutMs);
+    const sent = caller?.aborted !== true;
+    const signal = attemptSignal(timeout(timeoutMs), caller);
     const { url, ...init } = request;
     const replied = await attempt(() => doors.fetch(url, { ...init, signal }));
     if (!replied.ok) {
       // A failed connection may be tried again; a timed-out one may have been billed, so it is not.
-      const read = lostTo<Said>(signal, { read: "unavailable" });
-      return { read, status: null, requestId: null, seconds: secondsSince(started) };
+      const read = lostTo<Said>(signal, caller, { read: "unavailable" });
+      return { read, status: null, requestId: null, seconds: secondsSince(started), sent };
     }
     const response = replied.value;
     const body = await attempt(() => response.text());
@@ -258,23 +335,14 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     // A body lost after its status is read by the status alone, so a billed 200 is not tried again.
     const read = body.ok
       ? shape.read(status, body.value, retryAfter)
-      : lostTo(signal, shape.read(status, "", retryAfter));
+      : lostTo(signal, caller, shape.read(status, "", retryAfter));
     const requestId = response.headers.get(shape.requestIdHeader);
-    return { read, status, requestId, seconds: secondsSince(started) };
+    return { read, status, requestId, seconds: secondsSince(started), sent };
   };
 
   const logged = (to: ModelToCall, attempted: number, tried: Attempted): void => {
     doors.log.info(
-      {
-        purpose: to.purpose,
-        provider: to.provider,
-        model: to.model,
-        attempt: attempted,
-        status: tried.status,
-        read: tried.read.read,
-        seconds: tried.seconds,
-        request_id: tried.requestId,
-      },
+      attemptLine(to, attempted, { ...tried, read: tried.read.read }),
       "llm: a model call's attempt",
     );
   };
@@ -282,16 +350,7 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
   /** Logged as an attempt that was never made, so a judge that failed unsent says why. */
   const unsent = <T>(to: ModelToCall, read: Unsent): ModelOutcome<T> => {
     doors.log.info(
-      {
-        purpose: to.purpose,
-        provider: to.provider,
-        model: to.model,
-        attempt: 0,
-        status: null,
-        read,
-        seconds: 0,
-        request_id: null,
-      },
+      attemptLine(to, 0, { status: null, read, seconds: 0, requestId: null }),
       "llm: a model call never sent",
     );
     return { outcome: "failed", spent: [] };
@@ -302,7 +361,7 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     shape: WireShape<Said>,
     request: WireRequest,
     accept: Accept<Said, T>,
-    withinMs: number | undefined,
+    { withinMs, signal, cutAt }: Calling,
   ): Promise<ModelOutcome<T>> => {
     const startedMs = doors.clock.now().getTime();
     const leftMs = (): number =>
@@ -312,20 +371,14 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
       attempted: number,
       before: readonly CallSpent[],
     ): Promise<ModelOutcome<T>> => {
-      const tried = await attemptOnce(shape, request, Math.min(ATTEMPT_TIMEOUT_MS, leftMs()));
+      const timeoutMs = Math.min(ATTEMPT_TIMEOUT_MS, leftMs());
+      const tried = await attemptOnce(shape, request, timeoutMs, signal);
       logged(to, attempted, tried);
       const answered = answerOf(tried.read, accept);
-      const spent = [...before, spentBy(tried, answered !== undefined)];
+      const spent = [...before, spentBy(tried, answered !== undefined, cutAt)];
       if (answered !== undefined) return { outcome: "answered", answer: answered.answer, spent };
-      const step = stepAfter(tried.read, attempted);
-      if ("outcome" in step) return { outcome: step.outcome, spent };
-      if (step.waitMs + SHORTEST_ATTEMPT_MS > leftMs()) {
-        return { outcome: outOfTime(tried.read), spent };
-      }
-      await wait(step.waitMs);
-      // A timer can fire late, so the room is measured again after it.
-      if (leftMs() < SHORTEST_ATTEMPT_MS) return { outcome: outOfTime(tried.read), spent };
-      return from(attempted + 1, spent);
+      const ended = await afterAttempt(tried.read, attempted, leftMs, signal, wait);
+      return ended === undefined ? from(attempted + 1, spent) : { outcome: ended, spent };
     };
 
     return from(1, []);
@@ -341,7 +394,11 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
       answerSchema: answerSchemaOf(call.answer),
       tokensOut: call.most.tokensOut,
     });
-    return called(to, MESSAGES, request, (text) => jsonAs(call.answer, text), call.withinMs);
+    return called(to, MESSAGES, request, (text) => jsonAs(call.answer, text), {
+      withinMs: call.withinMs,
+      signal: call.signal,
+      cutAt: call.most,
+    });
   };
 
   /** A request longer than the model's window is never sent: the provider would cut it unsaid. */
@@ -358,7 +415,12 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     });
     if (!fitsWindow(to.model, request.body)) return unsent(to, "over-window");
     const answers = probabilitiesFor(Object.keys(call.questions));
-    return called(to, DECISION, request, (said) => answers.safeParse(said).data, call.withinMs);
+    // A decision call reserves no output, and nothing marks what a cut one was billed.
+    return called(to, DECISION, request, (said) => answers.safeParse(said).data, {
+      withinMs: call.withinMs,
+      signal: call.signal,
+      cutAt: NO_TOKENS,
+    });
   };
 
   return { callModel, decide };

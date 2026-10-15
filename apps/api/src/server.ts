@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Logger } from "pino";
 
 import { attempt } from "@better-answers/core/kernel";
-import { openCredentials, openModelClient } from "@better-answers/core/llm";
+import { openCredentials, openModelClient, openStreamingClient } from "@better-answers/core/llm";
 
 import { createClientMetadataFetcher } from "../lifts/better-auth-cimd-node/index.ts";
 import {
@@ -40,6 +40,9 @@ export type ServerDependencies = {
 
   /** The key each workspace's model key is sealed under; with none, no model is called. */
   readonly envelopeKey?: Uint8Array | undefined;
+
+  /** The longest an answer's stream stays quiet before it sends a keep-alive; a test shortens it. */
+  readonly askKeepAliveMs?: number | undefined;
   readonly serverVersion?: string;
 
   readonly webRoot?: string | undefined;
@@ -116,16 +119,20 @@ export function createServer(dependencies: ServerDependencies): Hono {
     }),
   );
 
+  const modelClientDoors = {
+    fetch: dependencies.fetchModel ?? fetch,
+    clock: doors.clock,
+    log: logger.child({ module: "llm" }),
+  };
   const modelDoors = {
     credentials:
       dependencies.envelopeKey === undefined
         ? undefined
         : openCredentials(dependencies.envelopeKey),
-    models: openModelClient({
-      fetch: dependencies.fetchModel ?? fetch,
-      clock: doors.clock,
-      log: logger.child({ module: "llm" }),
-    }),
+    models: {
+      ...openModelClient(modelClientDoors),
+      ...openStreamingClient(modelClientDoors),
+    },
   };
 
   const mcp = createMcpSurface({
@@ -152,6 +159,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
       auth,
       doors,
       modelDoors,
+      askKeepAliveMs: dependencies.askKeepAliveMs,
       logger,
       mail: { send: dependencies.sendEmail, publicUrl: dependencies.publicUrl },
     }),

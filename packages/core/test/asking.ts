@@ -8,15 +8,23 @@ import {
   ask,
   askInput,
   completeRecord,
+  keepDraft,
   openRecord,
   planAnswer,
+  reserveDrafting,
   reserveJudge,
   type AnswerResult,
   type AskCaps,
   type AskSteps,
+  type DraftSteps,
 } from "../src/answering/index.ts";
 import type { PrincipalRefusal, Result, UserPrincipal } from "../src/kernel/index.ts";
-import { openCredentials, type Credentials, type ModelClient } from "../src/llm/index.ts";
+import {
+  openCredentials,
+  type Credentials,
+  type ModelClient,
+  type StreamModel,
+} from "../src/llm/index.ts";
 import {
   openPostgres,
   withMember,
@@ -74,6 +82,32 @@ export const stepsFor = (
       flat(
         await withMember(asker, door, (member, tx) =>
           completeRecord(member, tx, { ...completion, completedAt: new Date() }),
+        ),
+      ),
+  };
+};
+
+/** The drafter's steps as a transport hands them: each a transaction of its own, as the asker. */
+export const draftStepsFor = (
+  pool: pg.Pool,
+  asker: UserPrincipal,
+  streamModel: StreamModel,
+): DraftSteps<PrincipalRefusal> => {
+  const door = openPostgres(pool);
+  const credentials = openCredentials(SUITE_ENVELOPE_KEY);
+  return {
+    read: async (work) => flat(await withMemberUnheld(asker, door, (_member, tx) => work(tx))),
+    reserve: async (reserving) =>
+      flat(
+        await withMember(asker, door, (member, tx) =>
+          reserveDrafting(member, tx, credentials, { ...reserving, now: new Date() }),
+        ),
+      ),
+    streamModel,
+    keepDraft: async (kept) =>
+      flat(
+        await withMember(asker, door, (member, tx) =>
+          keepDraft(member, tx, { ...kept, now: new Date() }),
         ),
       ),
   };

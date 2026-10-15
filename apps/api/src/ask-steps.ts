@@ -1,8 +1,11 @@
 import {
   completeRecord,
+  keepDraft,
   openRecord,
+  reserveDrafting,
   reserveJudge,
   type AskSteps,
+  type DraftSteps,
 } from "@better-answers/core/answering";
 import {
   err,
@@ -13,7 +16,7 @@ import {
   type Result,
   type UserPrincipal,
 } from "@better-answers/core/kernel";
-import type { Credentials, ModelClient } from "@better-answers/core/llm";
+import type { Credentials, ModelClient, StreamingClient } from "@better-answers/core/llm";
 import {
   withMember,
   withMemberUnheld,
@@ -26,7 +29,7 @@ import type { QuestionTransport } from "@better-answers/schema";
 export type ModelDoors = {
   /** Absent where the api holds no envelope key: no model key opens, so no judge is called. */
   readonly credentials: Credentials | undefined;
-  readonly models: ModelClient;
+  readonly models: ModelClient & StreamingClient;
 };
 
 /** What a road opens its transactions with and calls a model through; `ask` is handed none. */
@@ -62,30 +65,62 @@ const steppedAs = async <Value, Refused>(
   return opened.ok ? opened.value : opened;
 };
 
+/** No model key opens where the api holds no envelope key, so nothing is reserved. */
+const reservingBy =
+  <Reserving>(
+    reserve: (
+      member: UserPrincipal,
+      tx: Tx,
+      credentials: Credentials,
+      reserving: Reserving,
+    ) => ReturnType<typeof reserveJudge>,
+    { door, credentials }: StepDoors,
+    asker: UserPrincipal,
+  ) =>
+  async (reserving: Reserving) =>
+    credentials === undefined
+      ? ok(undefined)
+      : steppedAs(withMember, door, asker, (member, tx) =>
+          reserve(member, tx, credentials, reserving),
+        );
+
 /**
  * Each step opens and settles its own transaction, so none is held between them. Only the read
  * lends its transaction, which opens read-only.
  */
 export const stepsFor = (
-  { door, clock, credentials, models }: StepDoors,
+  doors: StepDoors,
   asker: UserPrincipal,
   transport: QuestionTransport,
+  leaving?: AbortSignal,
 ): AskSteps<StepRefusal> => ({
   openRecord: (opening) =>
-    steppedAs(withMember, door, asker, (member, tx) =>
+    steppedAs(withMember, doors.door, asker, (member, tx) =>
       openRecord(member, tx, { ...opening, transport }),
     ),
-  read: (work) => steppedAs(withMemberUnheld, door, asker, (_member, tx) => work(tx)),
-  reserve: async (reserving) =>
-    credentials === undefined
-      ? ok(undefined)
-      : steppedAs(withMember, door, asker, (member, tx) =>
-          reserveJudge(member, tx, credentials, reserving),
-        ),
-  callModel: models.callModel,
-  decide: models.decide,
+  read: (work) => steppedAs(withMemberUnheld, doors.door, asker, (_member, tx) => work(tx)),
+  reserve: reservingBy(reserveJudge, doors, asker),
+  callModel: (to, call) =>
+    doors.models.callModel(to, leaving === undefined ? call : { ...call, signal: leaving }),
+  decide: (to, call) =>
+    doors.models.decide(to, leaving === undefined ? call : { ...call, signal: leaving }),
   completeRecord: (completion) =>
-    steppedAs(withMember, door, asker, (member, tx) =>
-      completeRecord(member, tx, { ...completion, completedAt: clock.now() }),
+    steppedAs(withMember, doors.door, asker, (member, tx) =>
+      completeRecord(member, tx, { ...completion, completedAt: doors.clock.now() }),
     ),
 });
+
+/** The drafter's steps, each a transaction of its own as `stepsFor`'s are. */
+export const draftStepsFor = (doors: StepDoors, asker: UserPrincipal): DraftSteps<StepRefusal> => {
+  const { door, clock, models } = doors;
+  const reserve = reservingBy(reserveDrafting, doors, asker);
+  return {
+    read: (work) => steppedAs(withMemberUnheld, door, asker, (_member, tx) => work(tx)),
+    reserve: (reserving) => reserve({ ...reserving, now: clock.now() }),
+    streamModel: models.streamModel,
+    keepDraft: (kept) =>
+      steppedAs(withMember, door, asker, (member, tx) =>
+        keepDraft(member, tx, { ...kept, now: clock.now() }),
+      ),
+  };
+};

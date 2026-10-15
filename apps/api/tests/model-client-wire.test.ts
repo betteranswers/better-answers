@@ -131,9 +131,7 @@ describe("the server's model client", () => {
     expect(logged).not.toContain("thirteen months");
     expect(logged).not.toContain("<question>");
     expect(logged).not.toContain(A_MODEL_KEY);
-    expect(promptSent(wire.sent.at(-1) ?? { url: "", headers: {}, body: "" })).toContain(
-      "thirteen months",
-    );
+    expect(promptSent(wire.sent.at(-1) ?? { body: "" })).toContain("thirteen months");
   });
 
   it("answers a judged fit through the tool", async () => {

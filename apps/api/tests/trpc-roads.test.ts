@@ -17,6 +17,7 @@ import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
 
 import type { ModelDoors } from "../src/ask-steps.ts";
+import { ASK_KEEP_ALIVE_MS } from "../src/ask-stream.ts";
 import type { Doors } from "../src/doors.ts";
 import type { Refusal, RefusalAnswer } from "../src/refusal.ts";
 import type { GatedSessionReader } from "../src/second-factor-gate.ts";
@@ -99,6 +100,9 @@ const NO_MODEL = {
   models: {
     callModel: () => Promise.reject(new Error("no procedure here calls a model")),
     decide: () => Promise.reject(new Error("no procedure here calls a model")),
+    streamModel: () => {
+      throw new Error("no procedure here calls a model");
+    },
   },
 };
 
@@ -110,6 +114,7 @@ const contextOf = (
 ) => ({
   doors,
   modelDoors: NO_MODEL,
+  askKeepAliveMs: ASK_KEEP_ALIVE_MS,
   clock: systemClock(),
   readSession,
   headers,

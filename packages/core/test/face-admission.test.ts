@@ -14,7 +14,11 @@ const HOLDS_NO_ACTION = ["access", "kernel", "refusals", "store"];
 /** Each step a face exports, with the action that admits before it runs. */
 const STEPS: Readonly<Record<string, string>> = {
   "answering/completeRecord": "a step of ask, which admits the asker before it completes a record",
+  "answering/keepDraft":
+    "a step of the drafter, which admits the asker before it keeps a part's prose",
   "answering/openRecord": "a step of ask, which admits the asker before it opens a record",
+  "answering/reserveDrafting":
+    "a step of the drafter, which admits the asker before it reserves a part's call",
   "answering/reserveJudge":
     "a step of ask, which admits the asker before it reserves its judge's call",
   "audit/eventsNewestFirst": "the audit log's read calls it after admitting an Admin",

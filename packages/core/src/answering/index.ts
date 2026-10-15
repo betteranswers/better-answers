@@ -86,8 +86,15 @@ export {
   type RelatedConcept,
   type ReturnedConcept,
 } from "./plan.ts";
-export { completeRecord, openRecord } from "./record.ts";
-export { decisionJudgeCall, judgeCall, reserveJudge, type JudgeRefusal } from "./judge.ts";
+export { completeRecord, keepDraft, openRecord } from "./record.ts";
+export {
+  decisionJudgeCall,
+  judgeCall,
+  reserveDrafting,
+  reserveJudge,
+  type JudgeRefusal,
+} from "./judge.ts";
+export { draftAnswer, type DraftEvent, type DraftSteps } from "./draft.ts";
 export {
   closeFlag,
   closeFlagInput,

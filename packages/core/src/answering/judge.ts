@@ -12,6 +12,7 @@ import {
   type CallSpent,
   type Credentials,
   type DecisionModelCall,
+  type LlmPurpose,
   type ModelCall,
   type ModelClient,
   type ModelOutcome,
@@ -33,10 +34,10 @@ import type { RecordCompletion } from "./record.ts";
 /** Each candidate's verdict, keyed by the number the prompt gave it. */
 type Verdicts = Readonly<Record<string, CandidateVerdict>>;
 
-/** A judging call reserved, and the model it reserved for. */
-type JudgeReserved = { readonly to: ModelToCall; readonly reservationId: string };
+/** A model call reserved, and the model it reserved for. */
+export type CallReserved = { readonly to: ModelToCall; readonly reservationId: string };
 
-type JudgeReserving = {
+export type CallReserving = {
   /** The record of the question the call serves. */
   readonly answerId: string;
   /** By wire shape, since the model and so its shape are read only as the reservation is taken. */
@@ -53,22 +54,28 @@ export type JudgeRefusal = KernelRefusal<"spending-limit-met"> | Error;
 export type JudgeSteps<Refused = never> = ModelClient & {
   /** Commits before it answers; `undefined` where the workspace has no judge to call. */
   readonly reserve: (
-    reserving: JudgeReserving,
-  ) => Promise<Result<JudgeReserved | undefined, Refused | JudgeRefusal>>;
+    reserving: CallReserving,
+  ) => Promise<Result<CallReserved | undefined, Refused | JudgeRefusal>>;
 };
 
+/** One drafting call's reservation: drafting streams through the Messages shape alone. */
+export type DraftReserving = Omit<CallReserving, "most"> & { readonly most: CallSize };
+
 /**
- * The workspace's judging model, then the most its call may cost, both in the caller's
- * transaction: no reservation is taken with no model to call. A key that will not open is an
- * error, as its operator needs it to be.
+ * No reservation is taken with no model to call. A key that will not open is an error, as its
+ * operator needs it to be.
  */
-export const reserveJudge = async (
+const reservedFor = async (
+  purpose: LlmPurpose,
   asker: UserPrincipal,
   tx: Tx,
   credentials: Credentials,
-  reserving: JudgeReserving,
-): Promise<Result<JudgeReserved | undefined, JudgeRefusal>> => {
-  const to = await resolveModel(asker, tx, credentials, "judging");
+  reserving: Omit<CallReserving, "most"> & {
+    /** The most the model's wire shape may spend; `undefined` where it cannot make this call. */
+    readonly most: (shape: WireShapeName) => CallSize | undefined;
+  },
+): Promise<Result<CallReserved | undefined, JudgeRefusal>> => {
+  const to = await resolveModel(asker, tx, credentials, purpose);
   if (!to.ok) {
     return err(
       to.error instanceof Error
@@ -77,12 +84,40 @@ export const reserveJudge = async (
     );
   }
   if (to.value === undefined) return ok(undefined);
-  const most = reserving.most[wireShapeOf(to.value)];
-  const reserved = await reserveSpend(asker, tx, { ...reserving, most, purpose: "judging" });
+  const most = reserving.most(wireShapeOf(to.value));
+  if (most === undefined) return ok(undefined);
+  const reserved = await reserveSpend(asker, tx, { ...reserving, most, purpose });
   if (!reserved.ok) return reserved;
   if (!reserved.value.reserved) return ok(undefined);
   return ok({ to: to.value, reservationId: reserved.value.reservationId });
 };
+
+/** The judging model's call, reserved in the caller's transaction. */
+export const reserveJudge = async (
+  asker: UserPrincipal,
+  tx: Tx,
+  credentials: Credentials,
+  reserving: CallReserving,
+): Promise<Result<CallReserved | undefined, JudgeRefusal>> =>
+  reservedFor("judging", asker, tx, credentials, {
+    ...reserving,
+    most: (shape) => reserving.most[shape],
+  });
+
+/**
+ * One drafting call on the answering model, reserved in the caller's transaction. A model of the
+ * decision shape writes no prose, so none is reserved for it.
+ */
+export const reserveDrafting = async (
+  asker: UserPrincipal,
+  tx: Tx,
+  credentials: Credentials,
+  reserving: DraftReserving,
+): Promise<Result<CallReserved | undefined, JudgeRefusal>> =>
+  reservedFor("answering", asker, tx, credentials, {
+    ...reserving,
+    most: (shape) => (shape === "messages" ? reserving.most : undefined),
+  });
 
 /** The `Answer`s the judge is asked about: those that bear, in the order they bear, to the cap. */
 const candidatesOf = (

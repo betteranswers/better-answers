@@ -110,6 +110,100 @@ export const decisionReplyTo = (yes: ReadonlyMap<string, number>, body: string):
     messages: [],
   });
 
+/** Each concept's number in a drafting prompt, by its title. */
+export const conceptNumbersIn = (prompt: string): ReadonlyMap<string, string> =>
+  new Map(
+    [
+      ...prompt.matchAll(/<concept number="(\d+)">\n<kind>[^<]*<\/kind>\n<title>([^<]*)<\/title>/g),
+    ].map(([, number = "", title = ""]) => [title, number]),
+  );
+
+const sse = (event: string, data: object): string =>
+  `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+
+type StreamedUsage = { readonly input_tokens: number; readonly output_tokens: number };
+
+/** A streamed Messages reply writing `pieces`, a delta each, its events in the documented order. */
+export const streamedEventsOf = (
+  pieces: readonly string[],
+  usage: StreamedUsage = { input_tokens: 2_100, output_tokens: 140 },
+  stopReason = "end_turn",
+): readonly string[] => [
+  sse("message_start", {
+    type: "message_start",
+    message: {
+      id: "msg_02",
+      type: "message",
+      role: "assistant",
+      content: [],
+      model: "claude-sonnet-5-5",
+      stop_reason: null,
+      stop_sequence: null,
+      usage: { input_tokens: usage.input_tokens, output_tokens: 1 },
+    },
+  }),
+  sse("content_block_start", {
+    type: "content_block_start",
+    index: 0,
+    content_block: { type: "text", text: "" },
+  }),
+  sse("ping", { type: "ping" }),
+  ...pieces.map((text) =>
+    sse("content_block_delta", {
+      type: "content_block_delta",
+      index: 0,
+      delta: { type: "text_delta", text },
+    }),
+  ),
+  sse("content_block_stop", { type: "content_block_stop", index: 0 }),
+  sse("message_delta", {
+    type: "message_delta",
+    delta: { stop_reason: stopReason, stop_sequence: null },
+    usage: { output_tokens: usage.output_tokens },
+  }),
+  sse("message_stop", { type: "message_stop" }),
+];
+
+/** An error the provider sends inside a stream it has begun. */
+export const OVERLOADED_EVENT = sse("error", {
+  type: "error",
+  error: { type: "overloaded_error", message: "Overloaded" },
+});
+
+type Streaming = {
+  /** Awaited before chunk `at` is sent; a chunk never awaited for is sent at once. */
+  readonly before?: (at: number) => Promise<void>;
+  /** As `fetch`'s own: once aborted, the body errors as a cut connection's does. */
+  readonly signal?: AbortSignal | null | undefined;
+};
+
+/** A 200 whose body sends each chunk in turn, as a provider streams. */
+export const streamedResponse = (
+  chunks: readonly string[],
+  { before, signal }: Streaming = {},
+): Response => {
+  const encoder = new TextEncoder();
+  let at = 0;
+  const body = new ReadableStream<Uint8Array>({
+    start: (controller) => {
+      signal?.addEventListener("abort", () => {
+        controller.error(new DOMException("aborted", "AbortError"));
+      });
+    },
+    pull: async (controller) => {
+      if (at === chunks.length) {
+        controller.close();
+        return;
+      }
+      await before?.(at);
+      if (signal?.aborted === true) return;
+      controller.enqueue(encoder.encode(chunks[at] ?? ""));
+      at += 1;
+    },
+  });
+  return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+};
+
 /** The reply of a judge saying yes to each candidate written for one of `fits`, no to the rest. */
 export const judgeReplyTo = (fits: readonly string[], body: string): string =>
   messagesReplyOf(

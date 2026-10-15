@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-import { jsonAs, retryAfterMsOf, type WireRead, type WireRequest } from "./read.ts";
+import {
+  jsonAs,
+  retryAfterMsOf,
+  type TokensSpent,
+  type WireRead,
+  type WireRequest,
+} from "./read.ts";
 
 /** Each a value the provider publishes; the version pins the shape this file reads and writes. */
 const MESSAGES_URL = "https://api.anthropic.com/v1/messages";
@@ -18,11 +24,14 @@ export type MessagesCall = {
   readonly tokensOut: number;
 };
 
+/** One attempt whose answer is prose, sent as it is written. */
+export type MessagesStreamCall = Omit<MessagesCall, "answerSchema">;
+
 /**
  * No `thinking` and no sampling field: a model choice may name a model that refuses either, and
  * each model's default stands.
  */
-export const messagesRequest = (call: MessagesCall): WireRequest => ({
+const requestWith = (call: MessagesStreamCall, asking: object): WireRequest => ({
   url: MESSAGES_URL,
   method: "POST",
   headers: {
@@ -35,9 +44,16 @@ export const messagesRequest = (call: MessagesCall): WireRequest => ({
     max_tokens: call.tokensOut,
     system: call.system,
     messages: [{ role: "user", content: call.prompt }],
-    output_config: { format: { type: "json_schema", schema: call.answerSchema } },
+    ...asking,
   }),
 });
+
+export const messagesRequest = ({ answerSchema, ...call }: MessagesCall): WireRequest =>
+  requestWith(call, { output_config: { format: { type: "json_schema", schema: answerSchema } } });
+
+/** With no answer shape, prose arrives as server-sent events. */
+export const messagesStreamRequest = (call: MessagesStreamCall): WireRequest =>
+  requestWith(call, { stream: true });
 
 /** An answer is the text of the reply's blocks, which the caller reads as JSON. */
 type MessagesRead = WireRead<string>;
@@ -124,4 +140,66 @@ export const messagesRead = (
   // A billing fault is lifted by paying, never by waiting, as a spend cap is.
   if (status === BILLING) return { read: "spend-cap" };
   return UNAVAILABLE_STATUSES.has(status) ? { read: "unavailable" } : { read: "failed" };
+};
+
+/** Each event's data, and what is left over until the blank line that ends the next one. */
+type SseRead = { readonly data: readonly string[]; readonly rest: string };
+
+export const sseDataIn = (buffered: string): SseRead => {
+  const blocks = buffered.replaceAll("\r\n", "\n").split("\n\n");
+  const rest = blocks.pop() ?? "";
+  const data = blocks.flatMap((block) => {
+    const lines = block.split("\n").filter((line) => line.startsWith("data:"));
+    return lines.length === 0
+      ? []
+      : [lines.map((line) => line.slice("data:".length).trimStart()).join("\n")];
+  });
+  return { data, rest };
+};
+
+/** What one event of a streamed reply says; an event this file does not read is `other`. */
+export type StreamEventRead =
+  | { readonly event: "text"; readonly text: string }
+  | { readonly event: "started"; readonly spent: TokensSpent }
+  | { readonly event: "delta"; readonly stopReason: string | null; readonly spent: TokensSpent }
+  | { readonly event: "stopped" }
+  | { readonly event: "error" }
+  | { readonly event: "other" };
+
+const started = z.object({
+  type: z.literal("message_start"),
+  message: z.object({ usage: reply.shape.usage }),
+});
+
+/** Its counts are the whole reply's so far; an input count rides along only where it moved. */
+const delta = z.object({
+  type: z.literal("message_delta"),
+  delta: z.object({ stop_reason: z.string().nullable() }),
+  usage: reply.shape.usage.extend({ input_tokens: count.nullish() }),
+});
+
+const textDelta = z.object({
+  type: z.literal("content_block_delta"),
+  delta: z.object({ type: z.literal("text_delta"), text: z.string() }),
+});
+
+const typed = z.object({ type: z.string() });
+
+/** Data that is no JSON, or no event at all, is read as an error: the reply cannot be trusted. */
+export const streamEventRead = (data: string): StreamEventRead => {
+  const event = jsonAs(typed, data);
+  if (event === undefined || event.type === "error") return { event: "error" };
+  if (event.type === "message_stop") return { event: "stopped" };
+  const text = jsonAs(textDelta, data);
+  if (text !== undefined) return { event: "text", text: text.delta.text };
+  const opened = jsonAs(started, data);
+  if (opened !== undefined) return { event: "started", spent: spentOf(opened.message.usage) };
+  const moved = jsonAs(delta, data);
+  if (moved === undefined) return { event: "other" };
+  const { input_tokens: tokensIn, ...usage } = moved.usage;
+  return {
+    event: "delta",
+    stopReason: moved.delta.stop_reason,
+    spent: spentOf({ ...usage, input_tokens: tokensIn ?? 0 }),
+  };
 };

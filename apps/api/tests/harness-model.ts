@@ -1,6 +1,11 @@
 import { ok } from "@better-answers/core/kernel";
 import { openModelKeySetting } from "@better-answers/core/llm";
-import { judgeReplyTo, promptOf } from "@better-answers/core/testing/judge-wire";
+import {
+  judgeReplyTo,
+  promptOf,
+  streamedEventsOf,
+  streamedResponse,
+} from "@better-answers/core/testing/judge-wire";
 
 import { runOps } from "../src/ops/index.ts";
 import { connectAsHost } from "./flow.ts";
@@ -43,6 +48,8 @@ export type SentToModel = {
   readonly url: string;
   readonly headers: unknown;
   readonly body: string;
+  /** The request's own, which aborts once the api ends it. */
+  readonly signal: AbortSignal | null | undefined;
 };
 
 type Answering = (sent: SentToModel) => Response | Promise<Response>;
@@ -63,6 +70,7 @@ export const aModelWire = () => {
         url: input instanceof Request ? input.url : String(input),
         headers: init?.headers,
         body: typeof init?.body === "string" ? init.body : "",
+        signal: init?.signal,
       };
       sent.push(one);
       return await answering.current(one);
@@ -71,7 +79,7 @@ export const aModelWire = () => {
 };
 
 /** The prompt one request carried. */
-export const promptSent = (sent: SentToModel): string => promptOf(sent.body);
+export const promptSent = (sent: Pick<SentToModel, "body">): string => promptOf(sent.body);
 
 /** A judge saying yes to each candidate written for one of `fits`, and no to the rest. */
 export const judgeSaying =
@@ -91,13 +99,31 @@ const opsRun = async (app: TestApp, argv: readonly string[], stdin = ""): Promis
   if (exitCode !== 0) throw new Error(`ops ${argv.join(" ")} exited ${String(exitCode)}`);
 };
 
-type JudgingSet = { readonly limitGbp?: string; readonly chosen?: boolean };
+type JudgingSet = {
+  readonly limitGbp?: string;
+  readonly chosen?: boolean;
+  /** Sets an answering model too, so an evidence result is drafted over. */
+  readonly drafting?: boolean;
+};
+
+const modelChosen = (app: TestApp, workspaceId: string, purpose: string) =>
+  opsRun(app, [
+    "set-model-choice",
+    "--workspace",
+    workspaceId,
+    "--purpose",
+    purpose,
+    "--provider",
+    "anthropic",
+    "--model",
+    SONNET,
+  ]);
 
 /** In the RUNBOOK's order: the key, the price, the limit, then the choice, which needs the price. */
 export const judgingSetUp = async (
   app: TestApp,
   workspaceId: string,
-  { limitGbp = "100", chosen = true }: JudgingSet = {},
+  { limitGbp = "100", chosen = true, drafting = false }: JudgingSet = {},
 ): Promise<void> => {
   const workspace = ["--workspace", workspaceId];
   await opsRun(app, ["set-model-key", ...workspace, "--provider", "anthropic"], A_MODEL_KEY);
@@ -115,18 +141,23 @@ export const judgingSetUp = async (
     "8",
   ]);
   await opsRun(app, ["set-spending-limit", ...workspace, "--gbp", limitGbp]);
-  if (!chosen) return;
-  await opsRun(app, [
-    "set-model-choice",
-    ...workspace,
-    "--purpose",
-    "judging",
-    "--provider",
-    "anthropic",
-    "--model",
-    SONNET,
-  ]);
+  if (drafting) await modelChosen(app, workspaceId, "answering");
+  if (chosen) await modelChosen(app, workspaceId, "judging");
 };
+
+/** The aborted signal as `fetch` meets it: the request is ended, and its promise rejects. */
+export const endedWith = (signal: AbortSignal | null | undefined): Promise<never> =>
+  new Promise((_resolve, reject) => {
+    const end = () => reject(new DOMException("aborted", "AbortError"));
+    if (signal?.aborted === true) end();
+    signal?.addEventListener("abort", end, { once: true });
+  });
+
+/** A drafting model writing `lines`, each a delta of its own, streamed as the provider does. */
+export const drafterWriting =
+  (lines: (prompt: string) => readonly string[]): Answering =>
+  (sent) =>
+    streamedResponse(streamedEventsOf(lines(promptOf(sent.body))), { signal: sent.signal });
 
 /** A workspace holding `concepts`, its map counted, and an assistant connected as its Admin. */
 export const anAdminAsking = async (app: TestApp, concepts: readonly Rpc[]) => {
