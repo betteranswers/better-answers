@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
 
 import { conceptIriOf, type ConceptIri } from "@better-answers/schema";
 
@@ -29,9 +28,15 @@ import {
   type Asking,
   type SeededConcept,
 } from "./asking.ts";
+import { candidatesIn, judgeReplyTo, promptOf } from "./judge-wire.ts";
 import { bootstrap, provisionedWorkspace } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
-import { answered, postgresForSuite, seedingWith } from "./suite-postgres.ts";
+import {
+  answered,
+  asksTablesLockedAtOnce,
+  postgresForSuite,
+  seedingWith,
+} from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
 
 const db = postgresForSuite();
@@ -123,32 +128,6 @@ const QUESTION = "How do buyers access audit information?";
 
 type Sent = { readonly headers: unknown; readonly body: string };
 
-const messagesBody = z.object({ messages: z.array(z.object({ content: z.string() })) });
-
-const promptOf = (body: string): string =>
-  messagesBody.parse(JSON.parse(body)).messages[0]?.content ?? "";
-
-/** Each candidate's number and the question it was written for, as the prompt names them. */
-const candidatesIn = (prompt: string): ReadonlyMap<string, string> =>
-  new Map(
-    [
-      ...prompt.matchAll(
-        /<candidate number="(\d+)">\n<collection>[^<]*<\/collection>\n<written_for>([^<]*)<\/written_for>/g,
-      ),
-    ].map(([, place = "", title = ""]) => [title, place]),
-  );
-
-const replyOf = (text: string) =>
-  JSON.stringify({
-    id: "msg_01",
-    type: "message",
-    role: "assistant",
-    model: SONNET,
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    usage: { input_tokens: 1_580, output_tokens: 96 },
-  });
-
 type Wire = {
   readonly sent: Sent[];
   readonly client: ModelClient;
@@ -165,13 +144,7 @@ const judgeSaying = (
       const body = typeof init?.body === "string" ? init.body : "";
       sent.push({ headers: init?.headers, body });
       await during();
-      const verdicts = Object.fromEntries(
-        [...candidatesIn(promptOf(body))].map(([title, place]) => [
-          place,
-          fits.includes(title) ? "yes" : "no",
-        ]),
-      );
-      return new Response(replyOf(JSON.stringify(verdicts)), { status: 200 });
+      return new Response(judgeReplyTo(fits, body), { status: 200 });
     },
     clock: { now: () => new Date() },
     log: { info: () => {} },
@@ -200,11 +173,31 @@ const askedWith = (asker: UserPrincipal, asking: Asking, wire: Wire, caps?: AskC
     ...(caps === undefined ? {} : { caps }),
   });
 
+/** `ask` answered as it stands, a refusal included: the question is `QUESTION`. */
+const askedOutright = (asker: UserPrincipal, wire: Wire) =>
+  ask(
+    asker,
+    stepsFor(db().runtimePool, asker, { callModel: wire.client.callModel }),
+    inputOf(askInput, { question: QUESTION }),
+    new Date(),
+  );
+
 /** One at a time: the seeder numbers each concept's path as it writes it. */
 const seededIn = async (workspaceId: string, shapes: readonly SeededConcept[]) => {
   const iris: ConceptIri[] = [];
   for (const shape of shapes) iris.push(await conceptSeeded(db(), workspaceId, shape));
   return iris;
+};
+
+/** A judging workspace holding `shapes`, and a judge at the wire saying yes to `fits`. */
+const arranged = async (
+  shapes: readonly SeededConcept[],
+  fits: readonly string[] = [],
+  judging: Judging = {},
+) => {
+  const { workspaceId, asker } = await aJudgingWorkspace(judging);
+  const iris = await seededIn(workspaceId, shapes);
+  return { workspaceId, asker, iris, wire: judgeSaying(fits) };
 };
 
 const recordOf = async (recordId: string) => {
@@ -228,8 +221,20 @@ const spendOf = async (workspaceId: string) => {
   return { open: reservations.rows[0]?.open, calls: calls.rows };
 };
 
+/** Nothing was sent to the model, and nothing reserved or spent. */
+const expectNoCall = async (workspaceId: string, wire: Wire) => {
+  expect(wire.sent).toEqual([]);
+  expect(await spendOf(workspaceId)).toEqual({ open: 0, calls: [] });
+};
+
 const titlesOf = (concepts: readonly { readonly title: string }[]) =>
   concepts.map(({ title }) => title).toSorted();
+
+const NOT_AN_ANSWER: SeededConcept = {
+  collection: "audits",
+  title: "Audit information access",
+  body: "Buyers ask support.\n",
+};
 
 describe("the judge's call", () => {
   const candidate: ReturnedConcept = {
@@ -324,9 +329,10 @@ describe("the judge's call", () => {
 
 describe("ask with a judge", () => {
   it("AE1: returns two fits word for word, the third related", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace();
-    await seededIn(workspaceId, [USERS, SUPPLIER, RETENTION]);
-    const wire = judgeSaying([USERS.title, SUPPLIER.title]);
+    const { asker, wire } = await arranged(
+      [USERS, SUPPLIER, RETENTION],
+      [USERS.title, SUPPLIER.title],
+    );
 
     const answer = await askedWith(asker, { question: QUESTION, collections: ["audits"] }, wire);
 
@@ -340,7 +346,6 @@ describe("ask with a judge", () => {
   });
 
   it("AE3: returns Standard and Advanced fits side by side", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace();
     const standard = anAnswer(
       "How do Standard buyers export audit information?",
       "Standard buyers export it as CSV.\n",
@@ -349,8 +354,7 @@ describe("ask with a judge", () => {
       "How do Advanced buyers export audit information?",
       "Advanced buyers export it through the API.\n",
     );
-    await seededIn(workspaceId, [standard, advanced]);
-    const wire = judgeSaying([standard.title, advanced.title]);
+    const { asker, wire } = await arranged([standard, advanced], [standard.title, advanced.title]);
 
     const answer = await askedWith(
       asker,
@@ -364,18 +368,16 @@ describe("ask with a judge", () => {
   });
 
   it("answers related, judged, when the judge says no to all", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace();
-    await seededIn(workspaceId, [USERS, SUPPLIER]);
+    const { asker, wire } = await arranged([USERS, SUPPLIER]);
 
-    const answer = await askedWith(asker, { question: QUESTION }, judgeSaying([]));
+    const answer = await askedWith(asker, { question: QUESTION }, wire);
 
     expect([answer.verdict, answer.judgeState, answer.answers]).toEqual(["related", "judged", []]);
     expect(titlesOf(answer.related)).toEqual([USERS.title, SUPPLIER.title].toSorted());
   });
 
   it("answers related, judging failed, settling a timed-out call", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace();
-    await seededIn(workspaceId, [USERS]);
+    const { workspaceId, asker } = await arranged([USERS]);
 
     const answer = await askedWith(asker, { question: QUESTION }, judgeTimingOut());
 
@@ -392,10 +394,9 @@ describe("ask with a judge", () => {
   });
 
   it("settles a judged call as one succeeded llm_call row", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace();
-    await seededIn(workspaceId, [USERS]);
+    const { workspaceId, asker, wire } = await arranged([USERS], [USERS.title]);
 
-    const answer = await askedWith(asker, { question: QUESTION }, judgeSaying([USERS.title]));
+    const answer = await askedWith(asker, { question: QUESTION }, wire);
 
     expect(await spendOf(workspaceId)).toEqual({
       open: 0,
@@ -406,19 +407,14 @@ describe("ask with a judge", () => {
   });
 
   it("AE9: refuses at the limit, calls nothing, keeps the question", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace({ limitGbp: "0.01" });
-    await seededIn(workspaceId, [USERS]);
-    const wire = judgeSaying([USERS.title]);
+    const { workspaceId, asker, wire } = await arranged([USERS], [USERS.title], {
+      limitGbp: "0.01",
+    });
 
-    const refused = await ask(
-      asker,
-      stepsFor(db().runtimePool, asker, { callModel: wire.client.callModel }),
-      inputOf(askInput, { question: QUESTION }),
-      new Date(),
-    );
+    const refused = await askedOutright(asker, wire);
 
     expect(refused).toEqual({ ok: false, error: "spending-limit-met" });
-    expect(wire.sent).toEqual([]);
+    await expectNoCall(workspaceId, wire);
     const kept = await db().pool.query(
       `SELECT c.question, r.completed_at IS NOT NULL AS completed
          FROM question_asked r JOIN question_content c ON c.record_id = r.id
@@ -426,15 +422,10 @@ describe("ask with a judge", () => {
       [workspaceId],
     );
     expect(kept.rows).toEqual([{ question: QUESTION, completed: false }]);
-    expect(await spendOf(workspaceId)).toEqual({ open: 0, calls: [] });
   });
 
   it("answers at the limit where no `Answer` is a candidate", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace({ limitGbp: "0.01" });
-    await seededIn(workspaceId, [
-      { collection: "audits", title: "Audit information access", body: "Buyers ask support.\n" },
-    ]);
-    const wire = judgeSaying([]);
+    const { asker, wire } = await arranged([NOT_AN_ANSWER], [], { limitGbp: "0.01" });
 
     const answer = await askedWith(asker, { question: QUESTION }, wire);
 
@@ -442,10 +433,16 @@ describe("ask with a judge", () => {
     expect(wire.sent).toEqual([]);
   });
 
-  it("AE10: calls nothing with no judging model choice", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace({ chosen: false });
-    await seededIn(workspaceId, [USERS, SUPPLIER]);
-    const wire = judgeSaying([USERS.title, SUPPLIER.title]);
+  it.each([
+    ["no judging model choice", { chosen: false }],
+    ["no model key", { sealedUnder: null }],
+    ["no spending limit", { limitGbp: null }],
+  ] as const)("AE10: reserves and calls nothing with %s", async (_case, judging) => {
+    const { workspaceId, asker, wire } = await arranged(
+      [USERS, SUPPLIER],
+      [USERS.title, SUPPLIER.title],
+      judging,
+    );
 
     const answer = await askedWith(asker, { question: QUESTION, collections: ["audits"] }, wire);
 
@@ -455,48 +452,25 @@ describe("ask with a judge", () => {
       [],
     ]);
     expect(titlesOf(answer.related)).toEqual([USERS.title, SUPPLIER.title].toSorted());
-    expect(wire.sent).toEqual([]);
-    expect(await spendOf(workspaceId)).toEqual({ open: 0, calls: [] });
-  });
-
-  it.each([
-    ["no key", { sealedUnder: null }],
-    ["no limit", { limitGbp: null }],
-  ] as const)("reserves and calls nothing for a workspace with %s", async (_case, judging) => {
-    const { workspaceId, asker } = await aJudgingWorkspace(judging);
-    await seededIn(workspaceId, [USERS]);
-    const wire = judgeSaying([USERS.title]);
-
-    const answer = await askedWith(asker, { question: QUESTION }, wire);
-
-    expect([answer.verdict, answer.judgeState]).toEqual(["related", "not-judged"]);
-    expect(wire.sent).toEqual([]);
-    expect(await spendOf(workspaceId)).toEqual({ open: 0, calls: [] });
+    await expectNoCall(workspaceId, wire);
   });
 
   it("answers an error where the model key will not open", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace({ sealedUnder: ANOTHER_ENVELOPE_KEY });
-    await seededIn(workspaceId, [USERS]);
-    const wire = judgeSaying([USERS.title]);
+    const { workspaceId, asker, wire } = await arranged([USERS], [USERS.title], {
+      sealedUnder: ANOTHER_ENVELOPE_KEY,
+    });
 
-    const failed = await ask(
-      asker,
-      stepsFor(db().runtimePool, asker, { callModel: wire.client.callModel }),
-      inputOf(askInput, { question: QUESTION }),
-      new Date(),
-    );
+    const failed = await askedOutright(asker, wire);
 
     expect(failed.ok).toBe(false);
     expect(!failed.ok && failed.error instanceof Error && failed.error.message).toBe(
       "llm: the workspace's model key did not open (envelope-not-authentic)",
     );
-    expect(wire.sent).toEqual([]);
-    expect(await spendOf(workspaceId)).toEqual({ open: 0, calls: [] });
+    await expectNoCall(workspaceId, wire);
   });
 
   it("leaves the record open when the sweep settled first", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace();
-    await seededIn(workspaceId, [USERS]);
+    const { workspaceId, asker } = await arranged([USERS]);
     const sweptMeanwhile = async () => {
       answered(
         await settleExpiredSpend(PLATFORM, openPostgres(db().pool), {
@@ -507,12 +481,7 @@ describe("ask with a judge", () => {
     };
     const wire = judgeSaying([USERS.title], sweptMeanwhile);
 
-    const failed = await ask(
-      asker,
-      stepsFor(db().runtimePool, asker, { callModel: wire.client.callModel }),
-      inputOf(askInput, { question: QUESTION }),
-      new Date(),
-    );
+    const failed = await askedOutright(asker, wire);
 
     expect(failed.ok).toBe(false);
     expect(wire.sent).toHaveLength(1);
@@ -527,9 +496,7 @@ describe("ask with a judge", () => {
   });
 
   it("keeps an `Answer` past the cap related, and unsent", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace();
-    await seededIn(workspaceId, [USERS, SUPPLIER]);
-    const wire = judgeSaying([USERS.title, SUPPLIER.title]);
+    const { asker, wire } = await arranged([USERS, SUPPLIER], [USERS.title, SUPPLIER.title]);
 
     const answer = await askedWith(asker, { question: QUESTION }, wire, {
       ...ASK_CAPS,
@@ -543,14 +510,10 @@ describe("ask with a judge", () => {
   });
 
   it("records the judge's verdict for each candidate sent", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace();
-    const [users, supplier, note] = await seededIn(workspaceId, [
-      USERS,
-      SUPPLIER,
-      { collection: "audits", title: "Audit information access", body: "Buyers ask support.\n" },
-    ]);
+    const { asker, iris, wire } = await arranged([USERS, SUPPLIER, NOT_AN_ANSWER], [USERS.title]);
+    const [users, supplier, note] = iris;
 
-    const answer = await askedWith(asker, { question: QUESTION }, judgeSaying([USERS.title]));
+    const answer = await askedWith(asker, { question: QUESTION }, wire);
 
     const record = await recordOf(answer.recordId);
     const judged = new Map(
@@ -572,25 +535,10 @@ describe("ask with a judge", () => {
   });
 
   it("holds no connection while the judge is called", async () => {
-    const { workspaceId, asker } = await aJudgingWorkspace();
-    await seededIn(workspaceId, [USERS]);
+    const { asker } = await arranged([USERS]);
     const contended: string[] = [];
     const contender = async () => {
-      const client = await db().pool.connect();
-      try {
-        await client.query("BEGIN");
-        await client.query(
-          `LOCK TABLE member, "user", group_member, question_asked, question_content,
-                      spend_reservation, llm_call, workspace_config, model_choice, model_key
-             IN ACCESS EXCLUSIVE MODE NOWAIT`,
-        );
-        contended.push("locked");
-      } catch (cause) {
-        contended.push(cause instanceof Error ? cause.message : String(cause));
-      } finally {
-        await client.query("ROLLBACK");
-        client.release();
-      }
+      contended.push(await asksTablesLockedAtOnce(db().pool));
     };
 
     const answer = await askedWith(

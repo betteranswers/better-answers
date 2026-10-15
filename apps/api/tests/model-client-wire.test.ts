@@ -1,17 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { connectAsHost } from "./flow.ts";
-import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
 import {
   A_MODEL_KEY,
   aModelWire,
+  anAdminAsking as anAdminAskingIn,
   judgeSaying,
   judgingSetUp,
   promptSent,
   SONNET,
 } from "./harness-model.ts";
-import { rendered, structured, toolAnswered } from "./mcp-call.ts";
+import { rendered, structured } from "./mcp-call.ts";
 import { appForSuite } from "./suite-app.ts";
 
 const wire = aModelWire();
@@ -26,23 +25,8 @@ const RETENTION = {
 
 /** A workspace holding one `Answer`, and an assistant connected as its Admin. */
 const anAdminAsking = async () => {
-  const workspace = await app().provision();
-  await seedConcepts(
-    app(),
-    conceptsSeeding.parse({
-      workspaceId: workspace.workspaceId,
-      userId: workspace.admin.id,
-      concepts: [RETENTION],
-    }),
-  );
-  await app().database.superuser.query("ANALYZE map_node, map_edge");
-  const client = app().client();
-  const tokens = await connectAsHost(app(), client, workspace.admin, {
-    scope: "knowledge:read offline_access",
-  });
-  const asking = (question: string) =>
-    toolAnswered(client, tokens.accessToken, "ask", { question });
-  return { workspaceId: workspace.workspaceId, asking };
+  const { workspaceId, asking } = await anAdminAskingIn(app(), [RETENTION]);
+  return { workspaceId, asking: (question: string) => asking({ question }) };
 };
 
 const judgeState = z.object({ verdict: z.string(), judgeState: z.string() });

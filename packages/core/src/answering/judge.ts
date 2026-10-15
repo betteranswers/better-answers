@@ -8,7 +8,6 @@ import {
   reserveSpend,
   resolveModel,
   type CallSize,
-  type CallSpent,
   type Credentials,
   type ModelCall,
   type ModelOutcome,
@@ -16,14 +15,15 @@ import {
 } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import type { AnswerPlan, RelatedConcept, ReturnedConcept } from "./plan.ts";
+import type { RecordCompletion } from "./record.ts";
 
 /** Each candidate's verdict, keyed by the number the prompt gave it. */
 type Verdicts = Readonly<Record<string, CandidateVerdict>>;
 
 /** A judging call reserved, and the model it reserved for. */
-export type JudgeReserved = { readonly to: ModelToCall; readonly reservationId: string };
+type JudgeReserved = { readonly to: ModelToCall; readonly reservationId: string };
 
-export type JudgeReserving = {
+type JudgeReserving = {
   /** The record of the question the call serves. */
   readonly answerId: string;
   readonly most: CallSize;
@@ -31,12 +31,6 @@ export type JudgeReserving = {
 };
 
 export type JudgeRefusal = KernelRefusal<"spending-limit-met"> | Error;
-
-/** A judging call's attempts, to settle its reservation by. */
-export type JudgeSettling = {
-  readonly reservationId: string;
-  readonly calls: readonly CallSpent[];
-};
 
 /** What `ask` is handed to judge with, beside the steps that keep its record. */
 export type JudgeSteps<Refused = never> = {
@@ -75,7 +69,7 @@ export const reserveJudge = async (
 };
 
 /** The `Answer`s the judge is asked about: those that bear, in the order they bear, to the cap. */
-export const candidatesOf = (
+const candidatesOf = (
   related: readonly RelatedConcept[],
   cap: number,
 ): readonly ReturnedConcept[] =>
@@ -159,11 +153,8 @@ const byIri = (
     }),
   );
 
-/**
- * Every `Answer` judged yes is a fit, in the order it bore; the rest stay related. With no
- * verdicts the judging failed, and every candidate stays related.
- */
-export const judgedPlan = (
+/** Each `Answer` judged yes is a fit, in the order it bore. With no verdicts, every one stays related. */
+const judgedPlan = (
   plan: AnswerPlan,
   candidates: readonly ReturnedConcept[],
   verdicts: Verdicts | undefined,
@@ -189,7 +180,7 @@ export const judgedPlan = (
   };
 };
 
-export type Judged = AnswerPlan & { readonly settled?: JudgeSettling };
+type Judged = AnswerPlan & { readonly settled?: RecordCompletion["settled"] };
 
 /**
  * Judges the plan's candidates when the workspace has a judge to call: the reservation commits

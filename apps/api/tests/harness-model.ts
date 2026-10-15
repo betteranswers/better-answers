@@ -1,10 +1,12 @@
-import { z } from "zod";
-
 import { ok } from "@better-answers/core/kernel";
 import { openModelKeySetting } from "@better-answers/core/llm";
+import { judgeReplyTo, promptOf } from "@better-answers/core/testing/judge-wire";
 
 import { runOps } from "../src/ops/index.ts";
+import { connectAsHost } from "./flow.ts";
+import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
 import { capturingLogger, HARNESS_ENVELOPE_KEY, type TestApp } from "./harness.ts";
+import { toolAnswered, type Rpc } from "./mcp-call.ts";
 
 export const SONNET = "claude-sonnet-5-5";
 
@@ -42,63 +44,25 @@ export const aModelWire = () => {
   };
 };
 
-const messagesBody = z.object({ messages: z.array(z.object({ content: z.string() })) });
-
 /** The prompt one request carried. */
-export const promptSent = (sent: SentToModel): string =>
-  messagesBody.parse(JSON.parse(sent.body)).messages[0]?.content ?? "";
-
-export const replyOf = (text: string): Response =>
-  new Response(
-    JSON.stringify({
-      id: "msg_01",
-      type: "message",
-      role: "assistant",
-      model: SONNET,
-      content: [{ type: "text", text }],
-      stop_reason: "end_turn",
-      usage: { input_tokens: 1_580, output_tokens: 96 },
-    }),
-    { status: 200 },
-  );
+export const promptSent = (sent: SentToModel): string => promptOf(sent.body);
 
 /** A judge saying yes to each candidate written for one of `fits`, and no to the rest. */
 export const judgeSaying =
   (fits: readonly string[]): Answering =>
-  (sent) => {
-    const numbered = promptSent(sent).matchAll(
-      /<candidate number="(\d+)">\n<collection>[^<]*<\/collection>\n<written_for>([^<]*)<\/written_for>/g,
-    );
-    return replyOf(
-      JSON.stringify(
-        Object.fromEntries(
-          [...numbered].map(([, place = "", title = ""]) => [
-            place,
-            fits.includes(title) ? "yes" : "no",
-          ]),
-        ),
-      ),
-    );
-  };
+  (sent) =>
+    new Response(judgeReplyTo(fits, sent.body), { status: 200 });
 
 /** One ops command run as the owner runs it on the `api` service, its key on standard input. */
-export const opsRun = async (
-  app: TestApp,
-  argv: readonly string[],
-  stdin = "",
-): Promise<readonly string[]> => {
-  const lines: string[] = [];
+const opsRun = async (app: TestApp, argv: readonly string[], stdin = ""): Promise<void> => {
   const exitCode = await runOps(argv, app.doors, {
     fetch: async (url, init) => app.server.request(url, init),
     stdin: async () => stdin,
-    say: (line) => {
-      lines.push(line);
-    },
+    say: () => {},
     logger: capturingLogger().logger,
     modelKeySetting: ok(openModelKeySetting(HARNESS_ENVELOPE_KEY)),
   });
   if (exitCode !== 0) throw new Error(`ops ${argv.join(" ")} exited ${String(exitCode)}`);
-  return lines;
 };
 
 type JudgingSet = { readonly limitGbp?: string; readonly chosen?: boolean };
@@ -136,4 +100,27 @@ export const judgingSetUp = async (
     "--model",
     SONNET,
   ]);
+};
+
+/** A workspace holding `concepts`, its map counted, and an assistant connected as its Admin. */
+export const anAdminAsking = async (app: TestApp, concepts: readonly Rpc[]) => {
+  const workspace = await app.provision();
+  await seedConcepts(
+    app,
+    conceptsSeeding.parse({
+      workspaceId: workspace.workspaceId,
+      userId: workspace.admin.id,
+      concepts,
+    }),
+  );
+  // Uncounted, the planner joins every node to every step, and the walk nears its timeout.
+  await app.database.superuser.query("ANALYZE map_node, map_edge");
+  const client = app.client();
+  const tokens = await connectAsHost(app, client, workspace.admin, {
+    scope: "knowledge:read offline_access",
+  });
+  return {
+    workspaceId: workspace.workspaceId,
+    asking: (args: Rpc) => toolAnswered(client, tokens.accessToken, "ask", args),
+  };
 };

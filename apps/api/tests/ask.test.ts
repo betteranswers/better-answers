@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { connectAsHost } from "./flow.ts";
-import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
-import { aModelWire, judgeSaying, judgingSetUp } from "./harness-model.ts";
-import { rendered, structured, toolAnswered } from "./mcp-call.ts";
+import { asksTablesLockedAtOnce } from "@better-answers/core/testing/postgres";
+
+import {
+  aModelWire,
+  anAdminAsking as anAdminAskingIn,
+  judgeSaying,
+  judgingSetUp,
+} from "./harness-model.ts";
+import { rendered, structured } from "./mcp-call.ts";
 import { appForSuite } from "./suite-app.ts";
 
 const wire = aModelWire();
@@ -36,26 +41,9 @@ const QUESTION = "How do buyers access audit information?";
 
 /** A workspace holding the four `Answer`s, set to judge, and an assistant connected as its Admin. */
 const anAdminAsking = async (limitGbp?: string) => {
-  const workspace = await app().provision();
-  await seedConcepts(
-    app(),
-    conceptsSeeding.parse({
-      workspaceId: workspace.workspaceId,
-      userId: workspace.admin.id,
-      concepts: [USERS, SUPPLIER, RETENTION, LMS],
-    }),
-  );
-  await app().database.superuser.query("ANALYZE map_node, map_edge");
-  await judgingSetUp(app(), workspace.workspaceId, limitGbp === undefined ? {} : { limitGbp });
-  const client = app().client();
-  const tokens = await connectAsHost(app(), client, workspace.admin, {
-    scope: "knowledge:read offline_access",
-  });
-  return {
-    workspaceId: workspace.workspaceId,
-    asking: (args: Readonly<Record<string, unknown>>) =>
-      toolAnswered(client, tokens.accessToken, "ask", args),
-  };
+  const asking = await anAdminAskingIn(app(), [USERS, SUPPLIER, RETENTION, LMS]);
+  await judgingSetUp(app(), asking.workspaceId, limitGbp === undefined ? {} : { limitGbp });
+  return asking;
 };
 
 const judged = z.object({
@@ -101,26 +89,8 @@ describe("ask, judged over MCP", () => {
   it("holds no connection while the judge is called", async () => {
     const { asking } = await anAdminAsking();
     const contended: string[] = [];
-    // NOWAIT fails at once on any lock a transaction open across the call would hold.
-    const contender = async () => {
-      const client = await app().database.superuser.connect();
-      try {
-        await client.query("BEGIN");
-        await client.query(
-          `LOCK TABLE member, "user", group_member, question_asked, question_content,
-                      spend_reservation, llm_call, workspace_config, model_choice, model_key
-             IN ACCESS EXCLUSIVE MODE NOWAIT`,
-        );
-        contended.push("locked");
-      } catch (cause) {
-        contended.push(cause instanceof Error ? cause.message : String(cause));
-      } finally {
-        await client.query("ROLLBACK");
-        client.release();
-      }
-    };
     wire.answerWith(async (sent) => {
-      await contender();
+      contended.push(await asksTablesLockedAtOnce(app().database.superuser));
       return judgeSaying([USERS.title])(sent);
     });
 

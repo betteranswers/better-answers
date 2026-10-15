@@ -86,13 +86,7 @@ export {
   type ReturnedConcept,
 } from "./plan.ts";
 export { completeRecord, openRecord } from "./record.ts";
-export {
-  judgeCall,
-  reserveJudge,
-  type JudgeRefusal,
-  type JudgeReserved,
-  type JudgeReserving,
-} from "./judge.ts";
+export { judgeCall, reserveJudge, type JudgeRefusal } from "./judge.ts";
 export {
   closeFlag,
   closeFlagInput,
