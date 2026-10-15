@@ -122,6 +122,17 @@ const aFlagAndANewerQuestion = (at: AtTheQuestions): readonly SeedRecord[] => [
   { askedBy: at.adminId, question: NEWER_QUESTION, verdict: "related" },
 ];
 
+/** One more than a page holds, oldest first, so the first older question is "Question number 1". */
+const aPageAndOneMoreOpened = async (page: Page, api: APIRequestContext, name: string) => {
+  const at = await aWorkspaceWithConcepts(api, name);
+  const records = Array.from({ length: 51 }, (_, nth): SeedRecord => ({
+    question: `Question number ${nth + 1}`,
+    verdict: "ok",
+  }));
+  await seedQuestions(api, { workspaceId: at.workspaceId, records });
+  await signedInAtTheQuestions(page, api, at);
+};
+
 test.describe("Questions asked", () => {
   test("shows a record flagged over MCP first, with its flag", async ({ page, request }) => {
     const at = await aWorkspaceWithConcepts(request, "Holme Valley Audits");
@@ -251,13 +262,7 @@ test.describe("Questions asked", () => {
   });
 
   test("renders a page of rows within the list budget", async ({ page, request }) => {
-    const at = await aWorkspaceWithConcepts(request, "Wharfe Pages");
-    const records = Array.from({ length: 51 }, (_, nth): SeedRecord => ({
-      question: `Question number ${nth + 1}`,
-      verdict: "ok",
-    }));
-    await seedQuestions(request, { workspaceId: at.workspaceId, records });
-    await signedInAtTheQuestions(page, request, at);
+    await aPageAndOneMoreOpened(page, request, "Wharfe Pages");
 
     // A fresh document, so no page of the list is already in the page's cache.
     const started = Date.now();
@@ -270,13 +275,7 @@ test.describe("Questions asked", () => {
   });
 
   test("lists, opens and pages the questions by keyboard", async ({ page, request }) => {
-    const at = await aWorkspaceWithConcepts(request, "Aire Keys");
-    const records = Array.from({ length: 51 }, (_, nth): SeedRecord => ({
-      question: `Question number ${nth + 1}`,
-      verdict: "ok",
-    }));
-    await seedQuestions(request, { workspaceId: at.workspaceId, records });
-    await signedInAtTheQuestions(page, request, at);
+    await aPageAndOneMoreOpened(page, request, "Aire Keys");
     await expect(rowsOf(questionsAsked(page))).toHaveCount(50);
 
     const keystrokes = await keystrokesListed(page, "Questions Asked");

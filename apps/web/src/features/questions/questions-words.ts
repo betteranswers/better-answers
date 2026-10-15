@@ -139,7 +139,7 @@ export const QUESTIONS_WORDS = {
   noConcepts: "No concepts you can read",
   helpful: "Marked helpful",
   closeTheFlag: "Close This Flag",
-  closed: {
+  closedSaid: {
     "fixed-in-the-knowledge": "The flag has been closed as fixed in the knowledge successfully.",
     "no-fault-in-the-knowledge":
       "The flag has been closed as no fault in the knowledge successfully.",

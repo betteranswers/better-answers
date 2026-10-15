@@ -1,8 +1,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 
-import type { Undo } from "@/shared/api/optimistic.ts";
-import { takenFrom } from "@/shared/api/optimistic.ts";
+import { useOptimistic, type Undo } from "@/shared/api/optimistic.ts";
 import { useTRPC, type ApiError } from "@/shared/api/trpc.ts";
 
 type Api = ReturnType<typeof useTRPC>;
@@ -53,29 +52,30 @@ const closedIn = (record: AskedRecord, closing: Closing, at: string): AskedRecor
   return { ...record, feedback, flagged: feedback.some(isOpen) };
 };
 
+const holdsTheFlag = (page: QuestionsAskedPage, closing: Closing): boolean =>
+  page.records.some((record) => record.feedback.some((given) => given.id === closing.feedbackId));
+
+/** A page without the flag keeps its reference, so nothing reading it draws again. */
+const pageClosed = (page: QuestionsAskedPage, closing: Closing, at: string): QuestionsAskedPage =>
+  holdsTheFlag(page, closing)
+    ? { ...page, records: page.records.map((record) => closedIn(record, closing, at)) }
+    : page;
+
 /** A closing reads as done within a tenth of a second: the record leaves the flagged group at once. */
 export const useCloseFlag = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
+  const optimistic = useOptimistic();
   const queryKey = api.questions.asked.infiniteQueryKey({});
   return useMutation(
     api.questions.closeFlag.mutationOptions({
-      onMutate: async (closing: Closing): Promise<Undo> => {
-        await queryClient.cancelQueries({ queryKey });
-        const taken = takenFrom(queryClient, queryKey);
+      onMutate: (closing: Closing): Promise<Undo> => {
         const at = nowSaid();
-        queryClient.setQueryData(queryKey, (held) =>
-          held === undefined
-            ? held
-            : {
-                ...held,
-                pages: held.pages.map((page) => ({
-                  ...page,
-                  records: page.records.map((record) => closedIn(record, closing, at)),
-                })),
-              },
+        return optimistic(queryKey, (held) =>
+          held.pages.some((page) => holdsTheFlag(page, closing))
+            ? { ...held, pages: held.pages.map((page) => pageClosed(page, closing, at)) }
+            : held,
         );
-        return taken;
       },
       onError: (_refusal: ApiError, _closing: Closing, taken: Undo | undefined) => {
         taken?.undo();

@@ -226,7 +226,7 @@ function FeedbackPart(properties: { readonly record: AskedRecord }) {
       { feedbackId, closedAs },
       {
         onSuccess: () => {
-          setOutcome({ tone: "said", words: WORDS.closed[closedAs] });
+          setOutcome({ tone: "said", words: WORDS.closedSaid[closedAs] });
         },
         onError: (failure) => {
           setOutcome(outcomeOfFailure(failure, "action"));

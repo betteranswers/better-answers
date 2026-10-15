@@ -3,7 +3,17 @@ import { createHash, randomBytes } from "node:crypto";
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { z } from "zod";
 
-import type { AUDIENCES, REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
+import type {
+  AUDIENCES,
+  CANDIDATE_VERDICTS,
+  FEEDBACK_REASONS,
+  FLAG_CLOSINGS,
+  JUDGE_STATES,
+  QUESTION_TRANSPORTS,
+  QUESTION_VERDICTS,
+  REDACTION_TIERS,
+  SENSITIVITIES,
+} from "@better-answers/schema";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
 import {
@@ -353,25 +363,25 @@ export const seedConcepts = (
 
 /** A flag closed or not; a disputed sentence names the concept it rested on. */
 type SeedFlag = {
-  readonly reason: "wrong" | "out-of-date" | "incomplete" | "should-not-have-shown";
+  readonly reason: (typeof FEEDBACK_REASONS)[number];
   readonly note?: string;
   readonly disputedSentence?: string;
   readonly disputedConcept?: string;
-  readonly closedAs?: "fixed-in-the-knowledge" | "no-fault-in-the-knowledge";
+  readonly closedAs?: (typeof FLAG_CLOSINGS)[number];
 };
 
 /** `askedBy` left out is an asker an erasure renamed; a null question is content it removed. */
 export type SeedRecord = {
   readonly askedBy?: string;
-  readonly transport?: "mcp" | "trpc";
+  readonly transport?: (typeof QUESTION_TRANSPORTS)[number];
   readonly collections?: readonly string[];
   readonly question: string | null;
-  readonly verdict: "ok" | "warn" | "refuse" | "related";
-  readonly judgeState?: "not-judged" | "judged" | "judging-failed";
+  readonly verdict: (typeof QUESTION_VERDICTS)[number];
+  readonly judgeState?: (typeof JUDGE_STATES)[number];
   readonly concepts?: readonly {
     readonly iri: string;
-    readonly tier?: "unverified" | "machine-confirmed" | "human-reviewed";
-    readonly judged?: "yes" | "no";
+    readonly tier?: SeedConcept["trust"];
+    readonly judged?: (typeof CANDIDATE_VERDICTS)[number];
   }[];
   readonly flags?: readonly SeedFlag[];
 };

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { TRUST_TIERS } from "@better-answers/core/answering";
 import { actorIdOfPerson } from "@better-answers/core/kernel";
 import {
   boundarySchemas,
@@ -19,11 +20,9 @@ import type { TestApp } from "./harness.ts";
 /** Kept by the record as its trust then; the hash is never shown, so one stands for any. */
 const A_CONTENT_HASH = "a".repeat(64);
 
-const RECORDED_TIERS = ["unverified", "machine-confirmed", "human-reviewed"] as const;
-
 const aRecordedConcept = z.object({
   iri: z.string().min(1),
-  tier: z.enum(RECORDED_TIERS).default("unverified"),
+  tier: z.enum(TRUST_TIERS).default("unverified"),
   judged: z.enum(CANDIDATE_VERDICTS).optional(),
 });
 
@@ -69,7 +68,7 @@ const ONE_SECOND_MS = 1000;
 const askerOf = (record: AskedRecord): string =>
   record.askedBy === undefined ? `human:${ulid()}` : actorIdOfPerson(record.askedBy);
 
-const trustOf = (tier: (typeof RECORDED_TIERS)[number], askedAt: Date) => ({
+const trustOf = (tier: (typeof TRUST_TIERS)[number], askedAt: Date) => ({
   tier,
   status: "current",
   verifiedAt: tier === "unverified" ? null : askedAt.toISOString(),
