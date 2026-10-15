@@ -47,6 +47,7 @@ export const ACTION_HEADLINES = {
   "people.person.renamed": "Display name corrected",
   "people.person.restore_code_accepted": "Restore code used",
   "people.person.second_factor_confirmed": "Second factor confirmed",
+  "people.person.sessions_ended": "Sessions signed out",
   "people.person.sign_in_restored": "Sign-in restored",
   "people.person.signed_in": "Signed in",
   "people.request.approved": "Access request approved",

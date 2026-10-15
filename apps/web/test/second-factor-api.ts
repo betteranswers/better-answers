@@ -141,6 +141,11 @@ export const PENDING = {
 
 type Procedures = ReadonlyMap<string, () => unknown>;
 
+/** Ada holds one session, this one, so the Sessions section draws its only-session line. */
+const ADAS_SESSIONS = [
+  { id: "s", device: "Chrome on macOS", lastActiveAt: MADE_AT, current: true },
+];
+
 const answerTo = (
   name: string,
   held: () => unknown,
@@ -149,7 +154,9 @@ const answerTo = (
 ): unknown => {
   if (name === "person.secondFactor") return { result: { data: held() } };
   const procedure = procedures.get(name);
-  return procedure === undefined ? otherwise : { result: { data: procedure() } };
+  if (procedure !== undefined) return { result: { data: procedure() } };
+  if (name === "person.sessions") return { result: { data: ADAS_SESSIONS } };
+  return otherwise;
 };
 
 /**

@@ -71,6 +71,12 @@ const role = (detail: Slots["detail"]): string => {
   return typeof held === "string" ? held : "a role";
 };
 
+/** The sessions a sign-out ended; none named reads as one, which no sign-out ends. */
+const sessionsIn = (detail: Slots["detail"]): number => {
+  const held = detail["sessions"];
+  return Array.isArray(held) ? held.length : 1;
+};
+
 const FACTOR_WORDS: ReadonlyMap<unknown, string> = new Map([
   ["passkey", "a passkey"],
   ["authenticator", "an authenticator"],
@@ -153,6 +159,8 @@ const SENTENCES = {
     `${by} used a restore code from better-answers support`,
   "people.person.second_factor_confirmed": ({ by, detail }) =>
     `${by} confirmed their second factor with ${factorIn(detail, "method")}`,
+  "people.person.sessions_ended": ({ by, detail }) =>
+    `${by} signed out ${counted(sessionsIn(detail), "session", "sessions")}`,
   "people.person.sign_in_restored": ({ by, subject }) =>
     `${by} restored ${possessive(subject)} sign-in`,
   "people.person.signed_in": ({ by }) => `${by} signed in`,

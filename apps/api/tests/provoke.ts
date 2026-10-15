@@ -1,6 +1,7 @@
 import { expect } from "vitest";
 import { z } from "zod";
 
+import { sessionFor } from "@better-answers/core/testing/identity-rows";
 import { holdingTable, isBlockedOnTable, until } from "@better-answers/core/testing/postgres";
 import { restoreSignIn, SIGN_IN_CODE_PREFIX } from "@better-answers/core/workspaces";
 import { testData } from "@better-answers/schema/testing";
@@ -218,6 +219,24 @@ export const revocationHeldOpen = async (app: TestApp, userId: string): Promise<
     }
   };
   return { land: () => end("COMMIT"), abandon: () => end("ROLLBACK") };
+};
+
+/** One session the person holds, as a browser leaves it, answered by its id. */
+export const aSeededSessionFor = async (
+  app: TestApp,
+  personId: string,
+  agent: { readonly userAgent?: string | null },
+): Promise<string> => {
+  const now = new Date();
+  return sessionFor(app.database.superuser, personId, {
+    createdAt: now,
+    lastUsedAt: now,
+    expiresAt: now,
+    ipAddress: "203.0.113.7",
+    ...(agent.userAgent === undefined || agent.userAgent === null
+      ? {}
+      : { userAgent: agent.userAgent }),
+  });
 };
 
 /** How many of this database's sessions wait on a lock another holds. */

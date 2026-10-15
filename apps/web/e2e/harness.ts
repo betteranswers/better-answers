@@ -233,6 +233,24 @@ export const claudeExchanges = async (
   return { refreshToken: tokens.refresh_token };
 };
 
+/** Claude refreshing its grant, as a connected assistant does; answers the new refresh token. */
+export const claudeRefreshes = async (
+  api: APIRequestContext,
+  asked: { readonly origin: string; readonly refreshToken: string },
+): Promise<{ readonly refreshToken: string }> => {
+  const refreshed = await api.post("/oauth2/token", {
+    form: {
+      ...CLAUDE,
+      resource: `${asked.origin}/mcp`,
+      grant_type: "refresh_token",
+      refresh_token: asked.refreshToken,
+    },
+  });
+  expect(refreshed.ok(), `the refresh answered ${refreshed.status()}`).toBe(true);
+  const tokens = z.object({ refresh_token: z.string() }).parse(await refreshed.json());
+  return { refreshToken: tokens.refresh_token };
+};
+
 /** Claude revokes its own grant at the authorization server, as disconnecting it does. */
 export const claudeDisconnects = async (
   api: APIRequestContext,
@@ -517,6 +535,23 @@ export const emailsSentTo = async (api: APIRequestContext, email: string): Promi
   const counted = await api.get(`${HARNESS}/emails?to=${encodeURIComponent(email)}`);
   expect(counted.ok(), `counting the emails answered ${counted.status()}`).toBe(true);
   return emailsCounted.parse(await counted.json()).sent;
+};
+
+const aSessionSeeded = z.object({ sessionId: z.string() });
+
+/** One more session on the person, as a second device leaves it, without a sign-in code. */
+export const aSessionOn = async (
+  api: APIRequestContext,
+  personId: string,
+  userAgent?: string,
+): Promise<string> => {
+  const asked = await ask(
+    api,
+    "/sessions",
+    { userId: personId, ...(userAgent === undefined ? {} : { userAgent }) },
+    aSessionSeeded,
+  );
+  return asked.sessionId;
 };
 
 /** Timestamped and randomised, so a code read back for it is this test's alone. */

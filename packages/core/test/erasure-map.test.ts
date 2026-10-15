@@ -240,7 +240,11 @@ describe("the erasure map for a member", () => {
       { family: "identity-authenticator", categories: ["sign-in"], locations: [] },
       { family: "identity-recovery-code", categories: ["sign-in"], locations: [] },
       { family: "identity-confirm-failures", categories: ["sign-in"], locations: [] },
-      { family: "identity-last-active", categories: ["sign-in"], locations: [] },
+      {
+        family: "identity-last-active",
+        categories: ["sign-in"],
+        locations: [held.scenario.workspaceId],
+      },
       { family: "source-document", categories: ["document-text"], locations: [] },
       NO_QUESTION_ASKED,
     ]);
@@ -703,6 +707,11 @@ describe("the access answer", () => {
         },
         { family: "identity-invitation", categories: ["email-address"], location: held.invite.id },
         { family: "identity-account", categories: ["linked-account"], location: held.accountId },
+        {
+          family: "identity-last-active",
+          categories: ["sign-in"],
+          location: held.scenario.workspaceId,
+        },
       ],
     });
   });

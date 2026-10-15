@@ -132,13 +132,15 @@ export const passkeyUsedAt = async (pool: pg.Pool, passkeyId: string, at: Date):
   ]);
 };
 
+/** Upserts, since a resolved claim already stamps the pair, as a request does. */
 export const lastActiveIn = async (
   pool: pg.Pool,
   workspaceId: string,
   userId: string,
 ): Promise<void> => {
   await pool.query(
-    "INSERT INTO workspace_last_active (workspace_id, user_id, at) VALUES ($1, $2, now())",
+    `INSERT INTO workspace_last_active (workspace_id, user_id, at) VALUES ($1, $2, now())
+       ON CONFLICT (workspace_id, user_id) DO UPDATE SET at = now()`,
     [workspaceId, userId],
   );
 };
@@ -255,13 +257,16 @@ export const sessionFor = async (
 
     /** When the session last confirmed a second factor, where it holds one. */
     readonly confirmedAt?: Date;
+    /** What a browser sent, and the address it came from, as the library keeps both. */
+    readonly userAgent?: string;
+    readonly ipAddress?: string;
   },
 ): Promise<string> => {
   const sessionId = ulid();
   await pool.query(
     `INSERT INTO session (id, expires_at, token, created_at, updated_at, user_id, pending_since,
-                          second_factor_confirmed_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                          second_factor_confirmed_at, ip_address, user_agent)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [
       sessionId,
       at.expiresAt,
@@ -271,6 +276,8 @@ export const sessionFor = async (
       userId,
       at.pendingSince ?? null,
       at.confirmedAt ?? null,
+      at.ipAddress ?? null,
+      at.userAgent ?? null,
     ],
   );
   return sessionId;

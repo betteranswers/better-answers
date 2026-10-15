@@ -44,6 +44,7 @@ import {
   confirmationsAgedOverAnHourAgo,
   pendingSessionsPastTheirHour,
   restoredByTheOperator,
+  aSeededSessionFor,
 } from "./provoke.ts";
 
 const HARNESS_PREFIX = "/__harness";
@@ -92,6 +93,11 @@ const ending = z.object({ workspaceId: z.string().min(1), userId: z.string().min
 const MARK_CHANGES = ["grant", "revoke"] as const;
 const marking = z.object({ email: z.string().min(1), change: z.enum(MARK_CHANGES) });
 const aging = z.object({ userId: z.string().min(1) });
+/** The agent one browser leaves, as the library keeps it; unknown is fine, but not empty. */
+const aSession = z.object({
+  userId: z.string().min(1),
+  userAgent: z.string().min(1).nullish(),
+});
 const codeAging = z.object({ email: z.string().min(1) });
 const byEmail = z.object({ email: z.string().min(1) });
 /** Saved by default, as a first setup leaves an Admin; `none` is someone just made one. */
@@ -209,6 +215,16 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
     const asked = await readBody(context.req.raw, aging);
     await confirmationsAgedOverAnHourAgo(app, asked.userId);
     return context.json({ aged: true });
+  });
+
+  // One more browser session, as a second device leaves it, without spending a sign-in code.
+  control.post(`${HARNESS_PREFIX}/sessions`, async (context) => {
+    const asked = await readBody(context.req.raw, aSession);
+    const agent =
+      asked.userAgent === undefined || asked.userAgent === null
+        ? {}
+        : { userAgent: asked.userAgent };
+    return context.json({ sessionId: await aSeededSessionFor(app, asked.userId, agent) });
   });
 
   // The pending hour is too long for a spec to wait, so its clock is moved back the same way.

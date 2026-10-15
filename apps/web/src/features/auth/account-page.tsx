@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
 import { KeystrokesAction, usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
@@ -11,8 +11,8 @@ import {
   AuthenticatorSection,
   RecoveryCodesSection,
   SET_UP,
+  useLanding,
   type Landing,
-  type LandsAt,
 } from "./account-sections.tsx";
 import {
   ACCOUNT_HEADING,
@@ -51,28 +51,13 @@ import {
   type SecondFactorRead,
 } from "./second-factor-hooks.ts";
 import { READ_AGAIN, readUnanswered, SecondFactorRefused } from "./second-factor-parts.tsx";
+import { SessionsSection } from "./sessions-part.tsx";
 import { SignOutButton } from "./sign-out-button.tsx";
 import { ThemeSection } from "./theme-section.tsx";
 
 const SIGN_IN_HEADING = "sign-in-heading";
 
 const REFUSED = "account-refused";
-
-/** The node an action brings in takes focus as it mounts, since it is not there when the action ends. */
-const useLanding = (first: Landing | undefined) => {
-  const awaited = useRef<Landing | undefined>(first);
-  const at: LandsAt = (landing) => (node) => {
-    if (node === null || awaited.current !== landing) return;
-    awaited.current = undefined;
-    node.focus();
-  };
-  return {
-    at,
-    expect: (landing: Landing | undefined) => {
-      awaited.current = landing;
-    },
-  };
-};
 
 /** Each action clears what the last one said, so the page speaks of one action at a time. */
 const useAccountActions = (
@@ -342,6 +327,7 @@ export function AccountPage(properties: { readonly framed?: boolean }) {
           onDone={actions.done}
         />
       </section>
+      <SessionsSection />
       <ThemeSection />
     </>
   );

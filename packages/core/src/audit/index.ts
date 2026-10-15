@@ -46,6 +46,7 @@ export type {
   AuditAction,
   DetailOf,
   EndedGrant,
+  EndedSession,
   Matched,
   SecondFactor,
   SignInMethod,

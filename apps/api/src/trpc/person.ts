@@ -16,7 +16,11 @@ import {
   acknowledgeRecoveryCodesInput,
   dismissPasskeyOffer,
   factorChangeStale,
+  endOneSession,
+  endOneSessionInput,
+  endOtherSessions,
   readSecondFactor,
+  readSessions,
   readWorkspacesHeld,
   removeAuthenticator,
   removePasskey,
@@ -156,6 +160,38 @@ export const personRouter = router({
       if (promoted) void sendPromotionNotice(ctx, ctx.personId);
       return joined;
     }),
+  sessions: personProcedure.query(({ ctx }) =>
+    crossing(
+      ctx,
+      readSessions.name,
+      readSessions(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+        personId: ctx.personId,
+        sessionId: ctx.sessionId,
+      }),
+    ),
+  ),
+  signOutSession: personProcedure.input(parsedBy(endOneSessionInput)).mutation(({ ctx, input }) =>
+    crossing(
+      ctx,
+      endOneSession.name,
+      given(input, (asked) =>
+        endOneSession(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+          ...asked,
+          personId: ctx.personId,
+        }),
+      ),
+    ),
+  ),
+  signOutOtherSessions: personProcedure.mutation(({ ctx }) =>
+    crossing(
+      ctx,
+      endOtherSessions.name,
+      endOtherSessions(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+        personId: ctx.personId,
+        sessionId: ctx.sessionId,
+      }),
+    ),
+  ),
   secondFactor: personProcedure.query(({ ctx }) =>
     crossing(
       ctx,

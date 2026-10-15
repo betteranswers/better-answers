@@ -68,8 +68,8 @@ export type MemberRemoved = {
 type RemovedAt = { readonly at: Date; readonly batchId: string | undefined };
 
 /**
- * A step on a member row its action holds: the member and the person's tokens here issued before
- * `at` end, and the removal's audit events land.
+ * A step on a member row its action holds: the member, their last-activity row here and their
+ * tokens for this workspace issued before `at` end, and the removal's audit events land.
  */
 export const memberRemovedHere = async (
   admin: AdminUserPrincipal,
@@ -79,6 +79,11 @@ export const memberRemovedHere = async (
 ): Promise<void> => {
   // The composite foreign key takes the person's group_member rows here with the row.
   await tx.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+    admin.workspaceId,
+    removed.personId,
+  ]);
+  // An erasure from a workspace the person already left cannot reach this row, so it goes here.
+  await tx.query("DELETE FROM workspace_last_active WHERE workspace_id = $1 AND user_id = $2", [
     admin.workspaceId,
     removed.personId,
   ]);
