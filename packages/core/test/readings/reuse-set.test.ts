@@ -110,6 +110,9 @@ describe("the reuse reading", () => {
     expect(reading.misses).toContain(
       'negative taken: "Where is customer data hosted on the Starter plan?" / "Where is customer data hosted on the Enterprise plan?"',
     );
+    expect(reading.misses).toContain(
+      'other Answer taken: "Which country is our data hosted in if we buy the Standard plan?" / "What uptime does the Standard plan commit to?"',
+    );
   }, 300_000);
 
   it("counts a question whose judge failed apart from the tallies", async () => {

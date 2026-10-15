@@ -57,7 +57,9 @@ const reuseSet = z
         z.strictObject({
           group: answerKey,
           answers: z
-            .array(z.strictObject({ key: answerKey, title: z.string().min(1), body: z.string() }))
+            .array(
+              z.strictObject({ key: answerKey, title: z.string().min(1), body: z.string().min(1) }),
+            )
             .min(1),
         }),
       )
@@ -220,7 +222,10 @@ const heardOf = (
 ): Heard => {
   const verdictOf = (key: string): Verdict => verdicts.get(answers.get(key)?.iri ?? "");
   const named = new Set([...fits, ...negatives].map((key) => answers.get(key)?.iri));
-  const others = [...verdicts].filter(([iri, verdict]) => verdict === "yes" && !named.has(iri));
+  const titles = new Map([...answers.values()].map(({ iri, title }) => [iri, title]));
+  const others = [...verdicts].flatMap(([iri, verdict]) =>
+    verdict === "yes" && !named.has(iri) ? [titles.get(iri) ?? iri] : [],
+  );
   const missesOf = (keys: readonly string[], side: "fit" | "negative") =>
     keys.flatMap((key) => {
       const said = MISSED.get(`${side} ${verdictOf(key) ?? "unsent"}`);
@@ -233,7 +238,7 @@ const heardOf = (
     misses: [
       ...missesOf(fits, "fit"),
       ...missesOf(negatives, "negative"),
-      ...others.map(() => `other Answer taken: "${question}"`),
+      ...others.map((title) => `other Answer taken: "${question}" / "${title}"`),
     ],
   };
 };
@@ -245,15 +250,17 @@ const tallyOf = (verdicts: readonly Verdict[]): Tally => ({
   unsent: verdicts.filter((verdict) => verdict === undefined).length,
 });
 
-/** The client's `callModel`, each call's time from start to outcome added to `times`. */
-const timedBy =
-  (callModel: ModelClient["callModel"], times: number[]) =>
-  async <T>(to: ModelToCall, call: ModelCall<T>): Promise<ModelOutcome<T>> => {
+/** The client's `callModel`, and the time each call took from start to outcome. */
+const timedBy = (callModel: ModelClient["callModel"]) => {
+  const times: number[] = [];
+  const timed = async <T>(to: ModelToCall, call: ModelCall<T>): Promise<ModelOutcome<T>> => {
     const started = performance.now();
     const outcome = await callModel(to, call);
     times.push(performance.now() - started);
     return outcome;
   };
+  return { timed, times };
+};
 
 type Asked = { readonly unjudged: string } | Heard;
 
@@ -265,7 +272,8 @@ const askedOne = async (
   asking: ReuseQuestion,
 ): Promise<Asked> => {
   const answer = await asked(db, asker, { question: asking.question }, { judging: { callModel } });
-  if (answer.judgeState !== "judged") {
+  // With no candidate, nothing was sent: its fits and negatives count as never sent.
+  if (answer.judgeState === "judging-failed") {
     return { unjudged: `judge ${answer.judgeState}: "${asking.question}"` };
   }
   return heardOf(asking, await verdictsIn(db, answer.recordId), answers);
@@ -282,11 +290,10 @@ export const readReuse = async (
 ): Promise<ReuseReading> => {
   const { workspaceId, asker } = await judgingWorkspace(db, judge);
   const answers = await landed(db, workspaceId, set);
-  const times: number[] = [];
-  const callModel = timedBy(judge.callModel, times);
+  const { timed, times } = timedBy(judge.callModel);
   const read: Asked[] = [];
   for (const asking of set.questions) {
-    read.push(await askedOne(db, asker, callModel, answers, asking));
+    read.push(await askedOne(db, asker, timed, answers, asking));
   }
   const heard = read.flatMap((one) => ("unjudged" in one ? [] : [one]));
   return {
