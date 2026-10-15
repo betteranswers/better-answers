@@ -91,7 +91,10 @@ export type ModelCall<T> = {
   readonly system: string;
   readonly prompt: string;
   readonly answer: z.ZodType<T>;
+  /** Its `tokensOut` is each attempt's `max_tokens`, so no attempt spends past the reservation. */
   readonly most: CallSize;
+  /** The whole call's wall clock, every attempt and wait inside it; none where it is absent. */
+  readonly withinMs?: number;
 };
 
 type Unanswered = "rate-limited" | "spend-cap" | "refused" | "failed";
@@ -182,6 +185,13 @@ const answerOf = <T>(
   return parsed === undefined ? undefined : { answer: parsed };
 };
 
+/** Shorter than this, a retry would be cut off before a reply could come, yet might be billed. */
+const SHORTEST_ATTEMPT_MS = 10_000;
+
+/** A retry the deadline leaves no room for ends the call as the attempt before it read. */
+const outOfTime = (read: AttemptRead): Unanswered =>
+  read.read === "rate-limited" ? "rate-limited" : "failed";
+
 const lostTo = (signal: AbortSignal, otherwise: AttemptRead): AttemptRead =>
   signal.aborted ? { read: "timed-out" } : otherwise;
 
@@ -198,9 +208,13 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
   const secondsSince = (started: number): number =>
     (doors.clock.now().getTime() - started) / MS_PER_SECOND;
 
-  const attemptOnce = async (shape: WireShape, request: MessagesRequest): Promise<Attempted> => {
+  const attemptOnce = async (
+    shape: WireShape,
+    request: MessagesRequest,
+    timeoutMs: number,
+  ): Promise<Attempted> => {
     const started = doors.clock.now().getTime();
-    const signal = timeout(ATTEMPT_TIMEOUT_MS);
+    const signal = timeout(timeoutMs);
     const { url, ...init } = request;
     const replied = await attempt(() => doors.fetch(url, { ...init, signal }));
     if (!replied.ok) {
@@ -246,19 +260,27 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
       answerSchema: answerSchemaOf(call.answer),
       tokensOut: call.most.tokensOut,
     });
+    const startedMs = doors.clock.now().getTime();
+    const leftMs = (): number =>
+      (call.withinMs ?? Number.POSITIVE_INFINITY) - (doors.clock.now().getTime() - startedMs);
 
     const from = async (
       attempted: number,
       before: readonly CallSpent[],
     ): Promise<ModelOutcome<T>> => {
-      const tried = await attemptOnce(shape, request);
+      const tried = await attemptOnce(shape, request, Math.min(ATTEMPT_TIMEOUT_MS, leftMs()));
       logged(to, attempted, tried);
       const answered = answerOf(tried.read, call.answer);
       const spent = [...before, spentBy(tried, answered !== undefined)];
       if (answered !== undefined) return { outcome: "answered", answer: answered.answer, spent };
       const step = stepAfter(tried.read, attempted);
       if ("outcome" in step) return { outcome: step.outcome, spent };
+      if (step.waitMs + SHORTEST_ATTEMPT_MS > leftMs()) {
+        return { outcome: outOfTime(tried.read), spent };
+      }
       await wait(step.waitMs);
+      // A timer can fire late, so the room is measured again after it.
+      if (leftMs() < SHORTEST_ATTEMPT_MS) return { outcome: outOfTime(tried.read), spent };
       return from(attempted + 1, spent);
     };
 

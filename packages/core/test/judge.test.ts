@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { conceptIriOf, type ConceptIri } from "@better-answers/schema";
 
@@ -311,12 +312,14 @@ describe("the judge's call", () => {
   });
 
   it("reserves every byte sent and room to think", () => {
-    const one = judgeCall("Who pays the £50 fee?", [candidate]);
-    const two = judgeCall("Who pays the £50 fee?", [candidate, candidate]);
+    const call = judgeCall("Who pays the £50 fee?", [candidate]);
 
     // 710 bytes of system prompt, 231 of prompt (the pound sign is two), 2,000 of framing.
-    expect(one.most).toEqual({ tokensIn: 2_941, tokensOut: 12_016 });
-    expect(two.most.tokensOut).toBe(12_032);
+    expect(call.most).toEqual({ tokensIn: 2_941, tokensOut: 16_000 });
+  });
+
+  it("gives the whole call 150 seconds, under a host's 240", () => {
+    expect(judgeCall("Who?", [candidate]).withinMs).toBe(150_000);
   });
 
   it("AE11: sends a placeholder for a National Insurance number", () => {
@@ -532,6 +535,25 @@ describe("ask with a judge", () => {
       "no",
       undefined,
     ]);
+  });
+
+  it("sends as max_tokens the tokens out it reserved", async () => {
+    const { workspaceId, asker } = await arranged([USERS]);
+    const reserved: unknown[] = [];
+    const readReservation = async () => {
+      const open = await db().pool.query(
+        "SELECT tokens_out FROM spend_reservation WHERE workspace_id = $1",
+        [workspaceId],
+      );
+      reserved.push(...open.rows.map((row) => row.tokens_out));
+    };
+    const wire = judgeSaying([USERS.title], readReservation);
+
+    await askedWith(asker, { question: QUESTION }, wire);
+
+    const sent = z.object({ max_tokens: z.number() }).parse(JSON.parse(wire.sent[0]?.body ?? ""));
+    expect(reserved).toEqual([16_000]);
+    expect(sent.max_tokens).toBe(16_000);
   });
 
   it("holds no connection while the judge is called", async () => {

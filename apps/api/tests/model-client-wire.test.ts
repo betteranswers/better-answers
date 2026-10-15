@@ -50,7 +50,7 @@ describe("the server's model client", () => {
     });
     expect(JSON.parse(sent[0]?.body ?? "")).toEqual({
       model: SONNET,
-      max_tokens: 12_016,
+      max_tokens: 16_000,
       system: [
         "You judge whether each candidate answers a question as it was asked.",
         "Each candidate is an approved answer from a company's knowledge, shown with the question it was written for and the collection it is filed under.",

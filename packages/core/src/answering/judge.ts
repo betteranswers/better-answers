@@ -98,17 +98,21 @@ const candidateBlock = (candidate: ReturnedConcept, place: number): string =>
 /** Bounds the request's own framing and the instructions the provider adds for the answer's shape. */
 const FRAMING_TOKENS = 2_000;
 
-/** A model that thinks before it answers spends its thinking from the same allowance. */
-const THINKING_TOKENS = 12_000;
+/**
+ * Each attempt's `max_tokens`, its thinking and its verdicts together: the most a request with no
+ * stream should ask for, and far above twenty verdicts.
+ */
+const JUDGE_TOKENS_OUT = 16_000;
 
-const TOKENS_PER_VERDICT = 16;
+/** Under the 240 seconds a host gives one tool call, leaving `ask` time for its reads and writes. */
+const JUDGE_WITHIN_MS = 150_000;
 
 const utf8 = new TextEncoder();
 
 /** No token takes less than a byte, so the bytes sent bound the tokens sent. */
-const sizeOf = (prompt: string, candidates: number): CallSize => ({
+const sizeOf = (prompt: string): CallSize => ({
   tokensIn: utf8.encode(JUDGE_SYSTEM).length + utf8.encode(prompt).length + FRAMING_TOKENS,
-  tokensOut: THINKING_TOKENS + candidates * TOKENS_PER_VERDICT,
+  tokensOut: JUDGE_TOKENS_OUT,
 });
 
 /** One verdict required under each number, so an answer that skips a candidate is no answer. */
@@ -138,7 +142,8 @@ export const judgeCall = (
     system: JUDGE_SYSTEM,
     prompt,
     answer: verdictsFor(candidates.length),
-    most: sizeOf(prompt, candidates.length),
+    most: sizeOf(prompt),
+    withinMs: JUDGE_WITHIN_MS,
   };
 };
 
