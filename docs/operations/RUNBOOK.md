@@ -505,6 +505,42 @@ Each command writes nothing when it refuses. For `set-model-choice`, `no-sub-pro
 
 **Reading the spend.** Through the browsing login: this month's spend for a workspace is `SELECT sum(cost_gbp) FROM llm_call WHERE workspace_id = '<id>' AND called_at >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`, and the limit is `SELECT value FROM workspace_config WHERE workspace_id = '<id>' AND key = 'llm.spending_limit_gbp'`. A row names the question it served by `answer_id`, and never holds the prompt or the completion. After the release that adds these tables, run the browsing role's file again (§ Browse production, step 3).
 
+## Read the judge on the reuse set
+
+The reuse reading measures how well the judge tells an `Answer` that fits a question from one that differs from it in one qualifier, such as the plan, the module, the app or the audience. It runs on the owner's machine with the owner's own model key, and never in `check`: no test in `check` calls a real model. It asks the 34 questions of the synthetic reuse set (`packages/core/test/fixtures/reuse-set.json`) through the product's own `ask`, entry step and judge, in a throwaway Postgres container, so it reads what production would do with the same `Answer`s. It holds no customer content.
+
+It makes four runs, one after another: Claude Sonnet 5.5 and Claude Haiku 5.5, each at its own default effort (high for Sonnet 5.5, medium for Haiku 5.5) and at effort low. The product's judge sends no effort, so its default is what production runs; the reading adds effort low at the wire only.
+
+1. **Have Docker running** and the checkout installed (`pnpm install`).
+2. **Read the day's exchange rate**, pounds per US dollar. The reading prices each model at its list price in dollars, written in `packages/core/test/readings/reuse.reading.ts`; check it against the provider's price page first.
+3. **Run it from `packages/core`.** `read -rs` takes the key without showing it, so no command line or history holds it:
+
+   ```sh
+   cd packages/core
+   read -rs READING_ANTHROPIC_KEY && export READING_ANTHROPIC_KEY
+   READING_GBP_PER_USD=<pounds per dollar> pnpm reading:reuse
+   unset READING_ANTHROPIC_KEY
+   ```
+
+   To take one model or one effort alone, add a filter on the run's name, such as `pnpm reading:reuse -t "Haiku"` or `-t "effort low"`.
+
+Each run prints its figures under *Reuse reading*, then one line for each miss:
+
+- **fits found**, of the 32 the set names, and how many never reached the judge;
+- **hard negatives wrongly taken**, of the 36 the set names, and how many never reached the judge;
+- **other Answers taken**: `Answer`s judged to fit that the question names neither way, each a line to read;
+- **questions the judge answered**: a question whose call failed is left out of the counts above and named in a line of its own;
+- **spend** in pounds, from the run's own `llm_call` rows, as production counts it;
+- **judge latency**, the median and the worst call, retries included.
+
+A run whose judge answered nothing, as with a key the provider refuses, fails. The check suite holds every fit and every hard negative reaching the judge, so a figure of *never sent* above zero is something to report, not to read past.
+
+**What it costs.** A run makes 34 calls of about 2,000 tokens in. All four runs together cost about £1 at a rate near 0.75, almost all of it Sonnet 5.5 at its default effort. The most they can cost, with every call spending its whole allowance of 16,000 tokens out, is about £9. Each run's workspace has a spending limit of £20, so a run cannot spend past that.
+
+**The key.** It is sealed into the container's database as production seals a workspace's key, and is gone when the run ends and the container is removed. The reading never prints or logs it.
+
+**Recording the figures.** Copy each run's figures into S2b's entry on the route (`docs/specs/v01-route.md`), with the day, the rate and the commit the reading ran at.
+
 ## Read a workspace's unmapped-passage rate
 
 The rate is the second reading that can bring vectors in, beside recall at ten on the customer's answer tests. It is read per workspace on the `api` service:

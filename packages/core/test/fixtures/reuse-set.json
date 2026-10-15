@@ -1,0 +1,347 @@
+{
+  "note": "Synthetic Answers about an invented company and its invented product, Tallyloom, written once for the judge's reuse reading. None of it is, or is taken from, any customer's content. Most Answers come in pairs that differ in one qualifier: a plan, a module, an app, an audience or a scope. A question names its fits, the Answers that answer it as asked, and its negatives, the Answers that differ from it in that one qualifier. A question that names no qualifier counts each Answer that answers part of it as a fit, as two modules' Answers to one question both are.",
+  "groups": [
+    {
+      "group": "hosting",
+      "answers": [
+        {
+          "key": "data-location-standard",
+          "title": "Where is customer data hosted on the Standard plan?",
+          "body": "On the Standard plan, all customer data is hosted in our London region, on servers we rent from a UK cloud provider. It does not leave the United Kingdom."
+        },
+        {
+          "key": "data-location-enterprise",
+          "title": "Where is customer data hosted on the Enterprise plan?",
+          "body": "On the Enterprise plan, each customer chooses London or Dublin as its hosting region when its account is set up. Its data stays in the region it chose."
+        },
+        {
+          "key": "uptime-standard",
+          "title": "What uptime does the Standard plan commit to?",
+          "body": "The Standard plan commits to 99.5 % monthly uptime, measured at our status page. The Standard plan earns no service credits when a month falls short."
+        },
+        {
+          "key": "uptime-enterprise",
+          "title": "What uptime does the Enterprise plan commit to?",
+          "body": "The Enterprise plan commits to 99.9 % monthly uptime. A month that falls short earns a service credit of 10 % of that month's fee."
+        },
+        {
+          "key": "backup-database",
+          "title": "How often is the Tallyloom database backed up?",
+          "body": "The Tallyloom database is backed up every hour, and each database backup is kept for 35 days in a second London data centre."
+        },
+        {
+          "key": "backup-attachments",
+          "title": "How often are file attachments uploaded to Tallyloom backed up?",
+          "body": "Files that customers attach to records are backed up to a second London data centre once a day, and each backup of an attachment is kept for 90 days."
+        }
+      ]
+    },
+    {
+      "group": "security",
+      "answers": [
+        {
+          "key": "encryption-at-rest",
+          "title": "How is customer data encrypted at rest?",
+          "body": "Customer data is encrypted at rest with AES-256, using keys held in our cloud provider's key management service. The keys are rotated every year."
+        },
+        {
+          "key": "encryption-in-transit",
+          "title": "How is customer data encrypted in transit?",
+          "body": "Every connection to Tallyloom is encrypted in transit with TLS 1.2 or later. Older protocol versions are refused, and certificates renew automatically."
+        },
+        {
+          "key": "pentest-web",
+          "title": "When was the Tallyloom web app last penetration tested?",
+          "body": "The Tallyloom web app, used in a browser, is penetration tested every year by a CREST-accredited firm. The latest test finished in March 2026 and found no high-risk issues."
+        },
+        {
+          "key": "pentest-mobile",
+          "title": "When was the Tallyloom mobile app last penetration tested?",
+          "body": "The Tallyloom mobile app for iOS and Android was last penetration tested in November 2025 by a CREST-accredited firm. Its two medium-risk findings were fixed within a month."
+        },
+        {
+          "key": "sso-business",
+          "title": "Does the Business plan support single sign-on?",
+          "body": "Yes. The Business plan supports single sign-on through SAML 2.0 with Microsoft Entra ID, Okta and Google Workspace, at no extra charge."
+        },
+        {
+          "key": "sso-starter",
+          "title": "Does the Starter plan support single sign-on?",
+          "body": "No. On the Starter plan people sign in with an email address, a password and a second factor. Single sign-on needs the Business plan."
+        },
+        {
+          "key": "audit-log-invoicing",
+          "title": "How long does the Invoicing module keep its audit log?",
+          "body": "The Invoicing module keeps every change to an invoice in its audit log for seven years, the time HMRC asks invoice records to be kept."
+        },
+        {
+          "key": "audit-log-rota",
+          "title": "How long does the Rota module keep its audit log?",
+          "body": "The Rota module keeps its audit log of shift changes for two years. Older entries are deleted."
+        }
+      ]
+    },
+    {
+      "group": "privacy",
+      "answers": [
+        {
+          "key": "breach-notice",
+          "title": "How quickly do you tell customers about a personal data breach?",
+          "body": "We tell an affected customer about a personal data breach within 48 hours of confirming it, by email to the customer's named privacy contact."
+        },
+        {
+          "key": "outage-notice",
+          "title": "How quickly do you tell customers about a service outage?",
+          "body": "We post a service outage on our status page within 15 minutes of detecting that Tallyloom is down, and email the customers who subscribe to it at the same time."
+        },
+        {
+          "key": "deletion-live",
+          "title": "When is customer data deleted from the live service after a contract ends?",
+          "body": "Thirty days after a contract ends, the customer's data is deleted from the live service. The customer can export its data at any time before then."
+        },
+        {
+          "key": "deletion-backups",
+          "title": "When is customer data deleted from backups after a contract ends?",
+          "body": "Backups are never edited, so a former customer's data leaves them as they expire, at most 90 days after it was deleted from the live service."
+        },
+        {
+          "key": "subject-access-customer-staff",
+          "title": "How does Tallyloom help a customer answer a subject access request from the customer's own staff?",
+          "body": "When one of a customer's staff makes a subject access request, the customer's Admin can export that person's records from Tallyloom in one file. We answer the customer's questions about the request within five working days."
+        },
+        {
+          "key": "subject-access-tallyloom-staff",
+          "title": "How does Tallyloom answer a subject access request from its own employees?",
+          "body": "Tallyloom's own employees send a subject access request to our people team, who answer it within one month, as the UK GDPR requires."
+        }
+      ]
+    },
+    {
+      "group": "people",
+      "answers": [
+        {
+          "key": "training-employees",
+          "title": "What security training do Tallyloom employees take?",
+          "body": "Every Tallyloom employee completes security awareness training when they join and again every year, and takes a phishing test each quarter."
+        },
+        {
+          "key": "training-contractors",
+          "title": "What security training do Tallyloom contractors take?",
+          "body": "Tallyloom contractors complete a shorter security briefing before their accounts are opened. Contractors are not part of the yearly security awareness training or the phishing tests."
+        },
+        {
+          "key": "screening-employees",
+          "title": "Are Tallyloom employees background checked?",
+          "body": "Every Tallyloom employee has a right-to-work check and a basic DBS criminal record check before they start."
+        },
+        {
+          "key": "screening-contractors",
+          "title": "Are Tallyloom contractors background checked?",
+          "body": "Tallyloom contractors have a right-to-work check before they start. Contractors with access to customer data also have a basic DBS criminal record check."
+        }
+      ]
+    },
+    {
+      "group": "support",
+      "answers": [
+        {
+          "key": "support-hours-standard",
+          "title": "What hours does Standard support cover?",
+          "body": "Standard support answers by email from 9 am to 5.30 pm UK time, Monday to Friday, except bank holidays in England. Standard support takes no phone calls."
+        },
+        {
+          "key": "support-hours-premium",
+          "title": "What hours does Premium support cover?",
+          "body": "Premium support answers by phone and email around the clock, at weekends and on bank holidays, for incidents that stop work."
+        }
+      ]
+    },
+    {
+      "group": "integrations",
+      "answers": [
+        {
+          "key": "invoices-xero",
+          "title": "Can Tallyloom invoices be exported to Xero?",
+          "body": "Yes. Tallyloom invoices sync to Xero every fifteen minutes once an Admin connects the two accounts, and payments recorded in Xero flow back."
+        },
+        {
+          "key": "invoices-quickbooks",
+          "title": "Can Tallyloom invoices be exported to QuickBooks?",
+          "body": "Tallyloom invoices can be exported to QuickBooks Online as a CSV file that QuickBooks imports. There is no live sync with QuickBooks."
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "question": "Which country is our data hosted in if we buy the Standard plan?",
+      "fits": ["data-location-standard"],
+      "negatives": ["data-location-enterprise"]
+    },
+    {
+      "question": "On the Enterprise plan, can we choose the region where our data is hosted?",
+      "fits": ["data-location-enterprise"],
+      "negatives": ["data-location-standard"]
+    },
+    {
+      "question": "Where is customer data hosted on the Starter plan?",
+      "fits": [],
+      "negatives": ["data-location-standard", "data-location-enterprise"]
+    },
+    {
+      "question": "What monthly uptime is committed to Enterprise plan customers?",
+      "fits": ["uptime-enterprise"],
+      "negatives": ["uptime-standard"]
+    },
+    {
+      "question": "Do Standard plan customers get service credits when uptime falls short?",
+      "fits": ["uptime-standard"],
+      "negatives": ["uptime-enterprise"]
+    },
+    {
+      "question": "How frequently is the database backed up, and how long is each backup kept?",
+      "fits": ["backup-database"],
+      "negatives": ["backup-attachments"]
+    },
+    {
+      "question": "Are the files we attach to records backed up, and how often?",
+      "fits": ["backup-attachments"],
+      "negatives": ["backup-database"]
+    },
+    {
+      "question": "Describe how our data is encrypted when it is stored at rest.",
+      "fits": ["encryption-at-rest"],
+      "negatives": ["encryption-in-transit"]
+    },
+    {
+      "question": "Which TLS versions are accepted to encrypt data in transit?",
+      "fits": ["encryption-in-transit"],
+      "negatives": ["encryption-at-rest"]
+    },
+    {
+      "question": "Describe how customer data is encrypted, both at rest and in transit.",
+      "fits": ["encryption-at-rest", "encryption-in-transit"],
+      "negatives": []
+    },
+    {
+      "question": "When were the iOS and Android mobile apps last penetration tested?",
+      "fits": ["pentest-mobile"],
+      "negatives": ["pentest-web"]
+    },
+    {
+      "question": "Has the browser-based web app been penetration tested in the last year?",
+      "fits": ["pentest-web"],
+      "negatives": ["pentest-mobile"]
+    },
+    {
+      "question": "Can we use Okta single sign-on on the Business plan?",
+      "fits": ["sso-business"],
+      "negatives": ["sso-starter"]
+    },
+    {
+      "question": "Is SAML single sign-on included in the Starter plan?",
+      "fits": ["sso-starter"],
+      "negatives": ["sso-business"]
+    },
+    {
+      "question": "Is single sign-on available on the Professional plan?",
+      "fits": [],
+      "negatives": ["sso-starter", "sso-business"]
+    },
+    {
+      "question": "How long are changes to invoices kept in the Invoicing module's audit log?",
+      "fits": ["audit-log-invoicing"],
+      "negatives": ["audit-log-rota"]
+    },
+    {
+      "question": "For how long can we see shift changes in the Rota module's audit log?",
+      "fits": ["audit-log-rota"],
+      "negatives": ["audit-log-invoicing"]
+    },
+    {
+      "question": "Which modules keep an audit log, and how long is each audit log kept?",
+      "fits": ["audit-log-invoicing", "audit-log-rota"],
+      "negatives": []
+    },
+    {
+      "question": "How long does the Payroll module keep its audit log?",
+      "fits": [],
+      "negatives": ["audit-log-invoicing", "audit-log-rota"]
+    },
+    {
+      "question": "How quickly will you tell us if our personal data is breached?",
+      "fits": ["breach-notice"],
+      "negatives": ["outage-notice"]
+    },
+    {
+      "question": "How quickly will customers be told when Tallyloom is down with an outage?",
+      "fits": ["outage-notice"],
+      "negatives": ["breach-notice"]
+    },
+    {
+      "question": "When we leave, how long until our data is deleted from your backups?",
+      "fits": ["deletion-backups"],
+      "negatives": ["deletion-live"]
+    },
+    {
+      "question": "After our contract ends, when is our data deleted from the live service?",
+      "fits": ["deletion-live"],
+      "negatives": ["deletion-backups"]
+    },
+    {
+      "question": "One of our staff has made a subject access request. How can Tallyloom help us answer it?",
+      "fits": ["subject-access-customer-staff"],
+      "negatives": ["subject-access-tallyloom-staff"]
+    },
+    {
+      "question": "How do Tallyloom's own employees make a subject access request?",
+      "fits": ["subject-access-tallyloom-staff"],
+      "negatives": ["subject-access-customer-staff"]
+    },
+    {
+      "question": "What security training must Tallyloom contractors complete?",
+      "fits": ["training-contractors"],
+      "negatives": ["training-employees"]
+    },
+    {
+      "question": "How often do Tallyloom employees repeat their security awareness training?",
+      "fits": ["training-employees"],
+      "negatives": ["training-contractors"]
+    },
+    {
+      "question": "Do Tallyloom employees have a DBS check before they start?",
+      "fits": ["screening-employees"],
+      "negatives": ["screening-contractors"]
+    },
+    {
+      "question": "What background checks are done on Tallyloom contractors?",
+      "fits": ["screening-contractors"],
+      "negatives": ["screening-employees"]
+    },
+    {
+      "question": "Does Premium support answer at weekends?",
+      "fits": ["support-hours-premium"],
+      "negatives": ["support-hours-standard"]
+    },
+    {
+      "question": "Can we phone Standard support outside office hours?",
+      "fits": ["support-hours-standard"],
+      "negatives": ["support-hours-premium"]
+    },
+    {
+      "question": "Do Tallyloom invoices sync with Xero automatically?",
+      "fits": ["invoices-xero"],
+      "negatives": ["invoices-quickbooks"]
+    },
+    {
+      "question": "How do we get our Tallyloom invoices into QuickBooks?",
+      "fits": ["invoices-quickbooks"],
+      "negatives": ["invoices-xero"]
+    },
+    {
+      "question": "Can Tallyloom invoices be exported to Sage?",
+      "fits": [],
+      "negatives": ["invoices-xero", "invoices-quickbooks"]
+    }
+  ]
+}

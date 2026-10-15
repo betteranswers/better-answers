@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ASK_CAPS, askInput, find, planAnswer } from "../src/answering/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { recordFigures, type Figure } from "./figures.ts";
+import { theReuseSet } from "./readings/reuse-set.ts";
 import {
   answersOf,
   landRecallSet,
@@ -343,19 +344,31 @@ const namedIn = (bundle: Wording, text: string): boolean => {
 const borrowedFrom = (bundle: Wording, text: string, named: boolean): boolean =>
   (named && namedIn(bundle, text)) || runsOf(text).some((run) => bundle.runs.has(run));
 
-describe("the recall set's provenance", () => {
-  it("takes no title, paraphrase or wording from the customer's bundle", async (context) => {
+/** Each text a synthetic set holds, and whether it names a thing as a title or a question does. */
+const syntheticTexts = async (): Promise<readonly (readonly [string, boolean])[]> => {
+  const reuse = await theReuseSet();
+  return [
+    ...answersOf(await theRecallSet()).flatMap(({ title, body, paraphrases }) => [
+      ...[title, ...paraphrases].map((text) => [text, true] as const),
+      [body, false] as const,
+    ]),
+    ...reuse.groups.flatMap(({ answers }) =>
+      answers.flatMap(({ title, body }) => [[title, true] as const, [body, false] as const]),
+    ),
+    ...reuse.questions.map(({ question }) => [question, true] as const),
+  ];
+};
+
+describe("the synthetic sets' provenance", () => {
+  it("takes no title, question or wording from the customer's bundle", async (context) => {
     context.skip(
       !existsSync(CUSTOMER_BUNDLE),
       "the customer's bundle is machine-local, so only the owner's machine can compare against it",
     );
     const bundle = await bundleWording(CUSTOMER_BUNDLE);
 
-    const borrowed = answersOf(await theRecallSet()).flatMap(({ title, body, paraphrases }) =>
-      [
-        ...[title, ...paraphrases].map((text) => [text, true] as const),
-        [body, false] as const,
-      ].flatMap(([text, named]) => (borrowedFrom(bundle, text, named) ? [text] : [])),
+    const borrowed = (await syntheticTexts()).flatMap(([text, named]) =>
+      borrowedFrom(bundle, text, named) ? [text] : [],
     );
 
     expect(bundle.runs.size).toBeGreaterThan(0);
