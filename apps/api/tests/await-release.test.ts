@@ -2,11 +2,10 @@ import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import path from "node:path";
 
-import { serve } from "@hono/node-server";
-import type { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { serverFor, startApp, type TestApp } from "./harness.ts";
+import { servedOnLoopback as serving } from "./loopback-port.ts";
 
 const script = path.resolve(import.meta.dirname, "../../../deploy/await-release.sh");
 
@@ -42,20 +41,6 @@ describe("the release's wait against the api's own /health", () => {
   afterAll(async () => {
     await app.stop();
   });
-
-  const serving = async (server: Hono, work: (origin: string) => Promise<void>) => {
-    let listener: ReturnType<typeof serve> | undefined;
-    const port = await new Promise<number>((resolve) => {
-      listener = serve({ fetch: server.fetch, port: 0, hostname: "127.0.0.1" }, (info) =>
-        resolve(info.port),
-      );
-    });
-    try {
-      await work(`http://127.0.0.1:${String(port)}`);
-    } finally {
-      await new Promise((resolve) => listener?.close(resolve));
-    }
-  };
 
   it("passes on the promoted image and fails on another", async () => {
     await serving(serverFor(app.database.pool, { imageDigest: REPLACED }), async (origin) => {

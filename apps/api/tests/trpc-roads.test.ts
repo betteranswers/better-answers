@@ -16,9 +16,11 @@ import type { Tx } from "@better-answers/core/store/postgres";
 import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
 
+import type { ModelDoors } from "../src/ask-steps.ts";
 import type { Doors } from "../src/doors.ts";
 import type { Refusal, RefusalAnswer } from "../src/refusal.ts";
 import type { GatedSessionReader } from "../src/second-factor-gate.ts";
+import { askingProcedure } from "../src/trpc/ask.ts";
 import {
   crossing,
   mutationProcedure,
@@ -42,6 +44,7 @@ type MutationContext = inferProcedureBuilderResolverOptions<typeof mutationProce
 type OwnTransactionContext = inferProcedureBuilderResolverOptions<
   typeof ownTransactionProcedure
 >["ctx"];
+type AskingContext = inferProcedureBuilderResolverOptions<typeof askingProcedure>["ctx"];
 
 describe("the three roads a procedure takes", () => {
   it("is three procedures, not one wearing three names", () => {
@@ -55,6 +58,8 @@ describe("the three roads a procedure takes", () => {
     expectTypeOf<QueryContext["doors"]>().toEqualTypeOf<undefined>();
     expectTypeOf<MutationContext["tx"]>().toEqualTypeOf<Tx>();
     expectTypeOf<MutationContext["doors"]>().toEqualTypeOf<undefined>();
+    expectTypeOf<QueryContext["modelDoors"]>().toEqualTypeOf<undefined>();
+    expectTypeOf<MutationContext["modelDoors"]>().toEqualTypeOf<undefined>();
 
     // @ts-expect-error — a context holding a transaction reaches no door.
     expectTypeOf<QueryContext["doors"]["postgres"]>().toBeUnknown();
@@ -62,7 +67,9 @@ describe("the three roads a procedure takes", () => {
 
   it("hands the doors and no transaction to the own-transaction road", () => {
     expectTypeOf<OwnTransactionContext["doors"]>().toEqualTypeOf<Doors>();
+    expectTypeOf<OwnTransactionContext["modelDoors"]>().toEqualTypeOf<ModelDoors>();
     expectTypeOf<OwnTransactionContext>().not.toHaveProperty("tx");
+    expectTypeOf<AskingContext>().toEqualTypeOf<OwnTransactionContext>();
   });
 
   it("hands every road the Principal its own door re-judges", () => {
@@ -86,6 +93,12 @@ const A_SIGNED_IN_PERSON = {
 
 const wire = z.object({ error: z.object({ data: z.object({ refusal: z.unknown() }) }) });
 
+/** No procedure built here asks, so none calls a model. */
+const NO_MODEL = {
+  credentials: undefined,
+  models: { callModel: () => Promise.reject(new Error("no procedure here calls a model")) },
+};
+
 const contextOf = (
   doors: Doors,
   log: Logger,
@@ -93,6 +106,7 @@ const contextOf = (
   headers = new Headers(),
 ) => ({
   doors,
+  modelDoors: NO_MODEL,
   clock: systemClock(),
   readSession,
   headers,
@@ -448,6 +462,31 @@ describe("every query the router serves on a workspace road", () => {
     const named = await queriedFromATab(client, "members.list", here.workspaceId);
 
     expect([unnamed.status, named.status]).toEqual([200, 200]);
+  });
+});
+
+describe("every mutation on an own-transaction road", () => {
+  it("is one this list names", () => {
+    const roads = [ownTransactionProcedure, askingProcedure].map(
+      (road) => middlewaresOf(road).middlewares[0],
+    );
+
+    const paths = MUTATIONS.filter(([, procedure]) =>
+      roads.includes(middlewaresOf(procedure).middlewares[0]),
+    ).map(([path]) => path);
+
+    expect(paths.toSorted()).toEqual([
+      "ask.question",
+      "members.approveRequest",
+      "members.bulkChangeRole",
+      "members.bulkResendInvitations",
+      "members.changeRole",
+      "members.exportAuditLog",
+      "members.flagDisplayName",
+      "members.invite",
+      "members.resendInvitation",
+      "sources.connect",
+    ]);
   });
 });
 

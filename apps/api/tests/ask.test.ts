@@ -6,9 +6,12 @@ import { asksTablesLockedAtOnce } from "@better-answers/core/testing/postgres";
 import {
   aModelWire,
   anAdminAsking as anAdminAskingIn,
+  AUDIT_ANSWERS,
+  AUDIT_QUESTION as QUESTION,
   judgeSaying,
   judgingSetUp,
 } from "./harness-model.ts";
+import { recordsIn as recordsOf } from "./harness-questions.ts";
 import { rendered, structured } from "./mcp-call.ts";
 import { appForSuite } from "./suite-app.ts";
 
@@ -16,28 +19,7 @@ const wire = aModelWire();
 
 const app = appForSuite({ fetchModel: wire.fetch });
 
-const USERS = {
-  title: "How do buyers access audit information about their users' actions?",
-  collection: "audits",
-  body: "Buyers download their users' audit log from the console.",
-};
-const SUPPLIER = {
-  title: "How do buyers access audit information about the supplier's actions?",
-  collection: "audits",
-  body: "The supplier sends its own audit report on request.",
-};
-const RETENTION = {
-  title: "How long is audit information kept for buyers?",
-  collection: "audits",
-  body: "Audit information is kept for thirteen months.",
-};
-const LMS = {
-  title: "How do buyers access audit information in the LMS?",
-  collection: "lms",
-  body: "The LMS exports its audit trail to buyers.",
-};
-
-const QUESTION = "How do buyers access audit information?";
+const { users: USERS, supplier: SUPPLIER, retention: RETENTION, lms: LMS } = AUDIT_ANSWERS;
 
 /** A workspace holding the four `Answer`s, set to judge, and an assistant connected as its Admin. */
 const anAdminAsking = async (limitGbp?: string) => {
@@ -54,15 +36,7 @@ const judged = z.object({
   recordId: z.string(),
 });
 
-const recordsIn = async (workspaceId: string) => {
-  const kept = await app().database.superuser.query(
-    `SELECT r.verdict, r.judge_state, r.completed_at IS NOT NULL AS completed, c.question
-       FROM question_asked r JOIN question_content c ON c.record_id = r.id
-      WHERE r.workspace_id = $1`,
-    [workspaceId],
-  );
-  return kept.rows;
-};
+const recordsIn = (workspaceId: string) => recordsOf(app(), workspaceId);
 
 describe("ask, judged over MCP", () => {
   it("AE1: returns both fits word for word, none from lms", async () => {
@@ -111,7 +85,7 @@ describe("ask, judged over MCP", () => {
     expect(rendered(result)).toContain("spending-limit-met");
     expect(wire.sent.slice(before)).toEqual([]);
     expect(await recordsIn(workspaceId)).toEqual([
-      { verdict: null, judge_state: null, completed: false, question: QUESTION },
+      { transport: "mcp", verdict: null, judge_state: null, completed: false, question: QUESTION },
     ]);
   });
 
@@ -140,7 +114,13 @@ describe("ask, judged over MCP", () => {
       [],
     ]);
     expect(await recordsIn(workspaceId)).toEqual([
-      { verdict: "related", judge_state: "judging-failed", completed: true, question: QUESTION },
+      {
+        transport: "mcp",
+        verdict: "related",
+        judge_state: "judging-failed",
+        completed: true,
+        question: QUESTION,
+      },
     ]);
   });
 });

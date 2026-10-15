@@ -2,7 +2,7 @@ import { find, findInput, open, openInput, type OpenResult } from "@better-answe
 import { err, NOT_FOUND, ok, type Result } from "@better-answers/core/kernel";
 
 import { MCP_TOKEN_RULE } from "../auth/constants.ts";
-import { crossing, given, parsedBy, queryCeiling, router } from "./base.ts";
+import { crossing, given, parsedBy, queryCeiling, router, type RoadCeiling } from "./base.ts";
 
 type Found = Extract<OpenResult, { readonly found: true }>;
 
@@ -14,8 +14,10 @@ const foundOrRefused = <Refused>(
   return opened.value.found ? ok(opened.value) : err(NOT_FOUND);
 };
 
-/** A person reading on the web spends what one connection does over MCP, find and open together. */
-export const knowledgeReadProcedure = queryCeiling({ budget: "knowledge", rule: MCP_TOKEN_RULE });
+/** A person on the web spends what one connection does over MCP: find, open and ask together. */
+export const KNOWLEDGE_CEILING: RoadCeiling = { budget: "knowledge", rule: MCP_TOKEN_RULE };
+
+export const knowledgeReadProcedure = queryCeiling(KNOWLEDGE_CEILING);
 
 export const knowledgeRouter = router({
   find: knowledgeReadProcedure.input(parsedBy(findInput)).query(({ ctx, input }) =>

@@ -10,6 +10,32 @@ import { toolAnswered, type Rpc } from "./mcp-call.ts";
 
 export const SONNET = "claude-sonnet-5-5";
 
+/** Three `Answer`s on buyers' audit information in `audits`, and one in `lms`. */
+export const AUDIT_ANSWERS = {
+  users: {
+    title: "How do buyers access audit information about their users' actions?",
+    collection: "audits",
+    body: "Buyers download their users' audit log from the console.",
+  },
+  supplier: {
+    title: "How do buyers access audit information about the supplier's actions?",
+    collection: "audits",
+    body: "The supplier sends its own audit report on request.",
+  },
+  retention: {
+    title: "How long is audit information kept for buyers?",
+    collection: "audits",
+    body: "Audit information is kept for thirteen months.",
+  },
+  lms: {
+    title: "How do buyers access audit information in the LMS?",
+    collection: "lms",
+    body: "The LMS exports its audit trail to buyers.",
+  },
+};
+
+export const AUDIT_QUESTION = "How do buyers access audit information?";
+
 /** Invented: it reaches no provider. */
 export const A_MODEL_KEY = "sk-test-u13-invented-key-0002";
 

@@ -6,6 +6,7 @@ import { ulid } from "@better-answers/schema";
 
 import { connectAsHost } from "./flow.ts";
 import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
+import { feedbackKeptOn as feedbackOf } from "./harness-questions.ts";
 import type { TestClient } from "./harness.ts";
 import { calledTool, rendered, structured, toolAnswered, type Rpc } from "./mcp-call.ts";
 import { seededIn, waitingOnALock } from "./provoke.ts";
@@ -70,14 +71,7 @@ const asked = async ({ client, token }: Connected) => {
 const given = ({ client, token }: Connected, feedback: Rpc): Promise<Rpc> =>
   toolAnswered(client, token, "give_feedback", feedback);
 
-const feedbackKeptOn = async (recordId: string) => {
-  const kept = await app().database.superuser.query(
-    `SELECT given_by, verdict, reason, note, disputed_sentence, disputed_concept
-       FROM question_feedback WHERE record_id = $1 ORDER BY given_at, id`,
-    [recordId],
-  );
-  return kept.rows;
-};
+const feedbackKeptOn = (recordId: string) => feedbackOf(app(), recordId);
 
 /** How many rows the workspace holds in each table a queue is read from. */
 const queuedIn = async (workspaceId: string) => {

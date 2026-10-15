@@ -119,6 +119,75 @@ describe("the workspace an action names", () => {
   });
 });
 
+type Heard = {
+  readonly method: string | undefined;
+  readonly address: URL;
+  readonly body: string;
+  readonly named: string | null;
+};
+
+/** An api whose member read answers workspace `w`; `heard` holds each ask sent to it. */
+const anApiHearingAsks = () => {
+  const heard: Heard[] = [];
+  vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+    const address = addressOf(input);
+    if (!address.pathname.includes("ask.question")) {
+      return answered([{ result: { data: { workspace: { id: "w" } } } }]);
+    }
+    heard.push({
+      method: init?.method,
+      address,
+      body: typeof init?.body === "string" ? init.body : "",
+      named: new Headers(init?.headers).get(TAB_WORKSPACE_HEADER),
+    });
+    return Promise.resolve(new Response("", { status: 503 }));
+  });
+  return heard;
+};
+
+const A_QUESTION = "How long are audit logs kept for buyers?";
+
+describe("an ask the web sends", () => {
+  it("is a POST whose address holds none of the question", async () => {
+    const heard = anApiHearingAsks();
+    const clients = createAppClients();
+    await memberRead(clients);
+
+    await clients.apiClient.ask.question.mutate({ question: A_QUESTION }).catch(() => undefined);
+
+    expect(heard.map(({ method, named }) => [method, named])).toEqual([["POST", "w"]]);
+    const [sent] = heard;
+    expect(sent?.address.href).not.toMatch(/audit|logs|kept/i);
+    expect(decodeURIComponent(sent?.address.href ?? "")).not.toContain(A_QUESTION);
+    expect(sent?.body).toContain(A_QUESTION);
+  });
+
+  it("is sent alone, though another action leaves with it", async () => {
+    const heard = anApiHearingAsks();
+    const clients = createAppClients();
+
+    await Promise.allSettled([
+      clients.apiClient.ask.question.mutate({ question: A_QUESTION }),
+      groupMade(clients),
+    ]);
+
+    expect(heard.map(({ address }) => address.pathname)).toEqual([`${TRPC_ENDPOINT}/ask.question`]);
+  });
+
+  it("is sent once, though the api failed it", async () => {
+    const heard = anApiHearingAsks();
+    const clients = createAppClients();
+
+    const refused = await clients.apiClient.ask.question.mutate({ question: A_QUESTION }).then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+
+    expect(refused).toBeInstanceOf(Error);
+    expect(heard).toHaveLength(1);
+  });
+});
+
 describe("the path the tRPC client and the api agree on", () => {
   it("matches the one path apps/api mounts its router at", () => {
     const source = readFileSync(
