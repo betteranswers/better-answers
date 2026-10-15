@@ -81,7 +81,10 @@ type Reply = {
   readonly headers?: Readonly<Record<string, string>>;
 };
 
-type Answer = Reply | "hang" | "unreachable";
+/** A reply whose connection drops once its status is in, so its body never arrives. */
+type Dropped = { readonly droppedAfter: number };
+
+type Answer = Reply | Dropped | "hang" | "unreachable";
 
 const sentOf = (input: string | URL | Request, init: RequestInit = {}): Sent => ({
   url: input instanceof Request ? input.url : input.toString(),
@@ -95,11 +98,17 @@ const NO_MORE: Reply = { status: 418, body: "" };
 /** A hung attempt rejects once its timeout has fired, as `fetch` does on an aborted signal. */
 const answering = (next: Answer, signal: AbortSignal | null | undefined) => {
   if (next === "unreachable") throw new TypeError("fetch failed");
-  if (next !== "hang") {
-    return new Response(next.body, { status: next.status, headers: next.headers ?? {} });
+  if (next === "hang") {
+    if (signal?.aborted === true) throw new DOMException("timed out", "TimeoutError");
+    throw new Error("a hung attempt was sent with no timeout fired");
   }
-  if (signal?.aborted === true) throw new DOMException("timed out", "TimeoutError");
-  throw new Error("a hung attempt was sent with no timeout fired");
+  if ("droppedAfter" in next) {
+    const dropping = new ReadableStream({
+      start: (controller) => controller.error(new TypeError("terminated")),
+    });
+    return new Response(dropping, { status: next.droppedAfter });
+  }
+  return new Response(next.body, { status: next.status, headers: next.headers ?? {} });
 };
 
 /** A fake at the wire: it keeps what it is sent and answers each attempt in turn. */
@@ -408,6 +417,20 @@ describe("a model call's attempts", () => {
     expect(waits).toEqual([2000, 8000]);
   });
 
+  it("fails a 200 whose body is lost, once", async () => {
+    const wire = theWire({ droppedAfter: 200 }, ANSWERED);
+
+    expect(await calling(wire)).toEqual({ outcome: "failed", spent: [NOTHING_SPENT] });
+    expect(wire.sent).toHaveLength(1);
+  });
+
+  it("tries an overload whose body is lost again", async () => {
+    const wire = theWire({ droppedAfter: 529 }, ANSWERED);
+
+    expect((await calling(wire)).outcome).toBe("answered");
+    expect(wire.sent).toHaveLength(2);
+  });
+
   it("tries a provider timeout again", async () => {
     const wire = theWire({ status: 504, body: errorReply("timeout_error", "Timed out") }, ANSWERED);
 
@@ -503,6 +526,7 @@ describe("what a model call logs", () => {
     expect(await reads({ status: 200, body: reply('{"fits":[]}', "max_tokens") })).toEqual([
       [200, "cut-off"],
     ]);
+    expect(await reads({ droppedAfter: 200 })).toEqual([[200, "failed"]]);
     expect(await reads("unreachable", OVERLOADED, ANSWERED)).toEqual([
       [null, "unavailable"],
       [529, "unavailable"],
@@ -705,15 +729,21 @@ describe("setting a model choice", () => {
     expect(await choicesOf(workspaceId)).toEqual([]);
   });
 
+  it("refuses local, which no price can name", async () => {
+    const { workspaceId } = await aWorkspace(undefined, false);
+
+    expect(await choosing(workspaceId, "local", "clef-flash")).toEqual({
+      ok: false,
+      error: "no-sub-processor",
+    });
+    expect(await choiceEventsOf(workspaceId)).toEqual([]);
+  });
+
   it("refuses a model with no price in effect today", async () => {
     await priced("anthropic", "claude-haiku-5-5", "2026-10-16");
     const { workspaceId } = await aWorkspace(undefined, false);
 
     expect(await choosing(workspaceId, "anthropic", "claude-haiku-5-5")).toEqual({
-      ok: false,
-      error: "no-model-price",
-    });
-    expect(await choosing(workspaceId, "local", "clef-flash")).toEqual({
       ok: false,
       error: "no-model-price",
     });

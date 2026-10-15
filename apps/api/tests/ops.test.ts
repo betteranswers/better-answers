@@ -3221,7 +3221,21 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 9,
         lines: [
-          "set-model-choice: REFUSED — no-sub-processor: openai is no sub-processor the DPIA names (anthropic · mistral · local); nothing changed",
+          "set-model-choice: REFUSED — no-sub-processor: openai is no model provider the DPIA names as a sub-processor (anthropic · mistral); nothing changed",
+        ],
+      });
+      expect(await choicesHeld(app(), workspaceId)).toEqual([]);
+    });
+
+    it("refuses local, which no price can name", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await choosing(app(), workspaceId, "local");
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 9,
+        lines: [
+          "set-model-choice: REFUSED — no-sub-processor: local is no model provider the DPIA names as a sub-processor (anthropic · mistral); nothing changed",
         ],
       });
       expect(await choicesHeld(app(), workspaceId)).toEqual([]);
@@ -3284,7 +3298,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
       expect(await choicesHeld(app(), workspaceId)).toEqual([]);
       expect(help.lines.join("\n")).toContain(
-        "set-model-choice --workspace <id> --purpose <extraction|enrichment|answering|judging> --provider <anthropic|mistral|local> --model <model>",
+        "set-model-choice --workspace <id> --purpose <extraction|enrichment|answering|judging> --provider <anthropic|mistral> --model <model>",
       );
     });
   });

@@ -28,7 +28,7 @@ export {
 export type { ModelAttemptLine, ModelCall, ModelToCall } from "./client.ts";
 export { openCredentials, openModelKeySetting } from "./credentials.ts";
 export type { Credentials, ModelKeySetting } from "./credentials.ts";
-export { SUB_PROCESSORS } from "./sub-processors.ts";
+export { CHOOSABLE_PROVIDERS, SUB_PROCESSORS } from "./sub-processors.ts";
 export { checkTypedText } from "./typed-text.ts";
 export {
   RESERVATION_LIFETIME_MS,
@@ -56,7 +56,8 @@ export type WorkspaceModelChoice = {
   readonly retentionTail: string | null;
 };
 
-const FIXED_PURPOSE: LlmPurpose = "embedding";
+/** The index's vectors are this model's, which another could not read, so its choice is fixed. */
+export const FIXED_PURPOSE: LlmPurpose = "embedding";
 
 type ModelChoiceRow = {
   readonly purpose: string;

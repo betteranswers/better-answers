@@ -182,6 +182,9 @@ const answerOf = <T>(
   return parsed === undefined ? undefined : { answer: parsed };
 };
 
+const lostTo = (signal: AbortSignal, otherwise: AttemptRead): AttemptRead =>
+  signal.aborted ? { read: "timed-out" } : otherwise;
+
 const spentBy = (tried: Attempted, answered: boolean): CallSpent => ({
   ...("spent" in tried.read ? tried.read.spent : NO_TOKENS),
   seconds: tried.seconds,
@@ -192,27 +195,29 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
   const wait = doors.wait ?? waitFor;
   const timeout = doors.timeout ?? ((ms: number) => AbortSignal.timeout(ms));
 
+  const secondsSince = (started: number): number =>
+    (doors.clock.now().getTime() - started) / MS_PER_SECOND;
+
   const attemptOnce = async (shape: WireShape, request: MessagesRequest): Promise<Attempted> => {
     const started = doors.clock.now().getTime();
     const signal = timeout(ATTEMPT_TIMEOUT_MS);
     const { url, ...init } = request;
-    const replied = await attempt(async () => {
-      const response = await doors.fetch(url, { ...init, signal });
-      return {
-        status: response.status,
-        text: await response.text(),
-        retryAfter: response.headers.get("retry-after"),
-        requestId: response.headers.get("request-id"),
-      };
-    });
-    const seconds = (doors.clock.now().getTime() - started) / MS_PER_SECOND;
-    if (replied.ok) {
-      const { status, text, retryAfter, requestId } = replied.value;
-      return { read: shape.read(status, text, retryAfter), status, requestId, seconds };
+    const replied = await attempt(() => doors.fetch(url, { ...init, signal }));
+    if (!replied.ok) {
+      // A failed connection may be tried again; a timed-out one may have been billed, so it is not.
+      const read = lostTo(signal, { read: "unavailable" });
+      return { read, status: null, requestId: null, seconds: secondsSince(started) };
     }
-    // A failed connection may be tried again; a timed-out one may have been billed, so it is not.
-    const read: AttemptRead = signal.aborted ? { read: "timed-out" } : { read: "unavailable" };
-    return { read, status: null, requestId: null, seconds };
+    const response = replied.value;
+    const body = await attempt(() => response.text());
+    const { status } = response;
+    const retryAfter = response.headers.get("retry-after");
+    // A body lost after its status is read by the status alone, so a billed 200 is not tried again.
+    const read = body.ok
+      ? shape.read(status, body.value, retryAfter)
+      : lostTo(signal, shape.read(status, "", retryAfter));
+    const requestId = response.headers.get("request-id");
+    return { read, status, requestId, seconds: secondsSince(started) };
   };
 
   const logged = (to: ModelToCall, attempted: number, tried: Attempted): void => {

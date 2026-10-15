@@ -14,10 +14,11 @@ import {
   type Result,
 } from "../kernel/index.ts";
 import {
+  CHOOSABLE_PROVIDERS,
+  FIXED_PURPOSE,
   LLM_PURPOSES,
   pricedProviderOn,
   storeModelChoice,
-  SUB_PROCESSORS,
   type ModelChoiceStored,
 } from "../llm/index.ts";
 import { type PostgresDoor, withScope } from "../store/postgres/index.ts";
@@ -37,9 +38,6 @@ const named = z.object({
   provider: z.string().regex(MODEL_NAME),
   model: z.string().regex(MODEL_NAME),
 });
-
-/** Embedding sets the index's vectors, which another model could not read, so it is not chosen. */
-const FIXED_PURPOSE = "embedding";
 
 type SetModelChoiceInput = {
   readonly workspaceId: string;
@@ -68,7 +66,7 @@ export const setModelChoice = async (
   if (!asked.success) return err(MALFORMED);
   const { workspaceId, purpose, provider, model } = asked.data;
   if (purpose === FIXED_PURPOSE) return err("fixed-model-choice");
-  if (!SUB_PROCESSORS.has(provider)) return err("no-sub-processor");
+  if (!CHOOSABLE_PROVIDERS.has(provider)) return err("no-sub-processor");
 
   const set = await attempt(() =>
     withScope(

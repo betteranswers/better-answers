@@ -34,7 +34,12 @@ import {
   type RefusalClass,
   type Result,
 } from "@better-answers/core/kernel";
-import { LLM_PURPOSES, SUB_PROCESSORS, type ModelKeySetting } from "@better-answers/core/llm";
+import {
+  CHOOSABLE_PROVIDERS,
+  FIXED_PURPOSE,
+  LLM_PURPOSES,
+  type ModelKeySetting,
+} from "@better-answers/core/llm";
 import {
   ensureTestWorkspace,
   INVENTED_MEMBERS,
@@ -214,7 +219,7 @@ const WAIT_SECONDS = 120;
 const WAIT_POLL_MS = 2_000;
 
 /** The embedding model is fixed, so it is never offered. */
-const CHOSEN_PURPOSES = LLM_PURPOSES.filter((purpose) => purpose !== "embedding");
+const CHOSEN_PURPOSES = LLM_PURPOSES.filter((purpose) => purpose !== FIXED_PURPOSE);
 
 const USAGE_TEXT = `usage: pnpm ops <command> [options]
   replay-erasures --since <dump stamp | ISO instant>      re-apply every erasure completed after a dump (mandatory in every restore)
@@ -247,7 +252,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   set-model-key --workspace <id> --provider <${MODEL_PROVIDERS.join("|")}>
                                                             stdin: the workspace's key for that model provider, sealed and never printed; a second run replaces it
   set-spending-limit --workspace <id> --gbp <pounds>        the most the workspace's model calls may spend each calendar month; a second run replaces it, and with none set no model is called
-  set-model-choice --workspace <id> --purpose <${CHOSEN_PURPOSES.join("|")}> --provider <${[...SUB_PROCESSORS.keys()].join("|")}> --model <model>
+  set-model-choice --workspace <id> --purpose <${CHOSEN_PURPOSES.join("|")}> --provider <${[...CHOOSABLE_PROVIDERS].join("|")}> --model <model>
                                                             the model the workspace calls for that purpose, priced and named by the DPIA; a second run replaces it
   set-model-price --provider <${MODEL_PROVIDERS.join("|")}> --model <model> --from <yyyy-mm-dd> --gbp-per-million-in <pounds> --gbp-per-million-out <pounds>
                                                             what a model costs from that day on, per million tokens sent and returned; a model with no price is never called
@@ -1455,7 +1460,7 @@ const modelChoiceReason = (
     case "fixed-model-choice":
       return "fixed-model-choice: the embedding model is fixed, since the index's vectors are its own; nothing changed";
     case "no-sub-processor":
-      return `no-sub-processor: ${asked.provider} is no sub-processor the DPIA names (${[...SUB_PROCESSORS.keys()].join(" · ")}); nothing changed`;
+      return `no-sub-processor: ${asked.provider} is no model provider the DPIA names as a sub-processor (${[...CHOOSABLE_PROVIDERS].join(" · ")}); nothing changed`;
     case "no-model-price":
       return `no-model-price: ${asked.provider} ${asked.model} has no price in effect today; set one with set-model-price first; nothing changed`;
   }
