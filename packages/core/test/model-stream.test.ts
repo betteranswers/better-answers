@@ -91,6 +91,28 @@ const OVERLOADED: Answering = () =>
 
 const PIECES = ["Audit logs are kept", " for thirteen months.[^1]\n"];
 
+const ANSWERED_WHOLE = {
+  outcome: "answered",
+  spent: [{ tokensIn: 2_100, tokensOut: 140, seconds: 0, outcome: "succeeded" }],
+};
+
+/** Cut off after sending and before any reply, it counts at the size reserved for it. */
+const CUT_AT_FULL_SIZE = {
+  outcome: "failed",
+  spent: [{ tokensIn: 40_000, tokensOut: 16_000, seconds: 0, outcome: "failed" }],
+};
+
+const NOTHING_SPENT = [{ tokensIn: 0, tokensOut: 0, seconds: 0, outcome: "failed" }];
+
+/** As `fetch` meets an aborted signal; `leaving`, when given, aborts as the request goes out. */
+const endedOnAbort =
+  (leaving?: AbortController): Answering =>
+  async (signal) => {
+    leaving?.abort();
+    if (signal?.aborted === true) throw new DOMException("aborted", "AbortError");
+    return new Response("", { status: 500 });
+  };
+
 /** Its input as the reply opened with it, and its output at the size reserved, never counted. */
 const FAILED_AT_FULL_SIZE = {
   outcome: "failed",
@@ -131,10 +153,7 @@ describe("the streamed Messages shape", () => {
     const { texts, ended } = await drained(wire);
 
     expect(texts).toEqual(PIECES);
-    expect(ended).toEqual({
-      outcome: "answered",
-      spent: [{ tokensIn: 2_100, tokensOut: 140, seconds: 0, outcome: "succeeded" }],
-    });
+    expect(ended).toEqual(ANSWERED_WHOLE);
   });
 
   it("reads events each split across chunks of the wire", async () => {
@@ -147,10 +166,7 @@ describe("the streamed Messages shape", () => {
     const { texts, ended } = await drained(wire);
 
     expect(texts).toEqual(PIECES);
-    expect(ended).toEqual({
-      outcome: "answered",
-      spent: [{ tokensIn: 2_100, tokensOut: 140, seconds: 0, outcome: "succeeded" }],
-    });
+    expect(ended).toEqual(ANSWERED_WHOLE);
   });
 
   it("keeps a character whole across a chunk's edge", async () => {
@@ -403,61 +419,41 @@ describe("a caller's abort", () => {
 
   it("settles a judge's request it ended at the reserved size", async () => {
     const leaving = new AbortController();
-    const wire = theWire(async (signal) => {
-      leaving.abort();
-      if (signal?.aborted === true) throw new DOMException("aborted", "AbortError");
-      return new Response("", { status: 500 });
-    });
+    const wire = theWire(endedOnAbort(leaving));
     const { doors, lines } = doorsOn(wire);
 
     const ended = await judgedUntil(doors, leaving.signal);
 
-    expect(ended).toEqual({
-      outcome: "failed",
-      spent: [{ tokensIn: 40_000, tokensOut: 16_000, seconds: 0, outcome: "failed" }],
-    });
+    expect(ended).toEqual(CUT_AT_FULL_SIZE);
     expect(wire.sent).toHaveLength(1);
     expect(lines.map(({ read }) => read)).toEqual(["abandoned"]);
   });
 
   it("settles a stream ended before replying at its reserved size", async () => {
     const leaving = new AbortController();
-    const wire = theWire(async (signal) => {
-      leaving.abort();
-      if (signal?.aborted === true) throw new DOMException("aborted", "AbortError");
-      return new Response("", { status: 500 });
-    });
+    const wire = theWire(endedOnAbort(leaving));
 
     const { ended, lines } = await drained(wire, { ...A_CALL, signal: leaving.signal });
 
-    expect(ended).toEqual({
-      outcome: "failed",
-      spent: [{ tokensIn: 40_000, tokensOut: 16_000, seconds: 0, outcome: "failed" }],
-    });
+    expect(ended).toEqual(CUT_AT_FULL_SIZE);
     expect(lines.map(({ read }) => read)).toEqual(["abandoned"]);
   });
 
   it("settles a stream ended before it was sent at nothing", async () => {
-    const wire = theWire(async (signal) => {
-      if (signal?.aborted === true) throw new DOMException("aborted", "AbortError");
-      return new Response("", { status: 500 });
-    });
+    const wire = theWire(endedOnAbort());
 
     const { ended } = await drained(wire, { ...A_CALL, signal: AbortSignal.abort() });
 
-    expect(ended.spent).toEqual([{ tokensIn: 0, tokensOut: 0, seconds: 0, outcome: "failed" }]);
+    expect(ended.spent).toEqual(NOTHING_SPENT);
   });
 
   it("settles a request ended before it was sent at nothing", async () => {
-    const wire = theWire(async (signal) => {
-      if (signal?.aborted === true) throw new DOMException("aborted", "AbortError");
-      return new Response("", { status: 500 });
-    });
+    const wire = theWire(endedOnAbort());
     const { doors } = doorsOn(wire);
 
     const ended = await judgedUntil(doors, AbortSignal.abort());
 
-    expect(ended.spent).toEqual([{ tokensIn: 0, tokensOut: 0, seconds: 0, outcome: "failed" }]);
+    expect(ended.spent).toEqual(NOTHING_SPENT);
   });
 
   it("makes no attempt after an abort during its wait", async () => {
