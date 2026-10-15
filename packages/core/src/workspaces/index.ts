@@ -125,6 +125,7 @@ export type { CredentialsHeld, SecondFactorHeld } from "./second-factor.ts";
 export { promoting } from "./promotion.ts";
 export { judgeTheSession } from "./session-standing.ts";
 export type { SessionNamed, SessionStanding } from "./session-standing.ts";
+export { endOneSession, endOneSessionInput, endOtherSessions, readSessions } from "./sessions.ts";
 export {
   recordConsent,
   recordSignIn,

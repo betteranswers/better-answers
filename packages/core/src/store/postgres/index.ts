@@ -427,6 +427,9 @@ export const withIdentityRead = async <T>(
   work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
 ): Promise<T> => transaction(door, (tx) => work(tx, platform), answersARefusal, "BEGIN READ ONLY");
 
+/** How long a last-active stamp stands before a request writes it again. */
+const STAMP_STANDS_FOR = "interval '1 hour'";
+
 const MEMBER_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS person_revoked_at,
             m.credentials_revoked_at AS member_revoked_at,
             COALESCE((SELECT array_agg(gm.group_id ORDER BY gm.group_id)
@@ -434,7 +437,10 @@ const MEMBER_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS person_
                        WHERE gm.workspace_id = m.workspace_id AND gm.user_id = m.user_id),
                      '{}') AS group_ids,
             (SELECT s.second_factor_confirmed_at FROM session s
-              WHERE s.id = $3 AND s.user_id = m.user_id) AS "confirmedAt"
+              WHERE s.id = $3 AND s.user_id = m.user_id) AS "confirmedAt",
+            COALESCE((SELECT l.at < now() - ${STAMP_STANDS_FOR} FROM workspace_last_active l
+                       WHERE l.workspace_id = m.workspace_id AND l.user_id = m.user_id),
+                     true) AS "lastActiveStale"
      FROM member m
      JOIN "user" u ON u.id = m.user_id
     WHERE m.workspace_id = $1 AND m.user_id = $2`;
@@ -455,6 +461,34 @@ type MemberRow = {
 
   /** The named session's confirmation, read beside the rows; null where the claims name none. */
   readonly confirmedAt: Date | null;
+
+  /** Read beside the rows, so a request within the hour opens no second transaction. */
+  readonly lastActiveStale: boolean;
+};
+
+/** For a member still here: a removal that landed since the read leaves no row behind. */
+const STAMP = `INSERT INTO workspace_last_active (workspace_id, user_id, at)
+       SELECT $1, $2, now()
+        WHERE EXISTS (SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2)
+           ON CONFLICT (workspace_id, user_id)
+           DO UPDATE SET at = now()
+            WHERE workspace_last_active.at < now() - ${STAMP_STANDS_FOR}`;
+
+/** One conditional write in its own scoped transaction, never waiting on a held row. */
+const stampLastActive = async (
+  door: PostgresDoor,
+  workspaceId: string,
+  userId: string,
+): Promise<void> => {
+  try {
+    await transaction(door, async (tx) => {
+      await scopeTo(tx, workspaceId);
+      await tx.query("SET LOCAL lock_timeout = '50ms'");
+      await tx.query(STAMP, [workspaceId, userId]);
+    });
+  } catch {
+    // The request is already answered, and the next one past the hour stamps again.
+  }
 };
 
 const resolveClaims = async <T>(
@@ -470,7 +504,9 @@ const resolveClaims = async <T>(
 
   const credentialIssuedAtMs = claims.issuedAt.getTime();
 
-  return resolveScoped(
+  // A holder, not a `let`: the closure's assignment is invisible to the narrowing at the check below.
+  const seen = { lastActiveStale: false };
+  const opened = await resolveScoped(
     door,
     workspaceId.data,
     userId.data,
@@ -480,6 +516,7 @@ const resolveClaims = async <T>(
       const refusal = refuse(row, credentialIssuedAtMs);
       if (!refusal.ok) return refusal;
 
+      seen.lastActiveStale = refusal.value.lastActiveStale;
       const resolved: ResolvedMember = {
         ...refusal.value,
         confirmedAtMs: refusal.value.confirmedAt?.getTime() ?? null,
@@ -492,6 +529,10 @@ const resolveClaims = async <T>(
     query,
     opening,
   );
+  if (opened.ok && seen.lastActiveStale) {
+    await stampLastActive(door, workspaceId.data, userId.data);
+  }
+  return opened;
 };
 
 /**
@@ -505,7 +546,10 @@ export const withPrincipal = async <T>(
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
 ): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBER_QUERY, "BEGIN");
 
-/** As withPrincipal, but read-only: a write inside the work fails at its own statement. */
+/**
+ * As withPrincipal, but read-only: a write inside the work fails at its own statement. A stale
+ * last-active stamp is still written, in a transaction of its own after this one.
+ */
 export const withPrincipalRead = async <T>(
   door: PostgresDoor,
   claims: Claims,
@@ -514,7 +558,8 @@ export const withPrincipalRead = async <T>(
 
 /**
  * As withPrincipal, but the member and user rows stay held until commit, so a revocation cannot
- * land between the read and the commit.
+ * land between the read and the commit. The last-active stamp lands only once this transaction
+ * has released them.
  */
 export const withHeldPrincipal = async <T>(
   door: PostgresDoor,

@@ -100,7 +100,10 @@ describe("what a procedure may answer the wire", () => {
       "person.replaceRecoveryCodes",
       "person.requestAccess",
       "person.secondFactor",
+      "person.sessions",
       "person.setDisplayName",
+      "person.signOutOtherSessions",
+      "person.signOutSession",
       "person.workspaces",
       "questions.asked",
       "questions.closeFlag",
@@ -128,6 +131,9 @@ describe("what a procedure may answer the wire", () => {
       | "person.workspaces"
       | "person.acceptInvitation"
       | "person.secondFactor"
+      | "person.sessions"
+      | "person.signOutOtherSessions"
+      | "person.signOutSession"
       | "person.renamePasskey"
       | "person.removePasskey"
       | "person.dismissPasskeyOffer"

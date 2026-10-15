@@ -69,6 +69,7 @@ export const STORED_ACT_NAMES = [
   "platform.model.priced",
   "knowledge.feedback.closed",
   "platform.workspace.model_choice_set",
+  "people.person.sessions_ended",
 ] as const;
 
 /**
@@ -137,6 +138,7 @@ export const STORED_DETAIL_KEYS = {
   findingsSpecialCategory: "findingsSpecialCategory",
   matched: "matched",
   family: "family",
+  sessions: "sessions",
   eventCount: "eventCount",
   capped: "capped",
   searchTooBroad: "searchTooBroad",

@@ -145,7 +145,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "workspaces",
     access: "read and write",
     reason:
-      "Revoking everywhere ends every browser session created before the instant, in the same transaction that wrote it; the operator's inspection of a person reads when each of their sessions began, was last extended and ends.",
+      "Revoking everywhere ends every browser session created before the instant, in the same transaction that wrote it; a person signs their own sessions out, each ending recorded in the identity set; the person's own read and the operator's inspection of a person name each session's device and when it began, was last extended and ends — never the address one came from.",
   },
   {
     table: "public.oauth_refresh_token",
@@ -299,6 +299,13 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "read and write",
     reason:
       "When the person was last active here is this workspace's record of them, so every erasure from it deletes only that row under the workspace's scope. The erasure map reads it first, so an access answer names it.",
+  },
+  {
+    table: "public.workspace_last_active",
+    by: POSTGRES_DOOR,
+    access: "read and write",
+    reason:
+      "The claims resolution reads whether the member's last-active row here is an hour old, in the claims transaction, and stamps it only then, one conditional write in its own short transaction under that workspace's scope, so every door — the tRPC roads and the MCP surface alike — counts a use; a removal or an erasure deletes the row through the members slice that owns it.",
   },
   {
     table: "public.question_asked",

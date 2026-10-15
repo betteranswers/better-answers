@@ -87,6 +87,7 @@ const VALUE_LABELS = new Map(
     gbpPerMillionOut: "£ per Million Tokens Out",
     grants: "Access ended",
     closedAs: "Closed as",
+    sessions: "Sessions signed out",
   }),
 );
 
@@ -164,11 +165,13 @@ const namedLine = (key: string, label: string, named: NamedOrList): DetailLine =
     ? { key, label, value: named.map((one) => saidOf(one).value).join(", ") }
     : { key, label, ...saidOf(named) };
 
-/** A list is the assistant access an action ended, each named by its assistant. */
+/** A list is the assistant access or the sessions an action ended, each named by what it is. */
 const wordsOfValue = (value: DetailValue): string => {
   if (Array.isArray(value)) {
-    const assistants = value.map((grant) => grant["clientName"] ?? grant["clientId"] ?? "");
-    return assistants.length === 0 ? "none" : assistants.join(", ");
+    const named = value.map(
+      (entry) => entry["device"] ?? entry["clientName"] ?? entry["clientId"] ?? "",
+    );
+    return named.length === 0 ? "none" : named.join(", ");
   }
   if (typeof value === "boolean") return value ? "Yes" : "No";
   return VALUE_WORDS.get(value) ?? String(value);

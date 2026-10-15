@@ -41,6 +41,15 @@ export const endedGrant = z.strictObject({
 
 export type EndedGrant = z.output<typeof endedGrant>;
 
+/** A browser session an action ended: its id, its device and when it was last active. */
+const endedSession = z.strictObject({
+  sessionId: z.string().regex(ULID),
+  device: z.string().min(1),
+  lastActiveAt: z.iso.datetime(),
+});
+
+export type EndedSession = z.output<typeof endedSession>;
+
 /** A person or group a search found, by id alone: a typed name or address is never stored. */
 const MATCHED_KINDS = ["person", "group"] as const;
 
@@ -89,6 +98,7 @@ export const DETAIL_KINDS = {
   audience: (value: DetailValue) =>
     typeof value === "string" && AUDIENCES.some((word) => word === value),
   grants: (value: DetailValue) => z.array(endedGrant).safeParse(value).success,
+  sessions: (value: DetailValue) => z.array(endedSession).safeParse(value).success,
   signInMethod: (value: DetailValue) =>
     typeof value === "string" && SIGN_IN_METHODS.some((method) => method === value),
   secondFactor: (value: DetailValue) =>
@@ -124,19 +134,21 @@ type DetailValueOf<K extends DetailKind> = K extends "role"
       ? number
       : K extends "grants"
         ? readonly EndedGrant[]
-        : K extends "signInMethod"
-          ? SignInMethod
-          : K extends "secondFactor"
-            ? SecondFactor
-            : K extends "family?"
-              ? Family
-              : K extends "matched"
-                ? readonly Matched[]
-                : K extends "modelProvider"
-                  ? ModelProvider
-                  : K extends "flagClosing"
-                    ? FlagClosing
-                    : string;
+        : K extends "sessions"
+          ? readonly EndedSession[]
+          : K extends "signInMethod"
+            ? SignInMethod
+            : K extends "secondFactor"
+              ? SecondFactor
+              : K extends "family?"
+                ? Family
+                : K extends "matched"
+                  ? readonly Matched[]
+                  : K extends "modelProvider"
+                    ? ModelProvider
+                    : K extends "flagClosing"
+                      ? FlagClosing
+                      : string;
 
 export type DetailOf<Shape extends DetailShape> = {
   readonly [

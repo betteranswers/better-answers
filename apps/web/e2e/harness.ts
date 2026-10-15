@@ -233,6 +233,24 @@ export const claudeExchanges = async (
   return { refreshToken: tokens.refresh_token };
 };
 
+/** Claude refreshing its grant, as a connected assistant does; answers the new refresh token. */
+export const claudeRefreshes = async (
+  api: APIRequestContext,
+  asked: { readonly origin: string; readonly refreshToken: string },
+): Promise<{ readonly refreshToken: string }> => {
+  const refreshed = await api.post("/oauth2/token", {
+    form: {
+      ...CLAUDE,
+      resource: `${asked.origin}/mcp`,
+      grant_type: "refresh_token",
+      refresh_token: asked.refreshToken,
+    },
+  });
+  expect(refreshed.ok(), `the refresh answered ${refreshed.status()}`).toBe(true);
+  const tokens = z.object({ refresh_token: z.string() }).parse(await refreshed.json());
+  return { refreshToken: tokens.refresh_token };
+};
+
 /** Claude revokes its own grant at the authorization server, as disconnecting it does. */
 export const claudeDisconnects = async (
   api: APIRequestContext,
@@ -519,6 +537,23 @@ export const emailsSentTo = async (api: APIRequestContext, email: string): Promi
   return emailsCounted.parse(await counted.json()).sent;
 };
 
+const aSessionSeeded = z.object({ sessionId: z.string() });
+
+/** One more session on the person, as a second device leaves it, without a sign-in code. */
+export const aSessionOn = async (
+  api: APIRequestContext,
+  personId: string,
+  userAgent?: string,
+): Promise<string> => {
+  const asked = await ask(
+    api,
+    "/sessions",
+    { userId: personId, ...(userAgent === undefined ? {} : { userAgent }) },
+    aSessionSeeded,
+  );
+  return asked.sessionId;
+};
+
 /** Timestamped and randomised, so a code read back for it is this test's alone. */
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
@@ -649,4 +684,29 @@ export const signedInWithNoWorkspace = async (page: Page, api: APIRequestContext
   await signIn(page, api, email);
   await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
   return signedIn;
+};
+
+/** The first matching call reaches the api and its answer is held until released; later calls answer at once. */
+export const holdingTheFirstAnswer = async (
+  page: Page,
+  matches: (url: URL) => boolean,
+): Promise<{
+  readonly reached: Promise<void>;
+  readonly release: () => void;
+  readonly asked: () => number;
+}> => {
+  const reached = Promise.withResolvers<void>();
+  const released = Promise.withResolvers<void>();
+  let asked = 0;
+  await page.route(matches, async (route) => {
+    asked += 1;
+    const first = asked === 1;
+    const response = await route.fetch();
+    if (first) {
+      reached.resolve();
+      await released.promise;
+    }
+    await route.fulfill({ response });
+  });
+  return { reached: reached.promise, release: released.resolve, asked: () => asked };
 };

@@ -34,9 +34,27 @@ export type Landing =
   | "recovery-codes"
   | "passkeys"
   | "add-a-passkey"
-  | `passkey:${string}`;
+  | "sessions"
+  | `passkey:${string}`
+  | `session:${string}`;
 
 export type LandsAt = (landing: Landing) => (node: HTMLElement | null) => void;
+
+/** A node an action brings in takes focus as it mounts; one already there, as its result redraws it. */
+export const useLanding = (first: Landing | undefined) => {
+  const awaited = useRef<Landing | undefined>(first);
+  const at: LandsAt = (landing) => (node) => {
+    if (node === null || awaited.current !== landing) return;
+    awaited.current = undefined;
+    node.focus();
+  };
+  return {
+    at,
+    expect: (landing: Landing | undefined) => {
+      awaited.current = landing;
+    },
+  };
+};
 
 /** A child, so only a button given a keystroke listens for one. */
 function ActionKeystroke(properties: {

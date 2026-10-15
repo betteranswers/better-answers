@@ -315,3 +315,21 @@ export const whileWritesAreRefused = async <T>(
     await pool.query("DROP FUNCTION test_refuse_write()");
   }
 };
+
+/** Holds the rows `select` names, from a connection of its own, while `work` runs; then lets them go. */
+export const holdingRows = async <T>(
+  pool: pg.Pool,
+  select: string,
+  parameters: readonly unknown[],
+  work: () => Promise<T>,
+): Promise<T> => {
+  const holder = await pool.connect();
+  try {
+    await holder.query("BEGIN");
+    await holder.query(select, [...parameters]);
+    return await work();
+  } finally {
+    await holder.query("ROLLBACK");
+    holder.release();
+  }
+};
