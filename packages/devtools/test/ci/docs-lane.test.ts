@@ -228,9 +228,7 @@ describe("which paths reach which lane", () => {
 describe("which lane a change runs in", () => {
   it("takes the docs lane when every changed path is markdown", () => {
     expect(laneOf(["docs/adr/0043-what-an-action-is.md"])).toEqual("docs");
-    expect(laneOf(["docs/specs/T-121.md", "CONCEPTS.md", "apps/web/CODING_STANDARDS.md"])).toEqual(
-      "docs",
-    );
+    expect(laneOf(["docs/specs/T-121.md", "CONCEPTS.md", "apps/web/AGENTS.md"])).toEqual("docs");
     expect(laneOf(["docs/specs/old-name.md", "docs/specs/new-name.md"])).toEqual("docs");
   });
 
@@ -412,18 +410,6 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     file: "packages/devtools/test/ci/provision-skills.test.ts",
     reads:
       "packages/design-system/SKILL.md through its symlink, and which of the pixel-perfect plugin's files git tracks",
-    inTheLane: "check:docs:devtools",
-  },
-  {
-    file: "packages/devtools/test/ci/session-retro-skill.test.ts",
-    reads:
-      ".claude/skills/session-retro/SKILL.md and its reference, every path they name, and the made-up session logs under fixtures/session-retro/",
-    inTheLane: "check:docs:devtools",
-  },
-  {
-    file: "packages/devtools/test/ci/survey-architecture-skill.test.ts",
-    reads:
-      ".claude/skills/survey-architecture/SKILL.md and its two references, and every path they name",
     inTheLane: "check:docs:devtools",
   },
   {
