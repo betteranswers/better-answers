@@ -278,7 +278,6 @@ describe("the sweep when jdocmunch-mcp refuses the refresh", () => {
 
 const jdocmunchInstalled = spawnSync("jdocmunch-mcp", ["--version"]).status === 0;
 
-/** Real jdocmunch-mcp over a private store, which no watcher watches: an outage by construction. */
 describe.skipIf(!jdocmunchInstalled)("the sweep after docs change through git unwatched", () => {
   const indexSchema = z.object({ sections: z.array(z.object({ title: z.string() })) });
   const titles = (store: string, name: string): string[] =>

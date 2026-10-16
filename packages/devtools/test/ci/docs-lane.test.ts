@@ -70,7 +70,6 @@ type LaneCase = {
 
   readonly images: string;
 
-  /** Names the change in the test's title; `because` holds the reason, printed on failure. */
   readonly diff: string;
 
   readonly because: string;
@@ -321,7 +320,6 @@ const copiedBy = (leg: ImageLeg): readonly string[] =>
 const aChangeTo = (copied: string): string =>
   statSync(path.join(repositoryRoot, copied)).isDirectory() ? `${copied}/a-changed-file` : copied;
 
-/** Copied into an image as it stands; the suites read it on every run and build.yml probes the image. */
 const COPIED_SOURCE: readonly string[] = [
   "apps/api/src",
   "apps/web",
@@ -576,7 +574,6 @@ const NARROWED: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-/** A workspace whose suite is sharded runs its check as the steps it names, each a root script. */
 const RUN_BY_STEP: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   "packages/core": { typecheck: "check:core:typecheck", test: "check:core:suite" },
   "apps/web": { typecheck: "check:web:typecheck", test: "check:web:test", e2e: "check:web:e2e" },
@@ -597,7 +594,6 @@ const manifestAt = (directory: string): { readonly name: string; readonly check:
 const wholeGateOf = (gate: string): string =>
   Object.entries(NARROWED).find(([, parts]) => parts.includes(gate))?.[0] ?? gate;
 
-/** The lane that runs the root check's gates. The docs lane runs the prose suites, held above. */
 const CODE_LANE = "full";
 
 const A_BASE = "0123456789abcdef0123456789abcdef01234567";
@@ -793,7 +789,6 @@ const stub = (bin: string, name: string, script: string): void => {
 
 const EXPRESSION = /^\$\{\{ (?<path>[\w.]+) \}\}$/;
 
-/** The step's `env:` as GitHub expands it over `github`, refusing any expression but one path. */
 const laneStepEnv = (github: Context): Readonly<Record<string, string>> =>
   Object.fromEntries(
     Object.entries(laneStep()?.env ?? {}).map(([name, value]) => {
@@ -1308,7 +1303,6 @@ describe("the pull request's title, read by check.yml", () => {
       .object({ version: z.string() })
       .parse(JSON.parse(read(path.join("node_modules", name, "package.json")))).version;
 
-  /** The installed commitlint, run in dlx's place so the test never reaches the registry. */
   const offlineDlx = (): string => {
     const asked = COMMITLINT.map((name) => `--package=${name}@${installedVersion(name)}`);
     const installed = path.join(repositoryRoot, "node_modules", ".bin", "commitlint");

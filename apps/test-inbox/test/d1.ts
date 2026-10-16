@@ -16,7 +16,6 @@ const rowOf = (row: Readonly<Record<string, SQLOutputValue>>): Row =>
 
 export type D1StandIn = {
   readonly database: Database;
-  /** Every statement run or read, in order, so a suite can tell that a request touched nothing. */
   readonly ran: readonly string[];
   /** Deletes one row outside the store, as a prune deletes the row a reader's cursor names. */
   readonly forget: (id: string) => void;

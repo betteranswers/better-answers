@@ -47,10 +47,6 @@ const listing = (listed: readonly Listed[]): string =>
 
 type Daemon = { readonly env: Readonly<Record<string, string>>; readonly calls: () => string[] };
 
-/**
- * A logging `docker` ahead of the real one on PATH: it refuses to remove an id starting `refused`
- * and has already lost one starting `vanished`.
- */
 const daemonAnswering = (name: string, psOutput: string, psExit = 0): Daemon => {
   const bin = path.join(scratch, `${name}-bin`);
   const canned = path.join(scratch, `${name}-ps.txt`);

@@ -17,7 +17,6 @@ const COMMENT_RULES = [
   "better-answers/string-cites-nothing",
 ];
 
-/** A rule a directive can suppress, so a used disable is told apart from an unused one. */
 const SUPPRESSIBLE = "no-console";
 
 const config = readOxlintConfig();

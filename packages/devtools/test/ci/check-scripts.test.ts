@@ -154,7 +154,6 @@ describe("the gates a branch never narrows", () => {
   });
 });
 
-/** A runner's command word, which pnpm resolves to its `.bin` shim. */
 const SHIMMED_RUNNERS: readonly string[] = ["vitest", "stryker"];
 
 const RUNNER_SCRIPTS: Readonly<Record<string, string>> = {

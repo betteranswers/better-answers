@@ -97,6 +97,8 @@ describe("the arm a file is measured under", () => {
   });
 });
 
+const OVER_THE_SOURCE_CEILING = `over the ${CEILING.source.toFixed(2)} ceiling`;
+
 describe("the ceiling over a throwaway tree", () => {
   it("names workspace, arm and ratio when an arm is over", () => {
     const over = overTheCeiling(measure(cloc(OVER), [WORKSPACE]));
@@ -106,7 +108,7 @@ describe("the ceiling over a throwaway tree", () => {
     expect(over[0]?.arm).toBe("source");
     expect(
       reportOf(over[0] ?? { workspace: "", arm: "source", code: 0, comment: 0, ratio: 0 }),
-    ).toContain("0.50 comment lines per code line, over the 0.10 ceiling");
+    ).toContain(`0.50 comment lines per code line, ${OVER_THE_SOURCE_CEILING}`);
   });
 
   it("stays silent over a tree under both ceilings", () => {
@@ -135,7 +137,7 @@ describe("the ceiling's wrapper, run as the root manifest runs it", () => {
     executable: WRAPPER_EXECUTABLE,
     argv: ["packages"],
     foundSomething: [1],
-    smoke: { tree: OVER, reports: (output) => output.includes("over the 0.10 ceiling") },
+    smoke: { tree: OVER, reports: (output) => output.includes(OVER_THE_SOURCE_CEILING) },
   });
 
   it("fails naming the workspace and ratio over the ceiling", () => {
@@ -146,7 +148,7 @@ describe("the ceiling's wrapper, run as the root manifest runs it", () => {
     const output = wrapper(OVER);
 
     expect(output).toContain(
-      "over the 0.10 ceiling. A comment stays only for a constraint outside this repository",
+      `${OVER_THE_SOURCE_CEILING}. A comment stays only for a constraint outside this repository`,
     );
     expect(output).toContain(
       "Hold any other reason in a name, a type, a test or a grant, and delete the rest.",

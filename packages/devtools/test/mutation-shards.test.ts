@@ -909,7 +909,6 @@ describe("the shards command", () => {
   });
 });
 
-/** Padded to a size, since a file's size decides its shard. */
 const sourceOf = (body: string, bytes: number): string => {
   const padding = bytes - body.length - 4;
   return `${body}// ${"x".repeat(padding)}\n`;

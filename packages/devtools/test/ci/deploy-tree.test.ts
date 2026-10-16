@@ -96,7 +96,6 @@ const postgresPinManager = () =>
       ),
     );
 
-/** Renovate's regex versioning reads these named groups; the pin's major must be Postgres's. */
 const postgresVersioning = (): ((tag: string) => Record<string, string> | undefined) => {
   const versioning = postgresPinManager()?.versioningTemplate ?? "";
   const pattern = new RegExp(versioning.replace(/^regex:/, ""));
@@ -804,7 +803,6 @@ describe("the deploy tree", () => {
     expect(releases).toContain('git push origin "refs/tags/${tag}"');
 
     const rows = releases.split("\n").filter((line) => /^\| 20\d\d-/.test(line));
-    // Nothing appends to the table again, so its last row stays the last promotion in it.
     expect(rows.at(-1)).toContain("2026-09-23T04:26:58Z");
     expect(read(".github/workflows/release.yml")).not.toContain("deploy/RELEASES.md");
 
