@@ -15,7 +15,6 @@ export const LINK_WORDS = {
   readingAgain: "Checking",
 } as const;
 
-/** Each keystroke's action, as the list of keystrokes names it. */
 export const LINK_ACTIONS = {
   copy: "Copy the Code",
   readAgain: "Check the Link Again",

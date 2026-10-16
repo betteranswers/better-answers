@@ -30,7 +30,6 @@ export const useLanding = () => {
 
 export type Landing = ReturnType<typeof useLanding>;
 
-/** Taken as the line mounts, so focus waits for the page of lines that brings it. */
 export const useLandingLine = (landsHere: boolean, onLanded: () => void) =>
   useCallback(
     (line: HTMLElement | null) => {

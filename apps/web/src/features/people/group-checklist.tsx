@@ -11,7 +11,6 @@ import { outcomeOfGroupFailure } from "./refusal.tsx";
 type Choice = {
   readonly id: string;
   readonly label: string;
-  /** A member's address, read out after the label as the box's description. */
   readonly detail: string | undefined;
   readonly checked: boolean;
 };
@@ -22,10 +21,6 @@ type Pair = {
   readonly group: string;
 };
 
-/**
- * The multi-select both sheets carry: each box puts one member in one group, or takes them out,
- * the moment it is ticked or cleared.
- */
 export function GroupChecklist(properties: {
   readonly legend: string;
   readonly hint: string;

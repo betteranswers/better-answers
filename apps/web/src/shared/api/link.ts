@@ -70,7 +70,6 @@ type ApiLinkOptions = Pick<Parameters<typeof httpBatchLink>[0], "url" | "fetch">
  */
 const BATCH_URL_CEILING = 2083;
 
-/** Answered as a stream: its result first, then prose as it is drafted. */
 const STREAMED_PATH = "ask.question";
 
 export const apiLink = ({ uploadFetch, heldWorkspace, ...options }: ApiLinkOptions) => {

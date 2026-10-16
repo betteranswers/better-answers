@@ -14,10 +14,8 @@ export type InvitationStatus = NonNullable<
   Exclude<inferInput<Api["members"]["invitations"]>, void | undefined>["status"]
 >;
 
-/** One invitation and whether its email went, as every action that sends one answers it. */
 export type SentInvitation = inferOutput<Api["members"]["resendInvitation"]>;
 
-/** What inviting answers for each address: its invitation, and whether it replaced one waiting. */
 export type InvitedOne = inferOutput<Api["members"]["invite"]>["invitations"][number];
 
 export type BulkResent = inferOutput<Api["members"]["bulkResendInvitations"]>;
@@ -35,7 +33,6 @@ export const useInvitationCounts = () => {
   return useQuery(api.members.invitationCounts.queryOptions());
 };
 
-/** One for each status's list an action took rows from. */
 type Snapshot = { readonly taken: readonly Undo[] };
 
 /** Every settled action reads each status and the counts again; an action is a line of its Admin's Activity. */

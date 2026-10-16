@@ -52,7 +52,6 @@ const REFUSED = "sign-in-refused";
 
 const TOO_MANY_REQUESTS = 429;
 
-/** What each action's failure says when refused, and when never answered. */
 type SaidOfAnAction = { readonly refused: string; readonly unanswered: string };
 
 const SAID_OF_SENDING: SaidOfAnAction = {
@@ -60,13 +59,11 @@ const SAID_OF_SENDING: SaidOfAnAction = {
   unanswered: STOCK.tryAgain,
 };
 
-/** The api may have spent the code before its answer was lost, so no one is told to send it again. */
 const saidOfSigningIn = (left: number): SaidOfAnAction => ({
   refused: codeWrong(left),
   unanswered: STOCK.unconfirmed,
 });
 
-/** One reading of a failed action, which the page's words, tries count and styling all follow. */
 type Failed =
   | { readonly kind: "unanswered" }
   | { readonly kind: "too-many"; readonly waitSeconds: number | undefined }
@@ -96,7 +93,6 @@ const failureSaid = (
   return sendFailure === null ? undefined : saidOf(SAID_OF_SENDING, sendFailure);
 };
 
-/** A ceiling's refusal says nothing of the code, so it spends none of its tries. */
 const isAWrongCode = (failure: Error | null): boolean =>
   failure !== null && failedAs(failure).kind === "refused";
 

@@ -47,7 +47,6 @@ export const membersAt = (query: string | undefined): string =>
 
 const OPENED_AT = ["member", "role", "groups", "credentials", "flag", "removal"] as const;
 
-/** Where focus lands as a member's page opens: on who they are, or on one action's control. */
 export type OpenedAt = (typeof OPENED_AT)[number];
 
 /** Asked of a member's page through its history entry: a section has no address of its own. */
@@ -58,7 +57,6 @@ export const OPENING = z.object({
   membersQuery: z.string().optional().catch(undefined),
 });
 
-/** Who was removed from their page, carried by the Members entry the removal returns to. */
 export type Removed = { readonly personId: string; readonly name: string };
 
 export const RETURNED_FROM_A_REMOVAL = z.object({

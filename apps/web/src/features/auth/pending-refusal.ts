@@ -18,7 +18,6 @@ import { rememberAChangeUnsaved } from "./session-memory.ts";
 /** The auth library answers with the word as its code, in a plain object rather than an error. */
 const refusedByTheLibrary = z.object({ code: z.literal(SECOND_FACTOR_PENDING) });
 
-/** tRPC's refusal, our own routes' and the auth library's alike. */
 const isPendingRefusal = (failure: Error): boolean =>
   refusalOf(failure)?.word === SECOND_FACTOR_PENDING ||
   (failure instanceof CodeRefused && failure.word === SECOND_FACTOR_PENDING) ||

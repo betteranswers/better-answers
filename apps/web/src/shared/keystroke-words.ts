@@ -7,5 +7,4 @@ export const KEYSTROKE_WORDS = {
   thisPage: "This Page",
 } as const;
 
-/** The list's heading, naming the page its keystrokes are for. */
 export const keystrokesOn = (page: string): string => `${KEYSTROKE_WORDS.button} on ${page}`;

@@ -34,7 +34,6 @@ function Line(properties: {
   );
 }
 
-/** One heading a day, newest first, each event a line beneath its time. */
 export function EventDays<Event extends Dated>(properties: {
   readonly events: readonly Event[];
   readonly landing: Landing;

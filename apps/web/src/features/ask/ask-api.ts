@@ -7,7 +7,6 @@ import { useTRPC, useTRPCClient, type ApiError } from "@/shared/api/trpc.ts";
 
 type Api = ReturnType<typeof useTRPC>;
 
-/** The procedure answers a stream, read here one event at a time. */
 type Streamed = inferOutput<Api["ask"]["question"]>;
 
 type AskEvent = Streamed extends AsyncIterable<infer Event> ? Event : never;
@@ -33,11 +32,9 @@ const phaseOf = (told: readonly Told[]): Phase => {
 const isTold = (event: AskEvent): event is Told => event.kind !== "keep-alive";
 
 export type Answering = {
-  /** Until the stream ends, however it ends. */
   readonly streaming: boolean;
   readonly phase: Phase;
   readonly answer: Asked<AskResult> | undefined;
-  /** Why the stream ended without its result, or partway through its prose. */
   readonly failure: Error | ApiError | undefined;
   /** Asks nothing while an answer still streams, so a second press starts no second question. */
   readonly ask: (input: AskInput) => void;

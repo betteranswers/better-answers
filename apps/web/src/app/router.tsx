@@ -148,7 +148,6 @@ const confirmedFirst = async (
   if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
 };
 
-/** The dialog every refused act's page shares, drawn beside whatever page is open. */
 function RootFrame() {
   return (
     <>
@@ -301,7 +300,6 @@ const shellRoute = createRoute({
   id: "shell",
   component: WorkspaceFrame,
   notFoundComponent: () => <UnknownPage />,
-  // The sign-in page and the picker are this route's siblings, so this never runs on them.
   beforeLoad: async ({ context, location }) => {
     const refusal = await memberRefusal(context.queryClient, context.api, sessionHeld);
     if (refusal === undefined) return;

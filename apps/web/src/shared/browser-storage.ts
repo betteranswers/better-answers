@@ -26,7 +26,6 @@ export const keepOnThisBrowser = (key: string, value: string): void => {
   kept(onThisBrowser(), key, value);
 };
 
-/** Kept by this tab alone, through a reload. */
 export const inThisTab = (): Storage | undefined => reached((browser) => browser.sessionStorage);
 
 export const keepInThisTab = (key: string, value: string): void => {

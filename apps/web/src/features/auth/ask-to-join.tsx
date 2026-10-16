@@ -62,7 +62,6 @@ function RequestSent() {
   );
 }
 
-/** The refusal's region stands empty from the first render; the sent answer is met by focus. */
 function AskOutcome(properties: {
   readonly sent: boolean;
   readonly failure: Error | ApiError | null;

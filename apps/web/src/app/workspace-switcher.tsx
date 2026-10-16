@@ -41,7 +41,6 @@ type Switching = ReturnType<typeof useSwitchWorkspace>;
 
 type ListRead = ReturnType<typeof useWorkspacesHeld>;
 
-/** A workspace as the menu lists it, with the person's role there. */
 type Listed = SwitchedTo & { readonly role: string | undefined };
 
 const switchOutcome = (switching: Switching): Outcome | undefined => {

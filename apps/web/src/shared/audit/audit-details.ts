@@ -10,7 +10,6 @@ type Named = Exclude<NamedOrList, readonly unknown[]>;
 
 const isList = (named: NamedOrList): named is readonly Named[] => Array.isArray(named);
 
-/** One thing a detail key names; a key naming a list names no one thing. */
 export const namedIn = (named: ReadAuditEvent["named"], key: string): Named | undefined => {
   const held = named[key];
   return held === undefined || isList(held) ? undefined : held;
@@ -18,7 +17,6 @@ export const namedIn = (named: ReadAuditEvent["named"], key: string): Named | un
 
 type DetailValue = ReadAuditEvent["detail"][string];
 
-/** One line of an event's detail: its label, the value in words, and an address to show beneath. */
 export type DetailLine = {
   readonly key: string;
   readonly label: string;
@@ -122,7 +120,6 @@ export const KEPT_OFF_DETAIL_KEYS: Readonly<Partial<Record<DeclaredAction, reado
   "sources.finding.restored": ["findingId"],
 };
 
-/** Stored values a reader would not say: a sign-in method, an audience, a family, an AI provider. */
 const VALUE_WORDS: ReadonlyMap<unknown, string> = new Map([
   ["email_code", "Emailed code"],
   ["email_link", "Sign-in link"],

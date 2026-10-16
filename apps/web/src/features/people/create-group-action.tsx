@@ -22,7 +22,6 @@ import { outcomeOfGroupFailure } from "./refusal.tsx";
 
 const CREATE_KEYSTROKE = GROUPS_KEYSTROKES.create;
 
-/** The page's primary act: the list's head holds it, and its dialog holds the name it asks for. */
 export function CreateGroupAction(properties: {
   readonly onCreated: (groupId: string, name: string) => void;
 }) {

@@ -31,12 +31,9 @@ type BandProperties = {
   readonly wide: boolean;
   /** Where the logo leads: the person's home, or the index while their role is unread. */
   readonly home: string;
-  /** Absent while the workspace is unread. */
   readonly switcher: ReactNode;
-  /** The toggle when wide, the sheet's button when narrow. */
   readonly navigation: ReactNode;
   readonly jumpTo: ReactNode;
-  /** Drawn by the narrow band alone: the wide one leaves it to the rail's foot. */
   readonly keystrokes: ReactNode;
   readonly parts: readonly Part[];
   readonly person: Person | undefined;
@@ -116,7 +113,6 @@ const BAND_DRAWN_H = "--band-drawn-h";
  * once, so React attaches it once.
  */
 const publishTheDrawnHeight = (band: HTMLElement) => {
-  // Where no observer is offered, the band keeps the token's height.
   if (typeof ResizeObserver === "undefined") return undefined;
   const root = document.documentElement;
   const observer = new ResizeObserver(() => {

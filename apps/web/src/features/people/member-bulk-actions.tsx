@@ -44,7 +44,6 @@ type Settled = {
   readonly onError: (failure: Error | ApiError) => void;
 };
 
-/** What the list hands its bulk actions: the ticks, and where an action's outcome and marks land. */
 export type BulkList = {
   /** False while the list's read waits or has failed, when its rows are not there to act on. */
   readonly readable: boolean;
@@ -192,7 +191,6 @@ const BAR_ACTIONS: readonly {
   { action: "remove", keystroke: KEY.removeSelected, label: BULK_WORDS.remove.action },
 ];
 
-/** The bar's actions; each opens one dialog holding its value and its confirmation. */
 export function MemberBulkActions(properties: { readonly actions: Actions }) {
   const { actions } = properties;
   return (

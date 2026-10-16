@@ -11,12 +11,10 @@ type Api = ReturnType<typeof useTRPC>;
 
 export type ListedGroup = inferOutput<Api["members"]["groups"]>[number];
 
-/** One member and one group: who a box puts in the group, or takes out of it. */
 export type InGroup = inferInput<Api["members"]["addToGroup"]>;
 
 type HeldGroup = ListedMember["groups"][number];
 
-/** The one origin an Admin's own action gives a group; the wire's type holds it to the api's word. */
 const CURATED: ListedGroup["origin"] = "admin-curated";
 
 export const useGroups = () => {
@@ -149,7 +147,6 @@ const groupsHeld = (
   return joined === undefined ? others : inNameOrder([...others, joined]);
 };
 
-/** Putting a member in and taking them out move the same two lists, in opposite directions. */
 const useGroupMoved = (way: Way) => {
   const api = useTRPC();
   const queryClient = useQueryClient();

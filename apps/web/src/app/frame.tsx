@@ -74,7 +74,6 @@ const useRegion = (visible: VisibleTree, pathname: string): Region | undefined =
   return drawn !== undefined && isFilled(toolbar) ? { name: drawn.page.name, toolbar } : undefined;
 };
 
-/** A page at a detail address, or at no place, names the last part; elsewhere the open tab does. */
 const belowThePage = (
   open: Place<VisibleArea> | undefined,
   openTab: PageTab | undefined,
@@ -124,7 +123,6 @@ const useBandOutcome = (
 /** A place hidden from the reader is no place here, so it draws as one that never existed. */
 export function Frame(properties: {
   readonly visible: VisibleTree;
-  /** The workspace being read, or the console in its place. */
   readonly here: Here | undefined;
   readonly person: Person | undefined;
   readonly offersTheConsole: boolean;
@@ -140,7 +138,6 @@ export function Frame(properties: {
   const switching = useWorkspaceSwitch();
   // The frame's, not the tabs root's: the band names the open tab, and the root sits below it.
   const [pickedTab, pickTab] = useState<string>();
-  // Given by a page at a detail address, which alone knows whose it is.
   const [lastPart, nameLastPart] = useState<string>();
   // The frame's, not the page's: the workspace's key below draws the page, and its offer, afresh.
   const offerPlace = useOfferPlace();

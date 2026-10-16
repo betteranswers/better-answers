@@ -4,7 +4,6 @@ import type { ListedConnectedSource, Sensitivity } from "./sources-api.ts";
 
 export { instantWords };
 
-/** Said when a row's keystroke is pressed and no connected source has held focus. */
 export const SELECT_A_CONNECTED_SOURCE_FIRST = "Please select a connected source first.";
 
 type Meaning = { readonly word: string; readonly means: string };
@@ -44,7 +43,6 @@ const SYNC_SAYS = {
   poisoned: "Sync failed",
 } satisfies Record<Exclude<Sync["status"], "done">, string>;
 
-/** How a dismissal's line ends: where the sync that reads it has got to. */
 export const SYNC_OF_A_DISMISSAL = {
   queued: "is queued",
   claimed: "is running",
@@ -65,16 +63,13 @@ export const AUDIENCE_WORDS = {
   groups: "Named groups",
 } satisfies Record<ListedConnectedSource["audience"], string>;
 
-/** An audience's word inside a sentence, typed apart so no function recases the option's label. */
 const AUDIENCE_IN_A_SENTENCE = {
   everyone: "everyone in the workspace",
   groups: "named groups",
 } satisfies Record<ListedConnectedSource["audience"], string>;
 
-/** The empty list's one line: the toolbar's Connect a Document is how a document is connected. */
 export const NOTHING_CONNECTED = "No connected sources yet";
 
-/** One term over every destination's sentence, however many a connected source feeds. */
 export const DESTINATIONS_TERM = "Destinations";
 
 const DESTINATIONS = new Map<string, Meaning>([
@@ -166,7 +161,6 @@ export const AUDITED_CATEGORIES = [
 /** A category's or a tier's word is kebab-case on the row and spaced on the page. */
 const spokenWord = (word: string): string => word.replaceAll("-", " ");
 
-/** Where the word stands alone, as a table's cell does, it opens with a capital. */
 export const sentenceCased = (word: string): string => {
   const spoken = spokenWord(word);
   return spoken.charAt(0).toUpperCase() + spoken.slice(1);
@@ -226,7 +220,6 @@ const NARROWER_DOCUMENTS_STAY = "Narrower documents stay as they are.";
 
 const WHAT_CITES_IT_FOLLOWS = "Concepts and write-ups that cite it are updated too.";
 
-/** A narrowing's or a widening's inline panel: its name, consequence, commit and pending line. */
 export const SENSITIVITY_PANEL_WORDS = {
   narrow: {
     named: (name: string): string => `Narrow the Sensitivity of ${name}`,
@@ -247,19 +240,15 @@ export const SENSITIVITY_PANEL_WORDS = {
   },
 } as const;
 
-/** Said from a publish's press until its answer lands. */
 export const PUBLISH_PENDING = "Publishing.";
 
-/** Said beside a commit that waits on the narrowing or widening sent before it. */
 export const THE_CHANGE_BEFORE_IS_STILL_GOING = "Please wait for the previous change to finish.";
 
-/** Said when a review is asked to open or close while a bulk action waits on its answer. */
 export const THE_ACTION_BEFORE_IS_STILL_GOING = "Please wait for the previous action to finish.";
 
 export const groupsCounted = (groups: number): string =>
   counted(groups, "group of findings", "groups of findings");
 
-/** The same count as a dialog's title writes it. */
 const groupsCountedInATitle = (groups: number): string =>
   counted(groups, "Group of Findings", "Groups of Findings");
 
@@ -274,7 +263,6 @@ type NamedGroup = {
 export const REVIEW_WORDS = {
   heading: (name: string): string => `Review of ${name}`,
   lead: "Findings from the last sync. Values are never shown.",
-  /** While no group is ticked, the one line that says what enables the three actions. */
   selectFirst: "Select a group of findings first.",
   select: (group: NamedGroup): string =>
     `Select ${spokenWord(group.category)} by ${ruleWordOf(group.ruleId)} in ${group.title}`,

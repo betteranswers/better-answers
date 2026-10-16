@@ -39,7 +39,6 @@ export type QuestionsAsked = ReturnType<typeof useQuestionsAsked>;
 
 export type Closing = { readonly feedbackId: string; readonly closedAs: FlagClosing };
 
-/** Shown until the read answers again with the instant the api recorded. */
 const nowSaid = (): string => new Date().toISOString();
 
 const closedIn = (record: AskedRecord, closing: Closing, at: string): AskedRecord => {

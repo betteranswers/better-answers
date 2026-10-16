@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
 
-/** The person's own sessions, as the Sessions section shows them. */
 export const useSessions = () => {
   const api = useTRPC();
   return useQuery(api.person.sessions.queryOptions());

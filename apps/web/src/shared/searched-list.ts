@@ -4,13 +4,10 @@ import { z } from "zod";
 import { useListAddress, type ListFields } from "@/shared/list-address.ts";
 import { pageWithin } from "@/shared/list-pages.tsx";
 
-/** Long enough to span a burst of typing, short enough to land before a reader moves on. */
 const SETTLE_MS = 300;
 
-/** A list searched from a box keeps its search in the address, as a word. */
 type SearchedFields = ListFields & { readonly search: z.ZodCatch<z.ZodType<string>> };
 
-/** The two keys this module reads whatever else the list holds; a list with no pages is on its first. */
 const HELD = z.object({ search: z.string().catch(""), page: z.number().catch(1) });
 
 /**

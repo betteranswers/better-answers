@@ -35,7 +35,6 @@ type Child = Element["children"][number];
 type Tree = { readonly type: "root"; readonly children: Child[] };
 
 export type MarkOpening = {
-  /** The control whose panel is open: one of this body's marks, or a control elsewhere on the page. */
   readonly openerId: string | undefined;
   readonly onOpen: (chosen: { readonly openerId: string; readonly source: number }) => void;
   /** The panel, where it is drawn under the open mark's own block instead of beside the page. */
@@ -86,7 +85,6 @@ type Cited = {
 
 type Drawing = {
   readonly cited: readonly Cited[];
-  /** The mark whose panel is drawn under its block. */
   readonly inlineUnder: number | undefined;
 };
 
@@ -110,7 +108,6 @@ const markOf = (drawing: Drawing, mark: number, inLink: boolean): readonly Child
 
 type Drawn = {
   readonly nodes: readonly Child[];
-  /** Whether the mark the panel sits under is in here, and whether the panel already is. */
   readonly holds: boolean;
   readonly placed: boolean;
 };
@@ -223,7 +220,6 @@ const decoded = (address: string): string => {
   }
 };
 
-/** A link the read answered: the address the body wrote, and the concept it leads to. */
 type AnsweredLink = { readonly address: string; readonly target: string };
 
 /** The concept page each answered address leads to; the address itself is never a destination. */
@@ -283,7 +279,6 @@ export const LINK = "text-brand underline underline-offset-4";
 /** The file's own addresses on the web, and nothing a browser would run or resolve against this site. */
 const ON_THE_WEB = /^(?:https?:\/\/|mailto:)/i;
 
-/** A footnote's own link down to its note, or back up to the claim. */
 const footnoteJump = (node: Element | undefined): "down" | "back" | undefined => {
   if (node?.properties["dataFootnoteRef"] !== undefined) return "down";
   return node?.properties["dataFootnoteBackref"] === undefined ? undefined : "back";
@@ -297,7 +292,6 @@ const jumpWithinThePage = (event: MouseEvent<HTMLAnchorElement>): void => {
   (landing?.matches("a") === true ? landing : landing?.querySelector("a"))?.focus();
 };
 
-/** Where an answered address leads, else where a concept's own IRI does. */
 const pageOf = (held: Held | undefined, href: string): string | undefined =>
   held?.pages.get(decoded(href)) ?? conceptPageOf(href);
 
@@ -408,7 +402,6 @@ export function ConceptBody(properties: {
   readonly bodyLinks?: readonly AnsweredLink[];
   /** Absent where a mark opens nothing, as in the panel: one level only. */
   readonly opening?: MarkOpening;
-  /** The heading level the body's own first level takes. */
   readonly headingsFrom?: number;
 }) {
   const { body, evidence, bodyLinks, opening, headingsFrom = 3 } = properties;

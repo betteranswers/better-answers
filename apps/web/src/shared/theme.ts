@@ -9,7 +9,6 @@ import {
   type Theme,
 } from "@/shared/theme-switch.ts";
 
-/** A theme kept on this browser, or the device's. */
 export type ThemeChoice = Theme | "device";
 
 /** The choice made in this tab, which holds when the browser refuses to keep it. */

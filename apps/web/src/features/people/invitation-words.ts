@@ -141,7 +141,6 @@ export const INVITATIONS_WORDS = {
   resendTo: (address: string) => `Resend Invitation to ${address}`,
 } as const;
 
-/** The dialog's words; its title and its button are the action's own name. */
 export const INVITE_WORDS = {
   description: "Invite people to your workspace with a specific role.",
   field: "Email Addresses",

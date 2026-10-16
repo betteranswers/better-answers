@@ -62,7 +62,6 @@ const useNarrowedRequests = () => {
   return { ...list, read, listed, data };
 };
 
-/** A keystroke acts on the row in focus, and says which row to pick when none is. */
 const useInFocusKeystrokes = (properties: {
   readonly inFocus: WaitingRequest | undefined;
   readonly approve: (request: WaitingRequest) => void;

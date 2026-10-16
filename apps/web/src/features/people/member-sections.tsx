@@ -34,7 +34,6 @@ import { ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
 import { useSelfActionHome } from "./self-action.tsx";
 import { CredentialsHere, Day, nameOf } from "./words.tsx";
 
-/** The control each of the page's actions lands focus on, so a keystroke can reach any of them. */
 export type Landings = {
   readonly role: RefObject<HTMLDivElement | null>;
   readonly groups: RefObject<HTMLDivElement | null>;
@@ -43,7 +42,6 @@ export type Landings = {
   readonly removal: RefObject<HTMLButtonElement | null>;
 };
 
-/** Removal is the page's to take: the person, and the page with them, leave as it lands. */
 export type Removal = {
   /** None until the reader's own member read answers. */
   readonly remove: ((member: ListedMember) => void) | undefined;
@@ -65,7 +63,6 @@ function AccessSummary(properties: { readonly member: ListedMember }) {
   );
 }
 
-/** The hint beside the commit, which says so when the action is on the reader themself. */
 const roleHint = (name: string, held: Role, picked: Role, yourself: boolean): string => {
   if (picked === held) return WORDS.holdsRole(name, held);
   // The role held is said here too: a refused change leaves the pick on a role they do not hold.
@@ -331,7 +328,6 @@ function GroupsPicker(properties: {
   );
 }
 
-/** Who the member is and what they may reach here, with each action that changes it. */
 export function Access(properties: { readonly member: ListedMember; readonly landings: Landings }) {
   const { member, landings } = properties;
 
@@ -345,7 +341,6 @@ export function Access(properties: { readonly member: ListedMember; readonly lan
   );
 }
 
-/** The two actions that end the person's access here, set apart from the rest. */
 export function RemoveAndEndEverySignIn(properties: {
   readonly member: ListedMember;
   readonly landings: Landings;

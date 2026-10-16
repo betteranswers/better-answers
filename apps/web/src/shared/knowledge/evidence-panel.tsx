@@ -26,7 +26,6 @@ type OpenedSource =
   | (Extract<Opening, { readonly kind: "passage" }> & { readonly unmapped?: true })
   | Extract<Opening, { readonly kind: "concept" }>;
 
-/** A source opened beside the page, and the control that opened it, where focus goes back. */
 export type Opened = {
   readonly key: string;
   /** What its opener calls it, which names the panel until the read names the source itself. */

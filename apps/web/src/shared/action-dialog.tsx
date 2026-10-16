@@ -13,10 +13,6 @@ import {
 
 type Content = Pick<ComponentProps<typeof DialogContent>, "className" | "onCloseAutoFocus">;
 
-/**
- * The consequence is a required part, so no action on the page can ask for the click before
- * saying what it does.
- */
 export function ActionDialog(properties: {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;

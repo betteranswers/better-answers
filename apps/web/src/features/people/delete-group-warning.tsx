@@ -13,7 +13,6 @@ import {
 import { consequenceOfDeleting } from "./group-words.ts";
 import { type ListedGroup } from "./groups-api.ts";
 
-/** The warning before a group is deleted, shared by the sheet's Delete and the row menu's. */
 export function DeleteGroupWarning(properties: {
   readonly group: ListedGroup;
   readonly onDelete: (group: ListedGroup) => void;

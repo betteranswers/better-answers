@@ -69,7 +69,6 @@ const subjectLines = (subject: ReadAuditEvent["subject"]): readonly DetailLine[]
     ? [{ key: "subject", label: WORDS.about, ...personSaid(subject.displayName, subject.address) }]
     : [];
 
-/** Drawn only once the details open. */
 function DetailList(properties: { readonly event: ReadAuditEvent }) {
   const { event } = properties;
   const lines = [byLine(event.by), ...subjectLines(event.subject), ...detailLinesOf(event)];
@@ -92,7 +91,6 @@ const namesShared = (events: readonly ReadAuditEvent[]): ReadonlySet<string> => 
   return new Set([...addressesOf].filter(([, held]) => held.size > 1).map(([name]) => name));
 };
 
-/** An actor named by their address alone has none to add. */
 const addressAtRest = (
   by: ReadAuditEvent["by"],
   shared: ReadonlySet<string>,
@@ -213,7 +211,6 @@ function Events(properties: {
 /** The reader's own day, which `en-CA` writes year first. */
 const fileName = (): string => `audit-log-${new Date().toLocaleDateString("en-CA")}.csv`;
 
-/** The text is already in the browser, so a link to it saves the file without asking again. */
 const save = (csv: string, name: string): void => {
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const link = document.createElement("a");

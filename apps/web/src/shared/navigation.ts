@@ -2,7 +2,6 @@ import type { ROLES } from "@better-answers/schema";
 
 import type { IconName } from "./icon.tsx";
 
-/** A workspace role, as the session's member names it. */
 export type Role = (typeof ROLES)[number];
 
 /** The operator holds no role in the console, so its pages are shown to the mark instead. */
@@ -11,7 +10,6 @@ export type RoleOrOperator = Role | "operator";
 /** Something a page does that jump-to offers by name, to whoever may see the page. */
 type Action = {
   readonly name: string;
-  /** What the page's address carries to open it. */
   readonly asks: string;
   readonly icon: IconName;
 };
@@ -43,7 +41,6 @@ export type Page = {
 
 export type MenuGroup = {
   readonly id: string;
-  /** Absent where the area lists its pages alone, as Ask and Inbox do. */
   readonly name?: string;
   readonly summary?: string;
   readonly pages: readonly Page[];
@@ -445,7 +442,6 @@ export const CONSOLE = {
   ],
 } as const satisfies Area;
 
-/** The workspace's rail, in its order. */
 export const AREAS: readonly Area[] = [ASK, KNOWLEDGE, INBOX, CONTROL_CENTRE];
 
 export const EVERY_AREA: readonly Area[] = [...AREAS, CONSOLE];
@@ -457,7 +453,6 @@ type Declared =
   | typeof CONTROL_CENTRE
   | typeof CONSOLE;
 
-/** Every declared address, so a link written outside the list stops compiling when it moves. */
 export type PagePath = Declared["menuGroups"][number]["pages"][number]["path"];
 
 type MenuGroupOf<Held extends Area> = Held["menuGroups"][number];
@@ -474,7 +469,6 @@ export const menuGroupIn = <Held extends Area, Id extends MenuGroupOf<Held>["id"
   return group;
 };
 
-/** A page's address read off the list, so a link to it is never a second copy. */
 export const pageNamed = <Held extends MenuGroup>(
   group: Held,
   name: Held["pages"][number]["name"],
@@ -540,7 +534,6 @@ const shownOf = (
   };
 };
 
-/** Built-ness and the reader filter the list; a role's home shows whether built or not. */
 export const visibleTo = (reader: Reader, areas: readonly Area[]): VisibleTree => {
   const { role, owns } = reader;
   if (role === undefined) return NO_TREE;
@@ -592,7 +585,6 @@ export const placeAt = <Held extends Area>(
   return undefined;
 };
 
-/** The address of one row beneath a page that declares a detail address. */
 export const detailAt = (page: Page, value: string): string => {
   if (page.detail === undefined) throw new Error(`${page.path} declares no detail address`);
   return `${page.path}/${encodeURIComponent(value)}`;

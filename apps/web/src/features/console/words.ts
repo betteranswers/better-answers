@@ -12,17 +12,14 @@ export const NO_NAME_IN_FOCUS = selectFirst(SELECT_A_NAME_FIRST);
 
 export const CONSOLE_CLOSED = "Access Denied";
 
-/** The console's reads have no sentence of their own, so each says its class's. */
 export const saidOf = (refusal: Refusal): string =>
   refusalSentence({}, refusal.word, refusal.class);
 
-/** A failure with no refusal word is the network's. */
 export const readRefused = (failure: Error | ApiError): string => {
   const refusal = refusalOf(failure);
   return refusal === undefined ? STOCK.notLoaded : saidOf(refusal);
 };
 
-/** The revocation has no sentence of its own, so each refusal shows its class's. */
 export const { outcomeOfFailure: revocationRefused } = refusalsOf({});
 
 export const { outcomeOfFailure: correctingRefused } = refusalsOf(SAID_OF_CORRECTING);

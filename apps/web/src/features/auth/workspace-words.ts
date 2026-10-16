@@ -30,7 +30,6 @@ export const NO_WORKSPACE_ACTIONS = {
   readAgain: "Read Your Invitations Again",
 } as const;
 
-/** A connection carried through sign-in that the picker could not hand back. */
 export const NOT_CONNECTED = {
   heading: "You’re Signed In",
   carryOn: `Go to ${PRODUCT_NAME}`,

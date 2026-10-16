@@ -18,7 +18,6 @@ export function ReadSaid(properties: { readonly read: Read; readonly loading: st
   );
 }
 
-/** What is typed narrows the rows already read, in the browser: the api is asked nothing more. */
 export function useNarrowedRows<Row>(rows: readonly Row[], wordsOf: (row: Row) => string) {
   const [typed, setTyped] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -40,7 +39,6 @@ type CountWords = {
   readonly matching: (count: number, search: string) => string;
 };
 
-/** The list's one count: every row read, or the rows what was typed left. */
 export const countOf = (words: CountWords, read: number, narrowed: Narrowed): string =>
   narrowed.search === ""
     ? words.counted(read)

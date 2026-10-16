@@ -5,7 +5,6 @@ import { useTRPC } from "@/shared/api/trpc.ts";
 
 import { askOfOurRoute, rereadTheSession } from "./auth-hooks.ts";
 
-/** Where an authenticator's setup starts and finishes. */
 export type AuthenticatorRoutes = { readonly start: string; readonly finish: string };
 
 export const FIRST_AUTHENTICATOR: AuthenticatorRoutes = {
@@ -22,7 +21,6 @@ export const NEW_AUTHENTICATOR: AuthenticatorRoutes = {
 const keyIn = (setupAddress: string): string =>
   new URL(setupAddress).searchParams.get("secret") ?? "";
 
-/** The key is read out of the address here, so a setup carrying none is refused where it enters. */
 const setupStarted = z
   .object({ setupAddress: z.string().startsWith("otpauth://") })
   .transform(({ setupAddress }) => ({ setupAddress, key: keyIn(setupAddress) }))
@@ -38,7 +36,6 @@ const setupFinished = z
   ])
   .transform((answer) => (answer.recoveryCodes === null ? null : answer));
 
-/** A set as its issue answered it; `madeAt` names the set when it is acknowledged. */
 export type CodesIssued = NonNullable<z.output<typeof setupFinished>>;
 
 export const useSecondFactor = () => {

@@ -19,7 +19,6 @@ const offered = (held: SecondFactor | undefined): boolean =>
 const useAddressDrawn = (): string | undefined =>
   useRouterState({ select: (state) => state.matches.at(-1)?.pathname });
 
-/** The address the offer is drawn on, and how the offer says so as it draws. */
 export type OfferPlace = {
   readonly heldAt: string | undefined;
   readonly holdAt: (address: string) => void;
@@ -43,17 +42,11 @@ type OfferProperties = { readonly place: OfferPlace; readonly onDismissed: () =>
 export function PasskeyOffer(properties: OfferProperties) {
   const [here] = useState(passkeysHere);
   const drawn = useAddressDrawn();
-  // Account is where the offer leads, so it is not offered there again.
   if (!here || drawn === undefined || drawn === ACCOUNT) return null;
 
-  // Keyed by the address, so each page arrives asking afresh whether the offer was shown.
   return <OfferOnThisPage key={drawn} address={drawn} {...properties} />;
 }
 
-/**
- * Read only where a passkey can be used, so no other browser asks. Only the page that first draws
- * the offer keeps it.
- */
 function OfferOnThisPage(properties: OfferProperties & { readonly address: string }) {
   const { address } = properties;
   const { heldAt, holdAt } = properties.place;

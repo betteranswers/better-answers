@@ -14,7 +14,6 @@ export const requestsFeatures = tableFeatures({});
 const column = createColumnHelper<typeof requestsFeatures, WaitingRequest>();
 
 type RequestActions = {
-  /** The line that says what each decision does, named by every row's buttons. */
   readonly consequenceId: string;
   readonly onApprove: (request: WaitingRequest) => void;
   readonly onDecline: (request: WaitingRequest) => void;

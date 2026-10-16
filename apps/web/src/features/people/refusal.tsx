@@ -18,7 +18,6 @@ export const { outcomeOfFailure: outcomeOfGroupFailure } = refusalsOf(SAID_OF_A_
 
 export const { outcomeOfFailure: outcomeOfRequestFailure } = refusalsOf(SAID_OF_A_REQUEST);
 
-/** The audit log has no sentence of its own, so each refusal shows its class's. */
 export const { outcomeOfFailure: outcomeOfAuditLogFailure } = refusalsOf({});
 
 /** An action that emails meets its ceiling with no word, so the wait is what it says. */

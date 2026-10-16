@@ -26,7 +26,6 @@ export const PAGE_SIZE = 50;
 
 export type Asked = { readonly search: string; readonly offset: number };
 
-/** The page showing stays while the next is read, so a search never blanks the table. */
 export const usePeople = (asked: Asked) => {
   const api = useTRPC();
   return useQuery(
@@ -64,7 +63,6 @@ const endedEverywhere = (held: PersonInspected, at: string, by: DoneBy): PersonI
   ],
 });
 
-/** The operator, named as the api will name them once it answers. */
 const useTheOperator = (): DoneBy => {
   const standing = useOperatorStanding().data;
   return standing?.operator === true && standing.name.trim() !== ""
@@ -147,7 +145,6 @@ const renamedIn = (page: PeoplePage, personId: string, displayName: string): Peo
   ),
 });
 
-/** Corrected and off the names waiting before the api answers; trimmed, as the api keeps it. */
 export const useCorrectDisplayName = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

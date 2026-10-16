@@ -16,7 +16,6 @@ export type Concept = NonNullable<inferOutput<Api["knowledge"]["open"]>["concept
 /** One of a concept's sources as its reader may see it: `locator` or `iri` only where it opens. */
 export type Evidence = Concept["evidence"][number];
 
-/** What opens a source beside its claim: a passage by its locator, or a concept by its IRI. */
 export type Opening =
   | { readonly kind: "passage"; readonly locator: string }
   | { readonly kind: "concept"; readonly iri: string };

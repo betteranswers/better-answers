@@ -5,7 +5,6 @@ import { cn } from "@/shared/lib/utils.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Sheet, SheetContent } from "@/shared/ui/sheet.tsx";
 
-/** The row's own name, with a caret at rest: a name alone does not say that the row opens. */
 export function RowSheetButton(
   properties: Omit<ComponentProps<typeof Button>, "variant" | "aria-haspopup">,
 ) {

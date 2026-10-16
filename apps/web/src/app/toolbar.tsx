@@ -40,18 +40,12 @@ export function PageTabsRoot(properties: {
   return (
     // Spanning the toolbar and the content leaves the whole pattern to the registry: its
     // arrow keys above, its own tabpanel below.
-    <Tabs
-      value={openTab}
-      onValueChange={setPicked}
-      // Out of the layout: the regions stay the content column's own children.
-      className="contents"
-    >
+    <Tabs value={openTab} onValueChange={setPicked} className="contents">
       <OpenTabProvider openTab={openTab}>{spanned}</OpenTabProvider>
     </Tabs>
   );
 }
 
-/** The open tab's panel; with no tab open, its children as they are. */
 export function PagePanel(properties: { readonly children: ReactNode }) {
   const openTab = useOpenTab();
   if (openTab === undefined) return <>{properties.children}</>;

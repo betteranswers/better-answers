@@ -47,7 +47,6 @@ const NAME_HINT = "display-name-hint";
 
 const NAME_REFUSED = "display-name-refused";
 
-/** The one action a refusal leaves the person: a page to go to, from the path of this page. */
 type WayOn = {
   readonly keystroke: Keystroke;
   readonly to: (here: string) => string;

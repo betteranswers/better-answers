@@ -124,10 +124,6 @@ const failureSentence = (
   return refusal.class === "unauthenticated" ? STOCK.session : saidOf(refusal);
 };
 
-/**
- * What went wrong and what to do. A wordless failure says `unanswered`; an ended session gets a
- * button that signs in at `signInAt`.
- */
 export function Refused(properties: {
   readonly id: string;
   readonly failure: Error | ApiError | null;

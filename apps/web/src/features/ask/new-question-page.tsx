@@ -28,7 +28,6 @@ const CONNECT_CLAUDE = pageNamed(ASKING, "Connect Claude");
 
 const LISTED = Object.values(KEY);
 
-/** The spending limit names the one person who can lift it; any other refusal is its class's. */
 const { outcomeOfFailure } = refusalsOf(SAID_OF_KNOWLEDGE);
 
 const refusedWords = (failure: Error | ApiError): ReactNode => {
@@ -167,7 +166,6 @@ function QuestionForm(properties: {
   );
 }
 
-/** The collections the last answer said the reader may name, kept while the next is asked. */
 const useReadable = (answering: Answering): readonly string[] => {
   const [readable, setReadable] = useState<readonly string[]>([]);
   const known = answering.answer?.readableCollections;

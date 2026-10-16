@@ -62,7 +62,6 @@ type Section = {
   readonly apart?: true;
 };
 
-/** One page, each section drawn at once, in order. The security work adds Sign-in and Sessions. */
 const SECTIONS: readonly Section[] = [
   { id: "access", title: WORDS.access, draw: Access },
   { id: "activity", title: WORDS.activity, draw: MemberActivity },
@@ -76,7 +75,6 @@ const SECTIONS: readonly Section[] = [
 
 const headingIdOf = (section: Section): string => `member-${section.id}`;
 
-/** What the move that opened the page asked of it, kept in the page's own history entry. */
 const useOpening = () => {
   const openedAt = useRouterState({
     select: (state) => OPENING.safeParse(state.location.state).data?.openedAt,
@@ -199,7 +197,6 @@ function SectionNav() {
   );
 }
 
-/** Each action's control, and focus put on it: by a keystroke, or as the page opens at the action. */
 const useLandings = () => {
   const title = useRef<HTMLHeadingElement>(null);
   const landings: Landings = {

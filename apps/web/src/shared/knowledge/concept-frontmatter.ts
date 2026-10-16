@@ -65,7 +65,6 @@ const wordsOf = (value: Frontmatter[string]): string | undefined => {
   return listed.success ? listed.data.join(", ") : undefined;
 };
 
-/** The file's remaining keys under their own names, each a word or a list of words. */
 export const furtherKeysOf = (frontmatter: Frontmatter): readonly (readonly [string, string])[] =>
   Object.entries(frontmatter).flatMap(([key, value]) => {
     const words = SHOWN_ELSEWHERE.has(key) ? undefined : wordsOf(value);

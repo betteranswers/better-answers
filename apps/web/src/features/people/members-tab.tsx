@@ -55,7 +55,6 @@ import { outcomeOfFailure } from "./refusal.tsx";
 import { ROLES } from "./role-meanings.ts";
 import { nameOf } from "./words.tsx";
 
-/** The members read returns the whole workspace, so the browser pages it. */
 const PAGE_SIZE = 25;
 
 const MEMBERS_HEADING = "Members";
@@ -97,7 +96,6 @@ const matching = (narrowing: Narrowing) => {
     `${member.displayName} ${member.address}`.toLowerCase().includes(search);
 };
 
-/** A clear empties the search and filters and keeps the reader's sort. */
 const KEPT_ON_CLEAR = ["sort"] as const;
 
 const useNarrowedMembers = (listed: readonly ListedMember[]) => {
@@ -172,7 +170,6 @@ const useReturnedFromARemoval = (heading: RefObject<HTMLElement | null>): Outcom
   return removalSaid(name, removal);
 };
 
-/** Each of the row's actions opens the member's page at that action's control. */
 const ROW_ACTIONS: readonly { readonly label: string; readonly at: OpenedAt }[] = [
   { label: "Open", at: "member" },
   { label: "Change Role", at: "role" },
@@ -229,7 +226,6 @@ function MemberFilters(properties: {
             narrowed.write({ role: ROLES.find((each) => each === role), page: 1 });
           },
         },
-        // A filter with nothing to choose is no filter, so it waits for a group to exist.
         ...(groups.length === 0 ? [] : [groupFilter]),
       ]}
       columns={{
@@ -302,7 +298,6 @@ type Shown = { readonly outcome: Outcome | undefined; readonly refused: RefusedR
 
 const NOTHING_SHOWN: Shown = { outcome: undefined, refused: NO_MARKS };
 
-/** Ticks and an action's outcome are the page's; what narrows the rows is the address's. */
 function MemberList(properties: {
   readonly read: ReturnType<typeof useMembers>;
   readonly headingId: string;

@@ -8,10 +8,6 @@ const models = menuGroupIn(CONTROL_CENTRE, "models");
 
 const SPEND = "spend";
 
-/**
- * Tabs divide this page and nothing else, so the page declares them and its route carries
- * them to the shell.
- */
 export const MODELS_AND_SPEND_TOOLBAR: PageToolbar = {
   tabs: [
     { id: "model-choices", name: "Model Choices" },

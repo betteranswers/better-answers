@@ -36,7 +36,6 @@ const focusOnArrival = (node: HTMLElement | null) => {
 type NameActions = {
   readonly correct: (personId: string) => void;
   readonly focusedOn: (personId: string) => void;
-  /** The person whose action takes focus as it arrives: back from signing in, or refused. */
   readonly personToFocus: string | undefined;
 };
 
@@ -88,7 +87,6 @@ function CorrectAction(properties: {
   );
 }
 
-/** The row's own action corrects it, so the actions ride into the columns. */
 const columnsFor = (actions: NameActions) =>
   column.columns([
     column.display({

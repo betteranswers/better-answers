@@ -50,7 +50,6 @@ type Opted<Data> = {
 const HEAD =
   "h-9 px-3 font-medium whitespace-normal text-muted-foreground [font-size:var(--text-xs)]";
 
-/** Wrapping, not scrolling, is what keeps a 320px page from hiding a column. */
 const CELL = "h-10 px-3 py-2 whitespace-normal";
 
 /**
@@ -253,10 +252,6 @@ const columnCount = <Features extends TableFeatures, Data extends RowData>(
   (opted.ticking === undefined ? 0 : 1) +
   (opted.rowMenu === undefined ? 0 : 1);
 
-/**
- * `empty` fills the body when no row is left, so the header still names the columns. An opt-in
- * part left out draws nothing.
- */
 export function GridTable<Features extends TableFeatures, Data extends RowData>(
   properties: Opted<Data> & {
     /** Flat columns only: the header draws no spans, so a column group's header would misalign. */

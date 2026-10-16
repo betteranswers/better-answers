@@ -2,7 +2,6 @@ import { counted } from "@/shared/words.ts";
 
 type Noun = readonly [one: string, many: string];
 
-/** How many rows the typed words left, in the list's own noun. */
 const matching = (count: number, [one, many]: Noun, search: string): string =>
   `${counted(count, one, many)} ${count === 1 ? "matches" : "match"} “${search}”.`;
 

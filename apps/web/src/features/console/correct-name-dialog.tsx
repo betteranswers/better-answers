@@ -9,10 +9,6 @@ import { Label } from "@/shared/ui/label.tsx";
 import { correctingConsequence, correctWords } from "./correcting-words.ts";
 import type { Refused } from "./use-correcting.ts";
 
-/**
- * `name` is how the dialog calls the person, which may be their address. The opener puts focus
- * back, told whether the name was saved.
- */
 export function CorrectNameDialog(properties: {
   readonly name: string;
   readonly displayName: string;

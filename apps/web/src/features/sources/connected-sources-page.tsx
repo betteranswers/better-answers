@@ -83,7 +83,6 @@ const focusOn = (id: string) => {
   document.getElementById(id)?.focus();
 };
 
-/** A keystroke pressed with nothing in focus has the page itself here, which takes no focus back. */
 const theControlInFocus = (): HTMLElement | null => {
   const held = document.activeElement;
   return held instanceof HTMLElement && held !== document.body ? held : null;

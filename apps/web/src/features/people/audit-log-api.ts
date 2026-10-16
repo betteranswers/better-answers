@@ -9,7 +9,6 @@ type AuditLogProcedure = Api["members"]["auditLog"];
 
 export type Family = NonNullable<inferInput<AuditLogProcedure>["family"]>;
 
-/** What narrows the events, as the address holds it: no family and no search reads them all. */
 export type Asked = { readonly family: Family | undefined; readonly search: string };
 
 const inputOf = (asked: Asked) => ({

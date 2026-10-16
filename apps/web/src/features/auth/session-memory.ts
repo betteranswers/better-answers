@@ -10,7 +10,6 @@ import {
 
 const KEPT_UNDER = "better-answers.session";
 
-/** What this browser last did with a session: held one, held one not yet confirmed, or signed out. */
 const REMEMBERED = ["held", "pending", "signed-out"] as const;
 
 type Remembered = (typeof REMEMBERED)[number];
@@ -21,13 +20,11 @@ export const rememberTheSession = (memory: Remembered): void => {
   keepOnThisBrowser(KEPT_UNDER, memory);
 };
 
-/** Undefined when this browser never held a session here, or keeps nothing. */
 export const sessionRemembered = (): Remembered | undefined =>
   remembered.safeParse(onThisBrowser()?.getItem(KEPT_UNDER)).data;
 
 const UNSAVED_UNDER = "better-answers.change-unsaved";
 
-/** The page of a change refused while the session waited on its second factor. */
 export const rememberAChangeUnsaved = (pathname: string): void => {
   keepInThisTab(UNSAVED_UNDER, pathname);
 };
@@ -84,7 +81,6 @@ export const hearASignInElsewhere = (heard: () => void): (() => void) => {
   };
 };
 
-/** What every way of signing in leaves behind on this browser, and tells its other tabs. */
 export const signedInHere = (): void => {
   rememberTheSession("held");
   forgetThePasskeyOfferShown();

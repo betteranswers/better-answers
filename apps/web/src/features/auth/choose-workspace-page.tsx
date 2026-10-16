@@ -89,10 +89,6 @@ const focusTheFirstWorkspace = () => {
   document.getElementById(WORKSPACE_LIST)?.querySelector("button")?.focus();
 };
 
-/**
- * Opens a sole workspace without asking; a carried connection resumes after any pick. No session,
- * display name or workspace sends the person on.
- */
 export function ChooseWorkspacePage() {
   const navigate = useNavigate();
   const carried = carriedFlow(pageQuery());
@@ -219,13 +215,11 @@ export function ChooseWorkspacePage() {
 }
 
 type Standing = {
-  /** A carried connection that could not be handed back once the workspace was open. */
   readonly notConnected: boolean;
   readonly settled: boolean;
   readonly unread: boolean;
   readonly listed: boolean;
   readonly refused: boolean;
-  /** Set only while the latest pick's refusal says the person is no longer a member. */
   readonly removedFrom: Workspace | undefined;
 };
 

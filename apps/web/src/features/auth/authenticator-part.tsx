@@ -40,7 +40,6 @@ const SAID_OF_A_SETUP_WORD: ReadonlyMap<string, string> = new Map([
   ["changed-meanwhile", STOCK.changed],
 ]);
 
-/** A 409 is another tab's doing: it finished the setup, or started one with a new key. */
 const saidOfStartingByStatus = (refused: CodeRefused): string => {
   switch (refused.status) {
     case SIGNED_OUT:
@@ -63,7 +62,6 @@ const saidOfStarting = (refused: CodeRefused): string =>
 const saidOfFinishing = (refused: CodeRefused): string =>
   SAID_OF_A_SETUP_WORD.get(refused.word ?? "") ?? saidOfFinishingByStatus(refused);
 
-/** A failure with no status went unanswered. */
 const saidOfFailure = (
   failure: Error,
   saidOf: (refused: CodeRefused) => string,
@@ -114,13 +112,11 @@ function TheKey(properties: { readonly started: SetupStarted }) {
   );
 }
 
-/** Where a setup finishes, and who hears of a refusal there; the first setup's route by default. */
 type Finishing = {
   readonly routes?: AuthenticatorRoutes | undefined;
   readonly onRefused?: ((failure: Error) => void) | undefined;
 };
 
-/** The key shown, then the code it makes; keyed by the key, so a new one starts clean. */
 function KeyAndCode(
   properties: Finishing & {
     readonly started: SetupStarted;

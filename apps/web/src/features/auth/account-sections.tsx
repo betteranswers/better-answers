@@ -27,7 +27,6 @@ export const AUTHENTICATOR_HEADING = "authenticator-heading";
 
 const RECOVERY_CODES_HEADING = "recovery-codes-heading";
 
-/** Where focus goes once an action's result is drawn: each is a node the action brings in. */
 export type Landing =
   | "set-up"
   | "save-codes"
@@ -40,7 +39,6 @@ export type Landing =
 
 export type LandsAt = (landing: Landing) => (node: HTMLElement | null) => void;
 
-/** A node an action brings in takes focus as it mounts; one already there, as its result redraws it. */
 export const useLanding = (first: Landing | undefined) => {
   const awaited = useRef<Landing | undefined>(first);
   const at: LandsAt = (landing) => (node) => {
@@ -56,7 +54,6 @@ export const useLanding = (first: Landing | undefined) => {
   };
 };
 
-/** A child, so only a button given a keystroke listens for one. */
 function ActionKeystroke(properties: {
   readonly keystroke: Keystroke;
   readonly onKey: () => void;
@@ -76,7 +73,6 @@ export function ActionButton(properties: {
   readonly describedBy?: string | undefined;
   readonly actionRef?: Ref<HTMLButtonElement>;
   readonly className?: string;
-  /** Given by a button that shows and hides a part; its keystroke only ever shows it. */
   readonly expanded?: boolean;
   readonly controls?: string | undefined;
   readonly keystroke?: Keystroke;
@@ -162,7 +158,6 @@ function NoAuthenticator(properties: {
   );
 }
 
-/** The words of one factor's removal, from its button to its dialog's commit. */
 export type RemovalWords = {
   readonly remove: string;
   readonly title: string;
@@ -264,7 +259,6 @@ type AuthenticatorProperties = {
   readonly onRemove: () => void;
 };
 
-/** An unfinished setup holds no authenticator, so it offers a setup as none does. */
 function AuthenticatorState(properties: AuthenticatorProperties & { readonly held: SecondFactor }) {
   const { held } = properties;
   if (held.authenticator !== "set-up") return <NoAuthenticator {...properties} />;
@@ -277,7 +271,6 @@ function AuthenticatorState(properties: AuthenticatorProperties & { readonly hel
   );
 }
 
-/** The heading stands while the read is out or has failed; the state comes once it is read. */
 export function AuthenticatorSection(properties: AuthenticatorProperties) {
   const { held } = properties;
   return (
@@ -361,7 +354,6 @@ function MakeCodes(properties: {
   );
 }
 
-/** Codes are offered only to a person holding a second factor for them to stand in for. */
 const offersCodes = (held: SecondFactor): boolean =>
   held.recoveryCodes !== undefined || held.authenticator === "set-up" || held.passkeys.length > 0;
 

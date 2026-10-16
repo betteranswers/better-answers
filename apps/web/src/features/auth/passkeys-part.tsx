@@ -68,7 +68,6 @@ const saidOfTheRoute = (refused: CodeRefused): string => {
   return SAID_OF_THE_ROUTE.get(refused.word ?? "") ?? STOCK.general;
 };
 
-/** A cancelled prompt is no refusal. With no response the api may have kept the passkey. */
 const saidOfAdding = (failure: Error | null): string | undefined => {
   if (failure === null) return undefined;
   if (failure instanceof DeviceRefused) return SAID_OF_THE_DEVICE[failure.reason];
@@ -82,12 +81,10 @@ const saidWhileAdding = (pending: boolean, failure: Error | null): string | null
 
 const blankName = SAID_OF_SECOND_FACTOR["passkey-name-empty"];
 
-/** Selected as it mounts, so typing replaces the name it was given. */
 const selectOnMount = (node: HTMLInputElement | null): void => {
   node?.select();
 };
 
-/** For a page where adding a passkey is the first way on. */
 const focusOnMount = (node: HTMLInputElement | null): void => {
   node?.focus();
   node?.select();
@@ -340,7 +337,6 @@ function PasskeyRows(properties: PasskeysProperties & { readonly held: SecondFac
   );
 }
 
-/** A browser with no WebAuthn adds nothing, but its rows can still be renamed and removed. */
 function AddingHere(properties: PasskeysProperties) {
   const formId = useId();
   if (!properties.here) return <p className="mt-3">{PASSKEY_WORDS.noWebAuthn}</p>;
@@ -368,7 +364,6 @@ function AddingHere(properties: PasskeysProperties) {
   );
 }
 
-/** The heading stands while the read is out or has failed; the rows come once it is read. */
 export function PasskeysSection(properties: PasskeysProperties) {
   const { held } = properties;
   return (

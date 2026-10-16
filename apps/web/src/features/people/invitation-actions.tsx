@@ -28,7 +28,6 @@ export type Ticked = ReadonlyMap<string, string>;
 
 export const NONE: Ticked = new Map();
 
-/** What the list hands its actions: the ticks, and where an action's outcome and its unsent emails land. */
 type ActedList = {
   /** False while the list's read waits or has failed, when its rows are not there to act on. */
   readonly readable: boolean;

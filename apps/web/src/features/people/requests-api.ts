@@ -6,7 +6,6 @@ import { useTRPC, type ApiError } from "@/shared/api/trpc.ts";
 
 export type WaitingRequest = inferOutput<ReturnType<typeof useTRPC>["members"]["requests"]>[number];
 
-/** A requester who has given no display name yet is named by their address. */
 export const requesterName = (request: WaitingRequest): string =>
   request.requester.name === "" ? request.requester.email : request.requester.name;
 

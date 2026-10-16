@@ -1,7 +1,6 @@
 import type { RefusalClass, RefusalWord } from "@/shared/api/trpc.ts";
 import { minutesUntil } from "@/shared/words.ts";
 
-/** The sentence each kind of failure shows unless a feature lists its own. */
 export const STOCK = {
   session: "Your session has expired. Please sign in again.",
   permission: "You don't have permission to do this.",
@@ -37,7 +36,6 @@ const STOCK_OF_CLASS = {
 const stockOfClass = (refusalClass: RefusalClass): string =>
   Object.hasOwn(STOCK_OF_CLASS, refusalClass) ? STOCK_OF_CLASS[refusalClass] : STOCK.general;
 
-/** The words a feature gives a sentence of its own; any other word shows its class's stock sentence. */
 export type OwnSentences = Partial<Record<RefusalWord, string>>;
 
 /** The same on every surface: the dialog answers the word, the sentence stands where the act was refused. */
@@ -48,12 +46,10 @@ const OWN_ON_EVERY_SURFACE = {
     "It's been over an hour since you confirmed your second factor. Please confirm it again.",
 } satisfies OwnSentences;
 
-/** The feature's own sentence for the word, else the stock sentence of the word's class. */
 export const refusalSentence = (
   own: OwnSentences,
   word: RefusalWord,
   refusalClass: RefusalClass,
 ): string => ({ ...OWN_ON_EVERY_SURFACE, ...own })[word] ?? stockOfClass(refusalClass);
 
-/** The label of each control that takes an ended or stale session to sign in. */
 export const SIGN_IN_AGAIN = "Sign In Again";

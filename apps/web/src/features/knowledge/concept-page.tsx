@@ -258,7 +258,6 @@ function Links(properties: { readonly concept: Concept; readonly heading: Headin
   );
 }
 
-/** The one disclosure: what else the file says of itself, under the file's own key names. */
 function Details(properties: { readonly concept: Concept }) {
   const further = furtherKeysOf(properties.concept.frontmatter);
   if (further.length === 0) return null;

@@ -4,7 +4,6 @@ export type Outcome =
   | { readonly tone: "said"; readonly words: ReactNode }
   | { readonly tone: "refused"; readonly words: ReactNode };
 
-/** Said when a row's keystroke is pressed and no row has held focus; the line names the row. */
 export const selectFirst = (line: string): Outcome => ({ tone: "said", words: line });
 
 /**

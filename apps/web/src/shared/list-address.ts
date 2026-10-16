@@ -2,10 +2,8 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { z } from "zod";
 
-/** What one key of the address holds: a word, a number, or nothing at all. */
 type Held = string | number | undefined;
 
-/** Each field's `.catch` is the list's default for a missing or malformed value. */
 export type ListFields = Readonly<Record<string, z.ZodCatch<z.ZodType<Held>>>>;
 
 type AddressState<Fields extends ListFields> = z.output<z.ZodObject<Fields>>;
@@ -13,7 +11,6 @@ type AddressState<Fields extends ListFields> = z.output<z.ZodObject<Fields>>;
 /** The router reads a whole number as one, so a page held as a quoted word is malformed too. */
 export const PAGE_NUMBER = z.number().int().min(1).catch(1);
 
-/** The query as the router parsed it, every page's keys together. */
 const QUERY = z.record(z.string(), z.unknown());
 
 type Query = z.output<typeof QUERY>;
@@ -52,7 +49,6 @@ export const useListAddress = <Fields extends ListFields>(prefix: string, fields
 
   // Replaced, never pushed, so typing fills no history; read from the address at the write, so
   // two writes in one handler both land.
-  /** Names fields one by one, for a caller that knows some of them but not the list's whole shape. */
   const writeHeld = (patch: readonly (readonly [string, unknown])[]): void => {
     void navigate({
       to: ".",

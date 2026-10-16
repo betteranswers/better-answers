@@ -79,7 +79,6 @@ function CodesActions(properties: {
   );
 }
 
-/** A ceiling carries no word, only its wait. What no response means is the page's to say. */
 export const codesUnanswered = (failure: Error | ApiError, unanswered: string): string => {
   const liftsIn = ceilingLiftsIn(failure);
   return liftsIn === undefined ? unanswered : stockWait(liftsIn);

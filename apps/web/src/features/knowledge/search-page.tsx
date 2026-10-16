@@ -73,14 +73,11 @@ const saidOf = (query: string, matches: Matches, shown: number): string => {
 
 type OpenedFor = Opened & { readonly query: string };
 
-/** Open for the search on the page, with its match still among the ones a re-read lists. */
 const stillListed = (opened: OpenedFor, query: string, shown: readonly Match[]): boolean =>
   opened.query === query && shown.some((match) => keyOf(match) === opened.key);
 
-/** Takes a line of its own where the kind beside it leaves too little room. */
 const TITLE = "min-w-0 grow basis-48 font-medium break-words";
 
-/** The match whose page the reader opened and came back from, where focus goes once. */
 type Returning = { readonly key: string | undefined; readonly landed: () => void };
 
 type Reading = {

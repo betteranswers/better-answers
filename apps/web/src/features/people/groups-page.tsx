@@ -38,7 +38,6 @@ const SEARCH_LABEL = "Search by name";
 
 const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.group);
 
-/** A row is a group, or a name asked for whose group the api has not answered yet. */
 type GroupRow = {
   readonly key: string;
   readonly name: string;
@@ -203,7 +202,6 @@ function GroupsList(properties: { readonly headingId: string }) {
     openInFocus("delete");
   });
 
-  /** A name the api has not answered yet has no group to act on. */
   const rowMenuOf = (row: GroupRow) =>
     row.group === undefined ? null : (
       <RowMenu

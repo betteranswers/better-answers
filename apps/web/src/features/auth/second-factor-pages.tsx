@@ -59,12 +59,10 @@ const USE_A_RECOVERY_CODE: Keystroke = { key: "u", action: CONFIRM_WORDS.recover
 
 const BACK_TO_CONFIRM: Keystroke = { key: "b", action: RECOVERY_WORDS.instead };
 
-/** A passkey counts only where this browser can use it. */
 const passkeyHere = (held: SecondFactor): boolean => held.passkeys.length > 0 && passkeysHere();
 
 const authenticatorHeld = (held: SecondFactor): boolean => held.authenticator === "set-up";
 
-/** The other ways a throttled page may name, in the order its sentence names them. */
 const otherWays = (held: SecondFactor, ways: readonly OtherWay[]): readonly OtherWay[] => {
   const holds = {
     passkey: passkeyHere(held),
@@ -74,7 +72,6 @@ const otherWays = (held: SecondFactor, ways: readonly OtherWay[]): readonly Othe
   return ways.filter((way) => holds[way]);
 };
 
-/** Undefined: the page draws. A confirmed session goes on, one with no factor to setup. */
 const confirmElsewhere = (
   held: SecondFactor,
   query: string,
@@ -85,7 +82,6 @@ const confirmElsewhere = (
   return undefined;
 };
 
-/** A session already granted setup spends no second code. */
 const recoveryElsewhere = (held: SecondFactor, query: string): string | undefined => {
   if (sessionOf(held).setupGranted || held.restoreRequired) return `${SETUP_STEP}${query}`;
   return sessionOf(held).confirmed ? stepAfterTheFactors(held, query) : undefined;
@@ -111,7 +107,6 @@ const saidOfThePasskeyRoute = (refused: CodeRefused): string => {
   return SAID_OF_A_PASSKEY_WORD.get(refused.word ?? "") ?? PASSKEY_CONFIRM_REFUSED;
 };
 
-/** A dismissed prompt is no refusal: the status line says no passkey was used. */
 const saidOfConfirmingByPasskey = (failure: Error | null): string | undefined => {
   if (failure === null) return undefined;
   if (failure instanceof DeviceRefused) return SAID_OF_THE_DEVICE[failure.reason];
@@ -123,7 +118,6 @@ const saidWhilePasskeyConfirms = (pending: boolean, failure: Error | null): stri
   return isCancelled(failure) ? CONFIRM_WORDS.passkeyNotUsed : null;
 };
 
-/** Never started on its own: the device asks only once the person presses. */
 function PasskeyWay(properties: {
   readonly buttonRef: FocusOnArrival;
   readonly onConfirmed: () => void;
@@ -160,7 +154,6 @@ function PasskeyWay(properties: {
   );
 }
 
-/** A throttle is said by its wait; a cancelled or wordless failure by its own words. */
 const saidOfConfirmingByCode = (failure: Error | null): string | undefined => {
   if (failure === null || isTooMany(failure)) return undefined;
   if (!(failure instanceof CodeRefused)) return STOCK.unconfirmed;

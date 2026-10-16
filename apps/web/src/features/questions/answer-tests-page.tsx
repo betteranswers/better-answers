@@ -14,7 +14,6 @@ const ANSWER_TESTS_WORDS = {
   why: "Each correction recorded becomes an answer test. Recording corrections is coming soon.",
 } as const;
 
-/** Nothing records a correction yet, so no answer test exists and the page reads no table. */
 export function AnswerTestsPage() {
   const headingId = useId();
 

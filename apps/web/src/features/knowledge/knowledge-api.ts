@@ -17,7 +17,6 @@ export type PassageMatch = Extract<Match, { readonly layer: "sources" }>;
 /** Spaces alone ask for nothing, so they send nothing. */
 export const asksNothing = (query: string): boolean => query.trim() === "";
 
-/** A page at a time, after each page's cursor; a query of spaces alone sends nothing. */
 export const useMatches = (query: string) => {
   const api = useTRPC();
   return useInfiniteQuery(

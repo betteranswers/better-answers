@@ -62,7 +62,6 @@ function PersonCell(properties: { readonly member: ListedMember; readonly refuse
   const { personId, displayName, address } = member;
   return (
     <span className="flex min-w-0 items-start gap-2">
-      {/* Below the small breakpoint the name needs the room more than its initials do. */}
       <Avatar aria-hidden className="mt-0.5 size-7 max-sm:hidden">
         <AvatarFallback className="text-xs">{initialsOf(nameOf(member))}</AvatarFallback>
       </Avatar>
@@ -94,7 +93,6 @@ function PersonCell(properties: { readonly member: ListedMember; readonly refuse
   );
 }
 
-/** The person's own cell marks a row a bulk action refused, so the refusals ride in. */
 export const memberColumns = (refused: RefusedRows) =>
   column.columns([
     column.accessor((member) => nameOf(member), {

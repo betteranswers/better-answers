@@ -39,7 +39,6 @@ function ModelChoiceFields(properties: { readonly modelChoice: WorkspaceModelCho
   );
 }
 
-/** Only an embedding model choice that exists is fixed, so a purpose with none carries no note. */
 function FixedNote(properties: { readonly modelChoice: WorkspaceModelChoice }) {
   const { modelChoice } = properties;
   if (modelChoice.purpose !== FIXED_PURPOSE || !isSet(modelChoice)) return null;
@@ -67,7 +66,6 @@ function ModelChoiceRow(properties: { readonly modelChoice: WorkspaceModelChoice
   );
 }
 
-/** With no model choice set, one line says so rather than five rows each saying it. */
 function ModelChoiceList(properties: { readonly modelChoices: readonly WorkspaceModelChoice[] }) {
   if (!properties.modelChoices.some(isSet)) return <p>{MODEL_CHOICES_WORDS.noneSet}</p>;
   return (
@@ -79,7 +77,6 @@ function ModelChoiceList(properties: { readonly modelChoices: readonly Workspace
   );
 }
 
-/** Said once for the card, however many purposes have no model choice. */
 function WhoSets(properties: { readonly modelChoices: readonly WorkspaceModelChoice[] }) {
   if (properties.modelChoices.every(isSet)) return null;
   return <p className="text-muted-foreground">{MODEL_CHOICES_WORDS.whoSets}</p>;

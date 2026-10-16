@@ -11,7 +11,6 @@ export const useMember = () => {
   return useQuery(memberOptions(api));
 };
 
-/** Asked once, for a page that draws nothing until the read answers. */
 export const useMemberAskedOnce = () => {
   const api = useTRPC();
   return useQuery({ ...memberOptions(api), retry: false });
@@ -22,11 +21,9 @@ export const useRole = () => {
   return useQuery({ ...memberOptions(api), select: (held) => held.role }).data;
 };
 
-/** Read after the shell's own read, which left no answer when it failed. */
 export const roleHeld = (queryClient: QueryClient, api: ApiProxy) =>
   queryClient.getQueryData(memberOptions(api).queryKey)?.role;
 
-/** The workspace the band names, which each request names in turn. */
 export const workspaceHeld = (queryClient: QueryClient, api: ApiProxy) =>
   queryClient.getQueryData(memberOptions(api).queryKey)?.workspace.id;
 
@@ -72,23 +69,15 @@ export const memberRefusal = async (
   }
 };
 
-/** A pick answers this question differently, so the answer held is wrong rather than stale. */
 export const forgetMember = (queryClient: QueryClient, api: ApiProxy) => {
   queryClient.removeQueries({ queryKey: memberOptions(api).queryKey });
 };
 
-/**
- * What a caller does about the answer held once the reader's own member has changed. Neither has
- * a default.
- */
 type MemberChange = {
-  /** False where no member is left to read. */
   readonly readAgain: boolean;
-  /** Unread, the answer held is the one from before the change. */
   readonly ifUnread: "reset" | "keep";
 };
 
-/** In place, so the shell moves straight to the new answer. Undefined when the member is unread. */
 export const memberChanged = async (
   queryClient: QueryClient,
   api: ApiProxy,

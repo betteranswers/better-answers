@@ -25,7 +25,6 @@ const saidOfTheDevice = (refused: DeviceRefused): string | undefined => {
   return refused.reason === "unverified" ? PASSKEY_SIGN_IN_NOT_VERIFIED : PASSKEY_SIGN_IN_REFUSED;
 };
 
-/** A dismissed prompt is no refusal; the status line says no passkey was used. */
 export const saidOfAPasskeySignIn = (failure: Error | null): string | undefined => {
   if (failure === null) return undefined;
   if (failure instanceof DeviceRefused) return saidOfTheDevice(failure);

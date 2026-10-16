@@ -71,7 +71,6 @@ export const useMembers = () => {
   return useQuery(api.members.list.queryOptions());
 };
 
-/** Each action on the list is asked of one person or of a ticked set. */
 const ASKED_OF = z.union([
   z.object({ personId: z.string() }).transform((asked) => [asked.personId]),
   z.object({ personIds: z.array(z.string()) }).transform((asked) => asked.personIds),
@@ -150,7 +149,6 @@ export const useChangeRole = () => {
   return useMutation({ ...api.members.changeRole.mutationOptions<Undo>(), ...reconciled });
 };
 
-/** The instant shown at once is the browser's; the list read after the answer holds the api's. */
 export const useEndEverySignInAndToken = () => {
   const api = useTRPC();
   const reconciled = useReconciledList((listed, asked: { readonly personId: string }) => {
@@ -165,7 +163,6 @@ export const useEndEverySignInAndToken = () => {
   });
 };
 
-/** The shell's own read of who is signed in, and where, shared rather than asked again. */
 const useHeldMember = () => useMember().data;
 
 export const useReaderId = (): string | undefined => useHeldMember()?.person.id;
@@ -173,10 +170,6 @@ export const useReaderId = (): string | undefined => useHeldMember()?.person.id;
 /** A switch keeps a removal's state, and the same person may be a member of both workspaces. */
 const ASKED_IN = z.object({ workspaceId: z.string() });
 
-/**
- * None until the reader's member read answers, which names the workspace a removal is matched by and
- * whether it removes the reader.
- */
 export const useRemoveMember = () => {
   const api = useTRPC();
   const workspaceId = useHeldMember()?.workspace.id;
@@ -212,7 +205,6 @@ export const useRemovalOf = (personId: string | undefined) => {
   }).at(-1);
 };
 
-/** Who a bulk action changed; the rest of the set was already as asked. */
 export type BulkChanged = inferOutput<Api["members"]["bulkChangeRole"]>;
 
 type Ticked = { readonly personIds: readonly string[] };

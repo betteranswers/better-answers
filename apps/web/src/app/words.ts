@@ -22,14 +22,11 @@ export const NAVIGATION_SHEET = "Menu";
 /** The band's line of places from the area down, named apart from the rail and the menu. */
 export const BREADCRUMB = "Breadcrumb";
 
-/** The switcher's way to the whole list of a person's workspaces. */
 export const ALL_WORKSPACES = "All Workspaces";
 
-/** Said of a switch this tab only read of: nothing was refused, so nothing is left to redo. */
 export const switchedInAnotherTab = (workspace: string): string =>
   `You switched to ${workspace} in another browser tab.`;
 
-/** Said by the one toggle in the band, which names the state it would move to. */
 export const TOGGLE = {
   hide: "Hide Menu",
   show: "Show Menu",
@@ -61,10 +58,8 @@ export const ROLE_UNREAD = STOCK.notLoaded;
 export const goHome = (home: Page | undefined): string =>
   home === undefined ? "Go to Your Home Page" : `Go to ${home.name}`;
 
-/** Said by a role's home while it is unbuilt. */
 export const UNBUILT_LINE = "This page is coming soon.";
 
-/** Claude is the one assistant admitted. A read-only tool left unallowed asks before every question. */
 export const CONNECT_ASSISTANT = {
   heading: "Connect Claude as Your Assistant",
   steps: [

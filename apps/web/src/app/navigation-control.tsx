@@ -16,7 +16,6 @@ type Sheeting = {
   readonly controlRef: RefObject<HTMLButtonElement | null>;
 };
 
-/** The frame's, so the button in the band and the sheet below it read one state. */
 export const useNavigationSheet = (): Sheeting => {
   const [asked, ask] = useState(false);
   const controlRef = useRef<HTMLButtonElement | null>(null);
@@ -24,10 +23,6 @@ export const useNavigationSheet = (): Sheeting => {
   return { asked, ask, controlRef };
 };
 
-/**
- * The toggle for the menu when wide, the sheet's button when narrow. `controls` is the
- * nav's id.
- */
 export function NavigationButton(properties: {
   readonly sheet: Sheeting;
   readonly wide: boolean;
@@ -56,7 +51,6 @@ export function NavigationButton(properties: {
     );
   }
 
-  // An address that is no page has no area to list, so there is nothing to govern.
   if (open === undefined) return null;
 
   return (
@@ -96,8 +90,6 @@ export function NavigationSheet(properties: {
 
   return (
     <Sheet open={asked && !properties.wide} onOpenChange={ask}>
-      {/* The regions keep the widths they have in the shell, so nothing here is a second
-          layout to maintain. */}
       <SheetContent
         side="left"
         className="w-sidebar max-w-full gap-0 overflow-y-auto p-0"

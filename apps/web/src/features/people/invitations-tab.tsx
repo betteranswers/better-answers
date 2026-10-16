@@ -45,7 +45,6 @@ import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST } from "./people-state.ts
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
 import { UnsentEmails } from "./unsent-emails.tsx";
 
-/** Each status's list is read whole, so the browser pages it. */
 const PAGE_SIZE = 25;
 
 const INVITATIONS_HEADING = "Invitations";
@@ -161,7 +160,6 @@ const tickedFrom =
       ]),
     );
 
-/** The row focus is in stands while the list still holds it. */
 const useInFocusKeystrokes = (properties: {
   readonly inFocus: ListedInvitation | undefined;
   readonly resend: (invitation: ListedInvitation) => void;
@@ -208,7 +206,6 @@ const rowMenuOf =
     );
   };
 
-/** Ticks and an action's outcome are the page's; what narrows the rows is the address's. */
 function InvitationList(properties: {
   readonly headingId: string;
   readonly heading: RefObject<HTMLHeadingElement | null>;

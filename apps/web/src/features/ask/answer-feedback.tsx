@@ -15,7 +15,6 @@ import { useGiveFeedback, type FeedbackInput } from "./ask-api.ts";
 import { ASK_KEYSTROKES as KEY, NOTE_MAX } from "./ask-state.ts";
 import { ASK_WORDS as WORDS } from "./ask-words.ts";
 
-/** A flag on a sentence or an `Answer` names it and the concept it rested on. */
 type Disputed = { readonly sentence: string; readonly concept: string };
 
 const { outcomeOfFailure } = refusalsOf({});
@@ -101,12 +100,10 @@ function FlagForm(properties: {
 
 type Flagging = {
   readonly recordId: string;
-  /** The control's name, which names its popover too. */
   readonly name: string;
   /** The words it shows, which its name begins with; absent, it shows its glyph alone. */
   readonly label?: string;
   readonly disputed?: Disputed;
-  /** Opened by the answer's own keystroke. */
   readonly keyed?: boolean;
 };
 

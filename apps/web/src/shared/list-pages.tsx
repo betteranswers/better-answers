@@ -101,7 +101,6 @@ export function ListState(properties: { readonly state: State }) {
   }
 }
 
-/** A table's body with no row: nothing matches what was typed, or `children` with nothing typed. */
 export function NothingListed(properties: {
   readonly search: string;
   readonly noneMatch: (search: string) => string;
@@ -160,7 +159,6 @@ export function ListRead<Failure>(properties: {
 type Pages = {
   readonly kind: "pages";
   readonly label: string;
-  /** The page `pageWithin` chose, the one the page's rows come from. */
   readonly pageIndex: number;
   readonly pageSize: number;
   readonly total: number;
@@ -171,7 +169,6 @@ type Pages = {
 
 type Turns = { readonly previous: Keystroke; readonly next: Keystroke };
 
-/** Load more takes a cursor's lists, where no total is known ahead. */
 type More = {
   readonly kind: "more";
   readonly label: string;
@@ -281,7 +278,6 @@ function LoadMore(properties: { readonly more: More }) {
   );
 }
 
-/** Pages over a list held whole, or Load more over a cursor's; nothing when one page holds it. */
 export function ListPages(properties: { readonly pages: Pages | More }) {
   const { pages } = properties;
   return pages.kind === "pages" ? <PageTurns pages={pages} /> : <LoadMore more={pages} />;

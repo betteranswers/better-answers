@@ -20,7 +20,6 @@ import { outcomeOfFailure } from "./refusal.tsx";
 import { submitRename } from "./rename-group-form.ts";
 import { nameOf } from "./words.tsx";
 
-/** Where focus lands when the sheet opens: on the group, or straight on one of its actions. */
 export type GroupOpenedAt = "group" | "members" | "rename" | "delete";
 
 export const groupButtonId = (groupId: string): string => `group-${groupId}`;

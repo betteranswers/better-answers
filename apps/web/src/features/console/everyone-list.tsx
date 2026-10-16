@@ -62,7 +62,6 @@ function PersonCell(properties: {
   );
 }
 
-/** The person's own cell opens them, so its actions ride into the columns. */
 const columnsFor = (actions: PersonActions) =>
   column.columns([
     column.display({
@@ -126,7 +125,6 @@ function OpenedSheet(properties: {
   );
 }
 
-/** A keystroke that cannot act says why through `say`; the search's own is the filter row's. */
 function usePeopleKeystrokes(properties: {
   readonly openInFocus: (at: OpenedAt) => void;
   readonly turns: PageTurns;

@@ -2,13 +2,11 @@ import type { Refusal, RefusalWord } from "@/shared/api/trpc.ts";
 import { refusalSentence, type OwnSentences } from "@/shared/refusal-words.ts";
 import { minutesUntil, PRODUCT_NAME } from "@/shared/words.ts";
 
-/** The one refusal a stale confirmation answers with, wherever an act was refused. */
 export const STALE_CONFIRMATION = "confirmation-too-old" satisfies RefusalWord;
 
 const INVITATION_LINK_INVALID =
   "This invitation link isn't valid. Please ask the person who invited you to send a new one.";
 
-/** Said on the invitation page, of its read and of joining alike. */
 export const SAID_OF_ACCEPTING = {
   "no-such-invitation": INVITATION_LINK_INVALID,
   "invitation-expired":
@@ -23,7 +21,6 @@ export const SAID_OF_ACCEPTING = {
 /** The one refusal asking to join names: every other says the same, so none reveals a workspace. */
 export const REASON_REFUSED = "Please enter a reason.";
 
-/** Said on the email step and of a new code alike, so its next step fits both. */
 export const CODE_NOT_SENT =
   "We couldn't send a code to that address. Please check it, or use a different email address.";
 
@@ -48,7 +45,6 @@ export const SOLE_PICK_REFUSED = "Something went wrong. Please reload the page."
 export const CONNECTION_UNFINISHED =
   "The connection couldn't be completed. Please start it again from the app you were connecting.";
 
-/** Said wherever a person changes their own second factor or spends a recovery code. */
 export const SAID_OF_SECOND_FACTOR = {
   "passkey-name-empty": "Please enter a name.",
   "passkey-name-too-long": "Name must be 64 characters or fewer.",
@@ -75,7 +71,6 @@ export const PASSKEY_HELD =
 export const PASSKEY_NOT_VERIFIED =
   "Your device couldn't verify it's you. Please use a device with a fingerprint, face or PIN check.";
 
-/** Said of adding a passkey and of confirming with one alike. */
 export const PASSKEY_ASK_EXPIRED = "Your device took too long to respond. Please try again.";
 
 /** A device that never held one of ours, or one removed since. */
@@ -109,7 +104,6 @@ export const tooManyCodesTriedOr = (
   others: readonly OtherWay[],
 ): string => `Too many attempts. Please try again ${waitNamed(waitSeconds)}${orUsing(others)}.`;
 
-/** Said where a setup is finished and where a sign-in is confirmed alike. */
 export const AUTHENTICATOR_CODE_WRONG =
   "Verification code is incorrect. Please enter the code your authenticator shows now.";
 
@@ -126,7 +120,6 @@ export const PASSKEY_CONFIRM_REFUSED =
 
 export const RESTORE_CODE_WRONG = `That restore code is incorrect or has expired. Please check it, or ask ${PRODUCT_NAME} support for a new one.`;
 
-/** Said where a sign-in without the right to set up asks to, before the page moves on. */
 export const SETUP_NOT_GRANTED = "Please confirm it's you before setting up a new second factor.";
 
 export const RESTORE_CODE_NEEDED = SAID_OF_SECOND_FACTOR["restore-code-needed"];

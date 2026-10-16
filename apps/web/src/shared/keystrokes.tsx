@@ -36,10 +36,6 @@ const OFF = "off";
  */
 const keystrokesAreOn = (): boolean => onThisBrowser()?.getItem(KEPT_UNDER) !== OFF;
 
-/**
- * A key typed into a field is the field's, one with a modifier the browser's, one inside a
- * dialog or menu that control's.
- */
 const OWNED_ELSEWHERE =
   'input, textarea, select, [contenteditable="true"], [role="combobox"], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
 
@@ -49,10 +45,6 @@ const isThePages = (event: KeyboardEvent): boolean => {
   return !(target instanceof Element) || target.closest(OWNED_ELSEWHERE) === null;
 };
 
-/**
- * Runs `action` on the bare key from anywhere but a field, dialog or menu, unless the reader turned
- * single-key keystrokes off.
- */
 export function useKeystroke(keystroke: Keystroke, action: () => void) {
   const pressed = useEffectEvent((event: KeyboardEvent) => {
     if (event.key !== keystroke.key || !isThePages(event) || !keystrokesAreOn()) return;
@@ -60,8 +52,6 @@ export function useKeystroke(keystroke: Keystroke, action: () => void) {
     if (!event.repeat) action();
   });
 
-  // The document is the one listener every region shares, so a keystroke works from wherever
-  // focus sits on the page.
   useEffect(() => {
     document.addEventListener("keydown", pressed);
     return () => {
@@ -97,7 +87,6 @@ const keepFocusAKeyMoved = (event: Event) => {
   if (focused !== null && focused !== document.body) event.preventDefault();
 };
 
-/** `children` holds the trigger, so a caller may wrap it in a tooltip of its own. */
 function KeystrokesList(properties: {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
@@ -166,7 +155,6 @@ export function KeystrokesAction(properties: {
       keystrokes={[...properties.keystrokes, LIST_THE_KEYSTROKES]}
     >
       <PopoverTrigger asChild>
-        {/* Outside the shell it sits in a row of secondary actions, which share one treatment. */}
         <Button variant="outline" aria-keyshortcuts={LIST_THE_KEYSTROKES.key}>
           {KEYSTROKE_WORDS.button}
         </Button>
@@ -185,19 +173,13 @@ type Listing = {
 
 const ListingContext = createContext<Listing | undefined>(undefined);
 
-/** Answers the way to take the keystrokes back off the list. */
 type Register = (keystrokes: readonly Keystroke[]) => () => void;
 
 const RegisterContext = createContext<Register | undefined>(undefined);
 
 const NONE: readonly Keystroke[] = [];
 
-/**
- * Owns `?` and the one list at every width; the open page adds its own keystrokes through
- * `usePageKeystrokes`.
- */
 export function ShellKeystrokes(properties: {
-  /** The open page's name; undefined at an address that names no page. */
   readonly page: string | undefined;
   /** Bound with a modifier, so turning single-key keystrokes off leaves them on. */
   readonly shell: readonly Keystroke[];
@@ -246,7 +228,6 @@ export function usePageKeystrokes(keystrokes: readonly Keystroke[]) {
   useEffect(() => register?.(keystrokes), [register, keystrokes]);
 }
 
-/** The way to the list besides `?`: in the rail's foot when wide, in the band when narrow. */
 export function ShellKeystrokesAction(properties: { readonly at: "rail" | "band" }) {
   const listing = useContext(ListingContext);
   if (listing === undefined) return null;

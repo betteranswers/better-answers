@@ -10,7 +10,6 @@ import { sentWithProgress } from "./upload-progress.ts";
 
 export const TRPC_ENDPOINT = "/trpc";
 
-/** What a hook's `error` is typed as: the class's shape without the class. */
 export type ApiError = TRPCClientErrorLike<AppRouter>;
 
 /**

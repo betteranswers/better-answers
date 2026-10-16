@@ -11,7 +11,6 @@ const SEPARATORS = /[,;\r\n]+/;
 /** The two words the api refuses one address of a send with, keyed by its place in the send. */
 export type Flag = "malformed" | "already-a-member";
 
-/** One address the dialog holds, by the key the api mints it under. */
 export type Held = { readonly key: string; readonly address: string };
 
 /** Trimmed and lower-cased, as the api keys an invitation, so two spellings fold into one. */
@@ -33,7 +32,6 @@ const takenInto = (held: readonly Held[], addresses: readonly string[]): Taken =
     { held, left: [] },
   );
 
-/** What the field holds after its text moves into the list; `capped` when the cap left some behind. */
 export type Moved = {
   readonly held: readonly Held[];
   readonly field: string;
@@ -63,7 +61,6 @@ export const hasSeparator = (text: string): boolean => SEPARATORS.test(text);
 export const addressesCounted = (text: string): number =>
   new Set(addressesIn(text.split(SEPARATORS)).map(keyOf)).size;
 
-/** The web's own checks first, then what the api said of the address when it last refused it. */
 export const flagOf = (
   one: Held,
   members: ReadonlySet<string>,

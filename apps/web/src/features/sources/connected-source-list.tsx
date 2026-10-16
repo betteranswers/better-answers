@@ -201,7 +201,6 @@ function ConnectedSourceItem(properties: {
 }) {
   const { connectedSource, actions } = properties;
   const headingId = connectedSourceHeadingId(connectedSource.connectedSourceId);
-  /** Every control in the row names its connected source as the one in focus, for the keystrokes. */
   const focused = () => {
     actions.onFocusConnectedSource(connectedSource.connectedSourceId);
   };

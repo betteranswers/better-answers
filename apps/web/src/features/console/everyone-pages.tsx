@@ -2,7 +2,6 @@ import { Button } from "@/shared/ui/button.tsx";
 
 import { PAGE_SIZE } from "./people-api.ts";
 
-/** The offset each turn would ask for, and none past either end. */
 export type PageTurns = {
   readonly previous: number | undefined;
   readonly next: number | undefined;

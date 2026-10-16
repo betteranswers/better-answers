@@ -16,16 +16,13 @@ export const CONCEPT_IRI = z
   .transform(iriOf)
   .refine((iri) => IRI.test(iri));
 
-/** Undefined for anything but a concept's IRI, so no other address is ever sent to a page here. */
 export const conceptPageOf = (iri: string): string | undefined => {
   const ulid = ulidOfConceptIri(iri);
   return ulid === undefined ? undefined : detailAt(SEARCH_PAGE, ulid);
 };
 
-/** A concept match's key on Search, which both its row and the way back to it name. */
 export const conceptMatchKey = (iri: string): string => `bundles:${iri}`;
 
-/** The query Search was left at, which only ever begins a query. */
 const SEARCH_QUERY = z.string().startsWith("?").optional().catch(undefined);
 
 /** Search with the query its reader left it at, so the way back finds the same matches. */

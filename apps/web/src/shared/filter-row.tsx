@@ -24,7 +24,6 @@ type Choice = { readonly value: string; readonly label: string };
 
 type Search = {
   readonly label: string;
-  /** The longest search the read accepts, so the box never sends one it refuses. */
   readonly maxLength?: number;
   readonly value: string;
   readonly onChange: (value: string) => void;

@@ -119,7 +119,6 @@ type BulkActionState = ReturnType<typeof useBulkAction>;
 
 type ActionProperties = {
   readonly connectedSourceId: string;
-  /** The id of the line that says what enables the action, while no group is ticked. */
   readonly enabledBy: string | undefined;
 };
 
@@ -228,7 +227,6 @@ function KeepInTextAction(properties: ActionProperties) {
   const keep = useKeepInText();
   const words = REVIEW_WORDS.keep;
   const groups = action.ready?.groups ?? [];
-  /** Counted off the groups the review listed, so the page reads nothing of the findings kept. */
   const findings = groups.reduce((sum, group) => sum + group.found, 0);
 
   const kept = (reason: string) => {

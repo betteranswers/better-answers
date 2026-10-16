@@ -92,7 +92,6 @@ const columns = column.columns([
   }),
 ]);
 
-/** Every column but the workspace can hide, so a row always says which it is. */
 const HIDEABLE = [
   { id: "shortName", label: HEADS.shortName },
   { id: "memberCount", label: HEADS.memberCount },

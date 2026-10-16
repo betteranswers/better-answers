@@ -10,7 +10,6 @@ export type SaidEvent = Pick<ReadAuditEvent, "action" | "by" | "subject" | "deta
 type Subject = SaidEvent["subject"];
 
 type Slots = {
-  /** Who acted, ready to open a sentence. */
   readonly by: string;
   readonly subject: Subject;
   readonly detail: SaidEvent["detail"];
@@ -33,7 +32,6 @@ const wordsOfName = (action: string): string => {
 const opening = (by: SaidEvent["by"]): string =>
   by.kind === "person" ? nameOrAddress(by.displayName, by.address) : sentenceCase(byWords(by));
 
-/** An action on a person's identity alone names no member, so its subject reads as a person. */
 const person = (subject: Subject | undefined): string => {
   if (subject?.kind === "person") return nameOrAddress(subject.displayName, subject.address);
   return subject?.kind === "former-member" ? GONE_WORDS["former-member"] : "a person";

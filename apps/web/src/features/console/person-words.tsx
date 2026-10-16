@@ -7,13 +7,11 @@ import type { HeldGrant, ListedPerson } from "./people-api.ts";
 export const nameOf = (person: ListedPerson): string =>
   nameOrAddress(person.displayName, person.email);
 
-/** A person with no display name is named by their address, which breaks as an address does. */
 export function PersonName(properties: { readonly person: ListedPerson }) {
   const { displayName, email } = properties.person;
   return displayName === "" ? <Address address={email} /> : displayName;
 }
 
-/** Past its expiry a grant refreshes nothing, though no action ended it. */
 export const grantStateOf = (grant: HeldGrant, nowMs: number): "Expired" | "Live" =>
   Date.parse(grant.expiresAt) <= nowMs ? "Expired" : "Live";
 
@@ -37,7 +35,6 @@ export function At(properties: { readonly iso: string }) {
   return <span className="tabular-nums">{instantWords(properties.iso)}</span>;
 }
 
-/** `none` says what an instant never recorded means here. */
 export function Instant(properties: { readonly at: string | null; readonly none: string }) {
   if (properties.at === null) {
     return <span className="text-muted-foreground">{properties.none}</span>;

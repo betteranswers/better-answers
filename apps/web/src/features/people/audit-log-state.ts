@@ -10,7 +10,6 @@ export const AUDIT_LOG_KEYSTROKES = {
   export: { key: "e", action: "Export the Events Shown as a File" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
-/** In the order the filter offers them. */
 export const FAMILIES = [
   "people",
   "knowledge",

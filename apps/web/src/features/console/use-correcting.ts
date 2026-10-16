@@ -9,7 +9,6 @@ import { correctingRefused } from "./words.ts";
 
 type CorrectName = ReturnType<typeof useCorrectDisplayName>;
 
-/** A refused name, back in the field to be mended; `byTheRule` says why where the rule refused it. */
 export type Refused = { readonly displayName: string; readonly byTheRule: Outcome | undefined };
 
 const outcomeOf = (correctName: CorrectName, was: string): Outcome | undefined => {
@@ -38,7 +37,6 @@ export const useCorrecting = () => {
   return {
     pending: correctName.isPending,
     outcome: outcomeOf(correctName, was),
-    /** Refused, so the person's action takes focus back. */
     otherwiseRefusedFor: refusedFor,
     refusedAt: (personId: string) => refusedOf(correctName, personId),
     save: (asked: {

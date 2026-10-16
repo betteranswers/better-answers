@@ -13,7 +13,6 @@ const PERSON = "person";
 /** Read through `askedIn`, so a return address under the older key still lands. */
 const ACTION: Ask = "action";
 
-/** The sheet's two actions, opened straight from the address. */
 export type FreshAction = "revoke" | "correct";
 
 export type Arrival = {

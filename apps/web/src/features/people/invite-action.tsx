@@ -53,7 +53,6 @@ import { outcomeOfSendingFailure } from "./refusal.tsx";
 import { ROLE_OFFERED_FIRST, RoleChoice } from "./role-choice.tsx";
 import { UnsentEmails } from "./unsent-emails.tsx";
 
-/** The keystroke list names the action as the button does, so inviting has one name. */
 const ACTION_NAME = PEOPLE_KEYSTROKES.invite.action;
 
 const NO_FLAGS: ReadonlyMap<string, Flag> = new Map();
@@ -74,7 +73,6 @@ const pastedInto = (event: ClipboardEvent<HTMLInputElement>): string | undefined
   return `${value.slice(0, selectionStart ?? value.length)}${pasted}${value.slice(selectionEnd ?? value.length)}`;
 };
 
-/** The addresses the dialog holds, each with what flags it, and where focus goes as one leaves. */
 const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef, left: string) => {
   const [held, setHeld] = useState(NOTHING_HELD);
   const [field, setField] = useState(left);
@@ -108,7 +106,6 @@ const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef, left: str
     focusFirstFlagged();
   };
 
-  /** Each row's Remove by its key: focus finds a row by what it holds, not by counting buttons. */
   const removeRefOf = (key: string) => (button: HTMLButtonElement) => {
     removers.current.set(key, button);
     return () => {
@@ -244,7 +241,6 @@ function AddressField(properties: {
           placed(typedInto(addresses.held, event.target.value));
         }}
         onKeyDown={(event) => {
-          // An empty field leaves Enter to the form, which sends.
           if (event.key !== "Enter" || addresses.field.trim() === "") return;
           event.preventDefault();
           placed(allInto(addresses.held, addresses.field));

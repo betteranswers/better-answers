@@ -32,7 +32,6 @@ import {
 } from "./person-words.tsx";
 import { readRefused } from "./words.ts";
 
-/** Where focus lands when the sheet opens: on the person, or straight on one of their actions. */
 export type OpenedAt = "person" | FreshAction;
 
 export const personButtonId = (personId: string): string => `person-${personId}`;
@@ -69,7 +68,6 @@ function Sessions(properties: { readonly sessions: readonly HeldSession[] }) {
   );
 }
 
-/** An open grant and an ended one share the assistant, the state, the facts and the client id. */
 function GrantItem(properties: {
   readonly grant: HeldGrant | EndedGrant;
   readonly state: string;

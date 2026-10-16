@@ -31,7 +31,6 @@ const codesUnseen = (held: Held | undefined): boolean => {
   return !held.codesAcknowledged;
 };
 
-/** The page a pending session confirms or sets up on; undefined for a session not pending. */
 const pendingStepOf = (held: Held | undefined): string | undefined => {
   const standing = held?.thisSession?.standing;
   if (standing === "confirm") return CONFIRM_STEP;
@@ -63,14 +62,12 @@ const secondFactorOrUnread = async (queryClient: QueryClient, api: ApiProxy, fre
   return held;
 };
 
-/** Where a page was, as the router names it and as the address bar holds a signed query. */
 export type LeftFrom = { readonly href: string; readonly query: string };
 
 /** A signed flow keeps its whole query; anything else comes back to the address it left. */
 export const detourTo = (step: string, from: LeftFrom): string =>
   carriedFlow(from.query) === "" ? backTo(step, from.href) : `${step}${from.query}`;
 
-/** Undefined: the session is not pending, or its standing went unread, and the page draws. */
 export const pendingDetour = async (
   queryClient: QueryClient,
   api: ApiProxy,
@@ -81,7 +78,6 @@ export const pendingDetour = async (
   return step === undefined ? undefined : detourTo(step, from);
 };
 
-/** The person's own pending step, read afresh; confirm when the read says nothing. */
 export const confirmDetour = async (
   queryClient: QueryClient,
   api: ApiProxy,
@@ -89,7 +85,6 @@ export const confirmDetour = async (
 ): Promise<string> =>
   (await pendingDetour(queryClient, api, from, true)) ?? detourTo(CONFIRM_STEP, from);
 
-/** Confirm or setup, then unseen codes: the step due before any later one. Undefined: none is. */
 const stepDue = (held: Held | undefined, query: string): string | undefined => {
   const pending = pendingStepOf(held);
   if (pending !== undefined) return `${pending}${query}`;
@@ -102,7 +97,6 @@ export const factorStepDue = async (
   query: string,
 ): Promise<string | undefined> => stepDue(await secondFactorOrUnread(queryClient, api), query);
 
-/** The factor steps first, then the display name, or on if one is given. */
 const stepAfterSignIn = async (
   queryClient: QueryClient,
   api: ApiProxy,
@@ -120,7 +114,6 @@ export const useStepAfterSignIn = () => {
     stepAfterSignIn(queryClient, api, query, displayNameGiven);
 };
 
-/** The codes step draws only for unseen codes, once the session is confirmed. Undefined: it draws. */
 export const codesDetour = async (
   queryClient: QueryClient,
   api: ApiProxy,

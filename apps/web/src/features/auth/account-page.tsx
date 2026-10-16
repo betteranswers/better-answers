@@ -86,7 +86,6 @@ const useAccountActions = (
     acknowledge.reset();
   };
 
-  /** The name is suggested as the add opens, from the browser that will hold the passkey. */
   const toggleAdd = () => {
     if (!addOpen) setSuggestedName(passkeyNameFor(navigator.userAgent));
     setAddOpen(!addOpen);
@@ -220,7 +219,6 @@ const failureOnThePage = (read: SecondFactorRead, actions: AccountActions) => {
   return { failure: made, unanswered: codesUnanswered(made, STOCK.unconfirmed) };
 };
 
-/** The opening actions of the passkeys and the authenticator, each offered while it is closed. */
 const openingKeystrokes = (
   read: SecondFactorRead,
   actions: AccountActions,
@@ -252,7 +250,6 @@ const useSteadyKeystrokes = (keystrokes: readonly Keystroke[]): readonly Keystro
   return steady;
 };
 
-/** In the shell, whose band holds sign-out and the way on, and whose list holds these keys. */
 function InTheShell(properties: {
   readonly keystrokes: readonly Keystroke[];
   readonly children: ReactNode;

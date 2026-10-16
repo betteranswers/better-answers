@@ -103,10 +103,6 @@ function InvitationList(properties: {
   );
 }
 
-/**
- * The refusal's region stands empty from the first render. Nothing else shows while the read is
- * out, or when it finds none.
- */
 function Invitations(properties: { readonly read: InvitationsRead; readonly carried: string }) {
   const { read } = properties;
   const listed = listedIn(read);

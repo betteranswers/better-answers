@@ -53,7 +53,6 @@ import { SignOutButton } from "./sign-out-button.tsx";
 
 const SET_UP_INSTEAD: Keystroke = { key: "s", action: SETUP_WORDS.authenticatorInstead };
 
-/** First: holds none. New: a recovery code granted this session. Restored: by the operator. */
 type Variant = "first" | "new" | "restored";
 
 type SettingUp = {
@@ -99,7 +98,6 @@ const headingRefOnMount = (node: HTMLHeadingElement | null): void => {
   node?.focus();
 };
 
-/** The codes as the page itself: its `h1`, then Finish setup and on to the display name. */
 function CodesToFinish(properties: { readonly inHand: CodesInHand; readonly query: string }) {
   const navigate = useNavigate();
   const acknowledge = useAcknowledgeRecoveryCodes();
@@ -151,7 +149,6 @@ const keystrokesOf = (ready: boolean, open: boolean, keyShown: boolean): readonl
   return open && keyShown ? [SET_UP_INSTEAD, COPY_KEY] : [SET_UP_INSTEAD];
 };
 
-/** The authenticator's disclosure and its start live here, so the keystrokes list follows them. */
 const useSetup = (standing: Standing | undefined, onNotGranted: () => void) => {
   const granted = standing?.kind === "setting-up" && standing.granted;
   const routes = granted ? NEW_AUTHENTICATOR : FIRST_AUTHENTICATOR;
@@ -190,7 +187,6 @@ function AuthenticatorInstead(properties: {
   readonly setup: Setup;
   readonly controls: string;
   readonly unavailable: boolean;
-  /** Lands focus on arrival where no passkey can be made here. */
   readonly onArrival: FocusOnArrival | null;
 }) {
   const { setup, controls, unavailable, onArrival } = properties;
@@ -343,7 +339,6 @@ function SettingUpBody(properties: {
   );
 }
 
-/** Codes in hand hold the page; a refusal of the grant, or a setup with none, moves on. */
 const goesTo = (
   standing: Standing | undefined,
   inHand: CodesInHand | undefined,

@@ -2,7 +2,6 @@ import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 
 import { dayWords, instantWords, PRODUCT_NAME } from "@/shared/words.ts";
 
-/** The page's heading, and its name in the avatar menu and the links that reach it. */
 export const ACCOUNT_HEADING = "Account";
 
 export const ACCOUNT_WORDS = {
@@ -57,7 +56,6 @@ export const PASSKEY_WORDS = {
   dismissOffer: "Dismiss Passkey Offer",
 } as const;
 
-/** `Added 3 March 2026 · Last used 09:41 · 30 September 2026`, or `· Not used yet`. */
 export const passkeyDates = (createdAt: string, lastUsedAt: string | null): string =>
   `Added ${dayWords(createdAt)} · ${
     lastUsedAt === null ? PASSKEY_WORDS.notUsed : `Last used ${instantWords(lastUsedAt)}`
@@ -83,7 +81,6 @@ const SYSTEMS = [
   { pattern: /Linux/, system: "Linux" },
 ] as const;
 
-/** `Chrome on macOS`, or `Passkey` for a browser the list doesn't name. */
 export const passkeyNameFor = (userAgent: string): string => {
   const browser = BROWSERS.find((entry) => entry.pattern.test(userAgent))?.browser;
   const system = SYSTEMS.find((entry) => entry.pattern.test(userAgent))?.system;
@@ -146,7 +143,6 @@ export const codesLeft = (unused: number, madeAt: string): string =>
 /** The api sends the notice without waiting on it, so the page never says it arrived. */
 const noticeTo = (address: string): string => `A confirmation email is on its way to ${address}.`;
 
-/** Said once an action lands, with the notice every change of a second factor sends. */
 export const ACTION_LANDED = {
   passkeyAdded: (name: string, address: string) =>
     `Passkey “${name}” has been added successfully. ${noticeTo(address)}`,
@@ -165,7 +161,6 @@ export const ACTION_LANDED = {
 
 export const RECOVERY_CODES_FILE = `${PRODUCT_NAME}-recovery-codes.txt`;
 
-/** What the download holds: whose codes they are and when they were made, then one per line. */
 export const recoveryCodesText = (
   codes: readonly string[],
   address: string,

@@ -34,7 +34,6 @@ export const useSelfActionHome = () => {
     // What the reader may see has changed, so no read held from before answers a page they open next.
     void queryClient.resetQueries({ type: "inactive" });
     if (change === "removed") {
-      // No member is left to read, so the held answer goes unread.
       void memberChanged(queryClient, api, { readAgain: false, ifUnread: "reset" });
       // Not `/`: the session still names the workspace left, and the shell sends that refusal to sign-in.
       await navigate({ href: "/choose-workspace", replace: true });
@@ -61,7 +60,6 @@ export function HomeLine() {
     select: (state) => SENT_HOME.safeParse(state.location.state).data?.homeOf,
   });
 
-  // A status alone: this line never refuses, and the frame keeps it on every page.
   return (
     <output className="mb-4 block text-muted-foreground empty:sr-only">
       {role === undefined ? null : homeNowSaid(role)}

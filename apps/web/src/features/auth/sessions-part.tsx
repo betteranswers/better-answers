@@ -30,7 +30,6 @@ import {
 
 const SESSIONS_HEADING = "sessions-heading";
 
-/** The sessions the read holds, without the ones a sign-out has already taken away. */
 const heldAfter = (read: SessionsRead, taken: ReadonlySet<string>): readonly SessionShown[] =>
   (read.data ?? []).filter((session) => !taken.has(session.id));
 
@@ -83,7 +82,6 @@ function AnotherSession(properties: {
   );
 }
 
-/** The Sessions section of the Account page: the person's own, and no one else's. */
 export function SessionsSection() {
   const read = useSessions();
   const signOut = useSignOutSession();

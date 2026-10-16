@@ -13,7 +13,6 @@ import {
 import { workspaceHeld } from "@/shared/member.ts";
 import { useThemeFollowed } from "@/shared/theme.ts";
 
-/** What hears a failure once a router can say where it leads: the router is made after the cache. */
 type FailureListener = {
   readonly heard: FailureHeard;
   readonly answeredBy: (answer: FailureHeard) => void;

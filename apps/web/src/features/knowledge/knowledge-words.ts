@@ -17,7 +17,6 @@ export const SEARCH_WORDS = {
   document: "Document",
 } as const;
 
-/** A relation's kind as the map names it, in a reader's words; any other kind is shown untagged. */
 export const RELATION_WORDS: ReadonlyMap<string, string> = new Map([
   ["LINKS_TO", "Links to"],
   ["SUPERSEDES", "Supersedes"],

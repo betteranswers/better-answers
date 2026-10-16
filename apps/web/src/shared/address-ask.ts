@@ -1,7 +1,6 @@
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-/** What another place may ask of a page as it opens: one of its actions, or a search. */
 export type Ask = "action" | "search";
 
 /** Each ask's older key, which a bookmark or a saved sign-in return address can still carry. */
@@ -10,7 +9,6 @@ const ASKED_BEFORE = {
   search: undefined,
 } as const satisfies Readonly<Record<Ask, string | undefined>>;
 
-/** Whether the router would read a value as JSON, and the string it would read where it is one. */
 type Read = { readonly asJson: boolean; readonly string: string | undefined };
 
 const readOf = (value: string): Read => {
@@ -18,7 +16,6 @@ const readOf = (value: string): Read => {
     const read: unknown = JSON.parse(value);
     return { asJson: true, string: typeof read === "string" ? read : undefined };
   } catch {
-    // That it is no JSON is the whole answer, so the error says nothing more.
     return { asJson: false, string: undefined };
   }
 };
@@ -54,7 +51,6 @@ export const askingHere = (here: Here, path: string, ask: Ask, value: string): s
  * reload from asking again.
  */
 export const useAsked = (ask: Ask, take: (value: string) => void): void => {
-  // Its own key alone, so a list writing the rest of the query does not draw the page again.
   const asked = useRouterState({
     select: (state) => askedIn(new URLSearchParams(state.location.searchStr), ask),
   });

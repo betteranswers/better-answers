@@ -40,7 +40,6 @@ type Jump = {
   /** Unique across the list, so two namesakes are never one selection. */
   readonly value: string;
   readonly name: string;
-  /** Where it sits, or whose address it is. */
   readonly said: string | undefined;
   readonly icon: IconName;
   readonly to: string;
@@ -249,10 +248,8 @@ export const useJumping = (offered: boolean): Jumping => {
 
 const ON_APPLE = typeof navigator !== "undefined" && /Mac|iPhone|iPad/u.test(navigator.platform);
 
-/** As the reader's own keyboard labels it; either chord works on any. */
 const CHORD = ON_APPLE ? "⌘K" : "Ctrl K";
 
-/** For the shell's list of keystrokes, which names it on every page. */
 export const JUMP_TO_KEYSTROKE: Keystroke = { key: CHORD, action: JUMP_TO.name };
 
 function Trigger(properties: {
@@ -392,7 +389,6 @@ function WithMembers(properties: Listed) {
   );
 }
 
-/** The frame says whether it is offered, as it does for the chord and the list of keystrokes. */
 export function JumpTo(properties: {
   readonly offered: boolean;
   readonly wide: boolean;

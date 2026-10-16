@@ -35,7 +35,6 @@ const questions = menuGroupIn(CONTROL_CENTRE, "questions");
 
 const LISTED = Object.values(KEY);
 
-/** The read has no sentence of its own, so each refusal shows its class's. */
 const { outcomeOfFailure } = refusalsOf({});
 
 const NOTHING_IN_FOCUS = selectFirst(WORDS.selectFirst);
@@ -46,7 +45,6 @@ const recordsOf = (data: QuestionsAsked["data"]): readonly AskedRecord[] =>
 type RowActions = {
   readonly open: (recordId: string) => void;
   readonly focusedOn: (recordId: string) => void;
-  /** Where each record stands in the order the read served it, which Load more lands by. */
   readonly servedAt: ReadonlyMap<string, number>;
   readonly landing: Landing;
 };

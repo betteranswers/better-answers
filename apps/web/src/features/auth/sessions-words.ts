@@ -23,10 +23,8 @@ export const SESSIONS_WORDS = {
   consequence: "Each one ends now. Personal tokens keep working, and Claude stays connected.",
 } as const;
 
-/** The line under a session's device: when it was last active. */
 export const lastActiveAt = (iso: string): string => `Last active ${instantWords(iso)}`;
 
-/** The button a row carries, named by the device the row shows. */
 export const signOutNamed = (device: string): string => `Sign out ${device}`;
 
 export const everywhereTitle = (others: number): string =>

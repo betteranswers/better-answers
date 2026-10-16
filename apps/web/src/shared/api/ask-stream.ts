@@ -1,13 +1,8 @@
 /** How one collection's drafted part ended; `paused` means drafting stopped at the spending limit. */
 type DraftOutcome = "drafted" | "refused" | "failed" | "paused";
 
-/** One drafted sentence, with the concepts it cites. */
 type DraftedSentence = { readonly sentence: string; readonly concepts: readonly string[] };
 
-/**
- * An answer's stream: its phase, then the whole result before any prose, then each drafted
- * sentence and each part's end. A keep-alive carries nothing.
- */
 export type AskStreamEvent<Result extends object> =
   | { readonly kind: "phase"; readonly phase: string }
   | { readonly kind: "keep-alive" }
@@ -19,14 +14,12 @@ export type AskStreamEvent<Result extends object> =
       readonly outcome: DraftOutcome;
     };
 
-/** One collection's prose; its outcome is undefined while it is still being drafted. */
 export type ProsePart = {
   readonly collection: string | null;
   readonly sentences: readonly DraftedSentence[];
   readonly outcome: DraftOutcome | undefined;
 };
 
-/** The result an answer's stream carries, with the prose drafted after it, part by part. */
 export type Asked<Result extends object> = Result & { readonly prose: readonly ProsePart[] };
 
 /** A collection's part is made by its first event, and each later one adds to it. */

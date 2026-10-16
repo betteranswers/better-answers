@@ -12,10 +12,6 @@ export const isFilled = (toolbar: PageToolbar | undefined): toolbar is PageToolb
 
 const OpenTab = createContext<string | undefined>(undefined);
 
-/**
- * A page sits under the outlet, where the shell cannot hand it a prop. Undefined when the
- * page has no tabs.
- */
 export const useOpenTab = (): string | undefined => useContext(OpenTab);
 
 export function OpenTabProvider(properties: {
@@ -61,10 +57,6 @@ export function ViewStateSlot(properties: { readonly children: ReactNode }) {
   return <ViewState.Provider value={slot}>{properties.children}</ViewState.Provider>;
 }
 
-/**
- * A page declares its slot once and its content and its actions call what this hands back, so
- * the type is stated in one place.
- */
 export function viewStateOf<Value>(page: string) {
   const key = Symbol(page);
   /**

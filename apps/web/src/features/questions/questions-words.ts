@@ -19,13 +19,11 @@ const CLOSING_WORDS = {
   "no-fault-in-the-knowledge": "No fault in the knowledge",
 } as const satisfies Readonly<Record<FlagClosing, string>>;
 
-/** The control's own label, in a button's casing. */
 export const CLOSE_AS = {
   "fixed-in-the-knowledge": "Fixed in the Knowledge",
   "no-fault-in-the-knowledge": "No Fault in the Knowledge",
 } as const satisfies Readonly<Record<FlagClosing, string>>;
 
-/** The order the two closings are offered in. */
 export const CLOSINGS = [
   "fixed-in-the-knowledge",
   "no-fault-in-the-knowledge",
@@ -45,7 +43,6 @@ const RIDER_WORDS: ReadonlyMap<string, string> = new Map([
 
 type TrustThen = ConceptRead["trustThen"];
 
-/** A record never keeps who verified a concept, so a person's verification names none. */
 const verifiedWords = (trust: TrustThen): string => {
   const rider = trust.rider === null ? "" : (RIDER_WORDS.get(trust.rider) ?? "");
   switch (trust.tier) {
@@ -60,7 +57,6 @@ const verifiedWords = (trust: TrustThen): string => {
   }
 };
 
-/** The trust words a concept wore when the question was asked. */
 export const trustThenWords = (trust: TrustThen): string =>
   STATUS_WORDS.get(trust.status) ?? verifiedWords(trust);
 
@@ -79,7 +75,6 @@ export const QUESTIONS_WORDS = {
   others: "Other Questions",
   notAnswered: "Not Answered",
   noCollection: CONCEPT_WORDS.noCollection,
-  /** The group for none, in a heading's casing. */
   noCollectionHeading: "No Collection",
   more: "More Questions",
   removed: "Question removed by an erasure",

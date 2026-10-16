@@ -76,7 +76,6 @@ const seenOf = (
   return read.error === null ? CHECKING : { state: "unread", failure: read.error };
 };
 
-/** What the page's actions stand on, handed to whichever state is shown. */
 type Acting = {
   readonly signingIn: boolean;
   readonly signInFailure: Error | null;
@@ -85,7 +84,6 @@ type Acting = {
   readonly onCopy: (code: string) => void;
   readonly reading: boolean;
   readonly onReadAgain: () => void;
-  /** The query the clicked link carried, or nothing before a click. */
   readonly carried: string;
 };
 
@@ -148,7 +146,6 @@ function CodeToType(properties: {
   );
 }
 
-/** `carried` is the flow the clicked link carried, so a fresh sign-in still returns where it would. */
 function BackToSignIn(properties: { readonly focused: boolean; readonly carried: string }) {
   const navigate = useNavigate();
   const back = `/sign-in${properties.carried}`;
@@ -280,7 +277,6 @@ export function LinkPage() {
   const read = useDescribeTheLink(token, clicked === undefined);
   const signIn = useSignInByLink();
 
-  // The browser's history is outside React; the token leaves it once this page has read it.
   useEffect(dropTheLinkToken, []);
 
   const landAfterSignIn = (signedIn: SignedInByLink) => {

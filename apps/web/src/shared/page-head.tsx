@@ -13,7 +13,6 @@ export const PageHeadSlot = createContext<HTMLElement | null | undefined>(undefi
 export function PageHead(properties: {
   readonly heading: string;
   readonly summary?: string | undefined;
-  /** Given by a page that sends focus to its first heading. */
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
 }) {
   const { heading, summary, headingRef } = properties;
@@ -39,7 +38,6 @@ export function PageHead(properties: {
 export function ListHead(properties: {
   readonly heading: string;
   readonly headingId: string;
-  /** Given by a list that sends focus to its heading. */
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
   readonly description?: ReactNode;
   /** Empty while the list is unread; the region stands, so its first words are announced. */

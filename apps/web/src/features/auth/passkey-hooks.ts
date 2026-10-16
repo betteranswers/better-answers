@@ -27,12 +27,10 @@ const SIGN_IN_OPTIONS_PATH = "/passkeys/sign-in-options";
 
 const SIGN_IN_PATH = "/passkeys/sign-in";
 
-/** Whether this browser can make or use a passkey at all. */
 export const passkeysHere = (): boolean => browserSupportsWebAuthn();
 
 export type DeviceRefusal = "cancelled" | "held" | "unverified" | "failed";
 
-/** The device answered without a passkey: the person cancelled, or it could not do the asking. */
 export class DeviceRefused extends Error {
   readonly reason: DeviceRefusal;
 
@@ -111,7 +109,6 @@ export const useRemovePasskey = () => {
   return useMutation(api.person.removePasskey.mutationOptions({ onSettled: reread }));
 };
 
-/** The offer goes as it is dismissed; a dismissal that fails offers it again on the next read. */
 export const useDismissPasskeyOffer = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -134,7 +131,6 @@ const askToSignIn = () => askOfOurRoute(SIGN_IN_OPTIONS_PATH, {}, askedToSignIn)
 const signInWith = (response: AuthenticationResponseJSON): Promise<SignedIn> =>
   askOfOurRoute(SIGN_IN_PATH, { response }, signedInByPasskey);
 
-/** The route's challenge, answered by this device; a device's refusal reads as `DeviceRefused`. */
 export const answeredByThisDevice = async (
   optionsPath: string,
 ): Promise<AuthenticationResponseJSON> => {
