@@ -20,11 +20,14 @@ from testcontainers.community.postgres import PostgresContainer
 
 from pg_harness import (
     LOCATOR,
+    REPO_ROOT,
     _migrated_cluster,
     ensure_template,
     login_in_role,
     migrated_postgres_at,
     on_database,
+    pinned_postgres_image,
+    shared_address,
     sweep_dead_cases,
 )
 
@@ -183,6 +186,88 @@ def test_refuses_a_locator_signed_in_as_no_superuser(
             admin.execute(SQL("DROP ROLE {}").format(Identifier(login)))
 
     _assert_one_line_naming_the_way_out(message)
+
+
+PORT_OVERRIDE = "TEST_POSTGRES_PORT"
+OTHER_IMAGE = f"other/image:tag@sha256:{'0' * 64}"
+
+
+@pytest.mark.parametrize("port", [None, "54999"], ids=["derived", "overridden"])
+def test_shared_address_matches_the_scripts_uri(
+    monkeypatch: pytest.MonkeyPatch, port: str | None
+) -> None:
+    # The script honours a caller-set image and the harness never does.
+    monkeypatch.delenv("TEST_POSTGRES_IMAGE", raising=False)
+    monkeypatch.delenv(PORT_OVERRIDE, raising=False)
+    if port is not None:
+        monkeypatch.setenv(PORT_OVERRIDE, port)
+    printed = subprocess.run(
+        ("bash", str(REPO_ROOT / "deploy" / "test-postgres.sh"), "address"),
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    lines = dict(line.split(" ", 1) for line in printed.splitlines() if " " in line)
+
+    assert shared_address() == lines["uri"]
+
+
+@contextmanager
+def _throwaway_postgres(command: str | None) -> Iterator[int]:
+    container = PostgresContainer(
+        pinned_postgres_image(), username="postgres", password="postgres"
+    )
+    if command is not None:
+        container.with_command(command)
+    container.start()
+    try:
+        yield int(container.get_exposed_port(5432))
+    finally:
+        container.stop()
+
+
+@pytest.fixture(name="unstamped_port", scope="module")
+def an_unstamped_server() -> Iterator[int]:
+    with _throwaway_postgres(None) as port:
+        yield port
+
+
+@pytest.fixture(name="other_image_port", scope="module")
+def a_server_stamped_with_another_image() -> Iterator[int]:
+    with _throwaway_postgres(f"postgres -c better_answers.image={OTHER_IMAGE}") as port:
+        yield port
+
+
+def _uri_at(port: int) -> str:
+    return f"postgresql://postgres:postgres@127.0.0.1:{port}/postgres"
+
+
+@pytest.mark.xdist_group("throwaway-postgres")
+def test_shared_refuses_a_server_with_no_image_stamp(
+    unstamped_port: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(PORT_OVERRIDE, str(unstamped_port))
+
+    message = _refusal_for("shared", monkeypatch)
+
+    _assert_one_line_naming_the_way_out(message)
+    assert "no image stamp" in message
+
+
+@pytest.mark.xdist_group("throwaway-postgres")
+@pytest.mark.parametrize("form", ["shared", "explicit"])
+def test_refuses_a_server_stamped_with_another_image(
+    other_image_port: int, monkeypatch: pytest.MonkeyPatch, form: str
+) -> None:
+    monkeypatch.setenv(PORT_OVERRIDE, str(other_image_port))
+    locator = "shared" if form == "shared" else _uri_at(other_image_port)
+
+    message = _refusal_for(locator, monkeypatch)
+
+    _assert_one_line_naming_the_way_out(message)
+    assert f"stamped {OTHER_IMAGE}" in message
+    assert pinned_postgres_image() in message
 
 
 def test_two_racing_callers_build_one_template_once(
