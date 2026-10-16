@@ -1,16 +1,19 @@
 import atexit
 import hashlib
 import json
+import os
 import re
-from collections.abc import Iterator
-from contextlib import contextmanager
+import time
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager, suppress
 from functools import cache
 from itertools import count
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 from urllib.parse import urlsplit
 
 import psycopg
+from psycopg import errors
 from psycopg.sql import SQL, Identifier, Literal
 from testcontainers.community.postgres import PostgresContainer
 
@@ -99,10 +102,35 @@ def on_database(conninfo: str, database: str) -> str:
     return urlsplit(conninfo)._replace(path=f"/{database}").geturl()
 
 
+LOCATOR = "TEST_POSTGRES_URI"
+UP_COMMAND = "deploy/test-postgres.sh up"
+
+# Advisory locks conflict only within one database; the vitest tier shares this key.
+_TAKE_BUILD_LOCK = (
+    "SELECT pg_advisory_lock(hashtextextended('better-answers template build', 0))"
+)
+_RELEASE_BUILD_LOCK = (
+    "SELECT pg_advisory_unlock(hashtextextended('better-answers template build', 0))"
+)
+_SESSIONS_GONE_WITHIN_SECONDS = 30
+
+
+class Cluster(NamedTuple):
+    conninfo: str
+    template: str
+
+
 # A container costs a second and a half and a clone a fiftieth: one container per
 # process, one clone per test.
 @cache
-def _migrated_cluster() -> str:
+def _migrated_cluster() -> Cluster:
+    locator = os.environ.get(LOCATOR, "").strip()
+    if locator:
+        return _located_cluster(locator)
+    return _container_cluster()
+
+
+def _container_cluster() -> Cluster:
     container = PostgresContainer(pinned_postgres_image(), dbname=MIGRATED_TEMPLATE)
     container.start()
     atexit.register(container.stop)
@@ -110,7 +138,138 @@ def _migrated_cluster() -> str:
         "postgresql+psycopg2", "postgresql"
     )
     apply_journal(conninfo)
-    return conninfo
+    return Cluster(conninfo, MIGRATED_TEMPLATE)
+
+
+def _located_cluster(locator: str) -> Cluster:
+    maintenance = on_database(locator, "postgres")
+    _refuse_unless_superuser(maintenance)
+    sweep_dead_cases(maintenance)
+    return Cluster(
+        maintenance, ensure_template(maintenance, template_name(), apply_journal)
+    )
+
+
+def _refuse_unless_superuser(maintenance: str) -> None:
+    try:
+        with psycopg.connect(maintenance, connect_timeout=5) as connection:
+            row = connection.execute(
+                "SELECT rolsuper FROM pg_roles WHERE rolname = current_user"
+            ).fetchone()
+    except (psycopg.OperationalError, psycopg.ProgrammingError) as error:
+        reason = (str(error).splitlines() or [""])[0]
+        message = f"{LOCATOR} reaches no Postgres ({reason}): run `{UP_COMMAND}`"
+        raise RuntimeError(message) from None
+    if row is None or not row[0]:
+        message = (
+            f"{LOCATOR} signs in as no superuser: export the URI `{UP_COMMAND}` prints"
+        )
+        raise RuntimeError(message)
+
+
+def template_name() -> str:
+    digest = hashlib.sha256()
+    files = sorted(
+        (path.relative_to(MIGRATIONS_DIR).as_posix(), path)
+        for path in MIGRATIONS_DIR.rglob("*")
+        if path.is_file()
+    )
+    for relative, path in files:
+        digest.update(relative.encode("utf-8") + b"\0" + path.read_bytes() + b"\0")
+    digest.update(Path(__file__).read_bytes())
+    return f"tpl_py_{digest.hexdigest()[:12]}"
+
+
+def _exists(admin: psycopg.Connection, database: str) -> bool:
+    found = admin.execute(
+        "SELECT 1 FROM pg_database WHERE datname = %s", (database,)
+    ).fetchone()
+    return found is not None
+
+
+def _alter(admin: psycopg.Connection, database: str, clause: str) -> None:
+    admin.execute(SQL("ALTER DATABASE {} ").format(Identifier(database)) + SQL(clause))
+
+
+def _until_sessions_gone(admin: psycopg.Connection, database: str) -> None:
+    deadline = time.monotonic() + _SESSIONS_GONE_WITHIN_SECONDS
+    while _exists_session_on(admin, database):
+        if time.monotonic() > deadline:
+            message = f"a session stayed on {database} after its build returned"
+            raise RuntimeError(message)
+        time.sleep(0.05)
+
+
+def _exists_session_on(admin: psycopg.Connection, database: str) -> bool:
+    found = admin.execute(
+        "SELECT 1 FROM pg_stat_activity WHERE datname = %s", (database,)
+    ).fetchone()
+    return found is not None
+
+
+def _publish(
+    admin: psycopg.Connection,
+    maintenance: str,
+    name: str,
+    build: Callable[[str], None],
+) -> None:
+    building = f"{name}_building"
+    if _exists(admin, building):
+        # Postgres refuses to drop a database still marked as a template.
+        _alter(admin, building, "IS_TEMPLATE false")
+        admin.execute(SQL("DROP DATABASE {} WITH (FORCE)").format(Identifier(building)))
+    admin.execute(SQL("CREATE DATABASE {}").format(Identifier(building)))
+    build(on_database(maintenance, building))
+    _until_sessions_gone(admin, building)
+    _alter(admin, building, "ALLOW_CONNECTIONS false")
+    _alter(admin, building, "IS_TEMPLATE true")
+    admin.execute(
+        SQL("ALTER DATABASE {} RENAME TO {}").format(
+            Identifier(building), Identifier(name)
+        )
+    )
+
+
+def ensure_template(
+    maintenance_conninfo: str, name: str, build: Callable[[str], None]
+) -> str:
+    """Build `name` once per instance; a killed build leaves only `<name>_building`."""
+    # The session ends on any failure, which releases the lock.
+    with psycopg.connect(maintenance_conninfo, autocommit=True) as admin:
+        admin.execute(_TAKE_BUILD_LOCK)
+        if not _exists(admin, name):
+            _publish(admin, maintenance_conninfo, name, build)
+        admin.execute(_RELEASE_BUILD_LOCK)
+    return name
+
+
+def _is_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def sweep_dead_cases(maintenance: str) -> None:
+    with psycopg.connect(maintenance, autocommit=True) as admin:
+        names = [
+            str(row[0])
+            for row in admin.execute(
+                "SELECT datname FROM pg_database WHERE datname ~ '^case_[0-9]+_[0-9]+$'"
+            ).fetchall()
+        ]
+        for database in names:
+            if _is_alive(int(database.split("_")[1])):
+                continue
+            # Every worker sweeps the same leftovers; FORCE would end a session the
+            # liveness check misjudged.
+            with suppress(errors.ObjectInUse, errors.InvalidCatalogName):
+                admin.execute(
+                    SQL("DROP DATABASE IF EXISTS {}").format(Identifier(database))
+                )
 
 
 _DATABASE_NUMBERS = count()
@@ -119,15 +278,15 @@ _DATABASE_NUMBERS = count()
 @contextmanager
 def migrated_postgres_at() -> Iterator[tuple[psycopg.Connection, str]]:
     cluster = _migrated_cluster()
-    database = f"case_{next(_DATABASE_NUMBERS)}"
-    maintenance = on_database(cluster, "postgres")
+    database = f"case_{os.getpid()}_{next(_DATABASE_NUMBERS)}"
+    maintenance = on_database(cluster.conninfo, "postgres")
     with psycopg.connect(maintenance, autocommit=True) as admin:
         admin.execute(
             SQL("CREATE DATABASE {} TEMPLATE {}").format(
-                Identifier(database), Identifier(MIGRATED_TEMPLATE)
+                Identifier(database), Identifier(cluster.template)
             )
         )
-    conninfo = on_database(cluster, database)
+    conninfo = on_database(cluster.conninfo, database)
     try:
         with psycopg.connect(conninfo) as connection:
             yield connection, conninfo
@@ -138,17 +297,18 @@ def migrated_postgres_at() -> Iterator[tuple[psycopg.Connection, str]]:
             )
 
 
-# A role belongs to the cluster rather than to a database, so an earlier test in this
-# process may have made it already.
+# Roles span the server, and two concurrent creates of one raise unique_violation,
+# not duplicate_object.
 def login_in_role(
     connection: psycopg.Connection, *, login: str, password: str, role: str
 ) -> None:
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (login,))
-        if cursor.fetchone() is None:
-            cursor.execute(
-                SQL("CREATE ROLE {} LOGIN PASSWORD {} IN ROLE {}").format(
-                    Identifier(login), Literal(password), Identifier(role)
-                )
+    with (
+        suppress(errors.DuplicateObject, errors.UniqueViolation),
+        connection.transaction(),
+    ):
+        connection.execute(
+            SQL("CREATE ROLE {} LOGIN PASSWORD {} IN ROLE {}").format(
+                Identifier(login), Literal(password), Identifier(role)
             )
+        )
     connection.commit()
