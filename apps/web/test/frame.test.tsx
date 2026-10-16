@@ -230,7 +230,6 @@ describe("jump to, while no role is held", () => {
   });
 });
 
-/** Drawn by the router alone: the list's own entries and the ways into and out of the shell. */
 const OUTSIDE_THE_LIST = [
   "/",
   "/console",
@@ -253,7 +252,6 @@ const routedPaths = (): readonly string[] =>
       .routesByPath,
   ).filter((path) => !OUTSIDE_THE_LIST.includes(path));
 
-/** A detail address as the router names its segment. */
 const detailRouteOf = (each: Page): readonly string[] =>
   each.detail === undefined ? [] : [`${each.path}/$${each.detail.param}`];
 
@@ -269,7 +267,6 @@ const destinations = [
 
 const moved = movedWithin(EVERY_AREA);
 
-/** Every link in the menu, area by area, as the role reaches it from the rail. */
 const navigatedPaths = async (role: Role): Promise<readonly string[]> => {
   vi.stubGlobal("fetch", answeringAs(role));
   const reached: string[] = [];

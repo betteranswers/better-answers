@@ -68,7 +68,6 @@ describe("the query provider above the router", () => {
   });
 });
 
-/** An api whose member read answers the workspace `session.in`; `named` is what each group made named. */
 const anApiHearingActions = () => {
   const named: (string | null)[] = [];
   const session = { in: "w" };
@@ -126,7 +125,6 @@ type Heard = {
   readonly named: string | null;
 };
 
-/** An api whose member read answers workspace `w`; `heard` holds each ask sent to it. */
 const anApiHearingAsks = () => {
   const heard: Heard[] = [];
   vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {

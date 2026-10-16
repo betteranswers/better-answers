@@ -94,7 +94,6 @@ const auditIn = async (page: Page, theme: string): Promise<void> => {
   expect(await faintEdges(page), `controls drawn under 3:1 on ${where}`).toEqual([]);
 };
 
-/** The switch the page itself throws; undefined on a page with no theme of ours. */
 const themeOf = (page: Page): Promise<string | undefined> =>
   page.evaluate(() => document.documentElement.dataset["theme"]);
 

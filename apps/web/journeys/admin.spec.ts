@@ -28,7 +28,6 @@ const MODELS_AND_SPEND = pageNamed(menuGroupIn(CONTROL_CENTRE, "models"), "Model
 /** Every group the journeys make starts so, and the opening repair deletes any left behind. */
 const JOURNEYS_GROUPS = "Journeys run";
 
-/** A row's first cell is its tick, then the person, their role, and their groups. */
 const ROLE_CELL = 2;
 
 const GROUPS_CELL = 3;
@@ -50,7 +49,6 @@ const groupButton = (page: Page, name: string): Locator =>
 
 type BulkAction = { readonly action: string; readonly title: (count: number) => string };
 
-/** A bulk dialog's title counts the members ticked. */
 const membersTitled = (count: number): string => counted(count, "Member", "Members");
 
 const CHANGE_ROLE: BulkAction = {

@@ -15,13 +15,11 @@ const NOTHING_TO_CONFIRM = 409;
 
 const OTPAUTH = /^otpauth:\/\//i;
 
-/** The `secret` of the `otpauth://` link a setup's QR code carries, or the value as given. */
 const secretOf = (value: string): string =>
   OTPAUTH.test(value) && URL.canParse(value)
     ? (new URL(value).searchParams.get("secret") ?? "")
     : value;
 
-/** An authenticator's key as its setup shows it: base32, perhaps in spaced groups or lower case. */
 const KEY = z
   .string()
   .transform((value) => secretOf(value.trim()).replaceAll(/\s/g, "").toUpperCase())
@@ -29,7 +27,6 @@ const KEY = z
 
 const enrolled = z.object({ key: KEY });
 
-/** The key as the code generator takes it, from the key or its link; nothing if neither parses. */
 export const authenticatorKeyOf = (value: string | undefined): string | undefined => {
   const parsed = KEY.safeParse(value);
   return parsed.success ? parsed.data : undefined;
@@ -74,7 +71,6 @@ const judged = (status: number): void => {
   );
 };
 
-/** Through the product's own confirm page, with the code the key makes now. */
 export const confirmedWith = (page: Page, key: string): Promise<void> =>
   test.step("Confirm the second factor", async () => {
     await theConfirmPage(page);

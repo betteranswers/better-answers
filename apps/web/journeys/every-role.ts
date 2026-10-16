@@ -8,7 +8,6 @@ import { expect } from "./fixtures.ts";
 /** The audit of the page the journey is about to leave. */
 export type Gate = () => Promise<void>;
 
-/** An item of the switcher reads its workspace's name, then the person's role there. */
 const listedAs = (name: string, role: Role): string => `${name} ${role}`;
 
 /** A test person belongs to the test workspace alone, and no menu offers them the console. */

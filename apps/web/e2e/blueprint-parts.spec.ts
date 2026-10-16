@@ -18,7 +18,6 @@ test.beforeAll(async () => {
   });
 });
 
-/** A mark is the part's `::before`; `none` means it draws no "+". */
 const marksOf = (part: Locator) =>
   part.evaluate((element) => {
     const mark = getComputedStyle(element, "::before");
@@ -75,7 +74,6 @@ test.describe("the blueprint's parts, drawn on one board", () => {
     );
 
     const board = page.getByRole("region", { name: "Board" });
-    // One gradient across, one down.
     await expect(board).toHaveCSS("background-size", `${module} ${module}, ${module} ${module}`);
     await expect(board).toHaveCSS("background-image", /linear-gradient/);
 

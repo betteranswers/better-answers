@@ -40,14 +40,11 @@ const requestsRegion = (page: Page) => page.getByRole("region", { name: "Request
 /** The region's outcome line: its count is a status too, and stands before it. */
 const saidIn = (page: Page): Locator => requestsRegion(page).getByRole("status").last();
 
-/** An empty list is the empty state's title, where a list of requests draws a table. */
 const emptyLine = (page: Page): Locator =>
   requestsRegion(page).locator("[data-slot='empty-title']");
 
-/** The output in the row under the Requests region's heading: the count of requests. */
 const THE_COUNT = "//section[h2='Requests']/div/output";
 
-/** The header row is a row too, so the requests are the rows with a cell. */
 const requestRows = (page: Page): Locator =>
   requestsRegion(page)
     .getByRole("row")
@@ -77,7 +74,6 @@ const DECLINE_FORBIDDEN = {
   },
 };
 
-/** A route answered only once the returned call is made, so what the page does meanwhile is seen. */
 const heldUntilReleased = async (
   page: Page,
   procedure: string,
@@ -94,7 +90,6 @@ const heldUntilReleased = async (
   return release;
 };
 
-/** The decline, refused once released, so the row's leaving is seen before the api's answer lands. */
 const refusingTheDeclineOnRelease = (page: Page) =>
   heldUntilReleased(page, "members.declineRequest", (route) =>
     route.fulfill({ json: [DECLINE_FORBIDDEN] }),
@@ -104,7 +99,6 @@ const refusingTheDeclineOnRelease = (page: Page) =>
 const holdingTheRequestsRead = (page: Page) =>
   heldUntilReleased(page, "members.requests", (route) => route.continue());
 
-/** A role select is described by its role's meaning, so a pick shows in a description that changed. */
 const describedAfresh = async (select: Locator, pick: () => Promise<void>): Promise<void> => {
   const described = await select.getAttribute("aria-describedby");
   const before = await select

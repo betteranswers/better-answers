@@ -22,7 +22,6 @@ const connectOpened = async () => {
   return within(await screen.findByRole("main"));
 };
 
-/** The page holds other status regions, so the copy's outcome is read inside the steps. */
 const steps = (main: ReturnType<typeof within>) => within(main.getByRole("list"));
 
 describe("Ask › Connect Claude", () => {

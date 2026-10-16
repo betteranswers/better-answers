@@ -27,7 +27,6 @@ import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-/** Any id the platform mints: the page shows none, a finding's least of all. */
 const AN_ID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/;
 
 const CONNECTED_SOURCES = pageNamed(menuGroupIn(CONTROL_CENTRE, "sources"), "Connected Sources");
@@ -43,18 +42,14 @@ const DESTINATIONS_TERM = "Destinations";
 const connectedSourcesRegion = (page: Page) =>
   page.getByRole("region", { name: "Connected Sources" });
 
-/** The region's outcome line: its count and the connect action's progress are statuses before it. */
 const saidIn = (page: Page): Locator => connectedSourcesRegion(page).getByRole("status").last();
 
-/** What a region says now, as `toHaveText` reads it, for telling a later state from this one. */
 const saidNowIn = async (region: Locator): Promise<string> => (await region.textContent()) ?? "";
 
-/** A sync not yet finished is said in words before its time; a finished one is its time alone. */
 const A_SYNC_UNDER_WAY = /^\D+\d{2}:\d{2}/;
 
 const isTheList = (url: URL): boolean => url.pathname.includes("sources.list");
 
-/** True where the list's own call, alone or in a batch, was answered with a result. */
 const answeredTheList = async (answer: Response): Promise<boolean> => {
   const calls = new URL(answer.url()).pathname.split("/").at(-1)?.split(",") ?? [];
   const body: unknown = await answer.json();
@@ -89,7 +84,6 @@ const connectedSourceNamed = (page: Page, name: string): Locator =>
     .getByRole("listitem")
     .filter({ has: page.getByRole("heading", { level: 3, name, exact: true }) });
 
-/** The lead's one definition a term names, read the way a screen reader pairs them. */
 const leadOf = (page: Page, name: string, term: string): Locator =>
   connectedSourceNamed(page, name)
     .getByRole("term")
@@ -103,7 +97,6 @@ const lastSyncedOf = (page: Page, name: string) => leadOf(page, name, "Last Sync
 
 const sensitivityOf = (page: Page, name: string) => leadOf(page, name, "Sensitivity");
 
-/** The lead's terms come first in a row, so the last of a name is More Details'. */
 const detailOf = (page: Page, name: string, term: string): Locator =>
   connectedSourceNamed(page, name)
     .getByRole("term")
@@ -118,14 +111,12 @@ const ROW_ACTIONS = {
   widen: "Widen Sensitivity or Audience",
 } as const;
 
-/** A row's action, named for its effect and then, for a screen reader, its connected source. */
 const rowAction = (page: Page, name: string, action: keyof typeof ROW_ACTIONS): Locator =>
   connectedSourceNamed(page, name).getByRole("button", {
     name: `${ROW_ACTIONS[action]} ${name}`,
     exact: true,
   });
 
-/** A sensitivity panel's name, which holds its connected source's, and its commit. */
 const SENSITIVITY_PANELS = {
   narrow: { named: (name: string) => `Narrow the Sensitivity of ${name}`, commit: "Narrow" },
   widen: {
@@ -136,7 +127,6 @@ const SENSITIVITY_PANELS = {
 
 type SensitivityChange = keyof typeof SENSITIVITY_PANELS;
 
-/** Found inside its connected source's row, so a panel drawn anywhere else is not found. */
 const panelOf = (page: Page, name: string, change: SensitivityChange): Locator =>
   connectedSourceNamed(page, name).getByRole("group", {
     name: SENSITIVITY_PANELS[change].named(name),
@@ -148,7 +138,6 @@ const commitOf = (page: Page, name: string, change: SensitivityChange): Locator 
     exact: true,
   });
 
-/** An Admin of a fresh workspace, signed in on the product's own page and standing on Sources. */
 const anAdminAtSources = async (
   page: Page,
   api: APIRequestContext,
@@ -543,7 +532,6 @@ const SUPPLIER_FORMS: SeedConnectedSource = indexed("Supplier forms", {
   ],
 });
 
-/** The words the review shows for the three rules seeded here. */
 const BANK_ACCOUNT_RULE = "Sort code and account number";
 
 const HOME_ADDRESS_RULE = "Home address";
@@ -559,13 +547,8 @@ const healthCueBoxIn = (title: string): string =>
 
 const HEALTH_CUE_BOX = healthCueBoxIn("Staff survey");
 
-/** A note that a document is narrowed counts nothing; one of findings dismissed or kept does. */
 const aNoteOf = (findings: number): RegExp => new RegExp(String.raw`\b${String(findings)}\b`);
 
-/**
- * Two documents as a sync leaves them after a dismissal: one lifted to its connected source's sensitivity, one
- * still holding a span nobody dismissed.
- */
 const SERVICE_RECORDS: SeedConnectedSource = indexed("Service records", {
   documents: [
     {
@@ -596,11 +579,9 @@ const SERVICE_RECORDS: SeedConnectedSource = indexed("Service records", {
   ],
 });
 
-/** A connected source's review wherever the page draws it, for saying none is drawn. */
 const reviewNamed = (page: Page, name: string) =>
   page.getByRole("region", { name: `Review of ${name}` });
 
-/** Found inside its connected source's row, so a review drawn anywhere else is not found. */
 const reviewOf = (page: Page, name: string) =>
   connectedSourceNamed(page, name).getByRole("region", { name: `Review of ${name}` });
 
@@ -612,11 +593,9 @@ const reviewHeading = (page: Page, name: string) =>
 const findingRow = (page: Page, name: string, document: string, rule: string) =>
   reviewOf(page, name).getByRole("row").filter({ hasText: document }).filter({ hasText: rule });
 
-/** A finding's notes, each a line of its own under the document's sensitivity. */
 const notesOf = (page: Page, name: string, document: string, rule: string) =>
   findingRow(page, name, document, rule).getByRole("paragraph");
 
-/** The outcomes the review's actions have said, in the actions' order: keep, narrow, dismiss. */
 const outcomesOf = (page: Page, name: string) =>
   reviewOf(page, name).getByRole("status").filter({ hasText: /\S/ });
 
@@ -767,7 +746,6 @@ test.describe("reviewing a connected source's findings", () => {
     await rowAction(page, "Supplier forms", "review").click();
     const review = reviewOf(page, "Supplier forms");
 
-    // One line on the page describes all three while nothing is ticked.
     const describedBy =
       (await review
         .getByRole("button", { name: "Keep in Text", exact: true })
@@ -1118,7 +1096,6 @@ test.describe("publishing, narrowing and widening a connected source", () => {
         - definition
     `);
 
-    // What the row carries of a confirmation not yet made, which a tick must change.
     const waiting = carried.getByRole("definition").filter({
       hasText: await saidNowIn(
         carried
@@ -1486,7 +1463,6 @@ test.describe("the Sources page's keystrokes", () => {
         - term: /⌘K|Ctrl K/
         - definition
     `);
-    // Each of the eleven keys has an action of its own, and `b` the name of the button it presses.
     const actions = listed.getByRole("definition");
     await expect(actions).toHaveText(Array.from({ length: 11 }, () => /\S/));
     const said = await actions.allInnerTexts();

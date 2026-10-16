@@ -29,7 +29,6 @@ import {
 } from "./harness.ts";
 import { authAnswering, refusalAnswering } from "./refused-read.ts";
 
-/** A recovery code as the api mints it: four groups of four, none of them easy to misread. */
 const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
 
 const accountHeading = (page: Page) => page.getByRole("heading", { level: 1, name: "Account" });
@@ -55,10 +54,8 @@ const savedBox = (page: Page) => page.getByRole("checkbox", { name: "I have save
 const removeButton = (page: Page) =>
   authenticatorPart(page).getByRole("button", { name: "Remove", exact: true });
 
-/** The status an action's outcome is said in: the one holding words. */
 const outcomeOf = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ });
 
-/** A key the list of keystrokes holds, whatever it calls the key's action. */
 const keyListed = (listed: Locator, key: string) =>
   listed.getByRole("term").filter({ hasText: new RegExp(`^${key}$`) });
 
@@ -71,7 +68,6 @@ const accountFromTheBand = async (page: Page, who: string): Promise<void> => {
   await expect(page).toHaveURL(/\/account$/);
 };
 
-/** A person in no workspace reaches the page from the page they land on. */
 const accountWithNoWorkspace = async (page: Page, api: Parameters<typeof person>[0]) => {
   const email = anAddress("no-workspace");
   await person(api, email);
@@ -96,7 +92,6 @@ const setUpWithItsCode = async (page: Page): Promise<readonly string[]> => {
   return codesListed(page).allInnerTexts();
 };
 
-/** Done hands focus to the heading over the count of codes left, which takes the block's place. */
 const doneClosesTheCodes = async (page: Page): Promise<void> => {
   await doneButton(page).click();
   await expect(codesBlock(page)).toHaveCount(0);
@@ -174,7 +169,6 @@ test("Done waits for the tick, and a reload shows none", async ({ page, request 
   await expect(savedBox(page)).toBeChecked();
   await doneClosesTheCodes(page);
 
-  // The codes left and the size of a set are the first two numbers the line shows.
   const everyCodeLeft = new RegExp(
     String.raw`^\D*${String(RECOVERY_CODES_IN_A_SET)}\D+${String(RECOVERY_CODES_IN_A_SET)}\b`,
   );
@@ -238,7 +232,6 @@ test("a setup's codes land though Set up is pressed mid-finish", async ({ page, 
   await accountWithNoWorkspace(page, request);
   const key = await setupOpened(page);
   const pressed = Promise.withResolvers<void>();
-  // The api mints the codes before the press; only their landing in the page waits on it.
   await page.route("**/authenticator/finish", async (route) => {
     const answer = await route.fetch();
     await pressed.promise;
@@ -384,11 +377,9 @@ const passkeyName = (page: Page) => page.getByLabel("Passkey Name");
 const authenticatorInstead = (page: Page) =>
   page.getByRole("button", { name: "Set Up an Authenticator Instead" });
 
-/** Each accent-filled button a person can see, in the order the page reads. */
 const primaries = (page: Page) =>
   page.getByRole("button").and(page.locator('[data-variant="default"]'));
 
-/** An Admin holding no factor, whose sign-in leaves them on the setup page's passkey form. */
 const anAdminOnSetup = async (page: Page, api: Parameters<typeof person>[0]): Promise<void> => {
   const { admin } = await provision(api, { name: "Skipton Setups" });
   await page.goto("/sign-in");

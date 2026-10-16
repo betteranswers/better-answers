@@ -13,7 +13,6 @@ const REGION = "[aria-live]";
 
 const DOWN = new Error("the network is down");
 
-/** The failure's line as this test's region words it. */
 const failedSaid = (failure: Error): string => `No rows: ${failure.message}`;
 
 type Read = { readonly error: Error | null; readonly isPending: boolean };

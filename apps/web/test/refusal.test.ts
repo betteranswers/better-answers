@@ -16,7 +16,6 @@ const ATTEMPTS_ALREADY_MADE = 0;
 
 const NOT_ANSWERED = new Error("the network went away");
 
-/** A client that writes down how it heard each failure. */
 const hearing = () => {
   const heard: FailedDuring[] = [];
   const client = createQueryClient((_, during) => {

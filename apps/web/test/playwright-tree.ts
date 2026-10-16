@@ -15,10 +15,8 @@ import { fileURLToPath } from "node:url";
 
 const web = fileURLToPath(new URL("..", import.meta.url));
 
-/** A module of this workspace, as a spec in the tree imports it. */
 export const moduleAt = (file: string): string => JSON.stringify(path.join(web, file));
 
-/** Where the journeys' config has the reporter write its word, under Playwright's output folder. */
 export const OUTCOME_FILE = "test-results/journeys-outcome";
 
 type Ran = {
@@ -26,7 +24,6 @@ type Ran = {
   readonly stdout: string;
   readonly stderr: string;
   readonly summary: string;
-  /** Every file the run left under `test-results/`, by its path in the tree. */
   readonly left: ReadonlyMap<string, string>;
 };
 
@@ -87,17 +84,14 @@ export const playwrightOver = async (
 };
 
 type Journeys = {
-  /** Left out, the tree holds no spec at all. */
   readonly spec?: string;
   /** More specs by file name, which Playwright runs one worker through in name order. */
   readonly specs?: Readonly<Record<string, string>>;
   readonly use?: Readonly<Record<string, string | number>>;
   readonly env?: Readonly<Record<string, string>>;
-  /** The config's reporter list as written into it; the outcome reporter alone when left out. */
   readonly reporter?: string;
 };
 
-/** The outcome word the journeys' reporter wrote, if any, beside everything else the run left. */
 export const journeysOver = async (journeys: Journeys) => {
   const reporter =
     journeys.reporter ??

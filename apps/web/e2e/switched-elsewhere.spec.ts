@@ -19,7 +19,6 @@ import { refusalAnswering } from "./refused-read.ts";
 
 const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
 
-/** What the api answers an action that named a workspace the session has left. */
 const SWITCHED = { word: "workspace-switched", class: "conflict" } as const;
 
 type Role = "Admin" | "Editor" | "Viewer";
@@ -30,7 +29,6 @@ type Two = { readonly first: Workspace; readonly second: Workspace };
 
 const membersRegion = (page: Page): Locator => page.getByRole("region", { name: "Members" });
 
-/** A row's cells are its tick, the person and then their role. */
 const roleOf = (page: Page, name: string): Locator =>
   membersRegion(page).getByRole("row").filter({ hasText: name }).getByRole("cell").nth(2);
 
@@ -74,7 +72,6 @@ const switchedInAnotherTab = async (
   return elsewhere;
 };
 
-/** A fresh document, so its rows are read from the workspace the session is in now. */
 const membersReadAfresh = async (tab: Page, here: Workspace): Promise<void> => {
   await tab.goto(MEMBERS.path);
   await expect(switcherOf(tab, here.name)).toBeVisible();
@@ -107,11 +104,9 @@ const landedHomeSayingWhy = async (page: Page, now: Workspace): Promise<void> =>
   await expect(switcherOf(page, now.name), "the band names the workspace left").toBeVisible();
 };
 
-/** A batch's address names its procedures; a call sent alone names one. */
 const askedIn = (url: string): readonly string[] =>
   new URL(url).pathname.replace("/trpc/", "").split(",");
 
-/** Sam's page under `first`, read before the other tab switches. */
 const atSamsPage = async (page: Page, api: APIRequestContext, two: Two): Promise<Locator> => {
   const sam = await aMemberOfBoth(api, two, "Sam Okoro", { first: "Editor", second: "Viewer" });
   await page.goto(`${MEMBERS.path}/${sam}`);
@@ -137,7 +132,6 @@ test.describe("an action from a tab left in another workspace", () => {
     const answered = refusalAnswering(page, "members.remove");
     await removal.getByRole("button", { name: "Remove Member" }).click();
     await removal.getByRole("button", { name: "Remove", exact: true }).click();
-    // Awaited before either workspace is read, so what the action left is read after it landed.
     expect(await answered).toMatchObject(SWITCHED);
 
     await membersReadAfresh(elsewhere, two.second);

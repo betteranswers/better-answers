@@ -40,7 +40,6 @@ const WORKSPACES_READ = readOf("person.workspaces");
 
 const workspacesIn = (menu: Locator): Locator => menu.getByRole("menuitemradio");
 
-/** An item reads its workspace's name, then the person's role there. */
 const listedAs = (name: string, role: "Admin" | "Viewer"): string => `${name} ${role}`;
 
 /** Standing while empty, so the regions are found before they have anything to say. */
@@ -50,7 +49,6 @@ const saidInTheBand = (page: Page): Locator =>
 const refusedInTheBand = (page: Page): Locator =>
   page.getByRole("banner").getByRole("alert", { includeHidden: true });
 
-/** Better Auth's code for a switch to a workspace the person has left. */
 const NOT_A_MEMBER = "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION";
 
 const memberLink = (page: Page, name: string): Locator =>
@@ -63,7 +61,6 @@ const aMemberOnlyOf = async (api: APIRequestContext, workspaceId: string, name: 
   return member.id;
 };
 
-/** Held until the returned call, so the page meets the read while it is still pending. */
 const heldBack = async (page: Page, url: Parameters<Page["route"]>[0]): Promise<() => void> => {
   let release = () => {};
   const released = new Promise<void>((resolve) => {
@@ -386,7 +383,6 @@ test("says a pending switch's refusal, holding others until it answers", async (
   expect(switches, "a second switch started while the first was pending").toHaveLength(1);
 });
 
-/** Unanswered, so the refusal stands in the band's outcome row. */
 const unansweredSwitch = async (page: Page, from: string, to: string): Promise<void> => {
   await page.route("**/organization/set-active", (route) => route.abort());
   await switched(page, from, to);
@@ -414,7 +410,6 @@ const boxOf = async (region: Locator) => {
   return box;
 };
 
-/** How far `region` starts below the band's foot: below zero, the band covers its top. */
 const clearOfTheBand = async (page: Page, region: Locator): Promise<number> => {
   const [band, drawn] = await Promise.all([boxOf(page.getByRole("banner")), boxOf(region)]);
   return drawn.y - (band.y + band.height);

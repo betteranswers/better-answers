@@ -34,10 +34,6 @@ const ANOTHER_TABBED_PAGE: PageToolbar = {
   ],
 };
 
-/**
- * One helper of the feature's own, called by its content and by a part outside its panel: the
- * shared slot never learns the type.
- */
 const useTickedGroups = viewStateOf<number>("/connected-sources/review");
 
 const useAnotherPagesTickedGroups = viewStateOf<number>("/connected-sources/all");

@@ -36,7 +36,6 @@ const outline = (areas: readonly Area[]) =>
     area.menuGroups.map((group) => [group.name ?? null, group.pages.map((each) => each.name)]),
   ]);
 
-/** Every page called built and no home standing in, so what shows is the roles' doing. */
 const builtThroughout = (area: Area): Area => ({
   id: area.id,
   name: area.name,

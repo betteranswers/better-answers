@@ -83,7 +83,6 @@ function Registering(properties: { readonly keystrokes: readonly Keystroke[] }) 
   return null;
 }
 
-/** The shell as the frame draws it: the trigger in one place, the open page beneath. */
 function AShell(properties: { readonly page: string | undefined; readonly children?: ReactNode }) {
   return (
     <ShellKeystrokes page={properties.page} shell={[JUMP_TO]}>

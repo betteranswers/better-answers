@@ -8,7 +8,6 @@ placedWithoutMeasuring();
 
 const bar = () => screen.queryByRole("toolbar", { name: "Selected Members" });
 
-/** Each count the bar's status shows: the rows ticked, then the ticked rows a search hides. */
 const countsIn = (shown: HTMLElement | null): readonly string[] =>
   within(shown ?? document.body)
     .getByRole("status")
@@ -95,7 +94,6 @@ describe("the selection bar", () => {
 
     action.focus();
     fireEvent.keyDown(action, { key: "ArrowRight" });
-    // The registry moves focus a task after the key.
     await waitFor(() => {
       expect(document.activeElement).toBe(clear);
     });

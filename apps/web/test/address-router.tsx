@@ -12,7 +12,6 @@ import { expect } from "vitest";
 
 type Wrapper = ComponentType<{ readonly children: ReactNode }>;
 
-/** Each page at its path in a router of its own, opened at the last of `entries`. */
 export const openPages = async (
   pages: Readonly<Record<string, RouteComponent>>,
   entries: readonly string[],

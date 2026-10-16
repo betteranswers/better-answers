@@ -64,7 +64,6 @@ const POLICY = {
   body: "Buyers access audit information through the console's audit page.",
 } as const;
 
-/** Directly under the knowledge folder, so in no collection. */
 const UNFILED = {
   title: "How do buyers access audit information they exported?",
   kind: "Answer",
@@ -85,7 +84,6 @@ type Asking = {
   readonly viewerEmail: string;
 };
 
-/** A workspace holding the audit concepts, its models scripted, and a Viewer of it. */
 const aWorkspaceToAsk = async (api: APIRequestContext, script: Script): Promise<Asking> => {
   const adminEmail = anAddress("admin");
   const workspace = await provision(api, { name: "Calder Audits", adminEmail });
@@ -108,7 +106,6 @@ const signedInAsTheViewer = async (page: Page, api: APIRequestContext, asking: A
   await landedAtHome(page, "Viewer");
 };
 
-/** A Viewer's home is New question. */
 const aViewerAsking = async (
   page: Page,
   api: APIRequestContext,
@@ -129,7 +126,6 @@ const said = (page: Page) => newQuestion(page).getByRole("status");
 
 const alerted = (page: Page) => newQuestion(page).getByRole("alert");
 
-/** The result is a region named by its verdict. */
 const answered = (page: Page, verdict: string) =>
   page.getByRole("region", { name: verdict, exact: true });
 
@@ -143,7 +139,6 @@ const asked = async (page: Page, question = QUESTION): Promise<void> => {
 
 const NOTE = "It leaves out the LMS.";
 
-/** Flags the answer as incomplete with a note, answering its popover. */
 const flagSent = async (page: Page, result: Locator): Promise<Locator> => {
   await result.getByRole("button", { name: "Flag This Answer" }).click();
   const flagging = page.getByRole("dialog", { name: "Flag This Answer" });
@@ -153,7 +148,6 @@ const flagSent = async (page: Page, result: Locator): Promise<Locator> => {
   return flagging;
 };
 
-/** Counts each ask the page sends from here on. */
 const asksCounted = (page: Page): string[] => {
   const sent: string[] = [];
   page.on("request", (request) => {

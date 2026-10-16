@@ -55,7 +55,6 @@ const optionOf = (page: Page, name: string | RegExp) =>
 
 const groupOf = (page: Page, name: string) => dialogOf(page).getByRole("group", { name });
 
-/** The row that takes what is typed to Search, listed under its area's name. */
 const searchRowOf = (page: Page) => groupOf(page, "Knowledge").getByRole("option");
 
 const searchBoxOf = (page: Page) =>
@@ -72,7 +71,6 @@ const searchBox = (page: Page) =>
 
 const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
 
-/** The header row is a row too, so the members are the rows with a cell. */
 const memberRows = (page: Page): Locator =>
   membersRegion(page)
     .getByRole("row")
@@ -93,7 +91,6 @@ type Teammate = { readonly address: string; readonly id: string };
 
 type Team = { readonly priya: Teammate; readonly tom: Teammate };
 
-/** An Admin of a workspace with two other members, on a page that reads none of them. */
 const anAdminWithATeam = async (page: Page, api: APIRequestContext, name: string) => {
   const email = anAddress("jump-to");
   const workspace = await provision(api, { name, adminEmail: email });
@@ -194,7 +191,6 @@ test("opens on either chord anywhere, Escape handing focus back", async ({ page,
   await expect(triggerOf(page)).toBeFocused();
 });
 
-/** A member's page, told by the person its heading names. */
 const memberPageNaming = (page: Page, name: string) =>
   page.getByRole("main").getByRole("heading", { level: 2, name, exact: true });
 
@@ -213,7 +209,6 @@ test("lands an Admin on the member they chose", async ({ page, request }) => {
   await expect(memberRows(page)).toHaveCount(0);
   await expect(page.getByRole("main")).toBeFocused();
 
-  // From another tab of Members, the next one chosen opens their page as well.
   await page.goto(MEMBERS.path);
   await page.getByRole("tab", { name: "Invitations" }).click();
   await opened(page, "Meta+k");
@@ -223,7 +218,6 @@ test("lands an Admin on the member they chose", async ({ page, request }) => {
   await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}/${team.tom.id}$`));
   await expect(memberPageNaming(page, TOM)).toBeVisible();
 
-  // From one member's page to another's, so the page names the person it now holds.
   await opened(page, "Meta+k");
   await typed(page, "priya");
   await expect(optionOf(page, new RegExp(PRIYA))).toBeVisible();

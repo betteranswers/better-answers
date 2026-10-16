@@ -46,7 +46,6 @@ const POLICY = "Records policy";
 
 const MINUTES = "Board minutes";
 
-/** The Restricted document's own title, which the file's label for it does not say. */
 const MINUTES_DOCUMENT = "Closed session record, March";
 
 const STANDARD = "Retention standard";
@@ -91,7 +90,6 @@ const iriOf = (concepts: Seeded, title: string): string => {
 const pageOf = (concepts: Seeded, title: string): string =>
   `${SEARCH.path}/${iriOf(concepts, title).slice(IRI_PREFIX.length)}`;
 
-/** The Answer cites a passage, a Restricted passage, the committee and a page; the calendar links by IRI. */
 const aWorkspaceOfConcepts = async (api: APIRequestContext, name: string) => {
   const adminEmail = anAddress("admin");
   const workspace = await provision(api, { name, adminEmail });
@@ -181,7 +179,6 @@ const panelOf = (page: Page, title: string): Locator => page.getByRole("dialog",
 const wayBack = (page: Page): Locator =>
   page.getByRole("main").getByRole("link", { name: "Back to Search" });
 
-/** Not found is the way back alone: no concept, no alert and no read under way. */
 const drawsNotFound = async (page: Page): Promise<void> => {
   const main = page.getByRole("main");
   await expect(wayBack(page)).toBeVisible();
@@ -201,7 +198,6 @@ const asked = (query: string): string =>
 const matchOf = (page: Page, title: string): Locator =>
   page.getByRole("list", { name: "Matches" }).getByRole("link", { name: title, exact: true });
 
-/** Every `knowledge.open` the page sends from here on. */
 const opensSentBy = (page: Page): Request[] => {
   const sent: Request[] = [];
   page.on("request", (request) => {
@@ -217,7 +213,6 @@ const atTheConcept = async (page: Page, seeded: Workspace, title: string): Promi
   return concept;
 };
 
-/** Back an entry at a time: the pages between are hidden from the reader by then. */
 const wentBackTo = async (page: Page, address: string): Promise<void> => {
   for (let entries = 0; entries < 5 && !page.url().endsWith(address); entries += 1) {
     await page.goBack();
@@ -626,7 +621,6 @@ test.describe("the concept page", () => {
     await page.goto(asked("audit"));
     await matchOf(page, RETENTION).click();
     await expect(conceptOf(page, RETENTION)).toBeVisible();
-    // A fresh document holds no matches, so the way back must read them again, and cannot.
     await page.reload();
     await expect(conceptOf(page, RETENTION)).toBeVisible();
     await page.route(isAFind, (route) => route.abort());
@@ -655,7 +649,6 @@ test.describe("the concept page", () => {
     await page.goto(asked("audit"));
     await matchOf(page, RETENTION).click();
     await expect(crumbOf(page, RETENTION)).toBeVisible();
-    // Search is pushed after the concept, so the switch replaces Search and Back finds the concept.
     await wayBack(page).click();
     await expect(matchOf(page, RETENTION)).toBeFocused();
 

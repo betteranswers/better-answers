@@ -25,7 +25,6 @@ const REASON = "I run the estimating desk and need the tender library.";
 
 const A_SHORT_NAME = "acme-joinery";
 
-/** The short name's old word, spelled in halves so this file keeps none of it. */
 const OLD_WORD = ["sl", "ug"].join("");
 
 /** A reader has no use for the short name's old word, and a workspace is never an organisation. */
@@ -51,7 +50,6 @@ const askToJoin = async (page: Page, shortName: string, reason = REASON): Promis
   await askButton(page).click();
 };
 
-/** The body as read and as heard, so a word in an accessible name is caught too. */
 const thePageSaysNeither = async (page: Page, when: string): Promise<void> => {
   const said = `${await page.locator("body").innerText()}\n${await page.locator("body").ariaSnapshot()}`;
   for (const { word, pattern } of UNSAID) {

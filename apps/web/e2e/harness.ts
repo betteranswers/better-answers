@@ -137,11 +137,9 @@ export const ageThePendingHour = (api: APIRequestContext, userId: string) =>
 export const ageTheCode = (api: APIRequestContext, email: string) =>
   ask(api, "/codes/aged", { email }, confirmationAged);
 
-/** The re-confirm a stale confirmation opens, wherever the refused act was asked for. */
 export const reconfirmOf = (page: Page): Locator =>
   page.getByRole("dialog", { name: "Confirm It’s You" });
 
-/** Confirms the re-confirm with the code the harness-written authenticator shows now. */
 export const reconfirmedOn = async (
   page: Page,
   api: APIRequestContext,
@@ -233,7 +231,6 @@ export const claudeExchanges = async (
   return { refreshToken: tokens.refresh_token };
 };
 
-/** Claude refreshing its grant, as a connected assistant does; answers the new refresh token. */
 export const claudeRefreshes = async (
   api: APIRequestContext,
   asked: { readonly origin: string; readonly refreshToken: string },
@@ -395,7 +392,6 @@ export const seedConcepts = (
   input: { workspaceId: string; userId: string; concepts: readonly SeedConcept[] },
 ) => ask(api, "/concepts", input, seededConcepts);
 
-/** A flag closed or not; a disputed sentence names the concept it rested on. */
 type SeedFlag = {
   readonly reason: (typeof FEEDBACK_REASONS)[number];
   readonly note?: string;
@@ -524,7 +520,6 @@ const capturedFor = async <T>(
 export const codeSentTo = async (api: APIRequestContext, email: string): Promise<string> =>
   (await capturedFor(api, "/codes", email, codeSent)).code;
 
-/** The token in the fragment of the email's sign-in link. */
 export const linkSentTo = async (api: APIRequestContext, email: string): Promise<string> =>
   (await capturedFor(api, "/links", email, linkSent)).token;
 
@@ -539,7 +534,6 @@ export const emailsSentTo = async (api: APIRequestContext, email: string): Promi
 
 const aSessionSeeded = z.object({ sessionId: z.string() });
 
-/** One more session on the person, as a second device leaves it, without a sign-in code. */
 export const aSessionOn = async (
   api: APIRequestContext,
   personId: string,
@@ -656,7 +650,6 @@ export const signedInAtHome = async (
   await landedAtHome(page, role);
 };
 
-/** The Admin of `first`, holding `role` in `second`, signed in and reading `first`. */
 export const inTwoWorkspaces = async (
   page: Page,
   api: APIRequestContext,
@@ -686,7 +679,6 @@ export const signedInWithNoWorkspace = async (page: Page, api: APIRequestContext
   return signedIn;
 };
 
-/** The first matching call reaches the api and its answer is held until released; later calls answer at once. */
 export const holdingTheFirstAnswer = async (
   page: Page,
   matches: (url: URL) => boolean,

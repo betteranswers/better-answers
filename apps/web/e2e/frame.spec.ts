@@ -39,10 +39,6 @@ const MEMBERS = pageNamed(PEOPLE, "Members");
 
 const SYSTEM = menuGroupIn(CONTROL_CENTRE, "system");
 
-/**
- * What an Admin is shown today, spelled out rather than read through the filter that draws it:
- * each page's group, its name and its address.
- */
 const AN_ADMINS_PAGES = [
   ["Sources", "Connected Sources", pageNamed(SOURCES, "Connected Sources").path],
   ["Models", "Models and Spend", MODELS_AND_SPEND.path],
@@ -57,7 +53,6 @@ const AREA_NAMES = ["Ask", "Knowledge", "Control Centre"];
 
 const PAGE_NAMES = AN_ADMINS_PAGES.map(([, name]) => name);
 
-/** The first heading Models and spend draws: its group's name. */
 const ITS_HEADING = "Models";
 
 const SWAP_BUDGET_MS = 1000;
@@ -66,7 +61,6 @@ const ACTION_BUDGET_MS = 100;
 
 const NARROW = { width: 320, height: 720 };
 
-/** Short enough that the band scrolls out of sight within one page's content. */
 const NARROW_AND_SHORT = { width: 320, height: 256 };
 
 /** Past `--breakpoint-md`, which `--shell-wide` in `index.css` reads for the shell. */
@@ -119,13 +113,11 @@ const widthOf = async (region: Locator): Promise<number> => (await boxOf(region)
 
 const leftOf = async (region: Locator): Promise<number> => (await boxOf(region)).x;
 
-/** Read off the page, so the design system's token is never copied here. */
 const pageMaximumOf = (page: Page): Promise<number> =>
   page.evaluate(() =>
     Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--page-max")),
   );
 
-/** The width the pane offers a page's content, inside its padding and before the page maximum. */
 const roomIn = (pane: Locator): Promise<number> =>
   pane.evaluate((node) => {
     const style = getComputedStyle(node);
@@ -150,7 +142,6 @@ const scrollsNothingSideways = async (page: Page, when: string) => {
 const holdsFocus = (panel: Locator) =>
   panel.evaluate((node) => node.contains(document.activeElement));
 
-/** How a band fixed in place can cover what has focus: over its middle, or anywhere in its box. */
 const focusAgainstTheBand = (page: Page) =>
   page.evaluate(() => {
     const crosses = (one: DOMRect, other: DOMRect) =>
@@ -174,7 +165,6 @@ const focusAgainstTheBand = (page: Page) =>
 
 const focusUnderTheBand = async (page: Page) => (await focusAgainstTheBand(page)).under;
 
-/** Covered whole, a target cannot be pressed; covered in part, it is too small to press. */
 const halfUnderTheBand = (page: Page) =>
   page.evaluate(() => {
     const band = document.querySelector("header");
@@ -195,7 +185,6 @@ const halfUnderTheBand = (page: Page) =>
       .map((node) => node.getAttribute("aria-label") ?? node.textContent);
   });
 
-/** Taller by `grown` pixels at the foot of its content, answering how far the page can scroll. */
 const pageGrownBy = (page: Page, grown: number) =>
   page.evaluate((height) => {
     const id = "grown-by";
@@ -210,7 +199,6 @@ const pageGrownBy = (page: Page, grown: number) =>
 
 const overlapsTheBand = async (page: Page) => (await focusAgainstTheBand(page)).overlaps;
 
-/** Tab by tab to `target`, no stop on the way, nor `target` itself, sharing the band's box. */
 const tabClearOfTheBand = (page: Page, target: Locator) =>
   tabUntilFocused(page, target, undefined, async () => {
     expect(await overlapsTheBand(page), `a stop up to ${String(target)} overlaps the band`).toBe(
@@ -254,7 +242,6 @@ const glyphOf = (page: Page, pageName: string) =>
     .getByRole("link", { name: pageName })
     .evaluate((link) => link.querySelector("svg")?.innerHTML ?? "");
 
-/** A colour as a greyscale page shows it, so a mark that is hue alone reads as no mark. */
 const greyOf = (region: Locator, painted: "own" | "behind") =>
   region.evaluate((node, which) => {
     let from: Element | null = which === "own" ? node : node.parentElement;
@@ -270,7 +257,6 @@ const greyOf = (region: Locator, painted: "own" | "behind") =>
     return Math.round(0.2126 * red + 0.7152 * green + 0.0722 * blue);
   }, painted);
 
-/** Nothing in the band may move when the nav hides: every control it holds, to the pixel. */
 const bandBoxes = async (page: Page, workspaceName: string, who: string) => ({
   band: await boxOf(bandOf(page)),
   logo: await boxOf(logoOf(page)),
@@ -288,7 +274,6 @@ const signedIn = async (page: Page, api: Parameters<typeof provision>[0], name: 
   return workspace;
 };
 
-/** Asked for before signing in, so it is the first page the frame draws and the passkey offer's. */
 const signedInAtModelsAndSpend = async (
   page: Page,
   api: Parameters<typeof provision>[0],
@@ -302,7 +287,6 @@ const signedInAtModelsAndSpend = async (
   return workspace;
 };
 
-/** Drawn before anything is measured or pressed, so the narrow shell is what answers. */
 const narrowAtModelsAndSpend = async (
   page: Page,
   api: Parameters<typeof provision>[0],
@@ -321,7 +305,6 @@ test("names the icon rail's areas to eye, pointer and keyboard", async ({ page, 
   const rail = railOf(page);
   await expect(rail.getByRole("link")).toHaveText(AREA_NAMES);
 
-  // The keyboard first, before any pointer has opened one, then the pointer.
   const entry = rail.getByRole("link", { name: "Control Centre" });
   await tabUntilFocused(page, entry);
   const tooltip = page.getByRole("tooltip").filter({ hasText: "Control Centre" }).first();
@@ -372,14 +355,12 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
     await greyOf(open, "behind"),
   );
 
-  // Each page carries its glyph, and the open one's is set bold.
   const each = await nav
     .getByRole("link")
     .evaluateAll((links) => links.map((link) => link.querySelector("svg") !== null));
   expect(each.every(Boolean), "a page in the nav has no icon").toBe(true);
   const membersClosed = await glyphOf(page, "Members");
 
-  // No heading repeats the area the rail already names.
   await expect(nav).toMatchAriaSnapshot(`
     - navigation "Control Centre":
       - heading "Sources" [level=3]
@@ -418,7 +399,6 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
     membersClosed,
   );
 
-  // `goto` is the bookmark: a fresh document at a path no file sits at, not a click.
   await page.goto("/people/groups");
   await expect(navOf(page, "Control Centre").getByRole("link", { name: "Groups" })).toHaveAttribute(
     "aria-current",
@@ -436,7 +416,6 @@ test("marks Members current on a member page, adding no entry", async ({ page, r
 
   const nav = navOf(page, "Control Centre");
   await expect(nav.getByRole("link"), "the page took an entry of its own").toHaveText(PAGE_NAMES);
-  // The page is Members' own, so its entry is the current page, as on Members itself.
   await expect(nav.getByRole("link", { name: "Members" })).toHaveAttribute("aria-current", "page");
   const marked = await nav
     .getByRole("link")
@@ -476,7 +455,6 @@ test("names workspace and place, the logo leading home", async ({ page, request 
   }
   await expect(bandOf(page).getByRole("button", { name: "Sign Out" })).toHaveCount(0);
 
-  // The logo is the way home from anywhere, named for the product rather than drawn alone.
   await expect(logoOf(page)).toHaveAttribute("href", HOMES.Admin.path);
   await logoOf(page).click();
   await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
@@ -524,7 +502,6 @@ test("links each part but the last, the current page", async ({ page, request })
   await page.goto(MEMBERS.path);
   await page.getByRole("tab", { name: "Invitations" }).click();
 
-  // Control Centre opens on the Admin's home until Overview is built.
   for (const name of ["Control Centre", "People", "Members"]) {
     await expect(crumbOf(page, name)).toHaveAttribute("href", MEMBERS.path);
     await expect(crumbOf(page, name)).not.toHaveAttribute("aria-current");
@@ -588,12 +565,10 @@ test("sizes the band's cells to the rail and nav below", async ({ page, request 
   expect(band.width).toBe(DESKTOP.width);
   expect(band.y + band.height, "the band does not sit above the rail").toBeLessThanOrEqual(rail.y);
 
-  // The logo fills the first cell, so the cell is the rail's width.
   const logo = await boxOf(logoOf(page));
   expect(logo.x).toBe(rail.x);
   expect(logo.width).toBe(rail.width);
 
-  // The second cell ends where the nav does, so the toggle and the name sit over the nav.
   const toggle = await boxOf(closerOf(page));
   const name = await boxOf(partOf(page, workspace.name));
   expect(name.x).toBeGreaterThanOrEqual(nav.x);
@@ -610,7 +585,6 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
   );
   await theModelChoicesHaveLanded(page);
 
-  // Every part but the open tab leads somewhere, so each is a stop between toggle and jump-to.
   const band = [
     logoOf(page),
     switcherOf(page, workspace.name),
@@ -636,7 +610,6 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
     await expect(rail.getByRole("link", { name })).toBeFocused();
   }
 
-  // The rail's foot, under its areas.
   await page.keyboard.press("Tab");
   await expect(keystrokesButton(rail)).toBeFocused();
 
@@ -645,7 +618,6 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
     await expect(navOf(page, "Control Centre").getByRole("link", { name })).toBeFocused();
   }
 
-  // An Admin holding no passkey is offered one above the first page they reach.
   const offer = page.getByRole("region", { name: "Passkeys" });
   await page.keyboard.press("Tab");
   await expect(offer.getByRole("link", { name: "Add a Passkey" })).toBeFocused();
@@ -655,16 +627,11 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
   await page.keyboard.press("Tab");
   await expect(tabsOf(page).getByRole("tab", { name: "Model Choices" })).toBeFocused();
 
-  // The open tab's panel holds the page, so the content is reached through the toolbar.
   const panel = page.getByRole("tabpanel");
   await page.keyboard.press("Tab");
   await expect(panel).toBeFocused();
   await expect(panel.getByRole("region", { name: "Model Choices" })).toBeVisible();
 
-  /**
-   * Nothing carries a positive tabindex, so the document's own order is the tab order. Zero
-   * is not positive: the open tab's panel carries one.
-   */
   const contentIsLast = await page.evaluate(() => {
     const bar = document.querySelector("header");
     const content = document.querySelector("main");
@@ -696,7 +663,6 @@ test("leaves no target half under the band after skipping", async ({ page, reque
   await expect(tabsOf(page).getByRole("tab")).toHaveText(TOOLBAR_TABS);
   await skipLinkReachesThePage(page);
 
-  // Through a whole screen in steps shorter than any target, so no page height goes untried.
   const screen = await page.evaluate(() => innerHeight);
   for (let grown = 0; grown <= screen; grown += 4) {
     const overflow = await pageGrownBy(page, grown);
@@ -728,7 +694,6 @@ test("scrolls nothing sideways at 320 pixels, navigation open or closed", async 
 });
 
 test("names all four parts at 320 pixels, clipping none", async ({ page, request }) => {
-  // Long names in both of the first row's texts, so neither can push the row past the edge.
   const email = anAddress("long-names");
   const workspace = await provision(request, { name: LONG_NAME });
   const admin = await person(request, email, { displayName: LONG_PERSON });
@@ -740,7 +705,6 @@ test("names all four parts at 320 pixels, clipping none", async ({ page, request
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
   await page.getByRole("tab", { name: "Invitations" }).click();
 
-  // Its own row under the controls, so a long workspace name takes nothing from it.
   const row = await boxOf(sheetButtonOf(page));
   const parts = ["Control Centre", "People", "Members", "Invitations"];
   await expect(crumbsOf(page).getByRole("listitem")).toHaveText(parts);
@@ -787,7 +751,6 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
     before = box.x;
   }
 
-  // From the top to the last member row: first row, the parts that lead somewhere, toolbar, page.
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to the Page" })).toBeFocused();
   for (const stop of [
@@ -852,7 +815,6 @@ test("keeps a focused control clear of the fixed band", async ({ page, request }
   const last = page.getByRole("main").getByRole("link", { name: "Member 9", exact: true });
   await expect(last).toBeVisible();
 
-  // Backwards, so each stop scrolls up to meet the band rather than rise from below it.
   await tabUntilFocused(page, last, 80);
   const depth = () => page.evaluate(() => window.scrollY);
   const from = await depth();
@@ -876,10 +838,6 @@ test("paints the shell in the page's own surface token", async ({ page, request 
     const token = getComputedStyle(probe).backgroundColor;
     probe.remove();
 
-    /**
-     * The first painted ancestor is what a reader sees behind the page, whatever the number
-     * of layout wrappers between.
-     */
     let behind = main.parentElement;
     while (behind !== null && getComputedStyle(behind).backgroundColor === nothing) {
       behind = behind.parentElement;
@@ -902,14 +860,12 @@ test("fills the toolbar with tabs the arrow keys move between", async ({ page, r
       - tab "Spend"
   `);
 
-  // The tabs are the shell's own, inside the page: under its first heading, over the open panel.
   const main = page.getByRole("main");
   await expect(main.getByRole("tablist")).toHaveCount(1);
   const heading = main.getByRole("heading", { level: 1, name: ITS_HEADING });
   expect(await inDocumentOrder(page, [heading, tabs, main.getByRole("tabpanel")])).toBe(true);
   expect(await topOf(heading)).toBeLessThan(await topOf(tabs));
 
-  // The arrows and the selection are the registry's, so the shell rolls no keyboard of its own.
   await tabs.getByRole("tab", { name: "Model Choices" }).click();
   await page.keyboard.press("ArrowRight");
   await expect(tabs.getByRole("tab", { name: "Spend" })).toHaveAttribute("aria-selected", "true");
@@ -972,13 +928,11 @@ test("holds toggle and band still while the nav hides", async ({
   test.info().annotations.push({ type: "closing the menu", description: `${elapsed} ms` });
   expect(elapsed).toBeLessThan(ACTION_BUDGET_MS);
 
-  // The toggle, the band and the rail are where they were, to the pixel: only the nav left.
   const open = openerOf(page);
   expect(await boxOf(open), "the toggle moved as the nav hid").toEqual(toggle);
   expect(await bandBoxes(page, workspace.name, workspace.admin.name)).toEqual(band);
   expect(await boxOf(railOf(page))).toEqual(rail);
 
-  // The pane takes the nav's width, and the toolbar shares its column, so both move left by it.
   const hidden = await boxOf(page.getByRole("main"));
   const tableHidden = await widthOf(table);
   test.info().annotations.push({
@@ -988,7 +942,6 @@ test("holds toggle and band still while the nav hides", async ({
   expect(hidden.x).toBe(main.x - navWide);
   expect(hidden.width).toBe(main.width + navWide);
   expect(await leftOf(tabs)).toBe(tabsAt - navWide);
-  // The table takes that width only up to the page maximum.
   expect(tableHidden - tableWide, "the table did not take the width the nav left").toBe(
     Math.min(navWide, (await pageMaximumOf(page)) - room),
   );
@@ -1027,7 +980,6 @@ test("holds the toggle in place beside a 60-character workspace name", async ({
     await page.getByRole("button", { name, exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
     await expect(partOf(page, name)).toBeVisible();
-    // The switcher's accessible name is the whole name, however much of it shows.
     await expect(switcherOf(page, name)).toBeVisible();
     return boxOf(closerOf(page));
   };
@@ -1040,7 +992,6 @@ test("holds the toggle in place beside a 60-character workspace name", async ({
   });
   expect(besideTheLongOne, "a long workspace name moved the toggle").toEqual(beside);
 
-  // Cut with an ellipsis where it shows, whole in the document, so a screen reader hears it all.
   const cut = await partOf(page, LONG_NAME).evaluate((node) => ({
     whole: node.textContent,
     ellipsis: getComputedStyle(node).textOverflow,
@@ -1132,8 +1083,6 @@ test("remembers a closed menu on this browser only", async ({ page, request }) =
   await expect(navOf(page, "Control Centre")).toBeVisible();
   await theModelChoicesHaveLanded(page);
 
-  // Listening only across the action, so neither the start above nor the reload below is mistaken
-  // for it.
   const asked: string[] = [];
   const noting = (each: { url: () => string }) => asked.push(each.url());
   page.on("request", noting);
@@ -1179,13 +1128,8 @@ test("opens the navigation over narrow content, holding and returning focus", as
   await expect(panel.getByRole("navigation", { name: "Control Centre" })).toBeVisible();
   await expect(panel.getByRole("link")).toHaveText([...AREA_NAMES, ...PAGE_NAMES]);
 
-  // Over the content, not beside it: the content keeps every pixel it had.
   expect(await widthOf(page.getByRole("main"))).toBe(contentWide);
 
-  /**
-   * Twice round every stop it holds — the destinations and its way out — so a reader behind
-   * it can never tab onto the page.
-   */
   const stops = AREA_NAMES.length + PAGE_NAMES.length + 1;
   expect(await holdsFocus(panel)).toBe(true);
   for (let step = 0; step < stops * 2; step += 1) {

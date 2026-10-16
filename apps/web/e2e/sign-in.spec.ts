@@ -44,7 +44,6 @@ const codeField = (page: Page) => page.getByLabel("Verification Code", { exact: 
 const theSendsAnswer = (page: Page) =>
   page.waitForResponse((response) => new URL(response.url()).pathname === SEND_PATH);
 
-/** The wait the ceiling named, in whole seconds. */
 const waitNamedBy = async (answered: ReturnType<typeof theSendsAnswer>): Promise<number> => {
   const response = await answered;
   expect(response.status(), "the send was not refused by a ceiling").toBe(429);
@@ -53,7 +52,6 @@ const waitNamedBy = async (answered: ReturnType<typeof theSendsAnswer>): Promise
   return waitSeconds;
 };
 
-/** A code asked for at the email step meets a ceiling, and the page says the wait it named. */
 const theSendIsRefusedNamingItsWait = async (page: Page, email: string): Promise<void> => {
   await page.getByLabel("Email Address").fill(email);
   const answered = theSendsAnswer(page);
@@ -62,7 +60,6 @@ const theSendIsRefusedNamingItsWait = async (page: Page, email: string): Promise
   await saysTheWait(page.getByRole("alert"), await waitNamedBy(answered));
 };
 
-/** From the email step the page shows to the code step, through the product's own page. */
 const sendTheFirstCode = async (page: Page, email: string): Promise<void> => {
   await page.getByLabel("Email Address").fill(email);
   await page.getByRole("button", { name: "Send Code" }).click();
@@ -82,7 +79,6 @@ const saysANewEmailWent = async (page: Page, earlier: string): Promise<void> => 
   await saysSomethingNew(page.getByRole("status"), earlier);
 };
 
-/** A page's own words as an XPath string, whatever quotes they hold. */
 const asXPath = (words: string): string =>
   `concat(${words
     .split('"')
@@ -97,19 +93,16 @@ const atTheCodeStep = async (page: Page, email: string): Promise<void> => {
 /** The page counts the tries left itself, so the alert's number is all that says them. */
 const triesLeft = (left: number): RegExp => new RegExp(String.raw`\b${String(left)}\b`);
 
-/** Wrong unless the code sent was six zeros, one chance in a million. */
 const aWrongCodeIsRefused = async (page: Page): Promise<void> => {
   await codeField(page).fill("000000");
   await expect(page.getByRole("alert")).toHaveText(triesLeft(2));
 };
 
-/** Never the code sent: six digits `step` past it, wrapping at a million. */
 const notTheCode = (code: string, step: number): string =>
   String((Number(code) + step) % 1_000_000).padStart(6, "0");
 
 const SIGN_IN_PATH = "/sign-in/email-otp";
 
-/** Every code the page sends the api from now on, so a resend shows as a second entry. */
 const codesSentFrom = (page: Page): readonly string[] => {
   const sent: string[] = [];
   page.on("request", (asked) => {
@@ -118,7 +111,6 @@ const codesSentFrom = (page: Page): readonly string[] => {
   return sent;
 };
 
-/** Through the clipboard and the keyboard, as a person pastes a code copied from the email. */
 const pastedIntoTheField = async (page: Page, copied: string): Promise<void> => {
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.evaluate((text) => navigator.clipboard.writeText(text), copied);
@@ -142,7 +134,6 @@ const aFramePassed = (page: Page): Promise<void> =>
       }),
   );
 
-/** Runs what makes the page re-read its session, then holds that the page still waits at /sign-in. */
 const stillWaitingOnceReread = async (page: Page, prompt: () => Promise<void>): Promise<void> => {
   const reread = page.waitForRequest((asked) => new URL(asked.url()).pathname === "/get-session");
   await prompt();
@@ -155,7 +146,6 @@ const SESSION_READ = "**/get-session*";
 
 const heldSession = z.object({ session: z.object({ id: z.string() }) });
 
-/** As the api reads this browser's cookie, so a session begun since names a new id. */
 const sessionHeldBy = async (page: Page): Promise<string> =>
   heldSession.parse(await (await page.request.get("/get-session")).json()).session.id;
 
@@ -527,7 +517,6 @@ test("names the wait when a new code meets the ceiling", async ({
   await expect(listed.getByRole("term").filter({ hasText: /^e$/ })).toBeVisible();
   await keystrokesDismissed(page, listed);
 
-  // Landed once the status stops saying the first email's line; the page is read by its heading.
   const saidOfTheFirst = await page.getByRole("status").evaluate((status) => status.textContent);
   await clockTheNextKey(page, {
     at: `//main[.//*[@role='status'][string(.)!=${asXPath(saidOfTheFirst)}]]`,

@@ -15,7 +15,6 @@ const action = (label: string, destructive?: boolean) => ({
   onSelect: NOTHING,
 });
 
-/** The menu's items in the order a reader meets them, a separator drawn as a rule. */
 const menuOf = (actions: readonly ReturnType<typeof action>[]) => {
   render(<RowMenu name="Ada Lovelace" actions={actions} />);
   // The registry's menus open on a key or a press, never on a click.

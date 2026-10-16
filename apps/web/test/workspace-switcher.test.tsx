@@ -40,7 +40,6 @@ type Switching = Drawn["switching"];
 
 const HOLME = { id: "h", name: "Holme Valley Tools", role: "Viewer" };
 
-/** Where the switcher is drawn, and what its list has answered. */
 type Standing = Pick<Drawn, "here"> & Pick<Switching, "workspaces">;
 
 const IN_NORTHERN: Standing = {
@@ -64,7 +63,6 @@ const measuresNothing = class {
   disconnect = () => undefined;
 };
 
-/** The switcher alone, open, over a router that can take each of its ways out. */
 const openTheMenu = async (pending: boolean, standing: Standing = IN_NORTHERN) => {
   vi.stubGlobal("ResizeObserver", measuresNothing);
   const root = createRootRoute({
@@ -95,7 +93,6 @@ const openTheMenu = async (pending: boolean, standing: Standing = IN_NORTHERN) =
   return router;
 };
 
-/** Set-active answers as `answer` says; every other read as Ada's, an Admin of Northern Tooling. */
 const answeringTheSwitch =
   (answer: () => Promise<Response>) =>
   (input: Asked): Promise<Response> =>
@@ -111,7 +108,6 @@ const refusedWith = (code: string) => () =>
     }),
   );
 
-/** One hook alone, over the app's clients and a router it can navigate. */
 const renderTheHook = async <TResult,>(hook: () => TResult) => {
   const clients = createAppClients();
   const router = createRouter({
@@ -128,10 +124,8 @@ const renderTheHook = async <TResult,>(hook: () => TResult) => {
   return { queryClient: clients.queryClient, result };
 };
 
-/** The switch's hook, with the api's proxy beside it for reading and seeding the cache. */
 const switchHeld = () => renderTheHook(() => ({ switching: useSwitchWorkspace(), api: useTRPC() }));
 
-/** A hook over a cache that already holds the person's workspace list, as an opened menu leaves it. */
 const overTheListHeld = async <TResult,>(hook: () => TResult) => {
   const { queryClient, result } = await renderTheHook(() => ({ held: hook(), api: useTRPC() }));
   const listKey = result.current.api.person.workspaces.queryKey();
@@ -139,7 +133,6 @@ const overTheListHeld = async <TResult,>(hook: () => TResult) => {
   return { queryClient, result, listKey };
 };
 
-/** The join answers; every other read as Ada's, an Admin of Northern Tooling. */
 const answeringTheJoin = (input: Asked): Promise<Response> =>
   addressOf(input).pathname.includes("person.acceptInvitation")
     ? answered([{ result: { data: { workspaceId: HOLME.id } } }])

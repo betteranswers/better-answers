@@ -38,7 +38,6 @@ const whyOf = (result: TestResult): string | undefined =>
   whyItCouldNotRun(result.annotations) ??
   (result.status === "interrupted" ? "the run was stopped before the journey ended" : undefined);
 
-/** The preflight plays no role, so its project names it. */
 const roleOf = (test: TestCase, result: TestResult): string =>
   roleIn(result.annotations) ?? test.parent.project()?.name ?? "";
 
@@ -91,7 +90,6 @@ const titleOf = (test: TestCase): string =>
 /** One line a test, from its title and outcome alone, so the run's log never holds an error. */
 const lineOf = (test: TestCase, said: string): string => `  ${said}  ${titleOf(test)}\n`;
 
-/** The run's only output: the word in `outcomeFile`, the run's summary, and each test's title on stdout. */
 export default class OutcomeReporter implements Reporter {
   readonly #outcomeFile: string;
   #root: Suite | undefined;

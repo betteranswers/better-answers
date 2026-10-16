@@ -18,7 +18,6 @@ import {
 /** WCAG 1.4.11: a focus indicator holds 3:1 against the colours next to it. */
 const NON_TEXT_CONTRAST = 3;
 
-/** More stops than either page has controls, so a walk reaches every one of them. */
 const STOPS = 60;
 
 const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
@@ -34,7 +33,6 @@ type Drawn = {
   readonly behind: string;
 };
 
-/** A ring fades in, and read mid-fade it is the resting shadow. */
 const focusSettled = (page: Page): Promise<void> =>
   page.evaluate(async () => {
     const running = document.activeElement?.getAnimations({ subtree: true }) ?? [];
@@ -45,7 +43,6 @@ const focusSettled = (page: Page): Promise<void> =>
     );
   });
 
-/** A part that draws its ring on an inner element, as the counted switch does, is read there. */
 const drawnFocus = (page: Page, edge: string): Promise<Drawn | undefined> =>
   page.evaluate((inked) => {
     const focused = document.activeElement;
@@ -89,7 +86,6 @@ const drawnFocus = (page: Page, edge: string): Promise<Drawn | undefined> =>
     };
   }, edge);
 
-/** The token's outermost layer, its ink edge, in the theme in force. */
 const inkOf = async (page: Page): Promise<string> =>
   (await tokenPainted(page, "--focus-ring", "box-shadow")).match(/rgba?\([^)]+\)/g)?.at(-1) ?? "";
 
@@ -98,7 +94,6 @@ const inTheDark = (page: Page) =>
     localStorage.setItem(key, "dark");
   }, THEME_KEPT_UNDER);
 
-/** Every stop of a keyboard walk, until focus comes back round to the first. */
 const walked = async (page: Page): Promise<readonly Drawn[]> => {
   const edge = await inkOf(page);
   const seen: Drawn[] = [];

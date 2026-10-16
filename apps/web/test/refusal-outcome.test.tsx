@@ -131,7 +131,6 @@ const THE_PEOPLES_OWN = {
 
 const nameOf = (id: string): string => (id === "p1" ? "Ada Lovelace" : "Grace Hopper");
 
-/** A set refused whole for its first item's word, naming each item it refused. */
 const refusedForItems = (items: Readonly<Record<string, string>>): Error =>
   carrying({ refusal: { word: "last-admin", class: "precondition", items } });
 

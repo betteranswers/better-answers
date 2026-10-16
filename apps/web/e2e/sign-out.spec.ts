@@ -13,7 +13,6 @@ import {
   signOutFromTheShell,
 } from "./harness.ts";
 
-/** Says why the person is there in the region a status is read from, and answers what it said. */
 const signInSaysWhy = async (page: Page): Promise<string> => {
   await expect(signInHeading(page)).toBeVisible();
   await expect(page.getByRole("status"), "the sign-in page says nothing of the arrival").toHaveText(

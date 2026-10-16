@@ -32,7 +32,6 @@ afterEach(() => {
 
 const SESSION = { session: { id: "s" }, user: { id: "p", name: "Ada", email: "ada@example.test" } };
 
-/** An authenticator set up and no codes held, so the page offers a first set. */
 const NO_SET = {
   mustHoldOne: false,
   passkeys: [],
@@ -50,7 +49,6 @@ const ISSUED = {
 
 type Formatted = { readonly code: string; readonly httpStatus: number; readonly rpc: number };
 
-/** A refusal as the router's error formatter sends it. */
 const refusing = (word: string, refusalClass: string, formatted: Formatted) => ({
   error: {
     message: word,
@@ -87,7 +85,6 @@ const answerTo = (name: string, replace: () => unknown, read: () => unknown): un
   return name === "person.secondFactor" ? { result: { data: read() } } : FORBIDDEN;
 };
 
-/** Ada's api: `replace` answers making codes, and `read` her second factor each time it is read. */
 const adasApi =
   (replace: () => unknown, read: () => unknown) =>
   (input: string | URL | Request): Promise<Response> => {
@@ -112,7 +109,6 @@ const A_PASSKEY = {
   lastUsedAt: null,
 };
 
-/** An Admin whose one factor is a passkey, and no authenticator. */
 const ADMINS_ONLY_FACTOR = {
   mustHoldOne: true,
   passkeys: [A_PASSKEY],

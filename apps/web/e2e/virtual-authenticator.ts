@@ -18,11 +18,9 @@ export const aVirtualAuthenticator = async (page: Page) => {
     },
   });
   return {
-    /** The passkeys the device holds, whether or not the platform still keeps them. */
     held: async (): Promise<number> =>
       (await cdp.send("WebAuthn.getCredentials", { authenticatorId })).credentials.length,
 
-    /** A device whose fingerprint, face or PIN check fails. */
     stopsVerifying: () =>
       cdp.send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false }),
 
@@ -35,7 +33,6 @@ export const aVirtualAuthenticator = async (page: Page) => {
   };
 };
 
-/** A browser with no WebAuthn at all, as an old or locked-down one is. */
 export const withoutWebAuthn = (page: Page) =>
   page.addInitScript(() => {
     Object.defineProperty(window, "PublicKeyCredential", { value: undefined });

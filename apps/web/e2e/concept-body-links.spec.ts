@@ -33,7 +33,6 @@ const ulidOf = (concepts: Seeded, title: string): string => {
 const pageOf = (concepts: Seeded, title: string): string =>
   `${SEARCH.path}/${ulidOf(concepts, title)}`;
 
-/** The retention rule's body links the committee and the Restricted salary bands by their files. */
 const aRuleLinkingTwo = async (api: APIRequestContext, name: string) => {
   const adminEmail = anAddress("admin");
   const workspace = await provision(api, { name, adminEmail });
@@ -60,7 +59,6 @@ const aRuleLinkingTwo = async (api: APIRequestContext, name: string) => {
 const conceptOf = (page: Page, title: string): Locator =>
   page.getByRole("article", { name: title });
 
-/** The body's own line of links, apart from the page's list of the concept's relations. */
 const linkingLine = (page: Page): Locator =>
   conceptOf(page, RETENTION).getByRole("paragraph").filter({ hasText: SALARY });
 

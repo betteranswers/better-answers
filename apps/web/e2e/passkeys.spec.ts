@@ -36,17 +36,14 @@ const rowOf = (page: Page, name: string) => page.getByRole("listitem", { name, e
 const theNoWorkspacePage = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "No Workspace Yet" });
 
-/** The status an action's outcome is said in: the one holding words. */
 const outcomeOf = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ });
 
 /** A passkey's last use is shown to the minute, and the day it was added as a day alone. */
 const A_TIME_OF_USE = /\b\d{1,2}:\d{2}\b/;
 
-/** The name the page suggests, read from the browser it runs in. */
 const suggestedName = (page: Page): Promise<string> =>
   page.evaluate(() => navigator.userAgent).then(passkeyNameFor);
 
-/** From the Account page: open the add, keep the suggested name, and add it. */
 const passkeyAdded = async (page: Page): Promise<string> => {
   const name = await suggestedName(page);
   await page.getByRole("button", { name: "Add a Passkey" }).click();
@@ -60,13 +57,11 @@ const accountOpened = async (page: Page): Promise<void> => {
   await expect(accountHeading(page)).toBeVisible();
 };
 
-/** Sign out by dropping the session's cookie, so the next sign-in starts with nothing held. */
 const signedOut = async (page: Page): Promise<void> => {
   await page.context().clearCookies();
   await page.goto("/sign-in");
 };
 
-/** A person in no workspace whose device holds the one passkey they added on the Account page. */
 const withAPasskey = async (
   page: Page,
   api: Parameters<typeof signedInWithNoWorkspace>[1],
@@ -80,7 +75,6 @@ const withAPasskey = async (
   return { device, person, name };
 };
 
-/** Rename opened on the passkey's row, its field holding `typed`. */
 const renameTyped = async (page: Page, name: string, typed: string): Promise<void> => {
   await rowOf(page, name).getByRole("button", { name: "Rename" }).click();
   await page.getByRole("textbox", { name: "Passkey Name" }).fill(typed);
@@ -261,7 +255,6 @@ test("the email step reads email, send, then the passkey", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Sign In with a Passkey" })).toBeFocused();
 });
 
-/** The offer, found by the one control it alone draws. */
 const offerOf = (page: Page) => page.getByRole("button", { name: "Dismiss Passkey Offer" });
 
 const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
@@ -270,7 +263,6 @@ const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
 const secondFactorRead = (page: Page) =>
   page.waitForResponse((answer) => answer.url().includes("person.secondFactor"));
 
-/** A Viewer holding no passkey, on Ask from their sign-in, who signs in again by the address answered. */
 const aViewerOffered = async (page: Page, api: APIRequestContext) => {
   await aVirtualAuthenticator(page);
   const email = anAddress("offered");
@@ -296,7 +288,6 @@ const signedInAgain = async (
   await read;
 };
 
-/** On to another page, where the offer must not follow. */
 const movedOnWithoutTheOffer = async (page: Page): Promise<void> => {
   await railOf(page).getByRole("link", { name: "Knowledge" }).click();
   // Knowledge's first group heads the page its rail link opens.
@@ -334,7 +325,6 @@ test("a dismissed offer stays away after the next sign-in", async ({ page, reque
   await expect(offerOf(page), "a dismissed offer came back with the next sign-in").toHaveCount(0);
 });
 
-/** A Viewer of two workspaces, each homed on Ask, offered a passkey on the home of the first. */
 const aViewerOfTwoOffered = async (page: Page, api: APIRequestContext) => {
   await aVirtualAuthenticator(page);
   const email = anAddress("offered-in-two");

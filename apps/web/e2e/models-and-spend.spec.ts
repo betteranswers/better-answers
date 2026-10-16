@@ -59,11 +59,9 @@ const rowOf = (page: Page, purpose: (typeof PURPOSES)[number]) =>
 
 const embeddingRow = (page: Page) => rowOf(page, "Embedding");
 
-/** The head's lines: what the card is, then who sets a model while a purpose has none. */
 const headLines = (page: Page) =>
   modelChoicesCard(page).getByRole("heading", { level: 2 }).locator("xpath=following-sibling::p");
 
-/** A purpose with no model choice shows no field, so its row holds no term. */
 const unsetRows = (page: Page) =>
   modelChoicesCard(page)
     .getByRole("listitem")
@@ -75,7 +73,6 @@ const models = menuGroupIn(CONTROL_CENTRE, "models");
 
 const MODELS_AND_SPEND = pageNamed(models, "Models and Spend");
 
-/** No role lands on Models and spend, so every test here opens it from the member's home. */
 const openModelChoices = async (page: Page) => {
   await page.goto(MODELS_AND_SPEND.path);
   await expect(modelChoicesCard(page)).toBeVisible();
@@ -221,7 +218,6 @@ test.describe("the Models and spend page's model choices card", () => {
     await expect(embedding).toContainText("Mistral AI");
     await expect(embedding).toContainText(EMBEDDING.model);
 
-    // Its note with the dimensions, then why.
     await expect(embedding.getByRole("paragraph")).toHaveText([DIMENSIONS, /\S/]);
     await expect(
       modelChoicesCard(page).getByRole("listitem").filter({ hasText: DIMENSIONS }),
@@ -318,7 +314,6 @@ test.describe("the Models and spend page's model choices card", () => {
             - paragraph: /\\b${String(EMBEDDING_DIMENSIONS)}\\b/
             - paragraph
     `);
-    // The heading and its lead line, then the tabs. Equal children: the panel holds the card alone.
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
         - heading "Models" [level=1]

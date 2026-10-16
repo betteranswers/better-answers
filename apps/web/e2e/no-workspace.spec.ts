@@ -50,7 +50,6 @@ const consentHeading = (page: Page) =>
 const invitationsAnswered = (page: Page): Promise<Response> =>
   page.waitForResponse((response) => response.url().includes(INVITATIONS_READ));
 
-/** A named person and their Admin's waiting invitation to them, before either signs in. */
 const anInvitation = async (request: APIRequestContext, workspaceName: string, role: Role) => {
   const address = anAddress("priya");
   await person(request, address, { displayName: "Priya Shah" });
@@ -74,7 +73,6 @@ const lapsed = (search: string): string => {
   return `?${query.toString()}`;
 };
 
-/** Signed in from Claude's request, so the no-workspace page still carries its signed query. */
 const landedConnecting = async (
   page: Page,
   request: APIRequestContext,

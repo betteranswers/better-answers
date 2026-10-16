@@ -36,7 +36,6 @@ await vi.hoisted(() => import("./stub-server.ts"));
 
 placedWithoutMeasuring();
 
-/** What the api answers an action from a tab whose workspace the session has left. */
 const SWITCHED = aRefusalAnswer("workspace-switched", "conflict", 409);
 
 const SAID = refusalSentence({}, "workspace-switched", "conflict");
@@ -56,7 +55,6 @@ const KAYS = {
   invitedBy: ADA.displayName,
 };
 
-/** Grace's page under Northern Tooling, drawn as far as her role. */
 const openGracesPage = async (api: Api) => {
   const router = await openAt(GRACES_PAGE, api);
   await screen.findByRole("radio", { name: "Editor" });
@@ -68,13 +66,11 @@ const changeGracesRole = () => {
   fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
 };
 
-/** The band names the session's workspace and says why the tab moved. */
 const landedInHolme = async () => {
   await switcher(HOLME);
   await waitFor(() => expect(band().getByRole("alert").textContent).toBe(SAID));
 };
 
-/** Watched from now on, since a check at one moment can miss a blank: the band naming no workspace. */
 const bandBlanksWatched = () => {
   let blanked = false;
   const watching = new MutationObserver(() => {
@@ -106,7 +102,6 @@ const memberHeldAndCounted = (api: Api) => {
   return { ...member, askedAgainOnceSettled };
 };
 
-/** Refused once another browser tab took the session to Holme Valley Tools, Ada a Viewer there. */
 const refusedAfterASwitch = async () => {
   const api = adaAnAdmin();
   const router = await openGracesPage(api);
@@ -116,7 +111,6 @@ const refusedAfterASwitch = async () => {
   return router;
 };
 
-/** Refused while the member read fails, so no role is held to take the tab home. */
 const refusedWithTheMemberUnread = async () => {
   const api = adaAnAdmin();
   const router = await openGracesPage(api);

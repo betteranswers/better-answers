@@ -91,7 +91,6 @@ const openActionAndSearchAt = (asked: string) =>
 describe("an ask as the address holds it", () => {
   const here = { pathname: "/elsewhere", searchStr: "" };
 
-  /** What was typed, and how the address holds it. */
   const WHOLE = [
     ["1.50", "%221.50%22"],
     ["1e3", "%221e3%22"],

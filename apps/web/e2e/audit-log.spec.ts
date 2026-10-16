@@ -50,7 +50,6 @@ const said = (page: Page) => auditLog(page).getByRole("status").first();
 /** The empty list's one action, drawn only once a read has answered with no event. */
 const clearFilters = (page: Page) => auditLog(page).getByRole("button", { name: "Clear Filters" });
 
-/** Priya's one event: her name as the actor, then the group she created. */
 const BY_PRIYA = /Priya Shah.*Bid writers/;
 
 const pickFamily = async (page: Page, family: string): Promise<void> => {
@@ -116,7 +115,6 @@ const anAdminAtTheAuditLog = async (
   };
 };
 
-/** Groups made after the seeded three, so the newest page holds them alone. */
 const aFullPageOpened = async (
   page: Page,
   api: APIRequestContext,
@@ -165,7 +163,6 @@ test.describe("the System group's Audit log page", () => {
       ).toHaveCount(0);
     }
 
-    // The filter says the family in the lines' place, and still narrows them by it.
     await expect(familyFilter(page)).toHaveText("All Families");
     await pickFamily(page, "Platform");
     await expect(linesOf(page)).toHaveCount(1);
@@ -211,7 +208,6 @@ test.describe("the System group's Audit log page", () => {
 
     await page.goto(AUDIT_LOG_PAGE);
     await expect(linesOf(page)).toHaveCount(5);
-    // Newest first, so the second Sam's event leads.
     for (const [at, made] of [
       [0, 1],
       [1, 0],
@@ -252,7 +248,6 @@ test.describe("the System group's Audit log page", () => {
     await expect(linesOf(page)).toHaveCount(1);
 
     await familyFilter(page).click();
-    // Timed from the pick, so the budget is the read's and not the pointer's way to the list.
     const started = Date.now();
     await page.getByRole("option", { name: "Platform" }).click();
     await expect(clearFilters(page)).toBeVisible();
@@ -357,12 +352,10 @@ test.describe("the System group's Audit log page", () => {
     });
 
     await pickFamily(page, "Sources");
-    // Held, so the list draws no event and says in a status that it is being read.
     await expect(linesOf(page)).toHaveCount(0);
     await expect(auditLog(page).getByRole("status").filter({ hasText: /\S/ })).toHaveCount(1);
     held.resolve();
 
-    // The query asks twice more before it answers, as it does of any failure with no word.
     await saysARefusal(auditLog(page).getByRole("alert"));
     await expect(familyFilter(page)).toHaveText("Sources");
     await page.unroute(read);
@@ -377,7 +370,6 @@ test.describe("the System group's Audit log page", () => {
     passesTheAccessibilityGate,
   }) => {
     const at = await anAdminAtTheAuditLog(page, request, "Calder Castings");
-    // A fresh document, so the first Tab starts from the top rather than from the rail's link.
     await aFullPageOpened(page, request, at, 51);
 
     await skipLinkReachesThePage(page);

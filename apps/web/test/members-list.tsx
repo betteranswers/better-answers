@@ -89,7 +89,6 @@ const plainColumns = column.columns([
   column.accessor("joined", { id: "joined", header: "Joined" }),
 ]);
 
-/** Today's shape: a table with none of the opt-in parts. */
 export function BareList() {
   const table = useTable({
     features,
@@ -177,7 +176,6 @@ type Narrowed = { readonly search: string; readonly role: string | undefined };
 
 type FocusTarget = RefObject<HTMLElement | null>;
 
-/** The lines this list says of its own state, which a test holds it to by identity. */
 export const LIST_SAYS = {
   none: "No one belongs to this workspace yet.",
   noneFiltered: "No one matches these filters.",
@@ -220,7 +218,6 @@ const matching = (members: readonly Member[], narrowed: Narrowed): Member[] =>
       member.name.toLowerCase().includes(narrowed.search.toLowerCase()),
   );
 
-/** Ticks sit outside the table's rows. Narrowing comes before the table, so the total is known when the page is chosen. */
 function useMembersList(asked: Asked) {
   const { members = MEMBERS, pageSize = 25, onAction = NOTHING } = asked;
   const [narrowed, setNarrowed] = useState<Narrowed>({ search: "", role: undefined });
@@ -249,7 +246,6 @@ function useMembersList(asked: Asked) {
       pagination: { pageIndex, pageSize },
     },
   });
-  /** A narrower list starts again from its first page. */
   const narrow = (patch: Partial<Narrowed>) => {
     setNarrowed({ ...narrowed, ...patch });
     setPageIndex(0);
@@ -335,7 +331,6 @@ function MembersRead(properties: { readonly asked: Asked; readonly held: Held })
   return <MembersTable held={properties.held} />;
 }
 
-/** A Members list as the plan draws it, on every shared part; the browser suite draws it too. */
 export function MembersList(properties: Asked) {
   const held = useMembersList(properties);
   const { ticked } = held;

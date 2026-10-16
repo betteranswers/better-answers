@@ -60,17 +60,14 @@ const alerted = (page: Page) => searchRegion(page).getByRole("alert");
 
 const passagePanel = (page: Page, title: string) => page.getByRole("dialog", { name: title });
 
-/** The mark of a document no concept rests on, then its sensitivity, whatever stands between. */
 const markedAt = (sensitivity: string): RegExp =>
   new RegExp(`Not company knowledge\\W+${sensitivity}`);
 
 const asked = (query: string): string =>
   `${SEARCH.path}?${new URLSearchParams({ "knowledge.search": query }).toString()}`;
 
-/** No document holds this id, so an open of a passage in it reads nothing. */
 const NO_SUCH_DOCUMENT = "01JBZ6Q2V7Y9K3M5N8P0R2T4W6";
 
-/** The api's own refusal: the open is asked of a passage in a document nobody holds. */
 const asOfADocumentNobodyHolds = (route: Route): Promise<void> =>
   route.continue({
     url: route
@@ -79,13 +76,11 @@ const asOfADocumentNobodyHolds = (route: Route): Promise<void> =>
       .replace(/[0-9A-Z]{26}(?=(?:\/|%2F)chars)/, NO_SUCH_DOCUMENT),
   });
 
-/** A page past the first names its cursor in the batched input. */
 const isAFindPastTheFirstPage = (url: URL): boolean =>
   isAFind(url) && (url.searchParams.get("input") ?? "").includes('"cursor"');
 
 const HANDBOOK = "Warehouse handbook";
 
-/** Five more than a page, so a second page follows the first. */
 const PALLET_PASSAGES = Array.from(
   { length: A_PAGE + 5 },
   (_, index) => `Pallet bay ${index + 1} takes stock wrapped and labelled before it is racked.`,
@@ -93,7 +88,6 @@ const PALLET_PASSAGES = Array.from(
 
 type Seeded = { readonly workspaceId: string; readonly adminId: string };
 
-/** Four concepts by an Admin, one of them Restricted. */
 const conceptsSeeded = async (api: APIRequestContext, workspace: Seeded): Promise<void> => {
   await seedConcepts(api, {
     workspaceId: workspace.workspaceId,
@@ -172,7 +166,6 @@ const anAdminAtSearch = async (
   return workspace;
 };
 
-/** What the status says now, as `toHaveText` reads it, for telling a later state from this one. */
 const saidNow = async (page: Page): Promise<string> => (await said(page).textContent()) ?? "";
 
 /**
@@ -212,7 +205,6 @@ const foundNothing = async (
 
 const handbookMatches = (page: Page) => matchesOf(page).filter({ hasText: HANDBOOK });
 
-/** The handbook searched, then Load more pressed with its page held back until `release`. */
 const moreAskedForAndHeld = async (page: Page) => {
   await searched(page, "pallet");
   await expect(matchesOf(page)).toHaveCount(A_PAGE);

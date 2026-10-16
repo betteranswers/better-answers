@@ -19,7 +19,6 @@ function Line(properties: {
   );
 }
 
-/** Two lines, a box to move focus to, and a page of two more that lands when it is told to. */
 function Lines() {
   const [lines, setLines] = useState(["line 1", "line 2"]);
   const landing = useLanding();

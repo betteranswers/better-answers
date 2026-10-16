@@ -20,7 +20,6 @@ await vi.hoisted(() => import("./stub-server.ts"));
 
 placedWithoutMeasuring();
 
-/** The role cell, after the tick and the person. */
 const gracesRole = (): string | null | undefined =>
   screen.getByRole("link", { name: GRACE.displayName }).closest("tr")?.children[2]?.textContent;
 
@@ -36,7 +35,6 @@ describe("a bulk role change while the list is read again", () => {
     await openAt(HOMES.Admin.path, api);
     await waitFor(() => expect(tickOf(GRACE.displayName)).not.toBeNull());
     const list = heldBack(api, "members.list", read([ADA, GRACE]));
-    // Held, so the change's own settling asks for no second list.
     heldBack(api, "members.bulkChangeRole", read({ changed: [GRACE.personId], skipped: [] }));
     openTab("Invitations");
     openTab("Members");

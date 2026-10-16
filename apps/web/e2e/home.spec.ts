@@ -25,14 +25,12 @@ const READ_BUDGET_MS = 1000;
 
 const CONNECT_CLAUDE = pageNamed(menuGroupIn(ASK, "ask"), "Connect Claude");
 
-/** Each role's home, as the way home names it. */
 const HOME_NAMED = {
   Admin: "Members",
   Editor: "New Question",
   Viewer: "New Question",
 } as const satisfies Readonly<Record<Role, string>>;
 
-/** Every role joins the same way, so the Admin here differs from the others by role alone. */
 const signedInAs = async (page: Page, api: APIRequestContext, role: Role) => {
   const email = anAddress(role.toLowerCase());
   const member = await person(api, email, { displayName: `A ${role}` });
@@ -48,7 +46,6 @@ const controlCentreMenu = (page: Page) => navOf(page, "Control Centre");
 
 const unknownPage = (page: Page) => page.getByRole("heading", { level: 1, name: "Page Not Found" });
 
-/** In the shell, past the skip link, the not-found's one link is the way home. */
 const homeOfferedInTheShell = async (page: Page, role: Role, audited: () => Promise<void>) => {
   const home = `Go to ${HOME_NAMED[role]}`;
   await notFoundOfferingHome(page, role);
@@ -99,7 +96,6 @@ test("offers a Viewer's home from an unknown page, shell kept", async ({
   await homeOfferedInTheShell(page, "Viewer", passesTheAccessibilityGate);
 });
 
-/** One link from New question, where an Editor and a Viewer land. */
 const connectStepsOpened = async (page: Page) => {
   await page.getByRole("main").getByRole("link", { name: "connect Claude" }).click();
   await expect(page).toHaveURL(new RegExp(`${CONNECT_CLAUDE.path}$`));

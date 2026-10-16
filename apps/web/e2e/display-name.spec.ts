@@ -31,7 +31,6 @@ const saveButton = (page: Page) => page.getByRole("button", { name: "Save and Co
 
 const SET_DISPLAY_NAME = "person.setDisplayName";
 
-/** Every page the browser was shown, so a page that came and went cannot pass unseen. */
 const pagesShown = (page: Page): readonly string[] => {
   const shown: string[] = [];
   page.on("framenavigated", (frame) => {

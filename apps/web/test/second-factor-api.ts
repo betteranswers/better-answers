@@ -5,12 +5,10 @@ import { createAppClients } from "@/app/providers.tsx";
 import { appAt, openApp } from "./open-app.tsx";
 import { addressOf, answered } from "./stubbed-api.ts";
 
-/** What a route asks a device to sign, for any passkey the person holds. */
 export const A_CHALLENGE = { challenge: "Y2hhbGxlbmdl", userVerification: "required" };
 
 const aByte = (): ArrayBuffer => new Uint8Array([1]).buffer;
 
-/** A device's answer to a challenge, in the shape the browser hands it over. */
 export const A_CREDENTIAL = {
   id: "a2V5",
   rawId: aByte(),
@@ -25,7 +23,6 @@ export const A_CREDENTIAL = {
   authenticatorAttachment: "platform",
 };
 
-/** A browser that can use a passkey, whose device answers every ask with one. */
 export const withPasskeysHere = (): void => {
   vi.stubGlobal("PublicKeyCredential", () => undefined);
   Object.defineProperty(navigator, "credentials", {
@@ -57,13 +54,11 @@ const ADAS_SESSION = {
   user: { id: "p", name: "Ada", email: "ada@example.test" },
 };
 
-/** As the read names a session, by the standing the gate gives it. */
 export const sessionStanding = (
   standing: "not-required" | "confirmed" | "confirm" | "setup",
   facts: { confirmed?: boolean; setupGranted?: boolean; adminOf?: string | null } = {},
 ) => ({ confirmed: false, setupGranted: false, adminOf: null, ...facts, standing });
 
-/** An Admin with no passkey, no authenticator and no codes, on a session not yet confirmed. */
 export const NOTHING_HELD = {
   mustHoldOne: true,
   operator: false,
@@ -126,7 +121,6 @@ const REFUSED = {
   },
 };
 
-/** What every procedure outside the pending set answers a session waiting on its second factor. */
 export const PENDING = {
   error: {
     message: "second-factor-pending",
@@ -141,7 +135,6 @@ export const PENDING = {
 
 type Procedures = ReadonlyMap<string, () => unknown>;
 
-/** Ada holds one session, this one, so the Sessions section draws its only-session line. */
 const ADAS_SESSIONS = [
   { id: "s", device: "Chrome on macOS", lastActiveAt: MADE_AT, current: true },
 ];
@@ -159,10 +152,6 @@ const answerTo = (
   return otherwise;
 };
 
-/**
- * `held` answers each read of Ada's second factor, `routes` each post to our own routes, and
- * `otherwise` every procedure nothing else answers.
- */
 export const adasApi = (
   held: () => unknown,
   routes: ReadonlyMap<string, Route> = new Map(),
@@ -180,7 +169,6 @@ export const adasApi = (
   return asked;
 };
 
-/** Ada's session stands, and no read of the api ever answers. */
 export const readingForever = (): void => {
   vi.stubGlobal("fetch", (input: string | URL | Request) =>
     addressOf(input).pathname.startsWith("/trpc/")
@@ -189,7 +177,6 @@ export const readingForever = (): void => {
   );
 };
 
-/** The pages read their query off the address bar; the auth library's own read fails here at once. */
 const clientsAt = (path: string) => {
   globalThis.history.replaceState(null, "", path);
   const clients = createAppClients();
@@ -200,10 +187,8 @@ const clientsAt = (path: string) => {
 
 export const openAsAda = (path: string) => openApp(path, clientsAt(path));
 
-/** The router alone, loaded at `path` and never drawn. */
 export const loadedAsAda = (path: string) => appAt(path, clientsAt(path));
 
-/** The words in every alert that says something, in document order. */
 export const alertsSaying = (): readonly string[] =>
   [...document.querySelectorAll('[role="alert"]')]
     .map((alert) => alert.textContent)

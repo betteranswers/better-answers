@@ -64,7 +64,6 @@ const refusalWordOf = (text: string): string | undefined => {
 const refusalWordIn = async (answered: APIResponse): Promise<string | undefined> =>
   answered.ok() ? undefined : refusalWordOf(await answered.text());
 
-/** What a read through the Admin's session found, or the word the product refused it with. */
 export type Checked<T> =
   | { readonly kind: "read"; readonly value: T }
   | { readonly kind: "refused"; readonly procedure: string; readonly word: string };
@@ -82,7 +81,6 @@ const checkedThroughTheSession = async <T>(
 
 const PROTECTED_RESOURCE = z.object({ resource: z.string() });
 
-/** The address the release publishes for an assistant to connect to, read as an assistant reads it. */
 export const publishedAddressOf = async (page: Page): Promise<string> => {
   const answered = await page.request.get("/.well-known/oauth-protected-resource/mcp");
   refusedTheRun(answered, "the read of the protected-resource document");
@@ -123,7 +121,6 @@ export type StandingRead = {
   readonly connectedSources: number;
 };
 
-/** The three reads the fixture check judges; the first refusal, if any, stands for them all. */
 export const standingOf = async (page: Page): Promise<Checked<StandingRead>> => {
   const [members, counts, connectedSources] = await Promise.all([
     checkedThroughTheSession(page, "members.list", MEMBERS),
@@ -143,18 +140,15 @@ export const standingOf = async (page: Page): Promise<Checked<StandingRead>> => 
   };
 };
 
-/** The api's answer to an action of the journey's own, with nothing read from it. */
 export const answeredOk = async (page: Page, procedure: string): Promise<void> => {
   await answerTo(page, procedure, z.unknown());
 };
 
-/** How many the page's own read of the connected sources lists. */
 export const connectedSourcesRead = async (page: Page): Promise<number> =>
   (await answerTo(page, "sources.list", CONNECTED_SOURCES)).length;
 
 const BULK_CHANGED = z.object({ changed: z.array(z.unknown()), skipped: z.number() });
 
-/** How many a bulk action the journey committed changed, and how many it passed over. */
 export const bulkAnswerTo = async (
   page: Page,
   procedure: string,

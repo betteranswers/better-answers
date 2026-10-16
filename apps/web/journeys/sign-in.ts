@@ -26,7 +26,6 @@ type Fault = Exclude<InboxAnswer["answer"], "code">;
 
 type Judgement = { readonly outcome: Exclude<Outcome, "held">; readonly why: string };
 
-/** A missing email judges the release; an inbox that cannot tell judges nothing. */
 const INBOX_FAULTS = {
   "no-mail": {
     outcome: "fail",

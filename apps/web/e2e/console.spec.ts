@@ -51,7 +51,6 @@ const CLOSED = "Access Denied";
 const UK_DAY =
   /^\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
 
-/** The way in is the switcher's, offered from the operator's standing as last read. */
 const theConsoleOffered = async (page: Page, workspaceName: string) => {
   await switcherOf(page, workspaceName).click();
   const theConsole = switcherMenuOf(page, workspaceName).getByRole("menuitem", {
@@ -61,7 +60,6 @@ const theConsoleOffered = async (page: Page, workspaceName: string) => {
   return theConsole;
 };
 
-/** An item of the switcher reads its workspace's name, then the person's role there. */
 const listedAs = (name: string, role: "Admin" | "Viewer"): string => `${name} ${role}`;
 
 const listOf = (page: Page) => page.getByRole("region", { name: "Every Workspace" });
@@ -69,16 +67,13 @@ const listOf = (page: Page) => page.getByRole("region", { name: "Every Workspace
 const searchOf = (page: Page) =>
   listOf(page).getByRole("searchbox", { name: "Search by name or short name" });
 
-/** The list's one count, which the head says and nothing else in the region repeats. */
 const countOf = (page: Page) => listOf(page).getByRole("status");
 
-/** The header row is a row too, so the workspaces are the rows with a cell. */
 const workspaceRows = (page: Page): Locator =>
   listOf(page)
     .getByRole("row")
     .filter({ has: page.getByRole("cell") });
 
-/** A workspace's row, found by the disclosure it alone carries. */
 const rowOf = (page: Page, name: string): Locator =>
   workspaceRows(page).filter({
     has: page.getByRole("button", { name: `More About ${name}`, exact: true }),
@@ -256,7 +251,6 @@ test.describe("the way into the console", () => {
 
     await switcherOf(page, "Console").click();
     const menu = switcherMenuOf(page, "Console");
-    // No workspace is open in the console, so the list reads in name order, each role its own.
     await expect(menu.getByRole("menuitemradio")).toHaveText([
       listedAs(second.name, "Viewer"),
       listedAs(workspace.name, "Admin"),
@@ -390,7 +384,6 @@ test.describe("the console's Workspaces page", () => {
     await expect(rowOf(page, workspace.name)).toBeVisible();
 
     await markTheOperator(request, workspace.admin.email, "revoke");
-    // A move between the console's own pages keeps its standing, so the list asks again alone.
     await navOf(page, "Console").getByRole("link", { name: "Everyone" }).click();
     const refused = refusalAnswering(page, "console.workspaces.list");
     await navOf(page, "Console").getByRole("link", { name: "Every Workspace" }).click();
@@ -428,7 +421,6 @@ test.describe("the console's Workspaces page", () => {
 
   test("closes the console on entry once the mark is cleared", async ({ page, request }) => {
     const workspace = await theOperator(page, request, "Rossendale Forge");
-    // Offered from the standing read before the mark was cleared.
     const theConsole = await theConsoleOffered(page, workspace.name);
 
     await markTheOperator(request, workspace.admin.email, "revoke");
@@ -473,7 +465,6 @@ test.describe("the console's Workspaces page", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
     await expect(rowOf(page, workspace.name)).toBeVisible();
 
-    // Four columns outrun a narrow window, so it opens on two and its menu shows the rest again.
     await expect(listOf(page).getByRole("columnheader")).toHaveText(["Workspace", "Short Name"]);
     const room = await page.evaluate(() => {
       const table = document.querySelector("[data-slot=table-container]");
@@ -502,7 +493,6 @@ test.describe("the console's Workspaces page", () => {
 
     await skipLinkReachesThePage(page);
 
-    // Back to the first stop, to walk the regions in the order the document gives them.
     await page.getByRole("link", { name: "Skip to the Page" }).focus();
     for (const stop of [
       page.getByRole("banner").getByRole("link", { name: "better-answers" }),

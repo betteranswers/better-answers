@@ -26,7 +26,6 @@ const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
 
 const membersRegion = (page: Page) => thePage(page).getByRole("region", { name: "Members" });
 
-/** The header row is a row too, so the people are the rows with a cell. */
 const memberRows = (page: Page): Locator =>
   membersRegion(page)
     .getByRole("row")
@@ -49,7 +48,6 @@ const selectionAction = (page: Page, action: string): Locator =>
 
 const rowOf = (page: Page, name: string) => page.getByRole("listitem", { name, exact: true });
 
-/** The name the page suggests, read from the browser it runs in. */
 const suggestedName = (page: Page): Promise<string> =>
   page.evaluate(() => navigator.userAgent).then(passkeyNameFor);
 
@@ -60,7 +58,6 @@ type AtPeople = {
   readonly adminId: string;
 };
 
-/** A workspace of three, its Admin signed in and confirmed. */
 const anAdminAtPeople = async (
   page: Page,
   api: APIRequestContext,

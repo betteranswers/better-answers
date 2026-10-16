@@ -45,7 +45,6 @@ const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre
 
 const groupsRegion = (page: Page) => page.getByRole("region", { name: "Groups" });
 
-/** The header row is a row too, so the groups are the rows with a cell. */
 const groupRows = (page: Page): Locator =>
   groupsRegion(page)
     .getByRole("row")
@@ -70,7 +69,6 @@ const searchBox = (page: Page): Locator =>
 const renameDialog = (page: Page, name: string): Locator =>
   page.getByRole("dialog", { name: `Rename ${name}` });
 
-/** Opens a group's row menu and picks Rename, as a pointer would. */
 const renamingFromTheRowMenu = async (page: Page, name: string): Promise<Locator> => {
   await rowOf(page, name)
     .getByRole("button", { name: `Actions for ${name}` })
@@ -79,7 +77,6 @@ const renamingFromTheRowMenu = async (page: Page, name: string): Promise<Locator
   return renameDialog(page, name);
 };
 
-/** The action a keystroke list sets beside a key: the definition after the key's term. */
 const actionBeside = (keystrokes: Locator, key: string): Locator =>
   keystrokes
     .getByRole("term")
@@ -89,12 +86,10 @@ const actionBeside = (keystrokes: Locator, key: string): Locator =>
 /** A group being created is a name before it is a button, so its row is found by its text. */
 const countCellOf = (name: string): string => `//tr[td[1][normalize-space(.)='${name}']]/td[2]`;
 
-/** What the open sheet says under its heading: a group's member count. */
 const SHEET_COUNT = "//div[@role='dialog']//h2/following-sibling::p[1]";
 
 const LIST_COUNT = "//section[h2[normalize-space(.)='Groups']]/div/output";
 
-/** The warning before a group is deleted: what it says of the members it takes, and where focus sits. */
 const warnedOfDeleting = async (page: Page, name: string, members: number) => {
   const confirming = page.getByRole("alertdialog", { name: `Delete ${name}` });
   await expect(
@@ -105,14 +100,12 @@ const warnedOfDeleting = async (page: Page, name: string, members: number) => {
   return confirming;
 };
 
-/** Confirms the open deletion warning by its key, timed from the key to the row leaving. */
 const confirmedAtAKey = async (page: Page, confirming: Locator, left: number) => {
   await confirming.getByRole("button", { name: "Delete", exact: true }).focus();
   await clockTheNextKey(page, { at: LIST_COUNT, reads: String(left) });
   await page.keyboard.press("Enter");
 };
 
-/** Deletes an empty group through its sheet, answering how long its confirming key took to land. */
 const deletedAtAKey = async (page: Page, name: string, left: number): Promise<number> => {
   await groupButton(page, name).click();
   await sheetOf(page, name).getByRole("button", { name: "Delete Group" }).click();
@@ -122,7 +115,6 @@ const deletedAtAKey = async (page: Page, name: string, left: number): Promise<nu
   return actionClocked(page);
 };
 
-/** A group's label on a member's page, found only while the box beside it is ticked. */
 const tickedGroup = (name: string): string =>
   `//fieldset//div[button[@role='checkbox'][@aria-checked='true']]//label[normalize-space(.)='${name}']`;
 
@@ -186,7 +178,6 @@ test.describe("the People group's Groups page", () => {
       "aria-current",
       "page",
     );
-    // With no tabs to name the list, its own heading shows, under the page's.
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
         - heading "People" [level=1]
@@ -298,7 +289,6 @@ test.describe("a group's actions", () => {
     await createDialog(page).getByRole("button", { name: "Create Group" }).click();
 
     expect(await refused).toMatchObject({ word: "name-taken" });
-    // The dialog stays open on a refusal, so its line is the dialog's own.
     await saysARefusal(createDialog(page).getByRole("alert"));
     await keepsItsWordOffThePage(page, "name-taken");
     await expect(nameField(page)).toHaveValue("HR team");

@@ -58,7 +58,6 @@ const WAITING_TO_CONFIRM = BOTH_HELD;
 
 const CONFIRMED = { ...BOTH_HELD, thisSession: sessionStanding("confirmed", { confirmed: true }) };
 
-/** The shell's two reads of its own, answered; every other procedure is pending's. */
 const SHELL_READS = new Map<string, () => unknown>([
   ["session.member", () => A_MEMBER],
   ["session.operator", () => ({ operator: false, name: "Ada" })],
@@ -76,7 +75,6 @@ const NO_SESSION = {
   },
 };
 
-/** The page's own read, refused for its own reason before the session is pending. */
 const NO_GROUPS = {
   error: {
     message: "forbidden",
@@ -196,7 +194,6 @@ describe("a pending refusal heard mid-session", () => {
   });
 });
 
-/** Every read of the second factor answers `read`; the rest as Ada's pending session. */
 const answeringTheReadWith =
   (read: unknown) =>
   (input: string | URL | Request): Promise<Response> => {
@@ -208,7 +205,6 @@ const answeringTheReadWith =
     return answered(names.map((name) => (name === "person.secondFactor" ? read : PENDING)));
   };
 
-/** Confirmed and holding only an authenticator, until a dismissal finds the session pending. */
 const adaPromotedMidSession = () => {
   let pending = false;
   const held = () => ({
@@ -246,7 +242,6 @@ const adaPromotedMidSession = () => {
   };
 };
 
-/** The address bar moves with each step, as a signed query and `redirect` are read off it. */
 const openInTheBrowser = async (path: string) => {
   globalThis.history.replaceState(null, "", path);
   const clients = createAppClients();

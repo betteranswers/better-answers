@@ -47,7 +47,6 @@ const invitationsRegion = (page: Page) => page.getByRole("region", { name: "Invi
 const invitationsHeading = (page: Page) =>
   invitationsRegion(page).getByRole("heading", { name: "Invitations" });
 
-/** Every invitation names an address, so its row is the one holding an @; the empty state's does not. */
 const invitationRows = (page: Page): Locator =>
   invitationsRegion(page).getByRole("row").filter({ hasText: "@" });
 
@@ -76,11 +75,9 @@ const selectionAction = (page: Page, action: string): Locator =>
     .getByRole("toolbar", { name: "Selected Invitations" })
     .getByRole("button", { name: action, exact: true });
 
-/** The tab's outcome line naming an address, which its count beside it never does. */
 const saidInTheTab = (page: Page, address: string | RegExp): Locator =>
   invitationsRegion(page).getByRole("status").filter({ hasText: address });
 
-/** An empty list draws one cell, which says so; a row of an invitation draws several. */
 const theOneCell = (page: Page): Locator => invitationsRegion(page).getByRole("cell");
 
 /** The tab's second status, after its count, is its outcome line. */
@@ -89,7 +86,6 @@ const outcomeIn = (page: Page): Locator => invitationsRegion(page).getByRole("st
 const selectionSaid = (page: Page): Locator =>
   page.getByRole("toolbar", { name: "Selected Invitations" }).getByRole("status");
 
-/** The count output under the Invitations region's heading. */
 const THE_COUNT = "//section[.//h2[.='Invitations']]//output";
 
 const INVITE = "Invite a Person";
@@ -119,7 +115,6 @@ const capitalised = (address: string): string =>
 const anUnreachableAddress = (who: string): string =>
   anAddress(who).replace("@example.test", "@unreachable.example");
 
-/** A Resend's answer as if its email went, which it never does to that domain. */
 const resentAsIfItWent = (page: Page) =>
   page.route(
     (url) => url.pathname.includes("members.resendInvitation"),
@@ -138,7 +133,6 @@ const resentAsIfItWent = (page: Page) =>
 
 const unsentIn = (where: Locator): Locator => where.getByRole("region", { name: "Unsent Emails" });
 
-/** The action as the page's own tRPC client would send it, under the Admin's session. */
 const actedAside = async (
   page: Page,
   { workspaceId }: AtInvitations,
@@ -158,7 +152,6 @@ type AtInvitations = {
   readonly editor: string;
 };
 
-/** The Editor is a member already, so a spec can invite them and be refused. */
 const anAdminAtInvitations = async (
   page: Page,
   api: APIRequestContext,
@@ -179,7 +172,6 @@ const anAdminAtInvitations = async (
   return at;
 };
 
-/** Signed in at Members in a role that may not see it. */
 const aMemberBelowAdminAtPeople = async (
   page: Page,
   api: APIRequestContext,
@@ -200,7 +192,6 @@ const openInvitations = async (page: Page): Promise<void> => {
   await expect(invitationsRegion(page).getByRole("heading", { name: "Invitations" })).toBeVisible();
 };
 
-/** Seeds waiting invitations by address, answering each one's id in the same order. */
 const invitedEach = async (
   api: APIRequestContext,
   at: AtInvitations,
@@ -291,7 +282,6 @@ test.describe("the People page's Invitations tab", () => {
       await expect(inviteDialog(page)).toHaveCount(0);
       await expect(inviteAction(page), `focus left the action on ${name}`).toBeFocused();
 
-      // Each tab's list sets its own action beside d: the definition after the key's term.
       const keystrokes = await keystrokesListed(page, "Members");
       const action = keystrokes
         .getByRole("term")

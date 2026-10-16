@@ -25,7 +25,6 @@ const bar = (page: Page) => page.getByRole("toolbar", { name: "Selected Members"
 
 const tickOf = (page: Page, name: string) => page.getByRole("checkbox", { name: `Select ${name}` });
 
-/** The bar sits above the table, so a reader on a row's tick goes back to reach it. */
 const backUntilFocused = async (page: Page, target: Locator) => {
   for (let pressed = 0; pressed < 10; pressed += 1) {
     if (await target.evaluate((node) => node === document.activeElement)) return;
@@ -37,7 +36,6 @@ const backUntilFocused = async (page: Page, target: Locator) => {
 /** WCAG's minimum target, measured as the points around a box that a press on it reaches. */
 const TARGET = 24;
 
-/** The box as drawn, and each corner of a 24-pixel square on its centre that misses it. */
 const targetOf = (tick: Locator) =>
   tick.evaluate((node, side) => {
     const box = node.getBoundingClientRect();

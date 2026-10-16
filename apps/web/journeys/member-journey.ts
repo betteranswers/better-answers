@@ -39,7 +39,6 @@ const connectShowsThePublishedAddress = async (page: Page, gate: Gate): Promise<
   await gate();
 };
 
-/** An Editor or a Viewer: they reach their home and Search, and an Admin's page says it was never there. */
 export const aMembersJourney = async (
   page: Page,
   role: "Editor" | "Viewer",

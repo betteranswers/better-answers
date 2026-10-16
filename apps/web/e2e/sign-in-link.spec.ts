@@ -27,7 +27,6 @@ const CLIENT_IP_HEADER = "cf-connecting-ip";
 
 let browsersOpened = 0;
 
-/** A second device: no cookie of the page's, and a client address apart from both of the fixture's. */
 const test = base.extend<{ readonly anotherBrowser: BrowserContext }>({
   anotherBrowser: async ({ browser }, use, testInfo) => {
     browsersOpened += 1;
@@ -77,7 +76,6 @@ const aLinkAskedForIn = async (asking: BrowserContext, api: APIRequestContext, w
   return { email, asking: page, token: await linkSentTo(api, email) };
 };
 
-/** As a person reading the code off the other device types it. */
 const typedWhereItStarted = async (asking: Page, code: string): Promise<void> => {
   await asking.getByLabel("Verification Code", { exact: true }).fill(code);
   await landedAtHome(asking, "Editor");
@@ -88,7 +86,6 @@ const headingOf = (page: Page, name: string) =>
 
 const signInButton = (page: Page) => page.getByRole("button", { name: "Sign In", exact: true });
 
-/** One refusal from a ceiling, naming its wait; the next ask reaches the api. */
 const refusedOnceAt = (page: Page, path: string, waitSeconds: number) =>
   page.route(
     `**${path}`,
@@ -300,7 +297,6 @@ test("the code reads as six digits, and c copies it", async ({
   );
   await page.goto(linkTo(token));
   const { until } = elsewhere.parse(await (await described).json());
-  // The time the code stops working, as the reader's own clock shows it.
   const untilTime = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(
     new Date(until),
   );
@@ -319,7 +315,6 @@ test("the code reads as six digits, and c copies it", async ({
     /\S/,
   );
 
-  // Landed once the copy's own status, the page's last, holds words; the page is read by its heading.
   await clockTheNextKey(page, {
     at: "//main[(.//*[@role='status'])[last()][normalize-space(.)]]",
     reads: "Enter This Code Where You Started",

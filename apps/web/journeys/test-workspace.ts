@@ -19,18 +19,15 @@ export type Standing = {
   readonly connectedSources: number;
 };
 
-/** The part after the last `@`, as the fixture command reads it: a subdomain is another domain. */
 const domainOf = (address: string): string =>
   address.slice(address.lastIndexOf("@") + 1).toLowerCase();
 
-/** On the test people's own domain, as the fixture command puts them. */
 const inventedAt = (people: TestPeople, index: number): string =>
   inventedMemberAddress(index + 1, domainOf(people.Admin));
 
 const repairAddressesOf = (people: TestPeople): readonly string[] =>
   Array.from({ length: REPAIR_MEMBERS }, (_, index) => inventedAt(people, index));
 
-/** Each address the fixture holds, with the roles it may stand in. */
 const fixtureOf = (people: TestPeople): ReadonlyMap<string, readonly string[]> => {
   const invented = Array.from({ length: INVENTED_MEMBERS }, (_, index) => {
     const roles: readonly string[] = index < REPAIR_MEMBERS ? ["Viewer", "Editor"] : ["Viewer"];
@@ -71,9 +68,7 @@ export const findingsIn = (standing: Standing, people: TestPeople): readonly str
 };
 
 export type RepairMembers = {
-  /** Display names, as the Members page's ticks are labelled. */
   readonly names: readonly string[];
-  /** Those an earlier run left as Editors. */
   readonly editors: readonly string[];
 };
 

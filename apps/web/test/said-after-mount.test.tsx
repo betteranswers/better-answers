@@ -61,8 +61,6 @@ const A_CONNECTED_SOURCE: ListedConnectedSource = {
 
 describe("a page's read, said after its region mounts", () => {
   it("fills a loading state beside a refusal line after mount", async () => {
-    // The list's loading line is the empty state's title, and the page reads its search from the
-    // address, so it renders inside a router.
     const { seen, Seen } = regionsSeen("[data-slot='empty-title'] output");
     await openPages(
       {

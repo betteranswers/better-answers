@@ -36,7 +36,6 @@ const codeField = (page: Page) => page.getByRole("textbox", { name: "Authenticat
 
 const landedAt = (page: Page): URL => new URL(page.url());
 
-/** An Admin holding the harness's authenticator, signed in by email and waiting on confirm. */
 const anAdminWaiting = async (page: Page, api: APIRequestContext, workspaceName: string) => {
   const workspace = await provision(api, { name: workspaceName });
   const key = await withAnAuthenticator(api, workspace.admin.email);
@@ -149,7 +148,6 @@ test("a confirmed session opening confirm goes straight to its return", async ({
   await expect(confirmHeading(page)).toHaveCount(0);
 });
 
-/** A person in no workspace holding a passkey from this device and the harness's authenticator. */
 const someoneHoldingBoth = async (page: Page, api: APIRequestContext) => {
   const device = await aVirtualAuthenticator(page);
   const email = anAddress("priya");

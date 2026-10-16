@@ -11,7 +11,6 @@ await vi.hoisted(() => import("./stub-server.ts"));
 
 placedWithoutMeasuring();
 
-/** The set refused whole, naming Grace as the one member it would not change. */
 const REFUSED_FOR_GRACE = {
   error: {
     message: "last-admin",
@@ -32,11 +31,9 @@ const UNMARKED = `${GRACE.displayName}${GRACE.address}`;
 
 const tickOfGrace = () => screen.getByRole("checkbox", { name: `Select ${GRACE.displayName}` });
 
-/** Grace's name and address in her row, with whatever marks them. */
 const gracesCell = (): string =>
   screen.getByRole("link", { name: GRACE.displayName }).parentElement?.textContent ?? "";
 
-/** The Members tab once the api has refused a change of Grace's role, ticked alone. */
 const graceRefused = async () => {
   const api = adaAnAdmin();
   api.set("members.bulkChangeRole", () => REFUSED_FOR_GRACE);

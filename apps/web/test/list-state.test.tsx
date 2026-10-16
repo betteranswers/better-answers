@@ -21,12 +21,10 @@ const FAILED = "The members could not be read.";
 
 const DOWN = new Error("the network is down");
 
-/** The failure's line as this test's list words it. */
 const failedSaid = (failure: Error): string => `No list: ${failure.message}`;
 
 const NOTHING = () => undefined;
 
-/** The list's own region, not the count line or the outcome line beside it. */
 const LIST_REGION = "[data-slot=empty-title] output";
 
 const listRead = (read: { readonly error: Error | null; readonly isPending: boolean }) => (

@@ -66,10 +66,6 @@ export const skipLinkReachesThePage = async (page: Page): Promise<void> => {
   await expect(page.getByRole("main")).toBeFocused();
 };
 
-/**
- * `eachStop` runs after every press, the one landing on `target` too, but never for the start,
- * which no press reached.
- */
 export const tabUntilFocused = async (
   page: Page,
   target: Locator,
@@ -107,7 +103,6 @@ export const tabOpenedByKeyboard = async (page: Page, path: string, name: string
   );
 };
 
-/** A role select in focus reading Viewer, opened, one step up to Editor and picked. */
 export const editorPickedByKeyboard = async (page: Page, select: Locator): Promise<void> => {
   await expect(select).toBeFocused();
   await page.keyboard.press("Enter");
@@ -175,7 +170,6 @@ export const A_ROLE = {
   Viewer: "a Viewer",
 } as const satisfies Readonly<Record<Role, string>>;
 
-/** A role's home: its page's first heading, and the link the not-found page offers back to it. */
 const HOME_NAMES = {
   Admin: { heading: "People", link: "Go to Members" },
   Editor: { heading: "Ask", link: "Go to New Question" },
@@ -241,7 +235,6 @@ export const clockTheNextKey = (
 /** How many times a spec presses an action it holds at the median: one press on a busy runner is noise. */
 export const ACTION_SAMPLES = 5;
 
-/** Reads the clock `clockTheNextKey` started, so that call comes before the key it times. */
 export const actionClocked = async (page: Page): Promise<number> =>
   z.number().parse(await page.evaluate(() => Reflect.get(window, "actionClocked")));
 
@@ -309,7 +302,6 @@ export const saysTheWait = async (
 export const keepsItsWordOffThePage = (page: Page, word: RefusalWord): Promise<void> =>
   expect(page.locator("body"), `the page shows the word ${word}`).not.toContainText(word);
 
-/** The key in fours, as the page writes it out for typing into a phone. */
 const KEY_IN_FOURS = /^[A-Z2-7]{4}(?: [A-Z2-7]{1,4})+$/;
 
 /** An authenticator's key, read off the page as a person would type it into their phone. */
@@ -341,7 +333,6 @@ export const tokenPainted = (page: Page, token: string, property: string): Promi
 export const tokenColour = (page: Page, token: string): Promise<string> =>
   tokenPainted(page, token, "color");
 
-/** The registration marks a person sees, by their part: a mark inside a marked parent is never drawn. */
 export const drawnMarks = (page: Page): Promise<readonly string[]> =>
   page.evaluate(() =>
     [...document.querySelectorAll<HTMLElement>("[data-marks]")]
@@ -382,7 +373,6 @@ export type ControlEdge = {
   readonly behind: string;
 };
 
-/** A see-through `rgba()` colour as it paints over an opaque one. */
 export const paintedOver = (top: string, under: string): string => {
   const [alpha = 1] = (/rgba\([^)]*?([\d.]+)\)$/.exec(top)?.slice(1) ?? []).map(Number);
   const below = channels(under);
@@ -412,7 +402,6 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
       const [red = 0, green = 0, blue = 0, alpha = 0] = pixel.getImageData(0, 0, 1, 1).data;
       return [red, green, blue, alpha / 255];
     };
-    /** `share` of `top` over the rest of `under`, which is opaque. */
     const mixed = (top: Rgba, under: Rgba, share: number): Rgba => {
       const mix = (at: 0 | 1 | 2) => top[at] * share + under[at] * (1 - share);
       return [mix(0), mix(1), mix(2), 1];
@@ -443,7 +432,6 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
       const box = around.getBoundingClientRect();
       return SIDES.filter((side) => Math.abs(box[side] - own[side]) < HUGS_WITHIN_PX);
     };
-    /** Those of `sides` that `element` draws. */
     const sidesOf = (element: Element, sides: readonly Side[] = SIDES): string[] => {
       const style = getComputedStyle(element);
       return sides

@@ -43,7 +43,6 @@ const questionsAsked = (page: Page) => page.getByRole("region", { name: "Questio
 const groupNamed = (page: Page, name: string) =>
   questionsAsked(page).getByRole("region", { name, exact: true });
 
-/** A row is its question's button, which opens the record over the list. */
 const rowsOf = (region: Locator) => region.getByRole("listitem").getByRole("button");
 
 const recordOf = (page: Page, question: string) => page.getByRole("dialog", { name: question });
@@ -55,7 +54,6 @@ type AtTheQuestions = {
   readonly concepts: ReadonlyMap<string, string>;
 };
 
-/** One concept everyone reads, and one shared with a group the Admin is not in, whose collection the Admin cannot read. */
 const aWorkspaceWithConcepts = async (
   api: APIRequestContext,
   name: string,
@@ -107,7 +105,6 @@ const signedInAtTheQuestions = async (page: Page, api: APIRequestContext, at: At
   await expect(page).toHaveURL(new RegExp(`${QUESTIONS_ASKED}$`));
 };
 
-/** An older record flagged over MCP, and a newer one nobody flagged. */
 const aFlagAndANewerQuestion = (at: AtTheQuestions): readonly SeedRecord[] => [
   {
     askedBy: at.adminId,
@@ -123,7 +120,6 @@ const aFlagAndANewerQuestion = (at: AtTheQuestions): readonly SeedRecord[] => [
   { askedBy: at.adminId, question: NEWER_QUESTION, verdict: "related" },
 ];
 
-/** One more than a page holds, oldest first, so the first older question is "Question number 1". */
 const aPageAndOneMoreOpened = async (page: Page, api: APIRequestContext, name: string) => {
   const at = await aWorkspaceWithConcepts(api, name);
   const records = Array.from({ length: 51 }, (_, nth): SeedRecord => ({
@@ -281,7 +277,6 @@ test.describe("Questions asked", () => {
 
     await saysARefusal(record.getByRole("alert"));
     await expect(closing.getByRole("button", { name: "Fixed in the Knowledge" })).toBeFocused();
-    // The sheet is modal, so the list is read once it closes.
     await page.keyboard.press("Escape");
     await expect(record).toHaveCount(0);
     await expect(rowsOf(groupNamed(page, "Flagged"))).toHaveText([FLAGGED_QUESTION]);

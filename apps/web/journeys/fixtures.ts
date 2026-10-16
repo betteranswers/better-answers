@@ -49,9 +49,7 @@ export const theTestPeople = () => ({
 
 type Reader = {
   readonly source: CodeSource;
-  /** Whether the code source can hold a code at all, asked once before anyone signs in. */
   readonly stands: () => Promise<boolean>;
-  /** Where the test Admin's authenticator key comes from, beside the codes. */
   readonly factorKey: (address: string) => FactorKey;
 };
 

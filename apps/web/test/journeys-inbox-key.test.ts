@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 
 const web = path.resolve(import.meta.dirname, "..");
 
-/** Installed, built or left by a run, or the suite, which stubs the key rather than reading it. */
 const NOT_SOURCE = new Set(["node_modules", "dist", "test-results", "playwright-report", "test"]);
 
 const filesUnder = (directory: string): readonly string[] =>

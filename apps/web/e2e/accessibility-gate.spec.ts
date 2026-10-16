@@ -11,7 +11,6 @@ const drawAPictureWithNoAltText = (): void => {
   document.querySelector("main")?.append(picture);
 };
 
-/** A refused action's button, held at its disabled look until the fade's last moment. */
 const fadeAButtonBackFromItsDisabledLook = (): void => {
   const button = document.createElement("button");
   button.textContent = "Change Role";
@@ -73,7 +72,6 @@ const writeWordsLostInTheDark = (): void => {
   document.querySelector("main")?.append(words);
 };
 
-/** A field whose edge and fill are the page's own colour, so nothing shows where it is. */
 const drawAFieldWithNoEdge = (): void => {
   const field = document.createElement("input");
   field.setAttribute("aria-label", "A field nobody can find");
@@ -147,7 +145,6 @@ const drawAWordlessCheckbox = (dimmedTo: number): void => {
   document.querySelector("main")?.append(box);
 };
 
-/** A band that stays put, and the page scrolled until its button half covers a control. */
 const scrollAControlHalfUnderABand = (): boolean => {
   const band = document.createElement("header");
   band.style.cssText =
@@ -165,7 +162,6 @@ const scrollAControlHalfUnderABand = (): boolean => {
   room.style.height = "200vh";
   document.body.append(underIt, room);
 
-  // Two pixels show below the band, so the band does not hide it whole, and its button covers the rest.
   window.scrollBy(0, underIt.getBoundingClientRect().top - 26);
   const covering = inTheBand.getBoundingClientRect();
   const cut = underIt.getBoundingClientRect();

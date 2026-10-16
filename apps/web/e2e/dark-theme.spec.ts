@@ -15,7 +15,6 @@ import {
 
 const themeOf = (page: Page) => page.evaluate(() => document.documentElement.dataset["theme"]);
 
-/** The page's own colour, as `<html>` paints it under the theme in force. */
 const pagePainted = (page: Page) =>
   page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
 
@@ -27,7 +26,6 @@ const keptOnThisBrowser = (page: Page, theme: string) =>
     [THEME_KEPT_UNDER, theme] as const,
   );
 
-/** What the email step paints on its field and its two ways on. */
 const emailStepPaint = (page: Page) =>
   Promise.all(
     [
@@ -127,7 +125,6 @@ test("paints the kept theme before the page's scripts run", async ({
   await expect(signInHeading(page)).toBeVisible();
 });
 
-/** `#rrggbb` as a browser paints it, so the suite's contrast reads it. */
 const paintedHex = (hex: string): string =>
   `rgb(${[1, 3, 5].map((at) => String(Number.parseInt(hex.slice(at, at + 2), 16))).join(", ")})`;
 

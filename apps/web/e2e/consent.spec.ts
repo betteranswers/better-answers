@@ -46,7 +46,6 @@ const paintsTheDarkPage = async (page: Page): Promise<string> => {
   return painted;
 };
 
-/** A new workspace's Admin, signed in and on the consent page Claude asked for. */
 const anAdminAtConsent = async (
   page: Page,
   api: APIRequestContext,

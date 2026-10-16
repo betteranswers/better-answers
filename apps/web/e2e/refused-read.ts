@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 
-/** The api's refusal of a console read for want of the mark, as a batch carries one answer back. */
 const WITHOUT_THE_MARK = {
   error: {
     message: NOT_THE_OPERATOR,

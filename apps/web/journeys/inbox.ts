@@ -28,9 +28,7 @@ export type Inbox = {
   readonly recipient: string;
   readonly sender: string;
   readonly apiUrl: URL;
-  /** Answers a signing key's TXT record: the runner's own DNS, unless a test answers it. */
   readonly keyLookup?: DNSResolver;
-  /** Counted from the call to `codeSent`. */
   readonly deadlineMs?: number;
   readonly pollIntervalMs?: number;
   readonly lookupTimeoutMs?: number;
@@ -171,7 +169,6 @@ const isCandidate = (watch: Watch, listed: TestInboxListed): boolean =>
   addressOf(listed.from) === watch.sender &&
   listed.to.some((to) => addressOf(to) === watch.recipient);
 
-/** A message the sender's own signature vouches for, with the text part its code is read from. */
 type Vouched = { readonly messageId: string; readonly text: string };
 
 const SET_ASIDE = "set aside";
@@ -274,7 +271,6 @@ const answerOf = (vouched: readonly Vouched[]): InboxAnswer | undefined => {
 };
 
 type Poll = {
-  /** Undefined while no email the sender vouches for has arrived for the person. */
   readonly answer: InboxAnswer | undefined;
   /** Kept for the re-ask, so an email vouched for once is never judged again. */
   readonly verdicts: Verdicts;

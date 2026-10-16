@@ -17,7 +17,6 @@ const FIELDS = {
   page: PAGE_NUMBER,
 };
 
-/** A search box, a role filter and a page, each held in the address under the list's prefix. */
 function List(properties: { readonly prefix: string }) {
   const { prefix } = properties;
   const { state, write } = useListAddress(prefix, FIELDS);
@@ -63,7 +62,6 @@ function List(properties: { readonly prefix: string }) {
 
 const MEMBERS = () => <List prefix="members" />;
 
-/** Two tabs of one page; the open tab is the page's own state, never the address. */
 function Tabs() {
   const [open, setOpen] = useState("members");
 

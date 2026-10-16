@@ -38,7 +38,6 @@ test.describe("an action's outcome region", () => {
       "the groups are still unread",
     ).toHaveCount(1);
 
-    // The create dialog's outcome is its own, behind its scrim, and closes with the dialog.
     const onThePage = emptyStatusIn(groupsRegion(page));
     await expect(onThePage, "the page's outcome region is out of the tree").toHaveCount(1);
     for (const status of await onThePage.all()) {
