@@ -42,10 +42,8 @@ export const PERSON_ROUTE_REFUSALS = {
   codeWrong: { error: "code-wrong" },
   notVerified: { error: "not-verified" },
   challengeGone: { error: "challenge-gone" },
-  /** Restored by the operator: only a session that gave the restore code may set up a factor. */
   restoreCodeNeeded: { error: "restore-code-needed" },
   secondFactorPending: { error: "second-factor-pending" },
-  /** A factor change whose confirmation is over an hour old, refused where a factor is held. */
   confirmationTooOld: { error: "confirmation-too-old" },
 } as const;
 
@@ -69,7 +67,6 @@ export const heldBy = async (
   return held.ok ? held.value : undefined;
 };
 
-/** Granted by a spent recovery code or an accepted restore code, to this session alone. */
 export const mayReplace = (held: SecondFactorHeld): boolean =>
   held.thisSession?.setupGranted === true;
 
@@ -80,7 +77,6 @@ export const codeAsked = z.object({
   code: z.string().regex(new RegExp(`^\\d{${String(AUTHENTICATOR_CODE_LENGTH)}}$`)),
 });
 
-/** A person who held codes keeps them through a setup, so none are made or answered. */
 export const finishedWith = (
   issued: { readonly recoveryCodes: readonly string[]; readonly madeAt: string } | undefined,
 ) =>

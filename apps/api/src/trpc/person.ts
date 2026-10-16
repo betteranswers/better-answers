@@ -53,7 +53,6 @@ type ThePerson = {
   readonly log: Logger;
 };
 
-/** A factor change re-confirms where the person already holds a factor; a first one needs none. */
 const reconfirmingTheirFactors = async (
   ctx: ThePerson,
 ): Promise<Result<undefined, "confirmation-too-old" | RefusalAnswer | Error>> => {

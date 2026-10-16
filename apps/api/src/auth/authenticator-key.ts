@@ -7,7 +7,6 @@ import { PRODUCT_NAME } from "../product-name.ts";
 import type { Auth } from "./auth.ts";
 import { AUTHENTICATOR_STEP_SECONDS } from "./constants.ts";
 
-/** The plugin's own, so its verify accepts a key made here. */
 export const OTP_SETTINGS = {
   digits: AUTHENTICATOR_CODE_LENGTH,
   period: AUTHENTICATOR_STEP_SECONDS,
@@ -17,7 +16,6 @@ export const OTP_SETTINGS = {
 const SECRET_LENGTH = 32;
 
 export type MintedKey = {
-  /** As the plugin keeps a secret, so its verify can open it. */
   readonly sealed: string;
 
   readonly setupAddress: string;

@@ -118,7 +118,6 @@ export const startReconciler = (
     if (summary.stopped.length > 0 || summary.refused.length > 0) {
       logger.warn(summary, "reconciler tick");
     } else if (summary.replayed > 0 || summary.held.length > 0) {
-      // A bundle held by a rewrite or a write under way is caught up next tick, so it is no warning.
       logger.info(summary, "reconciler tick");
     } else {
       logger.debug(summary, "reconciler tick");
@@ -126,7 +125,6 @@ export const startReconciler = (
     return "ok";
   };
 
-  /** A sync it skips stays visible wider than its evidence, so the ping says so, not the log alone. */
   const followingSyncs = async (): Promise<PingOutcome> => {
     const pass = await attemptResult(() => followSyncsInEveryWorkspace(SYNC_CASCADE, postgres));
     if (!pass.ok) {
@@ -149,7 +147,6 @@ export const startReconciler = (
     return reconciled === "fail" || followed === "fail" ? "fail" : "ok";
   };
 
-  /** A tick never awaits its ping, so a slow check cannot hold the next tick back. */
   const pinging = new Set<Promise<void>>();
   let ticked = 0;
   let failedSincePing = false;

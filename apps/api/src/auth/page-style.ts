@@ -8,7 +8,6 @@ import type { Hono } from "hono";
 
 const STYLES = fileURLToPath(import.meta.resolve("@better-answers/design-system/styles.css"));
 
-/** An inline sheet resolves no relative `@import`: the browser would ask this origin for `/tokens/…`. */
 const expanded = (file: string): string =>
   readFileSync(file, "utf8").replace(/^@import "(\.\/[^"]+)";$/gm, (_line, relative: string) =>
     expanded(path.resolve(path.dirname(file), relative)),

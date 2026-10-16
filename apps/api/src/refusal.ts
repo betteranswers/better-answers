@@ -18,7 +18,6 @@ const REFUSALS = classesIn({
 
 export type RefusalWord = keyof typeof REFUSALS;
 
-/** A malformed input is the kernel parse's own answer, which says which field and never the value. */
 export type RefusalAnswer = RefusalWord | Malformed | RefusedItems<RefusalWord>;
 
 type ItemWords = RefusedItems<RefusalWord>["items"];
@@ -41,7 +40,6 @@ export const refusalOf = (answered: RefusalAnswer): Refusal =>
     ? { word: answered, class: REFUSALS[answered] }
     : { word: answered.word, class: REFUSALS[answered.word], ...detailOf(answered) };
 
-/** Word and class alone, so a refusal naming items logs no id of the people it names. */
 export const refusalLogged = (refusal: Refusal) => ({
   refusal: refusal.word,
   class: refusal.class,

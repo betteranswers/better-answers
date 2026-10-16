@@ -22,7 +22,6 @@ export const EMAIL_CODE_LIFETIME_SECONDS = 5 * 60;
 
 export const OAUTH_IP_RULE: CounterRule = { windowMs: 60_000, max: 60 };
 
-/** What a client reads before it holds anything: constants, so counted by no limiter and kept. */
 export const DISCOVERY_PATHS = [
   "/.well-known/oauth-protected-resource",
   "/.well-known/oauth-protected-resource/mcp",
@@ -42,12 +41,10 @@ export const SIGN_IN_BY_EMAIL_CODE_PATH = "/sign-in/email-otp";
 /** Behind the count by email. Every email-code endpoint but the sign-in spends it too. */
 export const EMAIL_CODE_SEND_IP_RULE: CounterRule = { windowMs: 10 * 60_000, max: 5 };
 
-/** A sign-in by the form and one by the link spend it alike. */
 export const EMAIL_CODE_SIGN_IN_IP_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
 
 export const SIGN_IN_PATH = "/sign-in";
 
-/** The SPA's page a sign-in link opens; its token rides in the fragment, which no server sees. */
 export const SIGN_IN_LINK_PAGE = "/sign-in/link";
 
 export const SIGN_IN_LINK_DESCRIBE_PATH = "/sign-in-link/describe";
@@ -61,7 +58,6 @@ export const SIGN_IN_LINK_DESCRIBE_IP_RULE: CounterRule = { windowMs: 60_000, ma
 
 export const SIGN_IN_LINK_SIGN_IN_IP_RULE: CounterRule = { windowMs: 60_000, max: 10 };
 
-/** Reads and sign-ins of one link together: room for a few reloads, not for a script. */
 export const SIGN_IN_LINK_TOKEN_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
 
 export const AUTHENTICATOR_START_PATH = "/authenticator/start";
@@ -77,7 +73,6 @@ export const AUTHENTICATOR_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, m
 /** Each replacement mails a notice, so a script cannot fill the person's inbox. */
 export const RECOVERY_CODES_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
 
-/** The step the library's verify checks a code against, which a setup address must name too. */
 export const AUTHENTICATOR_STEP_SECONDS = 30;
 
 export const CONFIRM_PASSKEY_OPTIONS_PATH = "/second-factor/confirm/passkey-options";
@@ -118,10 +113,8 @@ export const PASSKEY_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10
 /** The sign-in page asks once as it opens, for the browser's autofill, and again per press. */
 export const PASSKEY_SIGN_IN_IP_RULE: CounterRule = { windowMs: 60_000, max: 30 };
 
-/** A session lives this long, renewed while the person keeps using it. */
 export const SESSION_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
 
-/** The library moves a session's expiry on a day again once this much of its life has passed. */
 export const SESSION_RENEWAL_AGE_SECONDS = 24 * 60 * 60;
 
 export const MCP_UNAUTHENTICATED_IP_RULE: CounterRule = { windowMs: 60_000, max: 60 };
@@ -139,10 +132,6 @@ export const AUDIT_EXPORT_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, ma
 /** Room for a few mistyped short names, not for a list of guesses. */
 export const ASK_TO_JOIN_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
 
-/**
- * A known short name's ask writes rows and an unknown one's does not; every answer waits this long, so
- * the time taken says neither.
- */
 export const ASK_TO_JOIN_ANSWER_FLOOR_MS = 250;
 
 export const CIMD_ALLOWED_CLIENT_HOSTS = ["claude.ai"] as const;

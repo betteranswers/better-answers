@@ -92,10 +92,6 @@ const signedInAs = z.object({ user: z.object({ name: z.string() }) });
 const nameRefused = (context: Context, word: string): Response =>
   context.json({ error: word }, 400);
 
-/**
- * Each route calls a closed library endpoint as a server function, so it brings what the router
- * would: a rate rule and the same-origin fence.
- */
 export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): void => {
   const { auth, door, clock } = deps;
   const fenced = personRoutesAt(routes, "/passkeys/*", deps);
@@ -117,7 +113,6 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
       context.header("set-cookie", cookie, { append: true });
   };
 
-  /** Both steps check, since a challenge asked for before a restore lives five minutes. */
   const heldForAnAdd = async (
     context: Context,
     person: SignedIn,
@@ -127,15 +122,12 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     if (waitsOnTheRestoreCode(held)) {
       return context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409);
     }
-    // A grant a spent code made needs no re-confirm: the code was the stronger proof.
     if (mayReplace(held)) return held;
-    // An add to a person already holding a factor re-confirms first, so nothing reaches the device.
     return factorChangeStale(held, clock.now())
       ? context.json(PERSON_ROUTE_REFUSALS.confirmationTooOld, 412)
       : held;
   };
 
-  /** The name is judged before the device is asked, so a refused one leaves no passkey on it. */
   const askToAdd = async (context: Context, person: SignedIn): Promise<Response> => {
     const named = await parsedBody(context, naming);
     if (!named.success) return context.json(REFUSALS.malformed, 400);
@@ -194,7 +186,6 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     return context.json({ passkeyId, ...finishedWith(replaced.value.issued) });
   };
 
-  /** A session granted setup by a spent code replaces the person's factors with this passkey. */
   const add = async (context: Context, person: SignedIn): Promise<Response> => {
     const asked = await parsedBody(context, added);
     if (!asked.success) return context.json(REFUSALS.malformed, 400);
@@ -217,10 +208,6 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
       : settle(context, person, passkeyId);
   };
 
-  /**
-   * No cookie goes in, since a standing session narrows the ask to its own passkeys. The library
-   * only prefers user verification; ours requires it.
-   */
   const askToSignIn = async (context: Context): Promise<Response> => {
     const asked = await attempt(() =>
       auth.api.generatePasskeyAuthenticationOptions({

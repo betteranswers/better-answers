@@ -123,10 +123,6 @@ const flowHeaders = (request: Request, publicUrl: string): Headers => {
   return headers;
 };
 
-/**
- * Consent shares the product's origin, so a script's fetch passes the same-origin check; only a
- * document navigation follows the redirect.
- */
 const navigationOnly: MiddlewareHandler = async (context, next) => {
   if (context.req.method === "POST" && context.req.header("sec-fetch-dest") !== "document") {
     return context.html(refusedPage(REFUSAL_PAGES.notNavigated), 403);
@@ -168,7 +164,6 @@ type FlowBody =
   | { readonly postLogin: true; readonly oauth_query: string }
   | { readonly email: string; readonly otp: string; readonly oauth_query?: string };
 
-/** Closed to HTTP; the consent route alone reaches it, as a server function. */
 const LIBRARY_CONSENT_PATH = "/oauth2/consent";
 
 const callFlow = (
@@ -280,7 +275,6 @@ const LINK_REFUSALS = {
   unanswered: { error: "unanswered" },
 } as const;
 
-/** The library answers its own failure as a 500 response rather than throwing it. */
 const SERVER_FAILED = 500;
 
 const linkSignInBody = (use: LinkUse): FlowBody =>
@@ -304,7 +298,6 @@ const displayNameGivenIn = async (answered: Response): Promise<boolean> => {
 const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void => {
   const { auth, door, publicUrl, clock } = deps;
 
-  /** Reads and sign-ins count apart, so re-reading a link never spends the sign-in it offers. */
   const ceilingOf = async (
     route: "describe" | "sign-in",
     token: string,
@@ -330,7 +323,6 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
     return linkSeen(read, contents, read !== undefined && isBound(cookie, read.nonceHash));
   };
 
-  /** The link may still stand, so the page offers Sign in again rather than the dead page. */
   const unanswered = (context: Context, reason: string): Response => {
     deps.logger.warn(
       { event: "auth.link_sign_in_failed", reason },
@@ -436,13 +428,11 @@ const takesOrSendsACode = (path: string): boolean =>
   path.startsWith("/email-otp/") ||
   path.startsWith("/forget-password/");
 
-/** Another site can make a browser send any other method, so a post alone spends the count. */
 const countingPostsAlone =
   (limit: MiddlewareHandler): MiddlewareHandler =>
   (context, next) =>
     context.req.method === "POST" ? limit(context, next) : next();
 
-/** The `oauth` group counts its own of Better Auth's endpoints, and nothing counts discovery. */
 const countedByItsOwnGroup = (path: string): boolean =>
   !path.startsWith("/oauth2/") && path !== "/jwks" && !path.startsWith("/.well-known/");
 
@@ -471,7 +461,6 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     if (!(await holds(claims))) {
       return context.html(signInPage(REFUSAL_PAGES.sessionEnded, carry(context.req.url)), 401);
     }
-    // A token's workspace is fixed at consent, so it must be the one the page named when drawn.
     if (form.get(CONSENT_WORKSPACE_FIELD) !== claims?.workspaceId) {
       return context.html(refusedPage(REFUSAL_PAGES.workspaceMoved), 409);
     }
@@ -523,7 +512,6 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   }
 
   const mounted = mountedPaths(auth);
-  /** Ahead of every count, so a post from another site spends none. */
   for (const path of mounted.filter(takesOrSendsACode)) {
     routes.use(path, sameOriginOnly(publicUrl));
   }
@@ -539,10 +527,6 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     if (path === SIGN_IN_BY_EMAIL_CODE_PATH) return limitSignIns;
     return takesOrSendsACode(path) ? limitSends : limitIdentity;
   };
-  /**
-   * Here, so the count by email refuses a send first. Read off the instance, so an endpoint
-   * an upgrade adds is counted too.
-   */
   for (const path of mounted.filter(countedByItsOwnGroup)) {
     routes.use(path, limitOf(path));
   }

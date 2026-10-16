@@ -75,10 +75,6 @@ export const REFUSAL_PAGES = {
   },
 } as const satisfies Record<string, ReadNext | SignInNext>;
 
-/**
- * One marked card on the grid, its marks standing for its primary button's. The head script
- * precedes the stylesheet, so the first paint is themed.
- */
 const shell = (title: string, body: string): string => `<!doctype html>
 <html lang="en-GB"><head><meta charset="utf-8"><script>${FIRST_PAINT}</script>
 <meta name="viewport" content="width=device-width,initial-scale=1">

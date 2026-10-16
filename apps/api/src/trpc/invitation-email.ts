@@ -29,7 +29,6 @@ const invitationEmail = (publicUrl: string, invitation: InvitationToSend): Email
   ].join("\n"),
 });
 
-/** A failed send leaves the invitation standing: the answer says so, and the Admin resends. */
 export const sentInvitation = async (
   ctx: { readonly mail: Mail; readonly log: Logger },
   invitation: InvitationToSend,

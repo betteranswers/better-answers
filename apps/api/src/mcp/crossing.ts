@@ -10,10 +10,6 @@ const asToolError = (text: string): CallToolResult => ({
   isError: true,
 });
 
-/**
- * An action's refusal or failure answers as a tool error. Its rejection is caught here, not by the
- * protocol, so it is logged once.
- */
 export const crossing = async <Value>(
   log: Logger,
   entry: string,
@@ -34,6 +30,5 @@ export const crossing = async <Value>(
   }
   const refusal = refusalOf(answered.error);
   log.info({ event: "mcp.refused", entry, ...refusalLogged(refusal) }, "refused");
-  // Items are dropped: an MCP refusal says the set's word alone, which is what an agent acts on.
   return asToolError(`Refused: ${refusal.word} (${refusal.class}).${fieldsSaid(refusal)}`);
 };

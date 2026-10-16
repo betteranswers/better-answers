@@ -124,9 +124,6 @@ const REFUSED = 1;
 const USAGE = 2;
 export const NOT_BUILT = 3;
 
-/**
- * A wrapper reads the code alone, so a precondition it can wait on never shares one with a fault.
- */
 export const EXIT_OF_CLASS = {
   malformed: USAGE,
   unauthenticated: 4,
@@ -145,21 +142,18 @@ export type OpsIo = {
 
   readonly logger: Logger;
 
-  /** The smoke test sends the app hostname as its `host`; absent, it sends none. */
   readonly appHostname?: string | undefined;
 
   readonly writeReport?: ((path: string, body: string) => Promise<void>) | undefined;
 
   readonly readTree?: ((directory: string) => Promise<BundleTree>) | undefined;
 
-  /** Absent where no email transport is configured, so an action that must notify refuses. */
   readonly mail?: Mail | undefined;
 
   /** A refusal where no envelope key is configured, in the config module's own sentence. */
   readonly modelKeySetting: Result<ModelKeySetting, string>;
 };
 
-/** Takes a dump stamp (`20260601T120000Z`) or any instant `Date` reads; `undefined` is neither. */
 export const parseSince = (value: string): Date | undefined => {
   const stamp = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(value);
   const iso =
@@ -501,7 +495,6 @@ const sliceCommand = async (
 export const reasonOf = (reason: string | Error): string =>
   typeof reason === "string" ? reason : reason.message;
 
-/** A word said in a sentence still exits with its class's code: the wrapper reads the code alone. */
 const refused = (
   command: string,
   workspaceId: string,
@@ -1301,7 +1294,6 @@ const unexpectedSaid = (member: TestWorkspaceStanding["unexpected"][number]): st
   return `test-workspace: ${member.address}, ${article} ${member.role}, is no part of the fixture; left in place`;
 };
 
-/** The repository lives outside the Postgres transactions, so it is made, or found, after them. */
 const testWorkspaceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
   const asked = testWorkspaceAskedOf(flags);
   if (asked === undefined) {
@@ -1586,7 +1578,6 @@ const restoredSaid = (restored: SignInRestored, noticed: boolean): readonly stri
   "restore-sign-in: run this only once you have checked who they are by a channel other than their email, and hand them the code by that same channel, never by email",
 ];
 
-/** The code goes to stdout alone: never to the logger, and never in the notice. */
 const restoreSignInCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
   const email = flagValue(flags, "email");
   if (email === undefined) {

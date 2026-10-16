@@ -35,10 +35,6 @@ const quietFor = async (
 
 type Ended = { readonly threw: false } | { readonly threw: true; readonly error: Error };
 
-/**
- * `work` runs apart from the reader, so one who leaves never cuts its bookkeeping short. A
- * keep-alive fills each `quietMs` with no event.
- */
 export async function* eventsOf<Event extends object>(
   work: (emit: (event: Event) => void) => Promise<void>,
   quietMs: number,

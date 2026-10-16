@@ -57,7 +57,6 @@ export const keepALink = async (
     sealed: seal(token, store.secret, id, { code, carried: ask.carried, returnTo: ask.returnTo }),
   });
   await withIdentityWrite(IDENTITY_PRINCIPAL, store.door, async (tx) => {
-    // Two asks for one address would otherwise both delete before either inserts, keeping two links.
     await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [identifier]);
     await tx.query("DELETE FROM verification WHERE identifier = $1", [identifier]);
     await tx.query(

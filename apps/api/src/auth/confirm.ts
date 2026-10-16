@@ -102,10 +102,6 @@ type Answer = {
 
 type SpendsACode = typeof spendRecoveryCode | typeof acceptRestoreCode;
 
-/**
- * Confirm, recovery and the replacement setup they lead to. None makes a session: each stamps
- * or grants the one the person already holds.
- */
 export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): void => {
   const { auth, door, clock } = deps;
   const fenced = personRoutesAt(routes, "/second-factor/*", deps);
@@ -155,7 +151,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     return kept.ok ? context.json(options.value) : refused(context, kept.error);
   };
 
-  /** Our own check of the answer, since the library's verify would make a new session. */
   const verifyingTheAnswer = async (context: Context, person: SignedIn, answer: Answer) => {
     const verified = await attempt(() =>
       verifyAuthenticationResponse({
@@ -256,7 +251,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     return verifyingTheCode(context, person, asked.code, reserved.value.noticeDue);
   };
 
-  /** The action counts its own failures, and refuses a kind still waiting with the ceiling met. */
   const spending =
     (action: SpendsACode, wrong: { readonly error: string }, used?: FactorChange) =>
     async (context: Context, person: SignedIn): Promise<Response> => {
@@ -281,7 +275,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     return refused(context, why);
   };
 
-  /** Kept aside until its first code works. */
   const startTheReplacement = async (context: Context, person: SignedIn): Promise<Response> => {
     const minted = await attempt(() => mintAuthenticatorKey(auth, person.user.email));
     if (!minted.ok) return unanswered(context, minted.error.message);

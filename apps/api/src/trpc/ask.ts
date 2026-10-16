@@ -36,7 +36,6 @@ type AskEvent =
 /** Holds no transaction while the model is called, and spends from the knowledge reads' budget. */
 export const askingProcedure = ownTransactionCounted(KNOWLEDGE_CEILING);
 
-/** Runs apart from the stream's reader, so a reader who leaves still leaves a completed record. */
 const answered = async (
   ctx: AskingContext,
   input: Result<AskInput, Malformed>,
@@ -113,7 +112,6 @@ export const askRouter = router({
         leaving,
       );
     } finally {
-      // The reader is gone or the answer is done; either way no model call is left to run.
       reading.abort();
     }
   }),

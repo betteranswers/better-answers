@@ -33,7 +33,6 @@ import {
 const REFUSALS = {
   held: { error: "authenticator-held" },
   noSetupWaiting: { error: "no-setup-waiting" },
-  /** A first setup would leave the old factors standing, so a granted session uses the replacing routes. */
   replacementSetupNeeded: { error: "replacement-setup-needed" },
 } as const;
 
@@ -42,10 +41,6 @@ const setUpAnswer = z.object({ totpURI: z.string() });
 const cookieOf = (setCookies: readonly string[]): string =>
   setCookies.map((line) => line.split(";", 1)[0] ?? "").join("; ");
 
-/**
- * The library's first verify swaps the session, yet its answer names the old one: the stamp goes
- * to the session the new cookie holds.
- */
 export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependencies): void => {
   const { auth, door, clock } = deps;
   const fenced = personRoutesAt(routes, "/authenticator/*", deps);
@@ -146,7 +141,6 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
     if (held === undefined) return unanswered(context, "the second factor was not read");
     const refused = refusedAFirstSetup(context, held);
     if (refused !== undefined) return refused;
-    // Past setup the library checks a code with no count of tries, so no route may reach it.
     if (held.authenticator !== "awaiting-code") return context.json(REFUSALS.noSetupWaiting, 409);
     return verify(context, person, asked.data.code);
   };

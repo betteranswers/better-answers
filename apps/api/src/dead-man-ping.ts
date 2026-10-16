@@ -36,7 +36,6 @@ export const deadManPing = ({
         body: sizes === undefined ? outcome : `${outcome} ${sizes}`,
         signal: AbortSignal.timeout(PING_TIMEOUT_MS),
       });
-      // An unread body holds its connection until a collection frees it, and a ping recurs.
       await response.body?.cancel();
       return response;
     });

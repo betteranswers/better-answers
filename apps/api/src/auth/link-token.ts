@@ -31,7 +31,6 @@ const opened = z.strictObject({ code: z.string(), carried: z.string(), returnTo:
 
 export type Opened = Readonly<z.infer<typeof opened>>;
 
-/** The query the sign-in page carried, so the link's page lands where that page would have. */
 const carriedQueryOf = (contents: Opened): string => {
   if (contents.carried !== "") return `?${contents.carried}`;
   return contents.returnTo === "" ? "" : `?redirect=${encodeURIComponent(contents.returnTo)}`;
@@ -130,7 +129,6 @@ const triesSpentOn = (value: string): number => Number(value.slice(value.lastInd
 
 const hashKeptFor = (value: string): string => value.slice(0, value.lastIndexOf(":"));
 
-/** A link sealed before its code was replaced would only spend a try of the code that replaced it. */
 const codeLive = (
   code: LinkRead["code"],
   sealedCode: string,
@@ -140,7 +138,6 @@ const codeLive = (
   triesSpentOn(code.value) < EMAIL_CODE_ATTEMPTS &&
   hashKeptFor(code.value) === codeHashOf(sealedCode);
 
-/** One answer for every dead link, so a read never says whether a token was ever real. */
 export const linkSeen = (
   read: LinkRead | undefined,
   contents: Opened | undefined,

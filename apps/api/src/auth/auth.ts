@@ -151,10 +151,6 @@ const AUDITED_PATHS: ReadonlyMap<string, AuditEvent> = new Map([
 
 const auditedEvent = (path: string): AuditEvent | undefined => AUDITED_PATHS.get(path);
 
-/**
- * Their writes change a member or a workspace with no audit event; the short name check tells
- * anyone whether a company is a customer.
- */
 const CLOSED_ORGANISATION_PATHS = [
   "/organization/invite-member",
   "/organization/cancel-invitation",
@@ -169,10 +165,6 @@ const CLOSED_ORGANISATION_PATHS = [
   "/organization/check-slug",
 ] as const;
 
-/**
- * Each adds, removes, reveals or spends a factor past our gate; our routes call the few they need
- * as server functions.
- */
 const CLOSED_FACTOR_PATHS = [
   "/passkey/delete-passkey",
   "/passkey/generate-authenticate-options",
@@ -229,7 +221,6 @@ const signedInUser = z
   .optional()
   .catch(undefined);
 const redirectedTo = z.object({ url: z.string() }).optional().catch(undefined);
-/** A before-hook reads the body ahead of the endpoint's own validation. */
 const signInAddress = z.object({ email: z.string() }).optional().catch(undefined);
 
 const presentedCredential = z
@@ -237,7 +228,6 @@ const presentedCredential = z
   .optional()
   .catch(undefined);
 
-/** Refused before a passkey is kept or a session made, so neither exists without it. */
 export const USER_NOT_VERIFIED = "USER_NOT_VERIFIED";
 
 export const passkeyPartyOf = (publicUrl: string) => {
@@ -251,17 +241,9 @@ const userNotVerified = (): APIError =>
     message: "The device did not verify its user",
   });
 
-/**
- * A consent the library defers to a fresh sign-in answers a redirect too, but only the one it
- * wrote carries a code.
- */
 const carriesACode = (redirect: z.infer<typeof redirectedTo>): boolean =>
   redirect !== undefined && (URL.parse(redirect.url)?.searchParams.has("code") ?? false);
 
-/**
- * Reading a stale cookie's session expires every session cookie, so a sign-in's own new session
- * is read before the request's.
- */
 const sessionOfCall = async (ctx: Parameters<typeof getSessionFromCtx>[0]) =>
   ctx.context.session ?? ctx.context.newSession ?? (await getSessionFromCtx(ctx));
 
@@ -318,7 +300,6 @@ const claimsOfIssued = (issued: AuditedCall["issued"]) => {
   return claims.success ? claims.data : undefined;
 };
 
-/** Named from the grant whatever the outcome, so a refused refresh never reads as a first issue. */
 const tokenLine = (line: AuditLine, call: AuditedCall): AuditLine => {
   const event = call.fields.grant_type === "refresh_token" ? "auth.token_refresh" : line.event;
   const claims = claimsOfIssued(call.issued);
@@ -409,7 +390,6 @@ export const createAuth = (deps: AuthDependencies) => {
     });
   };
 
-  /** A token's issue, refusal or refresh and a workspace pick stay log lines for good. */
   const recorders = new Map<AuditEvent, Recorder>([
     [
       "auth.sign_in",
@@ -424,10 +404,6 @@ export const createAuth = (deps: AuthDependencies) => {
     ["auth.consent", recordConsentOf],
   ]);
 
-  /**
-   * Outside the library's transaction, once its write has landed: a failed row is a log line,
-   * never a refusal the person meets.
-   */
   const recordOnAuditLog = async (
     recorder: Recorder,
     line: AuditLine,
@@ -441,7 +417,6 @@ export const createAuth = (deps: AuthDependencies) => {
     );
   };
 
-  /** A lock left standing is today's skipped promotion, so a failed clear never costs the sign-in. */
   const clearAnExpiredPromotionLock = async (email: string): Promise<void> => {
     const cleared = await attempt(() =>
       dropAnExpiredPromotionLock(deps.door, email, deps.clock.now()),
@@ -474,7 +449,6 @@ export const createAuth = (deps: AuthDependencies) => {
     return { secondFactorConfirmedAt: at };
   };
 
-  /** Over HTTP alone: the api's own routes call closed endpoints as server functions and gate themselves. */
   const gatedToken = async (ctx: GateContext): Promise<string | undefined> => {
     if (ctx.request === undefined || SESSIONLESS_LIBRARY_PATHS.has(ctx.path)) return undefined;
     if (ctx.path === AUTHORIZE_PATH) return undefined;
@@ -490,7 +464,6 @@ export const createAuth = (deps: AuthDependencies) => {
       ? { context: { query: { ...ctx.query, disableRefresh: true } } }
       : undefined;
 
-  /** Past its hour, the row may outlive a skipped delete; signed out, as every other root reads it. */
   const endedHere = (ctx: GateContext) => {
     if (!PENDING_LIBRARY_PATHS.has(ctx.path)) throw new APIError("UNAUTHORIZED");
     return readWithoutRenewal(ctx);
@@ -540,7 +513,6 @@ export const createAuth = (deps: AuthDependencies) => {
     user: {
       additionalFields: {
         credentialsRevokedAt: { type: "date", required: false, input: false },
-        /** Undeclared, the library would hand the column back on every session it answers. */
         operator: { type: "boolean", required: false, input: false, returned: false },
         passkeyOfferDismissedAt: { type: "date", required: false, input: false, returned: false },
         recoveryCodesAcknowledged: {
@@ -554,7 +526,6 @@ export const createAuth = (deps: AuthDependencies) => {
       },
     },
     session: {
-      /** Our confirmation stamp is the one freshness rule, so the library's own never refuses. */
       freshAge: 0,
       expiresIn: SESSION_LIFETIME_SECONDS,
       updateAge: SESSION_RENEWAL_AGE_SECONDS,
@@ -564,29 +535,16 @@ export const createAuth = (deps: AuthDependencies) => {
         setupGrantedAt: { type: "date", required: false, input: false, returned: false },
       },
     },
-    /**
-     * The library's lookup deletes every expired row, so another person's sign-in would make a
-     * code just expired read as wrong. The daily sweep deletes them.
-     */
     verification: { disableCleanup: true },
-    /**
-     * The api counts every endpoint itself. The library counts a run of requests, not a
-     * window, and every page its handler is handed.
-     */
     rateLimit: { enabled: false },
     advanced: {
       ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
       database: {
         generateId: () => ulid(),
       },
-      /**
-       * The library defaults this to NODE_ENV === "test": unset, the fence is off under every
-       * test runner and the suites asserting it still pass.
-       */
       disableOriginCheck: false,
     },
     databaseHooks: {
-      /** A first sign-in may carry a name, which would reach the row past the display-name rule. */
       user: {
         create: {
           before: async (person) => ({ data: { ...person, name: "" } }),
@@ -607,10 +565,6 @@ export const createAuth = (deps: AuthDependencies) => {
       },
     },
     hooks: {
-      /**
-       * The library proves an unverified address under a lock, and one a dead sign-in left would
-       * skip it until the daily sweep.
-       */
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === "/sign-in/email-otp") {
           const asked = signInAddress.parse(ctx.body);
@@ -645,10 +599,6 @@ export const createAuth = (deps: AuthDependencies) => {
         roles,
         creatorRole,
 
-        /**
-         * Unset, the plugin reads the id generator to decide, and a custom minter switches that
-         * heuristic off, dropping the verification ask.
-         */
         requireEmailVerificationOnInvitation: true,
 
         invitationExpiresIn: INVITATION_EXPIRY_SECONDS,
@@ -684,7 +634,6 @@ export const createAuth = (deps: AuthDependencies) => {
               otp,
             ),
           );
-          // The code alone still signs in, so a link that could not be kept never costs the email.
           if (!kept.ok)
             audit.warn(
               { event: "auth.link_not_kept", reason: kept.error.message },
@@ -714,10 +663,6 @@ export const createAuth = (deps: AuthDependencies) => {
           clientRegistrationDefaultResources: [deps.mcpUrl],
           clientRegistrationAllowedResources: [deps.mcpUrl],
 
-          /**
-           * The api's own count by client address governs every `/oauth2/*` path, so a client
-           * meets one refusal, with `Retry-After`. Registration stays refused outright.
-           */
           rateLimit: {
             authorize: false,
             token: false,
@@ -731,7 +676,6 @@ export const createAuth = (deps: AuthDependencies) => {
 
             consentReferenceId: async ({ session, user: person }) => {
               const active = consentedWorkspaceOf(session, await workspacesOf(person.id));
-              // The session read here can follow a switch that landed after the page's own check.
               if (grantLeftItsWorkspace(active)) {
                 throw new APIError("CONFLICT", {
                   error: "workspace_moved",
@@ -748,10 +692,7 @@ export const createAuth = (deps: AuthDependencies) => {
             },
 
             shouldRedirect: async ({ session, user: person }) => {
-              // A pending session confirms on the way, from the post-login page, before any consent.
               if (pendingOr(await judged(deps, { id: session.id }))) return true;
-              // The post-login page asks for a display name first; skipping it for a person
-              // in one workspace would carry an unnamed person straight to consent.
               if (hasNoDisplayName(person.name)) return true;
               const held = await workspacesOf(person.id);
               const active = activeWorkspaceOf(session);
@@ -791,7 +732,6 @@ export const createAuth = (deps: AuthDependencies) => {
         ...passkeyPartyOf(deps.publicUrl),
         rpName: PRODUCT_NAME,
         authenticatorSelection: { userVerification: "required" },
-        /** The library verifies with user verification optional; a passkey counts only with it. */
         registration: {
           afterVerification: ({ verification }) => {
             if (verification.registrationInfo?.userVerified !== true) throw userNotVerified();

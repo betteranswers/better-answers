@@ -15,10 +15,6 @@ import type { PostgresDoor } from "@better-answers/core/store/postgres";
 
 import { doorTold, type Doors } from "../doors.ts";
 
-/**
- * Outside the router's types: the web's wrapper is kept in step by hand, and the api harness
- * holds the pair.
- */
 export const UPLOAD_DESCRIPTOR_HEADERS = {
   connectedSourceId: "x-upload-connected-source-id",
   name: "x-upload-name",

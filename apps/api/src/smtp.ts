@@ -24,7 +24,6 @@ export const pacedTransport = (smtpUrl: string): Transporter =>
 
 const domainOf = (address: string): string | null => address.split("@")[1] ?? null;
 
-/** With no transport every send throws, so a sign-in code that cannot go never reads as sent. */
 export const emailSender = (
   transport: Transporter | undefined,
   from: string,

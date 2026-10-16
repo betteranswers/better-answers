@@ -59,10 +59,6 @@ type StandardParser<Input, Output> = {
   };
 };
 
-/**
- * A refusal rides through as the input too, so a malformed input crosses, and is logged, where
- * every other refusal is.
- */
 export const parsedBy = <Schema extends z.ZodType>(
   schema: Schema,
 ): StandardParser<z.input<Schema>, Result<z.output<Schema>, Malformed>> => ({
@@ -79,7 +75,6 @@ export const given = <Input, Value, Refused>(
 ): Promise<Result<Value, Refused | Malformed>> =>
   parsed.ok ? run(parsed.value) : Promise.resolve(err(parsed.error));
 
-/** The seven classes sort a word by what its caller can do, which is why each falls on one status. */
 const CODE_OF_CLASS = {
   unauthenticated: "UNAUTHORIZED",
   forbidden: "FORBIDDEN",
@@ -115,10 +110,6 @@ const throttled = (log: Logger, action: string, met: CeilingMet): TRPCError => {
   });
 };
 
-/**
- * Throws a TRPCError for a refusal, a ceiling met or a failure. A rejection is caught here, not by
- * tRPC, so it is logged once.
- */
 export const crossing = async <Value>(
   ctx: { readonly log: Logger },
   action: string,
@@ -202,10 +193,8 @@ const claimsOf = async (ctx: TrpcContext, path: string): Promise<Claims> => {
   return claims;
 };
 
-/** The read that tells a tab where the session is, so a tab left behind can always learn it. */
 const MEMBER_READ = "session.member";
 
-/** An action must name the session's workspace; a read from a tab holding no member yet names none. */
 const leftBehind = (
   held: string | null,
   claims: Claims,
@@ -216,10 +205,6 @@ const leftBehind = (
   return path !== MEMBER_READ && held !== null && held !== claims.workspaceId;
 };
 
-/**
- * One browser holds one session, so a tab left behind by a switch would act in, or draw rows from,
- * the session's new workspace.
- */
 const claimsInTheTabsWorkspace = async (
   ctx: TrpcContext,
   path: string,
@@ -239,7 +224,6 @@ const settled = <Ran>(
   resolved: Result<Result<Ran, RefusalAnswer>, Error>,
 ): Ran => {
   if (!resolved.ok) {
-    // The procedure's own answer has crossed already; logging it here would say it twice.
     if (resolved.error instanceof TRPCError) throw resolved.error;
     throw failed(ctx.log, resolver, resolved.error);
   }
@@ -260,7 +244,6 @@ const thrownIfFailed = <
   return ran;
 };
 
-/** Past the ceiling the call answers 429 and when to ask again. */
 const consumeCeiling = async (
   ctx: Pick<TrpcContext, "doors" | "clock" | "log">,
   path: string,
@@ -276,7 +259,6 @@ const consumeCeiling = async (
   }
 };
 
-/** One count per person that every procedure built on the road spends. */
 export type RoadCeiling = { readonly budget: string; readonly rule: CounterRule };
 
 /** The count comes before the transaction, so a call held at its ceiling holds no connection. */
@@ -337,7 +319,6 @@ export const ownTransactionProcedure = onItsOwnTransactions();
 
 export const ownTransactionCounted = (ceiling: RoadCeiling) => onItsOwnTransactions(ceiling);
 
-/** Answers only once the action committed, so a follow-up such as an email never outruns the write. */
 export const committedAs = async <Value, Refused>(
   ctx: { readonly principal: UserPrincipal; readonly doors: Doors },
   action: (principal: UserPrincipal, tx: Tx) => Promise<Result<Value, Refused>>,
@@ -369,10 +350,6 @@ export const ownTransactionCeiling = (rule: CounterRule) =>
     return next();
   });
 
-/**
- * Built from the session alone: this surface reads no bearer, so a token never becomes the
- * operator.
- */
 const inTheOperatorsTransaction = (resolve: typeof withOperator) =>
   trpc.procedure.use(async ({ ctx, path, next }) => {
     const { user, session } = await sessionOf(ctx, path);

@@ -52,7 +52,6 @@ export const SESSIONLESS_LIBRARY_PATHS: ReadonlySet<string> = new Set([
   "/sign-in/social",
 ]);
 
-/** Reached by a pending session too, whose post-login rule then sends it on before any consent. */
 export const AUTHORIZE_PATH = "/oauth2/authorize";
 
 export type Gatekeeping = { readonly door: PostgresDoor; readonly clock: Clock };

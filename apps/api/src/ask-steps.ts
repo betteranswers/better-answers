@@ -26,12 +26,10 @@ import {
 import type { QuestionTransport } from "@better-answers/schema";
 
 export type ModelDoors = {
-  /** Absent where the api holds no envelope key: no model key opens, so no judge is called. */
   readonly credentials: Credentials | undefined;
   readonly models: ModelClient & StreamingClient;
 };
 
-/** What a road opens its transactions with and calls a model through; `ask` is handed none. */
 export type StepDoors = ModelDoors & {
   readonly door: PostgresDoor;
   readonly clock: Clock;
@@ -82,10 +80,6 @@ const reservingBy =
           reserve(member, tx, credentials, reserving),
         );
 
-/**
- * Each step opens and settles its own transaction, so none is held between them. Only the read
- * lends its transaction, which opens read-only.
- */
 export const stepsFor = (
   doors: StepDoors,
   asker: UserPrincipal,

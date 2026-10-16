@@ -36,7 +36,6 @@ export type ServerDependencies = {
 
   readonly fetchModel?: Fetching;
 
-  /** The key each workspace's model key is sealed under; with none, no model is called. */
   readonly envelopeKey?: Uint8Array | undefined;
 
   readonly askKeepAliveMs?: number | undefined;

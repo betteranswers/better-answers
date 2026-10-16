@@ -22,7 +22,6 @@ const nameFlagEmail = (to: string, raised: RaisedFlag): EmailMessage => ({
   ].join("\n"),
 });
 
-/** A missed email loses no flag: it stands on the identity-set audit log, and the answer is unmoved. */
 export const tellTheOperator = async (
   ctx: { readonly doors: Doors; readonly mail: Mail; readonly log: Logger },
   raised: RaisedFlag,

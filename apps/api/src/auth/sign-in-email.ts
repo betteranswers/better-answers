@@ -50,7 +50,6 @@ const textOf = (code: string, link: string | undefined): string =>
       ]
   ).join("\n");
 
-/** The text part keeps the code and the link each on a line of its own, where a reader finds them. */
 export const signInEmail = (to: string, code: string, link: string | undefined): EmailMessage => ({
   to,
   subject: WORDS.subject,
