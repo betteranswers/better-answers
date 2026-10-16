@@ -54,7 +54,7 @@ export const modelKey = withRLS(
 /** Lower case, digits, dots and hyphens, as providers name models: too narrow to carry a key. */
 export const MODEL_NAME = /^[a-z0-9][a-z0-9.-]{0,63}$/;
 
-export const GBP = /^\d+(\.\d+)?$/;
+export const DECIMAL_STRING = /^\d+(\.\d+)?$/;
 
 export const CALENDAR_DAY = /^\d{4}-\d{2}-\d{2}$/;
 

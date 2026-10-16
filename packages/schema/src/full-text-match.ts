@@ -35,11 +35,9 @@ export type AnyWordMatch = {
   readonly order: string;
 };
 
-/** BM25's saturation: past it, more of one word adds little. */
-const SATURATION = 1.2;
+const BM25_K1 = 1.2;
 
-/** What one place of a word counts for, by its weight class: `ts_rank`'s own defaults. */
-const PLACE_COUNTS =
+const TS_RANK_DEFAULT_WEIGHTS =
   "CASE place WHEN 'A' THEN 1.0 WHEN 'B' THEN 0.4 WHEN 'C' THEN 0.2 ELSE 0.1 END";
 
 /** How many rows a reader may read, and how many of them hold each of the query's words. */
@@ -86,12 +84,12 @@ export const anyWordMatch = (
           ) AS asked
           CROSS JOIN LATERAL (
             SELECT length(${vector}) - length(ts_delete(${vector}, asked.lexemes)) AS matched,
-                   (SELECT coalesce(sum(word.rarity * counted.often * ${SATURATION + 1}
-                                        / (${SATURATION} + counted.often) ORDER BY word.lexeme), 0)
+                   (SELECT coalesce(sum(word.rarity * counted.often * ${BM25_K1 + 1}
+                                        / (${BM25_K1} + counted.often) ORDER BY word.lexeme), 0)
                       FROM unnest(asked.lexemes, asked.rarities) AS word(lexeme, rarity)
                       JOIN unnest(${vector}) AS held ON held.lexeme = word.lexeme
                      CROSS JOIN LATERAL (
-                       SELECT sum(${PLACE_COUNTS})::double precision AS often
+                       SELECT sum(${TS_RANK_DEFAULT_WEIGHTS})::double precision AS often
                          FROM unnest(held.weights) AS place
                      ) AS counted) AS weight,
                    ts_rank_cd(${vector}, asked.query)::double precision AS rank

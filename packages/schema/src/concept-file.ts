@@ -9,12 +9,11 @@ export const IRI = new RegExp(
   `^${CONCEPT_IRI_PREFIX.replaceAll(".", String.raw`\.`)}${ULID_CHARACTERS}$`,
 );
 
-/** The registry's `iri` columns carry the same brand; this one cannot import the registry. */
-const MINTED_IRI = z.string().regex(IRI).brand<"ConceptIri">();
+export const CONCEPT_IRI = z.string().regex(IRI).brand<"ConceptIri">();
 
 /** `minted` is a fresh ULID, so a throw here is a broken invariant, not input to refuse. */
-export const conceptIriOf = (minted: string): z.output<typeof MINTED_IRI> =>
-  MINTED_IRI.parse(`${CONCEPT_IRI_PREFIX}${minted}`);
+export const conceptIriOf = (minted: string): z.output<typeof CONCEPT_IRI> =>
+  CONCEPT_IRI.parse(`${CONCEPT_IRI_PREFIX}${minted}`);
 
 /** The ULID a concept IRI ends in; `undefined` for any other value, a foreign host included. */
 export const ulidOfConceptIri = (iri: string): string | undefined =>
@@ -128,22 +127,27 @@ const openedFenceAt = (body: string, at: number): OpenedFence | undefined => {
   return lineEnd === -1 ? undefined : { mark, marks: run - opened, lineEnd };
 };
 
-const closingAt = (body: string, at: number, mark: string, marks: number): number => {
+const closingAt = (body: string, at: number, mark: string, marks: number): number | undefined => {
   const spaces = leadingSpacesOf(body, at);
-  if (spaces > 3) return -1;
+  if (spaces > 3) return undefined;
   const run = markRunOf(body, at + spaces, mark);
-  if (run - (at + spaces) < marks) return -1;
+  if (run - (at + spaces) < marks) return undefined;
   let tail = run;
   while (body[tail] === " " || body[tail] === "\t") tail += 1;
-  return body[tail] === "\n" || tail === body.length ? tail : -1;
+  return body[tail] === "\n" || tail === body.length ? tail : undefined;
 };
 
-const closingLineEnd = (body: string, from: number, mark: string, marks: number): number => {
+const closingLineEnd = (
+  body: string,
+  from: number,
+  mark: string,
+  marks: number,
+): number | undefined => {
   for (let at = from; at < body.length; at = lineStartFrom(body, at + 1)) {
     const end = closingAt(body, at, mark, marks);
-    if (end !== -1) return end;
+    if (end !== undefined) return end;
   }
-  return -1;
+  return undefined;
 };
 
 const fencedBlocksOf = (body: string): readonly { start: number; end: number }[] => {
@@ -151,9 +155,9 @@ const fencedBlocksOf = (body: string): readonly { start: number; end: number }[]
   for (let at = 0; at < body.length; at = lineStartFrom(body, at + 1)) {
     const opened = openedFenceAt(body, at);
     if (opened === undefined) continue;
-    const end = closingLineEnd(body, opened.lineEnd + 1, opened.mark, opened.marks);
-    blocks.push({ start: at, end: end === -1 ? body.length : end });
-    at = end === -1 ? body.length : end;
+    const end = closingLineEnd(body, opened.lineEnd + 1, opened.mark, opened.marks) ?? body.length;
+    blocks.push({ start: at, end });
+    at = end;
   }
   return blocks;
 };

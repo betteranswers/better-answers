@@ -6,10 +6,10 @@ import {
   boundarySchemas,
   CALENDAR_DAY,
   CONTENT_HASH,
+  DECIMAL_STRING,
   FAMILIES,
   FLAG_CLOSINGS,
   type FlagClosing,
-  GBP,
   GIT_SHA,
   IRI,
   llmPurpose,
@@ -113,7 +113,7 @@ export const DETAIL_KINDS = {
   llmPurpose: (value: DetailValue) =>
     typeof value === "string" && llmPurpose.enumValues.some((purpose) => purpose === value),
   day: (value: DetailValue) => typeof value === "string" && CALENDAR_DAY.test(value),
-  gbp: (value: DetailValue) => typeof value === "string" && GBP.test(value),
+  gbp: (value: DetailValue) => typeof value === "string" && DECIMAL_STRING.test(value),
   flagClosing: (value: DetailValue) =>
     typeof value === "string" && FLAG_CLOSINGS.some((closing) => closing === value),
 } as const;

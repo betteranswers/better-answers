@@ -44,7 +44,13 @@ export const VERIFICATION_CITATION_FIX_ORIGIN =
 export const VERIFICATION_ERASURE_ORIGIN =
   "erasure-rewrite" satisfies (typeof VERIFICATION_ORIGINS)[number];
 
-export { CONCEPT_IRI_PREFIX, conceptIriOf, IRI, type CitedSource } from "./concept-file.ts";
+export {
+  CONCEPT_IRI,
+  CONCEPT_IRI_PREFIX,
+  conceptIriOf,
+  IRI,
+  type CitedSource,
+} from "./concept-file.ts";
 
 export const GIT_SHA = /^[0-9a-f]{40}$/;
 

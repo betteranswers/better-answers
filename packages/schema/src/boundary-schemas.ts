@@ -12,6 +12,7 @@ import {
   bundleCommit,
   CONCEPT_BODY_MAX,
   CONCEPT_FRONTMATTER_MAX,
+  CONCEPT_IRI,
   CONCEPT_PATH,
   CONCEPT_STATUSES,
   conceptSensitivityOverride,
@@ -23,7 +24,6 @@ import {
   CONTENT_HASH,
   evidence,
   GIT_SHA,
-  IRI,
   VERIFICATION_ORIGINS,
 } from "./concept-tables.ts";
 import { CONTRACT_DIGEST_PATTERN } from "./contract-digest.ts";
@@ -79,7 +79,7 @@ import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./job-tables.ts";
 import { workspaceLastActive } from "./last-active-tables.ts";
 import {
   CALENDAR_DAY,
-  GBP,
+  DECIMAL_STRING,
   LLM_CALL_OUTCOMES,
   llmCall,
   MODEL_NAME,
@@ -196,7 +196,7 @@ const modelKeyUpdate = createUpdateSchema(modelKey, {
 });
 
 /** Money and rates are `numeric`, which the driver hands back as a string and never a float. */
-const decimal = (schema: z.ZodString) => schema.regex(GBP);
+const decimal = (schema: z.ZodString) => schema.regex(DECIMAL_STRING);
 
 const tokenCount = (schema: z.ZodNumber) => schema.int().nonnegative();
 
@@ -471,7 +471,7 @@ const accessRequestSelect = createSelectSchema(accessRequest, accessRequestRefin
 const accessRequestInsert = createInsertSchema(accessRequest, accessRequestRefinements);
 const accessRequestUpdate = createUpdateSchema(accessRequest, accessRequestRefinements);
 
-const conceptIri = (schema: z.ZodString) => schema.regex(IRI).brand<"ConceptIri">();
+const conceptIri = (schema: z.ZodString) => schema.pipe(CONCEPT_IRI);
 
 const frontmatterEntry = z
   .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
@@ -792,7 +792,7 @@ const writeUpIncludeInsert = createInsertSchema(writeUpInclude, writeUpIncludeRe
 const writeUpIncludeUpdate = createUpdateSchema(writeUpInclude, writeUpIncludeRefinements);
 
 const recordConcept = z.strictObject({
-  iri: z.string().regex(IRI).brand<"ConceptIri">(),
+  iri: CONCEPT_IRI,
   contentHash: z.string().regex(CONTENT_HASH),
   /** Never who verified it: that is a person, and no record holds one. */
   trust: z.strictObject({
@@ -825,7 +825,7 @@ const questionAskedUpdate = createUpdateSchema(questionAsked, questionAskedRefin
 
 const draftedSentence = z.strictObject({
   sentence: z.string().trim().min(1),
-  concepts: z.array(z.string().regex(IRI).brand<"ConceptIri">()).min(1),
+  concepts: z.array(CONCEPT_IRI).min(1),
 });
 
 const questionContentRefinements = {
