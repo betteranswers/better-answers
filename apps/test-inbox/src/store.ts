@@ -33,7 +33,6 @@ type PageAsked = { readonly after: string | undefined; readonly limit: number };
 type KeptPage = { readonly messages: readonly Kept[]; readonly hasMore: boolean };
 
 export type Store = {
-  /** Answers the id it minted. */
   readonly keep: (received: Received) => Promise<Result<string>>;
   readonly prune: (nowMs: number) => Promise<Result<undefined>>;
   /** Newest first, after the id `after` names whether or not its row is still kept. */

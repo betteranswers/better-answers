@@ -4,7 +4,6 @@ export type Result<T> =
 
 export const ok = <T>(value: T): Result<T> => ({ ok: true, value });
 
-/** Answers a rejection from the runtime or D1 as an error, so no caller needs a `catch`. */
 export const attempted = async <T>(work: () => Promise<Result<T>>): Promise<Result<T>> => {
   try {
     return await work();

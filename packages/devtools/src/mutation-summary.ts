@@ -29,7 +29,6 @@ const reportMutant = z.object({
 });
 export type ReportMutant = z.infer<typeof reportMutant>;
 
-/** Stryker's mutation-testing report, read as far as the summary needs it. */
 const report = z.object({
   files: z
     .record(z.string(), z.object({ source: z.string(), mutants: z.array(reportMutant).readonly() }))

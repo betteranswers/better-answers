@@ -37,7 +37,6 @@ const underADirective = (text: string, comments: readonly Comment[], block: Bloc
       directiveIn(proseOf(comment)) !== undefined,
   );
 
-/** Each run of stand-alone line comments, keyed by the line just below it. */
 const lineBlocksAbove = (
   text: string,
   comments: readonly Comment[],

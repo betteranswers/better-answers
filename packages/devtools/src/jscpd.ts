@@ -58,7 +58,6 @@ const clonesIn = (output: string): readonly Clone[] => {
 
 export type JscpdRunner = (tree: Tree) => readonly Clone[];
 
-/** The smoke tree must report exactly `smoke.clones` clones. */
 export const jscpdOver = (
   config: JscpdConfig,
   smoke: { readonly tree: Tree; readonly clones: number },

@@ -51,10 +51,6 @@ export type Counted = {
   readonly comment: number;
 };
 
-/**
- * cloc's by-file JSON, with a `header` and a `SUM` beside the files; the smoke case proves
- * the contract.
- */
 const clocReport = z.record(
   z.string(),
   z.looseObject({
@@ -94,7 +90,6 @@ const workspaceOf = (file: string, longestFirst: readonly string[]): string | un
 
 type Total = { code: number; comment: number };
 
-/** A file no workspace holds is dropped. */
 export const measure = (
   counted: readonly Counted[],
   workspaces: readonly string[],
@@ -133,7 +128,6 @@ export const overTheCeiling = (measured: readonly Measured[]): readonly Measured
 export const reportOf = (one: Measured): string =>
   `${one.workspace} ${one.arm}: ${one.ratio.toFixed(2)} comment lines per code line, over the ${CEILING[one.arm].toFixed(2)} ceiling. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. Hold any other reason in a name, a type, a test or a grant, and delete the rest.`;
 
-/** Runs cloc over `paths` from `cwd`; throws when cloc fails or writes no JSON. */
 export const countOver = (cwd: string, paths: readonly string[]): readonly Counted[] =>
   countedIn(
     execFileSync(executableOf(CLOC_EXECUTABLE), [...clocArgv(paths)], {
@@ -148,7 +142,6 @@ export const WRAPPER_EXECUTABLE = {
   path: ["..", "..", "scripts", "comment-density.mjs"],
 } as const;
 
-/** The smoke tree must count exactly `smoke.counted` measured files. */
 export const clocOver = (
   paths: readonly string[],
   smoke: { readonly tree: Tree; readonly counted: number },

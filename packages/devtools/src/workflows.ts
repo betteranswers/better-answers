@@ -50,7 +50,6 @@ export const buildWorkflow = (): z.infer<typeof buildWorkflowSchema> =>
 export const imageJob = () => buildWorkflow().jobs.image;
 export const matrixLegs = (): readonly MatrixLeg[] => imageJob().strategy.matrix.include;
 
-/** @throws when build.yml's image job builds no leg for the tier. */
 export const legFor = (tier: string): MatrixLeg => {
   const leg = matrixLegs().find((candidate) => candidate.tier === tier);
   if (leg === undefined) {

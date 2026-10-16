@@ -85,7 +85,6 @@ const entriesOf = (
 const readManifest = (root: string): CorePackage | null => {
   const manifest: unknown = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
 
-  // A manifest without the core's name is no core package, whatever else it holds.
   if (typeof manifest !== "object" || manifest === null) return null;
   if (!("name" in manifest) || manifest.name !== CORE) return null;
   const exported =

@@ -32,7 +32,6 @@ export const isFactoryModule = (file: string): boolean => FACTORY_MODULES.includ
 
 export const isScanned = (file: string): boolean => isSuiteFile(file) && !isFactoryModule(file);
 
-/** Each scanned file under the `roots` directories, relative to `root`, once and sorted. */
 export const scannedFilesUnder = (root: string, roots: readonly string[]): readonly string[] =>
   filesUnderEach(root, roots).filter(isScanned);
 

@@ -48,7 +48,6 @@ export const slicesUnder = (root: string, outsideCore: readonly string[]): reado
 export const sliceOf = (file: string, slices: readonly Slice[]): string | undefined =>
   slices.find(({ directory }) => file.startsWith(`${directory}/`))?.name;
 
-/** Production TypeScript under the `roots` directories, relative to `root`, once and sorted. */
 export const scannedFilesUnder = (root: string, roots: readonly string[]): readonly string[] =>
   filesUnderEach(root, roots).filter((file) => SCANNED.test(file) && !isTestPath(file));
 

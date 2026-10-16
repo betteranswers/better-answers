@@ -23,7 +23,6 @@ const NEVER_WALKED: ReadonlySet<string> = new Set([
   "test-results",
 ]);
 
-/** Pruned as it descends, because a package tree links to itself and a full walk never ends. */
 const filesUnder = (root: string, directory: string): readonly string[] =>
   readdirSync(path.join(root, directory), { withFileTypes: true }).flatMap((entry) => {
     if (NEVER_WALKED.has(entry.name)) return [];
@@ -32,7 +31,6 @@ const filesUnder = (root: string, directory: string): readonly string[] =>
     return entry.isFile() ? [relative] : [];
   });
 
-/** Each file under the `roots` directories, relative to `root`, once and sorted. */
 export const filesUnderEach = (root: string, roots: readonly string[]): readonly string[] =>
   [...new Set(roots.flatMap((directory) => filesUnder(root, directory)))].sort(byCodeUnit);
 
@@ -44,7 +42,6 @@ export const isTestPath = (file: string): boolean => {
 
 const PACKAGES_BLOCK = /^packages:\n((?:[ \t]*-[ \t]+\S+[ \t]*\n)+)/m;
 
-/** The workspace directories pnpm-workspace.yaml names, relative to the root and sorted. */
 export const workspacePackages = (): readonly string[] => {
   const file = readFileSync(path.join(repositoryRoot, "pnpm-workspace.yaml"), "utf8");
   const block = PACKAGES_BLOCK.exec(file)?.[1];
