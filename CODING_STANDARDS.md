@@ -12,10 +12,7 @@ These bind every workspace. A gate enforces the rest, and its message names the 
 ## Code
 
 - Return an error as a `Result`. Catch only around an external library, and wrap its throw with `normalizeError`.
-- Never mutate a parameter, including through `push`, `sort` or `Object.assign`. Return a new value.
-- Import statically in source. A dynamic `import()` hides a dependency from every tool that reads the module graph.
 - Suffix a money or time value with its unit: `timeoutMs`, `priceCents`.
-- A Python `# noqa: X` or `# type: ignore[x]` gives its reason on the same line.
 - Read the environment only in the tier's config module. Pass it to a child process through one named function.
 
 ## Data and secrets
