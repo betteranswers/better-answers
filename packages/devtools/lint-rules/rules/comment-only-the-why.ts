@@ -80,17 +80,17 @@ export const commentOnlyTheWhyRule = defineRule({
     fixable: "code",
     docs: {
       description:
-        "A comment is 25 words at most and says only what the code cannot, in words that stand on their own; a doc block on an exported function in packages/core or packages/schema may run to 50. A disable gives its reason on the same line, and a directive's reason counts against the cap (the root `CODING_STANDARDS.md`).",
+        "A comment is 25 words at most and says only what the code cannot, in words that stand on their own; a doc block on an exported function in packages/core or packages/schema may run to 50. A disable gives its reason on the same line, and a directive's reason counts against the cap.",
     },
     messages: {
       tooLong:
-        "This comment runs to {{words}} words; a comment says only what the code cannot — a constraint, a trade-off, a trap — in {{limit}} at most (the root `CODING_STANDARDS.md`). Delete what the code already says.",
+        "This comment runs to {{words}} words; a comment says only what the code cannot — a constraint, a trade-off, a trap — in {{limit}} at most. Delete what the code already says.",
       cites:
-        "This comment cites {{what}} (`{{cited}}`); a comment never says which ticket, decision or rule asked for the code (the root `CODING_STANDARDS.md`). git, a spec and an ADR are where that is read.",
+        "This comment cites {{what}} (`{{cited}}`); a comment never says which ticket, decision or rule asked for the code. git, a spec and an ADR are where that is read.",
       unexplained:
-        "This disable gives no reason; name what it suppresses and say why on the same line, after ` -- ` (`: ` for Stryker) (the root `CODING_STANDARDS.md`).",
+        "This disable gives no reason; name what it suppresses and say why on the same line, after ` -- ` (`: ` for Stryker).",
       reasonTooLong:
-        "This directive's reason runs to {{words}} words, and a reason counts against the comment cap of {{limit}} (the root `CODING_STANDARDS.md`). Say the constraint alone.",
+        "This directive's reason runs to {{words}} words, and a reason counts against the comment cap of {{limit}}. Say the constraint alone.",
     },
   },
   createOnce(context) {

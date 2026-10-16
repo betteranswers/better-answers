@@ -244,7 +244,7 @@ export const importDirectionRule = defineRule({
       internal:
         "`{{fromDir}}` ({{from}}) reaches `{{dir}}` only through its own index.ts, never `{{inside}}`. Export what you need from that face and import it from there.",
       unexported:
-        "`{{dir}}/index.ts` is a face packages/core's exports map does not name. Add `./{{entry}}` to the map, so a sibling and a transport reach one face and a test reaches an entry point (the root `CODING_STANDARDS.md`).",
+        "`{{dir}}/index.ts` is a face packages/core's exports map does not name. Add `./{{entry}}` to the map, so a sibling and a transport reach one face and a test reaches an entry point.",
     },
   },
   createOnce(context) {

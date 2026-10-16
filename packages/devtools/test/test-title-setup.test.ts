@@ -121,12 +121,10 @@ describe("the rendered test-title hold", () => {
     expect(statusesOf(10)).toEqual({ each: "passed", template: "passed", loop: "passed" });
   });
 
-  it("prints the rules file and the title it refuses", () => {
+  it("prints the rule and the title it refuses", () => {
     const outcomes = outcomesIn(vitest(suite(`it(${JSON.stringify(ELEVEN)}, () => {});\n`)));
 
-    expect(outcomes.get(ELEVEN)?.message).toContain(
-      `(the root \`CODING_STANDARDS.md\`): "${ELEVEN}"`,
-    );
+    expect(outcomes.get(ELEVEN)?.message).toContain(`never "should": "${ELEVEN}"`);
   });
 
   it("fails a short title holding the forbidden word", () => {

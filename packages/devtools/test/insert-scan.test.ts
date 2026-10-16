@@ -122,11 +122,11 @@ describe("the named list of factory modules", () => {
 });
 
 describe("the scan over a throwaway tree", () => {
-  it("refuses a TypeScript raw insert, naming line and rules file", () => {
+  it("refuses a TypeScript raw insert, naming line and the fix", () => {
     const output = scan(withTypescriptInsert());
 
     expect(output).toContain(`${WORKSPACE}/test/one.test.ts:2:`);
-    expect(output).toContain("the root `CODING_STANDARDS.md`");
+    expect(output).toContain("move it into one of the modules");
   });
 
   it("names where the list of factory modules lives", () => {

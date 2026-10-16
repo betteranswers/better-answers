@@ -37,11 +37,11 @@ const AWAITS_FIRST = `export const reprocess = async (principal, tx, input) => {
 const lint = oxlintOver(CONFIG, { tree: holding(AWAITS_FIRST), flagged: [FILE] });
 
 describe("the rule that a declared action admits before it awaits", () => {
-  it("refuses an action reading before admitting, naming its rules file", () => {
+  it("refuses an action reading before admitting, naming the fix", () => {
     const output = lint.output(holding(AWAITS_FIRST));
 
     expect(output).toContain("awaits before it admits");
-    expect(output).toContain("the root `CODING_STANDARDS.md`");
+    expect(output).toContain("so nothing is opened, read or written");
     expect(output).toContain("better-answers(action-admits-before-await)");
   });
 
