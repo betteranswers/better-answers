@@ -163,7 +163,8 @@ export const leaseLetLapse = async (
 export const isBlockedOnTable = async (pool: pg.Pool, table: string): Promise<boolean> => {
   const found = await pool.query(
     `SELECT 1 FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
-      WHERE c.relname = $1 AND NOT l.granted`,
+      WHERE c.relname = $1 AND NOT l.granted
+        AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())`,
     [table],
   );
   return (found.rowCount ?? 0) > 0;

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import type pg from "pg";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   isRuntimeRole,
@@ -17,8 +17,8 @@ import {
 import { declaredTableNames } from "../scripts/worker-view.ts";
 import { identityOf, SECURITY_DEFINER_REACH, ulid } from "../src/index.ts";
 import { testData } from "./factory.ts";
-import { withRollback } from "./harness.ts";
-import { postgresForSuite, privilegesHeld, refusesEach } from "./probes.ts";
+import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
+import { privilegesHeld, refusesEach } from "./probes.ts";
 import { A_MAP_NODE } from "./rls-probes.ts";
 
 /**
@@ -78,27 +78,33 @@ const THE_DEFAULTS_REVOKED = [
   'ALTER DEFAULT PRIVILEGES IN SCHEMA "index" REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM worker_rt',
 ];
 
-const db = postgresForSuite();
+/** A server of its own: the surface names every role on the server, and a shared one keeps others'. */
+let db: MigratedPostgres;
 
 beforeAll(async () => {
-  const client = await db().pool.connect();
+  db = await startMigratedPostgres();
+  const client = await db.pool.connect();
   try {
     await withOneWorkspacePartition(client);
   } finally {
     client.release();
   }
-  surface = await readRolesSurface(db().pool);
+  surface = await readRolesSurface(db.pool);
+});
+
+afterAll(async () => {
+  await db.stop();
 });
 
 describe("the roles' surface", () => {
   it("is byte-identical to a regeneration over a fresh partitioned database", async () => {
-    const regenerated = renderRolesSurface(await readRolesSurface(db().pool));
+    const regenerated = renderRolesSurface(await readRolesSurface(db.pool));
 
     expect(readFileSync(rolesSurfacePath, "utf8")).toBe(regenerated);
   });
 
   it("names exactly the catalogue's roles, and no grantee beyond them", async () => {
-    const catalogued = await db().pool.query<{ rolname: string }>(
+    const catalogued = await db.pool.query<{ rolname: string }>(
       String.raw`SELECT rolname FROM pg_roles WHERE rolname NOT LIKE 'pg\_%'`,
     );
     const migrator = catalogued.rows.map((row) => row.rolname).find((name) => !isRuntimeRole(name));
@@ -136,7 +142,7 @@ describe("the roles' surface", () => {
   });
 
   it("is the same file after a second tenant signs up", async () => {
-    await withRollback(db().pool, async (client) => {
+    await withRollback(db.pool, async (client) => {
       await oneWorkspacePartition(client);
 
       expect(renderRolesSurface(await readRolesSurface(client))).toBe(
@@ -146,7 +152,7 @@ describe("the roles' surface", () => {
   });
 
   it("collapses a granted partition to one token naming its parent", async () => {
-    await withRollback(db().pool, async (client) => {
+    await withRollback(db.pool, async (client) => {
       await client.query(`GRANT SELECT ON ${await thePartition(client)} TO worker_rt`);
 
       const relations = (await readRolesSurface(client)).relations.filter(
@@ -168,7 +174,7 @@ describe("the roles' surface", () => {
 
 describe("the two statements that make the flip", () => {
   it("move no existing relation's ACL", async () => {
-    await withRollback(db().pool, async (client) => {
+    await withRollback(db.pool, async (client) => {
       const before = (await readRolesSurface(client)).relations;
 
       for (const statement of THE_DEFAULTS_REVOKED) await client.query(statement);
@@ -180,7 +186,7 @@ describe("the two statements that make the flip", () => {
 
 describe("a table created after the flip", () => {
   it("gives worker_rt nothing and app_rt four verbs in either schema", async () => {
-    await withRollback(db().pool, async (client) => {
+    await withRollback(db.pool, async (client) => {
       await client.query("CREATE TABLE public.after_the_flip (id text PRIMARY KEY)");
       await client.query('CREATE TABLE "index".after_the_flip (id text PRIMARY KEY)');
 
@@ -198,7 +204,7 @@ describe("a table created after the flip", () => {
   });
 
   it("refuses the worker with an error and serves the api", async () => {
-    await withRollback(db().pool, async (client) => {
+    await withRollback(db.pool, async (client) => {
       await client.query("CREATE TABLE public.after_the_flip (id text PRIMARY KEY)");
       await client.query("SET LOCAL ROLE worker_rt");
 
@@ -229,7 +235,7 @@ describe("a table created after the flip", () => {
 
 describe("what worker_rt reaches after the flip", () => {
   it("is exactly what the journal's GRANTs name, table by table", async () => {
-    await withRollback(db().pool, async (client) => {
+    await withRollback(db.pool, async (client) => {
       expect({
         job: await privilegesHeld(client, "worker_rt", "public.job"),
         workspace: await privilegesHeld(client, "worker_rt", "public.workspace"),
@@ -247,7 +253,7 @@ describe("what worker_rt reaches after the flip", () => {
   });
 
   it("is a column set on the finding, and nothing table-wide", async () => {
-    await withRollback(db().pool, async (client) => {
+    await withRollback(db.pool, async (client) => {
       expect({
         table: await privilegesHeld(client, "worker_rt", "public.finding"),
         insert: await columnsHeld(client, "worker_rt", "public.finding", "INSERT"),
@@ -288,7 +294,7 @@ describe("what worker_rt reaches after the flip", () => {
   });
 
   it("is the whole document to read, write-back columns to update", async () => {
-    await withRollback(db().pool, async (client) => {
+    await withRollback(db.pool, async (client) => {
       expect({
         table: await privilegesHeld(client, "worker_rt", "public.source_document"),
         update: await columnsHeld(client, "worker_rt", "public.source_document", "UPDATE"),
@@ -310,7 +316,7 @@ describe("what worker_rt reaches after the flip", () => {
 
 describe("the functions the journal installs", () => {
   it("refuse the roles the migration did not name", async () => {
-    await withRollback(db().pool, async (client) => {
+    await withRollback(db.pool, async (client) => {
       await client.query("SET LOCAL ROLE worker_rt");
       await refusesEach(client, [
         [
@@ -337,7 +343,7 @@ describe("the functions the journal installs", () => {
   });
 
   it("carry no PUBLIC EXECUTE row between them", async () => {
-    const toPublic = await db().pool.query<{ fn: string }>(
+    const toPublic = await db.pool.query<{ fn: string }>(
       String.raw`SELECT n.nspname || '.' || p.proname AS fn
                    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace,
                         LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS a
@@ -353,7 +359,7 @@ describe("the functions the journal installs", () => {
   });
 
   it("would show a PUBLIC EXECUTE the moment one arrived", async () => {
-    await withRollback(db().pool, async (client) => {
+    await withRollback(db.pool, async (client) => {
       await client.query(
         "CREATE FUNCTION public.granted_to_nobody() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$",
       );
@@ -376,7 +382,7 @@ describe("the functions the journal installs", () => {
   });
 
   it("are the journal's alone, leaving out an extension's own functions", async () => {
-    const shipped = await db().pool.query<{ n: number }>(
+    const shipped = await db.pool.query<{ n: number }>(
       "SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'vector_dims'",
     );
 
@@ -387,7 +393,7 @@ describe("the functions the journal installs", () => {
   });
 
   it("still fire as triggers, though nobody holds EXECUTE on them", async () => {
-    await withRollback(db().pool, async (client) => {
+    await withRollback(db.pool, async (client) => {
       const seed = testData(client);
       const workspace = await seed.workspace();
       const decided = await seed.suggestion({ workspaceId: workspace.id });
@@ -428,7 +434,7 @@ describe("the functions the journal installs", () => {
 
 describe("the declared note over the SECURITY DEFINER functions", () => {
   it("names exactly the set the catalogue holds", async () => {
-    const catalogued = await db().pool.query<{ fn: string; args: string }>(
+    const catalogued = await db.pool.query<{ fn: string; args: string }>(
       String.raw`SELECT n.nspname || '.' || p.proname AS fn,
                         pg_get_function_identity_arguments(p.oid) AS args
                    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
