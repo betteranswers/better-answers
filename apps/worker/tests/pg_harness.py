@@ -6,6 +6,7 @@ import re
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
+from datetime import UTC, datetime
 from functools import cache
 from itertools import count
 from pathlib import Path
@@ -204,6 +205,14 @@ def _exists_session_on(admin: psycopg.Connection, database: str) -> bool:
     return found is not None
 
 
+def _drop_template(admin: psycopg.Connection, database: str) -> None:
+    if not _exists(admin, database):
+        return
+    # Postgres refuses to drop a database still marked as a template.
+    _alter(admin, database, "IS_TEMPLATE false")
+    admin.execute(SQL("DROP DATABASE {} WITH (FORCE)").format(Identifier(database)))
+
+
 def _publish(
     admin: psycopg.Connection,
     maintenance: str,
@@ -211,10 +220,7 @@ def _publish(
     build: Callable[[str], None],
 ) -> None:
     building = f"{name}_building"
-    if _exists(admin, building):
-        # Postgres refuses to drop a database still marked as a template.
-        _alter(admin, building, "IS_TEMPLATE false")
-        admin.execute(SQL("DROP DATABASE {} WITH (FORCE)").format(Identifier(building)))
+    _drop_template(admin, building)
     admin.execute(SQL("CREATE DATABASE {}").format(Identifier(building)))
     build(on_database(maintenance, building))
     _until_sessions_gone(admin, building)
@@ -227,15 +233,58 @@ def _publish(
     )
 
 
+_TEMPLATE_PREFIX = "tpl_py_"
+
+
+def _stamp_use(admin: psycopg.Connection, database: str) -> None:
+    admin.execute(
+        SQL("COMMENT ON DATABASE {} IS {}").format(
+            Identifier(database), Literal(datetime.now(UTC).isoformat())
+        )
+    )
+
+
+# A null age is a template with no use stamp yet, which is stamped rather than dropped.
+_AGES = r"""
+SELECT datname, CASE WHEN shobj_description(oid, 'pg_database') ~ '^\d{4}-\d{2}-\d{2}T'
+  THEN shobj_description(oid, 'pg_database')::timestamptz < now() - interval '1 day' END
+FROM pg_database WHERE datistemplate AND starts_with(datname, %s)
+"""
+
+
+# Holds the tmpfs to a day of templates; a run still cloning one keeps it until the
+# clone ends.
+def _age_out(admin: psycopg.Connection) -> None:
+    for database, stale in admin.execute(_AGES, (_TEMPLATE_PREFIX,)).fetchall():
+        if stale is None:
+            _stamp_use(admin, str(database))
+        elif stale:
+            _drop_template(admin, str(database))
+
+
+# Under the build lock no build of this tier is live, so every one found was killed.
+def _drop_killed_builds(admin: psycopg.Connection) -> None:
+    found = admin.execute(
+        r"SELECT datname FROM pg_database"
+        r" WHERE starts_with(datname, %s) AND datname LIKE '%%\_building'",
+        (_TEMPLATE_PREFIX,),
+    ).fetchall()
+    for (database,) in found:
+        _drop_template(admin, str(database))
+
+
 def ensure_template(
     maintenance_conninfo: str, name: str, build: Callable[[str], None]
 ) -> str:
-    """Build `name` once per instance; a killed build leaves only `<name>_building`."""
+    """Build `name` once per instance, stamp its use, and drop day-old templates."""
     # The session ends on any failure, which releases the lock.
     with psycopg.connect(maintenance_conninfo, autocommit=True) as admin:
         admin.execute(_TAKE_BUILD_LOCK)
         if not _exists(admin, name):
             _publish(admin, maintenance_conninfo, name, build)
+        _stamp_use(admin, name)
+        _age_out(admin)
+        _drop_killed_builds(admin)
         admin.execute(_RELEASE_BUILD_LOCK)
     return name
 

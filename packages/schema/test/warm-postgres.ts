@@ -118,11 +118,46 @@ const databaseExists = async (admin: pg.Client, database: string): Promise<boole
   return (found.rowCount ?? 0) > 0;
 };
 
-const dropLeftover = async (admin: pg.Client, database: string): Promise<void> => {
+const dropTemplate = async (admin: pg.Client, database: string): Promise<void> => {
   if (!(await databaseExists(admin, database))) return;
   // Postgres refuses to drop a database still marked as a template.
   await admin.query(`ALTER DATABASE ${quoted(database)} WITH IS_TEMPLATE false`);
   await admin.query(`DROP DATABASE ${quoted(database)} WITH (FORCE)`);
+};
+
+const TEMPLATE_PREFIX = "tpl_ts_";
+
+const stampUse = (admin: pg.Client, database: string): Promise<unknown> =>
+  admin.query(`COMMENT ON DATABASE ${quoted(database)} IS '${new Date().toISOString()}'`);
+
+/** Null for a template with no use stamp yet, which is stamped now rather than dropped. */
+const agesOf = async (
+  admin: pg.Client,
+): Promise<readonly { datname: string; stale: boolean | null }[]> =>
+  (
+    await admin.query<{ datname: string; stale: boolean | null }>(
+      String.raw`SELECT datname, CASE WHEN shobj_description(oid, 'pg_database') ~ '^\d{4}-\d{2}-\d{2}T'
+         THEN shobj_description(oid, 'pg_database')::timestamptz < now() - interval '1 day' END AS stale
+         FROM pg_database WHERE datistemplate AND starts_with(datname, $1)`,
+      [TEMPLATE_PREFIX],
+    )
+  ).rows;
+
+/** Holds the tmpfs to a day of templates; a run still cloning one keeps it until the clone ends. */
+const ageOut = async (admin: pg.Client): Promise<void> => {
+  for (const { datname, stale } of await agesOf(admin)) {
+    if (stale === null) await stampUse(admin, datname);
+    else if (stale) await dropTemplate(admin, datname);
+  }
+};
+
+/** Under the build lock no build of this tier is live, so every one found was killed. */
+const dropKilledBuilds = async (admin: pg.Client): Promise<void> => {
+  const found = await admin.query<{ datname: string }>(
+    "SELECT datname FROM pg_database WHERE starts_with(datname, $1) AND datname LIKE '%\\_building'",
+    [TEMPLATE_PREFIX],
+  );
+  for (const { datname } of found.rows) await dropTemplate(admin, datname);
 };
 
 const buildAndPublish = async (
@@ -132,7 +167,7 @@ const buildAndPublish = async (
   build: (databaseUri: string) => Promise<void>,
 ): Promise<void> => {
   const building = `${name}_building`;
-  await dropLeftover(admin, building);
+  await dropTemplate(admin, building);
   await admin.query(`CREATE DATABASE ${quoted(building)}`);
   await build(uriForDatabase(adminUri, building));
   await untilSessionsGone(admin, building);
@@ -145,7 +180,7 @@ const buildAndPublish = async (
 /** One key for the instance: every build creates the same cluster-wide roles, so builds take turns. */
 const BUILD_LOCK = "hashtextextended('better-answers template build', 0)";
 
-/** Builds `name` with `build` unless it is published; one build at a time on the instance. */
+/** Builds `name` unless published, stamps its use, drops this tier's day-old templates; one caller at a time. */
 export const ensureTemplate = (
   adminUri: string,
   name: string,
@@ -155,6 +190,9 @@ export const ensureTemplate = (
     await admin.query(`SELECT pg_advisory_lock(${BUILD_LOCK})`);
     try {
       if (!(await databaseExists(admin, name))) await buildAndPublish(admin, adminUri, name, build);
+      await stampUse(admin, name);
+      await ageOut(admin);
+      await dropKilledBuilds(admin);
     } finally {
       await admin.query(`SELECT pg_advisory_unlock(${BUILD_LOCK})`);
     }

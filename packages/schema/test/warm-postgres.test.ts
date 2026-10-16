@@ -325,6 +325,35 @@ afterAll(async () => {
   await dropEach(scratchTemplates);
 });
 
+const LONG_AGO = "2020-01-01T00:00:00.000Z";
+
+/** A published template under a tier's prefix, stamped `stamp` or left unstamped. */
+const plantedTemplate = async (
+  label: string,
+  stamp: string | null,
+  prefix = "tpl_ts_",
+): Promise<string> => {
+  const name = `${prefix}age_${label}_${String(process.pid)}`;
+  scratchTemplates.push(name, `${name}_building`);
+  await asAdmin(async (admin) => {
+    await admin.query(
+      `CREATE DATABASE ${quoted(name)} WITH IS_TEMPLATE true ALLOW_CONNECTIONS false`,
+    );
+    if (stamp !== null) await admin.query(`COMMENT ON DATABASE ${quoted(name)} IS '${stamp}'`);
+  });
+  return name;
+};
+
+const stampedSince = (database: string, since: number): Promise<boolean> =>
+  asAdmin(async (admin) => {
+    const found = await admin.query<{ stamp: string | null }>(
+      "SELECT shobj_description(oid, 'pg_database') AS stamp FROM pg_database WHERE datname = $1",
+      [database],
+    );
+    const stamp = found.rows[0]?.stamp;
+    return stamp !== null && stamp !== undefined && Date.parse(stamp) >= since - 1_000;
+  });
+
 const tablesIn = async (template: string): Promise<readonly string[]> => {
   const peek = `${template}_peek`;
   await asAdmin((admin) =>
@@ -570,6 +599,61 @@ describe("a shared template", () => {
       datistemplate: true,
       refused: "55000",
     });
+  });
+
+  it("drops a template unused for a day, keeping fresh ones", async () => {
+    const stale = await plantedTemplate("stale", LONG_AGO);
+    const fresh = await plantedTemplate("fresh", new Date().toISOString());
+
+    await ensureTemplate(adminUri(), scratchTemplate("aged"), buildLog().building("aged"));
+
+    expect({ stale: await isOnTheServer(stale), fresh: await isOnTheServer(fresh) }).toEqual({
+      stale: false,
+      fresh: true,
+    });
+  });
+
+  it("stamps an unstamped template rather than dropping it", async () => {
+    const before = Date.now();
+    const unstamped = await plantedTemplate("unstamped", null);
+
+    await ensureTemplate(adminUri(), scratchTemplate("stamper"), buildLog().building("stamper"));
+
+    expect({
+      kept: await isOnTheServer(unstamped),
+      stamped: await stampedSince(unstamped, before),
+    }).toEqual({
+      kept: true,
+      stamped: true,
+    });
+  });
+
+  it("leaves the worker tier's stale templates alone", async () => {
+    const theirs = await plantedTemplate("theirs", LONG_AGO, "tpl_py_");
+
+    await ensureTemplate(adminUri(), scratchTemplate("ours"), buildLog().building("ours"));
+
+    expect(await isOnTheServer(theirs)).toBe(true);
+  });
+
+  it("drops a killed builder's leftover under another name", async () => {
+    const orphan = `tpl_ts_age_orphan_${String(process.pid)}_building`;
+    scratchTemplates.push(orphan);
+    await asAdmin((admin) => admin.query(`CREATE DATABASE ${quoted(orphan)}`));
+
+    await ensureTemplate(adminUri(), scratchTemplate("sweeper"), buildLog().building("sweeper"));
+
+    expect(await isOnTheServer(orphan)).toBe(false);
+  });
+
+  it("stamps the ensured template with the time of use", async () => {
+    const before = Date.now();
+    const name = scratchTemplate("used");
+    await ensureTemplate(adminUri(), name, buildLog().building("used"));
+
+    await ensureTemplate(adminUri(), name, buildLog().building("used"));
+
+    expect(await stampedSince(name, before)).toBe(true);
   });
 
   it("is named for its migrations' content", async () => {
