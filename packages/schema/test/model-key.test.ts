@@ -1,6 +1,7 @@
 import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
+import { boundarySchemas, MODEL_NAME } from "../src/index.ts";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
 import { postgresForSuite, privilegesHeld, refusalOf } from "./probes.ts";
@@ -114,5 +115,31 @@ describe("a workspace's model key", () => {
         await refusalOf(client, () => client.query(A_MODEL_KEY, [nowhere, "anthropic", A_FRAME])),
       ).toBe("model_key_workspace_id_workspace_id_fk");
     });
+  });
+});
+
+describe("what a model key's row holds", () => {
+  it("holds the key sealed, in no readable column", () => {
+    expect(Object.keys(boundarySchemas.modelKey.select.shape).toSorted()).toEqual([
+      "provider",
+      "sealed",
+      "workspaceId",
+    ]);
+  });
+});
+
+describe("a model's name", () => {
+  const KEY_SHAPED = {
+    anthropic: `sk-ant-api03-${"Ab3_".repeat(23)}-AA`,
+    mistral: "Zq7Lm2Xc".repeat(4),
+    cloudflare: "Ab3Cd_Ef5-".repeat(4),
+  };
+
+  it.each(Object.entries(KEY_SHAPED))("refuses a key in %s's shape", (_provider, key) => {
+    expect(MODEL_NAME.test(key)).toBe(false);
+  });
+
+  it.each(["claude-sonnet-4-5", "mistral-large-2411"])("takes %s", (name) => {
+    expect(MODEL_NAME.test(name)).toBe(true);
   });
 });

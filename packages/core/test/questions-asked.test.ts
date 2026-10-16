@@ -281,6 +281,15 @@ describe("completing a record", () => {
     expect(await contentOf(recordId)).toEqual([expect.objectContaining({ drafted })]);
   });
 
+  it("leaves drafted null when the platform drafts nothing", async () => {
+    const asker = await anAsker();
+    const { recordId } = answered(await opening(asker));
+
+    answered(await completing(asker, recordId, REFUSED));
+
+    expect(await contentOf(recordId)).toEqual([expect.objectContaining({ drafted: null })]);
+  });
+
   it("keeps an unmapped passage's locator and none of its text", async () => {
     const asker = await anAsker();
     const { recordId } = answered(await opening(asker));

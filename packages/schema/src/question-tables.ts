@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { check, foreignKey, index, jsonb, primaryKey, text } from "drizzle-orm/pg-core";
 
 import { ACTOR_ID_PATTERN } from "./actor-id.ts";
+import type { DraftedSentence, RecordConcept } from "./boundary-schemas.ts";
 import { listed, stamp } from "./column-helpers.ts";
 import { ROLES } from "./roles.ts";
 import { withRLS } from "./with-rls.ts";
@@ -48,8 +49,7 @@ export const questionAsked = withRLS(
     completedAt: stamp("completed_at"),
     verdict: text("verdict"),
     judgeState: text("judge_state"),
-    /** Each returned or cited concept: its IRI, its content hash and trust then, the judge's word. */
-    concepts: jsonb("concepts").notNull().default([]),
+    concepts: jsonb("concepts").$type<RecordConcept[]>().notNull().default([]),
     unmappedPassages: text("unmapped_passages").array().notNull().default([]),
   },
   "workspaceId",
@@ -96,8 +96,7 @@ export const questionContent = withRLS(
     askedAt: stamp("asked_at").notNull(),
 
     question: text("question").notNull(),
-    /** Null unless the platform drafted: each sentence with the concepts its footnotes name. */
-    drafted: jsonb("drafted"),
+    drafted: jsonb("drafted").$type<DraftedSentence[]>(),
   },
   "workspaceId",
   (table) => [
@@ -131,7 +130,6 @@ export const questionFeedback = withRLS(
     disputedSentence: text("disputed_sentence"),
     disputedConcept: text("disputed_concept"),
 
-    /** Who closed it is the audit event's actor alone: the row is kept for good. */
     closedAs: text("closed_as"),
     closedAt: stamp("closed_at"),
   },

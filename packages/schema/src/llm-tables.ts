@@ -34,7 +34,6 @@ const sealedFrame = customType<{ data: Uint8Array; driverData: Buffer }>({
   dataType: () => "bytea",
 });
 
-/** Sealed and never hashed, because the key is sent: the row holds no readable part of it. */
 export const modelKey = withRLS(
   "model_key",
   {
@@ -51,7 +50,6 @@ export const modelKey = withRLS(
   ],
 );
 
-/** Lower case, digits, dots and hyphens, as providers name models: too narrow to carry a key. */
 export const MODEL_NAME = /^[a-z0-9][a-z0-9.-]{0,63}$/;
 
 export const DECIMAL_STRING = /^\d+(\.\d+)?$/;

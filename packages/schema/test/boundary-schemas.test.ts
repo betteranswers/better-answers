@@ -1346,6 +1346,27 @@ describe("what a finding may hold", () => {
   });
 });
 
+describe("what a flag on an answer holds", () => {
+  it("names no one who closed it: the audit event does", () => {
+    expect(Object.keys(boundarySchemas.questionFeedback.select.shape).toSorted()).toEqual(
+      [
+        "workspaceId",
+        "id",
+        "recordId",
+        "givenAt",
+        "givenBy",
+        "verdict",
+        "reason",
+        "note",
+        "disputedSentence",
+        "disputedConcept",
+        "closedAs",
+        "closedAt",
+      ].toSorted(),
+    );
+  });
+});
+
 describe("the rules in force a connected source carries", () => {
   const asKey = (tier: string) => tier.replaceAll("-", "_");
   const keyed: readonly string[] = RULES_IN_FORCE_KEYS;

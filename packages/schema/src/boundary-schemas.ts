@@ -794,7 +794,6 @@ const writeUpIncludeUpdate = createUpdateSchema(writeUpInclude, writeUpIncludeRe
 const recordConcept = z.strictObject({
   iri: CONCEPT_IRI,
   contentHash: z.string().regex(CONTENT_HASH),
-  /** Never who verified it: that is a person, and no record holds one. */
   trust: z.strictObject({
     tier: z.string().trim().min(1),
     status: z.string().trim().min(1),
@@ -803,6 +802,8 @@ const recordConcept = z.strictObject({
   }),
   judged: z.enum(CANDIDATE_VERDICTS).exactOptional(),
 });
+
+export type RecordConcept = z.output<typeof recordConcept>;
 
 const questionAskedRefinements = {
   workspaceId,
@@ -827,6 +828,8 @@ const draftedSentence = z.strictObject({
   sentence: z.string().trim().min(1),
   concepts: z.array(CONCEPT_IRI).min(1),
 });
+
+export type DraftedSentence = z.output<typeof draftedSentence>;
 
 const questionContentRefinements = {
   workspaceId,
