@@ -3,9 +3,6 @@ import { boolean, check, integer, pgTable, text } from "drizzle-orm/pg-core";
 
 import { listed, stamp } from "./column-helpers.ts";
 
-/**
- * The key can only be true, so a second stamp rewrites the row and a reader needs no ordering.
- */
 export const contractStamp = pgTable(
   "contract_stamp",
   {
@@ -23,7 +20,6 @@ export const STAMP_THE_CONTRACT =
 
 export const UPLOAD_SWEEP_MODES = ["list", "remove"] as const;
 
-/** One row per pass over every workspace, so it names none: counts only, never a key. */
 export const sweepPass = pgTable(
   "sweep_pass",
   {

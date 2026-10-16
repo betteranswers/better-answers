@@ -16,7 +16,6 @@ export const themeShown = (kept: string | null, deviceDark: boolean): Theme => {
   return deviceDark ? "dark" : "light";
 };
 
-/** Runs in the head before the first paint, so it repeats `themeShown`'s rule: no module has loaded. */
 export const FIRST_PAINT = `(() => {
   let kept = null;
   try { kept = localStorage.getItem(${JSON.stringify(THEME_KEPT_UNDER)}); } catch {}

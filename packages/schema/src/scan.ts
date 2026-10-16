@@ -1,5 +1,3 @@
-/** Scanning both readers share: a body is tenant input, so each read walks it once. */
-
 /** The next position at or after each index whose character `stops` holds, `-1` where
  * there is none. */
 export const nextStopsOf = (text: string, stops: (ch: string) => boolean): Int32Array => {

@@ -68,10 +68,8 @@ export const session = pgTable(
 
     secondFactorConfirmedAt: stamp("second_factor_confirmed_at"),
 
-    /** A clock for the pending session's hour, set once; whether it is pending is derived. */
     pendingSince: stamp("pending_since"),
 
-    /** Only the session that spent a recovery code or accepted a restore code may replace the factors. */
     setupGrantedAt: stamp("setup_granted_at"),
   },
   (table) => [index("session_user_id_idx").on(table.userId)],
@@ -183,7 +181,6 @@ export const invitation = pgTable(
     index("invitation_email_idx").on(table.email),
     check("invitation_role_check", sql.raw(`role IS NULL OR role IN (${roleList})`)),
 
-    // Over the address as any case spells it, so a capital never makes a second waiting one.
     uniqueIndex("invitation_waiting_uidx")
       .on(table.workspaceId, sql`lower(${table.email})`)
       .where(sql.raw(`status = '${INVITATION_WAITING_STATUS}'`)),
@@ -437,7 +434,6 @@ export const recoveryCode = pgTable(
   (table) => [uniqueIndex("recovery_code_user_id_code_hash_uidx").on(table.userId, table.codeHash)],
 );
 
-/** Per person, not per session, so many pending sessions never multiply the guesses. */
 export const secondFactorThrottle = pgTable(
   "second_factor_throttle",
   {

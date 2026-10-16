@@ -19,10 +19,6 @@ export const SUBJECT_IDENTIFIERS_MAX = 50;
  */
 export const SUPPRESSION_SIGN_IN_ADDRESSES_MAX = 2;
 
-/**
- * A suppression withholds every case-folded occurrence workspace-wide, so an identifier below
- * either floor would withhold ordinary words.
- */
 export const SUBJECT_IDENTIFIER_FLOOR = 3;
 export const SUBJECT_NAME_WORDS_FLOOR = 2;
 

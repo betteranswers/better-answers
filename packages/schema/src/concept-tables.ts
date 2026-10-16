@@ -128,7 +128,6 @@ export const CONTENT_HASH = /^[0-9a-f]{64}$/;
  */
 export const CONCEPT_FRONTMATTER_MAX = 64_000;
 
-/** The body's cap: refused at the write's boundary and held by a CHECK. */
 export const CONCEPT_BODY_MAX = 100_000;
 
 export const conceptIdentity = withRLS(

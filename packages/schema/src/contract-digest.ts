@@ -6,9 +6,6 @@ export const CONTRACTS_ROOT = path.resolve(import.meta.dirname, "../../../contra
 
 export const CONTRACT_STAMP_MODULE = path.resolve(import.meta.dirname, "contract-stamp.ts");
 
-/**
- * Whole and lowercase: a short form in a log is a value somebody compares by eye and gets wrong.
- */
 export const CONTRACT_DIGEST_PATTERN = /^[0-9a-f]{64}$/u;
 
 /** It carries no agreement, and a typo fix in prose must not idle a worker. */

@@ -424,7 +424,6 @@ const detail = z.union([
   z.null(),
 ]);
 
-/** One id space across both audit logs: an audit event's id, whichever audit log holds its row. */
 const auditLogRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID).brand<"AuditEventId">(),
   action: (schema: z.ZodString) =>
