@@ -162,16 +162,20 @@ Three of the suites read documents as well, so the docs lane runs them through
 ## `lint-rules/` — the `better-answers` oxlint plugin
 
 The repository's own rules: the ones that hold a rule in `CODING_STANDARDS.md` or an ADR rather
-than a generic hygiene pattern. Loaded by `.oxlintrc.json` as a `jsPlugins` specifier. A rule
-whose line lives in the root `CODING_STANDARDS.md` names that file in the message it prints.
-Each rule lands with a functional test through the runner.
+than a generic hygiene pattern. Loaded by `.oxlintrc.json` as a `jsPlugins` specifier. A rule's
+message states the rule and its fix, and points at no document. Each rule lands with a
+functional test through the runner.
 
-Three rules today. The two MCP entry rules hold ADR 0018's line at the declaration and are
+The two MCP entry rules hold ADR 0018's line at the declaration and are
 run by `apps/api/tests/lint-rules.test.ts`. `import-direction` holds all five of ADR 0029's
 import-direction rules over `packages/core` as one rule, by placing both ends of an import in
 a zone from their position under the package whose manifest names `@better-answers/core`;
 the rule file says what it refuses, and `packages/core/test/import-direction.test.ts` runs it
 both ways and over the committed tree.
+
+`import-statically` refuses a dynamic `import()`. An override in `.oxlintrc.json` turns it off
+for tests, `e2e/` and `scripts/`, and `test/import-statically.test.ts` runs it under that
+override, both ways.
 
 ## The comment gate — three parts, all in root `check`
 

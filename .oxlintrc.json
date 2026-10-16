@@ -97,6 +97,7 @@
     "better-answers/action-admits-before-await": "error",
     "better-answers/comment-only-the-why": "error",
     "better-answers/declaration-doc-block": "error",
+    "better-answers/import-statically": "error",
     "better-answers/string-cites-nothing": "error",
     "better-answers/mcp-entry-annotations": "error",
     "better-answers/mcp-entry-no-workspace-argument": "error",
@@ -462,6 +463,19 @@
       ],
       "rules": {
         "node/no-process-env": "off"
+      }
+    },
+    {
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/test/**",
+        "**/tests/**",
+        "**/e2e/**",
+        "scripts/**"
+      ],
+      "rules": {
+        "better-answers/import-statically": "off"
       }
     }
   ],
