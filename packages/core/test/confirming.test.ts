@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { CeilingMet } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
+import { SWEEPS, sweepIdentitySet } from "../src/sweeps/index.ts";
 import {
   acceptRestoreCode,
   confirmByAuthenticator,
@@ -800,6 +801,32 @@ describe("accepting a restore code", () => {
     expect(await grantOf(sessionId)).toBeNull();
     expect(await failuresOf(personId)).toEqual([{ kind: "restore-code", failures: 2 }]);
     expect(await identitySetRowsFor(personId)).toEqual([]);
+  });
+
+  it("leaves setup closed to the mailbox once the code expires", async () => {
+    const { personId } = await aRestoredPerson(after(60));
+    const aWeekOn = after(7 * 24 * 3600);
+    await sweepIdentitySet(SWEEPS, door(), { now: aWeekOn });
+    const mailbox = await aSession(personId);
+
+    const accepted = await accepting(personId, mailbox, RESTORE_CODE);
+    const read = await readSecondFactor(bootstrap, door(), {
+      personId,
+      sessionId: mailbox,
+      now: aWeekOn,
+    });
+    const minted = await replaceRecoveryCodes(bootstrap, door(), {
+      personId,
+      replacing: false,
+      now: aWeekOn,
+    });
+
+    expect(accepted).toMatchObject({ ok: true, value: { granted: false } });
+    expect(read).toMatchObject({
+      ok: true,
+      value: { restoreRequired: true, thisSession: { setupGranted: false } },
+    });
+    expect(minted).toEqual({ ok: false, error: "restore-code-needed" });
   });
 
   it("waits after six wrong codes, refusing even the right one", async () => {

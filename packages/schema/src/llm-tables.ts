@@ -65,8 +65,6 @@ const theCall = () => ({
   purpose: llmPurpose("purpose").notNull(),
   modelChoiceId: text("model_choice_id").notNull(),
   model: text("model").notNull(),
-  tokensIn: integer("tokens_in").notNull(),
-  tokensOut: integer("tokens_out").notNull(),
 });
 
 export const llmCall = withRLS(
@@ -78,6 +76,8 @@ export const llmCall = withRLS(
     id: text("id").notNull(),
     calledAt: stamp("called_at").notNull(),
     ...theCall(),
+    tokensIn: integer("tokens_in").notNull(),
+    tokensOut: integer("tokens_out").notNull(),
     seconds: doublePrecision("seconds").notNull(),
     costGbp: numeric("cost_gbp").notNull(),
     outcome: text("outcome").notNull(),
@@ -111,8 +111,9 @@ export const spendReservation = withRLS(
     id: text("id").notNull(),
     takenAt: stamp("taken_at").notNull(),
     expiresAt: stamp("expires_at").notNull(),
-    // Its tokens are the most the call may send and return, over every attempt.
     ...theCall(),
+    mostTokensIn: integer("tokens_in").notNull(),
+    mostTokensOut: integer("tokens_out").notNull(),
     gbpPerMillionIn: numeric("gbp_per_million_in").notNull(),
     gbpPerMillionOut: numeric("gbp_per_million_out").notNull(),
     reservedGbp: numeric("reserved_gbp").notNull(),

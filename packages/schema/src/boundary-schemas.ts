@@ -203,8 +203,6 @@ const tokenCount = (schema: z.ZodNumber) => schema.int().nonnegative();
 const servedBy = {
   modelChoiceId: (schema: z.ZodString) => schema.trim().min(1),
   model: (schema: z.ZodString) => schema.trim().min(1),
-  tokensIn: tokenCount,
-  tokensOut: tokenCount,
   runId: (schema: z.ZodString) => schema.trim().min(1),
   answerId: (schema: z.ZodString) => schema.regex(ULID),
 };
@@ -213,6 +211,8 @@ const llmCallRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.regex(ULID),
   ...servedBy,
+  tokensIn: tokenCount,
+  tokensOut: tokenCount,
   seconds: (schema: z.ZodNumber) => schema.nonnegative(),
   costGbp: decimal,
   outcome: (schema: z.ZodString) => schema.pipe(z.enum(LLM_CALL_OUTCOMES)),
@@ -226,6 +226,8 @@ const spendReservationRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.regex(ULID),
   ...servedBy,
+  mostTokensIn: tokenCount,
+  mostTokensOut: tokenCount,
   gbpPerMillionIn: decimal,
   gbpPerMillionOut: decimal,
   reservedGbp: decimal,

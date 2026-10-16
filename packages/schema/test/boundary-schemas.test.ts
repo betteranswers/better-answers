@@ -140,8 +140,8 @@ const acceptedRows = {
       purpose: "judging",
       modelChoiceId: "model-choice-judge",
       model: "claude-sonnet-5-5",
-      tokensIn: 40_000,
-      tokensOut: 2_000,
+      mostTokensIn: 40_000,
+      mostTokensOut: 2_000,
       gbpPerMillionIn: "3",
       gbpPerMillionOut: "15",
       reservedGbp: "0.15",
@@ -1661,8 +1661,8 @@ describe("5 — the inferred type is pinned", () => {
       purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
       modelChoiceId: string;
       model: string;
-      tokensIn: number;
-      tokensOut: number;
+      mostTokensIn: number;
+      mostTokensOut: number;
       gbpPerMillionIn: string;
       gbpPerMillionOut: string;
       reservedGbp: string;
