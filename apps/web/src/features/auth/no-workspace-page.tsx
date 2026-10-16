@@ -64,7 +64,6 @@ function InvitationItem(properties: {
   return (
     <li>
       <Button asChild variant="outline" className="w-full justify-start">
-        {/* A document navigation, so the router never re-serialises a carried signed query. */}
         <a
           href={`${invitationAt(invitation.invitationId)}${properties.carried}`}
           aria-describedby={invitedById}
@@ -139,7 +138,6 @@ const keystrokesOf = (read: InvitationsRead): readonly Keystroke[] => [
   ASK_TO_JOIN,
 ];
 
-/** A waiting invitation is the quickest way in, so it stands above asking to join. */
 export function NoWorkspacePage() {
   const carried = carriedFlow(pageQuery());
   const invitations = useOpenInvitations();

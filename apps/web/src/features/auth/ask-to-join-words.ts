@@ -15,7 +15,6 @@ export const ASK_TO_JOIN_WORDS = {
   ask: "Ask to Join",
   asking: "Asking",
   sent: "Request sent",
-  /** One sentence for every short name, so the answer can't tell a customer from a stranger. */
   whatHappensNext:
     "If that workspace exists, its Admins will review your request. You’ll get an email if it’s approved.",
 } as const;

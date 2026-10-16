@@ -41,10 +41,8 @@ const OFFER_SHOWN_UNDER = "better-answers.passkey-offer-shown";
 
 const SHOWN = "shown";
 
-/** Shown in this page load, which holds when the browser refuses to keep the mark. */
 let offerShownHere = false;
 
-/** Kept on the browser, not the tab, so a second tab of the same sign-in stays quiet. */
 export const rememberThePasskeyOfferShown = (): void => {
   offerShownHere = true;
   keepOnThisBrowser(OFFER_SHOWN_UNDER, SHOWN);
@@ -53,7 +51,6 @@ export const rememberThePasskeyOfferShown = (): void => {
 export const passkeyOfferShown = (): boolean =>
   offerShownHere || onThisBrowser()?.getItem(OFFER_SHOWN_UNDER) === SHOWN;
 
-/** Each sign-in is owed the offer once more. */
 export const forgetThePasskeyOfferShown = (): void => {
   offerShownHere = false;
   forgetOnThisBrowser(OFFER_SHOWN_UNDER);
@@ -61,11 +58,9 @@ export const forgetThePasskeyOfferShown = (): void => {
 
 const SIGNED_IN = "better-answers.signed-in";
 
-/** None where the browser has no channel between its tabs; a waiting one follows on being shown. */
 const signInChannel = (): BroadcastChannel | undefined =>
   typeof BroadcastChannel === "undefined" ? undefined : new BroadcastChannel(SIGNED_IN);
 
-/** Tells every other browser tab, so one waiting on its code follows the sign-in. */
 const announceTheSignIn = (): void => {
   const channel = signInChannel();
   channel?.postMessage(null);

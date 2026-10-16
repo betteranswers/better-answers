@@ -53,7 +53,6 @@ function CurrentSession(properties: { readonly session: SessionShown }) {
 function AnotherSession(properties: {
   readonly session: SessionShown;
   readonly landsAt: LandsAt;
-  /** A sign-out in flight: a second one sent now would drop the first's answer. */
   readonly pending: boolean;
   readonly onSignOut: (session: SessionShown) => void;
 }) {

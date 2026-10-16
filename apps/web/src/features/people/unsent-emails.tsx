@@ -12,7 +12,6 @@ import { outcomeOfSendingFailure } from "./refusal.tsx";
 
 const NONE_WENT: ReadonlySet<SentInvitation> = new Set();
 
-/** A Resend whose email goes takes its row, and focus goes to the heading; one that fails stays. */
 export function UnsentEmails(properties: { readonly unsent: readonly SentInvitation[] }) {
   const [outcome, setOutcome] = useState<Outcome>();
   // The rows themselves, not their ids: a later action's answer brings fresh rows, shown whole.
@@ -21,7 +20,6 @@ export function UnsentEmails(properties: { readonly unsent: readonly SentInvitat
   const resend = useResendInvitation();
   const heading = useRef<HTMLHeadingElement>(null);
   const headingId = useId();
-  // Kept once its last row goes, so the outcome's live region stays to say so.
   if (properties.unsent.length === 0) return null;
   const left = properties.unsent.filter((invitation) => !went.has(invitation));
 

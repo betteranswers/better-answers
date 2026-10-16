@@ -28,7 +28,6 @@ function WaysOut() {
   );
 }
 
-/** Outside the shell, so a person who is not the operator never sees the console's pages. */
 function ConsoleClosed(properties: { readonly standing: ReturnType<typeof useOperatorStanding> }) {
   const { standing } = properties;
 

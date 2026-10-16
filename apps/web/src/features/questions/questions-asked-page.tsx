@@ -210,7 +210,6 @@ function QuestionsAskedRegion() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      {/* No count: a total of questions asked is never shown. */}
       <ListHead heading={WORDS.heading} headingId={headingId} headingRef={headingRef} count="" />
       <Card className="mt-4 gap-0 py-0">
         <ListRead

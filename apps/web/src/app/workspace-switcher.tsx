@@ -27,10 +27,6 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { ALL_WORKSPACES } from "./words.ts";
 
-/**
- * Where the band says the person is: a workspace and their role in it, or the console, which is
- * none.
- */
 export type Here = {
   readonly name: string;
   readonly workspaceId: string | undefined;
@@ -57,10 +53,6 @@ const listOutcome = (list: ListRead): Outcome | undefined => {
   return list.isError ? refusedWith(STOCK.notLoaded) : undefined;
 };
 
-/**
- * Held by the frame rather than the menu, because what it says stands in the band's outcome line
- * and outlives the menu.
- */
 export const useWorkspaceSwitch = () => {
   const [open, setOpen] = useState(false);
   const [gone, setGone] = useState<readonly string[]>([]);
@@ -74,7 +66,6 @@ export const useWorkspaceSwitch = () => {
   return {
     open,
     onOpenChange: (opening: boolean) => {
-      // A reset lets go of a pending switch without stopping it, so its refusal would go unsaid.
       if (opening && !switching.isPending) switching.reset();
       setOpen(opening);
     },
@@ -109,10 +100,6 @@ const listedFrom = (here: Here, workspaces: readonly Listed[]): readonly Listed[
     : [{ id: workspaceId, name: here.name, role: here.role }, ...others];
 };
 
-/**
- * Held while a switch is pending, since its late answer would move whatever page the person
- * left for.
- */
 function WayOut(properties: {
   readonly to: "/choose-workspace" | "/console";
   readonly held: boolean;
@@ -120,7 +107,6 @@ function WayOut(properties: {
 }) {
   return (
     <DropdownMenuItem asChild disabled={properties.held}>
-      {/* The item's hold stops the pointer and the keys, not the link's own click. */}
       <Link
         to={properties.to}
         onClick={(event) => {
@@ -133,7 +119,6 @@ function WayOut(properties: {
   );
 }
 
-/** Inside the item, after the name, so a person reads where they hold which role. */
 function RoleTag(properties: { readonly role: string | undefined }) {
   if (properties.role === undefined) return null;
   return (
@@ -157,7 +142,6 @@ export function WorkspaceSwitcher(properties: {
     <DropdownMenu modal={false} open={switching.open} onOpenChange={switching.onOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button type="button" variant="ghost" className="min-w-0 flex-1 justify-between px-2">
-          {/* Cut with an ellipsis rather than wrapped, so no name can push the toggle along. */}
           <span className="truncate font-medium text-foreground">{here.name}</span>
           <Icon name="caret-down" className="text-muted-foreground" />
         </Button>
@@ -172,7 +156,6 @@ export function WorkspaceSwitcher(properties: {
             if (to !== undefined && id !== here.workspaceId) switching.switchTo(to);
           }}
         >
-          {/* Held while a switch is pending, which the band's outcome line names. */}
           {listed.map((workspace) => (
             <DropdownMenuRadioItem
               key={workspace.id}

@@ -87,7 +87,6 @@ function Collections(properties: {
   );
 }
 
-/** Enter asks and Shift+Enter starts a new line, as a message box does. */
 const asksOnEnter = (event: KeyboardEvent<HTMLTextAreaElement>): boolean =>
   event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing;
 

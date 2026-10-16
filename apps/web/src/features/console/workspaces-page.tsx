@@ -43,7 +43,6 @@ function WorkspaceCell(properties: { readonly workspace: ListedWorkspace }) {
   return (
     <div className="grid justify-items-start gap-0.5">
       <span className="font-medium wrap-anywhere">{workspace.name}</span>
-      {/* The one disclosure: what an ops command needs, never what the list is read for. */}
       <Collapsible>
         <CollapsibleTrigger asChild>
           <Button
@@ -98,7 +97,6 @@ const HIDEABLE = [
   { id: "createdAt", label: HEADS.createdAt },
 ] as const;
 
-/** Four columns outrun a narrow window, so it opens on two; the rest can be shown again. */
 const NARROW_HIDES: ReadonlySet<string> = new Set(["memberCount", "createdAt"]);
 
 const NO_WORKSPACE: readonly ListedWorkspace[] = [];
@@ -118,7 +116,6 @@ function WorkspacesList() {
   const headingId = useId();
   const listed = useWorkspaces();
   const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
-  // A refused read of it again leaves nothing listed: what it held may no longer be theirs.
   const read = listed.error === null ? listed.data : undefined;
   const narrowed = useNarrowedRows(read ?? NO_WORKSPACE, wordsOf);
   const table = useTable({
@@ -139,7 +136,6 @@ function WorkspacesList() {
       <ReadSaid read={listed} loading={WORDS.loading} />
 
       <Card className="mt-4">
-        {/* Drawn whatever the read says, so a refused read of it again takes no focus from the search. */}
         <FilterRow
           search={{
             label: WORDS.search,

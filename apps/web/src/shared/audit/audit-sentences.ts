@@ -28,7 +28,6 @@ const wordsOfName = (action: string): string => {
   return sentenceCase(`${subject} ${verb}`.replaceAll("_", " "));
 };
 
-/** A display name is the person's own, so only words the platform supplies take a capital. */
 const opening = (by: SaidEvent["by"]): string =>
   by.kind === "person" ? nameOrAddress(by.displayName, by.address) : sentenceCase(byWords(by));
 
@@ -45,7 +44,6 @@ const group = (subject: Subject): string =>
 const groupNow = (subject: Subject): string =>
   subject?.kind === "group" ? `the group now called ${subject.name}` : GONE_WORDS["deleted-group"];
 
-/** An invitation erasure deleted is said without the address it went to. */
 const invitation = (subject: Subject): string =>
   subject?.kind === "invitation" ? `an invitation to ${subject.address}` : "an invitation";
 
@@ -201,7 +199,6 @@ const SAID: ReadonlyMap<string, Sentence> = new Map(Object.entries(SENTENCES));
 
 const HEADED: ReadonlyMap<string, string> = new Map(Object.entries(HEADLINES));
 
-/** Each action a sentence says, so a test can hold the list to the actions core declares. */
 export const ACTIONS_SAID: readonly string[] = [...SAID.keys()];
 
 export const ACTIONS_HEADED: readonly string[] = [...HEADED.keys()];

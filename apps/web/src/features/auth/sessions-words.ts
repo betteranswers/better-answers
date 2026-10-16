@@ -4,7 +4,6 @@ import { counted, instantWords } from "@/shared/words.ts";
 
 export const SESSIONS_HEADING_WORD = "Sessions";
 
-/** A session that ended elsewhere leaves the row standing, so the person reads why it refused. */
 const SAID_OF_A_SIGN_OUT = {
   "session-gone": "This session has already ended.",
 } satisfies OwnSentences;

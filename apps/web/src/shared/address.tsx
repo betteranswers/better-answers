@@ -4,7 +4,6 @@ import { cn } from "@/shared/lib/utils.ts";
 
 type Part = { readonly from: number; readonly text: string };
 
-/** Each part ends at an `@` or a `.`, the places an address may break without splitting a word. */
 const partsOf = (address: string): readonly Part[] => {
   const parts: Part[] = [];
   let from = 0;

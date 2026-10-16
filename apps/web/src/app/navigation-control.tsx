@@ -12,7 +12,6 @@ import { NAVIGATION_SHEET, TOGGLE } from "./words.ts";
 type Sheeting = {
   readonly asked: boolean;
   readonly ask: (asked: boolean) => void;
-  /** The one button in the band that governs the navigation, and gets focus back from the sheet. */
   readonly controlRef: RefObject<HTMLButtonElement | null>;
 };
 
@@ -70,7 +69,6 @@ export function NavigationButton(properties: {
   );
 }
 
-/** Mounted in both layouts, so a crossing is a close it answers, not an unmount taking focus. */
 export function NavigationSheet(properties: {
   readonly sheet: Sheeting;
   readonly wide: boolean;
@@ -81,8 +79,6 @@ export function NavigationSheet(properties: {
   const close = () => ask(false);
 
   const handBackFocus = (event: Event) => {
-    // Radix hands focus to its own trigger, which this sheet lacks; the band's button takes it,
-    // or the page when no button is drawn.
     event.preventDefault();
     close();
     (controlRef.current ?? document.querySelector("main"))?.focus();

@@ -22,7 +22,6 @@ export type BulkResent = inferOutput<Api["members"]["bulkResendInvitations"]>;
 
 export type BulkCancelled = inferOutput<Api["members"]["bulkCancelInvitations"]>;
 
-/** Its key names no workspace: a switch drops it with every read of the workspace left. */
 export const useInvitations = (status: InvitationStatus) => {
   const api = useTRPC();
   return useQuery(api.members.invitations.queryOptions({ status }));

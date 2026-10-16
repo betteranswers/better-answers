@@ -17,7 +17,6 @@ export function Menu(properties: {
   return (
     <nav
       id={properties.id}
-      // Named, not headed: the rail beside it already shows the area's name.
       aria-label={properties.area.name}
       // Hidden rather than unmounted, so the button that governs it always names a region
       // that is there to be named.
@@ -34,13 +33,10 @@ export function Menu(properties: {
 
               return (
                 <li key={page.path}>
-                  {/* `aria-current` is the router's, off this same address; set here it would
-                      be written twice. */}
                   <Link
                     to={page.path}
                     onClick={properties.onChoose}
                     className={cn(
-                      // A fill, a weight and a bold glyph: the open page survives greyscale.
                       "flex items-center gap-2 px-2 py-1.5 text-foreground transition-colors",
                       open ? "bg-[var(--surface-active)] font-medium" : "hover:bg-accent",
                     )}

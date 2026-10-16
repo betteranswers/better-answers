@@ -24,10 +24,6 @@ export const takenFrom = (queryClient: QueryClient, queryKey: QueryKey): Undo =>
   };
 };
 
-/**
- * A click must read as done within a tenth of a second, so the cache takes the action before the
- * api answers.
- */
 export const useOptimistic = () => {
   const queryClient = useQueryClient();
   return async <Data>(

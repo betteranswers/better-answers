@@ -51,7 +51,6 @@ type WayOn = {
   readonly keystroke: Keystroke;
   readonly to: (here: string) => string;
 
-  /** Signed out first, so the sign-in page can take another address and come back here. */
   readonly signingOutFirst?: true;
 };
 
@@ -280,10 +279,6 @@ function InvitationToJoin(properties: {
   );
 }
 
-/**
- * Reached from the invitation email's link. The route has already sent a signed-out person on,
- * and brings them back here.
- */
 export function AcceptInvitationPage(properties: { readonly invitationId: string }) {
   const api = useTRPC();
   const { invitationId } = properties;

@@ -101,7 +101,6 @@ const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tel
     (each) => each.connectedSourceId === changing?.connectedSourceId,
   );
 
-  /** A control inside the open panel goes when the panel does, so it never becomes the opener. */
   const open = (asked: Changing) => {
     const focused = theControlInFocus();
     if (group.current?.contains(focused) !== true) opener.current = focused;
@@ -115,7 +114,6 @@ const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tel
 
   const { connectedSourceId, name } = connectedSource;
 
-  /** Focus moves before the panel goes, or the button it stood on would take it along. */
   const cancel = () => {
     const from = opener.current;
     from?.focus();
@@ -123,11 +121,9 @@ const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tel
     setChanging(undefined);
   };
 
-  /** A change must read as taken within a tenth of a second, so the panel closes before the api answers. */
   const commit = (asked: SensitivityAndAudience) => {
     focusOn(connectedSourceHeadingId(connectedSourceId));
     setChanging(undefined);
-    // Said as the change is sent, which empties the alert: a second refusal alike is announced again.
     tell({ tone: "said", words: SENSITIVITY_PANEL_WORDS[changing.change].pending });
     if (changing.change === "narrow") {
       narrowAction.mutate(
@@ -210,7 +206,6 @@ export function ConnectedSourcesPage() {
   const connectedSourceOf = (connectedSourceId: string | undefined) =>
     listed.find((connectedSource) => connectedSource.connectedSourceId === connectedSourceId);
 
-  /** The review may open beyond the fold of a long row, so focus follows it to its heading. */
   const review = (connectedSourceId: string) => {
     flushSync(() => {
       setReviewing(connectedSourceId);
@@ -218,7 +213,6 @@ export function ConnectedSourcesPage() {
     focusOn(REVIEW_HEADING);
   };
 
-  /** A bulk action answers through the review that sent it, so no review moves until it has. */
   const heldAndSaid = (): boolean => {
     if (reviewHeld) setOutcome(A_BULK_ACTION_IS_STILL_GOING);
     return reviewHeld;

@@ -1,4 +1,3 @@
-/** Never capitalised, even at the start of a sentence. */
 export const PRODUCT_NAME = "better-answers";
 
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });
@@ -20,26 +19,21 @@ export const instantWords = (iso: string): string => `${timeWords(iso)} · ${day
 export const counted = (count: number, one: string, many: string): string =>
   `${count} ${count === 1 ? one : many}`;
 
-/** A list a search or a filter emptied names what its button clears: the search where it has that alone. */
 export const CLEAR_WORDS = { search: "Clear Search", filters: "Clear Filters" } as const;
 
 export const nothingMatches = (typed: string): string => `No results found for “${typed}”.`;
 
-/** Rounded up, so the reader never asks again before a ceiling lifts. */
 export const minutesUntil = (seconds: number): string =>
   counted(Math.max(1, Math.ceil(seconds / 60)), "minute", "minutes");
 
-/** A person who has given no display name yet is named by their address. */
 export const nameOrAddress = (displayName: string, address: string): string =>
   displayName === "" ? address : displayName;
 
-/** Who did an action: the kind, not the words, since a person may give any display name. */
 export type DoneBy =
   | { readonly kind: "person"; readonly displayName: string }
   | { readonly kind: "former-member" }
   | { readonly kind: "platform" };
 
-/** The glossary's words for an actor the audit log cannot name by the name they gave. */
 const BY_WORDS = {
   "former-member": "a former member",
   platform: "the platform",

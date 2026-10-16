@@ -26,7 +26,6 @@ export type RoleChanged = inferOutput<Api["members"]["changeRole"]>;
 
 export type ActivityEvent = inferOutput<Api["members"]["activity"]>["events"][number];
 
-/** Whether the person took the action, it was done to them, or both, as a self-demotion is. */
 export type Direction = ActivityEvent["direction"];
 
 /** By name, so a row the cache takes sits among the others where a reader looks for it. */
@@ -106,7 +105,6 @@ const useReconciledList = <Asked>(
   const listKey = api.members.list.queryKey();
   // Callers spread these into `useMutation`: the React lint takes a callback passed through `mutationOptions` as called during render.
   return {
-    // Not awaited: a cancel reverts a read in flight at once and drops its answer, so the change below stands.
     onMutate: (asked: Asked): Undo => {
       void queryClient.cancelQueries({ queryKey: listKey });
       const taken = takenFrom(queryClient, listKey);
@@ -185,10 +183,6 @@ export const useRemoveMember = () => {
 
 const ASKED_OF_ONE = z.object({ personId: z.string() });
 
-/**
- * The latest removal of one person, read where it was not asked: a removal leaves the page it was
- * asked on before the api answers.
- */
 export const useRemovalOf = (personId: string | undefined) => {
   const api = useTRPC();
   const workspaceId = useHeldMember()?.workspace.id;

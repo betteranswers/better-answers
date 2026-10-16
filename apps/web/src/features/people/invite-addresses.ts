@@ -13,7 +13,6 @@ export type Flag = "malformed" | "already-a-member";
 
 export type Held = { readonly key: string; readonly address: string };
 
-/** Trimmed and lower-cased, as the api keys an invitation, so two spellings fold into one. */
 const keyOf = (address: string): string => address.trim().toLowerCase();
 
 const addressesIn = (parts: readonly string[]): readonly string[] =>
@@ -44,20 +43,17 @@ const movedOf = (taken: Taken, rest: readonly string[]): Moved => ({
   capped: taken.left.length > 0,
 });
 
-/** Every whole address moves into the list; the one still being typed stays in the field. */
 export const typedInto = (held: readonly Held[], text: string): Moved => {
   const parts = text.split(SEPARATORS);
   const typing = (parts.pop() ?? "").trimStart();
   return movedOf(takenInto(held, addressesIn(parts)), typing === "" ? [] : [typing]);
 };
 
-/** Pasted, or the field sent as it stands: every address in it moves into the list. */
 export const allInto = (held: readonly Held[], text: string): Moved =>
   movedOf(takenInto(held, addressesIn(text.split(SEPARATORS))), []);
 
 export const hasSeparator = (text: string): boolean => SEPARATORS.test(text);
 
-/** Counted as the list would hold them, two spellings of one address once. */
 export const addressesCounted = (text: string): number =>
   new Set(addressesIn(text.split(SEPARATORS)).map(keyOf)).size;
 
@@ -73,7 +69,6 @@ export const flagOf = (
 
 const isFlag = (word: string): word is Flag => word === "malformed" || word === "already-a-member";
 
-/** The api names each refused address by its place in the send, which is the list's order. */
 export const flagsFrom = (
   sent: readonly Held[],
   items: Readonly<Record<string, string>>,

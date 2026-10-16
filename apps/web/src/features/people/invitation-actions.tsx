@@ -23,7 +23,6 @@ import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST, shortcutOf } from "./peo
 import { SAID_OF_TICKED_INVITATIONS } from "./refusal-words.ts";
 import { outcomeOfInvitationFailure, outcomeOfSendingFailure } from "./refusal.tsx";
 
-/** Each ticked invitation by its id, with its address as the tick took it, shown or not. */
 export type Ticked = ReadonlyMap<string, string>;
 
 export const NONE: Ticked = new Map();
@@ -57,7 +56,6 @@ const refusalOf = (failure: Failure, names: Ticked): Outcome =>
       })
     : outcomeOfSendingFailure(failure);
 
-/** One action at a time: a second call on a mutation takes over the first's callbacks. */
 export const useOneAtATime = (say: (outcome: Outcome) => void) => {
   const [acting, setActing] = useState(false);
   const resend = useResendInvitation();
@@ -105,7 +103,6 @@ export const useInvitationActions = (list: ActedList) => {
   const bulkResend = useBulkResendInvitations();
   const bulkCancel = useBulkCancelInvitations();
 
-  /** Said at the press, so the action reads as taken within a tenth of a second. */
   const begun = (pending: string): boolean => {
     if (!begin()) {
       list.say(STILL_GOING);
@@ -123,7 +120,6 @@ export const useInvitationActions = (list: ActedList) => {
     list.tick(kept);
   };
 
-  /** An expired row leaves the list as it is resent, so focus goes to the list it left. */
   const resendOne = (invitation: ListedInvitation) => {
     if (!begun(INVITATIONS_WORDS.resending(invitation.address))) return;
     if (invitation.status === "expired") {

@@ -146,13 +146,8 @@ const isANewSignInOf = (
   );
 };
 
-/**
- * Moves on once another browser tab signs in: on hearing it announced, or on being shown again,
- * having missed the announcement.
- */
 function useFollowsASignInElsewhere(waiting: boolean, sentTo: string, follow: () => void) {
   const session = useSession();
-  // Signing in again starts here with a session standing, and only a different one is a sign-in.
   const standing = useRef<string | null | undefined>(undefined);
   const readWhatStands = useEffectEvent(() => {
     void session.refetch().then((read) => {
@@ -164,7 +159,6 @@ function useFollowsASignInElsewhere(waiting: boolean, sentTo: string, follow: ()
   });
   const recheck = useEffectEvent(() => {
     if (!waiting) return;
-    // With no standing session read yet there is nothing to compare, so this read becomes it.
     if (standing.current === undefined) readWhatStands();
     else void session.refetch().then(followIfNew);
   });
@@ -283,7 +277,6 @@ type CodeStep = {
   readonly actions: ReactNode;
 };
 
-/** No `maxLength`: a browser would cut a pasted `123-456` to `123-45` before it is read. */
 const codeStepOf = (step: CodeStep): Step => ({
   title: SIGN_IN_WORDS.codeTitle,
   said: step.said,
@@ -335,10 +328,6 @@ export function SignInPage() {
   const signingIn = signIn.isPending || signIn.isSuccess;
   const left = triesLeftAfter(refused, signIn.error);
 
-  /**
-   * The query rides along, a connector's signed one included, so that page sends the person
-   * where this one would have.
-   */
   const moveOnAfterSignIn = (signedIn: SignedIn) => {
     queryClient.clear();
     void stepAfterSignIn(pageQuery(), signedIn.displayNameGiven).then((next) =>
@@ -464,7 +453,6 @@ export function SignInPage() {
                 sendANewCode(sentTo);
               }}
               onChangeAddress={changeAddress}
-              // Nothing here read the name, so the display-name page's own read forwards a named person.
               onSignedInElsewhere={() => {
                 moveOnAfterSignIn({ displayNameGiven: false });
               }}
@@ -472,8 +460,6 @@ export function SignInPage() {
           ),
         });
 
-  // Each slot keeps its element across the steps, so the code step speaks in the regions that
-  // stood and focus stays in the field.
   return (
     <AuthPage title={step.title}>
       <Outcome tone="said">{step.said}</Outcome>

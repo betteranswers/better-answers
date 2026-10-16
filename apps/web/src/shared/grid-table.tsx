@@ -43,7 +43,6 @@ type Opted<Data> = {
   readonly sorting?: SortHeads | undefined;
   readonly hidden?: ReadonlySet<string> | undefined;
   readonly rowMenu?: ((row: Data) => ReactNode) | undefined;
-  /** The row focus is in, for keystrokes that act on it; `undefined` once focus leaves it. */
   readonly onRowFocus?: ((row: Data | undefined) => void) | undefined;
 };
 
@@ -52,21 +51,15 @@ const HEAD =
 
 const CELL = "h-10 px-3 py-2 whitespace-normal";
 
-/**
- * The drawn box is 16px; a press needs 24px. Centred, not inset, since an inset counts from inside
- * the border.
- */
 const TICK =
   "relative after:absolute after:top-1/2 after:left-1/2 after:size-6 after:-translate-x-1/2 after:-translate-y-1/2";
 
 const opensElsewhere = (event: MouseEvent<HTMLAnchorElement>): boolean =>
   event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
 
-/** A link the caller sent to another window, or to a download, is the browser's to follow. */
 const leavesThePage = (link: HTMLAnchorElement): boolean =>
   !["", "_self"].includes(link.target) || link.hasAttribute("download");
 
-/** A real link, so a new tab or a copied address still reaches the row; a plain click opens it here. */
 export function RowLink(
   properties: Omit<ComponentProps<"a">, "href" | "onClick"> & {
     readonly href: string;
@@ -190,7 +183,6 @@ function ColumnHead<Features extends TableFeatures, Data extends RowData>(proper
 const isShown = (hidden: ReadonlySet<string> | undefined, columnId: string): boolean =>
   hidden?.has(columnId) !== true;
 
-/** Focus moving between the row's own controls keeps it; only leaving the row lets it go. */
 const focusHandlersOf = <Data,>(
   onRowFocus: ((row: Data | undefined) => void) | undefined,
   row: Data,

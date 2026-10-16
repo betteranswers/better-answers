@@ -68,7 +68,6 @@ const column = createColumnHelper<typeof features, GroupRow>();
 type GroupActions = {
   readonly open: (groupId: string) => void;
   readonly focusedOn: (groupId: string) => void;
-  /** The group just created: its button takes focus as its row arrives, once. */
   readonly landOn: string | undefined;
   readonly landed: (button: HTMLButtonElement | null) => void;
 };
@@ -146,7 +145,6 @@ function GroupsList(properties: { readonly headingId: string }) {
   const [outcome, setOutcome] = useState<Outcome>();
   const [landOn, setLandOn] = useState<string>();
   const deleteGroup = useDeleteGroup();
-  // Set before the deleted row leaves the cache, so nothing hands focus to it meanwhile.
   const closingOnADeletion = useRef(false);
 
   const rows = useMemo(() => rowsOf(read.data ?? [], pending), [read.data, pending]);
@@ -159,7 +157,6 @@ function GroupsList(properties: { readonly headingId: string }) {
     },
     focusedOn: setInFocus,
     landOn,
-    // Cleared as the button takes focus, so the row's later remounts under a search take none.
     landed: (button) => {
       if (button === null) return;
       button.focus();
@@ -177,7 +174,6 @@ function GroupsList(properties: { readonly headingId: string }) {
   const groupOf = (groupId: string | undefined) =>
     (read.data ?? []).find((group) => group.id === groupId);
 
-  /** A row the search hides, or that another Admin deleted meanwhile, has nothing to land on. */
   const landOnOrHeading = (elementId: string | undefined) => {
     const target = elementId === undefined ? null : document.getElementById(elementId);
     (target ?? heading.current)?.focus();

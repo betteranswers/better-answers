@@ -43,18 +43,15 @@ export const JUMP_TO = {
   membersUnread: "The members didn’t load. Please close this and try again.",
 } as const;
 
-/** The one row that leaves the list: it takes what is typed to Knowledge's Search. */
 export const searchFor = (typed: string): string => `Search for “${typed}”`;
 
 const EITHER = new Intl.ListFormat("en-GB", { type: "disjunction" });
 
-/** Names only the kinds this reader can find, so a Viewer is not promised members. */
 export const findWhat = (kinds: readonly string[]): string => `Find ${EITHER.format(kinds)}`;
 
 /** No role is held, so no other page can be offered either. */
 export const ROLE_UNREAD = STOCK.notLoaded;
 
-/** The index finds the home of a reader whose role is not known yet. */
 export const goHome = (home: Page | undefined): string =>
   home === undefined ? "Go to Your Home Page" : `Go to ${home.name}`;
 

@@ -39,10 +39,6 @@ export function ViewStateSlot(properties: { readonly children: ReactNode }) {
   const [written, setWritten] = useState<Written>();
   const [tabWritingUnder, setTabWritingUnder] = useState(openTab);
 
-  /**
-   * The way back into a thrown page is the other tab, so what the page wrote goes with the
-   * tab it was written under.
-   */
   const stale = tabWritingUnder !== openTab;
   if (stale) {
     setTabWritingUnder(openTab);

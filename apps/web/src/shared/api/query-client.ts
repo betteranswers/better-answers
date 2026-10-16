@@ -10,7 +10,6 @@ const RETRY_ATTEMPTS = 2;
  */
 const worthAnotherAsk = (error: Error) => refusalOf(error) === undefined;
 
-/** A ceiling lifts only with time, so a read that met one is not asked again at once. */
 const retryUnlessWaiting = (failureCount: number, error: Error | ApiError): boolean =>
   ceilingLiftsIn(error) === undefined &&
   refusalOf(error) === undefined &&
@@ -20,7 +19,6 @@ type Held = {
   readonly state: { readonly error: Error | ApiError | null; readonly errorUpdatedAt: number };
 };
 
-/** True of a read that met no ceiling, and of one whose wait has run out. */
 const waitedOut = ({ state }: Held): boolean => {
   const liftsInSeconds = state.error === null ? undefined : ceilingLiftsIn(state.error);
   return liftsInSeconds === undefined || state.errorUpdatedAt + liftsInSeconds * 1000 <= Date.now();

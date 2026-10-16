@@ -215,7 +215,6 @@ const failureOnThePage = (read: SecondFactorRead, actions: AccountActions) => {
   if (removal !== null) return { failure: removal, unanswered: STOCK.tryAgain };
   const made = actions.make.error;
   if (made === null) return { failure: made, unanswered: STOCK.tryAgain };
-  // With no response a set may have been made, so no one is told to make another.
   return { failure: made, unanswered: codesUnanswered(made, STOCK.unconfirmed) };
 };
 
@@ -270,7 +269,6 @@ export function AccountPage(properties: { readonly framed?: boolean }) {
   const read = useSecondFactor();
   const address = useSession().data?.user.email ?? "";
   const hash = useLocation({ select: (location) => location.hash });
-  // A session a code granted must swap the factors, which only the replacing routes do.
   const routes =
     read.data?.thisSession?.setupGranted === true ? NEW_AUTHENTICATOR : FIRST_AUTHENTICATOR;
   const actions = useAccountActions(

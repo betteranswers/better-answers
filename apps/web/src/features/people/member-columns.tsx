@@ -40,7 +40,6 @@ export const HIDEABLE = [
 ] as const;
 
 type MemberActions = {
-  /** Opens the member's page, where the link alone would lose a search still settling. */
   readonly open: (personId: string) => void;
   readonly focusedOn: (personId: string) => void;
 };
@@ -51,7 +50,6 @@ type MemberActions = {
  */
 export const MemberActionsContext = createContext<MemberActions | undefined>(undefined);
 
-/** Each person the last bulk action's refusal named; the outcome's own line says why. */
 export type RefusedRows = ReadonlySet<string>;
 
 export const NO_MARKS: RefusedRows = new Set();
@@ -81,7 +79,6 @@ function PersonCell(properties: { readonly member: ListedMember; readonly refuse
             displayName
           )}
         </RowLink>
-        {/* Still `anywhere`: a cell is as wide as its longest part, which would scroll the table at 320px. */}
         <Address address={address} className="text-xs text-muted-foreground" />
         {refused ? (
           <span className="mt-1 flex text-xs">

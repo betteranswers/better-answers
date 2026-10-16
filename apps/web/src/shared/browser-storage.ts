@@ -11,7 +11,6 @@ const reached = (store: (browser: Window) => Storage): Storage | undefined => {
   }
 };
 
-/** A full or refusing store throws on a write; the choice is then not kept, and the action goes on. */
 const kept = (store: Storage | undefined, key: string, value: string): void => {
   try {
     store?.setItem(key, value);

@@ -53,7 +53,6 @@ import {
 
 import { cn } from "@/shared/lib/utils.ts";
 
-/** Phosphor stands in until the product has a set of its own; one family, one door to it. */
 export type IconName =
   | "ask"
   | "backlog"
@@ -106,10 +105,6 @@ export type IconName =
   | "verification"
   | "workspaces";
 
-/**
- * The keys are the glossary's words, not Phosphor's: the shell says navigation and menu,
- * never list or sidebar.
- */
 const GLYPHS = {
   ask: ChatText,
   backlog: Stack,
@@ -163,10 +158,8 @@ const GLYPHS = {
   workspaces: Buildings,
 } satisfies Readonly<Record<IconName, PhosphorGlyph>>;
 
-/** Hidden from assistive technology, so the caller names what it stands for beside it. */
 export function Icon(properties: {
   readonly name: IconName;
-  /** Bold marks the open entry in the rail or the menu, and nothing else. */
   readonly weight?: "regular" | "bold";
   readonly className?: string;
 }) {

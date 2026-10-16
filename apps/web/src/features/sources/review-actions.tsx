@@ -160,7 +160,6 @@ function BulkAction(properties: {
   );
 }
 
-/** A rule the page has no word for shows its id, in the face every id takes. */
 export function RuleWord(properties: { readonly ruleId: string }) {
   const word = ruleWordOf(properties.ruleId);
   return word === properties.ruleId ? <span className="font-mono">{word}</span> : word;
@@ -357,7 +356,6 @@ function DismissAsNotSpecialCategoryAction(properties: ActionProperties) {
   );
 }
 
-/** While no group is ticked, one line above the three says what enables them. */
 export function ReviewActions(properties: { readonly connectedSourceId: string }) {
   const { connectedSourceId } = properties;
   const [ticked] = useTickedGroups();

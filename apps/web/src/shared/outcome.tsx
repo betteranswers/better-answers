@@ -6,10 +6,6 @@ export type Outcome =
 
 export const selectFirst = (line: string): Outcome => ({ tone: "said", words: line });
 
-/**
- * A polite region shown already holding its words may go unread, so the status stays in the tree
- * while empty. Alerts are read when shown.
- */
 export function OutcomeLine(properties: {
   readonly outcome: Outcome | undefined;
   readonly className?: string;

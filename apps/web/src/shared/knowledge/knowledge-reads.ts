@@ -20,7 +20,6 @@ export type Opening =
   | { readonly kind: "passage"; readonly locator: string }
   | { readonly kind: "concept"; readonly iri: string };
 
-/** Nothing where the read gave neither, which it gives only to a reader who may open it. */
 export const openingOf = (item: Evidence | undefined): Opening | undefined => {
   if (item?.locator !== undefined) return { kind: "passage", locator: item.locator };
   return item?.iri === undefined ? undefined : { kind: "concept", iri: item.iri };

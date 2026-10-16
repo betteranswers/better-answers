@@ -16,7 +16,6 @@ export const CODE_WRONG = 400;
 export const isAWrongCode = (failure: Error | null): boolean =>
   failure instanceof CodeRefused && failure.status === CODE_WRONG;
 
-/** Sends `digits`, and hands any refusal back so a wrong code's digits stay selected. */
 type SendTheCode = (digits: string, onRefused: (failure: Error) => void) => void;
 
 /**

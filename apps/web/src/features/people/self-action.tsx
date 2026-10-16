@@ -31,15 +31,12 @@ export const useSelfActionHome = () => {
   const navigate = useNavigate();
 
   const goHome = async (change: OwnMemberChange): Promise<Outcome | undefined> => {
-    // What the reader may see has changed, so no read held from before answers a page they open next.
     void queryClient.resetQueries({ type: "inactive" });
     if (change === "removed") {
       void memberChanged(queryClient, api, { readAgain: false, ifUnread: "reset" });
-      // Not `/`: the session still names the workspace left, and the shell sends that refusal to sign-in.
       await navigate({ href: "/choose-workspace", replace: true });
       return undefined;
     }
-    // The held answer stays: dropping it would leave the page with no role to draw.
     const member = await memberChanged(queryClient, api, { readAgain: true, ifUnread: "keep" });
     if (member === undefined) return ROLE_UNREAD;
     const { role } = member;

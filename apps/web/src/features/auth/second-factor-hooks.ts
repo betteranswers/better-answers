@@ -12,7 +12,6 @@ export const FIRST_AUTHENTICATOR: AuthenticatorRoutes = {
   finish: "/authenticator/finish",
 };
 
-/** Open only to a session granted setup; finishing removes the old factors. */
 export const NEW_AUTHENTICATOR: AuthenticatorRoutes = {
   start: "/second-factor/replace/authenticator-start",
   finish: "/second-factor/replace/authenticator-finish",
@@ -28,7 +27,6 @@ const setupStarted = z
 
 export type SetupStarted = z.output<typeof setupStarted>;
 
-/** Null when the person already held codes, which a setup leaves standing. */
 const setupFinished = z
   .union([
     z.object({ recoveryCodes: z.array(z.string()), madeAt: z.iso.datetime() }),
@@ -90,7 +88,6 @@ export const useFinishAuthenticator = (
   });
 };
 
-/** Read where the setup is opened, since the code field holding the finish can close first. */
 export const useFinishingTheSetup = (routes = FIRST_AUTHENTICATOR): boolean =>
   useMutationState({ filters: { mutationKey: [routes.finish], status: "pending" } }).length > 0;
 
@@ -100,7 +97,6 @@ export const useRemoveAuthenticator = () => {
   return useMutation(api.person.removeAuthenticator.mutationOptions({ onSuccess: reread }));
 };
 
-/** Rereads on a refusal too: a set made in another tab turns Make into Replace. */
 export const useReplaceRecoveryCodes = () => {
   const api = useTRPC();
   const reread = useRereadTheSecondFactor();

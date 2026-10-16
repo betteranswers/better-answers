@@ -27,10 +27,8 @@ export const signingInAs = (address: string): string => `Signing in as ${address
 export const worksUntil = (until: string): string =>
   `This code works until ${instantWords(until)}.`;
 
-/** Grouped in threes, so the eye holds it while typing it elsewhere. */
 export const codeShown = (code: string): string => `${code.slice(0, 3)} ${code.slice(3)}`;
 
-/** One digit at a time, so a screen reader says six digits rather than two numbers. */
 export const codeSpelled = (code: string): string => code.split("").join(" ");
 
 export const CODE_NOT_COPIED = "Couldn't copy. Please type the code on the page where you started.";

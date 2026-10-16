@@ -100,7 +100,6 @@ import { ROLE_UNREAD } from "./words.ts";
 
 type BuiltPage = { readonly draw: () => ReactElement; readonly toolbar?: PageToolbar };
 
-/** The list decides which pages are built; this map only says by what, and with what in hand. */
 const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>([
   ["/ask/new-question", { draw: NewQuestionPage }],
   ["/ask/connect-claude", { draw: ConnectClaudePage }],
@@ -118,7 +117,6 @@ const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>
 ]);
 
 type BuiltDetail = {
-  /** What the address's segment must be; anything else draws as naming no row. */
   readonly value: z.ZodType<string>;
   readonly draw: (value: string | undefined) => ReactElement;
 };
@@ -131,13 +129,11 @@ const BUILT_DETAILS: ReadonlyMap<string, BuiltDetail> = new Map<PagePath, BuiltD
 
 type ShellContext = { readonly queryClient: QueryClient; readonly api: ApiProxy };
 
-/** The router's address, and the address bar's query, which alone keeps a signed flow whole. */
 const leftFrom = (location: { readonly href: string }): LeftFrom => ({
   href: location.href,
   query: pageQuery(),
 });
 
-/** A pending session confirms before any page that reads what the gate holds. */
 const confirmedFirst = async (
   context: ShellContext,
   location: { readonly href: string },
@@ -214,7 +210,6 @@ const codesRoute = createRoute({
   },
 });
 
-/** Answered, so not pending: a session ending from here ended for some other reason. */
 const sessionHeld = (): void => {
   rememberTheSession("held");
 };
@@ -244,7 +239,6 @@ const accountRoute = createRoute({
   },
 });
 
-/** A pending "connect Claude" flow lands here, and keeps its signed query through confirm. */
 const chooseWorkspaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/choose-workspace",
@@ -252,7 +246,6 @@ const chooseWorkspaceRoute = createRoute({
   beforeLoad: ({ context, location }) => confirmedFirst(context, location),
 });
 
-/** The operator's home is the console's, unless a carried Claude flow waits on joining one. */
 const noWorkspaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/no-workspace",
@@ -266,7 +259,6 @@ const noWorkspaceRoute = createRoute({
   },
 });
 
-/** Outside the shell: the person joining is not yet a member of the workspace. */
 const acceptInvitationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/invitations/$invitationId",
@@ -274,7 +266,6 @@ const acceptInvitationRoute = createRoute({
     const { invitationId } = acceptInvitationRoute.useParams();
     return <AcceptInvitationPage invitationId={invitationId} />;
   },
-  // The page asks a nameless invitee's name beside its join, so only a signed-out one is sent on.
   beforeLoad: async ({ context, location }) => {
     const elsewhere = await signedOutDetour(context.queryClient, location.pathname);
     if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
@@ -308,11 +299,9 @@ const shellRoute = createRoute({
   },
 });
 
-/** Read after the shell's own read, which left no role in hand when it failed. */
 const memberOf = (context: ShellContext): Reader =>
   readerOf(roleHeld(context.queryClient, context.api));
 
-/** No role is held, so asking again is the one way on; the route moves once it answers. */
 function RoleUnread() {
   const member = useMember();
 
@@ -331,7 +320,6 @@ const indexRoute = createRoute({
   path: "/",
   beforeLoad: ({ context }) => {
     const { role } = memberOf(context);
-    // The entry's state goes on with it: a tab landed here is told why at its home.
     if (role !== undefined) throw redirect({ href: HOMES[role].path, replace: true, state: true });
   },
   component: function HomeUnread() {
@@ -347,13 +335,11 @@ const consoleRoute = createRoute({
   id: "console",
   component: ConsoleFrame,
   notFoundComponent: () => <UnknownPage home={HOMES.operator} />,
-  // Asked afresh on the way in, and not again on each move between the console's own pages.
   beforeLoad: async ({ context, location, cause }) => {
     const afresh = cause === "enter";
     if (await mustSignInForTheConsole(context.queryClient, context.api, afresh)) {
       throw redirect(signInAndBackTo(location.href));
     }
-    // The operator's standing never refuses a pending session, so the console asks itself.
     await confirmedFirst(context, location, afresh);
   },
 });
@@ -366,7 +352,6 @@ const consoleIndexRoute = createRoute({
   },
 });
 
-/** A page hidden from a held role draws as an address that never existed. */
 function Seen(properties: { readonly path: string; readonly children: ReactNode }) {
   if (useHidden(useVisibleTree(), properties.path)) return <UnknownPage />;
   return properties.children;
@@ -374,7 +359,6 @@ function Seen(properties: { readonly path: string; readonly children: ReactNode 
 
 const PARAMS = z.record(z.string(), z.string());
 
-/** The address's segment is read once, here, and reaches the page only once it is valid. */
 function DetailOf(properties: {
   readonly page: Page;
   readonly param: string;
@@ -391,7 +375,6 @@ function DetailOf(properties: {
   return <Seen path={page.path}>{detail.draw(valid.success ? valid.data : undefined)}</Seen>;
 }
 
-/** An older address moves on only once the reader may see where it leads. */
 function MovedAway(properties: { readonly moved: Moved }) {
   const visible = useVisibleTree();
   if (visible.home === undefined) return <RoleUnread />;
@@ -439,13 +422,11 @@ const routesOf = (areas: readonly Area[], shell: AnyRoute, reading: Reading): An
     <FailedPage reset={failure.reset} home={home} />
   );
 
-  // An unbuilt page has no route at all, so its address is one that never existed.
   const drawn = pagesOf(areas).flatMap((page) => {
     const built = drawOf(page);
     return built === undefined ? [] : [{ page, built }];
   });
 
-  // Decided by the page's own address, so a detail beneath it is seen exactly as it is.
   const arriving = (page: Page) => (context: ShellContext) => {
     const reader = readerIn(context);
     return {
@@ -477,7 +458,6 @@ const routesOf = (areas: readonly Area[], shell: AnyRoute, reading: Reading): An
         staticData: { toolbar: built.toolbar },
       });
     }),
-    // No toolbar: a detail has the page's place, not its tabs.
     ...details.map(({ page, param, detail }) =>
       createRoute({
         getParentRoute: () => shell,
@@ -559,7 +539,6 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
     },
   });
   clients.failures.answeredBy((failure, during, refusedAct) => {
-    // A stale confirmation is met where the act was refused, never by a page away.
     if (refusedAct !== undefined && reconfirmAfter(failure, refusedAct)) return;
     const home = homeAfterASwitchElsewhere(failure, context);
     if (home === undefined) detour(failure, during);
@@ -573,7 +552,6 @@ declare module "@tanstack/react-router" {
     router: ReturnType<typeof createAppRouter>;
   }
 
-  /** The route is how a page's toolbar reaches the shell: props down, never an import up. */
   interface StaticDataRouteOption {
     readonly toolbar?: PageToolbar | undefined;
   }

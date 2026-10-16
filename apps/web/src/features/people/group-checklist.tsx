@@ -52,7 +52,6 @@ export function GroupChecklist(properties: {
 
   return (
     <>
-      {/* Boxless, so the line takes none of its card's gaps while it is empty. */}
       <OutcomeLine outcome={outcome} className="contents" />
       <fieldset ref={listRef} aria-describedby={ids.hint} className="grid gap-3">
         <legend className="sr-only">{legend}</legend>

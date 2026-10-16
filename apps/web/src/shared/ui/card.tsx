@@ -3,7 +3,6 @@ import * as React from "react";
 
 import { cn } from "@/shared/lib/utils.ts";
 
-/** `marks` registers a card that is a direct child of the grid; nested inside another, it draws none. */
 function Card({
   className,
   marks = false,
@@ -69,7 +68,6 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return <div data-slot="card-content" className={cn("p-4", className)} {...props} />;
 }
 
-/** The sunken strip a card's provenance sits in. */
 function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div

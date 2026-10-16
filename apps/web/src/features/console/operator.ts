@@ -11,10 +11,6 @@ export const useOperatorStanding = () => {
   return useQuery(standingOptions(api));
 };
 
-/**
- * Only a missing session sends the reader away. `afresh` asks again, since the mark may have
- * moved since the standing was read.
- */
 export const mustSignInForTheConsole = async (
   queryClient: QueryClient,
   api: ApiProxy,

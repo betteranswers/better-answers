@@ -63,7 +63,6 @@ type SettingUp = {
 
 type Standing = { readonly kind: "elsewhere"; readonly to: string } | SettingUp;
 
-/** A session that holds a factor but no grant must confirm, and setup never shows it. */
 const standingOf = (held: SecondFactor, query: string): Standing => {
   const { setupGranted } = sessionOf(held);
   if (held.restoreRequired)
@@ -79,7 +78,6 @@ const HEADINGS = {
   restored: { title: SETUP_WORDS.heading, why: SETUP_WORDS.why },
 } satisfies Record<Variant, { readonly title: string; readonly why: string }>;
 
-/** Promoted mid-session, the person is told which workspace made them an Admin. */
 const whyOf = (held: SecondFactor, variant: Variant): string => {
   const adminOf = held.thisSession?.adminOf ?? null;
   const promotedHere = variant !== "new" && held.promoted && adminOf !== null;
@@ -143,7 +141,6 @@ const useOnArrival = (run: () => void) => {
   }, []);
 };
 
-/** Listed open or closed: closing the authenticator is the way back to the passkey. */
 const keystrokesOf = (ready: boolean, open: boolean, keyShown: boolean): readonly Keystroke[] => {
   if (!ready) return [];
   return open && keyShown ? [SET_UP_INSTEAD, COPY_KEY] : [SET_UP_INSTEAD];
@@ -201,7 +198,6 @@ function AuthenticatorInstead(properties: {
   const toggle = () => {
     if (!unavailable) setup.toggle();
   };
-  // Focus first: the key may be pressed from inside the part that opening this hides.
   useKeystroke(SET_UP_INSTEAD, () => {
     if (unavailable) return;
     own.current?.focus();
@@ -225,10 +221,6 @@ function AuthenticatorInstead(properties: {
   );
 }
 
-/**
- * One choice: a passkey first, where one can be made, and the authenticator behind its disclosure,
- * which takes the passkey's place while open.
- */
 function SetupWays(properties: {
   readonly setup: Setup;
   readonly onCodes: (codes: readonly string[], madeAt: string) => void;
@@ -243,7 +235,6 @@ function SetupWays(properties: {
     typeof navigator === "undefined" ? PASSKEY_WORDS.unnamed : passkeyNameFor(navigator.userAgent),
   );
   const finishing = useFinishingTheSetup(setup.routes);
-  // Open from the first draw where no passkey can be made, so the key is minted as it mounts.
   useOnArrival(() => {
     if (setup.open) setup.mint();
   });
@@ -259,7 +250,6 @@ function SetupWays(properties: {
 
   return (
     <>
-      {/* Hidden, not unmounted: the name typed is kept, and focus stays on the button that hid it. */}
       {here ? (
         <div className="mt-6" hidden={setup.open}>
           <p>{SETUP_WORDS.passkey}</p>
@@ -292,7 +282,6 @@ function SetupWays(properties: {
   );
 }
 
-/** Asked first after an operator's restore; the ways open once it is accepted. */
 function RestoreCode(properties: { readonly held: SecondFactor; readonly granted: boolean }) {
   const accept = useAcceptARestoreCode();
   const first = useArrivalFocus();
@@ -394,7 +383,6 @@ export function SetupPage() {
   );
 }
 
-/** Each arrival makes a new set, voiding any unseen one; a reload never shows a set twice. */
 export function CodesPage() {
   const [query] = useState(pageQuery);
   const make = useReplaceRecoveryCodes();

@@ -8,7 +8,6 @@ export function DeleteGroupDialog(properties: {
   readonly onDelete: (group: ListedGroup) => void;
   readonly onClose: () => void;
 
-  /** A deletion takes the row away, so the list decides where focus lands once it has. */
   readonly onFocusBack: () => void;
 }) {
   const { group } = properties;

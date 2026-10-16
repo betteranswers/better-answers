@@ -14,7 +14,6 @@ import {
 
 import { BREADCRUMB } from "./words.ts";
 
-/** `to` is undefined for the last part alone, the place the reader is on. */
 export type Part = { readonly name: string; readonly to: string | undefined };
 
 const placeParts = ({ area, menuGroup, page }: Place<VisibleArea>): readonly Part[] => [
@@ -33,10 +32,6 @@ const saidOnce = (named: readonly Part[]): readonly Part[] =>
 const lastOnly = (parts: readonly Part[]): readonly Part[] =>
   parts.map((part, at) => (at === parts.length - 1 ? { ...part, to: undefined } : part));
 
-/**
- * Broadest first. `below` is the open tab or a name a page gives: a person's, never folded into a
- * part above, or the page's own.
- */
 export const partsOf = (
   open: Place<VisibleArea> | undefined,
   below: string | undefined,
@@ -50,7 +45,6 @@ export const partsOf = (
   );
 };
 
-/** The router marks every link to the open address as the page, and only the last part is. */
 function PartLink(properties: {
   readonly to: string;
   readonly name: string;
@@ -65,7 +59,6 @@ function PartLink(properties: {
   );
 }
 
-/** Wide, only the middle parts give way, so the last is never cut; narrow, the row wraps. */
 const itemClass = (wide: boolean, middle: boolean): string | undefined => {
   if (!wide) return undefined;
   return middle ? "min-w-0" : "shrink-0";

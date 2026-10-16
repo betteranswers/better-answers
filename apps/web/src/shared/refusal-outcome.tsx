@@ -16,7 +16,6 @@ const refusalOutcome = (
   refusalClass: RefusalClass,
 ): Outcome => refusedWith(refusalSentence(featureWords, word, refusalClass));
 
-/** A read saves nothing, so its failure with no word says only that nothing loaded. */
 const UNANSWERED = {
   action: STOCK.tryAgain,
   read: STOCK.notLoaded,
@@ -44,7 +43,6 @@ export const refusalsOf = (featureWords: OwnSentences) => ({
 
 type ItemSaid = { readonly id: string; readonly said: string };
 
-/** An item's word crosses with no class, so a word the feature lacks takes the whole set's sentence. */
 export const saidOfItems = (
   featureWords: OwnSentences,
   failure: Error | ApiError,
@@ -76,7 +74,6 @@ export function RefusedItemLines(properties: {
   );
 }
 
-/** A set refused whole; each item is named as the page named it at the press, shown or not. */
 export const setRefusalOutcome = (refused: {
   readonly featureWords: OwnSentences;
   readonly failure: Error | ApiError;

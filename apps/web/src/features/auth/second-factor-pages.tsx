@@ -224,7 +224,6 @@ const whyOf = (held: SecondFactor): string => {
   return held.mustHoldOne ? CONFIRM_WORDS.whyAnAdmin : CONFIRM_WORDS.why;
 };
 
-/** Every credential that can confirm this sign-in, so one the person never added is seen. */
 function WhatCanConfirm(properties: { readonly held: SecondFactor }) {
   const { held } = properties;
   const leadId = useId();
@@ -281,7 +280,6 @@ function ConfirmWays(properties: {
   );
 }
 
-/** Confirms this session with a factor it holds, and makes no other. */
 export function ConfirmPage() {
   const read = useSecondFactor();
   const [query] = useState(pageQuery);
@@ -309,7 +307,6 @@ export function ConfirmPage() {
   );
 }
 
-/** Spending a code grants only this session the right to set up a new second factor. */
 export function RecoveryPage() {
   const read = useSecondFactor();
   const spend = useSpendARecoveryCode();

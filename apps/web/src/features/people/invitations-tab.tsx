@@ -61,7 +61,6 @@ const matching = (search: string) => {
     invitation.address.toLowerCase().includes(sought);
 };
 
-/** A clear empties the search and stays on the status the reader chose. */
 const KEPT_ON_CLEAR = ["status"] as const;
 
 const useNarrowedInvitations = () => {
@@ -177,7 +176,6 @@ const useInFocusKeystrokes = (properties: {
   useKeystroke(KEY.tickInvitation, onTheRowInFocus(properties.tick));
 };
 
-/** An action that takes its row away hands focus to the list once the menu has shut. */
 const rowMenuOf =
   (actions: ReturnType<typeof useInvitationActions>, heading: RefObject<HTMLElement | null>) =>
   (invitation: ListedInvitation) => {
@@ -214,7 +212,6 @@ function InvitationList(properties: {
   const narrowed = useNarrowedInvitations();
   const { read, listed, state } = narrowed;
   const actable = isActable(state.status);
-  // A tick outlives its row and its status, so the next action refuses or skips it and says so.
   const [ticked, setTicked] = useState<Ticked>(NONE);
   const [inFocusId, setInFocusId] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
@@ -341,7 +338,6 @@ export function InvitationsTab() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      {/* Its heading is focusable, so focus lands there when an action takes the row it was in. */}
       <InvitationList headingId={headingId} heading={heading} />
     </section>
   );

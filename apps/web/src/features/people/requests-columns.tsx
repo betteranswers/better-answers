@@ -34,7 +34,6 @@ function Requester(properties: { readonly request: WaitingRequest }) {
       ) : (
         <span className="font-medium">{name}</span>
       )}
-      {/* Still `anywhere`: a cell is as wide as its longest part, which would scroll the table at 320px. */}
       <Address address={email} className="text-xs text-muted-foreground" />
     </span>
   );

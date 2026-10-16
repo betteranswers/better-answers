@@ -108,7 +108,6 @@ function RequestsList(properties: {
     setApproving(request);
   };
 
-  /** Where the dialog was opened from, unless the approval went and took that row with it. */
   const focusBack = (sent: boolean) => {
     const from = openedFrom.current;
     (sent || from?.isConnected !== true ? heading.current : from)?.focus();
@@ -133,7 +132,6 @@ function RequestsList(properties: {
     );
   };
 
-  /** The row leaves before the api answers, and comes back if the api refuses the decision. */
   const declined = (request: WaitingRequest) => {
     heading.current?.focus();
     setOutcome({
@@ -238,7 +236,6 @@ export function RequestsTab() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      {/* Its heading is focusable, so a decided row's focus lands there rather than on the page. */}
       <RequestsList headingId={headingId} heading={heading} />
     </section>
   );

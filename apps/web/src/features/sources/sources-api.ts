@@ -220,10 +220,6 @@ export const useNarrowDocuments = () => {
   );
 };
 
-/**
- * A bulk action's answer reaches the page through the review that sent it, so that review stays
- * drawn until the api has answered.
- */
 export const useBulkActionPending = (): boolean => {
   const api = useTRPC();
   const keeping = useIsMutating({ mutationKey: api.sources.keepInText.mutationKey() });

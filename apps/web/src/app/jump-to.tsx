@@ -37,7 +37,6 @@ const SEARCH_ROW = "search";
 type Kind = "place" | "member" | "action";
 
 type Jump = {
-  /** Unique across the list, so two namesakes are never one selection. */
   readonly value: string;
   readonly name: string;
   readonly said: string | undefined;
@@ -103,7 +102,6 @@ const actionJumps = (page: Page, here: Here): readonly Jump[] =>
     }),
   );
 
-/** A member opens on their own page, never as a narrowed list. */
 const memberJump = (member: Member): Jump =>
   jumpOf({
     value: `member ${member.personId}`,
@@ -114,7 +112,6 @@ const memberJump = (member: Member): Jump =>
     kind: "member",
   });
 
-/** Only what the visible tree holds, so an unbuilt or hidden page and its actions never show. */
 export const jumpsIn = (
   tree: VisibleTree,
   members: readonly Member[] | undefined,
@@ -149,10 +146,6 @@ export const matching = (groups: readonly JumpGroup[], typed: string): readonly 
     .filter((group) => group.jumps.length > 0);
 };
 
-/**
- * What is typed, as far as Search takes it. Never a match, so it is listed apart, and only where
- * the reader's tree holds Search.
- */
 export const searchGroup = (
   tree: VisibleTree,
   typed: string,
@@ -177,10 +170,6 @@ export const searchGroup = (
   };
 };
 
-/**
- * The list keeps its selection while that row shows, so Enter would pass over a first match
- * landing after the search row took it.
- */
 const useSelected = (shown: readonly JumpGroup[]) => {
   const [selected, setSelected] = useState("");
   const first = shown[0]?.jumps[0]?.value;
@@ -195,12 +184,10 @@ const useSelected = (shown: readonly JumpGroup[]) => {
   return [selected, setSelected] as const;
 };
 
-/** `unasked` for a reader who may not see People, whose dialog reads no members. */
 type MembersRead = "unasked" | "pending" | "failed" | "read";
 
 type Lines = { readonly said: string | undefined; readonly refused: string | undefined };
 
-/** Nothing matches only once nothing is still loading that might. */
 export const linesOf = (read: MembersRead, shown: number, typed: string): Lines => {
   const words = typed.trim();
   const nothing = shown === 0 && words !== "" ? nothingMatches(words) : undefined;
@@ -230,12 +217,10 @@ export const useJumping = (offered: boolean): Jumping => {
 
   const pressed = useEffectEvent((event: KeyboardEvent) => {
     if (!offered || !isTheChord(event)) return;
-    // Both chords open the browser's own search bar unless refused here, a held key's repeats too.
     event.preventDefault();
     if (!event.repeat) setOpen((was) => !was);
   });
 
-  // The document, so the chord works from inside a field as well as anywhere else.
   useEffect(() => {
     document.addEventListener("keydown", pressed);
     return () => {
@@ -344,7 +329,6 @@ function JumpList(
   ];
 
   return (
-    // The list is filtered here, so "Nothing matches" can wait on a read still loading.
     <Command
       label={JUMP_TO.name}
       value={selected}
@@ -407,7 +391,6 @@ export function JumpTo(properties: {
     void navigate({ href: jump.to });
   };
 
-  // Fired once the dialog has gone, which is after an action's own dialog has opened.
   const landFocus = (event: Event) => {
     event.preventDefault();
     const kind = chosen.current;

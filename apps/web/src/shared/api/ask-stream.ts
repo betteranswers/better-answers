@@ -1,4 +1,3 @@
-/** How one collection's drafted part ended; `paused` means drafting stopped at the spending limit. */
 type DraftOutcome = "drafted" | "refused" | "failed" | "paused";
 
 type DraftedSentence = { readonly sentence: string; readonly concepts: readonly string[] };
@@ -39,7 +38,6 @@ const withEvent = <Result extends object>(
   });
 };
 
-/** Folds the events so far into one result: none before the result, and a keep-alive is nothing. */
 export const askedFrom = <Result extends object>(
   events: readonly AskStreamEvent<Result>[],
 ): Asked<Result> | undefined => {

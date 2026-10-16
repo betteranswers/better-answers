@@ -15,7 +15,6 @@ export function useAsking(initial: string) {
     setTyped("");
     setAsked({ search: "", offset: 0 });
   };
-  /** An emptied box waits on no further key, so Escape and a clear ask at once. */
   const type = (value: string) => {
     if (value === "") {
       clear();

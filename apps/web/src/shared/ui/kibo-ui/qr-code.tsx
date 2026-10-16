@@ -16,7 +16,6 @@ export type QRCodeProps = Omit<
 /** The encoder writes a colour into its SVG unescaped, and the SVG is set as HTML. */
 const HEX_COLOUR = /^#(?:[\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/i;
 
-/** The tokens resolve to plain colours at the root, which the encoder takes as they are. */
 const tokenOf = (name: string): string =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -39,7 +38,6 @@ export const QRCode = ({
         const newSvg = await QR.toString(data, {
           type: "svg",
           color: {
-            // A scanner wants dark modules on a light field, so the ramp's ink and white, which no theme flips.
             dark: hexOr([foreground, tokenOf("--grey-900")], "#000000"),
             light: hexOr([background, tokenOf("--grey-0")], "#ffffff"),
           },

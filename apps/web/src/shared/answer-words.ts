@@ -1,6 +1,5 @@
 import type { FEEDBACK_REASONS, JudgeState, QuestionVerdict } from "@better-answers/schema";
 
-/** Related knowledge is never called an answer, so its word says only what it is. */
 export const VERDICT_WORDS = {
   ok: "Answered",
   warn: "Answered with a warning",

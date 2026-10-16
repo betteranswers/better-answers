@@ -65,7 +65,6 @@ const whereThePersonStands = (
 const endedTheMember = (refused: SwitchRefused | null): boolean =>
   refused?.noLongerAMember === true;
 
-/** Once a pick is refused, the list or the refusal stands to be read rather than a pick retried. */
 const whereThePickStands = (
   held: readonly Workspace[],
   noLongerHeld: Workspace | undefined,
@@ -238,7 +237,6 @@ const outcomeOf = (standing: Standing): Outcome | undefined => {
   return pickOutcome(standing);
 };
 
-/** The role describes the button and stays out of its name, so a workspace is found by name alone. */
 function WorkspaceRow(properties: {
   readonly workspace: Workspace;
   readonly first: boolean;
@@ -250,7 +248,6 @@ function WorkspaceRow(properties: {
 
   return (
     <li className="col-span-2 grid grid-cols-subgrid items-center">
-      {/* Enabled while a pick is open, so a refused pick can hand focus to what is left. */}
       <Button
         type="button"
         variant="outline"

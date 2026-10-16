@@ -7,10 +7,6 @@ import type { Role } from "./people-api.ts";
 import { requesterName, type WaitingRequest } from "./requests-api.ts";
 import { ROLE_OFFERED_FIRST, RoleChoice } from "./role-choice.tsx";
 
-/**
- * No Radix trigger opened it, so the opener puts focus back, told whether the approval went: a
- * sent one takes its row away.
- */
 export function ApproveRequest(properties: {
   readonly request: WaitingRequest;
   readonly onApprove: (role: Role) => void;

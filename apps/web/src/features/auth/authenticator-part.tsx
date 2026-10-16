@@ -158,7 +158,6 @@ function KeyAndCode(
           {finishing ? AUTHENTICATOR_WORDS.finishing : AUTHENTICATOR_WORDS.finish}
         </Button>
       </form>
-      {/* Unconfirmed: the api may have finished the setup before its answer was lost. */}
       <Outcome tone="refused" id={refusedId}>
         {failure === null ? null : saidOfFailure(failure, saidOfFinishing, STOCK.unconfirmed)}
       </Outcome>

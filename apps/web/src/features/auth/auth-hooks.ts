@@ -66,7 +66,6 @@ const sessionOptions = () =>
 
 export const useSession = () => useQuery(sessionOptions());
 
-/** The person's own, read before any workspace is open, so it belongs to none of them. */
 const theWorkspaceList = (api: ApiProxy) => api.person.workspaces.pathFilter();
 
 type WorkspacesHeld = inferOutput<ApiProxy["person"]["workspaces"]>;
@@ -143,7 +142,6 @@ const unwrapWithTheWait = async <TData>(
   throw new CodeRefused(error.status, waitSeconds, error.code);
 };
 
-/** Sealed into the email's link, so a sign-in through it returns where this page would. */
 const returnPathOf = (query: string): { readonly redirect?: string } => {
   const redirect = new URLSearchParams(query).get("redirect");
   return redirect === null ? {} : { redirect };
@@ -185,7 +183,6 @@ const LINK_TOKEN = /^#([A-Za-z0-9]{1,128})$/;
 export const linkTokenOnThisPage = (): string | undefined =>
   LINK_TOKEN.exec(globalThis.location.hash)?.[1];
 
-/** History keeps its state, so the router's key for this entry survives. */
 export const dropTheLinkToken = (): void => {
   const { hash, pathname, search } = globalThis.location;
   if (hash === "") return;
@@ -292,10 +289,6 @@ export const useArrival = (): Arrival | undefined => {
 const sessionOrUnread = (queryClient: QueryClient) =>
   queryClient.fetchQuery(sessionOptions()).catch(() => undefined);
 
-/**
- * Read before the page draws, so a person it has nothing to ask never sees it; an invitation
- * asks its invitee's name.
- */
 export const displayNameDetour = async (
   queryClient: QueryClient,
   api: ApiProxy,
@@ -439,18 +432,10 @@ const aboutTheWorkspace = (api: ApiProxy) => {
   return (query: Query) => !theirOwn.some((filters) => matchQuery(filters, query));
 };
 
-/**
- * Some reads, such as the members, name no workspace in their key, so a held answer is the left
- * workspace's.
- */
 const forgetTheWorkspaceLeft = (queryClient: QueryClient, api: ApiProxy) => {
   queryClient.removeQueries({ predicate: aboutTheWorkspace(api) });
 };
 
-/**
- * Another tab moved the session. The reads go as the cache hears the answer, before the frame
- * draws a page under it.
- */
 export const forgetAWorkspaceLeftElsewhere = (queryClient: QueryClient, api: ApiProxy): void => {
   const memberHash = hashKey(memberOptions(api).queryKey);
   let held = workspaceHeld(queryClient, api);

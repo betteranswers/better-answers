@@ -12,7 +12,6 @@ import { RequestsTab } from "./requests-tab.tsx";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
 
-/** A tab binds its keystrokes only while it is open, so a key two tabs share fires once. */
 type Tab = PageTab & {
   readonly content: ComponentType;
   readonly keystrokes: readonly Keystroke[];

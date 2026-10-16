@@ -34,18 +34,15 @@ const A_PERSON = "human:";
 
 type VerifiedEvent = { readonly at: string; readonly byAPerson: boolean };
 
-/** Who verified is said as a person or not: an actor's id is no word a reader meets. */
 export const verifiedEventsOf = (frontmatter: Frontmatter): readonly VerifiedEvent[] =>
   VERIFIED.parse(frontmatter["verified"] ?? []).map(({ by, at }) => ({
     at,
     byAPerson: by.startsWith(A_PERSON),
   }));
 
-/** The UK long form; a date the file wrote no parser reads is shown as the file wrote it. */
 export const dayOf = (event: VerifiedEvent): string =>
   Number.isNaN(Date.parse(event.at)) ? event.at : dayWords(event.at);
 
-/** Drawn elsewhere on the page, or an identity a reader never meets. */
 const SHOWN_ELSEWHERE: ReadonlySet<string> = new Set([
   "title",
   "type",

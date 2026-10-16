@@ -22,7 +22,6 @@ export const SOURCES_KEYSTROKES = {
 
 export const REVIEW_HEADING = "review-of-the-connected-source";
 
-/** One id, as the review's heading has: one narrowing or widening is open on the page at a time. */
 export const SENSITIVITY_FIELD = "sensitivity-of-the-connected-source";
 
 export type TickedGroups = {

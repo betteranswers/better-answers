@@ -27,12 +27,10 @@ const focusOnArrival = (control: HTMLButtonElement | null): void => {
   control?.focus();
 };
 
-/** What the reader has written into a flag, kept by its control so a refused send loses none of it. */
 type Draft = { readonly reason: Reason | undefined; readonly note: string };
 
 const NO_DRAFT: Draft = { reason: undefined, note: "" };
 
-/** No reason is chosen for the reader: the api takes none without one, so sending says so. */
 function FlagForm(properties: {
   readonly draft: Draft;
   readonly onDraft: (draft: Draft) => void;

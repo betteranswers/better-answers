@@ -26,11 +26,9 @@ export function CreateGroupAction(properties: {
   readonly onCreated: (groupId: string, name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  // A refusal keeps the dialog open, so its line is the dialog's, where the reader is.
   const [refused, setRefused] = useState<Outcome>();
   const createGroup = useCreateGroup();
   const fieldRef = useRef<HTMLInputElement>(null);
-  // The group a create made, so the closing dialog hands focus to the row it made.
   const created = useRef<string | undefined>(undefined);
   const ids = { field: useId() };
 

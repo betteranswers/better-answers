@@ -4,10 +4,8 @@ import type { IconName } from "./icon.tsx";
 
 export type Role = (typeof ROLES)[number];
 
-/** The operator holds no role in the console, so its pages are shown to the mark instead. */
 export type RoleOrOperator = Role | "operator";
 
-/** Something a page does that jump-to offers by name, to whoever may see the page. */
 type Action = {
   readonly name: string;
   readonly asks: string;
@@ -31,9 +29,7 @@ export type Page = {
   readonly icon: IconName;
   readonly built: boolean;
   readonly seenBy: readonly RoleOrOperator[];
-  /** Shown as well to anyone owning a collection, whatever their role. */
   readonly owners?: true;
-  /** Every older address, each leading here only for a person who may see the page. */
   readonly movedFrom?: readonly string[];
   readonly actions?: readonly Action[];
   readonly detail?: Detail;
@@ -480,7 +476,6 @@ export const pageNamed = <Held extends MenuGroup>(
 
 const NEW_QUESTION = pageNamed(menuGroupIn(ASK, "ask"), "New Question");
 
-/** Where each reader lands, and the way back offered when they are lost. */
 export const HOMES = {
   Admin: pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members"),
   Editor: NEW_QUESTION,
@@ -489,7 +484,6 @@ export const HOMES = {
 } as const satisfies { readonly [who in RoleOrOperator]: Page };
 
 export type Reader = {
-  /** Undefined until the member read answers, so nothing role-gated shows meanwhile. */
   readonly role: RoleOrOperator | undefined;
   readonly owns: readonly string[];
 };
@@ -499,7 +493,6 @@ export const readerOf = (role: RoleOrOperator | undefined): Reader => ({ role, o
 
 export const OPERATOR_READER: Reader = readerOf("operator");
 
-/** `opensAt` is where its rail entry leads: the reader's home when it is here. */
 export type VisibleArea = Area & { readonly opensAt: Page };
 
 export type VisibleTree = {
@@ -562,7 +555,6 @@ const placesIn = <Held extends Area>(area: Held): readonly Place<Held>[] =>
 export const pagesOf = (areas: readonly Area[]): readonly Page[] =>
   areas.flatMap(placesIn).map(({ page }) => page);
 
-/** One segment and no more, so a deeper address beneath a row names nothing. */
 const detailIn = (page: Page, pathname: string): string | undefined => {
   const beneath = `${page.path}/`;
   if (page.detail === undefined || !pathname.startsWith(beneath)) return undefined;
@@ -590,11 +582,9 @@ export const detailAt = (page: Page, value: string): string => {
   return `${page.path}/${encodeURIComponent(value)}`;
 };
 
-/** With no role held nothing is hidden, so a page draws its own loading or failed state. */
 export const hides = (tree: VisibleTree, path: string): boolean =>
   tree.home !== undefined && placeAt(tree.areas, path) === undefined;
 
-/** What a page's first heading says: its group's name, or its area's where it has none. */
 export const headingOf = (page: Page): string => {
   const place = placeAt(EVERY_AREA, page.path);
   return place?.menuGroup?.name ?? place?.area.name ?? page.name;
@@ -614,7 +604,6 @@ export const movedWithin = (areas: readonly Area[]): readonly Moved[] =>
     ]),
   );
 
-/** Undefined where the reader may see nothing the older address now names. */
 export const leadsTo = (tree: VisibleTree, moved: Moved): Page | undefined => {
   const shown = pagesOf(tree.areas);
   return moved.to.find((page) => shown.includes(page));

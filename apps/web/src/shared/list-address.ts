@@ -20,7 +20,6 @@ const keyOf = (prefix: string, field: string): string => `${prefix}.${field}`;
 const fieldsHeld = (prefix: string, fields: ListFields, query: Query): Query =>
   Object.fromEntries(Object.keys(fields).map((field) => [field, query[keyOf(prefix, field)]]));
 
-/** A value back at its default leaves the address, so an untouched list keeps a bare one. */
 const written = (
   prefix: string,
   defaults: Query,
@@ -33,10 +32,6 @@ const written = (
     ]),
   );
 
-/**
- * Read through the router's own parser, which quotes a word that would read as a number, so a
- * search comes back exactly as typed.
- */
 export const useListAddress = <Fields extends ListFields>(prefix: string, fields: Fields) => {
   const search = useRouterState({ select: (state) => state.location.search });
   const navigate = useNavigate();
@@ -47,8 +42,6 @@ export const useListAddress = <Fields extends ListFields>(prefix: string, fields
     [shape, prefix, fields, search],
   );
 
-  // Replaced, never pushed, so typing fills no history; read from the address at the write, so
-  // two writes in one handler both land.
   const writeHeld = (patch: readonly (readonly [string, unknown])[]): void => {
     void navigate({
       to: ".",

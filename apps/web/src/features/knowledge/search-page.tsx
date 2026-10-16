@@ -50,7 +50,6 @@ const LISTED = Object.values(KEY);
 const keyOf = (match: Match): string =>
   match.layer === "bundles" ? conceptMatchKey(match.iri) : `sources:${match.locator}`;
 
-/** A concept rewritten between pages can come back on the next, so a repeat is dropped. */
 const matchesOf = (data: Matches["data"]): readonly Match[] => {
   const seen = new Set<string>();
   return (data?.pages ?? [])
@@ -251,7 +250,6 @@ function Results(properties: {
   );
 }
 
-/** Search's history entry keeps the match opened, for Back; the concept's keeps the query left. */
 const useReading = (query: string): Reading => {
   const router = useRouter();
   const navigate = useNavigate();
@@ -260,7 +258,6 @@ const useReading = (query: string): Reading => {
   });
   // Taken as the page opens: marking the entry on the way out must move no focus.
   const [returning, setReturning] = useState({ key: returned, query });
-  // A match the search returned to never drew is not waited for under the next one.
   if (returning.key !== undefined && returning.query !== query) {
     setReturning({ key: undefined, query });
   }
@@ -290,10 +287,6 @@ const useReading = (query: string): Reading => {
   };
 };
 
-/**
- * A passage closes as its match leaves the list: with its search, or when a re-read no longer
- * lists it, which the page says.
- */
 const useOpening = (
   query: string,
   shown: readonly Match[],
@@ -308,7 +301,6 @@ const useOpening = (
   const left = leftIn === query;
   if (leftIn !== undefined && !left) setLeftIn(undefined);
 
-  // Focus that went with the panel has no opener to go back to, so it goes to the list's heading.
   useEffect(() => {
     if (left && document.activeElement === document.body) heading.current?.focus();
   }, [left, heading]);
@@ -345,7 +337,6 @@ function SearchRegion() {
   return (
     <section
       aria-labelledby={headingId}
-      // Room for the panel beside the list, so it covers none of the matches.
       className={cn("mt-6", opened !== undefined && beside && "pr-[var(--container-md)]")}
     >
       <h2 ref={heading} id={headingId} tabIndex={-1}>

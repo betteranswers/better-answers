@@ -31,7 +31,6 @@ const triesNamed = (left: number): string => (left === 1 ? "1 try" : `${String(l
 export const codeWrong = (triesLeft: number): string =>
   triesLeft === 0 ? CODE_SPENT : `Verification code is incorrect. ${triesNamed(triesLeft)} left.`;
 
-/** The list of what is left stands beside it, so the list is what to do next. */
 export const noLongerAMember = (workspace: string): string =>
   `You're no longer a member of ${workspace}.`;
 
@@ -39,7 +38,6 @@ export const noLongerAMember = (workspace: string): string =>
 export const noLongerAMemberOf = (workspace: string): string =>
   `You're no longer a member of ${workspace}.`;
 
-/** The page picked the one workspace itself, so it shows nothing to press again. */
 export const SOLE_PICK_REFUSED = "Something went wrong. Please reload the page.";
 
 export const CONNECTION_UNFINISHED =
@@ -51,10 +49,8 @@ export const SAID_OF_SECOND_FACTOR = {
   "last-second-factor":
     "You need at least one passkey or authenticator. Please add another before removing this one.",
   "recovery-code-wrong": "That code is incorrect or has already been used.",
-  /** The page reads again as it says this, so Replace stands beside it. */
   "recovery-codes-held":
     "You already have recovery codes. Please replace them if you need new ones.",
-  /** Said under the codes shown: only reloading the page puts them away. */
   "changed-meanwhile":
     "These codes have been replaced and no longer work. Please reload the page to see your current codes.",
   "restore-code-needed": `Please enter the restore code ${PRODUCT_NAME} support gave you first.`,
@@ -73,7 +69,6 @@ export const PASSKEY_NOT_VERIFIED =
 
 export const PASSKEY_ASK_EXPIRED = "Your device took too long to respond. Please try again.";
 
-/** A device that never held one of ours, or one removed since. */
 export const PASSKEY_UNKNOWN =
   "This passkey no longer works here. Please sign in by email, then remove the passkey from your device.";
 
@@ -83,7 +78,6 @@ export const PASSKEY_SIGN_IN_NOT_VERIFIED =
 export const PASSKEY_SIGN_IN_REFUSED =
   "That passkey didn't work. Please try again, or sign in by email.";
 
-/** The other ways a throttled code's page can name, each only when the person holds it. */
 const OTHER_WAYS = {
   passkey: "your passkey",
   authenticator: "your authenticator",

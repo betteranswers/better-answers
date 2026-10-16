@@ -26,14 +26,12 @@ const PRINT_CODES: Keystroke = { key: "p", action: ACCOUNT_ACTIONS.print };
 /** In the order the block shows its actions. */
 export const CODES_KEYSTROKES: readonly Keystroke[] = [COPY_CODES, DOWNLOAD_CODES, PRINT_CODES];
 
-/** Shown once: the api keeps only their hashes, so seeing codes again takes a new set. */
 export type CodesInHand = {
   readonly codes: readonly string[];
   readonly replacing: boolean;
   readonly madeAt: string;
 };
 
-/** Built in the browser, so the codes never travel again to become a file. */
 const asAFile = (text: string): string =>
   `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`;
 
@@ -90,7 +88,6 @@ export const saidOfAcknowledging = (failure: Error | ApiError | null): string | 
   return refusal === undefined ? STOCK.tryAgain : saidOfASecondFactorRefusal(refusal);
 };
 
-/** On a root page the codes are the page, so their heading is its `h1`. */
 const HEADINGS = {
   1: { Heading: "h1", className: "text-xl font-medium" },
   3: { Heading: "h3", className: "font-medium" },
@@ -98,7 +95,6 @@ const HEADINGS = {
 
 type HeadingLevel = keyof typeof HEADINGS;
 
-/** Shown again, a set says it replaces the one before. */
 function CodesHeading(properties: {
   readonly id: string;
   readonly headingRef: Ref<HTMLHeadingElement> | undefined;
@@ -144,10 +140,6 @@ function DoneButton(properties: {
   );
 }
 
-/**
- * Done stays focusable while unticked, so pressing it can say why it did nothing and hand focus
- * to the box.
- */
 export function RecoveryCodes(properties: {
   readonly inHand: CodesInHand;
   readonly address: string;
@@ -157,7 +149,6 @@ export function RecoveryCodes(properties: {
   readonly headingLevel?: HeadingLevel;
   readonly doneLabel?: string;
 
-  /** Handed the set's `madeAt`, so the acknowledgement names the set shown. */
   readonly onDone: (madeAt: string) => void;
 }) {
   const { inHand, address, acknowledging, failure, headingRef, onDone } = properties;

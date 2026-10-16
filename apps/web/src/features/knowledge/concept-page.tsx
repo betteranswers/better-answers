@@ -78,7 +78,6 @@ function WayBack(properties: { readonly iri: string | undefined }) {
   );
 }
 
-/** One state for a malformed, absent or withheld address, whose way back carries nothing of it. */
 function NoSuchConcept() {
   return (
     <ListState
@@ -331,7 +330,6 @@ function ConceptShown(properties: { readonly iri: string; readonly concept: Conc
   return (
     <article
       aria-labelledby={titleId}
-      // Room for the panel beside the page, so it covers none of the claim it was opened from.
       className={cn("mt-6", opened !== undefined && beside && "pr-[var(--container-md)]")}
     >
       <div className={COLUMN}>
@@ -361,7 +359,6 @@ function ConceptShown(properties: { readonly iri: string; readonly concept: Conc
   );
 }
 
-/** A failed read stands in for even a stale page, so nothing once read outlives being withheld. */
 function ConceptRead(properties: { readonly iri: string; readonly heading: Heading }) {
   const { iri } = properties;
   const concept = useConcept(iri);
@@ -394,7 +391,6 @@ function ConceptRead(properties: { readonly iri: string; readonly heading: Headi
   return <ConceptShown iri={iri} concept={read} />;
 }
 
-/** `iri` is undefined where the address holds no concept's id, so nothing is asked about it. */
 export function ConceptPage(properties: { readonly iri: string | undefined }) {
   const { iri } = properties;
   const heading = useRef<HTMLHeadingElement>(null);

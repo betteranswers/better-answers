@@ -13,13 +13,10 @@ const focusOnArrival = (node: HTMLElement | null) => {
   node?.focus();
 };
 
-/** Removal waits on a second, deliberate action, whose question takes focus rather than its button. */
 export function MemberRemoval(properties: {
   readonly member: ListedMember;
   readonly askRef: RefObject<HTMLButtonElement | null>;
-  /** None until the reader's own member read answers, which says whose removal this is. */
   readonly onRemove: ((member: ListedMember) => void) | undefined;
-  /** A refusal of removing yourself, which is answered here before you leave. */
   readonly outcome: Outcome | undefined;
 }) {
   const { member, askRef, onRemove } = properties;
@@ -92,7 +89,6 @@ export function MemberRemoval(properties: {
               </div>
             </fieldset>
           </CollapsibleContent>
-          {/* Boxless, so the line takes none of its card's gaps while it is empty. */}
           <OutcomeLine outcome={properties.outcome} className="contents" />
         </Collapsible>
       </section>

@@ -28,15 +28,12 @@ type OpenedSource =
 
 export type Opened = {
   readonly key: string;
-  /** What its opener calls it, which names the panel until the read names the source itself. */
   readonly title: string;
   readonly source: OpenedSource;
   readonly openerId: string;
-  /** Counts its opener's presses, so pressing it again brings focus back to the panel. */
   readonly pressed: number;
 };
 
-/** Mounted afresh for each source, so a second one chosen with the panel open takes focus too. */
 const focusOnMount = (heading: HTMLHeadingElement | null): void => {
   heading?.focus();
 };
@@ -72,14 +69,12 @@ const QUOTED =
 
 type PassageSource = Extract<OpenedSource, { readonly kind: "passage" }>;
 
-/** The read's own title takes the match's place as it lands, and a refused read gives the match's back. */
 function TitleRead(properties: { readonly locator: string; readonly until: string }) {
   const passage = usePassage(properties.locator);
   if (passage.error !== null) return properties.until;
   return passage.data?.passage?.source ?? properties.until;
 }
 
-/** The sensitivity is the read's own; the document's title stands under a concept's label for it. */
 function PassageRead(properties: {
   readonly opened: Opened;
   readonly source: PassageSource;
@@ -113,7 +108,6 @@ function PassageRead(properties: {
   );
 }
 
-/** One level only: its own marks are text, and its page is where they open. */
 function CitedConcept(properties: {
   readonly opened: Opened;
   readonly iri: string;
@@ -231,7 +225,6 @@ export function EvidenceSheet(properties: {
         onOpenAutoFocus={(event) => {
           event.preventDefault();
         }}
-        // Focus left on the page, as by typing a new search, stays where the reader put it.
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           if (document.activeElement === document.body) returnFocus(opened);
@@ -239,13 +232,11 @@ export function EvidenceSheet(properties: {
         onInteractOutside={(event) => {
           event.preventDefault();
         }}
-        // Beside its opener in the tab order: Tab off the panel lands on the match that opened it.
         onKeyDown={(event) => {
           if (!tabsOff(event)) return;
           event.preventDefault();
           returnFocus(opened);
         }}
-        // Escape is the panel's only while focus is in it; elsewhere it is the control's own.
         onEscapeKeyDown={(event) => {
           if (!content.current?.contains(document.activeElement)) event.preventDefault();
         }}
@@ -260,7 +251,6 @@ export function EvidenceSheet(properties: {
   );
 }
 
-/** Beneath its match at the narrow layout, where a panel beside it would scroll the page sideways. */
 export function EvidenceInline(properties: {
   readonly opened: Opened;
   readonly onClose: () => void;

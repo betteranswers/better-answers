@@ -43,7 +43,6 @@ export type Landings = {
 };
 
 export type Removal = {
-  /** None until the reader's own member read answers. */
   readonly remove: ((member: ListedMember) => void) | undefined;
   readonly outcome: Outcome | undefined;
 };
@@ -65,7 +64,6 @@ function AccessSummary(properties: { readonly member: ListedMember }) {
 
 const roleHint = (name: string, held: Role, picked: Role, yourself: boolean): string => {
   if (picked === held) return WORDS.holdsRole(name, held);
-  // The role held is said here too: a refused change leaves the pick on a role they do not hold.
   const heldNow = WORDS.heldUntilChanged(name, held);
   const change = yourself ? WORDS.changesYourRole(picked) : WORDS.changesTheirRole(picked);
   return `${heldNow} ${change}`;
@@ -86,10 +84,6 @@ function RolePicker(properties: {
   const itemId = useId();
   const name = nameOf(member);
 
-  /**
-   * Focus moves to the picker first: the button it leaves is disabled once the row takes the
-   * role.
-   */
   const commit = () => {
     pickerRef.current?.querySelector<HTMLElement>(`[value="${picked}"]`)?.focus();
     setOutcome(undefined);
@@ -98,7 +92,6 @@ function RolePicker(properties: {
       {
         onSuccess: (changed: RoleChanged) => {
           setOutcome({ tone: "said", words: WORDS.roleChanged(name, changed.role) });
-          // People is for Admins, so a reader who is one no longer leaves it for their new home.
           if (!yourself || changed.role === "Admin") return;
           void goHome("demoted").then((unread) => {
             if (unread !== undefined) setOutcome(unread);
@@ -159,7 +152,6 @@ function RolePicker(properties: {
             </p>
           </div>
 
-          {/* Boxless, so the line takes none of its card's gaps while it is empty. */}
           <OutcomeLine outcome={outcome} className="contents" />
         </div>
       </section>
@@ -204,7 +196,6 @@ function CredentialsRevoker(properties: {
           ref={revokeRef}
           variant="outline"
           aria-describedby={hintId}
-          // Not `disabled`: a disabled button drops the focus the action leaves on it.
           aria-disabled={revoke.isPending}
           onClick={commit}
         >
@@ -221,7 +212,6 @@ function CredentialsRevoker(properties: {
   );
 }
 
-/** Shown at the press, since the answer is this for every member; a refusal replaces it. */
 const SENT_TO_THE_OPERATOR: Outcome = {
   tone: "said",
   words: "The name has been flagged to better-answers support.",

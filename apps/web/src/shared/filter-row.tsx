@@ -31,7 +31,6 @@ type Search = {
   readonly inputRef?: RefObject<HTMLInputElement | null>;
 };
 
-/** `undefined` is no narrowing at all, which the select says in `anyLabel`. */
 type Filter = {
   readonly label: string;
   readonly value: string | undefined;
@@ -53,7 +52,6 @@ type ColumnControl = {
   readonly onHiddenChange: (hidden: ReadonlySet<string>) => void;
 };
 
-/** The registry's select refuses an empty value, so no narrowing needs a word, and each choice a mark that word lacks. */
 const ANY = "any";
 
 const CHOICE = "=";
@@ -134,7 +132,6 @@ const toggled = (hidden: ReadonlySet<string>, id: string, shown: boolean): Reado
   return next;
 };
 
-/** Only the columns a page lists can hide, so the person never leaves the table. */
 function ColumnMenu(properties: { readonly control: ColumnControl }) {
   const { columns, hidden, onHiddenChange } = properties.control;
   return (
@@ -166,7 +163,6 @@ function ColumnMenu(properties: { readonly control: ColumnControl }) {
   );
 }
 
-/** Wraps onto further lines at a narrow width rather than scrolling sideways. */
 export function FilterRow(properties: {
   readonly search: Search;
   readonly filters?: readonly Filter[];

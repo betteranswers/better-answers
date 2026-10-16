@@ -11,7 +11,6 @@ const CHOICES: readonly ThemeChoice[] = ["device", "light", "dark"];
 const choiceOf = (value: string): ThemeChoice | undefined =>
   CHOICES.find((choice) => choice === value);
 
-/** Applied as it is picked: the page itself shows what the choice did. */
 export function ThemeSection() {
   const choice = useThemeChoice();
   const id = useId();

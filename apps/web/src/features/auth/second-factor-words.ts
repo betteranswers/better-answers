@@ -19,7 +19,6 @@ export const CONFIRM_WORDS = {
   recoveryCode: "Use a Recovery Code",
 } as const;
 
-/** Shown to a person just made an Admin, until they first confirm, so a planted factor is seen. */
 export const PROMOTION_WORDS = {
   lead: "You’re now an Admin. You can confirm your sign-in with:",
   authenticator: "Authenticator",
@@ -29,7 +28,6 @@ export const PROMOTION_WORDS = {
 export const passkeyThatConfirms = (name: string | null, createdAt: string): string =>
   ["Passkey", ...(name === null ? [] : [name]), `added ${dayWords(createdAt)}`].join(" · ");
 
-/** Said in the band on the page a refused change came from, once the person has confirmed. */
 export const UNSAVED_AFTER_CONFIRMING =
   "Confirmed. Your last change wasn't saved, so please make it again.";
 

@@ -3,7 +3,6 @@ import { createContext, useContext, useEffect } from "react";
 
 import { hides, NO_TREE, type VisibleTree } from "@/shared/navigation.ts";
 
-/** The frame's live reading of the list, so a route waiting on the role moves once it is read. */
 export const VisibleTreeContext = createContext<VisibleTree>(NO_TREE);
 
 export const useVisibleTree = (): VisibleTree => useContext(VisibleTreeContext);
@@ -18,20 +17,12 @@ const useArrival = (found: keyof Arrival): boolean =>
     },
   });
 
-/**
- * Decided on arrival, so a role changed mid-action waits for the next move. An arrival without a
- * role follows the list until retaken.
- */
 export const useHidden = (tree: VisibleTree, path: string): boolean => {
   const hidden = useArrival("hidden");
   const unread = useArrival("unread");
   return hidden || (unread && hides(tree, path));
 };
 
-/**
- * Retakes an arrival without a role once the role is read, so its verdict holds to the next move.
- * The router is outside React.
- */
 export const useArrivalTakenOnceRead = (tree: VisibleTree): void => {
   const router = useRouter();
   const unread = useArrival("unread");

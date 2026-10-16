@@ -204,7 +204,6 @@ const useStandingRemembered = (held: SecondFactor | undefined) => {
   }, [held]);
 };
 
-/** h1 from the first draw and Sign out last; until the read lands, nothing between them. */
 export function PendingFrame(properties: {
   readonly title: string;
   readonly read: SecondFactorRead;
@@ -256,7 +255,6 @@ const saidOfSending = (failure: Error | null, wrong: string): string | undefined
   return failure.status === SIGNED_OUT ? STOCK.session : wrong;
 };
 
-/** A recovery or restore code, sent as typed: the api ignores its spaces, dashes and case. */
 export function OneTimeCodeForm(properties: {
   readonly label: string;
   readonly sending: SendingACode;

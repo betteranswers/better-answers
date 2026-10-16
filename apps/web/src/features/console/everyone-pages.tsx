@@ -12,7 +12,6 @@ export const turnsOf = (offset: number, total: number): PageTurns => ({
   next: offset + PAGE_SIZE < total ? offset + PAGE_SIZE : undefined,
 });
 
-/** A page's end stays focusable, so a reader who reaches it keeps their place. */
 function PageTurn(properties: {
   readonly label: string;
   readonly keystroke: string;

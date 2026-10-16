@@ -49,7 +49,6 @@ export const INVITATION_COLUMNS = column.columns([
   column.accessor("address", {
     id: "address",
     header: "Address",
-    // Still `anywhere`: a cell is as wide as its longest part, which would scroll the table at 320px.
     cell: ({ getValue }) => <Address address={getValue()} className="font-medium" />,
   }),
   column.accessor("role", {

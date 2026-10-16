@@ -50,7 +50,6 @@ type Drawn = {
   readonly member: ListedMember;
   readonly landings: Landings;
   readonly removal: Removal;
-  /** The section's own heading, where focus goes when what the section drew is replaced. */
   readonly heading: RefObject<HTMLHeadingElement | null>;
 };
 
@@ -109,7 +108,6 @@ const useRemoval = (
     if (personId !== readerId) {
       removeMember.mutate({ personId });
       const removed: Removed = { personId, name: nameOf(member) };
-      // Pushed, so Back finds this page with no one on it rather than skipping it.
       void navigate({ href: membersAt(membersQuery), state: (held) => ({ ...held, removed }) });
       return;
     }
@@ -169,7 +167,6 @@ function MemberHeader(properties: {
   );
 }
 
-/** Its links move focus within the page and leave the address alone: a section has none. */
 function SectionNav() {
   const toSection = (event: MouseEvent<HTMLAnchorElement>, section: Section) => {
     event.preventDefault();
@@ -272,7 +269,6 @@ function MemberShown(properties: {
     landOn("removal");
   });
 
-  // The page is opened at an action by a move from Members, which hands focus on to its control.
   const arrive = useEffectEvent((at: OpenedAt) => {
     landOn(at);
   });
@@ -328,7 +324,6 @@ function MemberRead(properties: {
   return <MemberShown member={member} openedAt={openedAt} removal={removal} />;
 }
 
-/** `personId` is undefined where the address holds no person's id, so nothing is asked about it. */
 export function MemberPage(properties: { readonly personId: string | undefined }) {
   const { personId } = properties;
   const heading = useRef<HTMLHeadingElement>(null);

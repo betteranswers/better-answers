@@ -30,10 +30,6 @@ const KEPT_UNDER = "better-answers.keystrokes";
 
 const OFF = "off";
 
-/**
- * WCAG 2.1.4: a reader whose speech input or tremor types letters by accident can turn every
- * single-key keystroke off.
- */
 const keystrokesAreOn = (): boolean => onThisBrowser()?.getItem(KEPT_UNDER) !== OFF;
 
 const OWNED_ELSEWHERE =
@@ -81,7 +77,6 @@ function TurnedOn() {
   );
 }
 
-/** Focus returns a task after the list goes; a key pressed in that gap has already placed it. */
 const keepFocusAKeyMoved = (event: Event) => {
   const focused = document.activeElement;
   if (focused !== null && focused !== document.body) event.preventDefault();
@@ -224,7 +219,6 @@ export function ShellKeystrokes(properties: {
  */
 export function usePageKeystrokes(keystrokes: readonly Keystroke[]) {
   const register = useContext(RegisterContext);
-  // The shell's list is outside the page, so it follows the page arriving and leaving.
   useEffect(() => register?.(keystrokes), [register, keystrokes]);
 }
 

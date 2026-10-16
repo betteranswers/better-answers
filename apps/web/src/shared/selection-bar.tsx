@@ -17,7 +17,6 @@ function ClearOn(properties: { readonly keystroke: Keystroke; readonly onClear: 
   return null;
 }
 
-/** A bulk action the arrow keys reach with the bar's others; a plain button would be a tab stop alone. */
 export function SelectionAction(properties: ComponentProps<typeof Button>) {
   return (
     <ToolbarPrimitive.Button asChild>
@@ -26,10 +25,6 @@ export function SelectionAction(properties: ComponentProps<typeof Button>) {
   );
 }
 
-/**
- * Hidden, never unmounted, so its count is a live region before the first tick. Clearing hides
- * the bar, so focus inside it moves to `focusAfterClear`.
- */
 export function SelectionBar(properties: {
   readonly label: string;
   readonly ticked: ReadonlySet<string>;

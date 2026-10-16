@@ -24,15 +24,10 @@ export function MarkedRegion({
   );
 }
 
-/**
- * The page's substrate at the layout's own pitch, drawn as its child's background: one per page,
- * never inside a card or dialog.
- */
 export function GridPattern(properties: { readonly children: ReactElement }) {
   return <Slot.Root data-grid-pattern="">{properties.children}</Slot.Root>;
 }
 
-/** "Nothing is here yet", drawn as its child's background: a bounded empty area only. */
 export function DotPattern(properties: { readonly children: ReactElement }) {
   return <Slot.Root data-dot-pattern="">{properties.children}</Slot.Root>;
 }

@@ -48,10 +48,6 @@ type Parts = Pick<
   "title" | "consequence" | "commit" | "children"
 >;
 
-/**
- * Open for as long as its opener mounts it. No Radix trigger opened it, so `onFocusBack` says
- * where focus goes as it closes.
- */
 export function MountedActionDialog(
   properties: Parts & { readonly onClose: () => void; readonly onFocusBack: () => void },
 ) {

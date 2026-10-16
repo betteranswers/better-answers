@@ -52,7 +52,6 @@ export type BulkList = {
   readonly nameOf: (personId: string) => string;
   readonly heading: RefObject<HTMLElement | null>;
 
-  /** One write for the line and the rows it marks, so a mark never outlives its reason. */
   readonly say: (outcome: Outcome | undefined, refused?: RefusedRows) => void;
 };
 
@@ -82,7 +81,6 @@ export const useMemberBulkActions = (list: BulkList) => {
   const [asked, setAsked] = useState<readonly string[]>([]);
   const [role, setRole] = useState<Role>(ROLE_OFFERED_FIRST);
   const [groupId, setGroupId] = useState<string>();
-  // One action at a time: a dialog's second call on its mutation takes over the first's callbacks.
   const [acting, setActing] = useState(false);
   const opener = useRef<HTMLElement>(null);
   const sent = useRef(false);
@@ -112,14 +110,12 @@ export const useMemberBulkActions = (list: BulkList) => {
     setOpen(action);
   };
 
-  /** A sent action spends the ticks that showed its button, so focus goes to the list it changed. */
   const returnFocus = (event: Event) => {
     event.preventDefault();
     if (!sent.current) opener.current?.focus();
     if (document.activeElement !== opener.current || sent.current) list.heading.current?.focus();
   };
 
-  /** Spent at the press, so the action reads as taken within a tenth of a second. */
   const command = (said: {
     readonly pending: string;
     readonly done: (answer: BulkChanged) => string;
@@ -389,7 +385,6 @@ function RemoveDialog(properties: { readonly actions: Actions }) {
   );
 }
 
-/** Mounted with the list, so an action still pending when its dialog shuts keeps its answer. */
 export function MemberBulkDialogs(properties: { readonly actions: Actions }) {
   return (
     <>

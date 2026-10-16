@@ -18,7 +18,6 @@ type DialogProperties = {
   readonly onConfirm: (confirmations: Confirmations) => void;
 };
 
-/** The action's own row may lose the control that opened it, so focus goes back to the connected source. */
 const toTheConnectedSource = (connectedSourceId: string) => (event: Event) => {
   event.preventDefault();
   document.getElementById(connectedSourceHeadingId(connectedSourceId))?.focus();

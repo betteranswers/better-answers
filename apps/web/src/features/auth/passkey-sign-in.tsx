@@ -39,7 +39,6 @@ export const saidWhileSigningInWithAPasskey = (
   return isCancelled(failure) ? SIGN_IN_WORDS.passkeyNotUsed : null;
 };
 
-/** Offered only where the browser can use a passkey; the email field's autofill offers it too. */
 export function PasskeyAction(properties: {
   readonly pending: boolean;
   readonly onSignIn: () => void;
@@ -47,7 +46,6 @@ export function PasskeyAction(properties: {
   return (
     <div className="mt-6">
       <p className="text-muted-foreground">{SIGN_IN_WORDS.or}</p>
-      {/* Enabled while the device asks, so a cancelled prompt hands focus back to the button. */}
       <Button
         type="button"
         variant="outline"

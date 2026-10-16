@@ -8,7 +8,6 @@ type Api = ReturnType<typeof useTRPC>;
 
 type QuestionsAskedPage = inferOutput<Api["questions"]["asked"]>;
 
-/** One record as the reading Admin may read it now: a concept they cannot read is simply absent. */
 export type AskedRecord = QuestionsAskedPage["records"][number];
 
 export type Feedback = AskedRecord["feedback"][number];

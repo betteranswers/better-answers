@@ -36,8 +36,6 @@ export function IconRail(properties: {
               <Link
                 to={area.opensAt.path}
                 onClick={properties.onChoose}
-                // The router marks only a link to the address itself, and an area is open on
-                // any of its pages.
                 aria-current={open ? "page" : undefined}
                 className={cn(
                   // The menu's open-page fill and a bold glyph, so greyscale tells the open area

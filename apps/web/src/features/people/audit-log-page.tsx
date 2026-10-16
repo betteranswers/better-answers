@@ -41,7 +41,6 @@ const LISTED = Object.values(KEY);
 const eventsOf = (data: AuditLog["data"]): readonly ReadAuditEvent[] =>
   data?.pages.flatMap((page) => page.events) ?? [];
 
-/** A sign-in address stands beneath its person's name, so two of one name are told apart. */
 function DetailRow(properties: { readonly line: DetailLine }) {
   const { label, value, address } = properties.line;
   return (
@@ -81,7 +80,6 @@ function DetailList(properties: { readonly event: ReadAuditEvent }) {
   );
 }
 
-/** The display names two actors among these events share, so each one's line says which. */
 const namesShared = (events: readonly ReadAuditEvent[]): ReadonlySet<string> => {
   const addressesOf = new Map<string, Set<string>>();
   for (const { by } of events) {
@@ -238,7 +236,6 @@ function ExportAction(properties: {
   const exporting = useExportAuditLog();
   const run = () => {
     if (nothingMatches || exporting.isPending) return;
-    // Cleared at the press, so a second refusal in the same sentence is announced again.
     say(undefined);
     exporting.exportFor(asked).then(
       (exported) => {

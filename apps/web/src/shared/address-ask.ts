@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 
 export type Ask = "action" | "search";
 
-/** Each ask's older key, which a bookmark or a saved sign-in return address can still carry. */
 const ASKED_BEFORE = {
   action: "act",
   search: undefined,
@@ -20,7 +19,6 @@ const readOf = (value: string): Read => {
   }
 };
 
-/** The router re-types a value that reads as JSON, `1.50` to `1.5`, and carries its JSON string whole. */
 const written = (value: string): string => (readOf(value).asJson ? JSON.stringify(value) : value);
 
 export const askedIn = (query: URLSearchParams, ask: Ask): string | undefined => {
@@ -39,7 +37,6 @@ const hrefOf = (path: string, query: URLSearchParams): string => {
   return words === "" ? path : `${path}?${words}`;
 };
 
-/** Asking another page drops the open page's query. */
 export const askingHere = (here: Here, path: string, ask: Ask, value: string): string => {
   const query = new URLSearchParams(here.pathname === path ? here.searchStr : "");
   query.set(ask, written(value));
@@ -65,7 +62,6 @@ export const useAsked = (ask: Ask, take: (value: string) => void): void => {
 
   useEffect(() => {
     if (asked === undefined) return;
-    // The address as history holds it, which a clear by another ask this commit has already moved.
     const { pathname, searchStr } = router.latestLocation;
     const rest = new URLSearchParams(searchStr);
     rest.delete(ask);

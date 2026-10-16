@@ -10,7 +10,6 @@ import { Button } from "@/shared/ui/button.tsx";
 
 const CONNECT_CLAUDE = pageNamed(menuGroupIn(ASK, "ask"), "Connect Claude");
 
-/** The api serves this page only on its public origin, which is the resource's origin too. */
 const ADDRESS = `${window.location.origin}/mcp`;
 
 const copyOutcome = (copied: boolean): Outcome =>

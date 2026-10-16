@@ -26,7 +26,6 @@ export const CONNECTOR_WORDS = {
   upload: "Upload",
 } satisfies Record<ListedConnectedSource["connector"], string>;
 
-/** Each says its effect before the click; the row adds its source's name for a screen reader. */
 export const ROW_ACTIONS = {
   review: "Review Findings",
   publish: "Publish",
@@ -114,7 +113,6 @@ const RETENTIONS = new Map<string, Meaning>([
   ],
 ]);
 
-/** A word the vocabulary has not met stands where its sentence would, so it is shown, not dropped. */
 const meaningIn = (vocabulary: ReadonlyMap<string, Meaning>, word: string): Meaning =>
   vocabulary.get(word) ?? { word, means: word };
 
@@ -146,7 +144,6 @@ export const unreadableCounted = (unreadable: number, needingOcr: number): strin
     : `${all} ${counted(needingOcr, "is a scan that needs", "are scans that need")} OCR.`;
 };
 
-/** The publish row carries one count per category the seam can raise, a zero included. */
 export const AUDITED_CATEGORIES = [
   { category: "special-category", term: "Findings, Special Category" },
   { category: "bank-details", term: "Findings, Bank Details" },
@@ -158,7 +155,6 @@ export const AUDITED_CATEGORIES = [
   { category: "job-title", term: "Findings, Job Title" },
 ] as const;
 
-/** A category's or a tier's word is kebab-case on the row and spaced on the page. */
 const spokenWord = (word: string): string => word.replaceAll("-", " ");
 
 export const sentenceCased = (word: string): string => {
@@ -180,7 +176,6 @@ const RULE_WORDS = new Map([
   ["JOB_TITLE", "Job title"],
 ]);
 
-/** A rule the list has not met reads as its id. */
 export const ruleWordOf = (ruleId: string): string => RULE_WORDS.get(ruleId) ?? ruleId;
 
 export type SensitivityAndAudience = {
@@ -195,7 +190,6 @@ const fromTo = (from: string, to: string): string => `From ${from} to ${to}`;
 
 type Change = { readonly term: string; readonly says: string };
 
-/** A term that stays where it is has nothing to say, so it is left off the list. */
 export const termsThatChange = (
   present: SensitivityAndAudience,
   asked: SensitivityAndAudience,

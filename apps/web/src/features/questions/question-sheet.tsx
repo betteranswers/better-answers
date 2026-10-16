@@ -130,7 +130,6 @@ const focusOnArrival = (line: HTMLElement | null): void => {
 
 function CloseActions(properties: {
   readonly pending: boolean;
-  /** Focus comes back to the first button when a refused closing puts the flag back. */
   readonly landsHere: boolean;
   readonly onClose: (closedAs: FlagClosing) => void;
 }) {

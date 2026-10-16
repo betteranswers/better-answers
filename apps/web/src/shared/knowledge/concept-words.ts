@@ -14,7 +14,6 @@ export const CONCEPT_WORDS = {
   footnotes: "Footnotes",
   backToTheClaim: "Back to the Claim",
   tags: "Tags",
-  /** A citation mark and its entry in the sources list are named alike, by the file’s own label. */
   sourceNamed: (place: number, label: string): string => `Source ${place}: ${label}`,
   neverVerified: "No verification recorded",
   verifiedOn: (day: string, byAPerson: boolean): string =>

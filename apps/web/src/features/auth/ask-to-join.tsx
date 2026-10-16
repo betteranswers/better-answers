@@ -50,7 +50,6 @@ const unansweredOf = (failure: Error | ApiError): string => {
   return liftsInSeconds === undefined ? STOCK.tryAgain : stockWait(liftsInSeconds);
 };
 
-/** Focus is moved here once the ask lands, so the answer is what a reader meets next. */
 function RequestSent() {
   return (
     <Card id={SENT} role="alert" aria-labelledby={SENT_TITLE} tabIndex={-1} className="mt-4 p-3">

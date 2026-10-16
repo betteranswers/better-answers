@@ -113,7 +113,6 @@ const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef, left: str
     };
   };
 
-  /** Focus goes to the row that took its place, else the one before, else the field. */
   const remove = (key: string, fieldRef: FieldRef) => {
     const at = held.findIndex((one) => one.key === key);
     const kept = held.filter((one) => one.key !== key);
@@ -263,7 +262,6 @@ function AddressField(properties: {
   );
 }
 
-/** Read in the outcome's own live region, which stood before the Sent view did. */
 const withWaiting = (outcome: Outcome | undefined, waiting: number): Outcome | undefined =>
   outcome === undefined || waiting === 0
     ? outcome
@@ -276,7 +274,6 @@ const withWaiting = (outcome: Outcome | undefined, waiting: number): Outcome | u
         ),
       };
 
-/** Addresses still waiting lead to the next invite, since Done drops them. */
 function Sent(properties: {
   readonly sent: readonly InvitedOne[];
   readonly waiting: boolean;
@@ -331,7 +328,6 @@ function InviteForm(properties: {
   const toSend = allInto(addresses.held, addresses.field).held.length;
   const waiting = sent === undefined ? 0 : addressesCounted(addresses.field);
 
-  /** Never refused at the cap: the list holds what one send takes, the rest wait in the field. */
   const refusedBefore = (held: readonly Held[]): Outcome | undefined => {
     if (held.some(addresses.isFlagged)) {
       addresses.focusFirstFlagged();
@@ -444,7 +440,6 @@ export function InviteAction() {
     if (action === INVITE_A_PERSON.asks) show();
   });
 
-  /** A fresh form in the open dialog, focus on its field where the pressed button was. */
   const again = (leftInTheField: string) => {
     flushSync(() => {
       setLeft(leftInTheField);
@@ -461,7 +456,6 @@ export function InviteAction() {
 
   return (
     <Dialog open={open} onOpenChange={openedOrClosed}>
-      {/* The trigger is where a closed dialog hands focus back, however it was opened. */}
       <DialogTrigger asChild>
         <Button size="sm" aria-keyshortcuts={PEOPLE_KEYSTROKES.invite.key}>
           {ACTION_NAME}

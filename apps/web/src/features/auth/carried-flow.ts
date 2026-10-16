@@ -19,7 +19,6 @@ const stillLive = (query: string): boolean =>
   carriedFlow(query) !== "" &&
   Number(new URLSearchParams(query).get(EXPIRY)) * MS_PER_SECOND > Date.now();
 
-/** A live flow resumes at the picker, which hands it on to consent. */
 export const nextAfterJoining = (query: string): string =>
   stillLive(query) ? `/choose-workspace${query}` : "/";
 

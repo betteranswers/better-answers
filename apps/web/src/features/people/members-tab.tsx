@@ -67,7 +67,6 @@ const NONE: ReadonlySet<string> = new Set();
 
 const NO_ONE: readonly ListedMember[] = [];
 
-/** Person and role are what a narrow window has room for; the rest can be shown again. */
 const NARROW_HIDES: ReadonlySet<string> = new Set(["groups", "joined"]);
 
 const countOfMembers = (count: number): string => counted(count, "member", "members");
@@ -119,10 +118,6 @@ const toggled = (ticked: ReadonlySet<string>, personId: string): ReadonlySet<str
   return next;
 };
 
-/**
- * Pushed, so Back comes to these rows again; a search still settling is sent first, or Back would
- * lose its last keys.
- */
 const useOpenMember = (flush: () => void) => {
   const navigate = useNavigate();
   const router = useRouter();
@@ -152,7 +147,6 @@ const removalSaid = (
   };
 };
 
-/** Arriving from a removal: the list it changed takes focus, and says how the removal went. */
 const useReturnedFromARemoval = (heading: RefObject<HTMLElement | null>): Outcome | undefined => {
   const personId = useRouterState({
     select: (state) =>
@@ -285,7 +279,6 @@ function NoOneMatches(properties: {
   );
 }
 
-/** A ticked person the list has since lost is still named by the action that refused them. */
 const namedIn =
   (listed: readonly ListedMember[]) =>
   (personId: string): string => {
@@ -293,7 +286,6 @@ const namedIn =
     return member === undefined ? NO_LONGER_LISTED : nameOf(member);
   };
 
-/** The list's line and the rows it marks, held as one so a mark never outlives its reason. */
 type Shown = { readonly outcome: Outcome | undefined; readonly refused: RefusedRows };
 
 const NOTHING_SHOWN: Shown = { outcome: undefined, refused: NO_MARKS };
@@ -306,7 +298,6 @@ function MemberList(properties: {
   const { read, heading } = properties;
   const listed = read.data ?? NO_ONE;
   const narrowed = useNarrowedMembers(listed);
-  // A tick outlives its row, so the next action refuses or skips that person and says so.
   const [ticked, setTicked] = useState<ReadonlySet<string>>(NONE);
   const [inFocus, setInFocus] = useState<string>();
   const [shown, setShown] = useState<Shown>(NOTHING_SHOWN);
@@ -469,7 +460,6 @@ export function MembersTab() {
   const members = useMembers();
   const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
-  // Read with the list, so a member's page opened on its groups has boxes to land focus on.
   useGroups();
 
   return (

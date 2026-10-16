@@ -10,7 +10,6 @@ import { GROUP_WORDS } from "./group-words.ts";
 import { useRenameGroup, type ListedGroup } from "./groups-api.ts";
 import { submitRename } from "./rename-group-form.ts";
 
-/** The row menu's Rename, in a dialog: the row stays, so focus goes back to the menu's trigger. */
 export function RenameGroupDialog(properties: {
   readonly group: ListedGroup;
   readonly onRenamed: (outcome: Outcome) => void;
@@ -21,7 +20,6 @@ export function RenameGroupDialog(properties: {
   const renameGroup = useRenameGroup();
   const formId = useId();
   const ids = { field: useId() };
-  // Every outcome but the one that closes it is the dialog's line, where the reader is.
   const [line, setLine] = useState<Outcome>();
 
   // Never disabled: the button a reader pressed keeps focus while the answer comes back.

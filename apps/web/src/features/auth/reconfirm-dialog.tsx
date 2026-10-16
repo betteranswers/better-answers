@@ -36,7 +36,6 @@ const askedAgain = (failure: Error): boolean =>
   refusalOf(failure)?.word === STALE_CONFIRMATION ||
   (failure instanceof CodeRefused && failure.word === STALE_CONFIRMATION);
 
-/** Opens the re-confirm a stale confirmation asked for; false where the failure is another's to say. */
 export const reconfirmAfter = (failure: Error, refusedAct: RefusedAct | undefined): boolean => {
   if (refusedAct === undefined || !askedAgain(failure)) return false;
   heard(refusedAct);

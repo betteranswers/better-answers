@@ -14,7 +14,6 @@ export const useRequests = () => {
   return useQuery(api.members.requests.queryOptions());
 };
 
-/** A decision reads as done within a tenth of a second: the row leaves before the api answers. */
 const useLeavesAtOnce = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

@@ -24,7 +24,6 @@ type Held = {
   readonly thisSession?: { readonly standing: SessionStanding } | undefined;
 };
 
-/** Hashed codes are never shown twice, so an unticked set comes anew; one owing a factor but holding none gets a first set. */
 const codesUnseen = (held: Held | undefined): boolean => {
   if (held === undefined) return false;
   if (held.recoveryCodes === undefined) return held.mustHoldOne === true;
@@ -46,7 +45,6 @@ export const rememberTheStanding = (held: Held | undefined): void => {
   rememberTheSession(pendingStepOf(held) === undefined ? "held" : "pending");
 };
 
-/** The display-name step's own read sends a named person on, so it is always the next one. */
 export const stepAfterTheCodes = (query: string): string => `${DISPLAY_NAME_STEP}${query}`;
 
 export const stepAfterTheFactors = (held: Held, query: string): string =>
@@ -64,7 +62,6 @@ const secondFactorOrUnread = async (queryClient: QueryClient, api: ApiProxy, fre
 
 export type LeftFrom = { readonly href: string; readonly query: string };
 
-/** A signed flow keeps its whole query; anything else comes back to the address it left. */
 export const detourTo = (step: string, from: LeftFrom): string =>
   carriedFlow(from.query) === "" ? backTo(step, from.href) : `${step}${from.query}`;
 

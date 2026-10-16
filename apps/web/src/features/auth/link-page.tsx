@@ -97,7 +97,6 @@ type Slots = {
 
 function SignInHere(properties: { readonly signingIn: boolean; readonly onSignIn: () => void }) {
   return (
-    // Enabled while signing in, so the focus the page gave the button is not dropped.
     <Button
       type="button"
       className="mt-6 aria-disabled:opacity-50"
@@ -263,10 +262,6 @@ const slotsOf = (seen: Seen, acting: Acting): Slots => {
   }
 };
 
-/**
- * Signs in only the browser that asked for the code, and only on a click, so a scanner opening
- * the link changes nothing.
- */
 export function LinkPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -295,7 +290,6 @@ export function LinkPage() {
       signIn.mutate(token, { onSuccess: landAfterSignIn });
     },
     copied: copiedIt,
-    // Written whole, with no space, so it pastes into the code field as it is.
     onCopy: (code) => {
       void copiedToTheClipboard(code).then(setCopiedIt);
     },

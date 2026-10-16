@@ -23,7 +23,6 @@ import { ASK_WORDS as WORDS } from "./ask-words.ts";
 type ShownConcept = {
   readonly iri: string;
   readonly kind: string;
-  /** For an `Answer`, the question it answered. */
   readonly title: string;
   readonly collection: string | null;
   readonly trustWords: string;
@@ -35,7 +34,6 @@ export type ShownAnswer = {
   readonly verdict: QuestionVerdict;
   readonly judgeState: JudgeState;
   readonly answers: readonly ShownConcept[];
-  /** The concepts that bear on the question, an `Answer` no judge passed among them. */
   readonly related: readonly ShownConcept[];
   readonly unmappedPassages: readonly {
     readonly locator: string;
@@ -120,7 +118,6 @@ function CollectionSection(properties: {
   );
 }
 
-/** An `Answer` a judge found to fit, word for word, with who verified it. */
 function FittingAnswer(properties: {
   readonly concept: ShownConcept;
   readonly recordId: string | undefined;
@@ -393,7 +390,6 @@ function PassageItem(properties: { readonly passage: ShownAnswer["unmappedPassag
   );
 }
 
-/** What nothing on the map answers: passages no concept rests on, never the company's answer. */
 function Unmapped(properties: { readonly passages: ShownAnswer["unmappedPassages"] }) {
   const headingId = useId();
   if (properties.passages.length === 0) return null;

@@ -24,7 +24,6 @@ export type OfferPlace = {
   readonly holdAt: (address: string) => void;
 };
 
-/** Held by the frame: a workspace's key draws the page beneath it afresh, and the offer with it. */
 export const useOfferPlace = (): OfferPlace => {
   const drawn = useAddressDrawn();
   const [heldAt, holdAt] = useState<string>();
@@ -50,13 +49,11 @@ export function PasskeyOffer(properties: OfferProperties) {
 function OfferOnThisPage(properties: OfferProperties & { readonly address: string }) {
   const { address } = properties;
   const { heldAt, holdAt } = properties.place;
-  // A page the frame draws again keeps the offer it was showing, whatever the browser's mark says.
   const [owedOnArrival] = useState(() => heldAt === address || !passkeyOfferShown());
   const read = useSecondFactorOnce();
   const dismiss = useDismissPasskeyOffer();
   const offering = owedOnArrival && offered(read.data);
 
-  // Marked as it draws, not as the frame mounts, so a person whose read is slow still sees it once.
   useEffect(() => {
     if (!offering) return;
     rememberThePasskeyOfferShown();

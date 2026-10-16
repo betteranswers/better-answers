@@ -66,10 +66,8 @@ function FrameKeystrokes(properties: {
   );
 }
 
-/** One source for both halves of the region, so a panel never outlives its tab list. */
 const useRegion = (visible: VisibleTree, pathname: string): Region | undefined => {
   const toolbar = useRouterState({ select: (state) => state.matches.at(-1)?.staticData.toolbar });
-  // The page's own verdict, so its tabs go exactly when it does.
   const drawn = useHidden(visible, pathname) ? undefined : placeAt(EVERY_AREA, pathname);
   return drawn !== undefined && isFilled(toolbar) ? { name: drawn.page.name, toolbar } : undefined;
 };
@@ -89,7 +87,6 @@ const listNameOf = (
   open: Place<VisibleArea> | undefined,
 ): string | undefined => handed?.name ?? open?.page.name;
 
-/** Kept to the history entry, as a refused tab's is, so it goes at the person's next move. */
 const useSwitchedInAnotherTabSaid = (here: Here | undefined): Outcome | undefined => {
   const entry = useRouterState({ select: (state) => state.location.state.__TSR_key });
   const now = here?.workspaceId;
@@ -114,13 +111,11 @@ const useBandOutcome = (
   pathname: string,
 ): Outcome | undefined => {
   const refusedElsewhere = useSwitchedElsewhereSaid();
-  // No workspace while a switch pressed here is pending, so the answer after it is a first read.
   const readElsewhere = useSwitchedInAnotherTabSaid(switching.pending ? undefined : here);
   const unsaved = useUnsavedChangeSaid(pathname);
   return switching.outcome ?? refusedElsewhere ?? readElsewhere ?? unsaved;
 };
 
-/** A place hidden from the reader is no place here, so it draws as one that never existed. */
 export function Frame(properties: {
   readonly visible: VisibleTree;
   readonly here: Here | undefined;
@@ -136,12 +131,9 @@ export function Frame(properties: {
   const sheet = useNavigationSheet();
   const navId = useId();
   const switching = useWorkspaceSwitch();
-  // The frame's, not the tabs root's: the band names the open tab, and the root sits below it.
   const [pickedTab, pickTab] = useState<string>();
   const [lastPart, nameLastPart] = useState<string>();
-  // The frame's, not the page's: the workspace's key below draws the page, and its offer, afresh.
   const offerPlace = useOfferPlace();
-  // Once a role is held, so nothing is offered to a reader the shell cannot place.
   const offersJumpTo = visible.home !== undefined;
   const jumping = useJumping(offersJumpTo);
 
@@ -197,10 +189,6 @@ export function Frame(properties: {
 
           <NavigationSheet sheet={sheet} wide={wide} areas={visible.areas} open={open} />
 
-          {/*
-           * A fixed rail and a 320px viewport cannot both be honoured; WCAG's reflow criterion
-           * says which gives, so the navigation moves behind one button.
-           */}
           <div className="flex flex-1">
             {wide ? (
               <Navigation areas={visible.areas} navId={navId} showing={showing} open={open} />
@@ -208,7 +196,6 @@ export function Frame(properties: {
 
             <div className="flex min-w-0 flex-1 flex-col">
               <BreadcrumbLastPartSlot value={nameLastPart}>
-                {/* Keyed by the workspace, so a switch draws the page afresh over its new reads. */}
                 <ToolbarAndPage
                   key={here?.workspaceId}
                   region={region}
@@ -242,7 +229,6 @@ export function WorkspaceFrame(properties: { readonly page?: Handed }) {
           : { name: held.workspace.name, workspaceId: held.workspace.id, role: held.role }
       }
       person={held === undefined ? undefined : { name: held.person.name, role: held.role }}
-      // Offered to the operator alone: a way in anyone else would only be refused at.
       offersTheConsole={standing.data?.operator === true}
       page={properties.page}
     />
@@ -285,7 +271,6 @@ function ToolbarAndPage(properties: {
   readonly offerPlace: OfferPlace;
 }) {
   const { region } = properties;
-  // Held in state, so the page's head draws once the place it draws into is on the page.
   const [headSlot, holdHeadSlot] = useState<HTMLElement | null>(null);
 
   return (
@@ -305,10 +290,8 @@ function ToolbarAndPage(properties: {
           tabIndex={-1}
           className="flex-1 [background-position:0_calc(var(--spacing)*6)] px-4 py-6 md:px-8"
         >
-          {/* The page's width, not the prose measure: the design system's rule keeps text to it. */}
           <div data-page-content className="max-w-page">
             <HomeLine />
-            {/* The page's head leads its tabs, which stand outside the panel a tab redraws. */}
             <div ref={holdHeadSlot} />
             {region === undefined ? null : <Toolbar name={region.name} toolbar={region.toolbar} />}
             <PageHeadSlot value={headSlot}>

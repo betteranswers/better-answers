@@ -14,7 +14,6 @@ export type MenuShowing = {
   readonly show: (showing: boolean) => void;
 };
 
-/** Kept on this browser: the nav shows unless the reader last hid it here. */
 export const useMenuShowing = (): MenuShowing => {
   const [showing, setShowing] = useState(() => onThisBrowser()?.getItem(KEPT_UNDER) !== CLOSED);
 

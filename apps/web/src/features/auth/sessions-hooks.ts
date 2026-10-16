@@ -11,7 +11,6 @@ export type SessionsRead = ReturnType<typeof useSessions>;
 
 export type SessionShown = NonNullable<SessionsRead["data"]>[number];
 
-/** Awaited by each sign-out that landed; a refused one keeps its row with its alert. */
 const useRereadTheSessions = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

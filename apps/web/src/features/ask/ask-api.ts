@@ -21,7 +21,6 @@ export type FeedbackInput = inferInput<Api["ask"]["giveFeedback"]>;
 
 type Told = Exclude<AskEvent, { readonly kind: "keep-alive" }>;
 
-/** The first phase is said before the api says it, so the press shows at once. */
 const FIRST_PHASE = "reading" satisfies Phase;
 
 const phaseOf = (told: readonly Told[]): Phase => {
@@ -36,7 +35,6 @@ export type Answering = {
   readonly phase: Phase;
   readonly answer: Asked<AskResult> | undefined;
   readonly failure: Error | ApiError | undefined;
-  /** Asks nothing while an answer still streams, so a second press starts no second question. */
   readonly ask: (input: AskInput) => void;
 };
 

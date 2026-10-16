@@ -37,7 +37,6 @@ type Tree = { readonly type: "root"; readonly children: Child[] };
 export type MarkOpening = {
   readonly openerId: string | undefined;
   readonly onOpen: (chosen: { readonly openerId: string; readonly source: number }) => void;
-  /** The panel, where it is drawn under the open mark's own block instead of beside the page. */
   readonly inline: ReactNode;
 };
 
@@ -45,20 +44,16 @@ const OPENS = "\uE000";
 
 const CLOSES = "\uE001";
 
-/** Punctuation, as the mark's own bracket was, so emphasis before it closes and a bare address ends. */
 const carrierOf = (mark: number): string => `<${OPENS}${String(mark)}${CLOSES}>`;
 
 const CARRIED = new RegExp(`<${OPENS}(\\d+)${CLOSES}>`);
 
-/** The carrier's two characters, written out or as the character references the parser would decode. */
 const FORGED = new RegExp(`[${OPENS}${CLOSES}]|&#(?:x0*e00[01]|0*5734[45]);`, "gi");
 
-/** The file's own words can never carry a mark: only a place the one reader found does. */
 const unforged = (words: string): string => words.replaceAll(FORGED, "");
 
 type Placed = { readonly at: number; readonly mark: string };
 
-/** Marks come in the body's order, each read from the body as the file wrote it. */
 const carrying = (body: string, marks: readonly Placed[]): string => {
   const pieces: string[] = [];
   let from = 0;
@@ -70,7 +65,6 @@ const carrying = (body: string, marks: readonly Placed[]): string => {
   return pieces.join("");
 };
 
-/** A destination that ends in a mark took the carrier with it; the address is the file's without it. */
 const CARRIED_IN_AN_ADDRESS = new RegExp(
   `(?:<|%3C)(?:${OPENS}|%EE%80%80)\\d+(?:${CLOSES}|%EE%80%81)(?:>|%3E)`,
   "gi",
@@ -79,7 +73,6 @@ const CARRIED_IN_AN_ADDRESS = new RegExp(
 type Cited = {
   readonly source: number;
   readonly label: string;
-  /** False where the reader may open nothing, and everywhere in a body no panel opens from. */
   readonly opens: boolean;
 };
 
@@ -127,7 +120,6 @@ const wordsDrawn = (value: string, within: Within): Drawn => {
   };
 };
 
-/** Where prose flows as blocks, so a panel can sit between two of them. */
 const FLOWS: ReadonlySet<string> = new Set(["li", "blockquote"]);
 
 const BLOCKS: ReadonlySet<string> = new Set([
@@ -150,7 +142,6 @@ const BLOCKS: ReadonlySet<string> = new Set([
 const isABlock = (node: Child | undefined): boolean =>
   node?.type === "element" && BLOCKS.has(node.tagName);
 
-/** After the block that holds the mark; in a line of loose words, after the last of them. */
 const slotAfter = (children: readonly Child[], holder: number): number => {
   if (isABlock(children[holder])) return holder;
   const nextBlock = children.findIndex((child, at) => at > holder && isABlock(child));
@@ -209,13 +200,10 @@ const marksDrawn =
     children: [...childrenDrawn(tree.children, { drawing, inLink: false }, true).nodes],
   });
 
-/** The parser percent-encodes what the file wrote plainly, so both sides are compared decoded. */
 const decoded = (address: string): string => {
   try {
-    // Not `decodeURIComponent`: an encoded slash or hash is no slash or hash of the file's.
     return decodeURI(address);
   } catch {
-    // No percent-encoding of anything, so the address stands as the file wrote it.
     return address;
   }
 };
@@ -276,7 +264,6 @@ function InlinePanel() {
 
 export const LINK = "text-brand underline underline-offset-4";
 
-/** The file's own addresses on the web, and nothing a browser would run or resolve against this site. */
 const ON_THE_WEB = /^(?:https?:\/\/|mailto:)/i;
 
 const footnoteJump = (node: Element | undefined): "down" | "back" | undefined => {
@@ -284,7 +271,6 @@ const footnoteJump = (node: Element | undefined): "down" | "back" | undefined =>
   return node?.properties["dataFootnoteBackref"] === undefined ? undefined : "back";
 };
 
-/** Focus moves within the page and the address stays, so Back still leaves the page. */
 const jumpWithinThePage = (event: MouseEvent<HTMLAnchorElement>): void => {
   event.preventDefault();
   const id = decodeURIComponent(new URL(event.currentTarget.href).hash.slice(1));
@@ -329,7 +315,6 @@ function BodyLink(properties: ComponentProps<"a"> & ExtraProps) {
   );
 }
 
-/** Never fetched: a remote image would tell its host who read which concept. */
 function AltText(properties: ComponentProps<"img"> & ExtraProps) {
   return properties.alt ?? null;
 }
@@ -338,7 +323,6 @@ const LEVELS = ["h2", "h3", "h4", "h5", "h6"] as const;
 
 const FOOTNOTE_LABEL = "footnote-label";
 
-/** The body sits under the page's own headings, so its first level is the one beneath them. */
 const headingAt = (depth: number) => (properties: ComponentProps<"h1"> & ExtraProps) => {
   const held = useContext(Body);
   const level = (held?.headingsFrom ?? 3) + Math.max(0, depth - 2);
@@ -398,9 +382,7 @@ const fragmentSafe = (id: string): string => id.replaceAll(/[^A-Za-z0-9_-]/g, ""
 export function ConceptBody(properties: {
   readonly body: string;
   readonly evidence: readonly Evidence[];
-  /** The body's links the read answered. Absent, every relative link is drawn as its words. */
   readonly bodyLinks?: readonly AnsweredLink[];
-  /** Absent where a mark opens nothing, as in the panel: one level only. */
   readonly opening?: MarkOpening;
   readonly headingsFrom?: number;
 }) {

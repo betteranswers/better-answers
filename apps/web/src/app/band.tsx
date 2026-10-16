@@ -21,7 +21,6 @@ import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { BandBreadcrumb, type Part } from "./breadcrumb.tsx";
 
-/** A role is a workspace's; outside one, the person has none to show. */
 export type Person = {
   readonly name: string;
   readonly role?: string | undefined;
@@ -29,7 +28,6 @@ export type Person = {
 
 type BandProperties = {
   readonly wide: boolean;
-  /** Where the logo leads: the person's home, or the index while their role is unread. */
   readonly home: string;
   readonly switcher: ReactNode;
   readonly navigation: ReactNode;
@@ -92,10 +90,6 @@ function PersonMenu(properties: Pick<BandProperties, "person" | "signingOut" | "
   );
 }
 
-/**
- * A row of its own across the band, taking no room until it has words. Never `hidden`: its status
- * must stay in the tree.
- */
 function BandOutcome(properties: { readonly outcome: Outcome | undefined; readonly rule: string }) {
   return (
     <div
@@ -125,7 +119,6 @@ const publishTheDrawnHeight = (band: HTMLElement) => {
   };
 };
 
-/** Each cell is as wide as the region below it, so hiding the nav moves nothing here. */
 function WideBand(properties: BandProperties) {
   return (
     <header ref={publishTheDrawnHeight} className="sticky top-0 z-10 bg-background">
@@ -152,7 +145,6 @@ function WideBand(properties: BandProperties) {
   );
 }
 
-/** Two rows that scroll with the page: a fixed band would take a short page's content. */
 function NarrowBand(properties: BandProperties) {
   return (
     <header className="border-b border-border bg-background">
@@ -167,7 +159,6 @@ function NarrowBand(properties: BandProperties) {
         </div>
       </div>
 
-      {/* Its own row, where it wraps rather than cut a reader's place short. */}
       <BandBreadcrumb parts={properties.parts} wide={false} className="px-4 pb-2" />
 
       <BandOutcome outcome={properties.outcome} rule="border-t" />

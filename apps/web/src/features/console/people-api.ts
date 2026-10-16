@@ -100,7 +100,6 @@ const undoEach = (undos: readonly Undo[] | undefined) => {
   for (const each of undos ?? []) each.undo();
 };
 
-/** Everything reads ended before the api answers, so the action lands within 100 ms. */
 export const useEndEverySignInEverywhere = (personId: string) => {
   const api = useTRPC();
   const queryClient = useQueryClient();

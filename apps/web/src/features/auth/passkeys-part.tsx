@@ -39,7 +39,6 @@ export const ADD_A_PASSKEY: Keystroke = { key: "a", action: ACCOUNT_ACTIONS.addP
 
 const PASSKEYS_HEADING = "passkeys-heading";
 
-/** The offer banner's link lands on this button. */
 export const ADD_A_PASSKEY_BUTTON = "add-a-passkey";
 
 export type Passkey = SecondFactor["passkeys"][number];
@@ -150,7 +149,6 @@ const saidOfRenaming = (failure: Error | ApiError | null): string | undefined =>
   return refusal === undefined ? STOCK.tryAgain : saidOfASecondFactorRefusal(refusal);
 };
 
-/** Enter saves and Escape puts the name back; either way focus returns to Rename. */
 function RenameAPasskey(properties: {
   readonly passkey: Passkey;
   readonly onDone: (renamedTo: string | undefined) => void;
@@ -239,7 +237,6 @@ function PasskeyRow(properties: {
   const backToRename = useRef(false);
   const [renaming, setRenaming] = useState(false);
 
-  /** Rename is drawn again once the field closes, and takes focus as it mounts. */
   const renameMounted = (node: HTMLButtonElement | null) => {
     if (node === null || !backToRename.current) return;
     backToRename.current = false;

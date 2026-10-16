@@ -14,7 +14,6 @@ export type ConceptMatch = Extract<Match, { readonly layer: "bundles" }>;
 
 export type PassageMatch = Extract<Match, { readonly layer: "sources" }>;
 
-/** Spaces alone ask for nothing, so they send nothing. */
 export const asksNothing = (query: string): boolean => query.trim() === "";
 
 export const useMatches = (query: string) => {

@@ -162,7 +162,6 @@ export function NamesWaitingList() {
   const [inFocus, setInFocus] = useState<string>();
   const [openFor, setOpenFor] = useState<string>();
   const [said, setSaid] = useState<Outcome>();
-  // A refused read leaves nothing listed: what it held may no longer be the reader's to see.
   const waiting = listed.error === null ? listed.data : undefined;
   const names = waiting ?? NO_NAME;
   const narrowed = useNarrowedRows(names, wordsOf);
@@ -195,7 +194,6 @@ export function NamesWaitingList() {
     correcting.save({ personId: asked.personId, was: asked.displayName, displayName });
   };
 
-  /** A saved name takes its row away, so focus waits on the heading until the api answers. */
   const focusBack = (personId: string, saved: boolean) => {
     const row = saved ? null : document.getElementById(correctButtonId(personId));
     (row ?? headingRef.current)?.focus();
@@ -214,7 +212,6 @@ export function NamesWaitingList() {
       <OutcomeLine outcome={said ?? correcting.outcome} className="mt-2" />
 
       <Card className="mt-4">
-        {/* Drawn whatever the read says, so a refused read of it again takes no focus from the search. */}
         <FilterRow
           search={{
             label: WORDS.search,

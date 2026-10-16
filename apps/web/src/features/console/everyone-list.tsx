@@ -84,7 +84,6 @@ type Listed = ReturnType<typeof usePeople>;
 
 const NO_ONE: readonly ListedPerson[] = [];
 
-/** A refused read leaves nothing listed: what it held may no longer be the reader's to see. */
 const readOf = (listed: Listed) => {
   const page = listed.error === null ? listed.data : undefined;
   return { page, people: page?.people ?? NO_ONE, total: page?.total ?? 0 };
@@ -109,7 +108,6 @@ function OpenedSheet(properties: {
   readonly returnFocus: (personId: string) => void;
 }) {
   const { opened } = properties;
-  // Correcting a name can take its person out of the search; their sheet stays on the last read.
   const person = useLastRead(properties.people, opened?.personId);
   if (opened === undefined || person === undefined) return null;
   return (
@@ -250,7 +248,6 @@ export function EveryoneList() {
         people={people}
         onClose={close}
         returnFocus={(personId) => {
-          // A person the list no longer holds has no row to go back to.
           (document.getElementById(personButtonId(personId)) ?? searchRef.current)?.focus();
         }}
       />

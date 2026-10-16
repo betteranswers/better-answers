@@ -40,7 +40,6 @@ const NAMED_LABELS = new Map(
   }),
 );
 
-/** Stored keys, as the register pins them; a key listed nowhere is left off the page. */
 const VALUE_LABELS = new Map(
   Object.entries({
     role: "Role",
@@ -174,7 +173,6 @@ const wordsOfValue = (value: DetailValue): string => {
   return VALUE_WORDS.get(value) ?? String(value);
 };
 
-/** An id is said by what it names, never as itself, and a key with no word is left off. */
 export const detailLinesOf = (
   event: Pick<ReadAuditEvent, "detail" | "named">,
 ): readonly DetailLine[] =>
