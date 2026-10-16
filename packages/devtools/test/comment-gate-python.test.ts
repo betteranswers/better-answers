@@ -46,7 +46,12 @@ describe("the Python check fires on a long or citing comment", () => {
     const output = run(holding(TOO_LONG));
 
     expect(output).toContain("runs to 29 words");
-    expect(output).toContain("Delete what the code already says.");
+    expect(output).toContain(
+      "A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason.",
+    );
+    expect(output).toContain(
+      "Hold any other reason in a name, a type, a test or a grant, and delete what the code already says.",
+    );
   });
 
   it("counts a docstring as a comment, unlike any ruff rule", () => {
@@ -274,7 +279,7 @@ describe("a public worker function's docstring may run to fifty words", () => {
     const output = run({ [file]: source });
 
     expect(output).toContain("runs to 26 words");
-    expect(output).toContain("in 25 at most");
+    expect(output).toContain("over the cap of 25");
   });
 });
 

@@ -29,7 +29,12 @@ describe("the comment rule fires on a long or citing comment", () => {
     const output = lint.output(holding(TOO_LONG));
 
     expect(output).toContain("runs to 29 words");
-    expect(output).toContain("Delete what the code already says.");
+    expect(output).toContain(
+      "A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason.",
+    );
+    expect(output).toContain(
+      "Hold any other reason in a name, a type, a test or a grant, and delete what the code already says.",
+    );
     expect(output).toContain("better-answers(comment-only-the-why)");
   });
 
@@ -252,7 +257,7 @@ describe("the comment rule allows an exported function a longer block", () => {
     const output = lint.output(inCore(source));
 
     expect(output).toContain("runs to 51 words");
-    expect(output).toContain("in 50 at most");
+    expect(output).toContain("over the cap of 50");
   });
 
   it.each([

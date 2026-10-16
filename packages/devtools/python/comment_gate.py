@@ -54,9 +54,11 @@ SUPPRESSION = re.compile(
 MARKER = re.compile(r"(?:^|\s)#+")
 
 TOO_LONG = (
-    "{path}:{line}: this comment runs to {words} words; a comment says only what the "
-    "code cannot — a constraint, a trade-off, a trap — in {limit} at most. Delete what "
-    "the code already says."
+    "{path}:{line}: this comment runs to {words} words, over the cap of {limit}. A "
+    "comment stays only for a constraint outside this repository (a library, platform "
+    "or protocol), a public contract, a generated-file marker, a license, or a "
+    "suppression's reason. Hold any other reason in a name, a type, a test or a grant, "
+    "and delete what the code already says."
 )
 
 REASON_TOO_LONG = (

@@ -80,11 +80,11 @@ export const commentOnlyTheWhyRule = defineRule({
     fixable: "code",
     docs: {
       description:
-        "A comment is 25 words at most and says only what the code cannot, in words that stand on their own; a doc block on an exported function in packages/core or packages/schema may run to 50. A disable gives its reason on the same line, and a directive's reason counts against the cap.",
+        "A comment is 25 words at most and cites nothing. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. A doc block on an exported function in packages/core or packages/schema may run to 50. A disable gives its reason on the same line, and a directive's reason counts against the cap.",
     },
     messages: {
       tooLong:
-        "This comment runs to {{words}} words; a comment says only what the code cannot — a constraint, a trade-off, a trap — in {{limit}} at most. Delete what the code already says.",
+        "This comment runs to {{words}} words, over the cap of {{limit}}. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. Hold any other reason in a name, a type, a test or a grant, and delete what the code already says.",
       cites:
         "This comment cites {{what}} (`{{cited}}`); a comment never says which ticket, decision or rule asked for the code. git, a spec and an ADR are where that is read.",
       unexplained:

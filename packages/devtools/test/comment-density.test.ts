@@ -145,8 +145,12 @@ describe("the ceiling's wrapper, run as the root manifest runs it", () => {
   it("says the fix", () => {
     const output = wrapper(OVER);
 
-    expect(output).toContain("over the 0.10 ceiling. A comment says only what the code cannot");
-    expect(output).toContain("so delete what it restates.");
+    expect(output).toContain(
+      "over the 0.10 ceiling. A comment stays only for a constraint outside this repository",
+    );
+    expect(output).toContain(
+      "Hold any other reason in a name, a type, a test or a grant, and delete the rest.",
+    );
   });
 
   it("passes over a tree under both ceilings", () => {
