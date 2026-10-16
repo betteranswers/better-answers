@@ -23,7 +23,6 @@ const linksTo = (link: string, target: string): boolean => {
   try {
     return readlinkSync(link) === target;
   } catch {
-    // Absent, or not a link: either way it is made again below.
     return false;
   }
 };

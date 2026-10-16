@@ -295,7 +295,6 @@ const createTable = async (databaseUri: string, table: string): Promise<void> =>
 
 const BUILD_PAUSE_MS = 200;
 
-/** Records each build, and the most that ran at once, so a test can see the lock hold. */
 const buildLog = () => {
   const built: string[] = [];
   let running = 0;
@@ -331,7 +330,6 @@ afterAll(async () => {
 
 const LONG_AGO = "2020-01-01T00:00:00.000Z";
 
-/** A published template under a tier's prefix, stamped `stamp` or left unstamped. */
 const plantedTemplate = async (
   label: string,
   stamp: string | null,

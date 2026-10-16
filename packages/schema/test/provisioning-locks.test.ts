@@ -27,10 +27,6 @@ const outcomeOf = (statement: Promise<unknown>, done: string): Promise<string> =
 const scopeTo = (client: pg.PoolClient, workspaceId: string) =>
   client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
 
-/**
- * A connection of its own under app_rt, as each of the product's transactions has, so one can
- * wait on another.
- */
 const opened = async (): Promise<pg.PoolClient> => {
   const client = await db().runtimePool.connect();
   await client.query("BEGIN");

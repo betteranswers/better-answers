@@ -103,7 +103,6 @@ const sourceFiles = (): readonly string[] =>
     exclude: ["**/node_modules/**"],
   }).toSorted((a, b) => a.localeCompare(b));
 
-/** The SQL the passage table's Drizzle definition gives its stored full-text column. */
 const passageSearchExpression = (): { readonly sql: string; readonly params: unknown[] } => {
   const generated = getTableConfig(passage).columns.find((column) => column.name === "search")
     ?.generated?.as;
@@ -150,7 +149,6 @@ type Narrowed = {
 
 type Matched = { readonly title: string; readonly weight: number; readonly rank: number };
 
-/** The workspace's concepts counted for `text`'s words, in one pass. */
 const countedFor = async (
   client: pg.PoolClient,
   workspaceId: string,
@@ -166,10 +164,6 @@ const countedFor = async (
   return counts;
 };
 
-/**
- * Concept rows titled and bodied as given, read back by the rule over `text`, keyed by title, with
- * the counts given or the workspace's own.
- */
 const matchedOver = (
   concepts: readonly (readonly [title: string, body: string])[],
   text: string,

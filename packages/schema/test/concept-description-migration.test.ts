@@ -22,7 +22,6 @@ const ONLY_IN_A_DESCRIPTION = "zebrafinch";
 
 type Journal = { readonly entries: readonly { readonly tag: string }[] };
 
-/** The migrations up to `LAST_BEFORE`, so 0080 is left to run over rows already stored. */
 const folderEndingAt = (tag: string): string => {
   const journalText = readFileSync(path.join(journalMetaFolder, "_journal.json"), "utf8");
   // oxlint-disable-next-line typescript/consistent-type-assertions -- src/journal.ts owns the journal's schema; this copy only cuts its entries

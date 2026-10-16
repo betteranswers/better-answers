@@ -67,7 +67,6 @@ const VALUED = [
 
 type Standing = Readonly<Record<string, number>>;
 
-/** Every row of the seven tables, counted per workspace and per stored value, as the superuser. */
 const standing = async (
   client: pg.ClientBase,
   tables: readonly string[],
@@ -93,7 +92,6 @@ const standing = async (
   return counted;
 };
 
-/** What `before` should read as after 0072: each old value and table under its new name. */
 const renamed = (before: Standing): Standing =>
   Object.fromEntries(
     Object.entries(before).map(([key, n]) => {
@@ -102,7 +100,6 @@ const renamed = (before: Standing): Standing =>
     }),
   );
 
-/** Grants, row security and policy text on a table, with its own name taken out. */
 const securityOf = async (client: pg.ClientBase, table: string): Promise<unknown> => {
   const relation = await client.query<{ acl: string; rls: boolean; forced: boolean }>(
     `SELECT relacl::text AS acl, relrowsecurity AS rls, relforcerowsecurity AS forced

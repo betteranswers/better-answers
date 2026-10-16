@@ -59,7 +59,6 @@ const MEMBER_ERASURE_ID = "01J6YYYYYYYYYYYYYYYYYYYYY3";
 const QUESTION_RECORD_ID = "01J6QQQQQQQQQQQQQQQQQQQQQQ";
 const DRAFTED_RECORD_ID = "01J6QQQQQQQQQQQQQQQQQQQQQ2";
 
-/** Bytes of a frame's length that seal nothing: no key was ever behind them. */
 const A_SEALED_FRAME = new Uint8Array(40).fill(7);
 
 /** Inside the month the migration made a content partition for, which is the month it ran in. */
@@ -1593,7 +1592,6 @@ describe("5 — the inferred type is pinned", () => {
     }[keyof typeof ids]
   >;
 
-  // The wrapper's type for an unrefined jsonb column, read off a table outside the registry.
   const jsonProbe = createSelectSchema(pgTable("json_probe", { value: jsonb("value").notNull() }));
   type UnrefinedJson = z.infer<typeof jsonProbe>["value"];
 

@@ -55,10 +55,6 @@ const THE_MIGRATION_IT_REPLACED = "0034_the-job-subject-and-the-run-key.sql";
 
 const ADDS_THE_REASON_CHECK = 'ADD CONSTRAINT "job_reason_check"';
 
-/**
- * Replayed from the journal rather than copied, so the rows seeded under it are ones a real
- * database held.
- */
 const theCheckItReplaced = (): string =>
   migrationStatementSaying(THE_MIGRATION_IT_REPLACED, ADDS_THE_REASON_CHECK);
 
@@ -507,13 +503,11 @@ const NEW_REASON = "model-choice-change";
 
 const OLD_REBUILD = { kind: "full-rebuild", reason: OLD_REASON, subjectId: null } as const;
 
-/** The migration's statements on `job`; the table renames before them ran when the database did. */
 const itsStatementsOnTheJobTable = (): readonly string[] =>
   migrationStatements(THE_RENAMING_MIGRATION).filter(
     (statement) => statement.includes('"job"') || statement.includes("public.job"),
   );
 
-/** Under the reason CHECK `tag` added, with `before` run ahead of the second workspace's making. */
 const withTheReasonCheckOf = async (
   tag: string,
   fn: (client: pg.PoolClient) => Promise<void>,
@@ -574,13 +568,8 @@ const OLD_FIRST_REBUILD = {
 
 const THE_OLD_DESTINATION = ["chunk-index", "graph"] as const;
 
-/** The map's table for connected sources, as migration 0067 and the snapshots before 0068 name it. */
 const THE_TABLE_THE_MAP_NAMED = "source_binding";
 
-/**
- * The migration's statements on `job` and the connected sources' table, under that table's name
- * today; its table renames ran when the database did.
- */
 const itsStatementsOnTheValuesItRewrites = (): readonly string[] =>
   migrationStatements(THE_MAP_MIGRATION)
     .filter((statement) =>
@@ -618,7 +607,6 @@ const aCheckFrom = (
   return `ALTER TABLE "connected_source" ADD CONSTRAINT "${addedAs}" CHECK (${value})`;
 };
 
-/** 0036 declared the CHECK, so the snapshot before the map holds it alone. */
 const theDestinationCheckBeforeTheMap = (): string =>
   aCheckFrom("0066_snapshot.json", "destination_check", "connected_source_destination_check");
 
@@ -694,7 +682,6 @@ const NEW_STATE = "received";
 
 const AN_OLD_RUN = { kind: "index", reason: OLD_INDEX_REASON } as const;
 
-/** Its statements that rewrite a value; the renames before them ran when the database did. */
 const itsValueRewrites = (): readonly string[] =>
   migrationStatements(THE_CONNECTED_SOURCE_MIGRATION).filter(
     (statement) =>
@@ -704,7 +691,6 @@ const itsValueRewrites = (): readonly string[] =>
       ),
   );
 
-/** Added by its old name, which 0068's DROP names: the table's other renames ran with the database. */
 const theStateCheckBeforeTheRename = (): string =>
   aCheckFrom("0067_snapshot.json", "state_check", `${THE_TABLE_THE_MAP_NAMED}_state_check`);
 
@@ -776,7 +762,6 @@ const THE_PASSAGE_MIGRATION = "0069_the-passage.sql";
 
 const DESTINATION_BEFORE_THE_PASSAGE = ["chunk-index", "bundle"] as const;
 
-/** Its statements that rewrite a destination; the renames before them ran when the database did. */
 const itsDestinationRewrites = (): readonly string[] =>
   migrationStatements(THE_PASSAGE_MIGRATION).filter(
     (statement) =>

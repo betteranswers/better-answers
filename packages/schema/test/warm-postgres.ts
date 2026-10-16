@@ -25,7 +25,6 @@ export type WarmPostgres = {
 
   readonly templateDatabase: string;
 
-  /** The vitest main process's pid, which every per-file database name ends with. */
   readonly runId: number;
 
   readonly source: "shared" | "container";
@@ -259,7 +258,6 @@ const sweepDeadRuns = (adminUri: string): Promise<void> =>
 
 type Started = { readonly provided: WarmPostgres; readonly teardown: () => Promise<void> };
 
-/** The run's own testcontainer carries no stamp, so only `shared` demands one. */
 const imageFault = ({ image }: Server, shared: boolean): string | undefined => {
   if (image === null) return shared ? "names a server with no image stamp" : undefined;
   if (image === POSTGRES_IMAGE) return undefined;

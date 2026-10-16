@@ -274,7 +274,6 @@ describe("the declarations and the DDL generated from them", () => {
   });
 });
 
-/** The newest migration that writes `submit_suggestion_set`'s body, which the database runs. */
 const theSuggestionFunction = (): string => {
   const sql = journalMigrationFiles()
     .map((file) => readFileSync(file, "utf8"))

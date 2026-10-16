@@ -1747,10 +1747,6 @@ const INSUFFICIENT_PRIVILEGE = "42501";
  */
 const A_PLATFORM_PROPOSER = "process:better-answers-test";
 
-/**
- * Under role NONE the function reads its caller off `session_user` instead: the migrator
- * who applied the journal, whom its CASE names no branch for.
- */
 const THE_CALLERS = [
   { caller: "app_rt", mayRaise: SUGGESTION_KINDS_FROM_THE_APP, role: "app_rt" },
   { caller: "worker_rt", mayRaise: SUGGESTION_KINDS_FROM_A_RUN, role: "worker_rt" },

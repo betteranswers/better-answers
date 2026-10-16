@@ -20,7 +20,6 @@ export type MigratedPostgres = {
   /** Connects as the superuser, whom no policy binds. */
   readonly pool: pg.Pool;
 
-  /** Connects as `app_rt`, the api's role, which every policy binds. */
   readonly runtimePool: pg.Pool;
 
   readonly connectionUri: string;

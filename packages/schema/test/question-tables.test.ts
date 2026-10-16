@@ -24,7 +24,6 @@ const WS_B = "01J6BBBBBBBBBBBBBBBBBBBBBB";
 
 const THE_THREE = ["question_asked", "question_content", "question_feedback"] as const;
 
-/** The month after the two the migration made: the furthest a sweep ever asks for. */
 const A_MONTH_NOT_MADE = inTheMonth(2);
 const ITS_PARTITION = contentPartitionOf(A_MONTH_NOT_MADE);
 
@@ -61,7 +60,6 @@ const as = async (
   await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
 };
 
-/** A record asked in a month with no partition, read as the api in its workspace. */
 const aRecordInAMonthNotMade = async (client: pg.PoolClient): Promise<Record> => {
   const record = await testData(client).questionAsked({
     workspaceId: WS_A,
@@ -85,7 +83,6 @@ const rowsOfEach = async (client: pg.PoolClient) => {
 const eachHolding = (workspaces: readonly string[]) =>
   THE_THREE.map((table) => ({ table, workspaces }));
 
-/** Resolves once some session of this database waits on a lock. */
 const untilASessionWaits = async (): Promise<void> => {
   for (let turn = 0; turn < 500; turn += 1) {
     const waiting = await db().pool.query(
@@ -108,7 +105,6 @@ const NO_PRIVILEGE = {
   MAINTAIN: false,
 };
 
-/** One write of each table into workspace A, for a role or a scope that may not make it. */
 const aWriteOfEach = (inA: Record) =>
   [
     [A_QUESTION_RECORD, "a record", [WS_A, ulid(), new Date(), AN_ASKER]],

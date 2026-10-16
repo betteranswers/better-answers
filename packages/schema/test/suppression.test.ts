@@ -39,10 +39,6 @@ const HIS_SET: Identifiers = { emails: [], names: ["Dan Okoro"], other: ["ACME-4
 const THEIR_SET: Identifiers = { emails: ["sam@other.invalid"], names: [], other: [] };
 const NO_SET: Identifiers = { emails: [], names: [], other: [] };
 
-/**
- * Replayed from the journal where it can be, so the rows seeded under it are ones a real
- * database held.
- */
 const theShapeItHadPerDocument = async (client: pg.PoolClient): Promise<void> => {
   await client.query(
     'ALTER TABLE "suppression" DROP CONSTRAINT "suppression_workspace_id_erasure_request_id_pk"',
