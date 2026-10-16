@@ -27,7 +27,8 @@ reviews:
       A new domain word is defined here in the same change as the code that
       first uses it, or before; a diff that introduces a domain term absent from
       the glossary at its head is a finding.
-    - `CODING_STANDARDS.md` — the constitution.
+    - `CODING_STANDARDS.md` — the rules that bind every workspace and that no gate
+      holds. A gate's failure message states the rest.
     - `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md`,
       `deploy/AGENTS.md`, `packages/core/AGENTS.md` and `packages/schema/AGENTS.md` —
       a directory's own rules. Apply each to changes in its directory.
@@ -111,7 +112,7 @@ reviews:
       description: "Scan for security flaws: hardcoded secrets, SQL injection, XSS, weak auth, exposed data, poor crypto, unsafe deserialization, insecure HTTP calls in production, and more. Ensure all network requests use HTTPS/TLS. Identify attack vectors and security violations to maintain robust defenses."
     - name: A Principal on every tenant-data call
       description: |-
-        Rule "Take a `Principal` as the first parameter". Every `packages/core` function that reads or writes tenant data takes a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter; transports build it, business logic checks the role, the role's action threshold and the read predicate (published, sensitivity, audience) beside the data access.
+        Every `packages/core` function that reads or writes tenant data takes a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter; transports build it, business logic checks the role, the role's action threshold and the read predicate (published, sensitivity, audience) beside the data access.
 
         Flag a function that reaches a table, a store door or the map and takes no `Principal` first, or takes one later in its parameter list, or takes a bare `workspaceId` string in place of one. Flag a transport that trusts a user-supplied workspace, organisation or account identifier instead of deriving it from the verified session or bearer token, and flag a request body accepted without runtime validation.
 
@@ -128,9 +129,9 @@ reviews:
       description: |-
         ADR 0009's identity seam. Better Auth is a stay with written leave-triggers, and this seam is what keeps the Keycloak fallback a fortnight of work rather than a rewrite.
 
-        A transport verifies a bearer token and builds a `Principal`. Nothing behind that seam knows which library minted the token. There are two auth modules: the api's `apps/api/src/auth/` and the web's `apps/web/src/features/auth/`. Flag any `better-auth` or `@better-auth/*` import outside them, and flag the subtler leak no lint rule sees: a Better Auth type, interface or object shape re-exported, aliased, structurally copied, or embedded in a `Principal`, a context object or a function signature that crosses into `packages/core`, or out of the web's auth module into the rest of the web app. Code inside an auth module may use Better Auth's types; the finding is at the module's edge. A session object passed onward where a `Principal` belongs is the same finding.
+        A transport verifies a bearer token and builds a `Principal`. Nothing behind that seam knows which library minted the token. There are two auth modules: the api's `apps/api/src/auth/` and the web's `apps/web/src/features/auth/`. Oxlint already refuses a `better-auth` or `@better-auth/*` import outside them. Flag the subtler leak no lint rule sees: a Better Auth type, interface or object shape re-exported, aliased, structurally copied, or embedded in a `Principal`, a context object or a function signature that crosses into `packages/core`, or out of the web's auth module into the rest of the web app. Code inside an auth module may use Better Auth's types; the finding is at the module's edge. A session object passed onward where a `Principal` belongs is the same finding.
 
-        Rule "Introduce a seam only where something already varies" governs seams generally. A seam is introduced only where something already varies across it, such as a second store or a second provider, so a seam built for one implementation with no second in sight is a finding. Dependencies arrive as parameters and results are returned rather than written as side effects.
+        A seam is introduced only where something already varies across it, such as a second store or a second provider, so a seam built for one implementation with no second in sight is a finding.
       include:
         - apps/api/**
         - apps/web/**
