@@ -174,6 +174,30 @@ Nothing is copied from `.env.local`: no workspace, test or compose file reads it
 
 pnpm can select scripts by regular expression and `--no-bail` will keep going past a failure, but as of pnpm 11.24.0 that combination exits 0 with failed scripts behind it, which is the silent pass this file exists to refuse. `pnpm -r --no-bail` — the recursive form the root uses over the workspaces — does report a non-zero exit and is unaffected. The worker's equivalent is `apps/worker/src/better_answers_worker/check.py`; the two are separate because a uv workspace is not a pnpm one and neither tier can run the other's.
 
+## The shared test Postgres
+
+By default every test run starts its own Postgres container. Several worktrees running `check` at once then run several servers, and on 15/10/2026 four of them took a 14-core Mac to a load average of 45. One shared server per machine avoids that. It is opt-in, and CI never uses it.
+
+Start it, then export the line it prints:
+
+```sh
+deploy/test-postgres.sh up
+export TEST_POSTGRES_URI=postgresql://postgres:postgres@127.0.0.1:55433/postgres
+```
+
+With `TEST_POSTGRES_URI` set, the warm harness in `packages/schema`, `packages/core` and `apps/api`, and the worker's pytest harness, start no Postgres container. Each tier clones its databases from a template on the shared server. The template is named for a digest of `packages/schema/migrations` and of the harness that builds it, so worktrees on different migrations never share one. The first run on a new migration set builds its template, and every later run reuses it. Leave the variable unset, or empty, and a run starts its own container as before.
+
+`deploy/test-postgres.sh down` stops the server and discards everything on it. Its data lives in memory, so a Docker restart discards it too, and the next run rebuilds its template in seconds. `TEST_POSTGRES_PORT` and `TEST_POSTGRES_PROJECT` move it off port 55433 and its default compose project. It is a separate server from the dev database `deploy/local-database.sh` starts.
+
+What to expect:
+
+- A run with the variable set but no server listening, or a URI that is not a superuser, stops at once with a line naming `TEST_POSTGRES_URI` and the `up` command. It never falls back to a container.
+- `up` refuses when the server already runs on an image other than this checkout's pin. Replacing it would wipe every other worktree's live run. Run `down` and then `up` when nothing else is using it, or leave the variable unset on that branch.
+- If the server runs out of memory, Postgres stops every session at once, and every run using it fails together. `down` then `up` clears it.
+- A run's databases carry its process id. A run that is killed leaves them behind, and the next run on the machine drops them once that process has gone.
+- `pnpm reap-containers` and Ryuk select only containers testcontainers labelled, so neither touches the shared server.
+- Some test files still start a server of their own: the two that replay part of the migration history, `roles-surface.test.ts` and `apps/api/tests/browse-role.test.ts`, which read or alter roles across the whole server, and the case in `warm-postgres.test.ts` that proves the path without a warm server. Garage still starts a container per run.
+
 ## The tool configuration at the repository root
 
 **`cubic.yaml`** is the reviewer's configuration, read from `main` only. Cubic enables five custom agents per repository, the repository's own first and then the organization's, and drops a sixth with no error, so each custom rule takes one of those slots; the API-auth agent was absorbed into the Principal rule rather than deleted, tenant scoping and request validation being what that rule is for.
