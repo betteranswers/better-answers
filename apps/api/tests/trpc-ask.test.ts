@@ -38,7 +38,6 @@ const wire = aModelWire();
 
 const { clock, stopTheClock } = aStoppableClock();
 
-/** Short, so a test sees a keep-alive without waiting the production interval. */
 const QUIET_MS = 200;
 
 const app = appForSuite({
@@ -54,7 +53,6 @@ const A_NOTE = "The period changed in May.";
 /** MCP_TOKEN_RULE's numbers: one connection's calls a minute. */
 const READS_A_MINUTE = 120;
 
-/** Signed in on the web and connected over MCP as the same person. */
 const bothWays = async (person: { readonly id: string; readonly email: string }, held: string) => {
   const client = app().client();
   const tokens = await connectAsHost(app(), client, person, {
@@ -68,7 +66,6 @@ const bothWays = async (person: { readonly id: string; readonly email: string },
   };
 };
 
-/** A concept no judge is asked about, which the drafter drafts from. */
 const ACCESS_POLICY = {
   title: "Audit information access for buyers",
   collection: "audits",
@@ -78,10 +75,6 @@ const ACCESS_POLICY = {
 
 type Arranged = { readonly limitGbp?: string; readonly drafting?: boolean };
 
-/**
- * A workspace holding three `Answer`s, set to judge, and its Admin both ways. Set to draft, it
- * holds a policy too, and an answering model.
- */
 const anAdminAsking = async ({ limitGbp, drafting = false }: Arranged = {}) => {
   const workspace = await app().provision();
   await seedConcepts(
@@ -108,7 +101,6 @@ type Web = Awaited<ReturnType<typeof anAdminAsking>>["web"];
 
 type Asking = Parameters<Web["ask"]["question"]["mutate"]>[0];
 
-/** Every event of one stream, in the order it arrived. */
 const streamed = async (web: Web, asking: Asking) => {
   const events = [];
   for await (const event of await web.ask.question.mutate(asking)) {
@@ -119,14 +111,11 @@ const streamed = async (web: Web, asking: Asking) => {
 
 type Streamed = Awaited<ReturnType<typeof streamed>>;
 
-/** Sent only when the stream is quiet, so a loaded machine may add one anywhere. */
 const isNotKeptAlive = (event: { readonly kind: string }) => event.kind !== "keep-alive";
 
-/** The events that carry something, in order: each phase and keep-alive left out. */
 const told = (events: Streamed) =>
   events.filter((event) => event.kind !== "phase" && event.kind !== "keep-alive");
 
-/** The result a stream carried. */
 const resultIn = (events: Streamed) => {
   const opened = events.find((event) => event.kind === "result");
   if (opened?.kind !== "result") throw new Error("the stream carried no result");
@@ -135,7 +124,6 @@ const resultIn = (events: Streamed) => {
 
 const recordsIn = (workspaceId: string) => recordsOf(app(), workspaceId);
 
-/** The spend a workspace holds: reservations not yet settled, and the calls settled. */
 const spendIn = async (workspaceId: string) => {
   const counted = await app().database.superuser.query(
     `SELECT (SELECT count(*)::int FROM spend_reservation WHERE workspace_id = $1) AS reserved,
@@ -342,17 +330,14 @@ describe("ask over tRPC", () => {
   });
 });
 
-/** A drafting request streams; the judge's does not. */
 const isDrafting = (sent: SentToModel): boolean =>
   z.object({ stream: z.literal(true) }).safeParse(JSON.parse(sent.body)).success;
 
-/** The judge saying no to every candidate, and the drafter writing `lines` from its prompt. */
 const judgedNoThenDrafting =
   (lines: (prompt: string) => readonly string[]) =>
   (sent: SentToModel): Response | Promise<Response> =>
     isDrafting(sent) ? drafterWriting(lines)(sent) : judgeSaying([])(sent);
 
-/** The policy's number in a drafting prompt. */
 const policyIn = (prompt: string): string =>
   conceptNumbersIn(prompt).get(ACCESS_POLICY.title) ?? "";
 
@@ -503,7 +488,6 @@ const wireAnswer = z.looseObject({
   related: z.array(wireConcept),
 });
 
-/** MCP's answer in core's words: its trust keys renamed back, and each address under no origin. */
 const inCoreTerms = (answered: Rpc, origin: string) => {
   const { answers, related, ...rest } = wireAnswer.parse(answered);
   const core = ({ url, trust, ...concept }: z.infer<typeof wireConcept>) => {

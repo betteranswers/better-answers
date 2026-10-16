@@ -46,7 +46,6 @@ const tool = z.object({
   name: z.string(),
   description: z.string().optional(),
   annotations: z.looseObject({ readOnlyHint: z.boolean().optional() }).optional(),
-  /** Loose, because one case reads the whole schema as text for a header it must not carry. */
   inputSchema: z.looseObject({ properties: z.record(z.string(), z.unknown()).optional() }),
   outputSchema: z.looseObject({}).optional(),
 });
@@ -91,7 +90,6 @@ const ENVELOPE = {
   "io.modelcontextprotocol/clientInfo": { name: "Anthropic/ClaudeAI", version: "1.0.0" },
 };
 
-/** An override of "" leaves the header off the request. */
 const withoutEmpty = (headers: Record<string, string>): Record<string, string> =>
   Object.fromEntries(Object.entries(headers).filter(([, value]) => value !== ""));
 
@@ -161,7 +159,6 @@ const connect = async (scope = "knowledge:read feedback:write offline_access") =
   return { workspace, client, token: tokens.accessToken };
 };
 
-/** Sends `max` the ceiling lets through, then one past it, the clock stopped while it counts. */
 const pastTheCeiling = async (max: number, send: () => Promise<Response>) => {
   stopTheClock();
   const letThrough: number[] = [];
@@ -234,7 +231,6 @@ const theMapCounted = async (): Promise<void> => {
   await app().database.superuser.query("ANALYZE map_node, map_edge");
 };
 
-/** `groups` is the predicate each record says applied. */
 const recordsKeptIn = async (workspaceId: string) => {
   const kept = await app().database.superuser.query<{
     id: string;
@@ -259,7 +255,6 @@ const AN_OPEN_RECORD = {
   completed: false,
 };
 
-/** A Viewer's own token, for a test that turns on what the asker's groups let them read. */
 const connectAViewer = async () => {
   const workspace = await app().provision();
   const viewer = await app().person();
@@ -271,7 +266,6 @@ const connectAViewer = async () => {
   return { workspace, viewer, client, token: tokens.accessToken };
 };
 
-/** What `ask` says where it answers an error: whether it did, its text, and no structured content. */
 const theErrorAskAnswers = async (client: TestClient, token: string) => {
   const called = await result(
     await callTool(client, token, "ask", { question: RETENTION_QUESTION }),

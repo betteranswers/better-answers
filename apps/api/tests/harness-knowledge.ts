@@ -57,14 +57,11 @@ const rulesBroken = (source: SourceKeys): readonly Broken[] => {
   return [...untitled, ...(source.at === undefined ? documentRules(source) : placeRules(source))];
 };
 
-/** A document's passages, a concept seeded before this one, or a place such as `p.4` that opens nothing. */
 const aSource = z
   .strictObject({
     title: z.string().min(1).optional(),
-    /** The file's own words for a document, where they are not its title. */
     label: z.string().min(1).optional(),
     passages: z.array(z.string().min(1)).min(1).optional(),
-    /** Its connected source's own, where the document is held closer than the concept citing it. */
     sensitivity: z.enum(SENSITIVITIES).optional(),
     concept: z.string().min(1).optional(),
     at: z.string().min(1).optional(),
@@ -77,7 +74,6 @@ const aSource = z
 
 const aConcept = z.object({
   title: z.string().min(1),
-  /** The folder under `knowledge/` its file sits in; the file sits in none when not given. */
   collection: z.string().min(1).optional(),
   kind: z.string().min(1).default("Answer"),
   body: z.string().min(1),
@@ -87,7 +83,6 @@ const aConcept = z.object({
   trust: z.enum(TRUST_TIERS).default("unverified"),
   linksTo: z.array(z.string().min(1)).default([]),
   sources: z.array(aSource).default([]),
-  /** Further keys of the file's own, such as `tags` or `verified`. */
   frontmatter: conceptFrontmatter.default({}),
 });
 
@@ -135,7 +130,6 @@ export const conceptsSeeding = z
     }
   });
 
-/** `document` only where the source is a passage, which the write records as evidence. */
 type Citation = {
   readonly id: string;
   readonly title: string;
@@ -184,11 +178,9 @@ type Seeding = {
   readonly workspaceId: string;
   readonly concept: AskedConcept;
   readonly earlier: readonly SeededConcept[];
-  /** The published connected source the concept's documents at one sensitivity are held in. */
   readonly connectedSourceAt: (sensitivity: Sensitivity) => Promise<string>;
 };
 
-/** One connected source for each sensitivity asked for, made when its first document is. */
 const connectedSourcesOf = (
   seed: Seeding["seed"],
   workspaceId: string,
@@ -213,7 +205,6 @@ const connectedSourcesOf = (
 
 type Unnumbered = Omit<Citation, "id">;
 
-/** Each passage is cited apart, by its document and its span in it. */
 const passagesCited = async (
   seeding: Seeding,
   source: AskedDocument,
@@ -260,7 +251,6 @@ const cited = async (seeding: Seeding, source: AskedSource): Promise<readonly Un
   return at === undefined ? [] : [{ title, resource: title, locator: at }];
 };
 
-/** The concept's sources in the order asked, each with the id its citation mark names. */
 const citationsOf = async (
   app: TestApp,
   workspaceId: string,
@@ -287,7 +277,6 @@ const citationsOf = async (
   });
 };
 
-/** A mark per source after the body's words, unless the body places it, then each concept it links. */
 const bodyOf = (
   concept: AskedConcept,
   citations: readonly Citation[],
@@ -297,7 +286,6 @@ const bodyOf = (
     .map((citation) => `[^${citation.id}]`)
     .filter((mark) => !concept.body.includes(mark))
     .join("");
-  // A link is read from the folder of the file that writes it.
   const folder = posix.dirname(pathOf(concept));
   const named = links.map((link) => `[${link.title}](${posix.relative(folder, link.path)})`);
   const related = named.length === 0 ? "" : `\n\nSee also ${named.join(", ")}.`;
@@ -383,7 +371,6 @@ const narrowedToAGroup = async (
   );
 };
 
-/** The Admin's own override, to everyone at the concept's sensitivity: shared beyond its evidence. */
 const sharedPastItsEvidence = async (
   app: TestApp,
   writer: Writer,
@@ -463,7 +450,6 @@ type Asked = z.output<typeof conceptsSeeding>;
 
 type Refusal = { readonly path: readonly (string | number)[]; readonly message: string };
 
-/** The files the workspace holds among those this seed would write, and its members. */
 const heldAhead = async (app: TestApp, asked: Asked) => {
   const { superuser } = app.database;
   const { workspaceId, concepts } = asked;
@@ -490,7 +476,6 @@ const titlesHeld = (asked: Asked, held: ReadonlySet<string>): readonly Refusal[]
       : [];
   });
 
-/** Only a concept shared with a group makes one, so only its members are held to the workspace. */
 const strangersToTheWorkspace = (asked: Asked, members: ReadonlySet<string>): readonly Refusal[] =>
   asked.concepts.flatMap((concept, at) =>
     (concept.audience === "groups" ? concept.groupMemberIds : []).flatMap((memberId, nth) =>
@@ -506,7 +491,6 @@ const strangersToTheWorkspace = (asked: Asked, members: ReadonlySet<string>): re
     ),
   );
 
-/** Each of a concept's asks that `seedConcept` answers with the Admin's own override. */
 const overridesAsked = (asked: Asked): readonly Refusal[] =>
   asked.concepts.flatMap((concept, at) => {
     if (concept.audience === "groups") {
@@ -531,7 +515,6 @@ const overridesAsked = (asked: Asked): readonly Refusal[] =>
     );
   });
 
-/** The slice's write admits an Editor, as the product does; only an override asks for an Admin. */
 const writerRefused = (asked: Asked, writer: UserPrincipal): readonly Refusal[] => {
   if (writer.role === "Admin") return [];
   if (writer.role === "Editor") return overridesAsked(asked);
@@ -559,10 +542,6 @@ const refusedBeforeAnyWrite = async (
   );
 };
 
-/**
- * Concepts written in order through the slice's own write, by the Admin or Editor `userId` names: a
- * concept links only to one before it.
- */
 export const seedConcepts = async (
   app: TestApp,
   asked: Asked,

@@ -15,7 +15,6 @@ import { toolAnswered, type Rpc } from "./mcp-call.ts";
 
 export const SONNET = "claude-sonnet-5-5";
 
-/** Three `Answer`s on buyers' audit information in `audits`, and one in `lms`. */
 export const AUDIT_ANSWERS = {
   users: {
     title: "How do buyers access audit information about their users' actions?",
@@ -41,20 +40,17 @@ export const AUDIT_ANSWERS = {
 
 export const AUDIT_QUESTION = "How do buyers access audit information?";
 
-/** Invented: it reaches no provider. */
 export const A_MODEL_KEY = "sk-test-u13-invented-key-0002";
 
 export type SentToModel = {
   readonly url: string;
   readonly headers: unknown;
   readonly body: string;
-  /** The request's own, which aborts once the api ends it. */
   readonly signal: AbortSignal | null | undefined;
 };
 
 type Answering = (sent: SentToModel) => Response | Promise<Response>;
 
-/** The provider's side of the wire: each request kept, each answered as the test last said. */
 export const aModelWire = () => {
   const sent: SentToModel[] = [];
   const answering: { current: Answering } = {
@@ -78,16 +74,13 @@ export const aModelWire = () => {
   };
 };
 
-/** The prompt one request carried. */
 export const promptSent = (sent: Pick<SentToModel, "body">): string => promptOf(sent.body);
 
-/** A judge saying yes to each candidate written for one of `fits`, and no to the rest. */
 export const judgeSaying =
   (fits: readonly string[]): Answering =>
   (sent) =>
     new Response(judgeReplyTo(fits, sent.body), { status: 200 });
 
-/** One ops command run as the owner runs it on the `api` service, its key on standard input. */
 const opsRun = async (app: TestApp, argv: readonly string[], stdin = ""): Promise<void> => {
   const exitCode = await runOps(argv, app.doors, {
     fetch: async (url, init) => app.server.request(url, init),
@@ -102,9 +95,7 @@ const opsRun = async (app: TestApp, argv: readonly string[], stdin = ""): Promis
 type JudgingSet = {
   readonly limitGbp?: string;
   readonly chosen?: boolean;
-  /** Sets an answering model too, so an evidence result is drafted over. */
   readonly drafting?: boolean;
-  /** The workspace's model key, which the wire reads back on every call. */
   readonly key?: string;
 };
 
@@ -147,7 +138,6 @@ export const judgingSetUp = async (
   if (chosen) await modelChosen(app, workspaceId, "judging");
 };
 
-/** The aborted signal as `fetch` meets it: the request is ended, and its promise rejects. */
 export const endedWith = (signal: AbortSignal | null | undefined): Promise<never> =>
   new Promise((_resolve, reject) => {
     const end = () => reject(new DOMException("aborted", "AbortError"));
@@ -155,13 +145,11 @@ export const endedWith = (signal: AbortSignal | null | undefined): Promise<never
     signal?.addEventListener("abort", end, { once: true });
   });
 
-/** A drafting model writing `lines`, each a delta of its own, streamed as the provider does. */
 export const drafterWriting =
   (lines: (prompt: string) => readonly string[]): Answering =>
   (sent) =>
     streamedResponse(streamedEventsOf(lines(promptOf(sent.body))), { signal: sent.signal });
 
-/** A workspace holding `concepts`, its map counted, and an assistant connected as its Admin. */
 export const anAdminAsking = async (app: TestApp, concepts: readonly Rpc[]) => {
   const workspace = await app.provision();
   await seedConcepts(

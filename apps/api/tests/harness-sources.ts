@@ -82,7 +82,6 @@ export const connectedSourcesSeeding = z.object({
   connectedSources: z.array(aConnectedSource).min(1),
 });
 
-/** By workspace alone: a connected source the browser connected carries an id only the page minted. */
 export const syncMoving = z.object({
   workspaceId: z.string().min(1),
   to: z.enum(MOVED_RUNS),
@@ -176,7 +175,6 @@ const seedFindings = async (
   return overridden;
 };
 
-/** Answers each passage's locator, in order. */
 export const seedPassages = async (
   seed: TestData,
   workspaceId: string,
@@ -268,10 +266,6 @@ const seedDocuments = async (
   return { documents, overridden, passageCount };
 };
 
-/**
- * Rows written as each action and the worker would leave them, so the page reads what a real
- * connected source's history leaves behind.
- */
 export const seedConnectedSources = async (
   app: TestApp,
   asked: z.output<typeof connectedSourcesSeeding>,
@@ -282,7 +276,6 @@ export const seedConnectedSources = async (
     const seeded: SeededConnectedSource[] = [];
 
     for (const connectedSource of asked.connectedSources) {
-      /** The audience CHECK wants a named group beside the word; the page names none. */
       const readers =
         connectedSource.audience === "groups"
           ? [(await seed.group({ workspaceId, name: `${connectedSource.name} readers` })).id]
@@ -323,10 +316,6 @@ export const seedConnectedSources = async (
     return seeded;
   });
 
-/**
- * The suite runs no worker process, so the harness takes its two steps through the queue's own
- * functions, under the worker's role.
- */
 export const moveTheSync = async (
   app: TestApp,
   asked: z.output<typeof syncMoving>,

@@ -19,14 +19,12 @@ const app = appForSuite();
 
 const asBuilt = authAsBuiltForSuite();
 
-/** An Admin holding an authenticator, signed in by email alone: pending, its workspace chosen. */
 const aPendingSession = async (): Promise<TestClient> => {
   const workspace = await app().provision();
   await holdAnAuthenticator(app(), workspace.admin.id);
   return signedInByEmailOnly(app(), workspace.admin.email);
 };
 
-/** Every transport answers a pending session in the one word, or sends it to confirm. */
 const refusedAsPending = async (answered: Response): Promise<boolean> => {
   if (answered.status === 302)
     return answered.headers.get("location")?.startsWith("/confirm") ?? false;
@@ -72,7 +70,6 @@ type Mounted = {
   readonly options?: { readonly method?: string | readonly string[] };
 };
 
-/** Read off the instance, so an endpoint a plugin adds on an upgrade is enumerated here too. */
 const ENDPOINTS = Object.values<Mounted>(asBuilt.api).flatMap((endpoint) => {
   const method = endpoint.options?.method;
   const first = typeof method === "string" ? method : method?.[0];
@@ -151,7 +148,6 @@ const API_ROUTES = {
   "GET /.well-known/oauth-protected-resource/mcp": "open",
 } as const;
 
-/** A signed query, as a consent page carries; consent takes a form navigation alone. */
 const askedOfTheApi = (client: TestClient, method: string, path: string): Promise<Response> => {
   const asked = `${path}?sig=x`;
   if (method === "GET") {

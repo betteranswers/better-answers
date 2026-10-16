@@ -211,7 +211,6 @@ const ULID_SHAPE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 const BOOTSTRAP_ACTOR = "process:better-answers-bootstrap";
 
-/** Table objects, never names, so a renamed table renames what each command must find. */
 const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "map-rebuild": [mapGeneration, mapNode, mapEdge, job],
   "map-sweep": [mapGeneration, mapNode, mapEdge],
@@ -361,10 +360,6 @@ const theIndexJobEnded = async (
   );
 };
 
-/**
- * This suite runs no worker, so it leaves the rows the worker's sync would: each document's text in
- * one passage, and the job done.
- */
 const theSyncLanded = async (
   app: TestApp,
   workspaceId: string,
@@ -430,7 +425,6 @@ const boundAndIndexed = async (
   await theSyncLanded(app, workspaceId, adminId);
 };
 
-/** Completed while the documents finder answered nothing, so its run wiped no connected source. */
 const completedBeforeTheFinder = async (
   app: TestApp,
   workspaceId: string,
@@ -1061,7 +1055,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return provisioned;
     };
 
-    /** Phase one waits on the worker's sync over its document, and the suite plays the worker. */
     const seededBeside = async (workspaceId: string, worker: () => Promise<void>) => {
       const [seed] = await Promise.all([
         opsWith(
@@ -2830,7 +2823,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   describe("set-model-key — the platform sets a workspace's model key", () => {
-    /** Invented, as each key here is: they seal and call nothing outside this suite. */
     const ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => index);
     const KEK = Buffer.from(ENVELOPE_KEY).toString("hex");
     const credentials = openCredentials(ENVELOPE_KEY);
@@ -2977,7 +2969,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    /** The real entrypoint in a process of its own, so its whole output is read and no part is injected. */
     const throughTheEntrypoint = (workspaceId: string, typed: string, kek: string | undefined) => {
       const inherited = Object.entries(process.env).filter(([name]) => name !== "KEK");
       const finished = spawnSync(

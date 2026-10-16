@@ -5,7 +5,6 @@ import { appForSuite } from "./suite-app.ts";
 
 const app = appForSuite();
 
-/** The one email a code request sent a fresh address, with the code read from it. */
 const signInEmailTo = async (email: string) => {
   await app().client().json("/email-otp/send-verification-otp", { email, type: "sign-in" });
   const sent = app().emails.filter(({ to }) => to === email);

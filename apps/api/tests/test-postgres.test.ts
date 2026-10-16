@@ -45,7 +45,6 @@ const testPostgres = (port: number, argv: readonly string[], stemName: string = 
 const uriOn = (port: number): string =>
   `postgresql://postgres:postgres@127.0.0.1:${String(port)}/postgres`;
 
-/** Started straight through compose, so the script's derivation and refusals are bypassed. */
 const composeUp = (projectName: string, port: number, image: string = POSTGRES_IMAGE): void => {
   execFileSync("docker", ["compose", "-f", composeFile, "-p", projectName, "up", "-d"], {
     env: { ...process.env, TEST_POSTGRES_IMAGE: image, TEST_POSTGRES_PORT: String(port) },

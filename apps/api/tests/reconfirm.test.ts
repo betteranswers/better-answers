@@ -28,7 +28,6 @@ afterAll(async () => {
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60_000;
 
-/** What a stale confirmation answers, as the re-confirm dialog's page reads it. */
 const STALE = { word: "confirmation-too-old", class: "precondition", httpStatus: 412 } as const;
 
 const aRefusal = z.object({ word: z.string(), class: z.string() });
@@ -44,7 +43,6 @@ const refusedAsStale = async (call: Promise<unknown>): Promise<boolean> => {
   );
 };
 
-/** A confirmation within the hour again, through the api's own confirm route. */
 const reconfirmed = async (
   personId: string,
   client: Parameters<typeof confirmWithTheAuthenticator>[0],
@@ -65,7 +63,6 @@ const theSessionOf = async (personId: string): Promise<SessionRow> => {
   return row;
 };
 
-/** Moves the session back as if the person signed in yesterday, behind the api's back. */
 const signedInYesterday = async (personId: string): Promise<void> => {
   await app.database.superuser.query(
     `UPDATE session

@@ -161,7 +161,6 @@ const removalsIn = (workspaceId: string) => eventsIn(workspaceId, REMOVED);
 
 type WebApi = Awaited<ReturnType<typeof webSignedIn>>["api"];
 
-/** Each action on one member as the Members view asks it, beside the audit action it writes. */
 const ACTIONS_ON_A_MEMBER = [
   {
     verb: "change a role",
@@ -182,7 +181,6 @@ const ACTIONS_ON_A_MEMBER = [
   },
 ] as const;
 
-/** Its first Admin is the one signed in on the web. */
 const aWorkspaceOfTwoAdmins = async () => {
   const workspace = await app.provision();
   const second = await app.person();
@@ -311,7 +309,6 @@ const whatLanded = async (workspaceId: string, personId: string) => ({
   changes: await roleChangesIn(workspaceId),
 });
 
-/** `meanwhile` runs while the Admin's change waits to read their member row, held under a lock. */
 const aChangeWaitingOnARevocation = async (
   meanwhile: (revocation: HeldRevocation) => Promise<unknown>,
 ) => {
@@ -396,7 +393,6 @@ const sessionsHeldBy = async (personId: string): Promise<number | undefined> => 
   return found.rows[0]?.held;
 };
 
-/** Each assistant signs in on its own, so the person holds a session per assistant. */
 const aMemberOfTwoOnFourClients = async () => {
   const acme = await app.provision({ name: "Acme" });
   const beta = await app.provision({ name: "Beta" });
@@ -738,10 +734,6 @@ const WORKSPACE_SWITCHED = {
   data: { httpStatus: 409, refusal: { word: "workspace-switched", class: "conflict" } },
 } as const;
 
-/**
- * A tab that read Acme before its session moved to Beta. Its Admin and Sam are in both, so an
- * unrefused action lands in Beta.
- */
 const aTabLeftInAcme = async (roleInBeta: "Admin" | "Editor" = "Admin") => {
   const acme = await app.provision({ name: "Acme" });
   const beta = await app.provision({ name: "Beta" });

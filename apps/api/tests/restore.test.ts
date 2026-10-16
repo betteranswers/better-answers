@@ -79,10 +79,6 @@ const replacing = (database: string): Ran =>
     { DATABASE_URL: insideUriFor(database), REPO_DIR: CHECKOUT },
   );
 
-/**
- * The drill runs its psql and pg_restore on VPC 2's host rather than in the backup image, so no
- * `tool` stands in.
- */
 const drilling = (database: string): Ran =>
   inTheContainer(
     [

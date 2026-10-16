@@ -35,7 +35,6 @@ type Pinged = { readonly url: string; readonly body: string };
 
 const answeredOk = async (): Promise<Response> => new Response("OK", { status: 200 });
 
-/** A sync that ended a minute ago and moved nothing, on a connected source no row names. */
 const syncThatMovedNothing = (client: PoolClient, workspaceId: string, id: string) => {
   const at = new Date(Date.now() - 60_000);
   return testData(client).job({
@@ -104,7 +103,6 @@ describe("the periodic head check", () => {
     vi.useRealTimers();
   });
 
-  /** A rewrite in another process, as the reconciler sees one: the bundle's lock held alone. */
   const rewritingElsewhere = async (workspaceId: string) => {
     const holder = await app().database.superuser.connect();
     await holder.query("SELECT pg_advisory_lock(hashtext('bundle'), hashtext($1))", [workspaceId]);
@@ -116,7 +114,6 @@ describe("the periodic head check", () => {
     };
   };
 
-  /** One tick's lines, run while a rewrite elsewhere holds a workspace that has its repository. */
   const aTickBesideARewrite = async (): Promise<{
     readonly lines: readonly LogLine[];
     readonly heldId: string;

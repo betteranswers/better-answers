@@ -96,7 +96,6 @@ const askToConfirm = async (client: TestClient): Promise<unknown> => {
 const confirmOn = async (client: TestClient, device: PasskeyDevice, verified = true) =>
   client.json(PASSKEY, { response: device.get(await askToConfirm(client), { verified }) });
 
-/** Tries a wrong code `times` times, each from the next of `clients` in turn. */
 const wrongCodesFrom = async (clients: readonly TestClient[], key: string, times: number) => {
   const statuses: number[] = [];
   for (let tried = 0; tried < times; tried += 1) {
@@ -277,7 +276,6 @@ describe("confirming with an authenticator", () => {
   });
 });
 
-/** Ten codes made over tRPC and no factor, in the email session that made them. */
 const aPersonHoldingCodesAlone = async () => {
   const { client } = await aPersonSignedIn(app());
   const { recoveryCodes } = await webClientOf(client).api.person.replaceRecoveryCodes.mutate({
@@ -286,7 +284,6 @@ const aPersonHoldingCodesAlone = async () => {
   return { client, recoveryCodes };
 };
 
-/** Everything held, a code spent in the unconfirmed session, and a new key's setup started there. */
 const aReplacementStarted = async () => {
   const held = await aPersonHoldingEverything(app());
   expect((await held.client.json(RECOVERY, { code: held.recoveryCodes[0] })).status).toBe(200);
@@ -439,7 +436,6 @@ describe("replacing the factors after a spent code", () => {
   });
 });
 
-/** A person the operator has restored, signed in again by email, with the code they were handed. */
 const aRestoredPerson = async () => {
   const person = await app().person();
   const code = await restoredByTheOperator(app(), person.email);

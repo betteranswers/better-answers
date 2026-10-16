@@ -129,7 +129,6 @@ const aKeptScene = async (): Promise<KeptScene> => {
   return { home: home.workspaceId, other: other.workspaceId, invitationId: invited.id, client };
 };
 
-/** Every row a write through the plugin could touch, and every email sent. */
 const identityRows = async () => {
   const read = async (sql: string) => (await app().database.superuser.query(sql)).rows;
   return {

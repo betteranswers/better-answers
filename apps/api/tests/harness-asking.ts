@@ -10,7 +10,6 @@ import {
 import { endedWith, judgeSaying, judgingSetUp } from "./harness-model.ts";
 import type { TestApp } from "./harness.ts";
 
-/** Each workspace's key names it at the wire, so specs running side by side never share a script. */
 const KEY_PREFIX = "sk-test-browser-";
 
 const keyOf = (workspaceId: string): string => `${KEY_PREFIX}${workspaceId}`;
@@ -19,25 +18,19 @@ const keyOf = (workspaceId: string): string => `${KEY_PREFIX}${workspaceId}`;
 const FAILED_STATUS = 418;
 
 const written = z.object({
-  /** The title of the concept the sentence cites, as its drafting prompt names it. */
   citing: z.string().min(1),
-  /** Ended by its own full stop; the footnote is added after it. */
   sentence: z.string().min(1),
 });
 
 type Written = z.output<typeof written>;
 
-/** What a script may hold back until the spec releases it. */
 const HELD_CALLS = ["judge", "draft"] as const;
 
 export const askingScripting = z.object({
   workspaceId: z.string().min(1),
-  /** Absent, no judging model is chosen: every `Answer` comes back not judged. */
   judging: z.union([z.object({ fits: z.array(z.string()) }), z.literal("fails")]).optional(),
-  /** Absent, no answering model is chosen, and nothing is drafted. */
   drafting: z.union([z.object({ writes: z.array(written) }), z.literal("fails")]).optional(),
   limitGbp: z.string().min(1).optional(),
-  /** Held until released: the judge's answer, or the draft after its first sentence. */
   holds: z.enum(HELD_CALLS).optional(),
 });
 
@@ -53,11 +46,9 @@ type Scripted = {
   readonly calls: Calls;
 };
 
-/** A drafting request streams; the judge's does not. */
 const isDrafting = (body: string): boolean =>
   z.object({ stream: z.literal(true) }).safeParse(JSON.parse(body)).success;
 
-/** Each sentence the script writes for a concept this part's prompt numbers, cited by that number. */
 const linesFor = (writes: readonly Written[], prompt: string): readonly string[] => {
   const numbers = conceptNumbersIn(prompt);
   return writes.flatMap(({ citing, sentence }) => {
@@ -93,10 +84,6 @@ const judged = async (
   return judgeSaying(judging.fits)({ url: "", headers: undefined, body, signal });
 };
 
-/**
- * The provider's side of the wire for the browser suite: each workspace's calls answered as its
- * own script says, and counted.
- */
 export const scriptedModels = () => {
   const scripts = new Map<string, Scripted>();
   const scriptedFor = (init: RequestInit | undefined): Scripted | undefined => {
@@ -122,7 +109,6 @@ export const scriptedModels = () => {
         calls: { judge: 0, draft: 0 },
       });
     },
-    /** Once released, a script's hold answers every later call at once too. */
     release: (workspaceId: string): boolean => {
       const scripted = scripts.get(workspaceId);
       scripted?.held.resolve();
@@ -137,7 +123,6 @@ export const scriptedModels = () => {
 
 export type ScriptedModels = ReturnType<typeof scriptedModels>;
 
-/** Set as the owner sets a workspace's models; with neither model scripted, none is set. */
 export const setUpAsking = async (
   app: TestApp,
   models: ScriptedModels,

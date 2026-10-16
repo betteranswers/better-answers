@@ -19,7 +19,6 @@ import {
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
 import { webClientOf, webSignedIn, webTabOf } from "./web-client.ts";
 
-/** While set, the relay holds every message to the address until the test ends. */
 let mailHeld: { readonly to: string; readonly until: Promise<void> } | undefined;
 
 const { clock, stopTheClock } = aStoppableClock();
@@ -101,7 +100,6 @@ const subjectsTo = (email: string): readonly string[] =>
 
 type ApiOf = Awaited<ReturnType<typeof webTabOf>>["api"];
 
-/** The member read of a session issued before a revocation, refused in its own word. */
 const expectTheMembersReadRevoked = async (api: ApiOf) => {
   expect(await refusalOf(api.session.member.query())).toMatchObject({
     data: { httpStatus: 401, refusal: { word: "credentials-revoked", class: "unauthenticated" } },

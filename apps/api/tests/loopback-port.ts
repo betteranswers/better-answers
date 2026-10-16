@@ -5,7 +5,6 @@ import type { Hono } from "hono";
 
 export type Held = { readonly server: Server; readonly port: number };
 
-/** A loopback port bound and kept, so nothing else takes it until it is `released`. */
 export const heldPort = async (): Promise<Held> => {
   const server = createServer();
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -24,7 +23,6 @@ export const freePort = async (): Promise<number> => {
   return held.port;
 };
 
-/** Serves `server` as the api's process does, on a loopback port, for the length of `work`. */
 export const servedOnLoopback = async (
   server: Hono,
   work: (origin: string) => Promise<void>,

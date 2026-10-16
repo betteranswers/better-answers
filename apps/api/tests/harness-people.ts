@@ -46,10 +46,6 @@ export const accessAsking = z.object({
   reason: z.string().min(1),
 });
 
-/**
- * The slice's own action under the principal the ask-to-join procedure uses, without the sign-in and
- * the answer's floor that procedure puts in front of it.
- */
 export const askToJoin = async (
   app: TestApp,
   asked: z.output<typeof accessAsking>,
@@ -64,10 +60,6 @@ export const nameFlagging = flagDisplayNameInput.extend({
   adminId: z.string().min(1),
 });
 
-/**
- * The slice's own action under the flagging Admin, less the operator's email the procedure sends once
- * it commits.
- */
 export const flagTheName = async (
   app: TestApp,
   asked: z.output<typeof nameFlagging>,

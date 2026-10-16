@@ -24,7 +24,6 @@ export const pkce = (): Pkce => {
   return { verifier, challenge: createHash("sha256").update(verifier).digest("base64url") };
 };
 
-/** A path on the public origin; the assistant defaults to Claude, the resource to the MCP surface. */
 export const authorizeUrl = (params: {
   readonly challenge: string;
   readonly scope: string;
@@ -85,7 +84,6 @@ export type Tokens = {
   readonly claims: Readonly<Record<string, unknown>>;
 };
 
-/** By the emailed code alone, failing unless both steps answer 200: one owing a factor stays pending. */
 export const signInByEmailOnly = async (
   app: TestApp,
   client: TestClient,
@@ -102,7 +100,6 @@ export const signInByEmailOnly = async (
   return signedIn;
 };
 
-/** As `signInByEmailOnly`, then past any required second factor by the harness's own writes. */
 export const signIn = async (
   app: TestApp,
   client: TestClient,
@@ -113,7 +110,6 @@ export const signIn = async (
   return signedIn;
 };
 
-/** Confirms `client`'s session with the code `key` shows now, failing the test unless it answers 200. */
 export const confirmWithTheAuthenticator = async (
   client: TestClient,
   key: string,
@@ -130,7 +126,6 @@ export const setActiveWorkspace = async (
   workspaceId: string,
 ): Promise<Response> => client.json("/organization/set-active", { organizationId: workspaceId });
 
-/** `query` is the authorize request's search string. Fails the test when no next step is named. */
 export const continueAfterPostLogin = async (client: TestClient, query: string): Promise<URL> => {
   const continued = await client.json("/oauth2/continue", {
     postLogin: true,
@@ -144,7 +139,6 @@ export const continueAfterPostLogin = async (client: TestClient, query: string):
   return new URL(next ?? "", PUBLIC_URL);
 };
 
-/** Where the authorize request, resumed once `person` has signed in, sends the browser. */
 export const driveToPage = async (
   app: TestApp,
   client: TestClient,
@@ -166,23 +160,17 @@ export const driveToPage = async (
 
 const DRAWN_FOR = new RegExp(`name="${CONSENT_WORKSPACE_FIELD}" value="([^"]*)"`);
 
-/** The fields Connect sends from a consent page drawn for `workspaceId`. */
 export const connectIn = (workspaceId: string): Record<string, string> => ({
   accept: "true",
   [CONSENT_WORKSPACE_FIELD]: workspaceId,
 });
 
-/** The fields Connect sends from a drawn consent page, read off the page itself. */
 const connectOn = (page: string): Record<string, string> => {
   const workspace = DRAWN_FOR.exec(page)?.[1];
   expect(workspace, "the consent page names no workspace").toBeDefined();
   return connectIn(workspace ?? "");
 };
 
-/**
- * Connects as Claude does: authorize, sign in, `pick` the active workspace if given, consent and
- * exchange. Fails the test at a step that strays.
- */
 export const connectAsHost = async (
   app: TestApp,
   client: TestClient,
@@ -249,7 +237,6 @@ const exchangeForTokens = async (
   return tokensOf(await response.json());
 };
 
-/** `scope`, when given, narrows the grant's scopes for the tokens the refresh issues. */
 export const refresh = async (
   client: TestClient,
   refreshToken: string,

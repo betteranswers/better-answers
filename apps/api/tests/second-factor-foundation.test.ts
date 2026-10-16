@@ -10,7 +10,6 @@ const app = appForSuite();
 
 const asBuilt = authAsBuiltForSuite();
 
-/** Read off the instance, so a path a plugin adds on an upgrade is held closed here too. */
 const FACTOR_PATHS = mountedPaths(asBuilt).filter(
   (path) => path.startsWith("/passkey/") || path.startsWith("/two-factor/"),
 );

@@ -31,7 +31,6 @@ type OperatorMutationContext = inferProcedureBuilderResolverOptions<
 
 type WebApi = Awaited<ReturnType<typeof webSignedIn>>["api"];
 
-/** Every console procedure, each asked about `personId` as the operator would ask it. */
 const CONSOLE_CALLS: readonly (readonly [
   string,
   (api: WebApi, personId: string) => Promise<unknown>,
@@ -51,7 +50,6 @@ const CONSOLE_CALLS: readonly (readonly [
   ],
 ];
 
-/** The same procedures as an assistant holding only a bearer asks for them. */
 const BEARER_ASKS: readonly (readonly [string, RequestInit])[] = [
   ["console.workspaces.list", {}],
   ["console.people.list", {}],
@@ -120,7 +118,6 @@ const theOperatorOnTheWeb = async () => {
   return { workspace, ...(await webSignedIn(app(), workspace.admin.email)) };
 };
 
-/** Every role a workspace gives, each signed in on the web, none of them carrying the mark. */
 const everyRoleOnTheWeb = async () => {
   const workspace = await app().provision();
   const editor = await app().person();
@@ -465,7 +462,6 @@ describe("ending every sign-in and token everywhere, from the console", () => {
     }
   });
 
-  /** The refresh tokens of the grant held before the revocation and the one taken after it. */
   const connectedAgainAfterRevocation = async () => {
     const { api } = await theOperatorOnTheWeb();
     const { admin: person } = await app().provision();
@@ -585,7 +581,6 @@ describe("correcting a flagged display name, from the console", () => {
     return found.rows;
   };
 
-  /** The operator on the web, and a person an Admin of another workspace flagged. */
   const theOperatorAndAFlaggedPerson = async () => {
     const operator = await theOperatorOnTheWeb();
     const acme = await app().provision({ name: "Acme Flagging" });
@@ -888,7 +883,6 @@ describe("the console's list and inspection of people", () => {
     );
   });
 
-  /** The one grant Claude holds for Acme's Admin, ended by the authorization server alone. */
   const endedByTheServer = (workspaceId: string) => [
     {
       assistant: { id: CLAUDE_CLIENT_ID, name: "Claude" },
@@ -900,7 +894,6 @@ describe("the console's list and inspection of people", () => {
     },
   ];
 
-  /** The operator on the web, and Claude connected as Acme's Admin through `host`. */
   const acmeConnected = async () => {
     const { api } = await theOperatorOnTheWeb();
     const acme = await app().provision({ name: "Acme" });

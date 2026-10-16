@@ -19,7 +19,6 @@ import { refusalOfCall, webClientOf, webTabOf } from "./web-client.ts";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
-/** Moved forward to stand an hour past a pending read without waiting it out. */
 const shift = { ms: 0 };
 
 const app = appForSuite({ clock: { now: () => new Date(Date.now() + shift.ms) } });
@@ -49,7 +48,6 @@ const signedInByPasskey = async (device: PasskeyDevice): Promise<TestClient> => 
   return client;
 };
 
-/** A new workspace's Admin holding an authenticator, and the key its codes come from. */
 const anAdminHolding = async () => {
   const workspace = await app().provision();
   const key = await holdAnAuthenticator(app(), workspace.admin.id);
@@ -64,7 +62,6 @@ const sessionRowsOf = async (personId: string) =>
     )
   ).rows;
 
-/** Through the Members page's own action, by the workspace's confirmed Admin. */
 const madeAnAdminBy = async (adminEmail: string, personId: string): Promise<void> => {
   const adminClient = await signedInByEmailOnly(app(), adminEmail);
   await confirmedByTheHarness(app(), adminClient);

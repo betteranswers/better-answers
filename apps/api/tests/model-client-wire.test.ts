@@ -23,7 +23,6 @@ const RETENTION = {
   body: "Audit logs are kept for thirteen months.",
 };
 
-/** A workspace holding one `Answer`, and an assistant connected as its Admin. */
 const anAdminAsking = async () => {
   const { workspaceId, asking } = await anAdminAskingIn(app(), [RETENTION]);
   return { workspaceId, asking: (question: string) => asking({ question }) };

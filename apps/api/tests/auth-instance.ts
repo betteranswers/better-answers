@@ -30,10 +30,6 @@ const authOverDoor = (door: TestApp["doors"]["postgres"], publicUrl = PUBLIC_URL
  */
 export const authOver = (app: TestApp): Auth => authOverDoor(app.doors.postgres, app.publicUrl);
 
-/**
- * Over a pool that reaches no database, so fit for reading the instance's shape alone. The caller
- * ends `database`.
- */
 export const authAsServerBuildsIt = (): BuiltAuth => {
   const doors = doorsFor("postgresql://unused@127.0.0.1:1/unused");
   const auth = authOverDoor(doors.postgres);
@@ -41,7 +37,6 @@ export const authAsServerBuildsIt = (): BuiltAuth => {
   return { auth, database: doors.postgres.pool };
 };
 
-/** As `authAsServerBuildsIt`, its pool ended once the suite has run. */
 export const authAsBuiltForSuite = (): Auth => {
   const { auth, database } = authAsServerBuildsIt();
   afterAll(async () => {

@@ -22,7 +22,6 @@ export const refusalToTheAdmin = async (
   return refusalOfCall(call(api));
 };
 
-/** Every People procedure is an Admin's, so each is called by a member who is not one. */
 export const refusalToAMemberAt = async (
   app: TestApp,
   role: "Editor" | "Viewer",
@@ -35,7 +34,6 @@ export const refusalToAMemberAt = async (
   return refusalOfCall(call(api));
 };
 
-/** Signed in to a workspace of their own, with a session that names `workspaceId` instead. */
 export const anAdminOfElsewherePointedAt = async (
   app: TestApp,
   workspaceId: string,
@@ -47,7 +45,6 @@ export const anAdminOfElsewherePointedAt = async (
   return webClientOf(client, workspaceId).api;
 };
 
-/** An Admin of another workspace, their session pointed here: each People procedure refuses them. */
 export const refusalToAnotherWorkspacesAdmin = async (
   app: TestApp,
   call: (api: WebApi) => Promise<unknown>,

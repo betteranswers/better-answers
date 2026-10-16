@@ -8,7 +8,6 @@ import { NO_SESSION_ANSWERED, refusalOfCall, webSignedIn } from "./web-client.ts
 
 const EIGHT_DAYS_MS = 8 * 24 * 60 * 60 * 1000;
 
-/** The action reads its instant from this clock, so an invitation can be read after its week is up. */
 const clockShift = { ms: 0 };
 
 const app = appForSuite({ clock: { now: () => new Date(Date.now() + clockShift.ms) } });
@@ -24,7 +23,6 @@ type Api = Awaited<ReturnType<typeof webSignedIn>>["api"];
 
 const ACCEPT_LINK = /\/invitations\/([0-9A-HJKMNP-TV-Z]{26})\b/;
 
-/** The id the accept link in the latest invitation to `address` names; a sign-in code is skipped. */
 const linkedInvitationId = (address: string): string => {
   const id = app()
     .emails.filter((message) => message.to === address)
@@ -39,7 +37,6 @@ const anAdmin = async (name = "Calder Joinery") => {
   return { workspace, ...(await webSignedIn(app(), workspace.admin.email)) };
 };
 
-/** An Admin's invitation to a new address, and that address signed in with a display name. */
 const anInvitee = async (role: "Admin" | "Editor" | "Viewer" = "Editor") => {
   const admin = await anAdmin();
   const address = anAddress("priya");
@@ -102,7 +99,6 @@ const statusOf = async (invitationId: string): Promise<string | undefined> =>
     )
   ).rows[0]?.status;
 
-/** Nothing of a refused or failed accept is left behind: no member, no event, still waiting. */
 const nothingLanded = async (at: {
   readonly workspaceId: string;
   readonly address: string;

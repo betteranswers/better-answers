@@ -25,7 +25,6 @@ const POLICY = {
   body: "Buyers access audit information through the console's audit page.",
 };
 
-/** Mounted as `serve.ts` mounts it, with the wire the TestApp's model calls reach. */
 const harness = (path: string, init?: RequestInit) =>
   new Hono().route("/", harnessControl(app(), models)).request(path, init);
 
@@ -52,7 +51,6 @@ const calls = z.object({ judge: z.number(), draft: z.number() });
 const callsTo = async (workspaceId: string) =>
   calls.parse(await (await harness(`/__harness/asking/calls?workspaceId=${workspaceId}`)).json());
 
-/** A workspace holding the two audit `Answer`s and the policy, and its Admin on the web. */
 const anAdminAsking = async () => {
   const { workspace, api } = await anAdminOnTheWeb(app());
   await seedConcepts(
@@ -70,7 +68,6 @@ type Web = Awaited<ReturnType<typeof anAdminAsking>>["api"];
 
 const kept = z.object({ drafted: z.array(z.unknown()).nullable() });
 
-/** The prose a record keeps, none while drafting goes on. */
 const draftedOn = async (recordId: string): Promise<readonly unknown[]> => {
   const found = await app().database.superuser.query(
     "SELECT drafted FROM question_content WHERE record_id = $1",

@@ -41,7 +41,6 @@ export const inspected = (container: string, format: string): string =>
 export const imagesOf = (projectName: string): readonly string[] =>
   containersOf(projectName).map((container) => inspected(container, "{{.Config.Image}}"));
 
-/** `up` on a port something else holds, under its own project, with its exit and what it started. */
 export const upOnATakenPort = async (
   up: (port: number, projectName: string) => Run,
   projectName: string,

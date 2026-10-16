@@ -177,10 +177,6 @@ const refusalIn = async (response: Response) =>
 const FIRST_PART = new TextEncoder().encode("The handbook says ");
 const LAST_PART = new TextEncoder().encode("what the company decided.");
 
-/**
- * Each read of this body past its first part waits for the test, so the action can be caught
- * mid-stream.
- */
 const heldOpenBody = () => {
   const held = { asked: 0, ended: false };
   const gate = Promise.withResolvers<void>();

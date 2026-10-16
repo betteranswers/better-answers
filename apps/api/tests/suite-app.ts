@@ -6,10 +6,6 @@ import type { Clock } from "@better-answers/core/kernel";
 
 import { startApp, type TestApp, type TestAppOptions } from "./harness.ts";
 
-/**
- * Registers `beforeAll` and `afterAll` hooks that start and stop one TestApp; the getter throws
- * until the first has run.
- */
 export const appForSuite = (options: TestAppOptions = {}): (() => TestApp) => {
   let started: TestApp | undefined;
 
@@ -57,6 +53,5 @@ export const aStoppableClock = (): {
 
 const WEB_ROOT = fileURLToPath(new URL("fixtures/web-build", import.meta.url));
 
-/** As `appForSuite`, with the fixture web build served. */
 export const servedApp = (options: Pick<TestAppOptions, "clock"> = {}): (() => TestApp) =>
   appForSuite({ ...options, webRoot: WEB_ROOT });

@@ -11,7 +11,6 @@ import { aPersonSignedIn, signedInByEmailOnly, signedInClient } from "./provoke.
 import { appForSuite } from "./suite-app.ts";
 import { webClientOf } from "./web-client.ts";
 
-/** Served as the browser suite serves it, on an origin of its own, so no cookie is the suites'. */
 const app = appForSuite({
   publicUrl: "http://localhost:4173",
   hostnames: { app: "localhost", agent: "agent.localhost", apex: "apex.localhost" },

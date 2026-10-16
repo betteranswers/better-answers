@@ -53,7 +53,6 @@ const provisioning = z.object({
   name: z.string().min(1).optional(),
   adminEmail: z.string().min(1).optional(),
 });
-/** An empty display name is a person who has not given one yet, which a spec may want. */
 const person = z.object({
   email: z.string().min(1).optional(),
   displayName: z.string().optional(),
@@ -64,7 +63,6 @@ const member = z.object({
   role: z.enum(ROLES),
 });
 const revocation = z.object({ userId: z.string().min(1) });
-/** The store's own words for an invitation's status, which a spec may seed one at. */
 const STORED_STATUSES = [
   INVITATION_WAITING_STATUS,
   INVITATION_ACCEPTED_STATUS,
@@ -93,14 +91,12 @@ const ending = z.object({ workspaceId: z.string().min(1), userId: z.string().min
 const MARK_CHANGES = ["grant", "revoke"] as const;
 const marking = z.object({ email: z.string().min(1), change: z.enum(MARK_CHANGES) });
 const aging = z.object({ userId: z.string().min(1) });
-/** The agent one browser leaves, as the library keeps it; unknown is fine, but not empty. */
 const aSession = z.object({
   userId: z.string().min(1),
   userAgent: z.string().min(1).nullish(),
 });
 const codeAging = z.object({ email: z.string().min(1) });
 const byEmail = z.object({ email: z.string().min(1) });
-/** Saved by default, as a first setup leaves an Admin; `none` is someone just made one. */
 const CODES_GIVEN = ["saved", "none"] as const;
 
 type CodesGiven = (typeof CODES_GIVEN)[number];
@@ -109,7 +105,6 @@ const enrolling = byEmail.extend({ codes: z.enum(CODES_GIVEN).default("saved") }
 
 type Enrolled = { readonly key: string; readonly recoveryCodes: readonly string[] };
 
-/** Asked again for the same person, the harness answers what it gave them the first time. */
 const enrolments = (app: TestApp) => {
   const held = new Map<string, Enrolled>();
   return {
@@ -141,7 +136,6 @@ const personIdOf = async (app: TestApp, email: string): Promise<string> => {
   return id;
 };
 
-/** @throws when the TestApp was started with no scripted wire, which only the suite's own api has. */
 const modelsOf = (models: ScriptedModels | undefined): ScriptedModels => {
   if (models === undefined) throw new Error("the harness was started with no scripted model wire");
   return models;
@@ -150,10 +144,6 @@ const modelsOf = (models: ScriptedModels | undefined): ScriptedModels => {
 const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> =>
   schema.parse(await request.json());
 
-/**
- * The spec's own mistake, if `error` is one: the fields a schema refused, the harness's or the
- * factory's, or the constraint a write tripped.
- */
 const whyNotWritten = (error: Error) => {
   if (error instanceof z.ZodError) {
     return {
@@ -166,15 +156,10 @@ const whyNotWritten = (error: Error) => {
   return undefined;
 };
 
-/**
- * Routes under `/__harness` through which the browser suite drives the TestApp as a test would;
- * `models` is the wire its model calls reach.
- */
 export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
   const control = new Hono();
   const enrolled = enrolments(app);
 
-  // A spec's mistake answers 400 with its reason. Anything else is thrown on to the 500 that logs it.
   control.onError((error, context) => {
     const why = whyNotWritten(error);
     if (why === undefined) throw error;
@@ -202,7 +187,6 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
     return context.json(await app.invite(asked));
   });
 
-  // The api's own instant, as the product takes it: one ahead of it refuses a sign-in made before it.
   control.post(`${HARNESS_PREFIX}/revocations`, async (context) => {
     const asked = await readBody(context.req.raw, revocation);
 
@@ -210,14 +194,12 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
     return context.json({ revoked: true });
   });
 
-  // An hour is too long for a spec to wait, so the confirmation is moved back behind the api's back.
   control.post(`${HARNESS_PREFIX}/confirmations/aged`, async (context) => {
     const asked = await readBody(context.req.raw, aging);
     await confirmationsAgedOverAnHourAgo(app, asked.userId);
     return context.json({ aged: true });
   });
 
-  // One more browser session, as a second device leaves it, without spending a sign-in code.
   control.post(`${HARNESS_PREFIX}/sessions`, async (context) => {
     const asked = await readBody(context.req.raw, aSession);
     const agent =
@@ -227,21 +209,18 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
     return context.json({ sessionId: await aSeededSessionFor(app, asked.userId, agent) });
   });
 
-  // The pending hour is too long for a spec to wait, so its clock is moved back the same way.
   control.post(`${HARNESS_PREFIX}/pending-sessions/aged`, async (context) => {
     const asked = await readBody(context.req.raw, aging);
     await pendingSessionsPastTheirHour(app, asked.userId);
     return context.json({ aged: true });
   });
 
-  // A code's lifetime is too long for a spec to wait, so its expiry is moved back the same way.
   control.post(`${HARNESS_PREFIX}/codes/aged`, async (context) => {
     const asked = await readBody(context.req.raw, codeAging);
     await codeSentPastItsExpiry(app, asked.email);
     return context.json({ aged: true });
   });
 
-  // Sealed as the plugin seals one, spending no emailed code; the key answered makes the codes.
   control.post(`${HARNESS_PREFIX}/authenticators`, async (context) => {
     const asked = await readBody(context.req.raw, enrolling);
     const personId = await personIdOf(app, asked.email);
@@ -249,7 +228,6 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
     return context.json(held);
   });
 
-  // The ops command's own restore, so a spec meets the person as the operator leaves them.
   control.post(`${HARNESS_PREFIX}/restores`, async (context) => {
     const asked = await readBody(context.req.raw, byEmail);
     return context.json({ code: await restoredByTheOperator(app, asked.email) });
@@ -287,7 +265,6 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
     return context.json(await seedConcepts(app, asked));
   });
 
-  // The owner's own ops commands set the models; the wire answers each workspace as its spec says.
   control.post(`${HARNESS_PREFIX}/asking`, async (context) => {
     const asked = await readBody(context.req.raw, askingScripting);
     await setUpAsking(app, modelsOf(models), asked);
@@ -309,7 +286,6 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
     return context.json({ records: await seedQuestions(app, asked) });
   });
 
-  // The ops command's own action under its own principal, so the mark lands as the owner's would.
   control.post(`${HARNESS_PREFIX}/operators`, async (context) => {
     const asked = await readBody(context.req.raw, marking);
     const marked = await setOperatorMark(IDENTITY_PRINCIPAL, app.doors.postgres, asked);
@@ -317,7 +293,6 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
     return context.json({ marked: true });
   });
 
-  // The fixture command's own action, so the journeys run by hand meet the workspace it makes.
   control.post(`${HARNESS_PREFIX}/test-workspaces`, async (context) => {
     const asked = await readBody(context.req.raw, testWorkspace);
     const ensured = await ensureTestWorkspace(BOOTSTRAP, app.doors.postgres, asked);

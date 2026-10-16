@@ -33,7 +33,6 @@ const signInRowsOf = async (email: string) =>
     )
   ).rows.map((row) => row.detail);
 
-/** Asks for a code as `client`, and answers the code and the link token the email carried. */
 const askedFor = async (client: TestClient, email: string, extra: Record<string, string> = {}) => {
   const asked = await client.json(SEND_CODE, { email, type: "sign-in", ...extra });
   expect(asked.status, "the code request was refused").toBe(200);
@@ -50,7 +49,6 @@ const signedInAs = async (client: TestClient): Promise<string | undefined> => {
   return session?.user.email;
 };
 
-/** A fresh link, with one of its address's rows rewritten behind the api's back. */
 const aLinkAfterRewriting = async (prefix: "sign-in-otp-" | "sign-in-link-", set: string) => {
   const person = await app().person();
   const asking = app().client();
@@ -61,7 +59,6 @@ const aLinkAfterRewriting = async (prefix: "sign-in-otp-" | "sign-in-link-", set
   return { person, asking, token };
 };
 
-/** What reading a link and then signing in with it answer. */
 const readAndSpent = async (client: TestClient, token: string) => ({
   read: await describedAs(client, token),
   status: (await client.json(SIGN_IN_BY_LINK, { token })).status,

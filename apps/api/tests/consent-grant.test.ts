@@ -12,13 +12,11 @@ const app = appForSuite();
 const consentsGiven = async (): Promise<unknown> =>
   (await app().database.superuser.query("SELECT count(*)::int AS n FROM oauth_consent")).rows[0];
 
-/** Read before the spy replaces it; called with the storage the route made. */
 const runInStore: AsyncLocalStorage<unknown>["run"] = Reflect.get(
   AsyncLocalStorage.prototype,
   "run",
 );
 
-/** Lands `landing` after the route's checks: Node's storage, not our code, is the patched seam. */
 const landingBeforeTheLibrary = (landing: () => Promise<unknown>): void => {
   vi.spyOn(AsyncLocalStorage.prototype, "run").mockImplementation(function (
     this: AsyncLocalStorage<unknown>,
@@ -36,7 +34,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** Acme's Admin holds Zenith too, and has Acme's consent page open. */
 const anAdminOnAcmesPage = async (on: TestApp) => {
   const acme = await on.provision({ name: "Acme" });
   const zenith = await on.provision({ name: "Zenith" });

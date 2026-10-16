@@ -18,7 +18,6 @@ export type Api = Awaited<ReturnType<typeof webSignedIn>>["api"];
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@client.example`;
 
-/** Its transport refuses the addresses in `unreachable`, as an SMTP relay that is down would. */
 export const appForSuite = (unreachable: ReadonlySet<string>, clock?: Clock): (() => TestApp) => {
   let started: TestApp | undefined;
 
@@ -79,7 +78,6 @@ export const answeredBelowAdmin = async (
   return Object.fromEntries(answers);
 };
 
-/** What another workspace's Admin is answered with their session pointed at this workspace. */
 export const answeredToAnAdminPointedHere = async (
   app: TestApp,
   workspaceId: string,

@@ -21,7 +21,6 @@ const app = appForSuite({ fetchModel: wire.fetch });
 
 const { users: USERS, supplier: SUPPLIER, retention: RETENTION, lms: LMS } = AUDIT_ANSWERS;
 
-/** A workspace holding the four `Answer`s, set to judge, and an assistant connected as its Admin. */
 const anAdminAsking = async (limitGbp?: string) => {
   const asking = await anAdminAskingIn(app(), [USERS, SUPPLIER, RETENTION, LMS]);
   await judgingSetUp(app(), asking.workspaceId, limitGbp === undefined ? {} : { limitGbp });

@@ -12,7 +12,6 @@ import { appRouter, type AppRouter } from "../src/trpc/router.ts";
 const API_SOURCE = fileURLToPath(new URL("../src/", import.meta.url));
 const CORE_SOURCE = fileURLToPath(new URL("../../../packages/core/src/", import.meta.url));
 
-/** Each TypeScript file under `root` whose text matches, by its path from `root`. */
 const filesMatching = (root: string, pattern: RegExp): readonly string[] =>
   readdirSync(root, { recursive: true, encoding: "utf8" })
     .filter((file) => file.endsWith(".ts"))

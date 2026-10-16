@@ -39,7 +39,6 @@ const linesSince = (before: number, event: string) =>
     .logs.slice(before)
     .filter((line) => line["event"] === event);
 
-/** A test client of its own, and the code just sent to `email` for it. */
 const codeAskedFor = async (email: string) => {
   const client = app().client();
   await client.json("/email-otp/send-verification-otp", { email, type: "sign-in" });

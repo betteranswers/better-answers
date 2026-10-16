@@ -48,10 +48,6 @@ const coseKeyOf = (publicKey: KeyObject): Uint8Array => {
 
 type Ceremony = { readonly verified?: boolean };
 
-/**
- * A platform authenticator in software: one P-256 key for one site, answering the options the
- * api hands out as a browser's `navigator.credentials` would.
- */
 export const aPasskeyDevice = (origin: string) => {
   const rpIdHash = sha256(new URL(origin).hostname);
   const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
@@ -77,7 +73,6 @@ export const aPasskeyDevice = (origin: string) => {
   return {
     credentialId: id,
 
-    /** What `startRegistration` hands back: an attestation of format "none". */
     create(asked: unknown, ceremony: Ceremony = {}) {
       const authData = concat(
         rpIdHash,
@@ -109,7 +104,6 @@ export const aPasskeyDevice = (origin: string) => {
       };
     },
 
-    /** What `startAuthentication` hands back: an assertion signed over the challenge. */
     get(asked: unknown, ceremony: Ceremony = {}) {
       const authenticatorData = concat(rpIdHash, Uint8Array.of(flagsOf(ceremony)), uint32(0));
       const clientDataJSON = clientData("webauthn.get", asked);

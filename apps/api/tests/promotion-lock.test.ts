@@ -30,7 +30,6 @@ const withSuperuser = async <T>(work: (data: ReturnType<typeof testData>) => Pro
   }
 };
 
-/** A promotion lock for `personId`, as the library writes one. */
 const lockFor = (personId: string, expiresAt: Date) =>
   withSuperuser((data) =>
     data.verification({
@@ -50,7 +49,6 @@ const anUnprovenPerson = async () => {
   return person;
 };
 
-/** Signed in once, so holding a session, with an account linked and the address unproven again. */
 const anUnprovenPersonWithAccess = async () => {
   const person = await app().person();
   await signIn(app(), app().client(), person.email);

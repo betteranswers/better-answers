@@ -21,7 +21,6 @@ afterAll(async () => {
   await app.stop();
 });
 
-/** HR team holds both non-Admin members; Bid writers holds no one. */
 const aWorkspaceWithGroups = async () => {
   const workspace = await app.provision();
   const { workspaceId } = workspace;
@@ -53,7 +52,6 @@ type GroupEvent = {
   readonly detail: Readonly<Record<string, string>>;
 };
 
-/** Every group, group member and group event the workspace holds, read past row-level security. */
 const standing = async (workspaceId: string) => {
   const { superuser } = app.database;
   const groups = await superuser.query<{ id: string; name: string }>(
@@ -80,7 +78,6 @@ const membersOf = async (workspaceId: string, groupId: string): Promise<readonly
 const eventsIn = async (workspaceId: string): Promise<readonly GroupEvent[]> =>
   (await standing(workspaceId)).events;
 
-/** The answer to `call`, having found the workspace's groups exactly as they stood before it. */
 const refusedChangingNothing = async (
   workspaceId: string,
   call: () => Promise<unknown>,
@@ -279,7 +276,6 @@ describe("the group actions over tRPC", () => {
 });
 
 type GroupAction = {
-  /** What the action does, in the words a title reads. */
   readonly does: string;
   readonly call: (api: Api, seeded: Seeded) => Promise<unknown>;
 };
