@@ -386,7 +386,6 @@ export const testData = (client: pg.PoolClient): TestData => {
   const passage: TestData["passage"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     if (!(await partitionExists(client, workspaceId))) {
-      // The lifecycle function refuses a workspace the transaction is not scoped to.
       const previous = await client.query("SELECT current_workspace_id() AS ws");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
       await client.query("SELECT create_workspace_partition($1)", [workspaceId]);

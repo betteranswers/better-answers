@@ -129,7 +129,6 @@ const dropTemplate = async (admin: pg.Client, database: string): Promise<void> =
 const stampUse = (admin: pg.Client, database: string): Promise<unknown> =>
   admin.query(`COMMENT ON DATABASE ${quoted(database)} IS '${new Date().toISOString()}'`);
 
-/** `stale` is null for a template with no use stamp yet, which is stamped now rather than dropped. */
 type TemplateAge = { readonly datname: string; readonly stale: boolean | null };
 
 const agesOf = async (admin: pg.Client): Promise<readonly TemplateAge[]> =>
@@ -277,7 +276,6 @@ const startShared = async ({ uri, shared }: Locator): Promise<Started> => {
   const templateDatabase = await ensureTemplate(adminUri, name, migrateInto);
   return {
     provided: { connectionUri: adminUri, templateDatabase, runId: process.pid, source: "shared" },
-    // The instance and its template outlive the run; each file's stop drops its own database.
     teardown: () => Promise.resolve(),
   };
 };

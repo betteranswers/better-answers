@@ -44,7 +44,6 @@ type Seeded = {
   readonly node: string;
 };
 
-/** One of each old value in `workspaceId`; the decided suggestion is one the trigger guards. */
 const oldValuesIn = async (client: pg.PoolClient, workspaceId: string): Promise<Seeded> => {
   const seed = testData(client);
   await seed.workspace({ id: workspaceId, name: workspaceId });
