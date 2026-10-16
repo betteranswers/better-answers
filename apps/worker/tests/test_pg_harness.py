@@ -20,7 +20,9 @@ from testcontainers.community.postgres import PostgresContainer
 
 from pg_harness import (
     LOCATOR,
+    PORT_OVERRIDE,
     REPO_ROOT,
+    SHARED,
     _migrated_cluster,
     ensure_template,
     login_in_role,
@@ -188,7 +190,6 @@ def test_refuses_a_locator_signed_in_as_no_superuser(
     _assert_one_line_naming_the_way_out(message)
 
 
-PORT_OVERRIDE = "TEST_POSTGRES_PORT"
 OTHER_IMAGE = f"other/image:tag@sha256:{'0' * 64}"
 
 
@@ -249,7 +250,7 @@ def test_shared_refuses_a_server_with_no_image_stamp(
 ) -> None:
     monkeypatch.setenv(PORT_OVERRIDE, str(unstamped_port))
 
-    message = _refusal_for("shared", monkeypatch)
+    message = _refusal_for(SHARED, monkeypatch)
 
     _assert_one_line_naming_the_way_out(message)
     assert "no image stamp" in message
@@ -261,7 +262,7 @@ def test_refuses_a_server_stamped_with_another_image(
     other_image_port: int, monkeypatch: pytest.MonkeyPatch, form: str
 ) -> None:
     monkeypatch.setenv(PORT_OVERRIDE, str(other_image_port))
-    locator = "shared" if form == "shared" else _uri_at(other_image_port)
+    locator = SHARED if form == "shared" else _uri_at(other_image_port)
 
     message = _refusal_for(locator, monkeypatch)
 

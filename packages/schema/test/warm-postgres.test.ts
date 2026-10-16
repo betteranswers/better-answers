@@ -728,8 +728,14 @@ describe("the warm harness under TEST_POSTGRES_URI=shared", () => {
     await Promise.all([unstamped?.stop(), stampedOther?.stop()]);
   });
 
+  const running = (
+    container: StartedPostgreSqlContainer | undefined,
+  ): StartedPostgreSqlContainer => {
+    if (container === undefined) throw new Error("the throwaway server never started");
+    return container;
+  };
   const portOf = (container: StartedPostgreSqlContainer | undefined): Record<string, string> => ({
-    TEST_POSTGRES_PORT: String(container?.getPort()),
+    TEST_POSTGRES_PORT: String(running(container).getPort()),
   });
 
   it("derives the address the script prints", async () => {
@@ -749,7 +755,7 @@ describe("the warm harness under TEST_POSTGRES_URI=shared", () => {
   });
 
   it("refuses another image's server under an explicit URI", async () => {
-    const started = await startInChild(stampedOther?.getConnectionUri() ?? "");
+    const started = await startInChild(running(stampedOther).getConnectionUri());
 
     expect(refusesFor(started, MISMATCH)).toEqual(REFUSES_FOR_THE_CAUSE);
   });

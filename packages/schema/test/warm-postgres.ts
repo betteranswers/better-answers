@@ -317,7 +317,9 @@ const SHARED_PORT_SPREAD = 1000;
 
 /** Mirrors `deploy/test-postgres.sh address`, so a worktree on another pin reaches its own server. */
 export const sharedUri = (): string => {
-  const digest = POSTGRES_IMAGE.split("@sha256:")[1] ?? "";
+  const digest = POSTGRES_IMAGE.split("@sha256:")[1];
+  if (digest === undefined)
+    throw new Error(`${POSTGRES_IMAGE} pins no digest to derive a port from`);
   const override = process.env["TEST_POSTGRES_PORT"];
   const port =
     override === undefined || override === ""

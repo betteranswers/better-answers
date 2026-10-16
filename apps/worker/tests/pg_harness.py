@@ -25,6 +25,7 @@ MIGRATIONS_DIR = REPO_ROOT / "packages" / "schema" / "migrations"
 _IMAGE_SOURCE = REPO_ROOT / "packages" / "schema" / "src" / "postgres-image.ts"
 
 
+@cache
 def pinned_postgres_image() -> str:
     source = _IMAGE_SOURCE.read_text("utf-8")
     matches = re.findall(r'"(pgvector/pgvector:[^"]+)"', source)
@@ -105,7 +106,7 @@ def on_database(conninfo: str, database: str) -> str:
 
 LOCATOR = "TEST_POSTGRES_URI"
 SHARED = "shared"
-_PORT_OVERRIDE = "TEST_POSTGRES_PORT"
+PORT_OVERRIDE = "TEST_POSTGRES_PORT"
 UP_COMMAND = "deploy/test-postgres.sh up"
 
 # Advisory locks conflict only within one database; the vitest tier shares this key.
@@ -143,7 +144,7 @@ def _pinned_digest() -> str:
 
 # deploy/test-postgres.sh derives the same port: one server per pinned image.
 def shared_address() -> str:
-    override = os.environ.get(_PORT_OVERRIDE, "").strip()
+    override = os.environ.get(PORT_OVERRIDE, "").strip()
     port = int(override) if override else 55434 + int(_pinned_digest()[:4], 16) % 1000
     return f"postgresql://postgres:postgres@127.0.0.1:{port}/postgres"
 
