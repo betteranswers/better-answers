@@ -40,7 +40,7 @@
     "mattpocock-skills@mattpocock": false,
     "mattpocock-skills@claude-plugins-official": false,
     "mattpocock-skills@synced": false,
-    "compound-engineering@compound-engineering-plugin": true
+    "compound-engineering@compound-engineering-plugin": false
   },
   "extraKnownMarketplaces": {
     "compound-engineering-plugin": {
