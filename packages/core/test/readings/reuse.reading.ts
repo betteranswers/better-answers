@@ -71,7 +71,6 @@ describe("the owner's reuse reading", () => {
         const priced = `$${usdIn} in and $${usdOut} out per million tokens, at £${rate} to the dollar`;
         await recordReuseReading(`Reuse reading, ${name} at effort ${asked}`, reading, priced);
 
-        // A refused key fails every call, and a run that judged nothing has no figures to record.
         expect(reading.judged).toBeGreaterThan(0);
       });
     }

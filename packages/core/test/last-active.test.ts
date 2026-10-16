@@ -62,7 +62,6 @@ const stampedIn = async (workspaceId: string, userId: string): Promise<Date | un
     )
   ).rows[0]?.at;
 
-/** A row `agoMs` old: within the hour no request writes it again, past the hour the next one does. */
 const stampedAgo = (workspaceId: string, userId: string, agoMs: number) =>
   seedingWith(db().pool, async (seed) =>
     seed.workspaceLastActive({
@@ -271,7 +270,6 @@ describe("stamping a member's last activity", () => {
       openPostgres(pool),
       { workspaceId: workspace.workspaceId, userId: viewer, issuedAt: new Date() },
       async (principal) => {
-        // A shutdown mid-request: the request's own connection serves until it is released.
         ending = pool.end();
         return principal.role;
       },

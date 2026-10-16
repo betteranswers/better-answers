@@ -51,7 +51,6 @@ const flat = <Value, Inner, Outer>(
 
 export const SUITE_ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => 255 - index);
 
-/** The judge's model client, and the keys it opens; a call with no client set fails its test. */
 export type Judging = {
   readonly credentials?: Credentials;
   readonly callModel?: ModelClient["callModel"];

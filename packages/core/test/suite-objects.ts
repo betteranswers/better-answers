@@ -17,7 +17,6 @@ export const textOf = async (stream: ReadableStream<Uint8Array>): Promise<string
   return text + decoder.decode();
 };
 
-/** A test file names this in its own source: a run where no file does starts no shared Garage. */
 export const objectStoreForSuite = (): (() => ObjectStore) => {
   let store: ObjectStore | undefined;
 

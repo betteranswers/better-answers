@@ -1492,10 +1492,6 @@ describe("the per-repository lock", () => {
     const scenario = await arrange();
     await landed(scenario, writeFor());
 
-    /**
-     * A failure the action meets inside the lock; one decided before the lock is taken would
-     * prove nothing about releasing it.
-     */
     const failed = await write(scenario, scenario.editor, writeFor({ expects: { head: null } }));
     expect(failed).toEqual({ ok: false, error: "stale-precondition" });
 

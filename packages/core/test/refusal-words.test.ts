@@ -163,7 +163,6 @@ const CATALOGUED = {
 
 type EveryCataloguedWord = WordIn<typeof REFUSAL_CATALOGUE>;
 
-/** A store door's word is a defect its slice maps or passes on, never a refusal. */
 const inASlice = (file: string): boolean =>
   !(asSliceRelative([file])[0] ?? "").startsWith("store/");
 

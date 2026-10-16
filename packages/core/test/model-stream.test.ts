@@ -94,7 +94,6 @@ const ANSWERED_WHOLE = {
   spent: [{ tokensIn: 2_100, tokensOut: 140, seconds: 0, outcome: "succeeded" }],
 };
 
-/** Cut off after sending and before any reply, it counts at the size reserved for it. */
 const CUT_AT_FULL_SIZE = {
   outcome: "failed",
   spent: [{ tokensIn: 40_000, tokensOut: 16_000, seconds: 0, outcome: "failed" }],

@@ -115,10 +115,6 @@ const BEYOND_USE = {
   monthly: "2026-12-01T12:00:00.000Z",
 } as const;
 
-/**
- * This day tells a day count from a calendar interval: six months on is 28 February, 183 days
- * on 2 March.
- */
 const ANCHORED_ON_A_31ST = new Date("2026-08-31T12:00:00.000Z");
 
 const BEYOND_USE_FROM_THE_31ST = {
@@ -149,12 +145,10 @@ const DOCUMENTS_WITHHELD =
   "bound later, each time a document is indexed; and the documents found above are indexed " +
   "again now.";
 
-/** Every run in the file logs here, so a case reads back the lines of its own request alone. */
 const operatorLines: ErasureLogLine[] = [];
 
 const questionsLines: QuestionsLogLine[] = [];
 
-/** The message each questions line was logged with: two sweeps log the same shape. */
 const saidWith = new Map<QuestionsLogLine, string>();
 
 const operatorLog: ErasureLog = {

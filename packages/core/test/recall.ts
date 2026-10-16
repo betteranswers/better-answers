@@ -132,7 +132,6 @@ const buyerQuestions = z
 
 export type BuyerQuestions = z.infer<typeof buyerQuestions>;
 
-/** Refused as the recall set is, and where its sources and its questions' citations do not pair. */
 export const readBuyerQuestions = (path: string): Promise<Result<BuyerQuestions, Error>> =>
   readAs(path, buyerQuestions);
 

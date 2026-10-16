@@ -140,10 +140,6 @@ export const until = async (condition: () => Promise<boolean>): Promise<void> =>
   throw new Error("the condition never held");
 };
 
-/**
- * No test can end a worker mid-run, so the row a departed claimant would have left is
- * written instead, as the queue contract's `lapse_first` does.
- */
 export const leaseLetLapse = async (
   pool: pg.Pool,
   job: { readonly workspaceId: string; readonly jobId: string },

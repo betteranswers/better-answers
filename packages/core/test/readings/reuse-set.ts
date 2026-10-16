@@ -36,7 +36,6 @@ const reuseQuestion = z
   .strictObject({
     question: z.string().min(1).max(500),
     fits: z.array(answerKey),
-    /** Each `Answer` that differs from the question in one qualifier. */
     negatives: z.array(answerKey),
   })
   .refine(
@@ -112,16 +111,13 @@ type Tally = {
 
 export type ReuseReading = {
   readonly asked: number;
-  /** The questions whose judge answered; the tallies count only these. */
   readonly judged: number;
   readonly fits: Tally;
   readonly negatives: Tally;
-  /** `Answer`s judged to fit that the question names neither way. */
   readonly othersTaken: number;
   readonly spentGbp: string;
   /** Each judging call, its retries included, from the client's call to its outcome. */
   readonly judgeMs: { readonly median: number; readonly worst: number };
-  /** One line for each fit missed, negative taken, other taken and question unjudged. */
   readonly misses: readonly string[];
 };
 
@@ -129,13 +125,8 @@ const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better
 
 const PRICED_FROM = "2026-01-01";
 
-/** Far above a reading's spend; a run that reaches it is refused rather than spending on. */
 const LIMIT_GBP = "20";
 
-/**
- * The decision model's choice is seeded: the DPIA's list names no Workers AI entry, and a reading
- * sends synthetic content alone.
- */
 const judgeChosen = async (
   db: MigratedPostgres,
   workspaceId: string,
@@ -312,10 +303,6 @@ const askedOne = async (
   return heardOf(asking, await verdictsIn(db, answer.recordId), answers);
 };
 
-/**
- * Asks each question through the product's own `ask`, entry step and judge, in a workspace of its
- * own judging with `judge`.
- */
 export const readReuse = async (
   db: MigratedPostgres,
   set: ReuseSet,
@@ -368,12 +355,10 @@ export const recordReuseReading = async (
   process.stdout.write(reading.misses.map((miss) => `  ${miss}\n`).join(""));
 };
 
-/** The effort levels a reading may ask for; `undefined` sends none, so the model's default stands. */
 export type Effort = "low" | undefined;
 
 const requestBody = z.looseObject({ output_config: z.looseObject({}).optional() });
 
-/** Adds `output_config.effort` at the wire, beside the client's own fields, so the client stays as the product runs it. */
 export const withEffort = (send: typeof fetch, effort: Effort): typeof fetch => {
   if (effort === undefined) return send;
   return async (input, init) => {

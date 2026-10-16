@@ -353,7 +353,6 @@ describe("a workspace's model key", () => {
   });
 });
 
-/** Invented: an account id is 32 hexadecimal digits, and the token follows its colon. */
 const A_WORKERS_AI_KEY = "0123456789abcdef0123456789abcdef:invented_Token-u15";
 
 const NOT_A_WORKERS_AI_KEY = [

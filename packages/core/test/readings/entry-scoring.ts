@@ -35,7 +35,6 @@ export type EntryScoring = {
   readonly byFind: Recalls;
   readonly byEntryStep: Recalls;
   readonly byDecision: Recalls;
-  /** Questions whose call failed; their entry step's own order stands in the decision's figure. */
   readonly unscored: number;
   readonly tokensIn: number;
   readonly scoreMs: { readonly median: number; readonly worst: number };
