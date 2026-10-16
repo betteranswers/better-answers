@@ -41,7 +41,7 @@ Text a person types, such as a question or a note on a flag, never passes the wo
 - The worker reads a cue, and the word that names a sort code and account number, through its tokenizer. Core has none. The worker finds a cue by taking an ending off the written word, so core reads as a cue any word that opens with a cue's stem, a misspelt one included. The worker reads five words before the pair, and between its two numbers it reads only a naming word whole, or its plural. Core reads all the text before the pair, and whole words between its numbers. Core's reading is made the wider of the two, so that a difference between them withholds more and not less.
 - The limit is stated: a name in typed text is not withheld. The always tier is patterns, which the api tier can read, and a name needs the detector's model, which it cannot.
 - A special-category cue withholds its whole sentence, so a one-sentence question that holds one reaches the model as a placeholder alone.
-- The check is `checkTypedText` in core's `llm` layer. S2b builds its callers with the model client, and the tree does not hold them yet.
+- The check is `checkTypedText` in core's `llm` layer. Its callers are the ask's model calls on a question, the judge and the draft, in core's `answering` slice.
 
 The erasure routine rewrites what the platform wrote; a person edits what the company wrote.
 

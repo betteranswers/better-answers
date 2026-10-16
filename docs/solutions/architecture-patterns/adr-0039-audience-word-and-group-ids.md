@@ -47,7 +47,7 @@ A passage carries no pair of its own. It reads its connected source's through `i
 
 **An empty intersection forces the unit Restricted, and is never stored.** It becomes *Restricted* for *everyone*, which the predicate reads as Admins alone. It is never stored as *groups* over an empty list.
 
-**A Restricted connected source's named people are a `group` row** of ADR 0038's implicit origin, whose id `audience_groups` names. Nothing here mints one. Minting it is an action of connected source management.
+**A Restricted connected source's named people are a `group` row** of ADR 0038's audience-minted origin, whose id `audience_groups` names. Nothing here mints one. Minting it is an action of connected source management.
 
 ## Why
 

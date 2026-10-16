@@ -57,4 +57,4 @@ The gate that treats uncited text as below threshold is the Editor's.
 
 ## History
 
-The full record, with its one amendment (ticket 79, applied by T-001, making roles levels): `docs/archive/adr/0015-write-ups-cite-concepts-by-footnote.md`. S2a's plan made a concept body's source footnote a citation mark (`docs/plans/2026-10-09-1344-feat-s2a-search-and-concept-page-plan.md`, KTD5).
+The full record, with its one amendment (ticket 79, applied by T-001, making roles levels): `docs/archive/adr/0015-compositions-cite-concepts-by-footnote.md`. S2a's plan made a concept body's source footnote a citation mark (`docs/plans/2026-10-09-1344-feat-s2a-search-and-concept-page-plan.md`, KTD5).

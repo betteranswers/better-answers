@@ -34,7 +34,7 @@ The interface is Tailwind v4. Its theme is the design system's tokens, read thro
 - The components live in `apps/web/src/shared/ui/`, with `kibo-ui/` and `ai-elements/` beside the shadcn primitives. `apps/web/components.json` records the registries and aliases.
 - Four rules that judge how a component is written are off over `apps/web/src/shared/ui/**` alone, in `.oxlintrc.json`. Every import rule, the accessibility rule at the page and the anti-slop rules stay on.
 - Kibo UI's `table` is rejected, because it is written against `@tanstack/react-table` v8. The shadcn `table` primitive stands in.
-- better-auth-ui is not used. The auth module's own TanStack Query factories over the `better-auth` client, in `apps/web/src/features/auth/auth-hooks.ts`, replace its provider, its `localization` and its hooks. The module's word map, `workspace-words.ts`, holds the words a page shows. The package and its two `declare module` augmentations are gone.
+- better-auth-ui is not used. The auth module's own TanStack Query factories over the `better-auth` client, in `apps/web/src/features/auth/auth-hooks.ts`, replace its provider, its `localization` and its hooks. The module's words files, `sign-in-words.ts` and `workspace-words.ts` among them, hold the words its pages show. The package and its two `declare module` augmentations are gone.
 - better-auth-ui's 28 rendered sign-in files stay refused. They are sign-up, password and social pages for a product this platform does not have.
 - `apps/web` stays on `moduleResolution: "bundler"` on the SPA's own grounds: Vite builds it and nothing in it is emitted.
 

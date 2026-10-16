@@ -1092,7 +1092,7 @@ cite.
 ### answer contract
 
 _Internal._ the one shape an answer takes for the UI, MCP and the response record: an event
-stream — verdict first — folded into one object.
+stream that gives the verdict before any prose, folded into one object.
 
 ### related knowledge
 
@@ -1336,8 +1336,9 @@ Not an *export* of knowledge.
 ### identity-set audit log
 
 The append-only record of the actions that belong to no workspace because they act on a person's
-identity itself: a person giving their own *display name*, an Admin's flag on one, a sign-in, every
-write the *operator* makes, and an Admin's action that ends a person's access.
+identity itself: a person giving their own *display name*, an Admin's flag on one, a sign-in, a
+person's own second-factor actions, a person ending their own sessions, every write the *operator*
+makes, and an Admin's action that ends a person's access.
 
 It sits beside the *audit log* and uses the same *audit actions*. A person appears in it by *person
 id*, never by name or address, and no row is ever rewritten. Only the operator reads it; no
@@ -1931,7 +1932,7 @@ leads to Members.
 The *page* a member lands on after signing in, and the one offered back when a page fails or an
 address names nothing they may see.
 
-It is Ask for an Editor or a Viewer, and People › Members for an Admin until Control Centre ›
+It is Ask › New question for an Editor or a Viewer, and People › Members for an Admin until Control Centre ›
 Overview is built. A role's home shows in the *icon rail* even before it is built, and then says
 plainly that it is on its way. The *console* has one home for everyone, Workspaces › Every
 workspace, which is where the *operator* lands while they belong to no workspace.

@@ -24,7 +24,7 @@ tags:
 
 ## The decision
 
-A passage's visibility is read, not carried. `index.readable_passage` is a `security_invoker` view that joins the passage to its connected source and its document (`packages/schema/migrations/0044_the-readable-chunk.sql`).
+A passage's visibility is read, not carried. `index.readable_passage` is a `security_invoker` view that joins the passage to its connected source and its document (`packages/schema/migrations/0044_the-readable-chunk.sql`, as `readable_chunk` and `narrower_class`, renamed by `0069_the-passage.sql` and `0072_the-knowledge-words.sql`).
 
 - `published_at`, `audience` and `audience_groups` are the connected source's.
 - `sensitivity` is the narrower of the connected source's sensitivity and the document's, by `narrower_sensitivity`. That is the document's *effective class*.

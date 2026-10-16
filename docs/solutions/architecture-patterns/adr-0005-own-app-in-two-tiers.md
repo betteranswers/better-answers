@@ -52,7 +52,7 @@ The envelope a credential is sealed in has a written format:
 - A reader refuses a version it does not know rather than guessing. It seals under the newest version it knows.
 - Each tier has an opener, `packages/core/src/kernel/envelope.ts` and `apps/worker/src/better_answers_worker/envelope.py`. A frame it cannot open answers `envelope-version-unknown`, `envelope-malformed` or `envelope-not-authentic`. A key of the wrong length throws.
 - The golden vector is at `contracts/credential-envelope/`.
-- ADR 0041's credentials provider is not built. It lands with the first slice that needs a credential.
+- ADR 0041's credentials provider is built for the LLM-provider class alone (`packages/core/src/llm/credentials.ts`). The first slice that needs another class builds that class's part.
 
 ## Why
 
