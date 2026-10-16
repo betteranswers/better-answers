@@ -165,6 +165,9 @@ def _refuse_unless_superuser(maintenance: str) -> None:
         raise RuntimeError(message)
 
 
+_TEMPLATE_PREFIX = "tpl_py_"
+
+
 def template_name() -> str:
     digest = hashlib.sha256()
     files = sorted(
@@ -175,7 +178,7 @@ def template_name() -> str:
     for relative, path in files:
         digest.update(relative.encode("utf-8") + b"\0" + path.read_bytes() + b"\0")
     digest.update(Path(__file__).read_bytes())
-    return f"tpl_py_{digest.hexdigest()[:12]}"
+    return f"{_TEMPLATE_PREFIX}{digest.hexdigest()[:12]}"
 
 
 def _exists(admin: psycopg.Connection, database: str) -> bool:
@@ -231,9 +234,6 @@ def _publish(
             Identifier(building), Identifier(name)
         )
     )
-
-
-_TEMPLATE_PREFIX = "tpl_py_"
 
 
 def _stamp_use(admin: psycopg.Connection, database: str) -> None:

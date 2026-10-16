@@ -98,6 +98,8 @@ const filesUnder = async (folder: string): Promise<readonly string[]> => {
     .toSorted();
 };
 
+const TEMPLATE_PREFIX = "tpl_ts_";
+
 /** Named for everything the build reads, so a branch with other migrations never clones it. */
 export const templateNameOver = async (folder: string): Promise<string> => {
   const files = await filesUnder(folder);
@@ -110,7 +112,7 @@ export const templateNameOver = async (folder: string): Promise<string> => {
       .update("\0");
   });
   digest.update(await readFile(HARNESS_SOURCE)).update(MARK_THE_MATCH_LEAKPROOF);
-  return `tpl_ts_${digest.digest("hex").slice(0, 12)}`;
+  return `${TEMPLATE_PREFIX}${digest.digest("hex").slice(0, 12)}`;
 };
 
 const databaseExists = async (admin: pg.Client, database: string): Promise<boolean> => {
@@ -125,17 +127,15 @@ const dropTemplate = async (admin: pg.Client, database: string): Promise<void> =
   await admin.query(`DROP DATABASE ${quoted(database)} WITH (FORCE)`);
 };
 
-const TEMPLATE_PREFIX = "tpl_ts_";
-
 const stampUse = (admin: pg.Client, database: string): Promise<unknown> =>
   admin.query(`COMMENT ON DATABASE ${quoted(database)} IS '${new Date().toISOString()}'`);
 
-/** Null for a template with no use stamp yet, which is stamped now rather than dropped. */
-const agesOf = async (
-  admin: pg.Client,
-): Promise<readonly { datname: string; stale: boolean | null }[]> =>
+/** `stale` is null for a template with no use stamp yet, which is stamped now rather than dropped. */
+type TemplateAge = { readonly datname: string; readonly stale: boolean | null };
+
+const agesOf = async (admin: pg.Client): Promise<readonly TemplateAge[]> =>
   (
-    await admin.query<{ datname: string; stale: boolean | null }>(
+    await admin.query<TemplateAge>(
       String.raw`SELECT datname, CASE WHEN shobj_description(oid, 'pg_database') ~ '^\d{4}-\d{2}-\d{2}T'
          THEN shobj_description(oid, 'pg_database')::timestamptz < now() - interval '1 day' END AS stale
          FROM pg_database WHERE datistemplate AND starts_with(datname, $1)`,
