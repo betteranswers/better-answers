@@ -30,7 +30,7 @@ The engine is ADR 0032's: plain Postgres tables under RLS. This record holds the
 - The bundle-and-record delta lands in the api's commit transaction, beside the concept index row, the `bundle_commit` and the audit event. The map is never behind for an edit.
 - Generations survive only for full rebuilds. A rebuild writes the next generation beside the live one and swaps with one row update.
 - Keys are never text: concepts by IRI, sections by `(IRI, slug)`, source entities by `(document, type, normalised-text hash)`, actors by `(workspace, actor id)`, write-ups by `(record id, version)`.
-- A confirmed alias merge makes a canonical entity, each contribution hanging off it by `SAME_AS` under its own connected source, sensitivity and audience.
+- A confirmed alias merge makes a canonical entity. Each contribution hangs off it by `SAME_AS`, under its own connected source, sensitivity and audience.
 - The label set is closed and owned by the migrations. A concept's kind is a property, never a label.
 - A `Person` concept starts Restricted whatever its evidence says. Only a recorded Admin override widens it.
 
@@ -40,22 +40,22 @@ A sensitivity is derived:
 
 - Most restrictive among the connected sources of the evidence a concept cites, and among a write-up's includes.
 - Re-derived synchronously inside the narrowing action, two levels down: connected source, then concept, then write-up.
-- One writer is the exception: the worker's sync, which narrows a document on a special-category verdict and lifts it back after a dismissal. The worker cannot run the derivation, so its index job's outcome names the documents it moved (ADR 0031's `sync-sensitivity-moves`), and the api's tick re-derives their concepts and write-ups under a platform principal. A reader may still reach a concept the narrowed document refuses from the sync's catalogue write, through the rest of the sync, until one tick after its job ends or its claim lapses.
+- One writer is the exception: the worker's sync, which narrows a document on a special-category verdict and lifts it back after a dismissal. The worker cannot run the derivation, so its index job's outcome names the documents it moved (ADR 0031's `sync-sensitivity-moves`). The api's tick then re-derives their concepts and write-ups under a platform principal. A reader may still reach a concept that the narrowed document refuses. This lasts from the sync's catalogue write, through the rest of the sync, until one tick after its job ends or its claim lapses.
 - Audiences combine by intersection, with *everyone* the identity. An empty intersection forces Restricted (ADR 0039).
-- A unit resting on nothing takes its fallback: the writer's word on a creation, what the row holds on anything else.
+- A unit resting on nothing takes its fallback: on a creation, the writer's word; on anything else, what the row holds.
 
-The walk's timeout is set per statement, never on a role. Entry is by key, never by a map-side index, and admits a set of keys. The governed write refuses a citation of a document the workspace's catalogue does not hold (`no-such-document`), so only a concept citing nothing takes the fallback.
+The walk's timeout is set per statement, never on a role. A walk enters by key, never by a map-side index, and its entry admits a set of keys. The governed write refuses a citation of a document the workspace's catalogue does not hold (`no-such-document`), so only a concept citing nothing takes the fallback.
 
 ## Why
 
 - A label is a registry: a schema object created, named, indexed and granted before any row can wear it. Labels by kind would rebuild the vocabulary file ADR 0001 died for, and nothing on the write path could create one.
 - Every other store in the estate has two isolation controls. `workspace_id` in every `WHERE` gives the map its second.
 - A sensitivity is a record, not knowledge: a company marks documents confidential, not each unit of what it knows. So a sensitivity may be derived and recomputed.
-- A queued recompute reopens the leak for the length of the queue. One level only lets the guide-footnote leak survive.
-- The sync's exception accepts that leak for a bounded time because nothing narrower is open to it: the derivation is the api's alone, and the worker calls nothing in the api (ADR 0005). Its passages are hidden at once, because a passage's visibility is read through the document (ADR 0044); the concept row is what waits for the tick.
+- A queued recompute reopens the leak for the length of the queue. Re-deriving only one level lets the guide-footnote leak survive.
+- The sync's exception accepts that leak for a bounded time because nothing narrower is open to it: the derivation is the api's alone, and the worker calls nothing in the api (ADR 0005). Its passages are hidden at once, because a passage's visibility is read through the document (ADR 0044). The concept row is what waits for the tick.
 - Generations, the debounce and the watermark bridged a second store the api could not write transactionally. That store is gone. Rebuild-equivalence and the nightly second parser keep the map derived.
 - A refusal after the commit would be the reconciler's finding, and the reconciler is for crashes.
-- A carried passage visibility was a copy five writers in two tiers kept equal by racing.
+- A carried passage visibility was a copy that five writers in two tiers kept equal by racing.
 - One walk per full-text match multiplies the cost and the row cap's reach by the number of matches.
 
 ## Rejected
@@ -71,4 +71,4 @@ The full record, with its seven amendments (among them T-055, T-078, T-113 and T
 
 Amended 09/10/2026 by the plan for BA-85 (`docs/plans/2026-10-09-1517-fix-sync-narrows-citing-concepts-plan.md`): the worker's sync is the one writer of a sensitivity whose cascade runs on the api's next tick rather than inside its own transaction.
 
-It superseded ADR 0021, which put the map on one shared Neo4j Community instance, rebuilt rather than backed up. That went because a JVM reserving about 3 GB for a map of tens of megabytes, a second stateful service that could not be backed up without stopping it, cost more than the port.
+It superseded ADR 0021, which put the map on one shared Neo4j Community instance, rebuilt rather than backed up. That went because it cost more than the port: a JVM reserving about 3 GB for a map of tens of megabytes, a second stateful service that could not be backed up without stopping it.

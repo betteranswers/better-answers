@@ -27,7 +27,7 @@ tags:
 - An Editor's and a Viewer's home is Ask › New question. They land there after signing in, and the not-found page offers it back.
 - An Admin lands on People › Members until Control Centre › Overview is built.
 - Control Centre stays the one Admin area, shown to Admins alone. Questions keeps *Questions asked* and the answer tests. Their names and addresses stayed until BA-29 renamed the first in the reader's words, on 07/10/2026.
-- What this record first set aside as a filtered Control Centre is now the decision, one level up: one rail, filtered page by page by role or by ownership of a collection (ADR 0047). Control Centre itself stays Admin-only, so a reader's home is never in it.
+- This record first set aside a filtered Control Centre. That idea is now the decision, one level up: one rail, filtered page by page by role or by ownership of a collection (ADR 0047). Control Centre itself stays Admin-only, so a reader's home is never in it.
 - *Questions asked* is read by Admins alone, in Control Centre › Questions. Each person reads their own questions in Ask › Your questions.
 - An owner decides in their Inbox, whatever their role (ADR 0047).
 - The console is reached from the workspace switcher, which lists it to the operator alone.
@@ -37,7 +37,7 @@ One thing stays open: an Editor's home once question sets land. It is Ask, or th
 ## Why
 
 - Someone who asks questions and reads answers should land where asking happens. Questions is where an Admin judges the answers other people got. Sending a Viewer there first shows them an audit they cannot act on, under a name they have not learnt yet.
-- The first fix proposed was to rename the view *Answers*. ADR 0017 had already refused that word for this door, because it would send readers to the bid library's wrong home, and the first customer's bid library is 241 `Answer` concepts. The design review found the home was the fault, and the name never was.
+- The first fix proposed was to rename the view *Answers*. ADR 0017 had already refused that word for this door. The word would send readers to the wrong home for the bid library, and the first customer's bid library is 241 `Answer` concepts. The design review found the fault was the home, never the name.
 - The first change was cheap: the web app already ran a second area, the console, through the same frame. One rail of areas then made a second set of regions unnecessary. An Admin who also asks reaches Ask from the same rail.
 - A reader needs their own history and the flags they can act on, not the workspace's questions. Ask gives them the first and their Inbox the second, so the workspace-wide audit stays with the Admin.
 

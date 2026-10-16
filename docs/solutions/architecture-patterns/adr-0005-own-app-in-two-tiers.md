@@ -32,13 +32,13 @@ The platform is our own application, not a fork, in two runtime tiers.
 The tiers share four stores and never code: the Postgres schema, the object store, the git store (a bare repository per workspace) and the map.
 
 - There is no HTTP between the api and the worker. The control plane is rows.
-- The api is the bundle's only writer. A concept the worker produces reaches the bundle as a suggestion's payload, which the api commits on acceptance. The worker holds no git credential.
+- The api is the bundle's only writer. A concept the worker produces reaches the bundle as a suggestion's payload, which the api commits when the suggestion is accepted. The worker holds no git credential.
 - The tier contract's fixtures live in top-level `contracts/` (ADR 0031).
 
 Third-party code is lifted by contract as pinned snapshots, never tracked as a fork or a submodule.
 
 - Each lift's directory carries a `THIRD_PARTY_NOTICES.md`, as `apps/api/lifts/better-auth-cimd-node/` does.
-- What that file holds, and the contract test a refresh must pass, is the api's rule *Test every lift by contract, never by trust*, in `apps/api/CODING_STANDARDS.md`.
+- The api's rule *Test every lift by contract, never by trust*, in `apps/api/CODING_STANDARDS.md`, says what that file holds and the contract test a refresh must pass.
 - The licence posture is ADR 0027's own text.
 - The constitution's rules on lifting are retired. Lifting by contract stands as this decision.
 
@@ -46,11 +46,11 @@ Python is unavoidable because of cocoindex and Google's OKF reference agent. Doc
 
 The envelope a credential is sealed in has a written format:
 
-- AES-256-GCM, spelled `aes-256-gcm`, in a versioned frame of version, nonce, ciphertext and tag: one byte, twelve bytes, the plaintext's length, sixteen bytes. The key is thirty-two bytes.
+- The cipher is AES-256-GCM, spelled `aes-256-gcm`. Its frame is versioned and holds the version (one byte), the nonce (twelve bytes), the ciphertext (the plaintext's length) and the tag (sixteen bytes). The key is thirty-two bytes.
 - The version is the first byte and also the additional authenticated data. Version 1 is that frame under AES-256-GCM.
 - Every seal draws a fresh random nonce, never a counter.
 - A reader refuses a version it does not know rather than guessing. It seals under the newest version it knows.
-- Each tier has an opener, `packages/core/src/kernel/envelope.ts` and `apps/worker/src/better_answers_worker/envelope.py`. A frame it cannot open answers `envelope-version-unknown`, `envelope-malformed` or `envelope-not-authentic`. A key of the wrong length throws.
+- Each tier has an opener, `packages/core/src/kernel/envelope.ts` and `apps/worker/src/better_answers_worker/envelope.py`. When an opener cannot open a frame, it answers `envelope-version-unknown`, `envelope-malformed` or `envelope-not-authentic`. A key of the wrong length throws.
 - The golden vector is at `contracts/credential-envelope/`.
 - ADR 0041's credentials provider is built for the LLM-provider class alone (`packages/core/src/llm/credentials.ts`). The first slice that needs another class builds that class's part.
 
@@ -59,9 +59,9 @@ The envelope a credential is sealed in has a written format:
 - No candidate works as a whole base. Onyx gates permission sync, tenancy and groups behind an Enterprise licence and needs 11 containers. Dust is a SaaS-entangled 1.1M-line codebase with no source-permission inheritance.
 - Both move at 500 to 1,400 commits a month, so a fork diverges within weeks.
 - Python is unavoidable (cocoindex has no TypeScript SDK) while the api's framework, the MCP SDK and tRPC are TypeScript.
-- A contract of data lets a worker run on another network with nothing but a database connection string, the shape a customer-hosted worker needs.
+- A contract of data lets a worker run on another network with nothing but a database connection string. A customer-hosted worker needs that shape.
 - The api decrypts and hands a sync its credentials, so the worker never holds the master key.
-- AES-256-GCM is already in both tiers (Node's `node:crypto`, and `cryptography` in the worker's lock), is hardware-accelerated on every machine in the estate, and is what NIST SP 800-38D names, which matters to public-body buyers.
+- AES-256-GCM is already in both tiers (Node's `node:crypto`, and `cryptography` in the worker's lock) and is hardware-accelerated on every machine in the estate. NIST SP 800-38D names it, which matters to public-body buyers.
 - The version comes first so a reader refuses an unknown one before it decrypts a byte. As authenticated data it binds the tag to the layout, so a version 1 body re-framed as version 2 does not open.
 - Two processes share a key, so a counter would hand out one nonce twice, and under GCM a repeated nonce gives the plaintexts away.
 - One word covers a moved byte and a wrong key alike, because an opener that told them apart would be an oracle.

@@ -35,7 +35,7 @@ The agreements live in top-level `contracts/`, listed in `contracts/manifest.jso
 - `queue` (SQL functions): claim, lease, heartbeat, reaper, attempt count and poison threshold; the kinds a claimant runs, a job's subject and the run key.
 - `suggestions` (SQL function): submitting a suggestion set; what acceptance promises is fixtured.
 - `model-choice` (SQL function): one model choice per workspace per purpose, resolved by the database.
-- `cost-ledger` (generated): the `llm_call` row, its golden rows held to the migrated table's columns and outcomes and to the purpose vocabulary both tiers speak.
+- `cost-ledger` (generated): the `llm_call` row. Its golden rows are held to the migrated table's columns and outcomes, and to the purpose vocabulary both tiers speak.
 - `credential-envelope`: the envelope's sealed vectors and the words an opener refuses with.
 - `id-shape`: the one shape every minted id has.
 - `concept-file`: the canonical text and content hash of a concept file.
@@ -46,11 +46,11 @@ The agreements live in top-level `contracts/`, listed in `contracts/manifest.jso
 - `emptying-a-connected-source`: the reasons on an index job that empty its connected source.
 - `erasure-match`: what counts as an occurrence of a suppressed identifier.
 - `links`: which of a concept body's footnotes are citation marks and which are links, and the ordinals the links take.
-- `sync-sensitivity-moves`: the key an index job's outcome names the documents its sync moved under, which documents count as moved, and how the api reads the key.
+- `sync-sensitivity-moves`: the key under which an index job's outcome names the documents its sync moved, which documents count as moved, and how the api reads the key.
 
 All but the first four are fixtured.
 
-Each agreement is proved by both tiers' suites from its own side, in `packages/core/test/tier-contract.test.ts` and `apps/worker/tests/test_tier_contract.py`. Each tier holds its own code to the fixture, never to a copy of the other tier's, so a failure lands on the side that diverged. A manifest entry's form is held to the disk: a fixtured agreement has its fixture and a generated one its golden rows.
+Both tiers' suites prove each agreement, each from its own side, in `packages/core/test/tier-contract.test.ts` and `apps/worker/tests/test_tier_contract.py`. Each tier holds its own code to the fixture, never to a copy of the other tier's, so a failure lands on the side that diverged. A manifest entry's form is held to the disk: a fixtured agreement has its fixture and a generated one its golden rows.
 
 The contract's version is a digest of `contracts/`, which each tier computes at build. `migrate` stamps it, and the worker compares its own beside the schema stamp. A mismatch refuses the claim. Editing a fixture edits no version number. The worker also claims no job while its schema stamp does not match the migration journal.
 
@@ -63,7 +63,7 @@ The read predicate's logic is api-only. The worker's reads are a producer's read
 - A pnpm package cannot serve the seam, because the worker is Python. A directory both suites read can.
 - A version constant beside each test could fail only by someone forgetting to edit a number, and nothing read it at run time. The digest makes a partial deploy loud.
 - No worker behaviour reads under the predicate. The nightly parse audit compares against every row, and a filter would make it report false mismatches.
-- The strict stamp check costs the minutes of a deploy already under way. Queued work is delayed, never lost. It reopens with a customer-hosted worker, whose redeploy we do not control.
+- The strict stamp check costs the minutes of a deploy already under way. Queued work is delayed, never lost. The strict check reopens with a customer-hosted worker, whose redeploy we do not control.
 
 ## Rejected
 

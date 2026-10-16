@@ -28,7 +28,7 @@ A passage's visibility is read, not carried. `index.readable_passage` is a `secu
 
 - `published_at`, `audience` and `audience_groups` are the connected source's.
 - `sensitivity` is the narrower of the connected source's sensitivity and the document's, by `narrower_sensitivity`. That is the document's *effective class*.
-- `narrower_sensitivity` is the sensitivity ranking's one SQL statement.
+- `narrower_sensitivity` is the one SQL statement of the sensitivity ranking.
 - `passageAt`, `findPassages` and `previewPassages` (`packages/core/src/sources/passages.ts`) read the view.
 - A passage whose connected source row is gone is unreadable.
 
@@ -48,9 +48,9 @@ Only S8 measuring a need for the filter columns on the indexed table reopens thi
 
 ## Why
 
-- Five writers in two tiers copied the four columns, and the fold was written four ways. A sync that read the connected source before a narrowing committed landed its rows at the old, wider sensitivity. The re-copy at sync end never ran if the sync failed, and could itself write a pre-narrowing sensitivity over a narrowing that had just committed.
+- Five writers in two tiers copied the four columns, and the fold was written four ways. A sync that read the connected source before a narrowing had committed landed its rows at the old, wider sensitivity. The re-copy at sync end never ran if the sync failed, and could itself write a pre-narrowing sensitivity over a narrowing that had just committed.
 - One SQL statement reads one snapshot. A read that joins the passage to its connected source and its document cannot see a narrowing half-applied, whatever the sync believed. The safety is the database's own, and needs no lock order.
-- Committing the catalogue writes first puts a document's special-category sensitivity on its row before any passage of it can be read. It is per sync, because the landing converges the whole connected source's rows in one update. A sync that dies between the two leaves findings for passages not yet landed, until the retry.
+- Committing the catalogue writes first puts a document's special-category sensitivity on its row before any passage of it can be read. This order is per sync, because the landing converges the whole connected source's rows in one update. A sync that dies between the two leaves findings for passages not yet landed, until the retry.
 - Measured on 1,000,000 passage rows under RLS, `find` through the view ran at p50 45 ms and p95 235 ms. That is inside ADR 0037's one second and no slower than the copies.
 - `security_invoker` makes the base tables' policies and the caller's privileges decide. A barrier would stop the planner reordering through the view.
 - The joins carry `workspace_id` beside the id, so the read prunes to one tenant's partition.

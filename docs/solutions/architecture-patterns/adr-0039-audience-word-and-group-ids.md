@@ -24,7 +24,7 @@ tags:
 
 ## The decision
 
-**The representation.** Every readable unit and the connected source carry a pair: `concept_index`, `write_up`, `connected_source`, `concept_sensitivity_override`, `map_node` and `map_edge`.
+**The representation.** Every readable unit and the connected source carry a pair. The tables that carry it are `concept_index`, `write_up`, `connected_source`, `concept_sensitivity_override`, `map_node` and `map_edge`.
 
 - `audience` is *everyone* or *groups*, narrowed at the boundary.
 - `audience_groups text[]` holds ADR 0038's group ids.
@@ -32,22 +32,22 @@ tags:
 
 A passage carries no pair of its own. It reads its connected source's through `index.readable_passage` (ADR 0044).
 
-**The predicate's third term** is `audience = 'everyone' OR audience_groups && $groups`. The caller's group ids are resolved on each call by the Principal resolver.
+**The predicate's third term** is `audience = 'everyone' OR audience_groups && $groups`. The Principal resolver resolves the caller's group ids on each call.
 
 - It fails closed. An empty caller list, a NULL array and a deleted group's dangling id all overlap nothing.
 - It is conjoined with the other two terms. An audience narrows a Restricted unit's Admins exactly as it narrows an Internal unit's members. The Admin arm is the sensitivity's alone.
 
 **Audiences combine by intersection, with *everyone* the identity.** The sensitivity combines beside it by ADR 0023's most-restrictive rule. One derivation does both: `derivedVisibility` in `packages/core/src/access`.
 
-- A recorded Admin override outranks everything, then the combination. A unit resting on nothing takes its fallback. The per-kind floor narrows the sensitivity and never widens it.
+- A recorded Admin override outranks everything. The combination comes next. A unit resting on nothing takes its fallback. The per-kind floor narrows the sensitivity and never widens it.
 - It runs at write time: the governed write derives the row it lands.
-- A narrowing re-derives synchronously two levels down, in the narrowing action's own transaction: every concept citing the connected source's documents, then every write-up including them.
+- A narrowing re-derives synchronously two levels down, in the narrowing action's own transaction. It re-derives every concept citing the connected source's documents, then every write-up including them.
 - The map's copies of the columns are rewritten in that same transaction.
-- The worker's sync is the exception: it narrows or lifts a document outside any action of the api's, so the api's tick re-derives what it moved, two levels down and the map's copies with them, one transaction per sync (ADR 0023).
+- The worker's sync is the exception. It narrows or lifts a document outside any action of the api's. So the api's tick re-derives what the sync moved, two levels down and the map's copies with them, in one transaction per sync (ADR 0023).
 
 **An empty intersection forces the unit Restricted, and is never stored.** It becomes *Restricted* for *everyone*, which the predicate reads as Admins alone. It is never stored as *groups* over an empty list.
 
-**A Restricted connected source's named people are a `group` row** of ADR 0038's audience-minted origin, whose id `audience_groups` names. Nothing here mints one. Minting it is an action of connected source management.
+**A Restricted connected source's named people are a `group` row** of ADR 0038's audience-minted origin, and `audience_groups` names its id. Nothing here mints one. Connected source management mints it.
 
 ## Why
 

@@ -22,16 +22,16 @@ tags:
 
 ## The decision
 
-A `Clock`, `{ now(): Date }`, lives in the kernel (`packages/core/src/kernel/clock.ts`). It is a value, not a fifth door. The api builds one `systemClock()` per process, in `openDoors` (`apps/api/src/doors.ts`), which `apps/api/src/main.ts` and `apps/api/src/ops.ts` each call once, and hands it down explicitly.
+A `Clock`, `{ now(): Date }`, lives in the kernel (`packages/core/src/kernel/clock.ts`). It is a value, not a fifth door. The api builds one `systemClock()` per process and hands it down explicitly. It builds the clock in `openDoors` (`apps/api/src/doors.ts`), which `apps/api/src/main.ts` and `apps/api/src/ops.ts` each call once.
 
 - An action that reads one instant and spends it once takes a plain `now: Date` from its caller (`open`, `find`, `approveRequest`, the git door's `CommitRequest.at`).
 - An action that hands the reading on to more than one call takes the `Clock` and reads it itself (`writeConcept`, the reconciler).
 - No parameter defaults to `new Date()`.
 - A row's own timestamp stays the database's `now()`: the audit log, `bundle_commit` and the worker's job queue.
 - The worker is handed no Clock. Its one clock-shaped read is the ULID minter's, which orders an id and decides nothing.
-- The identity set's `updated_at` columns are stamped by Better Auth inside the library (ADR 0009). Where the platform's raw SQL writes to those tables stamps `updated_at`, it sets `updated_at = now()`.
+- The identity set's `updated_at` columns are stamped by Better Auth inside the library (ADR 0009). Where one of the platform's raw-SQL writes to those tables stamps `updated_at`, that write sets `updated_at = now()`.
 
-The gate is a tree scan, `apps/api/tests/no-ambient-clock.test.ts`, over `packages/core/src`, `apps/api/src` and `packages/schema/src`. It has two exemptions: `kernel/clock.ts` and the ULID minter. The lint can now express the same selectors, but the scan stays: in the lint, each exemption would be an override restating every other selector.
+The gate is a tree scan, `apps/api/tests/no-ambient-clock.test.ts`, over `packages/core/src`, `apps/api/src` and `packages/schema/src`. It has two exemptions: `kernel/clock.ts` and the ULID minter. The lint can now express the same selectors, but the scan stays. In the lint, each exemption would be an override restating every other selector.
 
 ## Why
 

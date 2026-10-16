@@ -23,7 +23,7 @@ tags:
 
 ## The decision
 
-A connected source is defined by **origin** (company or external; platform origin is an evidence kind with no connected source), **reach** (copied or read live) and **destination** (the passage index, the bundle, the map; at least one).
+A connected source is defined by **origin** (company or external), **reach** (copied or read live) and **destination** (the passage index, the bundle, the map; at least one). Platform origin is an evidence kind with no connected source.
 
 It is gated by three permission fields:
 
@@ -47,7 +47,7 @@ An unpublished connected source derives as Restricted until its publish.
 - The publish is let through only once the connected source's latest sync is done.
 - The publish releases the connected source's sensitivity down the cascade.
 
-An Admin's recorded widen action (`widenConnectedSource`, in the `sources` slice) is the one road by which a connected source widens.
+A connected source widens only through an Admin's recorded widen action (`widenConnectedSource`, in the `sources` slice).
 
 - Its audit row carries the sensitivity and audience the connected source moved from and to.
 - It is refused while a special-category finding is unreviewed.
@@ -61,10 +61,10 @@ An Admin's recorded widen action (`widenConnectedSource`, in the `sources` slice
 - Publishing is a legal action with confirmations: lawful basis recorded, privacy information updated, a DPIA reference. Sensitivity alone cannot say "not yet" or "for one group only".
 - A concept's citation must survive the document it rests on, or trust is a lie.
 - The publish reads the latest index job, because publishing says somebody reviewed what the sync found.
-- A converter's normalised text is the address space every span and every content hash is read against. Swapping a converter's output reprocesses every document of that type and sends every citation into them to a citation fix.
+- A converter's normalised text is the address space every span and every content hash is read against. Swapping a converter's output reprocesses every document of that type. It also sends every citation into those documents to a citation fix.
 - Conversion runs before the redaction seam, so its input is unredacted. A hosted parser is refused.
 - A document has no audience of its own, because an audience is a decision about people and a connected source is where that decision is made.
-- With no widen action, an Admin who published at Restricted could open the connected source only by connecting the file again: a one-way door, placed where the platform steers Admins.
+- With no widen action, an Admin who published at Restricted could open the connected source only by connecting the file again. That is a one-way door, placed where the platform steers Admins.
 
 ## Rejected
 

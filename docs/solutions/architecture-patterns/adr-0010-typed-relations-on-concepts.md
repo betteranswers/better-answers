@@ -26,9 +26,9 @@ A concept file carries no `relations` key and no typed link. It carries only the
 
 - There is no relation schema either: no predicate list with from and to kinds, in the bundle or in a platform table.
 - A relation on the map is the link, the sentence around it and the two endpoint kinds, held as a `LINKS_TO` edge. Its kind is read from the sentence, never from a predicate (ADR 0026).
-- `SUPERSEDES`, `CITES` and `IS_CONCEPT` are the only named edges between concepts. `DERIVED_FROM` and `SAME_AS` are the platform's own bookkeeping and are not relations. That is six edge labels in all, `MAP_EDGE_LABELS` in `packages/schema/src/map-tables.ts`: `LINKS_TO` and five named edges.
+- `SUPERSEDES`, `CITES` and `IS_CONCEPT` are the only named edges between concepts. `DERIVED_FROM` and `SAME_AS` are the platform's own bookkeeping and are not relations. That is six edge labels in all: `LINKS_TO` and five named edges. They are `MAP_EDGE_LABELS` in `packages/schema/src/map-tables.ts`.
 - Product tiers are concepts, and a guide's tier axis reads the map.
-- A guide's expectation may select by relation to the subject as the map holds it, as well as by type and company-language tags. It never selects by directory, or by a tag that names a guide section.
+- A guide's expectation may select by type and company-language tags. It may also select by relation to the subject, as the map holds that relation. It never selects by directory, or by a tag that names a guide section.
 
 ## Why
 

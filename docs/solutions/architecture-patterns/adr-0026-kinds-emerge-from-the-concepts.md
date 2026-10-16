@@ -27,9 +27,9 @@ A concept's `type`, its kind, is the short string its producer chose, folded at 
 
 - The Kinds list is the set of kinds in use, derived from the concept index with counts per kind and per collection. It is never a file in the bundle, never a table an Admin curates, and never checked closed-world.
 - A new kind arrives with the concepts that carry it. The suggestion set's summary names it, and accepting the concepts accepts the kind.
-- An Admin renames or merges a kind from the Kinds list on Knowledge. That is one bulk commit that rewrites every affected `type` and re-keys `concept_identity` in the same transaction, because `type` is inside the merge key.
+- An Admin renames or merges a kind from the Kinds list on Knowledge. That is one bulk commit that rewrites every affected `type`. The same transaction re-keys `concept_identity`, because `type` is inside the merge key.
 - A kind's definition is a `Term` concept in a glossary collection. Tags stay free strings.
-- An alias is knowledge: a confirmed alias lands as an *Also known as* line in the concept body, and `concept_identity` derives its merge-key names from that line and the `title`.
+- An alias is knowledge: a confirmed alias lands as an *Also known as* line in the concept body. `concept_identity` derives its merge-key names from that line and the `title`.
 
 A relation between concepts is the link, and it is never named. Every markdown link between concepts is a `LINKS_TO` edge carrying the two endpoint kinds, the section and the sentence around it. There is no relations list, no predicate matcher and no `RELATES_TO` matrix. An agent that wants the predicate reads the sentence.
 
@@ -45,7 +45,7 @@ A kind is an indexed property on the one `Concept` label, never a label of its o
 - OKF's first non-goal is a fixed taxonomy of concept types, and its one required key is "not registered centrally". A producer mints a concept so it need not fit anywhere yet.
 - The driver is simplicity for companies of one to five hundred people. Categories emerge from evidence and a person approves, which the suggestion gate already does.
 - A typed relation would be an edge label on the map and nothing on the answer path: the walk filters by the target's kind, and the drafting model reads the sentence anyway.
-- A label is a registry, so labels by kind would rebuild the vocabulary file inside the Postgres catalogue, and a rename would become a schema migration.
+- A label is a registry, so labels by kind would rebuild the vocabulary file inside the Postgres catalogue. A rename would then become a schema migration.
 
 ## Rejected
 
