@@ -197,8 +197,6 @@ describe("setting up an authenticator", () => {
     await sessionPointedAt(app(), workspace.admin.id, workspace.workspaceId);
     const { api } = await webTabOf(client);
 
-    // The swapped-in session keeps the age of the one before it, so a revocation landing after
-    // the swap reads it as issued before itself.
     expect(answered.status).toBe(200);
     const ended = await api.members.endEverySignInAndToken.mutate({
       personId: workspace.admin.id,

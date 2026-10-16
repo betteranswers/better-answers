@@ -410,7 +410,6 @@ describe("the backup jobs' allow-list", () => {
 });
 
 const WORKSPACE = "ws-probe";
-/** A job that reads one repository and loses the rest of its list leaves this one out. */
 const SECOND_WORKSPACE = "ws-second";
 /** As `provision-workspace` leaves a workspace before its first write: a repository with no ref. */
 const UNWRITTEN_WORKSPACE = "ws-unwritten";

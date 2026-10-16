@@ -49,7 +49,6 @@ const documentRules = (source: SourceKeys): readonly Broken[] =>
     ? [["passages", "a source names a document's passages, a concept or a place"]]
     : [];
 
-/** One form alone, so a spec's mistake is refused by its field and never dropped unread. */
 const rulesBroken = (source: SourceKeys): readonly Broken[] => {
   if (source.concept !== undefined) return conceptRules(source);
   const untitled: readonly Broken[] =
@@ -88,7 +87,6 @@ const aConcept = z.object({
 
 type AskedConcept = z.output<typeof aConcept>;
 
-/** A source may name only a concept the same seed writes before it. */
 export const conceptsSeeding = z
   .object({
     workspaceId: z.string().min(1),
@@ -108,7 +106,6 @@ export const conceptsSeeding = z
       }
     }
   })
-  // A link too names only a concept before it, and one seed gives a title to one concept.
   .superRefine((asked, context) => {
     for (const [at, concept] of asked.concepts.entries()) {
       const earlier = new Set(asked.concepts.slice(0, at).map((seeded) => seeded.title));

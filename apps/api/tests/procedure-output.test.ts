@@ -18,7 +18,6 @@ const filesMatching = (root: string, pattern: RegExp): readonly string[] =>
     .filter((file) => pattern.test(readFileSync(path.join(root, file), "utf8")))
     .toSorted();
 
-/** Any mention, read or write, raw or through the schema, so a new one is a reviewed change. */
 const NAMES_THE_MARK = /test_workspace_mark|testWorkspaceMark/;
 
 const NAMING_THE_MARK_IN_CORE = [

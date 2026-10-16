@@ -72,7 +72,6 @@ const drafted = (scripted: Scripted, body: string, signal: AbortSignal | null | 
   });
 };
 
-/** A held judge still ends as a real fetch does when its caller aborts. */
 const judged = async (
   scripted: Scripted,
   body: string,

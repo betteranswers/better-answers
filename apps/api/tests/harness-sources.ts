@@ -22,7 +22,6 @@ const KEPT_BECAUSE = "The company's own business fact";
 
 const DISMISSED_BECAUSE = "The cue caught engineering prose, not health data";
 
-/** Each seeds a restored finding, which the store keeps on the always tier alone. */
 const RESTORED_BY = ["kept", "overriddenByErasure"] as const;
 
 const aFinding = z

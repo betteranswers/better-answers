@@ -121,7 +121,6 @@ describe("the pending set in the library's endpoints", () => {
   });
 });
 
-/** Written out, as the routes the api mounts beside the library and tRPC answer a pending session. */
 const API_ROUTES = {
   "GET /me": "refused",
   "GET /consent": "refused",

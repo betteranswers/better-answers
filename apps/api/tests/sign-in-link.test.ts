@@ -94,7 +94,6 @@ describe("the sign-in email's link", () => {
   });
 });
 
-/** Refuses the link's own row alone, so the library's code row still lands. */
 const whileLinksAreRefused = async <T>(work: () => Promise<T>): Promise<T> => {
   const superuser = app().database.superuser;
   await superuser.query(

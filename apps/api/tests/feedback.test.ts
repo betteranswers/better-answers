@@ -24,7 +24,6 @@ const A_DISPUTED_SENTENCE = "Audit logs are kept for a year.";
 
 const A_CONCEPT_NEVER_RETURNED = "https://better-answers.com/c/01ARZ3NDEKTSV4RRFFQ69G5FAV";
 
-/** What the tool says of a record the caller may not give feedback on, whatever the reason. */
 const NO_SUCH_RECORD = {
   content: [{ type: "text", text: "Refused: not-found (absent)." }],
   isError: true,

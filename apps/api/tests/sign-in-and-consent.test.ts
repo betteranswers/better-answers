@@ -45,7 +45,6 @@ const codeAskedFor = async (email: string) => {
   return { client, code: app().codeSentTo(email) };
 };
 
-/** A member of two workspaces, so a consent's workspace is the one they picked. */
 const memberOfTwo = async (testApp: TestApp) => {
   const first = await testApp.provision();
   const second = await testApp.provision();

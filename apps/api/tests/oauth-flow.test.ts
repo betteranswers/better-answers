@@ -546,7 +546,6 @@ describe("the pages, as a person walks them", () => {
     const { acme, client, consent } = await drawnThenMoved();
     const before = await consentsGiven();
 
-    // The route's check saw Acme; the library's own read of the session now finds Zenith.
     const grant = await grantingFor(acme.workspaceId, () =>
       authOver(app).api.oauth2Consent({
         headers: new Headers({ cookie: client.cookies() }),

@@ -306,7 +306,6 @@ const EVERY_GROUP_ACTION: readonly GroupAction[] = [
   },
 ];
 
-/** A group named by one of these can belong to another workspace. */
 const ACTIONS_NAMING_A_GROUP = EVERY_GROUP_ACTION.slice(2);
 
 describe("who may see and change groups", () => {
