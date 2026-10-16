@@ -61,10 +61,6 @@ const countOf = (deletion: Deletion): number => (deletion.ok ? deletion.value : 
 const refusalOf = (sweep: string, swept: Result<unknown, Error>) =>
   swept.ok ? [] : [{ sweep, reason: reasonOf(swept.error) }];
 
-/**
- * No workspace holds an identity-set row or a month's partition of the questions' content, so a
- * refused one names its sweep alone.
- */
 const sweptOutsideAnyWorkspace = async (postgres: PostgresDoor, now: Date) => {
   const { sessions, verifications, ingressWindows } = await sweepIdentitySet(SWEEPS, postgres, {
     now,
@@ -85,7 +81,6 @@ const sweptOutsideAnyWorkspace = async (postgres: PostgresDoor, now: Date) => {
   };
 };
 
-/** Counts, never a workspace, a key or an error. */
 const sizesOf = (pass: SweepPass): string => {
   const { workspaces, refused, found, removed, generations } = pass.totals;
   return `workspaces=${workspaces} refused=${refused} upload_sweep=${pass.uploadSweep} found=${found} removed=${removed} generations=${generations}`;

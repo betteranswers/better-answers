@@ -1,4 +1,3 @@
-/** Text a person typed, made safe to stand in a page's markup. */
 export const escaped = (value: string): string =>
   value
     .replaceAll("&", "&amp;")
@@ -6,7 +5,6 @@ export const escaped = (value: string): string =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 
-/** `3 March 2026`, as a UK reader writes a day, on the UK's own clock. */
 export const LONG_UK_DATE = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "long",

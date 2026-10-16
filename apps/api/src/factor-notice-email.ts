@@ -6,7 +6,6 @@ import { emailPage, PARAGRAPH } from "./email-page.ts";
 import type { EmailMessage, Mail } from "./email.ts";
 import { PRODUCT_NAME } from "./product-name.ts";
 
-/** The SPA's Account page, where a person sees and changes their own second factor. */
 const ACCOUNT_PATH = "/account";
 
 export type FactorChange =
@@ -25,10 +24,8 @@ type Change = {
   readonly subject: string;
   readonly happened: string;
 
-  /** Said in place of the usual line, for a notice of something the person may not have done. */
   readonly ifYou?: string;
 
-  /** Said in place of the usual line, where its Account page holds nothing left to check. */
   readonly ifNot?: string;
 };
 

@@ -40,7 +40,6 @@ import { type GatedSessionReader, PENDING_PROCEDURES, refusalFor } from "../seco
 type TrpcContext = {
   readonly doors: Doors;
   readonly modelDoors: ModelDoors;
-  /** The longest an answer's stream stays quiet before it sends a keep-alive. */
   readonly askKeepAliveMs: number;
   readonly clock: Clock;
   readonly readSession: GatedSessionReader;
@@ -310,7 +309,6 @@ const inTheResolversTransaction = (resolve: typeof withPrincipal, ceiling?: Road
 
 export const queryProcedure = inTheResolversTransaction(withPrincipalRead);
 
-/** As queryProcedure, its procedures counted together against `ceiling`. */
 export const queryCeiling = (ceiling: RoadCeiling) =>
   inTheResolversTransaction(withPrincipalRead, ceiling);
 
@@ -333,12 +331,10 @@ const onItsOwnTransactions = (ceiling?: RoadCeiling) =>
     return next({ ctx: { principal: resolved.value.value, doors: ctx.doors } });
   });
 
-/** What a procedure on the own-transaction road is handed: the member, and no transaction. */
 export type AskingContext = TrpcContext & { readonly principal: UserPrincipal };
 
 export const ownTransactionProcedure = onItsOwnTransactions();
 
-/** As ownTransactionProcedure, its procedures counted together against `ceiling`. */
 export const ownTransactionCounted = (ceiling: RoadCeiling) => onItsOwnTransactions(ceiling);
 
 /** Answers only once the action committed, so a follow-up such as an email never outruns the write. */
@@ -348,10 +344,6 @@ export const committedAs = async <Value, Refused>(
 ): Promise<Folded<Result<Value, Refused>>> =>
   folded<Result<Value, Refused>>(await withMember(ctx.principal, ctx.doors.postgres, action));
 
-/**
- * An action on the person themselves needs no workspace; the person is the session's, never a
- * value the request names.
- */
 export const personProcedure = trpc.procedure.use(async ({ ctx, path, next }) => {
   const { user, session } = await sessionOf(ctx, path);
   return next({
@@ -365,14 +357,12 @@ export const personProcedure = trpc.procedure.use(async ({ ctx, path, next }) =>
   });
 });
 
-/** Counted per person and procedure. */
 export const personCeiling = (rule: CounterRule) =>
   personProcedure.use(async ({ ctx, path, next }) => {
     await consumeCeiling(ctx, path, `${path}:${ctx.personId}`, rule);
     return next();
   });
 
-/** As personCeiling, for an action on the own-transaction road. */
 export const ownTransactionCeiling = (rule: CounterRule) =>
   ownTransactionProcedure.use(async ({ ctx, path, next }) => {
     await consumeCeiling(ctx, path, `${path}:${ctx.principal.userId}`, rule);

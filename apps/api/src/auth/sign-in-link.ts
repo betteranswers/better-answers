@@ -17,7 +17,6 @@ import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { EMAIL_CODE_LIFETIME_SECONDS, SIGN_IN_LINK_PAGE } from "./constants.ts";
 import { hashOf, type LinkRead, mintLinkToken, seal } from "./link-token.ts";
 
-/** What a code request hands its email: the nonce its cookie will hold, and any flow it carries. */
 type LinkAsk = { readonly nonce: string; readonly carried: string; readonly returnTo: string };
 
 /** The library's body validation drops the carried flow before its email hook runs. */
@@ -70,7 +69,6 @@ export const keepALink = async (
   return `${store.publicUrl}${SIGN_IN_LINK_PAGE}#${token}`;
 };
 
-/** The link's row, and its address's code row beside it, each judged against the database's clock. */
 const READ_A_LINK = `
   SELECT l.identifier, l.value, l.expires_at > now() AS link_live,
          c.value AS code_value, c.expires_at > now() AS code_live, c.expires_at AS code_expires_at
@@ -97,7 +95,6 @@ const keptValueOf = (text: string): z.infer<typeof linkValue> | undefined => {
   try {
     return linkValue.safeParse(JSON.parse(text)).data;
   } catch {
-    // A value that is not the JSON this module writes was not written by it: no link.
     return undefined;
   }
 };
@@ -111,7 +108,6 @@ const codeOf = (row: z.infer<typeof linkRow>): LinkRead["code"] =>
         expiresAt: row.code_expires_at.toISOString(),
       };
 
-/** Undefined when no link answers to `token`. */
 export const readALink = async (
   door: PostgresDoor,
   token: string,

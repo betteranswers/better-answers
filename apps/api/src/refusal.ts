@@ -27,7 +27,6 @@ type Detail =
   | { readonly fields: FieldIssues; readonly items?: never }
   | { readonly fields?: never; readonly items: ItemWords };
 
-/** One detail at most, so no reader meets fields and items together. */
 export type Refusal = { readonly word: RefusalWord; readonly class: RefusalClass } & (
   | { readonly fields?: never; readonly items?: never }
   | Detail
@@ -48,7 +47,6 @@ export const refusalLogged = (refusal: Refusal) => ({
   class: refusal.class,
 });
 
-/** Empty without fields; otherwise a sentence with its leading space, to append to a message. */
 export const fieldsSaid = (refusal: Refusal): string =>
   refusal.fields === undefined
     ? ""

@@ -15,7 +15,6 @@ const LOGO = readFileSync(
 
 const strong = (value: string): string => `<strong>${escaped(value)}</strong>`;
 
-/** The consent page's words. The page's body passes each value in escaped and marked up. */
 export const CONSENT_WORDS = {
   title: (assistant: string) => `Connect ${assistant}`,
   asYou: (assistant: string, workspace: string) => `${assistant} will act as you, at ${workspace}.`,
@@ -33,15 +32,12 @@ export const CONSENT_WORDS = {
   cancel: "Cancel",
 } as const;
 
-/** The Connect form's field naming the workspace the page was drawn for. */
 export const CONSENT_WORKSPACE_FIELD = "workspace";
 
 type RefusalWords = { readonly title: string; readonly why: string };
 
-/** A refusal whose last line says what to do. */
 type ReadNext = RefusalWords & { readonly next: string };
 
-/** A refusal whose last line is a link to sign in, labelled `signIn`. */
 type SignInNext = RefusalWords & { readonly signIn: string };
 
 const START_AGAIN = "Start the connection again from where you began it.";

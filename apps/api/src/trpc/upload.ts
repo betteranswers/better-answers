@@ -36,12 +36,10 @@ const decoded = (sent: string): Result<z.JSONType, IssueWord> => {
     const value: z.JSONType = JSON.parse(decodeURIComponent(sent));
     return ok(value);
   } catch {
-    // Either step throwing says the value was never encoded, which is that field's refusal.
     return err("bad-format");
   }
 };
 
-/** An absent header is an absent field; one never encoded joins the schema's own refusals. */
 export const descriptorOf = (headers: Headers): Result<ConnectUploadFields, Malformed> => {
   const gathered: Record<string, z.JSONType> = {};
   const unreadable: Record<string, IssueWord> = {};

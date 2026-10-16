@@ -14,7 +14,6 @@ const expanded = (file: string): string =>
     expanded(path.resolve(path.dirname(file), relative)),
   );
 
-/** The faces the design system depends on, resolved from it because the api does not list them. */
 const fromDesignSystem = createRequire(STYLES);
 
 const FACES = [
@@ -58,7 +57,6 @@ button[data-variant=outline]:active{background-color:var(--surface-active)}
 @media (min-width:48rem){body>header,main{padding-inline:var(--space-8)}[data-slot=card]{margin-top:var(--space-16)}}
 `;
 
-/** One sheet per process: the design system's, the faces at this tier's mounts, then the page's rules. */
 export const PAGE_STYLE = [expanded(STYLES), ...FACES.map((face) => face.css), PAGE_RULES].join(
   "\n",
 );

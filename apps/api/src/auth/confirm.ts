@@ -116,7 +116,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
   const unanswered = (context: Context, reason: string): Response =>
     fenced.unanswered(context, "auth.confirm_failed", reason);
 
-  /** A refusal no page can act on reads as unanswered; a lost session as signed out. */
   const refused = (context: Context, why: string | Error): Response => {
     if (why instanceof CeilingMet) return tooManyTries(why.retryAfterSeconds);
     if (why === "person-gone" || why === "session-gone") {
@@ -128,7 +127,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     return unanswered(context, why instanceof Error ? why.message : why);
   };
 
-  /** Never awaited, so a slow relay holds no answer. */
   const notify = (person: SignedIn, change: FactorChange): void => {
     void sendFactorNotice({ mail, log }, person.user.email, change);
   };
@@ -236,7 +234,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     return unanswered(context, verified.error.message);
   };
 
-  /** An authenticator's code as sent, with what the person holds; or the answer refusing either. */
   const codeAndHeld = async (context: Context, person: SignedIn) => {
     const sent = await parsedBody(context, codeAsked);
     if (!sent.success) return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
@@ -327,12 +324,10 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
       askedBy(clock, person),
     );
     if (!parked.ok) return refused(context, parked.error);
-    // Granted, but its key is gone: expired, or replaced by a later start.
     if (parked.value === undefined) return context.json(REFUSALS.changedMeanwhile, 409);
     return replacingWith(context, person, asked.code, parked.value);
   };
 
-  /** Each counts apart; only the code routes meet the throttle as well. */
   routes.post(
     CONFIRM_PASSKEY_OPTIONS_PATH,
     fenced.asThePerson("confirm-passkey-options", CONFIRM_PERSON_RULE, "confirm", askToConfirm),

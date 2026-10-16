@@ -232,7 +232,6 @@ const redirectedTo = z.object({ url: z.string() }).optional().catch(undefined);
 /** A before-hook reads the body ahead of the endpoint's own validation. */
 const signInAddress = z.object({ email: z.string() }).optional().catch(undefined);
 
-/** The credential a passkey sign-in presents, as the library's verify was handed it. */
 const presentedCredential = z
   .object({ response: z.object({ id: z.string() }) })
   .optional()
@@ -241,7 +240,6 @@ const presentedCredential = z
 /** Refused before a passkey is kept or a session made, so neither exists without it. */
 export const USER_NOT_VERIFIED = "USER_NOT_VERIFIED";
 
-/** The site a passkey is made for and the origin its answers come from, for the library and our confirm. */
 export const passkeyPartyOf = (publicUrl: string) => {
   const address = new URL(publicUrl);
   return { rpID: address.hostname, origin: address.origin };
@@ -287,7 +285,6 @@ type Outcome = "refused" | "declined" | "deferred" | "ok";
 type AuditLine = {
   readonly event: AuditEvent;
 
-  /** The library's path the call ran, which names how a sign-in was made. */
   readonly path: string;
   readonly principal: string | undefined;
   readonly workspaceId: string | undefined;

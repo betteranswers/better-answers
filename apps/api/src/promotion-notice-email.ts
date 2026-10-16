@@ -9,7 +9,6 @@ import type { EmailMessage, Mail } from "./email.ts";
 import { IDENTITY_PRINCIPAL } from "./identity-principal.ts";
 import { PRODUCT_NAME } from "./product-name.ts";
 
-/** The SPA's Account page, where a person removes a passkey or authenticator that is not theirs. */
 const ACCOUNT_PATH = "/account";
 
 const WORDS = {

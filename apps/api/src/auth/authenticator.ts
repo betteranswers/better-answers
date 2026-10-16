@@ -39,7 +39,6 @@ const REFUSALS = {
 
 const setUpAnswer = z.object({ totpURI: z.string() });
 
-/** A name and value alone, as a `cookie` header carries each `Set-Cookie` line. */
 const cookieOf = (setCookies: readonly string[]): string =>
   setCookies.map((line) => line.split(";", 1)[0] ?? "").join("; ");
 
@@ -152,7 +151,6 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
     return verify(context, person, asked.data.code);
   };
 
-  /** Starts and codes count apart. */
   routes.post(
     AUTHENTICATOR_START_PATH,
     fenced.asThePerson("authenticator-start", AUTHENTICATOR_PERSON_RULE, "set-up-a-factor", start),

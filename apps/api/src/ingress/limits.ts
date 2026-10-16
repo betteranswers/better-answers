@@ -49,7 +49,6 @@ export const tooManyRequests = (retryAfterSeconds: number, description: string):
     { status: 429, headers: { "retry-after": String(retryAfterSeconds) } },
   );
 
-/** The route groups the api counts by client address. */
 export type AddressScope =
   | "consent"
   | "email-code-send"

@@ -28,7 +28,6 @@ const signedIn = z
 
 export type SignedIn = NonNullable<z.output<typeof signedIn>>;
 
-/** The session the headers carry, with the age a setup carries over; undefined when there is none. */
 export const signedInPerson = async (
   auth: Auth,
   headers: Headers,
@@ -37,7 +36,6 @@ export const signedInPerson = async (
   return read.ok ? (signedIn.parse(read.value) ?? undefined) : undefined;
 };
 
-/** The refusals every route changing a person's own factor shares. */
 export const PERSON_ROUTE_REFUSALS = {
   signedOut: { error: "not_signed_in" },
   unanswered: { error: "unanswered" },
@@ -51,22 +49,18 @@ export const PERSON_ROUTE_REFUSALS = {
   confirmationTooOld: { error: "confirmation-too-old" },
 } as const;
 
-/** Past a route's ceiling, or while the person's tries of a code wait. */
 export const tooManyTries = (retryAfterSeconds: number): Response =>
   tooManyRequests(retryAfterSeconds, "Too many tries; try again later.");
 
-/** A body that is no JSON reads as nothing, so `schema` refuses it. */
 export const parsedBody = async <Schema extends z.ZodType>(context: Context, schema: Schema) =>
   schema.safeParse(await context.req.json().catch(() => undefined));
 
-/** The person and the session a step acts for, at the moment it asks. */
 export const askedBy = (clock: Clock, person: SignedIn) => ({
   personId: person.user.id,
   sessionId: person.session.id,
   now: clock.now(),
 });
 
-/** What the person holds, with this session's own standing; undefined when it could not be read. */
 export const heldBy = async (
   deps: { readonly door: PostgresDoor; readonly clock: Clock },
   person: SignedIn,
@@ -82,7 +76,6 @@ export const mayReplace = (held: SecondFactorHeld): boolean =>
 export const waitsOnTheRestoreCode = (held: SecondFactorHeld): boolean =>
   held.restoreRequired && !mayReplace(held);
 
-/** An authenticator's code as its page sends it. */
 export const codeAsked = z.object({
   code: z.string().regex(new RegExp(`^\\d{${String(AUTHENTICATOR_CODE_LENGTH)}}$`)),
 });
@@ -105,13 +98,8 @@ type PersonRoutes = {
   readonly publicUrl: string;
 };
 
-/** What a mount of factor routes needs: the person's routes, and a way to send their notices. */
 export type FactorRoutesDependencies = PersonRoutes & { readonly sendEmail: EmailSender };
 
-/**
- * Routes changing a person's own factor: refused from another site, never cached, each step
- * reached by a signed-in person alone and counted per person.
- */
 export const personRoutesAt = (routes: Hono, prefix: string, deps: PersonRoutes) => {
   routes.use(prefix, sameOriginOnly(deps.publicUrl));
   routes.use(prefix, async (context, next) => {
@@ -127,10 +115,6 @@ export const personRoutesAt = (routes: Hono, prefix: string, deps: PersonRoutes)
   };
 
   return {
-    /**
-     * Each counter counts apart, across every session the person holds. A pending session takes
-     * the step only where `pending` names one the pending set holds.
-     */
     asThePerson:
       (counter: string, rule: CounterRule, pending: PendingStep, step: Step) =>
       async (context: Context): Promise<Response> => {

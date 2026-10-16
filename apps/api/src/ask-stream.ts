@@ -4,12 +4,10 @@
  */
 export const ASK_KEEP_ALIVE_MS = 25_000;
 
-/** Sent when nothing else has been for a while; it carries nothing to show. */
 export type KeepAlive = { readonly kind: "keep-alive" };
 
 const KEEP_ALIVE: KeepAlive = { kind: "keep-alive" };
 
-/** Whether `quietMs` passed, or `stop` aborted, before `woken` settled. */
 const quietFor = async (
   woken: Promise<void>,
   quietMs: number,

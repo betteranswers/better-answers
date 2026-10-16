@@ -51,7 +51,6 @@ const answered = async (
   const doors = { door: ctx.doors.postgres, clock: ctx.clock, ...ctx.modelDoors };
   const steps = stepsFor(doors, ctx.principal, "trpc", leaving);
   let judgingSaid = false;
-  // A decision model is asked once per candidate; the phase is said once.
   const sayJudging = (): void => {
     if (!judgingSaid) emit({ kind: "phase", phase: "judging" });
     judgingSaid = true;

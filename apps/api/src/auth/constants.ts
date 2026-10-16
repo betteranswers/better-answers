@@ -100,7 +100,6 @@ export const REPLACE_AUTHENTICATOR_FINISH_PATH = "/second-factor/replace/authent
  */
 export const CONFIRM_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
 
-/** Recovery and restore codes, each counted apart; a spent recovery code mails a notice. */
 export const SPEND_A_CODE_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
 
 /** Outside `/passkey/`, where the library's own closed paths answer 404. */
@@ -112,10 +111,8 @@ export const PASSKEY_SIGN_IN_OPTIONS_PATH = "/passkeys/sign-in-options";
 
 export const PASSKEY_SIGN_IN_PATH = "/passkeys/sign-in";
 
-/** The library's verify a passkey sign-in runs, which names the session it creates. */
 export const PASSKEY_VERIFY_PATH = "/passkey/verify-authentication";
 
-/** Asks and adds of one person, counted apart; each add mails a notice. */
 export const PASSKEY_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
 
 /** The sign-in page asks once as it opens, for the browser's autofill, and again per press. */

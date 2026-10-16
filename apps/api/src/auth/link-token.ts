@@ -29,7 +29,6 @@ export const hashOf = (secret: string): string => createHash("sha256").update(se
 
 const opened = z.strictObject({ code: z.string(), carried: z.string(), returnTo: z.string() });
 
-/** What a link seals: its code, a carried flow's signed query, and the sign-in page's return path. */
 export type Opened = Readonly<z.infer<typeof opened>>;
 
 /** The query the sign-in page carried, so the link's page lands where that page would have. */
@@ -73,7 +72,6 @@ const openedFrom = (
   return opened.safeParse(JSON.parse(text)).data;
 };
 
-/** Undefined for a wrong token, a wrong row, or contents altered since they were sealed. */
 export const unseal = (
   token: string,
   salt: string,
@@ -83,12 +81,10 @@ export const unseal = (
   try {
     return openedFrom(token, salt, boundTo, Buffer.from(sealed, "base64url"));
   } catch {
-    // The cipher throws on a short value or a failed tag; a link that will not open is dead.
     return undefined;
   }
 };
 
-/** Whether the cookie a request carried holds the nonce the link was bound to. */
 export const isBound = (cookie: string | undefined, nonceHash: string): boolean => {
   if (cookie === undefined) return false;
   const offered = Buffer.from(hashOf(cookie), "hex");
@@ -96,7 +92,6 @@ export const isBound = (cookie: string | undefined, nonceHash: string): boolean 
   return offered.length === kept.length && timingSafeEqual(offered, kept);
 };
 
-/** A link's row and its code's, as read together: each with whether it is still within its time. */
 export type LinkRead = {
   readonly address: string;
   readonly nonceHash: string;
@@ -115,7 +110,6 @@ export type LinkState =
 
 export const DEAD_LINK: LinkState = { state: "dead" };
 
-/** What a sign-in through the link spends: never said to the browser, only used. */
 export type LinkUse = {
   readonly email: string;
   readonly code: string;
@@ -128,7 +122,6 @@ export type SeenLink = { readonly state: LinkState; readonly use: LinkUse | unde
 
 const NOTHING_TO_SEE: SeenLink = { state: DEAD_LINK, use: undefined };
 
-/** The library stores each code under this hash (`storeOTP.hash`), so a link compares like for like. */
 export const codeHashOf = (code: string): string =>
   createHash("sha256").update(code).digest("base64url");
 

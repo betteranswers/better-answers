@@ -43,7 +43,6 @@ const trust = z.object({
 
 type WireTrust = z.infer<typeof trust>;
 
-/** Core says who verified a concept and when; the wire keeps the keys its clients read. */
 const wireTrust = ({ tier, status, verifiedBy, verifiedAt, rider }: Trust): WireTrust => ({
   tier,
   status,
@@ -141,7 +140,6 @@ type WireAnswered = Omit<AnswerResult<string>, "answers" | "related"> & {
   readonly related: readonly WireMatch<RelatedConcept<string>>[];
 };
 
-/** Core names a concept's page by its path; an outside client can only open it under our origin. */
 const answeredOnTheWire = (
   origin: string,
   { answers, related, ...answer }: AnswerResult,
@@ -244,7 +242,6 @@ const giveFeedbackEntry = defineEntry({
   render: renderFeedback,
 });
 
-/** `origin` is the product's public origin, which a citation's address is under. */
 export const entriesAt = (origin: string): readonly Entry<z.ZodObject, z.ZodType>[] => [
   findEntry,
   askEntryAt(origin),

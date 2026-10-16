@@ -71,13 +71,11 @@ export type AuthRoutesDependencies = {
 
   readonly clock: Clock;
 
-  /** The auth secret, which seals what a sign-in link carries. */
   readonly secret: string;
 
   readonly sendEmail: EmailSender;
 };
 
-/** A session that must confirm its second factor first holds no claims to act on. */
 const PENDING = "pending";
 
 type Pending = typeof PENDING;
@@ -245,7 +243,6 @@ const secureOrigin = (publicUrl: string): boolean => publicUrl.startsWith("https
 const bindingCookieName = (publicUrl: string): string =>
   secureOrigin(publicUrl) ? `__Host-${SIGN_IN_LINK_COOKIE}` : SIGN_IN_LINK_COOKIE;
 
-/** The nonce goes to the email's link and, once the request has gone through, to this browser. */
 const bindTheLink =
   (publicUrl: string): MiddlewareHandler =>
   async (context, next) => {
@@ -277,7 +274,6 @@ const tokenOf = async (request: Request): Promise<string | undefined> => {
   return read.ok ? linkToken.safeParse(read.value).data?.token : undefined;
 };
 
-/** The sign-in route's refusal bodies; a read answers every dead link with its state alone. */
 const LINK_REFUSALS = {
   dead: { error: "link-dead" },
   notThisBrowser: { error: "not-this-browser" },
@@ -454,7 +450,6 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   const routes = new Hono();
   const { auth, door, publicUrl, clock } = deps;
 
-  /** A session ended meanwhile holds none at all. */
   const claimsFrom = async (headers: Headers): Promise<Claims | Pending | undefined> => {
     const read = await auth.api.getSession({ headers });
     const sessionId = sessionNamed.safeParse(read).data?.session.id;

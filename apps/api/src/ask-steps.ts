@@ -25,7 +25,6 @@ import {
 } from "@better-answers/core/store/postgres";
 import type { QuestionTransport } from "@better-answers/schema";
 
-/** What `ask` calls a model through, on whichever transport asked. */
 export type ModelDoors = {
   /** Absent where the api holds no envelope key: no model key opens, so no judge is called. */
   readonly credentials: Credentials | undefined;
@@ -65,7 +64,6 @@ const steppedAs = async <Value, Refused>(
   return opened.ok ? opened.value : opened;
 };
 
-/** No model key opens where the api holds no envelope key, so nothing is reserved. */
 const reservingBy =
   <Reserving>(
     reserve: (
@@ -110,7 +108,6 @@ export const stepsFor = (
     ),
 });
 
-/** The drafter's steps, each a transaction of its own as `stepsFor`'s are. */
 export const draftStepsFor = (doors: StepDoors, asker: UserPrincipal): DraftSteps<StepRefusal> => {
   const { door, clock, models } = doors;
   const reserve = reservingBy(reserveDrafting, doors, asker);

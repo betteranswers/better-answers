@@ -45,7 +45,6 @@ const REFUSALS = {
 
 type Refused = { readonly body: { readonly error: string }; readonly status: 400 | 401 };
 
-/** What the library's refusal of a ceremony means to the person, by the code it carries. */
 const REFUSED_AS: ReadonlyMap<string, Refused> = new Map([
   [USER_NOT_VERIFIED, { body: PERSON_ROUTE_REFUSALS.notVerified, status: 400 }],
   ["CHALLENGE_NOT_FOUND", { body: PERSON_ROUTE_REFUSALS.challengeGone, status: 400 }],
@@ -70,7 +69,6 @@ type Assertion = NonNullable<
   Parameters<Auth["api"]["verifyPasskeyAuthentication"]>[0]
 >["body"]["response"];
 
-/** The shape the browser's assertion takes; the library verifies every value in it. */
 const assertionShape = z.object({
   id: z.string(),
   rawId: z.string(),
@@ -83,7 +81,6 @@ const assertionShape = z.object({
   clientExtensionResults: z.object({}),
 });
 
-/** A passkey's answer to a sign-in's or a confirm's challenge, as the browser posts it. */
 export const presented = z.object({
   response: z.custom<Assertion>((value) => assertionShape.safeParse(value).success),
 });
@@ -115,7 +112,6 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
       : context.json(refused.body, refused.status);
   };
 
-  /** Hands the browser what the library set: the challenge's cookie, or a new session's. */
   const forward = (context: Context, headers: Headers): void => {
     for (const cookie of headers.getSetCookie())
       context.header("set-cookie", cookie, { append: true });
@@ -257,7 +253,6 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
 
   routes.use(PASSKEY_SIGN_IN_OPTIONS_PATH, limitByAddress);
   routes.use(PASSKEY_SIGN_IN_PATH, limitByAddress);
-  /** Asks and adds count apart. */
   routes.post(
     PASSKEY_ADD_OPTIONS_PATH,
     fenced.asThePerson("passkey-ask", PASSKEY_PERSON_RULE, "set-up-a-factor", askToAdd),

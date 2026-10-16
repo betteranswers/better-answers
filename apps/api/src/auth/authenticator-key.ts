@@ -20,7 +20,6 @@ export type MintedKey = {
   /** As the plugin keeps a secret, so its verify can open it. */
   readonly sealed: string;
 
-  /** The `otpauth://` address a QR code carries, naming `label`. */
   readonly setupAddress: string;
 };
 

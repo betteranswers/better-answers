@@ -195,7 +195,6 @@ const flagValue = (flags: Flags, name: string): string | undefined => {
 
 const MAP_TABLES = [mapGeneration, mapNode, mapEdge];
 
-/** Table objects, never names, so a renamed table renames what each command must find. */
 const NEEDS = {
   "map-rebuild": [...MAP_TABLES, job],
   "map-sweep": MAP_TABLES,
@@ -222,7 +221,6 @@ const REBUILD_DEFAULT_REASON = "drill";
 const WAIT_SECONDS = 120;
 const WAIT_POLL_MS = 2_000;
 
-/** The embedding model is fixed, so it is never offered. */
 const CHOSEN_PURPOSES = LLM_PURPOSES.filter((purpose) => purpose !== FIXED_PURPOSE);
 
 const USAGE_TEXT = `usage: pnpm ops <command> [options]
@@ -1519,7 +1517,6 @@ const priceNamed = (flags: Flags) => {
     : { provider, model, effectiveFrom, gbpPerMillionIn, gbpPerMillionOut };
 };
 
-/** A price names no workspace, so the command is sliceless and looks for its own table. */
 const setModelPriceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
   const price = priceNamed(flags);
   if (price === undefined) {
@@ -1678,10 +1675,6 @@ const SLICELESS_COMMANDS = new Map<
   ["restore-sign-in", restoreSignInCommand],
 ]);
 
-/**
- * Resolves to the exit code: 0 done, 1 refused in no refusal word, 2 usage, `NOT_BUILT`, or a
- * refusal word's `EXIT_OF_CLASS` code.
- */
 export const runOps = async (argv: readonly string[], doors: Doors, io: OpsIo): Promise<number> => {
   const [command, ...rest] = argv[0] === "--" ? argv.slice(1) : argv;
   const flags = parseFlags(rest);

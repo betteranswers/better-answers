@@ -43,7 +43,6 @@ const bearerExtra = z.object({
   }),
 });
 
-/** Undefined when the auth info was not made by this module's verifier. */
 export const bearerOf = (authInfo: AuthInfo): VerifiedBearer | undefined => {
   const parsed = bearerExtra.safeParse(authInfo.extra);
   return parsed.success ? parsed.data : undefined;
@@ -151,7 +150,6 @@ type SessionRecord = {
 };
 export type SessionReader = (headers: Headers) => Promise<SessionRecord | null>;
 
-/** Undefined when the headers carry no session, or a session with no workspace chosen. */
 export const sessionClaims = async (
   readSession: SessionReader,
   headers: Headers,
