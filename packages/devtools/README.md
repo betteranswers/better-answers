@@ -34,6 +34,8 @@ Beside the runner, for the tools whose subject is a git repository rather than a
 the worktree provisioning stage, the mutant probe — `throwawayRepository`, `gitIn` and
 `writeUnder` make one, run git in it and write under it; the suite that uses them builds the
 commits, links and worktrees its case needs and keeps the runner's two fences by hand.
+A suite that reads a tree back after a tool changed it makes the tree with `sweptFolder`, which
+puts it under the runner's folder, so a killed run's tree is still swept.
 
 A tool's binary is found through the module graph, and a package that withholds its own
 manifest from its `exports` map — knip does — is reached through its entry instead, so the

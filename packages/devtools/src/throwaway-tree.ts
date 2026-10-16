@@ -183,6 +183,9 @@ const sweptTreesFolder = (): string => {
   return folder;
 };
 
+/** A new empty folder under the swept one, so a run killed before its own removal is still swept. */
+export const sweptFolder = (): string => mkdtempSync(path.join(sweptTreesFolder(), "tree-"));
+
 /**
  * Resolves the binary and runs the smoke case now, throwing if either fails or the time limit is
  * an hour or more.
@@ -207,7 +210,7 @@ export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
   };
 
   const run: RunOverTree = (tree) => {
-    const directory = mkdtempSync(path.join(sweptTreesFolder(), "tree-"));
+    const directory = sweptFolder();
     try {
       writeTree(directory, tool.scaffold ?? {});
       writeTree(directory, tree);
