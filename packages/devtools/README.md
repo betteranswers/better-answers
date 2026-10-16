@@ -401,9 +401,11 @@ backslash, tab, newline and carriage return written `\\`, `\t`, `\n` and `\r`.
 row is found again by its exact text, so a moved line never deletes the wrong block. The whole
 unit is refused, and no file changes, when any row is unclassified, when a row's text is not in
 its file as often as the unit names it, or when a `held` or `structure` row's holder does not
-resolve. A holder is `path:line` or `path › title`, several joined by `; `. A test title holder
-must be the first argument of a `describe`, `it` or `test` call. A refused unit exits 1, and a
-malformed TSV exits 2 and names its line. `test/comment-inventory.test.ts` runs each command
+resolve. A holder is `path › text`, several joined by `; `. It resolves when the file, with
+every block the TSV deletes in any unit taken out, holds `text` exactly once. The text can be a
+test title or a code line such as `REVOKE DELETE ON "user"`. A holder anchors on text, never a
+line number, because a deletion above a line moves it and the number then names another line. A
+refused unit exits 1, and a malformed TSV exits 2 and names its line. `test/comment-inventory.test.ts` runs each command
 over a throwaway tree.
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted

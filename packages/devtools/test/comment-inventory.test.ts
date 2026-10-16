@@ -138,10 +138,10 @@ describe("comment-inventory apply", () => {
     const tsv = classified(inventoryOf(root), {
       [`${SAMPLE}:1`]: { class: "suppression", unit: "1" },
       [`${SAMPLE}:4`]: { class: "narration", unit: "1" },
-      [`${SAMPLE}:6`]: { class: "held", unit: "1", holder: `${HOLDER}:3` },
+      [`${SAMPLE}:6`]: { class: "held", unit: "1", holder: `${HOLDER} › keeps the answer` },
       [`${SAMPLE}:8`]: { class: "narration", unit: "2" },
       [`${SAMPLE}:13`]: { class: "foreign", unit: "1" },
-      [`${VIEW}:3`]: { class: "structure", unit: "1", holder: `${HOLDER} › keeps the answer` },
+      [`${VIEW}:3`]: { class: "structure", unit: "1", holder: `${SAMPLE} › type Shape =` },
     });
     const ran = applied(root, tsv, "1");
     expect(ran.stderr).toBe("");
@@ -197,6 +197,19 @@ export const shape: Shape = { side: 1 };
     expect(read(root, SAMPLE)).toBe("export const f = () => {\n  return 1;\n};\n");
   });
 
+  it("resolves a holder whose line an earlier unit's deletion moved", () => {
+    const root = treeOf({ [SAMPLE]: SAMPLE_SOURCE });
+    const tsv = classified(inventoryOf(root), {
+      [`${SAMPLE}:4`]: { class: "narration", unit: "1" },
+      [`${SAMPLE}:8`]: { class: "held", unit: "2", holder: `${SAMPLE} › export const shape` },
+    });
+    expect(applied(root, tsv, "1").status).toBe(0);
+    const ran = applied(root, tsv, "2");
+    expect(ran.stderr).toBe("");
+    expect(ran.status).toBe(0);
+    expect(read(root, SAMPLE)).not.toContain("A doc block.");
+  });
+
   it("deletes identical blocks together when the unit names each", () => {
     const source = "// twin\nexport const one = 1;\n// twin\nexport const two = 2;\n";
     const root = treeOf({ [SAMPLE]: source });
@@ -228,10 +241,11 @@ describe("comment-inventory apply refuses, changing no file", () => {
   const narrationAt4 = { [`${SAMPLE}:4`]: { class: "narration", unit: "1" } };
 
   it.each([
-    ["past its end", `${HOLDER}:9`, "is past its last line"],
-    ["in a missing file", "test/missing.test.ts:1", "names no file"],
-    ["an unknown title", `${HOLDER} › drops the answer`, "no describe, it or test there"],
-    ["neither form", "somewhere in the tests", "is neither path:line nor path"],
+    ["text found nowhere", `${HOLDER} › drops the answer`, "holds this text 0 times"],
+    ["text found twice", `${SAMPLE} › export const`, "holds this text 2 times"],
+    ["text a deletion removes", `${SAMPLE} › second line of a block`, "0 times"],
+    ["in a missing file", "test/missing.test.ts › keeps the answer", "names no file"],
+    ["a line number", `${HOLDER}:3`, "is not path › text: anchor it on text"],
   ])("when a held row's holder is %s", (_form, holder, why) => {
     const stderr = refusedOver(
       { [SAMPLE]: SAMPLE_SOURCE, [HOLDER]: HOLDER_SOURCE },
@@ -239,6 +253,17 @@ describe("comment-inventory apply refuses, changing no file", () => {
     );
     expect(stderr).toContain(`${SAMPLE}:8: `);
     expect(stderr).toContain(why);
+  });
+
+  it("when a holder's text only a later unit's deletion holds", () => {
+    const stderr = refusedOver(
+      { [SAMPLE]: SAMPLE_SOURCE },
+      {
+        [`${SAMPLE}:8`]: { class: "held", unit: "1", holder: `${SAMPLE} › a lone block` },
+        [`${SAMPLE}:13`]: { class: "narration", unit: "2" },
+      },
+    );
+    expect(stderr).toContain("holds this text 0 times");
   });
 
   it("when a row's text is no longer in the file", () => {

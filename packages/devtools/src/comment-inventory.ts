@@ -3,9 +3,7 @@ import path from "node:path";
 
 import type { Comment as GroupedComment } from "@oxlint/plugins";
 import {
-  type Argument,
   type Comment,
-  type Expression,
   type Program,
   type PropertyKey,
   type VariableDeclaration,
@@ -287,85 +285,52 @@ const sourceAt = (root: string, file: string): string | undefined => {
   return existsSync(at) && statSync(at).isFile() ? readFileSync(at, "utf8") : undefined;
 };
 
-const TEST_CALLS: ReadonlySet<string> = new Set(["describe", "it", "test"]);
+const HOLDER = /^(?<file>.+?) › (?<text>.+)$/;
 
-const calledName = (callee: Expression): string | undefined => {
-  switch (callee.type) {
-    case "Identifier":
-      return callee.name;
-    case "MemberExpression":
-      return calledName(callee.object);
-    case "CallExpression":
-      return calledName(callee.callee);
-    default:
-      return undefined;
+/** Counts overlapping matches, so `aa` is twice in `aaa` and names no single place. */
+const timesIn = (source: string, text: string): number => {
+  let times = 0;
+  for (let found = source.indexOf(text); found !== -1; found = source.indexOf(text, found + 1)) {
+    times += 1;
   }
+  return times;
 };
 
-const titleOf = (argument: Argument | undefined): string | undefined => {
-  switch (argument?.type) {
-    case "Literal":
-      return typeof argument.value === "string" ? argument.value : undefined;
-    case "TemplateLiteral":
-      return argument.expressions.length === 0
-        ? (argument.quasis[0]?.value.cooked ?? undefined)
-        : undefined;
-    default:
-      return undefined;
+/** Reads a file as the whole TSV would leave it, so an anchor inside a deleted block holds nothing. */
+type Survivor = (file: string) => string | undefined;
+
+const survivorOf = (root: string, rows: readonly Row[]): Survivor => {
+  const doomed = Map.groupBy(
+    rows.filter((row) => !KEPT.has(row.class)),
+    (row) => row.path,
+  );
+  return (file) =>
+    (doomed.get(file) ?? []).reduce<string | undefined>(
+      (source, row) => source?.split(row.text).join(""),
+      sourceAt(root, file),
+    );
+};
+
+const holderRefusal = (survivor: Survivor, holder: string): string | undefined => {
+  const named = HOLDER.exec(holder)?.groups;
+  if (named === undefined) {
+    return `holder \`${holder}\` is not path › text: anchor it on text its file holds once, not a line number`;
   }
-};
-
-const titlesIn = (file: string, source: string): ReadonlySet<string> => {
-  const titles = new Set<string>();
-  new Visitor({
-    CallExpression: (node) => {
-      const title = titleOf(node.arguments[0]);
-      if (title !== undefined && TEST_CALLS.has(calledName(node.callee) ?? "")) titles.add(title);
-    },
-  }).visit(parsedSource(file, source).program);
-  return titles;
-};
-
-const TITLE_SEPARATOR = " › ";
-
-const TITLE_HOLDER = /^(?<file>.+?) › (?<title>.+)$/;
-
-const LINE_HOLDER = /^(?<file>.+):(?<line>[1-9][0-9]*)$/;
-
-const lineRefusal = (root: string, file: string, line: number): string | undefined => {
-  const source = sourceAt(root, file);
-  if (source === undefined) return `holder ${file}:${line} names no file`;
-  const lines = source.replace(/\n$/, "").split("\n").length;
-  return line <= lines ? undefined : `holder ${file}:${line} is past its last line, ${lines}`;
-};
-
-const titleRefusal = (root: string, file: string, title: string): string | undefined => {
-  const source = sourceAt(root, file);
-  if (source === undefined) return `holder ${file}${TITLE_SEPARATOR}${title} names no file`;
-  return titlesIn(file, source).has(title)
-    ? undefined
-    : `holder ${file}${TITLE_SEPARATOR}${title}: no describe, it or test there has that title`;
-};
-
-const holderRefusal = (root: string, holder: string): string | undefined => {
-  const titled = TITLE_HOLDER.exec(holder)?.groups;
-  if (titled !== undefined) {
-    return titleRefusal(root, String(titled["file"]), String(titled["title"]));
-  }
-  const lined = LINE_HOLDER.exec(holder)?.groups;
-  if (lined !== undefined) return lineRefusal(root, String(lined["file"]), Number(lined["line"]));
-  return `holder \`${holder}\` is neither path:line nor path${TITLE_SEPARATOR}title`;
+  const source = survivor(String(named["file"]));
+  if (source === undefined) return `holder \`${holder}\` names no file`;
+  const times = timesIn(source, String(named["text"]));
+  return times === 1 ? undefined : `holder \`${holder}\`: the file holds this text ${times} times`;
 };
 
 const at = (row: Row): string => `${row.path}:${row.start}`;
 
-const rowRefusals = (root: string, row: Row): readonly string[] => {
+const rowRefusals = (survivor: Survivor, row: Row): readonly string[] => {
   if (row.class === "") return [`${at(row)}: unclassified, so nothing says its reason may go`];
   if (!NEEDS_A_HOLDER.has(row.class)) return [];
   const holders = row.holder.split("; ").filter((one) => one !== "");
   if (holders.length === 0) return [`${at(row)}: a ${row.class} row names no holder`];
   return holders.flatMap((holder) => {
-    const refused = holderRefusal(root, holder);
+    const refused = holderRefusal(survivor, holder);
     return refused === undefined ? [] : [`${at(row)}: ${refused}`];
   });
 };
@@ -407,8 +372,9 @@ const planFor = (root: string, rows: readonly Row[], unit: string): Outcome<read
     byCodeUnit(left, right),
   );
   const planned = byFile.map(([file, same]) => located(file, sourceAt(root, file), same));
+  const survivor = survivorOf(root, rows);
   const refused = [
-    ...deleted.flatMap((row) => rowRefusals(root, row)),
+    ...deleted.flatMap((row) => rowRefusals(survivor, row)),
     ...planned.flatMap((one) => ("refused" in one ? one.refused : [])),
   ];
   if (refused.length > 0) return { refused };
