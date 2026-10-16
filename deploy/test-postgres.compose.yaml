@@ -20,6 +20,9 @@ services:
       # Every clone is written into WAL, which shares the tmpfs, so WAL needs a fixed ceiling.
       - -c
       - max_wal_size=512MB
+      # Two digests can derive one port, so the harnesses check the server's image as well as its address.
+      - -c
+      - better_answers.image=${TEST_POSTGRES_IMAGE}
     # Parallel queries take dynamic shared memory from /dev/shm, and Docker's 64 MB default runs short.
     shm_size: 256m
     # Over TCP: the image's first-boot server listens on the socket alone, and must not read as up.
