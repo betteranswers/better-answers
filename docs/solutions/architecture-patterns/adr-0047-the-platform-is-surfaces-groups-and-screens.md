@@ -1,12 +1,12 @@
 ---
-title: "The platform is a rail of areas, each holding groups of pages"
+title: "The platform is a rail of areas, each holding menu groups of pages"
 date: 2026-09-30
 module: apps/web
 problem_type: architecture_pattern
 component: web
 severity: medium
 applies_when:
-  - "Adding an area, a group or a page, or deciding where a page belongs"
+  - "Adding an area, a menu group or a page, or deciding where a page belongs"
   - "Giving one of a page's rows a page of its own at an address beneath the page"
   - "Deciding who sees a page, by role or by owning a collection"
   - "Changing a role's home, or what an unbuilt, hidden or moved address shows"
@@ -27,7 +27,7 @@ tags:
   - rename-batch
 ---
 
-# The platform is a rail of areas, each holding groups of pages
+# The platform is a rail of areas, each holding menu groups of pages
 
 ## The decision
 
