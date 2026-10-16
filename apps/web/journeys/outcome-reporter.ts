@@ -26,7 +26,6 @@ const OUTSIDE_ANY_STEP = "outside any step";
 /** A timeout or a stop leaves its step unfinished, with no error and a duration of -1. */
 const endedThere = (step: TestStep): boolean => step.error !== undefined || step.duration < 0;
 
-/** A page or an action is a `test.step`, and one may sit inside a fixture's step, as sign-in does. */
 const failingStepsOf = (steps: readonly TestStep[]): readonly string[] => {
   const failing = steps.find(endedThere);
   if (failing === undefined) return [];
@@ -54,7 +53,6 @@ const findingOf = (test: TestCase, result: TestResult): Finding => {
   };
 };
 
-/** Held only once a test person's journey ran, so a run of the preflight alone judges nothing. */
 const outcomeOf = (findings: readonly Finding[], everyJourneyPassed: boolean): Outcome => {
   if (findings.some((finding) => finding.outcome === "could-not-run")) return "could-not-run";
   if (findings.length > 0) return "fail";

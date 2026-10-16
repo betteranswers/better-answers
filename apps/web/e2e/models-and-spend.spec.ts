@@ -46,7 +46,6 @@ const EVERY_PURPOSE: readonly SeedModelChoice[] = [
 
 const UNNAMED_PROVIDER = "acme-inference";
 
-/** Found where a purpose is set to them, so their absence elsewhere names words the page shows. */
 const OPENAI = "OpenAI";
 const GOOGLE = "Google";
 

@@ -39,10 +39,8 @@ const LIST_BUDGET_MS = 1000;
 
 const EVERY_WORKSPACE = HOMES.operator.path;
 
-/** Found where an Admin lands, so its absence from the console names a menu the shell does draw. */
 const controlCentreMenu = (page: Page) => navOf(page, "Control Centre");
 
-/** Found where a person who is not the operator lands, so its absence names a page that is drawn. */
 const noWorkspaceYet = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "No Workspace Yet" });
 

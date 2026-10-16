@@ -9,7 +9,6 @@ const GROUPS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Groups").p
 
 const groupsRegion = (page: Page) => page.getByRole("region", { name: "Groups" });
 
-/** Hidden regions left out, as a screen reader leaves them: only a region in the tree is found. */
 const emptyStatusIn = (scope: Locator): Locator =>
   scope.getByRole("status").filter({ hasNotText: /\S/ });
 

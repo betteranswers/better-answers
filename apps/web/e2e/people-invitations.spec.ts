@@ -80,7 +80,6 @@ const saidInTheTab = (page: Page, address: string | RegExp): Locator =>
 
 const theOneCell = (page: Page): Locator => invitationsRegion(page).getByRole("cell");
 
-/** The tab's second status, after its count, is its outcome line. */
 const outcomeIn = (page: Page): Locator => invitationsRegion(page).getByRole("status").nth(1);
 
 const selectionSaid = (page: Page): Locator =>
@@ -104,14 +103,11 @@ const heldAddresses = (page: Page) =>
 const removeOf = (page: Page, address: string) =>
   inviteDialog(page).getByRole("button", { name: `Remove ${address}`, exact: true });
 
-/** Every button whose name starts by inviting, so a second one under another name is counted. */
 const invitingButtons = (page: Page) => page.getByRole("button", { name: /^invite/i });
 
-/** The capitalised spelling of an address, which the api folds into the lower-cased one. */
 const capitalised = (address: string): string =>
   `${address.slice(0, 1).toUpperCase()}${address.slice(1)}`;
 
-/** The browser suite's api delivers nothing to this domain, so its invitations' emails never go. */
 const anUnreachableAddress = (who: string): string =>
   anAddress(who).replace("@example.test", "@unreachable.example");
 
@@ -638,7 +634,6 @@ test.describe("the People page's Invitations tab", () => {
       invitedEach(request, at, ["sam", "una", "ola"].map(anAddress)).then(() => undefined),
     );
 
-    // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
     await page.goto(MEMBERS_PAGE);
     await openInvitations(page);
@@ -867,7 +862,6 @@ test.describe("the People page's Invitations tab", () => {
     await expect(
       invitationsRegion(page).getByRole("heading", { name: "Invitations" }),
     ).toBeFocused();
-    // The line named the same address for the resend, so the cancel shows in what else it says.
     await expect(outcomeIn(page)).toContainText(dropped);
     await expect(outcomeIn(page), "the cancel said nothing of its own").not.toHaveText(
       saidOfTheResend,

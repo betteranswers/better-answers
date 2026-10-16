@@ -16,7 +16,6 @@ import {
 } from "./harness.ts";
 import { refusalAnswering } from "./refused-read.ts";
 
-/** Stated, not imported: `apps/web` takes nothing from `apps/api` at runtime. */
 const ASK_TO_JOIN = "person.requestAccess";
 
 const ASK_TO_JOIN_ENDPOINT = `/trpc/${ASK_TO_JOIN}`;

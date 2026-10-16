@@ -55,7 +55,6 @@ const HEALTH_CUE: GroupOfFindings = {
   dismissed: 0,
 };
 
-/** Raised by a rule the page's list of rules has not met. */
 const A_PASSPORT: GroupOfFindings = {
   ...BANK_DETAILS,
   category: "government-identifier",
@@ -342,7 +341,6 @@ const panelOf = (change: "narrow" | "widen", name: string) =>
 
 const reviewOf = (name: string) => screen.queryByRole("region", { name: `Review of ${name}` });
 
-/** The handbook's widening opened from its row's button, which then holds focus as the opener. */
 const widenOpened = (row: ReturnType<typeof within>): HTMLElement => {
   const widen = rowAction(row, ROW_ACTIONS.widen, "Staff handbook");
   widen.focus();

@@ -88,7 +88,6 @@ const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre
 
 const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
 
-/** The list's second status, after its count, is its outcome line. */
 const outcomeOf = (page: Page): Locator => membersRegion(page).getByRole("status").nth(1);
 
 const describing = async (control: Locator): Promise<string> =>
@@ -382,7 +381,6 @@ test.describe("the People group's Members page", () => {
     // A count is its number then a word; a date's month is capitalised.
     await expect(main.getByText(/\b3 [a-z]/), "the count is said twice").toHaveCount(1);
 
-    // The open tab names the list, so the list's own heading is kept for a screen reader alone.
     const heading = membersRegion(page).getByRole("heading", { level: 2, name: "Members" });
     expect((await heading.boundingBox())?.width, "the tab's name shows twice").toBeLessThanOrEqual(
       1,
@@ -446,7 +444,6 @@ test.describe("the People group's Members page", () => {
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Dales Engineering");
 
-    // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
     await page.goto(MEMBERS_PAGE);
     await expect(memberRows(page)).toHaveCount(3);
@@ -578,7 +575,6 @@ test.describe("a member's own page", () => {
     await expect(page).toHaveURL(priyasPage);
     await expect(personHeading(page, "Priya Shah")).toBeFocused();
 
-    // A fresh document, as a link someone sent would open it.
     await page.goto(memberPageAt(priya.id));
     await expect(personHeading(page, "Priya Shah")).toBeVisible();
     await expect(crumbsOf(page).last()).toHaveText("Priya Shah");
@@ -609,7 +605,6 @@ test.describe("a member's own page", () => {
     expect(new Set(meanings).size, "two roles are described alike").toBe(3);
     await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeChecked();
     await expect(changeRoleButton(page)).toBeDisabled();
-    // The role is said where it is changed and nowhere else: its word stands alone as the radio's label.
     await expect(
       thePage(page).getByText("Editor", { exact: true }),
       "the role is said outside the Role card",
@@ -992,7 +987,6 @@ test.describe("a member's Activity", () => {
             - time: /\\d{2}:\\d{2}/
     `);
     await expect(linesOf(page)).toContainText(byHannahToPriya);
-    // One event, said by on the actor's page and to on the subject's, so the two lines differ.
     await expect(linesOf(page), "Hannah's page says the line as Priya's does").not.toContainText(
       saidOnPriyas,
     );
@@ -1003,7 +997,6 @@ test.describe("a member's Activity", () => {
     const names = Array.from({ length: 51 }, (_, index) => `Crew ${String(index + 1)}`);
     await makeGroups(request, { workspaceId, userId: adminId, names });
 
-    // A fresh document, so no page of the stream is already in the page's cache.
     await linesWithinTheBudget(page, "activity", () => page.goto(memberPageAt(adminId)), 50);
     const loadMore = activityOf(page).getByRole("button", { name: "Load More" });
     await expect(loadMore).toHaveAttribute(
@@ -1383,7 +1376,6 @@ test.describe("removing a member from their page", () => {
     await removal.getByRole("button", { name: "Remove Member" }).click();
     const confirm = removal.getByRole("button", { name: "Remove", exact: true });
 
-    // The first removal reaches the api and its answer is held, so a second press meets it done.
     const held = await holdingTheFirstAnswer(page, REMOVAL);
 
     await confirm.focus();
@@ -1724,7 +1716,6 @@ const aWorkspaceOfThirtyEditors = async (
   return workspace;
 };
 
-/** A bulk dialog's lines: one more stands in it when the selection includes the reader. */
 const linesIn = (dialog: Locator): Locator => dialog.getByRole("paragraph");
 
 const MORE_TICKED = [
@@ -2245,7 +2236,6 @@ test.describe("bulk actions on the members ticked", () => {
   test("keeps a search still settling when a name opens", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Nidd Sailcloth");
 
-    // Typed and opened at once, inside the box's settling time, as a quick reader does it.
     await searchBox(page).fill("Priya");
     await memberLink(page, "Priya Shah").click();
     await expect(personHeading(page, "Priya Shah")).toBeVisible();
@@ -2272,7 +2262,6 @@ test.describe("bulk actions on the members ticked", () => {
     await expect(box).toBeFocused();
     await page.keyboard.press("Space");
     await expect(box).toBeChecked();
-    // The group is said where it is changed and nowhere else: its name stands alone as the box's label.
     await expect(
       thePage(page).getByText("Site leads", { exact: true }),
       "the group is named outside its checklist",

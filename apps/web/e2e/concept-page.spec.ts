@@ -62,7 +62,6 @@ const CLAIM = "We keep audit logs for seven years, then delete them.";
 
 const IMAGE_HOST = "images.example.test";
 
-/** Its first mark is placed by the body; the Restricted source's follows the body's last word. */
 const RETENTION_BODY = [
   `${CLAIM}[^source-1]`,
   "",
@@ -500,7 +499,6 @@ test.describe("the concept page", () => {
     const seeded = await aWorkspaceOfConcepts(request, "Holme Annals");
     await signedInAsTheAdmin(page, request, seeded);
     const ulid = pageOf(seeded.concepts, RETENTION).slice(SEARCH.path.length + 1);
-    // The api's own refusal: the page's well-formed ask reaches it with its id in lower case.
     await page.route(isAnOpen, (route) =>
       route.continue({ url: route.request().url().replace(ulid, ulid.toLowerCase()) }),
     );
@@ -783,7 +781,6 @@ test.describe("the concept page", () => {
     const seeded = await aWorkspaceOfConcepts(request, "Calder Registers");
     await signedInAsTheAdmin(page, request, seeded);
 
-    // A fresh document, so no read is already in the page's cache.
     const startedAtMs = Date.now();
     await page.goto(pageOf(seeded.concepts, RETENTION));
     await expect(conceptOf(page, RETENTION).getByText(CLAIM)).toBeVisible();

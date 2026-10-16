@@ -41,7 +41,6 @@ const signedInAs = async (page: Page, api: APIRequestContext, role: Role) => {
   await signIn(page, api, email);
 };
 
-/** Found on an Admin's home, so its absence from another role's names a menu the shell does draw. */
 const controlCentreMenu = (page: Page) => navOf(page, "Control Centre");
 
 const unknownPage = (page: Page) => page.getByRole("heading", { level: 1, name: "Page Not Found" });
@@ -240,7 +239,6 @@ test("lists the shell's keystrokes alone on Connect Claude, unknown pages", asyn
   await passesTheAccessibilityGate();
   await keystrokesDismissed(page, onConnect);
 
-  // Hidden from a Viewer, so it is the page that never existed.
   await page.goto(HOMES.Admin.path);
   await expect(unknownPage(page)).toBeVisible();
   const onUnknown = await keystrokesListed(page, "This Page");

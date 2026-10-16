@@ -70,7 +70,6 @@ const losingTheShellsRead = (role: Role) => {
   };
 };
 
-/** What a page's `beforeLoad` finds once the role is in hand and lets the reader see it. */
 const TAKEN = { hidden: false, unread: false };
 
 const INVITE = "Invite a Person";

@@ -5,11 +5,9 @@ import type { CarriedOn } from "@/features/auth/sign-in-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
 import { HOMES, type Role } from "@/shared/navigation.ts";
 
-/** Named for the person, though it shows their initials alone. */
 export const avatarOf = (page: Page, who: string): Locator =>
   page.getByRole("banner").getByRole("button", { name: new RegExp(who) });
 
-/** The avatar shows initials alone, so the person's name and role are one disclosure in. */
 export const personMenuOpened = async (page: Page, who: string): Promise<Locator> => {
   await avatarOf(page, who).click();
   const menu = page.getByRole("menu", { name: new RegExp(who) });
@@ -17,13 +15,11 @@ export const personMenuOpened = async (page: Page, who: string): Promise<Locator
   return menu;
 };
 
-/** Sign-out is one disclosure in from the band, so a spec that leaves opens the menu first. */
 export const signOutFromTheShell = async (page: Page, who: string): Promise<void> => {
   const menu = await personMenuOpened(page, who);
   await menu.getByRole("menuitem", { name: "Sign Out" }).click();
 };
 
-/** Named for where the person is: the workspace they are reading, or the console. */
 export const switcherOf = (page: Page, here: string): Locator =>
   page.getByRole("banner").getByRole("button", { name: here, exact: true });
 
@@ -36,7 +32,6 @@ export const switched = async (page: Page, from: string, to: string): Promise<vo
   await switcherMenuOf(page, from).getByRole("menuitemradio").filter({ hasText: to }).click();
 };
 
-/** The switcher's way to the picker, which lists every workspace the person is in. */
 export const allWorkspacesPicked = async (page: Page, here: string): Promise<void> => {
   await switcherOf(page, here).click();
   await switcherMenuOf(page, here).getByRole("menuitem", { name: "All Workspaces" }).click();
@@ -44,18 +39,15 @@ export const allWorkspacesPicked = async (page: Page, here: string): Promise<voi
 
 export const railOf = (page: Page): Locator => page.getByRole("navigation", { name: "Areas" });
 
-/** The menu, named for the open area. */
 export const navOf = (page: Page, area: string): Locator =>
   page.getByRole("navigation", { name: area });
 
-/** The current part is `role="link"` too, so a part that leads somewhere is told by its `href`. */
 export const crumbOf = (page: Page, name: string): Locator =>
   page
     .getByRole("banner")
     .getByRole("navigation", { name: "Breadcrumb" })
     .getByRole("link", { name, exact: true });
 
-/** A list's count is its head's, so it is the first status its region holds. */
 export const countOf = (list: Locator): Locator => list.getByRole("status").first();
 
 /** Needs a page with nothing focused yet, so the first Tab lands on the skip link. */
@@ -120,7 +112,6 @@ const SIGN_IN_HEADINGS = {
   connecting: "Sign In to Connect Claude",
 } as const satisfies Readonly<Record<CarriedOn | "nothing", string>>;
 
-/** The email step's heading, for what the sign-in carries on to. */
 export const signInHeading = (page: Page, carriedOn: CarriedOn | "nothing" = "nothing"): Locator =>
   page.getByRole("heading", { level: 1, name: SIGN_IN_HEADINGS[carriedOn], exact: true });
 
@@ -148,22 +139,18 @@ export const keystrokesListed = async (page: Page, named: string): Promise<Locat
   return listed;
 };
 
-/** A keystroke's key in the open list, which sets each action beside its key. */
 export const keyListed = (keystrokes: Locator, key: string): Locator =>
   keystrokes.getByRole("term").getByText(key, { exact: true });
 
-/** The one button opening the list: the rail's or the band's, or a page's outside the shell. */
 export const keystrokesButton = (within: Page | Locator): Locator =>
   within.getByRole("button", { name: "Keyboard Shortcuts", exact: true });
 
-/** Focus lands back on the button a task after the list is gone, unless a key has moved it. */
 export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<void> => {
   await page.keyboard.press("Escape");
   await expect(listed).toHaveCount(0);
   await expect(keystrokesButton(page)).toBeFocused();
 };
 
-/** The article a role takes in a test's title. */
 export const A_ROLE = {
   Admin: "an Admin",
   Editor: "an Editor",
@@ -176,7 +163,6 @@ const HOME_NAMES = {
   Viewer: { heading: "Ask", link: "Go to New Question" },
 } as const satisfies Readonly<Record<Role, { readonly heading: string; readonly link: string }>>;
 
-/** The address is read off the navigation list, so moving a role's home moves it here. */
 export const landedAtHome = async (page: Page, role: Role): Promise<void> => {
   await expect(page).toHaveURL(new RegExp(`${HOMES[role].path}$`));
   await expect(
@@ -193,7 +179,6 @@ export const askShowsTheServedAddress = async (page: Page): Promise<string> => {
   return resource;
 };
 
-/** A page hidden from the role says what an address that never existed says. */
 export const notFoundOfferingHome = async (page: Page, role: Role): Promise<void> => {
   await expect(page.getByRole("heading", { level: 1, name: "Page Not Found" })).toBeVisible();
   await expect(page.getByRole("link", { name: HOME_NAMES[role].link })).toBeVisible();
@@ -201,10 +186,6 @@ export const notFoundOfferingHome = async (page: Page, role: Role): Promise<void
 
 const ACTION_BUDGET_MS = 100;
 
-/**
- * Timed in the page, from the next key to the node at the XPath `at` reading `reads`: a matcher's
- * polling is coarser than the budget.
- */
 export const clockTheNextKey = (
   page: Page,
   landed: { readonly at: string; readonly reads: string },
@@ -245,7 +226,6 @@ const medianOf = (samples: readonly number[]): number => {
   return sorted.length % 2 === 1 ? upper : ((sorted[middle - 1] ?? Number.NaN) + upper) / 2;
 };
 
-/** Each press is annotated, so a run that passes still says how close each one came. */
 export const theActionsLandedWithinTheirBudget = (
   action: string,
   samples: readonly number[],
@@ -265,19 +245,16 @@ export const theActionLandedWithinItsBudget = async (page: Page, action: string)
   theActionsLandedWithinTheirBudget(action, [await actionClocked(page)]);
 };
 
-/** A refusal's region can stand empty from the first draw, so it shows one only once it holds words. */
 export const saysARefusal = (
   alert: Locator,
   within?: { readonly timeout: number },
 ): Promise<void> => expect(alert, "the alert says nothing").toHaveText(/\S/, within);
 
-/** A list says its read in a live region no role names, apart from its head's standing words. */
 export const saysOfItsRead = (list: Locator): Promise<void> =>
   expect(list.locator('[aria-live="polite"]'), "the list says nothing of its read").toHaveText(
     /\S/,
   );
 
-/** A status or an alert already saying something shows the next only by saying something else. */
 export const saysSomethingNew = (region: Locator, earlier: string): Promise<void> =>
   expect
     .poll(
@@ -286,7 +263,6 @@ export const saysSomethingNew = (region: Locator, earlier: string): Promise<void
     )
     .toBe(false);
 
-/** Said in whole minutes, rounded up, and matched by their number. A wait never named fails. */
 export const saysTheWait = async (
   alert: Locator,
   waitSeconds: number | undefined,
@@ -298,17 +274,14 @@ export const saysTheWait = async (
   );
 };
 
-/** The word stays off the page: it is for the logs and the wire. */
 export const keepsItsWordOffThePage = (page: Page, word: RefusalWord): Promise<void> =>
   expect(page.locator("body"), `the page shows the word ${word}`).not.toContainText(word);
 
 const KEY_IN_FOURS = /^[A-Z2-7]{4}(?: [A-Z2-7]{1,4})+$/;
 
-/** An authenticator's key, read off the page as a person would type it into their phone. */
 export const keyShown = async (page: Page): Promise<string> =>
   (await page.getByText(KEY_IN_FOURS).innerText()).replaceAll(" ", "");
 
-/** A refused code's digits stay selected, so the next code typed replaces them. */
 export const refusedDigitsSelected = async (field: Locator): Promise<void> => {
   const selected = await field.evaluate((input) =>
     input instanceof HTMLInputElement ? [input.selectionStart, input.selectionEnd] : [],
@@ -360,7 +333,6 @@ const luminance = (colour: string): number => {
   return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 };
 
-/** WCAG's contrast ratio between two painted `rgb()` colours, as a browser reports them. */
 export const contrastBetween = (one: string, other: string): number => {
   const [lighter, darker] = [luminance(one), luminance(other)].toSorted((a, b) => b - a);
   return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
@@ -382,10 +354,6 @@ export const paintedOver = (top: string, under: string): string => {
   return `rgb(${mixed.join(", ")})`;
 };
 
-/**
- * A wordless wrapper hugging a field lends its fill and hugging sides; a worded checkbox, radio or
- * switch goes by its words. Opacity is composited.
- */
 export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
   page.evaluate(() => {
     type Rgba = readonly [number, number, number, number];
@@ -411,10 +379,6 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
       `rgb(${[red, green, blue].map((channel) => String(Math.round(channel))).join(", ")})`;
     const fillOf = (element: Element) => rgba(getComputedStyle(element).backgroundColor);
     const WHITE: Rgba = [255, 255, 255, 1];
-    /**
-     * `layers` on `element` as shown: a dimmed ancestor shows its share of all painted inside it,
-     * and what was behind it for the rest.
-     */
     const shownThrough = (element: Element | null, layers: readonly Rgba[]): Rgba => {
       const down: Element[] = [];
       for (let at = element; at !== null; at = at.parentElement) down.unshift(at);
@@ -460,7 +424,6 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
           ? parent
           : undefined;
       const hugged = wordless === undefined ? [] : sidesHugging(control, wordless);
-      // A wordless parent no side of which hugs is a layout box: the field is measured against it.
       const wrapper = hugged.length > 0 ? wordless : undefined;
       return {
         control: nameOf(control),

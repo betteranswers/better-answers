@@ -109,7 +109,6 @@ describe("a rail of two areas", () => {
     expect(await screen.findByRole("tooltip")).toBeDefined();
     expect(tooltipsShowing()).toEqual(["First"]);
 
-    // The pointer moves on while the keyboard stays: the first gives way, not both at once.
     fireEvent.pointerMove(second, { pointerType: "mouse" });
     await vi.waitFor(() => expect(tooltipsShowing()).toEqual(["Second"]));
     expect(document.activeElement).toBe(first);

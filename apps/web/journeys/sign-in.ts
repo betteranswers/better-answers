@@ -4,7 +4,6 @@ import { emailField, sendCodeButton, verificationCodeField } from "../e2e/locato
 import type { InboxAnswer, Noted } from "./inbox.ts";
 import { couldNotRun, failed, type Outcome } from "./outcome.ts";
 
-/** Named, not imported: `apps/web` takes nothing from `apps/api` at runtime. */
 const SEND_PATH = "/email-otp/send-verification-otp";
 const SIGN_IN_PATH = "/sign-in/email-otp";
 
@@ -17,7 +16,6 @@ const TOO_MANY_REQUESTS = 429;
  */
 const SIGN_IN_TIMEOUT_MS = 150_000;
 
-/** Asked before Send, so the code it later answers is that Send's alone. */
 export type CodeSource = (address: string) => Promise<Noted>;
 
 type Awaiting = Extract<Noted, { readonly answer: "noted" }>;
@@ -43,7 +41,6 @@ const INBOX_FAULTS = {
   unreachable: { outcome: "could-not-run", why: "the test inbox did not answer" },
 } as const satisfies Readonly<Record<Fault, Judgement>>;
 
-/** Asked again after a refused code, where a second email means another Send rotated it. */
 const REASKED_FAULTS = {
   ...INBOX_FAULTS,
   ambiguous: {
@@ -82,7 +79,6 @@ const answerTo = (page: Page, path: string): Promise<Response> =>
     { timeout: ANSWER_TIMEOUT_MS },
   );
 
-/** Only the same email again leaves the product's refusal to judge. */
 const refusedCode = async (awaiting: Awaiting, status: number): Promise<never> => {
   const again = await awaiting.codeSent();
   if (again.answer !== "code") return judgedAs(REASKED_FAULTS[again.answer]);

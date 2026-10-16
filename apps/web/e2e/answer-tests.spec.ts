@@ -46,7 +46,6 @@ test.describe("the Answer Tests page", () => {
   test("renders within the constitution's list budget", async ({ page, request }) => {
     await anAdminSignedIn(page, request, "Teesdale Brackets");
 
-    // A fresh document, so nothing the page draws is already in its cache.
     const startedAtMs = Date.now();
     await page.goto(ANSWER_TESTS.path);
     await expect(answerTests(page)).toHaveText(/\S/);

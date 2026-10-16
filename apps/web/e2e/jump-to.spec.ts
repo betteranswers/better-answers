@@ -28,10 +28,8 @@ const MODELS = menuGroupIn(CONTROL_CENTRE, "models");
 
 const MODELS_AND_SPEND = pageNamed(MODELS, "Models and Spend");
 
-/** Declared and never built, so no reader may find it. */
 const SIGNALS = "Signals";
 
-/** Throws once no declared page has that name, so the test never types a word that names none. */
 const SIGNALS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), SIGNALS);
 
 const EVERY_WORKSPACE = pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every Workspace");
@@ -380,7 +378,6 @@ test("finds nothing by an unbuilt page's name", async ({ page, request }) => {
 
 test("draws the list within its second, timed in the page", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Ryedale Metalwork");
-  // A fresh document, so no members read is cached to answer it.
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Models" })).toBeVisible();
 

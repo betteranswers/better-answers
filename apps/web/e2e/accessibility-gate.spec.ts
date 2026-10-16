@@ -39,7 +39,6 @@ const markFourObjects = (): void => {
   }
 };
 
-/** Faint words inside a marked object, where a mark's own paint would leave axe undecided. */
 const writeFaintWordsInAMarkedObject = (): void => {
   const region = document.createElement("section");
   region.dataset["marks"] = "";
@@ -105,7 +104,6 @@ const drawEdgelessFieldsInABorderedBox = (): void => {
   document.querySelector("main")?.append(box);
 };
 
-/** An edgeless, see-through field in a filled box: the box's fill is the field's only where a side hugs. */
 const drawAnEdgelessFieldInAFilledBox = (padding: string): void => {
   const box = document.createElement("div");
   box.style.cssText = `padding: ${padding}; background: var(--text-primary)`;

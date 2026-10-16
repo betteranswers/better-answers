@@ -27,7 +27,6 @@ const waitingUntilAborted = (signal: AbortSignal | null | undefined): Promise<ne
     });
   });
 
-/** The person cancels the press's prompt, then picks from the email field the second time. */
 const aDevice = () => {
   let autofills = 0;
   return vi.fn<(options: CredentialRequestOptions) => Promise<unknown>>((options) => {

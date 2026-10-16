@@ -180,7 +180,6 @@ test("a second passkey from the same device is refused", async ({ page, request 
 test("an Admin keeps their only passkey, told why beside Remove", async ({ page, request }) => {
   await aVirtualAuthenticator(page);
   const { admin } = await provision(request, { name: "Passkeys Ltd" });
-  // An Admin holding no factor sets their first one up before anything else.
   await page.goto("/sign-in");
   await signInByEmail(page, request, admin.email);
   const name = await suggestedName(page);
@@ -219,7 +218,6 @@ test("a device whose user check fails signs nothing in", async ({ page, request 
   await device.stopsVerifying();
 
   await signedOut(page);
-  // The page already says the session ended, so an unused passkey shows by what is said next.
   await expect(page.getByRole("status")).toHaveText(/\S/);
   const saidOnArriving = await page.getByRole("status").innerText();
   await page.getByRole("button", { name: "Sign In with a Passkey" }).click();

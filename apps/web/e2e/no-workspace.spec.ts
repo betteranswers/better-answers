@@ -23,7 +23,6 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-/** Stated, not imported: `apps/web` takes nothing from `apps/api` at runtime. */
 const INVITATIONS_READ = "/trpc/person.invitations";
 
 const INVITATIONS_READ_ROUTE = `**${INVITATIONS_READ}*`;
@@ -33,7 +32,6 @@ const landedAt = (page: Page): URL => new URL(page.url());
 const noWorkspaceHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "No Workspace Yet" });
 
-/** The page names Claude only to a person who came to connect it. */
 const claudeLine = (page: Page) => page.getByRole("main").getByText(/\bClaude\b/);
 
 const invitations = (page: Page) => page.getByRole("region", { name: "Your Invitations" });

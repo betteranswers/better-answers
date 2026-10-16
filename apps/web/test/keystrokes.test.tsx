@@ -60,7 +60,6 @@ describe("the keystrokes list", () => {
   it("leaves focus where a sooner key moved it", async () => {
     render(<APage />);
     listDismissedByEscape();
-    // The next key's action, in the task the list left in, before focus is handed back.
     screen.getByRole("textbox", { name: SEARCH }).focus();
 
     await aTaskLater();

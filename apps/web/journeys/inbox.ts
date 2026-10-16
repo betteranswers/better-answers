@@ -21,7 +21,6 @@ const POLL_INTERVAL_MS = 2_000;
 const REQUEST_TIMEOUT_MS = 5_000;
 const LOOKUP_TIMEOUT_MS = 2_000;
 
-/** Alone on its line, so digits in the link are never read as it. */
 const SIGN_IN_CODE = /^(\d{6})$/m;
 
 export type Inbox = {
@@ -43,7 +42,6 @@ export type InboxAnswer =
 export type Noted =
   | {
       readonly answer: "noted";
-      /** Ask again after a refused code: one rotated since reads as ambiguous, not as a failure. */
       readonly codeSent: () => Promise<InboxAnswer>;
     }
   | { readonly answer: "unreachable" };
@@ -173,7 +171,6 @@ type Vouched = { readonly messageId: string; readonly text: string };
 
 const SET_ASIDE = "set aside";
 
-/** Judged once; a message whose key could not be looked up is not judged yet. */
 type Verdict = Vouched | typeof SET_ASIDE;
 
 const LOOK_AGAIN = "look again";
@@ -205,7 +202,6 @@ const keyUnread = (verified: DKIMVerifyResult, domain: string): boolean =>
       result.signingDomain?.toLowerCase() === domain && result.status.result === "temperror",
   );
 
-/** The text part alone, so an email that lost it reads as carrying no code. */
 const PARSING = { skipHtmlToText: true, skipTextToHtml: true, skipImageLinks: true } as const;
 
 const addressesIn = (to: ParsedMail["to"]): readonly string[] =>
@@ -215,7 +211,6 @@ const addressesIn = (to: ParsedMail["to"]): readonly string[] =>
     .flatMap((mailbox) => mailbox.group ?? [mailbox])
     .map(({ address }) => (address ?? "").toLowerCase());
 
-/** A genuine email to someone else, re-sent to the person, names them nowhere it was signed. */
 const readOf = async (watch: Watch, raw: Buffer, id: string): Promise<Verdict> => {
   const mail = await simpleParser(raw, PARSING);
   if (!addressesIn(mail.to).includes(watch.recipient)) return SET_ASIDE;
@@ -233,14 +228,12 @@ const judged = async (
     if (vouched && singlyAddressed(verified)) return await readOf(watch, raw, id);
     return keyUnread(verified, watch.senderDomain) ? LOOK_AGAIN : SET_ASIDE;
   } catch {
-    // Bytes the verifier or the parser cannot read vouch for nothing, and must not end the wait.
     return SET_ASIDE;
   }
 };
 
 type Verdicts = ReadonlyMap<string, Verdict>;
 
-/** The first unjudged candidate even past the deadline, so the last poll still reads what it lists. */
 const withVerdicts = async (
   watch: Watch,
   verdicts: Verdicts,
@@ -260,7 +253,6 @@ const withVerdicts = async (
 
 const isVouched = (verdict: Verdict | undefined): verdict is Vouched => typeof verdict === "object";
 
-/** Copies of one email share its Message-ID, so only a second Message-ID is a second email. */
 const answerOf = (vouched: readonly Vouched[]): InboxAnswer | undefined => {
   const emails = new Map(vouched.map(({ messageId, text }) => [messageId, text]));
   if (emails.size > 1) return AMBIGUOUS;
@@ -272,7 +264,6 @@ const answerOf = (vouched: readonly Vouched[]): InboxAnswer | undefined => {
 
 type Poll = {
   readonly answer: InboxAnswer | undefined;
-  /** Kept for the re-ask, so an email vouched for once is never judged again. */
   readonly verdicts: Verdicts;
   readonly arrived: boolean;
 };

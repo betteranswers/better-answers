@@ -22,7 +22,6 @@ import {
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
 
-/** `CLIENT_IP_HEADER`, named not imported: `apps/web` takes nothing from `apps/api` at runtime. */
 const CLIENT_IP_HEADER = "cf-connecting-ip";
 
 let browsersOpened = 0;
@@ -182,10 +181,6 @@ test("another device shows the code and stays signed out", async ({
   await typedWhereItStarted(asking, code);
 });
 
-/**
- * Spent in a browser of its own: Better Auth counts every load of a `/sign-in` page, three per ten
- * seconds from one address.
- */
 test("unknown, spent and superseded links show one dead page", async ({
   page,
   request,

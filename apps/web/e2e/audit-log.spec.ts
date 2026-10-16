@@ -320,7 +320,6 @@ test.describe("the System group's Audit log page", () => {
   test("renders the audit log within the latency budget", async ({ page, request }) => {
     await anAdminAtTheAuditLog(page, request, "Ryedale Metalwork");
 
-    // A fresh document, so no page of the audit log is already in the page's cache.
     const started = Date.now();
     await page.goto(AUDIT_LOG_PAGE);
     await expect(linesOf(page)).toHaveCount(3);

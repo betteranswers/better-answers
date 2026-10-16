@@ -52,7 +52,6 @@ const movingTheSession = (api: Api, request: string, answer: unknown) => {
   });
 };
 
-/** Landed in Holme Valley Tools by this tab's own doing, which another tab had no part in. */
 const landedAtHome = async (router: Awaited<ReturnType<typeof openAt>>) => {
   await waitFor(() => expect(switcherDrawn(HOLME)).not.toBeNull());
   expect(router.state.location.pathname).toBe(HOMES.Viewer.path);

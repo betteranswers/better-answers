@@ -42,7 +42,6 @@ const workspacesIn = (menu: Locator): Locator => menu.getByRole("menuitemradio")
 
 const listedAs = (name: string, role: "Admin" | "Viewer"): string => `${name} ${role}`;
 
-/** Standing while empty, so the regions are found before they have anything to say. */
 const saidInTheBand = (page: Page): Locator =>
   page.getByRole("banner").getByRole("status", { includeHidden: true });
 
@@ -134,7 +133,6 @@ test("opens the menu on the held list after a switch", async ({ page, request })
   await switched(page, first.name, second.name);
   await landedAtHome(page, "Viewer");
   await expect(switcherOf(page, second.name)).toBeVisible();
-  // Held, so what the menu lists is what the switch left in hand, not a fresh answer.
   const release = await heldBack(page, WORKSPACES_READ);
 
   await switcherOf(page, second.name).click();
@@ -233,7 +231,6 @@ test("drops the left workspace's members when All workspaces picks another", asy
   await aMemberOnlyOf(request, second.workspaceId, "Only In Derwent");
   await page.reload();
   await expect(memberLink(page, "Only In Esk")).toBeVisible();
-  // Held, so whatever the page draws before the new workspace's list lands is on show.
   const release = await heldBack(page, MEMBERS_READ);
 
   await allWorkspacesPicked(page, first.name);
@@ -334,7 +331,6 @@ test("says a pending switch's refusal, holding others until it answers", async (
     first: "Settle Castings",
     second: "Giggleswick Castings",
   });
-  // The operator, so the menu offers both of its ways out of the shell.
   await markTheOperator(request, email);
   await page.reload();
   await expect(switcherOf(page, first.name)).toBeVisible();
@@ -420,7 +416,6 @@ test("keeps the rail and nav below the band's refusal", async ({ page, request }
     first: "Marsden Presswork",
     second: "Slaithwaite Presswork",
   });
-  // Rows enough that the page scrolls past the band in a short window.
   for (let row = 1; row <= 4; row += 1) {
     await aMemberOnlyOf(request, first.workspaceId, `Row ${String(row)}`);
   }

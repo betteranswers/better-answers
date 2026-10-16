@@ -120,7 +120,6 @@ test.describe("a stale confirmation before a high-impact act", () => {
 
     expect(await refused).toMatchObject({ word: STALE_CONFIRMATION });
 
-    // One confirmation covers the batch: both removals land, and no dialog opens again.
     await reconfirmedOn(page, request, atPeople.adminEmail);
     await expect(memberRows(page)).toHaveCount(1);
     await expect(reconfirmOf(page)).toHaveCount(0);

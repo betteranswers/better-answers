@@ -32,7 +32,6 @@ const readThroughTheSession = async <T>(
 const askedAt = (url: string): readonly string[] =>
   new URL(url).pathname.replace(`${TRPC}/`, "").split(",");
 
-/** Asked for before the journey's own action that calls, or the answer can land unwaited for. */
 const answerTo = async <T>(page: Page, procedure: string, data: z.ZodType<T>): Promise<T> => {
   const answered = await page.waitForResponse((answer) =>
     askedAt(answer.url()).includes(procedure),
@@ -46,7 +45,6 @@ const answerTo = async <T>(page: Page, procedure: string, data: z.ZodType<T>): P
   return z.object({ result: z.object({ data }) }).parse(answer).result.data;
 };
 
-/** The api's refusal of an action: its word, alone, as the message. An edge or a failure says none. */
 const REFUSED = z.object({
   error: z.object({ message: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/) }),
 });

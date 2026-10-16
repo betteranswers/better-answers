@@ -80,7 +80,6 @@ const closerOf = (page: Page) => page.getByRole("button", { name: "Hide Menu" })
 
 const openerOf = (page: Page) => page.getByRole("button", { name: "Show Menu" });
 
-/** Exact, as "Menu" would otherwise match the toggle's "Hide Menu" too. */
 const sheetButtonOf = (page: Page) => page.getByRole("button", { name: "Menu", exact: true });
 
 const sheetOf = (page: Page) => page.getByRole("dialog", { name: "Menu", exact: true });
@@ -882,10 +881,6 @@ test("draws no toolbar over a page without tabs", async ({ page, request }) => {
 
   await expect(page.getByRole("tablist")).toHaveCount(0);
 
-  /**
-   * An empty bar is what this forbids, so the content must open its own column. The passkey offer
-   * alone may stand above it.
-   */
   const met = await page.evaluate((offer) => {
     const above = document.querySelector("main")?.previousElementSibling;
     return above === null || above?.getAttribute("aria-label") === offer;
@@ -946,7 +941,6 @@ test("holds toggle and band still while the nav hides", async ({
     Math.min(navWide, (await pageMaximumOf(page)) - room),
   );
 
-  // Audited closed here; the fixture audits the open state the test ends on.
   await passesTheAccessibilityGate();
 
   await expect(open).toHaveAttribute("aria-expanded", "false");

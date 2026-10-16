@@ -40,7 +40,6 @@ const SEND_PATH = "/email-otp/send-verification-otp";
 
 const codeField = (page: Page) => page.getByLabel("Verification Code", { exact: true });
 
-/** Asked for before the action that sends, or the answer can land before anything waits for it. */
 const theSendsAnswer = (page: Page) =>
   page.waitForResponse((response) => new URL(response.url()).pathname === SEND_PATH);
 
@@ -90,7 +89,6 @@ const atTheCodeStep = async (page: Page, email: string): Promise<void> => {
   await sendTheFirstCode(page, email);
 };
 
-/** The page counts the tries left itself, so the alert's number is all that says them. */
 const triesLeft = (left: number): RegExp => new RegExp(String.raw`\b${String(left)}\b`);
 
 const aWrongCodeIsRefused = async (page: Page): Promise<void> => {
@@ -214,7 +212,6 @@ test("lists a member's workspaces within a second", async ({ page, request }) =>
   await signIn(page, request, email);
   await expect(rowsOf(page)).toHaveCount(2);
 
-  // A fresh document, so no list is already in the page's cache.
   const started = Date.now();
   await page.goto("/choose-workspace");
   await expect(rowsOf(page)).toHaveCount(2);
@@ -377,13 +374,11 @@ test("says a code is sent, wrong, or asked too often", async ({
   await aWrongCodeIsRefused(page);
   await passesTheAccessibilityGate();
 
-  // `request` has a client address of its own, so the ceiling this trips is the per-email one.
   const flooded = anAddress("flood");
   await floodCodesTo(request, flooded, 6);
 
   await page.getByRole("button", { name: "Use a Different Email Address" }).click();
   await theSendIsRefusedNamingItsWait(page, flooded);
-  // Red words alone: the system never draws a coloured rule beside them.
   await expect(page.getByRole("alert")).toHaveCSS("border-left-width", "0px");
 });
 
@@ -508,7 +503,6 @@ test("names the wait when a new code meets the ceiling", async ({
   const email = anAddress("ceiling");
   await provision(request, { name: "Ceiling Ltd", adminEmail: email });
   await atTheCodeStep(page, email);
-  // The page sent one, so four more reach the per-email ceiling and the next is refused.
   await floodCodesTo(request, email, 4);
 
   await page.keyboard.press("Tab");
@@ -618,7 +612,6 @@ test("sends a wrong code once, selected, naming two tries left", async ({ page, 
   expect(sent, "the refused code was sent again").toHaveLength(2);
 });
 
-/** A spent code leaves focus on sending another, so Enter alone asks for the code that signs in. */
 const anotherCodeSignsIn = async (page: Page, request: APIRequestContext, email: string) => {
   await expect(page.getByRole("button", { name: "Send a New Code" })).toBeFocused();
   const saidOfTheFirst = await page.getByRole("status").innerText();
@@ -643,7 +636,6 @@ test("a third wrong code hands focus to sending another", async ({ page, request
     await expect(page.getByRole("alert")).toHaveText(triesLeft(left));
   }
   const oneLeft = await page.getByRole("alert").innerText();
-  // The api refuses the third as it did the first; the page's own count makes it the last.
   const third = authAnswering(page, SIGN_IN_PATH);
   await codeField(page).fill(notTheCode(code, 3));
   expect(await third).toMatchObject({ status: 400, code: "INVALID_OTP" });

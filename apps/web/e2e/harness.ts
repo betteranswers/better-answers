@@ -51,7 +51,6 @@ const ask = async <T>(
   answer: z.ZodType<T>,
 ): Promise<T> => {
   const answered = await api.post(`${HARNESS}${path}`, { data: body });
-  // A seed the harness will not write answers 400 with its reason, which belongs in the failure.
   const why = answered.ok() ? "" : `: ${await answered.text()}`;
   expect(answered.ok(), `${path} answered ${answered.status()}${why}`).toBe(true);
   return answer.parse(await answered.json());
@@ -87,7 +86,6 @@ export const endEverySignInAndToken = (api: APIRequestContext, userId: string) =
 
 const operatorMarked = z.object({ marked: z.boolean() });
 
-/** The mark only an ops command sets, granted or cleared as that command does it. */
 export const markTheOperator = (
   api: APIRequestContext,
   email: string,
@@ -98,7 +96,6 @@ const invitationWritten = z.object({ id: z.string() });
 /** The store keeps Better Auth's spelling; a spec says the glossary's. */
 const STORED_STATUS = { accepted: "accepted", cancelled: "canceled" } as const;
 
-/** As the invite action leaves it, less the email no spec reads; or accepted, cancelled, or past expiry. */
 export const invite = (
   api: APIRequestContext,
   input: {
@@ -129,11 +126,9 @@ const confirmationAged = z.object({ aged: z.boolean() });
 export const ageTheConfirmation = (api: APIRequestContext, userId: string) =>
   ask(api, "/confirmations/aged", { userId }, confirmationAged);
 
-/** How a spec meets a pending session's end without waiting out its hour. */
 export const ageThePendingHour = (api: APIRequestContext, userId: string) =>
   ask(api, "/pending-sessions/aged", { userId }, confirmationAged);
 
-/** How a spec meets an expired code without waiting out its lifetime. */
 export const ageTheCode = (api: APIRequestContext, email: string) =>
   ask(api, "/codes/aged", { email }, confirmationAged);
 
@@ -153,7 +148,6 @@ export const reconfirmedOn = async (
 
 const enrolled = z.object({ key: z.string(), recoveryCodes: z.array(z.string()) });
 
-/** Spends no emailed code; ten codes come saved, as a first setup leaves an Admin, unless `none`. */
 export const enrolledWith = (
   api: APIRequestContext,
   email: string,
@@ -163,7 +157,6 @@ export const enrolledWith = (
 export const withAnAuthenticator = async (api: APIRequestContext, email: string) =>
   (await enrolledWith(api, email)).key;
 
-/** The platform operator's restore, ending the person's factors and sessions; answers its code. */
 export const restored = async (api: APIRequestContext, email: string) =>
   (await ask(api, "/restores", { email }, codeSent)).code;
 
@@ -174,13 +167,11 @@ const CLAUDE = {
   redirect_uri: CLAUDES_REDIRECT_URI,
 } as const;
 
-/** A verifier and its challenge, as Claude mints a pair for each connection. */
 export const aPkcePair = () => {
   const verifier = randomBytes(64).toString("base64url");
   return { verifier, challenge: createHash("sha256").update(verifier).digest("base64url") };
 };
 
-/** Claude's authorize request for the MCP surface at `origin`. */
 export const claudesAuthorizeUrl = (
   origin: string,
   options: {
@@ -202,7 +193,6 @@ export const claudesAuthorizeUrl = (
   return `/oauth2/authorize?${query.toString()}`;
 };
 
-/** claude.ai is out of the suite's reach, so a stand-in page answers its redirect. */
 export const catchClaudesRedirect = (page: Page) =>
   page.route(`${CLAUDES_REDIRECT_URI}*`, (route) =>
     route.fulfill({
@@ -212,7 +202,6 @@ export const catchClaudesRedirect = (page: Page) =>
     }),
   );
 
-/** The code exchanged as Claude does, which is when the grant's refresh token is minted. */
 export const claudeExchanges = async (
   api: APIRequestContext,
   asked: { readonly origin: string; readonly code: string; readonly verifier: string },
@@ -248,7 +237,6 @@ export const claudeRefreshes = async (
   return { refreshToken: tokens.refresh_token };
 };
 
-/** Claude revokes its own grant at the authorization server, as disconnecting it does. */
 export const claudeDisconnects = async (
   api: APIRequestContext,
   refreshToken: string,
@@ -265,7 +253,6 @@ export type SeedModelChoice = {
   readonly model: string;
 };
 
-/** A purpose `modelChoices` leaves out has no model choice. */
 export const seedModelChoices = (
   api: APIRequestContext,
   input: { workspaceId: string; modelChoices: readonly SeedModelChoice[] },
@@ -275,7 +262,6 @@ type Sensitivity = (typeof SENSITIVITIES)[number];
 
 type RedactionTier = (typeof REDACTION_TIERS)[number];
 
-/** The store restores an always-tier finding alone, so no other tier is offered `kept` or an erasure's override. */
 type SeedFinding = {
   readonly category: string;
   readonly ruleId: string;
@@ -297,7 +283,6 @@ type SeedFinding = {
 type SeedDocument = {
   readonly title: string;
   readonly sensitivity?: Sensitivity;
-  /** One word with no space, as the worker's `NeedsOcrError` is. */
   readonly unreadableReason?: string;
   readonly passages?: readonly string[];
   readonly findings?: readonly SeedFinding[];
@@ -334,7 +319,6 @@ export const seedConnectedSources = (
   input: { workspaceId: string; connectedSources: readonly SeedConnectedSource[] },
 ) => ask(api, "/connected-sources", input, seededConnectedSources);
 
-/** `label` is the file's own name for the source; `sensitivity` holds the document closer than its concept. */
 type SeedCitedDocument = {
   readonly title: string;
   readonly label?: string;
@@ -342,18 +326,14 @@ type SeedCitedDocument = {
   readonly sensitivity?: Sensitivity;
 };
 
-/** A concept seeded earlier in the same list, by its title. */
 type SeedCitedConcept = { readonly concept: string };
 
-/** A place of the file's own in a source, such as `p.4`, which opens nothing. */
 type SeedCitedPlace = { readonly title: string; readonly at: string };
 
 type SeedFrontmatterEntry = Readonly<Record<string, string | number | boolean | null>>;
 
-/** A body that writes `[^source-N]` places that source's mark; the rest follow its last word. */
 type SeedConcept = {
   readonly title: string;
-  /** The folder under `knowledge/` the concept's file sits in; it sits in none when not given. */
   readonly collection?: string;
   readonly body: string;
   readonly kind?: string;
@@ -400,7 +380,6 @@ type SeedFlag = {
   readonly closedAs?: (typeof FLAG_CLOSINGS)[number];
 };
 
-/** `askedBy` left out is an asker an erasure renamed; a null question is content it removed. */
 export type SeedRecord = {
   readonly askedBy?: string;
   readonly transport?: (typeof QUESTION_TRANSPORTS)[number];
@@ -420,19 +399,13 @@ const seededQuestions = z.object({
   records: z.array(z.object({ recordId: z.string(), flagIds: z.array(z.string()) })),
 });
 
-/** Listed oldest first, a second apart, so the last is the newest. */
 export const seedQuestions = (
   api: APIRequestContext,
   input: { workspaceId: string; records: readonly SeedRecord[] },
 ) => ask(api, "/questions", input, seededQuestions);
 
-/** A sentence the drafter writes for the concept titled `citing`, which its footnote cites. */
 type ScriptedSentence = { readonly citing: string; readonly sentence: string };
 
-/**
- * A model left out is not chosen. A hold waits for `releaseTheModel`: the judge's answer, or the
- * draft after its first sentence.
- */
 export type AskingScript = {
   readonly workspaceId: string;
   readonly judging?: { readonly fits: readonly string[] } | "fails";
@@ -441,7 +414,6 @@ export type AskingScript = {
   readonly holds?: "judge" | "draft";
 };
 
-/** Set as the owner sets the workspace's models, so `ask` judges and drafts as the script says. */
 export const scriptAsking = (api: APIRequestContext, script: AskingScript) =>
   ask(api, "/asking", script, z.object({ scripted: z.literal(true) }));
 
@@ -450,7 +422,6 @@ export const releaseTheModel = (api: APIRequestContext, workspaceId: string) =>
 
 const modelCalls = z.object({ judge: z.number(), draft: z.number() });
 
-/** The calls the workspace's model has answered, or holds, so far. */
 export const modelCallsIn = async (api: APIRequestContext, workspaceId: string) => {
   const answered = await api.get(`${HARNESS}/asking/calls`, { params: { workspaceId } });
   expect(answered.ok(), `the calls answered ${answered.status()}`).toBe(true);
@@ -459,9 +430,6 @@ export const modelCallsIn = async (api: APIRequestContext, workspaceId: string) 
 
 const syncMoved = z.object({ jobId: z.string() });
 
-/**
- * The suite runs no worker, so a spec watching a state word move asks the harness for its steps.
- */
 export const moveTheSync = (
   api: APIRequestContext,
   input: { workspaceId: string; to: "claimed" | "done" },
@@ -469,10 +437,6 @@ export const moveTheSync = (
 
 const groupsMade = z.object({ made: z.number() });
 
-/**
- * Groups made by the member `userId` names, through the slice's own actions, each holding every one
- * of `memberIds`.
- */
 export const makeGroups = (
   api: APIRequestContext,
   input: {
@@ -485,10 +449,6 @@ export const makeGroups = (
 
 const accessAsked = z.object({ asked: z.literal(true) });
 
-/**
- * A person's ask to join a workspace by its short name, as the ask-to-join form leaves it, without the
- * sign-in the form needs.
- */
 export const askToJoin = (
   api: APIRequestContext,
   input: { shortName: string; requesterId: string; reason: string },
@@ -496,16 +456,11 @@ export const askToJoin = (
 
 const nameFlagged = z.object({ flagged: z.literal(true) });
 
-/**
- * A workspace's Admin flags a member's display name, as the member sheet does, without the email to
- * the operator.
- */
 export const flagTheName = (
   api: APIRequestContext,
   input: { workspaceId: string; adminId: string; personId: string },
 ) => ask(api, "/name-flags", input, nameFlagged);
 
-/** What the api captured of the last email to this address, in place of the email nobody receives. */
 const capturedFor = async <T>(
   api: APIRequestContext,
   path: string,
@@ -525,7 +480,6 @@ export const linkSentTo = async (api: APIRequestContext, email: string): Promise
 
 const emailsCounted = z.object({ sent: z.number() });
 
-/** How many emails the api has sent to an address, each counted as the transport took it. */
 export const emailsSentTo = async (api: APIRequestContext, email: string): Promise<number> => {
   const counted = await api.get(`${HARNESS}/emails?to=${encodeURIComponent(email)}`);
   expect(counted.ok(), `counting the emails answered ${counted.status()}`).toBe(true);
@@ -548,11 +502,9 @@ export const aSessionOn = async (
   return asked.sessionId;
 };
 
-/** Timestamped and randomised, so a code read back for it is this test's alone. */
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
-/** From the sign-in page the browser shows; an Admin or the operator is left on confirm or setup. */
 export const signInByEmail = async (
   page: Page,
   api: APIRequestContext,
@@ -565,8 +517,6 @@ export const signInByEmail = async (
   await expect(code).toBeVisible();
   await code.fill(await codeSentTo(api, email));
 
-  // Six digits sign in on their own; navigating before the page is left cancels the request,
-  // and no session is set.
   await expect(code).toHaveCount(0);
 };
 
@@ -602,7 +552,6 @@ const firstPageDrawn = async (page: Page): Promise<boolean> => {
   return PENDING_PAGE.test(new URL(page.url()).pathname);
 };
 
-/** For an action that makes the session pending, such as joining as an Admin. */
 export const confirmedWhenAsked = async (
   page: Page,
   api: APIRequestContext,
@@ -613,14 +562,12 @@ export const confirmedWhenAsked = async (
   await confirmedWithTheHarness(page, api, email);
 };
 
-/** As a person signs in, then past the confirm page an Admin or the operator must pass. */
 export const signIn = async (page: Page, api: APIRequestContext, email: string): Promise<void> => {
   await signInByEmail(page, api, email);
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/);
   if (await firstPageDrawn(page)) await confirmedWithTheHarness(page, api, email);
 };
 
-/** Asked for before signing in, so the sign-in page carries the member back to it. */
 export const aMemberSignedInAt = async (
   page: Page,
   api: APIRequestContext,
@@ -638,7 +585,6 @@ export const aMemberSignedInAt = async (
   return workspace;
 };
 
-/** From the sign-in page to a role's home, as a member of one workspace arrives. */
 export const signedInAtHome = async (
   page: Page,
   api: APIRequestContext,
@@ -669,7 +615,6 @@ export const inTwoWorkspaces = async (
   return { email, first, second };
 };
 
-/** From the sign-in page to the no-workspace page, as a person in no workspace arrives. */
 export const signedInWithNoWorkspace = async (page: Page, api: APIRequestContext, who: string) => {
   const email = anAddress(who);
   const signedIn = await person(api, email);

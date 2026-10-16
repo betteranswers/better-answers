@@ -159,7 +159,6 @@ const anAdminAtGroups = async (
     names: ["Una's crew"],
   });
 
-  // Asked for before signing in, so the sign-in page carries the Admin back to it.
   await page.goto(GROUPS_PAGE);
   await signIn(page, api, adminEmail);
   await expect(page).toHaveURL(new RegExp(`${GROUPS_PAGE}$`));
@@ -216,7 +215,6 @@ test.describe("the People group's Groups page", () => {
               - cell:
                 - button "Actions for HR team"
     `);
-    // A name alone does not say that its row opens, so each name carries a caret at rest.
     for (const name of ["Bid writers", "HR team"]) {
       const opens = groupsRegion(page).getByRole("button", { name, exact: true });
       await expect(opens).toHaveAttribute("aria-haspopup", "dialog");
@@ -228,7 +226,6 @@ test.describe("the People group's Groups page", () => {
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Dales Engineering");
 
-    // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
     await page.goto(GROUPS_PAGE);
     await expect(groupRows(page)).toHaveCount(2);
@@ -295,7 +292,6 @@ test.describe("a group's actions", () => {
     await createDialog(page).getByRole("button", { name: "Close" }).click();
     await expect(groupRows(page)).toHaveCount(2);
 
-    // Opened by its key this time, the dialog carries nothing of the refused try.
     await page.keyboard.press(GROUPS_KEYSTROKES.create.key);
     await expect(nameField(page)).toBeFocused();
     await expect(

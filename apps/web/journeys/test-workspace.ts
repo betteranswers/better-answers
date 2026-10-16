@@ -8,7 +8,6 @@ import { counted } from "@/shared/words.ts";
 import { roleOfTheAdmin, standingOf, type Checked, type Member } from "./reads.ts";
 import { stopTheRun } from "./run-stop.ts";
 
-/** The Admin's journey moves these and puts them back, so a failed run may leave them Editors. */
 const REPAIR_MEMBERS = 3;
 
 export type TestPeople = Readonly<Record<Role, string>>;
@@ -40,7 +39,6 @@ const fixtureOf = (people: TestPeople): ReadonlyMap<string, readonly string[]> =
   return new Map([...testPeople, ...invented]);
 };
 
-/** Counts alone, since the reason reaches the run's summary and an address must not. */
 export const findingsIn = (standing: Standing, people: TestPeople): readonly string[] => {
   const fixture = fixtureOf(people);
   const rolesOf = (member: Standing["members"][number]) =>
@@ -72,7 +70,6 @@ export type RepairMembers = {
   readonly editors: readonly string[];
 };
 
-/** Each repair member is here: a missing one is a finding, which stopped the run before now. */
 const repairMembersAmong = (members: readonly Member[], people: TestPeople): RepairMembers => {
   const addresses = repairAddressesOf(people);
   const repair = members.filter((member) => addresses.includes(member.address.toLowerCase()));
@@ -84,7 +81,6 @@ const repairMembersAmong = (members: readonly Member[], people: TestPeople): Rep
   };
 };
 
-/** A refusal the product named means the Admin lost their standing, which only someone changed. */
 const readOrStop = <T>(checked: Checked<T>): T =>
   checked.kind === "read"
     ? checked.value
@@ -92,10 +88,6 @@ const readOrStop = <T>(checked: Checked<T>): T =>
         `the test workspace refused the Admin's read of ${checked.procedure} (${checked.word})`,
       );
 
-/**
- * Read through the Admin's session before any action, their own role first. A finding stops the
- * run, so the Editor and Viewer never sign in.
- */
 export const theFixtureHolds = async (page: Page, people: TestPeople): Promise<RepairMembers> => {
   const role = readOrStop(await roleOfTheAdmin(page));
   if (role !== "Admin") stopTheRun("the test Admin no longer holds the Admin role");

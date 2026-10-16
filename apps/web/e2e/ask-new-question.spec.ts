@@ -233,7 +233,6 @@ test.describe("Ask › New question", () => {
     });
   }
 
-  // The streaming budget: the first sentence is on the page while the model still holds the rest.
   test("shows the first drafted sentence before the stream ends", async ({ page, request }) => {
     const { workspaceId } = await aViewerAsking(page, request, {
       judging: { fits: [] },

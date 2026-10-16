@@ -19,7 +19,6 @@ const WITHOUT_THE_MARK = {
 const askedAt = (url: string): readonly string[] =>
   new URL(url).pathname.replace("/trpc/", "").split(",");
 
-/** The batch's other answers stay the api's own: a refused standing would close the whole console. */
 export const refusedFromNowOn = (page: Page, procedure: string) =>
   page.route(
     (url) => askedAt(url.href).includes(procedure),
@@ -50,10 +49,6 @@ const aRefusedCall = z.object({
   }),
 });
 
-/**
- * Asked for before the action that calls, or the answer can land unwaited for. A ceiling carries a
- * wait and no word.
- */
 export const refusalAnswering = async (page: Page, procedure: string) => {
   const answered = await page.waitForResponse((answer) =>
     askedAt(answer.url()).includes(procedure),

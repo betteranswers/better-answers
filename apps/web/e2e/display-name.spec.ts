@@ -91,7 +91,6 @@ test("credits a new member by their given name, asking once", async ({ page, req
   expect(shown).not.toContain("/display-name");
 });
 
-// An Editor, since an Admin's sign-in passes the second-factor pages first.
 test("signs a named member straight into the shell, never asking", async ({ page, request }) => {
   const email = anAddress("already");
   const who = await person(request, email, { displayName: "Alys Named" });

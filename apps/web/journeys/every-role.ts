@@ -5,7 +5,6 @@ import { HOMES, type Role } from "@/shared/navigation.ts";
 import { saysARefusal, switcherMenuOf, switcherOf } from "../e2e/locators.ts";
 import { expect } from "./fixtures.ts";
 
-/** The audit of the page the journey is about to leave. */
 export type Gate = () => Promise<void>;
 
 const listedAs = (name: string, role: Role): string => `${name} ${role}`;

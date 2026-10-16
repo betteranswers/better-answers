@@ -274,7 +274,6 @@ test.describe("an action from a tab left in another workspace", () => {
     const elsewhere = await switchedInAnotherTab(context, page, two);
     await samsPage.getByRole("radio", { name: "Admin", exact: true }).click();
 
-    // Answered by the api and held on its way back, so the second press meets the first pending.
     const held = Promise.withResolvers<void>();
     let asked = 0;
     await page.route(

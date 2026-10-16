@@ -212,7 +212,6 @@ test("a second sign-out waits for the first to answer", async ({ page, request }
     name: "Sign out Safari on iOS",
   });
 
-  // The first sign-out reaches the api and its answer is held, so the second press meets it pending.
   const held = await holdingTheFirstAnswer(page, SIGN_OUT_ONE);
 
   await rowOf(page, "Edge on Windows")

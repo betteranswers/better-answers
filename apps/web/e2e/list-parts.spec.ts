@@ -15,7 +15,6 @@ test.beforeAll(async () => {
   });
 });
 
-/** No page draws every shared part yet, so the unit suite's Members list is drawn on its own. */
 const drawn = async (page: Page, request: APIRequestContext) => {
   await harnessDrawn(page, request, { title: "Members", script: parts ?? "" });
   await expect(page.getByRole("table")).toBeVisible();

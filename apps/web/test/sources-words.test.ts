@@ -128,7 +128,6 @@ describe("a connected source's stored values", () => {
   });
 });
 
-/** Each id the worker's redaction descriptors raise, beside its word in lower case. */
 const RULES_RAISED = {
   HEALTH_CUE: "health wording",
   UK_BANK_ACCOUNT: "sort code and account number",

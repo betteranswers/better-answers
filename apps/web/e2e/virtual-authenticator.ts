@@ -1,9 +1,5 @@
 import type { Page } from "@playwright/test";
 
-/**
- * A platform authenticator Chromium holds for the page, through the DevTools protocol: it verifies
- * its user and answers every prompt without one being shown.
- */
 export const aVirtualAuthenticator = async (page: Page) => {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("WebAuthn.enable", { enableUI: false });
@@ -24,7 +20,6 @@ export const aVirtualAuthenticator = async (page: Page) => {
     stopsVerifying: () =>
       cdp.send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false }),
 
-    /** Its owner away: every prompt waits unanswered, the email field's autofill included. */
     leftUnattended: () =>
       cdp.send("WebAuthn.setAutomaticPresenceSimulation", { authenticatorId, enabled: false }),
 

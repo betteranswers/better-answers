@@ -199,7 +199,6 @@ test.describe("the Sources page's list of connected sources", () => {
     ];
     await anAdminAtSources(page, request, { workspace: "Calder Joinery", connectedSources: ten });
 
-    // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
     await page.goto("/sources/connected-sources");
     await expect(connectedSourcesRegion(page).getByRole("heading", { level: 3 })).toHaveCount(10);
@@ -268,7 +267,6 @@ test.describe("the Sources page's list of connected sources", () => {
     await expect(handbook.getByRole("term").filter({ hasText: DESTINATIONS_TERM })).toHaveCount(0);
     await handbook.getByRole("button", { name: "More Details Staff handbook" }).click();
 
-    // A stored value is one word, and what More Details says of it is several.
     const aSentence = /\S\s+\S/;
     await expect(detailOf(page, "Staff handbook", "State")).toHaveText(aSentence);
     await expect(handbook.getByRole("term").filter({ hasText: /^Destination/ })).toHaveText([
@@ -1334,7 +1332,6 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       connectedSources: [indexed("Bid library"), indexed("Case studies")],
     });
 
-    // The first widening reaches the api and its answer is held, so the second press meets it pending.
     const reached = Promise.withResolvers<void>();
     const answered = Promise.withResolvers<void>();
     let asked = 0;
@@ -1469,7 +1466,6 @@ test.describe("the Sources page's keystrokes", () => {
     expect(new Set(said).size, "two keys are listed with one action").toBe(said.length);
     await page.keyboard.press("Escape");
     await expect(listed).toHaveCount(0);
-    // The rail's: the toolbar keeps the page's own actions alone.
     const keystrokes = page
       .getByRole("navigation", { name: "Areas" })
       .getByRole("button", { name: "Keyboard Shortcuts" });

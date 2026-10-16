@@ -40,7 +40,6 @@ import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-/** The read gives at most 20 matches a page. */
 const A_PAGE = 20;
 
 const searchRegion = (page: Page) => page.getByRole("region", { name: "Search" });
@@ -181,10 +180,6 @@ const searched = async (page: Page, query: string): Promise<void> => {
   await expect(matchesOf(page).first()).toBeVisible();
 };
 
-/**
- * No row tells a search that found nothing from one still asking, so the status must move on
- * from what it said while held.
- */
 const foundNothing = async (
   page: Page,
   query: string,
@@ -540,7 +535,6 @@ test.describe("the Knowledge Search page", () => {
     await expect(panel, "the panel copied the match's sensitivity").not.toContainText("Internal");
     await expect(first).toContainText(markedAt("Internal"));
 
-    // The same passage refused on its next read: the title once read does not stand over the refusal.
     await page.keyboard.press("Escape");
     await expect(panel).toHaveCount(0);
     await page.unroute(isAnOpen);
@@ -740,7 +734,6 @@ test.describe("the Knowledge Search page", () => {
   test("renders matches within the list's budget", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Ryedale Archives", [handbookSeeded]);
 
-    // A fresh document, so no page of matches is already in the page's cache.
     const started = Date.now();
     await page.goto(asked("pallet"));
     await expect(matchesOf(page)).toHaveCount(A_PAGE);

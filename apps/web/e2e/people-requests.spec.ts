@@ -37,7 +37,6 @@ const NAMES_AN_ORGANISATION = /organi[sz]ation/i;
 
 const requestsRegion = (page: Page) => page.getByRole("region", { name: "Requests" });
 
-/** The region's outcome line: its count is a status too, and stands before it. */
 const saidIn = (page: Page): Locator => requestsRegion(page).getByRole("status").last();
 
 const emptyLine = (page: Page): Locator =>
@@ -113,7 +112,6 @@ const describedAfresh = async (select: Locator, pick: () => Promise<void>): Prom
   ).not.toHaveAccessibleDescription(before);
 };
 
-/** Every button whose name starts by inviting, so a second one under another name is counted. */
 const invitingButtons = (page: Page) => page.getByRole("button", { name: /^invite/i });
 
 type Asking = { readonly displayName: string; readonly reason?: string };
@@ -212,7 +210,6 @@ test.describe("the People page's Requests tab", () => {
       { displayName: "Ola Nowak" },
     ]);
 
-    // A fresh document, so no list is already in the page's cache.
     const startedAtMs = Date.now();
     await page.goto(MEMBERS_PAGE);
     await openRequests(page);

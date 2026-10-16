@@ -17,7 +17,6 @@ import {
 import { refusedByTheEdge, signIn, type CodeSource } from "./sign-in.ts";
 
 type JourneyFixtures = {
-  /** The test person a journey signs in as. The preflight names none, and signs nobody in. */
   readonly role: Role | undefined;
   readonly signedIn: void;
 };
@@ -33,7 +32,6 @@ const INBOX_URL = z
 const CODE_SOURCES = ["inbox", "harness"] as const;
 const CODE_SOURCE = z.enum(CODE_SOURCES);
 
-/** The setting is named and its value never is: the addresses are secrets. */
 const addressOf = (role: Role): string => {
   const name = `JOURNEYS_${role.toUpperCase()}_EMAIL`;
   const parsed = ADDRESS.safeParse(process.env[name]);
@@ -53,7 +51,6 @@ type Reader = {
   readonly factorKey: (address: string) => FactorKey;
 };
 
-/** The URL's value is never named: it is a secret, as the addresses are. */
 const inboxReader = (): Reader => {
   const sender = SENDER.safeParse(process.env["JOURNEYS_SENDER"]);
   if (!sender.success) return couldNotRun("JOURNEYS_SENDER is not set");
@@ -66,7 +63,6 @@ const inboxReader = (): Reader => {
   };
 };
 
-/** By hand, against the browser suite's api, its capture holds the code nobody is mailed. */
 const harnessReader = (request: APIRequestContext): Reader => ({
   source: async (address) => ({
     answer: "noted",
@@ -143,7 +139,6 @@ export const test = suite.extend<JourneyFixtures>({
           () => {
             const named = addressOf(role);
             const reader = readerOf(request);
-            // Only the Admin must confirm a second factor; asked here, so a missing key spends no code.
             const key = role === "Admin" ? reader.factorKey(named) : undefined;
             return { address: named, source: reader.source, factorKey: key };
           },

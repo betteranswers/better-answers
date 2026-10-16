@@ -13,13 +13,11 @@ export const playsTheRole = (role: string): void => {
   test.info().annotations.push({ type: ROLE, description: role });
 };
 
-/** The release goes unjudged. The reason reaches the run's summary, so it never names an address. */
 export const couldNotRun = (reason: string): never => {
   test.info().annotations.push({ type: COULD_NOT_RUN, description: reason });
   throw new Error(`could not run: ${reason}`);
 };
 
-/** The release failed. The reason reaches the run's summary, so it never names an address. */
 export const failed = (reason: string): never => {
   test.info().annotations.push({ type: FAILED, description: reason });
   throw new Error(reason);

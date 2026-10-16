@@ -106,7 +106,6 @@ describe("where focus goes when Load More's page lands", () => {
     render(<Lines />);
 
     askedForMore();
-    // As a browser does for the control that held focus when its window is brought to the front again.
     fireEvent.focusIn(screen.getByRole("button", { name: "Load More" }));
     thePageLands();
 

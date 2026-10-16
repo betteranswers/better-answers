@@ -7,12 +7,8 @@ import { contrastBetween, controlEdges, drawnMarks } from "./locators.ts";
 
 let issued = 0;
 
-/** `CLIENT_IP_HEADER`, named not imported: `apps/web` takes nothing from `apps/api` at runtime. */
 const CLIENT_IP_HEADER = "cf-connecting-ip";
 
-/**
- * RFC 2544's benchmarking block. A caller with no address shares the bucket Better Auth warns of.
- */
 const anAddress = (workerIndex: number): string => {
   issued += 1;
   return `198.18.${workerIndex % 250}.${issued % 250}`;
@@ -20,10 +16,6 @@ const anAddress = (workerIndex: number): string => {
 
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
-/**
- * Axe reads colours mid-fade, which no one settles on. A spinner never ends, so an endless
- * animation is audited running.
- */
 const transitionsHaveEnded = async (page: Page): Promise<void> => {
   await page.evaluate(async () => {
     const ending = (): Animation[] =>
@@ -40,14 +32,11 @@ const transitionsHaveEnded = async (page: Page): Promise<void> => {
   });
 };
 
-/** The design system's rationing: if everything is registered, nothing is. */
 const MOST_MARKED = 3;
 
-/** Axe reads an image under text as an undecided colour, so a texture or mark hides contrast. */
 const TEXTURES_ASIDE =
   "[data-grid-pattern], [data-dot-pattern] { background-image: none !important; } [data-marks]::before { content: none !important; }";
 
-/** Axe's keys for a contrast it could not decide because of what was painted behind the text. */
 const UNDECIDED_BEHIND = new Set(["bgImage", "bgGradient", "pseudoContent"]);
 
 const undecidedBehind = (check: { readonly data: unknown }): boolean => {
@@ -105,10 +94,6 @@ const themeSet = (page: Page, theme: string | undefined): Promise<void> =>
 
 type Scrolled = readonly [left: number, top: number];
 
-/**
- * A row scrolled half under the sticky band is how a sticky band works, not a target-size defect:
- * the audit reads from the top.
- */
 const returnedToItsTop = (page: Page): Promise<Scrolled> =>
   page.evaluate((): Scrolled => {
     const was = [window.scrollX, window.scrollY] as const;
@@ -121,7 +106,6 @@ const scrolledBackTo = (page: Page, was: Scrolled): Promise<void> =>
     window.scrollTo(left, top);
   }, was);
 
-/** In the page's own theme, then in the other, so dark is held in every state a test leaves. */
 const auditOf = async (page: Page): Promise<void> => {
   const was = await returnedToItsTop(page);
   const own = await themeOf(page);
@@ -139,10 +123,6 @@ export type BrowserFixtures = {
   readonly holdsItsTitle: void;
 };
 
-/**
- * Playwright's `test`, with a client address for the page and another for `request`, and an
- * axe audit no passing test can skip.
- */
 export const test = base.extend<BrowserFixtures>({
   holdsItsTitle: [
     // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from this pattern, and it has none
@@ -164,9 +144,6 @@ export const test = base.extend<BrowserFixtures>({
     await use(await context.newPage());
   },
 
-  /**
-   * Its own address, not the page's: a flood here leaves the page to meet the per-email ceiling.
-   */
   request: async ({ playwright, baseURL }, use, testInfo) => {
     const api = await playwright.request.newContext({
       ...(baseURL === undefined ? {} : { baseURL }),

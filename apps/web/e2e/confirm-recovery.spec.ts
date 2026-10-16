@@ -53,7 +53,6 @@ const codesListed = (page: Page) =>
 const saidOfTheSet = (page: Page) =>
   page.getByRole("region", { name: "Save Your Recovery Codes" }).getByRole("paragraph");
 
-/** Every refusal region stands from the first draw, so the one saying something is the refusal. */
 const theRefusal = (page: Page) => page.getByRole("alert").filter({ hasText: /\S/ });
 
 const codeOf = (key: string): string => authenticatorCodeAt(key, new Date());
@@ -64,7 +63,6 @@ const aWrongCode = (right: string, nth = 1): string =>
     "0",
   );
 
-/** By email alone, so the sign-in waits on the page that confirms or sets up its second factor. */
 const signedInWaiting = async (page: Page, api: APIRequestContext, email: string, on: string) => {
   await page.goto("/sign-in");
   await signInByEmail(page, api, email);
@@ -92,7 +90,6 @@ const confirmedByCode = async (page: Page, key: string): Promise<void> => {
   await landedAtHome(page, "Admin");
 };
 
-/** Ticked on the page showing them, so no later sign-in shows them again. */
 const codesTicked = async (page: Page, finish: string): Promise<void> => {
   await page.getByRole("checkbox", { name: "I have saved these codes" }).check();
   await page.getByRole("button", { name: finish }).click();

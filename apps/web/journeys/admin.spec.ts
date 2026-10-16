@@ -25,7 +25,6 @@ const CONNECTED_SOURCES = pageNamed(
 ).path;
 const MODELS_AND_SPEND = pageNamed(menuGroupIn(CONTROL_CENTRE, "models"), "Models and Spend").path;
 
-/** Every group the journeys make starts so, and the opening repair deletes any left behind. */
 const JOURNEYS_GROUPS = "Journeys run";
 
 const ROLE_CELL = 2;
@@ -146,7 +145,6 @@ const groupDeleted = async (page: Page, name: string): Promise<void> => {
   await expect(groupButton(page, name)).toHaveCount(0);
 };
 
-/** What a failed run left: a repair member still an Editor, or a group of the journeys'. */
 const repaired = async (page: Page, repair: RepairMembers): Promise<void> => {
   if (repair.editors.length > 0) {
     await test.step("Set the repair members back to Viewer", () =>
@@ -161,7 +159,6 @@ const repaired = async (page: Page, repair: RepairMembers): Promise<void> => {
 const pagesOfMembers = (page: Page): Locator =>
   page.getByRole("navigation", { name: "Pages of Members" });
 
-/** Each turn waits for the count it says, so the next turn starts from the page it drew. */
 const lastPageReached = async (page: Page): Promise<number> => {
   const next = pagesOfMembers(page).getByRole("button", { name: "Next Page" });
   const said = pagesOfMembers(page).getByRole("status");
@@ -193,7 +190,6 @@ const membersWalked = async (page: Page, gate: Gate): Promise<void> => {
   });
 };
 
-/** The newest page of events, then Load more, which must bring older ones below it. */
 const olderEventsLoaded = async (page: Page, gate: Gate): Promise<void> => {
   await page.goto(AUDIT_LOG);
   const auditLog = page.getByRole("region", { name: "Audit Log" });
@@ -228,7 +224,6 @@ const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
     await gate();
   });
   await test.step("Connected sources", async () => {
-    // A failed read says so in the same region, so the page's own read is the one judged.
     const [read] = await Promise.all([connectedSourcesRead(page), page.goto(CONNECTED_SOURCES)]);
     expect(read, "the page read a connected source the fixture does not hold").toBe(0);
     const connectedSources = page.getByRole("region", { name: "Connected Sources" });
@@ -242,7 +237,6 @@ const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
   });
 };
 
-/** Named for the run, so a group a failed run leaves is told from one this run made. */
 const groupOfThisRun = (): string =>
   `${JOURNEYS_GROUPS} ${new Date().toISOString().slice(0, 19).replace("T", " ")}`;
 

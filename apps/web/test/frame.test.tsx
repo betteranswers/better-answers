@@ -255,7 +255,6 @@ const routedPaths = (): readonly string[] =>
 const detailRouteOf = (each: Page): readonly string[] =>
   each.detail === undefined ? [] : [`${each.path}/$${each.detail.param}`];
 
-/** One direction finds the page the router forgot; only the other finds a route nothing declared. */
 const destinations = [
   ...new Set([
     ...pagesOf(EVERY_AREA)

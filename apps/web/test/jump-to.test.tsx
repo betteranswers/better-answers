@@ -28,7 +28,6 @@ const PRIYA = { personId: "p1", displayName: "Priya Shah", address: "priya@examp
 
 const NAMELESS = { personId: "p2", displayName: "", address: "new@example.test" };
 
-/** A second Priya Shah, so two members share every word a reader sees but their address. */
 const ANOTHER_PRIYA = { personId: "p3", displayName: "Priya Shah", address: "ps@example.test" };
 
 const STUB: readonly Area[] = [

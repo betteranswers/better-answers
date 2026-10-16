@@ -285,7 +285,6 @@ test.describe("Questions asked", () => {
   test("renders a page of rows within the list budget", async ({ page, request }) => {
     await aPageAndOneMoreOpened(page, request, "Wharfe Pages");
 
-    // A fresh document, so no page of the list is already in the page's cache.
     const started = Date.now();
     await page.goto(QUESTIONS_ASKED);
     await expect(rowsOf(questionsAsked(page))).toHaveCount(50);

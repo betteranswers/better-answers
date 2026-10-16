@@ -375,7 +375,6 @@ test.describe("the console's Everyone page", () => {
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {
     await signedInAsTheOperator(page, request, aTag());
 
-    // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
     await page.goto(EVERYONE_PAGE);
     await expect(personRows(page).first()).toBeVisible();
@@ -810,7 +809,6 @@ test.describe("the console's Names Waiting page", () => {
       personId: priya.id,
     });
 
-    // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
     await page.goto(NAMES_WAITING_PAGE);
     await expect(waitingRowOf(page, name)).toBeVisible();

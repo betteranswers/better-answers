@@ -19,7 +19,6 @@ const A_FEATURES_OWN = {
   "last-admin": "What this feature alone says of the last Admin.",
 } satisfies OwnSentences;
 
-/** Any word and class, as the api would send them: a word the web has never met still shows. */
 const refusedWith = (word: string, refusalClass: string): Error =>
   carrying({ refusal: { word, class: refusalClass } });
 
