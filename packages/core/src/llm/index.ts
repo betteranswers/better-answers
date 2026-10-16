@@ -68,7 +68,6 @@ export type WorkspaceModelChoice = {
   readonly retentionTail: string | null;
 };
 
-/** The index's vectors are this model's, which another could not read, so its choice is fixed. */
 export const FIXED_PURPOSE: LlmPurpose = "embedding";
 
 type ModelChoiceRow = {

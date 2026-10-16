@@ -151,7 +151,6 @@ export type ReadInvitationInput = {
   readonly now: Date;
 };
 
-/** An id that parses as none names no invitation, which is what a mistyped link is. */
 const askedOf = (
   input: ReadInvitationInput,
 ): Result<Asked, MemberRefusal<"malformed" | "no-such-invitation">> => {
@@ -284,7 +283,6 @@ const join = async (
   tx: Tx,
   joining: Joining,
 ): Promise<Result<Joined, AcceptInvitationRefusal>> => {
-  // The invitation's row lock queues a second accept of it, which then finds the member.
   const held = await judged(tx, joining, "lock");
   if (!held.ok) return held;
   if (hasNoDisplayName(held.value.invitee.name)) return err("no-display-name");

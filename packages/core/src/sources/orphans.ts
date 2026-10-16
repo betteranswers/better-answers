@@ -33,10 +33,6 @@ export const ORPHANED_UPLOAD_GRACE_HOURS = 24;
 
 const AN_HOUR_MS = 60 * 60 * 1000;
 
-/**
- * Both shapes stand in the store: `uploads/<connected source>/<document>/original` and
- * `uploads/<connected source>/original`.
- */
 const AN_ORIGINAL = /^uploads\/([^/]+)\/(?:([^/]+)\/)?original$/;
 
 const NAMED_ORIGINALS = `SELECT original_key FROM source_document

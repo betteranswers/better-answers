@@ -107,7 +107,6 @@ const childEnvironment = (added: Readonly<Record<string, string>> = {}): NodeJS.
   LC_ALL: "C",
 });
 
-/** A child stopped mid-write closes its stdin; its exit, not the broken pipe, says what happened. */
 const feeding = (child: ChildProcess, input: string | undefined): void => {
   if (input === undefined) return;
   child.stdin?.on("error", (cause: NodeJS.ErrnoException) => {
@@ -116,7 +115,6 @@ const feeding = (child: ChildProcess, input: string | undefined): void => {
   child.stdin?.end(input);
 };
 
-/** execFile settles on abort before the child exits; five seconds lets git clear its lock files first. */
 const EXIT_GRACE_MS = 5_000;
 
 const exitedWithin = async (child: ChildProcess, graceMs: number): Promise<void> => {
@@ -178,10 +176,6 @@ const stdoutOf = (cause: unknown): string => {
   return typeof stdout === "string" ? stdout.trim() : "";
 };
 
-/**
- * git prints `--git-dir` only for a repository it recognises, before the ref read can fail: a
- * corrupt `packed-refs` exits 128 yet reads as no head.
- */
 const standingHead = async (
   gitDir: string,
   signal?: AbortSignal,
@@ -294,7 +288,6 @@ const commitFailure = (cause: unknown): "stale-precondition" | Error => {
   return cause instanceof Error ? cause : new Error(message);
 };
 
-/** A one-file commit takes milliseconds; a minute allows a slow disk yet frees the member row held across it. */
 const COMMIT_BUDGET_MS = 60_000;
 
 type Budget = { readonly ms: number; readonly signal: AbortSignal };
@@ -446,10 +439,6 @@ const carries = (line: string, needles: readonly string[]): boolean => {
   return needles.some((needle) => lowered.includes(needle.toLowerCase()));
 };
 
-/**
- * git grep exits 1 both for no match and for an object it could not read; only the silent one
- * means nobody is named.
- */
 const blobsNaming = async (
   gitDir: string,
   needles: readonly string[],
@@ -633,7 +622,6 @@ export const fileAtHead = async (
 export type Pseudonymisation = {
   readonly addresses: readonly string[];
 
-  /** Person ids, rewritten where history names them as `human:<id>`, trailers included. */
   readonly people: readonly string[];
   readonly pseudonym: string;
 };
@@ -667,7 +655,6 @@ const replacementsFor = (
     ...people.map((person) => `${PERSON_PREFIX}${person}==>${PERSON_PREFIX}${pseudonym}\n`),
   ].join("");
 
-/** A trailer is in the message, which no file search reads. */
 const messagesNaming = async (gitDir: string, needles: readonly string[]): Promise<boolean> => {
   const logged = await git(gitDir, ["log", "--all", "--format=%B%x00"]);
   return logged.split("\0").some((message) => carries(message, needles));
@@ -789,8 +776,6 @@ export const rewriteHistory = async (
     ]);
     const moved = await commitMapOf(gitDir, started);
 
-    // The reflog first: an entry in it is a reference, and gc prunes nothing something still
-    // refers to.
     await git(gitDir, ["reflog", "expire", "--expire=now", "--all"]);
     await git(gitDir, ["gc", "--prune=now", "--quiet"]);
     return { moved, paths: [...new Set(naming.blobs.map((blob) => blob.path))] };

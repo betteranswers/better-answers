@@ -62,7 +62,6 @@ export type TestWorkspaceInput = {
 
 type AddressWord = MemberRefusal<"off-testing-domain" | "operator-marked" | "member-elsewhere">;
 
-/** Names the address, which only the operator running the fixture reads. */
 type AddressRefused = { readonly word: AddressWord; readonly address: string };
 
 type ShortNameTaken = Extract<keyof typeof WORKSPACE_REFUSALS, "slug-taken">;
@@ -82,7 +81,6 @@ type MembersEnsured = {
   readonly membersAdded: number;
   readonly rolesReset: number;
 
-  /** On the testing domain and outside the fixture: reported, never removed. */
   readonly unexpected: readonly { readonly address: string; readonly role: Role }[];
 };
 
@@ -155,7 +153,6 @@ const fixtureOf = (input: TestWorkspaceInput): Parsed<Fixture> => {
   const others = [...people.value.others, ...inventedOn(testingDomain.data)];
   const everyone = [people.value.admin, ...others];
   const addresses = new Set(everyone.map((one) => one.address));
-  // A long domain can pass its own check yet make an invented address too long; refuse before any write.
   const wellFormed = everyone.every((one) => emailAddressOf(one.address) !== undefined);
   if (!wellFormed || addresses.size !== everyone.length) return err(MALFORMED);
   return ok({
@@ -412,10 +409,6 @@ const membersEnsured = async (
   });
 };
 
-/**
- * Each step is an existing action with its own transaction; a failure leaves what landed, and a
- * re-run repairs from there.
- */
 const fixtureWritten = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

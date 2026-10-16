@@ -60,7 +60,6 @@ const LISTED_ROW = WAITING_ROW.extend({
 
 export type InvitationCounts = Readonly<Record<InvitationStatus, number>>;
 
-/** By the server's clock: an invitation never accepted is expired from the instant it expires. */
 const statusOf = (bind: Bind, at: Date): string => {
   const waiting = bind(INVITATION_WAITING_STATUS);
   return `CASE WHEN i.status = $${waiting} AND i.expires_at > $${bind(at)} THEN 'waiting'

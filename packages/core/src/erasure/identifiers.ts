@@ -12,10 +12,6 @@ const SPACE = " ";
 
 const EMAILS: IdentifierKind = "emails";
 
-/**
- * The worker splits on Python's whitespace, which is not JavaScript's `\s`: it holds the
- * four separator controls and NEL, and not the byte-order mark.
- */
 const WHITESPACE_RANGES: readonly (readonly [number, number])[] = [
   [0x09, 0x0d],
   [0x1c, 0x20],
@@ -35,10 +31,6 @@ const WHITESPACE = new Set(
   ),
 );
 
-/**
- * Node's Unicode postdates the worker's 15.1, where these code points do not exist; the
- * agreement's digests fail when Node's Unicode moves.
- */
 const ASSIGNED_AFTER_UNICODE_15_1 = `
   88F 897 C5C CDC 1ACF-1ADD 1AE0-1AEB 1B4E-1B4F 1B7F 1C89-1C8A 20C1 2427-2429 2B96 31E4-31E5
   A7CB-A7CF A7D2 A7D4 A7DA-A7DC A7F1 FBC3-FBD2 FD90-FD91 FDC8-FDCE 105C0-105F3 10940-10959
@@ -72,7 +64,6 @@ const DOTLESS_I = "\u0131";
 const CHEROKEE_SMALL_LETTERS = { from: 0xab70, to: 0xabbf, capital: 0x13a0 };
 const CHEROKEE_SMALL_LETTERS_BEYOND = { from: 0x13f8, to: 0x13fd, capital: 0x13f0 };
 
-/** Cherokee folds a small letter to its capital, where lower-casing goes the other way. */
 const cherokeeCapitalOf = (character: string): string => {
   const point = character.codePointAt(0) ?? 0;
   const range = [CHEROKEE_SMALL_LETTERS, CHEROKEE_SMALL_LETTERS_BEYOND].find(
@@ -98,7 +89,6 @@ const spacedAs = (identifier: string, written: (character: string) => string): s
     .filter((word) => word !== "")
     .join(SPACE);
 
-/** Folded as the worker folds, with each run of whitespace one space and none at either end. */
 export const normalisedIdentifier = (identifier: string): string =>
   spacedAs(identifier, foldedCharacter);
 
@@ -114,10 +104,6 @@ export const floorNotCleared = (kind: IdentifierKind, identifier: string): Floor
 export type SoughtIdentifier = {
   readonly normalised: string;
 
-  /**
-   * Spaced as the agreement spaces it and never folded: the full-text index lower-cases and
-   * keeps ß, so it holds the spelling the request recorded.
-   */
   readonly recorded: string;
 
   readonly anAddress: boolean;
@@ -143,16 +129,11 @@ export const soughtIdentifiersOf = (
   return [...sought.values()];
 };
 
-/** Offsets count code points, not UTF-16 units; `end` is exclusive. */
 export type ErasureMatch = {
   readonly start: number;
   readonly end: number;
 };
 
-/**
- * Each folded code unit keeps the text character it came from: ß folds to two, and an
- * occurrence counts the text's own characters.
- */
 type Folded = {
   readonly text: string;
   readonly origins: readonly number[];
@@ -174,7 +155,6 @@ const foldedOf = (characters: readonly string[]): Folded => {
   return { text: pieces.join(""), origins };
 };
 
-/** A match starting or ending between the two letters ß folds to names nothing the text wrote. */
 const occurrencesOf = (folded: Folded, normalised: string): readonly ErasureMatch[] => {
   const { text, origins } = folded;
   const found: ErasureMatch[] = [];

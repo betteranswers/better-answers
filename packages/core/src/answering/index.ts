@@ -156,7 +156,6 @@ type ConceptView<Iri extends string> = {
     readonly target: Iri;
     readonly title: string;
   }[];
-  /** Each link in the body that leads to a concept the reader may read; `open` always answers it. */
   readonly bodyLinks?: readonly {
     readonly ordinal: number;
     readonly address: string;
@@ -472,21 +471,15 @@ export type AskRefusal = RefusalOf<typeof askAction> | Error;
  * open across the judge's call.
  */
 export type AskSteps<Refused = never> = JudgeSteps<Refused> & {
-  /** Commits before it answers: a question refused later is still on record. */
   readonly openRecord: (
     opening: Omit<RecordOpening, "transport">,
   ) => Promise<Result<{ readonly recordId: string }, Refused | Error>>;
   readonly read: ReadStep<Refused>;
-  /** Settles the judge's reservation, when one was taken, in the same transaction. */
   readonly completeRecord: (
     completion: Omit<RecordCompletion, "completedAt" | "drafted">,
   ) => Promise<Result<void, Refused | Error>>;
 };
 
-/**
- * What `ask` would answer, read through `read` alone: no record is opened, so the answer carries
- * no record's id.
- */
 export const planAnswer = async <Refused = never>(
   principal: UserPrincipal,
   read: ReadStep<Refused>,
@@ -543,7 +536,6 @@ const findLine = (match: FindMatch<string>): string =>
     ? `${match.kind} · ${match.title} · ${match.collection ?? NO_COLLECTION} · ${match.trustWords} · ${match.iri}`
     : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator}`;
 
-/** A client may read only the text, so the way to the next page is written out too. */
 export const renderFind = (result: FindResult<string>): string => {
   if (result.matches.length === 0) return "Nothing in the company's knowledge matches that.";
   const lines = result.matches.map(findLine);
@@ -552,7 +544,6 @@ export const renderFind = (result: FindResult<string>): string => {
     : [...lines, "", `More follow: call find again with cursor ${result.nextCursor}`].join("\n");
 };
 
-/** Every line quoted: a document's own line never reads as a heading or a concept of the answer. */
 const quoted = (text: string): readonly string[] => text.split(/\r?\n/).map((line) => `> ${line}`);
 
 export const renderOpen = (result: OpenView<string>): string => {
@@ -616,7 +607,6 @@ export const mapWords = (map: MapState): string => {
   }
 };
 
-/** The related line tells an assistant what to do, and never says the question was answered. */
 const VERDICT_LINES = {
   ok: "**Answered from the company's knowledge.**",
   warn: "**Answered with a warning for your role.**",
@@ -671,7 +661,6 @@ const unmappedText = (passage: PassageView): readonly string[] => [
 const FITS_THEN_RELATED =
   "**Related knowledge, which the judge did not find answers the question as asked.**";
 
-/** Each `Answer` that fits in full first, so an assistant reads the fits before what only bears. */
 const answeredText = (answer: PlannedAnswer<string>): readonly string[] =>
   answer.answers.length === 0
     ? relatedText(answer.related)

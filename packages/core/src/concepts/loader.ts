@@ -106,10 +106,6 @@ type YamlFrontmatter = z.infer<typeof yamlFrontmatter>;
 const isMapping = (value: YamlFrontmatter[string]): value is FrontmatterSource =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/**
- * The platform's frontmatter holds scalars and lists, so a flow mapping such as OKF's
- * `generated {by, at}` is carried as a one-entry list.
- */
 const frontmatterOf = (decoded: YamlFrontmatter): Frontmatter =>
   Object.fromEntries(
     Object.entries(decoded).map(([key, value]) => [key, isMapping(value) ? [value] : value]),

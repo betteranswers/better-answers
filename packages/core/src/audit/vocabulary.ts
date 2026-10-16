@@ -32,7 +32,6 @@ export type ActionName<F extends Family = Family> = Extract<
   `${F}.${string}`
 >;
 
-/** Ids alone: the assistant's and the workspace's names are read when the grant is shown. */
 export const endedGrant = z.strictObject({
   clientId: z.string().min(1),
   workspaceId: boundarySchemas.workspace.select.shape.id.nullable(),
@@ -49,7 +48,6 @@ const endedSession = z.strictObject({
 
 export type EndedSession = z.output<typeof endedSession>;
 
-/** A person or group a search found, by id alone: a typed name or address is never stored. */
 const MATCHED_KINDS = ["person", "group"] as const;
 
 const matched = z.strictObject({
@@ -207,10 +205,6 @@ const declarationRefusal = (
   return undefined;
 };
 
-/**
- * Declares every action or none: throws when a name is not of the family's form, names a record never
- * kept as an audit event, or is declared already or earlier in the same call.
- */
 export const declareActions = <
   F extends Family,
   const Actions extends Record<string, AuditAction<ActionName<F>>>,
@@ -235,10 +229,6 @@ export const declareActions = <
 
 const identitySetNames = new Set<string>();
 
-/**
- * Which audit log keeps an action is fixed where it is declared, so no caller can file a person's own
- * action in a workspace.
- */
 export const declareIdentitySetActions = <
   F extends Family,
   const Actions extends Record<string, AuditAction<ActionName<F>>>,

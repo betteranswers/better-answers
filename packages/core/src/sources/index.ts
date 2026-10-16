@@ -119,10 +119,6 @@ const SOURCE_ACTIONS = declareActions("sources", {
   }),
 });
 
-/**
- * A narrowing and a widening ask for the same pair; built twice, since one schema exported under
- * two names is a duplicate export.
- */
 const theSensitivityAsked = () =>
   CONNECTED_SOURCE_VISIBILITY.extend({
     connectedSourceId: CONNECTED_SOURCE_ID,
@@ -322,10 +318,6 @@ export const narrowConnectedSource = async (
   return sensitivitySet(admitted.value, tx, input, narrowing);
 };
 
-/**
- * `not-wider` unless the visibility asked is wider in sensitivity or audience and narrower in neither.
- * A document's own sensitivity is left alone: the derivation reads the narrower of it and the connected source's.
- */
 export const widenConnectedSource = async (
   principal: UserPrincipal,
   tx: Tx,

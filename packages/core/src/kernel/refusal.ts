@@ -24,11 +24,6 @@ export type CataloguedRefusal = {
 
 const WORD = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
-/**
- * Every word in `catalogue` with its class and owner, in the order declared.
- *
- * @throws on a word that is not lower case and hyphenated, or one two owners declare.
- */
 export const refusalsIn = (catalogue: Catalogue): readonly CataloguedRefusal[] => {
   const held = new Map<string, CataloguedRefusal>();
   for (const [owner, vocabulary] of Object.entries(catalogue)) {

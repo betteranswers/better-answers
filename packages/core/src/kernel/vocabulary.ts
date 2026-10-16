@@ -8,15 +8,10 @@ export const KERNEL_REFUSALS = {
   "role-forbids": "forbidden",
   "not-found": "absent",
 
-  // The operator resolver's one word, whatever it found, so a signed-in person it refuses learns
-  // nothing else.
   "not-the-operator": "forbidden",
 
-  // A high-impact act asks for a recent confirmation; confirming the second factor again is the
-  // whole remedy, which a fresh sign-in alone is not.
   "confirmation-too-old": "precondition",
 
-  // Signing in again would only meet it again: the remedy is confirming the second factor.
   "second-factor-pending": "precondition",
 
   // The action Postgres aborted to end a deadlock did nothing wrong: reading again and deciding
@@ -29,14 +24,10 @@ export const KERNEL_REFUSALS = {
   "role-unknown": "unauthenticated",
   "malformed-claims": "unauthenticated",
 
-  // The envelope's three: both tiers answer a frame they cannot open in these words, the frame
-  // being what they agree through.
   "envelope-version-unknown": "inapplicable",
   "envelope-malformed": "malformed",
   "envelope-not-authentic": "malformed",
 
-  // The llm layer may import no slice. The remedy is a raised limit or a new month, never a wait,
-  // so it is no `CeilingMet`.
   "spending-limit-met": "precondition",
 } as const satisfies Vocabulary;
 

@@ -20,13 +20,8 @@ import {
 } from "../store/postgres/index.ts";
 import type { LlmPurpose } from "./index.ts";
 
-/** Its value is a decimal string of pounds sterling, the currency every price is set in. */
 export const SPENDING_LIMIT_KEY = "llm.spending_limit_gbp";
 
-/**
- * Past the longest a call's timeout and its provider's retries can run, so a live call is never
- * settled as failed under it.
- */
 export const RESERVATION_LIFETIME_MS = 10 * 60_000;
 
 export type CallSize = { readonly tokensIn: number; readonly tokensOut: number };
@@ -39,7 +34,6 @@ export type SpendReserved = {
   readonly model: string;
 };
 
-/** No model may be called, so nothing was reserved: not a refusal, since `ask` still answers. */
 export type NoModelToCall = {
   readonly reserved: false;
   readonly because: "no-model-choice" | "no-price" | "no-spending-limit";
@@ -140,10 +134,6 @@ const reservedUnderTheLimit = async (
   });
 };
 
-/**
- * Reserves the most one call may cost, in the caller's transaction, which a refusal rolls back
- * whole. The limit's row is held to the commit, so two reservations cannot both pass it.
- */
 export const reserveSpend = async (
   asker: UserPrincipal,
   tx: Tx,
@@ -197,11 +187,6 @@ const SETTLED = `WITH taken AS (
   )
   SELECT count(*)::integer AS taken FROM taken`;
 
-/**
- * Replaces the reservation with one `llm_call` row per attempt, in the caller's transaction; what
- * was reserved and not spent is released, all of it when no attempt was made. A reservation the
- * sweep already settled is an error, and writes nothing.
- */
 export const settleSpend = async (
   asker: UserPrincipal,
   tx: Tx,
@@ -226,10 +211,6 @@ export const settleSpend = async (
     return err(new Error(`llm: no open reservation ${input.reservationId} to settle`));
   });
 
-/**
- * Billed whole: a provider may have billed a call cut off. It returned no tokens; the most it could
- * send and run stand in.
- */
 const EXPIRED_SETTLED = `WITH expired AS (
     DELETE FROM spend_reservation WHERE workspace_id = $1 AND expires_at < $2 RETURNING *
   )
@@ -240,10 +221,6 @@ const EXPIRED_SETTLED = `WITH expired AS (
          extract(epoch FROM expires_at - taken_at), reserved_gbp, $3, run_id, answer_id
     FROM expired`;
 
-/**
- * Settles each reservation of the workspace past its expiry as one failed `llm_call` row at its
- * reserved cost, and answers how many.
- */
 export const settleExpiredSpend = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

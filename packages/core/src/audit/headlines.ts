@@ -1,9 +1,5 @@
 import type { STORED_ACT_NAMES } from "./stored-names.ts";
 
-/**
- * Each stored action in a few words, as the Audit log heads it and its search matches it. The web
- * reads a generated copy.
- */
 export const ACTION_HEADLINES = {
   "knowledge.check.imported": "Verification imported",
   "knowledge.concept.class_overridden": "Sensitivity overridden",

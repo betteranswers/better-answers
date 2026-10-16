@@ -2,7 +2,6 @@ import { action, declareIdentitySetActions, record, type EndedGrant } from "../a
 import { ulid, type AdminUserPrincipal, type UserId, type WorkspaceId } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
-/** The operator reads a person's ended grants from here, since no workspace's audit log is theirs. */
 const ENDING_ACTIONS = declareIdentitySetActions("people", {
   revoked: action("people.person.credentials_revoked", { grants: "grants" }),
   endedHere: action("people.person.grants_ended", { workspaceId: "id", grants: "grants" }),
@@ -27,10 +26,6 @@ export type TokensEnded = {
 const TOKENS_TO_END =
   "user_id = $1 AND created_at < $2 AND ($3::text IS NULL OR reference_id = $3)";
 
-/**
- * A grant is one authorisation's family, issued at its earliest row, and open only while an
- * unrotated row stands unrevoked: the provider ended the rest.
- */
 const REFRESH_TOKENS_ENDED = `WITH ended AS (
          DELETE FROM oauth_refresh_token WHERE ${TOKENS_TO_END}
          RETURNING id, client_id, reference_id, authorization_code_id, created_at, rotated_at,
@@ -41,7 +36,6 @@ const REFRESH_TOKENS_ENDED = `WITH ended AS (
         GROUP BY COALESCE(authorization_code_id, id), client_id, reference_id
         ORDER BY issued_at, client_id, workspace_id`;
 
-/** The detail kind refuses a grant as `record` writes it: the one check, where it enters. */
 type DeletedGrantRow = {
   readonly client_id: string;
   readonly workspace_id: WorkspaceId | null;
@@ -56,11 +50,6 @@ const endedGrantOf = (row: DeletedGrantRow): EndedGrant => ({
   issuedAt: row.issued_at.toISOString(),
 });
 
-/**
- * Deletes the person's OAuth tokens issued before the instant, answering the grants they held.
- * Deleted rather than marked: a marked refresh token presented later makes the provider delete
- * every grant the person holds for that assistant, a later one included.
- */
 export const endTokens = async (tx: Tx, asked: TokensToEnd): Promise<TokensEnded> => {
   const parameters = [asked.personId, asked.before, asked.workspaceId];
   // Access tokens first: deleting a refresh token cascades to its own, which would go uncounted.

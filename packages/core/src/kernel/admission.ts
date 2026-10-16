@@ -36,15 +36,11 @@ const ROLE_FORBIDS = "role-forbids" satisfies AdmissionRefusal;
 
 const NOT_THE_OPERATOR = "not-the-operator" satisfies AdmissionRefusal;
 
-/** A role outside the three reaches nothing, whatever a caller's type says. */
 const reaches = (held: Role, named: Role): boolean => {
   const at = ROLES.indexOf(held);
   return at !== -1 && at <= ROLES.indexOf(named);
 };
 
-/**
- * `ROLES` runs from the highest down, so a named role is reached by itself and everything above.
- */
 type ReachingOne<
   Named extends Role,
   Rest extends readonly Role[] = typeof ROLES,
@@ -54,7 +50,6 @@ type ReachingOne<
     : Head | ReachingOne<Named, Tail>
   : never;
 
-/** A union of roles is reached by whoever reaches any of them, so by its lowest and above. */
 type Reaching<Named extends Role> = Named extends Role ? ReachingOne<Named> : never;
 
 type Admitted<A extends Admits> = A extends RoleOrPurpose
@@ -93,12 +88,6 @@ export type AdmittedOf<D extends ActionDeclaration> = Admitted<AdmitsOf<D>>;
 
 type AdmissionRefusedOf<D extends ActionDeclaration> = Refused<AdmitsOf<D>>;
 
-/**
- * Hands the declaration back unchanged. A word stated twice counts once in the union it builds,
- * so the count is checked here.
- *
- * @throws when `refuses` lists one word twice.
- */
 export const declareAction = <
   Schema extends z.ZodType,
   const A extends Admits,

@@ -45,7 +45,6 @@ import {
 import { AUTHENTICATOR_SECRET_PREFIX, OPERATOR_RESTORE_PREFIX } from "./sign-in-and-consent.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** The factor's kind alone: which passkey or code was used is no change to any factor. */
 const CONFIRMING_ACTIONS = declareIdentitySetActions("people", {
   confirmed: action("people.person.second_factor_confirmed", { method: "secondFactor" }),
   replaced: action("people.person.factors_replaced", { by: "secondFactor" }),
@@ -197,7 +196,6 @@ export const confirmByAuthenticator = async (
 
 type WrongCodeRefusal = WorkspaceRefusal<"recovery-code-wrong" | "restore-code-wrong">;
 
-/** Not a refusal: the failure it counts must commit, and the notice it may make due goes with it. */
 type Wrong = { readonly granted: false; readonly refusal: WrongCodeRefusal } & Counted;
 
 type CodeKind = {
@@ -255,7 +253,6 @@ export const spendRecoveryCode = async (
   asThePerson(platform, door, input, async (tx, held): Promise<Spending> => {
     const session = await holding(tx, held);
     if (!session.ok) return session;
-    // A restore stands for the operator's own check, which a code from the mailbox must not skip.
     if (await restoredByTheOperator(tx, held.personId)) return err("restore-code-needed");
     return tryingACode(tx, held, RECOVERY_CODE, async () => {
       const unused = await spendingARecoveryCode(platform, tx, held.personId, input.code);
@@ -375,7 +372,6 @@ const keepingThePasskey = async (
   return ok(undefined);
 };
 
-/** The columns the library writes, so its own verify reads the secret as one it set up. */
 const INSTALLING = `
   INSERT INTO authenticator (id, secret, backup_codes, user_id, verified)
   VALUES ($1, $2, '', $3, true)`;

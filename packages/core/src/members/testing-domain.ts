@@ -9,7 +9,6 @@ export const OFF_TESTING_DOMAIN =
 
 const MARKED = "SELECT testing_domain FROM test_workspace_mark WHERE workspace_id = $1";
 
-/** Undefined for an unmarked workspace, which invites any address. */
 export const testingDomainOf = async (
   admin: AdminUserPrincipal,
   tx: Tx,

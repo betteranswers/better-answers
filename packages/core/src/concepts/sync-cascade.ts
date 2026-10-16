@@ -29,7 +29,6 @@ export type SyncCascadePrincipal = PlatformPrincipal & {
 
 export const SYNC_CASCADE: SyncCascadePrincipal = { kind: "platform", actorId: SYNC_CASCADE_ACTOR };
 
-/** One event per sync and attempt: it is how the tick knows that attempt is handled. */
 export const SYNC_CASCADE_ACTIONS = declareActions("platform", {
   followed: action("platform.job.followed", {
     [STORED_DETAIL_KEYS.connectedSourceId]: "id",
@@ -42,7 +41,6 @@ export const SYNC_CASCADE_ACTIONS = declareActions("platform", {
 
 const ALREADY_FOLLOWED = "followed";
 
-/** A finish stamp is taken before its commit lands, so the scan reaches back past the first event. */
 const SCAN_MARGIN_MS = 60 * 60 * 1000;
 
 type SyncFollowed = {
@@ -94,7 +92,6 @@ const targetOf = (sync: EndedSync) =>
     ? { connectedSourceId: sync.connectedSourceId, documentIds: sync.moved.documentIds }
     : { connectedSourceId: sync.connectedSourceId };
 
-/** Locks a lapsed claim's row so its revoked claimant cannot write after us; reads the marker under the cascade lock, so replicas serialise. */
 const unlessFollowed =
   (platform: SyncCascadePrincipal, workspaceId: WorkspaceId, sync: EndedSync) =>
   async (tx: Tx): Promise<Result<undefined, typeof ALREADY_FOLLOWED | Error>> => {
@@ -148,7 +145,6 @@ const followSync = async (
     ),
   );
 
-/** Each source's newest sync stays listed until followed, so a first-pass failure is not lost behind the baseline. */
 const listedSyncs = async (
   platform: SyncCascadePrincipal,
   door: PostgresDoor,

@@ -38,7 +38,6 @@ type OperatorMarkInput = {
 type OperatorMarkSet = {
   readonly personId: UserId;
 
-  /** False where the person already stood as asked, and nothing was written. */
   readonly changed: boolean;
 };
 
@@ -107,17 +106,14 @@ export type SignInRestored = {
   /** As the person's row holds it: where the notice goes. */
   readonly email: string;
 
-  /** The one time it exists outside the person's hands: only its hash is kept. */
   readonly code: string;
   readonly expiresAt: Date;
 };
 
-/** The acceptor keys the code by the stored address, lowered by Postgres, so this does too. */
 const HOLDING_BY_ADDRESS = `
   SELECT id, email, $2 || lower(email) AS identifier
     FROM "user" WHERE lower(email) = lower($1) FOR UPDATE`;
 
-/** Before the sessions go: a row keyed by a session is found only through it. */
 const SESSION_ROWS = `
   DELETE FROM verification
    WHERE identifier IN (SELECT prefix || s.id FROM session s, unnest($2::text[]) AS prefix

@@ -5,7 +5,6 @@ import type { Tx } from "../store/postgres/index.ts";
 export type ModelPrice = {
   readonly provider: ModelProvider;
   readonly model: string;
-  /** A day, `yyyy-mm-dd`, from which the price applies. */
   readonly effectiveFrom: string;
   readonly gbpPerMillionIn: string;
   readonly gbpPerMillionOut: string;

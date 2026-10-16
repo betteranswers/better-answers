@@ -38,14 +38,12 @@ export type MapState =
   | { readonly state: "as_of"; readonly at: string }
   | { readonly state: "unavailable_since"; readonly since: string };
 
-/** The kind whose body an answer returns word for word. */
 export const ANSWER_KIND = "Answer";
 
 export type PreviewedConcept<Iri extends string = ConceptIri> = {
   readonly iri: Iri;
   readonly url: string;
   readonly kind: string;
-  /** For an `Answer`, the question it answered. */
   readonly title: string;
   readonly collection: string | null;
   readonly trust: Trust;
@@ -64,7 +62,6 @@ export type RelatedConcept<Iri extends string = ConceptIri> =
 export type PlannedAnswer<Iri extends string = ConceptIri> = {
   readonly verdict: QuestionVerdict;
   readonly judgeState: JudgeState;
-  /** Every `Answer` a judge found to fit the question. */
   readonly answers: readonly ReturnedConcept<Iri>[];
   /** The concepts that bear on the question, an `Answer` no judge passed among them. */
   readonly related: readonly RelatedConcept<Iri>[];
@@ -74,15 +71,12 @@ export type PlannedAnswer<Iri extends string = ConceptIri> = {
   }[];
   readonly unmappedPassages: readonly PassageView[];
   readonly map: MapState;
-  /** The collections considered: those named, or every one the reader may read. */
   readonly collections: readonly string[];
-  /** The collections the reader may name. */
   readonly readableCollections: readonly string[];
 };
 
 export type AskCaps = {
   readonly entryPoints: number;
-  /** The concepts an answer returns: entry points first, then what the walk reached. */
   readonly related: number;
   readonly unmappedPassages: number;
   /** The `Answer`s the judge is asked about, in the order they bear; any beyond stay related. */
@@ -90,16 +84,8 @@ export type AskCaps = {
   readonly decisionThresholds: DecisionThresholds;
 };
 
-/**
- * The least probability of yes that is a fit, by provider, then model. A model with none cannot
- * judge; none is calibrated before a reading.
- */
 export type DecisionThresholds = ReadonlyMap<ModelProvider, ReadonlyMap<string, number>>;
 
-/**
- * Each applies to what the reader may read. `related` exceeds `entryPoints`, or the walk has no
- * slot; a host's largest result bounds it.
- */
 export const ASK_CAPS: AskCaps = {
   entryPoints: 20,
   related: 28,
@@ -119,13 +105,11 @@ type ReadFailure = KernelRefusal<"role-forbids"> | Error;
 type Asked = {
   readonly reader: UserPrincipal;
   readonly question: string;
-  /** Undefined where none was named: every collection the reader may read. */
   readonly collections: readonly string[] | undefined;
   readonly now: Date;
   readonly caps: AskCaps;
 };
 
-/** Strong matches hold more of the question's words than weak ones, so the runs join in rank order. */
 const entryPoints = async (
   { reader, question, collections, caps }: Asked,
   tx: Tx,
@@ -147,7 +131,6 @@ const entryPoints = async (
   return ok([...taken, ...weak.value.map(({ concept }) => concept)]);
 };
 
-/** Never narrowed by collection: a passage no concept rests on belongs to none. */
 const unmappedPassagesFor = async (
   { reader, question, caps }: Asked,
   tx: Tx,
@@ -258,10 +241,6 @@ const passageReadOnce = (reader: UserPrincipal, tx: Tx) => {
   };
 };
 
-/**
- * Entry points, then the walk's nearest, cut at the cap. The walk kept to what the reader may
- * read, so nothing withheld takes a slot.
- */
 const returnedBy = async (
   { reader, caps, now }: Asked,
   tx: Tx,

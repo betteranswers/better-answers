@@ -63,7 +63,6 @@ import type { SourceRefusal } from "./vocabulary.ts";
 
 export const UPLOAD_ORIGINALS_PREFIX = "uploads/";
 
-/** One key per attempt: a concurrent repeat that loses writes beside the committed original. */
 const originalKeyOf = (connectedSourceId: string, documentId: string): string =>
   `${UPLOAD_ORIGINALS_PREFIX}${connectedSourceId.toLowerCase()}/${documentId.toLowerCase()}/original`;
 
@@ -171,7 +170,6 @@ export type ConnectUploadInput = ConnectUploadFields & {
   readonly body: ReadableStream<Uint8Array>;
 };
 
-/** The stream travels beside these fields, which are all an entry parses. */
 const connectUploadAction = declareAction({
   admits: ADMIN_ALONE,
   input: connectUploadFields,
@@ -345,7 +343,6 @@ export const connectUpload = async (
   const held = await everyGroupHeld(principal, doors.postgres, visibility);
   if (!held.ok) return err(held.error);
 
-  // Before a byte is read: a repeat of a committed connect would otherwise stream a copy no row names.
   const standing = await inTransaction(principal, doors.postgres, (fresh, tx) =>
     firstOutcomeOf(tx, workspaceId, connectedSourceId),
   );
@@ -423,7 +420,6 @@ export const publishConnectedSourceInput = z.object({
   } satisfies Record<(typeof CONFIRMATIONS)[number], z.ZodBoolean>),
 });
 
-/** The instant is the Clock's, never a caller's, so it travels beside the parsed fields. */
 export type PublishConnectedSourceInput = z.output<typeof publishConnectedSourceInput> & {
   readonly publishedAt: Date;
 };
@@ -451,10 +447,6 @@ export type ConnectedSourcePublished = {
   readonly dpiaHash: string;
 };
 
-/**
- * The job row, not connected_source.state: the worker holds only SELECT on that table and cannot
- * write its progress there.
- */
 const LATEST_SYNC = `SELECT status FROM job
     WHERE workspace_id = $1 AND kind = $2 AND subject_id = $3
     ORDER BY enqueued_at DESC, id DESC
@@ -641,8 +633,6 @@ const actingOn = (
     admittedAs.kind === "user"
       ? { admin: admittedAs, workspaceId: admittedAs.workspaceId, connectedSourceId }
       : { platform: admittedAs, workspaceId: input.workspaceId, connectedSourceId };
-  // A person may act only where it was proved a member, so a workspace it names otherwise holds none of
-  // its connected sources.
   if (acting.workspaceId !== input.workspaceId) return err("no-such-binding");
   return ok(acting);
 };

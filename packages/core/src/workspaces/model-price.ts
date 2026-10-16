@@ -14,7 +14,6 @@ import {
 import { storeModelPrice, type ModelPrice } from "../llm/index.ts";
 import { type PostgresDoor, withIdentityWrite } from "../store/postgres/index.ts";
 
-/** A price names no workspace, so its event lands in the log that holds no workspace's rows. */
 const PRICE_ACTIONS = declareIdentitySetActions("platform", {
   priced: action("platform.model.priced", {
     [STORED_DETAIL_KEYS.modelProvider]: "modelProvider",
@@ -29,7 +28,6 @@ type SetModelPriceInput = { readonly [Field in keyof ModelPrice]: string };
 
 export type SetModelPriceRefusal = KernelRefusal<"malformed">;
 
-/** The column takes a day the calendar has, which the pattern alone does not prove. */
 const isACalendarDay = (day: string): boolean => {
   const read = new Date(`${day}T00:00:00Z`);
   return !Number.isNaN(read.getTime()) && read.toISOString().startsWith(day);

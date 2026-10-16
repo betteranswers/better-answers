@@ -32,7 +32,6 @@ const ROLE_ACTIONS = declareActions("people", {
 
 const ROLE = boundarySchemas.member.select.shape.role;
 
-/** The role is any text, so a role outside the three reaches the action and is refused in its word. */
 export const changeRoleInput = memberKeyed.extend({ role: z.string() });
 
 /** When the action happens: a confirmation older than an hour makes the change wait on a re-confirm. */

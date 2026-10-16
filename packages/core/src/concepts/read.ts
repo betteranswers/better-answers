@@ -28,7 +28,6 @@ type EvidenceItem = {
   readonly id?: string;
   readonly source: string;
 
-  /** The file's own place in the source, such as `p.4`, which opens nothing. */
   readonly at?: string;
   readonly locator?: string;
   readonly iri?: ConceptIri;
@@ -52,10 +51,8 @@ export type Relation = {
   readonly title: string;
 };
 
-/** Reads the passage at a locator for the reader; `not-found` when they cannot, whatever the reason. */
 export type PassageReader = (locator: string) => Promise<Result<unknown, typeof NOT_FOUND | Error>>;
 
-/** Whether a locator has a passage address's shape, so a page reference is never read as withheld. */
 export type PassageNamer = (locator: string) => boolean;
 
 type Sharer = { readonly actor: string; readonly at: Date } | undefined;
@@ -140,10 +137,8 @@ const openingNamed = (
 const opensFor = (doors: Doors, opening: Opening): Promise<Result<boolean, Error>> =>
   "locator" in opening ? readsPassage(doors, opening.locator) : readsConcept(doors, opening.iri);
 
-/** Any run a document id could be, so a malformed passage address is never shown as a place. */
 const NAMES_A_DOCUMENT = new RegExp(ULID_CHARACTERS, "i");
 
-/** A locator with no passage address's shape, such as `p.4`: it names nothing a reader is kept from. */
 const placeOf = (doors: Doors, locator: string | null): string | undefined =>
   locator === null ||
   locator.trim() === "" ||
@@ -178,7 +173,6 @@ const resolvedOf = async (
   });
 };
 
-/** One per entry that names a resource, in the file's order, so a citation mark's index finds its item. */
 export const resolvedSourcesOf = async (
   doors: Doors,
   frontmatter: Frontmatter,
@@ -194,7 +188,6 @@ export const resolvedSourcesOf = async (
   return ok(resolved);
 };
 
-/** A resource holding `#` is closed with one, so the string never reads as resource and locator. */
 const labelOnlyText = (label: string, place: string | undefined): string => {
   if (place !== undefined) return `${label}#${place}`;
   return label.includes("#") ? `${label}#` : label;
@@ -224,7 +217,6 @@ const projectedSources = (
   const records = resolved.flatMap(({ entry, item, opens }) =>
     typeof entry === "string" ? [] : [opens ? entry : labelOnlyRecord(entry, item.source, item.at)],
   );
-  // The file parser holds a `sources` list to strings alone or records alone.
   return records.length === 0 ? texts : records;
 };
 
@@ -256,7 +248,6 @@ const wordsFor = (access: EvidencePane["access"], cited: number, pointing: numbe
   return pointing === 0 ? PANE_WORDS["nothing-to-open"] : PANE_WORDS.included;
 };
 
-/** Every source is listed; only one naming a passage or concept the reader cannot open is withheld. */
 export const paneOf = (resolved: readonly Resolved[], sharer: Sharer): EvidencePane => {
   const pointing = resolved.filter((one) => one.points).length;
   const opening = resolved.filter((one) => one.opens).length;
@@ -280,7 +271,6 @@ const BOOKKEEPING: readonly string[] = [
   "SAME_AS",
 ] satisfies (typeof MAP_EDGE_LABELS)[number][];
 
-/** The platform's own bookkeeping edges are not relations. */
 const RELATION_LABELS = MAP_EDGE_LABELS.filter((label) => !BOOKKEEPING.includes(label));
 
 const RELATIONS = `SELECT e.label AS kind, t.iri AS target, t.title
@@ -294,7 +284,6 @@ const RELATIONS = `SELECT e.label AS kind, t.iri AS target, t.title
    ORDER BY e.label, t.title, t.iri
    LIMIT ${RELATIONS_AT_MOST}`;
 
-/** The concepts the map says `iri` points at that this reader may read, capped and never counted. */
 export const relationsOf = (
   principal: UserPrincipal,
   tx: Tx,
@@ -320,7 +309,6 @@ export type BodyLink = {
   readonly target: ConceptIri;
 };
 
-/** Uncapped: the body's own links bound the rows, and a cap would decide which link has a target. */
 const LINKED = `SELECT t.iri, t.path
     FROM map_generation g
     JOIN map_edge e ON e.workspace_id = g.workspace_id AND e.gen = g.live_gen
@@ -335,7 +323,6 @@ type Linked = {
   readonly byPath: ReadonlyMap<string, string>;
 };
 
-/** The body may be older or newer than the map's edges, so a link takes only a target it names. */
 const linkedBy = (linked: Linked, address: string, from: string): string | undefined => {
   const named = targetOf(address, from);
   if (named === undefined) return undefined;
@@ -343,10 +330,6 @@ const linkedBy = (linked: Linked, address: string, from: string): string | undef
   return linked.iris.has(named.iri) ? named.iri : undefined;
 };
 
-/**
- * Each link in the body that the map leads to a concept this reader may read, in the body's order.
- * A concept they may not read, one not written and an address naming none all answer no entry.
- */
 export const bodyLinksOf = (
   principal: UserPrincipal,
   tx: Tx,

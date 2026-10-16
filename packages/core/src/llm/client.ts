@@ -31,7 +31,6 @@ export const ATTEMPT_TIMEOUT_MS = 2 * 60_000;
 
 export const RETRY_WAITS_MS = [2_000, 8_000] as const;
 
-/** A rate limit asking a longer wait than this is answered at once; the reservation would lapse. */
 export const LONGEST_RETRY_WAIT_MS = 30_000;
 
 type WireShape<Said> = {
@@ -44,7 +43,6 @@ const DECISION: WireShape<unknown> = { read: decisionRead, requestIdHeader: "cf-
 
 export type WireShapeName = "messages" | "decision";
 
-/** The model providers a wire shape speaks; any other has no model to call. */
 const SPOKEN = ["anthropic", "cloudflare"] as const satisfies readonly ModelProvider[];
 
 type SpokenProvider = (typeof SPOKEN)[number];
@@ -66,13 +64,8 @@ export type ModelToCall = {
 
 export const wireShapeOf = (to: ModelToCall): WireShapeName => SPEAKS[to.provider];
 
-/** A row naming a provider no wire shape speaks is no model to call. */
 const spokenChoice = z.object({ id: z.string(), provider: spoken, model: z.string() });
 
-/**
- * The model the workspace chose for `purpose`, with its key; `undefined` when there is none to
- * call: no choice, no key, or a provider no wire shape speaks.
- */
 export const resolveModel = async (
   asker: UserPrincipal,
   tx: Tx,
@@ -104,7 +97,6 @@ export type ModelCall<T> = {
   readonly signal?: AbortSignal;
 };
 
-/** One call through the decision shape. A decision model writes no text, so no output size is asked for. */
 export type DecisionModelCall = {
   readonly state: string;
   readonly questions: Readonly<Record<string, NoulInstructions>>;
@@ -128,7 +120,6 @@ export type AttemptRead<Said = unknown> =
 
 type Unsent = "another-shape" | "over-window";
 
-/** Every field a log line about a call may hold: never a prompt, an answer, a body or a key. */
 export type ModelAttemptLine = {
   readonly purpose: LlmPurpose;
   readonly provider: SpokenProvider;
@@ -162,7 +153,6 @@ type Attempted<Said = unknown> = {
   readonly status: number | null;
   readonly requestId: string | null;
   readonly seconds: number;
-  /** Whether the request went out: one its caller ended before sending reached no provider. */
   readonly sent: boolean;
 };
 
@@ -175,7 +165,6 @@ export const waitFor = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
-/** A provider's JSON schema reader takes no `$schema` key, which zod writes. */
 const answerSchemaOf = (answer: z.ZodType): AnswerSchema => {
   const { $schema: _written, ...schema } = z.toJSONSchema(answer);
   return schema;
@@ -193,7 +182,6 @@ const afterRateLimit = (retryAfterMs: number | undefined, attempted: number): St
     : { outcome: "rate-limited" };
 };
 
-/** Only an attempt that spent nothing is tried again, so a call never spends past its reservation. */
 const stepAfter = (read: AttemptRead, attempted: number): Step => {
   if (read.read === "rate-limited") return afterRateLimit(read.retryAfterMs, attempted);
   if (read.read === "unavailable") {
@@ -214,17 +202,11 @@ const answerOf = <Said, T>(
   return accepted === undefined ? undefined : { answer: accepted };
 };
 
-/** Shorter than this, a retry would be cut off before a reply could come, yet might be billed. */
 const SHORTEST_ATTEMPT_MS = 10_000;
 
-/** A retry the deadline leaves no room for ends the call as the attempt before it read. */
 const outOfTime = (read: AttemptRead): Unanswered =>
   read.read === "rate-limited" ? "rate-limited" : "failed";
 
-/**
- * How the call ends after an attempt, or `undefined` to try again. A wait the deadline leaves no
- * room for, or a caller who left during it, ends the call.
- */
 export const afterAttempt = async (
   read: AttemptRead,
   attempted: number,
@@ -237,7 +219,6 @@ export const afterAttempt = async (
   if (step.waitMs + SHORTEST_ATTEMPT_MS > leftMs()) return outOfTime(read);
   await wait(step.waitMs);
   if (caller?.aborted === true) return "failed";
-  // A timer can fire late, so the room is measured again after it.
   return leftMs() < SHORTEST_ATTEMPT_MS ? outOfTime(read) : undefined;
 };
 
@@ -272,10 +253,6 @@ export const attemptLine = (
   request_id: tried.requestId,
 });
 
-/**
- * An attempt its caller ended after sending it may have been billed, so it counts at `cutAt`,
- * the size reserved for it.
- */
 const spentBy = (tried: Attempted, answered: boolean, cutAt: TokensSpent): CallSpent => {
   const cut = tried.read.read === "abandoned" && tried.sent;
   return {
@@ -310,7 +287,6 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     const { url, ...init } = request;
     const replied = await attempt(() => doors.fetch(url, { ...init, signal }));
     if (!replied.ok) {
-      // A failed connection may be tried again; a timed-out one may have been billed, so it is not.
       const read = lostTo<Said>(signal, caller, { read: "unavailable" });
       return { read, status: null, requestId: null, seconds: secondsSince(started), sent };
     }
@@ -318,7 +294,6 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     const body = await attempt(() => response.text());
     const { status } = response;
     const retryAfter = response.headers.get("retry-after");
-    // A body lost after its status is read by the status alone, so a billed 200 is not tried again.
     const read = body.ok
       ? shape.read(status, body.value, retryAfter)
       : lostTo(signal, caller, shape.read(status, "", retryAfter));
@@ -333,7 +308,6 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     );
   };
 
-  /** Logged as an attempt that was never made, so a judge that failed unsent says why. */
   const unsent = <T>(to: ModelToCall, read: Unsent): ModelOutcome<T> => {
     doors.log.info(
       attemptLine(to, 0, { status: null, read, seconds: 0, requestId: null }),
@@ -387,7 +361,6 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     });
   };
 
-  /** A request longer than the model's window is never sent: the provider would cut it unsaid. */
   const decide = async (
     to: ModelToCall,
     call: DecisionModelCall,

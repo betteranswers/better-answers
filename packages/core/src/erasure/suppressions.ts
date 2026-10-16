@@ -8,10 +8,6 @@ export type Suppressed = {
 
 const NAMES_NOBODY: SubjectIdentifiers = { emails: [], names: [], other: [] };
 
-/**
- * A member's request may name them by person id alone, and the address they sign in with is the
- * one a company document holds.
- */
 const withTheSignInAddresses = (
   identifiers: SubjectIdentifiers,
   signInAddresses: readonly string[],
@@ -40,10 +36,6 @@ export const addressesSuppressedFor = async (
   return held.rows.map((row) => row.email);
 };
 
-/**
- * Writes nothing for an empty set, and keeps the first set a request wrote. Answers the count of
- * the set that stands.
- */
 export const suppressInTheWorkspace = async (
   platform: PlatformPrincipal,
   tx: Tx,

@@ -24,14 +24,9 @@ type AnAdmin = UserPrincipal & { readonly role: typeof ADMIN };
 export type HeldMember = {
   readonly role: Role;
 
-  /** Counted under the same lock, so it cannot move before the action commits. */
   readonly admins: number;
 };
 
-/**
- * Held until commit, so of two actions that would each leave one Admin, the second counts what the
- * first left.
- */
 const HELD_ADMINS = `SELECT user_id FROM member WHERE workspace_id = $1 AND role = $2
                       ORDER BY user_id FOR UPDATE`;
 
@@ -51,11 +46,6 @@ const memberHeld = async (
 
 export type HeldRefusal = MemberRefusal<"no-such-member"> | KernelRefusal<"changed-meanwhile">;
 
-/**
- * Runs `work` on the member once every Admin row of the workspace, then theirs, is held until
- * commit. The transport already holds the caller's own row, so two Admins acting on each other can
- * deadlock; Postgres aborts one, which answers `changed-meanwhile`.
- */
 export const withMemberHeld = async <Value, Refusal>(
   admin: AnAdmin,
   tx: Tx,
@@ -69,7 +59,6 @@ export const withMemberHeld = async <Value, Refusal>(
   return done.ok ? done.value : err(refusalOfDeadlock(done.error));
 };
 
-/** The workspace's one Admin may neither lose the role nor leave. */
 export const leavesNoAdmin = (held: HeldMember): boolean => held.role === ADMIN && held.admins <= 1;
 
 type HeldRow = { readonly personId: UserId; readonly role: Role };
@@ -113,10 +102,6 @@ export const withMembersHeld = async <Value, Refusal>(
 const adminsLeftAfter = (held: HeldSet, losing: readonly UserId[]): number =>
   held.admins.filter((personId) => !losing.includes(personId)).length;
 
-/**
- * Every Admin among `leaving` when, with all of them gone, the workspace would keep none; nobody
- * otherwise, so a refusal names each Admin ticked, never whichever came last.
- */
 export const lastAdminsAmong = (held: HeldSet, leaving: readonly HeldRow[]): readonly UserId[] => {
   const losing = leaving.filter((row) => row.role === ADMIN).map((row) => row.personId);
   return adminsLeftAfter(held, losing) < 1 ? losing : [];

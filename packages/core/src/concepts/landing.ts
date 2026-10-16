@@ -52,11 +52,6 @@ import type { Acceptance } from "./index.ts";
 import { markDeciding } from "./suggestions.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
 
-/**
- * Commits as the member with their member row held until the commit is in git, so ending the
- * member waits for a commit under way and refuses one that starts after it. The repository lock
- * cannot: it fences one process, and the erasure routine runs in another.
- */
 export const commitAsMember = async (
   principal: UserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
@@ -69,7 +64,6 @@ export const commitAsMember = async (
   return held.value.ok ? held.value.value : err(held.value.error);
 };
 
-/** Title-cases each word and drops a plural: `policies` and `Policy` both fold to `Policy`. */
 export const foldKind = (kind: string): string =>
   kind.replaceAll(/\S+/g, (word) => {
     const cased = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
@@ -497,8 +491,6 @@ export const carryVerificationsOntoRewrite = async (
     }
     const contentHash = contentHashOf(read.value.frontmatter, read.value.body, row.path);
 
-    // The hash leaves out keys a rewrite touches, `verified` among them, so the stored copy is
-    // compared whole; verifications move only with the hash.
     const reindexed = await tx.query(
       `UPDATE concept_index SET frontmatter = $3, body = $4, content_hash = $5
         WHERE workspace_id = ${scopeClause(1)} AND iri = $2

@@ -47,10 +47,6 @@ const spanOf = (spanPart: string): Span | undefined => {
   return { charStart, charEnd };
 };
 
-/**
- * Reads `<document>/chars:<start>-<end>`: offsets count code points, and the end is exclusive.
- * Any other shape is `not-found`.
- */
 export const parseLocator = (wire: string): Result<Locator, LocatorRefusal> => {
   const parts = twoParts(wire, PATH_SEPARATOR);
   if (parts === undefined) return err(NOT_FOUND);

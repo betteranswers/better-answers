@@ -16,7 +16,6 @@ import { type PostgresDoor, type Tx, withIdentityWrite } from "../store/postgres
 import { applyDisplayNameRule, type DisplayNameRefusal } from "./display-name.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** The detail holds no name: its one copy is the `user` row, where erasure blanks it. */
 const PERSON_ADDED = declareIdentitySetActions("people", {
   added: action("people.person.added", {}),
 }).added;
@@ -34,15 +33,10 @@ type PersonAdded = {
 
 export type AddPersonRefusal = DisplayNameRefusal | WorkspaceRefusal<"malformed" | "person-exists">;
 
-/** A first sign-in by the same address can land between the read and the insert. */
 const ADD_PERSON_CONSTRAINTS = {
   user_email_unique: "person-exists",
 } as const satisfies Record<string, AddPersonRefusal>;
 
-/**
- * The platform writes the row itself: Better Auth's create hook blanks every name, which a person
- * named before their first sign-in must keep.
- */
 const adding = async (
   platform: PlatformPrincipal,
   tx: Tx,

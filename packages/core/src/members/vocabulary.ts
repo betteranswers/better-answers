@@ -12,17 +12,12 @@ export const MEMBER_REFUSALS = {
   "already-in-group": "conflict",
   "already-decided": "conflict",
 
-  // Someone else is made an Admin first.
   "last-admin": "precondition",
-  // An Admin sends the invitation again, or a new one.
   "invitation-expired": "precondition",
 
-  // Only the person signed in with the invited address may take it up.
   "invitation-for-another-address": "forbidden",
 
-  // A marked workspace invites its testing domain alone, and nothing an Admin does lifts that.
   "off-testing-domain": "inapplicable",
-  // A test person is never the operator nor a member anywhere else: the remedy is another address.
   "operator-marked": "inapplicable",
   "member-elsewhere": "inapplicable",
 } as const satisfies Vocabulary;

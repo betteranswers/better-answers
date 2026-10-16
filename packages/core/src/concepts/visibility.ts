@@ -128,8 +128,6 @@ export const conceptVisibilityFrom = async (
             WHERE d.workspace_id = ${scopeClause(1)} AND d.id = ANY($2::text[])`,
           parameters: [scopeParameter(principal), [...new Set(concept.citing)]],
         };
-  // A statement that waited on a lock still reads unlocked rows at its first snapshot, so the
-  // document's sensitivity is read in the next.
   await tx.query(`SELECT 1 ${rowsCited.clause} FOR SHARE OF b`, rowsCited.parameters);
   const connectedSources = await tx.query<SourcedVisibilityRow>(
     `SELECT b.sensitivity, b.audience, b.audience_groups, d.sensitivity AS document_sensitivity,
@@ -165,10 +163,6 @@ export const conceptVisibilityFrom = async (
 
 type IndexVisibilityRow = VisibilityRow & { readonly workspace_id: string; readonly kind: string };
 
-/**
- * Every action that cascades takes this at its head; without it two narrowings each hold what
- * the other wants.
- */
 const serialisingCascades = async (principal: Principal, tx: Tx): Promise<void> => {
   await tx.query(
     `SELECT pg_advisory_xact_lock(hashtext('visibility-cascade'), hashtext(${scopeClause(1)}))`,
@@ -176,10 +170,6 @@ const serialisingCascades = async (principal: Principal, tx: Tx): Promise<void> 
   );
 };
 
-/**
- * Row first, citations after, the opposite order to conceptVisibilityFrom: waiting on the row
- * is what makes a re-write's citations the ones read.
- */
 const recomputeConceptVisibility = async (
   principal: Principal,
   tx: Tx,

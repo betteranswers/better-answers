@@ -17,10 +17,6 @@ export type FrontmatterValue =
 
 export type Frontmatter = Readonly<Record<string, FrontmatterValue>>;
 
-/**
- * Keys the platform derives or mints: hashing one would let recording a verification move the
- * hash that verification was taken against.
- */
 const UNHASHED_KEYS: ReadonlySet<string> = new Set([
   "generated",
   "verified",
@@ -78,10 +74,6 @@ const canonicalText = (value: FrontmatterValue | undefined): string =>
         .join(",")}]`
     : JSON.stringify(value);
 
-/**
- * Hex SHA-256 of `canonicalFrontmatter` and the body. CRLF line endings, trailing whitespace and
- * trailing blank lines in the body do not move it.
- */
 export const contentHashOf = (frontmatter: Frontmatter, body: string, path: string): string =>
   hashedFileOf(frontmatter, body, path).contentHash;
 
@@ -111,10 +103,6 @@ const yamlValue = (value: FrontmatterValue): string => {
     .join("\n")}`;
 };
 
-/**
- * Writes every key and scalar JSON-quoted, in `frontmatter`'s order: the one form
- * `parseConceptFile` reads.
- */
 export const renderConceptFile = (frontmatter: Frontmatter, body: string): string => {
   const lines = Object.entries(frontmatter).map(
     ([key, value]) => `${JSON.stringify(key)}:${yamlValue(value)}`,
@@ -243,11 +231,6 @@ const frontmatterAbove = (lines: readonly string[], close: number): Frontmatter 
   return frontmatter;
 };
 
-/**
- * Reads back only the form `renderConceptFile` writes: JSON-quoted keys and scalars, and lists of
- * strings or of flat mappings. Any other line, a repeated key, or no blank line after the closing
- * fence is `malformed`.
- */
 export const parseConceptFile = (
   content: string,
 ): Result<{ readonly frontmatter: Frontmatter; readonly body: string }, "malformed"> => {

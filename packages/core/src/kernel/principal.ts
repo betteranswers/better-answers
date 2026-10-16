@@ -16,10 +16,6 @@ export type { AccessRequestId, AuditEventId, GroupId, UserId, WorkspaceId };
 
 export type Role = z.infer<typeof boundarySchemas.member.select>["role"];
 
-/**
- * A Principal outlives the transaction that resolved it only where an action opens its own; never
- * the request, and that action's door re-judges it.
- */
 export type CarriesAConfirmation = { readonly secondFactorConfirmedAtMs: number | null };
 
 export type UserPrincipal = {
@@ -64,7 +60,6 @@ export type Claims = {
   readonly issuedAt: Date;
   readonly role?: Role;
 
-  /** The session a cookie names, whose confirmation stamp is the person's; a bearer names none. */
   readonly sessionId?: string;
 };
 

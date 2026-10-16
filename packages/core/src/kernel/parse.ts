@@ -59,10 +59,6 @@ export const parse = <Schema extends z.ZodType>(
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the boundary itself: a named type would claim a parse the schema has not yet done
   raw: unknown,
 ): Result<z.output<Schema>, Malformed> => {
-  /**
-   * `reportInput` is how a missing key is told from a wrong-typed one; the values it
-   * copies onto issues never leave this function.
-   */
   const read = schema.safeParse(raw, { reportInput: true });
   if (read.success) return ok(read.data);
 

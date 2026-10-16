@@ -1,18 +1,15 @@
 import type { KernelRefusal } from "./vocabulary.ts";
 
-/** The hour a pending session has to confirm, counted from the first request that found it pending. */
 export const PENDING_SESSION_LIFETIME_MS = 60 * 60 * 1000;
 
 export type SecondFactorFacts = {
   /** An Admin in any workspace, or the operator. */
   readonly mustHoldOne: boolean;
 
-  /** A passkey, or an authenticator past its first code; a setup still waiting is none. */
   readonly holdsAFactor: boolean;
 
   readonly confirmed: boolean;
 
-  /** This session spent a recovery code or gave the restore code since any restore. */
   readonly setupGranted: boolean;
 };
 
@@ -54,7 +51,6 @@ const BOTH: readonly PendingStanding[] = ["confirm", "setup"];
 
 const SETUP_ONLY: readonly PendingStanding[] = ["setup"];
 
-/** Setup only with nothing to confirm with, or a spent code's grant: a mailbox alone never adds a factor. */
 const PENDING_SET = {
   "read-the-session": BOTH,
   "sign-out": BOTH,
@@ -66,7 +62,6 @@ const PENDING_SET = {
   "set-up-a-factor": SETUP_ONLY,
 } as const satisfies Record<PendingStep, readonly PendingStanding[]>;
 
-/** Undefined: a step outside the pending set, which only a session that is not pending may take. */
 export const mayTake = (standing: SecondFactorStanding, step: PendingStep | undefined): boolean =>
   !isPending(standing) || (step !== undefined && PENDING_SET[step].includes(standing));
 

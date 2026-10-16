@@ -145,11 +145,6 @@ const sweepOne = async (
   }),
 });
 
-/**
- * Answers `held` at once when another pass holds the lock. A workspace whose sweep is refused is
- * counted in `refused` and the pass goes on. Writes one `sweep_pass` row; failing to write it
- * fails the pass, though every sweep ran.
- */
 export const sweepEveryWorkspace = async (
   platform: SweepsPrincipal,
   doors: SweepDoors,
@@ -209,7 +204,6 @@ export const makeQuestionMonths = (
     }
   });
 
-/** Past any wait to type a code from an email, so one that expired just before a pass reads as spent. */
 const VERIFICATION_KEPT_PAST_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 /** Far past the longest ingress rule's window, an hour, so no live count goes. */
@@ -240,11 +234,6 @@ const countDeleted = (
     return dropped.rowCount ?? 0;
   });
 
-/**
- * Deletes sessions past their expiry or their pending hour, verification rows a day past expiry,
- * and ingress windows a day old. Each delete stands alone, so a refused one keeps no other's
- * rows. Failed-confirm counts stay: deleting one would reset a person's backoff.
- */
 export const sweepIdentitySet = async (
   platform: SweepsPrincipal,
   door: PostgresDoor,

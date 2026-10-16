@@ -25,7 +25,6 @@ import {
 } from "./second-factor.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** Ids alone: the log is append-only, so a name a person later changes never lands in it. */
 const PASSKEY_ACTIONS = declareIdentitySetActions("people", {
   passkeyAdded: action("people.person.passkey_added", { passkeyId: "id" }),
   passkeyRenamed: action("people.person.passkey_renamed", { passkeyId: "id" }),
@@ -34,7 +33,6 @@ const PASSKEY_ACTIONS = declareIdentitySetActions("people", {
 
 const passkeyId = z.string().regex(ULID);
 
-/** A browser's own field sends no control character, so one here came from a script. */
 const CONTROL_CHARACTER = /\p{Cc}/u;
 
 type PasskeyNameRefusal = WorkspaceRefusal<
@@ -174,7 +172,6 @@ export type RemovePasskeyRefusal = WorkspaceRefusal<
 
 type Removal = Result<{ readonly passkeyId: string }, RemovePasskeyRefusal>;
 
-/** An authenticator still waiting on its code holds nothing, so it keeps no passkey standing. */
 const removing = async (
   platform: PlatformPrincipal,
   tx: Tx,

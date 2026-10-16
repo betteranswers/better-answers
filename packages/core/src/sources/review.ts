@@ -313,7 +313,6 @@ type SpansRefusal<GroupRefusal> =
   | SourceRefusal<"no-such-binding" | "no-such-finding">
   | Error;
 
-/** Every group is judged before the first read, so a refused one lands nothing beside it. */
 const spansCommanded = async <GroupRefusal extends string>(
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -395,7 +394,6 @@ export const keepInText = async (
   const { admin, workspaceId, connectedSourceId } = acting;
 
   const named = spans.map((span) => span.id);
-  /** One audit event per span, so the batch counts spans, not the documents the answer names. */
   const batchId = batchIdFor(named.length);
   for (const findingId of named) {
     const restored = await restoreFinding(admin, tx, {
@@ -617,11 +615,6 @@ const DISMISSED_REVIEW = `UPDATE finding
         SET review_state = $3, reviewed_by = $4, reviewed_at = now(), review_reason = $5
       WHERE workspace_id = $1 AND id = ANY($2::text[])`;
 
-/**
- * Dismisses each finding the document's last redaction raised in the groups, with an audit event per
- * document, and queues a sync. A group outside the special category refuses the whole
- * command.
- */
 export const dismissAsNotSpecialCategory = async (
   principal: UserPrincipal,
   tx: Tx,

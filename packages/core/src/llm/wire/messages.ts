@@ -8,7 +8,6 @@ import {
   type WireRequest,
 } from "./read.ts";
 
-/** Each a value the provider publishes; the version pins the shape this file reads and writes. */
 const MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const MESSAGES_VERSION = "2023-06-01";
 
@@ -25,10 +24,6 @@ export type MessagesCall = {
 
 export type MessagesStreamCall = Omit<MessagesCall, "answerSchema">;
 
-/**
- * No `thinking` and no sampling field: a model choice may name a model that refuses either, and
- * each model's default stands.
- */
 type Asking =
   | {
       readonly output_config: {
@@ -65,7 +60,6 @@ type MessagesRead = WireRead<string>;
 const count = z.number().int().nonnegative();
 
 const reply = z.object({
-  // Only a text block carries `text`; a thinking block's is under `thinking`.
   content: z.array(z.object({ text: z.string().optional() })),
   stop_reason: z.string().nullable(),
   usage: z.object({
@@ -84,16 +78,10 @@ const errorReply = z.object({
   }),
 });
 
-/** A tier's own monthly cap: a 429 that waiting does not lift. */
 const TIER_SPEND_CAP = "enforced_spend_limit_reached";
 
-/**
- * How the provider begins a 400 that only the account's billing lifts: a spend limit the
- * organisation or a workspace set, or credit run out.
- */
 const BILLED_OUT = ["You have reached your specified", "Your credit balance is too low"] as const;
 
-/** The provider's own faults and overload, which another attempt may get past. */
 const UNAVAILABLE_STATUSES: ReadonlySet<number> = new Set([500, 504, 529]);
 
 const BILLING = 402;
@@ -101,7 +89,6 @@ const RATE_LIMITED = 429;
 const BAD_REQUEST = 400;
 const ANSWERED = 200;
 
-/** Cached input is billed too, at its own rate, so every input token is counted. */
 const spentOf = (usage: z.output<typeof reply>["usage"]) => ({
   tokensIn:
     usage.input_tokens +
@@ -140,7 +127,6 @@ export const messagesRead = (
   if (status === ANSWERED) return answeredRead(text);
   if (status === RATE_LIMITED) return rateLimitedRead(text, retryAfter);
   if (status === BAD_REQUEST) return badRequestRead(text);
-  // A billing fault is lifted by paying, never by waiting, as a spend cap is.
   if (status === BILLING) return { read: "spend-cap" };
   return UNAVAILABLE_STATUSES.has(status) ? { read: "unavailable" } : { read: "failed" };
 };
@@ -186,7 +172,6 @@ const textDelta = z.object({
 
 const typed = z.object({ type: z.string() });
 
-/** Data that is no JSON, or no event at all, is read as an error: the reply cannot be trusted. */
 export const streamEventRead = (data: string): StreamEventRead => {
   const event = jsonAs(typed, data);
   if (event === undefined || event.type === "error") return { event: "error" };

@@ -47,7 +47,6 @@ type PersonListed = {
 
 type PeoplePage = {
   readonly people: readonly PersonListed[];
-  /** Every match, not only this page's. */
   readonly total: number;
 };
 
@@ -171,15 +170,10 @@ type EndedByTheServer = { readonly kind: "authorization-server" };
 
 type EndedGrantInspected = GrantNamed & {
   readonly endedAt: string;
-  /**
-   * Everywhere is the operator's revocation; a workspace's is its Admin's revocation or removal;
-   * a grant's is the authorization server ending that grant alone.
-   */
   readonly scope: "everywhere" | "workspace" | "grant";
   readonly endedBy: EndedBy | EndedByTheServer;
 };
 
-/** The console names an actor as it always has: no address, and no name reads as a former member. */
 type EndedBy =
   | { readonly kind: "person"; readonly displayName: string }
   | Exclude<AuditEventActor, { kind: "person" }>;
@@ -195,7 +189,6 @@ const endedByOf = (actor: string, names: PeopleNames): EndedBy => {
 type PersonInspected = {
   readonly sessions: readonly SessionHeld[];
   readonly grants: readonly GrantHeld[];
-  /** Newest first: each action's, as its audit event recorded it, and each the server ended. */
   readonly ended: readonly EndedGrantInspected[];
 };
 
@@ -232,21 +225,18 @@ const FAMILIES_OF_PERSON = `SELECT r.client_id, c.name AS client_name, r.referen
                            WHERE r.user_id = $1
                           WINDOW family AS (PARTITION BY COALESCE(r.authorization_code_id, r.id))`;
 
-/** Each refresh revokes the row it rotates, so the unrotated row is the grant as it stands. */
 const GRANTS_OF_PERSON = `SELECT client_id, client_name, workspace_id, workspace_name,
                        issued_at, last_used_at, expires_at
                   FROM (${FAMILIES_OF_PERSON}) grants
                  WHERE standing = 1 AND revoked IS NULL
                  ORDER BY last_used_at DESC, issued_at DESC`;
 
-/** An unrotated row's mark ends its grant; once an action or a replay deletes the rows, it is gone. */
 const ENDED_BY_THE_SERVER = `SELECT client_id, reference_id AS workspace_id, issued_at,
                                     revoked AS ended_at
                                FROM (${FAMILIES_OF_PERSON}) grants
                               WHERE standing = 1 AND revoked IS NOT NULL AND rotated_at IS NULL
                               ORDER BY revoked DESC, issued_at DESC`;
 
-/** Both actions are the identity set's, so the read never enters a workspace's audit log. */
 const ENDINGS_OF_PERSON = `SELECT id, action, at, actor, detail FROM identity_audit_event
                             WHERE subject_kind = 'person' AND subject_id = $1
                               AND action = ANY($2::text[])
@@ -271,7 +261,6 @@ const grantOf = (row: GrantRow): GrantHeld => ({
   expiresAt: row.expires_at.toISOString(),
 });
 
-/** An event from before its action kept its grants reads none. */
 const grantsRecorded = z.object({ grants: z.array(endedGrant).default([]) });
 
 type Ending = {
@@ -334,10 +323,6 @@ const grantsOfEnding = (ending: Ending, names: Names): readonly EndedGrantInspec
       endedBy: endedByOf(ending.actor, names.actors),
     }));
 
-/**
- * No workspace's audit log is the operator's, so actions' endings come from the identity set's alone.
- * The stable sort keeps each action's own order.
- */
 const endedGrantsOf = async (tx: Tx, personId: UserId): Promise<readonly EndedGrantInspected[]> => {
   const endings = await endingEventsOf(tx, personId);
   const byTheServer = await serverEndingsOf(tx, personId);

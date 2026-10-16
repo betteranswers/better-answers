@@ -17,7 +17,6 @@ export const askersOf = (people: readonly (string | null)[]): readonly string[] 
   ),
 ];
 
-/** `asked_at` as text: a `Date` keeps milliseconds, and the delete must match the instant stored. */
 const REWRITE_THE_ASKER = `UPDATE question_asked SET asked_by = $3
    WHERE workspace_id = $1 AND asked_by = ANY($2)
   RETURNING id, asked_at::text AS asked_at`;
@@ -26,10 +25,6 @@ const REWRITE_THE_ASKER = `UPDATE question_asked SET asked_by = $3
 const REMOVE_THE_QUESTIONS = `DELETE FROM question_content
    WHERE workspace_id = $1 AND record_id = ANY($2) AND asked_at = ANY($3::timestamptz[])`;
 
-/**
- * The note and the disputed sentence go, as free text sent on the person's behalf. The reason and
- * the concept the sentence rested on stay.
- */
 const REWRITE_THE_FEEDBACK = `UPDATE question_feedback
      SET given_by = $3, note = NULL, disputed_sentence = NULL
    WHERE workspace_id = $1 AND given_by = ANY($2)`;

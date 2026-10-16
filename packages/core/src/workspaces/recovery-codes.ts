@@ -38,7 +38,6 @@ const mintGroup = (): string =>
     "",
   );
 
-/** A recovery or restore code, in the one form `hashOfTyped` reads back. */
 export const mintOneTimeCode = (): string =>
   Array.from({ length: GROUPS_IN_A_CODE }, mintGroup).join("-");
 
@@ -60,11 +59,6 @@ type RecoveryCodesIssued = RecoveryCodesMade & {
   readonly replaced: boolean;
 };
 
-/**
- * Voids the person's codes and keeps ten new ones as hashes, answering the codes themselves: the
- * one time they exist outside the person's hands. Every row carries `now`, which names the set
- * when it is acknowledged.
- */
 export const issuingRecoveryCodes = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -112,7 +106,6 @@ const holdsASet = async (tx: Tx, personId: UserId): Promise<boolean> => {
   return (held.rowCount ?? 0) > 0;
 };
 
-/** Marked by the operator's restore, which only their restore code lifts. */
 export const restoredByTheOperator = async (tx: Tx, personId: UserId): Promise<boolean> => {
   const marked = await tx.query(
     'SELECT 1 FROM "user" WHERE id = $1 AND restore_required_at IS NOT NULL',
@@ -136,7 +129,6 @@ export const replaceRecoveryCodes = async (
   const issued = await attempt(() =>
     withIdentityWrite(platform, door, async (tx): Promise<Replaced> => {
       if (!(await holdThePerson(tx, personId.data))) return err("person-gone");
-      // A code minted now would open setup to whoever holds only the mailbox.
       if (await restoredByTheOperator(tx, personId.data)) return err("restore-code-needed");
       if (!input.replacing && (await holdsASet(tx, personId.data))) {
         return err("recovery-codes-held");
@@ -148,10 +140,6 @@ export const replaceRecoveryCodes = async (
   return issued.value;
 };
 
-/**
- * A conditional delete spends the code, so of two spends at once only one finds it. Answers the
- * codes left, or nothing when no stored hash matches what was typed.
- */
 export const spendingARecoveryCode = async (
   platform: PlatformPrincipal,
   tx: Tx,

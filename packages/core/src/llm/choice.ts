@@ -22,7 +22,6 @@ const CHOICE_STORED = `INSERT INTO model_choice (id, workspace_id, purpose, prov
         retention_tail = CASE WHEN model_choice.provider = EXCLUDED.provider
                               THEN model_choice.retention_tail END`;
 
-/** Replaces the workspace's choice for the purpose in place, so its id outlives the change. */
 export const storeModelChoice = async (tx: Tx, choice: ModelChoiceStored): Promise<void> => {
   await tx.query(CHOICE_STORED, [
     ulid(),

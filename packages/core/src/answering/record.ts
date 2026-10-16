@@ -29,11 +29,6 @@ export type RecordOpening = {
   readonly askedAt: Date;
 };
 
-/**
- * Writes the skeleton and the question in the caller's transaction, which the caller commits
- * before anything that can refuse the question. Answers an error where `askedAt` falls in a month
- * no sweep has made a partition for.
- */
 export const openRecord = async (
   asker: UserPrincipal,
   tx: Tx,
@@ -59,7 +54,6 @@ export type RecordedConcept = {
   readonly iri: ConceptIri;
   readonly contentHash: string;
   readonly trust: Trust;
-  /** The judge's word on a candidate; absent for a concept no judge was asked about. */
   readonly judged?: CandidateVerdict;
 };
 
@@ -73,11 +67,9 @@ const COMPLETED = `UPDATE question_asked
    WHERE workspace_id = $1 AND id = $2 AND completed_at IS NULL
   RETURNING asked_at::text AS asked_at`;
 
-/** `asked_at` as the text Postgres gave: a `Date` keeps milliseconds and would miss the row. */
 const ITS_DRAFT = `UPDATE question_content SET drafted = $4
    WHERE workspace_id = $1 AND record_id = $2 AND asked_at = $3::timestamptz`;
 
-/** Who verified a concept is a person and a record is kept for good, so the name is left out. */
 const asKept = ({ iri, contentHash, trust, judged }: RecordedConcept) => ({
   iri,
   contentHash,

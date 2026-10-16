@@ -26,7 +26,6 @@ const FIRST_WAIT_SECONDS = 30;
 
 const LONGEST_WAIT_SECONDS = 15 * 60;
 
-/** Capped rather than a lock: whoever holds only the mailbox can slow an Admin's confirms, never shut the Admin out. */
 const waitSecondsAfter = (failures: number): number =>
   failures <= FREE_FAILURES
     ? 0
@@ -63,7 +62,6 @@ export const waitsOf = async (tx: Tx, personId: UserId, now: Date): Promise<Wait
 export type Counted = {
   readonly waitSeconds: number;
 
-  /** True at the failure that makes the run long enough to warn the person, and never again before a success. */
   readonly noticeDue: boolean;
 };
 

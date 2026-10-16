@@ -65,10 +65,6 @@ export type ErasureLogLine = {
   readonly last_active_deleted: number;
 };
 
-/**
- * What one sweep of the questions did, the questions step's or the identity step's; a rerun
- * finds it done and counts nothing.
- */
 export type QuestionsLogLine = {
   readonly actor: typeof ERASURE_ACTOR;
   readonly erasure_request_id: string;
@@ -77,10 +73,6 @@ export type QuestionsLogLine = {
   readonly feedback_rewritten: number;
 };
 
-/**
- * The row and the report are the erasing workspace's to read, so what varies with another
- * workspace's records goes to the tier's log.
- */
 export type ErasureLog = {
   readonly info: (line: ErasureLogLine | QuestionsLogLine, message: string) => void;
 };
@@ -309,7 +301,6 @@ const withTheActorsStep = (actions: ErasureActions, swept: ActorsSwept): Erasure
   },
 });
 
-/** Held alone across processes: a write or reconciler tick between rewrite and rows names a pruned commit. */
 const rewritingTheBundle = (
   platform: ErasurePrincipal,
   doors: ErasureDoors,
@@ -330,10 +321,6 @@ const rewritingTheBundle = (
     }),
   );
 
-/**
- * The suppression still holds the sign-in address once the user row is tombstoned. Actor rows go
- * again for a commit the reconciler replayed.
- */
 const afterTheMembersEnd = async (
   platform: ErasurePrincipal,
   doors: ErasureDoors,
@@ -359,13 +346,8 @@ const afterTheMembersEnd = async (
   return actors.ok ? ok({ git: git.value, actors: actors.value }) : err(actors.error);
 };
 
-/**
- * The arm, pseudonymisation and deletes go to the operator's log line: on this workspace's row
- * they would say whether another workspace holds the person.
- */
 const withTheIdentityStep = (actions: ErasureActions, swept: IdentitySwept): ErasureActions => ({
   ...actions,
-  // Stored on the request's row and printed in its report, so the key keeps its first name (R22).
   "identity-user": { ...actions["identity-user"], membershipsEnded: swept.membersEnded },
 });
 
@@ -496,7 +478,6 @@ type ErasureOpened = {
   readonly concepts: readonly string[];
   readonly addresses: SubjectAddresses;
 
-  /** People a rerun cannot reach through a member row. */
   readonly namedPeople: readonly string[];
 };
 
@@ -587,10 +568,6 @@ const completeTheRequest = async (
 
   const standsAt = standingCompletion ?? completedAt;
 
-  /**
-   * Written before the completion commits: a run that leaves no copy loses the erasure to
-   * every restore from a dump older than the request.
-   */
   const copied = await attempt(() =>
     writeReplayCopy(platform, doors.objects, {
       workspaceId,
@@ -681,10 +658,6 @@ export const runErasure = async (
     });
     if (!rewritten.ok) return err(rewritten.error);
 
-    /**
-     * Before the identity step, which pseudonymises the sign-in address: a rerun after it would
-     * read no address to add.
-     */
     const suppressed = await attempt(() =>
       withScope(platform, doors.postgres, workspaceId, (tx) =>
         suppressInTheWorkspace(platform, tx, {
@@ -697,14 +670,9 @@ export const runErasure = async (
     );
     if (!suppressed.ok) return err(suppressed.error);
 
-    /**
-     * Before the identity step, which ends the member: a rerun after it would find no person
-     * behind an address, and leave their questions and ids.
-     */
     const named = { workspaceId, personIds, pseudonym };
     const swept = await attempt(async () => {
       const questions = await eraseFromTheQuestions(platform, doors.postgres, named);
-      // Logged as the step commits, for the identity step's reason below.
       logTheSweep(
         doors.log,
         questionsStepLineOf(platform, erasure.id, questions),

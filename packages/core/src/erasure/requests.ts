@@ -79,7 +79,6 @@ export type ReadSubjectRequestRefusal = RefusalOf<typeof subjectRequestForAction
 
 const REQUEST_ID = boundarySchemas.subjectRequest.select.shape.id;
 
-/** A day past the end of the month it lands in clamps to that month's last day. */
 export const monthsOn = (from: Date, months: number): Date => {
   const dayAsked = from.getUTCDate();
   const landed = new Date(from);

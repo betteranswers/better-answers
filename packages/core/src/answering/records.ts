@@ -46,7 +46,6 @@ const QUESTIONS_ASKED_PAGE_MAX = 100;
 
 const recordId = boundarySchemas.questionAsked.select.shape.id;
 
-/** Where a page was cut: its last record, and whether it was flagged when served. */
 const questionsAskedCursor = z.object({ id: recordId, flagged: z.boolean() });
 
 type QuestionsAskedCursor = z.output<typeof questionsAskedCursor>;
@@ -85,7 +84,6 @@ type FeedbackAsRead = {
   readonly verdict: z.output<typeof boundarySchemas.questionFeedback.select>["verdict"];
   readonly reason: z.output<typeof boundarySchemas.questionFeedback.select>["reason"];
   readonly note: string | null;
-  /** Given only where the reader may read the concept the sentence rested on. */
   readonly disputed?: { readonly sentence: string | null; readonly concept: ConceptIri };
   readonly closedAs: FlagClosing | null;
   readonly closedAt: string | null;
@@ -102,19 +100,15 @@ type RecordAsRead = {
   /** Null while the record is open. */
   readonly verdict: QuestionVerdict | null;
   readonly judgeState: JudgeState | null;
-  /** It holds a flag no Admin has closed. */
   readonly flagged: boolean;
   readonly concepts: readonly ConceptAsRead[];
-  /** Null unless the platform drafted; a sentence citing a concept the reader cannot read is left out. */
   readonly drafted: readonly DraftedSentence[] | null;
   readonly feedback: readonly FeedbackAsRead[];
-  /** A refusal's group: the first readable matched concept's collection, null for none; absent otherwise. */
   readonly refusedUnder?: string | null;
 };
 
 export type QuestionsAskedPage = {
   readonly records: readonly RecordAsRead[];
-  /** Null on the last page. */
   readonly nextCursor: QuestionsAskedCursor | null;
 };
 
@@ -313,11 +307,6 @@ const pageParameters = (admin: AdminUserPrincipal, { cursor, limit }: QuestionsA
   cursor?.flagged ?? null,
 ];
 
-/**
- * Every record for an Admin, a page at a time, open flags first, then newest. Each concept is read
- * under the Admin's predicate now: one they cannot read is absent with no sign, as is a drafted or
- * disputed sentence resting on it.
- */
 export const readQuestionsAsked = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -363,7 +352,6 @@ export type FlagClosed = {
   readonly closedAs: FlagClosing;
 };
 
-/** Helpful feedback is never a flag, so it answers as one that is not there. */
 const THE_FLAG = `SELECT record_id, closed_at IS NOT NULL AS closed
     FROM question_feedback
    WHERE workspace_id = $1 AND id = $2 AND verdict = '${FEEDBACK_FLAG_VERDICT}'

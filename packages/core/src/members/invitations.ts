@@ -55,7 +55,6 @@ export const INVITATION_ID = boundarySchemas.invitation.select.shape.id;
 export const NO_SUCH_INVITATION =
   "no-such-invitation" satisfies MemberRefusal<"no-such-invitation">;
 
-/** An address any case spells, or none, reaches the action, which names each it refuses. */
 export const inviteMembersInput = z.object({
   addresses: z.array(z.string()).min(1).max(MOST_AT_ONCE),
   role: z.string(),
@@ -165,7 +164,6 @@ type Minting = {
   readonly now: Date;
 };
 
-/** Two sends naming one address queue here, so the later replaces the earlier's invitation. */
 const ADDRESS_LOCK =
   "SELECT pg_advisory_xact_lock(hashtext('invitation'), hashtext($1 || ' ' || $2))";
 
@@ -259,12 +257,6 @@ export type MintInvitationInput = {
   readonly now: Date;
 };
 
-/**
- * The one step every invitation is minted by: a direct invite and an approved access request
- * alike. It cancels the address's waiting invitation in the same transaction, so only the newest
- * link stands, and writes `people.invitation.created`, with the replaced one's cancellation beside
- * it in one batch.
- */
 export const mintInvitation = async (
   admin: AdminUserPrincipal,
   tx: Tx,

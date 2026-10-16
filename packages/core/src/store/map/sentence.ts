@@ -1,5 +1,3 @@
-/** The sentence a link sits in, and the flattening that reads it: a body is tenant input,
- * so its worst shapes cost one walk. */
 import { autolinkClosesAt, nextOf, nextStopsOf } from "@better-answers/schema/scan";
 
 const SPACE = /\s/;

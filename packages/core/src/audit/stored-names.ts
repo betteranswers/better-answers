@@ -1,4 +1,3 @@
-/** Audit rows are never rewritten, so a name stays here for good; a new act's name is appended. */
 export const STORED_ACT_NAMES = [
   "knowledge.suggestion.declined",
   "knowledge.suggestion.returned",

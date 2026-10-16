@@ -6,13 +6,11 @@ import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { CeilingMet, err, ok, type AdminUserPrincipal, type Result } from "../kernel/index.ts";
 import { consumeInvitationEmails, type CounterRule, type Tx } from "../store/postgres/index.ts";
 
-/** One workspace emails an address at most this often, by an invite or a resend alike. */
 const INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 5 };
 
 /** Every workspace mails through one shared account, which a flood could get suspended; a few hundred people still fit in two hours. */
 const WORKSPACE_INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 200 };
 
-/** Hashed, so no address is kept as a counter's key, and salted by the workspace, so no two workspaces share one. */
 const counterKeyOf = (admin: AdminUserPrincipal, address: string): string =>
   createHash("sha256").update(`${admin.workspaceId}:${address}`).digest("hex");
 
@@ -33,7 +31,6 @@ const countersOf = (
   { key: WORKSPACE_KEY, rule: WORKSPACE_INVITATION_CEILING, amount: addresses.length },
 ];
 
-/** In key order, the workspace's last, so two actions sharing a counter queue rather than deadlock; past either ceiling the action fails whole. */
 export const emailsCounted = async (
   admin: AdminUserPrincipal,
   tx: Tx,

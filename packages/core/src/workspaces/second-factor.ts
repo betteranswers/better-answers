@@ -34,7 +34,6 @@ import { holdThePerson } from "./person-lock.ts";
 import { issuingRecoveryCodes, type RecoveryCodesMade } from "./recovery-codes.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** Ids alone: an authenticator has no name, and its secret never leaves the library's row. */
 const SECOND_FACTOR_ACTIONS = declareIdentitySetActions("people", {
   authenticatorAdded: action("people.person.authenticator_added", { authenticatorId: "id" }),
   authenticatorRemoved: action("people.person.authenticator_removed", { authenticatorId: "id" }),
@@ -68,7 +67,6 @@ type Facts = {
   readonly mustHoldOne: boolean;
   readonly operator: boolean;
 
-  /** Made an Admin or the operator and not yet confirmed since. */
   readonly promoted: boolean;
   readonly passkeys: number;
   readonly authenticator: AuthenticatorState;
@@ -78,7 +76,6 @@ type Facts = {
   readonly codesAcknowledged: boolean;
   readonly passkeyOfferDismissed: boolean;
 
-  /** Restored by the operator: setting up a factor waits on the restore code. */
   readonly restoreRequired: boolean;
 };
 
@@ -136,10 +133,6 @@ export const stamping = async (tx: Tx, input: Stamp): Promise<boolean> => {
   return stamped.rowCount === 1;
 };
 
-/**
- * A confirmation does not outlive the factor that may have made it, so every other session of
- * the person confirms again; the session that removed it acted as itself.
- */
 export const unconfirmingTheOthers = async (
   tx: Tx,
   personId: UserId,
@@ -154,14 +147,9 @@ export const unconfirmingTheOthers = async (
 export type SetUpInput = {
   readonly personId: string;
 
-  /** The session the setup ended in: the library's new one when its verify swapped them. */
   readonly sessionId: string;
   readonly at: Date;
 
-  /**
-   * The age of the session the setup began in: revocation and freshness date from creation, so a
-   * swapped-in session is made no younger.
-   */
   readonly carried: { readonly createdAt: Date; readonly expiresAt: Date };
 };
 
@@ -182,10 +170,6 @@ export type RecordAuthenticatorSetUpRefusal = WorkspaceRefusal<
 
 type SetUpAnswer = Result<AuthenticatorSetUp, "person-gone" | "no-authenticator">;
 
-/**
- * Two finishes at once can both pass the route's check: the second waits on the lock, then finds
- * the first's row and records nothing.
- */
 const recordingOnce = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -326,7 +310,6 @@ type SessionRow = {
   readonly confirmedAt: Date | null;
   readonly setupGranted: boolean;
 
-  /** The name of the session's workspace when the person is an Admin there. */
   readonly adminOf: string | null;
 };
 

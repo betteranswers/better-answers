@@ -28,9 +28,7 @@ export type StreamedCall = {
   readonly prompt: string;
   /** Its `tokensOut` is each attempt's `max_tokens`, so no attempt spends past the reservation. */
   readonly most: CallSize;
-  /** The whole call's wall clock, every attempt and wait inside it; none where it is absent. */
   readonly withinMs?: number;
-  /** The caller's: once it aborts, the reply in flight is cut off and no other attempt is made. */
   readonly signal?: AbortSignal;
 };
 
@@ -47,7 +45,6 @@ export type StreamModel = (
 
 export type StreamingClient = { readonly streamModel: StreamModel };
 
-/** The wire shapes with a streamed form; a provider absent here has no prose to stream. */
 const STREAMED_REQUESTS: Partial<
   Record<ModelToCall["provider"], (call: MessagesStreamCall) => WireRequest>
 > = { anthropic: messagesStreamRequest };
@@ -66,7 +63,6 @@ type Hearing = {
 
 const NOTHING_HEARD: Hearing = { stopped: false, errored: false };
 
-/** The counts are cumulative, so the larger of two readings of the input is the later one. */
 const hearing = (heard: Hearing, event: StreamEventRead): Hearing => {
   switch (event.event) {
     case "started":
@@ -92,7 +88,6 @@ type HeardRead = Extract<
   "answered" | "refused" | "cut-off" | "failed" | "timed-out" | "abandoned"
 >;
 
-/** A reply that never said it stopped was cut short, by the signal or by the wire. */
 const heardRead = (
   heard: Hearing,
   signal: AbortSignal,
@@ -107,10 +102,6 @@ const heardRead = (
   return heard.stopReason === "refusal" ? "refused" : "cut-off";
 };
 
-/**
- * A count the reply never gave stands at its reserved size: the provider bills what it ran
- * whether or not the reply said so.
- */
 const heardSpent = (heard: Hearing, most: CallSize): TokensSpent => ({
   tokensIn: heard.tokensIn ?? most.tokensIn,
   tokensOut: heard.tokensOut ?? most.tokensOut,
@@ -118,7 +109,6 @@ const heardSpent = (heard: Hearing, most: CallSize): TokensSpent => ({
 
 type Ending = { readonly read: HeardRead; readonly spent: TokensSpent };
 
-/** An attempt its caller ended after sending it may have been billed, so it counts at `most`. */
 const cutShort = (read: AttemptRead, sent: boolean, most: CallSize): TokensSpent =>
   read.read === "abandoned" && sent ? most : NO_TOKENS;
 
@@ -157,7 +147,6 @@ async function* heardFrom(
   return { read: heardRead(heard, signal, call.signal), spent: heardSpent(heard, call.most) };
 }
 
-/** A reply that began to stream may have been billed, so it is never tried again. */
 type Tried = (
   | { readonly streamed: true; readonly heard: HeardRead }
   | { readonly streamed: false; readonly read: AttemptRead }
@@ -170,7 +159,6 @@ type Tried = (
 const readOf = (tried: Tried): AttemptRead["read"] =>
   tried.streamed ? tried.heard : tried.read.read;
 
-/** Only a reply that streamed to its end answered; a refusal is told apart from a failure. */
 const outcomeOf = (tried: Tried): "answered" | "refused" | "failed" =>
   tried.streamed && (tried.heard === "answered" || tried.heard === "refused")
     ? tried.heard
@@ -181,7 +169,6 @@ export const openStreamingClient = (doors: ModelClientDoors): StreamingClient =>
   const timeout = doors.timeout ?? ((ms: number) => AbortSignal.timeout(ms));
   const nowMs = (): number => doors.clock.now().getTime();
 
-  /** A status other than a stream's is read as a reply with no stream is. */
   async function* attemptOnce(
     request: WireRequest,
     timeoutMs: number,

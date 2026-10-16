@@ -212,11 +212,6 @@ const landJob = async (tx: Tx, workspaceId: string, job: JobInsert): Promise<str
   return answered;
 };
 
-/**
- * Reuses a job already queued for the subject and answers its id; a reason that empties the
- * connected source replaces a queued reason that does not. Refuses `malformed` for input its kind does not
- * take, or another workspace's. Rejects when another action queues the subject meanwhile.
- */
 export const enqueueJobIn = async (
   principal: Principal,
   tx: Tx,
@@ -255,7 +250,6 @@ const jobByIdAction = declareAction({
 
 export type JobByIdRefusal = RefusalOf<typeof jobByIdAction> | PrincipalRefusal;
 
-/** A job in another workspace answers `no-such-job`, as a missing one does. */
 export const jobById = async (
   principal: Principal,
   door: PostgresDoor,
@@ -308,7 +302,6 @@ export const latestIndexOutcomeIn = async (
   return row === undefined ? ok(null) : outcomeOf(row.outcome);
 };
 
-/** The index job outcome's key naming each document whose stored sensitivity the sync changed. */
 export const SENSITIVITY_MOVED_KEY = "sensitivity_moved";
 
 export type SyncMoved =
@@ -325,10 +318,6 @@ const movedByTheKey = (outcome: JobOutcome | null): SyncMoved => {
   return named.success ? { kind: "documents", documentIds: named.data } : WHOLE_SOURCE;
 };
 
-/**
- * Only a done first attempt's key is trusted: a retry finds nothing left to move, and a failed,
- * poisoned or lapsed sync may have moved documents it never named.
- */
 export const whatTheSyncMoved = (sync: {
   readonly status: JobStatus;
   readonly attempts: number;
@@ -414,10 +403,6 @@ const endedSyncsAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/**
- * Index jobs that ended, or whose claim lapsed, oldest first; never a queued job or a live claim.
- * `newest-per-source` answers each connected source's newest ended sync and every lapsed claim.
- */
 export const endedSyncs = async (
   principal: Principal,
   door: PostgresDoor,
@@ -447,7 +432,6 @@ const lockSyncAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/** Locks the sync's job row until `tx` ends, so a claimant whose lease lapsed cannot write after it. */
 export const lockSyncIn = async (
   principal: Principal,
   tx: Tx,
@@ -456,7 +440,6 @@ export const lockSyncIn = async (
   const locker = admit(lockSyncAction, principal, input);
   if (!locker.ok) return err(locker.error);
 
-  // A claim renewed or taken again since the listing is live: locking it would stall its heartbeat.
   const locked = await attempt(() =>
     tx.query(
       `SELECT 1 FROM job

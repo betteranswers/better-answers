@@ -60,10 +60,6 @@ export type AuditEvent<A extends AuditAction> = {
 
   readonly batchId?: string | undefined;
 
-  /**
-   * Stamps `at` as the row is written, not as its transaction began, so rows a lock serialises
-   * sort in the lock's order.
-   */
   readonly stampedAsWritten?: true;
 };
 
@@ -117,7 +113,6 @@ export const latestOnIdentitySet = async (
 
 export type AuditEventPage = {
   readonly rows: readonly AuditEventRow[];
-  /** The last row's id when an older row follows it; null when this page holds the oldest. */
   readonly nextCursor: AuditEventId | null;
 };
 
@@ -134,10 +129,6 @@ const pageOf = (rows: readonly AuditEventRow[], limit: number): AuditEventPage =
   return { rows: rows.slice(0, limit), nextCursor: lastOfAFullPage?.id ?? null };
 };
 
-/**
- * Newest first, from the row after `cursor`. A cursor naming no row in scope reads nothing, so
- * another workspace's id learns nothing of it; one row past the page says another follows.
- */
 export const eventsNewestFirst = async (
   principal: Principal,
   tx: Tx,
@@ -185,7 +176,6 @@ export type EventsSought = {
 
 type ArmAt = CursorAt & { readonly limit: number; readonly family: number };
 
-/** Each arm is limited on its own index; one query that ORs them would scan the workspace. */
 const armOf = (at: ArmAt, predicate: string): string =>
   `(SELECT ${AUDIT_EVENT_ROW}
       FROM audit_event
@@ -337,21 +327,14 @@ const write = async <A extends AuditAction>(
   return { id: boundarySchemas.auditEvent.select.shape.id.parse(id), actorId: actor };
 };
 
-/**
- * Writes the event to the audit log its action was declared for. Rejects when the action was never
- * declared, or the event does not fit the audit log's row or its action's detail shape; under the
- * operator, who stands in no workspace, when the action is not the identity set's.
- */
 export const record = <A extends AuditAction>(
   principal: Principal | OperatorPrincipal,
   tx: Tx,
   event: AuditEvent<A>,
 ): Promise<Recorded> => write(tx, scopeParameter(principal), actorIdOf(principal), event);
 
-/** A lone event stands in no batch. */
 export const batchIdFor = (count: number): string | undefined => (count > 1 ? ulid() : undefined);
 
-/** Answers the batch the events share, or undefined for a lone one, which stands in none. */
 export const recordEach = async <A extends AuditAction>(
   principal: Principal | OperatorPrincipal,
   tx: Tx,
@@ -365,7 +348,6 @@ export const recordEach = async <A extends AuditAction>(
   return batchId;
 };
 
-/** As `record`, but the event's own `actor` is recorded rather than the platform. */
 export const recordFor = <A extends AuditAction>(
   platform: PlatformPrincipal,
   tx: Tx,

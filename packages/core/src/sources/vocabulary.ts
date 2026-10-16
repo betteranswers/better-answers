@@ -20,7 +20,6 @@ export const SOURCE_REFUSALS = {
   "not-wider": "inapplicable",
 } as const satisfies Vocabulary;
 
-/** A connected source's audience names groups, which the members slice owns and declares. */
 type BorrowedFromMembers = MemberRefusal<"no-such-group">;
 
 export type SourceRefusal<W extends RefusalWordFor<typeof SOURCE_REFUSALS> | BorrowedFromMembers> =

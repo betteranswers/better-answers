@@ -17,7 +17,6 @@ import { SPENDING_LIMIT_KEY } from "../llm/index.ts";
 import { type PostgresDoor, withScope, writeWorkspaceConfig } from "../store/postgres/index.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** The amount stays in the setting it sets: no detail key holds a sum of money. */
 const SPENDING_LIMIT_ACTIONS = declareActions("platform", {
   set: action("platform.workspace.spending_limit_set", {}),
 });

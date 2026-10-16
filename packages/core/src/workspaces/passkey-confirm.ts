@@ -9,7 +9,6 @@ const CHALLENGE_KEPT_FOR_MS = 5 * 60_000;
 
 const challengeUnder = (sessionId: string): string => `${PASSKEY_CHALLENGE_PREFIX}${sessionId}`;
 
-/** Written only under a session the person holds, so no caller keeps one for a stranger's. */
 const KEEPING = `
   INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at)
   SELECT $1, $2, $3, $4, $5, $5 FROM session WHERE id = $6 AND user_id = $7`;
@@ -89,7 +88,6 @@ type PasskeyCredential = {
   readonly transports: string | null;
 };
 
-/** The counter is a bigint column, which the driver would hand over as text. */
 const CREDENTIALS = `
   SELECT credential_id AS "credentialId", public_key AS "publicKey",
          counter::double precision AS counter, transports

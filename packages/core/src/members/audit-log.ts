@@ -82,7 +82,6 @@ export type ReadAuditEvent = Pick<
   AuditEventRow,
   "id" | "action" | "family" | "subjectKind" | "subjectId" | "actor"
 > & {
-  /** An ISO instant, which is what a `Date` becomes on the wire anyway. */
   readonly at: string;
   readonly by: AuditEventActor;
   /** Null for a subject with no name of its own, such as a suggestion or a request. */
@@ -131,7 +130,6 @@ type Found = {
   readonly people: readonly UserId[];
   readonly groups: readonly string[];
   readonly actions: readonly string[];
-  /** More people or groups matched than are read, so the events of the rest are left out. */
   readonly tooBroad: boolean;
 };
 
@@ -145,7 +143,6 @@ export const soughtFor = (found: Omit<Found, "tooBroad">): EventsSought => ({
   detail: PERSON_NAMED_IN,
 });
 
-/** Enough for any search a person types; one row past it says the search named more. */
 const IDS_SOUGHT = 100;
 
 const wordsOfAction = (name: string): string =>
@@ -173,7 +170,6 @@ const namedInDetail = (scope: number, bind: Bind): string =>
                      AND e.detail ->> $${bind(key)}::text = u.id)`,
   ).join("\n");
 
-/** Members and people its events name: a former member is found, an outsider never. */
 const peopleNamed = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -262,7 +258,6 @@ type Names = ReadonlyMap<string, string>;
 
 type ThingNames = Readonly<Record<Exclude<NamedKind, "person">, Names>>;
 
-/** The invitation table has no row-level security, so the workspace is named here or nowhere. */
 const NAMES_IN = {
   group: 'SELECT id, name FROM "group" WHERE workspace_id = $1 AND id = ANY($2::text[])',
   invitation:

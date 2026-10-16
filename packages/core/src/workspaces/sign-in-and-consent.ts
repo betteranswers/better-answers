@@ -19,7 +19,6 @@ import {
 import { type PostgresDoor, withIdentityWrite, withScope } from "../store/postgres/index.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** The method word alone: an address, an IP or a user agent here would need rewriting on erasure. */
 export const SIGN_IN_ACTIONS = declareIdentitySetActions("people", {
   signedIn: action("people.person.signed_in", { method: "signInMethod" }),
 });
@@ -29,7 +28,6 @@ export const SIGN_IN_CODE_PREFIX = "sign-in-otp-";
 
 export const SIGN_IN_LINK_PREFIX = "sign-in-link-";
 
-/** The operator's restore code, keyed the same way: its hash, never the code, lives in the row. */
 export const OPERATOR_RESTORE_PREFIX = "operator-restore-";
 
 /** No prefix starts another, so no address names a stranger's row. Verify and reset rows exist too. */
@@ -60,10 +58,6 @@ const CONSENT_ACTIONS = declareActions("people", {
 
 type RecordRefusal = WorkspaceRefusal<"malformed">;
 
-/**
- * Called once the library's sign-in has landed, so the row is written in a transaction of its
- * own: a failure here leaves the person signed in.
- */
 export const recordSignIn = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -93,7 +87,6 @@ type RecordConsentInput = {
   readonly clientId: string;
 };
 
-/** As `recordSignIn`, once the library's consent has landed; the assistant is the row's subject. */
 export const recordConsent = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

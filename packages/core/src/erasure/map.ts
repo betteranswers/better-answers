@@ -229,7 +229,6 @@ const ERASURE_FAMILY_DESCRIPTORS = {
     find: rowsOfThePersonIn("recovery_code"),
   },
 
-  /** One row a kind of code, named by the kind: the row has no id of its own. */
   "identity-confirm-failures": {
     categories: ["sign-in"],
     find: (platform, subject, tx) =>
@@ -240,7 +239,6 @@ const ERASURE_FAMILY_DESCRIPTORS = {
       ),
   },
 
-  /** This workspace's row alone: another's would say where else the person has been. */
   "identity-last-active": {
     categories: ["sign-in"],
     find: (platform, subject, tx) =>
@@ -333,7 +331,6 @@ export type AccessAnswer = {
   readonly locations: readonly AccessAnswerLocation[];
 };
 
-/** Only the categories some location holds, in `PERSONAL_DATA_CATEGORIES` order. */
 export const accessAnswerOf = (map: ErasureMap): AccessAnswer => {
   const locations = map.flatMap((entry) =>
     entry.locations.map((location) => ({

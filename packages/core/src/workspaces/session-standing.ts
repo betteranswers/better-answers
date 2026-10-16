@@ -94,7 +94,6 @@ const judging = async (
   if (!writesNothing(due)) {
     await withIdentityWrite(platform, door, (tx) => writing(tx, row, due, input.now));
   }
-  // Past its hour, a session reads as gone whether or not this read could end it.
   if (due.clock === "end") return undefined;
   return { sessionId: row.sessionId, personId: row.personId, standing: standingOf(row) };
 };

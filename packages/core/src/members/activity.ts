@@ -46,7 +46,6 @@ export type ReadActivityRefusal = MemberRefusal<RefusalOf<typeof readActivityAct
 
 type ReadEvent = AuditLogPage["events"][number];
 
-/** Whether the person took the action, it was done to them, or both, as a self-demotion is. */
 type Direction = "by" | "to" | "both";
 
 export type ActivityPage = Omit<AuditLogPage, "events"> & {

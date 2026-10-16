@@ -21,12 +21,10 @@ import { holdThePerson } from "./person-lock.ts";
 import { recordingTheirOwn } from "./second-factor.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** A sign-out names what it ended, so the rows it deleted are recorded before they go. */
 const SESSION_ACTIONS = declareIdentitySetActions("people", {
   sessionsEnded: action("people.person.sessions_ended", { sessions: "sessions" }),
 });
 
-/** An agent the lists cannot name is still a session, so it is named by what no device claims. */
 const UNKNOWN_DEVICE = "Unknown device";
 
 const BROWSERS: readonly (readonly [RegExp, string])[] = [
@@ -51,7 +49,6 @@ const wordIn = (
   words: readonly (readonly [RegExp, string])[],
 ): string | undefined => words.find(([names]) => names.test(userAgent))?.[1];
 
-/** `Chrome on macOS`, read from the agent alone; never the raw string, and no address beside it. */
 const deviceOf = (userAgent: string | null): string => {
   if (userAgent === null) return UNKNOWN_DEVICE;
   const browser = wordIn(userAgent, BROWSERS);
@@ -62,7 +59,6 @@ const deviceOf = (userAgent: string | null): string => {
 export type SessionShown = {
   readonly id: string;
 
-  /** Read from the session's user agent; an unreadable one reads as no known device. */
   readonly device: string;
 
   /** An ISO instant, as it crosses the wire. */
@@ -86,7 +82,6 @@ const idsOf = (input: { readonly personId: string; readonly sessionId: string })
     : undefined;
 };
 
-/** The current session first, then the rest newest first. No address is read; an expired row is the sweep's. */
 const SESSIONS_OF_PERSON = `SELECT id, user_agent AS "userAgent", updated_at AS "lastActiveAt"
                        FROM session WHERE user_id = $1 AND expires_at > $3
                       ORDER BY (id = $2) DESC, updated_at DESC, id DESC`;

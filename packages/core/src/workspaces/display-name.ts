@@ -19,16 +19,11 @@ import { ERASED_DOMAIN } from "../store/git/index.ts";
 import { type PostgresDoor, type Tx, withIdentityWrite } from "../store/postgres/index.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/**
- * Each row names the person by id and holds no name, so erasure's one copy to blank is the user
- * row.
- */
 const PERSON_ACTIONS = declareIdentitySetActions("people", {
   named: action("people.person.named", {}),
   renamed: action("people.person.renamed", {}),
 });
 
-/** The operator's correction: a name flag raised before it waits no more. */
 export const DISPLAY_NAME_CORRECTED = PERSON_ACTIONS.renamed;
 
 const DISPLAY_NAME_MAX_CHARACTERS = 100;
@@ -52,10 +47,6 @@ const CONTROL_CHARACTER = /\p{Cc}/u;
 /** Git drops both from an author's name, so a commit would credit a name the person never gave. */
 const ANGLE_BRACKET = /[<>]/u;
 
-/**
- * Code points, as Postgres counts a length: counting graphemes would let a thousand combining
- * marks pass as one character.
- */
 // oxlint-disable-next-line typescript/no-misused-spread -- the spread only counts code points, and nothing split is ever shown
 const charactersIn = (name: string): number => [...name].length;
 
@@ -90,10 +81,6 @@ type DisplayNameSet = {
 
 const ERASED_ADDRESS = `@${ERASED_DOMAIN}`;
 
-/**
- * An SQL condition on a person's address, false once erasure has pseudonymised it: erasure keeps
- * the person row, so the address is how an erased person shows.
- */
 export const notErasedAt = (email: string): string =>
   `right(lower(${email}), ${ERASED_ADDRESS.length}) <> '${ERASED_ADDRESS}'`;
 
@@ -106,10 +93,6 @@ const naming = async (tx: Tx, personId: UserId, name: string): Promise<boolean> 
   return (named.rowCount ?? 0) > 0;
 };
 
-/**
- * Held until commit by a flag on the person and by a correction of their name, so the later
- * one finds the earlier's row.
- */
 export const holdTheNameOf = async (tx: Tx, personId: UserId): Promise<void> => {
   await tx.query("SELECT pg_advisory_xact_lock(hashtext('display-name'), hashtext($1))", [
     personId,
@@ -159,7 +142,6 @@ export const correctDisplayNameInput = z.object({
 });
 
 type CorrectDisplayNameInput = z.output<typeof correctDisplayNameInput> & {
-  /** When the action happens, which the sign-in's age is judged against. */
   readonly at: Date;
 };
 

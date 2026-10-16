@@ -44,7 +44,6 @@ const TICKED = z.array(PERSON_ID).min(1).max(MOST_TICKED);
 
 const ROLE = boundarySchemas.member.select.shape.role;
 
-/** The role is any text, so a role outside the three reaches the action and is refused in its word. */
 export const bulkChangeRoleInput = z.object({ personIds: TICKED, role: z.string() });
 
 /** When the action happens: a confirmation older than an hour makes the move wait on a re-confirm. */

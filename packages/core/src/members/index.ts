@@ -4,10 +4,6 @@ export * from "./audit-export.ts";
 export * from "./audit-log.ts";
 export * from "./bulk.ts";
 export * from "./credentials.ts";
-/**
- * Here and below, actions are named one by one: a step that writes on a row its action holds would
- * skip that action's checks.
- */
 export type * from "./groups.ts";
 export {
   addToGroup,

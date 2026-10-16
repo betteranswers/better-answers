@@ -76,12 +76,10 @@ export const memberRemovedHere = async (
   removed: MemberRemoved,
   { at, batchId }: RemovedAt,
 ): Promise<void> => {
-  // The composite foreign key takes the person's group_member rows here with the row.
   await tx.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
     admin.workspaceId,
     removed.personId,
   ]);
-  // An erasure from a workspace the person already left cannot reach this row, so it goes here.
   await tx.query("DELETE FROM workspace_last_active WHERE workspace_id = $1 AND user_id = $2", [
     admin.workspaceId,
     removed.personId,

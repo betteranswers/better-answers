@@ -5,7 +5,6 @@ import { boundarySchemas, ids, MATCH_STRENGTHS, type CorpusCounts } from "@bette
 import type { ConceptBound } from "../concepts/index.ts";
 import type { PassageBound } from "../sources/index.ts";
 
-/** `counts` are the run's corpus as its first page counted it, so later pages weigh words alike. */
 export type FindPosition =
   | { readonly run: "strong" | "weak"; readonly bound: ConceptBound; readonly counts: CorpusCounts }
   | { readonly run: "passages"; readonly bound: PassageBound; readonly counts: CorpusCounts };
@@ -43,7 +42,6 @@ const FIND_POSITION = z.discriminatedUnion("run", [
   }),
 ]);
 
-/** Room for the corpus counts of a 500-character question. */
 const CURSOR_LENGTH_AT_MOST = 1024;
 
 const positionOf = (text: string): FindPosition | undefined => {

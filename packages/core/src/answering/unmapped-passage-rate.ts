@@ -23,9 +23,7 @@ export const ANSWER_MEASURES: AnswerMeasuresPrincipal = {
 const INCOMPLETE = "incomplete" satisfies (typeof FEEDBACK_REASONS)[number];
 
 const theCounts = z.object({
-  /** Records holding at least one flag whose reason is incomplete, open or closed. */
   flaggedIncomplete: z.number().int(),
-  /** Of those, the records whose result showed at least one unmapped passage. */
   showedUnmappedPassages: z.number().int(),
 });
 

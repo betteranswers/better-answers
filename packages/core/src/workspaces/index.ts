@@ -446,14 +446,12 @@ export const endEverySignInAndTokenInput = z.object({
 });
 
 type EndEverySignInAndTokenInput = z.output<typeof endEverySignInAndTokenInput> & {
-  /** When the action happens: the sign-in's age is judged against it, and it is the revocation's. */
   readonly at: Date;
 };
 
 type CredentialsRevoked = {
   readonly personId: UserId;
 
-  /** Later than the `at` asked for where an earlier revocation already held a later instant. */
   readonly revokedAt: string;
 };
 

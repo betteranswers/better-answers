@@ -265,11 +265,6 @@ const existingLiveGen = async (workspaceId: string, tx: Tx): Promise<number | nu
   return live.rows[0]?.live_gen ?? null;
 };
 
-/**
- * Upserts the concept's node in the live generation, opening generation 1 if the workspace has
- * none, and refreshes the edges into and out of it. A concept new to the generation also
- * re-derives the edges of every concept naming its file.
- */
 export const writeConceptDelta = async (
   principal: Principal,
   tx: Tx,
@@ -377,10 +372,6 @@ export const writeConceptVisibility = async (
   );
 };
 
-/**
- * A concept outside the collections ends a narrowed path. Tested before the cap, or a hub's
- * neighbours elsewhere take the slots.
- */
 const insideClause = (alias: string): string =>
   // The collections bind fifth, after the readable clause's two.
   `AND (${alias}.label <> '${CONCEPT_NODE_LABEL}' OR ${alias}.uid IN (
@@ -391,36 +382,25 @@ type Narrowing = { readonly seed: string; readonly hop: string; readonly answere
 
 const WHOLE: Narrowing = { seed: "", hop: "", answered: "" };
 
-/** Filtered before the cap, so the cap counts concepts alone. */
 const CONCEPTS_ANSWERED = `WHERE label = '${CONCEPT_NODE_LABEL}'`;
 
 /** A path may cross a node that is no concept, and it is not answered. */
 const CONCEPTS: Narrowing = { seed: "", hop: "", answered: CONCEPTS_ANSWERED };
 
-/** As CONCEPTS, inside the collections: a node that is no concept has none, so a path may cross it. */
 const INSIDE: Narrowing = {
   seed: insideClause("n"),
   hop: insideClause("m"),
   answered: CONCEPTS_ANSWERED,
 };
 
-/**
- * Grouped behind MATERIALIZED, before a narrowing's filter: the planner counts a filtered walk
- * as a few rows, then sorts every row to group them.
- */
 const NEAREST = `nearest AS MATERIALIZED (
     SELECT uid, label, kind, min(depth) AS depth
       FROM walk
      GROUP BY uid, label, kind
   )`;
 
-/**
- * The readable predicate goes on every node and edge of a path, not only the endpoints:
- * filtering the ends alone leaks the middle.
- */
 const walkStatement = (outward: boolean, narrowing: Narrowing = WHOLE): string => {
   const [source, sink] = outward ? ["from_uid", "to_uid"] : ["to_uid", "from_uid"];
-  // UNION keeps a node once per depth, so the walk costs the edges crossed, never the paths.
   return `WITH RECURSIVE live AS (
     SELECT live_gen FROM map_generation WHERE workspace_id = $1
   ),
@@ -492,10 +472,6 @@ export const walkFromEntries = (
   uids: readonly ConceptIri[],
 ): Promise<readonly WalkStep[]> => walk(WALK_FROM, principal, tx, uids);
 
-/**
- * As walkFromEntries, answering concepts alone, so its row limit counts concepts. Given
- * `collections`, it answers their concepts alone and passes through no other concept.
- */
 export const walkConceptsFromEntries = (
   principal: UserPrincipal,
   tx: Tx,
@@ -509,7 +485,6 @@ const WALK_TIMED_OUT = "57014";
 export const walkTimedOut = (error: Error): boolean =>
   "code" in error && error.code === WALK_TIMED_OUT;
 
-/** As walkFromEntries, against the edges' direction: the nodes that lead into any of `uids`. */
 export const walkToEntries = (
   principal: UserPrincipal,
   tx: Tx,
@@ -577,7 +552,6 @@ export type SweptGeneration = {
   readonly edges: number;
 };
 
-/** A missing generation row makes the `<>` comparison NULL, which deletes nothing. */
 const SWEEP = `WITH live AS (
     SELECT live_gen FROM map_generation WHERE workspace_id = $1
   ),
@@ -601,10 +575,6 @@ const SWEEP = `WITH live AS (
    GROUP BY gen
    ORDER BY gen`;
 
-/**
- * Deletes the nodes and edges of every generation but the live one, counted by generation. The
- * source partition is never swept, and nothing is when no generation is live.
- */
 export const sweepNonLiveGenerations = async (
   platform: PlatformPrincipal,
   tx: Tx,

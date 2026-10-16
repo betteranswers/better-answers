@@ -86,11 +86,6 @@ const combined = (from: readonly Visibility[]): Visibility | undefined => {
   return audience === "nobody" ? RESTRICTED_TO_ADMINS : { sensitivity, ...audience };
 };
 
-/**
- * `override` wins outright, over the kind's floor too. Otherwise the narrowest sensitivity in
- * `from` and the groups its group-limited entries share, or `fallback` when `from` is empty,
- * floored at Restricted for a Person. Entries sharing no group give `RESTRICTED_TO_ADMINS`.
- */
 export const derivedVisibility = (derivation: Derivation): Visibility => {
   if (derivation.override !== undefined) return derivation.override;
   const inherited = combined(derivation.from) ?? derivation.fallback;

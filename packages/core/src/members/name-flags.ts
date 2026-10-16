@@ -23,7 +23,6 @@ import type { Tx } from "../store/postgres/index.ts";
 import { DISPLAY_NAME_CORRECTED, holdTheNameOf, notErasedAt } from "../workspaces/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-/** Neither row holds the name: the person row keeps the one copy, which erasure blanks. */
 const FLAGGED_ACTIONS = declareActions("people", {
   flagged: action("people.person.name_flagged", {}),
 });
@@ -147,7 +146,6 @@ type NameWaiting = {
   readonly personId: UserId;
   readonly displayName: string;
 
-  /** A workspace's second flag is never raised while its first waits, so each appears once. */
   readonly flags: readonly FlagWaiting[];
 };
 
@@ -167,7 +165,6 @@ const WAITING_ROW = z.object({
   raisedAt: boundarySchemas.identityAuditEvent.select.shape.at,
 });
 
-/** The rows come oldest first, so a Map keeps each person where their oldest flag put them. */
 const byPerson = (rows: readonly z.output<typeof WAITING_ROW>[]): readonly NameWaiting[] => {
   const people = new Map<UserId, NameWaiting>();
   for (const row of rows) {

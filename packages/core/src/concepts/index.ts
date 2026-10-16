@@ -323,7 +323,6 @@ export const writeConcept = async (
   return commitConcept(admitted.value, doors, input);
 };
 
-/** The write once admitted: nothing below judges who asked. */
 const commitConcept = async (
   principal: AdmittedOf<typeof writeConceptAction>,
   doors: WriteDoors,
@@ -869,7 +868,6 @@ const dryRunOf = (
       countVerifications(held?.iri, concept.verifications, present),
     );
 
-    /** No iri is minted on a dry run, so the target's path stands in and only the count is read. */
     const { links } = rewriteLinks(held?.body ?? concept.body, concept.path, (target) =>
       paths.has(target) ? target : undefined,
     );
@@ -1125,10 +1123,6 @@ const runImport = async (
   });
 };
 
-/**
- * Not one transaction: a run stopped part way keeps what landed and names it in `progress`, and
- * a rerun skips it. A dry run writes nothing and counts what a run would do.
- */
 export const importBundle = async (
   principal: UserPrincipal,
   doors: WriteDoors,
@@ -1138,8 +1132,6 @@ export const importBundle = async (
   if (!admitted.ok) return err(admitted.error);
   const sensitivity = input.sensitivity ?? IMPORT_SENSITIVITY_DEFAULT;
 
-  // The second pass reads back what the first landed; a sensitivity the runner cannot read would stop
-  // the run after everything was written.
   if (!readsSensitivity(principal, sensitivity)) return err("class-unreadable");
   const opened = await openImport(principal, doors.postgres, input);
   if (!opened.ok) return err(opened.error);
@@ -1221,7 +1213,6 @@ const conceptByIriAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/** `undefined` both when no concept holds the iri and when this principal may not read it. */
 export const conceptByIri = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -1248,7 +1239,6 @@ const conceptsByIrisAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/** Those of `iris` this principal may read, by iri. A withheld one is absent, as an unwritten one is. */
 export const conceptsByIris = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -1278,7 +1268,6 @@ const CONCEPT_READ = `${conceptSelect({
                  ON o.workspace_id = c.workspace_id AND o.iri = c.iri`,
 })} AND c.iri = $4`;
 
-/** What a reader is shown of a concept: its frontmatter keeps a source's locator only where they may open it. */
 export type ConceptRead = {
   readonly iri: ConceptIri;
   readonly frontmatter: Frontmatter;
@@ -1296,10 +1285,6 @@ const sharerOfRow = (row: ReadRow) =>
     ? undefined
     : { actor: row.shared_by, at: row.shared_at };
 
-/**
- * `undefined` both when no concept holds the iri and when this principal may not read it. Each
- * source opens a passage only through `passageAt`, read for this principal.
- */
 export const readConcept = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -1339,10 +1324,6 @@ export const readConcept = async (
   });
 };
 
-/**
- * A concept's sources as this reader may open them, in the file's order. A source they cannot
- * open keeps the file's own label and nothing that leads to it.
- */
 export const evidenceOf = async (
   principal: UserPrincipal,
   tx: Tx,
