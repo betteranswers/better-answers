@@ -315,10 +315,12 @@ def test_stamps_an_unstamped_template_rather_than_dropping_it(
     assert stamp >= before
 
 
-def test_leaves_the_vitest_tiers_stale_templates_alone(
+# The vitest tier's real sweep would drop a tpl_ts_ plant, so a prefix no tier sweeps
+# stands in.
+def test_leaves_stale_templates_outside_its_prefix_alone(
     maintenance: str, unique: Callable[[str], str]
 ) -> None:
-    theirs = _planted(maintenance, unique, LONG_AGO, "tpl_ts_age")
+    theirs = _planted(maintenance, unique, LONG_AGO, "tpl_probe_age")
 
     _ensure_another(maintenance, unique)
 

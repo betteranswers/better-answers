@@ -628,8 +628,9 @@ describe("a shared template", () => {
     });
   });
 
-  it("leaves the worker tier's stale templates alone", async () => {
-    const theirs = await plantedTemplate("theirs", LONG_AGO, "tpl_py_");
+  // The worker tier's real sweep would drop a tpl_py_ plant, so a prefix no tier sweeps stands in.
+  it("leaves stale templates outside its prefix alone", async () => {
+    const theirs = await plantedTemplate("theirs", LONG_AGO, "tpl_t_");
 
     await ensureTemplate(adminUri(), scratchTemplate("ours"), buildLog().building("ours"));
 
