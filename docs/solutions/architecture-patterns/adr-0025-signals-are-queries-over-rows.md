@@ -34,7 +34,7 @@ A **signal** is a named query over rows the platform already keeps, with a thres
 - Three channels, each for the case only it can see: healthchecks.io for silence, Coolify through Resend for deploy and container failures, and the api's own email through `SMTP_URL` for the thresholds. That email goes out immediately for a short list and in a daily digest for the rest.
 - Retention: `platform_event` 90 days; heartbeats one a minute for seven days, then one an hour for ninety; `llm_call` six months, then a monthly per-workspace aggregate.
 
-These shapes live here, not in the rules. The rule *Log through the tier's one structured logger*, in `CODING_STANDARDS.md`, keeps the checkable sentence that no prompt or completion reaches a logger, an exporter or a row. The rule *Keep a signal and an alert as rows*, in `deploy/CODING_STANDARDS.md`, keeps "no metrics store and no scrape". The alert-once rule moved here from the deploy rule.
+These shapes live here, not in the rules. The logging rule in `CODING_STANDARDS.md` keeps the checkable sentence that no prompt or completion reaches a logger, an exporter or a row. `deploy/AGENTS.md` keeps "no metrics store and no scrape". The alert-once rule moved here from the deploy rule.
 
 `llm_call` has its table, which the api writes when a question's model call settles. The worker writes none yet, and `llm_call`'s retention is not built. `platform_event`, the threshold rows and the heartbeat's host figures have no table yet. `contracts/cost-ledger/rows.json` holds the `llm_call` row's golden rows, and both tiers hold its columns and outcomes to the table.
 

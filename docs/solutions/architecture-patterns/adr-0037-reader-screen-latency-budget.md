@@ -36,7 +36,7 @@ The browser suite asserts the budget per page, against the served build (`apps/w
 
 Work on a page names which of the three budgets it is under and how the suite asserts it.
 
-The web tier's rule *Give every common action a keystroke*, in `apps/web/CODING_STANDARDS.md`, keeps the keyboard clause: every common action has a keystroke, `?` lists them, and bulk work is select-then-command. The numbers live here.
+`apps/web/AGENTS.md` keeps the keyboard clause: every common action has a keystroke, `?` lists them, and bulk work is select-then-command. The numbers live here.
 
 ## Why
 

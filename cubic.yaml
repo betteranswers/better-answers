@@ -28,9 +28,9 @@ reviews:
       first uses it, or before; a diff that introduces a domain term absent from
       the glossary at its head is a finding.
     - `CODING_STANDARDS.md` — the constitution.
-    - `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md`,
-      `apps/worker/CODING_STANDARDS.md` and `deploy/CODING_STANDARDS.md` — a directory's
-      own rules. Apply each to changes in its directory.
+    - `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md`,
+      `deploy/AGENTS.md`, `packages/core/AGENTS.md` and `packages/schema/AGENTS.md` —
+      a directory's own rules. Apply each to changes in its directory.
     - `docs/solutions/architecture-patterns/` — the live architecture decisions, one
       doc each, at `adr-NNNN-<slug>.md`. Code states a decision in words, never by
       its number or its doc's path. A change that moves a decision edits its doc in

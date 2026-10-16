@@ -40,7 +40,7 @@ The table in `docs/operations/SECRETS.md`, under *The classes*, says what each c
 
 Settling either is a new decision. It amends this record and the record that loses.
 
-The decision predates this record. It was moved out of the rule *Keep a secret to its credential class*, in the root `CODING_STANDARDS.md`. That file keeps the sentence that classes are never mixed in one scope. The rule *Read the environment in the tier's one config module* keeps the seam.
+The decision predates this record. It was moved out of the credential-class rule in the root `CODING_STANDARDS.md`. That file keeps the sentence that classes are never mixed in one scope, and its config-module rule keeps the seam.
 
 ## The LLM-provider class
 

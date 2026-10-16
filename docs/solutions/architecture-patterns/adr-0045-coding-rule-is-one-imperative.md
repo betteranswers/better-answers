@@ -1,42 +1,33 @@
 ---
-title: "A coding rule is one imperative in the standards file of the directory it binds"
+title: "A coding rule is written down only where no gate holds it, beside the code it binds"
 date: 2026-09-24
 module: repository
 problem_type: architecture_pattern
 component: development-workflow
 severity: medium
 applies_when:
-  - "Adding or editing a rule in a CODING_STANDARDS.md file"
-  - "Finding a rule no gate holds, or deciding whether a rule needs a Reviewer line"
+  - "Adding or editing a rule in `CODING_STANDARDS.md` or a directory's `AGENTS.md`"
+  - "Adding a gate, or a gate's failure message"
   - "Writing a comment, a docstring or a lint suppression, or changing the comment gates"
 tags:
   - adr-0045
   - coding-standards
-  - reviewer
   - comment-gate
   - oxlint
 ---
 
-# A coding rule is one imperative in the standards file of the directory it binds
+# A coding rule is written down only where no gate holds it, beside the code it binds
 
 ## The decision
 
-A coding rule is one imperative in the `CODING_STANDARDS.md` of the directory it binds. There is the root file, one per workspace, and one beside the deployment configuration (`deploy/CODING_STANDARDS.md`).
+A rule that binds every workspace is a bullet in the root `CODING_STANDARDS.md`. A rule that binds one directory is a bullet in that directory's `AGENTS.md`, and a `CLAUDE.md` beside it holding `@AGENTS.md` loads it when work reaches the directory. Today those directories are `apps/api/`, `apps/web/`, `apps/worker/`, `deploy/`, `packages/core/` and `packages/schema/`.
 
-**The form.**
+**What gets written down.**
 
-- A rule's heading is its imperative. Under it come a body, an optional `Reviewer:` line, and a BAD/GOOD snippet where code says it faster than words.
-- Prose is capped at 80 words a rule, under a shrink-only exception list, and at 2,500 words in the root file. Snippets are free.
-- Outside a snippet, a rules file names identifiers only. A ticket, a date and a decision are each read where they are kept.
-
-**Who holds a rule.**
-
-- A `Reviewer:` line is written only where no mechanism could catch a breach: a judgement about depth, an oracle, a comment's intent.
-- Where a gate could exist and does not, the gap is a ticket, and the rule gets no sentence about it.
-- A rule states what it asks for. It does not say which gate catches a breach; the gate's failure message names the file that holds the rule.
-- A finding quotes the rule's heading.
-
-No suite holds the form now. The review reads the rules in whatever shape they take, so whoever edits a rules file keeps the form.
+- A rule is written down only when no gate, type or test holds it. Where one does, the gate's failure message states the rule and its fix on its own, and names no file. The prose goes.
+- General engineering judgement (module depth, where to validate, what a test asserts) is not restated. The pstack principle skills carry it, and load when the work calls for them.
+- What stays is what an agent cannot derive from the tree: a security or audit invariant, a trap, a product or legal requirement, a tier's ownership boundary.
+- Where a gate could hold a written rule and does not yet, building the gate and deleting the rule is the preferred fix.
 
 **Inside code, the comment rules are held by:**
 
@@ -46,9 +37,9 @@ No suite holds the form now. The review reads the rules in whatever shape they t
 
 ## Why
 
-- The rules files were founded on a short imperative form and drifted into narrative: enforcement bookkeeping, mechanism description, ticket history. An agent writes what it sees, and that voice ran through the code.
-- A rule is named by its heading alone, because an agent copies the name it meets into what it writes. A heading in words still says the rule wherever it lands.
-- A rule that names its gate repeats it. The gate already names the rule's file in the message a reader hits.
+- Every session, and every agent it spawned, read the root file and the workspace files in full, about 420 lines. Most of it restated a gate that already refuses the breach, or a principle a frontier model applies unprompted. That text cost context on every turn and taught nothing.
+- A rule beside its directory loads only when work reaches that directory.
+- A gate message that points at a file breaks when the file's prose is cut. A message that states the rule stands on its own.
 - With one lint config, `pnpm lint`, the pre-commit hook and an editor all show a breach as it is written.
 - `string-cites-nothing` is its own rule because it polices text a person reads, which is not a comment.
 - The density ceiling is the volume backstop for each workspace's TypeScript and Python. No gate reads a config file's comments; review holds them.
@@ -58,3 +49,5 @@ No suite holds the form now. The review reads the rules in whatever shape they t
 The full record, with its one amendment (T-384): `docs/archive/adr/0045-coding-rule-is-one-imperative.md`.
 
 Amended 12/10/2026 by the comment gates plan (`docs/plans/2026-10-12-1241-chore-one-holder-per-comment-rule-plan.md`, KTD5). The density ceiling measures workspaces only, so a config file, a shell script and a migration have no comment gate. The Claude Code hook that re-ran the comment gates on each written file is removed; the pre-commit hook now runs the Python gate and lints root scripts.
+
+Amended 16/10/2026 on the move from Compound Engineering to pstack. The rules files were cut to what no gate holds, the `Reviewer:` line and the per-rule form were dropped, the directory files became `AGENTS.md`, `packages/core/` and `packages/schema/` gained one each for the audit and row-level-security rules, and gate messages stopped naming the root file.

@@ -9,7 +9,7 @@ This repo is **single-context**: one root `CONCEPTS.md` and one set of decisions
 - **`CONCEPTS.md`** at the repo root — the glossary.
 - **`docs/solutions/architecture-patterns/`** — the live architecture decisions. Read the ones that touch the area you're about to work in.
 - **`AGENTS.md`** — the map: layout, how a task is worked, which skill to reach for.
-- **`CODING_STANDARDS.md`** — the constitution. A workspace's own rules live in `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md` and `apps/worker/CODING_STANDARDS.md`; read a workspace's file too when changing it.
+- **`CODING_STANDARDS.md`** — the constitution. A directory's own rules live in its `AGENTS.md`, which its `CLAUDE.md` loads when work reaches it.
 - **`docs/okf-v02.md`** — read before adding a key, convention or feature that touches a concept file.
 
 ## File structure
@@ -25,10 +25,10 @@ This repo is **single-context**: one root `CONCEPTS.md` and one set of decisions
 │   ├── solutions/     ← what past work learned; architecture-patterns/ holds the decisions
 │   └── archive/       ← frozen: the ADRs and specs from before Compound Engineering
 ├── apps/
-│   ├── api/           ← + apps/api/CODING_STANDARDS.md
-│   ├── web/           ← + apps/web/CODING_STANDARDS.md
-│   └── worker/        ← + apps/worker/CODING_STANDARDS.md
-├── packages/{core,schema}
+│   ├── api/           ← + AGENTS.md
+│   ├── web/           ← + AGENTS.md
+│   └── worker/        ← + AGENTS.md
+├── packages/{core,schema}  ← + AGENTS.md each
 └── contracts/         ← the tier contract's fixtures (ADR 0031)
 ```
 
