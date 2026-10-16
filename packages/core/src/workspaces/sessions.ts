@@ -59,7 +59,6 @@ const deviceOf = (userAgent: string | null): string => {
   return browser === undefined || system === undefined ? UNKNOWN_DEVICE : `${browser} on ${system}`;
 };
 
-/** One of the person's own sessions, as the Sessions section shows it. */
 export type SessionShown = {
   readonly id: string;
 
@@ -79,7 +78,6 @@ type SessionRow = {
   readonly lastActiveAt: Date;
 };
 
-/** Each id as the boundary names it, or nothing: a caller's id is never trusted to be well formed. */
 const idsOf = (input: { readonly personId: string; readonly sessionId: string }) => {
   const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
   const sessionId = boundarySchemas.session.select.shape.id.safeParse(input.sessionId);
@@ -122,7 +120,6 @@ export const readSessions = async (
   return read;
 };
 
-/** What a page sends to sign one of the person's own sessions out. */
 export const endOneSessionInput = z.object({ sessionId: z.string() });
 
 type EndedRow = {
@@ -131,7 +128,6 @@ type EndedRow = {
   readonly lastActiveAt: Date;
 };
 
-/** The detail's name for each session an act ended: its id, its device, and when it was last active. */
 const endedSessions = (rows: readonly EndedRow[]): readonly EndedSession[] =>
   rows.map((row) => ({
     sessionId: row.id,
@@ -139,7 +135,6 @@ const endedSessions = (rows: readonly EndedRow[]): readonly EndedSession[] =>
     lastActiveAt: row.lastActiveAt.toISOString(),
   }));
 
-/** One record of the person's own, naming the sessions their sign-out ended. */
 const recording = (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -157,7 +152,6 @@ const RETURNED_ENDED = `RETURNING id, user_agent AS "userAgent", updated_at AS "
 /** $1 binds the read's own session, $2 the person, $3 the instant: an expired row is the sweep's, never an act's. */
 const GONE = `DELETE FROM session WHERE expires_at > $3 AND`;
 
-/** Holds the person's row, ends the live sessions `rest` names, and records the act naming them. */
 const ending = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

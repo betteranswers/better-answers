@@ -23,7 +23,6 @@ import {
 } from "./wire/messages.ts";
 import type { TokensSpent, WireRequest } from "./wire/read.ts";
 
-/** One call whose answer is prose, read as it is written. */
 export type StreamedCall = {
   readonly system: string;
   readonly prompt: string;
@@ -41,7 +40,6 @@ export type StreamedOutcome = {
   readonly spent: readonly CallSpent[];
 };
 
-/** Yields the reply's text as it arrives, and answers how the call ended. */
 export type StreamModel = (
   to: ModelToCall,
   call: StreamedCall,
@@ -58,7 +56,6 @@ const NO_TOKENS: TokensSpent = { tokensIn: 0, tokensOut: 0 };
 
 const ANSWERED = 200;
 
-/** What a reply said of itself so far: its counts, how it stopped, and whether it broke. */
 type Hearing = {
   readonly tokensIn?: number;
   readonly tokensOut?: number;
@@ -125,7 +122,6 @@ type Ending = { readonly read: HeardRead; readonly spent: TokensSpent };
 const cutShort = (read: AttemptRead, sent: boolean, most: CallSize): TokensSpent =>
   read.read === "abandoned" && sent ? most : NO_TOKENS;
 
-/** Text as each event carries it; the reader is cancelled when `signal` aborts or reading stops. */
 async function* heardFrom(
   body: ReadableStream<Uint8Array>,
   signal: AbortSignal,

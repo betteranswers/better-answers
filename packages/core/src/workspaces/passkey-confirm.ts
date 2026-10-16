@@ -5,7 +5,6 @@ import { type PostgresDoor, withIdentityRead, withIdentityWrite } from "../store
 import { PASSKEY_CHALLENGE_PREFIX } from "./sign-in-and-consent.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** How long a passkey confirm's challenge waits for the device's answer. */
 const CHALLENGE_KEPT_FOR_MS = 5 * 60_000;
 
 const challengeUnder = (sessionId: string): string => `${PASSKEY_CHALLENGE_PREFIX}${sessionId}`;

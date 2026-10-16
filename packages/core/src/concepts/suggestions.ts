@@ -347,7 +347,6 @@ export const declineSuggestion = async (
   });
 };
 
-/** A step of an acceptance, for the Admin the acceptance admitted. */
 export const returnToProposer = (
   admin: AdminUserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },

@@ -423,7 +423,6 @@ const questionsStepLineOf = (
   feedback_rewritten: swept.feedbackRewritten,
 });
 
-/** A sweep that found nothing has no count to keep. */
 const logTheSweep = (log: ErasureLog, line: QuestionsLogLine, message: string): void => {
   if (line.records_rewritten + line.feedback_rewritten > 0) log.info(line, message);
 };
@@ -501,7 +500,6 @@ type ErasureOpened = {
   readonly namedPeople: readonly string[];
 };
 
-/** By this request's tombstone, or by an address it holds, a person held elsewhere among them. */
 const NAMED_PEOPLE = `SELECT id FROM "user" WHERE email = $1 OR lower(email) = ANY($2::text[])`;
 
 const peopleNamedBy = async (

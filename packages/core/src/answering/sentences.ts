@@ -3,22 +3,18 @@ import { linksAndMarksOf } from "@better-answers/schema/concept-file";
 
 import type { DraftedSentence } from "./record.ts";
 
-/** A concept a draft may cite, by the label its footnote carries. */
 export type Citable = { readonly label: string; readonly iri: ConceptIri };
 
-/** Each citable concept as a source a citation mark resolves to, so the shared reader reads it. */
 const marksIn = (text: string, citable: readonly Citable[]) =>
   linksAndMarksOf(
     text,
     citable.map(({ label, iri }) => ({ resource: iri, locator: null, id: label })),
   ).marks;
 
-/** What may stand between a sentence's marks and the space that ends it. */
 const CLOSING = new Set([".", ",", ";", ":", "!", "?", ")", '"', "'", "”", "’"]);
 
 const SPACE = new Set([" ", "\t"]);
 
-/** Where the space after `at` gives way to text, or the line's length where nothing follows. */
 const pastSpace = (line: string, at: number): number => {
   let next = at;
   while (SPACE.has(line[next] ?? "")) next += 1;

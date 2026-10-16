@@ -214,7 +214,6 @@ export const listObjects = (
   under: string,
 ): Promise<Result<readonly string[], KeyRefusal>> => listInside(door, prefixOf(principal), under);
 
-/** As putObject, in the platform's own space outside every workspace. */
 export const putPlatformObject = (
   platform: PlatformPrincipal,
   door: ObjectDoor,
@@ -222,7 +221,6 @@ export const putPlatformObject = (
   body: ReadableStream<Uint8Array>,
 ): Promise<Result<void, KeyRefusal>> => putInside(door, PLATFORM_PREFIX, key, body);
 
-/** As getObject, in the platform's own space outside every workspace. */
 export const getPlatformObject = (
   platform: PlatformPrincipal,
   door: ObjectDoor,
@@ -230,7 +228,6 @@ export const getPlatformObject = (
 ): Promise<Result<ReadableStream<Uint8Array>, ReadRefusal>> =>
   getInside(door, PLATFORM_PREFIX, key);
 
-/** As listObjects, in the platform's own space outside every workspace. */
 export const listPlatformObjects = (
   platform: PlatformPrincipal,
   door: ObjectDoor,

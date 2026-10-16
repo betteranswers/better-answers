@@ -24,7 +24,6 @@ import { targetOf } from "../store/map/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import type { Frontmatter, FrontmatterSource } from "./file.ts";
 
-/** One `sources` entry as a reader sees it: the file's label, and what opens it, when anything does. */
 type EvidenceItem = {
   readonly id?: string;
   readonly source: string;
@@ -59,7 +58,6 @@ export type PassageReader = (locator: string) => Promise<Result<unknown, typeof 
 /** Whether a locator has a passage address's shape, so a page reference is never read as withheld. */
 export type PassageNamer = (locator: string) => boolean;
 
-/** The override that let this reader see the concept, when one is recorded. */
 type Sharer = { readonly actor: string; readonly at: Date } | undefined;
 
 const PANE_COPY = {
@@ -129,7 +127,6 @@ const labelOf = (entry: SourceEntry, resource: string): string => {
 
 type Opening = { readonly locator: string } | { readonly iri: ConceptIri };
 
-/** A passage when the entry's locator has an address's shape, else a concept when its resource is a concept IRI. */
 const openingNamed = (
   doors: Doors,
   locator: string | null,
@@ -317,10 +314,8 @@ export const relationsOf = (
     }));
   });
 
-/** A link in the body, and the concept it leads to, which this reader may read. */
 export type BodyLink = {
   readonly ordinal: number;
-  /** The link's address as the body wrote it. */
   readonly address: string;
   readonly target: ConceptIri;
 };
@@ -335,7 +330,6 @@ const LINKED = `SELECT t.iri, t.path
      AND ${readableClause("t", 2)}
    GROUP BY t.iri, t.path`;
 
-/** The concepts the map links this one to that the reader may read, by IRI and by file. */
 type Linked = {
   readonly iris: ReadonlySet<string>;
   readonly byPath: ReadonlyMap<string, string>;
@@ -382,6 +376,5 @@ export const bodyLinksOf = (
 
 const CONCEPT_PAGE = "/knowledge/search/";
 
-/** The concept page's address on the web, which a citation links to. */
 export const conceptPageOf = (iri: ConceptIri): string =>
   `${CONCEPT_PAGE}${iri.slice(CONCEPT_IRI_PREFIX.length)}`;

@@ -38,7 +38,6 @@ export const withBundleWrite = async <T extends Result<unknown, unknown>>(
   return fenced.ok ? fenced.value : err(fenced.error);
 };
 
-/** As withBundleWrite, for the platform's own work, which may rewrite history and so hold it alone. */
 export const withBundleFenceAs = <T>(
   platform: PlatformPrincipal,
   doors: BundleDoors,

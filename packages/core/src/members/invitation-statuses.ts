@@ -27,7 +27,6 @@ const INVITATION_STATUSES = ["waiting", "accepted", "expired", "cancelled"] as c
 
 type InvitationStatus = (typeof INVITATION_STATUSES)[number];
 
-/** Asked no status, the list is the waiting invitations. */
 export const listInvitationsInput = z
   .object({ status: z.enum(INVITATION_STATUSES).default("waiting") })
   .default({ status: "waiting" });

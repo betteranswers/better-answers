@@ -68,7 +68,6 @@ const passesTheCheckDigit = (written: string): boolean => {
   return digits.reduce((sum, digit, at) => sum + digit * (10 - at), 0) % 11 === 0;
 };
 
-/** One UTF-16 unit at a time: no character of the class is longer. */
 const isSpace = (unit: string | undefined): boolean => unit !== undefined && A_SPACE.test(unit);
 
 /** The run with no space in it that holds `at`, walked by index so a long run is read once. */
@@ -103,7 +102,6 @@ const namedPairsIn = (text: string): readonly Hit[] => {
   return pairs;
 };
 
-/** The space round a sentence is no part of it. */
 const trimmed = (text: string, sentence: Hit): Hit => {
   let { start, end } = sentence;
   while (start < end && isSpace(text[start])) start += 1;
@@ -111,7 +109,6 @@ const trimmed = (text: string, sentence: Hit): Hit => {
   return { start, end };
 };
 
-/** The sentence that ends at the break numbered `next`, or at the end of the text. */
 const sentenceBefore = (text: string, breaks: readonly Hit[], next: number): Hit =>
   trimmed(text, { start: breaks[next - 1]?.end ?? 0, end: breaks[next]?.start ?? text.length });
 
@@ -138,7 +135,6 @@ const hitsIn = (text: string): readonly Hit[] => [
   ...sentencesWithACue(text),
 ];
 
-/** What a hit keeps once each hit ahead of it has taken the characters the two share. */
 const leftOf = (one: Hit, ahead: readonly Hit[]): readonly Hit[] => {
   let { start, end } = one;
   for (const winner of ahead) {

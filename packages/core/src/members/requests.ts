@@ -38,7 +38,6 @@ const REQUEST_ACTIONS = declareActions("people", {
   declined: action("people.request.declined", { requesterId: "id" }),
 });
 
-/** The role an approval grants when it names none. */
 export const REQUEST_ROLE_DEFAULT = "Viewer" satisfies Role;
 
 export type Acknowledgement = { readonly acknowledged: true };
@@ -120,7 +119,6 @@ type Claim = {
   readonly email: string;
 };
 
-/** Takes its face's admission as answered, and passes a refusal on before it reads a row. */
 const claimForDecision = async (
   admitted: Result<AdminUserPrincipal, MemberRefusal<"role-forbids">>,
   tx: Tx,

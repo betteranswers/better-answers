@@ -42,7 +42,6 @@ const mintGroup = (): string =>
 export const mintOneTimeCode = (): string =>
   Array.from({ length: GROUPS_IN_A_CODE }, mintGroup).join("-");
 
-/** What a person types, as it was minted: no spaces, no dashes, lower case. */
 const asMinted = (typed: string): string => typed.toLowerCase().replaceAll(/[\s-]/g, "");
 
 const hashOf = (code: string): string => createHash("sha256").update(code).digest("hex");
@@ -58,7 +57,6 @@ export type RecoveryCodesMade = {
 };
 
 type RecoveryCodesIssued = RecoveryCodesMade & {
-  /** Whether a set stood before, which this one voided. */
   readonly replaced: boolean;
 };
 

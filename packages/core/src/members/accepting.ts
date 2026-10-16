@@ -219,7 +219,6 @@ const waitingTo = async (tx: Tx, personId: UserId): Promise<readonly InvitationI
     )
     .map((waiting) => waiting.id);
 
-/** Judged one by one as `readInvitation` judges, so the two can never disagree on what is open. */
 const openTo = async (tx: Tx, personId: UserId, now: Date): Promise<readonly InvitationRead[]> => {
   const waiting = await waitingTo(tx, personId);
   const judgedEach = await Promise.all(

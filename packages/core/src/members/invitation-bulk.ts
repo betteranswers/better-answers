@@ -79,7 +79,6 @@ const HELD_INVITATIONS = `SELECT id, status FROM invitation
                            WHERE workspace_id = $1 AND id = ANY($2::text[])
                            ORDER BY id FOR UPDATE`;
 
-/** Each id asked for and held here in none of `standing`, named `no-such-invitation`. */
 const refusedOutside = async (
   admin: AdminUserPrincipal,
   tx: Tx,

@@ -34,7 +34,6 @@ import type { RecordCompletion } from "./record.ts";
 /** Each candidate's verdict, keyed by the number the prompt gave it. */
 type Verdicts = Readonly<Record<string, CandidateVerdict>>;
 
-/** A model call reserved, and the model it reserved for. */
 export type CallReserved = { readonly to: ModelToCall; readonly reservationId: string };
 
 export type CallReserving = {
@@ -71,7 +70,6 @@ const reservedFor = async (
   tx: Tx,
   credentials: Credentials,
   reserving: Omit<CallReserving, "most"> & {
-    /** The most the model's wire shape may spend; `undefined` where it cannot make this call. */
     readonly most: (shape: WireShapeName) => CallSize | undefined;
   },
 ): Promise<Result<CallReserved | undefined, JudgeRefusal>> => {
@@ -92,7 +90,6 @@ const reservedFor = async (
   return ok({ to: to.value, reservationId: reserved.value.reservationId });
 };
 
-/** The judging model's call, reserved in the caller's transaction. */
 export const reserveJudge = async (
   asker: UserPrincipal,
   tx: Tx,

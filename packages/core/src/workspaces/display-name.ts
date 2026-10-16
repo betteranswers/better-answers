@@ -70,7 +70,6 @@ export const applyDisplayNameRule = (asked: string): Result<string, DisplayNameR
   return ok(name);
 };
 
-/** A name of whitespace alone counts as none. */
 export const hasNoDisplayName = (held: string): boolean => held.trim() === "";
 
 export const setDisplayNameInput = z.object({ displayName: z.string() });
@@ -98,7 +97,6 @@ const ERASED_ADDRESS = `@${ERASED_DOMAIN}`;
 export const notErasedAt = (email: string): string =>
   `right(lower(${email}), ${ERASED_ADDRESS.length}) <> '${ERASED_ADDRESS}'`;
 
-/** False, having changed nothing, where no person holds the id or the one who did is erased. */
 const naming = async (tx: Tx, personId: UserId, name: string): Promise<boolean> => {
   const named = await tx.query(
     `UPDATE "user" SET name = $2, updated_at = now()

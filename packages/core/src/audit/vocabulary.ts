@@ -41,7 +41,6 @@ export const endedGrant = z.strictObject({
 
 export type EndedGrant = z.output<typeof endedGrant>;
 
-/** A browser session an action ended: its id, its device and when it was last active. */
 const endedSession = z.strictObject({
   sessionId: z.string().regex(ULID),
   device: z.string().min(1),
@@ -66,12 +65,10 @@ type DetailEntry = Readonly<Record<string, string | null>>;
 
 export type DetailValue = string | number | boolean | readonly DetailEntry[];
 
-/** How a person signed in: the code a sign-in email carries, typed, the link beside it, or a passkey. */
 const SIGN_IN_METHODS = ["email_code", "email_link", "passkey"] as const;
 
 export type SignInMethod = (typeof SIGN_IN_METHODS)[number];
 
-/** The two kinds of second factor a person can confirm with or set up. */
 const SECOND_FACTORS = ["passkey", "authenticator"] as const;
 
 export type SecondFactor = (typeof SECOND_FACTORS)[number];

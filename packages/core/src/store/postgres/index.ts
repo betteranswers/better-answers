@@ -23,10 +23,6 @@ export type PostgresDoor = {
 
 export const openPostgres = (pool: pg.Pool): PostgresDoor => ({ pool });
 
-/**
- * A SQL expression for the workspace in parameter `$at`, or for the transaction's own scope when
- * that parameter is null.
- */
 export const scopeClause = (at: number): string =>
   `COALESCE($${at}::text, (select current_workspace_id()))`;
 
@@ -39,7 +35,6 @@ export const scopeParameter = (principal: Principal | OperatorPrincipal): string
 
 type Bindable = string | number | Date | null | readonly string[];
 
-/** A placeholder is the number `bind` answers for its own value, so the two cannot drift apart. */
 export const boundValues = () => {
   const values: Bindable[] = [];
   return { values, bind: (value: Bindable): number => values.push(value) };
@@ -47,7 +42,6 @@ export const boundValues = () => {
 
 export type Bind = ReturnType<typeof boundValues>["bind"];
 
-/** An `ILIKE` pattern matching `text` anywhere, its own `%`, `_` and `\` taken literally. */
 export const containing = (text: string): string =>
   `%${text.replaceAll(/[\\%_]/g, String.raw`\$&`)}%`;
 
@@ -410,10 +404,6 @@ export const tryWorkspaceFence = async <T>(
     }),
   );
 
-/**
- * Runs `work` in one transaction with no workspace scope. It rolls back when `work` throws or
- * answers a refused Result.
- */
 export const withIdentityWrite = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -584,7 +574,6 @@ const withMemberQuery = async <T>(
       const refusal = refuse(row, principal.credentialIssuedAtMs);
       if (!refusal.ok) return refusal;
 
-      // The session is not named again: its confirmation travels with the principal that read it.
       const resolved: ResolvedMember = {
         ...refusal.value,
         confirmedAtMs: principal.secondFactorConfirmedAtMs,
@@ -853,7 +842,6 @@ const countForWorkspace = async (
   );
 };
 
-/** As consumeIngress, for one call on the token `tokenId`, inside the caller's transaction. */
 export const consumeCall = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -888,10 +876,6 @@ export const readWorkspaceConfig = async (
   return found.rows[0]?.value;
 };
 
-/**
- * As readWorkspaceConfig, the row held until the transaction ends, so a second caller holding the
- * same key reads it only after the first commits.
- */
 export const holdWorkspaceConfig = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -904,7 +888,6 @@ export const holdWorkspaceConfig = async (
   return found.rows[0]?.value;
 };
 
-/** Sets one setting by key in the workspace `tx` is scoped to, replacing any value it held. */
 export const writeWorkspaceConfig = async (
   tx: Tx,
   setting: { readonly workspaceId: WorkspaceId; readonly key: string; readonly value: string },

@@ -23,7 +23,6 @@ export const KERNEL_REFUSALS = {
   // again is the whole remedy.
   "changed-meanwhile": "conflict",
 
-  // The resolver's five: the remedy is a fresh sign-in, which `role-forbids` never is.
   "not-a-member": "unauthenticated",
   "credentials-revoked": "unauthenticated",
   "role-disagrees": "unauthenticated",
@@ -47,9 +46,6 @@ export type KernelRefusal<W extends KernelRefusalWord> = W;
 
 export type RefusalWordFor<V extends Vocabulary> = KernelRefusalWord | Extract<keyof V, string>;
 
-/**
- * Read off the vocabulary rather than restated, so a word whose class moved cannot pass unnoticed.
- */
 export type KernelRefusalOfClass<C extends RefusalClass> = {
   [W in KernelRefusalWord]: (typeof KERNEL_REFUSALS)[W] extends C ? W : never;
 }[KernelRefusalWord];

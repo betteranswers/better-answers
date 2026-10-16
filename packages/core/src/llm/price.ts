@@ -2,7 +2,6 @@ import type { ModelProvider } from "@better-answers/schema";
 
 import type { Tx } from "../store/postgres/index.ts";
 
-/** What a model costs in pounds per million tokens from a day on. */
 export type ModelPrice = {
   readonly provider: ModelProvider;
   readonly model: string;

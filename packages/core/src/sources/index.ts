@@ -244,7 +244,6 @@ const sensitivityWritten = async <A extends AuditAction>(
   return ok(auditEventId);
 };
 
-/** `checked` refuses the move, or names the audit event that records it. */
 const sensitivitySet = async <A extends AuditAction, E>(
   admin: AdminUserPrincipal,
   tx: Tx,

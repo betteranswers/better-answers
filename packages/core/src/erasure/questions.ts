@@ -40,10 +40,6 @@ export const NO_QUESTIONS_SWEPT: QuestionsSwept = {
   feedbackRewritten: 0,
 };
 
-/**
- * Rewrites who asked and who gave feedback to the erasure pseudonym, deletes the questions and
- * clears the notes, in this workspace alone and in the caller's transaction. The skeletons stay.
- */
 export const sweepTheQuestions = async (
   tx: Tx,
   subject: {
@@ -75,7 +71,6 @@ export const sweepTheQuestions = async (
   };
 };
 
-/** As sweepTheQuestions, in one transaction of its own. Does nothing where no person is named. */
 export const eraseFromTheQuestions = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

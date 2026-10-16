@@ -29,7 +29,6 @@ export const SPENDING_LIMIT_KEY = "llm.spending_limit_gbp";
  */
 export const RESERVATION_LIFETIME_MS = 10 * 60_000;
 
-/** The most one call may send and return, over every attempt it makes. */
 export type CallSize = { readonly tokensIn: number; readonly tokensOut: number };
 
 export type SpendReserved = {
@@ -61,7 +60,6 @@ type Priced = PricedChoice & {
   readonly gbpPerMillionOut: string;
 };
 
-/** A price takes effect on a UTC day; the latest on or before the call's day prices it. */
 const PRICED_CHOICE = `SELECT c.id, c.provider, c.model,
        p.gbp_per_million_in AS "gbpPerMillionIn", p.gbp_per_million_out AS "gbpPerMillionOut"
   FROM model_choice c
@@ -94,14 +92,12 @@ const RESERVED_UNDER_THE_LIMIT = `WITH spent AS (
    WHERE spent.gbp + sized.gbp <= $15::numeric
   RETURNING id`;
 
-/** The calendar month `now` falls in, by UTC. */
 const monthOf = (now: Date) => ({
   from: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
   to: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)),
 });
 
 type ReserveSpendInput = {
-  /** The question's record the call serves. */
   readonly answerId: string;
   readonly purpose: LlmPurpose;
   readonly most: CallSize;
@@ -176,7 +172,6 @@ export const reserveSpend = async (
     );
   });
 
-/** What one attempt of the call spent. */
 export type CallSpent = {
   readonly tokensIn: number;
   readonly tokensOut: number;

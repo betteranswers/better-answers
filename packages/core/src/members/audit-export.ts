@@ -98,7 +98,6 @@ const REMOVED_WORDS = {
   Record<Extract<AuditEventSubject, { kind: "removed" }>["of"], string>
 >;
 
-/** A person who has given no display name yet is named by their address. */
 const personWords = (person: { readonly displayName: string; readonly address: string }): string =>
   person.displayName === "" ? person.address : person.displayName;
 

@@ -21,13 +21,10 @@ type RoleOrPurpose = {
   readonly purposes: readonly string[] | typeof EVERY_PURPOSE;
 };
 
-/** A person who is an Admin, and the platform for no purpose. */
 export const ADMIN_ALONE = { role: "Admin", purposes: [] } as const;
 
-/** A person of any role, and the platform for no purpose. */
 export const ANY_ROLE = { role: "Viewer", purposes: [] } as const;
 
-/** No role and no purpose reaches an action that admits this. */
 export const OPERATOR_ALONE = { operator: true } as const;
 
 export type Admits = RoleOrPurpose | typeof OPERATOR_ALONE;
@@ -77,7 +74,6 @@ export type ActionDeclaration<
 > = {
   readonly admits: A | ((input: z.output<Schema>) => A);
 
-  /** The schema an entry parses with; `z.custom<T>()` where no entry parses the input yet. */
   readonly input: Schema;
 
   readonly refuses: readonly Word[];

@@ -52,7 +52,6 @@ export const applyPasskeyNameRule = (asked: string): Result<string, PasskeyNameR
 
 type Ids = { readonly personId: UserId; readonly passkeyId: string };
 
-/** Each id as the boundary names it, or nothing: a caller's id is never trusted to be well formed. */
 const idsOf = (input: { readonly personId: string; readonly passkeyId: string }) => {
   const person = boundarySchemas.user.select.shape.id.safeParse(input.personId);
   const passkey = passkeyId.safeParse(input.passkeyId);
@@ -128,7 +127,6 @@ export const recordPasskeyAdded = async (
   return added.value;
 };
 
-/** What a page sends to rename one of the person's own passkeys. */
 export const renamePasskeyInput = z.object({ passkeyId: z.string(), name: z.string() });
 
 export type RenamePasskeyRefusal = WorkspaceRefusal<
@@ -168,7 +166,6 @@ export const renamePasskey = async (
   return renamed.value;
 };
 
-/** What a page sends to remove one of the person's own passkeys. */
 export const removePasskeyInput = z.object({ passkeyId: z.string() });
 
 export type RemovePasskeyRefusal = WorkspaceRefusal<

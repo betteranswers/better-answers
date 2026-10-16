@@ -12,7 +12,6 @@ export type RefusalClass = (typeof REFUSAL_CLASSES)[number];
 
 export type Vocabulary = Readonly<Record<string, RefusalClass>>;
 
-/** Each owner's vocabulary under the owner's name. */
 export type Catalogue = Readonly<Record<string, Vocabulary>>;
 
 export type WordIn<C extends Catalogue> = { [O in keyof C]: Extract<keyof C[O], string> }[keyof C];

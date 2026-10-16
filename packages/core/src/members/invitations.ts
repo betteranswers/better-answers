@@ -129,10 +129,8 @@ export type WaitingInvitation = Omit<WaitingRow, "invitedAt" | "expiresAt"> & {
   readonly expiresAt: string;
 };
 
-/** What the email to the invited address is written from. */
 export type InvitationToSend = WaitingInvitation & { readonly workspaceName: string };
 
-/** Each invitation a send minted, and whether it replaced the one waiting for its address. */
 export type InvitationMinted = InvitationToSend & { readonly replaced: boolean };
 
 export const RETURNED = `id AS "invitationId", email AS address, role, created_at AS "invitedAt",
@@ -156,7 +154,6 @@ const windowOf = (now: Date): Pick<WaitingInvitation, "invitedAt" | "expiresAt">
   expiresAt: expiryFrom(now).toISOString(),
 });
 
-/** The admitted Admin's own workspace, so a row the parse finds missing is a failure. */
 export const workspaceNameOf = async (admin: AdminUserPrincipal, tx: Tx): Promise<string> =>
   WORKSPACE_NAMED.parse(
     (await tx.query("SELECT name FROM workspace WHERE id = $1", [admin.workspaceId])).rows[0],
@@ -184,7 +181,6 @@ const MINTED = `INSERT INTO invitation (id, workspace_id, email, role, status, c
                 SELECT minted.id, $1, minted.address, $4, $5, $6, $7, $8
                   FROM unnest($2::text[], $3::text[]) AS minted(id, address)`;
 
-/** Answers the id of each waiting invitation it cancelled, by its address. */
 const waitingCancelled = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -235,16 +231,11 @@ const mintsRecorded = async (
 };
 
 type Minted = {
-  /** Each address whose waiting invitation the mint replaced. */
   readonly replaced: ReadonlySet<string>;
 
   readonly workspaceName: string;
 };
 
-/**
- * Mints each invitation, cancelling the one waiting for its address, with their events in one
- * batch, and answers what the emails need beside the invitations.
- */
 const mintedEach = async (admin: AdminUserPrincipal, tx: Tx, minting: Minting): Promise<Minted> => {
   const addresses = minting.invitations.map((one) => one.address);
   const replaced = await waitingCancelled(admin, tx, addresses);
@@ -263,7 +254,6 @@ const mintedEach = async (admin: AdminUserPrincipal, tx: Tx, minting: Minting): 
 };
 
 export type MintInvitationInput = {
-  /** Lower-cased here, however the Admin or the person's own row spelled it. */
   readonly address: string;
   readonly role: Role;
   readonly now: Date;
@@ -304,7 +294,6 @@ export const mintInvitation = async (
 const MEMBERS_AMONG = `SELECT lower(u.email) AS address FROM member m JOIN "user" u ON u.id = m.user_id
                         WHERE m.workspace_id = $1 AND lower(u.email) = ANY($2::text[])`;
 
-/** Each position in the send whose address `belongs`, as the key a refused item takes. */
 const positionsWhere = (
   addresses: readonly string[],
   belongs: (address: string) => boolean,
@@ -313,7 +302,6 @@ const positionsWhere = (
 
 type Parsed = { readonly addresses: readonly string[]; readonly malformed: readonly string[] };
 
-/** Each address as the mint keys it, and the position of each that is none. */
 const addressesOf = (asked: readonly string[]): Parsed =>
   asked.reduce<Parsed>(
     (parsed, raw, position) => {
@@ -343,7 +331,6 @@ const offDomainRefused = async (
 
 type SendRefusal = RefusedItems<AlreadyAMember | MemberRefusal<"off-testing-domain">> | CeilingMet;
 
-/** Refuses each address off a marked workspace's domain, counts every email, refuses members, mints. */
 const sentUnderLocks = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -400,7 +387,6 @@ export const inviteMembers = async (
   if (!admitted.ok) return err(admitted.error);
   const role = ROLE.safeParse(input.role);
   if (!role.success) return err("no-such-role");
-  // Only a hand reached for the Admin role asks for a recent confirmation.
   if (role.data === "Admin") {
     const fresh = requireFreshConfirmation(admitted.value, input.now);
     if (!fresh.ok) return err(fresh.error);
@@ -419,7 +405,6 @@ export const inviteMembers = async (
 
 export type ResendInvitationInput = z.output<typeof invitationInput> & { readonly now: Date };
 
-/** The parse brands the ids; a row it throws on fails the action like the query would. */
 const firstWaitingOf = (rows: readonly unknown[]): WaitingInvitation | undefined => {
   const [row] = rows;
   return row === undefined ? undefined : waitingOf(WAITING_ROW.parse(row));

@@ -81,7 +81,6 @@ export const sweepMap = async (
   return swept.ok ? ok(swept.value) : err(swept.error);
 };
 
-/** Queues a full rebuild for the worker and returns its job id; nothing is rebuilt here. */
 export const rebuildMap = async (
   platform: MapMaintenancePrincipal,
   door: PostgresDoor,

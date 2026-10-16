@@ -169,7 +169,6 @@ const ERASURE_FAMILY_DESCRIPTORS = {
       aboutTheMember(tx, subject, "SELECT id AS location FROM session WHERE user_id = $1"),
   },
 
-  /** Keyed by an address, or by one of the person's sessions. */
   "identity-verification": {
     categories: ["email-address"],
     find: (platform, subject, tx) =>
@@ -206,7 +205,6 @@ const ERASURE_FAMILY_DESCRIPTORS = {
     find: rowsOfThePersonIn("account"),
   },
 
-  /** A passkey's last use sits in its own row, named after the passkey it belongs to. */
   "identity-passkey": {
     categories: ["sign-in", "device"],
     find: (platform, subject, tx) =>

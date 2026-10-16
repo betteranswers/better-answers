@@ -103,7 +103,6 @@ export type SearchedAuditLogPage = AuditLogPage & {
 
 type NamedKind = "person" | "group" | "invitation" | ThingKind;
 
-/** The subject kinds a person's id stands under. */
 export const PERSON_SUBJECT_KINDS = ["member", "person"] as const;
 
 /**
@@ -128,7 +127,6 @@ export const PERSON_NAMED_IN = [
   },
 ] as const satisfies readonly DetailNaming[];
 
-/** What a search names inside the workspace; each list is empty when nothing of its kind matched. */
 type Found = {
   readonly people: readonly UserId[];
   readonly groups: readonly string[];
@@ -137,7 +135,6 @@ type Found = {
   readonly tooBroad: boolean;
 };
 
-/** The events naming any of the people or groups, or taking any of the actions. */
 export const soughtFor = (found: Omit<Found, "tooBroad">): EventsSought => ({
   people: found.people,
   subjects: [
@@ -151,7 +148,6 @@ export const soughtFor = (found: Omit<Found, "tooBroad">): EventsSought => ({
 /** Enough for any search a person types; one row past it says the search named more. */
 const IDS_SOUGHT = 100;
 
-/** A subject and verb, as `member.role_changed` reads "member role changed". */
 const wordsOfAction = (name: string): string =>
   name.split(".").slice(1).join(" ").replaceAll("_", " ");
 
@@ -167,7 +163,6 @@ const actionsWorded = (search: string): readonly string[] => {
   );
 };
 
-/** An event of the workspace in `$scope` naming the person `u` in its detail, as the read finds them. */
 const namedInDetail = (scope: number, bind: Bind): string =>
   PERSON_NAMED_IN.map(
     ({ key, subjectKinds, actions }) =>
@@ -216,7 +211,6 @@ const groupsNamed = async (
   return found.rows.map((row) => row.id);
 };
 
-/** The people, groups and actions a search names, each read inside the principal's workspace. */
 const foundBy = async (principal: UserPrincipal, tx: Tx, search: string): Promise<Found> => {
   const pattern = containing(search);
   const people = await peopleNamed(principal, tx, pattern);
@@ -229,7 +223,6 @@ const foundBy = async (principal: UserPrincipal, tx: Tx, search: string): Promis
   };
 };
 
-/** Newest first, narrowed to the search's events, and what it found, when there is a search. */
 export const eventsAsked = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -253,7 +246,6 @@ const NAMED_KINDS: ReadonlyMap<string, NamedKind> = new Map([
   ["concept", "concept"],
 ]);
 
-/** Stored detail keys holding an id, by what the id names. */
 const DETAIL_NAMED_KINDS: ReadonlyMap<string, NamedKind> = new Map([
   [STORED_DETAIL_KEYS.userId, "person"],
   [STORED_DETAIL_KEYS.requesterId, "person"],
@@ -299,10 +291,8 @@ const detailIds = (row: AuditEventRow): readonly DetailId[] =>
     return kind === undefined || typeof value !== "string" ? [] : [[key, kind, value]];
   });
 
-/** A row with its detail's ids read once, since every kind's lookup asks for them. */
 type Scanned = { readonly row: AuditEventRow; readonly ids: readonly DetailId[] };
 
-/** The ids of one kind the rows name, as subject or in detail. */
 const idsNamedAs = (scanned: readonly Scanned[], kind: NamedKind): readonly string[] => [
   ...new Set(
     scanned.flatMap(({ row, ids }) => [
@@ -387,10 +377,6 @@ const thingNames = async (
   };
 };
 
-/**
- * Each event of the principal's workspace with its actor, subject, detail ids and ended grants
- * named as they stand now, reading each table once for all the rows.
- */
 export const eventsNamed = async (
   principal: UserPrincipal,
   tx: Tx,

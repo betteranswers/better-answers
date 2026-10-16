@@ -129,7 +129,6 @@ const KEEPING_THE_CODE = `
   INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at)
   VALUES ($1, $2, $3, $4, $5, $5)`;
 
-/** Ending every session ends every setup grant with it. */
 const clearingTheFactors = async (tx: Tx, personId: UserId, now: Date): Promise<void> => {
   await tx.query(SESSION_ROWS, [personId, [...SESSION_VERIFICATION_PREFIXES]]);
   for (const table of HELD_BY_THE_PERSON) {

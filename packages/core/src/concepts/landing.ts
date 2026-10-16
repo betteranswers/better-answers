@@ -79,7 +79,6 @@ export const foldKind = (kind: string): string =>
     return cased.slice(0, -1);
   });
 
-/** Trims the title, collapses its whitespace and lower-cases it; the kind is used as given. */
 export const mergeKeyOf = (foldedKind: string, title: string): string =>
   `${foldedKind}:${title.trim().replaceAll(/\s+/g, " ").toLowerCase()}`;
 
@@ -119,7 +118,6 @@ type HeldRow = {
   readonly published_at: Date | null;
 };
 
-/** `undefined` when no concept holds `iri`, or when a user principal may not read it. */
 export const heldByIri = async (
   principal: Principal,
   tx: Tx,
@@ -156,7 +154,6 @@ export const heldByIri = async (
       };
 };
 
-/** The IRI at `path` whatever its visibility; `undefined` when no concept holds the path. */
 export const holderOfPath = async (
   principal: Principal,
   tx: Tx,
@@ -169,7 +166,6 @@ export const holderOfPath = async (
   return found.rows[0]?.iri;
 };
 
-/** True when the workspace holds every listed source document, and for an empty list. */
 export const holdsEveryDocument = async (
   principal: Principal,
   tx: Tx,
@@ -236,11 +232,6 @@ const rowVisibilityOf = (facts: RowFacts, held: Held | undefined) =>
         audienceGroups: held.audienceGroups,
       };
 
-/**
- * The status is the one asked for, else the file's, else the held row's, else draft. A held
- * concept keeps its visibility and its publication time; `now` stamps a published row that has
- * none.
- */
 export const indexRowOf = (facts: RowFacts, held: Held | undefined, now: Date) => {
   const status = statusOf(facts, held);
   return conceptRow.safeParse({
@@ -431,10 +422,6 @@ const landAcceptance = async (tx: Tx, index: Landing, acceptance: Acceptance): P
   );
 };
 
-/**
- * Swaps each `[before, after]` sha in `bundle_commit` and `concept_index`; answers how many bundle
- * commits changed.
- */
 export const moveBundleCommits = async (
   platform: PlatformPrincipal,
   tx: Tx,

@@ -33,7 +33,6 @@ export const sweepTheActors = async (
   return { commits: commits.rowCount ?? 0, verifications: verifications.rowCount ?? 0 };
 };
 
-/** As sweepTheActors, in one transaction of its own. Does nothing where no person is named. */
 export const eraseFromTheActors = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

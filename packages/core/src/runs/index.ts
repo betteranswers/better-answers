@@ -225,7 +225,6 @@ export const enqueueJobIn = async (
   const descriptor = descriptorOf(input.kind);
   if (descriptor === undefined) return err("malformed");
 
-  /** Both ways into the enqueue pass here, so the gate stands where the door has not yet opened. */
   const admitted = admit(enqueueJobAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   if (principal.kind !== "platform" && input.workspaceId !== principal.workspaceId) {
@@ -237,7 +236,6 @@ export const enqueueJobIn = async (
   return ok({ jobId: await landJob(tx, input.workspaceId, job) });
 };
 
-/** As `enqueueJobIn`, in a transaction of its own. */
 export const enqueueJob = async (
   principal: Principal,
   door: PostgresDoor,
@@ -245,7 +243,6 @@ export const enqueueJob = async (
 ): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> =>
   inWorkspace(principal, door, input.workspaceId, (tx) => enqueueJobIn(principal, tx, input));
 
-/** An Admin, or the platform acting for any purpose. */
 const ADMIN_OR_THE_PLATFORM = { role: "Admin", purposes: EVERY_PURPOSE } as const;
 
 type JobByIdInput = { readonly workspaceId: string; readonly jobId: string };
@@ -293,7 +290,6 @@ export const jobById = async (
 
 type OutcomeRow = { readonly outcome: OutcomeColumn };
 
-/** The outcome of the connected source's newest `done` sync; null when there is none or it has none. */
 export const latestIndexOutcomeIn = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -342,7 +338,6 @@ export const whatTheSyncMoved = (sync: {
     ? movedByTheKey(sync.outcome)
     : WHOLE_SOURCE;
 
-/** `endedAt` is a lapsed claim's lease expiry, and every other sync's `finished_at`. */
 export type EndedSync = {
   readonly jobId: string;
   readonly connectedSourceId: string;
@@ -524,7 +519,6 @@ const subjectRunsOf = (
     },
   ]);
 
-/** Newest first. */
 export const runsOfSubject = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -545,7 +539,6 @@ export const runsOfSubject = async (
   return ok(subjectRunsOf(read.value.rows).map(([, subjectRun]) => subjectRun));
 };
 
-/** Each subject's newest job; a subject with no job is absent from the map. */
 export const latestRunsOf = async (
   admin: AdminUserPrincipal,
   tx: Tx,

@@ -117,7 +117,6 @@ export const NOT_COMPANY_KNOWLEDGE = "Not company knowledge";
 
 const NO_COLLECTION = "No collection";
 
-/** `Iri` is `string` where an iri is only read as text, as a renderer reads it. */
 type ConceptMatch<Iri extends string> = {
   readonly layer: "bundles";
   readonly iri: Iri;
@@ -125,7 +124,6 @@ type ConceptMatch<Iri extends string> = {
   readonly title: string;
   readonly trust: Trust;
   readonly trustWords: string;
-  /** Null for a concept in no collection. */
   readonly collection: string | null;
   readonly tags: readonly string[];
 };
@@ -181,7 +179,6 @@ type Opened<Iri extends string, View> =
       readonly locator?: string | undefined;
     };
 
-/** What MCP and the renderer read of an open. */
 export type OpenView<Iri extends string = ConceptIri> = Opened<Iri, ConceptView<Iri>>;
 
 /** The pane's words, which the web's concept page leads and ends its sources with. */
@@ -192,7 +189,6 @@ export type OpenResult<Iri extends string = ConceptIri> = Opened<
   ConceptView<Iri> & PaneWords & Required<Pick<ConceptView<Iri>, "bodyLinks">>
 >;
 
-/** What `ask` answers: the answer as planned, and the id of the record kept of the question. */
 export type AnswerResult<Iri extends string = ConceptIri> = PlannedAnswer<Iri> & {
   readonly recordId: string;
 };

@@ -20,7 +20,6 @@ export type Role = z.infer<typeof boundarySchemas.member.select>["role"];
  * A Principal outlives the transaction that resolved it only where an action opens its own; never
  * the request, and that action's door re-judges it.
  */
-/** What the one freshness rule reads of whoever it judges: a member, the operator, or a session. */
 export type CarriesAConfirmation = { readonly secondFactorConfirmedAtMs: number | null };
 
 export type UserPrincipal = {

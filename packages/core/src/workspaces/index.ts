@@ -463,7 +463,6 @@ export type EndEverySignInAndTokenRefusal = WorkspaceRefusal<
 
 type CredentialsEnded = { readonly held: Date; readonly grants: readonly EndedGrant[] };
 
-/** Undefined, having changed nothing, when no person holds the id. */
 const endingCredentials = async (
   tx: Tx,
   personId: UserId,

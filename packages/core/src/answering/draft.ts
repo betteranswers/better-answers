@@ -50,7 +50,6 @@ export type DraftSteps<Refused = never> = {
   readonly keepDraft: (kept: Omit<DraftKeeping, "now">) => Promise<Result<void, Refused | Error>>;
 };
 
-/** One collection's concepts that are no `Answer`, each with the label its footnote carries. */
 type Part = { readonly collection: string | null; readonly citable: readonly Citable[] };
 
 const isPreview = (concept: RelatedConcept): boolean => concept.kind !== ANSWER_KIND;
@@ -86,7 +85,6 @@ const conceptBlock = (label: string, concept: OpenedConcept): string =>
     "</concept>",
   ].join("\n");
 
-/** Bounds the request's own framing, as the judge's does. */
 const FRAMING_TOKENS = 2_000;
 
 /** Each attempt's `max_tokens`, the model's thinking and a part's few sentences together. */
@@ -105,7 +103,6 @@ const sizeOf = (prompt: string): CallSize => ({
 
 type Read = { readonly label: string; readonly concept: OpenedConcept };
 
-/** The question as the typed-text check leaves it, and each concept apart from the others. */
 const draftCall = (
   question: string,
   collection: string | null,
@@ -204,7 +201,6 @@ export async function* draftAnswer<Refused = never>(
   const everyCitable = parts.flatMap((part) => part.citable);
   const drafted: DraftedSentence[] = [];
 
-  /** One part: its concepts read, its call reserved, streamed and settled with what it drafted. */
   async function* partDrafted(
     part: Part,
   ): AsyncGenerator<DraftEvent, PartTried<Refused>, undefined> {
@@ -242,7 +238,6 @@ export async function* draftAnswer<Refused = never>(
   return yield* eachPart(parts, partDrafted, drafting.signal);
 }
 
-/** Each part in turn, until one is paused or fails, or the asker leaves. */
 async function* eachPart<Refused>(
   parts: readonly Part[],
   partDrafted: (part: Part) => AsyncGenerator<DraftEvent, PartTried<Refused>, undefined>,

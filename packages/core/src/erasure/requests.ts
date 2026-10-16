@@ -64,7 +64,6 @@ const recordSubjectRequestAction = declareAction({
   refuses: ["role-forbids", "malformed", "identifier-too-broad"],
 });
 
-/** `identifier-too-broad` is answered beside what was said, never as a bare word. */
 export type RecordSubjectRequestRefusal =
   | Exclude<RefusalOf<typeof recordSubjectRequestAction>, IdentifierTooBroad["word"]>
   | IdentifierTooBroad

@@ -26,7 +26,6 @@ const run = promisify(execFile);
 export type GitDoor = {
   readonly root: string;
 
-  /** How long one commit, every git child in it, may run; a test shortens it. */
   readonly commitBudgetMs?: number;
 };
 
@@ -363,7 +362,6 @@ export const withRepositoryLock = <T>(
   work: () => Promise<T>,
 ): Promise<T> => lockedRepository(bundleOf(door, principal), work);
 
-/** Shares withRepositoryLock's lock, so user and platform work on one repository queue together. */
 export const withRepositoryLockAs = <T>(
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -371,7 +369,6 @@ export const withRepositoryLockAs = <T>(
   work: () => Promise<T>,
 ): Promise<T> => lockedRepository(repositoryPath(door, workspaceId), work);
 
-/** As withRepositoryLockAs, but `held` at once while work in this process has the repository. */
 export const tryRepositoryLockAs = async <T>(
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -623,7 +620,6 @@ export const fileAt = async (
 ): Promise<string | null> =>
   isPortablePath(filePath) ? fileIn(repositoryPath(door, workspaceId), sha, filePath) : null;
 
-/** Null when the path is not portable, `head` would answer null, or `main` holds no such file. */
 export const fileAtHead = async (
   principal: UserPrincipal,
   door: GitDoor,
@@ -645,7 +641,6 @@ export type Pseudonymisation = {
 export type HistoryRewritten = {
   readonly moved: readonly (readonly [string, string])[];
 
-  /** Each path whose file, at some commit, named an address or a person id. */
   readonly paths: readonly string[];
 };
 

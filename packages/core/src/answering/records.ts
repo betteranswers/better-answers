@@ -52,7 +52,6 @@ const questionsAskedCursor = z.object({ id: recordId, flagged: z.boolean() });
 type QuestionsAskedCursor = z.output<typeof questionsAskedCursor>;
 
 export const questionsAskedInput = z.object({
-  /** Absent for the first page. */
   cursor: questionsAskedCursor.optional(),
   limit: z.number().int().min(1).max(QUESTIONS_ASKED_PAGE_MAX).default(QUESTIONS_ASKED_PAGE),
 });
@@ -69,15 +68,12 @@ const skeleton = boundarySchemas.questionAsked.select;
 
 type KeptConcept = NonNullable<z.output<typeof skeleton>["concepts"]>[number];
 
-/** A concept a record cites, as the reader may read it now, with the trust it had then. */
 type ConceptAsRead = {
   readonly iri: ConceptIri;
   readonly kind: string;
   readonly title: string;
-  /** Null for a concept in no collection. */
   readonly collection: string | null;
   readonly trustThen: KeptConcept["trust"];
-  /** The judge's word on it; absent where no judge was asked. */
   readonly judged?: CandidateVerdict;
 };
 
@@ -197,7 +193,6 @@ type FeedbackRow = z.output<typeof feedbackRow>;
 
 type Readable = ReadonlyMap<string, OpenedConcept>;
 
-/** Every concept a page names anywhere, so each is read once under the reader's predicate. */
 const irisNamedIn = (rows: readonly PageRow[], feedback: readonly FeedbackRow[]): ConceptIri[] => [
   ...new Set([
     ...rows.flatMap((row) => (row.concepts ?? []).map((concept) => concept.iri)),

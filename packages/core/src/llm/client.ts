@@ -29,13 +29,11 @@ import { jsonAs, type TokensSpent, type WireRead, type WireRequest } from "./wir
 export const MAX_ATTEMPTS = 3;
 export const ATTEMPT_TIMEOUT_MS = 2 * 60_000;
 
-/** Before the second attempt and the third. */
 export const RETRY_WAITS_MS = [2_000, 8_000] as const;
 
 /** A rate limit asking a longer wait than this is answered at once; the reservation would lapse. */
 export const LONGEST_RETRY_WAIT_MS = 30_000;
 
-/** How a reply is read, and the header it names its request by. */
 type WireShape<Said> = {
   readonly read: (status: number, text: string, retryAfter: string | null) => WireRead<Said>;
   readonly requestIdHeader: string;
@@ -53,13 +51,11 @@ type SpokenProvider = (typeof SPOKEN)[number];
 
 const spoken = z.enum(SPOKEN);
 
-/** The registry: the one wire shape each provider speaks. */
 const SPEAKS = {
   anthropic: "messages",
   cloudflare: "decision",
 } as const satisfies Record<SpokenProvider, WireShapeName>;
 
-/** Everything one call needs, read in a transaction and carried out of it. */
 export type ModelToCall = {
   readonly purpose: LlmPurpose;
   readonly modelChoiceId: string;
@@ -68,7 +64,6 @@ export type ModelToCall = {
   readonly key: ModelKey;
 };
 
-/** The wire shape the model is called through, which decides the call a caller builds for it. */
 export const wireShapeOf = (to: ModelToCall): WireShapeName => SPEAKS[to.provider];
 
 /** A row naming a provider no wire shape speaks is no model to call. */
@@ -97,7 +92,6 @@ export const resolveModel = async (
     return ok({ purpose, modelChoiceId: id, provider, model, key: key.value });
   });
 
-/** One call through the Messages shape: what to say, the answer's shape, and its reservation's size. */
 export type ModelCall<T> = {
   readonly system: string;
   readonly prompt: string;
@@ -127,13 +121,11 @@ export type ModelOutcome<T> =
   | { readonly outcome: "answered"; readonly answer: T; readonly spent: readonly CallSpent[] }
   | { readonly outcome: Unanswered; readonly spent: readonly CallSpent[] };
 
-/** `abandoned` is an attempt its caller's signal ended; `timed-out`, one its own timeout did. */
 export type AttemptRead<Said = unknown> =
   | WireRead<Said>
   | { readonly read: "timed-out" }
   | { readonly read: "abandoned" };
 
-/** Never sent: the model speaks another shape, or the request is longer than its window. */
 type Unsent = "another-shape" | "over-window";
 
 /** Every field a log line about a call may hold: never a prompt, an answer, a body or a key. */
@@ -149,7 +141,6 @@ export type ModelAttemptLine = {
 };
 
 export type ModelClientDoors = {
-  /** The shape of `fetch`, so a test hands the client a fake at the wire. */
   readonly fetch: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
   readonly clock: Clock;
   readonly log: { readonly info: (line: ModelAttemptLine, message: string) => void };
@@ -212,7 +203,6 @@ const stepAfter = (read: AttemptRead, attempted: number): Step => {
   return { outcome: "failed" };
 };
 
-/** What reads an answered attempt as the answer the call asked for, or `undefined` for none. */
 type Accept<Said, T> = (said: Said) => T | undefined;
 
 const answerOf = <Said, T>(
@@ -251,13 +241,11 @@ export const afterAttempt = async (
   return leftMs() < SHORTEST_ATTEMPT_MS ? outOfTime(read) : undefined;
 };
 
-/** An attempt's own signal, which its timeout or its caller's aborts. */
 export const attemptSignal = (
   timedOut: AbortSignal,
   caller: AbortSignal | undefined,
 ): AbortSignal => (caller === undefined ? timedOut : AbortSignal.any([timedOut, caller]));
 
-/** What an attempt cut short reads as: its caller's leaving, its timeout, or else `otherwise`. */
 export const lostTo = <Said>(
   signal: AbortSignal,
   caller: AbortSignal | undefined,
@@ -267,7 +255,6 @@ export const lostTo = <Said>(
   return signal.aborted ? { read: "timed-out" } : otherwise;
 };
 
-/** Every field of one attempt's log line, the same for each wire shape and form. */
 export const attemptLine = (
   to: ModelToCall,
   attempted: number,
@@ -298,7 +285,6 @@ const spentBy = (tried: Attempted, answered: boolean, cutAt: TokensSpent): CallS
   };
 };
 
-/** What a call carries beside its request: its deadline, its caller's signal, its reserved size. */
 type Calling = {
   readonly withinMs: number | undefined;
   readonly signal: AbortSignal | undefined;

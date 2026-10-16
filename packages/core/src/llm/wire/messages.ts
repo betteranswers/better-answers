@@ -14,7 +14,6 @@ const MESSAGES_VERSION = "2023-06-01";
 
 export type AnswerSchema = z.core.JSONSchema.JSONSchema;
 
-/** One attempt as the Messages API takes it: the answer constrained to a JSON schema. */
 export type MessagesCall = {
   readonly model: string;
   readonly key: string;
@@ -24,14 +23,12 @@ export type MessagesCall = {
   readonly tokensOut: number;
 };
 
-/** One attempt whose answer is prose, sent as it is written. */
 export type MessagesStreamCall = Omit<MessagesCall, "answerSchema">;
 
 /**
  * No `thinking` and no sampling field: a model choice may name a model that refuses either, and
  * each model's default stands.
  */
-/** What the reply is asked to be: JSON of a schema, or prose streamed as it is written. */
 type Asking =
   | {
       readonly output_config: {
@@ -60,11 +57,9 @@ const requestWith = (call: MessagesStreamCall, asking: Asking): WireRequest => (
 export const messagesRequest = ({ answerSchema, ...call }: MessagesCall): WireRequest =>
   requestWith(call, { output_config: { format: { type: "json_schema", schema: answerSchema } } });
 
-/** With no answer shape, prose arrives as server-sent events. */
 export const messagesStreamRequest = (call: MessagesStreamCall): WireRequest =>
   requestWith(call, { stream: true });
 
-/** An answer is the text of the reply's blocks, which the caller reads as JSON. */
 type MessagesRead = WireRead<string>;
 
 const count = z.number().int().nonnegative();
@@ -137,7 +132,6 @@ const badRequestRead = (text: string): MessagesRead => {
     : { read: "failed" };
 };
 
-/** Reads one reply by its status first, then its body, which it never hands on beyond the answer. */
 export const messagesRead = (
   status: number,
   text: string,
@@ -151,7 +145,6 @@ export const messagesRead = (
   return UNAVAILABLE_STATUSES.has(status) ? { read: "unavailable" } : { read: "failed" };
 };
 
-/** Each event's data, and what is left over until the blank line that ends the next one. */
 type SseRead = { readonly data: readonly string[]; readonly rest: string };
 
 export const sseDataIn = (buffered: string): SseRead => {
@@ -166,7 +159,6 @@ export const sseDataIn = (buffered: string): SseRead => {
   return { data, rest };
 };
 
-/** What one event of a streamed reply says; an event this file does not read is `other`. */
 export type StreamEventRead =
   | { readonly event: "text"; readonly text: string }
   | { readonly event: "started"; readonly spent: TokensSpent }

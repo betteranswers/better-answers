@@ -77,7 +77,6 @@ export type AuditEventRow = z.infer<typeof boundarySchemas.auditEvent.select>;
 const AUDIT_EVENT_ROW = `id, workspace_id AS "workspaceId", action, family, actor, subject_kind AS "subjectKind",
             subject_id AS "subjectId", at, detail, batch_id AS "batchId"`;
 
-/** Oldest first; `since` is inclusive. */
 export const eventsOfAction = async (
   principal: PlatformPrincipal,
   tx: Tx,
@@ -130,7 +129,6 @@ const afterTheCursor = (at: CursorAt): string =>
      SELECT page_end.at, page_end.id FROM audit_event page_end
       WHERE page_end.workspace_id = ${scopeClause(at.scope)} AND page_end.id = $${at.cursor}))`;
 
-/** Fetched one row past the page, so that row says another follows. */
 const pageOf = (rows: readonly AuditEventRow[], limit: number): AuditEventPage => {
   const lastOfAFullPage = rows.length > limit ? rows[limit - 1] : undefined;
   return { rows: rows.slice(0, limit), nextCursor: lastOfAFullPage?.id ?? null };
@@ -166,13 +164,11 @@ export const eventsNewestFirst = async (
   );
 };
 
-/** Ids under subject kinds; a kind left out of `kinds` hides the events its subjects stand under. */
 type SoughtSubjects = {
   readonly kinds: readonly string[];
   readonly ids: readonly string[];
 };
 
-/** Where a person's id may stand in an event's detail: under `key`, in the listed actions alone. */
 export type DetailNaming = {
   readonly key: string;
   /** Every kind the actions' subjects take, so the arm reaches the subject index. */
@@ -180,12 +176,10 @@ export type DetailNaming = {
   readonly actions: readonly ActionName[];
 };
 
-/** What a read looks for, each list read as its own arm; an empty list adds no arm. */
 export type EventsSought = {
   readonly people: readonly UserId[];
   readonly subjects: readonly SoughtSubjects[];
   readonly actions: readonly string[];
-  /** The keys a person's id stands under in detail, matched against `people`. */
   readonly detail: readonly DetailNaming[];
 };
 
@@ -232,11 +226,6 @@ const predicatesOf = (sought: EventsSought, bind: Bind): readonly string[] => {
   ];
 };
 
-/**
- * Newest first, from the row after `cursor`, within `family` when one is asked for: the events
- * whose actor or detail names one of the people, whose subject is one sought, or whose action is.
- * An event two arms reach is answered once, and nothing sought reads nothing.
- */
 export const eventsSoughtNewestFirst = async (
   principal: Principal,
   tx: Tx,
@@ -270,7 +259,6 @@ const eventInsert = boundarySchemas.auditEvent.insert.omit({ workspaceId: true }
 
 const identitySetInsert = boundarySchemas.identityAuditEvent.insert;
 
-/** Both audit logs take the same row; only a workspace's audit log adds the workspace it belongs to. */
 const ROW_COLUMNS = "id, action, actor, subject_id, detail, batch_id";
 
 const AN_KINDS: ReadonlySet<string> = new Set(["id", "iri", "audience"]);

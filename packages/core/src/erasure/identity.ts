@@ -145,11 +145,6 @@ const HELD_ELSEWHERE = `SELECT workspace_id FROM member
    WHERE user_id = $1 AND workspace_id <> $2
      FOR KEY SHARE`;
 
-/**
- * Does nothing without a person. Otherwise ends the member here, sweeps their questions and actor
- * ids again, and, when no other workspace holds them once the member has ended, deletes their
- * sign-in identity and pseudonymises them.
- */
 export const eraseFromTheIdentitySet = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

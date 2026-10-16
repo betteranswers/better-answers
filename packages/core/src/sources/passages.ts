@@ -150,7 +150,6 @@ const MATCH = anyWordMatch("c.search", "$2", ["c.source_document_id", "c.char_st
   frequencies: "$9",
 });
 
-/** The passages `principal` may read, counted for `query`'s words. */
 export const passageCountsOf = (
   principal: UserPrincipal,
   tx: Tx,
@@ -310,7 +309,6 @@ const previewPassagesAction = declareAction({
 
 type PreviewPassagesRefusal = SourceRefusal<RefusalOf<typeof previewPassagesAction>> | Error;
 
-/** `limit` is held to 20 at most. */
 export const previewPassages = async (
   principal: UserPrincipal,
   tx: Tx,

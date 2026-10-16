@@ -22,7 +22,6 @@ const RESTRICTED = "Restricted" satisfies Sensitivity;
 
 const EVERYONE = { audience: AUDIENCE_EVERYONE, audienceGroups: null } as const;
 
-/** Admins alone read it. A derivation whose sources share no group falls to it. */
 export const RESTRICTED_TO_ADMINS: Visibility = { sensitivity: RESTRICTED, ...EVERYONE };
 
 /**
@@ -43,7 +42,6 @@ export const readableParameters = (
   principal: UserPrincipal,
 ): readonly [Role, readonly GroupId[]] => [principal.role, principal.groups];
 
-/** Sensitivity alone: the audience is not checked. */
 export const readsSensitivity = (principal: UserPrincipal, sensitivity: Sensitivity): boolean =>
   sensitivity !== RESTRICTED || principal.role === "Admin";
 
@@ -102,7 +100,6 @@ export const derivedVisibility = (derivation: Derivation): Visibility => {
     : { ...inherited, sensitivity: narrower(inherited.sensitivity, floor) };
 };
 
-/** Wider in sensitivity or in audience is enough: narrower in the other still widens. */
 export const widens = (from: Visibility, to: Visibility): boolean => {
   if (RANK[to.sensitivity] > RANK[from.sensitivity]) return true;
   if (from.audienceGroups === null) return false;
@@ -137,10 +134,6 @@ const visibilityAgreeing = (fields: VisibilityFields): Visibility | undefined =>
   return undefined;
 };
 
-/**
- * For a zod refinement: when the audience word and the group list disagree, adds an issue at
- * `audience` and answers undefined.
- */
 export const visibilityAgreed = (
   fields: VisibilityFields,
   ctx: z.RefinementCtx,
@@ -164,9 +157,6 @@ export const visibilityOf = (row: VisibilityRow): Visibility => {
   return visibility;
 };
 
-/**
- * Fields that fail to parse or disagree give undefined, never a throw. Absent groups read as null.
- */
 export const visibilityFrom = (fields: {
   readonly sensitivity: string;
   readonly audience: string;

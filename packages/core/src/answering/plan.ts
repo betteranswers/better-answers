@@ -41,35 +41,26 @@ export type MapState =
 /** The kind whose body an answer returns word for word. */
 export const ANSWER_KIND = "Answer";
 
-/**
- * A concept named by a line, as `find` names it; `open` reads it in full. `Iri` is `string` where
- * an iri is only text.
- */
 export type PreviewedConcept<Iri extends string = ConceptIri> = {
   readonly iri: Iri;
-  /** The concept's page on the web. */
   readonly url: string;
   readonly kind: string;
   /** For an `Answer`, the question it answered. */
   readonly title: string;
-  /** Null for a concept in no collection. */
   readonly collection: string | null;
   readonly trust: Trust;
   readonly trustWords: string;
 };
 
-/** An `Answer` an answer returns as it stands. */
 export type ReturnedConcept<Iri extends string = ConceptIri> = PreviewedConcept<Iri> & {
   readonly body: string;
   readonly evidence: readonly Evidence<Iri>[];
 };
 
-/** A concept that bears on a question: an `Answer` as it stands, any other by its line. */
 export type RelatedConcept<Iri extends string = ConceptIri> =
   | ReturnedConcept<Iri>
   | PreviewedConcept<Iri>;
 
-/** An answer before its record is kept: everything `ask` answers but the record's id. */
 export type PlannedAnswer<Iri extends string = ConceptIri> = {
   readonly verdict: QuestionVerdict;
   readonly judgeState: JudgeState;
@@ -90,7 +81,6 @@ export type PlannedAnswer<Iri extends string = ConceptIri> = {
 };
 
 export type AskCaps = {
-  /** The entry points taken, best first: the walk's seeds. */
   readonly entryPoints: number;
   /** The concepts an answer returns: entry points first, then what the walk reached. */
   readonly related: number;
@@ -214,7 +204,6 @@ const walkedFrom = async <Refused>(
     : walked;
 };
 
-/** The concepts the walk reached beyond its seeds, nearest first; the walk answers concepts alone. */
 const reachedBeyond = (
   entries: readonly OpenedConcept[],
   steps: readonly WalkStep[],
@@ -260,7 +249,6 @@ const returnedOf = async (
   return ok({ shown: { ...preview, body: concept.body, evidence: evidence.value }, kept });
 };
 
-/** One read a locator, however many of the returned concepts cite the passage. */
 const passageReadOnce = (reader: UserPrincipal, tx: Tx) => {
   const read = new Map<string, ReturnType<typeof passageAt>>();
   return (locator: string): ReturnType<typeof passageAt> => {
@@ -305,7 +293,6 @@ const returnedBy = async (
 
 type Bearing = { readonly map: MapState; readonly returned: readonly Returned[] };
 
-/** With no entry point there is nothing to walk from, and no transaction is opened to learn it. */
 const NOTHING_BEARS: Bearing = { map: { state: "live" }, returned: [] };
 
 const bearingOn = async <Refused>(
@@ -322,7 +309,6 @@ const bearingOn = async <Refused>(
 
 export type AnswerPlan = {
   readonly answer: PlannedAnswer;
-  /** What a record keeps of each concept the answer returns. */
   readonly concepts: readonly RecordedConcept[];
 };
 

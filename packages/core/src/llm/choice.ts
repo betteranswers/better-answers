@@ -40,7 +40,6 @@ const PRICED_ON = `SELECT provider FROM model_price
 
 const pricedRow = z.object({ provider: z.enum(MODEL_PROVIDERS) });
 
-/** The provider, as a price names it, when a price for the model is in effect on `now`'s day. */
 export const pricedProviderOn = async (
   tx: Tx,
   model: { readonly provider: string; readonly model: string },

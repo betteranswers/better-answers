@@ -81,7 +81,6 @@ const pageOf = (tx: Tx, pattern: string, input: ListPeopleInput) =>
     [pattern, input.limit, input.offset],
   );
 
-/** Keyed by person id, each list in name order; a person who holds none has no entry. */
 export const workspacesOf = async (
   tx: Tx,
   personIds: readonly string[],
@@ -220,7 +219,6 @@ type GrantRow = {
 const SESSIONS_OF_PERSON = `SELECT created_at, updated_at, expires_at FROM session
                    WHERE user_id = $1 ORDER BY updated_at DESC, id DESC`;
 
-/** Each authorisation's family of the person's refresh tokens, its unrotated row standing first. */
 const FAMILIES_OF_PERSON = `SELECT r.client_id, c.name AS client_name, r.reference_id,
                                  w.id AS workspace_id, w.name AS workspace_name,
                                  min(r.created_at) OVER family AS issued_at,
@@ -276,7 +274,6 @@ const grantOf = (row: GrantRow): GrantHeld => ({
 /** An event from before its action kept its grants reads none. */
 const grantsRecorded = z.object({ grants: z.array(endedGrant).default([]) });
 
-/** The identity-set audit event of an action that ended a person's grants, newest first. */
 type Ending = {
   readonly action: string;
   readonly at: Date;

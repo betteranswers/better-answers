@@ -46,7 +46,6 @@ export type Citation = {
   readonly locator: string;
 };
 
-/** Recomputes no sensitivity: the caller derives it once the citations stand. */
 export const replaceCitations = async (
   principal: Principal,
   tx: Tx,
@@ -212,10 +211,6 @@ const recomputeConceptVisibility = async (
   return visibility;
 };
 
-/**
- * Recomputes each indexed concept citing the connected source's documents, or only those among
- * `documentIds`, and returns every one, whether or not its sensitivity moved.
- */
 const recomputeVisibilitySourcedFrom = async (
   principal: Principal,
   tx: Tx,
@@ -241,10 +236,6 @@ const recomputeVisibilitySourcedFrom = async (
   return recomputed;
 };
 
-/**
- * The concepts citing a connected source's documents, all of them or only `documentIds`, or the one
- * concept an override names.
- */
 type CascadeTarget =
   | {
       readonly connectedSourceId: string;

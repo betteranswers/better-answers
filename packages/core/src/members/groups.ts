@@ -106,7 +106,6 @@ type Admitted = Result<AdminUserPrincipal, MemberRefusal<"role-forbids">>;
 
 type TargetRefusal = MemberRefusal<"role-forbids" | "malformed">;
 
-/** Takes its face's admission as answered, and passes a refusal on untouched. */
 const groupTarget = (admitted: Admitted, groupId: string): Result<GroupTarget, TargetRefusal> => {
   if (!admitted.ok) return err(admitted.error);
   const parsed = GROUP_ID.safeParse(groupId);

@@ -16,7 +16,6 @@ export type GrantNamed = {
   readonly issuedAt: string;
 };
 
-/** One read of each table, by id, whatever the number of grants. */
 export const namesOfGrants = async (tx: Tx, grants: readonly EndedGrant[]): Promise<GrantNames> => {
   const assistantIds = [...new Set(grants.map((grant) => grant.clientId))];
   const workspaceIds = [...new Set(grants.flatMap((grant) => grant.workspaceId ?? []))];
@@ -51,7 +50,6 @@ type Detail = NonNullable<AuditEventRow["detail"]>;
 
 const listOfGrants = z.array(endedGrant);
 
-/** A field read once: a list of grants as the grant kind wrote it, or any other value as it was. */
 type FieldRead =
   | { readonly field: string; readonly grants: readonly EndedGrant[] }
   | { readonly field: string; readonly value: Detail[string] };

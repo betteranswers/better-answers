@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import { jsonAs, retryAfterMsOf, type WireRead, type WireRequest } from "./read.ts";
 
-/** Each a value the provider publishes. */
 const ACCOUNTS_URL = "https://api.cloudflare.com/client/v4/accounts";
 const MODELS_PATH = "ai/run/@cf/cloudflare";
 
@@ -21,7 +20,6 @@ const BYTES_PER_TOKEN = 3;
 /** The account's id, a colon, then an API token: Cloudflare names an account in the URL. */
 const WORKERS_AI_KEY = /^[0-9a-f]{32}:[A-Za-z0-9_-]+$/;
 
-/** Whether `key` is a Workers AI key as it is stored; the one place its form is refused. */
 export const isWorkersAiKey = (key: string): boolean => WORKERS_AI_KEY.test(key);
 
 /** A true-or-false question: what to ask, and the data it asks about, each under its own name. */
@@ -64,10 +62,8 @@ const utf8 = new TextEncoder();
 export const fitsWindow = (model: string, body: string): boolean =>
   Math.ceil(utf8.encode(body).length / BYTES_PER_TOKEN) <= (WINDOW_TOKENS.get(model) ?? 0);
 
-/** The probability of yes, by question id. */
 export type Probabilities = Readonly<Record<string, number>>;
 
-/** An answer of a noul question, read as its probability of yes. */
 const noulAnswer = z
   .object({ type: z.literal("noul"), noul: z.number().min(0).max(1) })
   .transform(({ noul }) => noul);
@@ -78,7 +74,6 @@ export const probabilitiesFor = (ids: readonly string[]): z.ZodType<Probabilitie
 
 const count = z.number().int().nonnegative();
 
-/** The REST API wraps a model's output in `result`, beside its own `success` and `errors`. */
 const reply = z.object({
   success: z.literal(true),
   result: z.object({
@@ -114,7 +109,6 @@ const rateLimitedRead = (text: string, retryAfter: string | null): WireRead<unkn
     ? { read: "spend-cap" }
     : { read: "rate-limited", retryAfterMs: retryAfterMsOf(retryAfter) };
 
-/** Reads one reply by its status first, then its body, which it never hands on beyond the answers. */
 export const decisionRead = (
   status: number,
   text: string,

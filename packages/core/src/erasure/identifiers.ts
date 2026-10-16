@@ -102,7 +102,6 @@ const spacedAs = (identifier: string, written: (character: string) => string): s
 export const normalisedIdentifier = (identifier: string): string =>
   spacedAs(identifier, foldedCharacter);
 
-/** The first floor the identifier falls below, `characters` before `name-words`. */
 export const floorNotCleared = (kind: IdentifierKind, identifier: string): Floor | undefined => {
   const normalised = normalisedIdentifier(identifier);
   if (Array.from(normalised).length < SUBJECT_IDENTIFIER_FLOOR) return "characters";

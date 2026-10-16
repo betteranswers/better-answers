@@ -23,7 +23,6 @@ import { holdsNoNul } from "./boundary.ts";
 
 const WRITTEN_CHARACTERS_AT_MOST = 2_000;
 
-/** Kept as it was sent, apart from the space around it. */
 const written = (what: string) =>
   z
     .string()
@@ -117,7 +116,6 @@ const NOT_A_CONCEPT_IT_RETURNED: Malformed = {
   fields: { "disputed.concept": "not-in-set" },
 };
 
-/** A flag's columns, each null on `helpful`. */
 const columnsOf = (input: FeedbackInput) =>
   input.verdict === "helpful"
     ? { reason: null, note: null, sentence: null, concept: null }
@@ -192,7 +190,6 @@ const flagSaid = (flag: Extract<FeedbackInput, { readonly verdict: "flag" }>): s
   return `flagged as ${REASON_WORDS[flag.reason]}${noted}${disputing}`;
 };
 
-/** Says where the feedback is kept and that it reaches nobody: all that is true of it. */
 export const renderFeedback = ({ feedback }: FeedbackReceipt): string => {
   const what = feedback.verdict === "helpful" ? "marked helpful" : flagSaid(feedback);
   return `Stored on record ${feedback.recordId}: ${what}. No one is notified of it.`;

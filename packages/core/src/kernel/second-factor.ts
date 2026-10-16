@@ -3,7 +3,6 @@ import type { KernelRefusal } from "./vocabulary.ts";
 /** The hour a pending session has to confirm, counted from the first request that found it pending. */
 export const PENDING_SESSION_LIFETIME_MS = 60 * 60 * 1000;
 
-/** What the gate reads of one session and its person, every fact from the store. */
 export type SecondFactorFacts = {
   /** An Admin in any workspace, or the operator. */
   readonly mustHoldOne: boolean;
@@ -11,7 +10,6 @@ export type SecondFactorFacts = {
   /** A passkey, or an authenticator past its first code; a setup still waiting is none. */
   readonly holdsAFactor: boolean;
 
-  /** This session carries a confirmation stamp. */
   readonly confirmed: boolean;
 
   /** This session spent a recovery code or gave the restore code since any restore. */
@@ -34,7 +32,6 @@ export const standingOf = (facts: SecondFactorFacts): SecondFactorStanding => {
   return facts.holdsAFactor && !facts.setupGranted ? "confirm" : "setup";
 };
 
-/** What a pending session meets outside the pending set. */
 export type SecondFactorRefusal = KernelRefusal<"second-factor-pending">;
 
 export const isPending = (standing: SecondFactorStanding): standing is PendingStanding =>
@@ -51,7 +48,6 @@ export const PENDING_STEPS = [
   "set-up-a-factor",
 ] as const;
 
-/** One thing a pending session may still do; a transport names its paths for each. */
 export type PendingStep = (typeof PENDING_STEPS)[number];
 
 const BOTH: readonly PendingStanding[] = ["confirm", "setup"];
@@ -74,7 +70,6 @@ const PENDING_SET = {
 export const mayTake = (standing: SecondFactorStanding, step: PendingStep | undefined): boolean =>
   !isPending(standing) || (step !== undefined && PENDING_SET[step].includes(standing));
 
-/** What a read does to the session's pending clock: a clock, never a stored state. */
 export type PendingClock = "none" | "start" | "run" | "stop" | "end";
 
 export const pendingClockOf = (

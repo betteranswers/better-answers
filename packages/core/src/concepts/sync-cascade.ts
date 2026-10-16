@@ -40,7 +40,6 @@ export const SYNC_CASCADE_ACTIONS = declareActions("platform", {
   }),
 });
 
-/** What the marker read answers for a sync and attempt already followed. */
 const ALREADY_FOLLOWED = "followed";
 
 /** A finish stamp is taken before its commit lands, so the scan reaches back past the first event. */
@@ -74,7 +73,6 @@ const firstFollowedAt = async (platform: SyncCascadePrincipal, tx: Tx): Promise<
 const followedKey = (sync: Pick<EndedSync, "jobId" | "attempts">): string =>
   `${sync.jobId}:${String(sync.attempts)}`;
 
-/** Each listed sync and attempt that already has its event, as `followedKey` spells it. */
 const followedAmong = async (
   platform: SyncCascadePrincipal,
   tx: Tx,

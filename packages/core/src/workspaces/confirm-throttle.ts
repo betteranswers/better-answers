@@ -49,7 +49,6 @@ const ROWS = `
 const rowsOf = async (tx: Tx, personId: UserId): Promise<readonly ThrottleRow[]> =>
   (await tx.query<ThrottleRow>(ROWS, [personId])).rows;
 
-/** Each kind's wait left, in seconds: none for a kind with no failures counted. */
 export const waitsOf = async (tx: Tx, personId: UserId, now: Date): Promise<WaitSeconds> => {
   const rows = await rowsOf(tx, personId);
   const waitOf = (kind: ThrottledKind) =>

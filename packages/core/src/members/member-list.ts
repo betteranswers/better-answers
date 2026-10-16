@@ -16,7 +16,6 @@ import {
 import type { Tx } from "../store/postgres/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-/** Every action on one member names them by person id, as the list does. */
 export const memberKeyed = z.object({ personId: boundarySchemas.user.select.shape.id });
 
 const listMembersAction = declareAction({
@@ -78,7 +77,6 @@ export const listMembers = async (
   const admitted = admit(listMembersAction, principal, {});
   if (!admitted.ok) return err(admitted.error);
 
-  // The parse brands the ids; a row it throws on fails the read like the query would.
   const listed = await attempt(async () =>
     z.array(LISTED_ROW).parse((await tx.query(MEMBERS, [admitted.value.workspaceId])).rows),
   );

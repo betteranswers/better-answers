@@ -97,7 +97,6 @@ export type RecordCompletion = {
   readonly judgeState: JudgeState;
   readonly concepts: readonly RecordedConcept[];
   readonly unmappedPassages: readonly { readonly locator: string }[];
-  /** Given only when the platform drafted. */
   readonly drafted?: readonly DraftedSentence[];
   /** Undefined where no model was called for the question; else its reservation, settled first. */
   readonly settled?:
@@ -156,7 +155,6 @@ export type DraftKeeping = {
   readonly recordId: string;
   /** Every sentence drafted for the question so far, which replaces what was kept before. */
   readonly drafted: readonly DraftedSentence[];
-  /** The drafting call's reservation, settled first. */
   readonly settled: { readonly reservationId: string; readonly calls: readonly CallSpent[] };
   readonly now: Date;
 };

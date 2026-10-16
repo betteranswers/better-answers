@@ -64,7 +64,6 @@ export type MemberRemoved = {
   readonly role: Role;
 };
 
-/** When a removal happens, and the batch its audit event stands in. */
 type RemovedAt = { readonly at: Date; readonly batchId: string | undefined };
 
 /**

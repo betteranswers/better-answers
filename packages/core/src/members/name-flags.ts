@@ -60,7 +60,6 @@ const flagDisplayNameAction = declareAction({
 
 export type FlagDisplayNameRefusal = MemberRefusal<"role-forbids" | "no-such-member"> | Error;
 
-/** What the operator is told of a flag just raised. */
 export type RaisedFlag = {
   readonly workspaceId: WorkspaceId;
   readonly workspaceName: string;

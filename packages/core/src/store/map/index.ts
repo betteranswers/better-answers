@@ -78,7 +78,6 @@ type OutgoingRef = {
   readonly sentence: string | null;
 };
 
-/** What a link's address names from the file at `from`: a concept IRI, or a path in the bundle. */
 export const targetOf = (raw: string, from: string): OutgoingRef["target"] | undefined => {
   const bare = raw.split("#")[0] ?? "";
   if (bare === "") return undefined;
@@ -351,10 +350,6 @@ export type ConceptVisibility = {
   readonly audienceGroups: readonly string[] | null;
 };
 
-/**
- * Copies the visibility onto the concept's live node and its outgoing derived edges; a workspace
- * with no live generation is left untouched.
- */
 export const writeConceptVisibility = async (
   principal: Principal,
   tx: Tx,
@@ -392,7 +387,6 @@ const insideClause = (alias: string): string =>
        SELECT filed.iri FROM concept_index filed
         WHERE filed.workspace_id = $1 AND filed.collection = ANY($5::text[])))`;
 
-/** What a narrowed walk adds to the statement, clause by clause. */
 type Narrowing = { readonly seed: string; readonly hop: string; readonly answered: string };
 
 const WHOLE: Narrowing = { seed: "", hop: "", answered: "" };
@@ -465,7 +459,6 @@ const WALK_TO: PreparedWalk = { statement: walkStatement(false), binds: [] };
 const WALK_CONCEPTS_FROM: PreparedWalk = { statement: walkStatement(true, CONCEPTS), binds: [] };
 const WALK_FROM_INSIDE = walkStatement(true, INSIDE);
 
-/** The narrowed statement and the collections it binds are chosen together, here alone. */
 const conceptWalkOutOf = (collections: readonly string[] | undefined): PreparedWalk =>
   collections === undefined
     ? WALK_CONCEPTS_FROM
@@ -523,14 +516,12 @@ export const walkToEntries = (
   uids: readonly string[],
 ): Promise<readonly WalkStep[]> => walk(WALK_TO, principal, tx, uids);
 
-/** As walkFromEntries, from the one entry `uid`. With no live generation it finds nothing. */
 export const walkFrom = (
   principal: UserPrincipal,
   tx: Tx,
   uid: ConceptIri,
 ): Promise<readonly WalkStep[]> => walkFromEntries(principal, tx, [uid]);
 
-/** As walkToEntries, into the one entry `uid`. */
 export const walkTo = (
   principal: UserPrincipal,
   tx: Tx,

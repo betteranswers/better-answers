@@ -82,7 +82,6 @@ const writing = async (tx: Tx, row: StandingRow, due: Due, now: Date): Promise<v
   if (due.unpromoted) await tx.query(NO_LONGER_PROMOTED, [row.personId]);
 };
 
-/** Read outside a transaction, which opens only when a write is due: most reads write nothing. */
 const judging = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

@@ -12,7 +12,6 @@ export const REVOKED_EVERYWHERE = ENDING_ACTIONS.revoked;
 
 export const GRANTS_ENDED_HERE = ENDING_ACTIONS.endedHere;
 
-/** Every workspace's tokens where `workspaceId` is null; only those consented in it otherwise. */
 type TokensToEnd = {
   readonly personId: UserId;
   readonly before: Date;

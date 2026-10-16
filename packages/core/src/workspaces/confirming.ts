@@ -52,7 +52,6 @@ const CONFIRMING_ACTIONS = declareIdentitySetActions("people", {
   restoreAccepted: action("people.person.restore_code_accepted", {}),
 });
 
-/** How long a replacement setup's sealed secret waits for its first working code. */
 const PARKED_FOR_MS = 10 * 60_000;
 
 type Confirm = {
@@ -95,7 +94,6 @@ const holdingTheGrant = async (
   return session.value.setupGranted ? ok(undefined) : err("setup-not-granted");
 };
 
-/** The person's id is refused once, where it enters; the work runs in one transaction. */
 const asThePerson = async <T, R>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -265,7 +263,6 @@ export const spendRecoveryCode = async (
     });
   });
 
-/** Only while the restore stands, before the code's day is out, and once. */
 const CONSUMING_THE_RESTORE = `
   DELETE FROM verification v USING "user" u
    WHERE u.id = $1 AND u.restore_required_at IS NOT NULL

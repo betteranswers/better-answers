@@ -4,14 +4,11 @@ import { autolinkClosesAt, nextOf, nextStopsOf } from "@better-answers/schema/sc
 
 const SPACE = /\s/;
 
-/** The next `>` or whitespace at or after each position, `-1` where there is none. */
 const autolinkEndsOf = (text: string): Int32Array =>
   nextStopsOf(text, (ch) => ch === ">" || SPACE.test(ch));
 
 type SpanOf = (bracket: number, ending: Int32Array, close: Int32Array) => number | undefined;
 
-/** One bracket pass: the label replaces the match, leftmost and non-overlapping, as the
- * pass's `replaceAll` held it. */
 const labelsOf = (text: string, spanOf: SpanOf): string => {
   const close = nextOf(text, "]");
   const ending = nextOf(text, ")");
@@ -63,13 +60,9 @@ const ANGLE_BRACKETED = (text: string): string => {
   return pieces.join("");
 };
 
-/** Every link form collapsed to what it held, in the four passes' order: inline,
- * reference, bare, autolink. */
 const flattenedLinks = (text: string): string =>
   ANGLE_BRACKETED(BRACKETED(BRACKETED_REFERENCE(BRACKETED_INLINE(text))));
 
-/** The sentence holding `index`: the paragraph around it, cut at its own bounds, links
- * flattened and whitespace run together. */
 export const sentenceAt = (body: string, index: number): string => {
   const before = body.lastIndexOf("\n\n", index);
   const paragraphStart = before === -1 ? 0 : before + 2;

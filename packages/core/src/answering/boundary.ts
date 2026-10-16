@@ -98,7 +98,6 @@ const passageView = z.object({
 
 export type PassageView = z.infer<typeof passageView>;
 
-/** A passage as an answer or an open shows it: its document's title is its source. */
 export const passageViewOf = (passage: {
   readonly locator: string;
   readonly title: string;

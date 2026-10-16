@@ -63,7 +63,6 @@ type WorkspaceSwept = {
   readonly workspaceId: WorkspaceId;
   readonly uploads: Result<SweptUploads, SweepUploadsRefusal>;
   readonly map: Result<readonly SweptGeneration[], MapMaintenanceRefusal | Error>;
-  /** How many reservations past their expiry were settled as failed calls. */
   readonly spend: Result<number, Error>;
 };
 
@@ -104,9 +103,6 @@ const RECORD_THE_PASS = `INSERT INTO sweep_pass
     (id, upload_sweep, workspaces, refused, found, removed, generations)
   VALUES ($1, $2, $3, $4, $5, $6, $7)`;
 
-/**
- * One statement and no scope: the row names no workspace, so no transaction is needed around it.
- */
 const recordThePass = async (
   door: PostgresDoor,
   uploadSweep: UploadSweepMode,
@@ -189,7 +185,6 @@ export const withSweepLock = <T>(
   work: () => Promise<T>,
 ): Promise<T> => withSessionLock(platform, door, SWEEP_LOCK, () => work());
 
-/** The day an ISO instant opens with, which Postgres reads as a date. */
 const ISO_DAY = "yyyy-mm-dd";
 
 const firstOfTheMonth = (now: Date, monthsOn: number): string =>

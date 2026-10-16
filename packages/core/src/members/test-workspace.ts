@@ -182,7 +182,6 @@ type MemberStanding = z.output<typeof MEMBER_ROW>;
 type Standing = {
   readonly workspaceId: WorkspaceId | undefined;
 
-  /** By address, each fixture person who already exists, with every workspace they belong to. */
   readonly people: ReadonlyMap<string, PersonStanding>;
 
   readonly members: readonly MemberStanding[];
@@ -246,7 +245,6 @@ const standingOf = (
     };
   });
 
-/** In the fixture's order, so the first person a refusal could name is the one named. */
 const refusalOf = (
   fixture: Fixture,
   standing: Standing,

@@ -53,12 +53,10 @@ const positionOf = (text: string): FindPosition | undefined => {
     );
     return read.success ? read.data : undefined;
   } catch {
-    // JSON.parse throws on a cursor that is not JSON: refused as any other malformed cursor.
     return undefined;
   }
 };
 
-/** Where the last page ended, as `find` handed it out. The server compares it and looks nothing up. */
 export const findCursor = z
   .string()
   .max(CURSOR_LENGTH_AT_MOST)

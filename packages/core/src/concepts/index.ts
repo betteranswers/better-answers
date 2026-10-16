@@ -461,7 +461,6 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
     }),
   );
 
-/** Order is precedence: the first entry that holds is the word the caller reads. */
 const WRITE_REFUSALS: readonly (readonly [
   WriteConceptRefusal,
   (write: ParsedWrite, existing: Existing) => boolean,
@@ -1152,7 +1151,6 @@ export const importBundle = async (
 export type OpenedConcept = {
   readonly iri: ConceptIri;
   readonly path: string;
-  /** Null for a concept in no collection. */
   readonly collection: string | null;
   readonly kind: string;
   readonly title: string;
@@ -1377,7 +1375,6 @@ export const corpusCountsOf = (
     return counts;
   });
 
-/** The concepts `principal` may read, counted for `query`'s words. */
 export const conceptCountsOf = (
   principal: UserPrincipal,
   tx: Tx,
@@ -1392,7 +1389,6 @@ export const conceptCountsOf = (
 
 const MATCH = anyWordMatch("c.search", "$4", ["c.iri"], { size: "$5", frequencies: "$6" });
 
-/** Collections bind eighth when named; the bound follows them, else binds eighth itself. */
 const matchingConcepts = (strength: MatchStrength, narrowed: boolean, after: boolean): string => {
   const bound = narrowed ? 9 : 8;
   const placed = (at: number): `$${number}` => `$${bound + at}`;
@@ -1470,7 +1466,6 @@ const readableCollectionsAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/** Each collection holding a concept this principal may read, in the order Postgres sorts them. */
 export const readableCollections = async (
   principal: UserPrincipal,
   tx: Tx,

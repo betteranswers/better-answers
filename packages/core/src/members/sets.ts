@@ -36,5 +36,4 @@ export const outcomeOf = <Id extends string>(
   skipped: asked.length - changed.length,
 });
 
-/** A row ticked twice is asked for once. */
 export const distinct = <Id extends string>(ids: readonly Id[]): readonly Id[] => [...new Set(ids)];

@@ -29,7 +29,6 @@ type ModelKeyOf = {
   readonly provider: ModelProvider;
 };
 
-/** What the side that calls a model is handed: the read, and no way to store. */
 export type Credentials = {
   /**
    * None is `undefined`; a row that will not open is refused, never read as none.

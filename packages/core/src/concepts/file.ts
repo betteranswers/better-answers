@@ -50,7 +50,6 @@ const reducedSources = (
 ): readonly HashedSource[] =>
   citedSourcesOf(value).map((cited) => [resolvedResource(cited.resource, path), cited.locator]);
 
-/** The text the hash reads: keys sorted, derived keys left out, sources resolved against `path`. */
 export const canonicalFrontmatter = (frontmatter: Frontmatter, path: string): string =>
   canonicalOver(frontmatter, reducedSources(frontmatter["sources"], path));
 
@@ -86,7 +85,6 @@ const canonicalText = (value: FrontmatterValue | undefined): string =>
 export const contentHashOf = (frontmatter: Frontmatter, body: string, path: string): string =>
   hashedFileOf(frontmatter, body, path).contentHash;
 
-/** `contentHashOf`, with the resolved `[resource, locator]` pairs it hashed. */
 export const hashedFileOf = (frontmatter: Frontmatter, body: string, path: string): HashedFile => {
   const sources = reducedSources(frontmatter["sources"], path);
   const contentHash = createHash("sha256")
@@ -149,7 +147,6 @@ const pairOf = (line: string): Pair | undefined => {
   return match === null || typeof key !== "string" ? undefined : { key, rest: match[2] };
 };
 
-/** Reads one `"key": <JSON scalar>` line; `undefined` for a line of any other form. */
 export const scalarPairOf = (
   line: string,
 ): { readonly key: string; readonly value: FrontmatterSource[string] } | undefined => {

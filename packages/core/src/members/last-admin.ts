@@ -19,7 +19,6 @@ const PERSON_ID = boundarySchemas.user.select.shape.id;
 
 const ADMIN = "Admin" satisfies Role;
 
-/** What an Admin-only action's admission hands on, so the step judges no one. */
 type AnAdmin = UserPrincipal & { readonly role: typeof ADMIN };
 
 export type HeldMember = {
@@ -76,10 +75,8 @@ export const leavesNoAdmin = (held: HeldMember): boolean => held.role === ADMIN 
 type HeldRow = { readonly personId: UserId; readonly role: Role };
 
 type HeldSet = {
-  /** Each ticked person who is a member here, in person id order. */
   readonly rows: readonly HeldRow[];
 
-  /** Every Admin here, ticked or not, held under the same lock. */
   readonly admins: readonly UserId[];
 };
 
@@ -103,10 +100,6 @@ const setHeld = async (admin: AnAdmin, tx: Tx, personIds: readonly UserId[]): Pr
   };
 };
 
-/**
- * As `withMemberHeld`, over a set: every Admin row, then the ticked rows. A deadlock anywhere in
- * `work`, its writes included, answers `changed-meanwhile`.
- */
 export const withMembersHeld = async <Value, Refusal>(
   admin: AnAdmin,
   tx: Tx,
@@ -117,7 +110,6 @@ export const withMembersHeld = async <Value, Refusal>(
   return done.ok ? done.value : err(refusalOfDeadlock(done.error));
 };
 
-/** The Admins the workspace keeps once every one of `losing` has lost the role. */
 const adminsLeftAfter = (held: HeldSet, losing: readonly UserId[]): number =>
   held.admins.filter((personId) => !losing.includes(personId)).length;
 

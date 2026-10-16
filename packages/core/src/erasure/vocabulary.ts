@@ -4,7 +4,6 @@ export const ERASURE_REFUSALS = {
   "identifier-too-broad": "inapplicable",
   "not-an-erasure": "inapplicable",
 
-  // The rehearsal's first phase seeds its subject; an erasure needs an address to rewrite.
   "not-seeded": "precondition",
   "no-address": "precondition",
 } as const satisfies Vocabulary;

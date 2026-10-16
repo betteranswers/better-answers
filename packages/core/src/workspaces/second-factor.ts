@@ -46,7 +46,6 @@ export const ADMIN: Role = "Admin";
 export const mustHoldOneOf = (person: string): string =>
   `${person}.operator OR EXISTS (SELECT 1 FROM member m WHERE m.user_id = ${person}.id AND m.role = $2)`;
 
-/** A person's action on their own second factor: they are its actor and its subject. */
 export const recordingTheirOwn = async <A extends AuditAction>(
   platform: PlatformPrincipal,
   tx: Tx,
@@ -66,7 +65,6 @@ export const recordingTheirOwn = async <A extends AuditAction>(
 type AuthenticatorState = "none" | "awaiting-code" | "set-up";
 
 type Facts = {
-  /** An Admin in any workspace, or the operator. */
   readonly mustHoldOne: boolean;
   readonly operator: boolean;
 
@@ -439,7 +437,6 @@ const reading = async (
 
 type PersonRead<T> = Result<T, WorkspaceRefusal<"malformed" | "person-gone"> | Error>;
 
-/** One read of a person's own rows by an id the caller hands in, refused where none is held. */
 const readOfThePerson = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -485,7 +482,6 @@ const credentialsOf = async (tx: Tx, personId: UserId): Promise<CredentialsHeld 
   return { address, passkeys, authenticator: facts.authenticator === "set-up" };
 };
 
-/** What the held read says of the acting session's confirmation, as the freshness rule reads it. */
 const confirmedAtMsOf = (held: SecondFactorHeld): number | null => {
   const confirmedAt = held.thisSession?.confirmedAt;
   return confirmedAt === undefined || confirmedAt === null ? null : Date.parse(confirmedAt);
