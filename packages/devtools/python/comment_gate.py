@@ -64,6 +64,12 @@ REASON_TOO_LONG = (
     "against the comment cap of {limit}. Say the constraint alone."
 )
 
+NO_REASON = (
+    "{path}:{line}: this suppression gives no reason; a `noqa` or a `type: ignore` "
+    "says on the same line why the rule does not hold here. Add the reason after a "
+    "second `#`."
+)
+
 DOCSTRING_TOO_LONG = (
     "{path}:{line}: this docstring runs to {words} words; a public function's "
     "docstring says only what its signature cannot — units, ranges, what None means, "
@@ -88,6 +94,7 @@ class Block(NamedTuple):
     prose: str
     limit: int = WORD_LIMIT
     too_long: str = TOO_LONG
+    unreasoned: str | None = None
 
 
 DOCSTRING_HOLDERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
@@ -134,27 +141,27 @@ def _suppresses(written: str) -> bool:
 
 
 def _blocks(lines: list[str], comments: Iterable[Comment]) -> list[Block]:
-    runs: list[tuple[int, list[str], str]] = []
+    runs: list[tuple[int, list[str], str, str | None]] = []
     previous = -2
     for row, column, written in comments:
-        text = _prose(written)
-        if text is None:
-            previous = -2
-            continue
         # A reason is held to its own directive, never to the comments around it.
         if _suppresses(written):
-            runs.append((row, [text], REASON_TOO_LONG))
+            runs.append((row, [_prose(written) or ""], REASON_TOO_LONG, NO_REASON))
+            previous = -2
+            continue
+        text = _prose(written)
+        if text is None:
             previous = -2
             continue
         own_line = lines[row - 1][:column].strip() == ""
         if own_line and row == previous + 1:
             runs[-1][1].append(text)
         else:
-            runs.append((row, [text], TOO_LONG))
+            runs.append((row, [text], TOO_LONG, None))
         previous = row if own_line else -2
     return [
-        Block(start, "\n".join(parts), WORD_LIMIT, template)
-        for start, parts, template in runs
+        Block(start, "\n".join(parts), WORD_LIMIT, template, unreasoned)
+        for start, parts, template, unreasoned in runs
     ]
 
 
@@ -243,7 +250,7 @@ def _findings(path: Path, source: str) -> list[str]:
     tree = ast.parse(source)
     said = _string_findings(path, tree)
     comments = _blocks(source.splitlines(), _python_comments(source))
-    for line, prose, limit, too_long in comments + _docstrings(path, tree):
+    for line, prose, limit, too_long, unreasoned in comments + _docstrings(path, tree):
         cited = citation_in(prose)
         if cited is not None:
             what, citation = cited
@@ -252,6 +259,8 @@ def _findings(path: Path, source: str) -> list[str]:
         words = len(prose.split())
         if words > limit:
             said.append(too_long.format(path=path, line=line, words=words, limit=limit))
+        elif not words and unreasoned is not None:
+            said.append(unreasoned.format(path=path, line=line))
     return said
 
 

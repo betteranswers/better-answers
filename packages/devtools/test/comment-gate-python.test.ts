@@ -109,8 +109,8 @@ describe("the Python check fires on a long or citing comment", () => {
 describe("the Python check's exemptions", () => {
   it.each([
     ["a why inside the ceiling", "# Deleting this changes what the engine memoises.\n"],
-    ["a type-checker escape", "# type: ignore[attr-defined]\n"],
-    ["a linter escape", "# noqa: E501\n"],
+    ["a type-checker escape", "# type: ignore[attr-defined]  # the stub lags the runtime\n"],
+    ["a linter escape", "# noqa: E501  # a URL cannot wrap\n"],
     ["a coverage pragma", "# pragma: no cover\n"],
     ["a copy-detection fence", "# jscpd:ignore-start\n# jscpd:ignore-end\n"],
     ["a licence notice", "# SPDX-License-Identifier: MIT\n"],
@@ -139,7 +139,9 @@ describe("the Python check's exemptions", () => {
   });
 
   it("keeps a directive's exemption off the paragraph under it", () => {
-    expect(findings(holding(`# type: ignore[attr-defined]\n${TOO_LONG}`))).toHaveLength(1);
+    const below = `# type: ignore[attr-defined]  # the stub lags the runtime\n${TOO_LONG}`;
+
+    expect(findings(holding(below))).toHaveLength(1);
   });
 
   it("stays silent over short comments that cite nothing", () => {
@@ -184,7 +186,7 @@ describe("a directive's reason counts against the twenty-five words", () => {
   it("counts none of the directive's own words", () => {
     const codes = Array.from({ length: 30 }, (_, index) => `E${String(index + 100)}`).join(", ");
 
-    expect(findings({ [FILE]: `KEEP = 1  # noqa: ${codes}\n` })).toEqual([]);
+    expect(findings({ [FILE]: `KEEP = 1  # noqa: ${codes}  # a generated table\n` })).toEqual([]);
   });
 
   it("accepts a noqa whose reason fits the ceiling", () => {
@@ -197,6 +199,31 @@ describe("a directive's reason counts against the twenty-five words", () => {
     const citing = "import os  # noqa: F401  # the loader changed under T-243\n";
 
     expect(findings({ [FILE]: citing })).toHaveLength(1);
+  });
+});
+
+describe("a suppression gives its reason on the same line", () => {
+  it.each([
+    ["a bare noqa", "KEEP = 1  # noqa: E501"],
+    ["a bare type-checker escape", "KEEP = 1  # type: ignore[attr-defined]"],
+    ["a blanket noqa", "KEEP = 1  # noqa"],
+    ["a bare noqa then a directive", "KEEP = 1  # noqa: E501  # fmt: skip"],
+  ])("refuses %s, naming the fix", (_what, line) => {
+    const output = run({ [FILE]: `${line}\n` });
+
+    expect(output).toMatch(/^probe\.py:1: this suppression gives no reason; /m);
+    expect(output).toContain("Add the reason after a second `#`.");
+  });
+
+  it.each([
+    ["a noqa", "import os  # noqa: F401  # pytest finds the fixture by import"],
+    [
+      "a type-checker escape",
+      "KEEP = 1  # type: ignore[attr-defined]  # torch installs `patch` at runtime",
+    ],
+    ["a reason after the codes", "import os  # noqa: F401 - pytest finds it"],
+  ])("accepts %s", (_what, line) => {
+    expect(findings({ [FILE]: `${line}\n` })).toEqual([]);
   });
 });
 

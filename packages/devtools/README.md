@@ -216,7 +216,8 @@ touching lines, and its docstrings. A docstring on a public module-level functio
 `apps/worker/src/` may run to 50 words, and every other block to 25. A directive or a notice is
 dropped by its opening text before blocks are grouped, so it cannot lend a paragraph its
 exemption. A suppression's reason is a block of its own. It is prose and counts, whether it
-follows a second `#` or the codes of a `noqa` or a `type: ignore` directly. A docstring is exempt only when it opens with a
+follows a second `#` or the codes of a `noqa` or a `type: ignore` directly, and a suppression
+without one is refused. A docstring is exempt only when it opens with a
 notice. No gate reads a comment in YAML, shell, TOML or SQL.
 
 | Part | What runs it | Its suite |
