@@ -44,7 +44,7 @@ export const standsAlone = (text: string, comment: Comment): boolean => {
   return comment.type === "Line" && text.slice(lineStart, comment.range[0]).trim() === "";
 };
 
-const isExempt = (comment: Comment): boolean => {
+export const isExempt = (comment: Comment): boolean => {
   const prose = proseOf(comment);
   return NOTICE.test(prose) || directiveIn(prose) !== undefined;
 };

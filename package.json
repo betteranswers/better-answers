@@ -32,6 +32,7 @@
     "table-ownership-scan": "node scripts/table-ownership-scan.mjs packages/core/src apps/api/src",
     "mutant-probe": "node scripts/mutant-probe.mjs",
     "reap-containers": "node scripts/reap-containers.mjs",
+    "comment-inventory": "node scripts/comment-inventory.mjs",
     "lint": "oxlint --report-unused-disable-directives-severity=error",
     "lint:workflows": "node scripts/check.mjs lint:workflows:actionlint lint:workflows:zizmor lint:workflows:shellcheck",
     "lint:workflows:actionlint": "uv run --project apps/worker --frozen --only-group dev actionlint -config-file .github/actionlint.yaml",

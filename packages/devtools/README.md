@@ -4,7 +4,7 @@ The repository's own gate tooling. **It is imported and never deployed** — `pa
 is imported, `apps/` is what deploys (ADR 0029) — so nothing under `apps/` copies this
 directory into an image, and every dependency here is a development dependency.
 
-Eleven things live here.
+Twelve things live here.
 
 ## `src/throwaway-tree.ts` — the runner
 
@@ -385,6 +385,26 @@ a namespace re-export are not followed, so the reader throws on either.
 names with the steps that suite lists, both ways. It reads every directory but the four it names,
 and holds that each face in core's exports map is one of those directories' `index.ts`. `test/face-admission.test.ts` holds each
 condition over sources written in the test.
+
+## `src/comment-inventory.ts` — the comment inventory
+
+The comment sweep's lever, behind `scripts/comment-inventory.mjs` (`pnpm comment-inventory`). An
+agent classifies comments and the tool alone deletes them. `inventory <path>...` writes one TSV
+row per comment block in the TypeScript under each path: `path`, `start`, `end`, `kind`,
+`attached`, `words`, `text`, then four columns the classifier fills: `class`, `holder`,
+`structure` and `unit`. Blocks are grouped as the comment gate groups them. A directive or notice
+is a row of its own, and a generated file is skipped. `text` is the block's source, with a
+backslash, tab, newline and carriage return written `\\`, `\t`, `\n` and `\r`.
+
+`apply <tsv> --unit <unit>` deletes the unit's rows, except `foreign`, `contract` and
+`suppression` ones. `check <tsv> [--unit <unit>]` runs the same checks and writes nothing. Each
+row is found again by its exact text, so a moved line never deletes the wrong block. The whole
+unit is refused, and no file changes, when any row is unclassified, when a row's text is not in
+its file as often as the unit names it, or when a `held` or `structure` row's holder does not
+resolve. A holder is `path:line` or `path › title`, several joined by `; `. A test title holder
+must be the first argument of a `describe`, `it` or `test` call. A refused unit exits 1, and a
+malformed TSV exits 2 and names its line. `test/comment-inventory.test.ts` runs each command
+over a throwaway tree.
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
 
