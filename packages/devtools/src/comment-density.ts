@@ -6,7 +6,7 @@ import { isTestPath } from "./paths.ts";
 import { executableOf, runsOverThrowawayTree } from "./throwaway-tree.ts";
 import type { Tree } from "./throwaway-tree.ts";
 
-export const CEILING = { source: 0.1, test: 0.05 } as const;
+export const CEILING = { source: 0.08, test: 0.05 } as const;
 
 export type Arm = keyof typeof CEILING;
 
