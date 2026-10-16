@@ -203,7 +203,7 @@ const LOCATOR_CONNECT_TIMEOUT_MS = 5_000;
 
 const pointTheWayUp = (fault: string): Error =>
   new Error(
-    `TEST_POSTGRES_URI ${fault}; run deploy/test-postgres.sh up and export the URI it prints, or unset TEST_POSTGRES_URI`,
+    `TEST_POSTGRES_URI ${fault}; run deploy/test-postgres.sh up and export what it prints, or unset TEST_POSTGRES_URI`,
   );
 
 const reasonOf = (error: unknown): string => {
@@ -211,17 +211,19 @@ const reasonOf = (error: unknown): string => {
   return typeof code === "string" ? code : String(error).replaceAll(/\s+/gu, " ");
 };
 
-const isSuperuser = async (adminUri: string): Promise<boolean> => {
+type Server = { readonly rolsuper: boolean; readonly image: string | null };
+
+const serverAt = async (adminUri: string): Promise<Server> => {
   const admin = new pg.Client({
     connectionString: adminUri,
     connectionTimeoutMillis: LOCATOR_CONNECT_TIMEOUT_MS,
   });
   try {
     await admin.connect();
-    const role = await admin.query<{ rolsuper: boolean }>(
-      "SELECT rolsuper FROM pg_roles WHERE rolname = current_user",
+    const found = await admin.query<Server>(
+      "SELECT rolsuper, current_setting('better_answers.image', true) AS image FROM pg_roles WHERE rolname = current_user",
     );
-    return role.rows[0]?.rolsuper === true;
+    return found.rows[0] ?? { rolsuper: false, image: null };
   } catch (error) {
     throw pointTheWayUp(`names a Postgres this run cannot sign in to (${reasonOf(error)})`);
   } finally {
@@ -257,10 +259,21 @@ const sweepDeadRuns = (adminUri: string): Promise<void> =>
 
 type Started = { readonly provided: WarmPostgres; readonly teardown: () => Promise<void> };
 
-const startShared = async (locator: string): Promise<Started> => {
-  const adminUri = uriForDatabase(locator, "postgres");
-  if (!(await isSuperuser(adminUri)))
-    throw pointTheWayUp("signs in as a role that is not a superuser");
+/** The run's own testcontainer carries no stamp, so only `shared` demands one. */
+const imageFault = ({ image }: Server, shared: boolean): string | undefined => {
+  if (image === null) return shared ? "names a server with no image stamp" : undefined;
+  if (image === POSTGRES_IMAGE) return undefined;
+  return `names a server stamped ${image} but this checkout pins ${POSTGRES_IMAGE}`;
+};
+
+type Locator = { readonly uri: string; readonly shared: boolean };
+
+const startShared = async ({ uri, shared }: Locator): Promise<Started> => {
+  const adminUri = uriForDatabase(uri, "postgres");
+  const server = await serverAt(adminUri);
+  if (!server.rolsuper) throw pointTheWayUp("signs in as a role that is not a superuser");
+  const fault = imageFault(server, shared);
+  if (fault !== undefined) throw pointTheWayUp(fault);
   await sweepDeadRuns(adminUri);
   const name = await templateNameOver(migrationsFolder);
   const templateDatabase = await ensureTemplate(adminUri, name, migrateInto);
@@ -298,13 +311,33 @@ const startContainer = async (): Promise<Started> => {
   };
 };
 
-const locatorUri = (): string | undefined => {
+const SHARED_BASE_PORT = 55_434;
+
+const SHARED_PORT_SPREAD = 1000;
+
+/** Mirrors `deploy/test-postgres.sh address`, so a worktree on another pin reaches its own server. */
+export const sharedUri = (): string => {
+  const digest = POSTGRES_IMAGE.split("@sha256:")[1];
+  if (digest === undefined)
+    throw new Error(`${POSTGRES_IMAGE} pins no digest to derive a port from`);
+  const override = process.env["TEST_POSTGRES_PORT"];
+  const port =
+    override === undefined || override === ""
+      ? SHARED_BASE_PORT + (Number.parseInt(digest.slice(0, 4), 16) % SHARED_PORT_SPREAD)
+      : Number(override);
+  return `postgresql://postgres:postgres@127.0.0.1:${String(port)}/postgres`;
+};
+
+const locatorOf = (): Locator | undefined => {
   const locator = process.env["TEST_POSTGRES_URI"]?.trim();
-  return locator === undefined || locator === "" ? undefined : locator;
+  if (locator === undefined || locator === "") return undefined;
+  return locator === "shared"
+    ? { uri: sharedUri(), shared: true }
+    : { uri: locator, shared: false };
 };
 
 const startWarmPostgres = async (project: TestProject): Promise<() => Promise<void>> => {
-  const locator = locatorUri();
+  const locator = locatorOf();
   const started = locator === undefined ? await startContainer() : await startShared(locator);
   project.provide("warmPostgres", started.provided);
   return started.teardown;

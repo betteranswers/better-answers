@@ -25,6 +25,7 @@ MIGRATIONS_DIR = REPO_ROOT / "packages" / "schema" / "migrations"
 _IMAGE_SOURCE = REPO_ROOT / "packages" / "schema" / "src" / "postgres-image.ts"
 
 
+@cache
 def pinned_postgres_image() -> str:
     source = _IMAGE_SOURCE.read_text("utf-8")
     matches = re.findall(r'"(pgvector/pgvector:[^"]+)"', source)
@@ -104,6 +105,8 @@ def on_database(conninfo: str, database: str) -> str:
 
 
 LOCATOR = "TEST_POSTGRES_URI"
+SHARED = "shared"
+PORT_OVERRIDE = "TEST_POSTGRES_PORT"
 UP_COMMAND = "deploy/test-postgres.sh up"
 
 # Advisory locks conflict only within one database; the vitest tier shares this key.
@@ -123,9 +126,27 @@ class Cluster(NamedTuple):
 @cache
 def _migrated_cluster() -> Cluster:
     locator = os.environ.get(LOCATOR, "").strip()
-    if locator:
-        return _located_cluster(locator)
-    return _container_cluster()
+    if not locator:
+        return _container_cluster()
+    if locator == SHARED:
+        return _located_cluster(shared_address(), shared=True)
+    return _located_cluster(locator, shared=False)
+
+
+def _pinned_digest() -> str:
+    image = pinned_postgres_image()
+    found = re.search(r"@sha256:([0-9a-f]{64})$", image)
+    if found is None:
+        msg = f"{_IMAGE_SOURCE} pins {image}, which carries no sha256 digest"
+        raise RuntimeError(msg)
+    return found.group(1)
+
+
+# deploy/test-postgres.sh derives the same port: one server per pinned image.
+def shared_address() -> str:
+    override = os.environ.get(PORT_OVERRIDE, "").strip()
+    port = int(override) if override else 55434 + int(_pinned_digest()[:4], 16) % 1000
+    return f"postgresql://postgres:postgres@127.0.0.1:{port}/postgres"
 
 
 def _container_cluster() -> Cluster:
@@ -139,28 +160,47 @@ def _container_cluster() -> Cluster:
     return Cluster(conninfo, MIGRATED_TEMPLATE)
 
 
-def _located_cluster(locator: str) -> Cluster:
+def _located_cluster(locator: str, *, shared: bool) -> Cluster:
     maintenance = on_database(locator, "postgres")
-    _refuse_unless_superuser(maintenance)
+    _refuse_unless_fit(maintenance, shared=shared)
     sweep_dead_cases(maintenance)
     return Cluster(
         maintenance, ensure_template(maintenance, template_name(), apply_journal)
     )
 
 
-def _refuse_unless_superuser(maintenance: str) -> None:
+def _server_facts(maintenance: str) -> tuple[bool, str | None]:
     try:
         with psycopg.connect(maintenance, connect_timeout=5) as connection:
             row = connection.execute(
-                "SELECT rolsuper FROM pg_roles WHERE rolname = current_user"
+                "SELECT rolsuper, current_setting('better_answers.image', true)"
+                " FROM pg_roles WHERE rolname = current_user"
             ).fetchone()
     except (psycopg.OperationalError, psycopg.ProgrammingError) as error:
         reason = (str(error).splitlines() or [""])[0]
         message = f"{LOCATOR} reaches no Postgres ({reason}): run `{UP_COMMAND}`"
         raise RuntimeError(message) from None
-    if row is None or not row[0]:
+    return (False, None) if row is None else (bool(row[0]), row[1])
+
+
+# This process's own container carries no stamp, so only `shared` demands one.
+def _refuse_unless_fit(maintenance: str, *, shared: bool) -> None:
+    superuser, stamp = _server_facts(maintenance)
+    if not superuser:
         message = (
             f"{LOCATOR} signs in as no superuser: export the URI `{UP_COMMAND}` prints"
+        )
+        raise RuntimeError(message)
+    pinned = pinned_postgres_image()
+    if stamp is None and shared:
+        message = (
+            f"{LOCATOR} reaches a Postgres with no image stamp: run `{UP_COMMAND}`"
+        )
+        raise RuntimeError(message)
+    if stamp is not None and stamp != pinned:
+        message = (
+            f"{LOCATOR} reaches a Postgres stamped {stamp} but this checkout pins"
+            f" {pinned}: run `{UP_COMMAND}`"
         )
         raise RuntimeError(message)
 

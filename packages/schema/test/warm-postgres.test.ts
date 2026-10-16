@@ -7,21 +7,25 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import pg from "pg";
-import { afterAll, describe, expect, inject, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 
+import { POSTGRES_IMAGE } from "../src/postgres-image.ts";
 import { testData } from "./factory.ts";
-import type { MigratedPostgres } from "./harness.ts";
+import { type MigratedPostgres, POSTGRES_COMMAND } from "./harness.ts";
 import {
   clonedFrom,
   ensureTemplate,
   openMigratedPostgres,
+  sharedUri,
   templateNameOver,
   type WarmPostgres,
 } from "./warm-postgres.ts";
 
 const run = promisify(execFile);
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
+const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const warmPostgresModule = fileURLToPath(new URL("./warm-postgres.ts", import.meta.url));
 
 const writeModelChoice = async (db: MigratedPostgres): Promise<void> => {
@@ -413,10 +417,13 @@ const START_IN_CHILD = [
   "}",
 ].join("\n");
 
-const startInChild = async (locator: string): Promise<StartedInChild> => {
+const startInChild = async (
+  locator: string,
+  env: Readonly<Record<string, string>> = {},
+): Promise<StartedInChild> => {
   const child = await run(process.execPath, ["--input-type=module", "--eval", START_IN_CHILD], {
     cwd: packageRoot,
-    env: { ...process.env, TEST_POSTGRES_URI: locator },
+    env: { ...process.env, TEST_POSTGRES_URI: locator, ...env },
   });
   const started: StartedInChild = JSON.parse(child.stdout);
   return started;
@@ -431,6 +438,13 @@ const pointsTheWayUp = (started: StartedInChild) => ({
 });
 
 const POINTS_THE_WAY_UP = { oneLine: true, namesTheLocator: true, namesTheUpCommand: true };
+
+const refusesFor = (started: StartedInChild, cause: string) => ({
+  ...pointsTheWayUp(started),
+  namesTheCause: started.failure?.includes(cause),
+});
+
+const REFUSES_FOR_THE_CAUSE = { ...POINTS_THE_WAY_UP, namesTheCause: true };
 
 const anExitedPid = async (): Promise<number> => {
   const child = spawn(process.execPath, ["--eval", ""]);
@@ -675,5 +689,85 @@ describe("a shared template", () => {
     } finally {
       await rm(folder, { recursive: true });
     }
+  });
+});
+
+const OTHER_IMAGE = `other/image:tag@sha256:${"0".repeat(64)}`;
+
+const MISMATCH = `stamped ${OTHER_IMAGE} but this checkout pins ${POSTGRES_IMAGE}`;
+
+const throwawayPostgres = (command: readonly string[]): Promise<StartedPostgreSqlContainer> =>
+  new PostgreSqlContainer(POSTGRES_IMAGE)
+    .withUsername("postgres")
+    .withPassword("postgres")
+    .withCommand([...command])
+    .start();
+
+const scriptUriLine = async (): Promise<string | undefined> => {
+  // The script lets TEST_POSTGRES_IMAGE replace the pin; this harness always reads the pin.
+  const printed = await run("bash", ["deploy/test-postgres.sh", "address"], {
+    cwd: repoRoot,
+    env: { ...process.env, TEST_POSTGRES_IMAGE: undefined },
+  });
+  const line = printed.stdout.split("\n").find((printedLine) => printedLine.startsWith("uri "));
+  return line?.slice("uri ".length);
+};
+
+describe("the warm harness under TEST_POSTGRES_URI=shared", () => {
+  let unstamped: StartedPostgreSqlContainer | undefined;
+  let stampedOther: StartedPostgreSqlContainer | undefined;
+  let stampedOurs: StartedPostgreSqlContainer | undefined;
+
+  beforeAll(async () => {
+    [unstamped, stampedOther, stampedOurs] = await Promise.all([
+      throwawayPostgres(POSTGRES_COMMAND),
+      throwawayPostgres([...POSTGRES_COMMAND, "-c", `better_answers.image=${OTHER_IMAGE}`]),
+      throwawayPostgres([...POSTGRES_COMMAND, "-c", `better_answers.image=${POSTGRES_IMAGE}`]),
+    ]);
+  }, 300_000);
+
+  afterAll(async () => {
+    await Promise.all([unstamped?.stop(), stampedOther?.stop(), stampedOurs?.stop()]);
+  });
+
+  const running = (
+    container: StartedPostgreSqlContainer | undefined,
+  ): StartedPostgreSqlContainer => {
+    if (container === undefined) throw new Error("the throwaway server never started");
+    return container;
+  };
+  const portOf = (container: StartedPostgreSqlContainer | undefined): Record<string, string> => ({
+    TEST_POSTGRES_PORT: String(running(container).getPort()),
+  });
+
+  it("derives the address the script prints", async () => {
+    expect(sharedUri()).toBe(await scriptUriLine());
+  });
+
+  it("accepts a server stamped with the pinned image", async () => {
+    const started = await startInChild("shared", portOf(stampedOurs));
+
+    expect({ failure: started.failure, source: started.source }).toEqual({
+      failure: undefined,
+      source: "shared",
+    });
+  });
+
+  it("refuses an unstamped server under shared", async () => {
+    const started = await startInChild("shared", portOf(unstamped));
+
+    expect(refusesFor(started, "no image stamp")).toEqual(REFUSES_FOR_THE_CAUSE);
+  });
+
+  it("refuses another image's server under shared", async () => {
+    const started = await startInChild("shared", portOf(stampedOther));
+
+    expect(refusesFor(started, MISMATCH)).toEqual(REFUSES_FOR_THE_CAUSE);
+  });
+
+  it("refuses another image's server under an explicit URI", async () => {
+    const started = await startInChild(running(stampedOther).getConnectionUri());
+
+    expect(refusesFor(started, MISMATCH)).toEqual(REFUSES_FOR_THE_CAUSE);
   });
 });

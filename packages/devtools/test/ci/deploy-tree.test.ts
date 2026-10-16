@@ -79,10 +79,32 @@ const renovateSchema = z.object({
         customType: z.string(),
         managerFilePatterns: z.array(z.string()),
         matchStrings: z.array(z.string()),
+        versioningTemplate: z.string().optional(),
       }),
     )
     .default([]),
 });
+
+const POSTGRES_PIN = "packages/schema/src/postgres-image.ts";
+
+const postgresPinManager = () =>
+  renovateSchema
+    .parse(JSON.parse(read("renovate.json")))
+    .customManagers.find((candidate) =>
+      candidate.managerFilePatterns.some((pattern) =>
+        new RegExp(pattern.slice(1, -1)).test(POSTGRES_PIN),
+      ),
+    );
+
+/** Renovate's regex versioning reads these named groups; the pin's major must be Postgres's. */
+const postgresVersioning = (): ((tag: string) => Record<string, string> | undefined) => {
+  const versioning = postgresPinManager()?.versioningTemplate ?? "";
+  const pattern = new RegExp(versioning.replace(/^regex:/, ""));
+  return (tag) => pattern.exec(tag)?.groups;
+};
+
+const postgresPinAsRenovateReadsIt = (): Record<string, string> | undefined =>
+  new RegExp(postgresPinManager()?.matchStrings[0] ?? "^$").exec(read(POSTGRES_PIN))?.groups;
 
 const groupOf = (match: RegExpMatchArray, name: string): string => match.groups?.[name] ?? "";
 
@@ -749,6 +771,35 @@ describe("the deploy tree", () => {
 
     expect(release).toMatch(/echo "::error::[^"\n]*\$\{head\}[^"\n]*" >&2\n\s+return 1/);
     expect(read("deploy/RELEASES.md")).toContain("`sha-<short>`");
+  });
+
+  it("reads the Postgres pin with Postgres's version as the major", () => {
+    const groupsOf = postgresVersioning();
+    const pinned = /"pgvector\/pgvector:([^@"]+)@sha256:[0-9a-f]{64}"/.exec(
+      read(POSTGRES_PIN),
+    )?.[1];
+
+    expect({
+      pinned: groupsOf(pinned ?? ""),
+      nextMajor: groupsOf("0.8.6-pg19-trixie")?.["major"],
+      floating: groupsOf("pg18"),
+      otherBase: groupsOf("0.8.6-pg18-bookworm")?.["compatibility"],
+    }).toEqual({
+      pinned: expect.objectContaining({ major: "18", compatibility: "trixie" }),
+      nextMajor: "19",
+      floating: undefined,
+      otherBase: "bookworm",
+    });
+  });
+
+  it("matches the pin's image, tag and digest for Renovate", () => {
+    const pinned = /"([^"]+)"/.exec(read(POSTGRES_PIN))?.[1] ?? "";
+
+    expect(postgresPinAsRenovateReadsIt()).toEqual({
+      depName: pinned.split(":")[0],
+      currentValue: pinned.split(":")[1]?.split("@")[0],
+      currentDigest: pinned.split("@")[1],
+    });
   });
 
   it("annotates every version an image fetches for Renovate to read", () => {

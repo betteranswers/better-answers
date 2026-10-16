@@ -176,28 +176,32 @@ pnpm can select scripts by regular expression and `--no-bail` will keep going pa
 
 ## The shared test Postgres
 
-By default every test run starts its own Postgres container. Several worktrees running `check` at once then run several servers, and on 15/10/2026 four of them took a 14-core Mac to a load average of 45. One shared server per machine avoids that. It is opt-in, and CI never uses it.
+By default every test run starts its own Postgres container. Several worktrees running `check` at once then run several servers, and on 15/10/2026 four of them took a 14-core Mac to a load average of 45. One shared server per pinned image avoids that. It is opt-in, and CI never uses it.
 
-Start it, then export the line it prints:
+Start the server for this checkout's pin, then export the line it prints:
 
 ```sh
 deploy/test-postgres.sh up
-export TEST_POSTGRES_URI=postgresql://postgres:postgres@127.0.0.1:55433/postgres
+export TEST_POSTGRES_URI=shared
 ```
 
-With `TEST_POSTGRES_URI` set, the warm harness in `packages/schema`, `packages/core` and `apps/api`, and the worker's pytest harness, start no Postgres container. Each tier clones its databases from a template on the shared server. The template is named for a digest of `packages/schema/migrations` and of the harness that builds it, so worktrees on different migrations never share one. The first run on a new migration set builds its template, and every later run reuses it. Leave the variable unset, or empty, and a run starts its own container as before.
+With `TEST_POSTGRES_URI=shared`, the warm harness in `packages/schema`, `packages/core` and `apps/api`, and the worker's pytest harness, start no Postgres container. Each works out its server's address from the image `packages/schema/src/postgres-image.ts` pins, so the variable needs no change when a branch moves to another pin. Each tier clones its databases from a template on that server. The template is named for a digest of `packages/schema/migrations` and of the harness that builds it, so worktrees on different migrations never share one. The first run on a new migration set builds its template, and every later run reuses it. Leave the variable unset, or empty, and a run starts its own container as before. A `postgresql://` URI in the variable is used as given.
 
-`deploy/test-postgres.sh down` stops the server and discards everything on it. Its data lives in memory, so a Docker restart discards it too, and the next run rebuilds its template in seconds. `TEST_POSTGRES_PORT` and `TEST_POSTGRES_PROJECT` move it off port 55433 and its default compose project. It is a separate server from the dev database `deploy/local-database.sh` starts.
+Each pinned image gets its own server: the compose project and port come from the image's digest. A worktree on a newer pin runs `up` and gets a second server beside the first, so neither wipes nor borrows the other. `deploy/test-postgres.sh address` prints the project and address for this checkout's pin without starting anything. `up` names any other server still running. `down` stops this pin's server and discards everything on it, and `down --all` stops every one. Their data lives in memory, so a Docker restart discards it too, and the next run rebuilds its template in seconds. `TEST_POSTGRES_PORT` and `TEST_POSTGRES_PROJECT` move a server off its derived port and project stem. They are separate servers from the dev database `deploy/local-database.sh` starts.
+
+After upgrading from the single shared server, run `deploy/test-postgres.sh down --all` once. It also clears the old server on port 55433, which would otherwise come back after every Docker restart.
 
 What to expect:
 
 - A run with the variable set but no server listening, or a URI that is not a superuser, stops at once with a line naming `TEST_POSTGRES_URI` and the `up` command. It never falls back to a container.
-- `up` refuses when the server already runs on an image other than this checkout's pin. Replacing it would wipe every other worktree's live run. Run `down` and then `up` when nothing else is using it, or leave the variable unset on that branch.
-- If the server runs out of memory, Postgres stops every session at once, and every run using it fails together. `down` then `up` clears it.
+- Every server carries its image as `better_answers.image`. Under `shared`, a run refuses a server with no stamp or another image's; with an explicit URI, it refuses another image's. That catches the rare case of two pins deriving one port: start the second with `TEST_POSTGRES_PORT=<free port> deploy/test-postgres.sh up` and export the same `TEST_POSTGRES_PORT`.
+- Two loaded servers can exhaust the Docker VM's memory. Clear old ones with `down --all` once no worktree uses their pin.
+- If a server runs out of memory, Postgres stops every session at once, and every run using it fails together. `down` then `up` clears it.
 - A run's databases carry its process id. A run that is killed leaves them behind, and the next run on the machine drops them once that process has gone.
 - Each run stamps its template with the time it used it. A template no run has used for a day is dropped by the next run of the same tier, so old migration sets do not fill the server. A run held open for longer than a day can lose its template; restart it and it rebuilds one.
-- `pnpm reap-containers` and Ryuk select only containers testcontainers labelled, so neither touches the shared server.
+- `pnpm reap-containers` and Ryuk select only containers testcontainers labelled, so neither touches the shared servers.
 - Some test files still start a server of their own: the two that replay part of the migration history, `roles-surface.test.ts` and `apps/api/tests/browse-role.test.ts`, which read or alter roles across the whole server, and the case in `warm-postgres.test.ts` that proves the path without a warm server. Garage still starts a container per run.
+- Renovate proposes updates to the pin each weekend and holds a Postgres major in the Dependency Dashboard. Production's Postgres is a Coolify resource set to the pin by hand: after merging a pin update, re-point it to the new image reference, and run `ALTER EXTENSION vector UPDATE` when pgvector's version moved.
 
 ## The tool configuration at the repository root
 
