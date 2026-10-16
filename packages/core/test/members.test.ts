@@ -377,16 +377,18 @@ const outcomesOf = async (
   return outcomes;
 };
 
-const eachVerb = async (
+/** `outcomes` still answers once `run` rejects, since the verbs ran before the commit failed. */
+const eachVerb = (
   workspace: Workspace,
   verbs: readonly Verb[],
-  outcomes: VerbOutcome[],
   before: (tx: Tx) => Promise<void> = async () => undefined,
-): Promise<void> => {
-  await asPerson(workspace, workspace.adminUserId, async (principal, tx) => {
+): { readonly run: Promise<unknown>; readonly outcomes: () => readonly VerbOutcome[] } => {
+  let outcomes: readonly VerbOutcome[] = [];
+  const run = asPerson(workspace, workspace.adminUserId, async (principal, tx) => {
     await before(tx);
-    outcomes.push(...(await outcomesOf(verbs, principal, tx)));
+    outcomes = await outcomesOf(verbs, principal, tx);
   });
+  return { run, outcomes: () => outcomes };
 };
 
 const refusedAlike = (verbs: readonly Verb[], error: unknown): readonly VerbOutcome[] =>
@@ -406,22 +408,22 @@ describe("what a group action refuses before it reads anything", () => {
     const workspace = await provisioned("Shapeless");
     const person = await seedMemberAt(workspace, "Viewer");
     const verbs = namingAGroup(everyVerb("' OR true --", person));
-    const outcomes: VerbOutcome[] = [];
+    const { run, outcomes } = eachVerb(workspace, verbs);
 
-    await eachVerb(workspace, verbs, outcomes);
+    await run;
 
-    expect(outcomes).toEqual(refusedAlike(verbs, "malformed"));
+    expect(outcomes()).toEqual(refusedAlike(verbs, "malformed"));
     expect(await groupRowCount(workspace.workspaceId)).toBe(0);
   });
 
   it("refuses a malformed person id to both verbs naming one", async () => {
     const { workspace, groupId } = await oneGroupOnePerson("Nameless");
     const verbs = namingAPerson(everyVerb(groupId, "' OR true --"));
-    const outcomes: VerbOutcome[] = [];
+    const { run, outcomes } = eachVerb(workspace, verbs);
 
-    await eachVerb(workspace, verbs, outcomes);
+    await run;
 
-    expect(outcomes).toEqual(refusedAlike(verbs, "malformed"));
+    expect(outcomes()).toEqual(refusedAlike(verbs, "malformed"));
   });
 
   it("refuses a rename to a blank name, renaming nothing", async () => {
@@ -443,13 +445,11 @@ describe("an action whose statement the store refuses", () => {
   it("hands back the store's failure from every verb, writing nothing", async () => {
     const { workspace, person, groupId } = await oneGroupOnePerson("Failing");
     const verbs = everyVerb(groupId, person);
-    const outcomes: VerbOutcome[] = [];
+    const { run, outcomes } = eachVerb(workspace, verbs, abortTheTransaction);
 
-    await expect(eachVerb(workspace, verbs, outcomes, abortTheTransaction)).rejects.toThrow(
-      /did not commit/,
-    );
+    await expect(run).rejects.toThrow(/did not commit/);
 
-    expect(outcomes).toEqual(refusedAlike(verbs, expect.any(Error)));
+    expect(outcomes()).toEqual(refusedAlike(verbs, expect.any(Error)));
 
     expect((await peopleActions(workspace.workspaceId)).map((event) => event.action)).toEqual([
       "people.group.created",
