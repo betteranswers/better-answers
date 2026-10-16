@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -10,7 +10,16 @@ import { repositoryRoot } from "@better-answers/devtools/paths";
 import { CONTRACT_DIGEST, POSTGRES_IMAGE } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
-import { freePort, heldPort, released } from "./loopback-port.ts";
+import {
+  containersOf,
+  imagesOf,
+  outcomeOf,
+  type Run,
+  runScript,
+  upOnATakenPort,
+  volumesOf,
+} from "./compose-project.ts";
+import { freePort } from "./loopback-port.ts";
 
 const script = path.join(repositoryRoot, "deploy/local-database.sh");
 const readJson = (relative: string): unknown =>
@@ -46,45 +55,11 @@ const SEEDED_LOCALLY = `synthetic fixture present: workspace ${SYNTHETIC_WORKSPA
 /** Its own project and port, so a developer's own local database is never the one this stops. */
 const project = `ba-local-database-test-${String(process.pid)}`;
 
-type Run = { readonly status: number | null; readonly stdout: string; readonly stderr: string };
-
-/** Compose narrates to stderr on success, so it is read only when the run failed. */
-const outcomeOf = (run: Run): string =>
-  run.status === 0 ? "ran" : `exited ${String(run.status)}: ${run.stderr}`;
-
-const localDatabase = (
-  port: number,
-  argv: readonly string[],
-  projectName: string = project,
-): Run => {
-  const result = spawnSync("bash", [script, ...argv], {
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      LOCAL_DATABASE_PROJECT: projectName,
-      LOCAL_DATABASE_PORT: String(port),
-    },
+const localDatabase = (port: number, argv: readonly string[], projectName: string = project): Run =>
+  runScript(script, argv, {
+    LOCAL_DATABASE_PROJECT: projectName,
+    LOCAL_DATABASE_PORT: String(port),
   });
-  return { status: result.status, stdout: result.stdout, stderr: result.stderr };
-};
-
-const containersOf = (projectName: string): readonly string[] =>
-  execFileSync(
-    "docker",
-    ["ps", "-a", "-q", "--filter", `label=com.docker.compose.project=${projectName}`],
-    { encoding: "utf8" },
-  )
-    .split("\n")
-    .filter((line) => line !== "");
-
-const volumesOf = (projectName: string): readonly string[] =>
-  execFileSync(
-    "docker",
-    ["volume", "ls", "-q", "--filter", `label=com.docker.compose.project=${projectName}`],
-    { encoding: "utf8" },
-  )
-    .split("\n")
-    .filter((line) => line !== "");
 
 let port: number;
 let upFirst: Run;
@@ -117,12 +92,7 @@ describe("the local database", () => {
   });
 
   it("runs the one pinned image, by digest", () => {
-    const images = containersOf(project).map((container) =>
-      execFileSync("docker", ["inspect", "--format", "{{.Config.Image}}", container], {
-        encoding: "utf8",
-      }).trim(),
-    );
-    expect(images).toEqual([POSTGRES_IMAGE]);
+    expect(imagesOf(project)).toEqual([POSTGRES_IMAGE]);
   });
 
   it("applies every migration and stamps the contract as `migrate` does", async () => {
@@ -316,19 +286,9 @@ describe("the local database", () => {
   }, 180_000);
 
   it("refuses a port already in use, and starts nothing", async () => {
-    const held = await heldPort();
-    const taken = held.port;
-    const elsewhere = `${project}-taken`;
-    try {
-      const run = localDatabase(taken, ["up"], elsewhere);
-      expect({ status: run.status, containers: containersOf(elsewhere) }).toEqual({
-        status: 1,
-        containers: [],
-      });
-      expect(run.stderr).toContain(`127.0.0.1:${String(taken)} is taken`);
-    } finally {
-      await released(held);
-    }
+    expect(
+      await upOnATakenPort((taken, name) => localDatabase(taken, ["up"], name), `${project}-taken`),
+    ).toEqual({ status: 1, containers: [], namesThePort: true });
   });
 
   it("refuses a fixture left under another id, saying to wipe", async () => {
