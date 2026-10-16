@@ -177,6 +177,10 @@ both ways and over the committed tree.
 for tests, `e2e/` and `scripts/`, and `test/import-statically.test.ts` runs it under that
 override, both ways.
 
+`parameter-never-mutated` refuses an in-place array method, or `Object.assign`, on a function's
+parameter. It resolves the receiver through scope, so a local that shadows a parameter goes
+past, and `test/parameter-never-mutated.test.ts` runs it both ways.
+
 ## The comment gate — three parts, all in root `check`
 
 The comment rules are held in three places. `.oxlintrc.json` holds them for TypeScript, a

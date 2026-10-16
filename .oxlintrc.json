@@ -101,7 +101,8 @@
     "better-answers/string-cites-nothing": "error",
     "better-answers/mcp-entry-annotations": "error",
     "better-answers/mcp-entry-no-workspace-argument": "error",
-    "better-answers/import-direction": "error"
+    "better-answers/import-direction": "error",
+    "better-answers/parameter-never-mutated": "error"
   },
   "overrides": [
     {
