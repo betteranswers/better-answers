@@ -6,7 +6,6 @@ import { customType } from "drizzle-orm/pg-core";
  */
 export const FULL_TEXT_LANGUAGE = "'english'";
 
-/** Drizzle has no `tsvector` type of its own. */
 export const searchVector = customType<{ data: string; driverData: string }>({
   dataType: () => "tsvector",
 });

@@ -13,7 +13,6 @@ export const ACTION = new RegExp(ACTION_PATTERN);
 
 const familyList = listed(FAMILIES);
 
-/** Both audit logs name an action the same way and carry the same row after the key. */
 const auditLogColumns = () => ({
   action: text("action").notNull(),
 

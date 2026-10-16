@@ -32,7 +32,6 @@ const SIX = " \t\n\r\f\v";
 
 const isSix = (ch: string): boolean => SIX.includes(ch);
 
-/** The first line start at or after `from`: the string's start, or the position after a `\n`. */
 const lineStartFrom = (text: string, from: number): number => {
   if (from <= 0) return 0;
   if (text[from - 1] === "\n") return from;
@@ -40,23 +39,17 @@ const lineStartFrom = (text: string, from: number): number => {
   return found === -1 ? text.length : found + 1;
 };
 
-/** What a scanner found: where it starts, and what it holds. */
 type Found = { readonly at: number; readonly text: string };
 
-/** The next `>` or one of the six at or after each position, `-1` where there is none. */
 const autolinkEndsOf = (text: string): Int32Array =>
   nextStopsOf(text, (ch) => ch === ">" || isSix(ch));
 
-/** Each `[`-form and autolink in order and extent: inline first, then reference, then
- * bare, then autolink. */
-/** Where the inline form after `bracket` ends, or `undefined` when it is none. */
 const inlineFormAt = (prose: string, bracket: number, ending: Int32Array): number | undefined => {
   if (prose[bracket + 1] !== "(") return undefined;
   const closed = ending[bracket + 2] ?? -1;
   return closed === -1 ? undefined : closed + 1;
 };
 
-/** Where the reference form after `bracket` ends, or `undefined` when it is none. */
 const referenceFormAt = (
   prose: string,
   at: number,
@@ -68,8 +61,6 @@ const referenceFormAt = (
   return reference === -1 ? undefined : reference + 1;
 };
 
-/** Where the `[`-form starting at `at` ends, in the expression's order: inline, then
- * reference, then bare. */
 const bracketFormAt = (
   prose: string,
   at: number,
@@ -112,14 +103,12 @@ const linkMatchesOf = (prose: string): readonly Found[] => {
   return found;
 };
 
-/** Where the run of `mark` starting at `at` ends. */
 const markRunOf = (body: string, at: number, mark: string): number => {
   let marker = at;
   while (body[marker] === mark) marker += 1;
   return marker;
 };
 
-/** The spaces before a fence or a definition, at most three. */
 const leadingSpacesOf = (body: string, at: number): number => {
   let spaces = 0;
   while (spaces < 4 && body[at + spaces] === " ") spaces += 1;
@@ -128,7 +117,6 @@ const leadingSpacesOf = (body: string, at: number): number => {
 
 type OpenedFence = { readonly mark: string; readonly marks: number; readonly lineEnd: number };
 
-/** The fence opening at the line start `at`, or `undefined` when the line opens none. */
 const openedFenceAt = (body: string, at: number): OpenedFence | undefined => {
   const spaces = leadingSpacesOf(body, at);
   const opened = at + spaces;
@@ -140,8 +128,6 @@ const openedFenceAt = (body: string, at: number): OpenedFence | undefined => {
   return lineEnd === -1 ? undefined : { mark, marks: run - opened, lineEnd };
 };
 
-/** Where the line at `at` ends, when only spaces or tabs follow its marks to a line feed
- * or the string's end; `-1` otherwise. */
 const closingAt = (body: string, at: number, mark: string, marks: number): number => {
   const spaces = leadingSpacesOf(body, at);
   if (spaces > 3) return -1;
@@ -152,7 +138,6 @@ const closingAt = (body: string, at: number, mark: string, marks: number): numbe
   return body[tail] === "\n" || tail === body.length ? tail : -1;
 };
 
-/** Where the fence opened at `lineEnd`'s line closes, or `-1` when no line closes it. */
 const closingLineEnd = (body: string, from: number, mark: string, marks: number): number => {
   for (let at = from; at < body.length; at = lineStartFrom(body, at + 1)) {
     const end = closingAt(body, at, mark, marks);
@@ -161,8 +146,6 @@ const closingLineEnd = (body: string, from: number, mark: string, marks: number)
   return -1;
 };
 
-/** Each fenced block's extent: a line of three or more marks, closed by as long a line
- * or the string's end. */
 const fencedBlocksOf = (body: string): readonly { start: number; end: number }[] => {
   const blocks: { start: number; end: number }[] = [];
   for (let at = 0; at < body.length; at = lineStartFrom(body, at + 1)) {
@@ -246,8 +229,6 @@ const normalisedLabel = (label: string): string =>
 const labelKey = (label: string): string =>
   label.startsWith("^") ? `^${normalisedLabel(label.slice(1))}` : normalisedLabel(label);
 
-/** The first run of more than the six after the six that follow `from`, and where it
- * ends. */
 const targetAfter = (
   prose: string,
   from: number,
@@ -262,8 +243,6 @@ const targetAfter = (
 
 type Definition = { readonly key: string; readonly target: string; readonly end: number };
 
-/** The definition at the line start `at`: a label without `]`, a colon at once, a
- * target after the six. */
 const definitionAt = (prose: string, at: number, close: Int32Array): Definition | undefined => {
   const spaces = leadingSpacesOf(prose, at);
   const opened = at + spaces;

@@ -1,4 +1,3 @@
-/** The journeys' test workspace as the fixture command makes it and the journeys check it. */
 export const INVENTED_MEMBERS = 51;
 
 /** Numbered from 01, so a list in address order is in number order. */

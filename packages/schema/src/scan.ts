@@ -17,7 +17,6 @@ export const nextOf = (text: string, close: string): Int32Array =>
 
 const SCHEME = /[a-z0-9+.-]/i;
 
-/** Where the autolink's scheme and colon end, or `undefined` when `at` opens none. */
 const colonAfter = (text: string, at: number): number | undefined => {
   if (!/[a-z]/i.test(text[at + 1] ?? "")) return undefined;
   let scheme = at + 2;

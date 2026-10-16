@@ -367,7 +367,6 @@ const invitationEmailCounterUpdate = createUpdateSchema(
   invitationEmailCounterRefinements,
 );
 
-/** What an address carries after its `@`, lower-cased, so a match is a plain comparison. */
 const isTestingDomain = (testingDomain: string): boolean =>
   testingDomain === testingDomain.toLowerCase() &&
   EMAIL_ADDRESS.safeParse(`mark@${testingDomain}`).success;
@@ -418,7 +417,6 @@ const sweepPassUpdate = createUpdateSchema(sweepPass, sweepPassRefinements);
 
 export { ACTOR_ID } from "./actor-id.ts";
 
-/** A list's entries are flat: text, or null where the entry has none. */
 const detailEntry = z.record(z.string(), z.union([z.string(), z.null()]));
 
 const detail = z.union([
@@ -644,8 +642,6 @@ const conceptSensitivityOverrideUpdate = createUpdateSchema(
 );
 
 const rulesInForce = z.union([
-  // Spelled out against the tuple: `satisfies` refuses a key it lacks and a member the literal
-  // misses.
   z.strictObject({
     default_on: z.boolean(),
     default_off: z.boolean(),
@@ -719,7 +715,6 @@ const subjectIdentifier = z.string().trim().min(1).max(SUBJECT_IDENTIFIER_MAX);
 const subjectIdentifierList = z.array(subjectIdentifier).max(SUBJECT_IDENTIFIERS_MAX);
 const identifierSetOf = (emailsMax: number) =>
   z.union([
-    // As above: the tuple's members, each spelled out and checked against it.
     z.strictObject({
       emails: z.array(subjectIdentifier).max(emailsMax),
       names: subjectIdentifierList,

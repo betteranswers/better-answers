@@ -29,7 +29,6 @@ const byByte = (a: string, b: string): number =>
  */
 export const contractFiles = (root: string): readonly string[] =>
   readdirSync(root, { recursive: true, withFileTypes: true })
-    // A link is a path, not content, and `isFile` is already false for one.
     .filter((entry) => entry.isFile())
     .map((entry) =>
       path.relative(root, path.join(entry.parentPath, entry.name)).split(path.sep).join("/"),

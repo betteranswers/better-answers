@@ -202,7 +202,6 @@ const CONCEPT_SEARCH = [
   `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, body), 'C')`,
 ].join(" || ");
 
-/** The folder directly under `knowledge/`, and null for a file that sits in none. */
 const CONCEPT_COLLECTION = `substring(path from '^knowledge/([^/]+)/')`;
 
 export const conceptIndex = withRLS(
