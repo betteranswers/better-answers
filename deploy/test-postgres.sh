@@ -18,7 +18,8 @@ digest="${pinned##*@sha256:}"
 
 # Each pinned image gets its own server, so worktrees on different pins never share one.
 project="${stem}-${digest:0:12}"
-port="${TEST_POSTGRES_PORT:-$((55434 + 16#${digest:0:4} % 1000))}"
+derived_port="$((55434 + 16#${digest:0:4} % 1000))"
+port="${TEST_POSTGRES_PORT:-${derived_port}}"
 [[ "${port}" =~ ^[1-9][0-9]{0,4}$ ]] && [ "${port}" -le 65535 ] || refuse "TEST_POSTGRES_PORT is not a port number"
 export TEST_POSTGRES_IMAGE="${pinned}" TEST_POSTGRES_PORT="${port}"
 
@@ -50,6 +51,8 @@ up() {
   bound="$(compose port postgres 5432)"
   say "up on ${bound}; point the test suites at it with:"
   printf 'export TEST_POSTGRES_URI=shared\n'
+  # The harnesses derive the same port from the pin, so a server moved off it must be named to them.
+  [ "${bound##*:}" = "${derived_port}" ] || printf 'export TEST_POSTGRES_PORT=%s\n' "${bound##*:}"
   say "deploy/test-postgres.sh down stops it and discards all its data"
   others="$(underStem | grep -vxF "${project}" | tr '\n' ' ' || true)"
   [ -z "${others}" ] || say "also running: ${others% } — deploy/test-postgres.sh down --all clears them"

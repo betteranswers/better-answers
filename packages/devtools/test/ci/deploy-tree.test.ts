@@ -99,6 +99,16 @@ const postgresVersioning = (): ((tag: string) => Record<string, string> | undefi
   return (tag) => pattern.exec(tag)?.groups;
 };
 
+const postgresPinAsRenovateReadsIt = (): Record<string, string> | undefined => {
+  const renovate = renovateSchema.parse(JSON.parse(read("renovate.json")));
+  const manager = renovate.customManagers.find((candidate) =>
+    candidate.managerFilePatterns.some((pattern) =>
+      new RegExp(pattern.slice(1, -1)).test(POSTGRES_PIN),
+    ),
+  );
+  return new RegExp(manager?.matchStrings[0] ?? "^$").exec(read(POSTGRES_PIN))?.groups;
+};
+
 const groupOf = (match: RegExpMatchArray, name: string): string => match.groups?.[name] ?? "";
 
 const releaseJobsSchema = z.object({
@@ -782,6 +792,16 @@ describe("the deploy tree", () => {
       nextMajor: "19",
       floating: undefined,
       otherBase: "bookworm",
+    });
+  });
+
+  it("matches the pin's image, tag and digest for Renovate", () => {
+    const pinned = /"([^"]+)"/.exec(read(POSTGRES_PIN))?.[1] ?? "";
+
+    expect(postgresPinAsRenovateReadsIt()).toEqual({
+      depName: pinned.split(":")[0],
+      currentValue: pinned.split(":")[1]?.split("@")[0],
+      currentDigest: pinned.split("@")[1],
     });
   });
 

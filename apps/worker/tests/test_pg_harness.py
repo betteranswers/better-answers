@@ -244,6 +244,26 @@ def _uri_at(port: int) -> str:
     return f"postgresql://postgres:postgres@127.0.0.1:{port}/postgres"
 
 
+@pytest.fixture(name="pinned_image_port", scope="module")
+def a_server_stamped_with_the_pinned_image() -> Iterator[int]:
+    stamp = f"postgres -c better_answers.image={pinned_postgres_image()}"
+    with _throwaway_postgres(stamp) as port:
+        yield port
+
+
+@pytest.mark.xdist_group("throwaway-postgres")
+def test_shared_accepts_a_server_stamped_with_the_pinned_image(
+    pinned_image_port: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(LOCATOR, SHARED)
+    monkeypatch.setenv(PORT_OVERRIDE, str(pinned_image_port))
+
+    cluster = _migrated_cluster.__wrapped__()
+
+    assert urlsplit(cluster.conninfo).port == pinned_image_port
+    assert cluster.template.startswith("tpl_py_")
+
+
 @pytest.mark.xdist_group("throwaway-postgres")
 def test_shared_refuses_a_server_with_no_image_stamp(
     unstamped_port: int, monkeypatch: pytest.MonkeyPatch

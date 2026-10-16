@@ -133,6 +133,10 @@ describe("the shared test postgres", () => {
     expect(upFirst.stdout).toContain("deploy/test-postgres.sh down");
   });
 
+  it("names a port moved off the derived one", () => {
+    expect(upFirst.stdout.split("\n")).toContain(`export TEST_POSTGRES_PORT=${String(port)}`);
+  });
+
   it("signs the printed URI in as a superuser", async () => {
     expect(await queried("SELECT rolsuper FROM pg_roles WHERE rolname = current_user")).toEqual([
       { rolsuper: true },

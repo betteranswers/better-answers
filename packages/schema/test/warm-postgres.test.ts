@@ -716,16 +716,18 @@ const scriptUriLine = async (): Promise<string | undefined> => {
 describe("the warm harness under TEST_POSTGRES_URI=shared", () => {
   let unstamped: StartedPostgreSqlContainer | undefined;
   let stampedOther: StartedPostgreSqlContainer | undefined;
+  let stampedOurs: StartedPostgreSqlContainer | undefined;
 
   beforeAll(async () => {
-    [unstamped, stampedOther] = await Promise.all([
+    [unstamped, stampedOther, stampedOurs] = await Promise.all([
       throwawayPostgres(POSTGRES_COMMAND),
       throwawayPostgres([...POSTGRES_COMMAND, "-c", `better_answers.image=${OTHER_IMAGE}`]),
+      throwawayPostgres([...POSTGRES_COMMAND, "-c", `better_answers.image=${POSTGRES_IMAGE}`]),
     ]);
   }, 300_000);
 
   afterAll(async () => {
-    await Promise.all([unstamped?.stop(), stampedOther?.stop()]);
+    await Promise.all([unstamped?.stop(), stampedOther?.stop(), stampedOurs?.stop()]);
   });
 
   const running = (
@@ -740,6 +742,15 @@ describe("the warm harness under TEST_POSTGRES_URI=shared", () => {
 
   it("derives the address the script prints", async () => {
     expect(sharedUri()).toBe(await scriptUriLine());
+  });
+
+  it("accepts a server stamped with the pinned image", async () => {
+    const started = await startInChild("shared", portOf(stampedOurs));
+
+    expect({ failure: started.failure, source: started.source }).toEqual({
+      failure: undefined,
+      source: "shared",
+    });
   });
 
   it("refuses an unstamped server under shared", async () => {
