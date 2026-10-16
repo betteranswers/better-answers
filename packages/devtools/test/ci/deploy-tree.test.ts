@@ -140,7 +140,68 @@ const composeServices = (file: string): readonly { name: string; body: string }[
   }));
 };
 
+const PINNED_BY_DIGEST = /^[^\s@$]+@(?:sha256:[0-9a-f]{64}|\$\{\w+_DIGEST:\?[^}]*\})$/;
+
+/** The two Postgres launchers export these from the pin, so each file starts on the pin's digest. */
+const SET_FROM_THE_POSTGRES_PIN = /^\$\{(?:LOCAL|TEST)_POSTGRES_IMAGE:\?[^}]*\}$/;
+
+const digestless = (directory: string): readonly string[] =>
+  readdirSync(directory)
+    .filter((file) => /\.ya?ml$/.test(file))
+    .flatMap((file) =>
+      [...readFileSync(path.join(directory, file), "utf8").matchAll(/^[ \t]+(image|build):(.*)$/gm)]
+        .map(([, key, raw]) => {
+          const value = (raw ?? "").trim().replace(/^(["'])(.*)\1$/, "$2");
+          return { key, value: value.replace(SET_FROM_THE_POSTGRES_PIN, POSTGRES_IMAGE) };
+        })
+        .filter(({ key, value }) => key === "build" || !PINNED_BY_DIGEST.test(value))
+        .map(({ key, value }) => `${file}: ${key ?? ""}: ${value}`),
+    );
+
+const DIGEST_RULE =
+  "Every image a deploy compose file runs is pinned by digest, as name@sha256:<64 hex> or name@${<NAME>_DIGEST:?…}, so the file refuses to start without one; no service builds its image";
+
 describe("the deploy tree", () => {
+  it("runs every compose image by its digest", () => {
+    expect({
+      rule: DIGEST_RULE,
+      unpinned: digestless(path.join(repositoryRoot, "deploy")),
+    }).toEqual({
+      rule: DIGEST_RULE,
+      unpinned: [],
+    });
+  });
+
+  it("reports a compose image a digest does not pin", () => {
+    const work = mkdtempSync(path.join(tmpdir(), "compose-digests-"));
+    onTestFinished(() => {
+      rmSync(work, { recursive: true, force: true });
+    });
+    writeFileSync(
+      path.join(work, "stores.compose.yaml"),
+      read("deploy/stores.compose.yaml").replace(
+        /(image: alpine:[^@\s]+)@sha256:[0-9a-f]{64}/,
+        "$1",
+      ),
+    );
+    writeFileSync(
+      path.join(work, "platform.compose.yaml"),
+      read("deploy/platform.compose.yaml").replace("WORKER_IMAGE_DIGEST:?", "WORKER_IMAGE_DIGEST?"),
+    );
+    writeFileSync(path.join(work, "built.compose.yaml"), "services:\n  db:\n    build: .\n");
+    writeFileSync(
+      path.join(work, "copy.compose.yaml"),
+      "services:\n  db:\n    image: ${DB_IMAGE:?}\n",
+    );
+
+    expect([...digestless(work)].sort()).toEqual([
+      "built.compose.yaml: build: .",
+      "copy.compose.yaml: image: ${DB_IMAGE:?}",
+      "platform.compose.yaml: image: ghcr.io/betteranswers/worker@${WORKER_IMAGE_DIGEST?set by the release workflow}",
+      "stores.compose.yaml: image: alpine:3.23.5",
+    ]);
+  });
+
   it("carries no `<read on the day>` placeholder in parsed fields", () => {
     for (const file of [
       "deploy/backup.Dockerfile",
@@ -176,7 +237,6 @@ describe("the deploy tree", () => {
   it("runs the backup service by the digest build.yml pushes", () => {
     const stores = read("deploy/stores.compose.yaml");
     expect(stores).toContain("ghcr.io/betteranswers/backup@${BACKUP_IMAGE_DIGEST:?");
-    expect(stores).not.toMatch(/^\s+build:/m);
     expect(read(".github/workflows/build.yml")).toMatch(
       /tier: backup\n\s+context: deploy\n\s+dockerfile: deploy\/backup\.Dockerfile/,
     );
