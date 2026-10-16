@@ -8,6 +8,7 @@ import uuid
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, suppress
+from datetime import UTC, datetime, timedelta
 from functools import partial
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -247,6 +248,108 @@ def test_drops_a_killed_builders_leftover_and_publishes(
     assert _row_of(maintenance, leftover) is None
     assert _row_of(maintenance, name) == (True, False)
     assert _tables_cloned_from(maintenance, name) == {"fresh"}
+
+
+LONG_AGO = "2020-01-01T00:00:00.000Z"
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _planted(
+    maintenance: str, unique: Callable[[str], str], stamp: str | None, prefix: str
+) -> str:
+    name = unique(prefix)
+    with _admin(maintenance) as admin:
+        admin.execute(
+            SQL(
+                "CREATE DATABASE {} WITH IS_TEMPLATE true ALLOW_CONNECTIONS false"
+            ).format(Identifier(name))
+        )
+        if stamp is not None:
+            admin.execute(
+                SQL("COMMENT ON DATABASE {} IS {}").format(
+                    Identifier(name), Literal(stamp)
+                )
+            )
+    return name
+
+
+def _stamp_of(maintenance: str, database: str) -> datetime | None:
+    with _admin(maintenance) as admin:
+        row = admin.execute(
+            "SELECT shobj_description(oid, 'pg_database') FROM pg_database"
+            " WHERE datname = %s",
+            (database,),
+        ).fetchone()
+    return None if row is None or row[0] is None else datetime.fromisoformat(row[0])
+
+
+def _ensure_another(maintenance: str, unique: Callable[[str], str]) -> None:
+    ensure_template(maintenance, unique("tpl_probe"), partial(_mark, table="other"))
+
+
+def test_drops_a_day_old_template_and_keeps_fresh_ones(
+    maintenance: str, unique: Callable[[str], str]
+) -> None:
+    stale = _planted(maintenance, unique, LONG_AGO, "tpl_py_age")
+    fresh = _planted(maintenance, unique, _now(), "tpl_py_age")
+
+    _ensure_another(maintenance, unique)
+
+    assert _row_of(maintenance, stale) is None
+    assert _row_of(maintenance, fresh) == (True, False)
+
+
+def test_stamps_an_unstamped_template_rather_than_dropping_it(
+    maintenance: str, unique: Callable[[str], str]
+) -> None:
+    before = datetime.now(UTC) - timedelta(seconds=1)
+    unstamped = _planted(maintenance, unique, None, "tpl_py_age")
+
+    _ensure_another(maintenance, unique)
+
+    stamp = _stamp_of(maintenance, unstamped)
+    assert stamp is not None
+    assert stamp >= before
+
+
+# The vitest tier's real sweep would drop a tpl_ts_ plant, so a prefix no tier sweeps
+# stands in.
+def test_leaves_stale_templates_outside_its_prefix_alone(
+    maintenance: str, unique: Callable[[str], str]
+) -> None:
+    theirs = _planted(maintenance, unique, LONG_AGO, "tpl_probe_age")
+
+    _ensure_another(maintenance, unique)
+
+    assert _row_of(maintenance, theirs) == (True, False)
+
+
+def test_drops_a_killed_builders_leftover_under_another_name(
+    maintenance: str, unique: Callable[[str], str]
+) -> None:
+    orphan = f"{unique('tpl_py_age')}_building"
+    _create(maintenance, orphan)
+
+    _ensure_another(maintenance, unique)
+
+    assert _row_of(maintenance, orphan) is None
+
+
+def test_stamps_the_ensured_template_with_the_time_of_use(
+    maintenance: str, unique: Callable[[str], str]
+) -> None:
+    name = unique("tpl_probe")
+    ensure_template(maintenance, name, partial(_mark, table="used"))
+    before = datetime.now(UTC) - timedelta(seconds=1)
+
+    ensure_template(maintenance, name, partial(_mark, table="used"))
+
+    stamp = _stamp_of(maintenance, name)
+    assert stamp is not None
+    assert stamp >= before
 
 
 CHILD_OPENS_ONE_CLONE = """

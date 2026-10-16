@@ -195,6 +195,7 @@ What to expect:
 - `up` refuses when the server already runs on an image other than this checkout's pin. Replacing it would wipe every other worktree's live run. Run `down` and then `up` when nothing else is using it, or leave the variable unset on that branch.
 - If the server runs out of memory, Postgres stops every session at once, and every run using it fails together. `down` then `up` clears it.
 - A run's databases carry its process id. A run that is killed leaves them behind, and the next run on the machine drops them once that process has gone.
+- Each run stamps its template with the time it used it. A template no run has used for a day is dropped by the next run of the same tier, so old migration sets do not fill the server. A run held open for longer than a day can lose its template; restart it and it rebuilds one.
 - `pnpm reap-containers` and Ryuk select only containers testcontainers labelled, so neither touches the shared server.
 - Some test files still start a server of their own: the two that replay part of the migration history, `roles-surface.test.ts` and `apps/api/tests/browse-role.test.ts`, which read or alter roles across the whole server, and the case in `warm-postgres.test.ts` that proves the path without a warm server. Garage still starts a container per run.
 

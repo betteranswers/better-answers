@@ -59,7 +59,7 @@ Each run already shares one container across its own test files (`packages/schem
 ### Scope Boundaries
 
 - The three test files that start a server of their own keep doing so: `packages/schema/test/knowledge-words-end-to-end.test.ts` and `packages/schema/test/concept-description-migration.test.ts` replay part of the migration history, and `apps/api/tests/browse-role.test.ts` alters a role that belongs to the whole server. A fourth site, the cold-path case in `packages/schema/test/warm-postgres.test.ts`, starts a container on purpose to prove the path without a warm cluster. A fifth, `packages/schema/test/roles-surface.test.ts`, moves off the warm harness onto a server of its own (U3), because it asserts every role on the server and the shared instance keeps the worker's login role between runs. R1 covers the per-file databases the warm harness opens.
-- Not built: a cleanup job for old templates. U1 sizes the tmpfs to hold stale templates beside peak clones, and `down` clears them all. A full tmpfs shows as Postgres stopping every session at once on a failed WAL write. Revisit if that is seen.
+- Template cleanup was first left out here. The owner reversed that on 16/10/2026 after this plan shipped: each run now stamps its template's last use, and the next run of the same tier drops templates unused for a day (`docs/operations/local-gates.md`, *The shared test Postgres*).
 - Not built: a silent fallback to a container when the locator is set but the instance is down. That would hide the fault and bring back the load this work removes (R4).
 
 #### Deferred to Follow-Up Work

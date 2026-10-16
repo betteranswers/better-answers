@@ -32,5 +32,5 @@ services:
       - type: tmpfs
         target: /var/lib/postgresql
         tmpfs:
-          # WAL at twice its soft ceiling (1 GiB), 88 clones and 16 stale templates at 16 MB (12 measured), a 40 MB empty cluster.
+          # WAL at twice its soft ceiling (1 GiB), 88 clones and a day's 16 templates at 16 MB (12 measured), a 40 MB empty cluster.
           size: 3gb
