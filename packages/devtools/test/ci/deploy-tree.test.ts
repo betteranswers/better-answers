@@ -87,27 +87,24 @@ const renovateSchema = z.object({
 
 const POSTGRES_PIN = "packages/schema/src/postgres-image.ts";
 
+const postgresPinManager = () =>
+  renovateSchema
+    .parse(JSON.parse(read("renovate.json")))
+    .customManagers.find((candidate) =>
+      candidate.managerFilePatterns.some((pattern) =>
+        new RegExp(pattern.slice(1, -1)).test(POSTGRES_PIN),
+      ),
+    );
+
 /** Renovate's regex versioning reads these named groups; the pin's major must be Postgres's. */
 const postgresVersioning = (): ((tag: string) => Record<string, string> | undefined) => {
-  const renovate = renovateSchema.parse(JSON.parse(read("renovate.json")));
-  const manager = renovate.customManagers.find((candidate) =>
-    candidate.managerFilePatterns.some((pattern) =>
-      new RegExp(pattern.slice(1, -1)).test(POSTGRES_PIN),
-    ),
-  );
-  const pattern = new RegExp((manager?.versioningTemplate ?? "").replace(/^regex:/, ""));
+  const versioning = postgresPinManager()?.versioningTemplate ?? "";
+  const pattern = new RegExp(versioning.replace(/^regex:/, ""));
   return (tag) => pattern.exec(tag)?.groups;
 };
 
-const postgresPinAsRenovateReadsIt = (): Record<string, string> | undefined => {
-  const renovate = renovateSchema.parse(JSON.parse(read("renovate.json")));
-  const manager = renovate.customManagers.find((candidate) =>
-    candidate.managerFilePatterns.some((pattern) =>
-      new RegExp(pattern.slice(1, -1)).test(POSTGRES_PIN),
-    ),
-  );
-  return new RegExp(manager?.matchStrings[0] ?? "^$").exec(read(POSTGRES_PIN))?.groups;
-};
+const postgresPinAsRenovateReadsIt = (): Record<string, string> | undefined =>
+  new RegExp(postgresPinManager()?.matchStrings[0] ?? "^$").exec(read(POSTGRES_PIN))?.groups;
 
 const groupOf = (match: RegExpMatchArray, name: string): string => match.groups?.[name] ?? "";
 
