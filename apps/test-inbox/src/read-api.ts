@@ -10,7 +10,6 @@ export type Logged = (event: string, detail: Readonly<Record<string, string | nu
 
 type ReadApi = {
   readonly store: Store;
-  /** Undefined while the secret is unset or too short to trust. */
   readonly token: string | undefined;
   readonly nowMs: number;
   readonly logged: Logged;
@@ -123,7 +122,6 @@ const routeOf = (pathname: string): Route | undefined => {
   return id === undefined ? undefined : { allowed: "GET", answer: (api) => retrieved(api, id) };
 };
 
-/** Answers JSON on every path, never a redirect or a page, and reads nothing for a refused one. */
 export const answer = async (request: Request, api: ReadApi): Promise<Response> => {
   if (api.token === undefined) return refused(503, "not_configured");
   if (!(await admits(request.headers.get("authorization"), api.token))) {

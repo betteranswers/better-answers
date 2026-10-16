@@ -109,7 +109,6 @@ const rowAt = (line: string, number: number): Outcome<Row> => {
   return { refused: [`line ${number}: ${issue?.path.join(".")} ${issue?.message}`] };
 };
 
-/** One malformed line refuses the whole file. */
 const rowsIn = (tsv: string): Outcome<readonly Row[]> => {
   const [header, ...lines] = tsv.replace(/\n$/, "").split("\n");
   if (header !== HEADER) return { refused: [`line 1: the header is not ${COLUMNS.join(", ")}`] };
@@ -191,7 +190,6 @@ const keyName = (key: PropertyKey): string | undefined => {
 const bindingName = ({ declarations: [first] }: VariableDeclaration): string | undefined =>
   first?.id.type === "Identifier" ? first.id.name : undefined;
 
-/** Keyed by where each declaration starts, an export by where its keyword does. */
 const declaredAt = (program: Program): ReadonlyMap<number, string> => {
   const names = new Map<number, string>();
   const exported: (readonly [number, number])[] = [];
@@ -225,7 +223,6 @@ const declaredAt = (program: Program): ReadonlyMap<number, string> => {
   return names;
 };
 
-/** Directly above means nothing but one line break between the block and the declaration. */
 const attachedTo = (source: string, cut: Cut, declared: ReadonlyMap<number, string>): string => {
   const gap = /^[ \t]*(?:\r?\n)?[ \t]*/.exec(source.slice(cut.end))?.[0].length ?? 0;
   return declared.get(cut.end + gap) ?? "";
@@ -233,7 +230,6 @@ const attachedTo = (source: string, cut: Cut, declared: ReadonlyMap<number, stri
 
 const wordsIn = (prose: string): number => prose.match(/\S+/g)?.length ?? 0;
 
-/** Blocks are grouped as the comment gate groups them; a directive or notice is a row of its own. */
 const foundIn = (file: string, source: string): readonly Found[] => {
   const { program, comments, lineOf } = parsedSource(file, source);
   const all = comments.map((comment) => grouped(source, lineOf, comment));
@@ -296,7 +292,6 @@ const timesIn = (source: string, text: string): number => {
   return times;
 };
 
-/** Reads a file as the whole TSV would leave it, so an anchor inside a deleted block holds nothing. */
 type Survivor = (file: string) => string | undefined;
 
 const survivorOf = (root: string, rows: readonly Row[]): Survivor => {
@@ -337,7 +332,6 @@ const rowRefusals = (survivor: Survivor, row: Row): readonly string[] => {
 
 type Planned = { readonly file: string; readonly source: string; readonly cuts: readonly Found[] };
 
-/** Identical blocks are deleted together or not at all, so a position never picks between them. */
 const located = (
   file: string,
   source: string | undefined,
@@ -507,7 +501,6 @@ const COMMANDS = new Map([
   ["check", check],
 ]);
 
-/** Paths are read from the working directory, so a suite can run it over a throwaway tree. */
 export const commentInventory = (argv: readonly string[]): number => {
   const [name = "", ...rest] = argv;
   const command = COMMANDS.get(name);

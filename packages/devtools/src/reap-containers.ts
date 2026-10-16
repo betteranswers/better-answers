@@ -10,10 +10,6 @@ const RYUK_LABEL = "org.testcontainers.ryuk";
 /** The Python library labels its Ryuk with neither label above, so only the name gives its session. */
 const RYUK_NAME = /^testcontainers-ryuk-(?<session>.+)$/;
 
-/**
- * A running container may be a live run's with Ryuk turned off, and a running Ryuk may yet clear
- * its session.
- */
 const STOPPED = new Set(["exited", "dead"]);
 
 const SHORT_ID = 12;
@@ -64,7 +60,6 @@ const listed = (): readonly Listed[] | undefined => {
   }
 };
 
-/** Ryuk leaves once its session's last process has, so no Ryuk up means no run left to clear it. */
 const endedIn = (rows: readonly Listed[]): readonly Listed[] => {
   const served = new Set(
     rows.filter((row) => isRyuk(row) && !STOPPED.has(row.state)).map((row) => sessionOf(row)),
@@ -94,10 +89,6 @@ const dryRunFrom = (argv: readonly string[]): boolean | undefined => {
   return undefined;
 };
 
-/**
- * Removes stopped testcontainers containers no Ryuk serves; `--dry-run` only names them. Exits 0
- * when done, 2 on a usage error, 1 when docker fails.
- */
 export const reapContainers = (argv: readonly string[]): number => {
   const dryRun = dryRunFrom(argv);
   if (dryRun === undefined) {

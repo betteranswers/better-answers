@@ -13,7 +13,6 @@ const DOCUMENTED_SOURCE = /[/\\]packages[/\\](?:core|schema)[/\\]src[/\\]/;
 
 const wordsIn = (prose: string): number => prose.match(/\S+/g)?.length ?? 0;
 
-/** Undefined means a separator the directive needs is missing, so it gives no reason at all. */
 const reasonOf = (prose: string, opened: Opened): string | undefined => {
   const rest = prose.slice(opened.opening[0].length);
   const { separator } = opened.directive;

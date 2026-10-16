@@ -49,13 +49,11 @@ export const isExempt = (comment: Comment): boolean => {
   return NOTICE.test(prose) || directiveIn(prose) !== undefined;
 };
 
-/** A dropped exempt comment leaves a gap in the line count, so it still ends a block. */
 const joins = (text: string, previous: Comment, comment: Comment): boolean =>
   standsAlone(text, previous) &&
   standsAlone(text, comment) &&
   comment.loc.start.line === previous.loc.end.line + 1;
 
-/** Touching stand-alone line comments form one block; a directive or notice belongs to none. */
 export const blocksIn = (text: string, comments: readonly Comment[]): readonly Block[] => {
   const blocks: [Comment, ...Comment[]][] = [];
   for (const comment of comments) {

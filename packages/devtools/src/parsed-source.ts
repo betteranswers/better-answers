@@ -5,11 +5,9 @@ export type ParsedSource = {
 
   readonly comments: readonly Comment[];
 
-  /** Counts from 1. */
   readonly lineOf: (offset: number) => number;
 };
 
-/** @throws when the file does not parse, which would otherwise read as holding nothing. */
 export const parsedSource = (file: string, source: string): ParsedSource => {
   const parsed = parseSync(file, source);
   const [first] = parsed.errors;

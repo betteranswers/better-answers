@@ -10,7 +10,6 @@ import { parsedSource } from "./parsed-source.ts";
 
 const REFUSAL_TYPE = /Refusal$/;
 
-/** A `…OfClass` type takes refusal classes, and a class is no word. */
 const TAKES_CLASSES = /OfClass$/;
 
 export type UnionWord = { readonly word: string; readonly line: number };
@@ -27,7 +26,6 @@ const argumentWords = ({ typeName, typeArguments }: TSTypeReference): readonly F
     ? []
     : (typeArguments?.params ?? []).flatMap(wordsOf);
 
-/** Never an object type's properties, which hold its shape: a `kind`, an `address`. */
 const wordsOf = (type: TSType): readonly Found[] => {
   switch (type.type) {
     case "TSLiteralType":
@@ -44,10 +42,6 @@ const wordsOf = (type: TSType): readonly Found[] => {
   }
 };
 
-/**
- * `RefusalOf<typeof …Action>` resolves to the declaration's `refuses` list, so the list is read
- * where it is written; a syntax walk cannot resolve the alias.
- */
 const refusesWords = ({ callee, arguments: [declaration] }: CallExpression): readonly Found[] => {
   if (callee.type !== "Identifier" || callee.name !== "declareAction") return [];
   if (declaration?.type !== "ObjectExpression") return [];

@@ -8,7 +8,6 @@ export const attempted = async <T>(work: () => Promise<Result<T>>): Promise<Resu
   try {
     return await work();
   } catch (error) {
-    // Each caller answers this error with a 503, or logs it.
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
 };

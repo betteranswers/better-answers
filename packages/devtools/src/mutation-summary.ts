@@ -83,8 +83,6 @@ const byIdentity = (report: Report): ReadonlyMap<string, readonly Placed[]> => {
     if (group === undefined) groups.set(key, [placed]);
     else group.push(placed);
   }
-  // Position order, never the report's: Stryker's mutant order moves between runs, and a
-  // survivor paired with the wrong occurrence reads as a lost kill.
   for (const group of groups.values()) group.sort(byPlace);
   return groups;
 };
@@ -194,7 +192,6 @@ const FAULT_CONSEQUENCE =
 
 const FROM_CHECKPOINT = ", read from the checkpoint since the run wrote no report";
 
-/** A mutant that ran no test, or a leg that killed none, is a broken runner: never a low score. */
 const runnerFault = (report: Report): string | undefined => {
   const mutants = mutantsOf(report);
   const covered = mutants.filter((mutant) => killed(mutant) || mutant.status === "Survived");
@@ -207,10 +204,6 @@ const runnerFault = (report: Report): string | undefined => {
   return undefined;
 };
 
-/**
- * The checkpoint is read only when there is no report: a leg cancelled at its ceiling
- * writes none.
- */
 const faultOf = (
   leg: string,
   report: Report | undefined,
@@ -224,14 +217,9 @@ const faultOf = (
 
 type SummaryRun = {
   readonly summary: string;
-  /** Set when the leg must fail, and named first in the summary. */
   readonly fault: string | undefined;
 };
 
-/**
- * An undefined `report` is a run that wrote none; `checkpoint` then stands in for it only to
- * find a runner fault.
- */
 export const mutationSummary = (
   leg: string,
   report: Report | undefined,

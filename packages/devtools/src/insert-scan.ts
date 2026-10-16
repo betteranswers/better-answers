@@ -1,13 +1,11 @@
 import { filesUnderEach, isTestPath } from "./paths.ts";
 
-/** A statement, not the two words: it opens a string literal, or a line inside a long one. */
 const RAW_INSERT = /(?:^|["'`])\s*insert\s+into\s+["'`]?[a-z_]/i;
 
 const SCANNED = /\.(?:tsx?|py)$/;
 
 export const WHERE_THE_LIST_LIVES = "packages/devtools/src/insert-scan.ts";
 
-/** A file cannot become a factory by being written beside a suite, so each one is named here. */
 export const FACTORY_MODULES = [
   "apps/worker/tests/factories.py",
   "apps/worker/tests/pg_harness.py",
@@ -25,7 +23,6 @@ export const SCAN_EXECUTABLE = {
   path: ["..", "..", "scripts", "insert-scan.mjs"],
 } as const;
 
-/** The suites' territory: a test by its name, and every module that sits among them. */
 export const isSuiteFile = (file: string): boolean => SCANNED.test(file) && isTestPath(file);
 
 export const isFactoryModule = (file: string): boolean => FACTORY_MODULES.includes(file);
@@ -37,7 +34,6 @@ export const scannedFilesUnder = (root: string, roots: readonly string[]): reado
 
 export type RawInsert = { readonly file: string; readonly line: number };
 
-/** `file` only labels each finding; `line` counts from 1. */
 export const rawInsertsIn = (file: string, source: string): readonly RawInsert[] =>
   source
     .split("\n")

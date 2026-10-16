@@ -28,7 +28,6 @@ const docBlockOf = (block: Block): string => {
   return ["/**", ...starred, " */"].join("\n");
 };
 
-/** A directive reaches past `//` lines to the code, so the run under one stays `//`. */
 const underADirective = (text: string, comments: readonly Comment[], block: Block): boolean =>
   comments.some(
     (comment) =>

@@ -6,7 +6,6 @@ import { isTestPath } from "./paths.ts";
 import { executableOf, runsOverThrowawayTree } from "./throwaway-tree.ts";
 import type { Tree } from "./throwaway-tree.ts";
 
-/** Comment lines per code line; an arm over its figure fails the gate. */
 export const CEILING = { source: 0.1, test: 0.05 } as const;
 
 export type Arm = keyof typeof CEILING;
@@ -33,11 +32,8 @@ export const clocArgv = (paths: readonly string[]): readonly string[] => [
   "--by-file",
   "--quiet",
 
-  // Without it cloc counts a file with a twin elsewhere once, and an arm loses its lines.
   "--skip-uniqueness",
 
-  // The per-file guard drops the file it fires on and writes prose after the JSON, so the
-  // count is short and the parse fails.
   "--timeout",
   "0",
   `--exclude-dir=${NEVER_WALKED.join(",")}`,
@@ -72,7 +68,6 @@ const countedIn = (output: string): readonly Counted[] =>
     .filter((counted) => MEASURED_LANGUAGES.has(counted.language))
     .sort((left, right) => left.file.localeCompare(right.file));
 
-/** A file under an `e2e`, `test` or `tests` directory, or named as a test, is `test`. */
 export const armOf = (file: string): Arm => (isTestPath(file) ? "test" : "source");
 
 export type Measured = {

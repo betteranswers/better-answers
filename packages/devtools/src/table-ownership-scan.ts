@@ -34,7 +34,6 @@ export type OwnershipMap = {
 
 export type Slice = { readonly name: string; readonly directory: string };
 
-/** Each core directory but the two, and each outside owner by its path, the deepest first. */
 export const slicesUnder = (root: string, outsideCore: readonly string[]): readonly Slice[] => {
   const inCore = readdirSync(path.join(root, CORE), { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && !NEVER_A_SLICE.has(entry.name))
@@ -58,17 +57,14 @@ const TABLE_REFERENCE = new RegExp(
   "gi",
 );
 
-/** A name followed by `AS (`, after `WITH` or a comma: a column list and `MATERIALIZED` allowed. */
 const CTE_NAME = new RegExp(
   String.raw`(?:\bWITH(?:\s+RECURSIVE)?|,)\s*(?<name>${IDENTIFIER})\s*(?:\([^()]*\)\s*)?AS\s+(?:(?:NOT\s+)?MATERIALIZED\s+)?\(`,
   "gi",
 );
 
-/** Postgres folds an unquoted name to lower case and keeps a quoted one as written. */
 const folded = (identifier: string): string =>
   identifier.startsWith('"') ? identifier.slice(1, -1) : identifier.toLowerCase();
 
-/** A table is named by schema and name; an unqualified one is on the search path, `public`. */
 const qualified = (name: string): string => {
   const parts = (name.match(new RegExp(IDENTIFIER, "gi")) ?? []).map(folded);
   return parts.length === 1 ? `public.${parts.join("")}` : parts.join(".");
@@ -119,11 +115,9 @@ const referencesIn = ({ offset, text }: Piece): readonly Reference[] =>
     verb: match.groups?.["verb"] ?? "",
   }));
 
-/** A CTE shadows only an unqualified name, so `public.member` past a `member` CTE is the table. */
 const isCte = (name: string, ctes: ReadonlySet<string>): boolean =>
   !name.includes(".") && ctes.has(folded(name));
 
-/** @throws when the file does not parse, which would otherwise read as naming no table. */
 export const tablesReadIn = (file: string, source: string): readonly TableRead[] => {
   const { program, lineOf } = parsedSource(file, source);
   return stringsIn(program, source).flatMap((pieces) => {
@@ -142,10 +136,8 @@ export const tablesReadIn = (file: string, source: string): readonly TableRead[]
 
 export type SliceRead = TableRead & { readonly slice: string | undefined };
 
-/** A write-only entry is out of reach: the slices write through helpers that take the table's name. */
 const claimsARead = ({ access }: CrossOwnerEntry): boolean => access !== "write";
 
-/** A read needs an entry that claims one; a delete is a write, which any entry covers. */
 const isDeclared = (map: OwnershipMap, { table, slice, reads }: SliceRead): boolean =>
   map.TABLE_OWNERS[table] === slice ||
   map.CROSS_OWNER_TABLE_ACCESS.some(
@@ -161,14 +153,12 @@ const refusalOf = (map: OwnershipMap, { file, line, table, slice, reads }: Slice
   return `${where}: ${slice} names ${table}, which ${String(map.TABLE_OWNERS[table])} owns, and ${WHERE_THE_MAP_LIVES} ${declared} by ${slice}; read it through its owner's face, or give it an entry with its reason in CROSS_OWNER_TABLE_ACCESS.`;
 };
 
-/** Each table a slice names beyond what it owns or declares, and each named outside a slice. */
 export const undeclaredIn = (map: OwnershipMap, reads: readonly SliceRead[]): readonly string[] =>
   reads
     .filter(({ table }) => Object.hasOwn(map.TABLE_OWNERS, table))
     .filter((read) => read.slice === undefined || !isDeclared(map, read))
     .map((read) => refusalOf(map, read));
 
-/** Each entry that claims a read no statement in its slice makes. */
 export const unreadIn = (map: OwnershipMap, reads: readonly SliceRead[]): readonly string[] =>
   map.CROSS_OWNER_TABLE_ACCESS.filter(claimsARead)
     .filter(

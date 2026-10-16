@@ -27,10 +27,8 @@ const spawnFailure = z.object({
   stderr: z.string().nullish(),
 });
 
-/** A test's own timeout cannot interrupt a synchronous run, so this is the one a hung tool meets. */
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
-/** A live tree lasts one run, inside the time limit, so a tree this old outlived a killed run. */
 const STALE_AFTER_MS = 60 * 60 * 1000;
 
 export type Tree = Readonly<Record<string, string>>;
@@ -44,13 +42,10 @@ export type Tool = {
 
   readonly env?: Readonly<Record<string, string>>;
 
-  /** The exits that mean the tool ran and reported something; any other non-zero exit throws. */
   readonly foundSomething: readonly number[];
 
-  /** Under an hour, or the sweep could take a live tree for one a killed run left. */
   readonly timeoutMs?: number;
 
-  /** A tree the tool must report on, run once when the runner is made. */
   readonly smoke: { readonly tree: Tree; readonly reports: (output: string) => boolean };
 };
 
@@ -76,10 +71,6 @@ const packageRoot = (from: ReturnType<typeof createRequire>, name: string): stri
   return directory;
 };
 
-/**
- * The binary's absolute path; throws when the package is not a dependency here or ships no such
- * file.
- */
 export const executableOf = (executable: Tool["executable"]): string => {
   const from = createRequire(import.meta.url);
   const root = packageRoot(from, executable.package);
@@ -155,7 +146,6 @@ const reportOrThrow = (tool: Tool, binary: string, timeoutMs: number, cause: unk
   );
 };
 
-/** Keyed by folder, not a flag, because the temp directory is read afresh on every run. */
 const sweptFolders = new Set<string>();
 
 const sweepStaleTrees = (folder: string): void => {
@@ -178,13 +168,8 @@ const sweptTreesFolder = (): string => {
   return folder;
 };
 
-/** A new empty folder under the swept one, so a run killed before its own removal is still swept. */
 export const sweptFolder = (): string => mkdtempSync(path.join(sweptTreesFolder(), "tree-"));
 
-/**
- * Resolves the binary and runs the smoke case now, throwing if either fails or the time limit is
- * an hour or more.
- */
 export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
   const binary = executableOf(tool.executable);
   const timeoutMs = timeoutMsFor(tool);

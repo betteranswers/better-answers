@@ -13,7 +13,6 @@ export type Statement = {
   readonly all: () => Promise<{ readonly results: readonly Row[] }>;
 };
 
-/** The few D1 calls the store makes, so a suite can drive the same SQL through `node:sqlite`. */
 export type Database = { readonly prepare: (query: string) => Statement };
 
 export type Received = {
@@ -35,7 +34,6 @@ type KeptPage = { readonly messages: readonly Kept[]; readonly hasMore: boolean 
 export type Store = {
   readonly keep: (received: Received) => Promise<Result<string>>;
   readonly prune: (nowMs: number) => Promise<Result<undefined>>;
-  /** Newest first, after the id `after` names whether or not its row is still kept. */
   readonly page: (asked: PageAsked) => Promise<Result<KeptPage>>;
   readonly message: (id: string) => Promise<Result<KeptMessage | undefined>>;
   /** Writes one row and deletes it, so a store that cannot write answers before mail is sent. */
@@ -62,7 +60,6 @@ const UNREADABLE_ROW = "D1 answered a row the store cannot read";
 const hex = (bytes: Uint8Array): string =>
   Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 
-/** Zero-padded, so ids sort as the times they were received do. */
 const mintedId = (receivedAtMs: number): string =>
   `${String(receivedAtMs).padStart(16, "0")}-${hex(crypto.getRandomValues(new Uint8Array(8)))}`;
 
@@ -95,7 +92,6 @@ const inserted = async (database: Database, id: string, received: Received): Pro
 const pageOf = async (database: Database, asked: PageAsked): Promise<Result<KeptPage>> => {
   const { results } = await database
     .prepare(PAGE)
-    // One row more than asked, whose presence answers whether more remain.
     .bind(asked.after ?? null, asked.limit + 1)
     .all();
   const rows = results.map(keptOf);
@@ -132,7 +128,6 @@ const probed = async (database: Database, nowMs: number): Promise<Result<undefin
   return ok(undefined);
 };
 
-/** Answers every D1 failure as an error, and never throws. */
 export const storeOver = (database: Database): Store => ({
   keep: (received) =>
     attempted(async () => {

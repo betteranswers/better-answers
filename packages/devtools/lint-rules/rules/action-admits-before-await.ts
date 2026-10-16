@@ -5,7 +5,6 @@ const DECLARE = "declareAction";
 
 const ADMIT = "admit";
 
-/** The shorthand admits on its own call, so only `admit` names a declaration to pair. */
 const ADMITTING = new Set([ADMIT, "requireFreshConfirmation"]);
 
 const calleeName = (node: ESTree.CallExpression): string | undefined =>
@@ -30,7 +29,6 @@ export const actionAdmitsBeforeAwaitRule = defineRule({
     },
   },
   createOnce(context) {
-    /** Whether each open function has awaited yet; the visitors fire in source order. */
     const awaited: boolean[] = [];
     const declared = new Map<string, ESTree.Node>();
     const admitted = new Set<string>();

@@ -24,8 +24,6 @@ export const stringCitesNothingRule = defineRule({
   },
   createOnce(context) {
     const refuseCitation = (node: Node, text: string): void => {
-      // A string with no space in it is an identifier, a path, a key or a version: a value,
-      // not something a person reads.
       if (!A_SPACE.test(text) || readsAsATest(context.filename)) return;
       const cited = citationIn(text);
       if (cited === undefined) return;

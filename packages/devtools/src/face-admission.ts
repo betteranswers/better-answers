@@ -20,7 +20,6 @@ import {
 
 import { parsedSource } from "./parsed-source.ts";
 
-/** A person of any role fits each. The kernel's narrower names are left out: only `admit` makes an Admin. */
 const FITS_ANY_PERSON: ReadonlySet<string> = new Set(["UserPrincipal", "Principal", "AdmittedOf"]);
 
 const ADMIT = "admit";
@@ -51,7 +50,6 @@ type Found = {
 type ReExport = { readonly name: string; readonly local: string; readonly from: string };
 
 type Module = {
-  /** Each function the file declares and exports, under the name it is exported by. */
   readonly own: ReadonlyMap<string, Found>;
   readonly named: readonly ReExport[];
   readonly whole: readonly string[];
@@ -64,14 +62,12 @@ const namesAPerson = ({ typeName }: TSTypeReference): boolean => {
   return typeName.type === "TSQualifiedName" && FITS_ANY_PERSON.has(typeName.right.name);
 };
 
-/** A declaration is passed by its name, as the lint that pairs the two reads it. */
 const passesADeclaration = ({ callee, arguments: [first] }: CallExpression): boolean =>
   callee.type === "Identifier" && callee.name === ADMIT && first?.type === "Identifier";
 
 type Marks = {
   readonly admissions: readonly number[];
 
-  /** A person named in a callback's own parameters is that callback's to take, and is left out. */
   readonly people: readonly number[];
 };
 
@@ -154,7 +150,6 @@ const importedBy = ({
           : [],
       );
 
-/** A re-export from another directory is that directory's own face to answer for. */
 const isBeside = (specifier: string): boolean => specifier.startsWith("./");
 
 type Reading = {
@@ -164,7 +159,6 @@ type Reading = {
   readonly functions: Map<string, Found>;
   readonly imports: Map<string, Imported>;
 
-  /** The exported name, then the name it goes by in the file. */
   readonly exported: Map<string, string>;
   readonly named: ReExport[];
   readonly whole: string[];
@@ -201,7 +195,6 @@ const exportNamed = (reading: Reading, statement: ExportNamedDeclaration): void 
   }
 };
 
-/** Silence on a form the reader does not follow would read as nothing exported. */
 const unread = (file: string, form: string): never => {
   throw new Error(`${file} has ${form}, which the face reader does not follow`);
 };
@@ -258,11 +251,6 @@ const moduleOf = (file: string, source: string): Module => {
 const beside = (file: string, specifier: string): string =>
   path.posix.join(path.posix.dirname(file), specifier);
 
-/**
- * A principal behind an alias goes unseen.
- *
- * @throws when a file does not parse or exports a form not followed.
- */
 export const facesAdmittingNobody = (
   sources: Sources,
   faces: readonly string[],
