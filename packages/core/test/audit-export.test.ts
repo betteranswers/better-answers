@@ -372,7 +372,8 @@ const waitingOnTheGroupTable = async (): Promise<void> => {
   for (let tries = 0; tries < 100; tries += 1) {
     const waiting = await db().pool.query<{ count: number }>(
       `SELECT count(*)::int AS count FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
-        WHERE c.relname = 'group' AND NOT l.granted`,
+        WHERE c.relname = 'group' AND NOT l.granted
+          AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())`,
     );
     if ((waiting.rows[0]?.count ?? 0) > 0) return;
     await new Promise((resolve) => setTimeout(resolve, 20));

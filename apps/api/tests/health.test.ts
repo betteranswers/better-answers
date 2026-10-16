@@ -72,10 +72,12 @@ describe("the api's health endpoint", () => {
   });
 
   it("reports unhealthy when the identity provider could not start", async () => {
-    await app.database.superuser.query("DROP DATABASE IF EXISTS unmigrated");
-    await app.database.superuser.query("CREATE DATABASE unmigrated");
+    // Several runs can share one server, so the scratch name carries this process.
+    const unmigrated = `unmigrated_${String(process.pid)}`;
+    await app.database.superuser.query(`DROP DATABASE IF EXISTS ${unmigrated} WITH (FORCE)`);
+    await app.database.superuser.query(`CREATE DATABASE ${unmigrated}`);
     const connection = new URL(String(app.database.superuser.options.connectionString));
-    connection.pathname = "/unmigrated";
+    connection.pathname = `/${unmigrated}`;
     const bare = new Pool({ connectionString: connection.href });
     const { logger, logs } = capturingLogger();
     try {
@@ -98,7 +100,7 @@ describe("the api's health endpoint", () => {
       );
     } finally {
       await bare.end();
-      await app.database.superuser.query("DROP DATABASE IF EXISTS unmigrated");
+      await app.database.superuser.query(`DROP DATABASE IF EXISTS ${unmigrated} WITH (FORCE)`);
     }
   });
 });

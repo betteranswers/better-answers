@@ -143,7 +143,8 @@ const MEMBER_SET_BACK =
 const isWaitingOnTheRoleRead = async (): Promise<boolean> => {
   const found = await db().pool.query(
     `SELECT 1 FROM pg_stat_activity
-      WHERE wait_event_type = 'Lock' AND query LIKE 'SELECT role FROM member WHERE workspace_id%'`,
+      WHERE datname = current_database() AND wait_event_type = 'Lock'
+        AND query LIKE 'SELECT role FROM member WHERE workspace_id%'`,
   );
   return (found.rowCount ?? 0) > 0;
 };
