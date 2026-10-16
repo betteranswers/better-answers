@@ -106,12 +106,9 @@ LOCATOR = "TEST_POSTGRES_URI"
 UP_COMMAND = "deploy/test-postgres.sh up"
 
 # Advisory locks conflict only within one database; the vitest tier shares this key.
-_TAKE_BUILD_LOCK = (
-    "SELECT pg_advisory_lock(hashtextextended('better-answers template build', 0))"
-)
-_RELEASE_BUILD_LOCK = (
-    "SELECT pg_advisory_unlock(hashtextextended('better-answers template build', 0))"
-)
+_BUILD_LOCK_KEY = "hashtextextended('better-answers template build', 0)"
+_TAKE_BUILD_LOCK = f"SELECT pg_advisory_lock({_BUILD_LOCK_KEY})"
+_RELEASE_BUILD_LOCK = f"SELECT pg_advisory_unlock({_BUILD_LOCK_KEY})"
 _SESSIONS_GONE_WITHIN_SECONDS = 30
 
 

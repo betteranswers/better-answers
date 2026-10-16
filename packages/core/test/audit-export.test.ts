@@ -15,7 +15,13 @@ import { auditEventsIn } from "./audit-rows.ts";
 import { confirmedSessionFor } from "./identity-rows.ts";
 import { provisionedWorkspace, seedPerson, type ProvisionedWorkspace } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
-import { answered, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
+import {
+  answered,
+  isBlockedOnTable,
+  postgresForSuite,
+  readingAs,
+  seedingWith,
+} from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
@@ -370,12 +376,7 @@ const groupTableHeld = async () => {
 
 const waitingOnTheGroupTable = async (): Promise<void> => {
   for (let tries = 0; tries < 100; tries += 1) {
-    const waiting = await db().pool.query<{ count: number }>(
-      `SELECT count(*)::int AS count FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
-        WHERE c.relname = 'group' AND NOT l.granted
-          AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())`,
-    );
-    if ((waiting.rows[0]?.count ?? 0) > 0) return;
+    if (await isBlockedOnTable(db().pool, "group")) return;
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
   throw new Error("the export never reached the group table");
