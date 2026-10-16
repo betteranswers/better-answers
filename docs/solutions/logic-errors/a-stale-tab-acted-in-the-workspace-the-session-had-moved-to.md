@@ -34,7 +34,7 @@ tags:
 
 One browser holds one session, and the api took the workspace from the session. A person who is a member of workspaces A and B switched to B in one browser tab. Their other tab still showed A. An action from that tab ran in B, on the same person id, because a person's id is the same in every workspace.
 
-The fix is pending in the pull request for BA-81 and BA-50. This note records what the fix had to learn, which the final code does not show.
+The fix landed in #705 (BA-81 and BA-50); #731 (BA-149) later extended the road check to reads. This note records what the fix had to learn, which the final code does not show.
 
 ## Symptoms
 
@@ -57,7 +57,7 @@ The fix is pending in the pull request for BA-81 and BA-50. This note records wh
 
 ## Solution
 
-**The check belongs to the road, not to an action.** The web's one tRPC link sends the workspace of the tab's held member read in the `x-tab-workspace` header on every request (`apiLink` in `apps/web/src/shared/api/link.ts`). The api's two workspace roads compare it with the session's workspace straight after the session's claims are read, on mutations only (`claimsInTheTabsWorkspace` in `apps/api/src/trpc/base.ts`). A mismatch, or no header, is refused as `workspace-switched`, a transport word of class *conflict*. The comparison comes before any ceiling, before the principal and before the input is parsed, so a stale tab hears this word and no other. A test walks the api's router and holds every mutation on a workspace road to it (`apps/api/tests/trpc-roads.test.ts`).
+**The check belongs to the road, not to an action.** The web's one tRPC link sends the workspace of the tab's held member read in the `x-tab-workspace` header on every request (`apiLink` in `apps/web/src/shared/api/link.ts`). The api's two workspace roads compare it with the session's workspace straight after the session's claims are read (`claimsInTheTabsWorkspace` in `apps/api/src/trpc/base.ts`). A mutation naming another workspace, or none, is refused as `workspace-switched`, a transport word of class *conflict*. Since #731 a query naming another workspace is refused the same way; a query naming none is answered, and `session.member` is never refused, because it is how a tab learns where the session is. The comparison comes before any ceiling, before the principal and before the input is parsed, so a stale tab hears this word and no other. A test walks the api's router and holds every mutation and every query on a workspace road to it (`apps/api/tests/trpc-roads.test.ts`).
 
 **A refused tab does what a switch does.** The one listener that hears every failed action goes by the word alone and runs the switch's own tail, `followTheSession` in `apps/web/src/features/auth/auth-hooks.ts`: drop the left workspace's reads, read the member again with a reset on failure, land home. It does not test the address, because a refusal that arrives after the person left the page still means the tab is stale.
 
@@ -90,4 +90,4 @@ A tab loaded before the release sends no header. The api refuses its actions, an
 - `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md` covers the switch made in the same tab: which cache verb reaches a mounted observer, and why an awaited refetch is no proof of a fresh answer. Its file addresses predate this work. The member read and its re-read now live in `apps/web/src/shared/member.ts`, and `memberChanged` replaces `rereadMember`.
 - `docs/solutions/logic-errors/a-second-mutate-drops-the-first-actions-callbacks.md` is why the refused tab's step is wired at the listener and in each mutation's own options, never in a per-call callback.
 - `docs/solutions/architecture-patterns/adr-0043-what-an-act-is.md` records the transport word and the roads' comparison.
-- Still open, on BA-149: the header is read when the request is sent, not when the person pressed, which leaves a gap of milliseconds; a tab follows the session once for each refusal, not once for each switch; and the consent page is a Hono route this check does not reach.
+- On BA-149: the header is read when the request is sent, not when the person pressed, which leaves a gap of milliseconds. The consent page, a Hono route this check does not reach, now carries the workspace it was drawn for and refuses a grant naming another (#731). A refusal that lands while a follow is under way joins it (`followedOnce` in `apps/web/src/features/auth/switched-elsewhere.ts`).

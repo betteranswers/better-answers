@@ -1715,6 +1715,17 @@ in what was sent — never by an address or a name.
 Nothing of the set lands. The refusal's own word is the first refused item's word in id order. Only
 tRPC carries the items, to the web app; MCP and an ops command answer the set's word alone.
 
+### ceiling
+
+_Internal._ a cap on how many times something may be counted against one key within a fixed span
+of time; once met, the action fails whole and answers only when it may be tried again.
+
+A ceiling is no *refusal*: time is its only remedy, so it carries a wait and no word. Its key
+decides what it bounds. A key naming the target stops one target being reached too often, but not
+one actor reaching many targets, so a shared resource needs a ceiling keyed on the actor as well.
+An action over many items counts every item, not one call. The words shown when one is met name
+nobody, because the answer does not say which ceiling was met.
+
 ### end every sign-in and token
 
 the one action that ends what a person was issued, in two scopes.

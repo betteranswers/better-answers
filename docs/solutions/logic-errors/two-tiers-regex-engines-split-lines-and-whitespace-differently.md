@@ -47,8 +47,8 @@ The api (TypeScript) and the worker (Python) each read a concept body's links an
 
 Both readers now state the line and whitespace rules explicitly, without relying on either engine's defaults (this PR, S2a U2):
 
-- **Lines break at `\n` alone.** The TypeScript patterns drop the `m` flag and anchor with `(?<=^|\n)` and `(?=\n|(?![\s\S]))` (`packages/schema/src/concept-file.ts:30`, `:37`). Python anchors with `(?:^|(?<=\n))` without `re.M` (`apps/worker/src/better_answers_worker/links.py:27`, `:42`). Python's look-behind must be fixed width, so its form uses an alternation outside the look-behind.
-- **Whitespace is `[ \t\n\r\f\v]`.** That class replaces `\s`, `\S`, `trim()` and `strip()` in labels, definitions and inline targets (`concept-file.ts:94`, `links.py:52`, `links.py:100`).
+- **Lines break at `\n` alone.** At S2a U2 the TypeScript patterns dropped the `m` flag and anchored with `(?<=^|\n)`, and Python anchored with `(?:^|(?<=\n))` without `re.M`. A later fix, "read a concept body in one walk", replaced every expression with a hand-written scanner that keeps the rule: a line starts at the string's start or after a `\n` (`lineStartFrom`, `packages/schema/src/concept-file.ts:35-41`; `_line_start_from`, `apps/worker/src/better_answers_worker/links.py:45-54`).
+- **Whitespace is `[ \t\n\r\f\v]`.** That set, `SIX` and `_SIX`, replaces `\s`, `\S`, `trim()` and `strip()` in labels, definitions and inline targets (`normalisedLabel`, `targetAfter` and `INLINE_TARGET`, `concept-file.ts:239-261`, `:305`; `_normalised_label`, `_target_after` and `_INLINE_TARGET`, `links.py:298-319`, `:384`).
 - **The fixture pins each difference.** `contracts/links/cases.json` gains *only plain whitespace is trimmed from a label* (U+FEFF, U+0085) and *a definition starts only after a line feed* (a lone `\r`, U+2028). Both were shown to fail against the earlier readers before the fix.
 
 ```ts
@@ -56,7 +56,7 @@ Both readers now state the line and whitespace rules explicitly, without relying
 const LINK_DEFINITION = /^ {0,3}\[([^\]]+)\]:\s*(\S+)/gm;
 label.trim().replaceAll(/\s+/g, " ").toLowerCase();
 
-// after
+// after, at S2a U2; the one-walk fix later replaced the expression with a scanner over the same six
 const LINK_DEFINITION = /(?<=^|\n) {0,3}\[([^\]]+)\]:[ \t\n\r\f\v]*([^ \t\n\r\f\v]+)/g;
 label.split(/[ \t\n\r\f\v]+/).filter((word) => word !== "").join(" ").toLowerCase();
 ```
