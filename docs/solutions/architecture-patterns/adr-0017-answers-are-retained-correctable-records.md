@@ -33,7 +33,7 @@ Every answer the platform gives is one retained, correctable record in *Question
 - Storing a flag comes before routing it. S2b stores it, and S5 adds the routing that makes the reason a record in someone's queue.
 - An Admin closes a flag as fixed in the knowledge or as no fault in the knowledge, so a fault in an assistant's wording is told apart from a fault in a concept.
 - A correction is an Admin's or owner's action that records the level the answer went wrong at (concept, source or retrieval) and links the action that fixed it.
-- A retrieval correction is kept as an answer test, replayed retrieval-only when the answer path changes and weekly.
+- A retrieval correction is kept as an answer test. The test is replayed retrieval-only when the answer path changes, and weekly.
 
 An `Answer` concept is minted or updated only at a gate a person runs, the promotion gate.
 
@@ -53,7 +53,7 @@ Control Centre is one area of eight groups: Overview, Suggestions, Sources, Mode
 - A wrong answer can be traced to the level it went wrong at and fixed there, visibly. A thumbs-down nobody can act on changes nothing. A reason that is already a record in someone's queue is the workflow.
 - A retrieval fix without a replayable test is a belief.
 - The bid library grows from use. A gate only Admins can feed is a gate nobody feeds, and one with no second pair of eyes turns one tender's wording into company knowledge.
-- One noun per thing an Admin is answerable for is what a person holds without reading, so each of Control Centre's groups is a noun. *Answers* on the door would send them to the bid library's wrong home.
+- Without reading, a person can hold one noun per thing an Admin is answerable for, so each of Control Centre's groups is a noun. *Answers* on the door would send them to the bid library's wrong home.
 - Pages named by verbs were refused while Control Centre was the only area. Ask contradicts that refusal: it is an area every role opens to do one thing, and the verb names that thing. The refusal was lifted on 30/09/2026 (ADR 0047). Control Centre's groups keep their nouns.
 - The page is *members*, not *roles*, because the three roles are fixed and ADR 0038 adopts no custom roles.
 

@@ -33,14 +33,14 @@ Where a unit lives follows one minting rule:
 
 The map derives from sources too:
 
-- A connected source whose destination is the map yields **source entities**: typed nodes and edges derived directly from a source document (a person, a meeting, a task), keyed to that document and carrying its sensitivity.
+- A connected source whose destination is the map yields **source entities**. These are typed nodes and edges derived directly from a source document (a person, a meeting, a task). Each is keyed to that document and carries its sensitivity.
 - A source entity is never a concept and never a record. A producer may later propose a concept from source entities through the ordinary suggestion path, and the document then becomes cited evidence.
 
-A relation is a `LINKS_TO` edge between two concepts, carrying its two endpoint kinds, its section and its sentence (ADR 0026). There is no typed-relation derivation, no relations list and no predicate matcher. The map derives supersession, conflicts and equivalence. A predicate label, if one is ever wanted, is derived from edge sentences by a later enrichment job and stays in the map.
+A relation is a `LINKS_TO` edge between two concepts, carrying its two endpoint kinds, its section and its sentence (ADR 0026). There is no typed-relation derivation, no relations list and no predicate matcher. The map derives supersession, conflicts and equivalence. If a predicate label is ever wanted, a later enrichment job derives it from edge sentences, and it stays in the map.
 
 What follows from the rule:
 
-- Every new kind of unit is classified by the rule in the ticket that introduces it, and `CONCEPTS.md` names the layer it lives in. Nothing is registered anywhere else.
+- The ticket that introduces a new kind of unit classifies it by the rule, and `CONCEPTS.md` names the layer it lives in. Nothing is registered anywhere else.
 - Q&A pairs are `Answer` concepts. A write-up has two homes, a guide section and a response.
 - The kinds in use are derived from the concept index, never a file in the bundle.
 

@@ -31,17 +31,17 @@ A guide definition and every write-up are platform records in Postgres, with app
 - A Q&A pair is a concept, `type: Answer` (ADR 0011): the question as `title`, the answer as the body, and `sources[]` naming the entry it came from and the concepts it rests on. Its usage and submissions are records attached by IRI.
 - A context wording lives on its concept as a named section of the body, chosen by an include (ADR 0014). There is no `variants:` key and no guide-shaped tag on a concept. A wording that states a different claim is a separate concept.
 - A guide's readers are roles, and roles are levels: Admin, Editor, Viewer. Per role, the guide definition sets the default layer and the action threshold.
-- A guide has no publish state. It is visible to its readers from the moment it exists, every section wearing its trust badge. A hidden section is a definition setting that Admins see marked, and coverage still counts it.
+- A guide has no publish state. It is visible to its readers from the moment it exists, every section wearing its trust badge. Hiding a section is a setting in the guide definition. Admins see a hidden section marked, and coverage still counts it.
 - A write-up's shown trust is the weaker of its own and its cited concepts'. When a cited concept changes, the write-up is marked *needs review* synchronously in Postgres.
 - Status, trust, freshness and *changed since checked* are carried on the Postgres row, so the map is never a hard dependency of a cited answer.
-- The map degrades visibly in fixed words, carried in an answer's context header line and never its verdict. The glossary's two are *map as of <time>* and *map unavailable since <time>*.
+- When the map degrades, it shows in fixed words. An answer carries them in its context header line, never in its verdict. The glossary's two are *map as of <time>* and *map unavailable since <time>*.
 
 ## Why
 
 - Guides are product functionality over knowledge, not knowledge. In every platform surveyed, the narrative page is a record that references and orders trust-bearing units, is never itself verified and is never exported.
 - Generated prose stored as a file drifts by design. Prose that must stay current is a regenerated row with version and provenance.
 - Prose in git would tie OKF to one product feature, fill the interchange format with UI-shaped state and make every guide edit a git commit.
-- The skeleton keeps the promise that the map outlives the tool, for structure.
+- For structure, the skeleton keeps the promise that the map outlives the tool.
 - The bundle-alone test governs every key and convention in a concept file: a company with no platform and no guides must still want it there. Q&A pairs and context wordings pass it, since the first customer keeps both today with no platform. Guide-shaped tags do not.
 - Moving prose between git and the database later would re-key every write-up's version history and edges.
 

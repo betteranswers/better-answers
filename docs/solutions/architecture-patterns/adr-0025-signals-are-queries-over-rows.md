@@ -31,12 +31,12 @@ A **signal** is a named query over rows the platform already keeps, with a thres
 - Every model call writes one `llm_call` row: `workspace_id`, its own id and when it was called, purpose, model choice, model, tokens in and out, seconds, priced cost in pounds sterling, outcome, and the sync or answer it served. Never the prompt or the completion.
 - *Questions asked* is its own table, with a workspace id and a retention period (ADR 0017).
 - The worker's heartbeat row carries the box's figures once a minute: memory, `pswpin`, disk under `/data`, the git store's size per workspace and each LMDB volume's. That row is the whole host-metrics agent. Swap-in above 4 MB/s for five minutes during a first index is ADR 0024's step-A signal.
-- Three channels, each for the case only it can see: healthchecks.io for silence, Coolify through Resend for deploy and container failures, and the api's own email through `SMTP_URL` for the thresholds, immediately for a short list and in a daily digest for the rest.
+- Three channels, each for the case only it can see: healthchecks.io for silence, Coolify through Resend for deploy and container failures, and the api's own email through `SMTP_URL` for the thresholds. That email goes out immediately for a short list and in a daily digest for the rest.
 - Retention: `platform_event` 90 days; heartbeats one a minute for seven days, then one an hour for ninety; `llm_call` six months, then a monthly per-workspace aggregate.
 
-These shapes live here, not in the rules. The rule *Log through the tier's one structured logger*, in `CODING_STANDARDS.md`, keeps the checkable sentence that no prompt or completion reaches a logger, an exporter or a row. The rule *Keep a signal and an alert as rows*, in `deploy/CODING_STANDARDS.md`, keeps "no metrics store and no scrape", and the alert-once rule moved here from the deploy rule.
+These shapes live here, not in the rules. The rule *Log through the tier's one structured logger*, in `CODING_STANDARDS.md`, keeps the checkable sentence that no prompt or completion reaches a logger, an exporter or a row. The rule *Keep a signal and an alert as rows*, in `deploy/CODING_STANDARDS.md`, keeps "no metrics store and no scrape". The alert-once rule moved here from the deploy rule.
 
-`llm_call` has its table, which the api writes when a question's model call settles; the worker writes none yet, and its retention is not built. `platform_event`, the threshold rows and the heartbeat's host figures have no table yet. `contracts/cost-ledger/rows.json` holds the `llm_call` row's golden rows, and both tiers hold its columns and outcomes to the table.
+`llm_call` has its table, which the api writes when a question's model call settles. The worker writes none yet, and `llm_call`'s retention is not built. `platform_event`, the threshold rows and the heartbeat's host figures have no table yet. `contracts/cost-ledger/rows.json` holds the `llm_call` row's golden rows, and both tiers hold its columns and outcomes to the table.
 
 ## Why
 

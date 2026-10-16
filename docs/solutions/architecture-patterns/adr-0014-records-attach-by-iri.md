@@ -24,7 +24,7 @@ tags:
 
 ## The decision
 
-Records attach to a concept by IRI and never restate it. A record keys to the concept index row by `(workspace_id, iri)`, a composite foreign key. Records keep versions only where a person edits text. Every action is audited in one audit log per workspace.
+Records attach to a concept by IRI and never restate it. A record keys to the concept's `concept_identity` row by `(workspace_id, iri)`, a composite foreign key. Records keep versions only where a person edits text. Every action is audited in one audit log per workspace.
 
 - A write-up's includes, a guide definition's sections and a question set's questions are rows, never saved lists.
 - A context wording is a named section of its concept's body, never a record.

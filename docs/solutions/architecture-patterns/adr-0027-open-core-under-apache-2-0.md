@@ -29,7 +29,7 @@ The repository is public under the Apache License 2.0, one licence over the whol
 - GPL and AGPL software, such as Garage, runs unmodified as a separate process over a network protocol, never linked, vendored or copied. Nothing under an enterprise-licensed directory is read, not even for its shape.
 - The estate's own configuration is not published. The ops documents in `docs/operations/` are public halves naming credential classes, contracts and the deployment shape. The gitignored `.planning/estate/` holds the addresses and the edge-policy placement.
 - No public file names a hostname's Access posture, a rate-limit placement, a firewall rule, a bucket name or an escrow holder. The rule binds operational files, not the ADRs. The compose files, Dockerfiles, wizard, workflows and backup and restore scripts stay public in full.
-- The licence posture binds as this decision's own text; `CODING_STANDARDS.md` carries no licence family. The per-lift file is the api's rule *Test every lift by contract, never by trust*, in `apps/api/CODING_STANDARDS.md`: a `THIRD_PARTY_NOTICES.md` and a contract test in every directory under `lifts/`, as in `apps/api/lifts/better-auth-cimd-node/`.
+- The licence posture binds as this decision's own text. `CODING_STANDARDS.md` carries no licence family. The per-lift file is the api's rule *Test every lift by contract, never by trust*, in `apps/api/CODING_STANDARDS.md`. Every directory under `lifts/` has a `THIRD_PARTY_NOTICES.md` that names the contract test a refresh must pass, and that test sits in the tier's own `tests/`. For example, `apps/api/lifts/better-auth-cimd-node/` names `apps/api/tests/cimd-fetch.test.ts`.
 - There is no root `THIRD_PARTY_NOTICES.md` aggregate and no `check` licence step.
 - The public face is read-only. Issues are open, outside pull requests are closed with a fixed note, and `SECURITY.md` names one address for vulnerability reports.
 
@@ -37,10 +37,10 @@ The repository is public under the Apache License 2.0, one licence over the whol
 
 - The product's one claim no competitor makes, *open format you own*, is whole only when the customer can leave with the bundle and run the thing that reads it.
 - The share agent and the customer-hosted worker are sold to people who will read the source first.
-- A public repository gets bigger runners, unlimited Actions minutes and code scanning for nothing, and the tree was clean before any product code, the cheapest moment for a one-way flip.
+- A public repository gets bigger runners, unlimited Actions minutes and code scanning for nothing. The tree was clean before any product code, which was the cheapest moment for a one-way flip.
 - Apache-2.0 over MIT for §3's patent grant and §6's reservation of the name *Better Answers*, which has no registered trade mark.
 - The flip is one-way through git history, so the estate's configuration had to stay out before it. The ADRs keep which hostnames sit outside the access wall, a fact one request establishes.
-- The posture is a decision, so the owner retired it from the standards; what a lift can be checked for is the lift-contract rule's.
+- The posture is a decision, so the owner retired it from the standards. What a lift can be checked for belongs to the lift-contract rule.
 
 ## Rejected
 

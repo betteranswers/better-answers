@@ -28,11 +28,11 @@ tags:
 
 - It is declared beside its hand-written face function.
 - The face function admits before its first `await`. The lint rule `action-admits-before-await` holds it (`packages/devtools/lint-rules/rules/action-admits-before-await.ts`).
-- A face function that takes a person declares what it admits, even where every role may ask: it declares the kernel's `ANY_ROLE`. `packages/core/test/face-admission.test.ts` names one that passes no declaration to `admit`, and lists each step a face exports with the action that admits for it.
+- A face function that takes a person declares what it admits, even where every role may ask: it declares the kernel's `ANY_ROLE`. `packages/core/test/face-admission.test.ts` names one that passes no declaration to `admit`. It also lists each step a face exports, with the action that admits for it.
 - There is no action constructor: a constructed action left GitNexus answering a lower bound.
 - The name an audit event is recorded under is its *audit action*.
 
-**A step** runs only inside another action's transaction, such as `record` or `enqueueJobIn`. It is never declared and has no refusal of its own. After an action's first write, anything it calls rejects.
+**A step**, such as `record` or `enqueueJobIn`, runs only inside another action's transaction. It is never declared and has no refusal of its own. After an action's first write, anything it calls rejects.
 
 **A refusal word** means one thing wherever it appears.
 
@@ -56,9 +56,9 @@ Each transport:
 
 - Over tRPC it is a thrown error, typed through `AppRouter` (`apps/api/src/trpc/base.ts`). The error carries the items, and the web reads them as plain words.
 - MCP has its own (`apps/api/src/mcp/crossing.ts`). It answers the set's word alone and drops the items, since no action that names items is an entry.
-- `pnpm ops` maps each class to an exit code (`apps/api/src/ops/index.ts`). A command's refusal is a word, or a word beside the one thing the operator must change, such as the address the test workspace's fixture refused, and it exits with its word's class. A run that names the file or commit it stopped at is no word, and exits as refused whatever word it names: an import's unsound tree or stopped file, and a reconcile's stopped replay. An import's manifest commit that the git door refuses as malformed is a defect in the import, so it stays an error and exits as refused too. The usage text says both. No command's action names items, so items never reach it.
+- `pnpm ops` maps each class to an exit code (`apps/api/src/ops/index.ts`). A command's refusal is a word, or a word beside the one thing the operator must change, such as the address the test workspace's fixture refused. It exits with its word's class. A run that names the file or commit it stopped at is no word. It exits as refused, whatever word it names. Such runs are an import's unsound tree or stopped file, and a reconcile's stopped replay. An import's manifest commit that the git door refuses as malformed is a defect in the import, so it stays an error and exits as refused too. The usage text says both. No command's action names items, so items never reach it.
 - A refusal's log line holds its word and class, never an item's id.
-- A ceiling is no refusal, since time is its only remedy. An action counting one in its own transaction fails with the kernel's `CeilingMet` (`packages/core/src/kernel/ceiling.ts`), which rolls the count back. tRPC's crossing answers it 429 with `retryAfterSeconds`, as a ceiling met before the action does.
+- A ceiling is no refusal, since time is its only remedy. An action counting one in its own transaction fails with the kernel's `CeilingMet` (`packages/core/src/kernel/ceiling.ts`), which rolls the count back. tRPC's crossing answers it 429 with `retryAfterSeconds`, as it answers a ceiling met before the action.
 - Procedures are written by hand, so the call graph stays whole.
 
 **A transport never nests a transaction.** The base procedures:
@@ -69,18 +69,18 @@ Each transport:
 
 An MCP entry's transaction opens as the entry's `readOnlyHint` declares: read-only where the entry tells the host it only reads, read-write otherwise (ADR 0030). A read-write entry reads the member `FOR SHARE`, as a mutation does, so a revocation waits on its commit.
 
-An MCP entry may take the own-transaction road instead. The surface resolves the member in a short transaction, releases the connection, and hands the entry fixed steps, never a door. Read-only, for such an entry, excludes the platform's own account of the call: the record of the question and the spend rows (ADR 0030). `ask` is the first. The road is in the tree, and so is the held member of a read-write entry. On the web, `ask` is a tRPC procedure on the own-transaction road, handed the same fixed steps. Its work runs apart from the stream that reads it, so a reader who leaves ends the model call in flight and still leaves a completed record and settled spend. The stream sends its phase at once and a keep-alive whenever it has been quiet 25 seconds, because Cloudflare ends a response quiet for 125.
+An MCP entry may take the own-transaction road instead. The surface resolves the member in a short transaction, releases the connection, and hands the entry fixed steps, never a door. For such an entry, read-only excludes the platform's own account of the call: the record of the question and the spend rows (ADR 0030). `ask` is the first. The road is in the tree, and so is the held member of a read-write entry. On the web, `ask` is a tRPC procedure on the own-transaction road, handed the same fixed steps. Its work runs apart from the stream that reads it. So a reader who leaves ends the model call in flight, and the work still leaves a completed record and settled spend. The stream sends its phase at once, and a keep-alive whenever it has been quiet for 25 seconds, because Cloudflare ends a response that has been quiet for 125.
 
-Every Postgres door rolls back when its work answers a refusal or throws. A principal-scoped door answers its own refusal apart from its work's, and an action that wants one union calls `folded` on it. One composition root, `openDoors` in `apps/api/src/doors.ts`, opens the four doors and the Clock (ADR 0040) and states the pool's size.
+Every Postgres door rolls back when its work answers a refusal or throws. A principal-scoped door answers its own refusal apart from its work's. An action that wants one union of the two calls `folded` on it. One composition root, `openDoors` in `apps/api/src/doors.ts`, opens the four doors and the Clock (ADR 0040) and states the pool's size.
 
-**Input is parsed once, at the entry**, by the kernel's `parse` (`packages/core/src/kernel/parse.ts`) over a schema the slice owns. Instants cross every wire as ISO-8601 text, with no transformer. The upload is a tRPC mutation over `application/octet-stream`, its descriptor travelling beside the bytes, with no exception to ADR 0006.
+**Input is parsed once, at the entry**, by the kernel's `parse` (`packages/core/src/kernel/parse.ts`) over a schema the slice owns. Instants cross every wire as ISO-8601 text, with no transformer. The upload is a tRPC mutation over `application/octet-stream`, with its descriptor travelling beside the bytes. It needs no exception to ADR 0006.
 
 ## Why
 
-- Refusal words retyped per action, admission answered in three places, input stated per transport and three composition roads were one absence. Only the audit half of an action was declared.
+- Four problems were one absence: refusal words were retyped per action, admission was answered in three places, input was stated per transport, and there were three composition roads. Only the audit half of an action was declared.
 - Classes sort a word by what its caller can do about it, so they fall one-to-one onto the status taxonomy every transport already has.
-- A spike built the constructor and dropped it. The hand-written `readMember` answered its callers; the constructed `narrowConnectedSource` answered impacted 0, risk unknown. A code index that answers a lower bound for every action cannot tell anyone what an edit breaks.
-- Transaction ownership differs by action, bytes before rows and git before rows (ADR 0012), so nothing may own it generically.
+- A spike built the constructor and dropped it. For the hand-written `readMember`, the code index answered its callers. For the constructed `narrowConnectedSource`, it answered impacted 0, risk unknown. A code index that answers a lower bound for every action cannot tell anyone what an edit breaks.
+- Who owns the transaction differs by action: bytes before rows, and git before rows (ADR 0012). So nothing may own it generically.
 - A procedure holding a pooled connection for the whole call made an upload hold two of the pool's ten.
 - A door that committed a refused work kept the rows landed before the refusal. When the door folded its own refusal into the work's, a caller could not tell a refused principal from a refused action.
 - tRPC 11.18's multipart handler buffers the whole body. Its octet-stream handler streams: the first byte reached `putObject` 3 ms into a 400 ms body.

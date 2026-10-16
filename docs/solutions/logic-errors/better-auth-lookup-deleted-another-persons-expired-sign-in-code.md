@@ -36,23 +36,23 @@ That table is the library's store of short-lived tokens: sign-in codes and links
 
 ## Symptoms
 
-- After someone else had tried a code, a person typing a code just past its expiry got `400 INVALID_OTP` rather than `400 OTP_EXPIRED`. The sign-in page showed "That code is wrong. Check it and try again. 2 tries left." (`apps/web/src/features/auth/refusal-words.ts:107-113`) instead of "That code can't be used any more." (`refusal-words.ts:100-103`). The page reads a code as spent only on a 403 or `OTP_EXPIRED` (`apps/web/src/features/auth/code-entry.ts:15-23`).
+- After someone else had tried a code, a person typing a code just past its expiry got `400 INVALID_OTP` rather than `400 OTP_EXPIRED`. The sign-in page showed "That code is wrong. Check it and try again. 2 tries left." instead of "That code can't be used any more." (the wording of the time; `apps/web/src/features/auth/refusal-words.ts` has since reworded both). The page reads a code as spent only on a 403 or `OTP_EXPIRED` (`apps/web/src/features/auth/code-entry.ts:25-34`).
 - Every later try was refused as wrong as well, so the page counted tries down for a code the database no longer held.
 - On its own, the same code read correctly as expired. The fault needed another request's lookup between the expiry and the holder's try.
-- The browser spec "an expired code reads as spent, handing focus to another" (`apps/web/e2e/sign-in.spec.ts:506`) was flaky under parallel Playwright workers: another worker's sign-in deleted the aged code before the spec typed it.
+- The browser spec "an expired code reads as spent, handing focus to another" (`apps/web/e2e/sign-in.spec.ts:666`) was flaky under parallel Playwright workers: another worker's sign-in deleted the aged code before the spec typed it.
 
 ## What Didn't Work
 
 No fix attempt failed. The defect surfaced while the expired-code browser spec was being built, and reading `findVerificationValue` in the installed library settled the cause (session history). Two approaches look sufficient and are not:
 
-- **Reading the answer differently in the browser.** The web layer already reads `OTP_EXPIRED` as spent, because the library deletes a code as it reports it expired (`apps/web/src/features/auth/code-entry.ts:17-18`). That cannot help here. The row was gone before the holder's first try, so the server's first answer was already `INVALID_OTP`, and no mapping in the web app can tell that from a wrong code.
+- **Reading the answer differently in the browser.** The web layer already reads `OTP_EXPIRED` as spent, because the library deletes a code as it reports it expired (`apps/web/src/features/auth/code-entry.ts:28-29`). That cannot help here. The row was gone before the holder's first try, so the server's first answer was already `INVALID_OTP`, and no mapping in the web app can tell that from a wrong code.
 - **Testing the expired code alone.** A test that ages one person's code and types it passes with or without the fix, because the holder's own lookup returns its row before deleting it (see _Why This Works_). The regression test has to put another person's lookup in between. The adversarial review of the fix asked for it to assert that the other try really reached the library (session history): it expects `INVALID_OTP` on the other person's wrong code before it checks the holder (`apps/api/tests/sign-in-and-consent.test.ts:154-158`). Without that assertion, a change that stopped the other try short of the lookup would let the test pass for the wrong reason.
 
 ## Solution
 
 Two parts, merged as #514 (Linear BA-34).
 
-**1. Turn the library's deletion at lookup off** (`apps/api/src/auth/auth.ts:444-448`):
+**1. Turn the library's deletion at lookup off** (`apps/api/src/auth/auth.ts:570-574`):
 
 ```ts
     /**
@@ -62,7 +62,7 @@ Two parts, merged as #514 (Linear BA-34).
     verification: { disableCleanup: true },
 ```
 
-**2. Delete expired rows in the api's daily sweep pass instead, a day after they expire.**
+**2. Delete expired rows in the api's daily sweep pass instead, a day after they expire.** As merged in #514; both files below have since gone, and the delete now lives in core (below).
 
 ```ts
 // apps/api/src/auth/constants.ts:20-24
@@ -82,9 +82,9 @@ export const dropExpiredVerifications = async (door: PostgresDoor, now: Date): P
 };
 ```
 
-`apps/api/src/sweeps.ts:48-54` wraps it, and the pass runs it after the workspace sweeps, whether or not they succeeded; a pass skipped for a held lock skips it too (`sweeps.ts:77-82`). A refused delete becomes a refusal whose sweep is `verifications` and which names no workspace, and the pass's log line carries `verifications_deleted` (`sweeps.ts:92-98`), as does `the sweep pass failed` (`sweeps.ts:83-90`). The delete covers every verification row more than a day past expiry, not only sign-in codes: links, OAuth state, trusted devices and the library's locks too. The runbook's "The daily sweeps" and §11 say so (`docs/operations/RUNBOOK.md`), and so does CONCEPTS.md's **sweep pass** entry.
+The pass in `apps/api/src/sweeps.ts` runs it after the workspace sweeps, whether or not they succeeded; a pass skipped for a held lock skips it too. A refused delete becomes a refusal whose sweep is `verifications` and which names no workspace, and the pass's log line carries `verifications_deleted`, as does `the sweep pass failed` (`sweptOutsideAnyWorkspace` and `pass` in `sweeps.ts`). The delete covers every verification row more than a day past expiry, not only sign-in codes: links, OAuth state, trusted devices and the library's locks too. The runbook's "The daily sweeps" and §11 say so (`docs/operations/RUNBOOK.md`), and so does CONCEPTS.md's **sweep pass** entry.
 
-The delete and its day's grace have since moved to core, as one of the three deletes in `sweepIdentitySet` (`packages/core/src/sweeps/index.ts`), beside expired sessions and rate-limit windows. The grace and the refusal word `verifications` are unchanged.
+The delete and its day's grace have since moved to core, as one of the three deletes in `sweepIdentitySet` (`packages/core/src/sweeps/index.ts`), beside expired sessions and rate-limit windows. The grace, now `VERIFICATION_KEPT_PAST_EXPIRY_MS`, and the refusal word `verifications` are unchanged.
 
 ## Why This Works
 
@@ -123,7 +123,7 @@ The day's grace is load-bearing too. A sweep that deletes every expired row the 
 
 ### The 1.7.5 baseline
 
-The api configures `jwt`, `organization`, `emailOTP`, `oauthProvider`, `twoFactor`, `passkey` and `cimd` (`apps/api/src/auth/auth.ts:515-658`), and no `socialProviders`. Paths below are under `apps/api/node_modules/better-auth/dist/`.
+The api configures `jwt`, `organization`, `emailOTP`, `oauthProvider`, `twoFactor`, `passkey` and `cimd` (`apps/api/src/auth/auth.ts:645-820`), and no `socialProviders`. Paths below are under `apps/api/node_modules/better-auth/dist/`.
 
 | `findVerificationValue` site                                                    | Reached here                    | Gate                                                                                        |
 | ------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -142,11 +142,11 @@ The api configures `jwt`, `organization`, `emailOTP`, `oauthProvider`, `twoFacto
 
 Consumers through `consumeVerificationValue`, gated by `internal-adapter.mjs:856`: passkey (`apps/api/node_modules/@better-auth/passkey/dist/index.mjs:343` and `:459`) and the oauth-provider's authorization code (`apps/api/node_modules/@better-auth/oauth-provider/dist/introspect-njKASm3q.mjs:1895`; the file name is a build hash, so grep rather than trust it). Inside better-auth, `magic-link`, `phone-number`, `one-time-token`, `siwe`, `email-otp`, two-factor's verify and `otp`, `api/routes/password.mjs` and `api/routes/update-user.mjs` also call `consumeVerificationValue`. `@better-auth/cimd` 1.7.5 neither looks up nor consumes a verification row.
 
-The project's own reads gate too. `READ_A_LINK` computes `link_live` and `code_live` as `expires_at > now()` (`apps/api/src/auth/sign-in-link.ts:74-76`), and `linkSeen` refuses a link unless both are live (`apps/api/src/auth/link-token.ts:141-157`). Erasure finds and deletes a person's verification rows by identifier whatever their expiry (`packages/core/src/erasure/map.ts:162-173`, `packages/core/src/erasure/identity.ts:63-66`), so a row kept for its day is still erased on request. The promotion-lock clear deletes a lock only once `expires_at <= now` (`apps/api/src/auth/promotion-lock.ts`).
+The project's own reads gate too. `READ_A_LINK` computes `link_live` and `code_live` as `expires_at > now()` (`apps/api/src/auth/sign-in-link.ts:74-76`), and `linkSeen` refuses a link unless both are live (`apps/api/src/auth/link-token.ts:151-169`). Erasure finds and deletes a person's verification rows by identifier whatever their expiry (`packages/core/src/erasure/map.ts:173-186`, `packages/core/src/erasure/identity.ts:90-94`), so a row kept for its day is still erased on request. The promotion-lock clear deletes a lock only once `expires_at <= now` (`apps/api/src/auth/promotion-lock.ts`).
 
 ### Latent: two-factor's no-session branch
 
-`verifyTwoFactor` checks only that the challenge row exists (`verify-two-factor.mjs:19-20`) before it reads the user and carries on. Its `valid()` step consumes through `consumeVerificationValue` (`:26`), so an expired challenge never mints a session, but the steps before it run against an expired row. This is unreachable today. Every `/two-factor/verify-*` path is in `CLOSED_FACTOR_PATHS` (`apps/api/src/auth/auth.ts:153-169`), and nothing in `apps/api/src` calls `verifyTOTP`, `verifyOTP` or `verifyBackupCode` as a server function. Before opening any of those paths, or calling one as a server function, add an expiry check in front of it.
+`verifyTwoFactor` checks only that the challenge row exists (`verify-two-factor.mjs:19-20`) before it reads the user and carries on. Its `valid()` step consumes through `consumeVerificationValue` (`:26`), so an expired challenge never mints a session, but the steps before it run against an expired row. This is unreachable today. Every `/two-factor/verify-*` path is in `CLOSED_FACTOR_PATHS` (`apps/api/src/auth/auth.ts:176-192`). The api calls `verifyTOTP` as a server function in two places (`apps/api/src/auth/authenticator.ts`, `confirm.ts`), but only behind `fenced.asThePerson`, which demands a session, so the library takes its session branch. Nothing calls `verifyOTP` or `verifyBackupCode`. Before opening any of those paths, or calling one without a session, add an expiry check in front of it.
 
 ### Fixed: an orphaned lock skipped one promotion
 
@@ -159,8 +159,8 @@ The api now clears it first (Linear BA-39). A `hooks.before` on `/sign-in/email-
 ### Tests that hold it
 
 - `apps/api/tests/sign-in-and-consent.test.ts:139-160`, "still answers expired after another person's code is tried". It ages the holder's code, has another person try a wrong code, asserts that try reached the library, then expects `OTP_EXPIRED` for the holder. Turn the deletion at lookup back on and it fails.
-- `apps/api/tests/sweeps.test.ts:245-257`, "deletes codes over a day expired, keeping later ones", pins the day's grace to the minute either side and the `verifications_deleted` count.
-- `apps/web/e2e/sign-in.spec.ts:506`, "an expired code reads as spent, handing focus to another", proves the spent reading through the browser.
+- `apps/api/tests/sweeps.test.ts:270-282`, "deletes codes over a day expired, keeping later ones", pins the day's grace to the minute either side and the `verifications_deleted` count.
+- `apps/web/e2e/sign-in.spec.ts:666`, "an expired code reads as spent, handing focus to another", proves the spent reading through the browser.
 - `apps/api/tests/promotion-lock.test.ts` seeds an orphaned lock under the library's reservation id on a person holding a session and an account, then signs in by code and by link and expects both gone and the address proven. Remove the hook and those tests fail. The same file pins the library's lock name and reservation key.
 
 ### When Better Auth changes

@@ -24,7 +24,7 @@ tags:
 
 ## The decision
 
-The map is two ordinary tenant tables in the platform Postgres, `map_node` and `map_edge`. They carry `workspace_id` and the three visibility terms as columns, under the same row-level security as every tenant table. Traversal is a prepared recursive-CTE template in the one map query module per tier, with depth capped at 4 by the template. A walk takes a set of entries in one statement and answers each reached node once, at its least depth. The nearest 1,000 nodes survive, ordered by depth then uid, so the cut is the same on every run. The statement runs under a two-second timeout set on its transaction. A walk may be narrowed to named collections, and the narrowing is in the statement, before the cap. A narrowed walk returns only concepts of the named collections and crosses no concept outside them, one in no collection included. It crosses a node that is not a concept under the reader's predicate alone, and never returns it. The map carries no collection on any node, and the promise is about concepts. There is no Apache AGE, no per-workspace role and no custom database image. There is no `neo4j` ecosystem either: no driver, no Bolt, no APOC and no `neo4j_graphrag` import, with no exception.
+The map is two ordinary tenant tables in the platform Postgres, `map_node` and `map_edge`. They carry `workspace_id` and the three visibility terms as columns, under the same row-level security as every tenant table. Each tier has one map query module, and traversal is a prepared recursive-CTE template in it. The template caps depth at 4. A walk takes a set of entries in one statement and answers each reached node once, at its least depth. The nearest 1,000 nodes survive, ordered by depth then uid, so the cut is the same on every run. The statement runs under a two-second timeout set on its transaction. A walk may be narrowed to named collections, and the narrowing is in the statement, before the cap. A narrowed walk returns only concepts of the named collections and crosses no concept outside them, one in no collection included. It crosses a node that is not a concept under the reader's predicate alone, and never returns it. The map carries no collection on any node, and the promise is about concepts. There is no Apache AGE, no per-workspace role and no custom database image. There is no `neo4j` ecosystem either: no driver, no Bolt, no APOC and no `neo4j_graphrag` import, with no exception.
 
 The tenancy rule lives here:
 
@@ -37,11 +37,11 @@ The substrate:
 
 - One migration journal, Drizzle's, in `packages/schema`. It generates migrations for `public` and carries hand-written SQL for the `index` schema, extensions, policies, SQL functions and the map tables.
 - One policy seam: every tenant policy calls `current_workspace_id()`, written `(SELECT current_workspace_id())`.
-- `index.passage`'s vector column is `vector(N)`, fixed, with `embedding_model_choice_id` on every row and list partitioning by workspace.
+- `index.passage`'s vector column is `vector(N)`, fixed. Every row carries `embedding_model_choice_id`, and the table is list-partitioned by workspace.
 - A `SECURITY DEFINER` function, `create_workspace_partition`, makes each workspace's `index.passage` partition with a GIN index over its full-text column, `search`. The HNSW index returns with the route's S8 block, when the embedding column is first written, in the same per-partition shape.
 - `worker_rt` is deny-by-default. A migration that wants the worker to reach a table says so in a GRANT. It holds SELECT, INSERT, UPDATE and DELETE on the `index.passage` parent and nothing on a partition.
-- The roles' surface, `packages/schema/roles-surface.json`, and the worker's schema view are generated from the catalogue after migrating, committed and drift-checked.
-- `migrate` connects as a superuser and, after the journal on every run, marks `pg_catalog.ts_match_vq` LEAKPROOF (`packages/schema/src/full-text-match.ts`). `find`'s full-text match then reaches the GIN index beneath the policy.
+- The roles' surface, `packages/schema/roles-surface.json`, and the worker's schema view are generated from the catalogue after migrating. Both are committed and drift-checked.
+- `migrate` connects as a superuser. On every run, after the journal, it marks `pg_catalog.ts_match_vq` LEAKPROOF (`packages/schema/src/full-text-match.ts`). `find`'s full-text match then reaches the GIN index beneath the policy.
 
 ## Why
 
@@ -55,7 +55,7 @@ The substrate:
 
 ## Rejected
 
-- Keeping AGE and spiking first: the spike defends a convenience whose induced cost is larger whatever it measures.
+- Keeping AGE and spiking first: the spike defends a convenience whose induced cost is larger whatever the spike measures.
 - Keeping AGE and building as first cut: builds the machine the spike might delete.
 - An edges table with per-workspace roles kept: catalogue sprawl, and `pg_dump` does not carry roles.
 - Two journals: a worker schema stamp blind to what the worker writes.

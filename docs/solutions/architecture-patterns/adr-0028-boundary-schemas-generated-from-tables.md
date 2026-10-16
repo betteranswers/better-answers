@@ -47,7 +47,7 @@ The parity test makes five assertions over the registry, against a real Postgres
 - A plain-schema refinement replaces the column wholesale. It drops nullability and optionality at runtime, so a select schema rejects a row Postgres legitimately returned. The callback keeps both, and turns a column's type change into a type error.
 - The types never check a refinement against its column. `z.number()` over a `text` column compiles, and `z.infer` follows the refinement. A dropped column fails `check`; a retyped column or a widened `pgEnum` fails nothing. Assertion 4 catches widening and assertion 5 catches a retype, and neither can do the other's job.
 - A plain schema reused across shapes loses the update schema's `.optional()`. The passage update schema demanded the embedding on every update until review caught it.
-- drizzle-orm v1 moves the package to a `drizzle-orm/zod` export, so one importing module makes that upgrade one edit.
+- drizzle-orm v1 moves the package to a `drizzle-orm/zod` export. With one importing module, that upgrade is one edit.
 
 ## Rejected
 

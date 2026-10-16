@@ -33,13 +33,13 @@ Everything a reader is told about a concept's trust is derived from its OKF file
 
 A person in a file is `human:<email>`.
 
-- It is rewritten only on a valid erasure request, across history, to `human:<erasure pseudonym>`. A reader then sees *Verified by a former member*.
+- Only an erasure, on a valid request, rewrites it, across history, to `human:<erasure pseudonym>`. A reader then sees *Verified by a former member*.
 - The erasure pseudonym is a per-workspace id minted at erasure. It is never the person id (ADR 0035).
 - On a record the platform keeps, a person is `human:<person id>`. An erasure rewrites it to `human:<erasure pseudonym>` on every such record but the audit log, which no routine rewrites.
 
 ## Why
 
-- The file is the substrate any OKF consumer reads. A word the platform shows that another consumer of the same file could not derive would make the platform disagree with the bundle it exports.
+- The file is the substrate any OKF consumer reads. If the platform showed a word that another consumer of the same file could not derive, the platform would disagree with the bundle it exports.
 - The words follow OKF's own. A concept file records `verified` events, so a reader of the raw file and a reader of a page meet one word.
 - A hash two parsers must agree on has to be a specification, not a description.
 - A verification must mean a second pair of eyes wherever the word appears, or it means less than it says.
@@ -67,4 +67,4 @@ The full record, with its two amendments (ticket 24 on the erasure line, T-073 o
 
 Amended 03/10/2026 by the glossary plan (`docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`, R4 and R5). The trust words became the reader's words listed above, and *Restricted* left the set to stay a sensitivity value. The tiers, the derivation and every rule above stand.
 
-Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-160 (`docs/plans/2026-10-14-1811-fix-erasure-late-commit-and-actors-plan.md`). "No routine rewrites" a person id now holds for the audit log alone. An erasure rewrites `bundle_commit.actor`, `concept_verification.actor` and the commit trailers to the pseudonym, as ADR 0020 says, so a verification by a person erased while they hold another workspace reads *Verified by a former member*.
+Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-160 (`docs/plans/2026-10-14-1811-fix-erasure-late-commit-and-actors-plan.md`). The rule that "no routine rewrites" a person id now holds for the audit log alone. An erasure rewrites `bundle_commit.actor`, `concept_verification.actor` and the commit trailers to the pseudonym, as ADR 0020 says, so a verification by a person erased while they hold another workspace reads *Verified by a former member*.

@@ -67,7 +67,7 @@ Paths under `jcodemunch_mcp/` and `jdocmunch_mcp/` (and the short forms `cli/…
 2. **Install jCodeMunch with its `watch` extra, then restart its watcher.**
 
    ```bash
-   uv tool install --force "jcodemunch-mcp[watch]==1.108.319"
+   uv tool install --force "jcodemunch-mcp[watch]"
    launchctl kickstart -k gui/$(id -u)/us.gravelle.jcodemunch-watch
    ```
 
@@ -79,17 +79,17 @@ Paths under `jcodemunch_mcp/` and `jdocmunch_mcp/` (and the short forms `cli/…
 
    A running Claude Code session keeps its in-memory server from before the config change. That session's own worktree index got re-created with `git_root` set and kept crashing until the session ended.
 
-4. **Give each worktree its own doc index, named after its folder.** jDocMunch keeps one index per worktree lineage by default: `worktree_mode="reuse_equivalent"` (`jdocmunch_mcp/tools/index_local.py:1641`). A per-worktree index needs `worktree_mode="branch_local"`. The MCP tool exposes it (`server.py:499-503`, passed through at `:2261`). The `index-local` CLI does not (`server.py:3049-3060` has `--path` and `--name` and no worktree flag). So `.claude/hooks/provision-worktree.sh:85-102` calls the Python API through the uv tool's own `python3`, with `worktree_mode="branch_local"`.
+4. **Give each worktree its own doc index, named after its folder.** jDocMunch keeps one index per worktree lineage by default: `worktree_mode="reuse_equivalent"` (`jdocmunch_mcp/tools/index_local.py:1641`). A per-worktree index needs `worktree_mode="branch_local"`. The MCP tool exposes it (`server.py:499-503`, passed through at `:2261`). The `index-local` CLI does not (`server.py:3049-3060` has `--path` and `--name` and no worktree flag). So `.claude/hooks/provision-worktree.sh:84-101` calls the Python API through the uv tool's own `python3`, with `worktree_mode="branch_local"`.
 
    The name matters. The edit hook finds the owning index by walking the file's parent folders and loading `local/<folder name>` for each (`jdocmunch_mcp/tools/index_file.py:37-53`). The default index name is the folder's name (`tools/index_local.py:1732`). Without a worktree index, the walk reached the main checkout's folder. Doc edits in a worktree were filed into the main index under `.claude/worktrees/…` paths. Those paths are git-ignored, so the watcher never removes them.
 
-   `.claude/hooks/worktree-lib.sh:24-32` drops the index on removal with `jdocmunch-mcp delete-index --repo local/<basename>`. jDocMunch takes `--repo` (`server.py:3139`). jCodeMunch takes a positional id (`worktree-lib.sh:15`).
+   `.claude/hooks/worktree-lib.sh:30-42` drops the index on removal with `jdocmunch-mcp delete-index --repo local/<basename>`. jDocMunch takes `--repo` (`server.py:3139`). jCodeMunch takes a positional id (`worktree-lib.sh:23`).
 
-5. **Stub every indexer binary in the hook tests.** The worktree removal and sweep tests stubbed `jcodemunch-mcp` only. The new drop call ran the real `jdocmunch-mcp` against the real `~/.doc-index`. Both now stub it: `packages/devtools/test/ci/worktree-remove-hook.test.ts:40` and `packages/devtools/test/ci/sweep-worktrees.test.ts:58` (PR #488).
+5. **Stub every indexer binary in the hook tests.** The worktree removal and sweep tests stubbed `jcodemunch-mcp` only. The new drop call ran the real `jdocmunch-mcp` against the real `~/.doc-index`. Both now stub it: `packages/devtools/test/ci/worktree-remove-hook.test.ts:41` and `packages/devtools/test/ci/sweep-worktrees.test.ts:84` (PR #488).
 
 6. **Put `~/.local/bin` on the hook's PATH.** jDocMunch's PostToolUse hook spawns `jdocmunch-mcp` by bare name.
 
-One related find: for this project, two unpinned "Local config" entries in `~/.claude.json` override `.mcp.json`'s version pins (`jcodemunch-mcp==1.108.319`, `jdocmunch-mcp==1.145.0`). While they exist, the pins do nothing.
+One related find: for this project, two unpinned "Local config" entries in `~/.claude.json` overrode `.mcp.json`'s version pins (`jcodemunch-mcp==1.108.319`, `jdocmunch-mcp==1.145.0`). The pins were dropped later on 30/09/2026, so `.mcp.json` now runs each server's latest release through `uvx`, as those entries do.
 
 ## Why This Works
 
@@ -101,11 +101,10 @@ Local identity gives each worktree one index key with an empty `git_root`, so on
 
 - After any install or upgrade of either server, run `watch-status` and read both `watch.err` logs. A healthy status line does not prove the watcher runs. Look for `FATAL` and `task crashed`.
 - Install jCodeMunch as `jcodemunch-mcp[watch]`, never bare.
-- Keep `"identity_mode": "local"` until a jcodemunch-mcp release carries #893. Then revert it, delete the worktree indexes, and re-index.
+- Keep `"identity_mode": "local"` until a jcodemunch-mcp release carries #893. Then revert it, delete the worktree indexes, and re-index. 1.108.364 carries it (its `storage/git_root.py` resolves a linked worktree's index to itself, citing #882).
 - Never `index-local` a worktree through the jDocMunch CLI. Use `provision-worktree.sh`, or the MCP tool with `worktree_mode="branch_local"`. Never name a worktree index anything but its folder name.
 - In any hook test, stub every indexer binary the hook can call. An unstubbed one runs against the real home directory.
 - Check staleness by date, not by the "fresh" label. Compare `resolve_repo`'s `indexed_at` with `git log -1 --format=%cd`. If the index is older than the last commit, it is stale.
-- Remove unpinned "Local config" MCP entries from `~/.claude.json` so `.mcp.json`'s pins apply.
 
 ## Related Issues
 

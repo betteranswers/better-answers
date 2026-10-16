@@ -28,7 +28,7 @@ A person has one id: the id on the identity set's `user` row.
 
 - The platform's one minter mints it: `ulid` in `packages/schema/src/ulid.ts`, re-exported by the kernel. Better Auth is handed the same function as its `generateId`, so every identity id has one shape, a time-ordered ULID. Session tokens, authorisation codes, client secrets and token `jti` values come from the library's own random paths, never from the minter.
 - It is `userId` on every Principal. It is written `human:<person id>` on every record the platform keeps: the audit log's actor, a commit trailer's `Actor:`, a suggestion's proposer and decider, an access request's requester, a `group_member` key.
-- It is never written into a concept file, which keeps `human:<email>`; erasure still rewrites a person id it finds in one.
+- It is never written into a concept file, which keeps `human:<email>`. Erasure still rewrites a person id it finds in one.
 - The member row's key names nothing of ours. Every People action keys by workspace and person.
 - A custom minter switches off Better Auth's opaque-invitation-id heuristic, so `requireEmailVerificationOnInvitation` is set to true explicitly.
 
@@ -39,20 +39,20 @@ Revocation has two scopes. Each deletes the tokens it ends rather than marking t
 - Each action that deletes a person's tokens names the grants it ended, by id, in its audit event: `people.person.credentials_revoked`, `people.member.credentials_revoked` and `people.member.removed`. When a workspace action ended any, it also writes `people.person.grants_ended` to the identity-set audit log.
 - No member state is put on and taken off. Revocation ends what was issued.
 
-A person's second factor is theirs, across every workspace (ADR 0048). Being an Admin in any one workspace, or the operator, requires it at every sign-in, and a workspace Admin never acts on another person's factors.
+A person's second factor is theirs, across every workspace (ADR 0048). Being an Admin in any one workspace, or the operator, requires it at every sign-in. A workspace Admin never acts on another person's factors.
 
-- A session that must confirm one and has not is pending. An hour after a request first finds it so, it ends.
-- Making a person an Admin or the operator, from needing no factor, clears every one of their sessions' confirmations in the same action, so each confirms again as an Admin.
+- A session that must confirm a factor and has not is pending. It ends an hour after a request first finds it pending.
+- When a person who needed no factor is made an Admin or the operator, the same action clears the confirmation on every one of their sessions, so each confirms again as an Admin.
 - Removing a factor clears the confirmation of the person's other sessions: a confirmation never outlives the factor that may have made it.
 
-Erasure rewrites `human:<email>` and `human:<person id>` across a workspace's files, history (git author lines and commit trailers), `bundle_commit` rows and verification rows to `human:<erasure pseudonym>`. The pseudonym is minted at erasure, one per workspace, and kept on the erasure request. It is never the person id. The user row is pseudonymised: email to a unique tombstone, name cleared, id kept. The audit log holds ids and never an email or a name, and it is never rewritten.
+Erasure rewrites `human:<email>` and `human:<person id>` to `human:<erasure pseudonym>` across a workspace's files, history (git author lines and commit trailers), `bundle_commit` rows and verification rows. The pseudonym is minted at erasure, one per workspace, and kept on the erasure request. It is never the person id. The user row is pseudonymised: email to a unique tombstone, name cleared, id kept. The audit log holds ids and never an email or a name, and it is never rewritten.
 
 The audit slice, `packages/core/src/audit/`, has two doors. `record` takes a Principal and derives the actor. `recordFor` takes the platform principal and an explicit actor. The kernel's actor id has three forms: `human:<person id>`, `process:better-answers-<purpose>`, or an agent's id. An audit action is named `family.subject.verb`, in four families: people, knowledge, sources and platform.
 
 ## Why
 
 - A person named by three ids is joined by none of them. An audit log keyed on one, a trailer on another and a file on a third cannot say what that person did.
-- A per-member id leaves actions taken before a person joins, a first sign-in or an access request, with no actor.
+- A per-member id leaves actions taken before a person joins with no actor: a first sign-in, or an access request.
 - One id shape means one boundary refinement, an audit log whose id order agrees with its timestamps, and one fixture both tiers pin, `contracts/id-shape/`.
 - A workspace Admin ending a person's sessions elsewhere is one company's decision reaching another's. Any rule that counts the workspaces a person holds is an oracle over them.
 - An erasure target shared across workspaces lets two exported histories be joined on the person the request was meant to unlink.

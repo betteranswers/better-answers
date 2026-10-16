@@ -42,7 +42,7 @@ Error: Interactive prompts require a TTY terminal (process.stdin.isTTY or proces
 
 1. Rename in `packages/schema/src/` first: the table name, its index and check names, and the symbol.
 2. Run `pnpm --filter @better-answers/schema run generate --custom --name=<tag>`. It adds the journal entry, an empty `NNNN_<tag>.sql` and `meta/NNNN_snapshot.json`.
-3. Write the SQL by hand. Its first line is exactly `-- Custom migration (hand-written SQL; ADR 0032).` (`packages/schema/test/migration-ownership.test.ts:22` checks that marker wherever a migration claims to be hand-written). ADR 0007 holds why the lock is bounded, why the bound ends with the migration, and why a CHECK-listed value is rewritten the way it is below. A comment cites `ADR 0007` in a few words, such as `-- Bounded wait for the rename's lock (ADR 0007).`, and repeats none of it (the root `CODING_STANDARDS.md`, *Cite a migration's shared reason, never restate it*). In the SQL:
+3. Write the SQL by hand. Its first line is exactly `-- Custom migration (hand-written SQL; ADR 0032).` (`packages/schema/test/migration-ownership.test.ts`, *spells the marker exactly wherever a migration claims it*, checks that marker wherever a migration claims to be hand-written). ADR 0007 holds why the lock is bounded, why the bound ends with the migration, and why a CHECK-listed value is rewritten the way it is below. A comment cites `ADR 0007` in a few words, such as `-- Bounded wait for the rename's lock (ADR 0007).`, and repeats none of it (the root `CODING_STANDARDS.md`, *Cite a migration's shared reason, never restate it*). In the SQL:
    - bound the locks with `SET LOCAL lock_timeout = '5s'` and reset it to `DEFAULT` at the end, as migration 0059 does;
    - list every name to rename from a migrated database's catalogue, never from the snapshot: `pg_constraint`, `pg_indexes`, `pg_policies` and `pg_trigger` for the table. A table ADR 0032 keeps out of drizzle's schema has no snapshot entry at all (the map tables, `index.passage`), and the snapshot never records NOT NULL constraints or triggers. U10 printed them from a throwaway test over `startMigratedPostgres()` and deleted it after;
    - rename the table, then every name Postgres derived from it, including the ones drizzle never declared: `<table>_pkey`, the foreign key, checks, indexes, and the policy (`ALTER POLICY … RENAME TO`);
@@ -68,10 +68,10 @@ A column rename has to reach every raw SQL string that names the column. drizzle
 
 | Site | What would have failed |
 |---|---|
-| `packages/core/src/members/name-flags.ts:39` and `:42`, in `STILL_WAITING` | an Admin flagging a member's display name, which first checks whether a flag already waits, and the operator's list of waiting flags |
+| `packages/core/src/members/name-flags.ts:40` and `:43`, in `STILL_WAITING` | an Admin flagging a member's display name, which first checks whether a flag already waits, and the operator's list of waiting flags |
 | `packages/core/src/members/audit-log.ts:177`, in `namedInDetail` | the Audit log's search for a person named in an event's detail |
 | `packages/core/src/concepts/reconciler-hit.ts:37`, in `restsAlsoOnItsReconcilerHit` | `recomputeConceptVisibility`, which re-derives a concept's visibility in a cascade and reads the reconciler's replay event to do it |
-| `packages/core/src/sources/connected-source.ts:197`, in `FIRST_OUTCOME` | every upload connect, which first reads whether a committed connect already stands; a bind retried with the same id (AE7) is one of them |
+| `packages/core/src/sources/connected-source.ts:209`, in `FIRST_OUTCOME` | every upload connect, which first reads whether a committed connect already stands; a bind retried with the same id (AE7) is one of them |
 
 Where TypeScript still reads the old result key, a select list names the new column under the old alias (`action AS act`) until the code itself is renamed. A statement that names both a renamed table and one the rename leaves alone is edited by hand: list the old word's code senses first, as step 1 of `what-a-rename-prose-pass-gets-wrong-and-the-checks-that-catch-it.md` says.
 

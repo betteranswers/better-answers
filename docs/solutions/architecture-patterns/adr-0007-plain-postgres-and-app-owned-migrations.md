@@ -38,7 +38,7 @@ The database is one plain, self-hosted Postgres 18 with pgvector. The api owns e
 A workspace's passage partition is attached, never created as a partition.
 
 - Provisioning makes the partition as a table of its own, `LIKE "index".passage` with what a partition inherits, revoked, its GIN index built. It then runs `ALTER TABLE "index".passage ATTACH PARTITION`. It never runs `CREATE TABLE … PARTITION OF`.
-- So provisioning holds the shared `index.passage` in no mode a read or a write waits on, and no writer needs a lock order.
+- So provisioning never holds the shared `index.passage` in a mode that a read or a write waits on, and no writer needs a lock order.
 - No `lock_timeout` bounds provisioning's ATTACH wait.
 
 A migration that takes a lock writers wait on bounds its own wait.
@@ -55,7 +55,7 @@ A migration that bounds a lock or writes a tenant table's rows cites `ADR 0007` 
 
 ## Why
 
-- The api owns every endpoint a caller reaches and every policy decision (ADR 0005). Eight of Supabase's ten services would idle while inviting dependence on Supabase-only features. The predecessor's 274 role-keyed RLS policies on a Supabase helper are the cautionary case.
+- The api owns every endpoint a caller reaches and every policy decision (ADR 0005). Eight of Supabase's ten services would idle, and Supabase would invite dependence on Supabase-only features. The predecessor's 274 role-keyed RLS policies on a Supabase helper are the cautionary case.
 - Two tiers writing one schema with two migration tools is the failure the data-not-code contract must prevent. The schema is the contract, so it has one author.
 - With one cocoindex environment per connected source, the engine's default `managed_by="system"` would let one connected source's deletion drop `index.passage` and its index under every other connected source.
 - `PARTITION OF` holds `index.passage` in ACCESS EXCLUSIVE, then waits for SHARE ROW EXCLUSIVE on `source_document` to clone the parent's foreign key. A transaction holding a write on `source_document` that then touches `index.passage` closes a cycle, and Postgres aborts one side with 40P01. Meanwhile every workspace's reads of `index.passage` queue behind it.

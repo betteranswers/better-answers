@@ -32,7 +32,7 @@ retire_when: "cocoindex ships an awaitable or explicit Environment close, or an 
 
 ## Problem
 
-A worker `Host` that opens a connected source's LMDB store soon after another `Host` in the same process closed it can fail. The engine may still hold the old handle, and heed refuses a second open of a path it holds. Closing the `Host` does not close the engine's handle, and cocoindex 1.0.24 (`apps/worker/pyproject.toml`) has no `Environment.close()`.
+A worker `Host` that opens a connected source's LMDB store soon after another `Host` in the same process closed it can fail. The engine may still hold the old handle, and heed refuses a second open of a path it holds. Closing the `Host` does not close the engine's handle. cocoindex 1.0.24, where this was found, had no `Environment.close()`. 1.0.25 (`apps/worker/pyproject.toml`) adds one, but `Host` does not call it yet.
 
 Upstream paths below are in the installed packages, heed 0.22.1 and cocoindex 1.0.24, and their line numbers are for those versions.
 
@@ -64,7 +64,7 @@ def _open_unless_held(open_store):
         return None
 
 
-def _opened_once_let_go(run, store, open_store, wait_seconds):
+def _opened_once_let_go(sync, store, open_store, wait_seconds):
     opened = _open_unless_held(open_store)
     if opened is not None:
         return opened
@@ -101,7 +101,7 @@ Which survivor outlived the first `Host` on the CI runner is not pinned. A probe
   ```python
   holder = threading.Thread(
       target=hold_until_waited_on,
-      args=(first.app_config(run, PASSAGES_APP), written),
+      args=(first.app_config(sync, PASSAGES_APP), written),
   )
   ```
 
@@ -113,7 +113,7 @@ Which survivor outlived the first `Host` on the CI runner is not pinned. A probe
   gc.disable()
   try:
       with Host(bootstrap) as first:
-          cycle: list[object] = [first.app_config(run, PASSAGES_APP)]
+          cycle: list[object] = [first.app_config(sync, PASSAGES_APP)]
           cycle.append(cycle)
       del cycle
       ...
@@ -123,4 +123,4 @@ Which survivor outlived the first `Host` on the CI runner is not pinned. A probe
 
   `test_a_store_never_let_go_raises_after_the_wait` checks the same message comes back after at least the wait. `test_an_unreadable_store_raises_without_waiting` checks that `MDB_INVALID` raises with no wait logged.
 
-- **The upstream fix.** An `Environment.close()` in cocoindex, built on heed's `prepare_for_closing()` (`src/envs/env.rs:620-627`), would let `Host.close()` wait for the real release and retire the retry. The request is filed upstream as [cocoindex-io/cocoindex#2467](https://github.com/cocoindex-io/cocoindex/issues/2467), related to [cocoindex-io/cocoindex#2402](https://github.com/cocoindex-io/cocoindex/issues/2402).
+- **The upstream fix.** cocoindex 1.0.25 ships `Environment.close()` (`cocoindex/_internal/environment.py:283-292`), which releases the database at `db_path` once in-flight writes finish, so it can be opened again in the process. `Host.close()` and the cache's eviction do not call it yet. Calling it would let them wait for the real release and retire the retry. The request was filed upstream as [cocoindex-io/cocoindex#2467](https://github.com/cocoindex-io/cocoindex/issues/2467), related to [cocoindex-io/cocoindex#2402](https://github.com/cocoindex-io/cocoindex/issues/2402).

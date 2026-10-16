@@ -29,14 +29,14 @@ The forge is bare git repositories the api writes, one per workspace directly un
 - The api writes through the git binary in its own image, one commit per action, under the bundle lock (ADR 0012).
 - `openGit` (`packages/core/src/store/git/index.ts`) is the one place that checks the root: an absolute path to an existing directory, or the door refuses.
 - The worker reads a repository at a commit over a read-only bind mount.
-- The `backup` service bundles each repository holding a ref nightly and pushes the mirror to VPC 2 over SSH. A repository with no ref, a workspace not yet written to, is neither bundled nor mirrored, because git refuses both; a restore makes it again, empty, for each workspace the restored database names. The mirror key (`deploy/mirror-shell.sh`) takes three verbs, `init-repo`, `git-receive-pack` and `prune-repo`, and refuses everything else. `deploy/backup.sh` calls `prune-repo` only after a push that replaced refs.
+- Each night the `backup` service bundles each repository that holds a ref, and pushes the mirror to VPC 2 over SSH. A repository with no ref, a workspace not yet written to, is neither bundled nor mirrored, because git refuses both. A restore makes it again, empty, for each workspace the restored database names. The mirror key (`deploy/mirror-shell.sh`) takes three verbs, `init-repo`, `git-receive-pack` and `prune-repo`, and refuses everything else. `deploy/backup.sh` calls `prune-repo` only after a push that replaced refs.
 
 v0.1 runs on two boxes of 4 vCPU · 4 GB · 120 GB:
 
 - VPC 1 runs all of production, with a 4 GB swap file as the safety net.
 - VPC 2 runs Coolify, the git mirror and a restore target that exists only during a drill or a rehearsal. Staging is on demand.
 - The growth steps, in order: A, split production across the two boxes over WireGuard if the swap-in signal says so; then E, a third contract.
-- A model-host box is a precondition of local embedding. The first workspace to ask for a local embedding model choice triggers it, as step E. Until then a hosted model choice is the default. `docs/operations/coolify.md` § The local embedding model choice carries the service.
+- Local embedding needs a model-host box first. The first workspace to ask for a local embedding model choice triggers it, as step E. Until then a hosted model choice is the default. `docs/operations/coolify.md` § The local embedding model choice carries the service.
 
 The worker holds the detector's weights once, mapped from the file. On VPC 1 it swaps nothing and settles near 650 MB of anonymous memory. It keeps its 1.5 GB cap, one sync at a time, and 1.5 GB of spill for what an index adds. S4's first index reads that.
 

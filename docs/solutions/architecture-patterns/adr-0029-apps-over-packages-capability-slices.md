@@ -34,7 +34,7 @@ The tree is `apps/` over `packages/`: `apps/` is what deploys and `packages/` is
 - `store/` holds the four doors, one per shared store, and is the only place a connection is made: `store/postgres`, `store/git`, `store/map` and `store/objects`. Each door is exported under its own name, such as `@better-answers/core/store/postgres`. There is no `store` barrel and no `./store` entry.
 - `llm/` and `audit/` are layers every slice may use.
 - A slice is the capability that owns a set of tables and the invariants over them. The slices today are `sources`, `concepts`, `answering`, `guides`, `erasure`, `runs`, `workspaces`, `members` and `sweeps`. `erasure` sits on top, and no slice imports it.
-- `refusals/` holds the refusal catalogue, each slice's vocabulary under its owner's name (ADR 0043). It is no slice: it owns no table. It imports `kernel` and every slice's face, `erasure` included, and nothing in core but a test imports it.
+- `refusals/` holds the refusal catalogue, each slice's vocabulary under its owner's name (ADR 0043). It is no slice, because it owns no table. It imports `kernel` and every slice's face, `erasure` included. Nothing in core but a test imports it.
 
 The import direction has five rules:
 
@@ -44,18 +44,18 @@ The import direction has five rules:
 4. A slice reaches another slice only through its face, never its internals. The slice graph is acyclic. The refusal catalogue reaches each slice the same way, and sits above the graph.
 5. Nothing in core imports a transport or a transport's dependency, such as `hono`, `@trpc`, `@modelcontextprotocol` or `better-auth`.
 
-All five are one rule in the repository's own lint plugin, `better-answers/import-direction`, in `packages/devtools/lint-rules/rules/import-direction.ts`. It places both ends of an import in a zone by position under the package whose `package.json` names `@better-answers/core`. A face is a directory's `index.ts` that `packages/core/package.json`'s `exports` map names, and a face the map does not name is refused. Inside a slice, the slice is the unit, so its own subdirectories reach each other freely. `import/no-cycle` holds rule 4's acyclic clause. `packages/core/test/import-direction.test.ts` holds each refusal where it fires and where it stays silent.
+All five are one rule in the repository's own lint plugin, `better-answers/import-direction`, in `packages/devtools/lint-rules/rules/import-direction.ts`. For each import, it places both ends in a zone by their position under the package whose `package.json` names `@better-answers/core`. A face is a directory's `index.ts` that the `exports` map in `packages/core/package.json` names. The rule refuses a face the map does not name. Inside a slice, the slice is the unit, so its own subdirectories reach each other freely. `import/no-cycle` holds rule 4's acyclic clause. `packages/core/test/import-direction.test.ts` holds each refusal where it fires and where it stays silent.
 
 Every query reaches its store through a store door in `packages/core/src/store/`. Row-level security is the tenancy guarantee (ADR 0032), and the door is ergonomics over it. A transaction that spans slices lives in the slice that owns the action.
 
-Every one of the four doors is real in a test, and none may be faked: `CODING_STANDARDS.md`'s rule *Run every store the platform runs, for real*. An in-memory adapter is for a service someone else runs, such as an LLM provider, behind that service's own adapter. The test inbox's D1 is such a service: its store takes the few D1 calls it makes, and its suite runs the same SQL through `node:sqlite`.
+Every one of the four doors is real in a test, and none may be faked. That is `CODING_STANDARDS.md`'s rule *Run every store the platform runs, for real*. An in-memory adapter is for a service someone else runs, such as an LLM provider, behind that service's own adapter. The test inbox's D1 is such a service. Its store takes the few D1 calls it makes, and its suite runs the same SQL through `node:sqlite`.
 
 ## Why
 
 - Business logic has five callers: tRPC, the MCP surface, `/agent/v1`, a script and the reconciler. Four of them have no notion of an HTTP status code, which belongs at the transport.
 - A package is chosen over a directory for its export list: a declared, compiler-checked interface. It is not an import gate; the transport ban is a separate mechanism.
-- Per-glob overrides held only two of the five rules. A probe ran ten cases, and seven that should have failed passed.
-- One slice writing SQL against another slice's tables has no import statement, so no linter sees it. The checked-in table-ownership map, `packages/schema/src/table-ownership.ts`, is held to the code both ways by a scan in root `check`: each slice's SQL reads only the tables it owns or declares, and each declared read is one its slice makes. Row-level security is the backstop.
+- Per-glob overrides held only two of the five rules. A probe ran ten cases, and seven passed that should have failed.
+- One slice writing SQL against another slice's tables has no import statement, so no linter sees it. A scan in root `check` holds the checked-in table-ownership map, `packages/schema/src/table-ownership.ts`, to the code both ways. Each slice's SQL reads only the tables it owns or declares, and each declared read is one its slice makes. Row-level security is the backstop.
 - An `exports` entry nothing imports is interface nobody asked for.
 - A faked door tests the fake. The four doors are stores the platform deploys and can start.
 

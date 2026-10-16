@@ -32,9 +32,9 @@ The interface is Tailwind v4. Its theme is the design system's tokens, read thro
 - The web's wording follows Kibo UI's patterns: their strings where one fits the product, their casing for each kind of text, and sentences written in the same manner where Kibo has none. In that wording the trust words and the glossary's words stay the platform's own. `packages/design-system/readme.md` holds the rule and its examples.
 - The design system's own components are deleted. Its tokens, stylesheet and bridge stay.
 - The components live in `apps/web/src/shared/ui/`, with `kibo-ui/` and `ai-elements/` beside the shadcn primitives. `apps/web/components.json` records the registries and aliases.
-- Four rules that judge how a component is written are off over `apps/web/src/shared/ui/**` alone, in `.oxlintrc.json`. Every import rule, the accessibility rule at the page and the anti-slop rules stay on.
+- `.oxlintrc.json` turns off four rules that judge how a component is written, over `apps/web/src/shared/ui/**` alone. Every import rule, the accessibility rule at the page and the anti-slop rules stay on.
 - Kibo UI's `table` is rejected, because it is written against `@tanstack/react-table` v8. The shadcn `table` primitive stands in.
-- better-auth-ui is not used. The auth module's own TanStack Query factories over the `better-auth` client, in `apps/web/src/features/auth/auth-hooks.ts`, replace its provider, its `localization` and its hooks. The module's word map, `workspace-words.ts`, holds the words a page shows. The package and its two `declare module` augmentations are gone.
+- better-auth-ui is not used. The auth module's own TanStack Query factories replace better-auth-ui's provider, its `localization` and its hooks. They sit over the `better-auth` client, in `apps/web/src/features/auth/auth-hooks.ts`. The module's words files, `sign-in-words.ts` and `workspace-words.ts` among them, hold the words its pages show. The package and its two `declare module` augmentations are gone.
 - better-auth-ui's 28 rendered sign-in files stay refused. They are sign-up, password and social pages for a product this platform does not have.
 - `apps/web` stays on `moduleResolution: "bundler"` on the SPA's own grounds: Vite builds it and nothing in it is emitted.
 
@@ -45,7 +45,7 @@ The interface is Tailwind v4. Its theme is the design system's tokens, read thro
 - The registries the product wants are Tailwind-shaped, AI Elements above all.
 - ADR 0019 makes trust a derived thing said in fixed words. A library that shipped its own severity palette would quietly contradict it.
 - Taking Kibo's `table` would have pinned a knowingly superseded major version.
-- better-auth-ui cost more than its roughly 70 library-facing lines: near-daily releases, broken declaration emit, peer warnings for packages this product will never use, and a second library for a reviewer to read. A sign-in whose every sentence is a platform decision left little behaviour to own.
+- better-auth-ui cost more than its roughly 70 library-facing lines: near-daily releases, broken declaration emit, peer warnings for packages this product will never use, and a second library for a reviewer to read. Every sentence of the sign-in is a platform decision, so little behaviour was left for the library to own.
 
 ## Rejected
 

@@ -48,7 +48,7 @@ SET LOCAL lock_timeout = DEFAULT;
 ```
 
 - `ALTER COLUMN ... SET EXPRESSION` needs Postgres 17 or later. It rewrites every row and rebuilds the column's indexes, so the index survives without being named.
-- The first line must be the custom marker exactly: `packages/schema/test/migration-ownership.test.ts` refuses a hand-written file without it.
+- The first line must be the custom marker exactly: `packages/schema/test/migration-ownership.test.ts` refuses a first line that claims a custom migration in any other spelling, though it cannot see a hand-written file that makes no claim.
 - Copy the expression from the generated `ADD COLUMN`, so it matches the snapshot byte for byte.
 - Prove the index, not just the matches. `packages/schema/test/full-text-match.test.ts` (*is valid, ready and over the column*) reads `pg_index` for `concept_index_search_gin` after every migration has run.
 

@@ -29,28 +29,29 @@ tags:
 An answer asserts only what a concept states. It is found by traversal before any prose is written.
 
 - Entry points are found first. The map is then walked from them, reading status, supersession, conflicts and trust.
-- Every `Answer` concept among the entry points and the walk that answers the question as asked is returned as it stands: word for word, under its collection, with the question it answered, its sources, and who verified it and when. `Answer`s that fit and say different things are returned side by side, never blended and never reduced to one.
-- One call on the judging model choice decides what fits, over the shortlist. It answers yes or no for each candidate and never ranks one against another. A call that fails returns its candidates as related knowledge. It never refuses, and it never calls another model.
+- Every `Answer` concept that answers the question as asked, among the entry points and the walk, is returned as it stands: word for word, under its collection, with the question it answered, its sources, and who verified it and when. `Answer`s that fit and say different things are returned side by side, never blended and never reduced to one.
+- One call on the judging model choice decides which candidates on the shortlist fit. It answers yes or no for each candidate and never ranks one against another. A call that fails returns its candidates as related knowledge. It never refuses, and it never calls another model.
+- At the workspace's spending limit `ask` refuses with `spending-limit-met` before any model is called, and the question stays on record.
 - Where no `Answer` is a judged fit and concepts bear on the question, the answer holds those concepts under a verdict of its own, *related knowledge*. A concept bears on a question when it is an entry point or the walk reaches it from one. An `Answer` with no judge's yes is among them and is never shown as a fit.
 - Prose is written over the returned concepts alone, with a footnote per claim (ADR 0015). Over MCP the platform writes none: the assistant writes it, told to quote an `Answer` unchanged and to assert only what the returned concepts state. On the Ask page the platform drafts it over a *related knowledge* result, one part per collection.
 - No prose is ever generated from a document. Where nothing the reader can read matches, the answer is the one sentence "Not answered from the company's knowledge", with unmapped passages. The sentence is kept for that case alone.
 - A caller may name collections. The entry step, the walk and the judge then stay inside them. Unmapped passages are not narrowed, because a passage no concept rests on belongs to no collection.
 - Nothing withheld is counted, hinted at or explained anywhere.
 
-An answer is served as one answer contract for the UI, MCP and the response record: an event stream, verdict first, folded by one pure function into one object. The verdict is ok, related, warn or refuse for the caller's role. It is ok when at least one `Answer` is a judged fit, and related when concepts bear on the question and none is. Nothing in v0.1 produces warn. The object says how its judge stood: *not judged*, *judged* or *judging failed*. MCP returns the object alone. On the web the object is the stream's first event and drafted sentences follow it. A refusal ends the stream with no prose.
+An answer is served as one answer contract for the UI, MCP and the response record. The contract is an event stream, verdict first, that one pure function folds into one object. The verdict is ok, related, warn or refuse for the caller's role. It is ok when at least one `Answer` is a judged fit, and related when concepts bear on the question and none is. Nothing in v0.1 produces warn. The object says how its judge stood: *not judged*, *judged* or *judging failed*. MCP returns the object alone. On the web the stream opens with its phase, the object follows before any prose, and drafted sentences follow it. A refusal ends the stream with no prose.
 
-A concept's collection, `ask`'s `collections` argument, the narrowing of the walk and the *related knowledge* verdict are in the tree. Until the judge is built, no `Answer` is a judged fit: every answer says *not judged*, and every `Answer` among its concepts is related knowledge. S2b builds the judge, and the tree does not hold it yet.
+A concept's collection, `ask`'s `collections` argument, the narrowing of the walk, the *related knowledge* verdict and the judge are in the tree. Where a workspace has no judging model choice or no spending limit, no model is called: every answer says *not judged*, and every `Answer` among its concepts is related knowledge.
 
-When the map is unavailable, the answer runs at depth 0. Entry points, the judge and reuse still run, and the context header line says the map is unavailable. A walk that passes its timeout is the map unavailable for that answer.
+When the map is unavailable, the answer runs at depth 0. Entry points, the judge and reuse still run, and the context header line says the map is unavailable. A walk that passes its timeout counts as the map unavailable for that answer.
 
 In v0.1 the entry step is full-text over the concept index alone.
 
 - A stored `tsvector` on the concept index, written in the governed write's transaction, so a concept is searchable at commit.
-- Title weighted first, tags and *Also known as* second, body third.
-- A concept that shares any of the question's words is an entry point, ranked first by how many of them it holds (owner, 09/10/2026). A question asked in plain words rarely repeats a concept's every word.
+- Title weighted first, tags, `description` and *Also known as* second, body third.
+- A concept that shares any of the question's words is an entry point (owner, 09/10/2026). Entry points are ranked first by the rarity weight of the question's words each holds, computed over the rows the reader may read (owner, 14/10/2026). A question asked in plain words rarely repeats a concept's every word.
 - No model call on the entry step.
 
-The concept unit of the one index, with its vectors and its catch-up run, is the reserve block S8. It lands only when the answer tests' recall on the first customer's context wordings falls below the threshold S2b sets. When it lands, the worker writes the vector on a job whose row the governed write inserts, never inline and never at read.
+The concept unit of the one index, with its vectors and its catch-up run, is the reserve block S8. It lands only when the answer tests' recall on the first customer's context wordings falls below the threshold S2b sets. When it lands, the governed write inserts a job row, and the worker writes the vector on that job, never inline and never at read.
 
 ## Why
 
@@ -80,6 +81,8 @@ The concept unit of the one index, with its vectors and its catch-up run, is the
 
 The full record, with its amendments (ticket 21, ticket 39, ticket 73, ticket 79 applied by T-001, and the route spec's Q1 spike of 09/09/2026): `docs/archive/adr/0016-answers-assert-concepts-only.md`.
 
-Amended 13/10/2026 on the owner's decisions of 11/10 and 12/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R28, with R1 to R5 and R8). An answer was one reused `Answer` or prose the platform drafted, on every transport. It is now every `Answer` that fits, returned unchanged, or the concepts that bear on the question under a fourth verdict, and over MCP the assistant writes the prose. The judge answers per candidate, and a caller may name collections. The refusal sentence is kept for a question nothing matches. The *Two contracts, one per transport* entry stands, and it now says what is given up.
+Amended 13/10/2026 on the owner's decisions of 11/10 and 12/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R28, with R1 to R5 and R8). An answer was one reused `Answer` or prose the platform drafted, on every transport. It is now every `Answer` that fits, returned unchanged, or the concepts that bear on the question under a fourth verdict. Over MCP the assistant writes the prose. The judge answers per candidate, and a caller may name collections. The refusal sentence is kept for a question nothing matches. The *Two contracts, one per transport* entry stands, and it now says what is given up.
 
 Amended 13/10/2026 by the same plan (KTD4). A walk that passed its timeout had no stated outcome. It now counts as the map unavailable: the answer stands on its entry points and says so.
+
+Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-168 (`docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md`). The concept index searches each concept's `description` at weight B, and an entry point ranks by a rarity weight over the rows the reader may read, not by how many of the question's words it holds.

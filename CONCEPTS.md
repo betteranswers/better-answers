@@ -1092,7 +1092,7 @@ cite.
 ### answer contract
 
 _Internal._ the one shape an answer takes for the UI, MCP and the response record: an event
-stream — verdict first — folded into one object.
+stream that gives the verdict before any prose, folded into one object.
 
 ### related knowledge
 
@@ -1336,8 +1336,9 @@ Not an *export* of knowledge.
 ### identity-set audit log
 
 The append-only record of the actions that belong to no workspace because they act on a person's
-identity itself: a person giving their own *display name*, an Admin's flag on one, a sign-in, every
-write the *operator* makes, and an Admin's action that ends a person's access.
+identity itself: a person giving their own *display name*, an Admin's flag on one, a sign-in, a
+person's own second-factor actions, a person ending their own sessions, every write the *operator*
+makes, and an Admin's action that ends a person's access.
 
 It sits beside the *audit log* and uses the same *audit actions*. A person appears in it by *person
 id*, never by name or address, and no row is ever rewritten. Only the operator reads it; no
@@ -1715,6 +1716,17 @@ in what was sent — never by an address or a name.
 Nothing of the set lands. The refusal's own word is the first refused item's word in id order. Only
 tRPC carries the items, to the web app; MCP and an ops command answer the set's word alone.
 
+### ceiling
+
+_Internal._ a cap on how many times something may be counted against one key within a fixed span
+of time; once met, the action fails whole and answers only when it may be tried again.
+
+A ceiling is no *refusal*: time is its only remedy, so it carries a wait and no word. Its key
+decides what it bounds. A key naming the target stops one target being reached too often, but not
+one actor reaching many targets, so a shared resource needs a ceiling keyed on the actor as well.
+An action over many items counts every item, not one call. The words shown when one is met name
+nobody, because the answer does not say which ceiling was met.
+
 ### end every sign-in and token
 
 the one action that ends what a person was issued, in two scopes.
@@ -1920,7 +1932,7 @@ leads to Members.
 The *page* a member lands on after signing in, and the one offered back when a page fails or an
 address names nothing they may see.
 
-It is Ask for an Editor or a Viewer, and People › Members for an Admin until Control Centre ›
+It is Ask › New question for an Editor or a Viewer, and People › Members for an Admin until Control Centre ›
 Overview is built. A role's home shows in the *icon rail* even before it is built, and then says
 plainly that it is on its way. The *console* has one home for everyone, Workspaces › Every
 workspace, which is where the *operator* lands while they belong to no workspace.
