@@ -76,7 +76,6 @@ type LaneCase = {
   readonly because: string;
 };
 
-/** The paths are what a merge group's diff hands the script; the answer is what the legs read. */
 const LANES: readonly LaneCase[] = [
   {
     changed: ["apps/web/src/app.tsx"],
@@ -299,7 +298,6 @@ const imageLegs = (): readonly ImageLeg[] =>
     })
     .parse(parse(read(".github/workflows/build.yml"))).jobs.image.strategy.matrix.include;
 
-/** The probe command ends in its file, relative to whichever workspace it runs in. */
 const probeFilesOf = (leg: ImageLeg): readonly string[] => {
   const file = (leg.probe ?? "").trim().split(/\s+/).at(-1) ?? "";
   return [...workspacePackages(), "apps/worker"]
@@ -558,7 +556,6 @@ const stepsOfJob = (job: string): readonly Step[] => checkJobs()[job]?.steps ?? 
 
 const laneStep = (): Step | undefined => stepsOfJob(LANE).find((one) => one.id === LANE);
 
-/** The matrix leg hands each of its jobs one slice of a root script's files. */
 const SHARD_ARGUMENT = / --shard="\$\{SHARD\}"$/;
 
 const gatesOf = (job: string): readonly string[] =>
@@ -585,7 +582,6 @@ const RUN_BY_STEP: Readonly<Record<string, Readonly<Record<string, string>>>> = 
   "apps/web": { typecheck: "check:web:typecheck", test: "check:web:test", e2e: "check:web:e2e" },
 };
 
-/** Each sharded leg, in the workflow's order, and the one root script it slices. */
 const SHARDED_LEGS: Readonly<Record<string, string>> = {
   "full-core": "check:core:suite",
   "full-web-browser": "check:web:e2e",
@@ -608,7 +604,6 @@ const A_BASE = "0123456789abcdef0123456789abcdef01234567";
 
 const TARGET = "refs/heads/main";
 
-/** Where `TARGET` points, which every group in the queue descends from. */
 const TARGET_TIP = "1111111111111111111111111111111111111111";
 
 /** The head of the group queued ahead, which GitHub gives the group behind it as `base_sha`. */
@@ -630,10 +625,8 @@ type LaneStepCase = {
 
   readonly github: Context;
 
-  /** Whether the stubbed `git fetch` finds the base. */
   readonly fetched: boolean;
 
-  /** What `git diff` names from each base to HEAD; a base absent here is one git cannot read. */
   readonly changedSince: Readonly<Record<string, readonly string[]>>;
 
   readonly lane: string;
@@ -788,7 +781,6 @@ type LaneStepRun = {
 
   readonly published: Decision & { readonly dependencies: string };
 
-  /** The git subcommands the step ran, in order. */
   readonly asked: readonly string[];
 
   readonly output: string;
@@ -816,13 +808,11 @@ type Scratch = {
 
   readonly fetched: boolean;
 
-  /** A file per base that `git diff` can read, holding the paths it names from there. */
   readonly since: string;
 
   readonly fetchHead: string;
 };
 
-/** Fetches `TARGET` as `TARGET_TIP` and a sha as itself, as the remote would. */
 const gitOver = ({ asked, fetched, since, fetchHead }: Scratch): string =>
   [
     `echo "$1" >> '${asked}'`,
@@ -838,7 +828,6 @@ const gitOver = ({ asked, fetched, since, fetchHead }: Scratch): string =>
     "",
   ].join("\n");
 
-/** Over a `git` answering from `changedSince`; `answered` replaces the lane script's answer. */
 const runTheLaneStep = (
   { github, fetched, changedSince }: LaneStepCase,
   answered?: string,
@@ -1064,17 +1053,14 @@ type VerdictCase = {
 
   readonly lane: string;
 
-  /** The legs that ended in success; every other leg was skipped. */
   readonly ran: readonly string[];
 
   readonly title: string;
 
   readonly wanted: string;
 
-  /** The dependency typecheck's result and what the fan-in wants of it; both `skipped` if absent. */
   readonly typecheck?: { readonly was: string; readonly wanted: string };
 
-  /** Drops the lane's legs from the jobs the verdict reads, as a lane with no leg would. */
   readonly withoutItsLegs?: boolean;
 
   readonly says?: string;
@@ -1329,7 +1315,6 @@ describe("the pull request's title, read by check.yml", () => {
     return `#!/bin/sh\n[ "$*" = "dlx ${asked.join(" ")} commitlint" ] || { echo "pnpm was asked: $*" >&2; exit 3; }\nexec '${installed}'\n`;
   };
 
-  /** gh answers the one question the step should ask, and fails any other. */
   const titleStepWith = (
     title: string,
     event: { readonly PULL_REQUEST: string; readonly QUEUED_REF: string },

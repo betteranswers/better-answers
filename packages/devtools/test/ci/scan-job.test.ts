@@ -53,7 +53,6 @@ const resolveStep = () => carrying(scanWorkflow().jobs.trivy.steps, NEWEST_BUILD
 
 const recordSchema = z.record(z.string(), z.unknown());
 
-/** The two forms of yq path the tiers job uses, `.key` and `.key[]`, and nothing wider. */
 const valuesAt = (document: unknown, yqPath: string): readonly unknown[] =>
   yqPath
     .split(".")
@@ -79,7 +78,6 @@ type Resolved = {
   readonly log: string;
 };
 
-/** The step's own script under bash, with `gh` answering from the pages given, or refusing. */
 const resolveAgainst = (pages: unknown): Resolved => {
   const step = resolveStep();
   const directory = mkdtempSync(path.join(tmpdir(), "scan-resolve-"));
@@ -129,9 +127,6 @@ const version = (name: string, createdAt: string, tags: readonly string[]) => ({
   metadata: { package_type: "container", container: { tags } },
 });
 
-/**
- * Read from the api package: an image, then the two manifests its provenance push wrote after it.
- */
 const IMAGE = version(
   "sha256:317ef2837f4ce3105d418849237c9e914477b44e6b5b9767671ca49bc2fdc173",
   "2026-09-23T15:29:50Z",

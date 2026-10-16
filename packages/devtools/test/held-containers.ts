@@ -13,10 +13,6 @@ export type Holder = {
   readonly container: Promise<string>;
 };
 
-/**
- * A process of its own that starts one container through testcontainers and holds it until
- * killed, as a test run does.
- */
 export const holdAContainer = (env: Readonly<Record<string, string>> = {}): Holder => {
   const child = spawn(process.execPath, [HOLDER], {
     env: { ...process.env, ...env },
@@ -40,7 +36,6 @@ export const holdAContainer = (env: Readonly<Record<string, string>> = {}): Hold
   return { process: child, container };
 };
 
-/** The container's state, or undefined once the daemon no longer has it; throws on any other failure. */
 export const containerState = (container: string): string | undefined => {
   const inspected = spawnSync("docker", ["inspect", "--format", "{{.State.Status}}", container], {
     encoding: "utf8",
@@ -59,7 +54,6 @@ export const untilContainerGone = async (container: string, withinMs: number): P
   return containerState(container) === undefined;
 };
 
-/** Removes only the containers named, each of which the calling suite started itself. */
 export const removeContainers = (containers: readonly string[]): void => {
   if (containers.length === 0) return;
   spawnSync("docker", ["rm", "--force", "--volumes", ...containers], { encoding: "utf8" });

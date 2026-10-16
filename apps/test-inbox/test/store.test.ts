@@ -20,7 +20,6 @@ const receivedAt = (receivedAtMs: number): Received => ({
   raw: new TextEncoder().encode(`Subject: Sent at ${String(receivedAtMs)}\r\n\r\nYour code\r\n`),
 });
 
-/** The ids it minted, in the order given. */
 const keptAt = async (store: Store, ...times: readonly number[]): Promise<readonly string[]> => {
   const ids: string[] = [];
   for (const receivedAtMs of times) ids.push(valueOf(await store.keep(receivedAt(receivedAtMs))));

@@ -32,7 +32,6 @@ const testOptionsOf = async (workspace: string) => {
   return testOptions.parse(loaded).default.test;
 };
 
-/** Read off pnpm's workspace list, so a new workspace that takes vitest is held to these. */
 const WORKSPACES = workspacePackages().filter((workspace) =>
   readFileSync(path.join(repositoryRoot, workspace, "package.json"), "utf8").includes('"vitest"'),
 );
@@ -91,7 +90,6 @@ const vitest = runsOverThrowawayTree({
 
 const KINDS = ["each", "template", "loop"] as const;
 
-/** `<kind> word1 … word<count - 1>`, its last word filled in only as the test runs. */
 const renderedTitle = (kind: string, count: number): string => `${kind} ${wordsOf(count - 1)}`;
 
 const renderedSuite = (count: number): string => {

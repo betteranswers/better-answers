@@ -42,7 +42,6 @@ type Listed = {
   readonly ryuk?: string;
 };
 
-/** The lines `docker ps` answers the reaper's format with. */
 const listing = (listed: readonly Listed[]): string =>
   listed.map((one) => `${JSON.stringify({ session: "", ryuk: "", ...one })}\n`).join("");
 

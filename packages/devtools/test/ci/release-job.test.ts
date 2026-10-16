@@ -78,7 +78,6 @@ const REPOSITORY = "betteranswers/better-answers";
 const tagOf = (commit: string, kind = "release"): string =>
   `refs/tags/${kind}/20260926T023514Z-${commit.slice(0, 7)}`;
 
-/** Answers only the calls the gate makes, so a changed call fails as unread. */
 const STUB_GH = [
   "#!/usr/bin/env bash",
   '[ -n "${STUB_GH_FAILS:-}" ] && exit 1',
@@ -266,7 +265,6 @@ describe("the gate the nightly release passes", () => {
   });
 });
 
-/** One run of each trigger, for a refusal every trigger must make. */
 const EVERY_TRIGGER = [
   { trigger: "merge", env: { COMMIT: HEAD, EVENT: "push" } },
   { trigger: "nightly", env: { EVENT: "schedule" } },
@@ -477,7 +475,6 @@ const READ_KEY = "hcr_read_only_key_for_tests";
 /** GitHub starts the 02:35 schedule hours late, about here. */
 const READ_AT = "2026-10-01T09:00:00Z";
 
-/** Answers only the clock read the check makes. */
 const STUB_DATE = [
   "#!/usr/bin/env bash",
   '[ "$*" = "-u +%s" ] || exit 2',
@@ -720,7 +717,6 @@ const jobOf = (name: string): ReleaseJob => {
   return job;
 };
 
-/** Every `secrets.` name a job reads, wherever in the job it reads it. */
 const secretsReadBy = (job: ReleaseJob): readonly string[] =>
   [...new Set([...JSON.stringify(job).matchAll(/secrets\.([A-Z_]+)/g)].map((found) => found[1]))]
     .filter((name) => name !== undefined)
@@ -870,7 +866,6 @@ describe("the tag a release records", () => {
   });
 });
 
-/** Logs each call, so a test reads the tag the record step made and what it pushed. */
 const STUB_GIT = [
   "#!/usr/bin/env bash",
   'printf "%s\\0" "$@" >> "${STUB_GIT_LOG}"',
@@ -883,7 +878,6 @@ const JOURNEYED = "d0aeb355cba8b2a0c86f4c2b1a3e9f6d7c5b4a31";
 
 type Recorded = { readonly calls: readonly (readonly string[])[]; readonly summary: string };
 
-/** Runs the record job's tagging step as release.yml writes it. */
 const recordedAs = async (env: Readonly<Record<string, string>>): Promise<Recorded> => {
   const step = jobOf("record").steps.find(running('git push origin "refs/tags/${tag}"'));
   const run = mkdtempSync(path.join(scratch, "record-"));
@@ -1127,7 +1121,6 @@ describe("the report a journeys run ends in", () => {
 
 type Reported = Ran & { readonly summary: string; readonly heard: readonly Heard[] };
 
-/** The run's other jobs as the report job reads them; unnamed, the gate passed and promote ran. */
 type Upstream = { readonly promote?: string; readonly refused?: string; readonly refusal?: string };
 
 const reported = async (

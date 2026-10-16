@@ -52,14 +52,12 @@ type Estate = {
 const STALE_ID = "stale0000000000000000000000000000000000000000000000000000000000ab";
 const LIVE_ID = "live00000000000000000000000000000000000000000000000000000000000cd";
 
-/** Every sweep here runs over this `docker`, so none reaches the machine's own daemon. */
 const dockerStub = (log: string): string =>
   recordsItsArgv(log, [
     `[ "$1" = ps ] && printf '%s\\n' '{"id":"${STALE_ID}","name":"stale","state":"exited","session":"s1","ryuk":""}'`,
     `[ "$1" = ps ] && printf '%s\\n' '{"id":"${LIVE_ID}","name":"live","state":"running","session":"s2","ryuk":""}'`,
   ]);
 
-/** jCodeMunch names each worktree `local/<name>`; gh says `t-squashed`'s head merged by squash. */
 const stubTools = (
   primary: string,
   worktrees: Readonly<Record<Name, string>>,
@@ -90,7 +88,6 @@ const stubTools = (
   });
 };
 
-/** One worktree per case, under the main checkout's `.claude/worktrees/` but for `elsewhere`. */
 const arrangeAndSweep = (): Estate => {
   const { origin, primary } = originAndClone(scratch, "estate", { "README.md": "# estate\n" });
   const under = path.join(primary, ".claude/worktrees");

@@ -77,7 +77,6 @@ const inventoryOf = (root: string): string => {
 
 type Classing = { readonly class: string; readonly unit: string; readonly holder?: string };
 
-/** Fills the classifier's columns of the row starting on `start` in `file`, as an agent would. */
 const classified = (tsv: string, choices: Readonly<Record<string, Classing>>): string =>
   tsv
     .split("\n")

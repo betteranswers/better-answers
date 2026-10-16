@@ -8,10 +8,8 @@ import { afterAll } from "vitest";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 
-/** A script under `deploy/`, by its file name. */
 export const deployScript = (name: string): string => path.join(repositoryRoot, "deploy", name);
 
-/** A directory of the suite's own, removed once the file's tests have run. */
 export const scratchDirectory = (prefix: string): string => {
   const made = mkdtempSync(path.join(tmpdir(), prefix));
   afterAll(() => {
@@ -20,12 +18,10 @@ export const scratchDirectory = (prefix: string): string => {
   return made;
 };
 
-/** The runner's PATH and nothing else, so a script sees no variable a test did not give it. */
 export const PATH_ONLY = { PATH: process.env["PATH"] ?? "" };
 
 export type Ran = { readonly code: number | null; readonly out: string; readonly err: string };
 
-/** Runs a script under bash with exactly `env`, collecting both streams. */
 export const ran = (
   script: string,
   args: readonly string[],
@@ -58,7 +54,6 @@ export type Answer = {
   readonly headers?: Readonly<Record<string, string>>;
 };
 
-/** A stand-in for a service a script calls, answering each request as `answer` says. */
 export const listening = async (
   answer: (heard: Heard) => Answer,
   work: (origin: string, heard: readonly Heard[]) => Promise<void>,

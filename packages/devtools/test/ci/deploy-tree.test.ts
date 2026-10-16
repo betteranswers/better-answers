@@ -738,7 +738,6 @@ describe("the deploy tree", () => {
     expect(read("deploy/backup.sh")).toContain("init-repo");
   });
 
-  /** The longest await-release.sh can run at `polls`, from its first poll to its last. */
   const awaitSeconds = (polls: number): number => {
     const script = read("deploy/await-release.sh");
     const delaySeconds = Number(/AWAIT_RELEASE_DELAY_SECONDS:-(\d+)/.exec(script)?.[1]);

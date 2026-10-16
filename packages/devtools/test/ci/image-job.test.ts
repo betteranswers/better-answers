@@ -54,7 +54,6 @@ const DEFERRAL =
 
 type DeferralRead = { readonly input: string; readonly answer: string };
 
-/** A value read some other way comes back whole, so the mismatch names it. */
 const deferralsRead = (): readonly DeferralRead[] =>
   checkLegs()
     .flatMap(([, steps]) => steps)

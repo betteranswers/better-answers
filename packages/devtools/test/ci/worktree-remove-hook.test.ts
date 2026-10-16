@@ -33,7 +33,6 @@ const worktreeOf = (name: string): { readonly root: string; readonly worktree: s
   return { root, worktree: worktreeUnder(scratch, root, name) };
 };
 
-/** jCodeMunch names `worktree` as `REPO_ID`, and gh answers `pullRequests` to every `pr list`. */
 const stubTools = (name: string, worktree: string, log: string, pullRequests = "[]"): string => {
   const registry = JSON.stringify([{ repo_id: REPO_ID, source_root: realpathSync(worktree) }]);
   return stubsOnPath(path.join(scratch, `${name}-bin`), {

@@ -49,10 +49,6 @@ const STRYKER_CONFIG = `export default {
 };
 `;
 
-/**
- * Models CI's contention: a slow sibling sleeps only while a mutant runs, so a whole-suite run
- * outlasts the short dry run's timeout budget.
- */
 const CONTENDED_WORKSPACE = {
   "stryker.config.mjs": `export default {
   testRunner: "vitest",

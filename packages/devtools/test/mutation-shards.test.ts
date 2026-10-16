@@ -516,7 +516,6 @@ const reported = (
   };
 };
 
-/** A previous run over `lines`, each line's string mutant timed out or killed. */
 const previousRun = (
   lines: readonly string[],
   timedOut: number,
@@ -1015,7 +1014,6 @@ const verdictsIn = (file: string): readonly Verdict[] =>
       `${left.file} ${left.mutant}` < `${right.file} ${right.mutant}` ? -1 : 1,
     );
 
-/** The two files named as the workflow's gather step names them, the names the merge reads. */
 const runAsShards = async (
   root: string,
   leg: ReadonlyMap<string, Leg>,

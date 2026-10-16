@@ -24,7 +24,6 @@ export type D1StandIn = {
   readonly corrupt: (id: string, column: "received_at" | "raw") => void;
 };
 
-/** D1 over `node:sqlite`, set up by the Worker's own migration; `failsOn` names what it refuses. */
 export const d1StandIn = (failsOn?: RegExp): D1StandIn => {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec(MIGRATION);
