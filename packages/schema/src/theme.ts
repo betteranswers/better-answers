@@ -19,6 +19,6 @@ export const themeShown = (kept: string | null, deviceDark: boolean): Theme => {
 export const FIRST_PAINT = `(() => {
   let kept = null;
   try { kept = localStorage.getItem(${JSON.stringify(THEME_KEPT_UNDER)}); } catch {}
-  const dark = kept === "dark" || (kept !== "light" && matchMedia(${JSON.stringify(DEVICE_DARK)}).matches);
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  const shown = ${themeShown.toString()};
+  document.documentElement.dataset.theme = shown(kept, matchMedia(${JSON.stringify(DEVICE_DARK)}).matches);
 })();`;

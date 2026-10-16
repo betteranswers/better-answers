@@ -96,6 +96,12 @@ describe("the head script", () => {
   });
 });
 
+describe("the key a theme is kept under", () => {
+  it("keeps the name readers' browsers already hold", () => {
+    expect(THEME_KEPT_UNDER).toBe("better-answers.theme");
+  });
+});
+
 describe("choosing a theme", () => {
   it("follows the device until a theme is chosen", () => {
     const device = aDevice(false);
