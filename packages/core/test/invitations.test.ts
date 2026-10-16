@@ -251,7 +251,6 @@ describe("inviting a person by address", () => {
   });
 });
 
-/** A request waiting in `workspace`, and the approval of it the Admin would send. */
 const aRequestIn = async (workspace: ProvisionedWorkspace, requester?: { email: string }) => {
   const person = await seedingWith(db().pool, (seed) => seed.user(requester));
   const requestId = await seedingWith(db().pool, async (seed) => {
@@ -325,7 +324,6 @@ describe("an approved access request's invitation", () => {
     ]);
   });
 
-  /** A request waiting in a new workspace, and the approval of it the Admin would send. */
   const aRequestWaiting = async (name: string) => {
     const workspace = await provisionedWorkspace(db(), name);
     return { workspace, ...(await aRequestIn(workspace)) };
@@ -617,7 +615,6 @@ describe("what resending and cancelling refuse", () => {
   });
 });
 
-/** A workspace holding one invitation in each status, as listed at `INVITED_AT`. */
 const oneOfEach = async (name: string) => {
   const workspace = await provisionedWorkspace(db(), name, { name: "Priya Shah" });
   const addresses = {

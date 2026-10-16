@@ -13,7 +13,6 @@ const CONFIRMED_AT = new Date("2026-10-14T12:00:00.000Z");
 
 const aMinute = (minutes: number): Date => new Date(CONFIRMED_AT.getTime() + minutes * 60_000);
 
-/** As a resolver hands either kind of principal over, confirmed at the instant named. */
 const confirmedAt = (secondFactorConfirmedAtMs: number | null) => ({
   credentialIssuedAtMs: CONFIRMED_AT.getTime(),
   secondFactorConfirmedAtMs,

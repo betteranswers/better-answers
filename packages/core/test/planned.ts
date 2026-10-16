@@ -21,7 +21,6 @@ const PLANNED_AS_THE_APP = [
 
 const INDEX_NAMED = /"Index Name": "(?<index>[^"]+)"/gu;
 
-/** A plan's node as auto_explain's JSON writes it, with the keys a suite reads. */
 type PlanNode = {
   readonly "Node Type": string;
   readonly "CTE Name"?: string;
@@ -47,10 +46,6 @@ export type Planned<T> = {
   readonly nodes: readonly PlanNode[];
 };
 
-/**
- * Runs `work` as `person` under the api's role, and names every index its statements' plans
- * used, with every node of those plans.
- */
 export const planned = async <T>(
   db: MigratedPostgres,
   person: { readonly workspaceId: string; readonly userId: string },

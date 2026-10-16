@@ -13,7 +13,6 @@ import { postgresForSuite, seedingWith, whileWritesAreRefused } from "./suite-po
 
 const db = postgresForSuite();
 
-/** Invented, as every key here is: they seal nothing outside this file. */
 const ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => index);
 const ANOTHER_ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => 255 - index);
 const A_SHORT_ENVELOPE_KEY = Uint8Array.of(0xde, 0xad, 0xbe, 0xef, 0x99);
@@ -34,7 +33,6 @@ const aWorkspace = (): Promise<string> =>
 const setting = (workspaceId: string, key: string, provider = "anthropic") =>
   setModelKey(bootstrap, door(), modelKeySetting, { workspaceId, provider, key });
 
-/** The key the workspace `scope` holds, read in a transaction of its own. */
 const keyReadIn = (
   scope: string,
   provider: ModelProvider = "anthropic",
@@ -75,7 +73,6 @@ const eventsOf = async (workspaceId: string) => {
   return audited.rows;
 };
 
-/** Every way a value is put in front of a person: as JSON, as a logger prints it, as text. */
 const shown = (value: unknown): string =>
   [
     JSON.stringify(value),
@@ -84,7 +81,6 @@ const shown = (value: unknown): string =>
     value instanceof Error ? `${value.message}\n${value.stack ?? ""}` : "",
   ].join("\n");
 
-/** Each way a key's bytes are written out: in hexadecimal, in base64, and as a list of numbers. */
 const writtenOut = (bytes: Uint8Array): readonly string[] => {
   const held = Buffer.from(bytes);
   const hex = held.toString("hex");
@@ -100,7 +96,6 @@ const writtenOut = (bytes: Uint8Array): readonly string[] => {
 
 const CONSOLE_METHODS = ["log", "info", "warn", "error", "debug"] as const;
 
-/** All the process printed while `work` ran, through the console or either stream. */
 const printedDuring = async (work: () => Promise<unknown>): Promise<string> => {
   const printed: string[] = [];
   const keep = (...parts: unknown[]): boolean => {

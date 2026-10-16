@@ -1410,7 +1410,6 @@ describe("an Admin reprocesses a connected source", () => {
   });
 });
 
-/** A source a wipe emptied, its `wiped` sync queued behind the sync that first indexed it. */
 const WIPED_AND_QUEUED = {
   passages: [],
   runs: [

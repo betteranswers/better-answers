@@ -1022,7 +1022,6 @@ describe("the operator resolver", () => {
     });
   });
 
-  /** Writes one identity-set row about the operator, then answers `answer`. */
   const writingThen =
     <Answer>(answer: Answer) =>
     async (operator: OperatorPrincipal, tx: Tx): Promise<Answer> => {

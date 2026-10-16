@@ -163,7 +163,6 @@ describe("find, by any of the query's words", () => {
   });
 });
 
-/** Two strong concepts, a passage, and two weak concepts, each run in a known order. */
 const threeRunsLanded = async (workspaceId: string): Promise<void> => {
   await documentLanded(db().pool, workspaceId, {
     title: "The audit log handbook",
@@ -417,7 +416,6 @@ describe("find's pages", () => {
   });
 });
 
-/** Runs `work` after a statement has failed, so every read it makes fails too. */
 const afterAFailedStatement = async <T, Refused>(
   person: UserPrincipal,
   work: (reader: UserPrincipal, tx: Tx) => Promise<Result<T, Refused>>,

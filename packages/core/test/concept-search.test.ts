@@ -7,7 +7,6 @@ const { db, arrange } = visibilitySuite();
 
 type Weighed = { readonly lexeme: string; readonly weights: readonly string[] };
 
-/** Each lexeme of the concept's search column, with the distinct weights it carries. */
 const weighed = async (scenario: Scenario, iri: string): Promise<readonly Weighed[]> => {
   const read = await db().pool.query<Weighed>(
     `SELECT word.lexeme, array(SELECT DISTINCT w FROM unnest(word.weights) w ORDER BY w) AS weights

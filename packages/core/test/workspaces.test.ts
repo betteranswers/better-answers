@@ -874,7 +874,6 @@ describe("a person's workspaces, each with their role there", () => {
     return { email, personId: await seedPerson(db().pool, { email }) };
   };
 
-  /** A new workspace under its own Admin, which the person holding `email` joins at `role`. */
   const joinedAs = async (name: string, email: string, role: "Admin" | "Editor" | "Viewer") => {
     const workspace = await provisionedWorkspace(db(), name);
     const added = await addMember(bootstrap, workspace.door, {

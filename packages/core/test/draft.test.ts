@@ -64,7 +64,6 @@ const SUPPLIER_ANSWER = anAnswer(
 
 type Drafting = {
   readonly limitGbp?: string;
-  /** Whether an answering model is chosen at all. */
   readonly chosen?: boolean;
 };
 
@@ -75,7 +74,6 @@ type Streamed = {
   readonly signals: (AbortSignal | null | undefined)[];
 };
 
-/** A drafting model at the wire, writing each reply's lines from the numbers its prompt gave. */
 const aDrafter = (
   writing: Writing,
   options: {
@@ -107,7 +105,6 @@ const aDrafter = (
 
 type Drafter = ReturnType<typeof aDrafter>;
 
-/** The titles of the concepts each drafting request gave the model. */
 const titlesSent = (drafter: Drafter) =>
   drafter.streamed.prompts.map((prompt) => [...numbersIn(prompt).keys()]);
 
@@ -115,11 +112,9 @@ type Steps = DraftSteps<PrincipalRefusal>;
 
 type Told = {
   readonly signal?: AbortSignal;
-  /** Changes a step, as a store fault or a reader's lost access would. */
   readonly steps?: (steps: Steps) => Steps;
 };
 
-/** Every event a draft sends, in order. */
 const draftOf = async (
   asker: UserPrincipal,
   result: AnswerResult,
@@ -160,7 +155,6 @@ const spendOf = async (workspaceId: string) => {
   return { open: open.rows[0]?.open, calls: calls.rows };
 };
 
-/** An evidence result over `shapes`, with no judge to call. */
 const arranged = async (
   shapes: readonly SeededConcept[],
   { limitGbp = "100", chosen = true }: Drafting = {},
@@ -176,7 +170,6 @@ const arranged = async (
   return { workspaceId, asker, iris, result };
 };
 
-/** Where a reply's second text delta sits among its events. */
 const SECOND_DELTA = streamedEventsOf(["a", "b"]).findIndex((event) => event.includes('"b"'));
 
 const numberOf = (numbers: ReadonlyMap<string, string>, shape: SeededConcept) =>
@@ -343,7 +336,6 @@ describe("the drafter", () => {
   });
 });
 
-/** As if the concept were gone from the index: no reader can read it any longer. */
 const unreadable = async (shape: SeededConcept, result: AnswerResult) => {
   const iri = result.related.find((concept) => concept.title === shape.title)?.iri;
   await db().pool.query("DELETE FROM concept_index WHERE iri = $1", [iri]);
@@ -432,7 +424,6 @@ describe("what the drafter reads and keeps", () => {
 
 type Labels = { readonly a: string; readonly b: string; readonly c: string };
 
-/** The `audits` part's sentences from `pieces`; `a` and `b` are its labels, `c` the other part's. */
 const sentOf = async (pieces: (labels: Labels) => readonly string[]) => {
   const { asker, result } = await arranged([RETENTION, EXPORT, LMS_LOGS]);
   const labelOf = (shape: SeededConcept) =>

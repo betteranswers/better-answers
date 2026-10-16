@@ -40,7 +40,6 @@ type Corpus = {
   readonly sourced: ConceptIri;
 };
 
-/** A passage covering all of `HANDBOOK` in `document`, and the locator that opens it. */
 const passageIn = async (
   scenario: Scenario,
   document: { readonly connectedSourceId: string; readonly documentId: string },
@@ -54,10 +53,6 @@ const passageIn = async (
   return `${document.documentId}/chars:0-${HANDBOOK.length}`;
 };
 
-/**
- * An `Answer` naming four sources, a readable passage, a Restricted passage, a corpus `Answer` and
- * a title alone, and linking two corpus `Answer`s.
- */
 const sourcedAnswer = async (scenario: Scenario, cited: ConceptIri): Promise<ConceptIri> => {
   const internal = await connectedSourceHolding(db(), scenario.workspaceId);
   const restricted = await connectedSourceHolding(db(), scenario.workspaceId, {
@@ -113,7 +108,6 @@ type Timed<T> = {
   readonly value: T;
 };
 
-/** Times `read` after a one-row read of `iri`, both in one transaction as `reader`. */
 const timed = async <T>(
   reader: UserPrincipal,
   iri: ConceptIri,
@@ -139,7 +133,6 @@ const timed = async <T>(
   return { ...timing, waitedMs: performance.now() - started };
 };
 
-/** `ROUNDS` rounds of `IN_FLIGHT` reads at once, the Viewer and the Admin alternating. */
 const underLoad = async <T>(
   scenario: Scenario,
   read: (reader: UserPrincipal) => Promise<Timed<T>>,
@@ -154,7 +147,6 @@ const underLoad = async <T>(
   return reads;
 };
 
-/** Records the reads' figures under `heading`; the median read, in one-row reads. */
 const reported = async (
   heading: string,
   reads: readonly Timed<unknown>[],
@@ -184,7 +176,6 @@ const opened = (reader: UserPrincipal, iri: ConceptIri) =>
     answered(await open(principal, tx, { iri }, NOW)),
   );
 
-/** The sources the read opens, a passage or a concept, by the file's own label. */
 const opensOf = (result: OpenResult): readonly string[] =>
   result.found
     ? (result.concept?.evidence.flatMap(({ source, locator, iri }) =>
@@ -192,7 +183,6 @@ const opensOf = (result: OpenResult): readonly string[] =>
       ) ?? [])
     : [];
 
-/** The addresses of the body's links the read answers, in the body's order. */
 const linksOf = (result: OpenResult): readonly string[] =>
   result.found ? (result.concept?.bodyLinks.map(({ address }) => address) ?? []) : [];
 

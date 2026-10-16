@@ -75,7 +75,6 @@ const raisedFor = async (personId: string) =>
     )
   ).rows;
 
-/** How many rows the flag left on each audit log. */
 const flagsOn = async (workspace: ProvisionedWorkspace, personId: string) => ({
   flagged: (await flaggedIn(workspace)).length,
   raised: (await raisedFor(personId)).length,
@@ -93,7 +92,6 @@ const correcting = (operator: OperatorPrincipal, tx: Tx, personId: string, displ
     at: new Date(),
   });
 
-/** @throws when the operator's correction is refused. */
 const correctedSince = async (personId: string, displayName = "Priya Shah") => {
   const corrected = await asTheOperator(db(), (operator, tx) =>
     correcting(operator, tx, personId, displayName),
@@ -101,7 +99,6 @@ const correctedSince = async (personId: string, displayName = "Priya Shah") => {
   if (!corrected.ok) throw new Error(`the correction was refused: ${String(corrected.error)}`);
 };
 
-/** Narrowed to `personIds`: every flag this file raises shares one database. */
 const waitingAmong = async (personIds: readonly string[]) => {
   const listed = await asTheOperator(db(), listNamesWaiting);
   if (!listed.ok) throw new Error(`the names waiting were refused: ${String(listed.error)}`);
@@ -212,7 +209,6 @@ describe("a flag that already waits", () => {
     const person = await joined(workspace, await aPerson(), "Viewer");
     const firstRaised = Promise.withResolvers<undefined>();
 
-    /** It commits only once the second waits on it, so the second reads after the first's write. */
     const first = heldAs(workspace, workspace.adminUserId, async (principal, tx) => {
       const flagged = await flagging(principal, tx, person);
       firstRaised.resolve(undefined);

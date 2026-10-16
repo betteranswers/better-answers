@@ -12,7 +12,6 @@ import { removeBundleRoot } from "./bundle-root.ts";
 
 const run = promisify(execFile);
 
-/** Registers the suite's hooks; the getter it hands back throws before `beforeAll` has run. */
 export const bundlesForSuite = (): (() => GitDoor) => {
   let root: string | undefined;
 
@@ -53,7 +52,6 @@ const git = async (
   return stdout;
 };
 
-/** Deletes the loose object a revision names and hands back its id; a packed one throws. */
 export const objectRemovedFrom = async (
   door: GitDoor,
   workspaceId: string,
@@ -67,10 +65,6 @@ export const objectRemovedFrom = async (
 
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
-/**
- * Points `main` at a new root commit of the empty tree, changing no file and sharing no history
- * with the old; hands back its sha.
- */
 export const emptyRootCommit = async (
   door: GitDoor,
   workspaceId: string,
@@ -160,7 +154,6 @@ export const fileAtCommit = (
   file: string,
 ): Promise<string> => git(door, workspaceId, ["show", `${sha}:${file}`]);
 
-/** `main`'s commits, oldest first; none when the repository has no `main` yet. */
 export const bundleHistory = async (
   door: GitDoor,
   workspaceId: string,
@@ -177,7 +170,6 @@ export const staged = async (door: GitDoor, workspaceId: string): Promise<readon
 export const removeRepository = (door: GitDoor, workspaceId: string): Promise<void> =>
   rm(gitDirOf(door, workspaceId), { recursive: true, force: true });
 
-/** Packs every ref, then corrupts the pack, so git still sees a repository but reads no ref. */
 export const corruptPackedRefs = async (door: GitDoor, workspaceId: string): Promise<void> => {
   await git(door, workspaceId, ["pack-refs", "--all"]);
   await writeFile(
@@ -186,7 +178,6 @@ export const corruptPackedRefs = async (door: GitDoor, workspaceId: string): Pro
   );
 };
 
-/** Each object reachable from `main`, as `cat-file --batch` prints it; empty with no `main`. */
 export const everyObjectOf = async (door: GitDoor, workspaceId: string): Promise<string> => {
   const listed = await git(door, workspaceId, ["rev-list", "--objects", "main"]).catch(() => "");
   const objects = listed
@@ -213,7 +204,6 @@ export const objectPresent = async (
     .then(() => true)
     .catch(() => false);
 
-/** Each `main` commit's `name <email>` author line, oldest first; none with no `main`. */
 export const authorLinesOf = async (
   door: GitDoor,
   workspaceId: string,

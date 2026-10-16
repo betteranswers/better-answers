@@ -33,7 +33,6 @@ const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better
 
 const CLEF_FLASH = "clef-flash";
 
-/** Invented: an account id, a colon, then a token. */
 const A_WORKERS_AI_KEY = "0123456789abcdef0123456789abcdef:invented_Token-u15";
 
 /** The suite's own: no decision model's threshold is calibrated. */
@@ -47,7 +46,6 @@ const CAPS: AskCaps = { ...ASK_CAPS, decisionThresholds: AT_SEVEN_TENTHS };
  */
 const PLACEHOLDER_LONGEST_ANSWER_CHARACTERS = 3_000;
 
-/** A workspace whose Admin asks, judging on Clef-flash with a key, priced for input alone. */
 const aDecidingWorkspace = async () => {
   const workspace = await provisionedWorkspace(db(), "Acme");
   const { workspaceId } = workspace;
@@ -100,7 +98,6 @@ const SUPPLIER = anAnswer(
 
 const QUESTION = "How do buyers access audit information?";
 
-/** Workers AI at the wire, answering each candidate the probability `yes` holds for its title. */
 const decidingWire = (
   yes: ReadonlyMap<string, number>,
   during: () => Promise<void> = async () => {},
@@ -134,7 +131,6 @@ const spendOf = async (workspaceId: string) => {
 const titlesOf = (concepts: readonly { readonly title: string }[]) =>
   concepts.map(({ title }) => title).toSorted();
 
-/** How judging stood, what was sent, and what is left reserved or spent. */
 const outcomeOf = async (
   answer: { readonly verdict: string; readonly judgeState: string },
   wire: Wire,

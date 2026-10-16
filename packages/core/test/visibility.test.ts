@@ -139,7 +139,6 @@ const whileAPassageRowIsHeld = <T>(
     work,
   );
 
-/** A second connected source under a held id fails the transaction after the action has landed every row. */
 const landedThenTheTransactionFailed = (
   scenario: Scenario,
   connectedSourceId: string,
@@ -225,7 +224,6 @@ const besideAnOpenNarrowing = async <T>(
   }
 };
 
-/** What a sync does to a document: its sensitivity moves, and nothing re-derives. */
 const documentNarrowedBySync = (tx: Pick<Tx, "query">, workspaceId: string, sourced: Sourced) =>
   tx.query(
     `UPDATE source_document SET sensitivity = 'Restricted'
@@ -587,7 +585,6 @@ const workspaceWithHrConnectedSource = async () => {
   return { scenario, hr, connectedSource };
 };
 
-/** A source whose document one concept cites, beside another source the cascade must leave. */
 const citedBesideAnother = async () => {
   const scenario = await arrange();
   const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
@@ -1277,7 +1274,6 @@ const findingIn = (scenario: Scenario, document: Sourced, finding: FindingSeeded
     }),
   );
 
-/** Reviewed, and the sync that would lift the seam's verdict not yet run: the document keeps it. */
 const dismissedBy = (scenario: Scenario) => ({
   reviewState: "dismissed",
   reviewedBy: `human:${scenario.admin.userId}`,
@@ -1931,7 +1927,6 @@ describe("find", () => {
 
 const RETENTION = "Retention of audit logs";
 
-/** `audits` holds a concept every reader may read, and `lms` only one a Viewer may not. */
 const auditsReadableAndLmsWithheld = async (scenario: Scenario) => {
   const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
   await conceptCiting(scenario, scenario.editor, [internal.documentId], {

@@ -118,7 +118,6 @@ const entryFigures = (name: string, scoring: EntryScoring, priced: string): read
   ],
 ];
 
-/** The entry step's points for a question with no collection named, as `person` reads them. */
 const entryPointsFor =
   (person: UserPrincipal) =>
   async (question: string): Promise<readonly EntryPoint[]> => {

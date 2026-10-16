@@ -42,7 +42,6 @@ const MEMBER_ADDED = "people.group.member_added";
 
 const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
-/** No person id minted now sorts below the first, nor above the second. */
 const BELOW_ANY_PERSON = "01AAAAAAAAAAAAAAAAAAAAAAAA";
 const ABOVE_ANY_PERSON = "7ZZZZZZZZZZZZZZZZZZZZZZZZZ";
 
@@ -112,7 +111,6 @@ const groupMembersOf = async (workspace: ProvisionedWorkspace, groupId: string) 
 const subjectsOf = async (workspace: ProvisionedWorkspace, action: string) =>
   sorted((await auditRowsOf(workspace, action)).map((row) => row.subject_id));
 
-/** Every event of `action` stands in the one batch, which is a minted id. */
 const oneBatchOf = async (workspace: ProvisionedWorkspace, action: string) => {
   const batches = await batchesOf(workspace, action);
   const [batch] = batches;
@@ -623,7 +621,6 @@ describe("two bulk actions racing", () => {
     const sales = await groupHolding(workspace, []);
     const firstAdded = Promise.withResolvers<undefined>();
 
-    /** It commits only once the second waits on its rows, so the second inserts after it. */
     const addingFirst = heldAs(workspace, workspace.adminUserId, async (principal, tx) => {
       const added = await adding(sales, [...shared, ...firsts])(principal, tx);
       firstAdded.resolve(undefined);

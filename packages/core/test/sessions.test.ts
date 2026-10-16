@@ -16,7 +16,6 @@ const db = postgresForSuite();
 
 const door = () => openPostgres(db().runtimePool);
 
-/** The agent a browser leaves, as the library keeps it: readable, and carrying an address. */
 const MAC_CHROME =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
@@ -26,21 +25,18 @@ const A_BROWSER_ADDRESS = "203.0.113.7";
 
 const STARTED = new Date("2026-10-02T09:00:00.000Z");
 
-/** A ULID-shaped id no seeded person holds a session of. */
 const NOBODY_HOLDING = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
 
 const LATER = new Date("2026-10-02T10:41:00.000Z");
 
 const EXPIRES = new Date("2026-10-09T10:41:00.000Z");
 
-/** When the acts run: the seeded sessions are live, and one seeded expired is an hour past. */
 const NOW = new Date("2026-10-03T09:00:00.000Z");
 
 const EXPIRED = new Date("2026-10-03T08:00:00.000Z");
 
 type Seeded = { readonly personId: string; readonly sessionIds: readonly string[] };
 
-/** One more session of the person's, already past its expiry when the acts run. */
 const anExpiredSessionOf = (seeded: Seeded): Promise<string> =>
   sessionFor(db().pool, seeded.personId, {
     createdAt: STARTED,
@@ -50,7 +46,6 @@ const anExpiredSessionOf = (seeded: Seeded): Promise<string> =>
     ipAddress: A_BROWSER_ADDRESS,
   });
 
-/** A person holding `count` sessions, each seeded with an agent and an address. */
 const aPersonWith = async (count: number, userAgent: string = MAC_CHROME): Promise<Seeded> => {
   const personId = await seedPerson(db().pool);
   const sessionIds = [];
@@ -68,7 +63,6 @@ const aPersonWith = async (count: number, userAgent: string = MAC_CHROME): Promi
   return { personId, sessionIds };
 };
 
-/** The seeded session at `at`, which a person seeded that many holds. */
 const sessionAt = (seeded: Seeded, at: number): string => {
   const id = seeded.sessionIds[at];
   if (id === undefined) throw new Error(`the person holds no session ${String(at)}`);
@@ -82,7 +76,6 @@ const read = (seeded: Seeded, at: number) =>
     now: NOW,
   });
 
-/** Signs the session `sessionId` out of the seeded person's, as the page's own one does. */
 const signOutOf = (seeded: Seeded, sessionId: string) =>
   endOneSession(bootstrap, door(), {
     ...inputOf(endOneSessionInput, { sessionId }),
@@ -90,10 +83,8 @@ const signOutOf = (seeded: Seeded, sessionId: string) =>
     now: NOW,
   });
 
-/** Signs the seeded session at `at` out. */
 const signOut = (seeded: Seeded, at: number) => signOutOf(seeded, sessionAt(seeded, at));
 
-/** Signs every session out but the seeded one at `at`, as the page's dialog commits it. */
 const signOutOthers = (seeded: Seeded, at: number) =>
   endOtherSessions(bootstrap, door(), {
     personId: seeded.personId,
@@ -101,14 +92,12 @@ const signOutOthers = (seeded: Seeded, at: number) =>
     now: NOW,
   });
 
-/** The session an act ended, named as its record names it. */
 const endedSession = (seeded: Seeded, at: number) => ({
   sessionId: sessionAt(seeded, at),
   device: "Chrome on macOS",
   lastActiveAt: expect.any(String),
 });
 
-/** The one record a sign-out writes, with the delete's own session order ironed out. */
 const aSignOutRecord = (
   personId: string,
   sessions: readonly { readonly sessionId: string; readonly device: string }[],

@@ -59,7 +59,6 @@ const AN_UNREACHABLE_STORE: WorkerObjectStore = {
 
 export const lmdbRootUnder = (bundleRoot: string): string => path.join(bundleRoot, "lmdb");
 
-/** Stamps the contract, then runs one pass as `worker_rt`; throws on a failure or a traceback. */
 export const runWorkerOnce = async (
   connectionUri: string,
   bundleRoot: string,

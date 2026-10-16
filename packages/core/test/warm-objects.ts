@@ -100,7 +100,6 @@ const startGarage = async (): Promise<StartedGarage> => {
   };
 };
 
-/** Vitest's global setup: starts one Garage, and only when a collected file names the harness. */
 const startWarmObjects = async (
   project: TestProject,
 ): Promise<(() => Promise<void>) | undefined> => {
@@ -249,10 +248,6 @@ const storeOver = async (
 
 const NOTHING_TO_STOP = async (): Promise<void> => {};
 
-/**
- * An emptied bucket named for `storeKey`, else the running test file; with no warm Garage, it
- * starts its own, which `stop` ends.
- */
 export const openObjectStore = async (storeKey?: string): Promise<ObjectStore> => {
   const name = storeNameFor(storeKey ?? runningTestFile());
   const warm = providedWarmObjects();

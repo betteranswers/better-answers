@@ -140,10 +140,6 @@ const aFinishedSync = (workspaceId: string, connectedSourceId: string): Promise<
     });
   });
 
-/**
- * Every action refuses a widening, so the restoring half of each pair can only be written onto
- * the source row itself.
- */
 const theConnectedSourceRowNowSays = async (
   workspaceId: string,
   connectedSourceId: string,
@@ -463,10 +459,6 @@ describe("a narrowing queues no sync", () => {
 
 type HeldNarrowing = { readonly commit: () => Promise<void> };
 
-/**
- * The action's work does not return until `commit` is called, so its transaction stays open with
- * the narrowing applied and uncommitted.
- */
 const aNarrowingHeldUncommitted = async (
   scenario: Scenario,
   connectedSourceId: string,

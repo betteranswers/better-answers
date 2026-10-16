@@ -55,7 +55,6 @@ const priced = async (
     }),
   );
 
-/** A workspace judging on `model`, its question on record, under `limit` when one is given. */
 const anAsker = async (limit?: string, model: string = SONNET): Promise<Asker> => {
   const workspace = await provisionedWorkspace(db(), "Acme");
   const asker = await principalFor(db(), workspace.workspaceId, workspace.adminUserId);
@@ -129,7 +128,6 @@ const spentAt = ({ asker, recordId }: Asker, calledAt: Date, costGbp: string) =>
     seed.llmCall({ workspaceId: asker.workspaceId, calledAt, costGbp, answerId: recordId }),
   );
 
-/** Priced at $3 and $15 a million, under a $10 limit, one reservation settled as `calls`. */
 const settledOnce = async (calls: readonly CallSpent[]): Promise<Asker> => {
   await priced("2026-10-01", "3", "15");
   const asking = await anAsker("10");

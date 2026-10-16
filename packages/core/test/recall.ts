@@ -14,7 +14,6 @@ import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
 
 type ReadingAs = ReturnType<typeof visibilitySuite>["reading"];
 
-/** `find`'s concept matches for a question, best first, as `person` reads them on `now`. */
 export const conceptsFoundBy =
   (reading: ReadingAs, person: UserPrincipal, now: Date) =>
   async (question: string): Promise<readonly string[]> => {
@@ -26,7 +25,6 @@ export const conceptsFoundBy =
     return found.matches.flatMap((match) => (match.layer === "bundles" ? [match.iri] : []));
   };
 
-/** A recall as a figure reads it. */
 export const worded = ({ recall, recalled, asked }: Recall, counted: string): string =>
   `${(recall * 100).toFixed(1)} %, for ${recalled} of ${asked} ${counted}`;
 
@@ -34,7 +32,6 @@ const RECALL_SET = fileURLToPath(new URL("./fixtures/recall-set.json", import.me
 
 const BUYER_QUESTIONS = fileURLToPath(new URL("./fixtures/buyer-questions.json", import.meta.url));
 
-/** How far down a ranking the master `Answer` may sit and still count as recalled. */
 export const RECALL_DEPTH = 10;
 
 const answerKey = z.string().regex(/^[a-z0-9-]+$/);
@@ -64,7 +61,6 @@ export type RecallSet = z.infer<typeof recallSet>;
 export const answersOf = (set: RecallSet): readonly (RecallAnswer & { group: string })[] =>
   set.groups.flatMap(({ group, answers }) => answers.map((answer) => ({ ...answer, group })));
 
-/** The JSON at `path` as `shape`, refused when it cannot be read, is not JSON or is not `shape`. */
 export const readAs = async <Held>(
   path: string,
   shape: z.ZodType<Held>,
@@ -77,11 +73,9 @@ export const readAs = async <Held>(
   return parsed.success ? ok(parsed.data) : err(new Error(z.prettifyError(parsed.error)));
 };
 
-/** The set at `path`, refused when it cannot be read, is not JSON, or holds no answer. */
 export const readRecallSet = (path: string): Promise<Result<RecallSet, Error>> =>
   readAs(path, recallSet);
 
-/** The repository's set; throws when it does not read, as a suite's setup should. */
 export const theRecallSet = async (): Promise<RecallSet> => {
   const read = await readRecallSet(RECALL_SET);
   if (!read.ok) throw new Error(`the recall set did not read: ${read.error.message}`);
@@ -111,13 +105,9 @@ const buyerQuestions = z
       .array(
         z.strictObject({
           question: z.string().min(1).max(QUESTION_CHARACTERS_AT_MOST),
-          /** The `id` of the form it was taken from. */
           source: answerKey,
-          /** Where in the form it stands. */
           at: z.string().min(1),
-          /** The one group every `Answer` it names sits in, where there is one. */
           collection: answerKey.optional(),
-          /** The key of each `Answer` of the recall set it must reach. */
           answers: z
             .array(answerKey)
             .min(1)
@@ -146,7 +136,6 @@ export type BuyerQuestions = z.infer<typeof buyerQuestions>;
 export const readBuyerQuestions = (path: string): Promise<Result<BuyerQuestions, Error>> =>
   readAs(path, buyerQuestions);
 
-/** The group every key sits in, where they share one. A key `set` does not hold has none. */
 const oneGroupOf = (
   groups: ReadonlyMap<string, string>,
   keys: readonly string[],
@@ -179,7 +168,6 @@ export const theBuyerQuestions = async (set: RecallSet): Promise<BuyerQuestions>
   return read.value;
 };
 
-/** Writes every answer as a stable Internal `Answer` through `writeConcept`; each key's IRI. */
 export const landRecallSet = async (
   scenario: Scenario,
   set: RecallSet,
@@ -213,15 +201,12 @@ export type Recall = {
   readonly recall: number;
 };
 
-/** A question the measure asks, and the key of each `Answer` it must reach. */
 export type RecallQuestion = {
   readonly question: string;
-  /** The collection every `Answer` it names sits in, where there is one. */
   readonly collection?: string | undefined;
   readonly answers: readonly string[];
 };
 
-/** Each paraphrase as a question that must reach its master `Answer`, in that `Answer`'s group. */
 export const paraphrasesOf = (set: RecallSet): readonly RecallQuestion[] =>
   answersOf(set).flatMap(({ key, group, paraphrases }) =>
     paraphrases.map((question) => ({ question, collection: group, answers: [key] })),
@@ -229,11 +214,8 @@ export const paraphrasesOf = (set: RecallSet): readonly RecallQuestion[] =>
 
 /** One reading counted three ways. A cap is sized from `byAnswer`. */
 export type Recalls = {
-  /** The questions that reach every `Answer` they name. */
   readonly everyAnswer: Recall;
-  /** The questions that reach at least one. */
   readonly anyAnswer: Recall;
-  /** The `Answer`s named, each counted once for each question that names it. */
   readonly byAnswer: Recall;
 };
 
@@ -243,10 +225,6 @@ const recallOf = (recalled: number, asked: number): Recall => ({
   recall: recalled / asked,
 });
 
-/**
- * Asks every question through `ranked`, which answers concept IRIs best first, and counts what
- * each finds of the `Answer`s it names among the first `depth`.
- */
 export const recallAt = async (
   questions: readonly RecallQuestion[],
   landed: ReadonlyMap<string, string>,

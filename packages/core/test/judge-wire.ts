@@ -5,7 +5,6 @@ import { conceptIriOf } from "@better-answers/schema";
 import type { ReturnedConcept } from "../src/answering/index.ts";
 import { openModelClient, type ModelClient } from "../src/llm/index.ts";
 
-/** One `Answer` a judge is asked about, as `ask` returns it. */
 export const A_CANDIDATE: ReturnedConcept = {
   iri: conceptIriOf("01J6AAAAAAAAAAAAAAAAAAAAAA"),
   url: "/knowledge/search/01J6AAAAAAAAAAAAAAAAAAAAAA",
@@ -24,10 +23,8 @@ export const A_CANDIDATE: ReturnedConcept = {
   evidence: [],
 };
 
-/** A request as the fake wire saw it. */
 export type WireSent = { readonly url: string; readonly headers: unknown; readonly body: string };
 
-/** A model client whose wire keeps what it is sent and answers each request as `answer` does. */
 export const clientAnswering = (
   answer: (body: string) => Promise<Response>,
 ): { readonly sent: WireSent[]; readonly client: ModelClient } => {
@@ -47,11 +44,9 @@ export const clientAnswering = (
 
 const messagesBody = z.object({ messages: z.array(z.object({ content: z.string() })) });
 
-/** The prompt a Messages request body carried. */
 export const promptOf = (body: string): string =>
   messagesBody.parse(JSON.parse(body)).messages[0]?.content ?? "";
 
-/** Each candidate's number, by the question it was written for, as the judge's prompt names them. */
 export const candidatesIn = (prompt: string): ReadonlyMap<string, string> =>
   new Map(
     [
@@ -61,7 +56,6 @@ export const candidatesIn = (prompt: string): ReadonlyMap<string, string> =>
     ].map(([, place = "", title = ""]) => [title, place]),
   );
 
-/** A Messages reply whose one text block is `text`, at a stated usage. */
 const messagesReplyOf = (text: string): string =>
   JSON.stringify({
     id: "msg_01",
@@ -80,7 +74,6 @@ const decisionBody = z.object({
   ),
 });
 
-/** Each candidate's question id, by the question it was written for, as a decision call names them. */
 export const decisionCandidatesIn = (body: string): ReadonlyMap<string, string> =>
   new Map(
     Object.entries(decisionBody.parse(JSON.parse(body)).questions).map(([id, question]) => [
@@ -89,10 +82,6 @@ export const decisionCandidatesIn = (body: string): ReadonlyMap<string, string> 
     ]),
   );
 
-/**
- * Workers AI's reply giving each candidate the probability of yes `yes` holds for its title, and
- * nought to the rest.
- */
 export const decisionReplyTo = (yes: ReadonlyMap<string, number>, body: string): string =>
   JSON.stringify({
     result: {
@@ -110,7 +99,6 @@ export const decisionReplyTo = (yes: ReadonlyMap<string, number>, body: string):
     messages: [],
   });
 
-/** Each concept's number in a drafting prompt, by its title. */
 export const conceptNumbersIn = (prompt: string): ReadonlyMap<string, string> =>
   new Map(
     [
@@ -123,7 +111,6 @@ const sse = (event: string, data: object): string =>
 
 type StreamedUsage = { readonly input_tokens: number; readonly output_tokens: number };
 
-/** A streamed Messages reply writing `pieces`, a delta each, its events in the documented order. */
 export const streamedEventsOf = (
   pieces: readonly string[],
   usage: StreamedUsage = { input_tokens: 2_100, output_tokens: 140 },
@@ -171,13 +158,11 @@ export const OVERLOADED_EVENT = sse("error", {
 });
 
 type Streaming = {
-  /** Awaited before chunk `at` is sent; a chunk never awaited for is sent at once. */
   readonly before?: (at: number) => Promise<void>;
   /** As `fetch`'s own: once aborted, the body errors as a cut connection's does. */
   readonly signal?: AbortSignal | null | undefined;
 };
 
-/** A 200 whose body sends each chunk in turn, as a provider streams. */
 export const streamedResponse = (
   chunks: readonly string[],
   { before, signal }: Streaming = {},
@@ -204,7 +189,6 @@ export const streamedResponse = (
   return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
 };
 
-/** The reply of a judge saying yes to each candidate written for one of `fits`, no to the rest. */
 export const judgeReplyTo = (fits: readonly string[], body: string): string =>
   messagesReplyOf(
     JSON.stringify(

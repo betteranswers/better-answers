@@ -39,10 +39,6 @@ export type SecondFactorRows = {
   readonly recoveryCodeIds: readonly string[];
 };
 
-/**
- * A passkey and its last use, an authenticator, two recovery codes, failed confirms of two kinds,
- * and the person's four flags set.
- */
 export const secondFactorRowsFor = async (
   pool: pg.Pool,
   userId: string,
@@ -124,7 +120,6 @@ export const passkeyFor = async (pool: pg.Pool, userId: string): Promise<string>
   return passkeyId;
 };
 
-/** As a passkey sign-in leaves it. */
 export const passkeyUsedAt = async (pool: pg.Pool, passkeyId: string, at: Date): Promise<void> => {
   await pool.query("INSERT INTO passkey_last_use (passkey_id, at) VALUES ($1, $2)", [
     passkeyId,
@@ -132,7 +127,6 @@ export const passkeyUsedAt = async (pool: pg.Pool, passkeyId: string, at: Date):
   ]);
 };
 
-/** Upserts, since a resolved claim already stamps the pair, as a request does. */
 export const lastActiveIn = async (
   pool: pg.Pool,
   workspaceId: string,
@@ -194,7 +188,6 @@ export const otherCodesFor = async (pool: pg.Pool, email: string): Promise<reado
   }),
 ];
 
-/** An operator's restore code as issued: keyed by the address, and kept only as the code's hash. */
 export const restoreCodeFor = async (
   pool: pg.Pool,
   email: string,
@@ -207,7 +200,6 @@ export const restoreCodeFor = async (
     expiresAt: code.expiresAt,
   });
 
-/** A replacement setup's secret, sealed and parked under the session that started it. */
 export const parkedSecretFor = async (
   pool: pg.Pool,
   sessionId: string,
@@ -220,7 +212,6 @@ export const parkedSecretFor = async (
     expiresAt,
   });
 
-/** A passkey confirm's challenge, kept under the session that asked for it. */
 export const passkeyChallengeFor = async (
   pool: pg.Pool,
   sessionId: string,
@@ -233,7 +224,6 @@ export const passkeyChallengeFor = async (
     expiresAt,
   });
 
-/** The row a sign-in link keeps beside its code: its id the link's hash, keyed by the address. */
 export const signInLinkFor = async (
   pool: pg.Pool,
   email: string,
@@ -255,9 +245,7 @@ export const sessionFor = async (
     readonly expiresAt: Date;
     readonly pendingSince?: Date;
 
-    /** When the session last confirmed a second factor, where it holds one. */
     readonly confirmedAt?: Date;
-    /** What a browser sent, and the address it came from, as the library keeps both. */
     readonly userAgent?: string;
     readonly ipAddress?: string;
   },
@@ -283,7 +271,6 @@ export const sessionFor = async (
   return sessionId;
 };
 
-/** A session the person confirmed at `confirmedAt`, so an act judged then goes ahead. */
 export const confirmedSessionFor = (
   pool: pg.Pool,
   userId: string,
@@ -353,7 +340,6 @@ export const issuedCredentialsFor = async (
   }
 };
 
-/** Seeded tokens named by grant, so an assertion reads which ones an action ended. */
 export type NamedGrants = {
   readonly clientId: string;
   readonly labelById: ReadonlyMap<string, string>;

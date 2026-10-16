@@ -382,7 +382,6 @@ const waitingOnTheGroupTable = async (): Promise<void> => {
   throw new Error("the export never reached the group table");
 };
 
-/** The workspace's door, running `before` ahead of each connection it opens, counted from 1. */
 const doorWith = (
   workspace: ProvisionedWorkspace,
   before: (opened: number) => Promise<void>,

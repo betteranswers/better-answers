@@ -43,7 +43,6 @@ import {
 
 const db = postgresForSuite();
 
-/** A verified, named person who belongs to no workspace yet. */
 const aPerson = (
   name: string,
   email = addressOf(name.toLowerCase().replaceAll(" ", ".")),
@@ -127,7 +126,6 @@ const invited = async (workspace: ProvisionedWorkspace, personId: string) => {
   return sent?.invitationId ?? "";
 };
 
-/** Priya asks to join `workspace`; answers her id and her request's. */
 const asked = async (workspace: ProvisionedWorkspace) => {
   const priya = await aPerson("Priya Shah");
   answered(
@@ -371,10 +369,6 @@ describe("a person's activity", () => {
   });
 });
 
-/**
- * Sixty events, oldest first, the `index`th at `secondOf(index)`; every third names Priya as actor
- * and subject.
- */
 const sixtyEventsOf = async (
   workspace: ProvisionedWorkspace,
   priya: string,
@@ -405,7 +399,6 @@ const sixtyEventsOf = async (
     return seeded;
   });
 
-/** The order the read promises, spelled out: the later instant first, then the greater id. */
 const newestFirst = (events: readonly { id: string; at: Date }[]) =>
   events.toSorted((a, b) => b.at.getTime() - a.at.getTime() || (a.id < b.id ? 1 : -1));
 
@@ -443,7 +436,6 @@ describe("paging a person's activity", () => {
   });
 });
 
-/** The reader's own activity, asked on a transaction the store has aborted, so none commits. */
 const readAfterTheStoreFailed = async (workspace: ProvisionedWorkspace, reader: string) => {
   let read: Result<unknown, unknown> | undefined;
   const reading = readingAs(
@@ -491,14 +483,12 @@ describe("who may read a person's activity", () => {
 
 const PEOPLE = 30;
 
-/** Most events are about concepts; a tenth add someone to a group, a tenth ask to join. */
 const busyEvent = (index: number, named: string) => {
   if (index % 10 === 0) return { action: "people.group.member_added", detail: { userId: named } };
   if (index % 10 === 1) return { action: "people.request.asked", detail: { requesterId: named } };
   return { action: "knowledge.concept.published", detail: {} };
 };
 
-/** Three thousand events across thirty actors, a hundred of them Priya's own actions. */
 const aBusyLog = async (workspace: ProvisionedWorkspace, priya: string) => {
   const actors = [priya, ...Array.from({ length: PEOPLE - 1 }, () => ulid())];
   await seedingWith(db().pool, async (seed) => {
@@ -513,7 +503,6 @@ const aBusyLog = async (workspace: ProvisionedWorkspace, priya: string) => {
   await db().pool.query("ANALYZE audit_event");
 };
 
-/** The plan Postgres ran for the read's one statement, run again with the same values. */
 const planOfTheRead = (workspace: ProvisionedWorkspace, priya: string) =>
   readingAs(
     db().runtimePool,

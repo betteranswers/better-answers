@@ -38,7 +38,6 @@ const WRONG_CODE = "0000-0000-0000-0000";
 
 const RESTORE_CODE = "7k3m-9pqr-x2v4-h8tw";
 
-/** The SHA-256 of the restore code as typed bare: lower case, no spaces, no dashes. */
 const RESTORE_HASH = createHash("sha256").update("7k3m9pqrx2v4h8tw").digest("hex");
 
 const actionsOn = async (personId: string) =>
@@ -60,7 +59,6 @@ const grantOf = async (sessionId: string) =>
     )
   ).rows[0]?.granted;
 
-/** The operator's restore as the person's row holds it, with no code written. */
 const markedRestored = async (personId: string, at: Date) => {
   await db().pool.query('UPDATE "user" SET restore_required_at = $2 WHERE id = $1', [personId, at]);
 };
@@ -105,7 +103,6 @@ const confirmingByPasskey = async (personId: string, sessionId: string, passkeyI
     now: AT,
   });
 
-/** A session that spent one of the person's ten codes; the nine left come back with it. */
 const aGrantedSession = async (personId: string) => {
   const [spent = "", ...left] = await tenCodesFor(personId);
   const sessionId = await aSession(personId);
@@ -116,7 +113,6 @@ const aGrantedSession = async (personId: string) => {
   return { sessionId, left };
 };
 
-/** An Admin holding a passkey and an authenticator, with a session granted their replacement. */
 const anAdminRecovering = async () => {
   const { adminUserId: personId } = await provisionedWorkspace(db(), "Acme");
   await passkeyFor(db().pool, personId);
@@ -124,7 +120,6 @@ const anAdminRecovering = async () => {
   return { personId, ...(await aGrantedSession(personId)) };
 };
 
-/** The granted session replaces the factors either way, a minute on. */
 const replacedBy = async (by: "passkey" | "authenticator", personId: string, sessionId: string) => {
   const now = after(60);
   if (by === "passkey") {

@@ -67,7 +67,6 @@ const promptly = <T>(answer: Promise<T>): Promise<T | typeof STILL_WAITING> =>
     ),
   ]);
 
-/** NOWAIT, so a row a waiter still held would answer at once rather than queueing behind it. */
 const theMemberRowIsFree = async (scenario: Scenario): Promise<boolean> => {
   const probe = await db().pool.connect();
   try {
@@ -85,7 +84,6 @@ const theMemberRowIsFree = async (scenario: Scenario): Promise<boolean> => {
   }
 };
 
-/** A writer parked on the fence behind a rewrite elsewhere, and the rewrite's release. */
 const writerParkedBehindARewrite = async (scenario: Scenario) => {
   const rewriting = await rewritingElsewhere(db().pool, scenario.workspaceId);
   const writing = writeConcept(scenario.editor, doorsOf(scenario), A_GUIDELINE);
@@ -153,7 +151,6 @@ describe("the reconciler beside a write elsewhere", () => {
 });
 
 describe("the fence's slots", () => {
-  /** A pool of its own, so the slots a case counts are its own. */
   const aSmallPool = () => new pg.Pool({ ...db().pool.options, max: FENCE_HOLDERS_PER_POOL + 1 });
 
   it("frees the lock and the slot when the work throws", async () => {

@@ -177,7 +177,6 @@ const rowsOf = async (workspaceId: string) => {
   return read.rows;
 };
 
-/** The flag the replay action declares as optional, read as such. */
 const replayDetail = z.object({ evidenceAgrees: z.boolean().optional() });
 
 const replayedEvents = async (workspaceId: string) => {

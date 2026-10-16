@@ -20,11 +20,9 @@ const holdingTheFence = async (pool: pg.Pool, workspaceId: string, suffix: "" | 
   };
 };
 
-/** A history rewrite in another process, as the fence sees one: the workspace's lock held alone. */
 export const rewritingElsewhere = (pool: pg.Pool, workspaceId: string) =>
   holdingTheFence(pool, workspaceId, "");
 
-/** A write in another process, as the fence sees one: the workspace's lock held shared. */
 export const writingElsewhere = (pool: pg.Pool, workspaceId: string) =>
   holdingTheFence(pool, workspaceId, "_shared");
 

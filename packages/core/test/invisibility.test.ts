@@ -221,7 +221,6 @@ const entryLinkingToWithheld = async () => {
   return { scenario, withheld, entry };
 };
 
-/** One concept citing a Restricted document and one citing an Internal one, the same Editor's. */
 const withheldBesideVisible = async () => {
   const scenario = await arrange();
   const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
@@ -498,7 +497,6 @@ const BOARD_RETENTION: WrittenAnswer = {
   sensitivity: "Restricted",
 };
 
-/** The Viewer's answer before and after a withheld `Answer` lands, and the Admin's after. */
 const aroundAWithheldAnswer = async (scenario: Scenario) => {
   const before = await asked(db(), scenario.viewer, QUESTION);
   const withheld = await answerWritten(scenario, BOARD_RETENTION);
@@ -646,7 +644,6 @@ describe("an `Answer` withheld from the asker", () => {
     expect(renderAnswer(admins)).toContain("> Audit logs are kept for seven years.");
   });
 
-  /** Only an `Answer` comes back with its evidence. */
   const evidenceOf = (concept: RelatedConcept) => ("evidence" in concept ? concept.evidence : []);
 
   it("names a source the asker cannot open by its label", async () => {

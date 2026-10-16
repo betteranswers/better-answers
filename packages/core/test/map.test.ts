@@ -415,7 +415,6 @@ describe("a map walk from several entries", () => {
   });
 });
 
-/** A concept's index row under `collection`, or under none, with its node on the map. */
 const conceptNode = async (
   seed: TestData,
   workspaceId: string,

@@ -12,7 +12,6 @@ const A_NOTE_ON_A_FLAG = "The period changed in May.";
 
 const A_DISPUTED_SENTENCE = "Audit logs are kept for a year.";
 
-/** One completed record `personId` asked, with its question and a flag of theirs carrying a note. */
 export const recordAskedBy = (pool: pg.Pool, workspaceId: string, personId: string) =>
   seedingWith(pool, async (seed) => {
     const asker = actorIdOfPerson(personIdOf(personId));
@@ -50,7 +49,6 @@ export const recordAskedBy = (pool: pg.Pool, workspaceId: string, personId: stri
     return { recordId: record.id, feedbackId: flag.id, asker, concept };
   });
 
-/** A flag with a note, given by `personId` on a record that may be another member's. */
 export const flagGivenBy = (
   pool: pg.Pool,
   workspaceId: string,
@@ -68,7 +66,6 @@ export const flagGivenBy = (
     }),
   );
 
-/** Who gave each flag on a record and its note, a cleared note first. */
 export const flagsOn = async (pool: pg.Pool, recordId: string) => {
   const read = await pool.query<{ given_by: string; note: string | null }>(
     `SELECT given_by, note FROM question_feedback
@@ -80,7 +77,6 @@ export const flagsOn = async (pool: pg.Pool, recordId: string) => {
 
 export const flagStanding = (givenBy: string) => ({ given_by: givenBy, note: A_NOTE_ON_A_FLAG });
 
-/** Moves a record's instant on by less than a millisecond, on the skeleton and the content. */
 export const askedAMicrosecondFiner = async (pool: pg.Pool, recordId: string): Promise<void> => {
   for (const [table, key] of [
     ["question_content", "record_id"],
@@ -93,7 +89,6 @@ export const askedAMicrosecondFiner = async (pool: pg.Pool, recordId: string): P
   }
 };
 
-/** What the three tables hold of one record, read past row-level security. */
 export const questionRowsOf = async (pool: pg.Pool, recordId: string) => {
   const read = async (statement: string) => (await pool.query(statement, [recordId])).rows;
   return {
@@ -107,7 +102,6 @@ export const questionRowsOf = async (pool: pg.Pool, recordId: string) => {
   };
 };
 
-/** The rows `recordAskedBy` leaves, named by `asker`, with the question and the note in place. */
 export const asAsked = (asker: string) => ({
   skeleton: [{ asked_by: asker, verdict: "related" }],
   content: [{ question: A_QUESTION_ASKED }],
@@ -122,7 +116,6 @@ export const asAsked = (asker: string) => ({
   ],
 });
 
-/** The rows once erased: renamed, the flag keeping its reason and concept but no free text. */
 export const asErased = (pseudonym: string) => ({
   skeleton: [{ asked_by: `human:${pseudonym}`, verdict: "related" }],
   content: [],
