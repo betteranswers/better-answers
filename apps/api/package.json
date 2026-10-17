@@ -29,7 +29,7 @@
     "@better-auth/oauth-provider": "1.7.7",
     "@better-auth/passkey": "1.7.7",
     "@better-auth/utils": "0.4.2",
-    "@hono/node-server": "2.1.4",
+    "@hono/node-server": "2.1.5",
     "@hono/trpc-server": "0.4.2",
     "@modelcontextprotocol/server": "2.3.1",
     "@simplewebauthn/server": "13.3.3",
@@ -38,10 +38,10 @@
     "drizzle-orm": "0.45.4",
     "hono": "4.13.13",
     "jose": "6.2.12",
-    "nodemailer": "10.0.16",
+    "nodemailer": "10.1.2",
     "pg": "8.23.1",
     "pino": "10.4.0",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@better-answers/devtools": "workspace:*",
@@ -53,7 +53,7 @@
     "@types/nodemailer": "8.0.2",
     "@types/pg": "8.23.1",
     "typescript": "7.0.2",
-    "vitest": "5.0.3",
+    "vitest": "5.0.5",
     "yaml": "2.9.1"
   }
 }
