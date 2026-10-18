@@ -209,6 +209,17 @@ export const shape: Shape = { side: 1 };
     expect(read(root, SAMPLE)).not.toContain("A doc block.");
   });
 
+  it("deletes an open row naming its tracker issue", () => {
+    const root = treeOf({ [SAMPLE]: SAMPLE_SOURCE });
+    const tsv = classified(inventoryOf(root), {
+      [`${SAMPLE}:8`]: { class: "open", unit: "1", holder: "BA-196" },
+    });
+    const ran = applied(root, tsv, "1");
+    expect(ran.stderr).toBe("");
+    expect(ran.stdout).toBe(`${SAMPLE}: deleted 1 block, lines 8-10\n`);
+    expect(read(root, SAMPLE)).toBe(SAMPLE_SOURCE.replace("/**\n * A doc block.\n */\n", ""));
+  });
+
   it("deletes identical blocks together when the unit names each", () => {
     const source = "// twin\nexport const one = 1;\n// twin\nexport const two = 2;\n";
     const root = treeOf({ [SAMPLE]: source });
@@ -252,6 +263,18 @@ describe("comment-inventory apply refuses, changing no file", () => {
     );
     expect(stderr).toContain(`${SAMPLE}:8: `);
     expect(stderr).toContain(why);
+  });
+
+  it.each([
+    ["no holder", ""],
+    ["a path › text holder", `${HOLDER} › keeps the answer`],
+    ["an issue of another tracker", "LIN-12"],
+  ])("when an open row names %s", (_form, holder) => {
+    const stderr = refusedOver(
+      { [SAMPLE]: SAMPLE_SOURCE, [HOLDER]: HOLDER_SOURCE },
+      { ...narrationAt4, [`${SAMPLE}:8`]: { class: "open", unit: "1", holder } },
+    );
+    expect(stderr).toContain(`${SAMPLE}:8: an open row's holder is the tracker issue`);
   });
 
   it("when a holder's text only a later unit's deletion holds", () => {

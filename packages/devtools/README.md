@@ -404,8 +404,10 @@ its file as often as the unit names it, or when a `held` or `structure` row's ho
 resolve. A holder is `path › text`, several joined by `; `. It resolves when the file, with
 every block the TSV deletes in any unit taken out, holds `text` exactly once. The text can be a
 test title or a code line such as `REVOKE DELETE ON "user"`. A holder anchors on text, never a
-line number, because a deletion above a line moves it and the number then names another line. A
-refused unit exits 1, and a malformed TSV exits 2 and names its line. `test/comment-inventory.test.ts` runs each command
+line number, because a deletion above a line moves it and the number then names another line. An
+`open` row's reason has no holder in the tree yet: its holder is the tracker issue the reason went
+to, such as `BA-196`. The tool deletes it without resolving anything, and refuses one whose holder
+is not an issue id. A refused unit exits 1, and a malformed TSV exits 2 and names its line. `test/comment-inventory.test.ts` runs each command
 over a throwaway tree.
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted

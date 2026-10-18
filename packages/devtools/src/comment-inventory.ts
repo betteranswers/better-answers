@@ -27,6 +27,7 @@ const CLASSES = [
   "narration",
   "held",
   "structure",
+  "open",
   "foreign",
   "contract",
   "suppression",
@@ -38,6 +39,8 @@ type Class = (typeof CLASSES)[number] | "";
 const KEPT: ReadonlySet<Class> = new Set(["foreign", "contract", "suppression"]);
 
 const NEEDS_A_HOLDER: ReadonlySet<Class> = new Set(["held", "structure"]);
+
+const TRACKER_ISSUE = /^BA-\d+$/;
 
 const COLUMNS = [
   "path",
@@ -321,6 +324,11 @@ const at = (row: Row): string => `${row.path}:${row.start}`;
 
 const rowRefusals = (survivor: Survivor, row: Row): readonly string[] => {
   if (row.class === "") return [`${at(row)}: unclassified, so nothing says its reason may go`];
+  if (row.class === "open") {
+    return TRACKER_ISSUE.test(row.holder)
+      ? []
+      : [`${at(row)}: an open row's holder is the tracker issue its reason went to, as BA-196`];
+  }
   if (!NEEDS_A_HOLDER.has(row.class)) return [];
   const holders = row.holder.split("; ").filter((one) => one !== "");
   if (holders.length === 0) return [`${at(row)}: a ${row.class} row names no holder`];
