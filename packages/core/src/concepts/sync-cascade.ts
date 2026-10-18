@@ -188,7 +188,6 @@ const syncsToFollow = async (
   return ok(listed.value.filter((sync) => !followed.value.has(followedKey(sync))));
 };
 
-/** One transaction per sync. A sync that fails is skipped and named, then tried again next pass. */
 export const followSyncs = async (
   platform: SyncCascadePrincipal,
   door: PostgresDoor,

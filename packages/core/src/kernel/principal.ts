@@ -39,10 +39,6 @@ export type PlatformPrincipal = {
 
 export type Principal = UserPrincipal | PlatformPrincipal;
 
-/**
- * Kept out of `Principal`, so no action over a workspace's data can be handed a caller who belongs
- * to none of them.
- */
 export type OperatorPrincipal = {
   readonly kind: "operator";
   readonly userId: UserId;

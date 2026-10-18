@@ -95,9 +95,6 @@ const keyOpened = (
 };
 
 /**
- * The reading half of the credentials provider. The envelope key is held here and handed back to
- * no caller.
- *
  * @throws when `envelopeKey` is not the envelope's length, naming no byte of it.
  */
 export const openCredentials = (envelopeKey: Uint8Array): Credentials => {

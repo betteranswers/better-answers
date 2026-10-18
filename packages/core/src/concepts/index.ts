@@ -304,9 +304,8 @@ const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
 type WriteDoors = { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock };
 
 /**
- * Commits one concept file under the repository lock, then writes its rows and audit event in
- * one transaction. An `iri` edits a concept that must already stand; an `acceptance` asks for
- * an Admin and a `base` precondition.
+ * An `iri` edits a concept that must already stand; an `acceptance` asks for an Admin and a
+ * `base` precondition.
  */
 export const writeConcept = async (
   principal: UserPrincipal,
@@ -639,11 +638,6 @@ const acceptSuggestionsAction = declareAction({
   refuses: ["role-forbids", "malformed"],
 });
 
-/**
- * Accepts each decision on its own, in order: one refused leaves the rest to go ahead. A
- * suggestion whose concept moved or went stale goes back to its proposer. Two or more decisions
- * share one audit batch.
- */
 export const acceptSuggestions = async (
   principal: UserPrincipal,
   doors: WriteDoors,
@@ -1328,10 +1322,6 @@ export const evidenceOf = async (
   return sources.ok ? ok(sources.value.map((source) => source.item)) : err(sources.error);
 };
 
-/**
- * The corpus counts `anyWordMatch` weighs by, over `documents` with `parameters` bound before the
- * query's words. A text with no words counts nothing: it matches nothing.
- */
 export const corpusCountsOf = (
   tx: Tx,
   documents: string,
@@ -1382,12 +1372,6 @@ export type ConceptFound = { readonly concept: OpenedConcept; readonly bound: Co
 
 type MatchingConceptRow = ConceptRow & { readonly weight: number; readonly rank: number };
 
-/**
- * Readable concepts by the any-word rule, after `after` when given. A strong match holds at least
- * half the query's distinct words, a weak one fewer. `collections`, when given, leaves only the
- * concepts in one of them, so a concept in no collection is left out. `counts` freeze a cursor's
- * ranking.
- */
 export const findConcepts = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -1462,7 +1446,6 @@ export const readableCollections = async (
   });
 };
 
-/** Whether a document is evidence for a concept the caller can read, `alias` naming its passage. */
 export const evidenceForAReadableConcept = (alias: string, roleParameter: number): string =>
   `EXISTS (SELECT 1
              FROM concept_evidence ce

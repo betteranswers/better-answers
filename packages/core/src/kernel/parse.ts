@@ -51,8 +51,8 @@ const wordOf = (issue: z.core.$ZodIssue): IssueWord => {
 };
 
 /**
- * Refuses `malformed` with the word of each failing field's first issue, keyed by its dotted path
- * and `ROOT_PATH` for the whole value. No value that failed is carried.
+ * Refuses `malformed` with the word of each failing field's first issue, keyed by its dotted path.
+ * No value that failed is carried.
  */
 export const parse = <Schema extends z.ZodType>(
   schema: Schema,

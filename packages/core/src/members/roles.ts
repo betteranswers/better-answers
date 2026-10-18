@@ -34,7 +34,6 @@ const ROLE = boundarySchemas.member.select.shape.role;
 
 export const changeRoleInput = memberKeyed.extend({ role: z.string() });
 
-/** When the action happens: a confirmation older than an hour makes the change wait on a re-confirm. */
 export type ChangeRoleInput = z.output<typeof changeRoleInput> & { readonly at: Date };
 
 const changeRoleAction = declareAction({
@@ -67,7 +66,6 @@ export type RoleChanged = {
   readonly role: Role;
 };
 
-/** As changed, and whether the move made them hold a second factor for the first time. */
 export type RoleMoved = RoleChanged & { readonly promoted: boolean };
 
 type Asked = { readonly personId: UserId; readonly role: Role };
@@ -134,9 +132,8 @@ const roleSetUnderTheLock = (
   });
 
 /**
- * Refuses `last-admin` for a change that would leave the workspace with no Admin; an Admin may
- * demote themself while another remains. Roles are read afresh on every call, so the change holds
- * from the member's next request. Asking for the role already held writes nothing.
+ * Refuses `last-admin` for a change that would leave the workspace with no Admin. Asking for the
+ * role already held writes nothing.
  */
 export const changeRole = async (
   principal: UserPrincipal,

@@ -59,9 +59,8 @@ const adding = async (
 };
 
 /**
- * Writes a person the platform names before they have ever signed in, and records it in the
- * identity-set audit log under the platform's own actor. The address stays unverified until their
- * first email-code sign-in, which finds this person and marks it verified.
+ * The address stays unverified until their first email-code sign-in, which finds this person and
+ * marks it verified.
  */
 export const addPerson = async (
   platform: PlatformPrincipal,

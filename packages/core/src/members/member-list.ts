@@ -46,7 +46,6 @@ type ListedRow = z.output<typeof LISTED_ROW>;
 export type ListedMember = Omit<ListedRow, "joinedAt" | "credentialsRevokedAt"> & {
   readonly joinedAt: string;
 
-  /** A credential issued before it is refused here; null where no Admin here has revoked any. */
   readonly credentialsRevokedAt: string | null;
 };
 
@@ -66,8 +65,7 @@ const MEMBERS = `SELECT u.id AS "personId", u.name AS "displayName", u.email AS 
       ORDER BY lower(u.name), lower(u.email), u.id`;
 
 /**
- * In display-name order, then by address. A member is named by their person id: the member row's
- * own key names nothing outside its table.
+ * In display-name order, then by address. A member is named by their person id.
  */
 export const listMembers = async (
   principal: UserPrincipal,

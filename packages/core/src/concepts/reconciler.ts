@@ -385,9 +385,8 @@ const replayMissed = async (
 };
 
 /**
- * Replays, oldest first and under the bundle fence, each bundle commit after the last one the
- * index recorded. The first commit it cannot replay ends the pass and is named in `stopped`, not
- * refused. A rewrite elsewhere makes it answer `held`; a later tick catches up.
+ * The first commit it cannot replay ends the pass and is named in `stopped`, not refused. A
+ * rewrite elsewhere makes it answer `held`.
  */
 export const reconcile = async (
   platform: ReconcilerPrincipal,
@@ -416,7 +415,6 @@ export type ReconcilerHit = {
   readonly batchId: string | null;
 };
 
-/** Oldest first; `since` is inclusive. */
 export const reconcilerHits = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

@@ -363,9 +363,8 @@ const sentUnderLocks = async (
 export type InviteMembersInput = z.output<typeof inviteMembersInput> & { readonly now: Date };
 
 /**
- * One invitation per address, folded however it is cased, or none: an address of no known form,
- * off a marked workspace's testing domain, or a member's here refuses the send naming each by its
- * position. A waiting invitation to an address is replaced, and the answer says so.
+ * One invitation per case-folded address, or none: one of no known form, off a marked workspace's
+ * testing domain, or a member's here refuses the send.
  */
 export const inviteMembers = async (
   principal: UserPrincipal,
@@ -436,8 +435,8 @@ const renewedOne = async (
 };
 
 /**
- * A resent invitation keeps its link and runs seven days from `now`, as the new email says. Each
- * resend counts against the address's ceiling and the workspace's.
+ * A resent invitation keeps its link and runs seven days from `now`. Each resend counts against the
+ * address's ceiling and the workspace's.
  */
 export const resendInvitation = async (
   principal: UserPrincipal,

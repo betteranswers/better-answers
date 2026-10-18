@@ -64,7 +64,6 @@ export type RaisedFlag = {
 export type NameFlagged = {
   readonly personId: UserId;
 
-  /** Null where this workspace's flag on the person already waited, and nothing was written. */
   readonly raised: RaisedFlag | null;
 };
 
@@ -117,9 +116,8 @@ const flagging = async (
 };
 
 /**
- * Flags a member's display name to the operator. The caller's answer is the same for every member
- * and whether or not a flag already waits; only the transport learns whether one was raised, to
- * tell the operator once it commits. An Admin has no action that changes the name itself.
+ * The caller's answer is the same for every member and whether or not a flag already waits; only
+ * the transport learns whether one was raised.
  */
 export const flagDisplayName = async (
   principal: UserPrincipal,
@@ -180,8 +178,7 @@ const byPerson = (rows: readonly z.output<typeof WAITING_ROW>[]): readonly NameW
 
 /**
  * Every person flagged since the operator last corrected their display name, the longest waiting
- * first, each with the workspaces that flagged them and when. A person's own renaming leaves a
- * flag waiting; an erased person's flags wait no more.
+ * first. A person's own renaming leaves a flag waiting.
  */
 export const listNamesWaiting = (
   _operator: OperatorPrincipal,

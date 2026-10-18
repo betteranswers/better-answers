@@ -325,11 +325,6 @@ const commitWithin = async (
   }
 };
 
-/**
- * Writes one file as one commit on `main`, compare-and-swap against the head it reads, which must
- * be `expectedHead` (null for the first commit) unless that is `ANY_HEAD`. The committer is always
- * the platform bot; the author is the request's. A git child past the budget is stopped.
- */
 export const commit = async (
   principal: UserPrincipal,
   door: GitDoor,
@@ -344,10 +339,6 @@ export const commit = async (
 
 const locks = new Map<string, Promise<unknown>>();
 
-/**
- * Runs `work` once every earlier holder's work on the same repository has settled, failed or
- * not. The lock holds within this process only.
- */
 export const withRepositoryLock = <T>(
   principal: UserPrincipal,
   door: GitDoor,
@@ -546,10 +537,6 @@ const changeIn = async (gitDir: string, sha: string): Promise<CommitRead["change
     : undefined;
 };
 
-/**
- * `parent` is null for a root or a merge commit. `change` is set only when the commit adds or
- * modifies exactly one file.
- */
 export const readCommit = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -711,11 +698,6 @@ const commitMapOf = async (
 const trimmed = (values: readonly string[]): readonly string[] =>
   values.map((value) => value.trim()).filter((value) => value !== "");
 
-/**
- * Only when history names an address or a person id, rewrites every ref: each actor id naming
- * one, in files and messages, and each author or committer carrying an address, takes the
- * pseudonym, and old objects are pruned. A dropped commit throws.
- */
 export const rewriteHistory = async (
   platform: PlatformPrincipal,
   door: GitDoor,

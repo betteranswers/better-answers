@@ -26,8 +26,8 @@ const CONNECTED_SOURCES = `SELECT id FROM connected_source WHERE workspace_id = 
 type ReindexRefusal = "malformed" | ReprocessConnectedSourceRefusal;
 
 /**
- * Runs every connected source in the workspace through the `wiped` reason, as a release that
- * renames the engine's target needs. A transaction per source, so a rerun repeats the rest harmlessly.
+ * Runs every connected source in the workspace through the `wiped` reason. A transaction per
+ * source, so a rerun repeats the rest harmlessly.
  */
 export const reindexEveryConnectedSource = async (
   platform: ReindexPrincipal,

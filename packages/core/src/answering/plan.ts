@@ -92,7 +92,6 @@ export const ASK_CAPS: AskCaps = {
   decisionThresholds: new Map(),
 };
 
-/** Runs `work` in a short read-only transaction of its own, and answers what it answered. */
 export type ReadStep<Refused = never> = <Read, Failure>(
   work: (tx: Tx) => Promise<Result<Read, Failure>>,
 ) => Promise<Result<Read, Failure | Refused>>;

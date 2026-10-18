@@ -158,7 +158,6 @@ type AuthenticatorSetUp = {
 
   readonly firstRecord: boolean;
 
-  /** Issued only to a person who held none, and shown to them once. */
   readonly issued: RecoveryCodesMade | undefined;
 };
 
@@ -207,8 +206,8 @@ const settingUp = async (
 };
 
 /**
- * Called once the library has verified the person's first code: records the authenticator, counts
- * the setup as the session's confirmation, and issues recovery codes to a person who holds none.
+ * Called once the library has verified the person's first code. Confirms the session; issues
+ * recovery codes to a person who holds none.
  */
 export const recordAuthenticatorSetUp = async (
   platform: PlatformPrincipal,
@@ -257,8 +256,8 @@ const removing = async (
 };
 
 /**
- * The person is the one caller. An Admin in any workspace, or the operator, keeps their last
- * second factor: the check runs under the person's lock, so two removals cannot each leave one.
+ * The person is the one caller. An Admin in any workspace, or the operator, keeps their last second
+ * factor: two removals cannot each leave one.
  */
 export const removeAuthenticator = async (
   platform: PlatformPrincipal,
@@ -426,7 +425,7 @@ const readOfThePerson = async <T>(
   return answered.value === undefined ? err("person-gone") : ok(answered.value);
 };
 
-/** What the person's own Sign-in section and the confirm pages show; nothing in it is a secret. */
+/** Nothing in it is a secret. */
 export const readSecondFactor = (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -461,14 +460,13 @@ const confirmedAtMsOf = (held: SecondFactorHeld): number | null => {
 };
 
 /**
- * A person who already holds a factor confirms within the hour before changing one; a first
- * factor has nothing to confirm against and needs none.
+ * A person who already holds a factor confirms within the hour before changing one; a first factor
+ * needs none.
  */
 export const factorChangeStale = (held: SecondFactorHeld, at: Date): boolean =>
   (held.passkeys.length > 0 || held.authenticator === "set-up") &&
   !requireFreshConfirmation({ secondFactorConfirmedAtMs: confirmedAtMsOf(held) }, at).ok;
 
-/** What a promotion's notice lists: the address, and every credential that can confirm a sign-in. */
 export const readCredentialsHeld = (
   platform: PlatformPrincipal,
   door: PostgresDoor,

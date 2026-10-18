@@ -51,10 +51,6 @@ const wipe = async (
   if (!wiped.ok) throw normalizeError(wiped.error);
 };
 
-/**
- * Queues the full rebuild only for a request not yet completed; `rebuildJobId` is null otherwise.
- * Throws when a connected source's wipe or the rebuild is refused.
- */
 export const rederiveAfterErasure = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

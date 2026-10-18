@@ -45,7 +45,6 @@ const ROLE = boundarySchemas.member.select.shape.role;
 
 export const bulkChangeRoleInput = z.object({ personIds: TICKED, role: z.string() });
 
-/** When the action happens: a confirmation older than an hour makes the move wait on a re-confirm. */
 export type BulkChangeRoleInput = z.output<typeof bulkChangeRoleInput> & { readonly at: Date };
 
 const bulkChangeRoleAction = declareAction({
@@ -61,7 +60,6 @@ const bulkChangeRoleAction = declareAction({
   ],
 });
 
-/** Each person the move made hold a second factor for the first time. */
 type BulkPromoted = { readonly promoted: readonly UserId[] };
 
 export type BulkChangeRoleRefusal =
@@ -70,9 +68,8 @@ export type BulkChangeRoleRefusal =
   | Error;
 
 /**
- * Moves every ticked member to the role, or no one: an id no member here holds, or a change that
- * would leave no Admin, refuses the set naming each such person. A member already at the role is
- * skipped.
+ * All or none: an id no member here holds, or leaving no Admin, refuses the set. A member already
+ * at the role is skipped.
  */
 export const bulkChangeRole = async (
   principal: UserPrincipal,
@@ -122,7 +119,6 @@ export const bulkChangeRole = async (
 export const bulkRemoveMembersInput = z.object({ personIds: TICKED });
 
 export type BulkRemoveMembersInput = z.output<typeof bulkRemoveMembersInput> & {
-  /** When the action happens: each person's tokens for this workspace issued before it end. */
   readonly at: Date;
 };
 
@@ -138,8 +134,8 @@ export type BulkRemoveMembersRefusal =
   | Error;
 
 /**
- * Ends every ticked member here and their tokens, or none: removing the workspace's last Admins
- * refuses the set naming each. An id no member here holds, whatever the reason, is skipped.
+ * Ends every ticked member here and their tokens, or none: removing the last Admins refuses the
+ * set. An id no member here holds is skipped.
  */
 export const bulkRemoveMembers = async (
   principal: UserPrincipal,
@@ -171,7 +167,6 @@ export const bulkAddToGroupInput = z.object({
   personIds: TICKED,
 });
 
-/** When the action happens: a confirmation older than an hour makes the adds wait on a re-confirm. */
 export type BulkAddToGroupInput = z.output<typeof bulkAddToGroupInput> & { readonly at: Date };
 
 const bulkAddToGroupAction = declareAction({
@@ -220,8 +215,8 @@ const addedUnderKeyShare = async (
 };
 
 /**
- * Adds every ticked member to the group, or no one: an id no member here holds refuses the set
- * naming each. One already in the group is skipped, counted from what the insert landed.
+ * Adds every ticked member to the group, or no one: an id no member here holds refuses the set. One
+ * already in it is skipped.
  */
 export const bulkAddToGroup = async (
   principal: UserPrincipal,

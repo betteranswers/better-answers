@@ -472,7 +472,6 @@ export const walkConceptsFromEntries = (
 
 const WALK_TIMED_OUT = "57014";
 
-/** Whether `error` is a walk stopped at its timeout, whose transaction answers nothing more. */
 export const walkTimedOut = (error: Error): boolean =>
   "code" in error && error.code === WALK_TIMED_OUT;
 

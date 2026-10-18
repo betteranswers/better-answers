@@ -64,10 +64,6 @@ export const endTokens = async (tx: Tx, asked: TokensToEnd): Promise<TokensEnded
   };
 };
 
-/**
- * The step after a workspace action's own row, in its transaction: the person's ended grants on the
- * identity-set audit log, under the Admin. An action that ended none writes nothing here.
- */
 export const recordGrantsEndedHere = async (
   admin: AdminUserPrincipal,
   tx: Tx,

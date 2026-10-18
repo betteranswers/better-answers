@@ -97,9 +97,8 @@ const judging = async (
 };
 
 /**
- * The gate's one read of a session: its second-factor standing, derived afresh. It starts a
- * pending session's hour on the first pending read, stops it once the session is no longer
- * pending, and ends a session pending past its hour, answering `session-gone`.
+ * Starts a pending session's hour on its first pending read, stops it once not pending, and ends
+ * one pending past its hour, answering `session-gone`.
  */
 export const judgeTheSession = async (
   platform: PlatformPrincipal,

@@ -73,9 +73,8 @@ const marking = async (
 };
 
 /**
- * Grants or revokes the operator mark of the person holding `email`, matched case-insensitively,
- * and records the change in the identity-set audit log under the platform's own actor. A person
- * already as asked is left alone, with nothing written.
+ * Grants or revokes the operator mark of the person holding `email`, matched case-insensitively. A
+ * person already as asked is left alone, with nothing written.
  */
 export const setOperatorMark = async (
   platform: PlatformPrincipal,
@@ -103,7 +102,7 @@ type RestoreSignInInput = {
 export type SignInRestored = {
   readonly personId: UserId;
 
-  /** As the person's row holds it: where the notice goes. */
+  /** As the person's row holds it. */
   readonly email: string;
 
   readonly code: string;
@@ -170,9 +169,8 @@ const restoring = async (
 };
 
 /**
- * Restores the sign-in of the person holding `email`, under their lock: their factors, codes and
- * sessions end, and setting up a factor waits on a one-time restore code. Recorded under the
- * platform's actor. Answers the code, which replaces any earlier one.
+ * Their factors, codes and sessions end, and setting up a factor waits on a one-time restore code.
+ * Answers the code, which replaces any earlier one.
  */
 export const restoreSignIn = async (
   platform: PlatformPrincipal,
@@ -186,7 +184,6 @@ export const restoreSignIn = async (
   return restored.value;
 };
 
-/** Every person carrying the mark, by address: where the platform writes to its operator. */
 export const operatorAddresses = (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -206,7 +203,7 @@ type OperatorStanding =
 
 /**
  * Whether a signed-in person stands as the operator, by the rule every console action is resolved
- * on, and their display name where they do. It answers no rather than refusing.
+ * on. It answers no rather than refusing.
  */
 export const standingAsOperator = async (
   door: PostgresDoor,

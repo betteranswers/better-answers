@@ -166,8 +166,7 @@ export const sweepEveryWorkspace = async (
 };
 
 /**
- * A run by hand waits for a pass that holds the lock rather than skipping, since a person
- * asked for it.
+ * A run by hand waits for a pass that holds the lock rather than skipping.
  */
 export const withSweepLock = <T>(
   platform: SweepsPrincipal,

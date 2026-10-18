@@ -46,10 +46,6 @@ const visibilityOfInclude = (include: IncludeRow): Visibility =>
         audience_groups: include.audience_groups,
       });
 
-/**
- * Locks and re-derives each write-up including one of `iris`; an include whose concept is gone
- * counts as admins-only. Answers the id of each one recomputed, changed or not, in id order.
- */
 export const recomputeWriteUpsIncluding = async (
   principal: Principal,
   tx: Tx,
@@ -101,10 +97,6 @@ const footnotesOfAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/**
- * Undefined when the write-up is absent or the principal cannot read it. Otherwise only the
- * includes whose concept the principal reads, in the write-up's order.
- */
 export const footnotesOf = async (
   principal: UserPrincipal,
   tx: Tx,

@@ -230,10 +230,6 @@ export const withSessionLock = async <T>(
 
 export type LockHeld = "held";
 
-/**
- * As withSessionLock, but `held` at once while another session holds `key`, so a second holder
- * skips its work rather than queueing behind the first.
- */
 export const withSessionTryLock = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -475,7 +471,7 @@ export const withPrincipal = async <T>(
 
 /**
  * As withPrincipal, but read-only: a write inside the work fails at its own statement. A stale
- * last-active stamp is still written, in a transaction of its own after this one.
+ * last-active stamp is still written.
  */
 export const withPrincipalRead = async <T>(
   door: PostgresDoor,
@@ -485,8 +481,7 @@ export const withPrincipalRead = async <T>(
 
 /**
  * As withPrincipal, but the member and user rows stay held until commit, so a revocation cannot
- * land between the read and the commit. The last-active stamp lands only once this transaction
- * has released them.
+ * land between the read and the commit.
  */
 export const withHeldPrincipal = async <T>(
   door: PostgresDoor,
@@ -523,9 +518,7 @@ const withMemberQuery = async <T>(
   );
 
 /**
- * Reads the principal's member row again, held as withHeldPrincipal holds it, and runs `work` as
- * the principal read back, groups included. Refuses a non-member, an unknown role, revoked
- * credentials, and a role that has moved.
+ * Refuses a non-member, an unknown role, revoked credentials, and a role that has moved.
  */
 export const withMember = async <T>(
   principal: UserPrincipal,
@@ -699,9 +692,8 @@ const countInWindow = async (
 };
 
 /**
- * Counts one attempt against `scope` and `key` in the fixed window `now` falls in, and drops the
- * pair's earlier windows. It commits at once. `retryAfterSeconds` runs to the window's end, 1 at
- * least.
+ * Counts one attempt in the fixed window `now` falls in. It commits at once. `retryAfterSeconds`
+ * runs to the window's end, 1 at least.
  */
 export const consumeIngress = async (
   door: PostgresDoor,
@@ -774,10 +766,6 @@ export const consumeCall = async (
   now: Date,
 ): Promise<CounterOutcome> => countForWorkspace(principal, tx, "call", tokenId, rule, now, 1);
 
-/**
- * As consumeCall, counting `amount` invitation emails against `key` at once. An action that refuses
- * or fails after it rolls the count back, and the counter row stays held until it commits.
- */
 export const consumeInvitationEmails = async (
   principal: UserPrincipal,
   tx: Tx,

@@ -47,7 +47,6 @@ export type ListInvitationsRefusal =
   | MemberRefusal<RefusalOf<typeof listInvitationsAction | typeof countInvitationsAction>>
   | Error;
 
-/** The inviter by display name, read from their person row, so it stands after they leave. */
 export type ListedInvitation = WaitingInvitation & {
   readonly invitedBy: string;
   readonly status: InvitationStatus;
@@ -113,7 +112,7 @@ const countedQuery = (admin: AdminUserPrincipal, at: Date) => {
 
 const COUNTED_ROW = z.object({ status: z.enum(INVITATION_STATUSES), count: z.int() });
 
-/** How many invitations each status holds as of `at`, from one grouped read. */
+/** How many invitations each status holds as of `at`. */
 export const countInvitations = async (
   principal: UserPrincipal,
   tx: Tx,

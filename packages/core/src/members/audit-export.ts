@@ -45,7 +45,6 @@ const EXPORT_CAP = 10_000;
 
 export const exportAuditLogInput = readAuditLogInput.pick({ family: true, search: true });
 
-/** When the action happens: a confirmation older than an hour makes the export wait on a re-confirm. */
 export type ExportAuditLogInput = z.output<typeof exportAuditLogInput> & { readonly at: Date };
 
 const exportAuditLogAction = declareAction({
@@ -62,9 +61,7 @@ export type ExportAuditLogRefusal =
 export type AuditExport = {
   readonly csv: string;
   readonly count: number;
-  /** Whether more events matched than the file holds. */
   readonly capped: boolean;
-  /** Whether the search named more people or groups than were read. */
   readonly searchTooBroad: boolean;
 };
 

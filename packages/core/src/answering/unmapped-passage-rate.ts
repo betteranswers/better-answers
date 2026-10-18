@@ -27,7 +27,6 @@ const theCounts = z.object({
   showedUnmappedPassages: z.number().int(),
 });
 
-/** Two counts and never their quotient: no reading of it is a single percentage. */
 export type UnmappedPassageRate = z.output<typeof theCounts>;
 
 const THE_COUNTS = `SELECT count(*)::int AS "flaggedIncomplete",
@@ -39,10 +38,6 @@ const THE_COUNTS = `SELECT count(*)::int AS "flaggedIncomplete",
                   WHERE f.workspace_id = a.workspace_id AND f.record_id = a.id
                     AND f.verdict = '${FEEDBACK_FLAG_VERDICT}' AND f.reason = '${INCOMPLETE}')`;
 
-/**
- * Of a workspace's records flagged incomplete, how many showed unmapped passages: one of the two
- * readings that bring vectors in. It reads in a read-only transaction scoped to that workspace.
- */
 export const unmappedPassageRate = async (
   platform: AnswerMeasuresPrincipal,
   door: PostgresDoor,

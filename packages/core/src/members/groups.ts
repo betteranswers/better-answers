@@ -323,10 +323,6 @@ const holdsEveryGroupAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/**
- * True for an empty list, and a repeated id counts once. A failed query rejects rather than
- * answering an error.
- */
 export const holdsEveryGroup = async (
   principal: UserPrincipal,
   tx: Tx,

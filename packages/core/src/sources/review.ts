@@ -371,9 +371,7 @@ const KEPT_IN_TEXT_REVIEW = `UPDATE finding
       WHERE workspace_id = $1 AND id = ANY($2::text[]) AND review_state <> $4`;
 
 /**
- * Restores each span the document's last redaction raised in the groups, marks those not
- * dismissed as kept in text, and queues a sync. A group outside the always tier refuses the
- * whole command.
+ * A group outside the always tier refuses the whole command.
  */
 export const keepInText = async (
   principal: UserPrincipal,

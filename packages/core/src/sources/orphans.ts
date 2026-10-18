@@ -146,10 +146,8 @@ const removeOrphans = async (
 };
 
 /**
- * Removes each original under `uploads/` that no document names once past the grace hours: a
- * failed connect's, or a lost race's. Each removal's audit event names its source, and its document
- * when the key has one. `dryRun` only counts. A failed removal is an Error saying how many went
- * first.
+ * Removes each original under `uploads/` that no document names once past the grace hours.
+ * `dryRun` only counts. A failed removal is an Error.
  */
 export const sweepOrphanedUploads = async (
   platform: UploadSweepPrincipal,

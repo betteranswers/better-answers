@@ -455,11 +455,6 @@ type RewrittenRow = {
   readonly content_hash: string;
 };
 
-/**
- * Re-reads each rewritten path at its indexed commit, refreshes the index row, and moves the
- * concept's verifications onto a changed hash.
- * @throws when the bundle holds a file the platform cannot read.
- */
 export const carryVerificationsOntoRewrite = async (
   platform: PlatformPrincipal,
   tx: Tx,

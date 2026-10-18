@@ -193,8 +193,8 @@ export const endOneSession = async (
 export type EndOtherSessionsRefusal = WorkspaceRefusal<"malformed" | "person-gone"> | Error;
 
 /**
- * Ends every session the person holds but the one the request runs in, and no token of theirs.
- * No record is written when the current session was the only one.
+ * Ends the person's other sessions, not the current one nor their tokens. Writes no record when the
+ * current session was the only one.
  */
 export const endOtherSessions = async (
   platform: PlatformPrincipal,

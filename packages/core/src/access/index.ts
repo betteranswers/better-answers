@@ -134,7 +134,6 @@ export const visibilityAgreed = (
   return held;
 };
 
-/** @throws when the row does not parse, or its audience word and group list disagree. */
 export const visibilityOf = (row: VisibilityRow): Visibility => {
   const parsed = VISIBILITY_FIELDS.parse({
     sensitivity: row.sensitivity,

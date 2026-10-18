@@ -73,10 +73,6 @@ const namedField = (read: FieldRead, names: GrantNames): Detail[string] =>
       })
     : read.value;
 
-/**
- * Each detail with its grants beside the names their ids hold now, read with one query to each
- * table for all the details together.
- */
 export const detailsNamed = async (
   tx: Tx,
   details: readonly Detail[],

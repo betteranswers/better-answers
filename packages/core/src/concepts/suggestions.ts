@@ -113,10 +113,6 @@ const suggestionSetSummaryAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/**
- * Refuses anyone but an Admin a set holding another person's suggestion. For anyone but an
- * Admin, `target` is null where they cannot read the concept the suggestion resolved to.
- */
 export const suggestionSetSummary = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -183,10 +179,6 @@ export type SubmitSuggestionSetRefusal =
   | RefusalOf<typeof submitSuggestionSetAction>
   | PrincipalRefusal;
 
-/**
- * `malformed` also refuses an empty set and one over `SUGGESTION_SET_MAX`; `kind-forbids`
- * refuses a kind a person may not raise.
- */
 export const submitSuggestionSet = async (
   principal: UserPrincipal,
   doors: { readonly postgres: PostgresDoor },

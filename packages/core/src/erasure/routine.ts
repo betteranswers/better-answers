@@ -614,11 +614,6 @@ const completeTheRequest = async (
   });
 };
 
-/**
- * Waits on the backup dump's lock. A rerun is safe, and answers the first completion's time and
- * report. Refuses `no-address` when the bundle names the person but no address to rewrite is known.
- * A step that fails answers its error, and the steps before it stay applied.
- */
 export const runErasure = async (
   platform: ErasurePrincipal,
   doors: ErasureDoors,

@@ -89,8 +89,7 @@ export const reserveJudge = async (
   });
 
 /**
- * One drafting call on the answering model, reserved in the caller's transaction. A model of the
- * decision shape writes no prose, so none is reserved for it.
+ * A model of the decision shape writes no prose, so none is reserved for it.
  */
 export const reserveDrafting = async (
   asker: UserPrincipal,

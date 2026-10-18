@@ -43,13 +43,11 @@ const asMinted = (typed: string): string => typed.toLowerCase().replaceAll(/[\s-
 
 const hashOf = (code: string): string => createHash("sha256").update(code).digest("hex");
 
-/** A typed recovery or restore code's stored form: however it was spaced or cased, one hash. */
 export const hashOfTyped = (typed: string): string => hashOf(asMinted(typed));
 
 export type RecoveryCodesMade = {
   readonly recoveryCodes: readonly string[];
 
-  /** An ISO instant, as it crosses the wire: acknowledging names the set by it. */
   readonly madeAt: string;
 };
 
@@ -113,8 +111,8 @@ export const restoredByTheOperator = async (tx: Tx, personId: UserId): Promise<b
 };
 
 /**
- * The person is the one caller: a transport hands the id of the session's own person. A caller
- * asking for a first set is refused while one stands, so a stale page never voids a set unasked.
+ * The person is the one caller: a transport hands the id of the session's own person. A first set
+ * is refused while one stands.
  */
 export const replaceRecoveryCodes = async (
   platform: PlatformPrincipal,
@@ -179,8 +177,8 @@ const ACKNOWLEDGING = `
      AND EXISTS (SELECT 1 FROM recovery_code r WHERE r.user_id = $1 AND r.created_at = $2)`;
 
 /**
- * The person has saved the set, so it is never shown again. Only the set they were shown is
- * marked: a page still showing one since replaced is refused, and marks nothing.
+ * Only the set they were shown is marked: a page still showing one since replaced is refused, and
+ * marks nothing.
  */
 export const acknowledgeRecoveryCodes = async (
   platform: PlatformPrincipal,

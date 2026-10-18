@@ -319,9 +319,8 @@ const storeOriginal = async (
 };
 
 /**
- * Once the first connect commits, a repeat returns its outcome and reads no byte. A concurrent repeat
- * that loses the insert returns it too, its own object left to the upload sweep. `too-large`
- * answers a declared size or streamed body over the cap; the document records the size streamed.
+ * Once the first connect commits, a repeat returns its outcome and reads no byte. `too-large`
+ * answers a declared size or streamed body over the cap.
  */
 export const connectUpload = async (
   principal: UserPrincipal,
@@ -564,8 +563,7 @@ const publishWritten = async (
 
 /**
  * `confirmation-missing` unless all three confirmations are true, and `not-indexed` unless the
- * latest sync is done. Stamps the connected source published, writes an audit event with the DPIA hash
- * and the last sync's finding count per category, and recomputes what cites its documents.
+ * latest sync is done.
  */
 export const publishConnectedSource = async (
   principal: UserPrincipal,

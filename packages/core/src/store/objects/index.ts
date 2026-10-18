@@ -36,8 +36,7 @@ export type ObjectDoor = {
 export type ObjectStoreRefusal = "endpoint-not-a-url" | "no-bucket";
 
 /**
- * Reaches no store: it checks only that the bucket is named and the endpoint parses as a URL, so a
- * wrong address or credential shows at the first call.
+ * Reaches no store: it checks only that the bucket is named and the endpoint parses as a URL.
  */
 export const openObjects = (
   settings: ObjectStoreSettings,
@@ -205,7 +204,7 @@ export const getObject = (
 
 /**
  * Every key in the principal's workspace that starts with `under`, relative to the workspace.
- * `under` matches as a plain prefix: `docs` also lists `docs2/a`, and `docs/` does not.
+ * `under` matches as a plain prefix.
  */
 export const listObjects = (
   principal: UserPrincipal,
@@ -233,10 +232,6 @@ export const listPlatformObjects = (
   under: string,
 ): Promise<Result<readonly string[], KeyRefusal>> => listInside(door, PLATFORM_PREFIX, under);
 
-/**
- * The platform's listing of one workspace's objects under `under`, each with when it was stored.
- * An object whose stamp the store withheld is left out.
- */
 export const listWorkspaceObjects = (
   platform: PlatformPrincipal,
   door: ObjectDoor,

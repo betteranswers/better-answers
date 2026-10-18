@@ -320,9 +320,8 @@ const findAction = declareAction({
 export type FindRefusal = RefusalOf<typeof findAction> | Error;
 
 /**
- * Concepts holding at least half the query's words, then passages, then concepts holding fewer,
- * `limit` to a page, after `cursor` when given. `now` decides which concepts are past their shelf
- * life.
+ * Concepts holding at least half the query's words, then passages, then concepts holding fewer.
+ * `now` decides which concepts are past their shelf life.
  */
 export const find = async (
   principal: UserPrincipal,
@@ -464,8 +463,7 @@ const askAction = declareAction({
 export type AskRefusal = RefusalOf<typeof askAction> | Error;
 
 /**
- * `ask` is handed these in place of a door. Each runs in a transaction of its own, so none stays
- * open across the judge's call.
+ * Each runs in a transaction of its own, so none stays open across the judge's call.
  */
 export type AskSteps<Refused = never> = JudgeSteps<Refused> & {
   readonly openRecord: (
@@ -492,10 +490,8 @@ export const planAnswer = async <Refused = never>(
 };
 
 /**
- * Opens the question's record, reads what bears on it, has the workspace's judge say which
- * `Answer`s fit, and completes the record. With no judge to call, every `Answer` is related
- * knowledge. At the spending limit it refuses, leaving the record open. `now` decides which
- * concepts are past their shelf life.
+ * With no judge to call, every `Answer` is related knowledge. At the spending limit it refuses,
+ * leaving the record open.
  */
 export const ask = async <Refused = never>(
   principal: UserPrincipal,

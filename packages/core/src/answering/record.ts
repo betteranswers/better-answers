@@ -143,8 +143,7 @@ export type DraftKeeping = {
 };
 
 /**
- * Settles one drafting call and keeps the prose drafted so far on a completed record, in the
- * caller's transaction. A record not completed, or not there, answers an error.
+ * A record not completed, or not there, answers an error.
  */
 export const keepDraft = async (
   asker: UserPrincipal,

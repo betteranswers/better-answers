@@ -118,10 +118,7 @@ export type ReserveAuthenticatorTryRefusal = WorkspaceRefusal<"malformed" | "per
 
 type Reserved = Result<Counted, "person-gone" | CeilingMet>;
 
-/**
- * Counted as a failure before its code is checked, under the person's lock, so tries sent at once
- * meet the wait one by one. A confirm forgets it.
- */
+/** Counted as a failure before its code is checked. A confirm forgets it. */
 export const reserveAuthenticatorTry = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

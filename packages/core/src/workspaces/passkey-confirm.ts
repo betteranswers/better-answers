@@ -22,10 +22,7 @@ type ChallengeInput = {
 
 type KeepPasskeyChallengeRefusal = WorkspaceRefusal<"malformed" | "session-gone">;
 
-/**
- * Keeps the challenge the api handed a session's passkey confirm, for five minutes. A session
- * keeps one at a time: a later ask replaces the earlier.
- */
+/** Kept for five minutes. A session keeps one at a time: a later ask replaces the earlier. */
 export const keepPasskeyChallenge = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -93,7 +90,7 @@ const CREDENTIALS = `
     FROM passkey WHERE user_id = $1
    ORDER BY created_at, id`;
 
-/** The person's own passkeys, as a verifier needs them; a public key is no secret. */
+/** The person's own passkeys, as a verifier needs them. */
 export const readPasskeyCredentials = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

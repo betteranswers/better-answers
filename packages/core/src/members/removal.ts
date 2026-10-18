@@ -31,7 +31,6 @@ const REMOVAL_ACTIONS = declareActions("people", {
 export const removeMemberInput = memberKeyed;
 
 export type RemoveMemberInput = z.output<typeof removeMemberInput> & {
-  /** When the action happens: the person's tokens for this workspace issued before it end. */
   readonly at: Date;
 };
 
@@ -60,7 +59,6 @@ export type RemoveMemberRefusal =
 export type MemberRemoved = {
   readonly personId: UserId;
 
-  /** The role the member held when it ended. */
   readonly role: Role;
 };
 
@@ -109,9 +107,8 @@ const removedUnderTheLock = (
   });
 
 /**
- * Ends the person as a member here, and their tokens for this workspace; their sessions stand for
- * any other workspace and are refused here. Refuses `last-admin` for the workspace's one Admin; an
- * Admin may remove themself while another remains.
+ * Ends the person as a member here, and their tokens for this workspace. Refuses `last-admin` for
+ * the workspace's one Admin.
  */
 export const removeMember = async (
   principal: UserPrincipal,

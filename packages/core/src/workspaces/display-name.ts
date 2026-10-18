@@ -50,7 +50,6 @@ const ANGLE_BRACKET = /[<>]/u;
 // oxlint-disable-next-line typescript/no-misused-spread -- the spread only counts code points, and nothing split is ever shown
 const charactersIn = (name: string): number => [...name].length;
 
-/** Answers the name trimmed, the form to store; every rule reads the trimmed name. */
 export const applyDisplayNameRule = (asked: string): Result<string, DisplayNameRefusal> => {
   const name = asked.trim();
   if (name === "") return err("display-name-empty");
@@ -150,9 +149,8 @@ type CorrectDisplayNameRefusal =
   | WorkspaceRefusal<"no-such-user" | "confirmation-too-old">;
 
 /**
- * Replaces a person's display name under the rule their own name follows, and records it under
- * the operator even where the name is unchanged, so a flag on a name judged fine still clears. An
- * erased person answers `no-such-user`, as one nobody holds does.
+ * Replaces a person's display name under the rule their own name follows. An erased person answers
+ * `no-such-user`, as one nobody holds does.
  */
 export const correctDisplayName = async (
   operator: OperatorPrincipal,

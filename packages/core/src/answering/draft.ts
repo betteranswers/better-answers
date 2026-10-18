@@ -36,7 +36,7 @@ export type DraftEvent<Iri extends string = ConceptIri> =
     }
   | { readonly kind: "part"; readonly collection: string | null; readonly outcome: DraftOutcome };
 
-/** What the drafter is handed in place of a door; each runs in a transaction of its own. */
+/** Each step runs in a transaction of its own. */
 export type DraftSteps<Refused = never> = {
   readonly read: ReadStep<Refused>;
   readonly reserve: (

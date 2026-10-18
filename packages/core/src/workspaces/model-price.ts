@@ -33,10 +33,7 @@ const isACalendarDay = (day: string): boolean => {
   return !Number.isNaN(read.getTime()) && read.toISOString().startsWith(day);
 };
 
-/**
- * Sets what a model costs in pounds from a day on, replacing a price set for that same day, and
- * records who set it, with its rates and day.
- */
+/** Sets what a model costs in pounds from a day on, replacing a price set for that same day. */
 export const setModelPrice = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

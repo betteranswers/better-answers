@@ -248,11 +248,6 @@ const rederived = async (principal: Principal, tx: Tx, target: CascadeTarget) =>
   return { concepts, writeUps };
 };
 
-/**
- * Takes the workspace's cascade lock, runs `write`, then recomputes the target's concepts and every
- * write-up including them. A refusal from `write` comes back as it is, with nothing recomputed. The
- * caller's own checks belong inside `write`, after the lock and before any row it locks.
- */
 export const cascadingVisibility = async <T, E>(
   principal: Principal,
   tx: Tx,

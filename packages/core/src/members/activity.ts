@@ -75,8 +75,8 @@ const directionOf = (event: ReadEvent, personId: UserId): Direction => {
 };
 
 /**
- * The events of the principal's workspace the person took or that were done to them, newest
- * first, across every time they have been a member here. The identity-set audit log is never read.
+ * The principal's workspace's events the person took or that were done to them, newest first,
+ * across every time they have been a member here.
  */
 export const readActivity = async (
   principal: UserPrincipal,

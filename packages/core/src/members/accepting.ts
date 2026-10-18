@@ -141,7 +141,6 @@ const judged = async (
 export type ReadInvitationInput = {
   readonly invitationId: string;
 
-  /** The session's own person, never one the request names. */
   readonly personId: string;
   readonly now: Date;
 };
@@ -161,7 +160,6 @@ export type InvitationRead = {
   readonly workspaceName: string;
   readonly role: Role;
 
-  /** By display name, read from the inviter's person row, so it stands after they leave. */
   readonly invitedBy: string;
   readonly expiresAt: string;
 };
@@ -175,9 +173,8 @@ const readOf = (invitationId: InvitationId, invitation: HeldInvitation): Invitat
 });
 
 /**
- * What accepting would join, for the person the invitation is addressed to. It refuses as
- * accepting would, so the page says so before the click, save a missing display name: the page
- * asks for that beside the join.
+ * What accepting would join, for the person the invitation is addressed to. Refuses as accepting
+ * would, save a missing display name.
  */
 export const readInvitation = async (
   platform: PlatformPrincipal,
@@ -227,7 +224,6 @@ const openTo = async (tx: Tx, personId: UserId, now: Date): Promise<readonly Inv
 };
 
 export type ReadOpenInvitationsInput = {
-  /** The session's own person, never one the request names. */
   readonly personId: string;
   readonly now: Date;
 };
@@ -267,7 +263,6 @@ export type Joined = {
   readonly workspaceName: string;
   readonly role: Role;
 
-  /** Joining as an Admin made the person hold a second factor for the first time. */
   readonly promoted: boolean;
 };
 
@@ -312,7 +307,6 @@ const JOIN_CONSTRAINTS = {
 } as const satisfies Record<string, AcceptInvitationRefusal>;
 
 export type AcceptInvitationInput = ReadInvitationInput & {
-  /** The session the request came on, which the joined workspace becomes the active one of. */
   readonly sessionId: string;
 };
 

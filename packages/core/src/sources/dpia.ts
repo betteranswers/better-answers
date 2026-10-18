@@ -139,10 +139,6 @@ const canonical = (value: Canonical): string => {
   return JSON.stringify(value);
 };
 
-/**
- * The hash is SHA-256, in hex, over the document's JSON with its keys sorted at every depth, so
- * the same answers hash the same whatever order they were built in.
- */
 export const dpiaInputFor = async (
   principal: UserPrincipal,
   tx: Tx,

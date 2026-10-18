@@ -82,8 +82,8 @@ export const manifestAtHead = async (
 };
 
 /**
- * Writes the manifest as a commit of its own, once: `written: false` when a manifest with the
- * same id already stands, `path-taken` when anything else holds the path.
+ * `written: false` when a manifest with the same id already stands, `path-taken` when anything
+ * else holds the path.
  */
 export const writeManifest = async (
   principal: UserPrincipal,

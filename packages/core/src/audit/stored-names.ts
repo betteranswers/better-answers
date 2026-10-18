@@ -71,10 +71,6 @@ export const STORED_ACT_NAMES = [
   "people.person.sessions_ended",
 ] as const;
 
-/**
- * Named in the reader's words and valued as rows store it, so a rename moves the name, never the
- * value.
- */
 export const STORED_DETAIL_KEYS = {
   setId: "setId",
   grants: "grants",

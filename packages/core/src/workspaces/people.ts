@@ -118,8 +118,7 @@ const personOf = (row: PersonRow, held: HeldBy): PersonListed => ({
 
 /**
  * Every person whose display name or address holds `search` as literal text, ignoring case, a page
- * at a time in name order, with each workspace they belong to and their role there. The last
- * sign-in is read from the identity-set audit log, so it outlives the person's sessions.
+ * at a time in name order.
  */
 export const listPeople = (
   operator: OperatorPrincipal,
@@ -341,9 +340,8 @@ const endedGrantsOf = async (tx: Tx, personId: UserId): Promise<readonly EndedGr
 };
 
 /**
- * The person's sessions by last use, each assistant's access they hold, and each an action or the
- * authorization server ended. A grant is a refresh token's line: an assistant that asked for none
- * holds only an access token no row keeps, which lapses within the hour.
+ * Sessions by last use. A grant is a refresh token's line: an assistant that asked for none holds
+ * only an access token no row keeps.
  */
 export const inspectPerson = async (
   _operator: OperatorPrincipal,

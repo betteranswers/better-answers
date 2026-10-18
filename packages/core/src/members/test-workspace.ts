@@ -445,10 +445,8 @@ const fixtureWritten = async (
 };
 
 /**
- * Creates or repairs the test workspace, its mark, three test people and 51 invented Viewers.
- * Before writing anything it refuses an address off the testing domain, the operator's or a
- * member's elsewhere, and a short name whose workspace holds a member or waiting invitation off it.
- * It removes nobody.
+ * Creates or repairs the test workspace, its mark, three test people and 51 invented Viewers. It
+ * removes nobody.
  */
 export const ensureTestWorkspace = async (
   platform: PlatformPrincipal,

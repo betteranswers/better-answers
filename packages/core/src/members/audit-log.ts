@@ -78,10 +78,8 @@ export type ReadAuditEvent = Pick<
 > & {
   readonly at: string;
   readonly by: AuditEventActor;
-  /** Null for a subject with no name of its own, such as a suggestion or a request. */
   readonly subject: AuditEventSubject | null;
   readonly detail: NonNullable<AuditEventRow["detail"]>;
-  /** Each detail key holding the id of something named, or a list of them, as it stands now. */
   readonly named: Readonly<Record<string, AuditEventSubject | readonly AuditEventSubject[]>>;
 };
 
@@ -90,7 +88,6 @@ export type AuditLogPage = Omit<AuditEventPage, "rows"> & {
 };
 
 export type SearchedAuditLogPage = AuditLogPage & {
-  /** The search named more than 100 people or groups, and only the first 100 were read. */
   readonly searchTooBroad: boolean;
 };
 
@@ -377,8 +374,8 @@ export const eventsNamed = async (
 };
 
 /**
- * The workspace's own audit log, newest first; the identity-set audit log is never read. A grant
- * an action ended is named from its assistant and workspace as they stand now.
+ * The workspace's own audit log, newest first. A grant an action ended is named from its assistant
+ * and workspace as they stand now.
  */
 export const readAuditLog = async (
   principal: UserPrincipal,

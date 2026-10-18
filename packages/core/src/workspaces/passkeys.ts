@@ -78,7 +78,6 @@ type PasskeyAdded = {
   readonly passkeyId: string;
   readonly stamped: boolean;
 
-  /** Issued only to a person who must hold a factor and held no codes, and shown to them once. */
   readonly issued: RecoveryCodesMade | undefined;
 };
 
@@ -106,9 +105,8 @@ const recordingAdded = async (
 };
 
 /**
- * Called once the library has verified and kept a new passkey: records it, counts the adding as
- * the session's confirmation, and issues recovery codes to a person who must hold a factor and
- * holds none.
+ * Called once the library has kept a new passkey. Confirms the session; issues recovery codes to
+ * one who must hold a factor and holds none.
  */
 export const recordPasskeyAdded = async (
   platform: PlatformPrincipal,
@@ -191,8 +189,8 @@ const removing = async (
 };
 
 /**
- * The person is the one caller. An Admin in any workspace, or the operator, keeps their last
- * second factor: the check runs under the person's lock, so two removals cannot each leave one.
+ * The person is the one caller. An Admin in any workspace, or the operator, keeps their last second
+ * factor: two removals cannot each leave one.
  */
 export const removePasskey = async (
   platform: PlatformPrincipal,
@@ -216,10 +214,7 @@ const USING = `
   SELECT id, $2 FROM passkey WHERE credential_id = $1
   ON CONFLICT (passkey_id) DO UPDATE SET at = EXCLUDED.at`;
 
-/**
- * Keyed by the credential a sign-in presents, the one id the library's verify hands on. A use is
- * no change to the factor, so nothing is recorded on the log.
- */
+/** Keyed by the credential a sign-in presents, the one id the library's verify hands on. */
 export const recordPasskeyUse = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -236,7 +231,6 @@ const DISMISSING = `
   UPDATE "user" SET passkey_offer_dismissed_at = COALESCE(passkey_offer_dismissed_at, $2)
    WHERE id = $1 AND ${notErasedAt("email")}`;
 
-/** A preference, not a change to any factor, so nothing is recorded on the log. */
 export const dismissPasskeyOffer = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

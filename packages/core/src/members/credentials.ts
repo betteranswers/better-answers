@@ -31,7 +31,6 @@ export const endEverySignInAndTokenHereInput = z.object({
 });
 
 export type EndEverySignInAndTokenHereInput = z.output<typeof endEverySignInAndTokenHereInput> & {
-  /** When the action happens: every credential the member was issued before it is refused here. */
   readonly at: Date;
 };
 
@@ -48,7 +47,6 @@ export type EndEverySignInAndTokenHereRefusal =
 export type CredentialsRevokedHere = {
   readonly personId: UserId;
 
-  /** Later than the `at` asked for where an earlier revocation here already held a later one. */
   readonly revokedAt: string;
 };
 
@@ -86,9 +84,8 @@ const revokedHere = async (
 };
 
 /**
- * Every session and token the member was issued before the instant is refused in this workspace
- * and nowhere else, and a fresh sign-in is admitted. The answer is the same whether or not the
- * person belongs to another workspace. Revoking the last Admin, themself included, is allowed.
+ * The member's sessions and tokens issued before `at` are refused here and nowhere else; a fresh
+ * sign-in is admitted. Revoking the last Admin is allowed.
  */
 export const endEverySignInAndTokenHere = async (
   principal: UserPrincipal,
