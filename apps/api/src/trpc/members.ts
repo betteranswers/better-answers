@@ -263,7 +263,6 @@ export const membersRouter = router({
     .input(parsedBy(bulkAddToGroupInput))
     .mutation(answeredAt(bulkAddToGroup)),
 
-  /** A constant answer: whether a flag was raised or already waited is the operator's to know. */
   flagDisplayName: ownTransactionProcedure
     .input(parsedBy(flagDisplayNameInput))
     .mutation(async ({ ctx, input }) => {

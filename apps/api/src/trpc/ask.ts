@@ -23,10 +23,8 @@ import {
 } from "./base.ts";
 import { KNOWLEDGE_CEILING } from "./knowledge.ts";
 
-/** What an answer is doing while nothing else is sent: reading, judging, then drafting. */
 type AskPhase = "reading" | "judging" | "drafting";
 
-/** Its phase at once, then the whole result before any prose; a keep-alive carries nothing. */
 type AskEvent =
   | { readonly kind: "phase"; readonly phase: AskPhase }
   | { readonly kind: "result"; readonly result: AnswerResult }
@@ -91,10 +89,6 @@ const answered = async (
 };
 
 export const askRouter = router({
-  /**
-   * A mutation, so it is refused over GET, carries the question in its body and is never retried:
-   * a failed call cannot pay twice.
-   */
   question: askingProcedure.input(parsedBy(askInput)).mutation(async function* ({
     ctx,
     input,
