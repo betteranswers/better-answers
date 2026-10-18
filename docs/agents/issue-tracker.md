@@ -7,9 +7,8 @@ Issues live in Linear: workspace `tw-group`, team `better-answers` (ids `BA-N`),
 ## What an issue is for
 
 - **The backlog.** Work that is known but not yet planned.
-- **A finding put off for later.** A review, a gate or a mutation run finds something that does not belong in the change at hand. It becomes one issue, with no plan and no spec until it is picked up.
 
-An issue is not the unit of build work: a plan in `docs/plans/` is. An issue that gets built gets a plan (`/ce-plan`), and the pull request that lands it says `Fixes BA-N` in its description.
+An issue is not the unit of build work: a plan in `docs/plans/` is. An issue that gets built gets a plan, and the pull request that lands it says `Fixes BA-N` in its description.
 
 ## States
 
@@ -43,7 +42,7 @@ What this issue accomplishes.
 Anything that doesn't fit elsewhere.
 ```
 
-Progress goes in comments, one per landing. A dependency is a Linear relation (`blockedBy`), not a line in the description. The route block an issue belongs to (`S2`, `S4` …) is named in its Goal or Notes.
+Progress goes in comments, one per landing. A dependency is a Linear relation (`blockedBy`), not a line in the description. The route block an issue belongs to (`S2`, `S4` …) is named in its Goal or Notes, and added as a label.
 
 ## The tasks before Linear
 
@@ -53,5 +52,3 @@ Until 30/09/2026 the tracker was ordna, and code, docs and commits cite its task
 git fetch origin '+refs/ordna/tasks/*:refs/ordna/tasks/*'
 git cat-file -p refs/ordna/tasks/T-123
 ```
-
-The eleven tasks still open on 30/09/2026 moved to Linear as BA-11 to BA-21. Each description opens with `Migrated from ordna T-nnn`, so a Linear search for the `T-nnn` finds it, and each ordna task is archived with a line naming its `BA-N`. Nothing writes to the ordna refs any more.
