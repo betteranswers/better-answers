@@ -93,7 +93,7 @@ describe("the arm a file is measured under", () => {
   });
 });
 
-const OVER_THE_SOURCE_CEILING = `over the ${CEILING.source.toFixed(2)} ceiling`;
+const OVER_THE_SOURCE_CEILING = `over the ${CEILING.source.toFixed(3)} ceiling`;
 
 describe("the ceiling over a throwaway tree", () => {
   it("names workspace, arm and ratio when an arm is over", () => {
@@ -104,7 +104,7 @@ describe("the ceiling over a throwaway tree", () => {
     expect(over[0]?.arm).toBe("source");
     expect(
       reportOf(over[0] ?? { workspace: "", arm: "source", code: 0, comment: 0, ratio: 0 }),
-    ).toContain(`0.50 comment lines per code line, ${OVER_THE_SOURCE_CEILING}`);
+    ).toContain(`0.500 comment lines per code line, ${OVER_THE_SOURCE_CEILING}`);
   });
 
   it("stays silent over a tree under both ceilings", () => {
@@ -137,7 +137,7 @@ describe("the ceiling's wrapper, run as the root manifest runs it", () => {
   });
 
   it("fails naming the workspace and ratio over the ceiling", () => {
-    expect(wrapper(OVER)).toContain(`${WORKSPACE} source: 0.50 comment lines per code line`);
+    expect(wrapper(OVER)).toContain(`${WORKSPACE} source: 0.500 comment lines per code line`);
   });
 
   it("says the fix", () => {
