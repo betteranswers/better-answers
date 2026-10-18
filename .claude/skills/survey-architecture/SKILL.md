@@ -67,8 +67,7 @@ Apply the deletion test to anything that looks shallow. Ask whether deleting it 
 **Leave out what a gate already holds for that tier.** The TypeScript gates are the `check:gates` script in the root `package.json` and the rules in `.oxlintrc.json`, which include import direction for `packages/core` only, cycles and the complexity cap. The worker's gates are the ruff settings in `apps/worker/pyproject.toml`. Where a rule could be gated and is not, the opportunity names that gap. The fix for it is a Linear issue, never an edit to `CODING_STANDARDS.md`.
 
 **Rebuild each opportunity from first principles.** The proposal is not limited to deepening a module. It may merge, split or delete modules, move a seam, or reopen a decision, whichever shape the facts support.
-- Rebuild each proposal under pstack's `principle-redesign-from-first-principles`: ask what you would build if the area were written from scratch today, from the code, docs and history alone. Each unknown that reading cannot settle becomes an open question on the opportunity, for the review.
-- When it is absent, use the same frame. State the facts, the constraints, the assumptions and the unknowns, then what the module must do, before choosing its shape. Say in the header that the skill was absent.
+- Rebuild each proposal under pstack's `principle-redesign-from-first-principles`: ask what you would build if the area were written from scratch today, from the code, docs and history alone. State the facts, the constraints, the assumptions and the unknowns, then what the module must do, before choosing its shape. Each unknown that reading cannot settle becomes an open question on the opportunity, for the review.
 
 **The test note.** Read `references/deepening.md` from this skill's directory when writing each proposal's test note.
 
