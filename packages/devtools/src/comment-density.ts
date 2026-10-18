@@ -120,7 +120,7 @@ export const overTheCeiling = (measured: readonly Measured[]): readonly Measured
   measured.filter((one) => one.code > 0 && one.ratio > CEILING[one.arm]);
 
 export const reportOf = (one: Measured): string =>
-  `${one.workspace} ${one.arm}: ${one.ratio.toFixed(2)} comment lines per code line, over the ${CEILING[one.arm].toFixed(2)} ceiling. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. Hold any other reason in a name, a type, a test or a grant, and delete the rest.`;
+  `${one.workspace} ${one.arm}: ${one.ratio.toFixed(2)} comment lines per code line, over the ${CEILING[one.arm].toFixed(2)} ceiling. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. Any other comment is deleted: hold its reason in a name, a type, a test, a grant or a lint, or report it open in the tracker.`;
 
 export const countOver = (cwd: string, paths: readonly string[]): readonly Counted[] =>
   countedIn(

@@ -37,22 +37,22 @@ The anchor resolving proves the holder exists. It does not prove the holder hold
 | web tests and journeys | 354 | 129 |
 | devtools and test-inbox tests | 27 | 12 |
 
-Without the second read, those comments would have gone, and with them the only statement of their reason. Some carried security reasons: an open-redirect test that never tries the backslash form, a log test whose fake error can never contain the name it guards, a refusal whose sameness across outcomes no test asserts.
+Without the second read, those comments would have gone as held, and their reasons with them, filed nowhere. Some carried security reasons: an open-redirect test that never tries the backslash form, a log test whose fake error can never contain the name it guards, a refusal whose sameness across outcomes no test asserts.
 
 ## The method that held
 
 1. Inventory one workspace and split it into partitions of about 200 rows. Each classifier writes only its partition's out TSV, works alone, and keeps scratch files in its own temp directory (two classifiers sharing `/tmp/sicko/` overwrote each other).
 2. Check each out TSV against its input: same rows, same first seven columns.
 3. Give every `held` row to an independent reviewer with the strict rule: a holder that exercises the path without asserting the property misses, and a title that names the subject without stating the property misses.
-4. Fold the verdicts. A `partial` or `misses` row becomes `structure`, its `structure` cell carrying the reviewer's note, and its unit empties, so the comment stays. An identical comment in the same file as a structure row follows it. A backslash in the reviewer's note must be doubled, or the TSV is malformed.
-5. Apply unit 1 (narration), run oxfmt over the touched files, then `check:gates` and the workspace's own `check`, and commit. Then unit 2 (held) the same way. A deletion can let a JSX element fit one line, and the format gate refuses it unformatted.
-6. File the structure rows as one tracker issue per workspace, with the rows attached. The reviewer's note often names a sibling test that already asserts the missing half, which is a second anchor and a cheap fix.
+4. Fold the verdicts. A `partial` or `misses` row becomes `open`: its holder is the workspace's tracker issue (`BA-196`), its `structure` cell carries the reviewer's note, and the comment is deleted with the rest of its unit. An identical comment in the same file as an open row follows it. A backslash in the reviewer's note must be doubled, or the TSV is malformed.
+5. Apply unit 1 (narration), run oxfmt over the touched files, then `check:gates` and the workspace's own `check`, and commit. Then unit 2 (held and open) the same way. A deletion can let a JSX element fit one line, and the format gate refuses it unformatted.
+6. Attach the open rows, each comment's text verbatim, to the workspace's tracker issue, so the reason the deletion removed is still read there. The reviewer's note often names a sibling test that already asserts the missing half, which is a second anchor and a cheap fix.
 
 ## Rules a sweep needs before it starts
 
-- **Name the contract criterion per workspace.** Without one, each classifier invents its own. In this sweep a contract was a doc block on a tRPC procedure, an MCP entry or a file the SPA's typecheck reads (api), a doc block on a helper exported through `@better-answers/schema/testing` (schema tests), and nothing in web.
-- **Scan the rows to delete for text a tool reads.** One doc block carried `@public S2a`, which knip reads to allow an unused export. Its review downgraded it, so it stayed, but nothing in the method guaranteed that.
-- **A suppression or directive row is kept, and a comment that is the whole body of a `catch` is structure**, since deleting it leaves an empty block the lint refuses.
+- **Give the classifiers one contract criterion.** Without one, each invents its own. A doc block stays as a contract only on an export another workspace imports, and only for a precondition, postcondition, unit or error the signature cannot express, in 25 words or fewer. A field on an exported type counts only when another workspace imports that type by name. Anything else in the block is trimmed, or the block is held or open like any other comment.
+- **Scan the rows to delete for text a tool reads.** Two doc blocks carried knip's `@public` tag, which allows an unused export. The tag stays and its prose goes, by hand, since the tool deletes whole blocks.
+- **A suppression or directive row is kept, and so is a comment that is the whole body of a `catch` or other block**, since deleting it leaves an empty block the lint refuses. The tool cannot see this before it applies: run oxfmt then oxlint over the touched files, and on a `no-empty` hit restore every file the unit touched and apply again without that row.
 - **Line numbers in the TSV go stale after each apply.** The tool relocates rows by text, so later units still apply, but a filed row's line is where the comment stood before the sweep.
 
 ## When it does not apply

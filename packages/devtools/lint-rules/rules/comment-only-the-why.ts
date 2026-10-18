@@ -41,7 +41,7 @@ export const commentOnlyTheWhyRule = defineRule({
     },
     messages: {
       tooLong:
-        "This comment runs to {{words}} words, over the cap of {{limit}}. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. Hold any other reason in a name, a type, a test or a grant, and delete what the code already says.",
+        "This comment runs to {{words}} words, over the cap of {{limit}}. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. Any other comment is deleted: hold its reason in a name, a type, a test, a grant or a lint, or report it open in the tracker.",
       cites:
         "This comment cites {{what}} (`{{cited}}`); a comment never says which ticket, decision or rule asked for the code. git, a spec and an ADR are where that is read.",
       unexplained:

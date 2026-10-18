@@ -55,8 +55,8 @@ TOO_LONG = (
     "{path}:{line}: this comment runs to {words} words, over the cap of {limit}. A "
     "comment stays only for a constraint outside this repository (a library, platform "
     "or protocol), a public contract, a generated-file marker, a license, or a "
-    "suppression's reason. Hold any other reason in a name, a type, a test or a grant, "
-    "and delete what the code already says."
+    "suppression's reason. Any other comment is deleted: hold its reason in a name, a "
+    "type, a test, a grant or a lint, or report it open in the tracker."
 )
 
 REASON_TOO_LONG = (
