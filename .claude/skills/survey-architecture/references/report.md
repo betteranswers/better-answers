@@ -18,7 +18,7 @@ Never overwrite an earlier report. `lavish-axi` resumes a session by file, so a 
 - The date, the surveyed ref and its commit.
 - How the areas were chosen: named by the owner, or picked by the history recipe with its window, area cap and the number of commits left out.
 - For each area, the GitNexus index's commit against the area's last commit, and whether the index was older.
-- Every capability the run did without, and what it used instead: GitNexus, the `first-principles` skill, the `diagram-design` plugin, `lavish-axi`.
+- Every capability the run did without, and what it used instead: GitNexus, the `diagram-design` plugin, `lavish-axi`.
 
 Caller counts are lower bounds; say so wherever one appears.
 
