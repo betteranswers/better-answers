@@ -40,14 +40,14 @@
     "mattpocock-skills@mattpocock": false,
     "mattpocock-skills@claude-plugins-official": false,
     "mattpocock-skills@synced": false,
-    "compound-engineering@compound-engineering-plugin": false
+    "pstack@pstack-claude": true
   },
   "extraKnownMarketplaces": {
-    "compound-engineering-plugin": {
+    "pstack-claude": {
       "source": {
         "source": "github",
-        "repo": "EveryInc/compound-engineering-plugin",
-        "ref": "compound-engineering-v3.30.4"
+        "repo": "michael-denyer/pstack-claude",
+        "ref": "v0.9.86"
       },
       "autoUpdate": true
     }

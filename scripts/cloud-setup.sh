@@ -42,12 +42,12 @@ cd "$REPO"
 npx -y gitnexus@latest analyze || echo "setup: WARNING gitnexus analyze failed; run it by hand" >&2
 took "gitnexus analyze"
 
-# Compound Engineering: a cloud session never adds the marketplaces .claude/settings.json lists,
+# pstack: a cloud session never adds the marketplaces .claude/settings.json lists,
 # and the CLI takes no ref, so this installs the marketplace's newest release, not the pinned one
 if command -v claude >/dev/null 2>&1 \
-  && claude plugin marketplace add EveryInc/compound-engineering-plugin \
-  && claude plugin install compound-engineering@compound-engineering-plugin; then
-  took "compound engineering"
+  && claude plugin marketplace add michael-denyer/pstack-claude \
+  && claude plugin install pstack@pstack-claude; then
+  took "pstack"
 else
-  echo "setup: WARNING Compound Engineering did not install; run /plugin install by hand" >&2
+  echo "setup: WARNING pstack did not install; run /plugin install by hand" >&2
 fi
