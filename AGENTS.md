@@ -6,7 +6,7 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 
 ## Read first
 
-- `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block. A block that is one change goes to `/poteto-mode`; a block of several changes is planned first (*Workflow*, below).
+- `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block. A block one owner can build in one session goes to `/poteto-mode`, as one pull request or a short stack. A block that needs more than one owner, or will outlast one session, is planned first (*Workflow*, below).
 - `CONCEPTS.md` — the glossary. Name things in code, tests, docs and commits with its words. `docs/agents/domain.md` says more.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open, and where each lands here. Read it before adding a key, convention or feature that relates to the knowledge layer.
 - `CODING_STANDARDS.md` — the rules that bind every workspace and that no gate enforces. A directory's own rules live in its `AGENTS.md` (`apps/api/`, `apps/web/`, `apps/worker/`, `deploy/`, `packages/core/`, `packages/schema/`), which its `CLAUDE.md` loads when work reaches it.
@@ -55,7 +55,7 @@ Other skills belong in the `.claude/skills/` folder beside the files they serve,
 
 `project_tracker: linear`
 
-The backlog lives in **Linear**: team `better-answers` (issue ids `BA-N`), project `better-answers`, reached through the `linear-server` MCP. A pull request is the unit of build work, and work that spans several gets a plan in `docs/plans/` first. The procedure is in `docs/agents/issue-tracker.md`.
+The backlog lives in **Linear**: team `better-answers` (issue ids `BA-N`), project `better-answers`, reached through the `linear-server` MCP. A pull request is the unit of build work. Work that needs more than one owner, or will outlast one session, gets a plan in `docs/plans/` first. The procedure is in `docs/agents/issue-tracker.md`.
 
 ### Workflow
 
@@ -79,7 +79,7 @@ A plan's test scenario opens with the behaviour it checks.
 
 ### Compounding
 
-`docs/solutions/` is the repository's memory of solved problems; Read it before planning implementation.
+`docs/solutions/` is the repository's memory of solved problems. Look up the docs whose `applies_when` matches the area you are working in.
 
 After a solved, verified problem, document it. Apply this counterfactual: if the learning document disappeared, would a future engineer reading the final implementation still be likely to repeat the mistake or redo substantial investigation? If not, it doesn't warrant a document.
 

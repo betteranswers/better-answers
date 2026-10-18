@@ -6,7 +6,7 @@ This repo is **single-context**: one root `CONCEPTS.md` and one set of decisions
 
 ## Before exploring, read these
 
-- **`CONCEPTS.md`** at the repo root — the glossary.
+- **`CONCEPTS.md`** at the repo root, the glossary. Look up the entry for each domain word you meet with `search_sections`, one entry at a time. Do not read the whole file.
 - **`docs/solutions/architecture-patterns/`** — the live architecture decisions. Read the ones that touch the area you're about to work in.
 - **`AGENTS.md`** — the map: layout, how a task is worked, which skill to reach for.
 - **`CODING_STANDARDS.md`** — the constitution. A directory's own rules live in its `AGENTS.md`, which its `CLAUDE.md` loads when work reaches it.
@@ -46,4 +46,4 @@ If your output contradicts a decision in `docs/solutions/architecture-patterns/`
 
 ## Where a changed decision lands
 
-A decision's doc states **what is true now**. A change that moves it **edits the doc in place**, in the same commit as the code; git keeps the history. The ADRs these docs came from, amendments and struck text included, are frozen in `docs/archive/adr/`: read one there when you need how a decision got to where it is.
+A decision's doc states **what is true now**. The step that edits it in place, in the same commit as the code, is in `.agents/playbooks/knowledge.md`; git keeps the history. The ADRs these docs came from, amendments and struck text included, are frozen in `docs/archive/adr/`: read one there when you need how a decision got to where it is.

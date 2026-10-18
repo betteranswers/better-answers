@@ -2310,8 +2310,9 @@ _Internal._ one section of the route spec: a destination a product session can p
 the ADRs and words it rests on, what in the tree it builds on, what it must carry, its blocking
 edges, a seam sketch.
 
-Taken to `/poteto-mode`, and planned first when it is several changes; the block itself is never
-one of its plans. Each block lands its own page. A slice is a core package capability, never a block.
+Taken to `/poteto-mode`, and planned first when it needs more than one owner or will outlast
+one session; the block itself is never one of its plans. Each block lands its own page. A slice is
+a core package capability, never a block.
 
 ### strand
 
