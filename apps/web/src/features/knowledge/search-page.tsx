@@ -62,7 +62,6 @@ const matchesOf = (data: Matches["data"]): readonly Match[] => {
     });
 };
 
-/** Every state is said here, a region that stays mounted, and never with a count. */
 const saidOf = (query: string, matches: Matches, shown: number): string => {
   if (asksNothing(query)) return WORDS.nothingAsked;
   if (matches.isPending) return WORDS.searching(query);
@@ -256,7 +255,6 @@ const useReading = (query: string): Reading => {
   const returned = useRouterState({
     select: (state) => RETURNED_TO.safeParse(state.location.state).data?.openedMatch,
   });
-  // Taken as the page opens: marking the entry on the way out must move no focus.
   const [returning, setReturning] = useState({ key: returned, query });
   if (returning.key !== undefined && returning.query !== query) {
     setReturning({ key: undefined, query });
@@ -357,7 +355,6 @@ function SearchRegion() {
           {saidOf(query, matches, shown.length)}
           {left ? ` ${WORDS.passageLeft}` : null}
         </output>
-        {/* Keyed, so a page landing late for the last search never reaches this one's list. */}
         <Results
           key={query}
           query={query}

@@ -18,10 +18,6 @@ export const isAWrongCode = (failure: Error | null): boolean =>
 
 type SendTheCode = (digits: string, onRefused: (failure: Error) => void) => void;
 
-/**
- * The digit filter and submit-at-six. A code refused as wrong is never sent again, since the api
- * would only spend a try on it.
- */
 export const useSixDigits = (fieldId: string, waiting: boolean, send: SendTheCode) => {
   const [code, setCode] = useState("");
   const [refused, setRefused] = useState<readonly string[]>([]);

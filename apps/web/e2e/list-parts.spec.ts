@@ -32,7 +32,6 @@ const backUntilFocused = async (page: Page, target: Locator) => {
   await expect(target, "Shift+Tab never reached it").toBeFocused();
 };
 
-/** WCAG's minimum target, measured as the points around a box that a press on it reaches. */
 const TARGET = 24;
 
 const targetOf = (tick: Locator) =>
@@ -82,7 +81,6 @@ test.describe("the shared list parts, drawn together", () => {
     });
     expect(room.scrolls, "the page scrolls sideways").toBeLessThanOrEqual(room.holds);
     expect(room.pastTheEdge, "a part outside the table reaches past the edge").toEqual([]);
-    // Six columns cannot wrap into 320 pixels; the table scrolls in its own box, and this says how far.
     test.info().annotations.push({
       type: "table at 320 pixels",
       description: `${String(room.tableScrolls)} px of columns in ${String(room.tableHolds)} px`,

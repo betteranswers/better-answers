@@ -273,13 +273,7 @@ function Prose(properties: {
   return (
     <div className="grid gap-2">
       {part.sentences.map((sentence, at) => (
-        <DraftedSentence
-          // A draft may repeat a sentence word for word, and a part only grows, so its place is its key.
-          key={at}
-          sentence={sentence}
-          concepts={concepts}
-          recordId={recordId}
-        />
+        <DraftedSentence key={at} sentence={sentence} concepts={concepts} recordId={recordId} />
       ))}
       {unwritten === null ? null : (
         <p className="text-muted-foreground">{WORDS.unwritten[unwritten]}</p>
@@ -328,7 +322,6 @@ function Fitting(properties: {
       ))}
       {answer.related.length === 0 ? null : (
         <Collapsible
-          // Folding the list takes away what opened the panel, and the panel's only way back.
           onOpenChange={(open) => {
             if (!open) close();
           }}
@@ -469,7 +462,6 @@ export function AnswerView(properties: {
       <section
         aria-labelledby={headingId}
         aria-busy={drafting ? true : undefined}
-        // Room for the panel beside the answer, so it covers none of it.
         className={cn("mt-8 grid gap-6", sheet && "pr-[var(--container-md)]")}
       >
         <h2 id={headingId}>{WORDS.verdictHeading[answer.verdict]}</h2>

@@ -19,7 +19,6 @@ export function GoHome(properties: {
   );
 }
 
-/** Asked only here, so the console never reads a workspace its reader need not be a member of. */
 function RoleHomeLink(properties: { readonly className: string }) {
   const role = useRole();
 

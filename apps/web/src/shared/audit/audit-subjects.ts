@@ -16,7 +16,6 @@ export const GONE_WORDS = {
   "erased-invitation": "an erased invitation",
 } as const;
 
-/** A person with no display name yet is named by their address, so it is not said twice. */
 export const personSaid = (
   displayName: string,
   address: string,

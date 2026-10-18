@@ -159,7 +159,6 @@ function CloseActions(properties: {
   );
 }
 
-/** Given only where the reader may read the concept the sentence rested on; an erasure clears the sentence. */
 function DisputedRows(properties: {
   readonly disputed: Feedback["disputed"];
   readonly concepts: readonly ConceptRead[];
@@ -183,7 +182,6 @@ function DisputedRows(properties: {
   );
 }
 
-/** Focus lands here once the flag it was closing is closed, since the buttons go with it. */
 function ClosedRow(properties: { readonly feedback: Feedback; readonly landsHere: boolean }) {
   const { closedAs, closedAt } = properties.feedback;
   if (closedAs === null || closedAt === null) return null;
@@ -224,7 +222,6 @@ function FlagItem(properties: {
   );
 }
 
-/** The page's closing of a flag: it outlives the sheet, so an answer landing after it closes is kept. */
 export type FlagClosingState = {
   readonly pending: boolean;
   readonly last: { readonly recordId: string; readonly feedbackId: string } | undefined;

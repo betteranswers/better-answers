@@ -73,7 +73,6 @@ const RESTORED = refusing("restore-code-needed", "precondition", {
   rpc: -32_012,
 });
 
-/** Ada is in no workspace, so the Account page draws outside the shell. */
 const FORBIDDEN = refusing("forbidden", "forbidden", {
   code: "FORBIDDEN",
   httpStatus: 403,

@@ -96,10 +96,6 @@ const codesTicked = async (page: Page, finish: string): Promise<void> => {
   await expect(codesListed(page)).toHaveCount(0);
 };
 
-/**
- * The add confirms its own session, so the Admin signs in by email again with the device
- * unattended, or its autofill signs in instead.
- */
 const anAdminWithBothFactors = async (page: Page, api: APIRequestContext) => {
   const device = await aVirtualAuthenticator(page);
   const admin = await anAdminWithAnAuthenticator(page, api);

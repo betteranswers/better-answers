@@ -101,7 +101,6 @@ function RequestsList(properties: {
     getRowId: (request) => request.id,
   });
 
-  // Read when the dialog opens, by a click or a key, since either leaves focus where the action began.
   const toApprove = (request: WaitingRequest) => {
     const { activeElement } = document;
     openedFrom.current = activeElement instanceof HTMLElement ? activeElement : null;

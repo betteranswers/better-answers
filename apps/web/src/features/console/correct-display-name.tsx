@@ -20,7 +20,6 @@ export function CorrectDisplayName(properties: {
   const consequenceId = useId();
   const name = nameOf(person);
 
-  /** The dialog closes first, so focus is back on the action when the name changes. */
   const save = (displayName: string) => {
     setAsking(false);
     correcting.save({ personId: person.id, was: name, displayName });

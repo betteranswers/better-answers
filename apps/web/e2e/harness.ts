@@ -59,9 +59,6 @@ const ask = async <T>(
 export const provision = (api: APIRequestContext, input: { name: string; adminEmail?: string }) =>
   ask(api, "/workspaces", input, aProvisionedWorkspace);
 
-/**
- * A display name left out is the harness's own; an empty one is a person who has given none yet.
- */
 export const person = (
   api: APIRequestContext,
   email: string,
@@ -122,7 +119,6 @@ export const invite = (
 
 const confirmationAged = z.object({ aged: z.boolean() });
 
-/** How a spec meets `confirmation-too-old` without waiting the hour out. */
 export const ageTheConfirmation = (api: APIRequestContext, userId: string) =>
   ask(api, "/confirmations/aged", { userId }, confirmationAged);
 
@@ -362,11 +358,7 @@ const seededConcepts = z.object({
   ),
 });
 
-/**
- * Written in order by `userId`, an Admin; `linksTo` names earlier concepts, and `groupMemberIds` fill a
- * `"groups"` audience's one group.
- * @public S2a
- */
+/** @public S2a */
 export const seedConcepts = (
   api: APIRequestContext,
   input: { workspaceId: string; userId: string; concepts: readonly SeedConcept[] },
@@ -520,10 +512,6 @@ export const signInByEmail = async (
   await expect(code).toHaveCount(0);
 };
 
-/**
- * The page's read lands first: one landing after the harness's write would send the page to
- * confirm itself, racing the visit below.
- */
 const factorsRead = (page: Page) =>
   expect(
     page
@@ -531,7 +519,6 @@ const factorsRead = (page: Page) =>
       .or(page.getByRole("button", { name: "Set Up an Authenticator Instead" })),
   ).toBeVisible();
 
-/** The real confirm page, opened afresh since it drew the factors held before the harness wrote one. */
 const confirmedWithTheHarness = async (
   page: Page,
   api: APIRequestContext,
@@ -544,7 +531,6 @@ const confirmedWithTheHarness = async (
   await expect(page).not.toHaveURL(/\/confirm(?:\?|$)/);
 };
 
-/** A pending session draws no page before confirm or setup, so the first heading drawn says which. */
 const PENDING_PAGE = /^\/(?:confirm|setup)$/;
 
 const firstPageDrawn = async (page: Page): Promise<boolean> => {

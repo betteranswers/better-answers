@@ -19,7 +19,6 @@ export const FAMILIES = [
 
 export const AUDIT_LOG_LIST = "audit";
 
-/** The read refuses a longer search, so neither the box nor an old address may hold one. */
 export const SEARCH_MAX = 100;
 
 export const AUDIT_LOG_FIELDS = {

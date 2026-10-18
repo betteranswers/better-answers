@@ -14,7 +14,6 @@ import { theConsoleIsRefused, theSwitcherListsOneWorkspace, type Gate } from "./
 import { expect, test } from "./fixtures.ts";
 import { publishedAddressOf, sessionMemberOf } from "./reads.ts";
 
-/** The test workspace may hold no knowledge, so Search is read with nothing asked. */
 const searchIsReached = async (page: Page, gate: Gate): Promise<void> => {
   await railOf(page).getByRole("link", { name: "Knowledge" }).click();
   await expect(page).toHaveURL(new RegExp(`${SEARCH.path}$`));
@@ -25,10 +24,6 @@ const searchIsReached = async (page: Page, gate: Gate): Promise<void> => {
   await gate();
 };
 
-/**
- * One link from New question. A release whose page and published resource differ would send a
- * person's assistant nowhere.
- */
 const connectShowsThePublishedAddress = async (page: Page, gate: Gate): Promise<void> => {
   await page.getByRole("main").getByRole("link", { name: "connect Claude" }).click();
   await expect(

@@ -50,7 +50,6 @@ export const SYNC_OF_A_DISMISSAL = {
   poisoned: "failed",
 } satisfies Record<Sync["status"], string>;
 
-/** The Last synced row: a finished sync's time alone, and any other sync's state before its time. */
 export const lastSyncedWords = (lastSync: Sync | null): string => {
   if (lastSync === null) return "Not synced yet";
   const when = instantWords(lastSync.finishedAt ?? lastSync.enqueuedAt);
@@ -120,10 +119,6 @@ export const destinationOf = (word: string): Meaning => meaningIn(DESTINATIONS, 
 
 export const retentionOf = (word: string): Meaning => meaningIn(RETENTIONS, word);
 
-/**
- * The api's cap, stated not imported: the web takes nothing from the api at runtime, and the api
- * refuses a larger file alike.
- */
 export const UPLOAD_CAP_MB = 64;
 
 export const NEEDS_OCR = "NeedsOcrError";
@@ -136,7 +131,6 @@ const UNREADABLE_WORDS = new Map([
 export const unreadableWordOf = (error: string): string =>
   UNREADABLE_WORDS.get(error) ?? "could not be read";
 
-/** OCR is named only where a document needs it: an Admin weighing OCR reads the count. */
 export const unreadableCounted = (unreadable: number, needingOcr: number): string => {
   const all = `${counted(unreadable, "document", "documents")} unreadable.`;
   return needingOcr === 0
@@ -162,7 +156,6 @@ export const sentenceCased = (word: string): string => {
   return spoken.charAt(0).toUpperCase() + spoken.slice(1);
 };
 
-/** The ids the worker's redaction descriptors raise. */
 const RULE_WORDS = new Map([
   ["HEALTH_CUE", "Health wording"],
   ["UK_BANK_ACCOUNT", "Sort code and account number"],

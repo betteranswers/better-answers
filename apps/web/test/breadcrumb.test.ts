@@ -10,7 +10,6 @@ import {
   type RoleOrOperator,
 } from "@/shared/navigation.ts";
 
-/** `below` is the open tab, or on a member page the name the page gives. */
 const partsAt = (role: RoleOrOperator, path: string, below?: string) => {
   const areas = role === "operator" ? [CONSOLE] : AREAS;
   const visible = visibleTo(readerOf(role), areas).areas;

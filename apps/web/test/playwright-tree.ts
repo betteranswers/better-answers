@@ -38,7 +38,6 @@ const leftUnder = (tree: string): ReadonlyMap<string, string> => {
 
 type Exited = Pick<Ran, "status" | "stdout" | "stderr">;
 
-/** Asynchronous, so a stand-in server in the calling process can answer the run. */
 const playwrightIn = (tree: string, env: Readonly<Record<string, string>>): Promise<Exited> =>
   new Promise((resolve, reject) => {
     const child = spawn(

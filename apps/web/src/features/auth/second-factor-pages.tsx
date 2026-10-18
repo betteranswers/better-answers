@@ -134,7 +134,6 @@ function PasskeyWay(properties: {
 
   return (
     <div className="mt-6">
-      {/* Enabled while the device asks, so a cancelled prompt hands focus back to the button. */}
       <Button
         ref={buttonRef}
         type="button"
@@ -161,7 +160,6 @@ const saidOfConfirmingByCode = (failure: Error | null): string | undefined => {
   return failure.word === "no-authenticator" ? STOCK.gone : AUTHENTICATOR_CODE_WRONG;
 };
 
-/** Read-only while throttled, with no countdown, while every other way stays open. */
 function AuthenticatorWay(properties: {
   readonly primary: boolean;
   readonly fieldRef: FocusOnArrival | undefined;

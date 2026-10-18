@@ -57,7 +57,6 @@ type Section = {
   readonly id: string;
   readonly title: string;
   readonly draw: ComponentType<Drawn>;
-  /** Set apart below the rest, since its actions end the person's access. */
   readonly apart?: true;
 };
 
@@ -84,10 +83,6 @@ const useOpening = () => {
   return { openedAt, membersQuery };
 };
 
-/**
- * Someone else's removal returns to Members before the api answers, and Members says how it
- * went. Your own waits: where you land depends on it.
- */
 const useRemoval = (
   membersQuery: string | undefined,
   hold: (member: ListedMember | undefined) => void,
@@ -207,9 +202,7 @@ const useLandings = () => {
   const controlAt = {
     member: () => title.current,
     role: () => landings.role.current?.querySelector<HTMLElement>('[aria-checked="true"]'),
-    // A workspace with no groups offers its link to the Groups page in their place.
     groups: () => landings.groups.current?.querySelector<HTMLElement>('[role="checkbox"], a'),
-    // A member with no display name has no flag to land on, so focus goes to who they are.
     flag: () => landings.flag.current ?? title.current,
     credentials: () => landings.credentials.current,
     removal: () => landings.removal.current,
@@ -289,14 +282,12 @@ function MemberShown(properties: {
   );
 }
 
-/** Drawn from the members list already held. A failed read stands in for even a stale page. */
 function MemberRead(properties: {
   readonly personId: string;
   readonly heading: RefObject<HTMLHeadingElement | null>;
 }) {
   const members = useMembers();
   const { openedAt, membersQuery } = useOpening();
-  // Held while it goes, so the list taking the removal first draws no "no such member" meanwhile.
   const [leaving, setLeaving] = useState<ListedMember>();
   const removal = useRemoval(membersQuery, setLeaving);
 

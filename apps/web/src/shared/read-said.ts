@@ -5,10 +5,6 @@ type Read<Failure> = {
   readonly isPending: boolean;
 };
 
-/**
- * Words inside a live region as it mounts may go unread, so each fills a render later, and clears
- * with the read.
- */
 export function useReadSaid<Failure>(read: Read<Failure>): Read<Failure> {
   const error = useDeferredValue(read.error, null);
   const isPending = useDeferredValue(read.isPending, false);

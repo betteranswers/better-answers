@@ -60,7 +60,6 @@ const verifiedWords = (trust: TrustThen): string => {
 export const trustThenWords = (trust: TrustThen): string =>
   STATUS_WORDS.get(trust.status) ?? verifiedWords(trust);
 
-/** The glossary's words for an asker the record cannot name, set at the start of a line. */
 const ASKER_WORDS = {
   "former-member": "A former member",
   platform: "The platform",

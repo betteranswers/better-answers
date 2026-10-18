@@ -507,7 +507,6 @@ describe("noteInbox, looking the signing key up", () => {
     const startedAt = Date.now();
 
     expect(await noted.codeSent()).toEqual({ answer: "unverified" });
-    // Under the runner's own 2 s lookup timeout, so ignoring this one still fails.
     expect(Date.now() - startedAt).toBeLessThan(DEADLINE_MS + 1_000);
   });
 });

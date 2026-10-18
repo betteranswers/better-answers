@@ -85,7 +85,6 @@ function WayOnAction(properties: { readonly way: WayOn; readonly here: string })
   const { signOut, signingOut } = useSignOut(way.to(here));
 
   const go = () => {
-    // Enabled while signing out, so the focus a click gave the button is not dropped.
     if (signingOut) return;
     if (way.signingOutFirst === true) signOut();
     else void navigate(leavingFor(way.to(here)));
@@ -149,7 +148,6 @@ function InvitationUnread(properties: {
   );
 }
 
-/** Above the join, for a person who has given no name: saving it is the join's first action. */
 function NameAsked(properties: {
   readonly name: string;
   readonly onName: (name: string) => void;
@@ -212,7 +210,6 @@ function InvitationToJoin(properties: {
 }) {
   const { invitation, invitationId, here } = properties;
   const session = useSession().data;
-  // Kept for the page's life, so the field stays under the reader once their name lands.
   const [asksAName, setAsksAName] = useState(() => {
     const given = session?.user.name;
     return given !== undefined && !hasADisplayName(given);
@@ -235,9 +232,7 @@ function InvitationToJoin(properties: {
   };
 
   const join = () => {
-    // The button stays enabled while joining, so the focus a click gave it is not dropped.
     if (joining) return;
-    // A name already saved is not saved again, which would record a second naming.
     const named = !asksAName || (naming.isSuccess && naming.variables.displayName === name);
     if (named) {
       acceptIt();

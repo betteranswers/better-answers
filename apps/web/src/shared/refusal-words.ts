@@ -16,7 +16,6 @@ export const STOCK = {
   copy: "Couldn't copy. Please select it and copy it manually.",
 } as const;
 
-/** Names nobody, because the ceiling met is not always the reader's own. */
 export const stockWait = (liftsInSeconds: number | undefined): string =>
   liftsInSeconds === undefined
     ? "Too many attempts. Please try again later."
@@ -32,13 +31,11 @@ const STOCK_OF_CLASS = {
   precondition: STOCK.notYet,
 } satisfies Record<RefusalClass, string>;
 
-/** The api's answer is typed and never parsed, so a newer api's class can be in no table. */
 const stockOfClass = (refusalClass: RefusalClass): string =>
   Object.hasOwn(STOCK_OF_CLASS, refusalClass) ? STOCK_OF_CLASS[refusalClass] : STOCK.general;
 
 export type OwnSentences = Partial<Record<RefusalWord, string>>;
 
-/** The same on every surface: the dialog answers the word, the sentence stands where the act was refused. */
 const OWN_ON_EVERY_SURFACE = {
   "workspace-switched":
     "You switched workspace in another tab, so this tab now shows that workspace.",

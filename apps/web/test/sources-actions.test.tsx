@@ -466,7 +466,6 @@ describe("a connected source's row", () => {
   it("holds r in another row while a keep is pending", async () => {
     const held = await aKeepHeldPending();
     const priceBook = await rowOf("Price book");
-    // Flushed, so the row is the one in focus before the key is read.
     act(() => {
       rowAction(priceBook, ROW_ACTIONS.review, "Price book").focus();
     });
@@ -494,7 +493,6 @@ describe("widening a connected source in its row", () => {
   it("opens on w with focus on the sensitivity", async () => {
     atSources();
     const row = await rowOf("Staff handbook");
-    // Flushed, so the row is the one in focus before the key is read.
     act(() => {
       rowAction(row, ROW_ACTIONS.review, "Staff handbook").focus();
     });
@@ -666,7 +664,6 @@ describe("a connected source's action in flight", () => {
   );
 });
 
-/** The same sentence said twice is announced once, so the alert stands empty between them. */
 describe("a connected source's action refused twice", () => {
   it.each(SENT_FROM_A_ROW)(
     "empties the alert when a refused $action is sent again",

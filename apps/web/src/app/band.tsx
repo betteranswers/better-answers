@@ -102,10 +102,6 @@ function BandOutcome(properties: { readonly outcome: Outcome | undefined; readon
 
 const BAND_DRAWN_H = "--band-drawn-h";
 
-/**
- * The outcome row grows the band past its token's height, so the height is measured. Declared
- * once, so React attaches it once.
- */
 const publishTheDrawnHeight = (band: HTMLElement) => {
   if (typeof ResizeObserver === "undefined") return undefined;
   const root = document.documentElement;
@@ -123,7 +119,6 @@ function WideBand(properties: BandProperties) {
   return (
     <header ref={publishTheDrawnHeight} className="sticky top-0 z-10 bg-background">
       <div className="flex h-band">
-        {/* No rule beneath: the logo's cell and the rail read as one column. */}
         <LogoLink home={properties.home} className="w-rail border-r border-border bg-sidebar" />
 
         <div className="flex w-sidebar shrink-0 items-center justify-end gap-1 border-r border-b border-border px-2">

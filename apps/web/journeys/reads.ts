@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { refusedTheRun } from "./sign-in.ts";
 
-/** Named, not imported: the SPA's tRPC client module brings React's own with it. */
 const TRPC = "/trpc";
 
 const asked = async (page: Page, procedure: string): Promise<APIResponse> => {
@@ -21,7 +20,6 @@ const readFrom = async <T>(
   return z.object({ result: z.object({ data }) }).parse(await answered.json()).result.data;
 };
 
-/** Through the person's own session, as their page asks it, so it reads what they may read. */
 const readThroughTheSession = async <T>(
   page: Page,
   procedure: string,
@@ -54,7 +52,6 @@ const refusalWordOf = (text: string): string | undefined => {
     const refused = REFUSED.safeParse(JSON.parse(text));
     return refused.success ? refused.data.error.message : undefined;
   } catch {
-    // An edge answers in HTML, which holds no refusal of the product's.
     return undefined;
   }
 };

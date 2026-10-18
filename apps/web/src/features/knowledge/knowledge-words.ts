@@ -11,7 +11,6 @@ export const SEARCH_WORDS = {
       ? `Showing the first matches for ${quoted(query)}.`
       : `Showing matches for ${quoted(query)}.`,
   matches: "Matches",
-  /** True of a match re-ranked past the pages shown as of one withheld, so it says neither. */
   passageLeft: "The passage you had open is no longer listed.",
   more: "More Matches",
   document: "Document",

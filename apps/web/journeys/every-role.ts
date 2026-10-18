@@ -9,7 +9,6 @@ export type Gate = () => Promise<void>;
 
 const listedAs = (name: string, role: Role): string => `${name} ${role}`;
 
-/** A test person belongs to the test workspace alone, and no menu offers them the console. */
 export const theSwitcherListsOneWorkspace = async (
   page: Page,
   workspace: string,
@@ -23,7 +22,6 @@ export const theSwitcherListsOneWorkspace = async (
   await expect(menu).toHaveCount(0);
 };
 
-/** No test person is the operator. A standing left unread alerts too, under another heading. */
 export const theConsoleIsRefused = async (page: Page, gate: Gate): Promise<void> => {
   await page.goto(HOMES.operator.path);
   await expect(page.getByRole("heading", { level: 1, name: "Access Denied" })).toBeVisible();

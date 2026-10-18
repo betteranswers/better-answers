@@ -38,10 +38,6 @@ export type Answering = {
   readonly ask: (input: AskInput) => void;
 };
 
-/**
- * A mutation, never a query: nothing asks again, and the app's failure listener hears a refusal.
- * Leaving the page ends the stream.
- */
 export const useAnswering = (): Answering => {
   const client = useTRPCClient();
   const [told, setTold] = useState<readonly Told[]>([]);
@@ -64,7 +60,6 @@ export const useAnswering = (): Answering => {
           if (isTold(event)) setTold((held) => [...held, event]);
         }
       } catch (failure) {
-        // Leaving the page ends the stream, which is no failure of the answer's.
         if (!controller.signal.aborted) throw failure;
       } finally {
         if (reading.current === controller) reading.current = undefined;

@@ -16,7 +16,6 @@ export const worthSending = (
   length = EMAIL_CODE_LENGTH,
 ): boolean => code.length === length && !refused.includes(code);
 
-/** The api names no tries left, so they are counted from the refusals since the code was sent. */
 export const triesLeft = (refusals: number): number => Math.max(0, EMAIL_CODE_ATTEMPTS - refusals);
 
 const TRIES_SPENT = 403;

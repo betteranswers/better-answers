@@ -89,7 +89,6 @@ const MARK = "button";
 
 const SLOT = "aside";
 
-/** A mark inside a link stays text: a control inside a link is no control. */
 const markOf = (drawing: Drawing, mark: number, inLink: boolean): readonly Child[] => {
   const cited = drawing.cited[mark];
   if (cited === undefined) return [];
@@ -186,7 +185,6 @@ const elementDrawn = (node: Element, within: Within): Drawn => {
   return { ...drawn, nodes: [{ ...element, children: [...drawn.nodes] }] };
 };
 
-/** Raw HTML is drawn as the text the file wrote, so a mark inside it is still a mark. */
 const nodeDrawn = (node: Child, within: Within): Drawn => {
   if (node.type === "element") return elementDrawn(node, within);
   if (node.type === "text" || node.type === "raw") return wordsDrawn(node.value, within);
@@ -210,7 +208,6 @@ const decoded = (address: string): string => {
 
 type AnsweredLink = { readonly address: string; readonly target: string };
 
-/** The concept page each answered address leads to; the address itself is never a destination. */
 const pagesByAddress = (bodyLinks: readonly AnsweredLink[]): ReadonlyMap<string, string> =>
   new Map(
     bodyLinks.flatMap(({ address, target }) => {
@@ -378,7 +375,6 @@ const PROSE = cn(
 /** An id is safe in an address's fragment only as letters, digits and dashes. */
 const fragmentSafe = (id: string): string => id.replaceAll(/[^A-Za-z0-9_-]/g, "");
 
-/** Raw HTML is drawn as text and an image as its alt text; a mark takes its source's number. */
 export function ConceptBody(properties: {
   readonly body: string;
   readonly evidence: readonly Evidence[];

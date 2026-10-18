@@ -4,10 +4,6 @@ import { createPortal } from "react-dom";
 import { cn } from "@/shared/lib/utils.ts";
 import { useOpenTab } from "@/shared/page-toolbar.tsx";
 
-/**
- * The frame's tabs stand outside the page, so its head draws where the frame says: null until
- * that place is drawn, undefined with no frame.
- */
 export const PageHeadSlot = createContext<HTMLElement | null | undefined>(undefined);
 
 export function PageHead(properties: {
@@ -31,16 +27,11 @@ export function PageHead(properties: {
   return slot === null ? null : createPortal(head, slot);
 }
 
-/**
- * An open tab names its list, so the heading is a screen reader's. Its focus rings the count line:
- * drawn, it would move rows.
- */
 export function ListHead(properties: {
   readonly heading: string;
   readonly headingId: string;
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
   readonly description?: ReactNode;
-  /** Empty while the list is unread; the region stands, so its first words are announced. */
   readonly count: ReactNode;
   readonly action?: ReactNode;
 }) {

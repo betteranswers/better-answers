@@ -7,7 +7,6 @@ import { Pagination, PaginationContent, PaginationItem } from "@/shared/ui/pagin
 
 export type PaginationTurnProps = {
   label: string;
-  /** Stays focusable at either end, so a reader who reaches the end keeps their place. */
   disabled: boolean;
   keystroke?: string | undefined;
   onTurn: () => void;
@@ -43,7 +42,6 @@ export type PaginationCounterProps = ComponentProps<typeof Pagination> & {
   next: PaginationTurnProps;
 };
 
-/** One live region says where a turn landed: the summary when there is one, else the counter. */
 export const PaginationCounter = ({
   summary,
   counter,

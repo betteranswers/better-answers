@@ -20,7 +20,6 @@ const ANSWER_TESTS = pageNamed(menuGroupIn(CONTROL_CENTRE, "questions"), "Answer
 
 const answerTests = (page: Page) => page.getByRole("region", { name: "Answer Tests" });
 
-/** A new workspace's Admin, at home: no answer test can exist, since nothing records a correction. */
 const anAdminSignedIn = async (page: Page, api: APIRequestContext, workspace: string) => {
   const email = anAddress("admin");
   await provision(api, { name: workspace, adminEmail: email });

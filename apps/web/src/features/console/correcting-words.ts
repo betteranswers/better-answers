@@ -1,4 +1,3 @@
-/** A person erased since their flag has no name left to own one. */
 const possessiveOf = (name: string): string => (name === "" ? "this person’s" : `${name}’s`);
 
 export const CORRECT_DISPLAY_NAME = "Correct Display Name";

@@ -131,7 +131,6 @@ const useOpenMember = (flush: () => void) => {
   };
 };
 
-/** A removal asked on a member's own page lands here before the api answers it. */
 const removalSaid = (
   name: string | undefined,
   removal: ReturnType<typeof useRemovalOf>,
@@ -231,7 +230,6 @@ function MemberFilters(properties: {
   );
 }
 
-/** A failed read stands in for the rows, even stale ones: the reader must not act on them. */
 function MembersRead(properties: {
   readonly read: ReturnType<typeof useMembers>;
   readonly searchRef: RefObject<HTMLInputElement | null>;
@@ -430,7 +428,6 @@ function MemberList(properties: {
   );
 }
 
-/** A letter pressed outside the list still needs a member, so the one last in focus stands. */
 function useInFocusKeystrokes(properties: {
   readonly inFocus: ListedMember | undefined;
   readonly open: (personId: string, at: OpenedAt) => void;

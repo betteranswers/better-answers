@@ -38,7 +38,6 @@ const GROUPS_PAGE = pageNamed(people, "Groups").path;
 
 const MEMBERS_PAGE = pageNamed(people, "Members").path;
 
-/** A member's row leads with its tick, then the person and their role. */
 const GROUPS_CELL = 3;
 
 const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
@@ -83,7 +82,6 @@ const actionBeside = (keystrokes: Locator, key: string): Locator =>
     .filter({ hasText: new RegExp(`^${key}$`) })
     .locator("xpath=following-sibling::*[1]");
 
-/** A group being created is a name before it is a button, so its row is found by its text. */
 const countCellOf = (name: string): string => `//tr[td[1][normalize-space(.)='${name}']]/td[2]`;
 
 const SHEET_COUNT = "//div[@role='dialog']//h2/following-sibling::p[1]";
@@ -118,10 +116,8 @@ const deletedAtAKey = async (page: Page, name: string, left: number): Promise<nu
 const tickedGroup = (name: string): string =>
   `//fieldset//div[button[@role='checkbox'][@aria-checked='true']]//label[normalize-space(.)='${name}']`;
 
-/** A card's inner gap and a little over: text further beneath its header has a band above it. */
 const ONE_GAP_PX = 16;
 
-/** An empty outcome line that took a gap of its own would push the card's first text down. */
 const startsUnderItsHeader = async (card: Locator): Promise<void> => {
   const header = await card.locator("[data-slot='card-header']").boundingBox();
   const firstLine = await card.getByRole("paragraph").first().boundingBox();
@@ -132,7 +128,6 @@ const startsUnderItsHeader = async (card: Locator): Promise<void> => {
   ).toBeLessThanOrEqual(ONE_GAP_PX);
 };
 
-/** Another workspace's group is made alongside, so a list that leaked would show it. */
 const anAdminAtGroups = async (
   page: Page,
   api: APIRequestContext,
@@ -560,7 +555,6 @@ test.describe("a group's actions", () => {
 
   test("lets an Admin reach every group action by keyboard alone", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Calder Castings");
-    // A fresh document, so the first Tab starts from the top rather than from the rail's link.
     await page.goto(GROUPS_PAGE);
     await expect(groupRows(page)).toHaveCount(2);
     await skipLinkReachesThePage(page);
@@ -760,7 +754,6 @@ test.describe("a member's groups, on their row and their page", () => {
       .getByRole("link", { name: "Test person", exact: true })
       .click();
     const groups = page.getByRole("main").getByRole("region", { name: "Groups", exact: true });
-    // The page has no way to create a group, so its empty state carries the one action.
     await expect(groups).toMatchAriaSnapshot(`
       - region "Groups":
         - /children: equal

@@ -44,7 +44,6 @@ const askRegion = (page: Page) => page.getByRole("region", { name: "Ask to Join 
 const consentHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "Connect Claude" });
 
-/** Asked for before the page loads, so an absence asserted after it is the read's answer. */
 const invitationsAnswered = (page: Page): Promise<Response> =>
   page.waitForResponse((response) => response.url().includes(INVITATIONS_READ));
 
@@ -274,7 +273,6 @@ test("carries Claude's request through a join to consent", async ({
   await page.getByRole("button", { name: "Join Workspace" }).click();
 
   await expect(consentHeading(page)).toBeVisible();
-  // The consent's own line names the workspace, apart from any heading or band that might.
   await expect(
     page
       .getByRole("main")

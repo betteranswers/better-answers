@@ -21,7 +21,6 @@ export type ProsePart = {
 
 export type Asked<Result extends object> = Result & { readonly prose: readonly ProsePart[] };
 
-/** A collection's part is made by its first event, and each later one adds to it. */
 const withEvent = <Result extends object>(
   parts: readonly ProsePart[],
   event: AskStreamEvent<Result>,

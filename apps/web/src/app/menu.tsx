@@ -18,8 +18,6 @@ export function Menu(properties: {
     <nav
       id={properties.id}
       aria-label={properties.area.name}
-      // Hidden rather than unmounted, so the button that governs it always names a region
-      // that is there to be named.
       hidden={!properties.showing}
       className="shrink-0 border-b border-border bg-background px-2 py-3 md:sticky md:top-[var(--band-drawn-h)] md:h-[calc(100vh-var(--band-drawn-h))] md:w-sidebar md:self-start md:overflow-y-auto md:border-r md:border-b-0"
     >

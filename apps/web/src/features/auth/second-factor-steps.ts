@@ -36,10 +36,6 @@ const pendingStepOf = (held: Held | undefined): string | undefined => {
   return standing === "setup" ? SETUP_STEP : undefined;
 };
 
-/**
- * The last read of the standing says how a session that ends was left: a pending one is told it
- * ended unconfirmed.
- */
 export const rememberTheStanding = (held: Held | undefined): void => {
   if (held?.thisSession === undefined) return;
   rememberTheSession(pendingStepOf(held) === undefined ? "held" : "pending");
@@ -50,7 +46,6 @@ export const stepAfterTheCodes = (query: string): string => `${DISPLAY_NAME_STEP
 export const stepAfterTheFactors = (held: Held, query: string): string =>
   codesUnseen(held) ? `${CODES_STEP}${query}` : stepAfterTheCodes(query);
 
-/** Never retried: an unread second factor holds nothing back. A stale held read is caught later. */
 const secondFactorOrUnread = async (queryClient: QueryClient, api: ApiProxy, fresh = true) => {
   const asked = { ...api.person.secondFactor.queryOptions(), retry: false };
   const held = await (
@@ -103,7 +98,6 @@ const stepAfterSignIn = async (
   (await factorStepDue(queryClient, api, query)) ??
   (displayNameGiven ? nextAfterSignIn(query) : stepAfterTheCodes(query));
 
-/** Read after the sign-in has cleared the cache, so the second factor read is the new session's. */
 export const useStepAfterSignIn = () => {
   const queryClient = useQueryClient();
   const api = useTRPC();

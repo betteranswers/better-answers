@@ -95,7 +95,6 @@ export function AskToJoin() {
 
   const ask = (event: FormEvent) => {
     event.preventDefault();
-    // The button stays enabled while asking, so the focus a click gave it is not dropped.
     if (requestAccess.isPending) return;
     setSent(false);
     requestAccess.mutate(

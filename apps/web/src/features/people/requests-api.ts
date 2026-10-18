@@ -40,7 +40,6 @@ const useLeavesAtOnce = () => {
   };
 };
 
-/** An approval mints an invitation, so the invitations are read again with the requests. */
 export const useApproveRequest = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

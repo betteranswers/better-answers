@@ -57,7 +57,6 @@ const PROBED = z.object({ probed: z.literal(true) });
 const KEY = z.string().min(1);
 
 const inboxKey = (): string | undefined => {
-  // Read here alone, so no caller ever holds the key to print it.
   const parsed = KEY.safeParse(process.env["JOURNEYS_INBOX_KEY"]);
   return parsed.success ? parsed.data : undefined;
 };
@@ -72,7 +71,6 @@ const fetched = async <T>(
     const response = await fetch(url, {
       method,
       headers: { authorization: `Bearer ${key}`, "user-agent": USER_AGENT },
-      // Following one would carry the key wherever it points.
       redirect: "error",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
@@ -83,7 +81,6 @@ const fetched = async <T>(
     const parsed = schema.safeParse(await response.json());
     return parsed.success ? parsed.data : undefined;
   } catch {
-    // A refused connection, a redirect, a timeout and a body that is not JSON all mean no answer.
     return undefined;
   }
 };
@@ -125,10 +122,6 @@ const bounded =
 const runnersDns: DNSResolver = (name) =>
   new Resolver({ timeout: LOOKUP_TIMEOUT_MS, tries: 1 }).resolveTxt(name);
 
-/**
- * Only the sender's domain vouches, and the verifier asks for each signature's key in turn, so a
- * forger's many domains would otherwise outlast the sign-in.
- */
 const sendersOwn =
   (lookup: DNSResolver, senderDomain: string): DNSResolver =>
   (name, rrtype) =>
@@ -145,7 +138,6 @@ type Watch = {
   readonly keyLookup: DNSResolver;
 };
 
-/** The inbox lists newest first, so everything from the first noted message on was there before. */
 const arrivalsAfter = async (
   watch: Watch,
   after: string | undefined,
@@ -178,10 +170,6 @@ const LOOK_AGAIN = "look again";
 const signedFields = (result: DKIMResult): readonly string[] =>
   (result.signingHeaders?.keys ?? "").split(":").map((field) => field.trim().toLowerCase());
 
-/**
- * Over the whole body, since content appended past an `l=` would pass. The verifier already fails
- * a signature leaving From unsigned.
- */
 const vouches = (result: DKIMResult, domain: string): boolean =>
   result.status.result === "pass" &&
   result.signingDomain?.toLowerCase() === domain &&
@@ -191,11 +179,9 @@ const vouches = (result: DKIMResult, domain: string): boolean =>
 const fieldCount = (verified: DKIMVerifyResult, name: string): number =>
   verified.headers?.parsed.filter(({ key }) => key === name).length ?? 0;
 
-/** A From or To added above the signed one leaves the signature passing. */
 const singlyAddressed = (verified: DKIMVerifyResult): boolean =>
   fieldCount(verified, "from") === 1 && fieldCount(verified, "to") === 1;
 
-/** A lookup that failed says nothing of the message; one that found no key does. */
 const keyUnread = (verified: DKIMVerifyResult, domain: string): boolean =>
   verified.results.some(
     (result) =>
@@ -304,10 +290,6 @@ const watchOf = (inbox: Inbox, client: Client, page: TestInboxPage): Watch => {
   };
 };
 
-/**
- * Notes the inbox before Send. An inbox fault answers rather than throws, and no answer holds the
- * key or an address.
- */
 export const noteInbox = async (inbox: Inbox): Promise<Noted> => {
   const key = inboxKey();
   if (key === undefined) return UNREACHABLE;
@@ -325,13 +307,11 @@ export const noteInbox = async (inbox: Inbox): Promise<Noted> => {
     codeSent: async () => {
       const poll = await codeWithin(watch, verdicts, timing);
       verdicts = poll.verdicts;
-      // Only emails nobody vouched for, or whose key could not be looked up, ever arrived.
       return poll.answer ?? (poll.arrived ? UNVERIFIED : NO_MAIL);
     },
   };
 };
 
-/** Before any Send, so a store that cannot write stops the run rather than reading as no mail. */
 export const probeInbox = async (apiUrl: URL): Promise<boolean> => {
   const key = inboxKey();
   if (key === undefined) return false;

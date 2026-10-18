@@ -146,7 +146,6 @@ function Records(properties: { readonly asked: QuestionsAsked }) {
   const [inFocus, setInFocus] = useState<string>();
   const [openedId, setOpenedId] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
-  // A closing can carry its record past the loaded pages; its sheet stays on the last read.
   const opened = useLastRead(records, openedId);
   const closing = useFlagClosing();
 

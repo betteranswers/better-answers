@@ -18,7 +18,6 @@ export const INVITE_A_PERSON = {
   icon: "invite",
 } as const satisfies Action;
 
-/** One segment beneath a page, naming a row: listed nowhere, gated and framed as its page. */
 type Detail = {
   readonly param: string;
 };
@@ -40,7 +39,6 @@ export type MenuGroup = {
   readonly name?: string;
   readonly summary?: string;
   readonly pages: readonly Page[];
-  /** Every older address naming the group, each leading to its first page the person may see. */
   readonly movedFrom?: readonly string[];
 };
 
@@ -392,7 +390,6 @@ export const CONTROL_CENTRE = {
   ],
 } as const satisfies Area;
 
-/** Reached from the workspace switcher, never the rail. */
 export const CONSOLE = {
   id: "console",
   name: "Console",
@@ -488,7 +485,6 @@ export type Reader = {
   readonly owns: readonly string[];
 };
 
-/** Nothing records who owns a collection, so a page marked for owners shows by role alone. */
 export const readerOf = (role: RoleOrOperator | undefined): Reader => ({ role, owns: [] });
 
 export const OPERATOR_READER: Reader = readerOf("operator");
@@ -497,7 +493,6 @@ export type VisibleArea = Area & { readonly opensAt: Page };
 
 export type VisibleTree = {
   readonly areas: readonly VisibleArea[];
-  /** Undefined exactly when no role is held. */
   readonly home: Page | undefined;
 };
 
@@ -543,7 +538,6 @@ export type Place<Held extends Area = Area> = {
   readonly area: Held;
   readonly menuGroup: MenuGroup | undefined;
   readonly page: Page;
-  /** The segment a page's detail address holds, still encoded as the address has it. */
   readonly detail?: string;
 };
 
@@ -562,7 +556,6 @@ const detailIn = (page: Page, pathname: string): string | undefined => {
   return segment === "" || segment.includes("/") ? undefined : segment;
 };
 
-/** An exact match first, then a page's declared detail address; anything deeper is no place. */
 export const placeAt = <Held extends Area>(
   areas: readonly Held[],
   pathname: string,
@@ -590,7 +583,6 @@ export const headingOf = (page: Page): string => {
   return place?.menuGroup?.name ?? place?.area.name ?? page.name;
 };
 
-/** `to` is in order: an older address leads to the first page in it the reader may see. */
 export type Moved = { readonly from: string; readonly to: readonly Page[] };
 
 const movesOf = (from: readonly string[] = [], to: readonly Page[]): readonly Moved[] =>

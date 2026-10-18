@@ -1,8 +1,5 @@
 import type { OwnSentences } from "@/shared/refusal-words.ts";
 
-/**
- * The api's rule holds the limit; this is the number a page tells the reader before they type.
- */
 export const DISPLAY_NAME_MAX_CHARACTERS = 100;
 
 export const DISPLAY_NAME_WORDS = {

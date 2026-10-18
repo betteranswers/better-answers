@@ -13,7 +13,6 @@ export const MEMBERS_PAGE = pageNamed(PEOPLE, "Members");
 
 export const GROUPS_PATH = pageNamed(PEOPLE, "Groups").path;
 
-/** Members, Invitations and Requests share one address, so each tab's keys carry its prefix. */
 export const MEMBERS_LIST = "members";
 
 const ROLE_FILTERS = ["Admin", "Editor", "Viewer"] as const satisfies readonly Role[];

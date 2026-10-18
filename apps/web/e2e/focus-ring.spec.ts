@@ -15,7 +15,6 @@ import {
   tokenPainted,
 } from "./harness.ts";
 
-/** WCAG 1.4.11: a focus indicator holds 3:1 against the colours next to it. */
 const NON_TEXT_CONTRAST = 3;
 
 const STOPS = 60;

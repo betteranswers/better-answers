@@ -52,10 +52,6 @@ const askOf = (ready: TickedGroups) => ({
 
 const reasonedAsk = (ready: TickedGroups, reason: string) => ({ ...askOf(ready), reason });
 
-/**
- * Inert until this connected source's review has ticked groups the action takes: an action over nothing is
- * disabled and reads as such.
- */
 const useBulkAction = (
   connectedSourceId: string,
   takes: (group: GroupOfFindings) => boolean = takesAnyGroup,
@@ -76,10 +72,6 @@ const useBulkAction = (
     setOpen(true);
   };
 
-  /**
-   * The action's own button is disabled once the selection is spent, so focus it cannot take goes to
-   * the review.
-   */
   const returnFocus = (event: Event) => {
     event.preventDefault();
     opener.current?.focus();
@@ -88,10 +80,6 @@ const useBulkAction = (
     }
   };
 
-  /**
-   * A command must read as taken within a tenth of a second, so the dialog closes and the
-   * selection is spent before the api answers.
-   */
   const command = <Answer,>(said: {
     readonly pending: string;
     readonly done: (answer: Answer) => ReactNode;
@@ -178,10 +166,6 @@ function TickedList(properties: { readonly groups: readonly GroupOfFindings[] })
   );
 }
 
-/**
- * Both reasoned actions land the reason in the audit log beside the Admin who gave it, so they ask for
- * it alike.
- */
 function ReasonedDialog(properties: {
   readonly action: BulkActionState;
   readonly title: string;

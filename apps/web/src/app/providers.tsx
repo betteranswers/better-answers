@@ -36,15 +36,9 @@ export type AppClients = {
   readonly failures: FailureListener;
 };
 
-/**
- * A module-scope query client is one cache shared by every render in the process, so a second
- * test render would see the first one's data.
- */
 export const createAppClients = (): AppClients => {
   const failures = aFailureListener();
   const queryClient = createQueryClient(failures.heard);
-  // The member read's key comes from a proxy over the client this link belongs to, so the link
-  // reads the proxy only at a send.
   const apiClient: ApiClient = createApiClient(() => workspaceHeld(queryClient, api));
   const api: ApiProxy = createApiProxy(apiClient, queryClient);
   forgetAWorkspaceLeftElsewhere(queryClient, api);

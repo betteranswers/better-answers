@@ -41,7 +41,6 @@ const useAnotherPagesTickedGroups = viewStateOf<number>("/connected-sources/all"
 function NarrowAction() {
   const [ticked] = useTickedGroups();
 
-  // Inert on an empty slot, which is the action's own property and what makes a thrown page safe.
   return (
     <button type="button" disabled={ticked === undefined}>
       {ticked === undefined ? "Narrow these documents" : `Narrow ${ticked} documents`}
@@ -77,7 +76,6 @@ const A_REVIEW_VIEW: PageToolbar = {
   ],
 };
 
-/** The actions stand beside the panel, so a page that throws leaves them drawn over its slot. */
 const drawReview = (throwsOnATick: boolean) =>
   render(
     <PageTabsRoot tabs={A_REVIEW_VIEW.tabs}>
@@ -127,7 +125,6 @@ describe("the toolbar the open page fills", () => {
     );
     expect(panel.textContent).toMatch(/\S/v);
     expect(screen.queryByRole("region", { name: "Model Choices" })).toBeNull();
-    // A tab divides a page, so the page's own words stand either way.
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Models");
   });
 

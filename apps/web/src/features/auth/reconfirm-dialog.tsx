@@ -20,7 +20,6 @@ import { DeviceRefused, passkeysHere } from "./passkey-hooks.ts";
 import { AUTHENTICATOR_CODE_WRONG, STALE_CONFIRMATION } from "./refusal-words.ts";
 import { CONFIRM_WORDS } from "./second-factor-words.ts";
 
-/** The refused act, kept whole: it runs again with its input once the confirmation lands. */
 type Refused = RefusedAct;
 
 let refused: Refused | undefined;
@@ -168,7 +167,6 @@ export function ReconfirmDialog() {
   });
   const ways = waysHeld(held.data);
 
-  /** The dialog closes first, so the act's own outcome region takes the focus its answer gives. */
   const confirmedAndRetried = () => {
     const act = refusedAct;
     cancelTheRefusedAct();

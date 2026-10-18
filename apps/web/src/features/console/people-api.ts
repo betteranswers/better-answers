@@ -21,7 +21,6 @@ export type HeldGrant = PersonInspected["grants"][number];
 
 export type EndedGrant = PersonInspected["ended"][number];
 
-/** The api answers a hundred at most; fifty keeps a page inside the list's second. */
 export const PAGE_SIZE = 50;
 
 export type Asked = { readonly search: string; readonly offset: number };
@@ -41,10 +40,6 @@ export const useInspected = (personId: string) => {
   return useQuery(api.console.people.inspect.queryOptions({ personId }));
 };
 
-/**
- * In the api's order, newest action first. A grant the server ended leaves, since the action deletes the
- * tokens its end is read from.
- */
 const endedEverywhere = (held: PersonInspected, at: string, by: DoneBy): PersonInspected => ({
   sessions: [],
   grants: [],
@@ -77,7 +72,6 @@ const revokedIn = (page: PeoplePage, personId: string, at: string): PeoplePage =
   ),
 });
 
-/** Every page of the list read so far, where `useOptimistic` takes one query. */
 const useOnEveryPage = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -107,7 +101,6 @@ export const useEndEverySignInEverywhere = (personId: string) => {
   const onEveryPage = useOnEveryPage();
   const operator = useTheOperator();
   const inspectedKey = api.console.people.inspect.queryKey({ personId });
-  // The callbacks go to the hook itself: the React lint takes one passed through `mutationOptions` as run during render.
   return useMutation({
     ...api.console.people.endEverySignInAndToken.mutationOptions<readonly Undo[]>(),
     onMutate: () => {

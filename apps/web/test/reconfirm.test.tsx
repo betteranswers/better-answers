@@ -15,7 +15,6 @@ import { carrying } from "./stubbed-api.ts";
 const stale = (): Error =>
   carrying({ refusal: { word: STALE_CONFIRMATION, class: "precondition" } });
 
-/** Reads the store the dialog reads, so a test asserts what the dialog would draw. */
 function Probe() {
   const refused = useTheRefusedAct();
   return refused === undefined ? (

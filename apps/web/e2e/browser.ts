@@ -49,7 +49,6 @@ const undecidedBehind = (check: { readonly data: unknown }): boolean => {
   );
 };
 
-/** WCAG 1.4.11's floor for what tells a person a control is there. */
 const CONTROL_EDGE = 3;
 
 const faintEdges = async (page: Page): Promise<readonly string[]> =>

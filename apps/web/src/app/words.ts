@@ -13,13 +13,10 @@ export const UNKNOWN_PAGE = {
   signIn: "Sign In",
 } as const;
 
-/** The menu beside it is named for the open area, so the rail needs a name apart. */
 export const RAIL = "Areas";
 
-/** The narrow layout's sheet holds the rail as well, but the person opened it for the menu. */
 export const NAVIGATION_SHEET = "Menu";
 
-/** The band's line of places from the area down, named apart from the rail and the menu. */
 export const BREADCRUMB = "Breadcrumb";
 
 export const ALL_WORKSPACES = "All Workspaces";
@@ -32,7 +29,6 @@ export const TOGGLE = {
   show: "Show Menu",
 } as const;
 
-/** The band's finder. Never named Search: that is Knowledge's page, and this goes places. */
 export const JUMP_TO = {
   name: "Jump To",
   said: "Type to search.",
@@ -49,7 +45,6 @@ const EITHER = new Intl.ListFormat("en-GB", { type: "disjunction" });
 
 export const findWhat = (kinds: readonly string[]): string => `Find ${EITHER.format(kinds)}`;
 
-/** No role is held, so no other page can be offered either. */
 export const ROLE_UNREAD = STOCK.notLoaded;
 
 export const goHome = (home: Page | undefined): string =>

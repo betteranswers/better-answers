@@ -355,7 +355,6 @@ test.describe("the People page's Invitations tab", () => {
     const refused = refusalAnswering(page, "members.invite");
     await sendButton(page).click();
 
-    // An item is named by its address's place in the send.
     expect((await refused).items).toEqual({ 1: "already-a-member" });
     await saysARefusal(inviteDialog(page).getByRole("alert"));
     await expect(removeOf(page, joined)).toBeFocused();
@@ -397,7 +396,6 @@ test.describe("the People page's Invitations tab", () => {
     await expect(sendButton(page)).toHaveText("Send 2 Invitations");
     await sendButton(page).click();
 
-    // The form counts its two addresses in a status too, so the outcome is read once Done shows.
     await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeVisible();
     await expect(inviteDialog(page).getByRole("status").first()).toHaveText(/\b2\b/);
     await inviteDialog(page).getByRole("button", { name: "Done" }).click();
@@ -845,7 +843,6 @@ test.describe("the People page's Invitations tab", () => {
 
     await tabUntilFocused(page, menuOf(page, dropped));
     await page.keyboard.press(PEOPLE_KEYSTROKES.resend.key);
-    // A resend still going names the address too; one that landed goes on to the day it lasts until.
     await expect(saidInTheTab(page, new RegExp(`${dropped}.*\\d{4}`))).toBeVisible();
     const saidOfTheResend = await outcomeIn(page).innerText();
 

@@ -207,7 +207,6 @@ test("asks for a name when the join finds none given", async ({
   await signIn(page, request, address);
   await expect(nameField(page)).toBeVisible();
 
-  // The page's read of the session names someone the api does not, as a stale read would.
   await page.route(SESSION_READ, async (route) => {
     const answered = await route.fetch();
     const held: { readonly user: object } = await answered.json();

@@ -34,7 +34,6 @@ export const useInvitationCounts = () => {
 
 type Snapshot = { readonly taken: readonly Undo[] };
 
-/** Every settled action reads each status and the counts again; an action is a line of its Admin's Activity. */
 const useReconcile = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -46,7 +45,6 @@ const useReconcile = () => {
   };
 };
 
-/** The rows an action moves leave before the api answers, so it lands within 100 ms; a refusal puts them back. */
 const useMoving = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -90,7 +88,6 @@ export const useInvite = () => {
   return useMutation(api.members.invite.mutationOptions({ onSettled: () => reconcile() }));
 };
 
-/** A resent expired invitation is waiting again, so it leaves the expired list at once. */
 export const useResendInvitation = () => {
   const api = useTRPC();
   const moving = useMoving();

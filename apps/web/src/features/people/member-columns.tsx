@@ -32,7 +32,6 @@ const column = createColumnHelper<typeof memberFeatures, ListedMember>();
 
 export const SORTABLE: ReadonlySet<string> = new Set(["person", "role", "joined"]);
 
-/** Every column but the person can hide, so a row always says who it is. */
 export const HIDEABLE = [
   { id: "role", label: "Role" },
   { id: "groups", label: "Groups" },
@@ -44,10 +43,6 @@ type MemberActions = {
   readonly focusedOn: (personId: string) => void;
 };
 
-/**
- * The list's actions reach each cell here, not through the columns: new columns draw every link
- * afresh, dropping focus a press just gave.
- */
 export const MemberActionsContext = createContext<MemberActions | undefined>(undefined);
 
 export type RefusedRows = ReadonlySet<string>;

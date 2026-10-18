@@ -1,6 +1,5 @@
 import { test } from "@playwright/test";
 
-/** The word the release workflow reads. could-not-run outranks fail, which outranks held. */
 export type Outcome = "held" | "fail" | "could-not-run";
 
 type Annotation = { readonly type: string; readonly description?: string };

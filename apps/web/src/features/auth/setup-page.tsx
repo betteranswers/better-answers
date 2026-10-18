@@ -85,7 +85,6 @@ const whyOf = (held: SecondFactor, variant: Variant): string => {
   return promotedHere ? `${SETUP_WORDS.nowAnAdmin(adminOf)} ${why}` : why;
 };
 
-/** A restored person's ways wait on the restore code; everyone else's are open at once. */
 const waysOpen = (standing: Standing | undefined): boolean =>
   standing?.kind === "setting-up" && (standing.variant !== "restored" || standing.granted);
 
@@ -176,10 +175,6 @@ const useSetup = (standing: Standing | undefined, onNotGranted: () => void) => {
 
 type Setup = ReturnType<typeof useSetup>;
 
-/**
- * Its keystroke hides the authenticator as well as showing it. Focusable while a setup finishes,
- * so focus never drops as it waits.
- */
 function AuthenticatorInstead(properties: {
   readonly setup: Setup;
   readonly controls: string;
@@ -344,7 +339,6 @@ const settingUpOf = (
 ): SettingUp | undefined =>
   goingOn === undefined && standing?.kind === "setting-up" ? standing : undefined;
 
-/** No skip and no later: the person leaves by setting up a factor, or by signing out. */
 export function SetupPage() {
   const read = useSecondFactor();
   const [query] = useState(pageQuery);
@@ -402,7 +396,6 @@ export function CodesPage() {
   return (
     <AuthPage title={RECOVERY_CODE_WORDS.saveHeading}>
       <Outcome tone="said">{make.isPending ? RECOVERY_CODE_WORDS.makingLine : null}</Outcome>
-      {/* A repeat voids only a set never shown, as a reload would, so it is safe to ask for. */}
       <Refused
         id={refusedId}
         failure={make.error}

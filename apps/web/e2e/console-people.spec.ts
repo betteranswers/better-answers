@@ -62,7 +62,6 @@ const THE_LAST_PAGE = /\b51\D+51\D+51\b/;
 
 const asWritten = (said: string): string => said.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`);
 
-/** Everyone the run makes is on this list, so a test finds its own by a tag in their address. */
 const aTag = (): string => `t${Date.now()}${Math.floor(Math.random() * 1e6)}`;
 
 const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
@@ -210,7 +209,6 @@ const waitingRows = (page: Page): Locator =>
     .getByRole("row")
     .filter({ has: page.getByRole("cell") });
 
-/** Every name the run flags waits on this list, so a test's own name carries its tag. */
 const waitingRowOf = (page: Page, name: string): Locator =>
   namesWaiting(page)
     .getByRole("row")
@@ -817,7 +815,6 @@ test.describe("the console's Names Waiting page", () => {
     test.info().annotations.push({ type: "names waiting list", description: `${elapsed} ms` });
     expect(elapsed, "the names waiting rendered past their budget").toBeLessThan(LIST_BUDGET_MS);
 
-    // Every name the run flags waits here, so the page is read narrowed to this test's own.
     await waitingSearch(page).fill(name);
     await expect(waitingRows(page)).toHaveCount(1);
     await expect(thePage(page)).toMatchAriaSnapshot(`
@@ -964,7 +961,6 @@ test.describe("the console's Names Waiting page", () => {
     await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
     await expect(personButton(page, corrected)).toBeVisible();
     await page.goto(NAMES_WAITING_PAGE);
-    // The count stands empty until the list is read.
     await expect(waitingCount(page)).toHaveText(/\S/);
     await expect(waitingRowOf(page, name)).toHaveCount(0);
   });

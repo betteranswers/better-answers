@@ -28,10 +28,6 @@ const undoingEach = (undos: readonly Undo[]): Undo => ({
   },
 });
 
-/**
- * A group's count and each member's groups say the same thing twice, so every settled action reads
- * both again.
- */
 const useReconcile = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -47,10 +43,6 @@ const useReconcile = () => {
 
 const ASKED_NAME = z.object({ name: z.string() });
 
-/**
- * The api mints a group's id, so a name asked for and not yet answered is drawn as a row of its
- * own until then.
- */
 export const usePendingGroupNames = (): readonly (string | undefined)[] => {
   const api = useTRPC();
   return useMutationState({
@@ -65,7 +57,6 @@ export const useCreateGroup = () => {
   const reconcile = useReconcile();
   return useMutation(
     api.members.createGroup.mutationOptions({
-      // Written before the pending name is let go, so the row never blinks out between the two.
       onSuccess: ({ groupId }, { name }) => {
         queryClient.setQueryData(api.members.groups.queryKey(), (listed) =>
           listed === undefined

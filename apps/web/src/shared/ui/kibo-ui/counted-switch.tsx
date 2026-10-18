@@ -16,10 +16,6 @@ export type CountedSwitchProps = {
   onValueChange: (value: string) => void;
 };
 
-/**
- * The bridge rounds every `role="radio"` fully, so the drawn segment is the inner span and the
- * button underneath stays a bare, square-looking hit area.
- */
 export const CountedSwitch = ({ label, value, choices, onValueChange }: CountedSwitchProps) => (
   <RadioGroup
     aria-label={label}

@@ -43,10 +43,6 @@ export const askingHere = (here: Here, path: string, ask: Ask, value: string): s
   return hrefOf(path, query);
 };
 
-/**
- * Taken in the render that sees it, so an open page takes it too. Clearing only its key keeps a
- * reload from asking again.
- */
 export const useAsked = (ask: Ask, take: (value: string) => void): void => {
   const asked = useRouterState({
     select: (state) => askedIn(new URLSearchParams(state.location.searchStr), ask),

@@ -32,7 +32,6 @@ export function CreateGroupAction(properties: {
   const created = useRef<string | undefined>(undefined);
   const ids = { field: useId() };
 
-  // The trigger and the keystroke open by one path, so nothing from the last open outlives its close.
   const show = () => {
     created.current = undefined;
     setRefused(undefined);
@@ -40,7 +39,6 @@ export function CreateGroupAction(properties: {
   };
   useKeystroke(CREATE_KEYSTROKE, show);
 
-  // Never disabled: the field keeps the name and focus while the answer comes back.
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -85,7 +83,6 @@ export function CreateGroupAction(properties: {
             created.current === undefined
               ? null
               : document.getElementById(groupButtonId(created.current));
-          // A row the search hides has no button, so Radix's own return to the trigger stands.
           if (row === null) return;
           event.preventDefault();
           row.focus();

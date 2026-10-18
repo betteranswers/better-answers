@@ -23,7 +23,6 @@ const choiceKept = (): ThemeChoice => {
   return theme === "light" || theme === "dark" ? theme : "device";
 };
 
-/** Undefined where the browser answers no media query, as a test's document does not. */
 const device = (): MediaQueryList | undefined =>
   typeof matchMedia === "function" ? matchMedia(DEVICE_DARK) : undefined;
 

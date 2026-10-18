@@ -47,7 +47,6 @@ const whatTheSessionSays = (session: Session) => ({
   active: session.data?.session.activeOrganizationId ?? undefined,
 });
 
-/** A workspace refused as no longer held is left out at once, before the list is read again. */
 const whereThePersonStands = (
   session: Session,
   workspaces: Workspaces,
@@ -151,7 +150,6 @@ export function ChooseWorkspacePage() {
 
   const openSoleWorkspace = () => {
     if (sole === undefined) return;
-    // A session can still name a workspace the person has just left.
     if (active === sole.id) {
       goOn();
       return;
@@ -160,7 +158,6 @@ export function ChooseWorkspacePage() {
     openWorkspace(sole);
   };
 
-  // Resumed once: an answered resume is leaving the page, and another would ask consent again.
   const decided = settled && !pick.isPending && resume.isIdle && !wentNowhere;
   useEffect(() => {
     if (!decided) return;
@@ -277,7 +274,6 @@ function WorkspaceList(properties: {
     <>
       <p className="mt-2 text-muted-foreground">{PICKER_WORDS.lead}</p>
 
-      {/* One grid for every row, so the buttons end on one line whatever each role's width. */}
       <ul id={WORKSPACE_LIST} className="mt-6 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
         {properties.held.map((workspace, at) => (
           <WorkspaceRow
@@ -313,7 +309,6 @@ function NextAction(properties: {
   );
 }
 
-/** The outcome's regions stand in one place through every state, so each change is announced. */
 function WorkspaceChoice(properties: {
   readonly standing: Standing;
   readonly held: readonly Workspace[];

@@ -40,7 +40,6 @@ const whyOf = (result: TestResult): string | undefined =>
 const roleOf = (test: TestCase, result: TestResult): string =>
   roleIn(result.annotations) ?? test.parent.project()?.name ?? "";
 
-/** Built from titles and authored reasons alone: an error's message may hold an address. */
 const findingOf = (test: TestCase, result: TestResult): Finding => {
   const why = whyOf(result);
   const path = failingStepsOf(result.steps);
@@ -85,7 +84,6 @@ const titleOf = (test: TestCase): string =>
     .filter((title) => title !== "")
     .join(" › ");
 
-/** One line a test, from its title and outcome alone, so the run's log never holds an error. */
 const lineOf = (test: TestCase, said: string): string => `  ${said}  ${titleOf(test)}\n`;
 
 export default class OutcomeReporter implements Reporter {

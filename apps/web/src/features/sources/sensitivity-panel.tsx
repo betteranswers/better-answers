@@ -75,7 +75,6 @@ const narrowerThan = (sensitivity: Sensitivity): readonly Sensitivity[] =>
 const asWideOrWiderThan = (sensitivity: Sensitivity): readonly Sensitivity[] =>
   SENSITIVITIES.slice(SENSITIVITIES.indexOf(sensitivity));
 
-/** The panel opens on a widening, so the one click it asks for is never refused as not wider. */
 const firstWidening = (connectedSource: ListedConnectedSource): SensitivityAndAudience => {
   const wider = SENSITIVITIES[SENSITIVITIES.indexOf(connectedSource.sensitivity) + 1];
   return wider === undefined
@@ -120,10 +119,6 @@ const OFFERS = {
   },
 } satisfies Record<SensitivityChange, Offer>;
 
-/**
- * A narrowing takes reach away and a widening gives it back, so both are one group in the row,
- * never a modal.
- */
 export function SensitivityPanel(properties: {
   readonly change: SensitivityChange;
   readonly connectedSource: ListedConnectedSource;

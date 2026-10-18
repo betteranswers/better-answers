@@ -109,7 +109,6 @@ const memberRows = (page: Page): Locator =>
 
 const rowOf = (page: Page, name: string): Locator => memberRows(page).filter({ hasText: name });
 
-/** A row's first cell is its tick, so a column's cell is counted from the second. */
 const COLUMN = { Person: 1, Role: 2, Groups: 3, Joined: 4 } as const;
 
 const cellOf = (page: Page, name: string, column: keyof typeof COLUMN): Locator =>
@@ -225,7 +224,6 @@ type Joined = {
   readonly role: "Editor" | "Viewer";
 };
 
-/** Another workspace's member is made alongside, so a list that leaked would show them. */
 const anAdminAtPeople = async (
   page: Page,
   api: APIRequestContext,
@@ -285,7 +283,6 @@ const saysToPickAMemberAfter = async (page: Page, key: string): Promise<void> =>
   await expect(page, "the keystroke left Members").toHaveURL(new RegExp(`${MEMBERS_PAGE}(#.*)?$`));
 };
 
-/** A fresh document, so the first Tab starts from the top rather than from the rail's link. */
 const skippedToMembers = async (page: Page, api: APIRequestContext, workspaceName: string) => {
   await anAdminAtPeople(page, api, workspaceName);
   await page.goto(MEMBERS_PAGE);
@@ -378,7 +375,6 @@ test.describe("the People group's Members page", () => {
             - button "Invite a Person"
             - searchbox "Search by name or address"
     `);
-    // A count is its number then a word; a date's month is capitalised.
     await expect(main.getByText(/\b3 [a-z]/), "the count is said twice").toHaveCount(1);
 
     const heading = membersRegion(page).getByRole("heading", { level: 2, name: "Members" });
@@ -683,7 +679,6 @@ test.describe("a member's own page", () => {
     await page.setViewportSize({ width: 320, height: 720 });
 
     const sections = thePage(page).getByRole("navigation", { name: "On This Page" });
-    // The narrow layout answers a resize on its own render, so the stack is waited for, not read once.
     await expect
       .poll(
         async () => {
@@ -767,7 +762,6 @@ test.describe("a member's own page", () => {
     await expect(pill, "the kit's rounded-full on a pill").toHaveCSS("border-radius", "0px");
 
     await openedByName(page, "Priya Shah");
-    // The avatar is hidden from assistive technology, so no role or name reaches it.
     const avatar = thePage(page).locator("[data-slot='avatar']");
     await expect(avatar, "the avatar, a kept circle").toHaveCSS("border-radius", "999px");
     await expect(
@@ -814,9 +808,7 @@ test.describe("a member's own page", () => {
     await saysARefusal(rolePickerRegion(page).getByRole("alert"));
     await keepsItsWordOffThePage(page, "last-admin");
     await passesTheAccessibilityGate();
-    // The refused pick stays, so the card still says which role they hold.
     await expect(changeRoleButton(page)).toHaveAccessibleDescription(/Test person.*Admin/);
-    // The card says the role held once the pick matches it, so the pick is put back to read it.
     await thePage(page).getByRole("radio", { name: "Admin", exact: true }).click();
     await expect(changeRoleButton(page)).toHaveAccessibleDescription(/Test person.*Admin/);
   });
@@ -866,7 +858,6 @@ test.describe("a member's own page", () => {
       dropped = true;
       return route.abort();
     });
-    // The shell's read on arrival is dropped, so the role arrives after the page does.
     await page.reload();
     await expect(personHeading(page, "Test person")).toBeVisible();
 
@@ -885,7 +876,6 @@ test.describe("a member's own page", () => {
     await anAdminAtPeople(page, request, "Calder Looms");
     await expect(memberRows(page)).toHaveCount(3);
 
-    // One button, and it is the rail's: no toolbar holds one any more.
     await expect(keystrokesButton(page)).toHaveCount(1);
     const inTheRail = page
       .getByRole("navigation", { name: "Areas" })
@@ -971,7 +961,6 @@ test.describe("a member's Activity", () => {
     await changeRoleButton(page).click();
 
     const byHannahToPriya = /Hannah Wright.*Priya Shah.*Editor/;
-    // The page the action was taken on reads its Activity again once the action settles.
     await expect(linesOf(page)).toHaveCount(1);
     await expect(linesOf(page)).toContainText(byHannahToPriya);
     const saidOnPriyas = ((await linesOf(page).textContent()) ?? "").replace(/^\d{2}:\d{2}/, "");
@@ -1097,7 +1086,6 @@ test.describe("a member's Activity", () => {
 
     await page.goto(memberPageAt(adminId));
 
-    // The query client asks twice more before it gives up, a second apart and then two.
     await saysARefusal(activityOf(page).getByRole("alert"), { timeout: 10_000 });
     await expect(accessOf(page), "a failed Activity took Access with it").toBeVisible();
     await expect(
@@ -1123,7 +1111,6 @@ const endButton = (page: Page): Locator =>
 const credentialsRegion = (page: Page): Locator =>
   thePage(page).getByRole("region", { name: "Sign-Ins and Personal Tokens" });
 
-/** Priya is a member of a second workspace too, so a page that told of it would name it. */
 const anAdminWithAMemberOfTwo = async (page: Page, api: APIRequestContext) => {
   const admin = anAddress("admin");
   const workspace = await provision(api, { name: "Swale Presswork", adminEmail: admin });
@@ -1240,7 +1227,6 @@ test.describe("removing a member from their page", () => {
     passesTheAccessibilityGate,
   }) => {
     const { workspaceId } = await anAdminAtPeople(page, request, "Rye Foundry");
-    // Sorted, so the return is seen to keep what the list's address held.
     const person = membersRegion(page).getByRole("columnheader", { name: "Person" });
     await person.getByRole("button").click();
     await person.getByRole("button").click();
@@ -1300,7 +1286,6 @@ test.describe("removing a member from their page", () => {
     passesTheAccessibilityGate,
   }) => {
     await anAdminAtPeople(page, request, "Rye Ropery");
-    // Refused only once the page has left for Members, as a change landing meanwhile is.
     await answeredChangedMeanwhile(page, REMOVAL);
 
     const refused = refusalAnswering(page, "members.remove");
@@ -1361,7 +1346,6 @@ test.describe("removing a member from their page", () => {
     ).not.toBe(ofAnother);
     await confirm.click();
 
-    // The chooser sends a person who holds no other workspace straight on.
     await expect(page).toHaveURL(/\/no-workspace$/);
     await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
   });
@@ -1423,7 +1407,6 @@ test.describe("a member's display name, flagged to better-answers support", () =
 
     await flagButton(page).focus();
     await expect(said).toHaveText("");
-    // The card's own name is read once its outcome line holds words, as the flag's landing leaves it.
     await clockTheNextKey(page, {
       at: "//section[div[@data-slot='card-header']/h3[normalize-space(.)='Display Name']][.//output[normalize-space(.)!='']]",
       reads: "Display Name",
@@ -1466,7 +1449,6 @@ test.describe("a member's display name, flagged to better-answers support", () =
     const { workspaceId, joined } = await anAdminAtPeople(page, request, "Swale Stonecraft");
     const sam = joined.find((member) => member.displayName === "Sam Okoro");
     if (sam === undefined) throw new Error("Sam Okoro was joined");
-    // The page reads the list again as it opens; held, so the page still draws Sam to act on.
     await page.route(MEMBERS_READ, () => Promise.withResolvers<void>().promise);
     await openedByName(page, "Sam Okoro");
     await removeMember(request, { workspaceId, userId: sam.id });
@@ -1496,7 +1478,6 @@ test.describe("a member's display name, flagged to better-answers support", () =
   });
 });
 
-/** A card's inner gap and a little over: more beneath its last line is an empty band. */
 const ONE_GAP_PX = 16;
 
 const bottomOf = async (drawn: Locator): Promise<number> => {
@@ -1504,10 +1485,8 @@ const bottomOf = async (drawn: Locator): Promise<number> => {
   return box === null ? Number.NaN : box.y + box.height;
 };
 
-/** An empty outcome line that took its own gap would hold the card open under its last line. */
 const endsUnderItsLastLine = async (card: Locator, lastLine: Locator): Promise<void> => {
   const named = await card.getByRole("heading").innerText();
-  // Found by role, so it stands in the accessibility tree and its first outcome is announced.
   await expect(card.getByRole("status"), `${named}: the empty outcome region`).toHaveText("");
   const [cardEnds, lineEnds] = await Promise.all([bottomOf(card), bottomOf(lastLine)]);
   expect(
@@ -1532,7 +1511,6 @@ test.describe("a member's page before any action's outcome", () => {
 });
 
 test.describe("the People page's words", () => {
-  // Every People area joins this test as it is built: the product's word is workspace.
   test("says workspace, never organisation, on every People page", async ({ page, request }) => {
     const { admin, shortName } = await anAdminAtPeople(page, request, "Ryedale Metalwork");
     const organisation = /organi[sz]ation/i;
@@ -1588,7 +1566,6 @@ test.describe("the People page's words", () => {
       expect(await modal.ariaSnapshot(), where).not.toMatch(organisation);
     };
 
-    // Last, so the audit log above reads the one event the workspace's provisioning wrote.
     await page.goto(MEMBERS_PAGE);
     await expect(memberRows(page)).toHaveCount(3);
     const inviting = page.getByRole("dialog", { name: "Invite a Person" });
@@ -1922,7 +1899,6 @@ test.describe("bulk actions on the members ticked", () => {
         role: "Viewer",
       });
     }
-    // The switcher holds a list of every workspace, which must not outlive the removal.
     await switcherOf(page, "Esk Ropeworks").click();
     await expect(switcherMenuOf(page, "Esk Ropeworks")).toContainText("Ure Ropeworks");
     await page.keyboard.press("Escape");
@@ -1952,7 +1928,6 @@ test.describe("bulk actions on the members ticked", () => {
 
     await removedThemselfThroughTheBar(page);
 
-    // The session still names the workspace left, so the chooser must not take it as the open one.
     await landedAtHome(page, "Viewer");
     await expect(switcherOf(page, "Ure Sailmakers")).toBeVisible();
   });
@@ -2026,7 +2001,6 @@ test.describe("bulk actions on the members ticked", () => {
       await tickOf(page, second).check();
       await page.keyboard.press(PEOPLE_KEYSTROKES.nextPage.key);
       await tickOf(page, onPageTwo).check();
-      // The bar refuses another set while the last is still out.
       await expect(selectionAction(page, "Change Role")).not.toHaveAttribute(
         "aria-disabled",
         "true",
@@ -2141,7 +2115,6 @@ test.describe("bulk actions on the members ticked", () => {
 
     await refusedAsNoMember();
     await expect(refused.getByRole("listitem")).toContainText("Sam Okoro");
-    // The refusal reads the list again, which no longer holds Sam.
     await expect(rowOf(page, "Sam Okoro")).toHaveCount(0);
     await expect(ticks).toHaveText(TWO_TICKED_ONE_HIDDEN);
 
@@ -2296,7 +2269,6 @@ test.describe("bulk actions on the members ticked", () => {
 
   test("wraps a long address between its parts at 390 pixels", async ({ page, request }) => {
     const { workspaceId } = await anAdminAtPeople(page, request, "Ure Spinning");
-    // Dots and no hyphen in its first words, so a break inside them would be mid-word.
     const long = anAddress("oliver.bannerman.accountspayable");
     const made = await person(request, long, { displayName: "Oliver Bannerman" });
     await addMember(request, { workspaceId, userId: made.id, role: "Viewer" });

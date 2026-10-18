@@ -27,7 +27,6 @@ const closedBy = (onClose: () => void) => (open: boolean) => {
   if (!open) onClose();
 };
 
-/** `said` is the tick box's label and `term` the same words as the audit summary's term. */
 const CONFIRMATIONS = [
   { field: "lawfulBasisRecorded", said: "Lawful basis recorded", term: "Lawful Basis Recorded" },
   {

@@ -15,7 +15,6 @@ const ACCOUNT = "/account";
 const offered = (held: SecondFactor | undefined): boolean =>
   held !== undefined && held.passkeys.length === 0 && !held.passkeyOfferDismissed;
 
-/** The page drawn, not the one asked for: a frame being left would draw the offer and spend it. */
 const useAddressDrawn = (): string | undefined =>
   useRouterState({ select: (state) => state.matches.at(-1)?.pathname });
 
@@ -27,17 +26,12 @@ export type OfferPlace = {
 export const useOfferPlace = (): OfferPlace => {
   const drawn = useAddressDrawn();
   const [heldAt, holdAt] = useState<string>();
-  // During render, setting only this hook's own state: any other address ends the offer for good.
   if (heldAt !== undefined && heldAt !== drawn) holdAt(undefined);
   return { heldAt, holdAt };
 };
 
 type OfferProperties = { readonly place: OfferPlace; readonly onDismissed: () => void };
 
-/**
- * Offered once per sign-in, on the first page that draws it, to a person holding no passkey. It
- * never takes focus or announces itself.
- */
 export function PasskeyOffer(properties: OfferProperties) {
   const [here] = useState(passkeysHere);
   const drawn = useAddressDrawn();

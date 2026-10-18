@@ -1,4 +1,3 @@
-/** Whole characters as a reader sees them, so an emoji or an accent typed apart is never split. */
 const CHARACTERS =
   "Segmenter" in Intl ? new Intl.Segmenter("en-GB", { granularity: "grapheme" }) : undefined;
 

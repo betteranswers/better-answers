@@ -35,7 +35,6 @@ type Heard = {
 export type StandIn = {
   readonly origin: string;
   readonly heard: readonly Heard[];
-  /** Listed by id, so a test mints its ids in the order its messages arrive. */
   readonly arrive: (...arriving: readonly Stored[]) => void;
   readonly answerEverythingWith: (answer: Answer) => void;
   readonly probeAnswers: (answer: Answer) => void;

@@ -4,7 +4,6 @@ export const SAID_OF_A_MEMBER = {
   "last-admin": "A workspace needs at least one Admin. Please make someone else an Admin first.",
 } satisfies OwnSentences;
 
-/** A bulk action refuses the whole set, so each item's line says why that one person stopped it. */
 export const SAID_OF_TICKED_MEMBERS = {
   "last-admin":
     "This would leave the workspace without an Admin. Please keep at least one Admin unselected.",
@@ -18,13 +17,11 @@ export const SAID_OF_AN_INVITATION = {
   malformed: "Please enter a valid email address.",
 } satisfies OwnSentences;
 
-/** A set is refused whole, so each item's line says why that one invitation stopped it. */
 export const SAID_OF_TICKED_INVITATIONS = {
   "no-such-invitation": "No longer waiting.",
   "off-testing-domain": "Not on the testing domain.",
 } satisfies OwnSentences;
 
-/** A group action refuses `malformed` for a name with no letter or figure in it. */
 export const SAID_OF_A_GROUP = {
   "name-taken": "A group with that name already exists.",
   malformed: "Please enter a group name.",

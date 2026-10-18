@@ -76,6 +76,5 @@ export const confirmedWith = (page: Page, key: string): Promise<void> =>
     const response = await answered;
     refusedTheRun(response, "the confirm");
     if (!response.ok()) judged(response.status());
-    // Six digits confirm on their own; leaving the page sooner cancels the request.
     await expect(field).toHaveCount(0);
   });

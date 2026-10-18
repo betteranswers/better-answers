@@ -679,7 +679,6 @@ test.describe("the concept page", () => {
     await matchOf(page, SALARY).click();
     await expect(conceptOf(page, SALARY)).toBeVisible();
 
-    // No fresh document from here on: what an Admin was given stays in the page's cache.
     await railOf(page).getByRole("link", { name: "Control Centre" }).click();
     await navOf(page, "Control Centre").getByRole("link", { name: "Members" }).click();
     const people = page.getByRole("main");

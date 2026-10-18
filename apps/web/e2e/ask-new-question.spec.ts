@@ -33,7 +33,6 @@ import {
 } from "./harness.ts";
 import { scrolledSideways, windowRefocused } from "./knowledge.ts";
 
-/** The answer's first content is a read, so it takes the read's second. */
 const ANSWER_BUDGET_MS = 1000;
 
 const NEW_QUESTION = pageNamed(menuGroupIn(ASK, "ask"), "New Question");
@@ -72,7 +71,6 @@ const UNFILED = {
 
 const DRAFTED = "Buyers use the console's audit page.";
 
-/** The policy is the one concept no judge is asked about, so the drafter cites it. */
 const DRAFTING = { writes: [{ citing: POLICY.title, sentence: DRAFTED }] } as const;
 
 type Script = Omit<AskingScript, "workspaceId">;
@@ -256,7 +254,6 @@ test.describe("Ask › New question", () => {
     await expect(askButton(page)).not.toHaveAttribute("aria-disabled", "true");
   });
 
-  // A failed draft was asked of the model once and not again; a paused one never reached it.
   for (const [how, script, calls] of [
     ["fails", { judging: { fits: [] }, drafting: "fails" }, { judge: 1, draft: 1 }],
     ["pauses", { drafting: DRAFTING, limitGbp: "0.001" }, { judge: 0, draft: 0 }],
@@ -297,7 +294,6 @@ test.describe("Ask › New question", () => {
     const sending = page.waitForResponse((response) => response.url().includes("ask.giveFeedback"));
     await flagging.getByRole("button", { name: "Send Flag" }).click();
     await expect(audits.getByRole("button", { name: "Flagged" })).toBeVisible();
-    // Shown flagged at the press; leaving before the api answers would cancel the send.
     expect((await sending).ok(), "the flag was not stored").toBe(true);
 
     await page.goto(QUESTIONS_ASKED.path);
@@ -600,12 +596,10 @@ test.describe("Ask › New question", () => {
     await asked(page);
     const result = answered(page, "Answered");
     await expect(result).toBeVisible();
-    // Off the question box, where a single key is typed, not pressed.
     await result.getByRole("heading", { level: 2 }).click();
 
     await page.keyboard.press(KEY.helpful.key);
     await expect(result.getByRole("button", { name: "Marked Helpful" })).toBeVisible();
-    // Said once the api has kept it; the button changes as it is pressed.
     await expect(result.getByRole("status").filter({ hasText: /\S/ })).toHaveCount(1);
     await page.keyboard.press(KEY.flag.key);
     await expect(page.getByRole("dialog", { name: "Flag This Answer" })).toBeVisible();

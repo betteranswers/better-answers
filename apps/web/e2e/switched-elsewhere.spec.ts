@@ -44,7 +44,6 @@ const invitationTo = (page: Page, address: string): Locator =>
 const removalOf = (samsPage: Locator): Locator =>
   samsPage.getByRole("region", { name: "Removal", exact: true });
 
-/** In both, or no action could land on the wrong one; a role apiece tells the two lists apart. */
 const aMemberOfBoth = async (
   api: APIRequestContext,
   { first, second }: Two,
@@ -57,7 +56,6 @@ const aMemberOfBoth = async (
   return member.id;
 };
 
-/** `page` takes no fresh document from here on: it would read the member and learn of the switch. */
 const switchedInAnotherTab = async (
   context: BrowserContext,
   page: Page,
@@ -77,7 +75,6 @@ const membersReadAfresh = async (tab: Page, here: Workspace): Promise<void> => {
   await expect(switcherOf(tab, here.name)).toBeVisible();
 };
 
-/** The other tab switches back, only once the refused tab has landed: it follows the session. */
 const backIn = async (elsewhere: Page, { first, second }: Two): Promise<void> => {
   await switched(elsewhere, second.name, first.name);
   await expect(switcherOf(elsewhere, first.name)).toBeVisible();
@@ -246,7 +243,6 @@ test.describe("an action from a tab left in another workspace", () => {
         if (JSON.stringify(each).includes(`"${SWITCHED.word}"`)) refused.add(asked[at] ?? "");
       });
     });
-    // Each follow of the session reads the member again; history cannot tell two moves home apart.
     let memberReads = 0;
     page.on("request", (asking) => {
       if (asking.url().includes("/trpc/") && askedIn(asking.url()).includes("session.member")) {
@@ -254,7 +250,6 @@ test.describe("an action from a tab left in another workspace", () => {
       }
     });
 
-    // In the app, not a fresh document: the band keeps its member, and the page asks its reads together.
     await page
       .getByRole("navigation", { name: "Areas" })
       .getByRole("link", { name: "Control Centre" })
@@ -286,7 +281,6 @@ test.describe("an action from a tab left in another workspace", () => {
       },
     );
     const answered = refusalAnswering(page, "members.changeRole");
-    // By pointer: the first press hands focus to the picked role, so a key's second would miss.
     await samsPage.getByRole("button", { name: "Change Role" }).dblclick();
     await expect.poll(() => asked, { message: "neither press asked the api" }).toBe(1);
     held.resolve();

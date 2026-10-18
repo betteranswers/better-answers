@@ -4,7 +4,6 @@ import { JUDGE_WORDS, REASON_WORDS } from "@/shared/answer-words.ts";
 
 import type { Phase } from "./ask-api.ts";
 
-/** How one collection's drafted part ended, `drafted` apart: it says nothing of itself. */
 type Unwritten = "refused" | "failed" | "paused";
 
 export const ASK_WORDS = {

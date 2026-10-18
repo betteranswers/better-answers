@@ -37,7 +37,6 @@ const refusedWords = (failure: Error | ApiError): ReactNode => {
     : stockWait(liftsInSeconds);
 };
 
-/** The status says the phase until the verdict, then the verdict, once; a refusal is an alert. */
 const saidOf = (answering: Answering): Outcome | undefined => {
   const { failure, answer, streaming, phase } = answering;
   if (failure !== undefined) return { tone: "refused", words: refusedWords(failure) };
@@ -52,7 +51,6 @@ const toggled = (named: ReadonlySet<string>, collection: string, on: boolean) =>
   return next;
 };
 
-/** Offered once an answer has said which collections the reader may name; none is every one. */
 function Collections(properties: {
   readonly readable: readonly string[];
   readonly named: ReadonlySet<string>;
@@ -104,7 +102,6 @@ function QuestionForm(properties: {
     box.current?.focus();
   });
 
-  // Focus stays in the box, so the next question is typed where the last one was.
   const ask = () => {
     box.current?.focus();
     if (answering.streaming) return;

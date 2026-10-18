@@ -59,7 +59,6 @@ const SIGN_IN_HEADING = "sign-in-heading";
 
 const REFUSED = "account-refused";
 
-/** Each action clears what the last one said, so the page speaks of one action at a time. */
 const useAccountActions = (
   address: string,
   firstLanding: Landing | undefined,
@@ -206,7 +205,6 @@ const useAccountActions = (
 
 type AccountActions = ReturnType<typeof useAccountActions>;
 
-/** A read already drawn stands through a refetch that fails, so only a first read's is said. */
 const failureOnThePage = (read: SecondFactorRead, actions: AccountActions) => {
   if (read.data === undefined && read.error !== null) {
     return { failure: read.error, unanswered: STOCK.notLoaded };
@@ -228,7 +226,6 @@ const openingKeystrokes = (
   return [...(offersAdd ? [ADD_A_PASSKEY] : []), ...(offersSetup ? [SET_UP] : [])];
 };
 
-/** In the order the page shows their actions. */
 const keystrokesOf = (read: SecondFactorRead, actions: AccountActions): readonly Keystroke[] => {
   const keyShown = actions.setupOpen && actions.starting.data !== undefined;
   return [
@@ -242,7 +239,6 @@ const keystrokesOf = (read: SecondFactorRead, actions: AccountActions): readonly
 const sameKeys = (one: readonly Keystroke[], other: readonly Keystroke[]): boolean =>
   one.length === other.length && one.every((keystroke, at) => keystroke === other[at]);
 
-/** The same list while its keys are, so the shell registers it once per change, not per draw. */
 const useSteadyKeystrokes = (keystrokes: readonly Keystroke[]): readonly Keystroke[] => {
   const [steady, keep] = useState(keystrokes);
   if (!sameKeys(steady, keystrokes)) keep(keystrokes);
@@ -264,7 +260,6 @@ function InTheShell(properties: {
   );
 }
 
-/** `framed` in a member's shell; outside it, so a person with no workspace reaches it too. */
 export function AccountPage(properties: { readonly framed?: boolean }) {
   const read = useSecondFactor();
   const address = useSession().data?.user.email ?? "";

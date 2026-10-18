@@ -22,7 +22,6 @@ const { outcomeOfFailure } = refusalsOf({});
 const reasonOf = (value: string): Reason | undefined =>
   FLAG_REASONS.find((reason) => reason === value);
 
-/** Lands on the control that took the trigger's place, since the trigger is gone. */
 const focusOnArrival = (control: HTMLButtonElement | null): void => {
   control?.focus();
 };
@@ -99,7 +98,6 @@ function FlagForm(properties: {
 type Flagging = {
   readonly recordId: string;
   readonly name: string;
-  /** The words it shows, which its name begins with; absent, it shows its glyph alone. */
   readonly label?: string;
   readonly disputed?: Disputed;
   readonly keyed?: boolean;
@@ -110,10 +108,6 @@ function OpensOnItsKey(properties: { readonly onOpen: () => void }) {
   return null;
 }
 
-/**
- * Shown sent when pressed; a refused send reopens with its draft. Its own mutation keeps one
- * control's answer from another's callbacks.
- */
 export function FlagControl(properties: Flagging) {
   const { recordId, name, label, disputed } = properties;
   const giving = useGiveFeedback();
@@ -190,7 +184,6 @@ export function FlagControl(properties: Flagging) {
   );
 }
 
-/** Marked as pressed, and put back with the refusal if the api refuses it. */
 export function HelpfulControl(properties: { readonly recordId: string }) {
   const giving = useGiveFeedback();
   const [sent, setSent] = useState(false);

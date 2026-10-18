@@ -38,7 +38,6 @@ const formOf = (said: string): string => said.replaceAll(/\d+/g, "");
 
 const countsIn = (said: string): readonly string[] => said.match(/\b\d+\b/g) ?? [];
 
-/** A closed-set word as it is held: its casing and its apostrophe are the page's to choose. */
 const spoken = (word: string): string => word.toLowerCase().replaceAll("’", "'");
 
 describe("a connected source's last sync", () => {

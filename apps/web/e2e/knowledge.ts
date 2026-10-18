@@ -53,7 +53,6 @@ export const passageBecomes = (changed: Answer) =>
     return passage === undefined ? data : { ...data, passage: { ...passage, ...changed } };
   });
 
-/** A batch refused as the api refuses a call past a ceiling, with a minute to wait, so no test runs against the clock. */
 export const refusedAtACeiling = (route: Route): Promise<void> => {
   const calls = new URL(route.request().url()).pathname.split(",");
   const refusal = {
@@ -77,7 +76,6 @@ export const heldBack = async (page: Page, named: (url: URL) => boolean) => {
   return { reached: reached.promise, release: held.resolve };
 };
 
-/** The window taking focus again. Its own request leaves after any read that asked, so a count taken next holds it. */
 export const windowRefocused = (page: Page): Promise<void> =>
   page.evaluate(async () => {
     window.dispatchEvent(new Event("visibilitychange"));
@@ -92,7 +90,6 @@ export const windowRefocused = (page: Page): Promise<void> =>
 
 const PAST_THE_READS_CEILING = 121;
 
-/** Batched calls fill the person's ceiling and leave the address's, which counts requests, clear. */
 export const readsCeilingFilled = async (page: Page, read: string): Promise<void> => {
   const asked = new URL(read);
   const call = Object.values(

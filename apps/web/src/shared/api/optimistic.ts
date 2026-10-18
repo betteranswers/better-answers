@@ -7,10 +7,6 @@ import {
 
 export type Undo = { readonly undo: () => void };
 
-/**
- * Undone only into the read it was taken from: a switch drops the workspace left's reads, and
- * writing to a dropped key makes it again.
- */
 export const takenFrom = (queryClient: QueryClient, queryKey: QueryKey): Undo => {
   const reads = queryClient.getQueryCache();
   const read = reads.find({ queryKey, exact: true });

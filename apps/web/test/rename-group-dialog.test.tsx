@@ -21,7 +21,6 @@ const HR_TEAM: ListedGroup = {
   memberCount: 2,
 };
 
-/** The stub refuses every action, so a changed name ends refused and an unchanged one never asks. */
 const opened = async () => {
   vi.stubGlobal("fetch", answeringAs("Admin"));
   const onRenamed = vi.fn<(outcome: Outcome) => void>();

@@ -23,7 +23,6 @@ const DOWNLOAD_CODES: Keystroke = { key: "d", action: ACCOUNT_ACTIONS.download }
 
 const PRINT_CODES: Keystroke = { key: "p", action: ACCOUNT_ACTIONS.print };
 
-/** In the order the block shows its actions. */
 export const CODES_KEYSTROKES: readonly Keystroke[] = [COPY_CODES, DOWNLOAD_CODES, PRINT_CODES];
 
 export type CodesInHand = {

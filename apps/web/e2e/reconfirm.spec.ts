@@ -90,14 +90,11 @@ test.describe("a stale confirmation before a high-impact act", () => {
     await removal.getByRole("button", { name: "Remove", exact: true }).click();
 
     expect(await refused).toMatchObject({ word: STALE_CONFIRMATION });
-    // The removal returns to the list before the api answers, and the list says how it went.
     await expect(page).toHaveURL(new RegExp(`${MEMBERS_PAGE}`));
 
-    // The refused removal waits in the dialog; its confirmation runs it again with the person kept.
     await reconfirmedOn(page, request, atPeople.adminEmail);
     await expect(memberRows(page)).toHaveCount(2);
 
-    // A role change ten minutes after the confirmation goes ahead with no re-confirm asked.
     await memberLink(page, "Sam Okoro").click();
     await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
     await roleRegion(page).getByRole("button", { name: "Change Role" }).click();

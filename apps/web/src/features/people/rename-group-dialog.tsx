@@ -22,7 +22,6 @@ export function RenameGroupDialog(properties: {
   const ids = { field: useId() };
   const [line, setLine] = useState<Outcome>();
 
-  // Never disabled: the button a reader pressed keeps focus while the answer comes back.
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLine(undefined);

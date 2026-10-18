@@ -19,10 +19,6 @@ type RequestActions = {
   readonly onDecline: (request: WaitingRequest) => void;
 };
 
-/**
- * The list's actions reach each cell here, not through the columns: new columns draw every button
- * afresh, dropping focus a press just gave.
- */
 export const RequestsActionsContext = createContext<RequestActions | undefined>(undefined);
 
 function Requester(properties: { readonly request: WaitingRequest }) {

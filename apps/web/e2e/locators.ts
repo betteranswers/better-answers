@@ -26,7 +26,6 @@ export const switcherOf = (page: Page, here: string): Locator =>
 export const switcherMenuOf = (page: Page, here: string): Locator =>
   page.getByRole("menu", { name: here });
 
-/** Picks `to` in the switcher's menu and waits for nothing, so a spec meets the switch pending. */
 export const switched = async (page: Page, from: string, to: string): Promise<void> => {
   await switcherOf(page, from).click();
   await switcherMenuOf(page, from).getByRole("menuitemradio").filter({ hasText: to }).click();
@@ -50,7 +49,6 @@ export const crumbOf = (page: Page, name: string): Locator =>
 
 export const countOf = (list: Locator): Locator => list.getByRole("status").first();
 
-/** Needs a page with nothing focused yet, so the first Tab lands on the skip link. */
 export const skipLinkReachesThePage = async (page: Page): Promise<void> => {
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to the Page" })).toBeFocused();
@@ -72,10 +70,6 @@ export const tabUntilFocused = async (
   await expect(target, "Tab never reached it").toBeFocused();
 };
 
-/**
- * A fresh document, so the first Tab starts from the top. Each arrow lands before the next, or
- * the tab's navigation swallows the second.
- */
 export const tabOpenedByKeyboard = async (page: Page, path: string, name: string) => {
   await page.goto(path);
   const tabs = page.getByRole("tab");
@@ -115,8 +109,6 @@ const SIGN_IN_HEADINGS = {
 export const signInHeading = (page: Page, carriedOn: CarriedOn | "nothing" = "nothing"): Locator =>
   page.getByRole("heading", { level: 1, name: SIGN_IN_HEADINGS[carriedOn], exact: true });
 
-/* Shared with the journeys, so a sign-in rename the suite catches is fixed before a release walks them. */
-
 export const emailField = (page: Page): Locator => page.getByLabel("Email Address");
 
 export const sendCodeButton = (page: Page): Locator =>
@@ -128,10 +120,6 @@ export const verificationCodeField = (page: Page): Locator =>
 export const authenticatorCodeField = (page: Page): Locator =>
   page.getByLabel("Authenticator Code", { exact: true });
 
-/**
- * `?` opens the keystrokes of the page `named`, as the navigation list names it, from anywhere on
- * it outside a field.
- */
 export const keystrokesListed = async (page: Page, named: string): Promise<Locator> => {
   await page.keyboard.press("?");
   const listed = page.getByRole("dialog", { name: `Keyboard Shortcuts on ${named}` });
@@ -170,7 +158,6 @@ export const landedAtHome = async (page: Page, role: Role): Promise<void> => {
   ).toBeVisible();
 };
 
-/** A deployment whose page and published resource differ fails here. */
 export const askShowsTheServedAddress = async (page: Page): Promise<string> => {
   const answer = await page.request.get("/.well-known/oauth-protected-resource/mcp");
   expect(answer.ok(), `the protected-resource document answered ${answer.status()}`).toBe(true);
@@ -213,7 +200,6 @@ export const clockTheNextKey = (
     Reflect.set(window, "actionClocked", clocked);
   }, landed);
 
-/** How many times a spec presses an action it holds at the median: one press on a busy runner is noise. */
 export const ACTION_SAMPLES = 5;
 
 export const actionClocked = async (page: Page): Promise<number> =>
@@ -289,7 +275,6 @@ export const refusedDigitsSelected = async (field: Locator): Promise<void> => {
   expect(selected, "the refused digits are not selected for retyping").toEqual([0, 6]);
 };
 
-/** A design-system token as the browser paints it in a property, so a check compares like with like. */
 export const tokenPainted = (page: Page, token: string, property: string): Promise<string> =>
   page.evaluate(
     ([name, painted]) => {
@@ -358,7 +343,6 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
   page.evaluate(() => {
     type Rgba = readonly [number, number, number, number];
     const SIDES = ["top", "right", "bottom", "left"] as const;
-    /** A row's rule runs this close to its field; a layout's border stands off by its padding. */
     const HUGS_WITHIN_PX = 8;
     // A computed colour can be `oklab()` or `color()`, which Tailwind's `/50` writes; a canvas reads any.
     const pixel = new OffscreenCanvas(1, 1).getContext("2d", { willReadFrequently: true });

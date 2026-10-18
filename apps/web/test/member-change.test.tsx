@@ -58,14 +58,12 @@ describe("a change to the reader's own member", () => {
     api.set("members.remove", () => {
       api.set("session.member", () => NOT_A_MEMBER);
       api.set("members.list", () => NOT_A_MEMBER);
-      // Two are left, so the chooser stands rather than opening the only one.
       api.set("person.workspaces", () =>
         read([
           { workspace: HOLME, role: "Viewer" },
           { workspace: CALDER, role: "Viewer" },
         ]),
       );
-      // The chooser reads this before it draws, so the frame stands until the test lets it answer.
       api.set("person.secondFactor", () => landing.promise.then(() => FORBIDDEN));
       return read({});
     });

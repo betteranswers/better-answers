@@ -21,7 +21,6 @@ import {
   TableRow,
 } from "@/shared/ui/table.tsx";
 
-/** Ticks are row ids the page holds, so a row a search or a page hides stays ticked. */
 type Ticks = {
   readonly ticked: ReadonlySet<string>;
   readonly onTickedChange: (ticked: ReadonlySet<string>) => void;
@@ -105,7 +104,6 @@ const pageTickState = (ticked: ReadonlySet<string>, ids: readonly string[]) => {
   return count === ids.length ? true : "indeterminate";
 };
 
-/** Ticks the rows this page shows and no others; a tick on another page stands. */
 function PageTick(properties: { readonly ids: readonly string[]; readonly ticking: Ticks }) {
   const { ids, ticking } = properties;
   return (
@@ -145,7 +143,6 @@ const ariaSortOf = (sorted: ColumnSort | undefined) => {
   return sorted.desc ? "descending" : "ascending";
 };
 
-/** Ascending first, then each press turns it round; a list always holds some order. */
 const nextSort = (sorted: ColumnSort | undefined, id: string): ColumnSort => ({
   id,
   desc: sorted?.id === id && !sorted.desc,
@@ -246,7 +243,6 @@ const columnCount = <Features extends TableFeatures, Data extends RowData>(
 
 export function GridTable<Features extends TableFeatures, Data extends RowData>(
   properties: Opted<Data> & {
-    /** Flat columns only: the header draws no spans, so a column group's header would misalign. */
     readonly table: HeldTable<Features, Data>;
     readonly caption: string;
     readonly empty: ReactNode;

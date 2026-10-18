@@ -83,7 +83,6 @@ const saidOf = (action: SaidOfAnAction, failure: Error): string => {
   return failed.kind === "refused" ? action.refused : action.unanswered;
 };
 
-/** Each action clears the other as it starts, so at most one has failed. */
 const failureSaid = (
   sendFailure: Error | null,
   signInFailure: Error | null,
@@ -127,11 +126,9 @@ type SessionRead = {
     | undefined;
 };
 
-/** Undefined for a failed read, which keeps whatever it held before and proves nothing. */
 const sessionIdOf = (read: SessionRead): string | null | undefined =>
   read.isError ? undefined : (read.data?.session.id ?? null);
 
-/** Until the standing session is known nothing is new, and another address's sign-in is not awaited. */
 const isANewSignInOf = (
   read: SessionRead,
   standing: string | null | undefined,
@@ -191,7 +188,6 @@ function CodeStepActions(properties: {
 
   return (
     <div className="mt-6 flex flex-wrap items-center gap-2">
-      {/* Enabled while sending, so the focus a click gave the button is not dropped. */}
       <Button
         id={SEND_AGAIN_BUTTON}
         type="button"
@@ -385,7 +381,6 @@ export function SignInPage() {
   const countTheRefusal = (digits: string, failure: Error) => {
     if (!isAWrongCode(failure)) return;
     const nowRefused = [...refused, digits];
-    // Committed before the mutation's own render, so the alert never names a try already spent.
     flushSync(() => {
       setRefused(nowRefused);
     });

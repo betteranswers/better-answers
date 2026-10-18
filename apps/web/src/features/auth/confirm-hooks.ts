@@ -31,7 +31,6 @@ export const useConfirmByPasskey = () => {
   return useMutation({ mutationFn: confirmWithAPasskey, onSuccess: reread });
 };
 
-/** Rereads on a refusal too, so a throttle's wait reaches the read. */
 const useSendACode = <Answer>(path: string, answer: z.ZodType<Answer>) => {
   const reread = useRereadTheSecondFactor();
   return useMutation({

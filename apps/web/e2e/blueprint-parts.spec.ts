@@ -41,7 +41,6 @@ test.describe("the blueprint's parts, drawn on one board", () => {
     expect(marks.ink, "the marked region's marks are not the mark colour").toContain(
       await tokenColour(page, "--border-default"),
     );
-    // Centred on the hairline: three pixels of arm either side of the one-pixel line.
     expect([marks.top, marks.left]).toEqual(["-4px", "-4px"]);
   });
 

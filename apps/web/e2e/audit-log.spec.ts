@@ -24,7 +24,6 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-/** Under two lines of text with a row's padding, so only an event on one line passes. */
 const ONE_LINE_PX = 48;
 
 const AUDIT_LOG_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log").path;
@@ -47,7 +46,6 @@ const exportButton = (page: Page) => auditLog(page).getByRole("button", { name: 
 
 const said = (page: Page) => auditLog(page).getByRole("status").first();
 
-/** The empty list's one action, drawn only once a read has answered with no event. */
 const clearFilters = (page: Page) => auditLog(page).getByRole("button", { name: "Clear Filters" });
 
 const BY_PRIYA = /Priya Shah.*Bid writers/;
@@ -67,10 +65,6 @@ type AtTheAuditLog = {
   readonly unnamedEmail: string;
 };
 
-/**
- * Three events by three kinds of actor, and another workspace's alongside, so an audit log that
- * leaked would show its person.
- */
 const anAdminAtTheAuditLog = async (
   page: Page,
   api: APIRequestContext,

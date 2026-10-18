@@ -121,7 +121,6 @@ type BuiltDetail = {
   readonly draw: (value: string | undefined) => ReactElement;
 };
 
-/** The list declares each detail address; this map says what draws it, keyed by its page. */
 const BUILT_DETAILS: ReadonlyMap<string, BuiltDetail> = new Map<PagePath, BuiltDetail>([
   ["/knowledge/search", { value: CONCEPT_IRI, draw: (iri) => <ConceptPage iri={iri} /> }],
   ["/people/members", { value: PERSON_ID, draw: (personId) => <MemberPage personId={personId} /> }],
@@ -164,7 +163,6 @@ const signInRoute = createRoute({
   component: SignInPage,
 });
 
-/** The email's sign-in link, which carries its token in the fragment, so no server log holds it. */
 const signInLinkRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sign-in/link",
@@ -181,7 +179,6 @@ const displayNameRoute = createRoute({
   },
 });
 
-/** Only a signed-out visitor is sent on; each page's own read decides the rest as it draws. */
 const pendingRoute = <const Path extends string>(path: Path, component: () => ReactElement) =>
   createRoute({
     getParentRoute: () => rootRoute,
@@ -199,7 +196,6 @@ const recoveryRoute = pendingRoute(RECOVERY_STEP, RecoveryPage);
 
 const setupRoute = pendingRoute(SETUP_STEP, SetupPage);
 
-/** After the pending pages and before the display name, for a set never ticked as saved. */
 const codesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: CODES_STEP,
@@ -214,7 +210,6 @@ const sessionHeld = (): void => {
   rememberTheSession("held");
 };
 
-/** Framed once a workspace is open, and decided on arrival: a later read never swaps the page. */
 function AccountWhereHeld(): ReactElement {
   const framed = accountRoute.useRouteContext({ select: (context) => context.framed });
 
@@ -225,7 +220,6 @@ function AccountWhereHeld(): ReactElement {
   );
 }
 
-/** Outside the shell's route, so a person with no workspace and the operator reach it too. */
 const accountRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/account",
@@ -275,7 +269,6 @@ const acceptInvitationRoute = createRoute({
 
 const signInAndBackTo = (href: string) => ({ href: backTo("/sign-in", href), replace: true });
 
-/** A pending session's own step is asked afresh: a held read may predate the refusal. */
 const shellDetour = async (
   context: ShellContext,
   location: { readonly href: string },
@@ -324,12 +317,10 @@ const indexRoute = createRoute({
   },
   component: function HomeUnread() {
     const { home } = useVisibleTree();
-    // State goes on from here as well: a role read late takes this road home.
     return home === undefined ? <RoleUnread /> : <Navigate to={home.path} replace state />;
   },
 });
 
-/** Outside any workspace, so it asks for a session and never for a workspace pick. */
 const consoleRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "console",
@@ -385,7 +376,6 @@ function MovedAway(properties: { readonly moved: Moved }) {
 
 const HOME_PAGES: readonly Page[] = Object.values(HOMES);
 
-/** A detail address is declared beneath a built page, and nowhere else is one drawn. */
 const detailOf = (page: Page): BuiltDetail | undefined => {
   const built = BUILT_DETAILS.get(page.path);
   if (page.detail !== undefined && built === undefined) {
@@ -412,7 +402,6 @@ const drawOf = (page: Page): BuiltPage | undefined => {
 
 type Reading = {
   readonly readerIn: (context: ShellContext) => Reader;
-  /** A failed page offers the way home, which in the console is the console's own. */
   readonly home?: Page;
 };
 
@@ -488,7 +477,6 @@ const consoleRoutes = routesOf([CONSOLE], consoleRoute, {
   home: HOMES.operator,
 });
 
-/** Each failure is heard where it happened, and acted on only if the person is still there. */
 const detouringOn =
   (
     context: ShellContext,

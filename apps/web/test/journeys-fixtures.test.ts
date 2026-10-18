@@ -114,7 +114,6 @@ const replyTo = (asked: string, body: string, replies: Replies, signOut: () => R
 
 const STEP_MS = 30_000;
 
-/** The code the key shows now, or the step either side, so a step's edge never flakes. */
 const confirmed = (body: string): Reply => {
   const now = Date.now();
   const shown = [now - STEP_MS, now, now + STEP_MS].map((at) =>

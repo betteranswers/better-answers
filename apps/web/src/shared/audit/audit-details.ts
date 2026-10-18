@@ -24,7 +24,6 @@ export type DetailLine = {
   readonly address?: string;
 };
 
-/** Stored keys holding an id, which the read names; one it could not name is left off. */
 const NAMED_LABELS = new Map(
   Object.entries({
     userId: "Person",
@@ -93,7 +92,6 @@ export const LABELLED_DETAIL_KEYS: readonly string[] = [
   ...VALUE_LABELS.keys(),
 ];
 
-/** Ids and hashes the read never names, and a sweep's subject and row counts no reader acts on. */
 export const KEPT_OFF_DETAIL_KEYS: Readonly<Partial<Record<DeclaredAction, readonly string[]>>> = {
   "knowledge.check.imported": ["verificationId"],
   "knowledge.concept.committed": ["commitSha", "contentHash"],
@@ -155,13 +153,11 @@ const saidOf = (named: Named): Said => {
   }
 };
 
-/** A list, such as an export's matches, reads as its names alone. */
 const namedLine = (key: string, label: string, named: NamedOrList): DetailLine =>
   isList(named)
     ? { key, label, value: named.map((one) => saidOf(one).value).join(", ") }
     : { key, label, ...saidOf(named) };
 
-/** A list is the assistant access or the sessions an action ended, each named by what it is. */
 const wordsOfValue = (value: DetailValue): string => {
   if (Array.isArray(value)) {
     const named = value.map(

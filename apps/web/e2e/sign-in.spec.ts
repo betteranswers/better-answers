@@ -66,10 +66,6 @@ const sendTheFirstCode = async (page: Page, email: string): Promise<void> => {
   await expect(page.getByRole("status"), "the page says nothing of the email").toHaveText(/\S/);
 };
 
-/**
- * A send still out says something new too, so the status is compared only once the button that
- * sends is free again.
- */
 const saysANewEmailWent = async (page: Page, earlier: string): Promise<void> => {
   await expect(
     page.getByRole("button", { name: "Send a New Code" }),
@@ -170,7 +166,6 @@ const memberOfTwoWorkspaces = async (
 
 const LIST_BUDGET_MS = 1000;
 
-/** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 const theWorkspacesRead = (url: URL): boolean => url.pathname.includes("person.workspaces");
 
 const rowsOf = (page: Page) => page.getByRole("main").getByRole("listitem");
@@ -416,7 +411,6 @@ test("draws a row of secondary actions in one treatment", async ({ page, request
 
 test("names the wait when one client asks too many codes", async ({ page }) => {
   await page.goto("/sign-in");
-  // The page's own client address asks each code for another email, so no per-email ceiling is met.
   for (let asked = 0; asked < 5; asked += 1) {
     await page.request.post(SEND_PATH, { data: { email: anAddress("spread"), type: "sign-in" } });
   }
@@ -472,7 +466,6 @@ test("a new code sent from the code step signs in", async ({
 
   await page.getByRole("button", { name: "Send a New Code" }).click();
 
-  // The press took focus, and the field takes it back only once the new email has gone.
   await expect(codeField(page), "the new code's field did not take focus").toBeFocused();
   await expect(codeField(page), "the refused digits outlived the new code").toHaveValue("");
   await saysANewEmailWent(page, saidOfTheFirst);
@@ -617,7 +610,6 @@ const anotherCodeSignsIn = async (page: Page, request: APIRequestContext, email:
   const saidOfTheFirst = await page.getByRole("status").innerText();
 
   await page.keyboard.press("Enter");
-  // The field takes focus only once the new email has gone, so the code read next is the new one.
   await expect(codeField(page)).toBeFocused();
   await expect(codeField(page), "the spent digits outlived the new code").toHaveValue("");
   await saysANewEmailWent(page, saidOfTheFirst);
@@ -661,10 +653,6 @@ test("an expired code reads as spent, handing focus to another", async ({ page, 
   await anotherCodeSignsIn(page, request, email);
 });
 
-/**
- * A following tab reads where to go before the other tab confirms, so an Editor, needing no second
- * factor, shows the following alone.
- */
 const anEditorOf = async (request: APIRequestContext, name: string): Promise<string> => {
   const email = anAddress("tabs");
   const who = await person(request, email, { displayName: "Tam Editor" });
@@ -707,7 +695,6 @@ test("a tab waiting on one address ignores another's sign-in", async ({
   await landedAtHome(page, "Admin");
 });
 
-/** The query client asks a failed read three times before it gives up. */
 const READ_ATTEMPTS = 3;
 
 test("a tab whose first read failed still follows a sign-in", async ({
@@ -738,7 +725,6 @@ test("a tab whose first read failed still follows a sign-in", async ({
 });
 
 test("a tab hidden through a sign-in lands once shown", async ({ page, context, request }) => {
-  // This tab never hears the announcement, so only its being shown again can land it.
   await page.addInitScript(() => {
     Reflect.deleteProperty(globalThis, "BroadcastChannel");
   });
@@ -773,7 +759,6 @@ test("a shown tab waits for a sign-in of its own", async ({ page, request }) => 
   expect(await sessionHeldBy(page), "the tab landed on the session that stood").not.toBe(standing);
 });
 
-/** A session begun before the person joined names no workspace, so the picker opens the one joined since. */
 const joinedAfterSigningIn = async (page: Page, request: APIRequestContext, name: string) => {
   const who = await signedInWithNoWorkspace(page, request, "later");
   const workspace = await provision(request, { name });

@@ -3,10 +3,6 @@ import type { ComponentProps, ReactElement } from "react";
 
 import { cn } from "@/shared/lib/utils.ts";
 
-/**
- * The marked primitive: no fill, one hairline, for a figure or a region rather than content. Not
- * the shell's frame.
- */
 export function MarkedRegion({
   className,
   asChild = false,

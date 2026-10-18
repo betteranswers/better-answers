@@ -16,10 +16,8 @@ export const openTabIn = (
 
 export type PickedTab = readonly [string | undefined, (picked: string | undefined) => void];
 
-/** Opens on the first tab until one is picked; with no tabs, it holds the view-state slot alone. */
 export function PageTabsRoot(properties: {
   readonly tabs: readonly PageTab[] | undefined;
-  /** The frame's, so the band names the open tab; a root drawn alone keeps its own. */
   readonly picked?: PickedTab;
   readonly children: ReactNode;
 }) {
@@ -43,8 +41,6 @@ export function PagePanel(properties: { readonly children: ReactNode }) {
   const openTab = useOpenTab();
   if (openTab === undefined) return <>{properties.children}</>;
 
-  // The shell's half of the pattern, not the page's: an open tab must control a panel even
-  // where the page inside it failed to draw.
   return (
     <TabsContent key={openTab} value={openTab}>
       {properties.children}

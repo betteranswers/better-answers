@@ -70,7 +70,6 @@ const answering =
 
     const answerTo = (name: string): Answer => {
       if (name === "session.operator") return standing;
-      // The shell reads the second factor wherever it draws, and the dialog shares that read.
       return (
         refused.get(name) ?? {
           result: { data: held[name] ?? (name === "person.secondFactor" ? NOTHING_HELD : []) },
@@ -127,7 +126,6 @@ const NAMES_WAITING = [
   { personId: "p2", displayName: "Sam Okoro", flags: [flaggedBy(DALES)] },
 ];
 
-/** The header row is a row too, so a list's own rows are the ones with a cell. */
 const rowsOf = (list: HTMLElement): readonly HTMLElement[] =>
   within(list)
     .getAllByRole("row")

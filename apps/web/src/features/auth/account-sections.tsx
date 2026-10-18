@@ -62,10 +62,6 @@ function ActionKeystroke(properties: {
   return null;
 }
 
-/**
- * An action's own button, focusable while it cannot run, so focus never drops as it waits. Its
- * keystroke passes the same guard.
- */
 export function ActionButton(properties: {
   readonly id?: string;
   readonly unavailable: boolean;
@@ -165,10 +161,6 @@ export type RemovalWords = {
   readonly commit: string;
 };
 
-/**
- * Whoever must hold a factor keeps their last: Remove says why beside it, not after a press. Focus
- * returns to Remove however the dialog closes.
- */
 export function RemoveKeepingTheLast(properties: {
   readonly words: RemovalWords;
   readonly last: boolean;
@@ -333,7 +325,6 @@ function ReplaceCodes(properties: {
   );
 }
 
-/** Nothing is voided by a first set, so making one asks nothing first. */
 function MakeCodes(properties: {
   readonly making: boolean;
   readonly onMake: (replacing: boolean) => void;

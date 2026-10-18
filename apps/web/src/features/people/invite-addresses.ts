@@ -1,14 +1,9 @@
 import { EMAIL_ADDRESS } from "@better-answers/schema/email-address";
 
-/**
- * Matches the api's cap for one send or one action on a set, which refuses any more as input it
- * cannot read.
- */
 export const MOST_AT_ONCE = 50;
 
 const SEPARATORS = /[,;\r\n]+/;
 
-/** The two words the api refuses one address of a send with, keyed by its place in the send. */
 export type Flag = "malformed" | "already-a-member";
 
 export type Held = { readonly key: string; readonly address: string };

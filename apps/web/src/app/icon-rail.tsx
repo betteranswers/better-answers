@@ -8,23 +8,18 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shar
 
 import { RAIL } from "./words.ts";
 
-/** A beat before the first one, so a pointer crossing the rail on its way elsewhere opens none. */
 const HOVER_DELAY_MS = 200;
 
-/** `tooltips` is for a rail of icons alone; where each entry shows its name, leave it off. */
 export function IconRail(properties: {
   readonly areas: readonly VisibleArea[];
   readonly openAreaId: string | undefined;
   readonly tooltips: boolean;
   readonly onChoose?: () => void;
-  /** The utilities under the areas. The sheet has none: its rail sits in a dialog. */
   readonly foot?: ReactNode;
 }) {
   return (
     <nav
       aria-label={RAIL}
-      /* Sticky under the band rather than a scroll region: a pane that scrolls on its own is
-         one a keyboard can miss. */
       className="shrink-0 border-b border-border bg-sidebar px-2 py-2 md:sticky md:top-[var(--band-drawn-h)] md:flex md:h-[calc(100vh-var(--band-drawn-h))] md:w-rail md:flex-col md:self-start md:border-r md:border-b-0 md:py-1"
     >
       <TooltipProvider delayDuration={HOVER_DELAY_MS}>
@@ -38,8 +33,6 @@ export function IconRail(properties: {
                 onClick={properties.onChoose}
                 aria-current={open ? "page" : undefined}
                 className={cn(
-                  // The menu's open-page fill and a bold glyph, so greyscale tells the open area
-                  // apart without outweighing the primary button. The accent is for actions.
                   "flex h-10 items-center gap-2 px-2 transition-colors md:w-10 md:justify-center md:px-0",
                   open
                     ? "bg-[var(--surface-active)] text-foreground"

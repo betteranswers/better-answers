@@ -128,7 +128,6 @@ test("an hour unconfirmed ends the sign-in; signing in returns there", async ({
   await signIn(page, request, workspace.admin.email);
   await expect(page).toHaveURL(new RegExp(`${GROUPS}$`));
 
-  // A confirmed session that ends is told apart from one never confirmed.
   await page.context().clearCookies();
   await page.reload();
   await expect(signInHeading(page)).toBeVisible();
@@ -156,7 +155,6 @@ const someoneHoldingBoth = async (page: Page, api: APIRequestContext) => {
   await page.goto("/sign-in");
   await signIn(page, api, email);
   await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
-  // Adding a passkey beside a held factor asks for a fresh confirmation first, so confirm here.
   const codeNow = authenticatorCodeAt(key, new Date());
   await page.goto("/confirm");
   await authenticatorCodeField(page).fill(codeNow);
@@ -166,7 +164,6 @@ const someoneHoldingBoth = async (page: Page, api: APIRequestContext) => {
   await page.getByRole("button", { name: "Add a Passkey" }).click();
   const passkey = await page.getByLabel("Passkey Name").inputValue();
   await page.getByRole("button", { name: "Add Passkey" }).click();
-  // Codes come only with a first factor, and the harness's authenticator came first.
   await expect(page.getByRole("listitem", { name: passkey, exact: true })).toBeFocused();
   return { device, who, key, passkey };
 };

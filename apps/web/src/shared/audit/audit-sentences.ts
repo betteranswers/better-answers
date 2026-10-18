@@ -22,7 +22,6 @@ type DeclaredAction = (typeof DECLARED_ACTIONS)[number];
 
 const sentenceCase = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 
-/** `people.member.role_changed` reads "Member role changed": the action's subject, then its verb. */
 const wordsOfName = (action: string): string => {
   const [, subject = "", verb = ""] = action.split(".");
   return sentenceCase(`${subject} ${verb}`.replaceAll("_", " "));
@@ -47,7 +46,6 @@ const groupNow = (subject: Subject): string =>
 const invitation = (subject: Subject): string =>
   subject?.kind === "invitation" ? `an invitation to ${subject.address}` : "an invitation";
 
-/** Named as it stands now, or by its kind alone once it is removed. */
 const thing = (kind: Thing) => {
   const noun = THING_NOUNS[kind];
   return (subject: Subject | undefined): string => {
@@ -67,7 +65,6 @@ const role = (detail: Slots["detail"]): string => {
   return typeof held === "string" ? held : "a role";
 };
 
-/** The sessions a sign-out ended; none named reads as one, which no sign-out ends. */
 const sessionsIn = (detail: Slots["detail"]): number => {
   const held = detail["sessions"];
   return Array.isArray(held) ? held.length : 1;
@@ -203,7 +200,6 @@ export const ACTIONS_SAID: readonly string[] = [...SAID.keys()];
 
 export const ACTIONS_HEADED: readonly string[] = [...HEADED.keys()];
 
-/** An action the web was built before falls back to its stored name in words. */
 export const headlineOf = (action: string): string => HEADED.get(action) ?? wordsOfName(action);
 
 export const sentenceOf = (event: SaidEvent): string => {

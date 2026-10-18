@@ -14,7 +14,6 @@ const NONE_WENT: ReadonlySet<SentInvitation> = new Set();
 
 export function UnsentEmails(properties: { readonly unsent: readonly SentInvitation[] }) {
   const [outcome, setOutcome] = useState<Outcome>();
-  // The rows themselves, not their ids: a later action's answer brings fresh rows, shown whole.
   const [went, setWent] = useState(NONE_WENT);
   const { acting, begin, settled } = useOneAtATime(setOutcome);
   const resend = useResendInvitation();

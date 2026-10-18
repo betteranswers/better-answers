@@ -26,7 +26,6 @@ const SWITCH_BUDGET_MS = 1000;
 
 const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
 
-/** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 const readOf =
   (procedure: string) =>
   (url: URL): boolean =>
@@ -53,7 +52,6 @@ const NOT_A_MEMBER = "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION";
 const memberLink = (page: Page, name: string): Locator =>
   page.getByRole("main").getByRole("link", { name, exact: true });
 
-/** A member of one workspace alone, so a row names the workspace it was read from. */
 const aMemberOnlyOf = async (api: APIRequestContext, workspaceId: string, name: string) => {
   const member = await person(api, anAddress("only"), { displayName: name });
   await addMember(api, { workspaceId, userId: member.id, role: "Viewer" });
@@ -242,10 +240,8 @@ test("drops the left workspace's members when All workspaces picks another", asy
   await page.getByRole("banner").getByRole("button", { name: "Jump To" }).click();
   const jumpTo = page.getByRole("dialog", { name: "Jump To" });
   await jumpTo.getByRole("combobox", { name: "Jump To" }).fill("Only In Esk");
-  // Said of the read still out, which is not yet that nothing matches what was typed.
   await expect(jumpTo.getByRole("status"), "jump-to says nothing of its read").toHaveText(/\S/);
   await expect(jumpTo.getByRole("status")).not.toContainText("Only In Esk");
-  // Search's row names what was typed, so a member is looked for under Members alone.
   const members = jumpTo.getByRole("group", { name: "Members" });
   await expect(members, "jump-to offered the left workspace's members").toHaveCount(0);
 
@@ -451,7 +447,6 @@ test("drops the left workspace's name when the member read fails", async ({ page
 
   await switched(page, first.name, second.name);
 
-  // The switch's read and then the shell's each ask again twice before they give up.
   await expect(switcherOf(page, first.name), "the band still names the workspace left").toHaveCount(
     0,
     { timeout: 15_000 },
@@ -476,7 +471,6 @@ test("drops the left workspace's name while the switch waits offline", async ({
     first: "Hebden Wireworks",
     second: "Ryburn Wireworks",
   });
-  // Offline once the pick has landed, so the member read is the one that waits.
   await page.route("**/organization/set-active", async (route) => {
     const answered = await route.fetch();
     await context.setOffline(true);
@@ -500,7 +494,6 @@ test("says an unread list, and how to read it again", async ({ page, request }) 
     first: "Lune Toolmaking",
     second: "Wenning Toolmaking",
   });
-  // A fresh document, so no list the picker read is held.
   await page.reload();
   await expect(switcherOf(page, first.name)).toBeVisible();
   await page.route(WORKSPACES_READ, (route) => route.abort());

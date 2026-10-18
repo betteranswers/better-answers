@@ -79,7 +79,6 @@ const belowThePage = (
 ): string | undefined =>
   open === undefined || open.detail !== undefined ? lastPart : openTab?.name;
 
-/** A page whose route sits outside the shell, drawn in it; `name` titles its keystroke list. */
 export type Handed = { readonly draw: ReactNode; readonly name?: string };
 
 const listNameOf = (
@@ -101,10 +100,6 @@ const useSwitchedInAnotherTabSaid = (here: Here | undefined): Outcome | undefine
     : undefined;
 };
 
-/**
- * The band has one line: the switcher's own outcome leads, a refused tab's precedes a returning
- * tab's, and the unsaved note comes last.
- */
 const useBandOutcome = (
   switching: WorkspaceSwitch,
   here: Here | undefined,
@@ -212,7 +207,6 @@ export function Frame(properties: {
   );
 }
 
-/** One frame for every workspace area, so moving between them keeps the pressed menu button. */
 export function WorkspaceFrame(properties: { readonly page?: Handed }) {
   const member = useMember();
   const standing = useOperatorStanding();
@@ -283,7 +277,6 @@ function ToolbarAndPage(properties: {
       />
 
       <GridPattern>
-        {/* The grid moves down by the top padding, so the page starts on one of its lines. */}
         <main
           id={PAGE}
           aria-label="Page"

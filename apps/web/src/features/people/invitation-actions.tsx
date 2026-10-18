@@ -28,7 +28,6 @@ export type Ticked = ReadonlyMap<string, string>;
 export const NONE: Ticked = new Map();
 
 type ActedList = {
-  /** False while the list's read waits or has failed, when its rows are not there to act on. */
   readonly readable: boolean;
   readonly ticked: Ticked;
   readonly tick: (ticked: Ticked) => void;
@@ -45,7 +44,6 @@ const STILL_GOING: Outcome = { tone: "said", words: BULK_WORDS.stillGoing };
 
 const TOO_MANY: Outcome = { tone: "said", words: INVITATIONS_WORDS.bulk.tooMany(MOST_AT_ONCE) };
 
-/** A ceiling carries no items, so it is said first; names are those the ticks took. */
 const refusalOf = (failure: Failure, names: Ticked): Outcome =>
   ceilingLiftsIn(failure) === undefined
     ? setRefusalOutcome({
@@ -150,9 +148,7 @@ export const useInvitationActions = (list: ActedList) => {
     return list.ticked.size > MOST_AT_ONCE ? TOO_MANY : undefined;
   };
 
-  /** The ticks are spent at the press, and come back if the set is refused. */
   const onTheTicked = (pending: (count: number) => string, run: (names: Ticked) => void) => {
-    // The failed or waiting read already says why there is no list to act on.
     if (!list.readable) return;
     const refused = refusedBefore();
     if (refused !== undefined) {

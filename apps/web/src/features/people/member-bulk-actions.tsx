@@ -45,7 +45,6 @@ type Settled = {
 };
 
 export type BulkList = {
-  /** False while the list's read waits or has failed, when its rows are not there to act on. */
   readonly readable: boolean;
   readonly ticked: ReadonlySet<string>;
   readonly tick: (ticked: ReadonlySet<string>) => void;
@@ -59,7 +58,6 @@ const NOTHING_TICKED = selectFirst(PEOPLE_SELECT_FIRST.member);
 
 const STILL_GOING: Outcome = { tone: "said", words: BULK_WORDS.stillGoing };
 
-/** Matches the api's cap for one action, which refuses any more as input it cannot read. */
 const MOST_TICKED = 200;
 
 const TOO_MANY: Outcome = { tone: "said", words: BULK_WORDS.tooMany(MOST_TICKED) };
@@ -67,7 +65,6 @@ const TOO_MANY: Outcome = { tone: "said", words: BULK_WORDS.tooMany(MOST_TICKED)
 const refusedRowsOf = (failure: Error | ApiError): RefusedRows =>
   new Set(saidOfItems(SAID_OF_TICKED_MEMBERS, failure).map(({ id }) => id));
 
-/** Names are taken at the press, so a person the list has since lost is still named. */
 const refusalOf = (failure: Error | ApiError, names: ReadonlyMap<string, string>): Outcome =>
   setRefusalOutcome({
     featureWords: SAID_OF_TICKED_MEMBERS,
@@ -88,7 +85,6 @@ export const useMemberBulkActions = (list: BulkList) => {
   const { goHome } = useSelfActionHome();
 
   const show = (action: BulkAction) => {
-    // The failed or waiting read already says why there is no list to act on.
     if (!list.readable) return;
     if (acting) {
       list.say(STILL_GOING);
@@ -157,7 +153,6 @@ export const useMemberBulkActions = (list: BulkList) => {
     show("remove");
   });
 
-  // A read failing under an open dialog shuts it for good, rather than reopening it once read.
   if (!list.readable && open !== undefined) setOpen(undefined);
 
   return {
@@ -290,7 +285,6 @@ function GroupSelect(properties: {
   );
 }
 
-/** Only an answered read may say there are no groups; a waiting or failed one says so instead. */
 function GroupChoice(properties: {
   readonly actions: Actions;
   readonly groups: ReturnType<typeof useGroups>;

@@ -177,7 +177,6 @@ const signInEmailOtpOptions = () =>
 
 export const useSignInEmailOtp = () => useMutation(signInEmailOtpOptions());
 
-/** The shape the api accepts, not the one it mints, so a change of length never reads as no link. */
 const LINK_TOKEN = /^#([A-Za-z0-9]{1,128})$/;
 
 export const linkTokenOnThisPage = (): string | undefined =>
@@ -236,7 +235,6 @@ export const askOfOurRoute = async <T>(
 
 const ASKED_AGAIN_AT_MOST = 2;
 
-/** Each read spends the link's ceiling, and a failed read stays stale, so only Read again reads twice. */
 export const useDescribeTheLink = (token: string | undefined, reading: boolean) =>
   useQuery({
     queryKey: [...AUTH_KEYS.all, "link", token],
@@ -271,10 +269,6 @@ const ARRIVAL_AFTER = {
   "signed-out": "signed-out",
 } as const satisfies Record<NonNullable<ReturnType<typeof sessionRemembered>>, Arrival>;
 
-/**
- * Said only once the api reads no session: a failed sign-out, or a visit while signed in, leaves
- * one standing.
- */
 export const useArrival = (): Arrival | undefined => {
   const [remembered] = useState(sessionRemembered);
   const session = useQuery({ ...sessionOptions(), enabled: remembered !== undefined });
@@ -282,10 +276,6 @@ export const useArrival = (): Arrival | undefined => {
   return ARRIVAL_AFTER[remembered];
 };
 
-/**
- * Undefined when unread: the page then stands, and its own next request says in words what went
- * wrong.
- */
 const sessionOrUnread = (queryClient: QueryClient) =>
   queryClient.fetchQuery(sessionOptions()).catch(() => undefined);
 
@@ -311,7 +301,6 @@ export const signedOutDetour = async (
   return session === null ? backTo("/sign-in", path) : undefined;
 };
 
-/** A step's query already names where the person returns, so sign-in keeps it whole. */
 export const signedOutOfAStep = async (
   queryClient: QueryClient,
   query: string,
@@ -320,7 +309,6 @@ export const signedOutOfAStep = async (
   return session === null ? `/sign-in${query}` : undefined;
 };
 
-/** Read again rather than dropped, for a page that shows whose session it is. */
 export const rereadTheSession = (queryClient: QueryClient): Promise<void> =>
   queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
 
@@ -329,8 +317,6 @@ export const useSetDisplayName = () => {
   const queryClient = useQueryClient();
   return useMutation(
     api.person.setDisplayName.mutationOptions({
-      // Removed, not invalidated: no page watches it here, so a stale answer would be the next
-      // page's first read.
       onSuccess: () => {
         queryClient.removeQueries({ queryKey: AUTH_KEYS.session });
       },
@@ -372,8 +358,6 @@ export const useSignOut = (returnTo?: string) => {
     signingOut: signOut.isPending,
     signOut: () => {
       signOut.mutate(undefined, {
-        // On settle, not success: whatever the server said, this browser is done with the
-        // session the person asked to leave.
         onSettled: () => {
           queryClient.clear();
           rememberTheSession("signed-out");
@@ -390,11 +374,9 @@ const notAMember = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORGAN
 
 const libraryCode = z.object({ code: z.string() });
 
-/** A refused switch or pick in the platform's terms, so no page reads the provider's error. */
 export class SwitchRefused extends Error {
   readonly noLongerAMember: boolean;
 
-  /** The library's own, so a pending refusal heard app-wide is still told apart. */
   readonly code: string | undefined;
 
   constructor(noLongerAMember: boolean, code?: string) {
@@ -418,10 +400,6 @@ const setActiveOrganizationOptions = () =>
     mutationFn: (input) => setActiveWorkspace(input.organizationId),
   });
 
-/**
- * The session's, the console's and the workspace list's reads belong to no workspace, so a switch
- * keeps them. One left off is read again.
- */
 const aboutTheWorkspace = (api: ApiProxy) => {
   const theirOwn = [
     { queryKey: AUTH_KEYS.all },
@@ -465,13 +443,8 @@ export const useSetActiveOrganization = () => {
 
 export type SwitchedTo = { readonly id: string; readonly name: string };
 
-/**
- * Whichever tab moved the session. The reads go before the first wait, so a rollback still on
- * its way finds them gone.
- */
 export const followTheSession = async (queryClient: QueryClient, api: ApiProxy): Promise<void> => {
   forgetTheWorkspaceLeft(queryClient, api);
-  // In place, not dropped, so the band blanks between the two only when the read fails or waits.
   await memberChanged(queryClient, api, { readAgain: true, ifUnread: "reset" });
   void queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
 };
@@ -498,7 +471,6 @@ const oauthContinueOptions = () =>
     mutationFn: async (input) => {
       const { data, error } = await authClient.oauth2.continue(input);
       if (error !== null) {
-        // The library's code rides along, so a pending refusal heard app-wide is still told apart.
         throw Object.assign(new Error(`answered ${String(error.status)}`), { code: error.code });
       }
       return resumeAnswer.parse(data);

@@ -98,7 +98,6 @@ function KeystrokesList(properties: {
       {properties.children}
       <PopoverContent
         side={properties.side}
-        // Beside the rail, clear of its edge rather than over it.
         sideOffset={properties.side === "right" ? 12 : 4}
         align="end"
         aria-labelledby={headingId}
@@ -128,10 +127,6 @@ function KeystrokesList(properties: {
   );
 }
 
-/**
- * For a page outside the shell. It binds `?` itself and lists it, so the caller leaves `?`
- * out.
- */
 export function KeystrokesAction(properties: {
   readonly page: string;
   readonly keystrokes: readonly Keystroke[];
@@ -176,7 +171,6 @@ const NONE: readonly Keystroke[] = [];
 
 export function ShellKeystrokes(properties: {
   readonly page: string | undefined;
-  /** Bound with a modifier, so turning single-key keystrokes off leaves them on. */
   readonly shell: readonly Keystroke[];
   readonly children: ReactNode;
 }) {
@@ -189,7 +183,6 @@ export function ShellKeystrokes(properties: {
 
   const register = useCallback<Register>((keystrokes) => {
     setOwn(keystrokes);
-    // Only its own: the next page's arrive in the same commit.
     return () => {
       setOwn((current) => (current === keystrokes ? NONE : current));
     };
@@ -213,10 +206,6 @@ export function ShellKeystrokes(properties: {
   );
 }
 
-/**
- * A page sits under the outlet, where the shell cannot hand it a prop. Pass one identity, or
- * every draw registers again.
- */
 export function usePageKeystrokes(keystrokes: readonly Keystroke[]) {
   const register = useContext(RegisterContext);
   useEffect(() => register?.(keystrokes), [register, keystrokes]);

@@ -77,10 +77,6 @@ const rowOf = (page: Page, name: string): Locator =>
     has: page.getByRole("button", { name: `More About ${name}`, exact: true }),
   });
 
-/**
- * The console lists every workspace the run provisioned, so a name another spec also uses would
- * match two rows.
- */
 const aNameOfItsOwn = (name: string): string =>
   `${name} ${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
@@ -519,7 +515,6 @@ test.describe("the console's Workspaces page", () => {
         - button "Keyboard Shortcuts"
     `);
 
-    // The count is the whole platform's, so the page is read narrowed to this test's own row.
     await page.keyboard.press(WORKSPACES_KEYSTROKES.search.key);
     await expect(searchOf(page)).toBeFocused();
     await page.keyboard.type(workspace.name);

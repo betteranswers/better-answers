@@ -72,7 +72,6 @@ type GroupActions = {
   readonly landed: (button: HTMLButtonElement | null) => void;
 };
 
-/** Read by each cell, so a change of what the page does leaves the columns, and their cells, standing. */
 const GroupActionsContext = createContext<GroupActions | undefined>(undefined);
 
 function GroupCell(properties: { readonly row: GroupRow }) {
@@ -127,7 +126,6 @@ const saidOfCount = (shown: number, total: number, search: string): string =>
 
 type Opened = { readonly groupId: string; readonly at: GroupOpenedAt };
 
-/** Read once the groups are listed: sooner, it rides the request a switch's follow waits on. */
 function MembersRead() {
   useMembers();
   return null;
@@ -179,7 +177,6 @@ function GroupsList(properties: { readonly headingId: string }) {
     (target ?? heading.current)?.focus();
   };
 
-  /** A letter pressed outside the list still needs a group, so the one last in focus stands. */
   const openInFocus = (at: GroupOpenedAt) => {
     const group = groupOf(inFocus);
     setOutcome(group === undefined ? NOTHING_IN_FOCUS : undefined);

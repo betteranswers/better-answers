@@ -12,7 +12,6 @@ const WRITTEN = z.string().trim().min(1);
 const wordsAt = (frontmatter: Frontmatter, key: string): string | undefined =>
   WRITTEN.safeParse(frontmatter[key]).data;
 
-/** A file need not title itself, and its identity is never what a page calls it. */
 export const titleOf = (frontmatter: Frontmatter): string =>
   wordsAt(frontmatter, "title") ?? WORDS.untitled;
 

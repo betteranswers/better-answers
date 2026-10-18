@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 
 import type { Asked } from "./people-api.ts";
 
-/** A pause in typing asks the api once, rather than once a key under its per-address ceiling. */
 const SEARCH_PAUSE_MS = 200;
 
 export function useAsking(initial: string) {

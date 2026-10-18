@@ -34,7 +34,6 @@ export const READ_AGAIN: Keystroke = { key: "r", action: ACCOUNT_ACTIONS.readAga
 
 const MS_PER_SECOND = 1000;
 
-/** The throttle's first wait, for a refusal whose answer named none. */
 const SHORTEST_WAIT_SECONDS = 30;
 
 export const holdsAFactor = (held: SecondFactor): boolean =>
@@ -94,7 +93,6 @@ export const useArrivalFocus = () => {
 
 export type FocusOnArrival = ReturnType<typeof useArrivalFocus>;
 
-/** No countdown: the wait is named once, and its lifting said once. */
 const useWaiting = (secondsAtArrival: number, onLifted: () => void) => {
   const [wait, setWait] = useState<{ readonly seconds: number | undefined } | undefined>(
     secondsAtArrival > 0 ? { seconds: secondsAtArrival } : undefined,

@@ -249,7 +249,6 @@ test.describe("Questions asked", () => {
     await page.keyboard.press("Escape");
     await expect(groupNamed(page, "Flagged")).toHaveCount(0);
 
-    // Read afresh, so what shows is what the api kept.
     await page.reload();
     await expect(rowsOf(groupNamed(page, "Other Questions"))).toHaveText([
       NEWER_QUESTION,

@@ -97,7 +97,6 @@ const addressAtRest = (
     ? personSaid(by.displayName, by.address).address
     : undefined;
 
-/** One line at rest: the sentence, then Details, whose list opens on a line of its own beneath. */
 function EventLine(properties: {
   readonly event: ReadAuditEvent;
   readonly address: string | undefined;
@@ -206,7 +205,6 @@ function Events(properties: {
   );
 }
 
-/** The reader's own day, which `en-CA` writes year first. */
 const fileName = (): string => `audit-log-${new Date().toLocaleDateString("en-CA")}.csv`;
 
 const save = (csv: string, name: string): void => {
@@ -329,7 +327,6 @@ function AuditLogRegion() {
           failed={(failure) => outcomeOfAuditLogFailure(failure, "read").words}
           focusAfterRetry={searchRef}
         >
-          {/* Keyed, so a page of older events never lands its focus in another search's list. */}
           <Events
             key={`${asked.family ?? ""}:${asked.search}`}
             auditLog={auditLog}

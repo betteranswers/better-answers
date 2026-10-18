@@ -84,7 +84,6 @@ const setupOpened = async (page: Page): Promise<string> => {
   return keyShown(page);
 };
 
-/** Six digits finish the setup on their own, as a sign-in code does. */
 const setUpWithItsCode = async (page: Page): Promise<readonly string[]> => {
   const key = await setupOpened(page);
   await codeField(page).fill(authenticatorCodeAt(key, new Date()));
@@ -110,7 +109,6 @@ const tenCodesInTheList = Array.from(
   () => `        - listitem: ${String(RECOVERY_CODE)}`,
 ).join("\n");
 
-/** An Admin cannot reach Account holding no factor, so an Editor shows the first setup there. */
 const anEditorOnAccount = async (page: Page, api: Parameters<typeof person>[0]) => {
   const email = anAddress("editor");
   const editor = await person(api, email, { displayName: "Ines Editor" });
@@ -154,7 +152,6 @@ test("Done waits for the tick, and a reload shows none", async ({ page, request 
   await setUpWithItsCode(page);
 
   await doneButton(page).focus();
-  // Landed once the block's alert holds words: the block is found so, and read for its heading.
   await clockTheNextKey(page, {
     at: `//section[h3[normalize-space(.)="Save Your Recovery Codes"]][.//*[@role='alert'][normalize-space(.)]]`,
     reads: "Save Your Recovery Codes",
@@ -199,7 +196,6 @@ test("an Admin's only authenticator keeps Remove disabled, saying why", async ({
 
 test("a wrong setup code is refused, its digits left selected", async ({ page, request }) => {
   await accountWithNoWorkspace(page, request);
-  // The key is bound once the read says there is no authenticator, which the button shows.
   await expect(setUpButton(page)).toBeVisible();
   await page.keyboard.press("s");
   await expect(page.getByRole("img", { name: "QR code for your authenticator" })).toBeVisible();

@@ -137,7 +137,6 @@ test.describe("the Models and spend page's model choices card", () => {
     await expect(rowOf(page, "Answering").getByText("Anthropic", { exact: true })).toBeVisible();
     await expect(embeddingRow(page).getByText("Mistral AI", { exact: true })).toBeVisible();
 
-    // Exact, because a model's id can hold its provider's: mistral-embed.
     await expect(page.getByText(ANSWERING.provider, { exact: true })).toHaveCount(0);
     await expect(page.getByText(EMBEDDING.provider, { exact: true })).toHaveCount(0);
   });

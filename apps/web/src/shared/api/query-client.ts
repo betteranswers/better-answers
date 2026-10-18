@@ -4,10 +4,6 @@ import { ceilingLiftsIn, refusalOf, type ApiError } from "./trpc.ts";
 
 const RETRY_ATTEMPTS = 2;
 
-/**
- * Every class names something its reader must do, and none of them is waiting, so a refusal of
- * any word is never asked again.
- */
 const worthAnotherAsk = (error: Error) => refusalOf(error) === undefined;
 
 const retryUnlessWaiting = (failureCount: number, error: Error | ApiError): boolean =>
@@ -24,7 +20,6 @@ const waitedOut = ({ state }: Held): boolean => {
   return liftsInSeconds === undefined || state.errorUpdatedAt + liftsInSeconds * 1000 <= Date.now();
 };
 
-/** While a ceiling's wait runs, only its reader asks again. A mount has two roads: a read holding an answer, and one holding none. */
 export const WHILE_A_CEILING_HOLDS = {
   retry: retryUnlessWaiting,
   retryOnMount: waitedOut,
@@ -33,13 +28,10 @@ export const WHILE_A_CEILING_HOLDS = {
   refetchOnReconnect: waitedOut,
 } as const;
 
-/** A read saves nothing, so only a refused action leaves something unsaved. */
 export type FailedDuring = "read" | "action";
 
-/** The refused act a mutation leaves behind, so a re-confirm can run it again with its input. */
 export type RefusedAct = { readonly retry: () => void };
 
-/** Typed as the cache types it, though the auth library's failures arrive as plain objects. */
 export type FailureHeard = (failure: Error, during: FailedDuring, refusedAct?: RefusedAct) => void;
 
 export const createQueryClient = (heard: FailureHeard = () => undefined) =>

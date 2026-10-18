@@ -46,7 +46,6 @@ const switchOutcome = (switching: Switching): Outcome | undefined => {
   return refusedWith(switching.error.noLongerAMember ? noLongerAMemberOf(to.name) : STOCK.general);
 };
 
-/** A list already held stands through a failed read of it again, so only a first read speaks. */
 const listOutcome = (list: ListRead): Outcome | undefined => {
   if (list.data !== undefined) return undefined;
   if (list.isFetching) return { tone: "said", words: PICKER_WORDS.reading };
@@ -56,7 +55,6 @@ const listOutcome = (list: ListRead): Outcome | undefined => {
 export const useWorkspaceSwitch = () => {
   const [open, setOpen] = useState(false);
   const [gone, setGone] = useState<readonly string[]>([]);
-  // Read on opening alone, so a page load says nothing in the band and asks nothing of the api.
   const list = useWorkspacesHeld(open);
   const switching = useSwitchWorkspace();
   const workspaces: readonly Listed[] = (list.data ?? []).filter(
@@ -74,7 +72,6 @@ export const useWorkspaceSwitch = () => {
     switchTo: (to: SwitchedTo) => {
       if (switching.isPending) return;
       switching.mutate(to, {
-        // Left out at once, before the list is read again on the next opening.
         onError: (refused) => {
           if (refused.noLongerAMember) setGone((was) => [...was, to.id]);
         },
@@ -86,10 +83,6 @@ export const useWorkspaceSwitch = () => {
 
 export type WorkspaceSwitch = ReturnType<typeof useWorkspaceSwitch>;
 
-/**
- * The open workspace first, from what the frame holds, so it shows while the list is read; the
- * rest by name.
- */
 const listedFrom = (here: Here, workspaces: readonly Listed[]): readonly Listed[] => {
   const { workspaceId } = here;
   const others = workspaces

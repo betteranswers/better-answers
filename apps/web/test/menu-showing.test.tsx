@@ -10,7 +10,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** An Admin, so there is an area open for the nav to list. */
 const openAt = async (path: string) => {
   vi.stubGlobal("fetch", answeringAs("Admin"));
   return (await openApp(path)).rendered;

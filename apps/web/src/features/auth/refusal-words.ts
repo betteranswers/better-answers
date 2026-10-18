@@ -18,7 +18,6 @@ export const SAID_OF_ACCEPTING = {
   malformed: INVITATION_LINK_INVALID,
 } satisfies OwnSentences;
 
-/** The one refusal asking to join names: every other says the same, so none reveals a workspace. */
 export const REASON_REFUSED = "Please enter a reason.";
 
 export const CODE_NOT_SENT =
@@ -34,7 +33,6 @@ export const codeWrong = (triesLeft: number): string =>
 export const noLongerAMember = (workspace: string): string =>
   `You're no longer a member of ${workspace}.`;
 
-/** Said in the band, where the switcher lists the workspaces left. */
 export const noLongerAMemberOf = (workspace: string): string =>
   `You're no longer a member of ${workspace}.`;
 
@@ -92,7 +90,6 @@ const orUsing = (others: readonly OtherWay[]): string =>
 const waitNamed = (waitSeconds: number | undefined): string =>
   waitSeconds === undefined ? "later" : `in ${minutesUntil(waitSeconds)}`;
 
-/** The field waits, with no countdown, while every other way the person holds stays open. */
 export const tooManyCodesTriedOr = (
   waitSeconds: number | undefined,
   others: readonly OtherWay[],

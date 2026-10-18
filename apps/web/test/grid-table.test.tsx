@@ -529,7 +529,6 @@ const FOCUS_COLUMNS = focusColumn.columns([
   focusColumn.accessor("name", { id: "person", header: "Person" }),
 ]);
 
-/** Two controls a row, so focus can move inside one row as well as between rows. */
 function FocusedList(properties: { readonly onRowFocus: (id: string | undefined) => void }) {
   const table = useTable({
     features: FOCUS_FEATURES,

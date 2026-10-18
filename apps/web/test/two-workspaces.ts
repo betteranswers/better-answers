@@ -24,7 +24,6 @@ export const ADA = {
 
 export const GRACE = { ...ADA, personId: "01JGRACE00000000000000000A", displayName: "Grace" };
 
-/** In Holme Valley Tools only, so a row of hers is never one of the workspace left. */
 export const HEDY = { ...ADA, personId: "01JHEDY000000000000000000A", displayName: "Hedy" };
 
 const A_SESSION = {
@@ -92,10 +91,6 @@ export const heldBack = (api: Api, procedure: string, answer: unknown) => {
   return { asked: asked.promise, resolve: held.resolve };
 };
 
-/**
- * A turn of the event loop later, as a network answers: sooner, the answer lands before the frame
- * hears its member read change.
- */
 const aTurnLater = () =>
   new Promise<void>((resolve) => {
     setTimeout(resolve);

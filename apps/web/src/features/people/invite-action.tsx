@@ -65,7 +65,6 @@ type FieldRef = RefObject<HTMLInputElement | null>;
 
 type ListRef = RefObject<HTMLUListElement | null>;
 
-/** A paste holding several addresses, put where the caret was; one address pastes as typing. */
 const pastedInto = (event: ClipboardEvent<HTMLInputElement>): string | undefined => {
   const pasted = event.clipboardData.getData("text");
   if (!hasSeparator(pasted)) return undefined;
@@ -85,7 +84,6 @@ const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef, left: str
     setField(moved.field);
   };
 
-  /** Drawn at once, so the press that moved the field can check the list and move focus into it. */
   const placedNow = (moved: Moved): readonly Held[] => {
     flushSync(() => {
       place(moved);
@@ -210,7 +208,6 @@ const summaryOf = (addresses: Addresses): string => {
     : INVITE_WORDS.summary(addresses.held.length - flagged, flagged);
 };
 
-/** Typed, pasted or entered, whole addresses move into the list below; the one being typed stays. */
 function AddressField(properties: {
   readonly addresses: Addresses;
   readonly list: ListRef;
@@ -304,7 +301,6 @@ function Sent(properties: {
   );
 }
 
-/** Mounted afresh for each invite, so nothing from the last one is in it but what its cap left. */
 function InviteForm(properties: {
   readonly members: readonly ListedMember[] | undefined;
   readonly fieldRef: FieldRef;
@@ -363,7 +359,6 @@ function InviteForm(properties: {
     );
   };
 
-  // Never disabled: a disabled button drops focus, and a refusal would land nowhere.
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (sending) return;
@@ -429,7 +424,6 @@ export function InviteAction() {
   const [invites, setInvites] = useState(0);
   const [left, setLeft] = useState("");
   const fieldRef = useRef<HTMLInputElement>(null);
-  // Held here, where the dialog opens on the list already read: it checks against no fresher one.
   const members = useMembers().data;
 
   const show = () => {
@@ -448,7 +442,6 @@ export function InviteAction() {
     fieldRef.current?.focus();
   };
 
-  // A closed dialog's content unmounts, so what a capped send left must not reach the next opening.
   const openedOrClosed = (opened: boolean) => {
     setOpen(opened);
     if (!opened) setLeft("");

@@ -14,10 +14,6 @@ const partsOf = (address: string): readonly Part[] => {
   return parts;
 };
 
-/**
- * `<wbr>` adds no character, so the address reads as itself. A part too long for its line breaks
- * inside, rather than scroll the page sideways.
- */
 export function Address(properties: { readonly address: string; readonly className?: string }) {
   return (
     <span className={cn("wrap-anywhere", properties.className)}>

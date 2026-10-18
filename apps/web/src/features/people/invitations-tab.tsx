@@ -146,7 +146,6 @@ function NoneShown(properties: {
   );
 }
 
-/** A tick taken on another status or page keeps the address it was taken with. */
 const tickedFrom =
   (ticked: Ticked, listed: readonly ListedInvitation[]) =>
   (ids: ReadonlySet<string>): Ticked =>

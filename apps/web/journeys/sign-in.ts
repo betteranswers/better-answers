@@ -10,10 +10,6 @@ const SIGN_IN_PATH = "/sign-in/email-otp";
 const FORBIDDEN = 403;
 const TOO_MANY_REQUESTS = 429;
 
-/**
- * Noting the inbox, 5 s; its 90 s deadline then a list, retrieve and two key lookups, 14 s; a
- * re-ask, 14 s; the page.
- */
 const SIGN_IN_TIMEOUT_MS = 150_000;
 
 export type CodeSource = (address: string) => Promise<Noted>;
@@ -57,19 +53,16 @@ const codeFrom = (answer: InboxAnswer): string =>
 
 type Answered = Pick<APIResponse, "status" | "headers">;
 
-/** A ceiling or a challenge stops the run before the product is reached, so it judges nothing. */
 export const refusedTheRun = (response: Answered, at: string): void => {
   if (response.status() === TOO_MANY_REQUESTS) couldNotRun(`a rate ceiling refused ${at}`);
   if (response.headers()["cf-mitigated"] === "challenge") couldNotRun(`the edge challenged ${at}`);
 };
 
-/** The product answers 403 here only to a post from a foreign origin, so a 403 is the edge's. */
 export const refusedByTheEdge = (response: Answered, at: string): void => {
   refusedTheRun(response, at);
   if (response.status() === FORBIDDEN) couldNotRun(`the edge refused ${at}`);
 };
 
-/** Inside the sign-in's budget: the action timeout alone would fail a slow Send after spending it. */
 const ANSWER_TIMEOUT_MS = 60_000;
 
 const answerTo = (page: Page, path: string): Promise<Response> =>
@@ -107,14 +100,9 @@ const enterTheCode = async (page: Page, awaiting: Awaiting, code: string): Promi
   const response = await answered;
   refusedTheRun(response, "the code");
   if (!response.ok()) await refusedCode(awaiting, response.status());
-  // Six digits sign in on their own; leaving the page sooner cancels the request.
   await expect(field).toHaveCount(0);
 };
 
-/**
- * Through the product's own page, pressing Send once. A fault in the run's ground ends it
- * could-not-run; a fault in the release fails it.
- */
 export const signIn = (page: Page, address: string, source: CodeSource): Promise<void> =>
   test.step(
     "Sign in",

@@ -41,7 +41,6 @@ export const useSecondFactor = () => {
   return useQuery(api.person.secondFactor.queryOptions());
 };
 
-/** Every frame reads it, so never again on a window's focus; an Account page action still rereads it. */
 export const useSecondFactorOnce = () => {
   const api = useTRPC();
   return useQuery({
@@ -55,23 +54,17 @@ export type SecondFactorRead = ReturnType<typeof useSecondFactor>;
 
 export type SecondFactor = NonNullable<SecondFactorRead["data"]>;
 
-/** Awaited by each action, so the action stays pending until the page can show what it changed. */
 export const useRereadTheSecondFactor = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries(api.person.secondFactor.queryFilter());
 };
 
-/** Starting over an unfinished setup mints a new key, so the old one scanned stops matching. */
 export const useStartAuthenticator = (routes = FIRST_AUTHENTICATOR) =>
   useMutation({ mutationFn: () => askOfOurRoute(routes.start, {}, setupStarted) });
 
 export type StartingTheSetup = ReturnType<typeof useStartAuthenticator>;
 
-/**
- * The codes show once, so the mutation hands them over first, even if the field has closed. The
- * first code swaps the session's cookie.
- */
 export const useFinishAuthenticator = (
   onFinished: (issued: CodesIssued | null) => void,
   routes = FIRST_AUTHENTICATOR,

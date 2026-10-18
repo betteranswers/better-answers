@@ -12,7 +12,6 @@ import {
 import type { Role } from "./people-api.ts";
 import { ROLE_MEANINGS, ROLES, roleOf } from "./role-meanings.ts";
 
-/** The least a new person is offered, so a slip never hands out more than asking. */
 export const ROLE_OFFERED_FIRST: Role = "Viewer";
 
 export function RoleChoice(properties: {

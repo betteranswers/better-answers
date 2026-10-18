@@ -24,7 +24,6 @@ type JourneyFixtures = {
 const ADDRESS = z.email();
 const SENDER = z.string().min(1);
 
-/** The reader adds each path itself, and sends the key nowhere but over https. */
 const INBOX_URL = z
   .url({ protocol: /^https$/ })
   .transform((value) => new URL(value))
@@ -38,7 +37,6 @@ const addressOf = (role: Role): string => {
   return parsed.success ? parsed.data : couldNotRun(`${name} is not set to an address`);
 };
 
-/** Each test person's address, by role. A caller never prints one. */
 export const theTestPeople = () => ({
   Admin: addressOf("Admin"),
   Editor: addressOf("Editor"),
@@ -82,10 +80,6 @@ const readerOf = (request: APIRequestContext): Reader => {
   return named.data === "inbox" ? inboxReader() : harnessReader(request);
 };
 
-/**
- * Before anyone signs in, so a missing setting or an inbox that is silent or cannot store spends no
- * sign-in. Neither check sends anything.
- */
 export const theSettingsAndInboxHold = (request: APIRequestContext): Promise<void> =>
   suite.step("Read the journeys' settings and note the test inbox", async () => {
     const reader = readerOf(request);
@@ -94,7 +88,6 @@ export const theSettingsAndInboxHold = (request: APIRequestContext): Promise<voi
     if (!(await reader.stands())) couldNotRun("the test inbox could not store a message");
   });
 
-/** Through the context's own cookies, so it holds when the page does not. */
 const signedOut = (context: BrowserContext, baseURL: string | undefined): Promise<void> =>
   suite.step("Sign out on the server", async () => {
     const signOut = new URL("/sign-out", baseURL);
@@ -106,10 +99,6 @@ const signedOut = (context: BrowserContext, baseURL: string | undefined): Promis
     expect(answered.ok(), `signing out answered ${answered.status()}`).toBe(true);
   });
 
-/**
- * The browser suite's `test`, with no client address of its own, since production's edge sets
- * one. A journey names its person with `test.use({ role })`.
- */
 export const test = suite.extend<JourneyFixtures>({
   role: [undefined, { option: true }],
 

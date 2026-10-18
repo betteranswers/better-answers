@@ -33,7 +33,6 @@ const SESSIONS_HEADING = "sessions-heading";
 const heldAfter = (read: SessionsRead, taken: ReadonlySet<string>): readonly SessionShown[] =>
   (read.data ?? []).filter((session) => !taken.has(session.id));
 
-/** The row's own name, so a session never reads the same as another list's row. */
 const named = (device: string): string => `A session on ${device}`;
 
 function CurrentSession(properties: { readonly session: SessionShown }) {
@@ -108,7 +107,6 @@ export function SessionsSection() {
     });
   };
 
-  /** The row leaves at once; on success focus reaches the next Sign out, or the heading. */
   const signOutOne = (session: SessionShown) => {
     setSaid(undefined);
     setRefused(undefined);

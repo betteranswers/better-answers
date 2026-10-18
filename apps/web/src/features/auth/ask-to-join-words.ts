@@ -1,7 +1,3 @@
-/**
- * The api's rule holds the limit. Stated rather than imported, because the schema module holding
- * it would bring its table definitions into the bundle.
- */
 export const REASON_MAX_CHARACTERS = 1_000;
 
 export const SHORT_NAME_EXAMPLE = "acme-joinery";

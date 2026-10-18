@@ -38,7 +38,6 @@ export const leavingFor = (href: string) => ({
   reloadDocument: new URL(href, "https://app.invalid").searchParams.has(SIGNATURE),
 });
 
-/** Anything but a path on this origin is an open redirect with a person's session behind it. */
 const safeReturnPath = (value: string | null | undefined): string | undefined => {
   if (value === null || value === undefined || value === "") return undefined;
   if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return undefined;
@@ -61,7 +60,6 @@ export const nextAfterSignIn = (query: string): string => {
   return safeReturnPath(new URLSearchParams(query).get("redirect")) ?? "/";
 };
 
-/** Claude is the one assistant the authorization server admits, so a signed flow is Claude's. */
 export const carriedOnTo = (query: string): CarriedOn | undefined => {
   if (carriedFlow(query) !== "") return "connecting";
   const back = safeReturnPath(new URLSearchParams(query).get("redirect"));

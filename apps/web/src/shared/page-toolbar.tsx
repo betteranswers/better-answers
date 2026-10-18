@@ -6,7 +6,6 @@ export type PageToolbar = {
   readonly tabs?: readonly PageTab[] | undefined;
 };
 
-/** An empty row under a page's heading is the defect this guards. */
 export const isFilled = (toolbar: PageToolbar | undefined): toolbar is PageToolbar =>
   (toolbar?.tabs ?? []).length > 0;
 
@@ -21,10 +20,6 @@ export function OpenTabProvider(properties: {
   return <OpenTab.Provider value={properties.openTab}>{properties.children}</OpenTab.Provider>;
 }
 
-/**
- * Untyped here and typed where a feature declares its own helper, so the shared module
- * stays two names wide.
- */
 type Written = { readonly key: symbol; readonly value: unknown };
 
 type Slot = {
@@ -55,10 +50,6 @@ export function ViewStateSlot(properties: { readonly children: ReactNode }) {
 
 export function viewStateOf<Value>(page: string) {
   const key = Symbol(page);
-  /**
-   * The slot holds writes as `unknown`; this declaration's own are kept here under the object
-   * it handed over, typed by construction.
-   */
   const held = new WeakMap<Written, Value>();
 
   const useViewState = (): readonly [Value | undefined, (value: Value) => void] => {

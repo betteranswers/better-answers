@@ -27,7 +27,6 @@ describe("the test inbox's key", () => {
       .filter((file) => readFileSync(file, "utf8").includes("JOURNEYS_INBOX_KEY"))
       .map((file) => path.relative(web, file));
 
-    // A walk that missed the journeys would find nothing to hold.
     expect(files.map((file) => path.relative(web, file))).toContain("journeys/fixtures.ts");
     expect(naming).toEqual(["journeys/inbox.ts"]);
   });

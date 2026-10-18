@@ -30,10 +30,8 @@ import { nameOrAddress, nothingMatches } from "@/shared/words.ts";
 
 import { findWhat, JUMP_TO, searchFor } from "./words.ts";
 
-/** The search row's value, constant so the row keeps the selection while more is typed. */
 const SEARCH_ROW = "search";
 
-/** Where focus goes once chosen: a place hands it to the page, an action to its own dialog. */
 type Kind = "place" | "member" | "action";
 
 type Jump = {
@@ -43,7 +41,6 @@ type Jump = {
   readonly icon: IconName;
   readonly to: string;
   readonly kind: Kind;
-  /** Lower-cased, and only words the reader sees: never an id or a path. */
   readonly words: string;
 };
 
@@ -132,7 +129,6 @@ export const jumpsIn = (
   return groups.filter((group) => group.jumps.length > 0);
 };
 
-/** Every typed word must appear somewhere in what the reader sees of an item. */
 export const matching = (groups: readonly JumpGroup[], typed: string): readonly JumpGroup[] => {
   const terms = typed
     .toLowerCase()
@@ -210,7 +206,6 @@ type Jumping = {
   readonly triggerRef: RefObject<HTMLButtonElement | null>;
 };
 
-/** The frame's, so an open dialog survives the band redrawing at the breakpoint. */
 export const useJumping = (offered: boolean): Jumping => {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -336,7 +331,6 @@ function JumpList(
       shouldFilter={false}
       vimBindings={false}
       loop
-      // Room on the right, so the dialog's close button stands clear of the field.
       className="**:data-[slot=command-input-wrapper]:h-12 **:data-[slot=command-input-wrapper]:pr-12 [&_[cmdk-item]]:py-2"
     >
       <CommandInput value={typed} onValueChange={setTyped} placeholder={findWhat(kinds)} />
@@ -359,7 +353,6 @@ function JumpList(
   );
 }
 
-/** Read as the dialog opens, by the Members list's own query, so a list it read shows at once. */
 function WithMembers(properties: Listed) {
   const members = useMembers();
   const read = members.error === null ? "pending" : "failed";

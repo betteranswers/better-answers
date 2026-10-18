@@ -39,7 +39,6 @@ type OpenInvitation = NonNullable<InvitationsRead["data"]>[number];
 
 const saidOf = (refusal: Refusal): string => refusalSentence({}, refusal.word, refusal.class);
 
-/** A list already read stands through a refetch that fails, so only a first read's failure is said. */
 const failureOf = (read: InvitationsRead): Error | ApiError | null =>
   read.data === undefined ? read.error : null;
 
@@ -131,7 +130,6 @@ function Invitations(properties: { readonly read: InvitationsRead; readonly carr
   );
 }
 
-/** In the order the page shows their actions. */
 const keystrokesOf = (read: InvitationsRead): readonly Keystroke[] => [
   ...(unanswered(read) ? [READ_AGAIN] : []),
   ...(listedIn(read).length > 0 ? [TO_INVITATIONS] : []),

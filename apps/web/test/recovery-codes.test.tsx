@@ -24,7 +24,6 @@ const CODES = [
 
 const ADDRESS = "ada@example.test";
 
-/** Mid-morning in UTC, so it is 2 October in UTC and every European zone. */
 const MADE_AT = "2026-10-02T09:41:00.000Z";
 
 const drawn = (onDone: (madeAt: string) => void = () => {}) =>

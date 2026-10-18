@@ -21,7 +21,6 @@ export const LINK_ACTIONS = {
   backToSignIn: "Go Back to Sign-In",
 } as const;
 
-/** Safe to say only because the link is bound to this browser. */
 export const signingInAs = (address: string): string => `Signing in as ${address}.`;
 
 export const worksUntil = (until: string): string =>
@@ -33,5 +32,4 @@ export const codeSpelled = (code: string): string => code.split("").join(" ");
 
 export const CODE_NOT_COPIED = "Couldn't copy. Please type the code on the page where you started.";
 
-/** Sign in is the one control here, and a second press of a spent link shows the dead page. */
 export const SIGN_IN_UNCONFIRMED = "We couldn't confirm that. Please try again.";

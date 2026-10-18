@@ -28,7 +28,6 @@ const refusedOf = (correctName: CorrectName, personId: string): Refused | undefi
   };
 };
 
-/** `was` is kept, since the cache no longer holds the name it replaced once the action lands. */
 export const useCorrecting = () => {
   const correctName = useCorrectDisplayName();
   const [was, setWas] = useState("");

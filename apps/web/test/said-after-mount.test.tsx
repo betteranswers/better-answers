@@ -28,7 +28,6 @@ afterEach(() => {
 
 const REGION = "[aria-live=polite]";
 
-/** For a loading line the page writes inline, with no constant to hold it to. */
 const HOLDS_TEXT = /\S/v;
 
 const mounted = (selector: string, children: ReactNode) => {

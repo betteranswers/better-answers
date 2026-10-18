@@ -38,7 +38,6 @@ function UnknownSignedOut() {
 export function UnknownAddress() {
   const member = useMemberAskedOnce();
   if (member.data !== undefined) return <WorkspaceFrame page={{ draw: <UnknownPage /> }} />;
-  // Only a first read in flight draws nothing: a refusal read again keeps its page, and offline draws.
   if (!member.isFetched && member.fetchStatus === "fetching") return null;
 
   const signedOut = member.error !== null && refusalOf(member.error)?.word === NO_SESSION;

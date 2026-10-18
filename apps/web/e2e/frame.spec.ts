@@ -63,7 +63,6 @@ const NARROW = { width: 320, height: 720 };
 
 const NARROW_AND_SHORT = { width: 320, height: 256 };
 
-/** Past `--breakpoint-md`, which `--shell-wide` in `index.css` reads for the shell. */
 const WIDE = { width: 1024, height: 720 };
 
 const DESKTOP = { width: 1440, height: 900 };
@@ -96,7 +95,6 @@ const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Models and Spe
 
 const modelChoicesCardOf = (page: Page) => page.getByRole("region", { name: "Model Choices" });
 
-/** The card holds its lead until its read lands, which brings a new workspace two lines more. */
 const theModelChoicesHaveLanded = (page: Page) =>
   expect(modelChoicesCardOf(page).getByRole("paragraph")).toHaveCount(3);
 
@@ -220,7 +218,6 @@ const inDocumentOrder = async (page: Page, regions: readonly Locator[]): Promise
   );
 };
 
-/** Swept rather than read by key: what matters is that nothing kept here is about the reader. */
 const keptOnThisBrowser = (page: Page) =>
   page.evaluate(() =>
     Object.keys(localStorage).map((key) => `${key} ${localStorage.getItem(key) ?? ""}`),
@@ -329,11 +326,9 @@ test("marks the open area in the rail, on any page", async ({ page, request }) =
     .evaluateAll((links) => links.filter((link) => link.hasAttribute("aria-current")).length);
   expect(marked).toBe(1);
 
-  // A fill where the others have none reads in greyscale, so the mark is not colour alone.
   const fill = await paintedFill(page, "Control Centre");
   expect(fill).not.toBe("rgba(0, 0, 0, 0)");
 
-  // A place, not an action, and lighter than the primary button: the menu's open-page grey.
   expect(fill, "the open area is not the open-page grey").toBe(
     await tokenColour(page, "--surface-active"),
   );
@@ -348,7 +343,6 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
   const open = nav.getByRole("link", { name: "Audit Log" });
   await expect(open).toHaveAttribute("aria-current", "page");
 
-  // Heavier and filled where its neighbours are neither, so it survives a greyscale page.
   expect(await weightOf(page, "Audit Log")).toBeGreaterThan(await weightOf(page, "Members"));
   expect(await greyOf(open, "own"), "the open page's fill is the nav's own").not.toBe(
     await greyOf(open, "behind"),
@@ -644,12 +638,9 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
   expect(contentIsLast).toBe(true);
 });
 
-// Its own test, not the tail of the one above: the skip link is the first stop, so it needs
-// a page with nothing focused.
 test("moves focus from the skip link into the content", async ({ page, request }) => {
   await signedIn(page, request, "Ribble Toolmaking");
   await page.goto(MODELS_AND_SPEND.path);
-  // A keypress before the shell has drawn is spent on nothing, so wait for the page first.
   await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
 
   await skipLinkReachesThePage(page);
@@ -665,7 +656,6 @@ test("leaves no target half under the band after skipping", async ({ page, reque
   const screen = await page.evaluate(() => innerHeight);
   for (let grown = 0; grown <= screen; grown += 4) {
     const overflow = await pageGrownBy(page, grown);
-    // Scrolling from the first step on, the sweep would skip the shallow jumps that cut the head.
     if (grown === 0) expect(overflow, "the page scrolls before it is grown").toBe(0);
     await page.getByRole("link", { name: "Skip to the Page" }).focus();
     await page.keyboard.press("Enter");
@@ -780,7 +770,6 @@ test("opens the keystrokes from the narrow band, focus returned", async ({
   await page.goto(MEMBERS.path);
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 
-  // The rail lives in the sheet here, a dialog the keystrokes ignore, so the band holds the one.
   const trigger = keystrokesButton(bandOf(page));
   await expect(keystrokesButton(page)).toHaveCount(1);
   await expect(trigger).toHaveAttribute("aria-keyshortcuts", "?");
@@ -817,7 +806,6 @@ test("keeps a focused control clear of the fixed band", async ({ page, request }
   await tabUntilFocused(page, last, 80);
   const depth = () => page.evaluate(() => window.scrollY);
   const from = await depth();
-  // Past the rows already in view: a walk that scrolls nothing meets no band.
   for (let step = 0; step < 27; step += 1) {
     await page.keyboard.press("Shift+Tab");
     expect(await focusUnderTheBand(page), `stop ${step + 1} back sits under the band`).toBe(false);
@@ -1167,8 +1155,6 @@ test("closes the sheet on widening, focusing the navigation control", async ({ p
   await sheetButtonOf(page).click();
   await expect(sheetOf(page)).toBeVisible();
 
-  // The reader never asked for this crossing, so the sheet owes back the focus it borrowed —
-  // vanishing would leave it on the body.
   await page.setViewportSize(WIDE);
 
   await expect(sheetOf(page)).toHaveCount(0);

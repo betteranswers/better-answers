@@ -26,10 +26,6 @@ export const roleHeld = (queryClient: QueryClient, api: ApiProxy) =>
 export const workspaceHeld = (queryClient: QueryClient, api: ApiProxy) =>
   queryClient.getQueryData(memberOptions(api).queryKey)?.workspace.id;
 
-/**
- * A first read, a read after a drop or a reset, and another role in the same workspace are no
- * change of workspace.
- */
 export const leftFor = (held: string | undefined, now: string | undefined): boolean =>
   held !== undefined && now !== undefined && now !== held;
 
@@ -41,7 +37,6 @@ export const SECOND_FACTOR_PENDING: RefusalWord = "second-factor-pending";
 
 export const WORKSPACE_SWITCHED: RefusalWord = "workspace-switched";
 
-/** Only what the reader answers by signing in again, or by confirming it's them, sends them on. */
 const wordSendingThemOn = (error: Error): RefusalWord | undefined => {
   const refusal = refusalOf(error);
   if (refusal?.word === SECOND_FACTOR_PENDING) return refusal.word;
@@ -85,7 +80,6 @@ export const memberChanged = async (
       await queryClient.refetchQueries(filters, { cancelRefetch: false });
     }
     const read = queryClient.getQueryState(filters.queryKey);
-    // `refetchQueries` resolves on a failed or paused read too, so only a settled answer counts.
     if (read?.status === "success" && read.fetchStatus === "idle") return read.data;
   }
   if (change.ifUnread === "reset") void queryClient.resetQueries(filters);

@@ -67,7 +67,6 @@ const askedForMore = (): void => {
   fireEvent.click(more);
 };
 
-/** A click fired, not pressed: a press would move focus, and the page lands under whatever holds it. */
 const thePageLands = (): void => {
   fireEvent.click(screen.getByRole("button", { name: "The page lands" }));
 };

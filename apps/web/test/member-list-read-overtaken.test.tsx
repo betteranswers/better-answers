@@ -29,7 +29,6 @@ const settled = () =>
   });
 
 describe("a bulk role change while the list is read again", () => {
-  // The change is not awaited behind the cancel: this holds only while a cancel reverts at once.
   it("keeps its rows through the read it overtook", async () => {
     const api = adaAnAdmin();
     await openAt(HOMES.Admin.path, api);

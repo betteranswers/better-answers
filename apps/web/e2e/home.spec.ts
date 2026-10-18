@@ -226,7 +226,6 @@ test("lists the shell's keystrokes alone on Connect Claude, unknown pages", asyn
   await landedAtHome(page, "Viewer");
   await connectStepsOpened(page);
   const theShells = ["Show This List", "Jump To"];
-  // The list always says where single keys work; a page with none of its own adds a line.
   const addsNoLine = "the list adds no line for a page with no keystrokes of its own";
 
   await page

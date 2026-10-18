@@ -67,11 +67,9 @@ export function MemberRemoval(properties: {
                 <Button
                   variant="destructive"
                   aria-describedby={recordId}
-                  // Not `disabled`: a disabled button drops the focus the action leaves on it.
                   aria-disabled={!offered}
                   className="aria-disabled:opacity-50"
                   onClick={() => {
-                    // A page drawn again mid-removal has an idle action of its own, so this is the guard.
                     if (offered) onRemove(member);
                   }}
                 >

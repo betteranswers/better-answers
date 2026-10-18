@@ -7,7 +7,6 @@ import { readRefused } from "./words.ts";
 
 type Read = { readonly error: Error | ApiError | null; readonly isPending: boolean };
 
-/** Mounts empty, so a read still loading or refused is heard as it fills. */
 export function ReadSaid(properties: { readonly read: Read; readonly loading: string }) {
   const said = useReadSaid(properties.read);
   return (

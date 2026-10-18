@@ -18,14 +18,12 @@ export type Part = { readonly name: string; readonly to: string | undefined };
 
 const placeParts = ({ area, menuGroup, page }: Place<VisibleArea>): readonly Part[] => [
   { name: area.name, to: area.opensAt.path },
-  // The reader's own copy of the group, so its first page is one they may see.
   ...(menuGroup?.name === undefined
     ? []
     : [{ name: menuGroup.name, to: menuGroup.pages[0]?.path ?? page.path }]),
   { name: page.name, to: page.path },
 ];
 
-/** A name said twice in a row is said once, by the deeper part. */
 const saidOnce = (named: readonly Part[]): readonly Part[] =>
   named.filter((part, at) => part.name !== named[at + 1]?.name);
 
@@ -78,7 +76,6 @@ export function BandBreadcrumb(properties: {
         {parts.map((part, at) => {
           const middle = at > 0 && at < parts.length - 1;
 
-          // By place, not name: a person's name may repeat a part above it.
           return [
             at === 0 ? null : (
               <BreadcrumbSeparator key={`${String(at)} after`} className="shrink-0">

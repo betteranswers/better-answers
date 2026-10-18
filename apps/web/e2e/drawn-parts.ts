@@ -62,7 +62,6 @@ const servedStylesheets = async (request: APIRequestContext): Promise<string> =>
   return links.join("");
 };
 
-/** On the product's origin, so the gate audits it. A class only the harness writes is not served. */
 export const harnessDrawn = async (
   page: Page,
   request: APIRequestContext,

@@ -63,12 +63,10 @@ export const refusalAnswering = async (page: Page, procedure: string) => {
   return { status: httpStatus, ...refusal, waitSeconds: retryAfterSeconds };
 };
 
-/** Better Auth names a refusal in `code`, and one of the api's own routes in `error`. */
 const aRefusalOutsideTrpc = z.object({ code: z.string().optional(), error: z.string().optional() });
 
 const wholeSeconds = z.coerce.number().int().optional();
 
-/** A path outside tRPC, Better Auth's or the api's own, asked for before the action as `refusalAnswering` is. */
 export const authAnswering = async (page: Page, path: string) => {
   const answered = await page.waitForResponse((answer) => new URL(answer.url()).pathname === path);
   if (answered.ok()) throw new Error(`the api did not refuse ${path}`);

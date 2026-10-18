@@ -90,7 +90,6 @@ const theControlInFocus = (): HTMLElement | null => {
 
 type Changing = { readonly change: SensitivityChange; readonly connectedSourceId: string };
 
-/** One narrowing or widening is open on the page at a time, drawn in its connected source's row. */
 const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tell) => {
   const [changing, setChanging] = useState<Changing>();
   const opener = useRef<HTMLElement>(null);
@@ -241,10 +240,6 @@ export function ConnectedSourcesPage() {
       sensitivity.open({ change: "widen", connectedSourceId: connectedSource.connectedSourceId });
   };
 
-  /**
-   * A letter pressed outside the list still needs a connected source, so the one whose row last held
-   * focus stands.
-   */
   const connectedSourceInFocusOrTell = (): ListedConnectedSource | undefined => {
     const connectedSource = connectedSourceOf(inFocus);
     if (connectedSource === undefined) setOutcome(NOTHING_IN_FOCUS);

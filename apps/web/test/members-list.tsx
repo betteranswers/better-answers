@@ -29,7 +29,6 @@ type Member = {
 
 const ROLES = ["Admin", "Editor", "Viewer"];
 
-/** One name and address long enough to need wrapping at 320 pixels. */
 export const MEMBERS: readonly Member[] = [
   {
     id: "cy",

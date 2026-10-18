@@ -129,7 +129,6 @@ describe("the members' bulk actions", () => {
 
     fireEvent.keyDown(document.body, { key, shiftKey: true });
 
-    // A dialog draws after the press, so its absence is waited on rather than read at once.
     await expect(screen.findByRole("dialog", undefined, { timeout: 300 })).rejects.toThrow(
       'Unable to find role="dialog"',
     );

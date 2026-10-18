@@ -15,7 +15,6 @@ export const CONCEPT_KEYSTROKES = {
 
 export const SEARCH_LIST = "knowledge";
 
-/** The read refuses a longer query, so neither the box nor an old address may hold one. */
 export const QUERY_MAX = 500;
 
 export const MATCHES_A_PAGE = 20;

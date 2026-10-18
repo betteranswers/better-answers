@@ -63,7 +63,6 @@ type Composed = {
   readonly messageId?: string;
   readonly contentType?: string;
   readonly transferEncoding?: string;
-  /** The body as it travels, already in its transfer encoding. */
   readonly body: string;
 };
 

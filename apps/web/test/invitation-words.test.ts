@@ -30,7 +30,6 @@ const invited = (address: string, sent: Partial<InvitedOne> = {}): InvitedOne =>
 
 const formOf = (said: string): string => said.replaceAll(/\d+/g, "");
 
-/** Each count a line shows, in order. A count of none may be a word, so no zero is read. */
 const countsIn = (said: string): readonly string[] => said.match(/\b[1-9]\d*\b/g) ?? [];
 
 describe("an invite's outcome", () => {

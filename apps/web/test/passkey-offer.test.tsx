@@ -24,7 +24,6 @@ const FIRST_PAGE = "/people/groups";
 
 const NEXT_PAGE = "/people/members";
 
-/** A switch of workspace lands an Admin here again, at the address it left. */
 const HOME = HOMES.Admin.path;
 
 const NO_PASSKEY = {
@@ -98,7 +97,6 @@ const switchedOnTheOffer = async () => {
     await loaded.router.navigate({ href: "/" });
   });
 
-  // The band names the workspace read, so the page beneath it has been drawn afresh for it.
   await within(screen.getByRole("banner")).findByRole("button", { name: HOLME_PRESSINGS.name });
   return loaded;
 };
@@ -144,7 +142,6 @@ describe("the passkey offer", () => {
 
   it("stays quiet on a page load after another showed it", async () => {
     adaHoldingNoPasskey();
-    // Account reads the second factor and draws no offer, so the next load finds the read held.
     const { clients, rendered } = await openAsAda("/account");
     await screen.findByRole("button", { name: "Add a Passkey" });
     rendered.unmount();

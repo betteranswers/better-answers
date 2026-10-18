@@ -131,7 +131,6 @@ export function AddAPasskey(properties: {
           setName(event.target.value);
         }}
       />
-      {/* Enabled while the device asks, so a cancelled prompt hands focus back to the button. */}
       <Button type="submit" className="mt-4 aria-disabled:opacity-50" aria-disabled={pending}>
         {properties.commit ?? PASSKEY_WORDS.addCommit}
       </Button>
@@ -297,7 +296,6 @@ function PasskeyRow(properties: {
   );
 }
 
-/** Whoever must hold a factor keeps their last: a passkey alone, with no authenticator set up. */
 const isTheLastFactor = (held: SecondFactor): boolean =>
   held.mustHoldOne && held.authenticator !== "set-up" && held.passkeys.length === 1;
 

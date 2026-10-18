@@ -108,7 +108,6 @@ export const refusing =
       ),
     );
 
-/** A refusal is never asked again, so a read nothing here answers fails once and stays failed. */
 const REFUSED = {
   error: {
     message: "forbidden",

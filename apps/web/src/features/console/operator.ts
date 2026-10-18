@@ -2,7 +2,6 @@ import { useQuery, type QueryClient } from "@tanstack/react-query";
 
 import { refusalOf, useTRPC, type ApiProxy } from "@/shared/api/trpc.ts";
 
-/** The console's route reads this before its shell mounts, so a read on mount would be the second. */
 const standingOptions = (api: ApiProxy) =>
   api.session.operator.queryOptions(undefined, { refetchOnMount: false });
 
@@ -25,7 +24,6 @@ export const mustSignInForTheConsole = async (
   }
 };
 
-/** Any failure answers no, so a person whose standing is unread sees what they saw before. */
 export const isTheOperator = async (
   queryClient: QueryClient,
   api: ApiProxy,

@@ -58,10 +58,6 @@ const freshlyOpened = async (page: Page, path: string): Promise<void> => {
 
 const linkTo = (token: string): string => `/sign-in/link#${token}`;
 
-/**
- * An Editor asks for a code in `asking`'s browser, whose binding cookie the link then signs in; an
- * Admin would meet the second factor first.
- */
 const aLinkAskedForIn = async (asking: BrowserContext, api: APIRequestContext, who: string) => {
   const email = anAddress(who.toLowerCase());
   const editor = await person(api, email, { displayName: `${who} Editor` });
@@ -106,7 +102,6 @@ const DEAD_PAGE = `
     - button "Keyboard Shortcuts"
 `;
 
-/** Answers what a screen reader hears, so two dead pages can be told identical. */
 const theDeadPage = async (page: Page): Promise<string> => {
   const main = page.getByRole("main");
   await expect(main).toMatchAriaSnapshot(DEAD_PAGE);
@@ -164,7 +159,6 @@ test("another device shows the code and stays signed out", async ({
   await expect(page.getByText(codeShown(code))).toBeVisible();
   await expect(signInButton(page)).toHaveCount(0);
 
-  // The copy's own status follows the page's, and stands empty until the code is copied.
   const saidOfTheCopy = page.getByRole("status").last();
   await expect(saidOfTheCopy, "the copy's status holds words before a copy").toBeEmpty();
   await page.getByRole("button", { name: "Copy Code" }).click();
@@ -190,9 +184,7 @@ test("unknown, spent and superseded links show one dead page", async ({
   const { asking, token: superseded } = asked;
   const saidOfTheFirst = await asking.getByRole("status").innerText();
   await asking.getByRole("button", { name: "Send a New Code" }).click();
-  // The press took focus, and the field takes it back only once the new email has gone.
   await expect(asking.getByLabel("Verification Code", { exact: true })).toBeFocused();
-  // A send still out says something new too, so the button is free again before the status is read.
   await expect(
     asking.getByRole("button", { name: "Send a New Code" }),
     "the second email is still sending",

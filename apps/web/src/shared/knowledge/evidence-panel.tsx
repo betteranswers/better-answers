@@ -21,7 +21,6 @@ import { CONCEPT_WORDS, EVIDENCE_WORDS } from "./concept-words.ts";
 import { useConcept, usePassage, type Opening } from "./knowledge-reads.ts";
 import { failedReadWords } from "./refusal.tsx";
 
-/** `unmapped` is a match no concept rests on, which the panel says beside the passage's sensitivity. */
 type OpenedSource =
   | (Extract<Opening, { readonly kind: "passage" }> & { readonly unmapped?: true })
   | Extract<Opening, { readonly kind: "concept" }>;
@@ -156,7 +155,6 @@ function CitedConcept(properties: {
 
 const HEADING = "pr-8 font-semibold wrap-anywhere";
 
-/** The sheet's title names the sheet; inline, the heading names its region. */
 function PanelBody(properties: {
   readonly opened: Opened;
   readonly at: { readonly kind: "sheet" } | { readonly kind: "inline"; readonly headingId: string };
@@ -164,7 +162,6 @@ function PanelBody(properties: {
   const { opened, at } = properties;
   const { source } = opened;
   const heading = useRef<HTMLHeadingElement>(null);
-  // Stable, so a render of the page around the panel never takes focus back to its heading.
   const held = useCallback((node: HTMLHeadingElement | null) => {
     heading.current = node;
     focusOnMount(node);
@@ -202,7 +199,6 @@ function PanelBody(properties: {
   );
 }
 
-/** Beside the page at the wide layout: the list stays live, and a click on it never closes this. */
 export function EvidenceSheet(properties: {
   readonly opened: Opened;
   readonly onClose: () => void;
@@ -268,7 +264,6 @@ export function EvidenceInline(properties: {
     close();
   });
 
-  // From anywhere inside, as the sheet's own Escape is.
   useEffect(() => {
     const here = region.current;
     here?.addEventListener("keydown", closeOnEscape);

@@ -23,7 +23,6 @@ export const answered = (body: unknown): Promise<Response> =>
 
 const A_SESSION = { session: { activeOrganizationId: "w" }, user: { id: "p", name: "Ada" } };
 
-/** A refusal is never asked again, so no retry outlives the test onto the next stub. */
 const REFUSED = {
   error: {
     message: "forbidden",

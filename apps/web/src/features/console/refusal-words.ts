@@ -4,5 +4,4 @@ import type { OwnSentences } from "@/shared/refusal-words.ts";
 
 export const NOT_THE_OPERATOR = "not-the-operator" satisfies RefusalWord;
 
-/** The rule's own sentences, for a name the operator types for someone else. */
 export const SAID_OF_CORRECTING = DISPLAY_NAME_REFUSED satisfies OwnSentences;

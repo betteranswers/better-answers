@@ -140,7 +140,6 @@ export const RECOVERY_CODE_WORDS = {
 export const codesLeft = (unused: number, madeAt: string): string =>
   `${String(unused)} of ${String(RECOVERY_CODES_IN_A_SET)} unused · made ${dayWords(madeAt)}`;
 
-/** The api sends the notice without waiting on it, so the page never says it arrived. */
 const noticeTo = (address: string): string => `A confirmation email is on its way to ${address}.`;
 
 export const ACTION_LANDED = {

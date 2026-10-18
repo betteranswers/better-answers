@@ -47,7 +47,6 @@ test("brings an ended session through sign-in back to its page", async ({
   const workspace = await provision(request, { name: "Returning", adminEmail: email });
   await page.goto("/sign-in");
   await signIn(page, request, email);
-  // Not the Admin's home, which sign-in would reach without carrying the page back.
   const elsewhere = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log");
   await page.getByRole("link", { name: "Audit Log" }).click();
   await expect(page).toHaveURL(new RegExp(`${elsewhere.path}$`));

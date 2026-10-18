@@ -106,7 +106,6 @@ const columnsFor = (actions: NameActions) =>
     }),
   ]);
 
-/** A name is found by itself or by a workspace that flagged it; the read carries no address. */
 const wordsOf = (waiting: NameWaiting): string =>
   [waiting.displayName, ...waiting.flags.map((flag) => flag.workspace.name)].join("\n");
 
@@ -178,18 +177,15 @@ export function NamesWaitingList() {
     getRowId: (each) => each.personId,
   });
 
-  /** A letter pressed outside the list still needs a name it shows, so the one last in focus stands. */
   useKeystroke(NAMES_WAITING_KEYSTROKES.correct, () => {
     const held = narrowed.shown.find((each) => each.personId === inFocus);
     setSaid(held === undefined ? NO_NAME_IN_FOCUS : undefined);
     if (held !== undefined) setOpenFor(held.personId);
   });
 
-  /** The dialog closes first, so the row leaves the list as the dialog does. */
   const save = (asked: NameWaiting, displayName: string) => {
     setOpenFor(undefined);
     setSaid(undefined);
-    // The address that brought focus back to this person has served once they are corrected.
     if (asked.personId === arrivedFor) void navigate({ to: NAMES_WAITING_PATH, replace: true });
     correcting.save({ personId: asked.personId, was: asked.displayName, displayName });
   };

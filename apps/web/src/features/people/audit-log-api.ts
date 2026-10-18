@@ -16,7 +16,6 @@ const inputOf = (asked: Asked) => ({
   search: asked.search === "" ? undefined : asked.search,
 });
 
-/** Newest first, a page at a time. */
 export const useAuditLog = (asked: Asked) => {
   const api = useTRPC();
   return useInfiniteQuery(
@@ -28,7 +27,6 @@ export const useAuditLog = (asked: Asked) => {
 
 export type AuditLog = ReturnType<typeof useAuditLog>;
 
-/** A saved export records itself, so the log is read again behind the file, never before it. */
 export const useExportAuditLog = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

@@ -100,7 +100,6 @@ const actingAt = async () => {
 const workspacesHeldIn = (clients: AppClients) =>
   createApiProxy(clients.apiClient, clients.queryClient).person.workspaces.queryKey();
 
-/** A search read as an Admin and left behind: no page shows it while People is open. */
 const MATCHES_HELD = [
   ["knowledge", "find"],
   { input: { query: "salary bands" }, type: "infinite" },

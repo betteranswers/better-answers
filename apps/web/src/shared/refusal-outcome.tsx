@@ -21,7 +21,6 @@ const UNANSWERED = {
   read: STOCK.notLoaded,
 } satisfies Record<FailedDuring, string>;
 
-/** A failure with no refusal word is the network's, never the reader's to fix. */
 const failureOutcome = (
   featureWords: OwnSentences,
   failure: Error | ApiError,
@@ -33,7 +32,6 @@ const failureOutcome = (
     : refusalOutcome(featureWords, refusal.word, refusal.class);
 };
 
-/** A feature's sentences, named once: its own for the word, then the class's, then no response. */
 export const refusalsOf = (featureWords: OwnSentences) => ({
   outcomeOfFailure: (failure: Error | ApiError, during: FailedDuring): Outcome =>
     failureOutcome(featureWords, failure, during),

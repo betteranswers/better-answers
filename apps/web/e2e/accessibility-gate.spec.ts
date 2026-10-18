@@ -50,7 +50,6 @@ const writeFaintWordsInAMarkedObject = (): void => {
   document.querySelector("main")?.append(region);
 };
 
-/** Words over an image no set-aside clears, so axe cannot decide their contrast. */
 const writeWordsOverAnImage = (): void => {
   const words = document.createElement("p");
   words.style.backgroundImage =
@@ -78,7 +77,6 @@ const drawAFieldWithNoEdge = (): void => {
   document.querySelector("main")?.append(field);
 };
 
-/** A white-edged field on a see-through tint, as a hovered row paints it: lost in light alone. */
 const drawAFieldWithNoEdgeOnATint = (): void => {
   const tint = document.createElement("div");
   tint.style.cssText =
@@ -90,7 +88,6 @@ const drawAFieldWithNoEdgeOnATint = (): void => {
   document.querySelector("main")?.append(tint);
 };
 
-/** Edgeless fields in a box whose strong border stands a grid step off them: a layout's edge, not a field's. */
 const drawEdgelessFieldsInABorderedBox = (): void => {
   const box = document.createElement("div");
   box.style.cssText = "padding: 8px; border: 1px solid var(--text-primary)";
@@ -115,7 +112,6 @@ const drawAnEdgelessFieldInAFilledBox = (padding: string): void => {
   document.querySelector("main")?.append(box);
 };
 
-/** An edgeless field whose row draws a strong rule close under it, as Jump to's row does. */
 const drawAFieldOnItsRowsRule = (): void => {
   const row = document.createElement("div");
   row.style.cssText = "padding: 4px 24px; border-bottom: 1px solid var(--text-primary)";

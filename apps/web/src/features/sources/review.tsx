@@ -75,7 +75,6 @@ function GroupNotes(properties: {
   );
 }
 
-/** Its own component, so the region and the read's words it holds mount together, on opening. */
 function PreviewPassages(properties: {
   readonly preview: ReturnType<typeof usePreview>;
   readonly open: boolean;

@@ -45,7 +45,6 @@ function Stream(properties: { readonly activity: Activity; readonly name: string
           </div>
         )}
       />
-      {/* The lines read so far stay; Load more is the way to ask again. */}
       <OutcomeLine
         outcome={activity.error === null ? undefined : outcomeOfFailure(activity.error, "read")}
         className="px-4 has-[[role=alert]:not(:empty)]:py-2"
@@ -64,7 +63,6 @@ function Stream(properties: { readonly activity: Activity; readonly name: string
   );
 }
 
-/** An empty stream has nowhere to say a later read failed, so a failure stands in for it. */
 const streamStands = (activity: Activity): boolean =>
   activity.error === null || activity.data?.pages.some((page) => page.events.length > 0) === true;
 

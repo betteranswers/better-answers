@@ -44,7 +44,6 @@ const MEMBERS = HOMES.Admin.path;
 
 const GRACES_PAGE = memberPageOf(GRACE.personId);
 
-/** Waiting in Northern Tooling only. */
 const KAYS = {
   invitationId: "01JKAY0000000000000000000A",
   address: "kay@example.test",
@@ -83,7 +82,6 @@ const bandBlanksWatched = () => {
   };
 };
 
-/** Held until `resolve`. A refused action's settle reads the member again, cancelling the read under way. */
 const memberHeldAndCounted = (api: Api) => {
   const member = heldBack(api, "session.member", adaAt("Admin", HOLME));
   const answer = api.get("session.member");

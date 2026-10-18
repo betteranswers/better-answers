@@ -54,7 +54,6 @@ const DEAD: Seen = { state: "dead" };
 
 const CHECKING: Seen = { state: "checking" };
 
-/** Any refusal but a wait is a link spent since its read, or bound to another browser. */
 const linkDied = (failure: Error | null): boolean =>
   failure instanceof CodeRefused && !isTooMany(failure);
 
@@ -63,7 +62,6 @@ const saidOfFailure = (failure: Error, unanswered: string): string =>
 
 type Read = { readonly data: LinkDescribed | undefined; readonly error: Error | null };
 
-/** What the person clicked Sign in on stands: success clears every held read, this one too. */
 const seenOf = (
   token: string | undefined,
   read: Read,
@@ -187,7 +185,6 @@ const unreadSlots = (failure: Error, acting: Acting): Slots => ({
   said: null,
   body: null,
   refused: saidOfFailure(failure, STOCK.tryAgain),
-  // The fragment is gone from the address, so a reload would show the dead page.
   actions: (
     <div className="mt-6 flex flex-wrap items-center gap-2">
       <ReadAgain
@@ -302,8 +299,6 @@ export function LinkPage() {
 
   const slots = slotsOf(seenOf(token, read, clicked, signIn.error), acting);
 
-  // Each slot keeps its element across the states, so each new state speaks in the regions that
-  // stood.
   return (
     <AuthPage title={slots.title}>
       <Outcome tone="said">{slots.said}</Outcome>

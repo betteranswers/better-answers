@@ -35,7 +35,6 @@ type ConnectedSourceActions = {
 
 type OpenInARow = {
   readonly reviewing: string | undefined;
-  /** A bulk action waits on its answer, so no row's button opens, closes or replaces a review. */
   readonly reviewHeld: boolean;
   readonly panel: { readonly connectedSourceId: string; readonly part: ReactNode } | undefined;
 };

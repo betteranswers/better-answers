@@ -81,7 +81,6 @@ function RenameGroup(properties: {
   const renameGroup = useRenameGroup();
   const ids = { field: useId(), hint: useId() };
 
-  // Never disabled: the button a reader pressed keeps focus while the answer comes back.
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setOutcome(undefined);

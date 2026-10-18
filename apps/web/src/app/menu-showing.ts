@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import { keepOnThisBrowser, onThisBrowser } from "@/shared/browser-storage.ts";
 
-/** Stored on readers' browsers, so the key keeps its first name (R22). */
 const KEPT_UNDER = "better-answers.secondary-nav";
 
 const OPEN = "open";

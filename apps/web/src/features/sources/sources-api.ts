@@ -28,7 +28,6 @@ export type DismissedAsNotSpecialCategory = inferOutput<
 
 export type Sensitivity = ListedConnectedSource["sensitivity"];
 
-/** Narrowest first, the order a narrowing moves in. */
 export const SENSITIVITIES: readonly Sensitivity[] = ["Restricted", "Internal", "Public"];
 
 export const NARROWEST: Sensitivity = "Restricted";
@@ -113,7 +112,6 @@ export const usePublish = () => {
   const api = useTRPC();
   const optimistic = useOptimistic();
   const reconcile = useReconcile();
-  // The callbacks go to the hook itself: the React lint takes one passed through `mutationOptions` as called during render.
   return useMutation({
     ...api.sources.publish.mutationOptions<Undo>(),
     onMutate: (asked) =>

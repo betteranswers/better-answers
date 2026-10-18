@@ -38,7 +38,6 @@ const theNoWorkspacePage = (page: Page) =>
 
 const outcomeOf = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ });
 
-/** A passkey's last use is shown to the minute, and the day it was added as a day alone. */
 const A_TIME_OF_USE = /\b\d{1,2}:\d{2}\b/;
 
 const suggestedName = (page: Page): Promise<string> =>
@@ -196,10 +195,6 @@ test("an Admin keeps their only passkey, told why beside Remove", async ({ page,
   await expect(remove).toHaveAccessibleDescription(/\S/);
 });
 
-/**
- * A prompt that used no passkey is no refusal. Waiting says something too, so the status is read
- * again once the button is free.
- */
 const saysNoPasskeyWasUsed = async (page: Page, saidBefore: string): Promise<void> => {
   await saysSomethingNew(page.getByRole("status"), saidBefore);
   await expect(page.getByRole("button", { name: "Sign In with a Passkey" })).toHaveAttribute(
@@ -257,7 +252,6 @@ const offerOf = (page: Page) => page.getByRole("button", { name: "Dismiss Passke
 
 const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
 
-/** Asked for before the page loads or signs in, so an absence asserted after it is the read's answer. */
 const secondFactorRead = (page: Page) =>
   page.waitForResponse((answer) => answer.url().includes("person.secondFactor"));
 
@@ -272,7 +266,6 @@ const aViewerOffered = async (page: Page, api: APIRequestContext) => {
   return { email, name: viewer.name };
 };
 
-/** Through the avatar menu, so the sign-in after it happens in the page that showed the offer. */
 const signedInAgain = async (
   page: Page,
   api: APIRequestContext,
@@ -288,7 +281,6 @@ const signedInAgain = async (
 
 const movedOnWithoutTheOffer = async (page: Page): Promise<void> => {
   await railOf(page).getByRole("link", { name: "Knowledge" }).click();
-  // Knowledge's first group heads the page its rail link opens.
   await expect(page.getByRole("heading", { level: 1, name: "Browse" })).toBeVisible();
   await expect(offerOf(page), "the offer followed the Viewer to the next page").toHaveCount(0);
 };
@@ -360,7 +352,6 @@ test("a Viewer's offer ends on a trip through All workspaces", async ({ page, re
   const { first, second } = await aViewerOfTwoOffered(page, request);
 
   await allWorkspacesPicked(page, first.name);
-  // A pick drops the second factor's read, so the home it opens reads it again.
   const read = secondFactorRead(page);
   await page.getByRole("button", { name: second.name }).click();
 
@@ -392,7 +383,6 @@ test("a browser without WebAuthn keeps the email path alone", async ({ page, req
   await signedInWithNoWorkspace(page, request, "no-webauthn");
   await accountOpened(page);
 
-  // The add's place holds a line more than a list with no passkey shows, and no button.
   const passkeys = page.getByRole("region", { name: "Passkeys" });
   await expect(passkeys.getByRole("paragraph"), "nothing stands in the add's place").toHaveCount(2);
   await expect(passkeys.getByRole("button", { name: "Add a Passkey" })).toHaveCount(0);

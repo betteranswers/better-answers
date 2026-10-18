@@ -9,7 +9,6 @@ const nameOfGroupForm = (form: HTMLFormElement): string | undefined => {
   return typeof asked === "string" ? asked.trim() : undefined;
 };
 
-/** Sends what a rename form holds; a name the group already has is said, never sent. */
 export const submitRename = (properties: {
   readonly group: ListedGroup;
   readonly form: HTMLFormElement;

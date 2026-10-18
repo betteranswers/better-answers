@@ -17,7 +17,6 @@ export const PICKER_ACTIONS = {
 export const NO_WORKSPACE_HEADING = "No Workspace Yet";
 
 export const NO_WORKSPACE_WORDS = {
-  /** Claude's request lapses within minutes, and joining can take an Admin's day. */
   claudeAfterJoining: "Join a workspace, then connect again from Claude.",
   invitations: "Your Invitations",
   invitedAs,

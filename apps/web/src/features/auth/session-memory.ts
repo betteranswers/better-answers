@@ -32,7 +32,6 @@ export const rememberAChangeUnsaved = (pathname: string): void => {
 export const unsavedChangeRefusedOn = (): string | undefined =>
   inThisTab()?.getItem(UNSAVED_UNDER) ?? undefined;
 
-/** Said once: the page it names has lost a change only on the way straight back to it. */
 export const forgetTheUnsavedChange = (): void => {
   inThisTab()?.removeItem(UNSAVED_UNDER);
 };

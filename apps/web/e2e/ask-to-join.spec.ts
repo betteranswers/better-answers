@@ -26,7 +26,6 @@ const A_SHORT_NAME = "acme-joinery";
 
 const OLD_WORD = ["sl", "ug"].join("");
 
-/** A reader has no use for the short name's old word, and a workspace is never an organisation. */
 const UNSAID = [
   { word: "an organisation", pattern: /organi[sz]ation/i },
   { word: `a ${OLD_WORD}`, pattern: new RegExp(String.raw`\b${OLD_WORD}\b`, "i") },
@@ -112,7 +111,6 @@ test("answers known, unknown and repeated short names alike", async ({ page, req
   const said: string[] = [];
   for (const shortName of [workspace.shortName, `nobody-${Date.now()}`, workspace.shortName]) {
     await askToJoin(page, shortName);
-    // The fields empty only once this ask is acknowledged, so the banner read is this ask's.
     await expect(shortNameField(page)).toHaveValue("");
     said.push(await requestSent(page).innerText());
   }
@@ -153,8 +151,6 @@ test("refuses a blank reason, saying what to send", async ({
 test("tells a person past the ceiling when to ask again", async ({ page, request }) => {
   await signedInWithNoWorkspace(page, request, "asker");
 
-  // The window is wall-clock aligned, so a burst straddling a boundary starts its count again:
-  // ask until refused, not a fixed number.
   let status = 200;
   for (let attempt = 0; attempt < 30 && status !== 429; attempt += 1) {
     const answered = await page.request.post(ASK_TO_JOIN_ENDPOINT, {

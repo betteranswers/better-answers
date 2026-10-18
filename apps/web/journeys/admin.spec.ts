@@ -38,7 +38,6 @@ const rowOf = (page: Page, name: string): Locator =>
     .getByRole("row")
     .filter({ has: page.getByRole("link", { name, exact: true }) });
 
-/** An outcome's status stands beside its alert. A list's count and its pages' count have none. */
 const outcomeOf = (list: Locator): Locator => list.locator("output:has(+ [role='alert'])");
 
 const groupsRegion = (page: Page): Locator => page.getByRole("region", { name: "Groups" });
@@ -60,7 +59,6 @@ const ADD_TO_GROUP: BulkAction = {
   title: (count) => `Add ${membersTitled(count)} to a Group`,
 };
 
-/** Ticked on the first page, where the invented members' names sort the repair members. */
 const opened = async (page: Page, names: readonly string[], bulk: BulkAction): Promise<Locator> => {
   await page.goto(MEMBERS);
   for (const name of names) {
@@ -80,10 +78,6 @@ const chosen = async (dialog: Locator, field: string, option: string): Promise<v
   await dialog.page().getByRole("option", { name: option, exact: true }).click();
 };
 
-/**
- * The rows change before the api answers, and a bulk action is refused while another is going, so
- * each waits for its answer.
- */
 const committed = async (
   page: Page,
   procedure: string,
@@ -138,7 +132,6 @@ const groupDeleted = async (page: Page, name: string): Promise<void> => {
   const confirm = page
     .getByRole("alertdialog", { name: `Delete ${name}` })
     .getByRole("button", { name: "Delete", exact: true });
-  // The list drops the group before the api answers, and the run reads the api next.
   await Promise.all([answeredOk(page, "members.deleteGroup"), confirm.click()]);
   await expect(sheet).toHaveCount(0);
   await expect(groupsRegion(page).getByRole("heading", { name: "Groups" })).toBeFocused();
@@ -204,10 +197,6 @@ const olderEventsLoaded = async (page: Page, gate: Gate): Promise<void> => {
   await gate();
 };
 
-/**
- * Only read: an action would upload documents or spend on models. The fixture leaves both lists
- * empty.
- */
 const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
   await test.step("Invitations", async () => {
     await page.goto(MEMBERS);
@@ -216,7 +205,6 @@ const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
       .getByRole("region", { name: "Invitations" })
       .getByRole("row")
       .filter({ has: page.getByRole("cell") });
-    // A list still loading says so in a status, and one unread in an alert.
     await expect(
       rows.filter({ hasNot: page.getByRole("status") }).filter({ hasNot: page.getByRole("alert") }),
     ).toHaveText([/\S/]);
