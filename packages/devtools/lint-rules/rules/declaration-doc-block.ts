@@ -19,7 +19,6 @@ const DECLARATIONS = new Set([
   "TSExportAssignment",
 ]);
 
-/** A line comment's text after `//`, any further slashes, and the one space that follows. */
 const lineOf = (comment: Comment): string => comment.value.replace(/^\/* ?/, "").trimEnd();
 
 const docBlockOf = (block: Block): string => {

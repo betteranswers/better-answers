@@ -61,8 +61,6 @@ const spanText = (source: string, location: ReportMutant["location"]): string =>
 
 const identity = (placed: Placed): string =>
   [placed.file, placed.mutant.mutatorName, placed.mutant.replacement ?? "", placed.text].join(
-    // Written as an escape: a raw NUL byte would make this file binary to git. No part of
-    // an identity can contain one.
     "\u0000",
   );
 
@@ -239,7 +237,6 @@ export const mutationSummary = (
   return { summary: `${[...faultLines, ...lines].join("\n")}\n`, fault };
 };
 
-/** A file that is not a report, or not JSON, reads as no report. */
 const readReport = (file: string): Report | undefined => {
   if (!existsSync(file)) return undefined;
   try {
@@ -253,10 +250,6 @@ const readReport = (file: string): Report | undefined => {
 const readOptional = (file: string | undefined): Report | undefined =>
   file === undefined ? undefined : readReport(file);
 
-/**
- * Throws the usage line unless the flags pair and name `--leg` and `--report`; an absent or
- * unreadable file reads as no report.
- */
 export const mutationSummaryFromArgv = (argv: readonly string[]): SummaryRun => {
   const values = flagValues(argv);
   const leg = values?.get("leg");

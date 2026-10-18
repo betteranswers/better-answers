@@ -62,11 +62,6 @@ const refusesWords = ({ callee, arguments: [declaration] }: CallExpression): rea
 const isVocabulary = ({ typeName }: TSTypeReference): boolean =>
   typeName.type === "Identifier" && REFUSAL_TYPE.test(typeName.name);
 
-/**
- * Also reads unexported aliases, an object's `word`, and `refuses` lists.
- *
- * @throws when the file does not parse, which would otherwise read as naming no word.
- */
 export const refusalWordsIn = (file: string, source: string): readonly UnionWord[] => {
   const { program, lineOf } = parsedSource(file, source);
   const byOffset = new Map<number, string>();

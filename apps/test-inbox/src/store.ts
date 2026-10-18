@@ -36,7 +36,6 @@ export type Store = {
   readonly prune: (nowMs: number) => Promise<Result<undefined>>;
   readonly page: (asked: PageAsked) => Promise<Result<KeptPage>>;
   readonly message: (id: string) => Promise<Result<KeptMessage | undefined>>;
-  /** Writes one row and deletes it, so a store that cannot write answers before mail is sent. */
   readonly probe: (nowMs: number) => Promise<Result<undefined>>;
 };
 
@@ -110,10 +109,6 @@ const messageOf = async (
   return message === undefined ? { ok: false, error: UNREADABLE_ROW } : ok(message);
 };
 
-/**
- * No recipient or sender, so no reader takes a row a failed delete leaves; the day's prune
- * removes it.
- */
 const PROBE_ROW: Omit<Received, "receivedAtMs"> = {
   recipient: "",
   from: "",

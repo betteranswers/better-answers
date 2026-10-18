@@ -33,7 +33,6 @@ const fileResult = z.looseObject({ source: z.string().optional(), mutants: z.arr
 
 const testFile = z.looseObject({ tests: z.array(test) });
 
-/** Loose, so every key survives: the merged file is the one the next run's Stryker reads back. */
 const results = z.looseObject({
   files: z.record(z.string(), fileResult),
   testFiles: z.record(z.string(), testFile).optional(),
@@ -71,7 +70,6 @@ export const mutateSet = (root: string, patterns: readonly string[]): readonly s
 
 const ORDINARY_SECONDS = 10;
 const STATIC_SECONDS = 13;
-/** A timeout waits out the whole related suite. */
 const TIMEOUT_SECONDS = 370;
 
 const secondsOf = (found: Mutant): number => {
@@ -260,10 +258,6 @@ type Part = { readonly file: string; readonly lines?: Lines | undefined };
 const partName = ({ file, lines }: Part): string =>
   lines === undefined ? file : `${file}:${String(lines.from)}-${String(lines.to)}`;
 
-/**
- * A shard apiece for the pieces, so cutting a file that had a shard to itself leaves the others'
- * slices as they were.
- */
 const legSlices = async (
   name: string,
   { root, mutate, split = new Map<string, number>() }: Leg,
@@ -322,10 +316,6 @@ type TestTable = {
   readonly files: ReadonlyMap<string, TestFile>;
 };
 
-/**
- * Each shard numbers its tests itself; a test is matched by file, place and title, as Stryker
- * matches one between runs.
- */
 const testTableOf = (sources: readonly Results[]): TestTable => {
   const idByKey = new Map<string, string>();
   const files = new Map<string, { readonly entry: TestFile; readonly tests: Test[] }>();
@@ -458,10 +448,6 @@ export const mergeShards = ({
   return { checkpoint, report: everyShardFinished ? checkpoint : undefined, summary };
 };
 
-/**
- * Absent, not JSON or not a report reads as nothing left: a shard cut before or during its
- * write, or a leg never run.
- */
 const readResults = (file: string): Results | undefined => {
   try {
     const read = results.safeParse(JSON.parse(readFileSync(file, "utf8")));

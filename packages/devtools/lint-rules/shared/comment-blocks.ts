@@ -5,7 +5,6 @@ const NOTICE =
 
 type Directive = { readonly opening: RegExp; readonly separator?: RegExp };
 
-/** A disable must give a reason; every other directive may. */
 const DIRECTIVES: readonly Directive[] = [
   {
     opening: /^(?:eslint|oxlint)-(?<kind>disable|enable)(?:-next-line|-line)?\b/,

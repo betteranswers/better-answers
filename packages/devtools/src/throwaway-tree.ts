@@ -285,10 +285,6 @@ export type KnipRunner = {
 
 const namedIssues = z.array(z.object({ name: z.string() })).optional();
 
-/**
- * knip's JSON reporter, its kinds spelled out against the tuple. The smoke case proves the
- * shape, so an unreadable report is refused there.
- */
 const knipReport = z.object({
   issues: z
     .array(

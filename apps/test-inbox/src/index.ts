@@ -4,7 +4,6 @@ import { storeOver, type Database, type Received, type Store } from "./store.ts"
 
 type Env = { readonly DB: Database; readonly READ_TOKEN?: string | undefined };
 
-/** The part of Cloudflare's `ForwardableEmailMessage` the test inbox reads. */
 type ReceivedEmail = {
   readonly to: string;
   readonly headers: Headers;

@@ -15,7 +15,6 @@ export const SCAN_EXECUTABLE = {
 
 const CORE = "packages/core/src";
 
-/** The schema's own suite names these two as never an owner; `store`'s doors are listed outside. */
 const NEVER_A_SLICE: ReadonlySet<string> = new Set(["kernel", "store"]);
 
 const SCANNED = /\.tsx?$/;
@@ -79,7 +78,6 @@ export type TableRead = {
 
 type Piece = { readonly offset: number; readonly text: string };
 
-/** A quoted string's value, since it escapes a quoted name; a template raw, so its offsets are the file's. */
 const stringsIn = (program: Program, source: string): readonly (readonly Piece[])[] => {
   const found: Piece[][] = [];
   new Visitor({

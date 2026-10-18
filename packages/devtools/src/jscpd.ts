@@ -45,8 +45,6 @@ const clonesIn = (output: string): readonly Clone[] => {
     .filter((file): file is string => file !== undefined);
   const clones: Clone[] = [];
   for (let index = 0; index + 1 < files.length; index += 2) {
-    // SAFETY: the loop condition holds both indices inside the array, and
-    // `noUncheckedIndexedAccess` cannot see that.
     clones.push({ left: files[index] ?? "", right: files[index + 1] ?? "" });
   }
   return clones;

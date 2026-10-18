@@ -530,8 +530,6 @@ describe("each mutation leg, run as shards and summed once", () => {
     );
   });
 
-  // A shard named wrongly would run nothing, and the run would come back green having tested
-  // nothing.
   it.each([
     { shards: "core-1,api-2", leg: "core", of: 16, refused: false },
     { shards: "api-6", leg: "core", of: 16, refused: false },

@@ -26,7 +26,6 @@ const ADMIT = "admit";
 
 const FACE_FILE = "index.ts";
 
-/** Keyed by path under the source root, with `/` between its parts. */
 type Sources = Readonly<Record<string, string>>;
 
 export type UnadmittedFace = {

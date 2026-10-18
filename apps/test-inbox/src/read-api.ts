@@ -51,7 +51,6 @@ const unavailable = (api: ReadApi, error: string): Response => {
 const digestOf = async (text: string): Promise<Uint8Array> =>
   new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
 
-/** Compares digests, so a token of any length takes the same time and reveals nothing of it. */
 const admits = async (authorization: string | null, token: string): Promise<boolean> => {
   const offered = BEARER.exec(authorization ?? "")?.[1];
   if (offered === undefined) return false;
@@ -114,7 +113,6 @@ type Route = {
   readonly answer: (api: ReadApi, url: URL) => Promise<Response>;
 };
 
-/** Matches the id as the path carries it, so a malformed escape is an unknown id, not a throw. */
 const routeOf = (pathname: string): Route | undefined => {
   if (pathname === RECEIVING) return { allowed: "GET", answer: listed };
   if (pathname === PROBE_PATH) return { allowed: "POST", answer: probed };

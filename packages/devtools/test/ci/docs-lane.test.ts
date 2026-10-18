@@ -306,7 +306,6 @@ const probeFilesOf = (leg: ImageLeg): readonly string[] => {
 
 const COPY = /^COPY\s+(?<words>.+)$/gm;
 
-/** A stage's own output is no path in the tree, so a `--from` copy names nothing to watch. */
 const copiedBy = (leg: ImageLeg): readonly string[] =>
   [...read(leg.dockerfile).matchAll(COPY)].flatMap((found) => {
     const words = (found.groups?.["words"] ?? "").trim().split(/\s+/);
@@ -533,20 +532,16 @@ const workflow = (name: string): Workflow => readWorkflow(name, workflowFile);
 
 const LANE = "lane";
 
-/** The branch ruleset's required context, and the job build.yml's `image` waits on. */
 const FAN_IN = "check";
 
-/** No lane's leg, though its name starts like the pr lane's: it reads the title in the queue too. */
 const TITLE_JOB = "pr-title";
 
-/** No lane's leg either: it runs on a pull request whose dependencies moved, and nowhere else. */
 const TYPECHECK_JOB = "dependency-typecheck";
 
 const LOCKFILE_JOB = "pr-lockfile";
 
 const checkJobs = (): Readonly<Record<string, Job>> => workflow("check.yml").jobs;
 
-/** The fan-in reads the prefix to decide what it requires, so it is load-bearing, not tidiness. */
 const legsOf = (lane: string): readonly string[] =>
   Object.keys(checkJobs()).filter((job) => job.startsWith(`${lane}-`) && job !== TITLE_JOB);
 
@@ -561,7 +556,6 @@ const gatesOf = (job: string): readonly string[] =>
     gatesUnder((step.run ?? "").trim().replace(SHARD_ARGUMENT, "")),
   );
 
-/** One step cannot run on every leg, so the legs run these narrowings and this folds them back. */
 const NARROWED: Readonly<Record<string, readonly string[]>> = {
   "check:workspaces": [
     "check:libraries:unsharded",

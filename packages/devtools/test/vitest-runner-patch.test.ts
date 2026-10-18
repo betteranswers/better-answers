@@ -237,7 +237,6 @@ describe("the vitest runner's patch over a throwaway workspace", () => {
       statusReason: expect.stringContaining("is not a family"),
     });
 
-    // Reached only while a test runs, so its run is filtered to that test by its full name.
     expect(rowAt(rows, 10, "BlockStatement", "{}")).toMatchObject({
       status: "Killed",
       testsCompleted: 1,

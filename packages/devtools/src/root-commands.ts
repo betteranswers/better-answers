@@ -53,10 +53,6 @@ const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<gates>[\s\S]+)$/;
 const stepsNamed = (command: string): readonly string[] =>
   (RUNNER.exec(command.trim())?.groups?.["gates"] ?? "").split(/\s+/).filter((gate) => gate !== "");
 
-/**
- * A step that is itself a runner call stands for its own steps, so `check:gates` holds the
- * tree-walking gates once.
- */
 const expand = (command: string, seen: readonly string[]): readonly string[] =>
   stepsNamed(command).flatMap((gate) => {
     if (seen.includes(gate)) throw new Error(`${gate} is a step of itself: ${seen.join(" -> ")}`);

@@ -193,10 +193,6 @@ const B_TEST = { name: "answers > b", line: 9 };
 const C_TEST = { name: "answers > c" };
 const GONE_TEST = { name: "answers > gone", line: 20 };
 
-/**
- * Two dry runs may number the tests differently; a mutant naming a test its shard never listed
- * names none.
- */
 const SHARD_ONE = results(
   {
     "src/a.ts": [killed("1", "0", ["0", "1", "9"])],
@@ -222,7 +218,6 @@ const SHARD_TWO = results(
     { id: "2", ...C_TEST },
   ),
 );
-/** The previous run held a test this run no longer has. */
 const PREVIOUS = results(
   {
     "src/a.ts": [survived("1", ["5"])],
@@ -348,8 +343,6 @@ describe("a leg's results, merged from its shards", () => {
   });
 
   describe("for a file cut into pieces", () => {
-    // A shard holds the whole file: its own piece tested, and the rest carried forward from the
-    // results it started from.
     const at = (line: number, status: string): Found => ({
       id: String(line),
       mutatorName: "StringLiteral",
@@ -389,7 +382,6 @@ describe("a leg's results, merged from its shards", () => {
       ]);
     });
 
-    // The file may have moved since the previous run, whose lines would then be another text's.
     it("fills a silent piece from a sibling piece's shard", () => {
       const sibling = left(results({ "src/cut.ts": [at(4, "Survived"), at(5, "Killed")] }, {}));
 
@@ -480,10 +472,6 @@ describe("a leg's files, weighed by their cost last run", () => {
   });
 });
 
-/**
- * Nineteen mutants: seven on lines 2 and 3, ten on 5 to 8, one spanning them, two on line 10,
- * none on 1 or 11.
- */
 const THREE_STATEMENTS = `export type Name = string;
 export const greet = (name: Name): string =>
   name === "" ? "nobody" : \`hello \${name}\`;
@@ -497,7 +485,6 @@ export const double = (value: number): number => value * 2;
 export type Doubled = number;
 `;
 
-/** Two mutants a line: the arrow emptied, and the string emptied. */
 const line = (name: string, text = name): string =>
   `export const ${name} = (): string => "${text}";`;
 
@@ -768,7 +755,6 @@ describe("the shards command", () => {
     expect(writtenTo(out)).toEqual({ files: ["src/a.ts"], report: false });
   });
 
-  // The previous run priced every file alike, so the slices are [a, c] and [b].
   it("reads a stopped shard's checkpoint, and fills a silent one", async () => {
     const out = path.join(scratch, "merged-two");
     const baseline = path.join(scratch, "previous.json");
@@ -1053,7 +1039,6 @@ const runAsShards = async (
   );
 };
 
-/** Cleared after, so every shard starts from no previous run as a forced one does. */
 const wholeRun = (root: string): readonly Verdict[] => {
   runStryker(root);
   const verdicts = verdictsIn(path.join(root, "reports", "mutation.json"));

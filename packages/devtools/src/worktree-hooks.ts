@@ -118,7 +118,6 @@ const alive = (pid: number): boolean => {
   }
 };
 
-/** Named by the physical path, as the hooks resolve it; `orphaned` leaves it to pid 1 at once. */
 export const decoyWorker = (worktree: string, orphaned: boolean): Decoy => {
   const marker = path.join(realpathSync(worktree), "node_modules/vitest/dist/workers/forks.js");
   if (orphaned) {

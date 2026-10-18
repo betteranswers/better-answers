@@ -19,7 +19,6 @@ import {
 const IMAGE_ID_VARIABLE = "IMAGE_ID";
 const PROBE_DEFERRAL_VARIABLE = "IMAGE_PROBE_DEFERRED";
 
-/** This suite spells the variable too, and reads it in no leg. */
 const thisSuite = path.relative(repositoryRoot, fileURLToPath(import.meta.url));
 
 const checkWorkflowSchema = z.object({
@@ -63,7 +62,6 @@ const deferralsRead = (): readonly DeferralRead[] =>
       return { input: groups?.["input"] ?? value, answer: groups?.["answer"] ?? value };
     });
 
-/** Tracked files only, which is what a leg would have checked out. */
 const workspacesReadingTheDeferral = (): ReadonlySet<string> => {
   const found = spawnSync(
     "git",

@@ -83,10 +83,6 @@ describe("the workspaces' scripts", () => {
   });
 });
 
-/**
- * The tree's oxlint runs once from the root; a workspace copy would annotate every warning
- * twice, on paths CI cannot place on a diff.
- */
 const GATE_STEPS = ["lint:python", "lint:python-format", "typecheck", "test", "e2e"] as const;
 
 const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<steps>.+)$/;
@@ -159,7 +155,6 @@ const SHIMMED_RUNNERS: readonly string[] = ["vitest", "stryker"];
 const RUNNER_SCRIPTS: Readonly<Record<string, string>> = {
   test: "vitest",
   mutation: "@stryker-mutator/core",
-  // Knip loads the config a `--config` names, and the journeys' refuses to load without PUBLIC_URL.
   journeys: "@playwright/test",
 };
 

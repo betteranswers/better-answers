@@ -18,7 +18,6 @@ import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 const WORKSPACE = "packages/probe";
 
-/** Spelled in two halves, so the scan does not read this suite's own fixtures as violations. */
 const insert = (table: string): string => `INSERT ${"INTO"} ${table} (id) VALUES (1)`;
 
 const typescriptTest = `it("keeps a row", async () => {\n  await q(\`${insert("workspace")}\`);\n});\n`;

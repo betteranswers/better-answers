@@ -17,7 +17,6 @@ const rowOf = (row: Readonly<Record<string, SQLOutputValue>>): Row =>
 export type D1StandIn = {
   readonly database: Database;
   readonly ran: readonly string[];
-  /** Deletes one row outside the store, as a prune deletes the row a reader's cursor names. */
   readonly forget: (id: string) => void;
   /** Overwrites one column with text, which SQLite stores whatever the column's type, so D1 answers a row the store cannot read. */
   readonly corrupt: (id: string, column: "received_at" | "raw") => void;

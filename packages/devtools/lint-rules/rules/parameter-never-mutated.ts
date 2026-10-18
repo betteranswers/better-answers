@@ -1,10 +1,6 @@
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree, Scope } from "@oxlint/plugins";
 
-/**
- * Map and Set methods are left out, as a parameter holding one is often a collector; so is
- * `fill`, a Playwright locator method.
- */
 const MUTATORS = new Set([
   "push",
   "pop",

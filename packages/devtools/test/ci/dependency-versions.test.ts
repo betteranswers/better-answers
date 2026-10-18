@@ -33,7 +33,6 @@ const renovateSchema = z.object({
 
 const packageRules = renovateSchema.parse(JSON.parse(read("renovate.json"))).packageRules;
 
-/** Fails rather than falling back, so a hold that was deleted cannot read as one that matches. */
 const holdOn = (pattern: string): string => {
   const hold = packageRules.find(
     (rule) => rule.allowedVersions !== undefined && rule.matchPackageNames?.includes(pattern),
@@ -42,7 +41,6 @@ const holdOn = (pattern: string): string => {
   return hold;
 };
 
-/** The api is the workspace that installs the passkey plugin, so its tree is the one resolved. */
 const installed = (name: string): z.infer<typeof manifestSchema> =>
   manifestOf(path.join("apps/api/node_modules", name, "package.json"));
 
@@ -80,7 +78,6 @@ describe("renovate.json's better-auth holds", () => {
   });
 });
 
-/** The root manifest counts: it pins the same lint and type tools devtools does. */
 const manifests = (): readonly string[] => [".", ...workspacePackages()];
 
 const pinsOf = (directory: string): readonly (readonly [string, string])[] => {

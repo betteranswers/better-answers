@@ -129,7 +129,6 @@ const tsvOf = (rows: readonly Row[]): string =>
     .map((line) => `${line}\n`)
     .join("");
 
-/** What a deletion removes: the comment, or the `{}` around a JSX comment that holds nothing else. */
 type Cut = { readonly start: number; readonly end: number };
 
 type Found = { readonly row: Row; readonly cut: Cut };
@@ -176,7 +175,6 @@ const cutOf = (source: string, block: Block, containers: readonly Cut[]): Cut =>
   return holding ?? { start, end };
 };
 
-/** A bundler reads this one, and the comment gate has no reason to exempt it. */
 const BUNDLER_DIRECTIVE = /^@vite-ignore\b/;
 
 const kindOf = (source: string, block: Block, cut: Cut): Kind => {
@@ -286,7 +284,6 @@ const sourceAt = (root: string, file: string): string | undefined => {
 
 const HOLDER = /^(?<file>.+?) › (?<text>.+)$/;
 
-/** Counts overlapping matches, so `aa` is twice in `aaa` and names no single place. */
 const timesIn = (source: string, text: string): number => {
   let times = 0;
   for (let found = source.indexOf(text); found !== -1; found = source.indexOf(text, found + 1)) {
@@ -394,13 +391,11 @@ const firstLineOf = (tail: string): string => tail.split("\n", 1)[0] ?? "";
 
 const isBlank = (line: string | undefined): line is string => line?.trim() === "";
 
-/** An absent neighbour is the file's edge, which the formatter treats as a bracket. */
 const opensOrEdge = (line: string | undefined): boolean =>
   line === undefined || isBlank(line) || OPENS.test(line);
 
 const closesOrEdge = (line: string | undefined): boolean => line === undefined || CLOSES.test(line);
 
-/** Leaves no blank line the formatter would take out: two in a row, or one beside an edge. */
 const joined = (head: string, tail: string): string => {
   const previous = head === "" ? undefined : lastLineOf(head);
   const next = tail === "" ? undefined : firstLineOf(tail);

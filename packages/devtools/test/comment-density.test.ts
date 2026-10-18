@@ -39,10 +39,6 @@ const workspaceTree = (source: string, test: string): Tree => ({
 const UNDER = workspaceTree(withRatio(1, 40), withRatio(1, 40));
 const OVER = workspaceTree(withRatio(20, 40), withRatio(1, 40));
 
-/**
- * SQL that is mostly comment, beside ten times as much TypeScript, reads under the ceiling
- * when the two share one number.
- */
 const diluting = (sql: string): Tree => ({
   [`${WORKSPACE}/package.json`]: JSON.stringify({ name: "@better-answers/probe" }),
   [`${WORKSPACE}/src/one.ts`]: withRatio(1, 400),

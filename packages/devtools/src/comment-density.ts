@@ -91,7 +91,6 @@ export const measure = (
 ): readonly Measured[] => {
   const totals = new Map<string, Map<Arm, Total>>();
 
-  // Longest path first, so a workspace inside another takes the files it holds.
   const longestFirst = [...workspaces].sort((left, right) => right.length - left.length);
   for (const row of counted) {
     const workspace = workspaceOf(row.file, longestFirst);

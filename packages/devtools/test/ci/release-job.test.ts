@@ -144,7 +144,6 @@ const LIVE = "The journeys run against the live release.";
 
 type Refusal = { readonly mode?: string; readonly due?: boolean };
 
-/** A refusal still tells the report job why, and whether the journeys were due. */
 const refused = (said: string, trigger: string, { mode = "off", due }: Refusal = {}): GateRun => ({
   code: 1,
   said: `::error::${said}\n`,
@@ -1079,7 +1078,6 @@ describe("the journeys a release runs", () => {
     const journeysSeconds =
       (msOf("PREFLIGHT_TIMEOUT_MS") + roles * msOf("ROLE_JOURNEY_TIMEOUT_MS")) / 1000;
 
-    // An install and Chromium took about five minutes in check.yml's web leg; twice that.
     expect(roles).toBe(3);
     expect(journeysSeconds + 10 * 60).toBeLessThanOrEqual(
       jobOf("journeys")["timeout-minutes"] * 60,

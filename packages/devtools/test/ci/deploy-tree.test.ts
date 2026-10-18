@@ -47,7 +47,6 @@ const NOT_BUILT_EXIT = 3;
 const SYNTHETIC_WORKSPACE = "01M2SYNTHET1CAAAAAAAAAAAAA";
 const STAGING_COUNTS = '{"live_gen":3,"nodes":{"Concept":2},"edges":{"links_to":1}}';
 
-/** Off stdout, as the drill's own writes, so no redirect or command substitution swallows it. */
 const ASIDE = ["exec 4>&1", 'aside() { say "$@" >&4; }'];
 
 const countsRan = (staging: string, stagingStatus: number): BashRun => {
@@ -141,7 +140,6 @@ const composeServices = (file: string): readonly { name: string; body: string }[
 
 const PINNED_BY_DIGEST = /^[^\s@$]+@(?:sha256:[0-9a-f]{64}|\$\{\w+_DIGEST:\?[^}]*\})$/;
 
-/** The two Postgres launchers export these from the pin, so each file starts on the pin's digest. */
 const SET_FROM_THE_POSTGRES_PIN = /^\$\{(?:LOCAL|TEST)_POSTGRES_IMAGE:\?[^}]*\}$/;
 
 const digestless = (directory: string): readonly string[] =>
@@ -686,7 +684,6 @@ describe("the deploy tree", () => {
     const newest = fencedIn(read("deploy/restore-drill.sh"), "the newest dump");
     expect({ markers: newest !== undefined }).toEqual({ markers: true });
 
-    // As the bucket stands at 03:00 on the 1st, when the drill runs.
     const listed: Readonly<Record<string, readonly string[]>> = {
       hourly: [
         "globals-20261001T010512Z.sql.age",
@@ -751,7 +748,6 @@ describe("the deploy tree", () => {
     const polls = Number(/AWAIT_RELEASE_POLLS:-(\d+)/.exec(script)?.[1]);
     const delaySeconds = Number(/AWAIT_RELEASE_DELAY_SECONDS:-(\d+)/.exec(script)?.[1]);
 
-    // Twice the three minutes a fresh image took to pull and start, end to end; no sleep follows the last poll.
     expect((polls - 1) * delaySeconds).toBeGreaterThanOrEqual(360);
     expect(awaitSeconds(polls)).toBeLessThan(
       (releaseJob("promote")?.["timeout-minutes"] ?? 0) * 60,
@@ -769,7 +765,6 @@ describe("the deploy tree", () => {
       return { name, polls, fits: awaitSeconds(polls) < (job?.["timeout-minutes"] ?? 0) * 60 };
     });
 
-    // Production already answered on this digest at the smoke, so a few polls ride out a blip.
     expect(rereads).toEqual([
       { name: "journeys", polls: 3, fits: true },
       { name: "record", polls: 3, fits: true },
@@ -797,8 +792,6 @@ describe("the deploy tree", () => {
     expect(releases).toContain("| When (UTC) | By | api | worker | Rode on |");
     expect(releases).toContain("release/<UTC stamp>-<short commit>");
     expect(releases).toContain("git tag --list 'release/*' --sort=-creatordate");
-    // An on-box promotion, which the unreachable-Coolify carve-out still allows, has a
-    // recorded home: the same tag, made by hand.
     expect(releases).toContain("Access debt recorded 04/09/2026");
     expect(releases).toContain('git push origin "refs/tags/${tag}"');
 

@@ -12,7 +12,6 @@ export const PERSON = "admin@journeys.example";
 
 export const PRODUCTION = "Better Answers <sign-in@better-answers.example>";
 
-/** As long as the shortest token the Worker accepts. */
 export const TOKEN = "0123456789abcdef0123456789abcdef";
 
 export const receivedAt = (receivedAtMs: number): Received => ({

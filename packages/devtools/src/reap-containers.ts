@@ -7,7 +7,6 @@ const USAGE = "usage: reap-containers [--dry-run]";
 const SESSION_LABEL = "org.testcontainers.session-id";
 const RYUK_LABEL = "org.testcontainers.ryuk";
 
-/** The Python library labels its Ryuk with neither label above, so only the name gives its session. */
 const RYUK_NAME = /^testcontainers-ryuk-(?<session>.+)$/;
 
 const STOPPED = new Set(["exited", "dead"]);
