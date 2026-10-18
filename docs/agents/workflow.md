@@ -6,11 +6,13 @@ How a change becomes merged code. pstack runs the work in the session. An agent 
 
 **`/poteto-mode <what to do>`** matches the task to a pstack playbook and runs it: Feature, Bug fix, Refactoring and the rest. Its Feature playbook explains the subsystem with `how`, settles the shape with `architect`, delegates the code, verifies it on the real surface, then opens the pull request. Name the goal and how to tell it is done, not the skills.
 
+The project playbooks in `.agents/playbooks/` add this repository's steps to pstack's. `/poteto-mode` opens each one whose `extends` or `when` matches the task, after pstack's `check-playbooks.mjs` confirms their anchors.
+
 - `/sharpen` or `/in-your-own-words` first when what to build is still open.
 - A design question that a run can answer is settled by the Prototype playbook or `/architect`, not by asking the owner.
-- Work that spans several pull requests gets a plan first: `/poteto-mode plan <the work> in docs/plans/` runs the Multi-phase plan playbook, which writes the plan and stops. Its `check-plan.mjs` holds the plan's shape. A plan has no status field: git says what shipped.
+- Work one owner can build in one session runs under Feature, Refactoring or Bug fix with no plan, even when it lands as a short stack of pull requests. Work that needs more than one owner, or will outlast one session, gets a plan first. `/poteto-mode plan <the work> in docs/plans/` runs the Multi-phase plan playbook, which writes the plan and stops. Its `check-plan.mjs` holds the plan's shape. A plan has no status field: git says what shipped.
 
-A route block (`docs/specs/v01-route.md`) that is one change goes straight to `/poteto-mode`. A block of several changes is planned first, then built under the plan's execution playbook. The personas in `docs/personas/` ground a design: read the ones a screen serves before shaping it.
+A route block (`docs/specs/v01-route.md`) that one owner can build in one session goes straight to `/poteto-mode`. A block that needs more than one owner, or will outlast one session, is planned first, then built under the plan's execution playbook. The personas in `docs/personas/` ground a design: read the ones a screen serves before shaping it.
 
 ## What pstack does not know about this repository
 
@@ -19,7 +21,7 @@ A route block (`docs/specs/v01-route.md`) that is one change goes straight to `/
 - A worker prompt names each test scenario by the behaviour it checks, and a test's title is that behaviour, in 10 words at most.
 - A change to a page a journey walks (`apps/web/journeys/`) changes that journey in the same pull request, and runs the journeys against the browser suite's api, with the harness code source, before it lands. Nothing else runs them before the release does: `check` never runs a journey, and the release runs the journeys of the commit its api image was built from, so a page that moved without its journey ends that night's run `fail`. The browser-suite skill's *The journeys* gives the run.
 - `/mutation-testing` runs after the tests are green, on refactors and on changes to validation, parsing or auth. Skip it for UI, copy and config diffs.
-- A change that moves an architecture decision edits its doc in `docs/solutions/architecture-patterns/` in the same commit, and a new decision lands there as a new doc with the code it decides. `docs/archive/adr/` is frozen.
+- The rules that fire at a step of pstack's own playbooks live in `.agents/playbooks/`. `knowledge.md` holds the glossary entry, the decision doc edited in the same commit and the lesson routed through `/correct`. `plan.md` holds this repository's facts in a plan.
 
 ## Merging
 

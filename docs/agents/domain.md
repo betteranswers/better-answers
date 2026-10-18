@@ -6,7 +6,7 @@ This repo is **single-context**: one root `CONCEPTS.md` and one set of decisions
 
 ## Before exploring, read these
 
-- **`CONCEPTS.md`** at the repo root — the glossary.
+- **`CONCEPTS.md`** at the repo root, the glossary. Look up the entry for each domain word you meet with `search_sections`, one entry at a time. Do not read the whole file.
 - **`docs/solutions/architecture-patterns/`** — the live architecture decisions. Read the ones that touch the area you're about to work in.
 - **`AGENTS.md`** — the map: layout, how a task is worked, which skill to reach for.
 - **`CODING_STANDARDS.md`** — the constitution. A directory's own rules live in its `AGENTS.md`, which its `CLAUDE.md` loads when work reaches it.

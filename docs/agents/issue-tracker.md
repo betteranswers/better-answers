@@ -8,7 +8,7 @@ Issues live in Linear: workspace `tw-group`, team `better-answers` (ids `BA-N`),
 
 - **The backlog.** Work that is known but not yet planned.
 
-An issue is not the unit of build work: a pull request is, and work that spans several pull requests gets a plan in `docs/plans/` first. The pull request that lands an issue says `Fixes BA-N` in its description.
+An issue is not the unit of build work: a pull request is. Work that needs more than one owner, or will outlast one session, gets a plan in `docs/plans/` first. The pull request that lands an issue says `Fixes BA-N` in its description.
 
 ## States
 
