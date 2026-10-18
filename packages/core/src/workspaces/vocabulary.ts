@@ -38,7 +38,6 @@ export const WORKSPACE_REFUSALS = {
 
   "no-sub-processor": "precondition",
   "no-model-price": "precondition",
-  // The index's vectors are the embedding model's: another could not read them.
   "fixed-model-choice": "inapplicable",
 
   "last-second-factor": "precondition",

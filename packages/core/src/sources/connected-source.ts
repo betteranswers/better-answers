@@ -92,10 +92,6 @@ type CountField<Word extends string> = `findings${Pascal<Word>}`;
 type FindingCounts = { readonly [Word in RedactionCategoryWord as CountField<Word>]: number };
 type FindingCountShape = { readonly [Word in RedactionCategoryWord as CountField<Word>]: "count" };
 
-/**
- * Spelled out: `Object.fromEntries` would lose what the two types hold, and a category the list
- * gains fails here at compile time.
- */
 const FINDING_COUNT_SHAPE: FindingCountShape = {
   findingsSpecialCategory: "count",
   findingsBankDetails: "count",
@@ -666,11 +662,6 @@ const emptyTheConnectedSource = async (
   return ok({ passages: wiped.value.rowCount ?? 0, findings: raised.value.rowCount ?? 0 });
 };
 
-/**
- * Queues a sync, then deletes the connected source's passages and its unreviewed, unrestored findings;
- * `passages` and `findings` count the rows deleted. A person reaches only its own workspace, and any
- * other is `no-such-binding`.
- */
 export const reprocessConnectedSource = async (
   principal: Principal,
   tx: Tx,

@@ -123,10 +123,6 @@ const passageRowsAreHeld = async (
   }
 };
 
-/**
- * No action under test holds a passage row, so the probe's `true` branch needs this control to stay
- * honest.
- */
 const whileAPassageRowIsHeld = <T>(
   workspaceId: string,
   connectedSourceId: string,
@@ -805,7 +801,6 @@ describe("narrowing a connected source", () => {
     expect(editor?.ok && editor.value.found).toBe(true);
   });
 
-  // A shape says nothing of a tenant's state, so refusing it ahead of the role leaks nothing.
   it("names a malformed field before weighing role, and moves nothing", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);

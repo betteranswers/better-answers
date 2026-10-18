@@ -74,7 +74,6 @@ export type BulkResendInvitationsRefusal = SetRefusal<
 
 export type BulkCancelInvitationsRefusal = SetRefusal<MemberRefusal<"no-such-invitation">>;
 
-/** One statement, in id order, so two actions holding overlapping sets take them alike. */
 const HELD_INVITATIONS = `SELECT id, status FROM invitation
                            WHERE workspace_id = $1 AND id = ANY($2::text[])
                            ORDER BY id FOR UPDATE`;

@@ -90,7 +90,6 @@ const groupMade = async (workspace: ProvisionedWorkspace, userId: string, name: 
     ),
   );
 
-/** A group named as given, past the trimming the factory and an Admin's own action both do. */
 const groupSeeded = (workspace: ProvisionedWorkspace, name: string) =>
   seedingWith(db().pool, async (seed) => {
     const group = await seed.group({ workspaceId: workspace.workspaceId, name: "Unnamed" });
@@ -361,7 +360,6 @@ describe("the audit log's export", () => {
   });
 });
 
-/** Holds the group table, so an export stops partway, after its member read. */
 const groupTableHeld = async () => {
   const holder = await db().pool.connect();
   await holder.query("BEGIN");

@@ -150,7 +150,6 @@ type InspectPersonInput = z.output<typeof inspectPersonInput>;
 
 type SessionHeld = {
   readonly createdAt: string;
-  /** Moved when the library extends the session, so it can trail a use by up to a day. */
   readonly lastUsedAt: string;
   readonly expiresAt: string;
 };
@@ -160,7 +159,6 @@ type GrantHeld = {
   readonly assistant: { readonly id: string; readonly name: string | null };
   readonly workspace: WorkspaceNamed | null;
   readonly issuedAt: string;
-  /** When the assistant last refreshed; a call made on a live access token leaves no row. */
   readonly lastUsedAt: string;
   readonly expiresAt: string;
 };

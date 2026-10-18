@@ -37,7 +37,6 @@ export const suiteWithBundles = () => {
   return { db, bundles, arrange: (): Promise<Scenario> => arrangeWorkspace(db(), bundles()) };
 };
 
-/** Resolves the member; `confirmed` names a session confirmed now, and a scenario's principal names none, or the erasure map would count its row. */
 export const principalFor = async (
   db: MigratedPostgres,
   workspaceId: string,

@@ -75,14 +75,12 @@ const walkedFromEntries = async (
 const uidsByDepth = (steps: readonly WalkStep[]): readonly (readonly [string, number])[] =>
   steps.map((step) => [step.uid, step.depth]);
 
-/** A hub one hop from 1,001 spokes, more than the row limit holds. */
 const starIn = async (
   scenario: MapScenario,
 ): Promise<{ readonly hub: string; readonly spokes: readonly string[] }> => {
   const star = await seeded(async (seed) => {
     const hub = await seed.mapNode({ workspaceId: scenario.workspaceId });
     const spokes = Array.from({ length: 1_001 }, () => conceptIriOf(ulid())).toSorted();
-    // Greatest uid first, so a cut taken in the order rows are met keeps the wrong spokes.
     for (const uid of spokes.toReversed()) {
       await seed.mapNode({ workspaceId: scenario.workspaceId, uid });
       await seed.mapEdge({ workspaceId: scenario.workspaceId, fromUid: hub.uid, toUid: uid });
@@ -336,7 +334,6 @@ describe("a map walk from several entries", () => {
         workspaceId: scenario.workspaceId,
         sensitivity: "Restricted",
       });
-      // The least uid there is: were the withheld entry walked from, this would lead depth one.
       const behind = await seed.mapNode({
         workspaceId: scenario.workspaceId,
         uid: conceptIriOf("00000000000000000000000000"),
@@ -434,7 +431,6 @@ const conceptNode = async (
   return iri;
 };
 
-/** A hub one hop from 1,003 spokes in uid order: the first 1,001 fill the row limit. */
 const hubOf = async (
   workspaceId: string,
   spoke: (seed: TestData, uid: string, first: boolean) => Promise<void>,
@@ -456,7 +452,6 @@ describe("a map walk narrowed to collections", () => {
   it("keeps a collection's neighbours past a hub's thousand others", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
-    // The two greatest uids are the hub's own collection: a cut taken first drops exactly them.
     const { hub, last: inside } = await hubOf(workspaceId, async (seed, uid, first) => {
       await conceptNode(seed, workspaceId, first ? "lms" : "audits", uid);
     });
@@ -550,7 +545,6 @@ describe("a map walk narrowed to collections", () => {
   it("caps concepts alone when no collection is named", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
-    // The two greatest uids are concepts: a cap that counts sections drops exactly them.
     const { hub, last: concepts } = await hubOf(workspaceId, async (seed, uid, first) => {
       if (first) await seed.mapNode({ workspaceId, uid, label: "Section", kind: null });
       else await conceptNode(seed, workspaceId, "audits", uid);
@@ -577,7 +571,6 @@ describe("a map walk narrowed to collections", () => {
     const narrowed = await planned(db(), scenario.viewer, (principal, tx) =>
       walkConceptsFromEntries(principal, tx, [ids.conceptIri.parse(entry)], collections),
     );
-    /** The filter on each scan of the CTE `name`: a filter beneath the grouping costs a sort. */
     const filtersOn = (name: string): readonly string[] =>
       narrowed.nodes
         .filter((node) => node["Node Type"] === "CTE Scan" && node["CTE Name"] === name)
@@ -685,8 +678,6 @@ describe("the delta a second commit runs", () => {
   it("moves an inbound link's denormalised kind with its target's kind", async () => {
     const { scenario, product, policy } = await linkedPair();
 
-    // The target lands first: a newly mapped concept re-derives every file naming it, which
-    // would carry the new kind whether or not the sync ran.
     await land(scenario, deltaOf(product));
     await land(scenario, deltaOf(policy));
 

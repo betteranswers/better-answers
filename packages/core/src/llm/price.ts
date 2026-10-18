@@ -17,7 +17,6 @@ const PRICE_SET = `INSERT INTO model_price
   DO UPDATE SET gbp_per_million_in = EXCLUDED.gbp_per_million_in,
                 gbp_per_million_out = EXCLUDED.gbp_per_million_out`;
 
-/** Replaces a price set for the same day; the audited action that calls it records the change. */
 export const storeModelPrice = async (tx: Tx, price: ModelPrice): Promise<void> => {
   await tx.query(PRICE_SET, [
     price.provider,

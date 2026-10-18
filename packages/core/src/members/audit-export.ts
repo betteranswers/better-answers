@@ -41,7 +41,6 @@ const EXPORT_ACTIONS = declareActions("platform", {
   }),
 });
 
-/** About 3 to 5 MB of text, which the browser saves as one file. */
 const EXPORT_CAP = 10_000;
 
 export const exportAuditLogInput = readAuditLogInput.pick({ family: true, search: true });
@@ -136,7 +135,6 @@ const STOPPED = `The export stopped at ${EXPORT_CAP.toLocaleString("en-GB")} eve
 const TOO_BROAD =
   "The search named more than 100 people or groups. Only the first 100 were read; narrow it for the rest.";
 
-/** A file read short says so in its own last lines, so a copy passed on still says it. */
 const csvOf = (read: Read): string =>
   [
     HEADER,
@@ -147,7 +145,6 @@ const csvOf = (read: Read): string =>
     .map((cells) => `${lineOf(cells)}\r\n`)
     .join("");
 
-/** Built a field at a time, as the family is stored only when the export was narrowed to one. */
 type ExportedDetail = {
   -readonly [Key in keyof DetailOf<typeof EXPORT_ACTIONS.exported.detail>]: DetailOf<
     typeof EXPORT_ACTIONS.exported.detail

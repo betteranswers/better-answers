@@ -117,7 +117,6 @@ type Recorded = {
   readonly detail: { readonly sessions: readonly { readonly sessionId: string }[] };
 };
 
-/** The record's sessions by id, so a delete's own order never reaches the comparison. */
 const inIdOrder = (rows: readonly Recorded[]) =>
   rows.map((row) => ({
     ...row,

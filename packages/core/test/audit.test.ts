@@ -517,8 +517,6 @@ describe("the first door — record, the actor from the Principal", () => {
         subjectId: adminUserId,
         detail: { adminUserId: "priya@example.invalid", role: "Admin", confirmed: true },
       }),
-      // The end anchor tells this message from the optional kind's, which is this plus ", or
-      // absent"; unanchored, both read green.
     ).rejects.toThrow(/adminUserId is not an id$/);
     await expect(
       write({

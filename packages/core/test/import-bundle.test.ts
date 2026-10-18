@@ -321,10 +321,6 @@ const standingConcept = (
     ...overrides,
   });
 
-/**
- * Held at the manifest's row, the run has read the standing paths; the writer queues behind it
- * on the bundle's lock.
- */
 const landedBetweenTheReadAndTheWrite = async (
   scenario: Scenario,
   path: string,

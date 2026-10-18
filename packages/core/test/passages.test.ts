@@ -129,7 +129,6 @@ type StraddledRow = {
   readonly charEnd: number;
 };
 
-/** A straddle's two rows can only be narrowed from above, never one row and not the other. */
 const documentWithTwoPassages = (
   workspaceId: string,
   what: {
@@ -182,7 +181,6 @@ const BOARD_TITLE = "The board's note";
 const BOARD_TEXT = "The board's note on the bid.";
 const BOARD_CHAR_END = 28;
 
-/** Two bare words on purpose: spliced into `to_tsquery` as typed, they raise a syntax error. */
 const QUERY = "holiday policy";
 
 const HANDBOOK = {
@@ -572,10 +570,6 @@ const connectedSourceUnderReview = (
     }
   });
 
-/**
- * Both documents hold a passage matching the search's words, so an empty search over them is the
- * published arm at work, not an unmatched query.
- */
 const seedTheConnectedSourceUnderReview = (workspaceId: string): Promise<void> =>
   connectedSourceUnderReview(workspaceId, REVIEW_CONNECTED_SOURCE, [
     {

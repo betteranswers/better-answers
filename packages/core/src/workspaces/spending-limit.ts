@@ -21,7 +21,6 @@ const SPENDING_LIMIT_ACTIONS = declareActions("platform", {
   set: action("platform.workspace.spending_limit_set", {}),
 });
 
-/** Whole pounds and pence beyond them, as a decimal string: money is never a float. */
 const named = z.object({
   workspaceId: boundarySchemas.workspace.select.shape.id,
   gbp: z.string().regex(/^\d{1,9}(\.\d{1,6})?$/),

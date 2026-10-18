@@ -20,7 +20,6 @@ export const CONCEPT_REFUSALS = {
   "no-such-repository": "precondition",
   "history-diverged": "precondition",
 
-  // Another process is rewriting the bundle's history; the next reconciler pass catches up.
   held: "conflict",
 
   "stale-precondition": "conflict",

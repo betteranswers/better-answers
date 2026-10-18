@@ -92,10 +92,6 @@ export const eventsOfAction = async (
   return found.rows.map((row) => boundarySchemas.auditEvent.select.parse(row));
 };
 
-/**
- * The latest instant each subject met `action` on the identity-set audit log; a subject that never
- * did is left out. Naming the subject kind reaches the log's index on kind and subject.
- */
 export const latestOnIdentitySet = async (
   _operator: OperatorPrincipal,
   tx: Tx,
@@ -162,7 +158,6 @@ type SoughtSubjects = {
 
 export type DetailNaming = {
   readonly key: string;
-  /** Every kind the actions' subjects take, so the arm reaches the subject index. */
   readonly subjectKinds: readonly string[];
   readonly actions: readonly ActionName[];
 };
@@ -185,7 +180,6 @@ const armOf = (at: ArmAt, predicate: string): string =>
      ORDER BY at DESC, id DESC
      LIMIT $${at.limit} + 1)`;
 
-/** One value compares by `=`, so an arm on one person keeps its index's order and needs no sort. */
 const oneOf = (values: readonly string[], bind: Bind): string =>
   values.length === 1 ? `= $${bind(values[0] ?? "")}` : `= ANY($${bind(values)}::text[])`;
 

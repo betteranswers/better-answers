@@ -365,10 +365,6 @@ const syncQueued = async (
 
 const KEPT_IN_TEXT = "kept-in-text" satisfies (typeof FINDING_REVIEW_STATES)[number];
 
-/**
- * A later keep does not revise what a dismissal said the span is; the keep has the restore
- * columns.
- */
 const KEPT_IN_TEXT_REVIEW = `UPDATE finding
         SET review_state = $3, reviewed_by = restored_by,
             reviewed_at = restored_at, review_reason = restore_reason
@@ -551,11 +547,6 @@ const documentsNarrowedBy = async (
   return ok({ documentIds, batchId });
 };
 
-/**
- * Sets each named document's sensitivity, marks the groups' unreviewed findings narrowed, and
- * recomputes the visibility of what those documents source. A sensitivity wider than any
- * document's effective class, the narrower of its own and its source's, refuses the whole command.
- */
 export const narrowDocuments = async (
   principal: UserPrincipal,
   tx: Tx,

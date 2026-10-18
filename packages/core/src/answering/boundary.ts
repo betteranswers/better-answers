@@ -117,7 +117,6 @@ const documentMatch = z.object({
   sensitivity: z.string(),
 });
 
-/** `trust` is the one key the wire names its own way, so each edge hands in its schema. */
 export const findOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
   z.object({
     query: z.string(),
@@ -158,10 +157,6 @@ const evidenceItem = z.object({
     .describe("The concept this source names; absent where there is none you may read."),
 });
 
-/**
- * `source` is the file's own label. `locator` or `iri` is what opens it, given only where the reader
- * may open it; neither is ever `""`.
- */
 export type Evidence<Iri extends string> = {
   readonly id?: string;
   readonly source: string;
@@ -187,7 +182,6 @@ const returnedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
     evidence: z.array(evidenceItem),
   });
 
-/** One object with two optional keys, not a union: the kind that decides is free text. */
 const relatedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
   previewedConceptWith(trust).extend({
     body: z

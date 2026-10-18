@@ -180,7 +180,6 @@ type Opened<Iri extends string, View> =
 
 export type OpenView<Iri extends string = ConceptIri> = Opened<Iri, ConceptView<Iri>>;
 
-/** The pane's words, which the web's concept page leads and ends its sources with. */
 type PaneWords = Pick<ConceptRead["pane"], "access" | "lead" | "next">;
 
 export type OpenResult<Iri extends string = ConceptIri> = Opened<
@@ -224,7 +223,6 @@ type Search = {
 
 type Counted = () => Promise<Result<CorpusCounts, Error>>;
 
-/** Counts once a request, or takes the counts of a cursor that stopped in one of `runs`. */
 const countedOnce = (
   runs: readonly FindRun[],
   after: FindPosition | undefined,
@@ -285,7 +283,6 @@ const passageRun =
 
 type Page<Match> = { readonly matches: readonly Match[]; readonly next: FindPosition | undefined };
 
-/** Reads one row past `limit`, so a page names where it ended only when more follow. */
 const pageOf = async <Match>(
   runs: readonly (readonly [FindRun, RunReader<Match>])[],
   limit: number,
@@ -642,7 +639,6 @@ const PREVIEWS_HEADING =
 const previewLine = (concept: PreviewedConcept<string>): string =>
   `- ${concept.kind} · ${concept.title} · ${concept.collection ?? NO_COLLECTION} · ${concept.trustWords} · ${concept.iri} — ${concept.url}`;
 
-/** An `Answer` in full, then every other concept by its line, each in the order it bears. */
 const relatedText = (related: readonly RelatedConcept<string>[]): readonly string[] => [
   ...related.flatMap((concept) => ("body" in concept ? returnedText(concept) : [])),
   ...listed(

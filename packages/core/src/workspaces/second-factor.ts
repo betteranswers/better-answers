@@ -41,7 +41,6 @@ const SECOND_FACTOR_ACTIONS = declareIdentitySetActions("people", {
 
 export const ADMIN: Role = "Admin";
 
-/** Whether the person `person` aliases must hold a second factor; `$2` binds `ADMIN`. */
 export const mustHoldOneOf = (person: string): string =>
   `${person}.operator OR EXISTS (SELECT 1 FROM member m WHERE m.user_id = ${person}.id AND m.role = $2)`;
 
@@ -157,7 +156,6 @@ type AuthenticatorSetUp = {
   readonly authenticatorId: string;
   readonly stamped: boolean;
 
-  /** False when another finish recorded this authenticator first, so this one sends no notice. */
   readonly firstRecord: boolean;
 
   /** Issued only to a person who held none, and shown to them once. */
@@ -279,7 +277,6 @@ export const removeAuthenticator = async (
   return removed.value;
 };
 
-/** Every instant is ISO, as it crosses the wire; a passkey never used has no last use. */
 type PasskeyHeld = {
   readonly id: string;
   readonly name: string | null;
@@ -313,7 +310,6 @@ type SessionRow = {
   readonly adminOf: string | null;
 };
 
-/** As the wire carries it: the session's confirmation named by an ISO instant. */
 type ThisSession = Omit<SessionRow, "confirmedAt"> & {
   readonly confirmedAt: string | null;
   readonly standing: SecondFactorStanding;
@@ -325,13 +321,11 @@ export type SecondFactorHeld = {
   readonly promoted: boolean;
   readonly passkeys: readonly PasskeyHeld[];
   readonly authenticator: AuthenticatorState;
-  /** `madeAt` is an ISO instant, as it crosses the wire. */
   readonly recoveryCodes: { readonly unused: number; readonly madeAt: string } | undefined;
   readonly codesAcknowledged: boolean;
   readonly passkeyOfferDismissed: boolean;
   readonly restoreRequired: boolean;
 
-  /** Seconds before each kind of code may be tried again. */
   readonly waits: WaitSeconds;
 
   /** Only when the read names a session: one the person does not hold is neither. */
@@ -357,10 +351,6 @@ const heldOf = (facts: Facts, around: Around): SecondFactorHeld => ({
   thisSession: around.thisSession,
 });
 
-/**
- * Of session `$1`, held by person `$2`. A grant made before the operator's restore never saw their
- * restore code, so it lapses.
- */
 export const SETUP_GRANTED = `
   setup_granted_at IS NOT NULL
     AND setup_granted_at >= COALESCE(

@@ -312,7 +312,6 @@ describe("the authenticator's failures", () => {
     const personId = await seedPerson(db().pool);
     await failingTimes(personId, 5, after(1));
 
-    // Of two attempts at once, the one stamped first can read the other's failure.
     const reserved = await reserving(personId, AT);
 
     expect(reserved).toEqual({ ok: true, value: { waitSeconds: 30, noticeDue: false } });

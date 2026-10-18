@@ -197,10 +197,6 @@ type SensitivityChecked<A extends AuditAction, E> = (
   tx: Tx,
 ) => Promise<Result<Pick<AuditEvent<A>, "action" | "detail">, E>>;
 
-/**
- * Inside the cascade's lock, before the connected source's: a narrowing and a widening then queue
- * behind each other rather than deadlock.
- */
 const sensitivityAskedOf = async (
   acting: ActingOnConnectedSource,
   tx: Tx,

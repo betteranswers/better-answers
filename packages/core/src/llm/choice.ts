@@ -13,7 +13,6 @@ export type ModelChoiceStored = {
   readonly model: string;
 };
 
-/** A retention tail is the provider's, so it is kept only while the provider stays the same. */
 const CHOICE_STORED = `INSERT INTO model_choice (id, workspace_id, purpose, provider, model)
   VALUES ($1, $2, $3, $4, $5)
   ON CONFLICT (workspace_id, purpose) DO UPDATE

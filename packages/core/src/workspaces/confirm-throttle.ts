@@ -86,7 +86,6 @@ const afterOneMore = (earlier: Pick<ThrottleRow, "failures" | "noticedAt">, now:
   };
 };
 
-/** Run under the person's lock, so two failures at once each count. */
 export const countingAFailure = async (
   tx: Tx,
   personId: UserId,
@@ -99,7 +98,6 @@ export const countingAFailure = async (
   return next.counted;
 };
 
-/** A success forgets the kind's failures, its wait and its notice. */
 export const resettingTheThrottle = async (
   tx: Tx,
   personId: UserId,

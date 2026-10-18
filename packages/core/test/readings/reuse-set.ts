@@ -116,7 +116,6 @@ export type ReuseReading = {
   readonly negatives: Tally;
   readonly othersTaken: number;
   readonly spentGbp: string;
-  /** Each judging call, its retries included, from the client's call to its outcome. */
   readonly judgeMs: { readonly median: number; readonly worst: number };
   readonly misses: readonly string[];
 };

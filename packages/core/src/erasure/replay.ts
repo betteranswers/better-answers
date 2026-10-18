@@ -126,7 +126,6 @@ const copyAt = async (
   return copyOf(parsed.data);
 };
 
-/** Copies completed after `since`, not at it. One unreadable copy answers an error. */
 export const replayCopiesSince = async (
   platform: PlatformPrincipal,
   door: ObjectDoor,

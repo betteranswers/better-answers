@@ -140,7 +140,6 @@ const recordedCommits = async (workspaceId: string): Promise<readonly string[]> 
 };
 
 const reading = <T>(
-  /** A session the principal names, for an act that asks how fresh its confirmation is. */
   principal: UserPrincipal & { readonly sessionId?: string },
   work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
 ): Promise<Folded<T>> => readingAs(db().runtimePool, principal, work);
@@ -209,8 +208,6 @@ describe("a governed write", () => {
       ].join("\n"),
     );
 
-    // Written down, never computed here: an expectation this action's own hash produced would
-    // agree with any canonicalisation at all, the Python tier's included.
     expect(written.contentHash).toBe(
       "16f6c6993084b35862434bc90dece1fb2c2669cbddc21c910bdcd95bef0dcecc",
     );
@@ -803,10 +800,6 @@ describe("the map a governed write leaves behind", () => {
   it("keeps mapping links past long unmatched backtick runs", async () => {
     const scenario = await arrange();
 
-    /**
-     * The middle paragraph's size and shape are what a rescanning pairing chokes on: many
-     * distinct unpaired lengths, then many paired short runs.
-     */
     const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
       body: [
         "# Details",
@@ -1212,10 +1205,6 @@ describe("what a re-write of an existing concept may not move", () => {
   });
 });
 
-/**
- * Bound here, never Postgres's now(): issuance is stamped by this process, and a second clock
- * would order events milliseconds apart by drift.
- */
 const REVOCATIONS = {
   here: {
     statement:
@@ -1372,7 +1361,6 @@ describe("authority that moved while the action was in flight", () => {
 
     expect(landed).toEqual({ ok: false, error: "credentials-revoked" });
 
-    // The commit holds the member row too, so it reads the revocation the first read missed.
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
     expect(await recordedCommits(scenario.workspaceId)).toEqual([]);
     expect(await rowsFor(scenario.workspaceId)).toMatchObject({
@@ -1629,7 +1617,6 @@ describe("opening a concept by IRI", () => {
 
     expect(await verifiedBy()).toBe("Priya Anand");
 
-    // The removal asks how fresh the confirmation is, so the Admin acts from a confirmed session.
     const removed = await reading(
       {
         ...scenario.admin,

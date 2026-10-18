@@ -33,7 +33,6 @@ const JOINING_ACTIONS = declareActions("people", {
   joined: action("people.member.joined", { invitationId: "id", role: "role" }),
 });
 
-/** Borrowed from the workspaces slice, whose words they are: adding a member refuses them too. */
 type Borrowed = Extract<
   keyof typeof WORKSPACE_REFUSALS,
   "already-a-member" | "no-display-name" | "person-gone"
@@ -114,10 +113,6 @@ const inviteeOf = async (
   return row === undefined ? undefined : INVITEE.parse(row);
 };
 
-/**
- * The address is judged first, so a person holding another's link learns nothing of the
- * invitation's state.
- */
 const refusalAgainst = (
   { invitation, invitee }: Held,
   now: Date,
@@ -297,8 +292,6 @@ const join = async (
     "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, $4, now())",
     [ulid(), workspaceId, joining.personId, role],
   );
-  // A session ended meanwhile matches no row: the person is still a member, and the next sign-in
-  // finds it.
   await tx.query(
     `UPDATE session SET active_workspace_id = $1, updated_at = now()
       WHERE id = $2 AND user_id = $3`,

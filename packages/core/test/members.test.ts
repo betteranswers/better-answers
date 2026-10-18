@@ -377,7 +377,6 @@ const outcomesOf = async (
   return outcomes;
 };
 
-/** `outcomes` still answers once `run` rejects, since the verbs ran before the commit failed. */
 const eachVerb = (
   workspace: Workspace,
   verbs: readonly Verb[],

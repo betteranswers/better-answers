@@ -2,15 +2,10 @@ const WITHHELD = "[withheld]";
 
 type Hit = { readonly start: number; readonly end: number };
 
-/**
- * Python's whitespace, which the worker's patterns read: unlike JavaScript's `\s` it holds NEL
- * and four separator controls, and not the byte-order mark.
- */
 const SPACE = String.raw`\t\n\v\f\r\x1c-\x1f \x85\xa0\u{1680}\u{2000}-\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}`;
 
 const WORD = String.raw`\p{L}\p{N}_`;
 
-/** The same to Presidio's engine: a combining mark is a word's character, a fraction is not. */
 const WORD_TO_PRESIDIO = String.raw`\p{Alphabetic}\p{M}\p{Nd}\p{Pc}\p{Join_Control}`;
 
 const DIGIT = String.raw`\p{Nd}`;
@@ -38,7 +33,6 @@ const A_SORT_CODE_WITH_AN_ACCOUNT = new RegExp(
 
 const A_WORD_THAT_NAMES_A_PAIR = /account|sort|bank|payment|bacs/iu;
 
-/** Between the numbers the worker reads a naming word only whole, or as its plural. */
 const A_WHOLE_WORD_THAT_NAMES_A_PAIR = new RegExp(
   `${EDGE}(?:account|sort|bank|payment|bacs)s?${EDGE}`,
   "iu",
@@ -70,14 +64,9 @@ const runAround = (text: string, at: number): Hit => {
   return { start, end };
 };
 
-/**
- * The worker reads five words back, whole words between the numbers, and one word on after a
- * colon-joined sort code. This reads wider.
- */
 const namedPairsIn = (text: string): readonly Hit[] => {
   const naming = A_WORD_THAT_NAMES_A_PAIR.exec(text);
   if (naming === null) return [];
-  // No naming word holds another, so the first to open is the first to close.
   const named = naming.index + naming[0].length;
   const pairs: Hit[] = [];
   let run: Hit = { start: 0, end: 0 };

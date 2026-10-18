@@ -93,11 +93,6 @@ const restingOn = (row: SourcedVisibilityRow): readonly Visibility[] => [
   ...(row.published ? [] : [RESTRICTED_TO_ADMINS]),
 ];
 
-/**
- * Derives the sensitivity from the connected sources and documents the concept cites, or from `citing` in
- * place of its standing citations. `alsoOn` adds sensitivities, `onTheRow` adds its index row locked
- * for update, and an override wins outright. Share-locks each connected source it reads.
- */
 export const conceptVisibilityFrom = async (
   principal: Principal,
   tx: Tx,
@@ -137,10 +132,6 @@ export const conceptVisibilityFrom = async (
   );
   const override = await overrideOf(principal, tx, concept.iri);
 
-  /**
-   * After the connected sources, never before: taking this row first is the one order that deadlocks
-   * with a narrowing.
-   */
   const row =
     concept.onTheRow === true
       ? await tx.query<VisibilityRow>(

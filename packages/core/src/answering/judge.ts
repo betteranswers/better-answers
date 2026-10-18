@@ -36,7 +36,6 @@ type Verdicts = Readonly<Record<string, CandidateVerdict>>;
 export type CallReserved = { readonly to: ModelToCall; readonly reservationId: string };
 
 export type CallReserving = {
-  /** The record of the question the call serves. */
   readonly answerId: string;
   readonly most: Readonly<Record<WireShapeName, CallSize>>;
   readonly now: Date;
@@ -50,7 +49,6 @@ export type JudgeSteps<Refused = never> = ModelClient & {
   ) => Promise<Result<CallReserved | undefined, Refused | JudgeRefusal>>;
 };
 
-/** One drafting call's reservation: drafting streams through the Messages shape alone. */
 export type DraftReserving = Omit<CallReserving, "most"> & { readonly most: CallSize };
 
 const reservedFor = async (
@@ -105,7 +103,6 @@ export const reserveDrafting = async (
     most: (shape) => (shape === "messages" ? reserving.most : undefined),
   });
 
-/** The `Answer`s the judge is asked about: those that bear, in the order they bear, to the cap. */
 const candidatesOf = (
   related: readonly RelatedConcept[],
   cap: number,
@@ -184,7 +181,6 @@ export const judgeCall = (
 const DECISION_ASK =
   "Does this approved answer answer the question in the state as it was asked? It does not if it answers a different question, a narrower or a wider one, or one about another product, module, plan or audience than the question names.";
 
-/** A decision model answers each question with a probability and writes no text. */
 const DECISION_TOKENS_OUT_EACH = 16;
 
 type DecisionJudgeCall = DecisionModelCall & { readonly most: CallSize };
@@ -255,7 +251,6 @@ const byIri = (
     }),
   );
 
-/** Each `Answer` judged yes is a fit, in the order it bore. With no verdicts, every one stays related. */
 const judgedPlan = (
   plan: AnswerPlan,
   candidates: readonly ReturnedConcept[],

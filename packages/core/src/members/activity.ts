@@ -65,7 +65,6 @@ const isDoneTo = (event: ReadEvent, personId: UserId): boolean =>
       event.detail[key] === personId,
   );
 
-/** An event naming the person neither way means the read and `PERSON_NAMED_IN` have drifted. */
 const directionOf = (event: ReadEvent, personId: UserId): Direction => {
   const by = isTakenBy(event, personId);
   const to = isDoneTo(event, personId);

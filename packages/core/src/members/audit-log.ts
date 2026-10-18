@@ -41,7 +41,6 @@ import type { MemberRefusal } from "./vocabulary.ts";
 
 const AUDIT_LOG_PAGE = 50;
 
-/** People's names and addresses, group names, or an action's words; never stored, never logged. */
 const auditSearch = z.string().trim().max(100);
 
 export const readAuditLogInput = z.object({
@@ -62,13 +61,8 @@ const readAuditLogAction = declareAction({
 
 export type ReadAuditLogRefusal = MemberRefusal<RefusalOf<typeof readAuditLogAction>> | Error;
 
-/** A thing an event names that has a name of its own; one since removed is said by its kind. */
 type ThingKind = "connected-source" | "document" | "concept";
 
-/**
- * The kind, not the words, as an actor's is. Only erasure deletes an invitation, so an invitation
- * no row holds was erased.
- */
 export type AuditEventSubject =
   | Extract<AuditEventActor, { kind: "person" | "former-member" }>
   | { readonly kind: "group"; readonly name: string }
@@ -104,10 +98,6 @@ type NamedKind = "person" | "group" | "invitation" | ThingKind;
 
 export const PERSON_SUBJECT_KINDS = ["member", "person"] as const;
 
-/**
- * The only places a person's id is read beyond the actor. An invitation names an address, so it
- * reaches its inviter alone.
- */
 export const PERSON_NAMED_IN = [
   {
     key: "userId",
@@ -148,10 +138,6 @@ const IDS_SOUGHT = 100;
 const wordsOfAction = (name: string): string =>
   name.split(".").slice(1).join(" ").replaceAll("_", " ");
 
-/**
- * The stored register, since the declarations hold only the slices this process imported. The
- * page's words find an action, and so do its stored name's.
- */
 const actionsWorded = (search: string): readonly string[] => {
   const words = search.toLowerCase().split(/\s+/).join(" ");
   return STORED_ACT_NAMES.filter(

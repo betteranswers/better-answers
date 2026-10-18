@@ -158,7 +158,6 @@ const started = z.object({
   message: z.object({ usage: reply.shape.usage }),
 });
 
-/** Its counts are the whole reply's so far; an input count rides along only where it moved. */
 const delta = z.object({
   type: z.literal("message_delta"),
   delta: z.object({ stop_reason: z.string().nullable() }),

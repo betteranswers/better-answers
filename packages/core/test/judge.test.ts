@@ -224,7 +224,6 @@ describe("the judge's call", () => {
   it("reserves every byte sent and room to think", () => {
     const call = judgeCall("Who pays the £50 fee?", [candidate]);
 
-    // 710 bytes of system prompt, 231 of prompt (the pound sign is two), 2,000 of framing.
     expect(call.most).toEqual({ tokensIn: 2_941, tokensOut: 16_000 });
   });
 

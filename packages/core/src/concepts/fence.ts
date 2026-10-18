@@ -21,10 +21,6 @@ import {
 
 type BundleDoors = { readonly git: GitDoor; readonly postgres: PostgresDoor };
 
-/**
- * A member's write to the bundle, fenced across processes as well as in this one. The
- * in-process queue comes first, so one writer per workspace in this process waits on the fence.
- */
 export const withBundleWrite = async <T extends Result<unknown, unknown>>(
   principal: UserPrincipal,
   doors: BundleDoors,
@@ -49,11 +45,6 @@ export const withBundleFenceAs = <T>(
     withWorkspaceFence(platform, doors.postgres, workspaceId, hold, work),
   );
 
-/**
- * As withBundleFenceAs, but `held` at once while work in this process has the repository or a
- * rewrite elsewhere holds the bundle. The in-process try still comes first: taking the fence
- * before the queue would make a cycle across processes that Postgres cannot see.
- */
 export const tryBundleFenceAs = async <T>(
   platform: PlatformPrincipal,
   doors: BundleDoors,

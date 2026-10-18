@@ -253,10 +253,6 @@ export const submitSuggestionSet = async (
   return ok({ setId, suggestionIds: submitted.value.value });
 };
 
-/**
- * The database refuses to decide a suggestion the transaction has not marked; the mark lasts
- * until the transaction ends.
- */
 export const markDeciding = async (tx: Tx, suggestionId: string): Promise<void> => {
   await tx.query("SELECT set_config('app.deciding_suggestion', $1, true)", [suggestionId]);
 };

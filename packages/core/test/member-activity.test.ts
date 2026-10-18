@@ -426,7 +426,6 @@ describe("paging a person's activity", () => {
     const first = pageOf(await activityOf(workspace, priya));
     const rest = pageOf(await activityOf(workspace, priya, first.nextCursor));
 
-    // Unless the page's last event and the next share an instant, the tie-break goes untested.
     expect(expected[50]?.at).toEqual(expected[49]?.at);
     expect([...first.events, ...rest.events].map((event) => event.id)).toEqual(
       expected.map(({ id }) => id),

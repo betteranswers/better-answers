@@ -69,7 +69,6 @@ type HeldSet = {
   readonly admins: readonly UserId[];
 };
 
-/** One statement, in person id order, so two actions holding overlapping sets take them alike. */
 const HELD_MEMBERS = `SELECT user_id, role FROM member
                        WHERE workspace_id = $1 AND user_id = ANY($2::text[])
                        ORDER BY user_id FOR UPDATE`;

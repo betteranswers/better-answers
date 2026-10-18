@@ -87,10 +87,6 @@ const located = async (
   return found.rows.map((row) => row.location);
 };
 
-/**
- * By the request's person and by the member an address finds, so a former member's rows are
- * named as a present one's are.
- */
 const aboutTheActors = async (
   tx: Tx,
   subject: SubjectHere,
@@ -119,10 +115,6 @@ const MEMBER_HERE = `SELECT u.id AS location
     WHERE m.workspace_id = $1 AND (u.id = $2 OR lower(u.email) = ANY($3))
     LIMIT 1`;
 
-/**
- * The suppression adds the addresses the person signs in with, so the documents naming them are
- * the ones its erasure re-indexes.
- */
 const SIGN_IN_ADDRESSES = `SELECT email AS location FROM "user" WHERE id = ANY($1::text[])`;
 
 const ERASURE_FAMILY_DESCRIPTORS = {
@@ -297,7 +289,6 @@ const subjectHereOf = async (tx: Tx, request: SubjectRequest): Promise<SubjectHe
   };
 };
 
-/** Reads only. One entry per family, in `ERASURE_FAMILIES` order, its locations sorted. */
 export const erasureMapOf = async (
   platform: PlatformPrincipal,
   tx: Tx,

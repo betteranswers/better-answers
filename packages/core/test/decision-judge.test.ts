@@ -35,15 +35,10 @@ const CLEF_FLASH = "clef-flash";
 
 const A_WORKERS_AI_KEY = "0123456789abcdef0123456789abcdef:invented_Token-u15";
 
-/** The suite's own: no decision model's threshold is calibrated. */
 const AT_SEVEN_TENTHS: DecisionThresholds = new Map([["cloudflare", new Map([[CLEF_FLASH, 0.7]])]]);
 
 const CAPS: AskCaps = { ...ASK_CAPS, decisionThresholds: AT_SEVEN_TENTHS };
 
-/**
- * A placeholder until the owner measures the real bundle's longest `Answer`s: about 500 words,
- * as a long answer on a procurement form runs.
- */
 const PLACEHOLDER_LONGEST_ANSWER_CHARACTERS = 3_000;
 
 const aDecidingWorkspace = async () => {
@@ -184,7 +179,6 @@ describe("the decision judge's call", () => {
   it("reserves every byte stated and a little output each", () => {
     const call = decisionJudgeCall("Who pays the £50 fee?", [candidate, candidate]);
 
-    // 778 bytes of state and questions as JSON (the pound sign is two), 2,000 of framing.
     expect(call.most).toEqual({ tokensIn: 2_778, tokensOut: 32 });
   });
 
@@ -310,7 +304,6 @@ describe("ask with a decision model", () => {
 
     await askedWith(asker, decidingWire(new Map([[USERS.title, 0.9]])));
 
-    // 2,400 tokens in at £0.03 a million; the 3 out are priced at nothing.
     expect(await spendOf(workspaceId)).toEqual({
       open: 0,
       calls: [{ outcome: "succeeded", tokens_in: 2_400, tokens_out: 3, cost_gbp: "0.000072" }],

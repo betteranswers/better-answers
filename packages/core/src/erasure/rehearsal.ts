@@ -83,10 +83,6 @@ const DOCUMENT_CONNECTED_SOURCE = "Erasure rehearsal";
 const documentFileOf = (subject: SyntheticSubject): string =>
   `erasure-rehearsal-${subject.personId.toLowerCase()}.md`;
 
-/**
- * A work address and a name, neither of which a rule in force raises: the index holds both
- * until the erasure withholds them.
- */
 const documentNaming = (subject: SyntheticSubject): string =>
   "# Erasure rehearsal\n\n" +
   `The drill's synthetic document. It names the rehearsal's subject, ${subject.name}, ` +
@@ -302,7 +298,6 @@ const recordTheRehearsal = async (
   return auditEventId;
 };
 
-/** A too-broad refusal's word, never its sentence, which quotes the identifier. */
 const refusalWordOf = (refused: RecordSubjectRequestRefusal): string =>
   typeof refused === "string" || refused instanceof Error ? String(refused) : refused.word;
 

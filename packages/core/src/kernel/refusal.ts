@@ -43,12 +43,6 @@ export const refusalsIn = (catalogue: Catalogue): readonly CataloguedRefusal[] =
   return [...held.values()];
 };
 
-/**
- * For a transport to index. `Object.assign` over a spread answers `any`, so the return type is
- * this function's own claim.
- *
- * @throws as `refusalsIn` does.
- */
 export const classesIn = <const C extends Catalogue>(
   catalogue: C,
 ): Readonly<Record<WordIn<C>, RefusalClass>> =>

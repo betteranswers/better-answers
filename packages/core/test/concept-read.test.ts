@@ -136,7 +136,6 @@ const readableAndWithheld = async (scenario: Scenario) => {
   };
 };
 
-/** A read takes no lock a write could hold, so the read is paused through its `tx` after its first statement. */
 const readAcross = async (
   reader: UserPrincipal,
   iri: ConceptIri,
@@ -755,7 +754,6 @@ const noteAt = (scenario: Scenario, path: string, overrides: Partial<WriteConcep
 
 type SeededConcept = Parameters<Parameters<typeof seededBy>[1]>[0]["conceptIndex"];
 
-/** A concept seeded straight into the index, so no write derives an edge to it. */
 const indexedAt = (
   scenario: Scenario,
   path: string,

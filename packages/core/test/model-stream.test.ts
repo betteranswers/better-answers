@@ -110,7 +110,6 @@ const endedOnAbort =
     return new Response("", { status: 500 });
   };
 
-/** Its input as the reply opened with it, and its output at the size reserved, never counted. */
 const FAILED_AT_FULL_SIZE = {
   outcome: "failed",
   spent: [{ tokensIn: 2_100, tokensOut: 16_000, seconds: 0, outcome: "failed" }],

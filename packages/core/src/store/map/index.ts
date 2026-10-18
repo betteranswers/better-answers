@@ -373,7 +373,6 @@ export const writeConceptVisibility = async (
 };
 
 const insideClause = (alias: string): string =>
-  // The collections bind fifth, after the readable clause's two.
   `AND (${alias}.label <> '${CONCEPT_NODE_LABEL}' OR ${alias}.uid IN (
        SELECT filed.iri FROM concept_index filed
         WHERE filed.workspace_id = $1 AND filed.collection = ANY($5::text[])))`;
@@ -384,7 +383,6 @@ const WHOLE: Narrowing = { seed: "", hop: "", answered: "" };
 
 const CONCEPTS_ANSWERED = `WHERE label = '${CONCEPT_NODE_LABEL}'`;
 
-/** A path may cross a node that is no concept, and it is not answered. */
 const CONCEPTS: Narrowing = { seed: "", hop: "", answered: CONCEPTS_ANSWERED };
 
 const INSIDE: Narrowing = {
@@ -431,7 +429,6 @@ const walkStatement = (outward: boolean, narrowing: Narrowing = WHOLE): string =
    LIMIT ${MAP_WALK_ROW_LIMIT}`;
 };
 
-/** A walk's statement with what it binds after the readable clause's two. */
 type PreparedWalk = { readonly statement: string; readonly binds: readonly (readonly string[])[] };
 
 const WALK_FROM: PreparedWalk = { statement: walkStatement(true), binds: [] };
@@ -450,7 +447,6 @@ const walk = async (
   tx: Tx,
   uids: readonly string[],
 ): Promise<readonly WalkStep[]> => {
-  // Transaction-local, so it also bounds whatever the same short read runs after the walk.
   await tx.query("SELECT set_config('statement_timeout', $1, true)", [String(MAP_WALK_TIMEOUT_MS)]);
   const found = await tx.query<WalkStep>(statement, [
     principal.workspaceId,
@@ -461,11 +457,6 @@ const walk = async (
   return found.rows;
 };
 
-/**
- * One step per node within MAP_WALK_DEPTH hops out of `uids`, at its least depth: the nearest
- * MAP_WALK_ROW_LIMIT, alike on every run. A path stops at what the principal cannot read. Past
- * MAP_WALK_TIMEOUT_MS it rejects, its transaction aborted.
- */
 export const walkFromEntries = (
   principal: UserPrincipal,
   tx: Tx,
@@ -529,10 +520,6 @@ const countsOf = async (
   return Object.fromEntries(found.rows.map((row) => [row.label, row.count]));
 };
 
-/**
- * Node and edge counts by label over the source partition and the live generation. With none
- * live, `liveGen` is null and only the source partition counts.
- */
 export const countMap = async (
   platform: PlatformPrincipal,
   tx: Tx,

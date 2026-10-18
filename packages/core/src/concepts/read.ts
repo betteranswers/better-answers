@@ -82,7 +82,6 @@ const PANE_WORDS = {
 
 type SourceEntry = string | FrontmatterSource;
 
-/** `points` is whether the file names a passage or a concept for it; `opens`, whether this reader may. */
 type Resolved = {
   readonly entry: SourceEntry;
   readonly item: EvidenceItem;
@@ -220,10 +219,6 @@ const projectedSources = (
   return records.length === 0 ? texts : records;
 };
 
-/**
- * The frontmatter with each source this reader cannot open cut to its label, id and any place, and
- * any entry naming no resource left out. A `sources` that is no list is left out whole: it may hold a locator.
- */
 export const projectedFrontmatter = (
   frontmatter: Frontmatter,
   resolved: readonly Resolved[],
@@ -263,7 +258,6 @@ export const paneOf = (resolved: readonly Resolved[], sharer: Sharer): EvidenceP
   };
 };
 
-/** Sized so a concept's read stays a small part of what an MCP client takes in one answer. */
 const RELATIONS_AT_MOST = 25;
 
 const BOOKKEEPING: readonly string[] = [

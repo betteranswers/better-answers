@@ -92,7 +92,6 @@ const sentOf = (input: string | URL | Request, init: RequestInit = {}): Sent => 
   body: typeof init.body === "string" ? init.body : "",
 });
 
-/** Past its replies the wire answers a teapot, so an attempt too many shows in what was spent. */
 const NO_MORE: Reply = { status: 418, body: "" };
 
 /** A hung attempt rejects once its timeout has fired, as `fetch` does on an aborted signal. */
@@ -398,7 +397,6 @@ const emptyBodyBytes = (model: string): number =>
     }),
   );
 
-/** Clef-flash's window of 24,576 tokens, at three bytes a token. */
 const WINDOW_BYTES = 73_728;
 
 const callOfBytes = (bytes: number, model = "clef-flash"): DecisionModelCall => ({
@@ -622,7 +620,6 @@ describe("a decision model's window", () => {
   it("holds Clef to its own larger window", async () => {
     const wire = theWire(DECIDED, DECIDED);
     const toClef = { ...TO_CLEF_FLASH, model: "clef" };
-    // 65,536 tokens at three bytes a token.
     const clefBytes = 196_608;
 
     await deciding(wire, callOfBytes(clefBytes, "clef"), toClef);

@@ -9,7 +9,6 @@ export type GrantNames = {
   readonly workspaces: ReadonlyMap<string, string>;
 };
 
-/** An ended grant as it is shown: named from the assistant and workspace rows as they stand now. */
 export type GrantNamed = {
   readonly assistant: { readonly id: string; readonly name: string };
   readonly workspace: { readonly id: WorkspaceId; readonly name: string } | null;
@@ -33,7 +32,6 @@ export const namesOfGrants = async (tx: Tx, grants: readonly EndedGrant[]): Prom
   };
 };
 
-/** An assistant or workspace with no name, or gone since, reads as its id, which a reader can look up. */
 export const grantNamed = (grant: EndedGrant, names: GrantNames): GrantNamed => ({
   assistant: { id: grant.clientId, name: names.assistants.get(grant.clientId) ?? grant.clientId },
   workspace:

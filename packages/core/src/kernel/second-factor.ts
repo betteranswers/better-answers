@@ -3,7 +3,6 @@ import type { KernelRefusal } from "./vocabulary.ts";
 export const PENDING_SESSION_LIFETIME_MS = 60 * 60 * 1000;
 
 export type SecondFactorFacts = {
-  /** An Admin in any workspace, or the operator. */
   readonly mustHoldOne: boolean;
 
   readonly holdsAFactor: boolean;
@@ -19,10 +18,6 @@ export type SecondFactorStanding = (typeof SECOND_FACTOR_STANDINGS)[number];
 
 type PendingStanding = Extract<SecondFactorStanding, "confirm" | "setup">;
 
-/**
- * Derived afresh on every request, so a role change, a removed factor or a restore takes effect on
- * the next one. A stamp counts only while the person still holds a factor to confirm with.
- */
 export const standingOf = (facts: SecondFactorFacts): SecondFactorStanding => {
   if (!facts.mustHoldOne) return "not-required";
   if (facts.holdsAFactor && facts.confirmed) return "confirmed";

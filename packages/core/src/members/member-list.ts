@@ -44,7 +44,6 @@ const LISTED_ROW = z.object({
 type ListedRow = z.output<typeof LISTED_ROW>;
 
 export type ListedMember = Omit<ListedRow, "joinedAt" | "credentialsRevokedAt"> & {
-  /** An ISO instant, which is what a `Date` becomes on the wire anyway. */
   readonly joinedAt: string;
 
   /** A credential issued before it is refused here; null where no Admin here has revoked any. */

@@ -85,10 +85,6 @@ const QUESTIONS_SINCE_LOGGED =
 const IDENTITY_STEP_LOGGED =
   "erasure: the identity step's arm, and what it pseudonymised and deleted";
 
-/**
- * deploy/backup.sh takes the same advisory lock by this number; change one and a dump runs
- * beside an erasure.
- */
 const DUMP_LOCK = 41;
 
 const ERASURE_ACTIONS = declareActions("people", {
@@ -120,10 +116,6 @@ export type ErasureRun = {
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
-/**
- * Months are calendar months, as deploy/backup.sh's interval writes them;
- * packages/schema/test/factory.ts spells the same four and moves with this.
- */
 const BEYOND_USE = { hourlyHours: 48, dailyDays: 30, weeklyWeeks: 8, monthlyMonths: 6 } as const;
 
 export const beyondUseFrom = (anchoredAt: Date) => ({
@@ -336,7 +328,6 @@ const afterTheMembersEnd = async (
     withScope(platform, doors.postgres, workspaceId, (tx) => addressesSuppressedFor(tx, subject)),
   );
   if (!suppressed.ok) return err(suppressed.error);
-  // An address typed into the request may be another erasure's tombstone, which stays as it is.
   const addresses = [...new Set([...subject.addresses, ...suppressed.value])].filter(
     (address) => !isTombstone(address),
   );
@@ -691,8 +682,6 @@ export const runErasure = async (
       }),
     );
     if (!identity.ok) return err(identity.error);
-    // Logged as the step commits, not at completion: a run that dies after it leaves the next
-    // run nothing left to count.
     doors.log.info(identityStepLineOf(platform, erasure.id, identity.value), IDENTITY_STEP_LOGGED);
     logTheSweep(
       doors.log,

@@ -28,10 +28,6 @@ const PUBLISHED = new Date("2026-09-11T09:00:00.000Z");
 const SYNC_FINISHED_AT = new Date("2026-09-11T08:30:00.000Z");
 const NOW = new Date("2026-09-11T12:00:00.000Z");
 
-/**
- * Every document below answers this query, so an absent match is the read predicate and never an
- * unmatched term.
- */
 const QUERY = "holiday policy";
 
 const HANDBOOK = "The holiday policy grants twenty-eight days.";
@@ -161,7 +157,6 @@ const theConnectedSourceRowNowSays = async (
   );
 };
 
-/** The schema refuses a class wider than the Admin's narrowing, so the narrowing goes with it. */
 const theDocumentRowNowSays = async (
   workspaceId: string,
   documentId: string,
@@ -427,8 +422,6 @@ describe("a narrowing queues no sync", () => {
     });
     await landed(scenario.workspaceId, theConnectedSource);
     await landed(scenario.workspaceId, theOther);
-    // The sync that had already been and gone, so an empty answer below is the action and not a
-    // reader that sees nothing.
     await aFinishedSync(scenario.workspaceId, theOther.connectedSourceId);
     const theSyncThatRan = {
       kind: "index",
@@ -529,8 +522,6 @@ describe("the race with a narrowing in flight", () => {
 });
 
 describe("a passage whose rows do not all name one source", () => {
-  // The connected source id has no foreign key, so one document's rows can name two connected sources — which is
-  // what keeps `passageAt`'s fold reachable.
   it("is opened at the narrower source, withheld whole from Viewers", async () => {
     const scenario = await arrange();
     const wide = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
@@ -558,7 +549,6 @@ describe("a passage whose rows do not all name one source", () => {
 });
 
 describe("a passage whose connected source row is absent", () => {
-  // The passage's connected source id carries no foreign key, so only the read closes this shape.
   it("is read and listed by nobody, unlike a live neighbour", async () => {
     const scenario = await arrange();
     const absent = ulid();

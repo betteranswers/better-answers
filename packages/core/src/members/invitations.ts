@@ -45,7 +45,6 @@ export const INVITATION_ACTIONS = declareActions("people", {
   cancelled: action("people.invitation.cancelled", { replacedByInvitationId: "id?" }),
 });
 
-/** One action sends to, or holds, at most this many invitations until it commits. */
 export const MOST_AT_ONCE = 50;
 
 const ROLE = boundarySchemas.member.select.shape.role;
@@ -96,7 +95,6 @@ const cancelInvitationAction = declareAction({
   refuses: ON_AN_INVITATION,
 });
 
-/** Borrowed from the workspaces slice, whose word it is: joining refuses a member in it too. */
 type AlreadyAMember = Extract<keyof typeof WORKSPACE_REFUSALS, "already-a-member">;
 
 export type InviteMembersRefusal =
@@ -122,7 +120,6 @@ export const WAITING_ROW = z.object({
 
 type WaitingRow = z.output<typeof WAITING_ROW>;
 
-/** The instants are ISO strings, which is what a `Date` becomes on the wire anyway. */
 export type WaitingInvitation = Omit<WaitingRow, "invitedAt" | "expiresAt"> & {
   readonly invitedAt: string;
   readonly expiresAt: string;

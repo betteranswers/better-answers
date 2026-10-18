@@ -23,11 +23,6 @@ const keyed = (key: Uint8Array): Uint8Array => {
   return key;
 };
 
-/**
- * A frame of the version byte, a fresh nonce, the ciphertext and the tag, in that order.
- *
- * @throws when `key` is not `ENVELOPE_KEY_BYTES` long.
- */
 export const sealEnvelope = (key: Uint8Array, plaintext: Uint8Array): Uint8Array => {
   const version = Uint8Array.of(ENVELOPE_VERSION);
   /**

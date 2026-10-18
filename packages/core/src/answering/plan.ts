@@ -63,7 +63,6 @@ export type PlannedAnswer<Iri extends string = ConceptIri> = {
   readonly verdict: QuestionVerdict;
   readonly judgeState: JudgeState;
   readonly answers: readonly ReturnedConcept<Iri>[];
-  /** The concepts that bear on the question, an `Answer` no judge passed among them. */
   readonly related: readonly RelatedConcept<Iri>[];
   readonly conflicts: readonly {
     readonly subject: string;
@@ -79,7 +78,6 @@ export type AskCaps = {
   readonly entryPoints: number;
   readonly related: number;
   readonly unmappedPassages: number;
-  /** The `Answer`s the judge is asked about, in the order they bear; any beyond stay related. */
   readonly candidates: number;
   readonly decisionThresholds: DecisionThresholds;
 };
@@ -99,7 +97,6 @@ export type ReadStep<Refused = never> = <Read, Failure>(
   work: (tx: Tx) => Promise<Result<Read, Failure>>,
 ) => Promise<Result<Read, Failure | Refused>>;
 
-/** The reads' own steps admit for themselves, so their refusal is in what a read can answer. */
 type ReadFailure = KernelRefusal<"role-forbids"> | Error;
 
 type Asked = {
@@ -168,10 +165,6 @@ const matched = async (asked: Asked, tx: Tx): Promise<Result<Matched, ReadFailur
 
 type Walked = { readonly steps: readonly WalkStep[]; readonly map: MapState };
 
-/**
- * The walk takes a transaction to itself: its timeout binds whatever shares one. Past it, the
- * answer stands on its entry points.
- */
 const walkedFrom = async <Refused>(
   { reader, collections, now }: Asked,
   read: ReadStep<Refused>,
@@ -215,7 +208,6 @@ const previewOf = (concept: OpenedConcept, trust: Trust): PreviewedConcept => {
 
 type ReturnReads = Parameters<typeof evidenceOf>[3];
 
-/** An `Answer` comes back as it stands; any other concept by its line, its evidence unread. */
 const returnedOf = async (
   reader: UserPrincipal,
   tx: Tx,
@@ -261,7 +253,6 @@ const returnedBy = async (
     namesPassage: (locator: string) => parseLocator(locator).ok,
   };
   const returned: Returned[] = [];
-  // A concept the reader could read when walked and cannot now has no row, and is left out.
   for (const concept of slots.flatMap((iri) => byIri.get(iri) ?? [])) {
     const one = await returnedOf(reader, tx, concept, reads, now);
     if (!one.ok) return one;
@@ -291,10 +282,6 @@ export type AnswerPlan = {
   readonly concepts: readonly RecordedConcept[];
 };
 
-/**
- * Reads what bears on the question for the reader its action admitted, in three short reads at
- * most, and writes nothing. No judge runs, so every `Answer` it finds is related knowledge.
- */
 export const answerPlanned = async <Refused>(
   reader: UserPrincipal,
   read: ReadStep<Refused>,

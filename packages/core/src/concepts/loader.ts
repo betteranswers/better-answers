@@ -429,7 +429,6 @@ export type VerificationsRecorded = {
   readonly present: number;
 };
 
-/** An `undefined` IRI is a concept not held yet, so every verification counts as recorded. */
 export const countVerifications = (
   iri: string | undefined,
   verifications: readonly ImportedVerification[],

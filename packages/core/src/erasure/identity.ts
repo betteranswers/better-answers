@@ -24,7 +24,6 @@ export type IdentitySwept = {
   readonly authenticators: number;
   readonly recoveryCodes: number;
 
-  /** The kinds of code with failures counted against the person. */
   readonly confirmFailures: number;
   readonly lastActive: number;
   readonly invitationsHere: number;
@@ -123,10 +122,6 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
   };
 };
 
-/**
- * Held to the erasure's commit, so a removal elsewhere waits and the arm read here is still true
- * when the step commits.
- */
 const HELD_ELSEWHERE = `SELECT workspace_id FROM member
    WHERE user_id = $1 AND workspace_id <> $2
      FOR KEY SHARE`;

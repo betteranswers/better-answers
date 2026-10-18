@@ -13,7 +13,6 @@ import {
   type ReuseSet,
 } from "./reuse-set.ts";
 
-/** List prices in US dollars per million tokens, and each model's own effort; check the price page before a run. */
 const MODELS = [
   { name: "Claude Sonnet 5.5", model: "claude-sonnet-5-5", usdIn: 2, usdOut: 10, effort: "high" },
   {

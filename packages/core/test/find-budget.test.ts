@@ -15,20 +15,14 @@ const { db, arrange } = suiteWithBundles();
 
 const NOW = new Date("2026-10-09T12:00:00.000Z");
 
-/** The most connections one api process opens to Postgres: its pool holds ten. */
 const IN_FLIGHT = 10;
 const ROUNDS = 5;
 
 const readers = runtimePoolFor(db, IN_FLIGHT);
 
-/**
- * Priced against a one-row read of `concept_index` on the same connection before it: load slows
- * both alike, a dearer read only the one under test.
- */
 const FIND_BUDGET_IN_ONE_ROW_READS = 60;
 const OPEN_BUDGET_IN_ONE_ROW_READS = 40;
 
-/** Five words, two of them shared by most of the corpus, so every run is read and ranked. */
 const BROAD_QUESTION = "how do I export Tallyloom invoicing records to a spreadsheet";
 const PAGE = 20;
 

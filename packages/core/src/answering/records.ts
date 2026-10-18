@@ -95,9 +95,7 @@ type RecordAsRead = {
   readonly askedBy: AuditEventActor;
   readonly transport: QuestionTransport;
   readonly collectionsNamed: readonly string[];
-  /** Null once an erasure removed it. */
   readonly question: string | null;
-  /** Null while the record is open. */
   readonly verdict: QuestionVerdict | null;
   readonly judgeState: JudgeState | null;
   readonly flagged: boolean;
@@ -114,7 +112,6 @@ export type QuestionsAskedPage = {
 
 export type QuestionsAskedRefusal = RefusalOf<typeof readQuestionsAskedAction> | Error;
 
-/** Each arm reads one page by its index; the cut keeps its served flag, so a closing mid-read loses nothing. */
 const A_PAGE_OF_RECORDS = `WITH open_flags AS (
     SELECT DISTINCT record_id FROM question_feedback
      WHERE workspace_id = $1 AND verdict = '${FEEDBACK_FLAG_VERDICT}' AND closed_at IS NULL
@@ -361,10 +358,6 @@ const ITS_CLOSING = `UPDATE question_feedback SET closed_as = $3, closed_at = $4
    WHERE workspace_id = $1 AND id = $2 AND closed_at IS NULL
   RETURNING id`;
 
-/**
- * Closes an open flag once, as fixed in the knowledge or as no fault in the knowledge, and audits
- * it in the same transaction. The row keeps how and when; who is the audit event's actor alone.
- */
 export const closeFlag = async (
   principal: UserPrincipal,
   tx: Tx,

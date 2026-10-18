@@ -30,7 +30,6 @@ export const SIGN_IN_LINK_PREFIX = "sign-in-link-";
 
 export const OPERATOR_RESTORE_PREFIX = "operator-restore-";
 
-/** No prefix starts another, so no address names a stranger's row. Verify and reset rows exist too. */
 export const VERIFICATION_PREFIXES = [
   SIGN_IN_CODE_PREFIX,
   SIGN_IN_LINK_PREFIX,
@@ -46,7 +45,6 @@ export const AUTHENTICATOR_SECRET_PREFIX = "second-factor-enrol:";
 
 export const PASSKEY_CHALLENGE_PREFIX = "second-factor-challenge:";
 
-/** Rows keyed by a session id rather than an address: erasure reaches them through the person's sessions. */
 export const SESSION_VERIFICATION_PREFIXES = [
   AUTHENTICATOR_SECRET_PREFIX,
   PASSKEY_CHALLENGE_PREFIX,

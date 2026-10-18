@@ -33,7 +33,6 @@ const MODELS = [
   { name: "Clef", model: "clef", usdIn: 0.24 },
 ] as const;
 
-/** No threshold is calibrated, so the reuse reading runs at each of these. */
 const THRESHOLDS = [0.3, 0.5, 0.7, 0.9] as const;
 
 const KEY_NEEDED =
@@ -91,7 +90,6 @@ describe("the owner's decision reading on reuse", () => {
         const heading = `Reuse reading, ${name} at threshold ${String(threshold)}`;
         await recordReuseReading(heading, judged, priced);
 
-        // A refused key fails every call, and a run that decided nothing has no figures to record.
         expect(judged.judged).toBeGreaterThan(0);
       });
     }
@@ -176,7 +174,6 @@ describe("the owner's decision reading at the entry step", () => {
       }
       await recordFigures(`Entry step reading, ${name}`, figures);
 
-      // A refused key fails every call, and a run that scored nothing has no figures to record.
       expect(unscored).toBeLessThan(paraphrasesOf(set).length);
     }, 3_600_000);
   }

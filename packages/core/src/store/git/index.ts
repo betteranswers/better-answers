@@ -63,7 +63,6 @@ export type CommitAuthor = {
   readonly email: string;
 };
 
-/** No precondition on the head: the commit lands on whichever stands, the ref move still guarded. */
 export const ANY_HEAD: unique symbol = Symbol("any head");
 
 export type CommitRequest = {
@@ -386,11 +385,6 @@ const lockedRepository = async <T>(key: string, work: () => Promise<T>): Promise
   }
 };
 
-/**
- * The commits on `main` after `since`, oldest first, or all of them when `since` is null.
- * `history-diverged` when git cannot show that the head still descends from `since`; an `Error`
- * when it reads the head but cannot list the commits behind it.
- */
 export const commitsAfter = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -479,10 +473,6 @@ const authorsNaming = async (
 const allCommits = async (gitDir: string): Promise<readonly string[]> =>
   (await git(gitDir, ["rev-list", "--all"])).split("\n").filter((sha) => sha !== "");
 
-/**
- * Each commit's text files that carry one of `needles`, and each commit whose author does, matched
- * without case across all refs. `authors` holds commit shas. Blank needles are dropped.
- */
 export const historyNaming = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -511,10 +501,6 @@ export type CommitRead = {
 
 const TRAILER_LINE = /^([A-Za-z][A-Za-z-]*): (.+)$/;
 
-/**
- * The last paragraph, never the first match: isSubjectLine keeps a forged trailer out at the
- * write door, and this is the read half.
- */
 const trailersOf = (message: string) => {
   const block = message.trimEnd().split("\n\n").at(-1) ?? "";
   return Object.fromEntries(
@@ -597,9 +583,6 @@ const fileIn = async (
   }
 };
 
-/**
- * Null when the path is not portable or the commit holds no such file; any other failure throws.
- */
 export const fileAt = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -641,7 +624,6 @@ const PYTHON_SPECIAL = /[()[\]{}?*+\-|^$\\.&~# \t\n\r\v\f]/g;
 const escapedForPython = (literal: string): string =>
   literal.replace(PYTHON_SPECIAL, (character) => `\\${character}`);
 
-/** A person id is a ULID, so its actor id is matched literally and no longer one extends it. */
 const replacementsFor = (
   addresses: readonly string[],
   people: readonly string[],

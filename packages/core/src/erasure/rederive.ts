@@ -39,10 +39,6 @@ const connectedSourcesHolding = async (
   return found.rows.map((row) => CONNECTED_SOURCE_ID.parse(row.connected_source_id));
 };
 
-/**
- * A transaction per connected source: a refusal takes back that connected source's wipe alone, and a rerun repeats
- * the rest harmlessly.
- */
 const wipe = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

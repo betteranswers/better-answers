@@ -2,13 +2,11 @@ import { PERSON_PREFIX, type PlatformPrincipal } from "../kernel/index.ts";
 import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 
 export type QuestionsSwept = {
-  /** The records whose asker was rewritten; each keeps its skeleton. */
   readonly rewritten: number;
   readonly questionsRemoved: number;
   readonly feedbackRewritten: number;
 };
 
-/** The actor ids a record may name the person by, given each as an actor id or a person id. */
 export const askersOf = (people: readonly (string | null)[]): readonly string[] => [
   ...new Set(
     people
@@ -21,7 +19,6 @@ const REWRITE_THE_ASKER = `UPDATE question_asked SET asked_by = $3
    WHERE workspace_id = $1 AND asked_by = ANY($2)
   RETURNING id, asked_at::text AS asked_at`;
 
-/** Named by `asked_at` too, so only the months those records were asked in are read. */
 const REMOVE_THE_QUESTIONS = `DELETE FROM question_content
    WHERE workspace_id = $1 AND record_id = ANY($2) AND asked_at = ANY($3::timestamptz[])`;
 

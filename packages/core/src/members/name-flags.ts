@@ -27,15 +27,10 @@ const FLAGGED_ACTIONS = declareActions("people", {
   flagged: action("people.person.name_flagged", {}),
 });
 
-/** The operator reads what waits from here, since no workspace's audit log is theirs to read. */
 const RAISED_ACTIONS = declareIdentitySetActions("people", {
   raised: action("people.name_flag.raised", { workspaceId: "id" }),
 });
 
-/**
- * Over the rows aliased `raised`. It takes `$1` and `$2` from `WAITING_ACTIONS`, so a query using it
- * numbers its own parameters from `$3`.
- */
 const STILL_WAITING = `raised.subject_kind = split_part($1, '.', 2) AND raised.action = $1
     AND raised.at > COALESCE(
       (SELECT max(corrected.at) FROM identity_audit_event corrected

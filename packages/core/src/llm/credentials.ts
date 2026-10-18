@@ -116,12 +116,6 @@ export const openCredentials = (envelopeKey: Uint8Array): Credentials => {
   };
 };
 
-/**
- * The storing half, sealed and never hashed because a model key is sent. Kept apart from the
- * read so that only the audited action holds it.
- *
- * @throws when `envelopeKey` is not the envelope's length, naming no byte of it.
- */
 export const openModelKeySetting = (envelopeKey: Uint8Array): ModelKeySetting => {
   const sealer = envelopeKeyHeld(envelopeKey);
   return {

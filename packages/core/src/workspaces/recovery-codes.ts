@@ -25,10 +25,8 @@ const RECOVERY_CODE_ACTIONS = declareIdentitySetActions("people", {
   used: action("people.person.recovery_code_used", {}),
 });
 
-/** Crockford's base32, without the letters a reader takes for a digit. */
 const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
 
-/** Sixteen characters carry 80 bits, past guessing from a leaked hash, so the hash needs no key. */
 const GROUPS_IN_A_CODE = 4;
 
 const CHARACTERS_IN_A_GROUP = 4;

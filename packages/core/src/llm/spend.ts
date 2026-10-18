@@ -65,10 +65,6 @@ const PRICED_CHOICE = `SELECT c.id, c.provider, c.model,
   ) AS p ON true
  WHERE c.workspace_id = $1 AND c.purpose = $2`;
 
-/**
- * Inserts nothing past the limit. Open reservations count whatever month they were taken in, since
- * each lives minutes.
- */
 const RESERVED_UNDER_THE_LIMIT = `WITH spent AS (
     SELECT (SELECT COALESCE(sum(cost_gbp), 0) FROM llm_call
              WHERE workspace_id = $1 AND called_at >= $2 AND called_at < $3)
@@ -169,7 +165,6 @@ export type CallSpent = {
   readonly outcome: LlmCallOutcome;
 };
 
-/** Each attempt is priced at the rates its reservation carries, so a settle bills what was sized. */
 const SETTLED = `WITH taken AS (
     DELETE FROM spend_reservation WHERE workspace_id = $1 AND id = $2 RETURNING *
   ), written AS (

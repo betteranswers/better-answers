@@ -52,7 +52,6 @@ const rowsOf = async (workspaceId: string) => {
   return stored.rows;
 };
 
-/** The first frame `from` holds, written as the key of `onto`: what a writer past the provider could do. */
 const frameCopied = async (
   from: string,
   onto: { readonly workspaceId: string; readonly provider: ModelProvider },

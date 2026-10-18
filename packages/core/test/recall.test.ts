@@ -38,7 +38,6 @@ const NOW = new Date("2026-10-09T12:00:00.000Z");
 
 type Ranking = Promise<readonly string[]>;
 
-/** Ranks each asking once: a question with no collection asks the same of two readings. */
 const kept = <Asking extends readonly unknown[]>(rank: (...asking: Asking) => Ranking) => {
   const held = new Map<string, Ranking>();
   return (...asking: Asking): Ranking => {
@@ -51,7 +50,6 @@ const kept = <Asking extends readonly unknown[]>(rank: (...asking: Asking) => Ra
 
 const conceptsFound = (person: UserPrincipal) => kept(conceptsFoundBy(reading, person, NOW));
 
-/** Entry points alone only while the set's map holds no edge, which a test below holds. */
 const conceptsPlanned = (person: UserPrincipal) =>
   kept(async (question: string, collection: string | undefined) => {
     const asking = { question, collections: collection === undefined ? [] : [collection] };
@@ -63,7 +61,6 @@ const conceptsPlanned = (person: UserPrincipal) =>
     return planned.related.map(({ iri }) => iri);
   });
 
-/** By `Answer` named leads: it is the figure a cap is sized from. */
 const figuresOf = (
   read: string,
   { byAnswer, everyAnswer, anyAnswer }: Recalls,
@@ -279,10 +276,8 @@ const CUSTOMER_BUNDLE = fileURLToPath(
   new URL("../../../.planning/client-bundle/", import.meta.url),
 );
 
-/** Eight words in a row shared with the bundle count as wording taken from it. */
 const RUN_OF_WORDS = 8;
 
-/** A title or paraphrase this long, found anywhere in the bundle's text, counts as taken from it. */
 const NAMED_WORDS = 5;
 
 const wordsOf = (text: string): readonly string[] =>

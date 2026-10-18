@@ -53,7 +53,6 @@ export const keepPasskeyChallenge = async (
   return kept.value.rowCount === 1 ? ok(undefined) : err("session-gone");
 };
 
-/** Spent by its first answer, live or not, so one challenge never verifies twice. */
 const TAKING = `
   DELETE FROM verification WHERE identifier = $1
   RETURNING value, expires_at > $2 AS live`;

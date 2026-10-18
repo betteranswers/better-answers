@@ -108,7 +108,6 @@ const unverified: Trust = {
   rider: null,
 };
 
-/** Core's own trust, handed to an output schema as an edge that renames nothing would. */
 const trust = z.custom<Trust>();
 
 const messagesOf = (parsed: { readonly error?: z.ZodError }): readonly string[] | undefined =>
@@ -1378,7 +1377,6 @@ describe("what ask answers with no model", () => {
     const { workspaceId, asker } = await anAsker();
     const uids = Array.from({ length: 1_002 }, () => conceptIriOf(ulid())).toSorted();
     const sections = uids.slice(0, 1_001);
-    // The greatest uid is the concept: a cap that counts the sections drops exactly it.
     const reached = await seededIn(workspaceId, {
       ...CONSOLE_EXPORTS,
       collection: "audits",

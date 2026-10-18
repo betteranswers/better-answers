@@ -65,7 +65,6 @@ const acting = async <T>(
     work,
   );
 
-/** One transaction each, so each group's event holds an instant of its own. */
 const groupsMadeBy = async (
   workspace: ProvisionedWorkspace,
   userId: string,
@@ -393,7 +392,6 @@ describe("the audit log", () => {
   });
 });
 
-/** The member row alone goes, as a removal leaves the person and their events behind. */
 const memberRemoved = (workspace: ProvisionedWorkspace, userId: string) =>
   db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
     workspace.workspaceId,

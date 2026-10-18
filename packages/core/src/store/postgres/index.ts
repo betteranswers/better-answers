@@ -145,10 +145,6 @@ const transaction = async <T>(
 
 const DEADLOCK_DETECTED = "40P01";
 
-/**
- * Two actions each waiting on a lock the other holds: Postgres aborts one, and that action answers
- * `changed-meanwhile` rather than failing. Any other error is itself.
- */
 export const refusalOfDeadlock = (error: Error): KernelRefusal<"changed-meanwhile"> | Error =>
   "code" in error && error.code === DEADLOCK_DETECTED ? "changed-meanwhile" : error;
 
@@ -165,10 +161,6 @@ const scopedTo =
     return work(tx, platform);
   };
 
-/**
- * Runs `work` in one transaction scoped to `workspaceId`. It rolls back when `work` throws or
- * answers a refused Result.
- */
 export const withScope = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -184,7 +176,6 @@ export const withScopeRead = async <T>(
 ): Promise<T> =>
   transaction(door, scopedTo(platform, workspaceId, work), answersARefusal, "BEGIN READ ONLY");
 
-/** A connection whose unlock failed may still hold its session lock, so it is destroyed, not pooled. */
 const failedUnlocks = new WeakMap<pg.PoolClient, Error>();
 
 const unlocking = async (
@@ -226,10 +217,6 @@ const unlockingAfter = async <T>(
   }
 };
 
-/**
- * Waits for the session lock on `key`, runs `work` outside any transaction, and unlocks once
- * `work` settles, failed or not.
- */
 export const withSessionLock = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -282,7 +269,6 @@ const FENCE_SQL = {
   { readonly wait: string; readonly try: string; readonly free: string }
 >;
 
-/** Each holder needs two connections: three take six of the api's ten, leaving four for other queries. */
 export const FENCE_HOLDERS_PER_POOL = 3;
 
 type Slots = { free: number; readonly waiting: (() => void)[] };
@@ -400,10 +386,6 @@ const MEMBER_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS person_
      JOIN "user" u ON u.id = m.user_id
     WHERE m.workspace_id = $1 AND m.user_id = $2`;
 
-/**
- * Both rows held, or a revocation lands between the read and the commit; never on the boundary
- * read, which every request runs.
- */
 const MEMBER_QUERY_HELD = `${MEMBER_QUERY} FOR SHARE OF m, u`;
 
 const isRole = (value: string): value is Role => ROLES.some((role) => role === value);
@@ -455,7 +437,6 @@ const resolveClaims = async <T>(
 
   const credentialIssuedAtMs = claims.issuedAt.getTime();
 
-  // A holder, not a `let`: the closure's assignment is invisible to the narrowing at the check below.
   const seen = { lastActiveStale: false };
   const opened = await resolveScoped(
     door,
@@ -625,7 +606,6 @@ type OperatorRow = {
   readonly operator: boolean;
   readonly revoked_at: Date | null;
 
-  /** The named session's confirmation; null where the claims name no session. */
   readonly confirmedAt: Date | null;
 };
 

@@ -224,10 +224,6 @@ type EvidenceInput = {
   readonly contentVersion?: string;
 };
 
-/**
- * `head` expects the bundle's head commit, `null` for an empty bundle; `base` expects the
- * standing concept's content hash, `null` for a new concept.
- */
 type WritePrecondition = { readonly head: string | null } | { readonly base: string | null };
 
 export type Acceptance = {
@@ -758,7 +754,6 @@ const acceptOne = async (
 export type ImportBundleInput = {
   readonly tree: BundleTree;
 
-  /** The sensitivity every landed concept takes; `IMPORT_SENSITIVITY_DEFAULT` when absent. */
   readonly sensitivity?: (typeof SENSITIVITIES)[number] | undefined;
 
   readonly dryRun?: boolean | undefined;
@@ -838,7 +833,6 @@ const manifestRefusalOf = (refusal: WriteManifestRefusal | Error): ImportBundleR
   switch (refusal) {
     case "path-taken":
       return "manifest-taken";
-    // Only a defect in the import makes its manifest commit malformed, so no caller can act on it.
     case "malformed":
     case "malformed-path":
     case "malformed-message":

@@ -101,7 +101,6 @@ export const DETAIL_KINDS = {
   "family?": (value: DetailValue) =>
     typeof value === "string" && FAMILIES.some((family) => family === value),
   matched: (value: DetailValue) => matchedList.safeParse(value).success,
-  // One of the closed set and nothing freer: a detail that took any text could take a key.
   modelProvider: (value: DetailValue) =>
     typeof value === "string" && MODEL_PROVIDERS.some((provider) => provider === value),
   modelName: (value: DetailValue) => typeof value === "string" && MODEL_NAME.test(value),

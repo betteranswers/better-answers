@@ -26,10 +26,6 @@ const workerDsn = (connectionUri: string): string => {
   return uri.toString();
 };
 
-/**
- * The deploy order in a fixture. As the owner, not through `workerDsn`: the worker is refused
- * this write.
- */
 const stampTheContract = async (connectionUri: string): Promise<void> => {
   const client = new pg.Client({ connectionString: connectionUri });
   await client.connect();
@@ -48,7 +44,6 @@ export type WorkerObjectStore = {
   readonly secretAccessKey: string;
 };
 
-/** A suite whose jobs read no original still has to give the worker a bucket to open. */
 const AN_UNREACHABLE_STORE: WorkerObjectStore = {
   endpoint: "http://objectstore.invalid:3900",
   bucket: "better-answers",

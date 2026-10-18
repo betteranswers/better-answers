@@ -163,7 +163,6 @@ describe("the reuse reading", () => {
       { named: 36, yes: 0, no: 36, unsent: 0 },
     ]);
     expect(atHalf.negatives).toEqual({ named: 36, yes: 36, no: 0, unsent: 0 });
-    // 34 calls of 2,400 tokens in at £0.03 a million.
     expect(atSevenTenths.spentGbp).toBe("0.002448");
   }, 300_000);
 

@@ -181,7 +181,6 @@ const syncsToFollow = async (
   if (!first.ok) return err(first.error);
   const listed = await listedSyncs(platform, door, workspaceId, first.value);
   if (!listed.ok) return err(listed.error);
-  // Rules out what is already followed without a transaction per sync; the marker read under the lock still decides.
   const followed = await attempt(() =>
     withScope(platform, door, workspaceId, (tx) => followedAmong(platform, tx, listed.value)),
   );

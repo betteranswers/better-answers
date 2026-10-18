@@ -39,11 +39,9 @@ export type DraftEvent<Iri extends string = ConceptIri> =
 /** What the drafter is handed in place of a door; each runs in a transaction of its own. */
 export type DraftSteps<Refused = never> = {
   readonly read: ReadStep<Refused>;
-  /** Stamps its own time, so a later part's reservation lives its full ten minutes. */
   readonly reserve: (
     reserving: Omit<DraftReserving, "now">,
   ) => Promise<Result<CallReserved | undefined, Refused | JudgeRefusal>>;
-  /** Called with no transaction open. */
   readonly streamModel: StreamModel;
   readonly keepDraft: (kept: Omit<DraftKeeping, "now">) => Promise<Result<void, Refused | Error>>;
 };
@@ -87,7 +85,6 @@ const FRAMING_TOKENS = 2_000;
 /** Each attempt's `max_tokens`, the model's thinking and a part's few sentences together. */
 const DRAFT_TOKENS_OUT = 16_000;
 
-/** A part's call, every attempt inside it, well within the ten minutes its reservation lasts. */
 const DRAFT_WITHIN_MS = 150_000;
 
 const utf8 = new TextEncoder();

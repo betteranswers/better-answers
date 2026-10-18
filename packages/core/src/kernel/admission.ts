@@ -29,7 +29,6 @@ export const OPERATOR_ALONE = { operator: true } as const;
 
 export type Admits = RoleOrPurpose | typeof OPERATOR_ALONE;
 
-/** The resolver's own words reach a caller from the door, never from here. */
 export type AdmissionRefusal = KernelRefusalOfClass<"forbidden" | "unauthenticated">;
 
 const ROLE_FORBIDS = "role-forbids" satisfies AdmissionRefusal;
@@ -113,12 +112,6 @@ const opens = (wanted: Admits, principal: Principal | OperatorPrincipal): boolea
     : reaches(principal.role, wanted.role);
 };
 
-/**
- * Admits a person whose role is the declared one or above, the platform acting for a declared
- * purpose, or the operator where the action admits them alone. An `admits` written as a function is
- * read from `input`. Anyone else is refused `role-forbids`, or `not-the-operator` by an operator's
- * action.
- */
 export const admit = <D extends ActionDeclaration>(
   declaration: D,
   principal: Principal | OperatorPrincipal,

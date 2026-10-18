@@ -604,7 +604,6 @@ describe("an `Answer` withheld from the asker", () => {
     const ofTwo = { caps: { ...ASK_CAPS, related: 2 } };
 
     const before = await asked(db(), scenario.viewer, QUESTION, ofTwo);
-    // The lesser IRI: were the withheld concept walked to, it would be the first one reached.
     const withheld = await conceptSeeded(db(), scenario.workspaceId, {
       collection: "audits",
       title: "Board papers",

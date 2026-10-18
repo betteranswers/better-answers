@@ -82,7 +82,6 @@ export const theRecallSet = async (): Promise<RecallSet> => {
   return read.value;
 };
 
-/** `find` takes no longer a query, and the measure asks every question of both entries. */
 const QUESTION_CHARACTERS_AT_MOST = 500;
 
 const buyerQuestions = z
@@ -143,10 +142,6 @@ const oneGroupOf = (
   return others.length === 0 ? group : undefined;
 };
 
-/**
- * Throws on a key `set` does not hold, counted otherwise as a miss, and on a collection that is
- * not its row's one group.
- */
 export const theBuyerQuestions = async (set: RecallSet): Promise<BuyerQuestions> => {
   const read = await readBuyerQuestions(BUYER_QUESTIONS);
   if (!read.ok) throw new Error(`the buyer-worded set did not read: ${read.error.message}`);
@@ -211,7 +206,6 @@ export const paraphrasesOf = (set: RecallSet): readonly RecallQuestion[] =>
     paraphrases.map((question) => ({ question, collection: group, answers: [key] })),
   );
 
-/** One reading counted three ways. A cap is sized from `byAnswer`. */
 export type Recalls = {
   readonly everyAnswer: Recall;
   readonly anyAnswer: Recall;

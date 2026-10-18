@@ -222,7 +222,6 @@ export const conceptSeeded = (
     return ids.conceptIri.parse(indexed.iri);
   });
 
-/** One at a time: the seeder numbers each concept's path as it writes it. */
 export const conceptsSeeded = async (
   db: MigratedPostgres,
   workspaceId: string,

@@ -234,8 +234,6 @@ const erasedOnEachArm = async (): Promise<{
   await seedingWith(db().pool, (seed) =>
     seed.member({ workspaceId: elsewhere.workspaceId, userId: stillMember.id, role: "Editor" }),
   );
-  // The same records held here for each person, so a line that differs between them can differ
-  // only by the arm.
   for (const [person, email] of [
     [lastMember, onlyHere],
     [stillMember, heldElsewhere],
@@ -2356,7 +2354,6 @@ describe("the questions a person asked", () => {
   const openingARecord = (member: Member): Promise<{ readonly recordId: string }> =>
     asTheMember(member, opening);
 
-  /** Refused, with prose the platform drafted, so the content row holds more than the question. */
   const completingTheRecord = (member: Member, recordId: string): Promise<void> =>
     asTheMember(member, (asker, tx) =>
       completeRecord(asker, tx, {

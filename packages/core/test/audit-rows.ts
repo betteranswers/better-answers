@@ -2,7 +2,6 @@ import type pg from "pg";
 
 import { ulid } from "@better-answers/schema";
 
-/** One statement, since a round trip a row costs a shared runner seconds at ten thousand rows. */
 export const auditEventsIn = async (
   pool: pg.Pool,
   events: {

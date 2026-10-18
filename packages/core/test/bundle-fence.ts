@@ -26,10 +26,6 @@ export const rewritingElsewhere = (pool: pg.Pool, workspaceId: string) =>
 export const writingElsewhere = (pool: pg.Pool, workspaceId: string) =>
   holdingTheFence(pool, workspaceId, "_shared");
 
-/**
- * The same repositories by another path, which the in-process lock keys apart: what a second
- * process writing the bundle looks like from this one.
- */
 export const asAnotherProcess = async (git: GitDoor): Promise<GitDoor> => {
   const elsewhere = `${git.root}-elsewhere-${randomUUID()}`;
   await symlink(git.root, elsewhere);

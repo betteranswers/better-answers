@@ -49,7 +49,6 @@ const FACTS_BY_TOKEN = facts("token");
 const keyOf = (session: SessionNamed): readonly [string, string] =>
   "id" in session ? [FACTS_BY_ID, session.id] : [FACTS_BY_TOKEN, session.token];
 
-/** A row another transaction holds is skipped, never waited on: the next read writes it. */
 const UNHELD_SESSION = "(SELECT id FROM session WHERE id = $1 FOR UPDATE SKIP LOCKED)";
 
 const STARTED = `UPDATE session SET pending_since = $2
@@ -68,7 +67,6 @@ type Due = { readonly clock: PendingClock; readonly unpromoted: boolean };
 
 const dueOf = (row: StandingRow, now: Date): Due => ({
   clock: pendingClockOf(standingOf(row), row.pendingSince, now),
-  // A promotion cleared every stamp, so any stamp now is a confirmation made since.
   unpromoted: row.promoted && standingOf(row) === "confirmed",
 });
 

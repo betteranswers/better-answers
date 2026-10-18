@@ -173,7 +173,6 @@ const storedInside = async (
   if (!walked.ok) return err(walked.error);
   const dated: StoredObject[] = [];
   for (const entry of walked.value) {
-    // A stamp the store withheld leaves the age unknowable, which is all this listing is for.
     if (entry.storedAt !== undefined) dated.push({ key: entry.key, storedAt: entry.storedAt });
   }
   return ok(dated);

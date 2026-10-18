@@ -240,7 +240,6 @@ describe("asking to join a workspace", () => {
 
 describe("approving a request", () => {
   it("mints and records the requester's invitation at the chosen role", async () => {
-    // Each file has its own database, so the one address is this test's alone.
     const { workspace, requester, requestId } = await withOneWaitingRequest("Approve", {
       email: "Priya.Shah@Calder.example",
     });

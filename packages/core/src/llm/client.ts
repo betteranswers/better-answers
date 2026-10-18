@@ -89,26 +89,20 @@ export type ModelCall<T> = {
   readonly system: string;
   readonly prompt: string;
   readonly answer: z.ZodType<T>;
-  /** Its `tokensOut` is each attempt's `max_tokens`, so no attempt spends past the reservation. */
   readonly most: CallSize;
-  /** The whole call's wall clock, every attempt and wait inside it; none where it is absent. */
   readonly withinMs?: number;
-  /** The caller's: once it aborts, the attempt in flight ends and no other is made. */
   readonly signal?: AbortSignal;
 };
 
 export type DecisionModelCall = {
   readonly state: string;
   readonly questions: Readonly<Record<string, NoulInstructions>>;
-  /** The whole call's wall clock, every attempt and wait inside it; none where it is absent. */
   readonly withinMs?: number;
-  /** The caller's: once it aborts, the attempt in flight ends and no other is made. */
   readonly signal?: AbortSignal;
 };
 
 export type Unanswered = "rate-limited" | "spend-cap" | "refused" | "failed";
 
-/** Each attempt is one `CallSpent`, which settles the call's reservation as it stands. */
 export type ModelOutcome<T> =
   | { readonly outcome: "answered"; readonly answer: T; readonly spent: readonly CallSpent[] }
   | { readonly outcome: Unanswered; readonly spent: readonly CallSpent[] };
@@ -374,7 +368,6 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     });
     if (!fitsWindow(to.model, request.body)) return unsent(to, "over-window");
     const answers = probabilitiesFor(Object.keys(call.questions));
-    // A decision call reserves no output, and nothing marks what a cut one was billed.
     return called(to, DECISION, request, (said) => answers.safeParse(said).data, {
       withinMs: call.withinMs,
       signal: call.signal,

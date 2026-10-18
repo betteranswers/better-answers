@@ -14,7 +14,6 @@ const WORKSPACE_INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 
 const counterKeyOf = (admin: AdminUserPrincipal, address: string): string =>
   createHash("sha256").update(`${admin.workspaceId}:${address}`).digest("hex");
 
-/** No hex digest spells it, so it never meets an address's key, and every one sorts before it. */
 const WORKSPACE_KEY = "workspace";
 
 type Counter = { readonly key: string; readonly rule: CounterRule; readonly amount: number };
@@ -50,7 +49,6 @@ export const emailsCounted = async (
 const ADDRESSES_WAITING = `SELECT lower(email) AS address FROM invitation
                             WHERE workspace_id = $1 AND id = ANY($2::text[]) AND status = $3`;
 
-/** Read unlocked, so every action takes its counters before any invitation row it holds. */
 export const waitingCounted = async (
   admin: AdminUserPrincipal,
   tx: Tx,

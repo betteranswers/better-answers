@@ -67,10 +67,6 @@ const HOLDING_THE_SESSION = `
   SELECT ${SETUP_GRANTED} AS "setupGranted"
     FROM session WHERE id = $1 AND user_id = $2 FOR UPDATE`;
 
-/**
- * Person, then session, in every action here, so none holds what another waits on. A held session
- * cannot be signed out before the stamp lands.
- */
 const holding = async (
   tx: Tx,
   held: Held,
@@ -109,7 +105,6 @@ const asThePerson = async <T, R>(
   return done.value;
 };
 
-/** Either factor proves the person, so it forgets the authenticator's failures as a code would. */
 const confirming = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -209,10 +204,6 @@ const RESTORE_CODE: CodeKind = { kind: "restore-code", refusal: "restore-code-wr
 
 const GRANTING = "UPDATE session SET setup_granted_at = $3 WHERE id = $1 AND user_id = $2";
 
-/**
- * Run once the person and session are held. A kind still waiting refuses even the right code, so
- * no guess is spent while it waits.
- */
 const tryingACode = async <Accepted>(
   tx: Tx,
   held: Held,
@@ -376,7 +367,6 @@ const INSTALLING = `
   INSERT INTO authenticator (id, secret, backup_codes, user_id, verified)
   VALUES ($1, $2, '', $3, true)`;
 
-/** Only the secret parked under this session's grant, so the one installed is the one its code proved. */
 const installingTheAuthenticator = async (
   tx: Tx,
   held: Held,
@@ -401,10 +391,6 @@ type Replaced = { readonly issued: RecoveryCodesMade };
 const REPLACED_FLAGS = `
   UPDATE "user" SET authenticator_enabled = $2, restore_required_at = NULL WHERE id = $1`;
 
-/**
- * Every session's grant goes, and every other session's stamp: either left standing would outlast
- * the lost factors.
- */
 const finishingTheReplacement = async (
   platform: PlatformPrincipal,
   tx: Tx,

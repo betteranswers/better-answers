@@ -11,7 +11,6 @@ import { actorIdOf, attempt, ulid, type Result, type UserPrincipal } from "../ke
 import { settleSpend, type CallSpent } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
-/** One statement, so the content's month is its record's own `asked_at`. */
 const A_RECORD_WITH_ITS_QUESTION = `WITH record AS (
     INSERT INTO question_asked
       (workspace_id, id, asked_at, asked_by, transport, collections, predicate_role,
@@ -90,7 +89,6 @@ export type RecordCompletion = {
   readonly concepts: readonly RecordedConcept[];
   readonly unmappedPassages: readonly { readonly locator: string }[];
   readonly drafted?: readonly DraftedSentence[];
-  /** Undefined where no model was called for the question; else its reservation, settled first. */
   readonly settled?:
     | {
         readonly reservationId: string;
@@ -99,11 +97,6 @@ export type RecordCompletion = {
     | undefined;
 };
 
-/**
- * Completes an open record once: one completed or not there answers an error and changes
- * nothing. A settle the sweep beat leaves the record open, since both share the transaction. A
- * passage is kept as its locator, and a concept as its IRI, hash and trust, never its text.
- */
 export const completeRecord = async (
   asker: UserPrincipal,
   tx: Tx,
@@ -136,7 +129,6 @@ export const completeRecord = async (
     ]);
   });
 
-/** Joined on the record's own `asked_at`, so the content's partition is found by its key. */
 const DRAFT_KEPT = `UPDATE question_content AS content SET drafted = $3
     FROM question_asked AS record
    WHERE record.workspace_id = $1 AND record.id = $2 AND record.completed_at IS NOT NULL
@@ -145,7 +137,6 @@ const DRAFT_KEPT = `UPDATE question_content AS content SET drafted = $3
 
 export type DraftKeeping = {
   readonly recordId: string;
-  /** Every sentence drafted for the question so far, which replaces what was kept before. */
   readonly drafted: readonly DraftedSentence[];
   readonly settled: { readonly reservationId: string; readonly calls: readonly CallSpent[] };
   readonly now: Date;

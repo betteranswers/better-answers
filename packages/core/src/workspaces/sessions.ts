@@ -34,7 +34,6 @@ const BROWSERS: readonly (readonly [RegExp, string])[] = [
   [/Safari\//, "Safari"],
 ];
 
-/** An iPhone names Mac OS X and Android names Linux, so each is read before those. */
 const SYSTEMS: readonly (readonly [RegExp, string])[] = [
   [/iPhone|iPad/, "iOS"],
   [/Android/, "Android"],
@@ -61,10 +60,8 @@ export type SessionShown = {
 
   readonly device: string;
 
-  /** An ISO instant, as it crosses the wire. */
   readonly lastActiveAt: string;
 
-  /** The session the read is made from, which alone carries no sign-out. */
   readonly current: boolean;
 };
 
@@ -144,7 +141,6 @@ const recording = (
 
 const RETURNED_ENDED = `RETURNING id, user_agent AS "userAgent", updated_at AS "lastActiveAt"`;
 
-/** $1 binds the read's own session, $2 the person, $3 the instant: an expired row is the sweep's, never an act's. */
 const GONE = `DELETE FROM session WHERE expires_at > $3 AND`;
 
 const ending = async (

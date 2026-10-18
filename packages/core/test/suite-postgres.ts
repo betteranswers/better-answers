@@ -37,10 +37,6 @@ export const postgresForSuite = (): (() => MigratedPostgres) => {
   };
 };
 
-/**
- * For an action that reads every workspace the database holds, whose totals another case's rows
- * would change.
- */
 export const postgresForEachCase = (): (() => MigratedPostgres) => {
   let db: MigratedPostgres | undefined;
   let cases = 0;
@@ -63,10 +59,6 @@ export const postgresForEachCase = (): (() => MigratedPostgres) => {
   };
 };
 
-/**
- * A pool as `app_rt` holding a connection per read, never reaped while idle: the suite's own
- * `runtimePool` holds five, and a sixth read waits.
- */
 export const runtimePoolFor = (db: () => MigratedPostgres, reads: number): (() => pg.Pool) => {
   let pool: pg.Pool | undefined;
 

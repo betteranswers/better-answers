@@ -28,7 +28,6 @@ export type UserPrincipal = {
 
   readonly credentialIssuedAtMs: number;
 
-  /** When the session last confirmed a second factor; null where the claims name no session. */
   readonly secondFactorConfirmedAtMs: number | null;
 };
 
@@ -50,7 +49,6 @@ export type OperatorPrincipal = {
 
   readonly credentialIssuedAtMs: number;
 
-  /** When the session last confirmed a second factor; null where the claims name no session. */
   readonly secondFactorConfirmedAtMs: number | null;
 };
 

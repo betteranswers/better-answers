@@ -41,13 +41,8 @@ export type SweepsPrincipal = PlatformPrincipal & {
   readonly actorId: typeof SWEEPS_ACTOR;
 };
 
-/**
- * Holds the lock and lists the workspaces; each sweep still runs, and is audited, as its own
- * actor, the same as a run by hand.
- */
 export const SWEEPS: SweepsPrincipal = { kind: "platform", actorId: SWEEPS_ACTOR };
 
-/** 41 is the dump's, which the erasure routine and the backup job share. */
 const SWEEP_LOCK = 42;
 
 /** `list` finds the orphaned uploads and removes none; `remove` removes them. */
@@ -187,11 +182,6 @@ const firstOfTheMonth = (now: Date, monthsOn: number): string =>
     .toISOString()
     .slice(0, ISO_DAY.length);
 
-/**
- * Makes the partitions a question's content is stored in, since a request cannot make its own.
- * The clock's own month is asked for beside the next, so a database restored from an older dump
- * has it by the first pass.
- */
 export const makeQuestionMonths = (
   door: PostgresDoor,
   input: { readonly now: Date },
@@ -206,7 +196,6 @@ export const makeQuestionMonths = (
 
 const VERIFICATION_KEPT_PAST_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
-/** Far past the longest ingress rule's window, an hour, so no live count goes. */
 const INGRESS_WINDOW_KEPT_MS = 24 * 60 * 60 * 1000;
 
 const EXPIRED_SESSIONS = "DELETE FROM session WHERE expires_at < $1 OR pending_since < $2";

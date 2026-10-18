@@ -35,7 +35,6 @@ import type { MemberRefusal } from "./vocabulary.ts";
 
 export type { BulkOutcome } from "./sets.ts";
 
-/** One action holds at most this many member rows until it commits. */
 const MOST_TICKED = 200;
 
 const PERSON_ID = boundarySchemas.user.select.shape.id;

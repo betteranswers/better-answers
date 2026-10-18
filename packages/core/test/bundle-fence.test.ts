@@ -56,7 +56,6 @@ const waitingOnTheFence = async (): Promise<boolean> =>
 
 const STILL_WAITING = "still waiting";
 
-/** Long enough for a refusal that waits on nothing, short against the forty-five a waiter gets. */
 const PROMPTLY_MS = 2_000;
 
 const promptly = <T>(answer: Promise<T>): Promise<T | typeof STILL_WAITING> =>
@@ -195,7 +194,6 @@ describe("the fence's slots", () => {
     expect(answered).toEqual({ ok: false, error: "held" });
   });
 
-  /** A run starts its holders together; a slow connect can keep one from overlapping the rest. */
   const holdersAtOnce = async (): Promise<{ readonly most: number; readonly finished: number }> => {
     const small = aSmallPool();
     const door = openPostgres(small);

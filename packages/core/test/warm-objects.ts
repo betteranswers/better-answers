@@ -40,7 +40,6 @@ export type ObjectStore = {
 
 const GARAGE_CONFIG = path.resolve(import.meta.dirname, "../../../deploy/garage.toml");
 
-/** The one pin: production runs this file, and Renovate moves the image here and nowhere else. */
 const STORES_COMPOSE = path.resolve(import.meta.dirname, "../../../deploy/stores.compose.yaml");
 
 const storesComposeShape = z.object({

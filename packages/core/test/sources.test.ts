@@ -70,7 +70,6 @@ const uploadOf = (text: string) => {
   return { state, body };
 };
 
-/** Holds its bytes until released, so a test can say which of two binds streams first. */
 const heldUploadOf = (text: string) => {
   const reached = Promise.withResolvers<void>();
   const gate = Promise.withResolvers<void>();
@@ -284,10 +283,6 @@ describe("an Admin connects an upload", () => {
     const scenario = await arrange();
     const { input } = handbookOffered();
 
-    /**
-     * The job is the transaction's last statement, so refusing it fails the action with three rows
-     * written: only that tells one transaction from four statements.
-     */
     const bound = await whileWritesAreRefused(db().pool, "job", () =>
       connectUpload(scenario.admin, doorsOf(scenario), input),
     );
@@ -533,7 +528,6 @@ const aFailedConnect = async (scenario: Scenario) => {
   return left[0];
 };
 
-/** An original under `uploads/<connected source>/original`, the shape keys already in the store still have. */
 const anOlderOriginal = async (scenario: Scenario, connectedSourceId: string) => {
   const key = `uploads/${connectedSourceId.toLowerCase()}/original`;
   await putObject(scenario.admin, store().door, key, uploadOf(HANDBOOK).body);
@@ -844,10 +838,6 @@ const publishedHandbook = async (scenario: Scenario, connectedSourceId: string) 
   return published.value;
 };
 
-/**
- * Keys written sorted at every depth, the canonical form the hash covers, so the expected hash owes
- * nothing to the code under test.
- */
 const dpiaHashOfTheHandbook = (connectedSourceId: string): string =>
   createHash("sha256")
     .update(

@@ -26,13 +26,11 @@ import type { TokensSpent, WireRequest } from "./wire/read.ts";
 export type StreamedCall = {
   readonly system: string;
   readonly prompt: string;
-  /** Its `tokensOut` is each attempt's `max_tokens`, so no attempt spends past the reservation. */
   readonly most: CallSize;
   readonly withinMs?: number;
   readonly signal?: AbortSignal;
 };
 
-/** Each attempt is one `CallSpent`, which settles the call's reservation as it stands. */
 export type StreamedOutcome = {
   readonly outcome: "answered" | Unanswered;
   readonly spent: readonly CallSpent[];

@@ -310,11 +310,6 @@ const landEvidence = async (
   await replaceCitations(principal, tx, iri, evidence);
 };
 
-/**
- * Writes the concept's identity, evidence, citations, index row, bundle commit and map delta,
- * recomputes write-ups when its visibility moved, and decides an accepted suggestion.
- * @throws when somebody else decided that suggestion first.
- */
 export const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<void> => {
   await tx.query(
     `INSERT INTO concept_identity (workspace_id, iri, merge_key) VALUES ($1, $2, $3)

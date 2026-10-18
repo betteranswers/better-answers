@@ -1,8 +1,5 @@
 import type { RefusalClass, Vocabulary } from "./refusal.ts";
 
-/**
- * A word naming a thing one slice owns stays there; a second slice borrows it rather than move it.
- */
 export const KERNEL_REFUSALS = {
   malformed: "malformed",
   "role-forbids": "forbidden",
@@ -14,8 +11,6 @@ export const KERNEL_REFUSALS = {
 
   "second-factor-pending": "precondition",
 
-  // The action Postgres aborted to end a deadlock did nothing wrong: reading again and deciding
-  // again is the whole remedy.
   "changed-meanwhile": "conflict",
 
   "not-a-member": "unauthenticated",

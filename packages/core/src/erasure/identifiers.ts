@@ -72,16 +72,11 @@ const cherokeeCapitalOf = (character: string): string => {
   return range === undefined ? character : String.fromCodePoint(range.capital + point - range.from);
 };
 
-/**
- * Per character, so no final sigma is written; down, up and down again fully folds all but
- * dotless i, Cherokee and what 15.1 lacks.
- */
 const foldedCharacter = (character: string): string =>
   character === DOTLESS_I || !knownToUnicode15_1(character)
     ? character
     : Array.from(character.toLowerCase().toUpperCase().toLowerCase(), cherokeeCapitalOf).join("");
 
-/** A folded character is never a space, so the words are found after folding. */
 const spacedAs = (identifier: string, written: (character: string) => string): string =>
   Array.from(identifier, (character) => (WHITESPACE.has(character) ? SPACE : written(character)))
     .join("")
@@ -109,10 +104,6 @@ export type SoughtIdentifier = {
   readonly anAddress: boolean;
 };
 
-/**
- * Skips an identifier below a floor. A spelling repeated among the emails, or among the names and
- * other identifiers, is sought once.
- */
 export const soughtIdentifiersOf = (
   set: Readonly<Record<IdentifierKind, readonly string[]>> | null,
 ): readonly SoughtIdentifier[] => {
@@ -188,7 +179,6 @@ const bounded = (
   );
 };
 
-/** Whole-word matches, each span once, sorted by start and then end. */
 export const erasureMatchesIn = (
   text: string,
   sought: readonly SoughtIdentifier[],

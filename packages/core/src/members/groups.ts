@@ -40,10 +40,6 @@ const GROUP_NAME = boundarySchemas.group.insert.shape.name;
 const GROUP_ORIGIN = boundarySchemas.group.select.shape.origin;
 const PERSON_ID = boundarySchemas.user.select.shape.id;
 
-/**
- * Each field is any text, so a name or an id the action cannot take reaches it and is refused in its
- * own word, `malformed`.
- */
 export const createGroupInput = z.object({ name: z.string() });
 
 export type CreateGroupInput = z.output<typeof createGroupInput>;
@@ -240,11 +236,6 @@ const memberTarget = (
   return ok({ ...target.value, userId: person.data });
 };
 
-/**
- * A step on rows its action holds: each person into the group, in person id order, so two such steps
- * over one group never wait on each other in a cycle. Answers those the insert landed, in that
- * order, one audit event each; one already in lands nothing.
- */
 export const addedToGroup = async (
   admin: AdminUserPrincipal,
   tx: Tx,

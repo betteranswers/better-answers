@@ -24,20 +24,14 @@ const EVERYONE = { audience: AUDIENCE_EVERYONE, audienceGroups: null } as const;
 
 export const RESTRICTED_TO_ADMINS: Visibility = { sensitivity: RESTRICTED, ...EVERYONE };
 
-/**
- * A SQL condition: the row at `alias` is published and the principal may read it. The role binds
- * at placeholder `roleParameter` and the groups at the next: bind `readableParameters` there.
- */
 export const readableClause = (alias: string, roleParameter: number): string =>
   `${alias}.published_at IS NOT NULL
      AND ${sensitivityAndAudienceClause(alias, roleParameter)}`;
 
-/** `readableClause` without the published check, its placeholders bound the same way. */
 export const sensitivityAndAudienceClause = (alias: string, roleParameter: number): string =>
   `(${alias}.sensitivity <> '${RESTRICTED}' OR $${roleParameter} = 'Admin')
      AND (${alias}.audience = '${AUDIENCE_EVERYONE}' OR ${alias}.audience_groups && $${roleParameter + 1}::text[])`;
 
-/** The two values the readable clauses bind, in placeholder order. */
 export const readableParameters = (
   principal: UserPrincipal,
 ): readonly [Role, readonly GroupId[]] => [principal.role, principal.groups];

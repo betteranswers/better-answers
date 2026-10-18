@@ -95,10 +95,6 @@ const roleWrittenBy = async (
   return promoted;
 };
 
-/**
- * A step on a member row its action holds: the role moves, and its audit event lands in `batchId`.
- * True when the move made the person hold a second factor for the first time.
- */
 export const roleWritten = (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -108,10 +104,6 @@ export const roleWritten = (
 
 const ROLE_HELD = "SELECT role FROM member WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE";
 
-/**
- * As `roleWritten`, by the platform under `workspaceId`'s scope, judging no last Admin. It holds
- * the row itself, so a role moved or a member removed since the caller read records nothing stale.
- */
 export const roleWrittenByPlatform = async (
   platform: PlatformPrincipal,
   tx: Tx,

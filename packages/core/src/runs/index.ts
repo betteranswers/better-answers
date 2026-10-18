@@ -132,7 +132,6 @@ export const enqueueJobInput = z.discriminatedUnion("kind", [
 ]);
 
 export const enqueueJobAction = declareAction({
-  /** The level is the kind's own, and a kind with no descriptor is left to the highest role. */
   admits: (input: z.output<typeof enqueueJobInput>) => ({
     role: descriptorOf(input.kind)?.enqueuedBy ?? ROLES[0],
     purposes: EVERY_PURPOSE,
@@ -462,10 +461,6 @@ const runsOfSubjectAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/**
- * Its outcome stays on the job row: a sync's outcome locates each overridden span, the
- * address of withheld text.
- */
 export type SubjectRun = {
   readonly jobId: string;
   readonly kind: JobKind;
@@ -547,7 +542,6 @@ const bundleHealthAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/** Read from the newest `done` nightly audit; an outcome that cannot be read is `mismatched`. */
 export const bundleHealth = async (
   principal: UserPrincipal,
   door: PostgresDoor,

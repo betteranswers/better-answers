@@ -41,7 +41,6 @@ const MARK_ACTIONS = declareActions("platform", {
 
 const TEST_WORKSPACE_NAME = "Test workspace";
 
-/** Enough that a list paged at 25 runs to three pages; the journeys read the same number. */
 export { INVENTED_MEMBERS };
 
 const TESTING_DOMAIN = boundarySchemas.testWorkspaceMark.insert.shape.testingDomain;
@@ -183,7 +182,6 @@ type Standing = {
 
   readonly members: readonly MemberStanding[];
 
-  /** Accepting never reads the mark, so an off-domain address here could still join once marked. */
   readonly invited: readonly string[];
 };
 
@@ -381,7 +379,6 @@ const driftedAmong = (
     return [{ personId: one.id, previousRole, role: one.role }];
   });
 
-/** The Admin comes first, so no reset leaves the workspace without one. */
 const membersEnsured = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

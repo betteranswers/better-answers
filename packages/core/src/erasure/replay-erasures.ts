@@ -81,7 +81,6 @@ const erasureRequestsSince = async (
   return ok(found);
 };
 
-/** Oldest completion first. A request's own row wins over its replay copy. */
 export const replayableErasures = async (
   platform: PlatformPrincipal,
   doors: Pick<ErasureDoors, "postgres" | "objects">,

@@ -42,7 +42,6 @@ const stopAfter = (
 
 type Split = { readonly sentences: readonly string[]; readonly rest: string };
 
-/** A line cut after each sentence its marks end; the tail is a sentence too once the line is done. */
 const splitLine = (line: string, citable: readonly Citable[], lineDone: boolean): Split => {
   const marks = marksIn(line, citable);
   const markStarts = new Set(marks.map((mark) => mark.at));
@@ -61,11 +60,6 @@ const splitLine = (line: string, citable: readonly Citable[], lineDone: boolean)
 const written = (sentences: readonly string[]): readonly string[] =>
   sentences.map((sentence) => sentence.trim()).filter((sentence) => sentence !== "");
 
-/**
- * The sentences finished in `buffered`, and what is left to read. A sentence ends with its line,
- * or after its marks and their closing punctuation once a space follows them. When the reply has
- * `ended`, what is left is a sentence too.
- */
 export const finishedSentences = (
   buffered: string,
   citable: readonly Citable[],
@@ -78,7 +72,6 @@ export const finishedSentences = (
   return { sentences: written([...done, ...tail.sentences]), rest: tail.rest };
 };
 
-/** A sentence's end with more text after it: an abbreviation reads as one too, and is refused. */
 const AN_EARLIER_END = /[.!?]["'”’)]*\s+\S/;
 
 const tidied = (text: string): string =>

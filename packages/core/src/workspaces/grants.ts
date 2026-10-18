@@ -52,7 +52,6 @@ const endedGrantOf = (row: DeletedGrantRow): EndedGrant => ({
 
 export const endTokens = async (tx: Tx, asked: TokensToEnd): Promise<TokensEnded> => {
   const parameters = [asked.personId, asked.before, asked.workspaceId];
-  // Access tokens first: deleting a refresh token cascades to its own, which would go uncounted.
   const access = await tx.query(
     `DELETE FROM oauth_access_token WHERE ${TOKENS_TO_END}`,
     parameters,

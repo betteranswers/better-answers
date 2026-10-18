@@ -19,10 +19,6 @@ const withTheSignInAddresses = (
   return { ...identifiers, emails: [...identifiers.emails, ...added] };
 };
 
-/**
- * The addresses the request's suppression holds, lower-cased. It is written before the identity
- * step and never replaced, so it still holds the sign-in address once the user row is tombstoned.
- */
 export const addressesSuppressedFor = async (
   tx: Tx,
   input: { readonly workspaceId: string; readonly erasureRequestId: string },

@@ -96,7 +96,6 @@ export const authenticatorFor = async (
   return authenticatorId;
 };
 
-/** A recovery code stored as its hash; the hash is the code itself, which no spend reaches. */
 export const recoveryCodeFor = async (
   pool: pg.Pool,
   userId: string,

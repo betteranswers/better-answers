@@ -66,10 +66,6 @@ export type MemberRemoved = {
 
 type RemovedAt = { readonly at: Date; readonly batchId: string | undefined };
 
-/**
- * A step on a member row its action holds: the member, their last-activity row here and their
- * tokens for this workspace issued before `at` end, and the removal's audit events land.
- */
 export const memberRemovedHere = async (
   admin: AdminUserPrincipal,
   tx: Tx,
