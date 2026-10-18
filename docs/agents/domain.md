@@ -46,4 +46,4 @@ If your output contradicts a decision in `docs/solutions/architecture-patterns/`
 
 ## Where a changed decision lands
 
-A decision's doc states **what is true now**. A change that moves it **edits the doc in place**, in the same commit as the code; git keeps the history. The ADRs these docs came from, amendments and struck text included, are frozen in `docs/archive/adr/`: read one there when you need how a decision got to where it is.
+A decision's doc states **what is true now**. The step that edits it in place, in the same commit as the code, is in `.agents/playbooks/knowledge.md`; git keeps the history. The ADRs these docs came from, amendments and struck text included, are frozen in `docs/archive/adr/`: read one there when you need how a decision got to where it is.
