@@ -1,8 +1,8 @@
 # Third-party notices for `.claude/skills/`
 
-Two skills here come from https://github.com/jspiro/skills, which is under the MIT licence: `complexity-gate` and `mutation-testing`. Each was copied from that repository's `skills/<name>/` folder. `skills-lock.json` names the source of each one.
+One skill here comes from https://github.com/jspiro/skills, which is under the MIT licence: `mutation-testing`. It was copied from that repository's `skills/mutation-testing/` folder. `skills-lock.json` names its source.
 
-Both carry the owner's edits.
+It carries the owner's edits.
 
 The notice sits in this file, not in each skill's folder. A licence file inside a folder would change that folder's hash in `skills-lock.json`.
 
@@ -37,7 +37,7 @@ SOFTWARE.
 
 `pixel-perfect` is a plugin, not a single skill. It comes from https://github.com/Factory-AI/factory-plugins, folder `plugins/pixel-perfect/`, on the branch `add-impeccable-design-skills` at commit `e6ad78444fc6175c2b68e24c371445b2626ee050`, read on 06/10/2026. That branch is not merged, and the repository's marketplace does not list the plugin, so there is no release to pin. It is under the Apache License 2.0. Parts of it derive from Impeccable by Paul Bakaus and from Anthropic's `frontend-design` skill, both under the Apache License 2.0, as its `NOTICE.md` records.
 
-Upstream ships it as a Factory Droid plugin, with its manifest at `.factory-plugin/plugin.json`. Here the same manifest sits at `.claude-plugin/plugin.json`, so Claude Code loads the folder as `pixel-perfect@skills-dir` and its skills take the `pixel-perfect:` prefix. That move is the only change. Every other file matches upstream at that commit.
+Upstream ships it as a Factory Droid plugin, with its manifest at `.factory-plugin/plugin.json`. Here the same manifest sits at `.claude-plugin/plugin.json`, so Claude Code loads the folder as `pixel-perfect@skills-dir` and its skills take the `pixel-perfect:` prefix. Four skills carry the owner's edits: `animate`, `colorize` and `typeset` read the project's `.pixel-perfect.md` first, and `frontend-design` works within the project's design system. Every other file matches upstream at that commit.
 
 Its `LICENSE` and `NOTICE.md` sit inside its folder, because the Apache License 2.0 requires both to travel with the files. The rule above about keeping licence files out of a skill's folder protects hashes in `skills-lock.json`. The skills CLI does not install this plugin, so that rule does not apply to it.
 

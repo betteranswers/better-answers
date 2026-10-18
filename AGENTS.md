@@ -1,15 +1,15 @@
 # AGENTS.md
 
-`AGENTS.md` is the canonical repo instruction file. Root `CLAUDE.md` is a file of its own that imports it: its first line is `@AGENTS.md`, and below that sits only the block GitNexus keeps.
+`AGENTS.md` is the canonical repo instruction file, and Claude Code reads it directly. The repository has no root `CLAUDE.md`.
 
-A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge layers: **sources** (evidence) → **bundles** (OKF concepts, curated) → the **map** (derived). Over them the platform keeps **records** (guides, write-ups, usage, connected sources, audit), which cite concepts. The destination this repo builds towards is `VISION.md`. Two runtime tiers share four stores: Postgres, an object store, a git repository per workspace, and the map as Postgres tables under RLS. The way to v0.1 is the **route spec**, `docs/specs/v01-route.md`. The map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
+A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge layers: **sources** (evidence) → **bundles** (OKF concepts, curated) → the **map** (derived). Over them the platform keeps **records** (guides, write-ups, usage, connected sources, audit), which cite concepts. The destination this repo builds towards is `VISION.md`. Two runtime tiers share four stores: Postgres, an object store, a git repository per workspace, and the map as Postgres tables under RLS. The way to v0.1 is the **route spec**, `docs/specs/v01-route.md`.
 
 ## Read first
 
-- `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block. A block becomes a plan through `/ce-brainstorm` and `/ce-plan` (*Workflow*, below).
+- `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block. A block that is one change goes to `/poteto-mode`; a block of several changes is planned first (*Workflow*, below).
 - `CONCEPTS.md` — the glossary. Name things in code, tests, docs and commits with its words. `docs/agents/domain.md` says more.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open, and where each lands here. Read it before adding a key, convention or feature that relates to the knowledge layer.
-- `CODING_STANDARDS.md` — the constitution: every rule that binds work in this repo. A directory's own rules live in its `AGENTS.md` (`apps/api/`, `apps/web/`, `apps/worker/`, `deploy/`, `packages/core/`, `packages/schema/`), which its `CLAUDE.md` loads when work reaches it.
+- `CODING_STANDARDS.md` — the rules that bind every workspace and that no gate enforces. A directory's own rules live in its `AGENTS.md` (`apps/api/`, `apps/web/`, `apps/worker/`, `deploy/`, `packages/core/`, `packages/schema/`), which its `CLAUDE.md` loads when work reaches it.
 - `docs/solutions/architecture-patterns/` — why the architecture is the way it is: one doc per live decision. The doc is `docs/solutions/architecture-patterns/adr-NNNN-<slug>.md`.
 
 ## Repository Docs Convention
@@ -35,7 +35,6 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 | `contracts/` | The tier contract's language-neutral fixtures. Both tiers' suites read it, and so does the gate tooling. Nothing imports it and nothing deploys it |
 | `docs/archive/` | Frozen history: the original ADRs with their amendments, and the block and ticket specs the route was built through |
 | `docs/personas/` | The personas used for dogfooding |
-| `.compound-engineering/` | Compound Engineering's settings for this repository |
 | `docs/operations/` | Public-facing ops documents. Documents that are not public-facing are under `.planning/estate/` |
 | `deploy/` | Compose files and deployment configuration |
 | `.cubic/wiki/` | Cubic's generated wiki |
@@ -56,15 +55,15 @@ Other skills belong in the `.claude/skills/` folder beside the files they serve,
 
 `project_tracker: linear`
 
-The backlog lives in **Linear**: team `better-answers` (issue ids `BA-N`), project `better-answers`, reached through the `linear-server` MCP. A plan in `docs/plans/` is the unit of build work. The procedure is in `docs/agents/issue-tracker.md`.
+The backlog lives in **Linear**: team `better-answers` (issue ids `BA-N`), project `better-answers`, reached through the `linear-server` MCP. A pull request is the unit of build work, and work that spans several gets a plan in `docs/plans/` first. The procedure is in `docs/agents/issue-tracker.md`.
 
 ### Workflow
 
 Use pstack.
 
-A pull request's body becomes its merge commit's body on `main`, so every body an agent writes has one form. A body repeats no check counts and no release steps a plan or the RUNBOOK holds; it links to them. The body closes with these lines, after every section and before any attribution a tool appends:
+A pull request's body becomes its squash commit's body on `main`, so every body an agent writes has one form. A body repeats no check counts and no release steps a plan or the RUNBOOK holds; it links to them. The body closes with these lines, after every section and before any attribution a tool appends:
 
-- `Merge risk:` is required on every body. It says whether reverting the merge commit undoes the change, `reversible` or `not reversible`, then what a failure would reach.
+- `Merge risk:` is required on every body. It says whether reverting that commit undoes the change, `reversible` or `not reversible`, then what a failure would reach.
 - The issue line follows it whenever the pull request has an issue: `Fixes BA-N` when the pull request completes the issue, or `Related to BA-N` when it does not.
 
 ```text
@@ -74,7 +73,7 @@ Fixes BA-58
 
 Every commit reaches `main` through the merge queue. A commit's subject and a PR's title take the Conventional Commits form.
 
-A plan's test scenario opens with the behaviour it checks, and a unit names the acceptance examples it covers in its Requirements field.
+A plan's test scenario opens with the behaviour it checks.
 
 `docs/agents/workflow.md` has the loop, the commit's form, the merge, what `check` runs where, and what a worker prompt carries.
 
@@ -102,7 +101,7 @@ A mutation survivor is a hypothesis until a probe answers it. Triage uses contro
 
 ### Code review
 
-Reviews should be right-sized to the changes being made. `/thermos` runs before the pull request. Cubic reviews every head on the pull request. `babysit` fixes or answers its threads, three rounds at most, and the ruleset holds the merge until every thread is resolved. The loop is in `docs/agents/code-review.md`. NB. Cubic is currently paused, so review is pre-PR only, unless CodeRabbit flags an issue.
+Size a review to its change. `/thermos` runs before the pull request. Cubic is paused, so review happens before the pull request, unless CodeRabbit flags an issue. `babysit` fixes or answers a review bot's threads, three rounds at most, and the ruleset holds the merge until every thread is resolved. The loop is in `docs/agents/code-review.md`.
 
 ## Code and doc exploration
 
@@ -136,7 +135,7 @@ No hook holds this rule, so it applies whether you would read with `Read` or thr
 
 This project is indexed by GitNexus as **better-answers**. Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
-> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner.
+> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. `.gitnexusrc` sets its `--skip-agents-md` and `--skip-skills`, so it writes no `CLAUDE.md` and no skills, and leaves this block as it is.
 
 `impact` warns on HIGH or CRITICAL and never stops an edit, and from a worktree `rename` stays a dry run.
 
@@ -147,9 +146,9 @@ This project is indexed by GitNexus as **better-answers**. Use the GitNexus MCP 
 - Full context on a symbol — callers, callees, the flows it takes part in: `context({name: "symbolName"})`.
 - Security review: `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
 
-### Never Do
+### Renames
 
-- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph. From a worktree it stays a dry run and its edits are applied by hand: *From a worktree, two indexes*, above.
+- Rename a symbol with `rename`, not find-and-replace: `rename` follows the call graph. From a worktree it stays a dry run and its edits are applied by hand: *From a worktree, two indexes*, above.
 
 ### Resources
 
@@ -159,14 +158,6 @@ This project is indexed by GitNexus as **better-answers**. Use the GitNexus MCP 
 | `gitnexus://repo/better-answers/clusters` | All functional areas |
 | `gitnexus://repo/better-answers/processes` | All execution flows |
 | `gitnexus://repo/better-answers/process/{name}` | Step-by-step execution trace |
-
-### CLI
-
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus-impact-analysis/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus-refactoring/SKILL.md` |
 
 <!-- gitnexus:keep -->
 <!-- gitnexus:end -->

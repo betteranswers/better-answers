@@ -65,7 +65,6 @@ AGENTS.md.bak
 !.claude/skills/browser-suite/
 !.claude/skills/renovate-prs/
 !.claude/skills/better-answers-design
-!.claude/skills/complexity-gate/
 !.claude/skills/mutation-testing/
 !.claude/skills/pixel-perfect/
 !.claude/skills/survey-architecture/

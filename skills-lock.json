@@ -55,12 +55,6 @@
       "skillPath": "packages/client/skills/client-setup/SKILL.md",
       "computedHash": "65b2f97d796665441ec9044e422d549184836684b2f15b8586d978b9f8bb0406"
     },
-    "complexity-gate": {
-      "source": "jspiro/skills",
-      "sourceType": "github",
-      "skillPath": "skills/complexity-gate/SKILL.md",
-      "computedHash": "a6ecc578515c889f5bd25496027448561bdd36d3c3e630de916fbc33bd00e950"
-    },
     "create-auth": {
       "source": "better-auth/skills",
       "sourceType": "github",

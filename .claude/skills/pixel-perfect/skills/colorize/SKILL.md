@@ -6,6 +6,8 @@ user-invocable: true
 
 Transform monochrome or gray interfaces with purposeful color, verified in the actual browser.
 
+Read `.pixel-perfect.md` in the project root first, if it exists. Where it names a palette or a design system, that governs over this skill's defaults.
+
 ## 1. Assess the Current Palette
 
 Scan the codebase for the existing color usage:

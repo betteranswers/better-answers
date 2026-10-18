@@ -6,6 +6,8 @@ user-invocable: true
 
 Fix flat, generic, or poorly structured typography using real browser rendering verification.
 
+Read `.pixel-perfect.md` in the project root first, if it exists. Where it names type rules or a design system, that governs over this skill's defaults, its sizes and weights included.
+
 ## 1. Assess Current Typography
 
 Scan the codebase for type-related values:

@@ -107,6 +107,6 @@ If anything looks wrong in the screenshots, fix it before moving on. Code that l
 
 ## Implementation Principles
 
-Match implementation complexity to the aesthetic vision. Interpret creatively — make unexpected choices that feel genuinely designed for the context. No two designs should look the same. Vary between light and dark themes, different fonts, different aesthetics. NEVER converge on common choices across generations.
+Match implementation complexity to the aesthetic vision. Interpret creatively — make choices that feel designed for the context. Where `.pixel-perfect.md` or the project's design system sets a direction, work within it. Otherwise vary themes, fonts and aesthetics between projects rather than converging on common choices.
 
-The AI model is capable of extraordinary creative work. Don't hold back — commit fully to a distinctive vision, then verify it renders correctly in the browser.
+Commit to a distinctive vision, then verify it renders correctly in the browser.
