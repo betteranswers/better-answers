@@ -23,8 +23,8 @@ def fetch() -> None:
 
 
 def carried_repositories() -> tuple[Path, ...]:
-    """The hub cache directory of each model and of the encoder its config names,
-    where its tokenizer comes from. Offline: raises when `fetch` has not run."""
+    """The hub cache directory of each model and of the encoder its config names.
+    Offline: raises when `fetch` has not run."""
     found: dict[str, Path] = {}
     for model_id in WEIGHTS:
         snapshot = Path(snapshot_download(model_id, local_files_only=True))

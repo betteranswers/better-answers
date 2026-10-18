@@ -355,9 +355,8 @@ export type BodyReading = {
 };
 
 /**
- * A link's ordinal counts every link in the prose, images and links naming nothing included. A
- * footnote naming a source is a citation mark, resolving to the first entry of `sources` with that
- * id: it takes no ordinal. Any other footnote is a link only when the body defines it.
+ * A link's ordinal counts every prose link, images and links naming nothing included. A footnote
+ * naming a source is a citation mark: no ordinal.
  */
 export const linksAndMarksOf = (body: string, sources: readonly CitedSource[]): BodyReading => {
   const prose = proseOf(body);

@@ -232,22 +232,10 @@ describe("a suppression gives its reason on the same line", () => {
   });
 });
 
-describe("a public worker function's docstring may run to fifty words", () => {
+describe("a docstring holds to twenty-five words wherever it sits", () => {
   it.each([
-    ["a public worker function", "def reads() -> int:"],
-    ["a public async worker function", "async def reads() -> int:"],
-  ])("accepts a fifty-word docstring on %s", (_what, signature) => {
-    expect(findings({ [WORKER_MODULE]: documented(signature, 50) })).toEqual([]);
-  });
-
-  it("refuses a fifty-one-word docstring on a public worker function", () => {
-    const output = run({ [WORKER_MODULE]: documented("def reads() -> int:", 51) });
-
-    expect(output).toContain("runs to 51 words");
-    expect(output).toContain("in 50 at most");
-  });
-
-  it.each([
+    ["a public worker function", WORKER_MODULE, documented("def reads() -> int:", 26)],
+    ["a public async worker function", WORKER_MODULE, documented("async def reads() -> int:", 26)],
     ["an internal worker function", WORKER_MODULE, documented("def _reads() -> int:", 26)],
     [
       "a method, which is a member",

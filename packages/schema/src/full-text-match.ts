@@ -49,9 +49,8 @@ export const QUERY_WORDS = `SELECT array_to_tsvector(ARRAY[parsed.lexeme])::text
    ORDER BY parsed.at`;
 
 /**
- * One pass over `documents`, a `SELECT` of the `search` column of the rows the reader may read, so a
- * weight tells nothing of a row they may not. The words bind from `$first` on, as `QUERY_WORDS`
- * gives them.
+ * `documents` is a `SELECT` of the `search` column of the rows the reader may read. The words bind
+ * from `$first` on.
  */
 export const corpusCounts = (documents: string, words: number, first: number): string =>
   `SELECT count(*)::integer AS size,
@@ -63,8 +62,8 @@ export const corpusCounts = (documents: string, words: number, first: number): s
      FROM (${documents}) AS document`;
 
 /**
- * BM25F with no length normalisation, which lost recall. The rarities come from `counts`, bound as a
- * `CorpusCounts`, so a cursor can hold them fixed while the corpus changes under it.
+ * BM25F with no length normalisation. The rarities come from `counts`, bound as a `CorpusCounts`, so
+ * a cursor can hold them fixed.
  */
 export const anyWordMatch = (
   vector: string,

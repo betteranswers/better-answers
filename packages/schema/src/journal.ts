@@ -117,12 +117,6 @@ const chainIn = (
   return { ok: true, value: walked };
 };
 
-/**
- * The snapshots in the journal's order, once each entry has one, each snapshot has an entry,
- * and each names the one before as its parent. Otherwise the first refusal, checked in that
- * order.
- * @throws when the journal or a snapshot does not parse, or an instant does not increase.
- */
 export const journalSnapshotsIn = (folder: string): Result<readonly string[], SnapshotRefusal> => {
   const entries = entriesIn(folder);
   const unpaired = unpairedIn(folder, entries);

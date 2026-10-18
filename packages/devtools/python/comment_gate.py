@@ -19,8 +19,6 @@ UNREADABLE = (OSError, SyntaxError, tokenize.TokenError, UnicodeDecodeError)
 
 WORD_LIMIT = 25
 
-DOCSTRING_LIMIT = 50
-
 Comment = tuple[int, int, str]
 
 
@@ -72,12 +70,6 @@ NO_REASON = (
     "second `#`."
 )
 
-DOCSTRING_TOO_LONG = (
-    "{path}:{line}: this docstring runs to {words} words; a public function's "
-    "docstring says only what its signature cannot — units, ranges, what None means, "
-    "a side effect, a refusal — in {limit} at most. Delete the rest."
-)
-
 CITES = (
     "{path}:{line}: this comment cites {what} (`{cited}`); a comment never says which "
     "ticket, decision or rule asked for the code. git, a spec and an ADR are where "
@@ -102,8 +94,6 @@ class Block(NamedTuple):
 DOCSTRING_HOLDERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 
 A_TEST_PATH = re.compile(r"(?:^|/)(?:tests?|e2e)/|(?:^|/)(?:test_[^/]*|conftest)\.py$")
-
-A_WORKER_MODULE = re.compile(r"(?:^|/)apps/worker/src/")
 
 A_SPACE = re.compile(r"\s")
 
@@ -177,19 +167,7 @@ def _python_comments(source: str) -> list[Comment]:
     return found
 
 
-def _public_worker_functions(path: Path, tree: ast.Module) -> set[ast.AST]:
-    if A_WORKER_MODULE.search(path.as_posix()) is None:
-        return set()
-    return {
-        node
-        for node in tree.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        and not node.name.startswith("_")
-    }
-
-
-def _docstrings(path: Path, tree: ast.Module) -> list[Block]:
-    public = _public_worker_functions(path, tree)
+def _docstrings(tree: ast.Module) -> list[Block]:
     found: list[Block] = []
     for node in ast.walk(tree):
         if not isinstance(node, DOCSTRING_HOLDERS):
@@ -198,10 +176,7 @@ def _docstrings(path: Path, tree: ast.Module) -> list[Block]:
         if text is None or A_NOTICE.match(text.strip()) is not None:
             continue
         line = getattr(node.body[0], "lineno", 1)
-        if node in public:
-            found.append(Block(line, text, DOCSTRING_LIMIT, DOCSTRING_TOO_LONG))
-        else:
-            found.append(Block(line, text))
+        found.append(Block(line, text))
     return found
 
 
@@ -252,7 +227,7 @@ def _findings(path: Path, source: str) -> list[str]:
     tree = ast.parse(source)
     said = _string_findings(path, tree)
     comments = _blocks(source.splitlines(), _python_comments(source))
-    for line, prose, limit, too_long, unreasoned in comments + _docstrings(path, tree):
+    for line, prose, limit, too_long, unreasoned in comments + _docstrings(tree):
         cited = citation_in(prose)
         if cited is not None:
             what, citation = cited

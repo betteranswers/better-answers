@@ -813,7 +813,7 @@ export const writeWorkspaceConfig = async (
 
 /**
  * Those of `names` that `information_schema.tables` lists in `public`, in no set order: a view
- * counts, and a table the role holds no privilege on does not.
+ * counts, a table the role holds no privilege on does not.
  */
 export const tablesPresent = async (
   door: PostgresDoor,

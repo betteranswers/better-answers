@@ -79,8 +79,8 @@ def withholdings_over(
 def written_spans_of(
     withholdings: Sequence[Withholding], erasure_matches: Sequence[ErasureMatch]
 ) -> tuple[WrittenSpan, ...]:
-    """The spans to overwrite, in offset order and never overlapping. A span inside
-    a longer one gives way; an overlap goes by tier, then length, then score."""
+    """In offset order and never overlapping. A span inside a longer one gives way; an
+    overlap goes by tier, then length, then score."""
     withheld = tuple(_competitor_of(one) for one in withholdings if one.withheld)
     # How a finding was written is read off the spans, so a finding keeps its own span
     # from a match it already covers.

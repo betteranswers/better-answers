@@ -55,9 +55,8 @@ def indexed_concepts(cursor: psycopg.Cursor) -> list[IndexedConcept]:
 def run_audit(
     cursor: psycopg.Cursor, git_store_dir: str, workspace_id: str
 ) -> AuditOutcome:
-    """Checks each concept file at the bundle's head against its
-    `concept_index` row by content hash, and writes nothing. A workspace with
-    no bundle audits as one with no files, so every row is `missing_file`."""
+    """Checks each concept file at the bundle's head against its `concept_index` row by
+    content hash, and writes nothing. With no bundle, every row is `missing_file`."""
     outcome = AuditOutcome()
     try:
         blobs = concepts_at_head(git_store_dir, workspace_id)

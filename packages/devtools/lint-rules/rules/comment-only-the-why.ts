@@ -1,15 +1,11 @@
 import { defineRule } from "@oxlint/plugins";
-import type { Comment, ESTree, Fix, Fixer, SourceCode } from "@oxlint/plugins";
+import type { Comment, Fix, Fixer } from "@oxlint/plugins";
 
 import { citationIn } from "../../src/citations.ts";
 import { blocksIn, directiveIn, lastOf, proseOf } from "../shared/comment-blocks.ts";
 import type { Block, Opened } from "../shared/comment-blocks.ts";
 
 const WORD_LIMIT = 25;
-
-const DOC_BLOCK_LIMIT = 50;
-
-const DOCUMENTED_SOURCE = /[/\\]packages[/\\](?:core|schema)[/\\]src[/\\]/;
 
 const wordsIn = (prose: string): number => prose.match(/\S+/g)?.length ?? 0;
 
@@ -26,51 +22,13 @@ type Finding = {
   readonly data: Readonly<Record<string, string | number>>;
 };
 
-const findingIn = (
-  prose: string,
-  limit: number,
-  overLimit: "tooLong" | "reasonTooLong",
-): Finding | undefined => {
+const findingIn = (prose: string, overLimit: "tooLong" | "reasonTooLong"): Finding | undefined => {
   const cited = citationIn(prose);
   if (cited !== undefined) return { messageId: "cites", data: { ...cited } };
   const words = wordsIn(prose);
-  return words > limit ? { messageId: overLimit, data: { words, limit } } : undefined;
-};
-
-const FUNCTION_VALUES = new Set(["ArrowFunctionExpression", "FunctionExpression"]);
-
-const declaresAFunction = (declaration: ESTree.Node | null): boolean => {
-  if (declaration === null) return false;
-  if (declaration.type === "VariableDeclaration") {
-    return declaration.declarations.every(
-      (declarator) => declarator.init !== null && FUNCTION_VALUES.has(declarator.init.type),
-    );
-  }
-  return (
-    declaration.type === "FunctionDeclaration" ||
-    declaration.type === "TSDeclareFunction" ||
-    FUNCTION_VALUES.has(declaration.type)
-  );
-};
-
-const docBlockOf = (
-  statement: ESTree.Program["body"][number],
-  sourceCode: SourceCode,
-): Comment | undefined => {
-  const exported =
-    statement.type === "ExportNamedDeclaration" || statement.type === "ExportDefaultDeclaration";
-  if (!exported || !declaresAFunction(statement.declaration)) return undefined;
-  const block = sourceCode.getCommentsBefore(statement).at(-1);
-  return block?.type === "Block" && block.value.startsWith("*") ? block : undefined;
-};
-
-const docBlocksIn = (program: ESTree.Program, sourceCode: SourceCode): ReadonlySet<number> => {
-  const starts = new Set<number>();
-  for (const statement of program.body) {
-    const block = docBlockOf(statement, sourceCode);
-    if (block !== undefined) starts.add(block.range[0]);
-  }
-  return starts;
+  return words > WORD_LIMIT
+    ? { messageId: overLimit, data: { words, limit: WORD_LIMIT } }
+    : undefined;
 };
 
 export const commentOnlyTheWhyRule = defineRule({
@@ -79,7 +37,7 @@ export const commentOnlyTheWhyRule = defineRule({
     fixable: "code",
     docs: {
       description:
-        "A comment is 25 words at most and cites nothing. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. A doc block on an exported function in packages/core or packages/schema may run to 50. A disable gives its reason on the same line, and a directive's reason counts against the cap.",
+        "A comment is 25 words at most and cites nothing. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. A disable gives its reason on the same line, and a directive's reason counts against the cap.",
     },
     messages: {
       tooLong:
@@ -104,29 +62,25 @@ export const commentOnlyTheWhyRule = defineRule({
         }
         return;
       }
-      const found = findingIn(reason, WORD_LIMIT, "reasonTooLong");
+      const found = findingIn(reason, "reasonTooLong");
       if (found !== undefined) context.report({ loc: comment.loc, ...found });
     };
 
-    const checkBlock = (block: Block, documented: ReadonlySet<number>): void => {
+    const checkBlock = (block: Block): void => {
       const [first] = block;
       const last = lastOf(block);
-      const limit = documented.has(first.range[0]) ? DOC_BLOCK_LIMIT : WORD_LIMIT;
-      const found = findingIn(block.map(proseOf).join("\n"), limit, "tooLong");
+      const found = findingIn(block.map(proseOf).join("\n"), "tooLong");
       if (found === undefined) return;
       const fix = (fixer: Fixer): Fix => fixer.removeRange([first.range[0], last.range[1]]);
       context.report({ loc: { start: first.loc.start, end: last.loc.end }, ...found, fix });
     };
 
     return {
-      "Program:exit"(program): void {
+      "Program:exit"(): void {
         const { sourceCode } = context;
-        const documented = DOCUMENTED_SOURCE.test(context.filename)
-          ? docBlocksIn(program, sourceCode)
-          : new Set<number>();
         const comments = sourceCode.getAllComments();
         for (const comment of comments) checkDirective(comment);
-        for (const block of blocksIn(sourceCode.text, comments)) checkBlock(block, documented);
+        for (const block of blocksIn(sourceCode.text, comments)) checkBlock(block);
       },
     };
   },

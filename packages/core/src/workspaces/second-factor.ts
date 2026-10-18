@@ -112,10 +112,7 @@ type Stamp = Pick<SetUpInput, "sessionId" | "at"> & {
   readonly carried?: SetUpInput["carried"];
 };
 
-/**
- * Stamps only the person's own session; false, having stamped nothing, for any other. With nothing
- * carried, `LEAST` skips the nulls, so the session keeps its own age.
- */
+/** With nothing carried, `LEAST` skips the nulls, so the session keeps its own age. */
 export const stamping = async (tx: Tx, input: Stamp): Promise<boolean> => {
   const stamped = await tx.query(
     `UPDATE session SET second_factor_confirmed_at = $3, pending_since = NULL,

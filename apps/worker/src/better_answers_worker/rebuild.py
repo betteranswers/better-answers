@@ -77,9 +77,8 @@ def live_generation(cursor: psycopg.Cursor, workspace_id: str) -> int:
 def run_rebuild(
     cursor: psycopg.Cursor, git_store_dir: str, workspace_id: str
 ) -> RebuildOutcome:
-    """Writes the whole map as the generation after the live one and makes it live,
-    leaving older generations for the api's sweep. Nodes come from `concept_index` rows
-    and edges from the files at head, each hash checked as `run_audit` checks it."""
+    """Writes the whole map as the next generation and makes it live, leaving older
+    ones. Nodes come from `concept_index` rows, edges from files at head."""
     outcome = RebuildOutcome()
 
     live = live_generation(cursor, workspace_id)

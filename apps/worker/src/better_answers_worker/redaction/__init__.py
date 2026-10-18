@@ -57,9 +57,9 @@ def redact(
     restores: Sequence[Restore] = (),
     dismissals: Sequence[Dismissal] = (),
 ) -> Redaction:
-    """Writes a placeholder over every withheld span, and over each erased
-    identifier that clears the length floor wherever it appears, raised or not.
-    A name's placeholder carries a letter drawn from `seed`, one per name."""
+    """Placeholders cover every withheld span, and each erased identifier clearing the
+    length floor wherever it appears, raised or not. A name's letter comes from
+    `seed`."""
 
     policy = Policy(
         rules_in_force=rules_in_force,

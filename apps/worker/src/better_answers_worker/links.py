@@ -594,10 +594,9 @@ def _reading_of(
 def links_and_marks_of(
     body: str, frontmatter: Frontmatter
 ) -> tuple[list[BodyLink], list[CitationMark]]:
-    """A link's ordinal counts every link in the prose, images and links
-    naming nothing included. A footnote naming a source is a citation mark,
-    resolving to the first `sources` entry with that id: it takes no ordinal.
-    Any other footnote is a link only when the body defines it."""
+    """Ordinals count prose links, images and links naming nothing included. Footnotes
+    naming a source are citation marks, without ordinals; others are links only when
+    defined."""
     prose = prose_of(body)
     definitions = _definitions_of(prose)
     sources_by_id = _sources_by_id(_cited_entries(frontmatter))
@@ -713,9 +712,9 @@ def outgoing_edges(
     by_path: dict[str, ResolvedTarget],
     by_iri: dict[str, ResolvedTarget],
 ) -> list[OutgoingEdge]:
-    """A path that names no concept is dropped, while an IRI that names
-    none still makes an edge, with no kind. Each cited concept gives one
-    lineage edge, `SUPERSEDES` when it is deprecated and of the same kind."""
+    """Unresolved paths are dropped; unresolved IRIs still make an edge, with no kind.
+    Each cited concept gives one lineage edge, `SUPERSEDES` when deprecated and
+    same-kind."""
     edges: list[OutgoingEdge] = []
     cited: set[str] = set()
     for reference in references_of(body, frontmatter, path):

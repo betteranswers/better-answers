@@ -78,9 +78,8 @@ const citedByKeys = (entry: SourceEntry): CitedSource | undefined => {
 };
 
 /**
- * Reads one `sources` entry: a string splits at its last `#`, and a record reads its `resource`
- * and `locator` keys. Undefined means the resource is missing or blank; it is trimmed, the
- * locator never. A record's locator is stringified, and one not given is null.
+ * A string splits at its last `#`. Undefined means the resource is missing or blank; it is trimmed,
+ * the locator never.
  */
 export const citedSourceOf = (entry: SourceEntry | string): CitedSource | undefined =>
   typeof entry === "string" ? citedByText(entry) : citedByKeys(entry);
@@ -102,9 +101,8 @@ export const citedSourcesOf = (value: SourcesValue): readonly CitedSource[] =>
   });
 
 /**
- * A URL, or a resource starting `//`, comes back unchanged. Any other resolves against the root
- * when it starts with `/`, else against the directory of `from`, the root when `from` holds no `/`.
- * The answer is rooted, with `.` and `..` folded; `..` stops at the root.
+ * A URL, or a resource starting `//`, comes back unchanged. Others resolve against the root when
+ * starting `/`, else against `from`'s directory.
  */
 export const resolvedResource = (resource: string, from: string): string => {
   if (resource.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(resource)) return resource;

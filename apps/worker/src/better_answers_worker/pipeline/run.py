@@ -75,10 +75,9 @@ def index_connected_source(
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> IndexOutcome:
-    """Redacts the connected source's live documents, splits them into passages and
-    lands the passage rows. A `wiped` or `rule-change` sync first empties the source's
-    store; a source that is gone lands nothing. Raises `ClaimLostError`, writing
-    nothing, once `job`'s claim is lost. `copies` defaults to the workspace's bucket."""
+    """`wiped` and `rule-change` syncs first empty the store; gone sources land nothing.
+    A lost claim raises `ClaimLostError`, writing nothing. `copies` defaults to the
+    workspace's bucket."""
     with Host(bootstrap) as host:
         if sync.reason in REASONS_EMPTYING_THE_CONNECTED_SOURCE:
             host.remove_connected_source_store(sync)

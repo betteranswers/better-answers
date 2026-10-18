@@ -9,7 +9,6 @@ import { fixedByOxlint } from "./oxlint-fix.ts";
 
 const RULE = "better-answers/comment-only-the-why";
 const FILE = "probe.ts";
-const CORE = "packages/core/src/probe.ts";
 
 const CONFIG = pluginConfigFor({ [RULE]: "error" });
 
@@ -215,91 +214,15 @@ describe("the comment rule holds a directive to a same-line reason", () => {
   });
 });
 
-describe("the comment rule allows an exported function a longer block", () => {
-  const inCore = (source: string, file = CORE): Tree => ({ [file]: source });
-
+describe("the comment rule gives a doc block no longer cap", () => {
   it.each([
-    ["an arrow function", "export const wait = (count: number): number => count;\n"],
-    [
-      "a function expression",
-      "export const wait = function (count: number): number {\n  return count;\n};\n",
-    ],
-    [
-      "a function declaration",
-      "export function wait(count: number): number {\n  return count;\n}\n",
-    ],
-    [
-      "an async function",
-      "export async function wait(count: number): Promise<number> {\n  return count;\n}\n",
-    ],
-    [
-      "a default function",
-      "export default function wait(count: number): number {\n  return count;\n}\n",
-    ],
-    ["a default arrow", "export default (count: number): number => count;\n"],
-    [
-      "an overload's signature",
-      "export function wait(count: number): number;\nexport function wait(count: number): number {\n  return count;\n}\n",
-    ],
-  ])("walks past 50 words on %s in packages/core", (_what, code) => {
-    expect(lint.flagged(inCore(`/** ${wordsOf(50)} */\n${code}`))).toEqual([]);
-  });
-
-  it("walks past a 50-word block on an export in packages/schema", () => {
-    const schema = "packages/schema/src/probe.ts";
-    const source = `/** ${wordsOf(50)} */\nexport const wait = (count: number): number => count;\n`;
-
-    expect(lint.flagged(inCore(source, schema))).toEqual([]);
-  });
-
-  it("refuses a 51-word export block, naming the 50-word ceiling", () => {
-    const source = `/** ${wordsOf(51)} */\nexport const wait = (count: number): number => count;\n`;
-    const output = lint.output(inCore(source));
-
-    expect(output).toContain("runs to 51 words");
-    expect(output).toContain("over the cap of 50");
-  });
-
-  it.each([
-    ["an exported value", "export const limit = 50;\n"],
-    ["a value-and-function export", "export const limit = 50, wait = (): number => 1;\n"],
-    [
-      "an internal function",
-      "const wait = (count: number): number => count;\nexport const keep = wait(1);\n",
-    ],
-    ["an exported type", "export type Wait = number;\n"],
-    ["an uninitialised export", "export let later: number | undefined;\n"],
-    ["a re-export of a function", "export { wait } from './wait.ts';\n"],
-  ])("refuses a 26-word block on %s", (_what, code) => {
-    expect(lint.output(inCore(`/** ${wordsOf(26)} */\n${code}`))).toContain("runs to 26 words");
-  });
-
-  it("refuses 26 words of line comments on an exported function", () => {
-    const lines = `// ${wordsOf(13)}\n// ${wordsOf(13)}\n`;
-    const source = `${lines}export const wait = (count: number): number => count;\n`;
-
-    expect(lint.flagged(inCore(source))).toEqual([CORE]);
-  });
-
-  it("refuses a 26-word plain block comment on an exported function", () => {
-    const source = `/* ${wordsOf(26)} */\nexport const wait = (count: number): number => count;\n`;
-
-    expect(lint.flagged(inCore(source))).toEqual([CORE]);
-  });
-
-  it.each([
-    ["outside both packages", "apps/api/src/probe.ts"],
-    ["in package tests", "packages/core/test/probe.ts"],
-  ])("refuses 26 words on an exported function %s", (_where, file) => {
+    ["an export in packages/core", "packages/core/src/probe.ts"],
+    ["an export in packages/schema", "packages/schema/src/probe.ts"],
+    ["an export in apps/api", "apps/api/src/probe.ts"],
+  ])("refuses a 26-word doc block on %s", (_where, file) => {
     const source = `/** ${wordsOf(26)} */\nexport const wait = (count: number): number => count;\n`;
 
-    expect(lint.flagged(inCore(source, file))).toEqual([file]);
-  });
-
-  it("gives the longer ceiling only to the export's own block", () => {
-    const source = `/** ${wordsOf(26)} */\nconst limit = 1;\n/** short */\nexport const wait = (count: number): number => count + limit;\n`;
-
-    expect(lint.flagged(inCore(source))).toEqual([CORE]);
+    expect(lint.flagged({ [file]: source })).toEqual([file]);
   });
 });
 
