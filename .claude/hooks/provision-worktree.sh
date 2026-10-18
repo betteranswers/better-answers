@@ -124,18 +124,5 @@ link_from_primary() {
 link_from_primary scratch .scratch
 link_from_primary planning .planning
 
-# Relative, so it resolves in the primary checkout and, through the `.planning` link, here.
-PERSONAS_LINK="$WORKTREE_PATH/docs/personas"
-if [ -e "$PERSONAS_LINK" ] || [ -L "$PERSONAS_LINK" ]; then
-  echo "  personas: already here — left alone" >&2
-elif [ ! -d "$WORKTREE_PATH/.planning/personas" ]; then
-  echo "  personas: no .planning/personas — nothing to link" >&2
-elif mkdir -p "$WORKTREE_PATH/docs" && ln -s ../.planning/personas "$PERSONAS_LINK"; then
-  echo "  personas: linked to .planning/personas" >&2
-else
-  echo "  personas: FAILED to link — run ln -s ../.planning/personas \"$PERSONAS_LINK\" by hand" >&2
-  STATUS=1
-fi
-
 echo "provision-worktree: $([ $STATUS -eq 0 ] && echo ready || echo incomplete)" >&2
 exit $STATUS

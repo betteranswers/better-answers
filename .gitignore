@@ -55,8 +55,6 @@ deploy/wizard-41.env
 # untracked, which the remove hook reads as work to keep and `git add -A` would commit.
 .planning
 .scratch
-# the personas ce-dogfood reads, a link into .planning/personas made by the same script
-docs/personas
 .lavish/
 15-user-feedback.md
 old-suggested-schema.md
