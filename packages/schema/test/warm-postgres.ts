@@ -99,7 +99,6 @@ const filesUnder = async (folder: string): Promise<readonly string[]> => {
 
 const TEMPLATE_PREFIX = "tpl_ts_";
 
-/** Named for everything the build reads, so a branch with other migrations never clones it. */
 export const templateNameOver = async (folder: string): Promise<string> => {
   const files = await filesUnder(folder);
   const contents = await Promise.all(files.map((file) => readFile(path.join(folder, file))));
@@ -175,7 +174,6 @@ const buildAndPublish = async (
 /** One key for the instance: every build creates the same cluster-wide roles, so builds take turns. */
 const BUILD_LOCK = "hashtextextended('better-answers template build', 0)";
 
-/** Builds `name` unless published, stamps its use, drops this tier's day-old templates; one caller at a time. */
 export const ensureTemplate = (
   adminUri: string,
   name: string,
@@ -308,7 +306,6 @@ const SHARED_BASE_PORT = 55_434;
 
 const SHARED_PORT_SPREAD = 1000;
 
-/** Mirrors `deploy/test-postgres.sh address`, so a worktree on another pin reaches its own server. */
 export const sharedUri = (): string => {
   const digest = POSTGRES_IMAGE.split("@sha256:")[1];
   if (digest === undefined)
@@ -365,7 +362,6 @@ const runningTestFile = (): string => {
   return testPath;
 };
 
-/** A fresh copy of `warm`'s template, named after `databaseKey` and the run; `stop` drops it. */
 export const clonedFrom = async (
   warm: WarmPostgres,
   databaseKey: string,

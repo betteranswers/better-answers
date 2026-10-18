@@ -40,7 +40,7 @@ export type TestData = {
 
   user(overrides?: Partial<InsertInput<"user">>): Promise<Row<"user">>;
 
-  /** As the library writes one; `secondFactorConfirmedAt` where the session confirmed a factor. */
+  /** As the library writes one. */
   session(overrides?: Partial<InsertInput<"session">>): Promise<Row<"session">>;
 
   account(overrides?: Partial<InsertInput<"account">>): Promise<Row<"account">>;
@@ -162,7 +162,7 @@ export type TestData = {
 
   /**
    * Seeds its record too when given none, asked now. A `recordId` comes with that record's
-   * `askedAt`, so the row lands in its record's month.
+   * `askedAt`.
    */
   questionContent(
     overrides?: Partial<Omit<InsertInput<"questionContent">, "recordId" | "askedAt">> &
@@ -179,10 +179,7 @@ export type TestData = {
   /** Serves a question it seeds, asked now, when given no run and no answer. */
   llmCall(overrides?: Partial<InsertInput<"llmCall">>): Promise<Row<"llmCall">>;
 
-  /**
-   * Taken now for ten minutes, at $0.15 the most, serving a question it seeds when given no run
-   * and no answer.
-   */
+  /** Taken now for ten minutes, serving a question it seeds when given no run and no answer. */
   spendReservation(
     overrides?: Partial<InsertInput<"spendReservation">>,
   ): Promise<Row<"spendReservation">>;
