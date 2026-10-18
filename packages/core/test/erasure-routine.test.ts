@@ -115,10 +115,6 @@ const BEYOND_USE = {
   monthly: "2026-12-01T12:00:00.000Z",
 } as const;
 
-/**
- * This day tells a day count from a calendar interval: six months on is 28 February, 183 days
- * on 2 March.
- */
 const ANCHORED_ON_A_31ST = new Date("2026-08-31T12:00:00.000Z");
 
 const BEYOND_USE_FROM_THE_31ST = {
@@ -149,12 +145,10 @@ const DOCUMENTS_WITHHELD =
   "bound later, each time a document is indexed; and the documents found above are indexed " +
   "again now.";
 
-/** Every run in the file logs here, so a case reads back the lines of its own request alone. */
 const operatorLines: ErasureLogLine[] = [];
 
 const questionsLines: QuestionsLogLine[] = [];
 
-/** The message each questions line was logged with: two sweeps log the same shape. */
 const saidWith = new Map<QuestionsLogLine, string>();
 
 const operatorLog: ErasureLog = {
@@ -240,8 +234,6 @@ const erasedOnEachArm = async (): Promise<{
   await seedingWith(db().pool, (seed) =>
     seed.member({ workspaceId: elsewhere.workspaceId, userId: stillMember.id, role: "Editor" }),
   );
-  // The same records held here for each person, so a line that differs between them can differ
-  // only by the arm.
   for (const [person, email] of [
     [lastMember, onlyHere],
     [stillMember, heldElsewhere],
@@ -530,7 +522,6 @@ const grantsEndedRowsAbout = async (personId: string) => {
   return read.rows.map((each) => each.row);
 };
 
-/** Counts every verification row the address at `parameter` is behind, in each shape written. */
 const verificationsOfAnAddress = (parameter: string): string => `SELECT count(*) FROM verification
   WHERE lower(identifier) IN ('sign-in-otp-' || ${parameter}, 'sign-in-link-' || ${parameter},
                               'email-verification-otp-' || ${parameter},
@@ -595,7 +586,6 @@ const SECOND_FACTOR_HELD = {
   promoted: true,
 };
 
-/** A member here who is an Editor of a second workspace too. */
 const memberHereAndElsewhere = async () => {
   const scenario = await arrange();
   const elsewhere = await arrange();
@@ -607,7 +597,6 @@ const memberHereAndElsewhere = async () => {
   return { scenario, elsewhere, email, person };
 };
 
-/** The identity-set tables naming a person by `user_id` that the last workspace's sweep empties. */
 const SWEPT_BY_PERSON = [
   "public.account",
   "public.authenticator",
@@ -618,7 +607,6 @@ const SWEPT_BY_PERSON = [
   "public.session",
 ];
 
-/** An assistant's registration, and a grant's tokens and consent: the identity sweep reaches none. */
 const BEYOND_THE_SWEEP = [
   "public.oauth_access_token",
   "public.oauth_client",
@@ -681,7 +669,6 @@ const operatorMarkOf = async (userId: string): Promise<boolean | undefined> => {
   return read.rows[0]?.operator;
 };
 
-/** @throws when the platform refuses the mark. */
 const theOperator = async (scenario: Scenario, email: string): Promise<void> => {
   const marked = await setOperatorMark(bootstrap, scenario.postgres, { email, change: "grant" });
   if (!marked.ok || !marked.value.changed) throw new Error(`the mark was not set on ${email}`);
@@ -2206,10 +2193,6 @@ const aMemberHere = async () => {
   };
 };
 
-/**
- * Holds the routine at its identity step's first delete, the git, questions and actors steps
- * committed and the member not yet ended, while `meanwhile` runs.
- */
 const heldAheadOfTheMembersEnd = async <T>(
   scenario: Scenario,
   subjectRequestId: string,
@@ -2342,7 +2325,6 @@ describe("the questions a person asked", () => {
     expect(await flagsOn(db().pool, theirs.recordId)).toEqual([erased, erased]);
   });
 
-  /** As an entry that writes runs: the member's rows are held until `work` commits. */
   const asTheMember = async <T>(
     member: Member,
     work: (principal: UserPrincipal, tx: Tx) => Promise<Result<T, unknown>>,
@@ -2372,7 +2354,6 @@ describe("the questions a person asked", () => {
   const openingARecord = (member: Member): Promise<{ readonly recordId: string }> =>
     asTheMember(member, opening);
 
-  /** Refused, with prose the platform drafted, so the content row holds more than the question. */
   const completingTheRecord = (member: Member, recordId: string): Promise<void> =>
     asTheMember(member, (asker, tx) =>
       completeRecord(asker, tx, {
@@ -2397,7 +2378,6 @@ describe("the questions a person asked", () => {
     );
   };
 
-  /** One `ask` refused and then flagged by its asker, each step in a transaction of its own. */
   const askingThenFlagging = async (member: Member): Promise<string> => {
     const { recordId } = await openingARecord(member);
     await completingTheRecord(member, recordId);
@@ -2405,7 +2385,6 @@ describe("the questions a person asked", () => {
     return recordId;
   };
 
-  /** What `askingThenFlagging` leaves, named by `asker`. */
   const asAskedMidRun = (asker: string) => ({
     skeleton: [{ asked_by: asker, verdict: "refuse" }],
     content: [{ question: A_LATE_QUESTION }],
@@ -2527,10 +2506,6 @@ describe("the questions a person asked", () => {
     expect(await rowsOf(met.there)).toEqual(asAskedMidRun(`human:${person.id}`));
   });
 
-  /**
-   * Parks `write` on `table` with the member's row held, until the routine `resume` lets go waits
-   * on that row to end the member.
-   */
   const stillOpenAtTheMembersEnd = async (
     table: string,
     resume: () => Promise<unknown>,
@@ -2748,7 +2723,6 @@ const replayCopyOf = async (workspaceId: string, erasureRequestId: string): Prom
   return textOf(got.value);
 };
 
-/** Strict, so a key the copy gained is refused here and never read past as a finder's own. */
 const copyAsRead = z.strictObject({
   workspaceId: z.string(),
   subjectRequestId: z.string(),
@@ -2922,7 +2896,6 @@ describe("a request the routine will not run", () => {
   });
 });
 
-/** A concept landed in a workspace and verified by `verifier` on 5 April 2026. */
 const conceptVerifiedBy = async (workspaceId: string, verifier: string): Promise<ConceptIri> =>
   seedingWith(db().pool, async (seed) => {
     const sha = randomBytes(20).toString("hex");
@@ -3107,7 +3080,6 @@ const thePersonIn = async (scenario: Scenario, person: { readonly id: string }, 
 
 const NOWHERE = { address: false, personId: false, authors: [] };
 
-/** NOWAIT, so a row a commit still holds answers at once rather than queueing behind it. */
 const theMemberRowIsFree = async (scenario: Scenario, person: { readonly id: string }) => {
   const probe = await db().pool.connect();
   try {
@@ -3266,7 +3238,6 @@ describe("a commit made as the person while the routine runs", () => {
     expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
   });
 
-  /** A bundle naming a person held elsewhere too, and a request naming them by address alone. */
   const heldElsewhereNamedByAddress = async () => {
     const { scenario, email, person } = await bundleNamingThePerson();
     const elsewhere = await arrange();

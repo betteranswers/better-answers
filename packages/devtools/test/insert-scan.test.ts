@@ -18,7 +18,6 @@ import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 const WORKSPACE = "packages/probe";
 
-/** Spelled in two halves, so the scan does not read this suite's own fixtures as violations. */
 const insert = (table: string): string => `INSERT ${"INTO"} ${table} (id) VALUES (1)`;
 
 const typescriptTest = `it("keeps a row", async () => {\n  await q(\`${insert("workspace")}\`);\n});\n`;
@@ -122,11 +121,11 @@ describe("the named list of factory modules", () => {
 });
 
 describe("the scan over a throwaway tree", () => {
-  it("refuses a TypeScript raw insert, naming line and rules file", () => {
+  it("refuses a TypeScript raw insert, naming line and the fix", () => {
     const output = scan(withTypescriptInsert());
 
     expect(output).toContain(`${WORKSPACE}/test/one.test.ts:2:`);
-    expect(output).toContain("the root `CODING_STANDARDS.md`");
+    expect(output).toContain("move it into one of the modules");
   });
 
   it("names where the list of factory modules lives", () => {

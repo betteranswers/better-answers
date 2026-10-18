@@ -8,10 +8,8 @@ import { facesAdmittingNobody } from "@better-answers/devtools/face-admission";
 
 import { asSliceRelative, coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 
-/** A directory under `src` that holds no action; every other one is a face and is read. */
 const HOLDS_NO_ACTION = ["access", "kernel", "refusals", "store"];
 
-/** Each step a face exports, with the action that admits before it runs. */
 const STEPS: Readonly<Record<string, string>> = {
   "answering/completeRecord": "a step of ask, which admits the asker before it completes a record",
   "answering/keepDraft":
@@ -49,7 +47,6 @@ const NO_LISTED_STEP = "takes a person, admits nobody and is no listed step";
 
 const SRC = "./src/";
 
-/** What a transport can import: the faces the package's exports map names under `src`. */
 const exportedFaces = (): readonly string[] => {
   const manifest = z
     .object({ exports: z.record(z.string(), z.string()) })

@@ -25,10 +25,6 @@ import { AUDIENCE_WORDS, CONNECT_WORDS, UPLOAD_CAP_MB } from "./words.ts";
 
 const UPLOAD_BYTE_CAP = UPLOAD_CAP_MB * 1024 * 1024;
 
-/**
- * The api's allow-list, stated not imported: the web takes nothing from the api at runtime, and
- * the api refuses alike.
- */
 const MEDIA_TYPE_OF_EXTENSION = new Map([
   ["md", "text/markdown"],
   ["markdown", "text/markdown"],
@@ -140,7 +136,6 @@ export function ConnectAction() {
 
   return (
     <>
-      {/* Heard, not seen: the new row is what the eye reads, and the band has no width at 320px. */}
       <OutcomeLine outcome={open ? undefined : outcome} className="sr-only" />
       <Button size="sm" aria-keyshortcuts={SOURCES_KEYSTROKES.connect.key} onClick={show}>
         Connect a Document

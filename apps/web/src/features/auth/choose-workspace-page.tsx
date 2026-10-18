@@ -47,7 +47,6 @@ const whatTheSessionSays = (session: Session) => ({
   active: session.data?.session.activeOrganizationId ?? undefined,
 });
 
-/** A workspace refused as no longer held is left out at once, before the list is read again. */
 const whereThePersonStands = (
   session: Session,
   workspaces: Workspaces,
@@ -65,7 +64,6 @@ const whereThePersonStands = (
 const endedTheMember = (refused: SwitchRefused | null): boolean =>
   refused?.noLongerAMember === true;
 
-/** Once a pick is refused, the list or the refusal stands to be read rather than a pick retried. */
 const whereThePickStands = (
   held: readonly Workspace[],
   noLongerHeld: Workspace | undefined,
@@ -89,10 +87,6 @@ const focusTheFirstWorkspace = () => {
   document.getElementById(WORKSPACE_LIST)?.querySelector("button")?.focus();
 };
 
-/**
- * Opens a sole workspace without asking; a carried connection resumes after any pick. No session,
- * display name or workspace sends the person on.
- */
 export function ChooseWorkspacePage() {
   const navigate = useNavigate();
   const carried = carriedFlow(pageQuery());
@@ -156,7 +150,6 @@ export function ChooseWorkspacePage() {
 
   const openSoleWorkspace = () => {
     if (sole === undefined) return;
-    // A session can still name a workspace the person has just left.
     if (active === sole.id) {
       goOn();
       return;
@@ -165,7 +158,6 @@ export function ChooseWorkspacePage() {
     openWorkspace(sole);
   };
 
-  // Resumed once: an answered resume is leaving the page, and another would ask consent again.
   const decided = settled && !pick.isPending && resume.isIdle && !wentNowhere;
   useEffect(() => {
     if (!decided) return;
@@ -219,13 +211,11 @@ export function ChooseWorkspacePage() {
 }
 
 type Standing = {
-  /** A carried connection that could not be handed back once the workspace was open. */
   readonly notConnected: boolean;
   readonly settled: boolean;
   readonly unread: boolean;
   readonly listed: boolean;
   readonly refused: boolean;
-  /** Set only while the latest pick's refusal says the person is no longer a member. */
   readonly removedFrom: Workspace | undefined;
 };
 
@@ -244,7 +234,6 @@ const outcomeOf = (standing: Standing): Outcome | undefined => {
   return pickOutcome(standing);
 };
 
-/** The role describes the button and stays out of its name, so a workspace is found by name alone. */
 function WorkspaceRow(properties: {
   readonly workspace: Workspace;
   readonly first: boolean;
@@ -256,7 +245,6 @@ function WorkspaceRow(properties: {
 
   return (
     <li className="col-span-2 grid grid-cols-subgrid items-center">
-      {/* Enabled while a pick is open, so a refused pick can hand focus to what is left. */}
       <Button
         type="button"
         variant="outline"
@@ -286,7 +274,6 @@ function WorkspaceList(properties: {
     <>
       <p className="mt-2 text-muted-foreground">{PICKER_WORDS.lead}</p>
 
-      {/* One grid for every row, so the buttons end on one line whatever each role's width. */}
       <ul id={WORKSPACE_LIST} className="mt-6 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
         {properties.held.map((workspace, at) => (
           <WorkspaceRow
@@ -322,7 +309,6 @@ function NextAction(properties: {
   );
 }
 
-/** The outcome's regions stand in one place through every state, so each change is announced. */
 function WorkspaceChoice(properties: {
   readonly standing: Standing;
   readonly held: readonly Workspace[];

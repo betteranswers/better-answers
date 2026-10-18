@@ -16,10 +16,6 @@ import {
 import type { Tx } from "../store/postgres/index.ts";
 import { isWorkersAiKey } from "./wire/decision.ts";
 
-/**
- * Reached through `reveal` alone, so a logger, an error or a JSON body handed this value prints no
- * part of the key.
- */
 export type ModelKey = {
   readonly reveal: () => string;
 };
@@ -29,25 +25,14 @@ type ModelKeyOf = {
   readonly provider: ModelProvider;
 };
 
-/** What the side that calls a model is handed: the read, and no way to store. */
 export type Credentials = {
-  /**
-   * None is `undefined`; a row that will not open is refused, never read as none.
-   *
-   * @throws outside a workspace's transaction.
-   */
   readonly readModelKey: (
     tx: Tx,
     provider: ModelProvider,
   ) => Promise<Result<ModelKey | undefined, OpenEnvelopeRefusal>>;
 };
 
-/** What the audited action is handed: a key is stored only with the event that records it. */
 export type ModelKeySetting = {
-  /**
-   * Replaces any key `of` held, then awaits `recorded`. Refuses, never repeating it, a key that is
-   * not one header value or not its provider's form.
-   */
   readonly storeModelKey: (
     tx: Tx,
     of: ModelKeyOf,
@@ -58,13 +43,8 @@ export type ModelKeySetting = {
 
 const MODEL_KEY_MAX = 1024;
 
-/**
- * Visible ASCII with no space, as a request header carries it. A key outside it is refused when
- * sent, in an error quoting it.
- */
 const ONE_HEADER_VALUE = /^[!-~]+$/;
 
-/** A provider whose key carries more than a secret has its form checked as it is stored. */
 const KEY_FORMS: ReadonlyMap<ModelProvider, (key: string) => boolean> = new Map([
   ["cloudflare", isWorkersAiKey],
 ]);
@@ -76,10 +56,6 @@ const keyOfItsForm = (provider: ModelProvider, key: string): boolean =>
 
 const LINE = "\n";
 
-/**
- * The sealed text names whose key it is: the envelope authenticates its own bytes alone, so a frame
- * copied onto another row would otherwise open.
- */
 const textSealedFor = (of: ModelKeyOf, key: string): Uint8Array =>
   new TextEncoder().encode([of.workspaceId, of.provider, key].join(LINE));
 
@@ -92,7 +68,6 @@ const keyHeldFor = (
   return named ? key : undefined;
 };
 
-/** Checked as it is taken, so a mis-provisioned key is told before the first row is read. */
 const envelopeKeyHeld = (envelopeKey: Uint8Array): Uint8Array => {
   if (envelopeKey.length !== ENVELOPE_KEY_BYTES) {
     throw new Error(
@@ -102,7 +77,6 @@ const envelopeKeyHeld = (envelopeKey: Uint8Array): Uint8Array => {
   return envelopeKey;
 };
 
-/** The scope comes back beside the row, so no key and no workspace are told apart. */
 const KEY_OF_THE_SCOPE = `SELECT scope.id AS "workspaceId", held.sealed
    FROM (SELECT current_workspace_id() AS id) AS scope
    LEFT JOIN model_key AS held ON held.workspace_id = scope.id AND held.provider = $1`;
@@ -117,14 +91,10 @@ const keyOpened = (
   const opened = openEnvelope(opener, sealed);
   if (!opened.ok) return opened;
   const key = keyHeldFor(of, new TextDecoder().decode(opened.value));
-  // One word for a moved frame and a wrong key alike, as the envelope answers them.
   return key === undefined ? err("envelope-not-authentic") : ok({ reveal: () => key });
 };
 
 /**
- * The reading half of the credentials provider. The envelope key is held here and handed back to
- * no caller.
- *
  * @throws when `envelopeKey` is not the envelope's length, naming no byte of it.
  */
 export const openCredentials = (envelopeKey: Uint8Array): Credentials => {
@@ -143,12 +113,6 @@ export const openCredentials = (envelopeKey: Uint8Array): Credentials => {
   };
 };
 
-/**
- * The storing half, sealed and never hashed because a model key is sent. Kept apart from the
- * read so that only the audited action holds it.
- *
- * @throws when `envelopeKey` is not the envelope's length, naming no byte of it.
- */
 export const openModelKeySetting = (envelopeKey: Uint8Array): ModelKeySetting => {
   const sealer = envelopeKeyHeld(envelopeKey);
   return {

@@ -26,7 +26,6 @@ const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
 
 const membersRegion = (page: Page) => thePage(page).getByRole("region", { name: "Members" });
 
-/** The header row is a row too, so the people are the rows with a cell. */
 const memberRows = (page: Page): Locator =>
   membersRegion(page)
     .getByRole("row")
@@ -49,7 +48,6 @@ const selectionAction = (page: Page, action: string): Locator =>
 
 const rowOf = (page: Page, name: string) => page.getByRole("listitem", { name, exact: true });
 
-/** The name the page suggests, read from the browser it runs in. */
 const suggestedName = (page: Page): Promise<string> =>
   page.evaluate(() => navigator.userAgent).then(passkeyNameFor);
 
@@ -60,7 +58,6 @@ type AtPeople = {
   readonly adminId: string;
 };
 
-/** A workspace of three, its Admin signed in and confirmed. */
 const anAdminAtPeople = async (
   page: Page,
   api: APIRequestContext,
@@ -93,14 +90,11 @@ test.describe("a stale confirmation before a high-impact act", () => {
     await removal.getByRole("button", { name: "Remove", exact: true }).click();
 
     expect(await refused).toMatchObject({ word: STALE_CONFIRMATION });
-    // The removal returns to the list before the api answers, and the list says how it went.
     await expect(page).toHaveURL(new RegExp(`${MEMBERS_PAGE}`));
 
-    // The refused removal waits in the dialog; its confirmation runs it again with the person kept.
     await reconfirmedOn(page, request, atPeople.adminEmail);
     await expect(memberRows(page)).toHaveCount(2);
 
-    // A role change ten minutes after the confirmation goes ahead with no re-confirm asked.
     await memberLink(page, "Sam Okoro").click();
     await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
     await roleRegion(page).getByRole("button", { name: "Change Role" }).click();
@@ -123,7 +117,6 @@ test.describe("a stale confirmation before a high-impact act", () => {
 
     expect(await refused).toMatchObject({ word: STALE_CONFIRMATION });
 
-    // One confirmation covers the batch: both removals land, and no dialog opens again.
     await reconfirmedOn(page, request, atPeople.adminEmail);
     await expect(memberRows(page)).toHaveCount(1);
     await expect(reconfirmOf(page)).toHaveCount(0);

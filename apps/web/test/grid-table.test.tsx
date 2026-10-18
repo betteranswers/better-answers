@@ -57,7 +57,6 @@ const pickRole = (role: string) => {
 
 const searchBox = () => screen.getByRole("searchbox", { name: "Search by name or address" });
 
-/** Three pages of five. */
 const PAGES_OF_TWELVE = {
   kind: "pages",
   label: "Pages of Members",
@@ -530,7 +529,6 @@ const FOCUS_COLUMNS = focusColumn.columns([
   focusColumn.accessor("name", { id: "person", header: "Person" }),
 ]);
 
-/** Two controls a row, so focus can move inside one row as well as between rows. */
 function FocusedList(properties: { readonly onRowFocus: (id: string | undefined) => void }) {
   const table = useTable({
     features: FOCUS_FEATURES,

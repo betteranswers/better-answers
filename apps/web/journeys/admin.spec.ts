@@ -25,10 +25,8 @@ const CONNECTED_SOURCES = pageNamed(
 ).path;
 const MODELS_AND_SPEND = pageNamed(menuGroupIn(CONTROL_CENTRE, "models"), "Models and Spend").path;
 
-/** Every group the journeys make starts so, and the opening repair deletes any left behind. */
 const JOURNEYS_GROUPS = "Journeys run";
 
-/** A row's first cell is its tick, then the person, their role, and their groups. */
 const ROLE_CELL = 2;
 
 const GROUPS_CELL = 3;
@@ -40,7 +38,6 @@ const rowOf = (page: Page, name: string): Locator =>
     .getByRole("row")
     .filter({ has: page.getByRole("link", { name, exact: true }) });
 
-/** An outcome's status stands beside its alert. A list's count and its pages' count have none. */
 const outcomeOf = (list: Locator): Locator => list.locator("output:has(+ [role='alert'])");
 
 const groupsRegion = (page: Page): Locator => page.getByRole("region", { name: "Groups" });
@@ -50,7 +47,6 @@ const groupButton = (page: Page, name: string): Locator =>
 
 type BulkAction = { readonly action: string; readonly title: (count: number) => string };
 
-/** A bulk dialog's title counts the members ticked. */
 const membersTitled = (count: number): string => counted(count, "Member", "Members");
 
 const CHANGE_ROLE: BulkAction = {
@@ -63,7 +59,6 @@ const ADD_TO_GROUP: BulkAction = {
   title: (count) => `Add ${membersTitled(count)} to a Group`,
 };
 
-/** Ticked on the first page, where the invented members' names sort the repair members. */
 const opened = async (page: Page, names: readonly string[], bulk: BulkAction): Promise<Locator> => {
   await page.goto(MEMBERS);
   for (const name of names) {
@@ -83,10 +78,6 @@ const chosen = async (dialog: Locator, field: string, option: string): Promise<v
   await dialog.page().getByRole("option", { name: option, exact: true }).click();
 };
 
-/**
- * The rows change before the api answers, and a bulk action is refused while another is going, so
- * each waits for its answer.
- */
 const committed = async (
   page: Page,
   procedure: string,
@@ -141,14 +132,12 @@ const groupDeleted = async (page: Page, name: string): Promise<void> => {
   const confirm = page
     .getByRole("alertdialog", { name: `Delete ${name}` })
     .getByRole("button", { name: "Delete", exact: true });
-  // The list drops the group before the api answers, and the run reads the api next.
   await Promise.all([answeredOk(page, "members.deleteGroup"), confirm.click()]);
   await expect(sheet).toHaveCount(0);
   await expect(groupsRegion(page).getByRole("heading", { name: "Groups" })).toBeFocused();
   await expect(groupButton(page, name)).toHaveCount(0);
 };
 
-/** What a failed run left: a repair member still an Editor, or a group of the journeys'. */
 const repaired = async (page: Page, repair: RepairMembers): Promise<void> => {
   if (repair.editors.length > 0) {
     await test.step("Set the repair members back to Viewer", () =>
@@ -163,7 +152,6 @@ const repaired = async (page: Page, repair: RepairMembers): Promise<void> => {
 const pagesOfMembers = (page: Page): Locator =>
   page.getByRole("navigation", { name: "Pages of Members" });
 
-/** Each turn waits for the count it says, so the next turn starts from the page it drew. */
 const lastPageReached = async (page: Page): Promise<number> => {
   const next = pagesOfMembers(page).getByRole("button", { name: "Next Page" });
   const said = pagesOfMembers(page).getByRole("status");
@@ -195,7 +183,6 @@ const membersWalked = async (page: Page, gate: Gate): Promise<void> => {
   });
 };
 
-/** The newest page of events, then Load more, which must bring older ones below it. */
 const olderEventsLoaded = async (page: Page, gate: Gate): Promise<void> => {
   await page.goto(AUDIT_LOG);
   const auditLog = page.getByRole("region", { name: "Audit Log" });
@@ -210,10 +197,6 @@ const olderEventsLoaded = async (page: Page, gate: Gate): Promise<void> => {
   await gate();
 };
 
-/**
- * Only read: an action would upload documents or spend on models. The fixture leaves both lists
- * empty.
- */
 const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
   await test.step("Invitations", async () => {
     await page.goto(MEMBERS);
@@ -222,7 +205,6 @@ const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
       .getByRole("region", { name: "Invitations" })
       .getByRole("row")
       .filter({ has: page.getByRole("cell") });
-    // A list still loading says so in a status, and one unread in an alert.
     await expect(
       rows.filter({ hasNot: page.getByRole("status") }).filter({ hasNot: page.getByRole("alert") }),
     ).toHaveText([/\S/]);
@@ -230,7 +212,6 @@ const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
     await gate();
   });
   await test.step("Connected sources", async () => {
-    // A failed read says so in the same region, so the page's own read is the one judged.
     const [read] = await Promise.all([connectedSourcesRead(page), page.goto(CONNECTED_SOURCES)]);
     expect(read, "the page read a connected source the fixture does not hold").toBe(0);
     const connectedSources = page.getByRole("region", { name: "Connected Sources" });
@@ -244,7 +225,6 @@ const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
   });
 };
 
-/** Named for the run, so a group a failed run leaves is told from one this run made. */
 const groupOfThisRun = (): string =>
   `${JOURNEYS_GROUPS} ${new Date().toISOString().slice(0, 19).replace("T", " ")}`;
 

@@ -37,10 +37,6 @@ export const postgresForSuite = (): (() => MigratedPostgres) => {
   };
 };
 
-/**
- * For an action that reads every workspace the database holds, whose totals another case's rows
- * would change.
- */
 export const postgresForEachCase = (): (() => MigratedPostgres) => {
   let db: MigratedPostgres | undefined;
   let cases = 0;
@@ -63,10 +59,6 @@ export const postgresForEachCase = (): (() => MigratedPostgres) => {
   };
 };
 
-/**
- * A pool as `app_rt` holding a connection per read, never reaped while idle: the suite's own
- * `runtimePool` holds five, and a sixth read waits.
- */
 export const runtimePoolFor = (db: () => MigratedPostgres, reads: number): (() => pg.Pool) => {
   let pool: pg.Pool | undefined;
 
@@ -104,14 +96,12 @@ export const seedingWith = async <T>(
   }
 };
 
-/** Runs `work` as the member `reader`, in one transaction under row-level security; it may write. */
 export const readingAs = async <T>(
   pool: pg.Pool,
   reader: {
     readonly workspaceId: string;
     readonly userId: string;
 
-    /** A session of the reader's, for an act that asks how fresh its confirmation is. */
     readonly sessionId?: string;
   },
   work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
@@ -134,7 +124,6 @@ export const answered = <Value, Refusal>(read: Result<Value, Refusal>): Value =>
   return read.value;
 };
 
-/** Polls 1,800 times, 25 ms apart: at least 45 seconds before it throws. */
 export const until = async (condition: () => Promise<boolean>): Promise<void> => {
   for (let turn = 0; turn < 1_800; turn += 1) {
     if (await condition()) return;
@@ -143,10 +132,6 @@ export const until = async (condition: () => Promise<boolean>): Promise<void> =>
   throw new Error("the condition never held");
 };
 
-/**
- * No test can end a worker mid-run, so the row a departed claimant would have left is
- * written instead, as the queue contract's `lapse_first` does.
- */
 export const leaseLetLapse = async (
   pool: pg.Pool,
   job: { readonly workspaceId: string; readonly jobId: string },
@@ -174,7 +159,6 @@ export const isBlockedOnTable = async (pool: pg.Pool, table: string): Promise<bo
 const ASKS_TABLES = `member, "user", group_member, question_asked, question_content,
   spend_reservation, llm_call, workspace_config, model_choice, model_key`;
 
-/** "locked" when every table `ask` touches can be locked at once, else why not. */
 export const asksTablesLockedAtOnce = async (pool: pg.Pool): Promise<string> => {
   const contender = await pool.connect();
   try {
@@ -189,7 +173,6 @@ export const asksTablesLockedAtOnce = async (pool: pg.Pool): Promise<string> => 
   }
 };
 
-/** Holds an ACCESS EXCLUSIVE lock on `table`, from a connection of its own, while `work` runs. */
 export const holdingTable = async <T>(
   pool: pg.Pool,
   table: string,
@@ -215,10 +198,6 @@ export const abortTheTransaction = async (tx: Tx): Promise<void> => {
   }
 };
 
-/**
- * Once released, actions pass `in turn`, each holding the rest back until it commits, or all
- * `together`, so their statements interleave.
- */
 type Released = "in turn" | "together";
 
 const HOLD_OF: Readonly<Record<Released, string>> = {
@@ -226,7 +205,6 @@ const HOLD_OF: Readonly<Record<Released, string>> = {
   together: "pg_advisory_xact_lock_shared",
 };
 
-/** Each `event` on `table` blocks until `work` calls `release` or ends. */
 export const whileActionsWaitAt = async <T>(
   pool: pg.Pool,
   table: string,
@@ -276,7 +254,6 @@ export const statementsWaitingOnALock = async (pool: pg.Pool): Promise<readonly 
 export const countWaitingOnLocks = async (pool: pg.Pool): Promise<number> =>
   (await statementsWaitingOnALock(pool)).length;
 
-/** Starts every action, lets them past `table`'s inserts once each waits on a lock, and answers each. */
 export const racedAt = <T>(
   pool: pg.Pool,
   table: string,
@@ -317,7 +294,6 @@ export const whileWritesAreRefused = async <T>(
   }
 };
 
-/** Holds the rows `select` names, from a connection of its own, while `work` runs; then lets them go. */
 export const holdingRows = async <T>(
   pool: pg.Pool,
   select: string,

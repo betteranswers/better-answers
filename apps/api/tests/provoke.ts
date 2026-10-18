@@ -14,27 +14,23 @@ import { signIn, signInByEmailOnly } from "./flow.ts";
 import type { TestApp, TestClient } from "./harness.ts";
 import { aPasskeyDevice } from "./passkey-device.ts";
 
-/** Past the second factor where one is required, by the harness's own writes. */
 export const signedInClient = async (app: TestApp, email: string): Promise<TestClient> => {
   const client = app.client();
   await signIn(app, client, email);
   return client;
 };
 
-/** By the emailed code alone: a person who must hold a second factor is left pending. */
 export const signedInByEmailOnly = async (app: TestApp, email: string): Promise<TestClient> => {
   const client = app.client();
   await signInByEmailOnly(app, client, email);
   return client;
 };
 
-/** A person in no workspace, so nobody requires a factor of them, signed in. */
 export const aPersonSignedIn = async (app: TestApp) => {
   const person = await app.person();
   return { person, client: await signedInClient(app, person.email) };
 };
 
-/** A new workspace's Admin, who must hold a factor and holds none, signed in and pending setup. */
 export const anAdminSignedIn = async (app: TestApp) => {
   const { admin } = await app.provision();
   return { admin, client: await signedInByEmailOnly(app, admin.email) };
@@ -59,19 +55,16 @@ export const setUpAnAuthenticator = async (app: TestApp, client: TestClient): Pr
   return key;
 };
 
-/** An authenticator set up for `email`, then a session signed in by email and not yet confirmed. */
 const heldThenSignedIn = async (app: TestApp, email: string) => {
   const key = await setUpAnAuthenticator(app, await signedInByEmailOnly(app, email));
   return { key, client: await signedInByEmailOnly(app, email) };
 };
 
-/** A person in no workspace holding an authenticator whose `key` makes its codes. */
 export const aPersonWithAnAuthenticator = async (app: TestApp) => {
   const person = await app.person();
   return { person, ...(await heldThenSignedIn(app, person.email)) };
 };
 
-/** A new workspace's Admin holding an authenticator whose `key` makes its codes. */
 export const anAdminWithAnAuthenticator = async (app: TestApp) => {
   const { admin } = await app.provision();
   return { admin, ...(await heldThenSignedIn(app, admin.email)) };
@@ -84,14 +77,12 @@ export const codeNow = (setupAddress: string): string =>
 
 export const aWrongCode = (right: string): string => (right === "000000" ? "111111" : "000000");
 
-/** Starts a setup through the api's own route; answers the address its QR code carries. */
 export const startOn = async (client: TestClient): Promise<string> => {
   const answered = await client.json("/authenticator/start", {});
   expect(answered.status, "the setup did not start").toBe(200);
   return started.parse(await answered.json()).setupAddress;
 };
 
-/** A setup started and finished with the code its key shows now; `client` stays signed in. */
 export const setUpOn = async (client: TestClient) => {
   const setupAddress = await startOn(client);
   return {
@@ -100,10 +91,6 @@ export const setUpOn = async (client: TestClient) => {
   };
 };
 
-/**
- * The ops command's own restore under its own principal, sending no notice; answers the code.
- * @throws when no person holds `email`.
- */
 export const restoredByTheOperator = async (app: TestApp, email: string): Promise<string> => {
   const restored = await restoreSignIn(IDENTITY_PRINCIPAL, app.doors.postgres, {
     email,
@@ -113,7 +100,6 @@ export const restoredByTheOperator = async (app: TestApp, email: string): Promis
   return restored.value.code;
 };
 
-/** A passkey added through the api's two steps, from a device of its own. */
 export const passkeyAddedOn = async (client: TestClient) => {
   const device = aPasskeyDevice(client.origin);
   const options = await client.json("/passkeys/add-options", { name: "Phone" });
@@ -127,7 +113,6 @@ export const passkeyAddedOn = async (client: TestClient) => {
 
 const codesIssued = z.object({ recoveryCodes: z.array(z.string()) });
 
-/** A passkey, an authenticator and its ten codes, set up through the api; then an unconfirmed email session. */
 export const aPersonHoldingEverything = async (app: TestApp) => {
   const { person, client: setUpIn } = await aPersonSignedIn(app);
   const { device } = await passkeyAddedOn(setUpIn);
@@ -155,7 +140,6 @@ export const displayNameHeldBy = async (
 
 type TestData = ReturnType<typeof testData>;
 
-/** Runs `work` over one superuser connection, past row-level security. */
 export const seededIn = async <T>(app: TestApp, work: (seed: TestData) => Promise<T>) => {
   const client = await app.database.superuser.connect();
   try {
@@ -165,14 +149,12 @@ export const seededIn = async <T>(app: TestApp, work: (seed: TestData) => Promis
   }
 };
 
-/** The confirmations `sources.publish` asks for, each given. */
 export const THE_THREE_CONFIRMATIONS = {
   lawfulBasisRecorded: true,
   privacyInformationUpdated: true,
   dpiaReferenced: true,
 } as const;
 
-/** @throws when no constraint has the name. */
 export const constraintDefinition = async (app: TestApp, name: string): Promise<string> => {
   const found = await app.database.superuser.query<{ definition: string }>(
     "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = $1",
@@ -183,7 +165,6 @@ export const constraintDefinition = async (app: TestApp, name: string): Promise<
   return definition;
 };
 
-/** Signed in as a Viewer of two new workspaces, with neither chosen as the active one. */
 export const memberOfTwoWorkspaces = async (app: TestApp): Promise<TestClient> => {
   const first = await app.provision();
   const second = await app.provision();
@@ -198,10 +179,6 @@ export type HeldRevocation = {
   abandon(): Promise<void>;
 };
 
-/**
- * The row is written and locked with its commit still to come: the moment a held member read
- * must wait out.
- */
 export const revocationHeldOpen = async (app: TestApp, userId: string): Promise<HeldRevocation> => {
   const revoking = await app.database.superuser.connect();
   await revoking.query("BEGIN");
@@ -222,10 +199,6 @@ export const revocationHeldOpen = async (app: TestApp, userId: string): Promise<
   return { land: () => end("COMMIT"), abandon: () => end("ROLLBACK") };
 };
 
-/**
- * One session the person holds, as a browser leaves it, answered by its id. It runs for the
- * library's lifetime unless `expiresAt` says otherwise.
- */
 export const aSeededSessionFor = async (
   app: TestApp,
   personId: string,
@@ -244,7 +217,6 @@ export const aSeededSessionFor = async (
   });
 };
 
-/** How many of this database's sessions wait on a lock another holds. */
 export const waitingOnALock = async (app: TestApp): Promise<number> => {
   const found = await app.database.superuser.query<{ waiting: number }>(
     `SELECT count(*)::int AS waiting FROM pg_stat_activity
@@ -256,7 +228,6 @@ export const waitingOnALock = async (app: TestApp): Promise<number> => {
 export const someoneWaitsOnALock = async (app: TestApp): Promise<boolean> =>
   (await waitingOnALock(app)) > 0;
 
-/** Moves every session `userId` holds to a sign-in 61 minutes ago, behind the api's back. */
 export const sessionsAgedUnderTheApi = async (app: TestApp, userId: string): Promise<void> => {
   await app.database.superuser.query(
     "UPDATE session SET created_at = now() - interval '61 minutes' WHERE user_id = $1",
@@ -264,7 +235,6 @@ export const sessionsAgedUnderTheApi = async (app: TestApp, userId: string): Pro
   );
 };
 
-/** Moves every session `userId` holds to a confirmation 61 minutes ago, behind the api's back. */
 export const confirmationsAgedOverAnHourAgo = async (
   app: TestApp,
   userId: string,
@@ -275,7 +245,6 @@ export const confirmationsAgedOverAnHourAgo = async (
   );
 };
 
-/** Moves every session `userId` holds to a pending hour that ended a minute ago, as if unconfirmed. */
 export const pendingSessionsPastTheirHour = async (app: TestApp, userId: string): Promise<void> => {
   await app.database.superuser.query(
     "UPDATE session SET pending_since = now() - interval '61 minutes' WHERE user_id = $1",
@@ -292,7 +261,6 @@ export const codeSentPastItsExpiry = async (app: TestApp, email: string): Promis
   if (aged.rowCount === 0) throw new Error(`no code was sent to ${email}`);
 };
 
-/** Points every session `userId` holds at the workspace, behind the api's back. */
 export const sessionPointedAt = async (
   app: TestApp,
   userId: string,
@@ -304,10 +272,6 @@ export const sessionPointedAt = async (
   );
 };
 
-/**
- * Every write an action makes lands, and its commit is what fails, so anything sent before the
- * commit would already have gone.
- */
 export const whileCommitsAreRefused = async <T>(
   app: TestApp,
   table: string,
@@ -330,10 +294,6 @@ export const whileCommitsAreRefused = async <T>(
   }
 };
 
-/**
- * The api's role lacks `privilege` on `table` in the whole database, so no suite whose tests run
- * together may use it.
- */
 export const whileTheApiLacks = async <T>(
   app: TestApp,
   privilege: "SELECT" | "UPDATE",
@@ -349,10 +309,6 @@ export const whileTheApiLacks = async <T>(
   }
 };
 
-/**
- * `change` lands while `work` waits on `table`, so between two of its statements, and `work`
- * then goes on.
- */
 export const changedWhileItWaitsOn = async <T>(
   app: TestApp,
   table: string,

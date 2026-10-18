@@ -12,6 +12,7 @@ import {
   bundleCommit,
   CONCEPT_BODY_MAX,
   CONCEPT_FRONTMATTER_MAX,
+  CONCEPT_IRI,
   CONCEPT_PATH,
   CONCEPT_STATUSES,
   conceptSensitivityOverride,
@@ -23,7 +24,6 @@ import {
   CONTENT_HASH,
   evidence,
   GIT_SHA,
-  IRI,
   VERIFICATION_ORIGINS,
 } from "./concept-tables.ts";
 import { CONTRACT_DIGEST_PATTERN } from "./contract-digest.ts";
@@ -79,7 +79,7 @@ import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./job-tables.ts";
 import { workspaceLastActive } from "./last-active-tables.ts";
 import {
   CALENDAR_DAY,
-  GBP,
+  DECIMAL_STRING,
   LLM_CALL_OUTCOMES,
   llmCall,
   MODEL_NAME,
@@ -196,15 +196,13 @@ const modelKeyUpdate = createUpdateSchema(modelKey, {
 });
 
 /** Money and rates are `numeric`, which the driver hands back as a string and never a float. */
-const decimal = (schema: z.ZodString) => schema.regex(GBP);
+const decimal = (schema: z.ZodString) => schema.regex(DECIMAL_STRING);
 
 const tokenCount = (schema: z.ZodNumber) => schema.int().nonnegative();
 
 const servedBy = {
   modelChoiceId: (schema: z.ZodString) => schema.trim().min(1),
   model: (schema: z.ZodString) => schema.trim().min(1),
-  tokensIn: tokenCount,
-  tokensOut: tokenCount,
   runId: (schema: z.ZodString) => schema.trim().min(1),
   answerId: (schema: z.ZodString) => schema.regex(ULID),
 };
@@ -213,6 +211,8 @@ const llmCallRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.regex(ULID),
   ...servedBy,
+  tokensIn: tokenCount,
+  tokensOut: tokenCount,
   seconds: (schema: z.ZodNumber) => schema.nonnegative(),
   costGbp: decimal,
   outcome: (schema: z.ZodString) => schema.pipe(z.enum(LLM_CALL_OUTCOMES)),
@@ -226,6 +226,8 @@ const spendReservationRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.regex(ULID),
   ...servedBy,
+  mostTokensIn: tokenCount,
+  mostTokensOut: tokenCount,
   gbpPerMillionIn: decimal,
   gbpPerMillionOut: decimal,
   reservedGbp: decimal,
@@ -367,7 +369,6 @@ const invitationEmailCounterUpdate = createUpdateSchema(
   invitationEmailCounterRefinements,
 );
 
-/** What an address carries after its `@`, lower-cased, so a match is a plain comparison. */
 const isTestingDomain = (testingDomain: string): boolean =>
   testingDomain === testingDomain.toLowerCase() &&
   EMAIL_ADDRESS.safeParse(`mark@${testingDomain}`).success;
@@ -418,7 +419,6 @@ const sweepPassUpdate = createUpdateSchema(sweepPass, sweepPassRefinements);
 
 export { ACTOR_ID } from "./actor-id.ts";
 
-/** A list's entries are flat: text, or null where the entry has none. */
 const detailEntry = z.record(z.string(), z.union([z.string(), z.null()]));
 
 const detail = z.union([
@@ -426,7 +426,6 @@ const detail = z.union([
   z.null(),
 ]);
 
-/** One id space across both audit logs: an audit event's id, whichever audit log holds its row. */
 const auditLogRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID).brand<"AuditEventId">(),
   action: (schema: z.ZodString) =>
@@ -474,7 +473,7 @@ const accessRequestSelect = createSelectSchema(accessRequest, accessRequestRefin
 const accessRequestInsert = createInsertSchema(accessRequest, accessRequestRefinements);
 const accessRequestUpdate = createUpdateSchema(accessRequest, accessRequestRefinements);
 
-const conceptIri = (schema: z.ZodString) => schema.regex(IRI).brand<"ConceptIri">();
+const conceptIri = (schema: z.ZodString) => schema.pipe(CONCEPT_IRI);
 
 const frontmatterEntry = z
   .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
@@ -644,8 +643,6 @@ const conceptSensitivityOverrideUpdate = createUpdateSchema(
 );
 
 const rulesInForce = z.union([
-  // Spelled out against the tuple: `satisfies` refuses a key it lacks and a member the literal
-  // misses.
   z.strictObject({
     default_on: z.boolean(),
     default_off: z.boolean(),
@@ -719,7 +716,6 @@ const subjectIdentifier = z.string().trim().min(1).max(SUBJECT_IDENTIFIER_MAX);
 const subjectIdentifierList = z.array(subjectIdentifier).max(SUBJECT_IDENTIFIERS_MAX);
 const identifierSetOf = (emailsMax: number) =>
   z.union([
-    // As above: the tuple's members, each spelled out and checked against it.
     z.strictObject({
       emails: z.array(subjectIdentifier).max(emailsMax),
       names: subjectIdentifierList,
@@ -798,9 +794,8 @@ const writeUpIncludeInsert = createInsertSchema(writeUpInclude, writeUpIncludeRe
 const writeUpIncludeUpdate = createUpdateSchema(writeUpInclude, writeUpIncludeRefinements);
 
 const recordConcept = z.strictObject({
-  iri: z.string().regex(IRI).brand<"ConceptIri">(),
+  iri: CONCEPT_IRI,
   contentHash: z.string().regex(CONTENT_HASH),
-  /** Never who verified it: that is a person, and no record holds one. */
   trust: z.strictObject({
     tier: z.string().trim().min(1),
     status: z.string().trim().min(1),
@@ -809,6 +804,8 @@ const recordConcept = z.strictObject({
   }),
   judged: z.enum(CANDIDATE_VERDICTS).exactOptional(),
 });
+
+export type RecordConcept = z.output<typeof recordConcept>;
 
 const questionAskedRefinements = {
   workspaceId,
@@ -820,7 +817,6 @@ const questionAskedRefinements = {
   predicateGroups: (schema: z.ZodArray<z.ZodString>) => z.array(groupId(schema.element)),
   verdict: (schema: z.ZodString) => schema.pipe(z.enum(QUESTION_VERDICTS)),
   judgeState: (schema: z.ZodString) => schema.pipe(z.enum(JUDGE_STATES)),
-  // Null parses because the column's type takes a JSON null; the table's CHECK refuses one.
   concepts: (schema: z.ZodType) => schema.pipe(z.union([z.array(recordConcept), z.null()])),
   unmappedPassages: (schema: z.ZodArray<z.ZodString>) => z.array(schema.element.trim().min(1)),
 };
@@ -831,8 +827,10 @@ const questionAskedUpdate = createUpdateSchema(questionAsked, questionAskedRefin
 
 const draftedSentence = z.strictObject({
   sentence: z.string().trim().min(1),
-  concepts: z.array(z.string().regex(IRI).brand<"ConceptIri">()).min(1),
+  concepts: z.array(CONCEPT_IRI).min(1),
 });
+
+export type DraftedSentence = z.output<typeof draftedSentence>;
 
 const questionContentRefinements = {
   workspaceId,

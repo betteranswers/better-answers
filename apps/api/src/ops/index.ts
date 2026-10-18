@@ -124,9 +124,6 @@ const REFUSED = 1;
 const USAGE = 2;
 export const NOT_BUILT = 3;
 
-/**
- * A wrapper reads the code alone, so a precondition it can wait on never shares one with a fault.
- */
 export const EXIT_OF_CLASS = {
   malformed: USAGE,
   unauthenticated: 4,
@@ -145,21 +142,17 @@ export type OpsIo = {
 
   readonly logger: Logger;
 
-  /** The smoke test sends the app hostname as its `host`; absent, it sends none. */
   readonly appHostname?: string | undefined;
 
   readonly writeReport?: ((path: string, body: string) => Promise<void>) | undefined;
 
   readonly readTree?: ((directory: string) => Promise<BundleTree>) | undefined;
 
-  /** Absent where no email transport is configured, so an action that must notify refuses. */
   readonly mail?: Mail | undefined;
 
-  /** A refusal where no envelope key is configured, in the config module's own sentence. */
   readonly modelKeySetting: Result<ModelKeySetting, string>;
 };
 
-/** Takes a dump stamp (`20260601T120000Z`) or any instant `Date` reads; `undefined` is neither. */
 export const parseSince = (value: string): Date | undefined => {
   const stamp = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(value);
   const iso =
@@ -195,7 +188,6 @@ const flagValue = (flags: Flags, name: string): string | undefined => {
 
 const MAP_TABLES = [mapGeneration, mapNode, mapEdge];
 
-/** Table objects, never names, so a renamed table renames what each command must find. */
 const NEEDS = {
   "map-rebuild": [...MAP_TABLES, job],
   "map-sweep": MAP_TABLES,
@@ -222,7 +214,6 @@ const REBUILD_DEFAULT_REASON = "drill";
 const WAIT_SECONDS = 120;
 const WAIT_POLL_MS = 2_000;
 
-/** The embedding model is fixed, so it is never offered. */
 const CHOSEN_PURPOSES = LLM_PURPOSES.filter((purpose) => purpose !== FIXED_PURPOSE);
 
 const USAGE_TEXT = `usage: pnpm ops <command> [options]
@@ -503,7 +494,6 @@ const sliceCommand = async (
 export const reasonOf = (reason: string | Error): string =>
   typeof reason === "string" ? reason : reason.message;
 
-/** A word said in a sentence still exits with its class's code: the wrapper reads the code alone. */
 const refused = (
   command: string,
   workspaceId: string,
@@ -773,7 +763,6 @@ const importReason = (refusal: ImportBundleRefusal | Error, email: string): stri
   return `stopped at ${refusal.file} (${reasonOf(refusal.reason)}); landed ${landed.length}, skipped ${skipped.length}, verifications ${verifications.recorded} recorded, ${counted(linksOf(rewritten), "link")} rewritten; what landed stays, and a rerun continues from there`;
 };
 
-/** A word exits with its class's code; an unsound tree and a stopped import are no one word's. */
 const importRefused = (
   workspaceId: string,
   refusal: ImportBundleRefusal | Error,
@@ -912,8 +901,6 @@ const seedingToBeDumped = async (
   if (!seeded.ok) {
     return refused("erasure-rehearsal", workspaceId, seeded.error, io, rehearsalSaid(seeded.error));
   }
-  // A dump taken before the worker indexes the document holds no passage naming the subject,
-  // and phase two would then prove nothing about the index.
   const { indexJobId } = seeded.value.document;
   const indexed = await jobAfterWaiting(
     ERASURE,
@@ -1085,10 +1072,6 @@ const provisionRefused = (
   return exitOf(refusal);
 };
 
-/**
- * The repository lives outside the Postgres transaction, so the root is checked before the action
- * and the repository made after it.
- */
 const provisionWorkspaceCommand = async (
   doors: Doors,
   flags: Flags,
@@ -1303,7 +1286,6 @@ const unexpectedSaid = (member: TestWorkspaceStanding["unexpected"][number]): st
   return `test-workspace: ${member.address}, ${article} ${member.role}, is no part of the fixture; left in place`;
 };
 
-/** The repository lives outside the Postgres transactions, so it is made, or found, after them. */
 const testWorkspaceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
   const asked = testWorkspaceAskedOf(flags);
   if (asked === undefined) {
@@ -1378,10 +1360,6 @@ const modelKeyReason = (refusal: SetModelKeyRefusal | Error, workspaceId: string
   }
 };
 
-/**
- * The key comes on standard input, which no shell history and no process list keeps, and no line
- * this says repeats it.
- */
 const setModelKeyCommand = async (
   doors: Doors,
   workspaceId: string,
@@ -1519,7 +1497,6 @@ const priceNamed = (flags: Flags) => {
     : { provider, model, effectiveFrom, gbpPerMillionIn, gbpPerMillionOut };
 };
 
-/** A price names no workspace, so the command is sliceless and looks for its own table. */
 const setModelPriceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
   const price = priceNamed(flags);
   if (price === undefined) {
@@ -1589,7 +1566,6 @@ const restoredSaid = (restored: SignInRestored, noticed: boolean): readonly stri
   "restore-sign-in: run this only once you have checked who they are by a channel other than their email, and hand them the code by that same channel, never by email",
 ];
 
-/** The code goes to stdout alone: never to the logger, and never in the notice. */
 const restoreSignInCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
   const email = flagValue(flags, "email");
   if (email === undefined) {
@@ -1678,10 +1654,6 @@ const SLICELESS_COMMANDS = new Map<
   ["restore-sign-in", restoreSignInCommand],
 ]);
 
-/**
- * Resolves to the exit code: 0 done, 1 refused in no refusal word, 2 usage, `NOT_BUILT`, or a
- * refusal word's `EXIT_OF_CLASS` code.
- */
 export const runOps = async (argv: readonly string[], doors: Doors, io: OpsIo): Promise<number> => {
   const [command, ...rest] = argv[0] === "--" ? argv.slice(1) : argv;
   const flags = parseFlags(rest);

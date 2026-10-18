@@ -45,7 +45,6 @@ export interface ContainerRun {
   readonly reachesTheHost?: boolean;
 }
 
-/** The name a container that `reachesTheHost` dials a port the host publishes on. */
 export const THE_HOST = "host.docker.internal";
 
 const BUILD_ALLOWANCE = 900_000;
@@ -66,7 +65,6 @@ const INSPECT_ALLOWANCE = 60_000;
 
 type BuildEnvironment = Readonly<Record<string, string | undefined>>;
 
-/** An indented line belongs to one of the builder's nodes, not to the builder. */
 const topLevelFieldsOf = (inspected: string): ReadonlyMap<string, string> => {
   const read = new Map<string, string>();
   for (const line of inspected.split("\n")) {
@@ -78,7 +76,6 @@ const topLevelFieldsOf = (inspected: string): ReadonlyMap<string, string> => {
   return read;
 };
 
-/** The builder `docker buildx inspect` names, or undefined unless it names one that can export. */
 export const builderThatCanExport = (inspected: string): string | undefined => {
   const read = topLevelFieldsOf(inspected);
   const named = read.get("Name") ?? "";
@@ -92,7 +89,6 @@ interface SharedCache {
   readonly registry: string;
 }
 
-/** Undefined, and the daemon never asked, unless the environment names the cache's registry. */
 export const sharedCache = async (
   environment: BuildEnvironment,
   inspectTheBuilder: () => Promise<string | undefined>,
@@ -173,7 +169,6 @@ const theImageToRun = async (image: ImageUnderTest): Promise<ImageToRun> => {
 
 const discardIfBuiltHere = async (image: ImageToRun): Promise<void> => {
   if (image.builtHere) {
-    // An image left behind costs disk alone, and the next build reuses its layers.
     await run("docker", ["rmi", "--force", image.id], { timeout: CONTAINER_ALLOWANCE }).catch(
       () => undefined,
     );
@@ -203,10 +198,6 @@ const docker = async (
   return stdout;
 };
 
-/**
- * Runs the image built here, or the one `IMAGE_ID` names; an image built here is removed after.
- * @throws when no Docker daemon answers.
- */
 export const readTheImage = async (
   image: ImageUnderTest,
   container: ContainerRun,
@@ -230,7 +221,6 @@ export interface StartedContainer {
   readonly stop: () => Promise<void>;
 }
 
-/** As `readTheImage`, detached; `stop` removes the container, and the image when built here. */
 export const startTheImage = async (
   image: ImageUnderTest,
   environment: Environment,

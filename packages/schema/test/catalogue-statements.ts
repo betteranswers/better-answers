@@ -32,7 +32,6 @@ export const seedConnectedSourceOfAConnectorAlone = async (
 const CONNECTED_SOURCE_IN = `INSERT INTO connected_source (workspace_id, id, name, connector, state)
   VALUES ($1, $2, 'The handbook', 'upload', $3)`;
 
-/** Raw, so a state word a CHECK of the day admits can be seeded beneath a later one. */
 export const seedConnectedSourceIn = async (
   client: pg.PoolClient,
   workspaceId: string,
@@ -46,7 +45,6 @@ export const seedConnectedSourceIn = async (
 const CONNECTED_SOURCE_TO = `INSERT INTO connected_source (workspace_id, id, name, connector, destination)
   VALUES ($1, $2, 'The handbook', 'upload', $3::text[])`;
 
-/** Raw, so a destination word a CHECK of the day admits can be seeded beneath a later one. */
 export const seedConnectedSourceTo = async (
   client: pg.PoolClient,
   workspaceId: string,

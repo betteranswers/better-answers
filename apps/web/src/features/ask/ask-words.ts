@@ -4,7 +4,6 @@ import { JUDGE_WORDS, REASON_WORDS } from "@/shared/answer-words.ts";
 
 import type { Phase } from "./ask-api.ts";
 
-/** How one collection's drafted part ended, `drafted` apart: it says nothing of itself. */
 type Unwritten = "refused" | "failed" | "paused";
 
 export const ASK_WORDS = {
@@ -15,20 +14,17 @@ export const ASK_WORDS = {
   ask: "Ask",
   collections: "Collections",
   collectionsHelp: "Tick none to ask across every collection.",
-  /** Loading lines, said while the answer is on its way. */
   phase: {
     reading: "Reading this workspace’s knowledge.",
     judging: "Checking which Answers fit your question.",
     drafting: "Drafting from the related knowledge.",
   } satisfies Readonly<Record<Phase, string>>,
-  /** The verdict's heading, in a heading's casing. */
   verdictHeading: {
     ok: "Answered",
     warn: "Answered with a Warning",
     refuse: "Not Answered",
     related: "Related Knowledge",
   } satisfies Readonly<Record<QuestionVerdict, string>>,
-  /** Said once, as the verdict arrives; related knowledge never says the question was answered. */
   verdictSaid: {
     ok: "Answered from this workspace’s knowledge.",
     warn: "Answered from this workspace’s knowledge, with a warning.",
@@ -38,7 +34,6 @@ export const ASK_WORDS = {
   judge: JUDGE_WORDS satisfies Readonly<Record<JudgeState, string>>,
   noCollection: "No Collection",
   unmapped: "Unmapped Passages",
-  /** A drafted part that says no prose was drafted, and why. */
   unwritten: {
     refused: "Nothing was drafted, because no sentence could cite this knowledge.",
     failed: "Nothing was drafted. Please try again.",

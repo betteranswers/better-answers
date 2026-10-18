@@ -67,7 +67,6 @@ const lint = oxlintOver(pluginConfigFor({ [RULE]: severity }), {
 
 const INTERNAL = "only through its own index.ts";
 
-/** Each clause as the rule prints it, with the imports that break it. */
 const REFUSED: Readonly<Record<string, readonly (readonly [string, string, string])[]>> = {
   "packages/core is transport-agnostic": [
     ["a slice importing hono", SLICE, "hono"],

@@ -31,47 +31,32 @@ import type {
 } from "./plan.ts";
 import type { RecordCompletion } from "./record.ts";
 
-/** Each candidate's verdict, keyed by the number the prompt gave it. */
 type Verdicts = Readonly<Record<string, CandidateVerdict>>;
 
-/** A model call reserved, and the model it reserved for. */
 export type CallReserved = { readonly to: ModelToCall; readonly reservationId: string };
 
 export type CallReserving = {
-  /** The record of the question the call serves. */
   readonly answerId: string;
-  /** By wire shape, since the model and so its shape are read only as the reservation is taken. */
   readonly most: Readonly<Record<WireShapeName, CallSize>>;
   readonly now: Date;
 };
 
 export type JudgeRefusal = KernelRefusal<"spending-limit-met"> | Error;
 
-/**
- * What `ask` is handed to judge with, beside the steps that keep its record. The model client's
- * calls run with no transaction open.
- */
 export type JudgeSteps<Refused = never> = ModelClient & {
-  /** Commits before it answers; `undefined` where the workspace has no judge to call. */
   readonly reserve: (
     reserving: CallReserving,
   ) => Promise<Result<CallReserved | undefined, Refused | JudgeRefusal>>;
 };
 
-/** One drafting call's reservation: drafting streams through the Messages shape alone. */
 export type DraftReserving = Omit<CallReserving, "most"> & { readonly most: CallSize };
 
-/**
- * No reservation is taken with no model to call. A key that will not open is an error, as its
- * operator needs it to be.
- */
 const reservedFor = async (
   purpose: LlmPurpose,
   asker: UserPrincipal,
   tx: Tx,
   credentials: Credentials,
   reserving: Omit<CallReserving, "most"> & {
-    /** The most the model's wire shape may spend; `undefined` where it cannot make this call. */
     readonly most: (shape: WireShapeName) => CallSize | undefined;
   },
 ): Promise<Result<CallReserved | undefined, JudgeRefusal>> => {
@@ -92,7 +77,6 @@ const reservedFor = async (
   return ok({ to: to.value, reservationId: reserved.value.reservationId });
 };
 
-/** The judging model's call, reserved in the caller's transaction. */
 export const reserveJudge = async (
   asker: UserPrincipal,
   tx: Tx,
@@ -105,8 +89,7 @@ export const reserveJudge = async (
   });
 
 /**
- * One drafting call on the answering model, reserved in the caller's transaction. A model of the
- * decision shape writes no prose, so none is reserved for it.
+ * A model of the decision shape writes no prose, so none is reserved for it.
  */
 export const reserveDrafting = async (
   asker: UserPrincipal,
@@ -119,7 +102,6 @@ export const reserveDrafting = async (
     most: (shape) => (shape === "messages" ? reserving.most : undefined),
   });
 
-/** The `Answer`s the judge is asked about: those that bear, in the order they bear, to the cap. */
 const candidatesOf = (
   related: readonly RelatedConcept[],
   cap: number,
@@ -155,7 +137,6 @@ const FRAMING_TOKENS = 2_000;
  */
 const JUDGE_TOKENS_OUT = 16_000;
 
-/** Under the 240 seconds a host gives one tool call, leaving `ask` time for its reads and writes. */
 const JUDGE_WITHIN_MS = 150_000;
 
 const utf8 = new TextEncoder();
@@ -166,7 +147,6 @@ const sizeOf = (prompt: string): CallSize => ({
   tokensOut: JUDGE_TOKENS_OUT,
 });
 
-/** One verdict required under each number, so an answer that skips a candidate is no answer. */
 const verdictsFor = (candidates: number): z.ZodType<Verdicts> =>
   z.strictObject(
     Object.fromEntries(
@@ -177,7 +157,6 @@ const verdictsFor = (candidates: number): z.ZodType<Verdicts> =>
     ),
   );
 
-/** The question as the typed-text check leaves it, and each candidate apart from the others. */
 export const judgeCall = (
   question: string,
   candidates: readonly ReturnedConcept[],
@@ -201,16 +180,10 @@ export const judgeCall = (
 const DECISION_ASK =
   "Does this approved answer answer the question in the state as it was asked? It does not if it answers a different question, a narrower or a wider one, or one about another product, module, plan or audience than the question names.";
 
-/** A decision model answers each question with a probability and writes no text. */
 const DECISION_TOKENS_OUT_EACH = 16;
 
-/** A decision call, and the most it may cost, reserved before the model is known. */
 type DecisionJudgeCall = DecisionModelCall & { readonly most: CallSize };
 
-/**
- * The question as the state, after the typed-text check, and one true-or-false question per
- * candidate holding it apart. A request is no longer than this JSON and its framing.
- */
 export const decisionJudgeCall = (
   question: string,
   candidates: readonly ReturnedConcept[],
@@ -238,7 +211,6 @@ export const decisionJudgeCall = (
   };
 };
 
-/** At the threshold is a yes: the threshold names the least probability that is a fit. */
 const verdictsAt = (probabilities: Probabilities, threshold: number): Verdicts =>
   Object.fromEntries(
     Object.entries(probabilities).map(([place, yes]) => [place, yes >= threshold ? "yes" : "no"]),
@@ -253,7 +225,6 @@ const heardOf = <T>(called: ModelOutcome<T>, verdicts: (answer: T) => Verdicts):
   spent: called.spent,
 });
 
-/** A decision model with no stored threshold is never called, and its judging fails. */
 const heardFrom = async <Refused>(
   steps: JudgeSteps<Refused>,
   to: ModelToCall,
@@ -279,7 +250,6 @@ const byIri = (
     }),
   );
 
-/** Each `Answer` judged yes is a fit, in the order it bore. With no verdicts, every one stays related. */
 const judgedPlan = (
   plan: AnswerPlan,
   candidates: readonly ReturnedConcept[],
@@ -308,11 +278,6 @@ const judgedPlan = (
 
 type Judged = AnswerPlan & { readonly settled?: RecordCompletion["settled"] };
 
-/**
- * Judges the plan's candidates when the workspace has a judge to call: the reservation commits
- * before the call, and the call runs with no transaction open. A failed call fails the judging,
- * never the answer.
- */
 export const judgedBy = async <Refused>(
   steps: JudgeSteps<Refused>,
   plan: AnswerPlan,

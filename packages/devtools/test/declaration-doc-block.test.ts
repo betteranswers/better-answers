@@ -23,11 +23,11 @@ const whyLint = oxlintOver(pluginConfigFor({ [WHY_RULE]: "error" }), {
 });
 
 describe("the doc-block rule fires on a declaration's line comment", () => {
-  it("names the form to write and its rules file", () => {
+  it("names the form to write and why", () => {
     const output = docBlockLint.output(holding("// Kept short.\nexport const keep = 1;\n"));
 
     expect(output).toContain("`/** */`");
-    expect(output).toContain("the root `CODING_STANDARDS.md`");
+    expect(output).toContain("wherever the name is used");
     expect(output).toContain("better-answers(declaration-doc-block)");
   });
 

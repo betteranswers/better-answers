@@ -14,16 +14,11 @@ export const requestsFeatures = tableFeatures({});
 const column = createColumnHelper<typeof requestsFeatures, WaitingRequest>();
 
 type RequestActions = {
-  /** The line that says what each decision does, named by every row's buttons. */
   readonly consequenceId: string;
   readonly onApprove: (request: WaitingRequest) => void;
   readonly onDecline: (request: WaitingRequest) => void;
 };
 
-/**
- * The list's actions reach each cell here, not through the columns: new columns draw every button
- * afresh, dropping focus a press just gave.
- */
 export const RequestsActionsContext = createContext<RequestActions | undefined>(undefined);
 
 function Requester(properties: { readonly request: WaitingRequest }) {
@@ -35,7 +30,6 @@ function Requester(properties: { readonly request: WaitingRequest }) {
       ) : (
         <span className="font-medium">{name}</span>
       )}
-      {/* Still `anywhere`: a cell is as wide as its longest part, which would scroll the table at 320px. */}
       <Address address={email} className="text-xs text-muted-foreground" />
     </span>
   );

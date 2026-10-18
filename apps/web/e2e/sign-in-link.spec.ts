@@ -22,12 +22,10 @@ import {
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
 
-/** `CLIENT_IP_HEADER`, named not imported: `apps/web` takes nothing from `apps/api` at runtime. */
 const CLIENT_IP_HEADER = "cf-connecting-ip";
 
 let browsersOpened = 0;
 
-/** A second device: no cookie of the page's, and a client address apart from both of the fixture's. */
 const test = base.extend<{ readonly anotherBrowser: BrowserContext }>({
   anotherBrowser: async ({ browser }, use, testInfo) => {
     browsersOpened += 1;
@@ -60,10 +58,6 @@ const freshlyOpened = async (page: Page, path: string): Promise<void> => {
 
 const linkTo = (token: string): string => `/sign-in/link#${token}`;
 
-/**
- * An Editor asks for a code in `asking`'s browser, whose binding cookie the link then signs in; an
- * Admin would meet the second factor first.
- */
 const aLinkAskedForIn = async (asking: BrowserContext, api: APIRequestContext, who: string) => {
   const email = anAddress(who.toLowerCase());
   const editor = await person(api, email, { displayName: `${who} Editor` });
@@ -77,7 +71,6 @@ const aLinkAskedForIn = async (asking: BrowserContext, api: APIRequestContext, w
   return { email, asking: page, token: await linkSentTo(api, email) };
 };
 
-/** As a person reading the code off the other device types it. */
 const typedWhereItStarted = async (asking: Page, code: string): Promise<void> => {
   await asking.getByLabel("Verification Code", { exact: true }).fill(code);
   await landedAtHome(asking, "Editor");
@@ -88,7 +81,6 @@ const headingOf = (page: Page, name: string) =>
 
 const signInButton = (page: Page) => page.getByRole("button", { name: "Sign In", exact: true });
 
-/** One refusal from a ceiling, naming its wait; the next ask reaches the api. */
 const refusedOnceAt = (page: Page, path: string, waitSeconds: number) =>
   page.route(
     `**${path}`,
@@ -110,7 +102,6 @@ const DEAD_PAGE = `
     - button "Keyboard Shortcuts"
 `;
 
-/** Answers what a screen reader hears, so two dead pages can be told identical. */
 const theDeadPage = async (page: Page): Promise<string> => {
   const main = page.getByRole("main");
   await expect(main).toMatchAriaSnapshot(DEAD_PAGE);
@@ -168,7 +159,6 @@ test("another device shows the code and stays signed out", async ({
   await expect(page.getByText(codeShown(code))).toBeVisible();
   await expect(signInButton(page)).toHaveCount(0);
 
-  // The copy's own status follows the page's, and stands empty until the code is copied.
   const saidOfTheCopy = page.getByRole("status").last();
   await expect(saidOfTheCopy, "the copy's status holds words before a copy").toBeEmpty();
   await page.getByRole("button", { name: "Copy Code" }).click();
@@ -185,10 +175,6 @@ test("another device shows the code and stays signed out", async ({
   await typedWhereItStarted(asking, code);
 });
 
-/**
- * Spent in a browser of its own: Better Auth counts every load of a `/sign-in` page, three per ten
- * seconds from one address.
- */
 test("unknown, spent and superseded links show one dead page", async ({
   page,
   request,
@@ -198,9 +184,7 @@ test("unknown, spent and superseded links show one dead page", async ({
   const { asking, token: superseded } = asked;
   const saidOfTheFirst = await asking.getByRole("status").innerText();
   await asking.getByRole("button", { name: "Send a New Code" }).click();
-  // The press took focus, and the field takes it back only once the new email has gone.
   await expect(asking.getByLabel("Verification Code", { exact: true })).toBeFocused();
-  // A send still out says something new too, so the button is free again before the status is read.
   await expect(
     asking.getByRole("button", { name: "Send a New Code" }),
     "the second email is still sending",
@@ -300,7 +284,6 @@ test("the code reads as six digits, and c copies it", async ({
   );
   await page.goto(linkTo(token));
   const { until } = elsewhere.parse(await (await described).json());
-  // The time the code stops working, as the reader's own clock shows it.
   const untilTime = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(
     new Date(until),
   );
@@ -319,7 +302,6 @@ test("the code reads as six digits, and c copies it", async ({
     /\S/,
   );
 
-  // Landed once the copy's own status, the page's last, holds words; the page is read by its heading.
   await clockTheNextKey(page, {
     at: "//main[(.//*[@role='status'])[last()][normalize-space(.)]]",
     reads: "Enter This Code Where You Started",

@@ -6,10 +6,10 @@ import {
   boundarySchemas,
   CALENDAR_DAY,
   CONTENT_HASH,
+  DECIMAL_STRING,
   FAMILIES,
   FLAG_CLOSINGS,
   type FlagClosing,
-  GBP,
   GIT_SHA,
   IRI,
   llmPurpose,
@@ -32,7 +32,6 @@ export type ActionName<F extends Family = Family> = Extract<
   `${F}.${string}`
 >;
 
-/** Ids alone: the assistant's and the workspace's names are read when the grant is shown. */
 export const endedGrant = z.strictObject({
   clientId: z.string().min(1),
   workspaceId: boundarySchemas.workspace.select.shape.id.nullable(),
@@ -41,7 +40,6 @@ export const endedGrant = z.strictObject({
 
 export type EndedGrant = z.output<typeof endedGrant>;
 
-/** A browser session an action ended: its id, its device and when it was last active. */
 const endedSession = z.strictObject({
   sessionId: z.string().regex(ULID),
   device: z.string().min(1),
@@ -50,7 +48,6 @@ const endedSession = z.strictObject({
 
 export type EndedSession = z.output<typeof endedSession>;
 
-/** A person or group a search found, by id alone: a typed name or address is never stored. */
 const MATCHED_KINDS = ["person", "group"] as const;
 
 const matched = z.strictObject({
@@ -66,12 +63,10 @@ type DetailEntry = Readonly<Record<string, string | null>>;
 
 export type DetailValue = string | number | boolean | readonly DetailEntry[];
 
-/** How a person signed in: the code a sign-in email carries, typed, the link beside it, or a passkey. */
 const SIGN_IN_METHODS = ["email_code", "email_link", "passkey"] as const;
 
 export type SignInMethod = (typeof SIGN_IN_METHODS)[number];
 
-/** The two kinds of second factor a person can confirm with or set up. */
 const SECOND_FACTORS = ["passkey", "authenticator"] as const;
 
 export type SecondFactor = (typeof SECOND_FACTORS)[number];
@@ -106,14 +101,13 @@ export const DETAIL_KINDS = {
   "family?": (value: DetailValue) =>
     typeof value === "string" && FAMILIES.some((family) => family === value),
   matched: (value: DetailValue) => matchedList.safeParse(value).success,
-  // One of the closed set and nothing freer: a detail that took any text could take a key.
   modelProvider: (value: DetailValue) =>
     typeof value === "string" && MODEL_PROVIDERS.some((provider) => provider === value),
   modelName: (value: DetailValue) => typeof value === "string" && MODEL_NAME.test(value),
   llmPurpose: (value: DetailValue) =>
     typeof value === "string" && llmPurpose.enumValues.some((purpose) => purpose === value),
   day: (value: DetailValue) => typeof value === "string" && CALENDAR_DAY.test(value),
-  gbp: (value: DetailValue) => typeof value === "string" && GBP.test(value),
+  gbp: (value: DetailValue) => typeof value === "string" && DECIMAL_STRING.test(value),
   flagClosing: (value: DetailValue) =>
     typeof value === "string" && FLAG_CLOSINGS.some((closing) => closing === value),
 } as const;
@@ -210,10 +204,6 @@ const declarationRefusal = (
   return undefined;
 };
 
-/**
- * Declares every action or none: throws when a name is not of the family's form, names a record never
- * kept as an audit event, or is declared already or earlier in the same call.
- */
 export const declareActions = <
   F extends Family,
   const Actions extends Record<string, AuditAction<ActionName<F>>>,
@@ -238,10 +228,6 @@ export const declareActions = <
 
 const identitySetNames = new Set<string>();
 
-/**
- * Which audit log keeps an action is fixed where it is declared, so no caller can file a person's own
- * action in a workspace.
- */
 export const declareIdentitySetActions = <
   F extends Family,
   const Actions extends Record<string, AuditAction<ActionName<F>>>,

@@ -11,7 +11,6 @@ import { actorIdOf, attempt, ulid, type Result, type UserPrincipal } from "../ke
 import { settleSpend, type CallSpent } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
-/** One statement, so the content's month is its record's own `asked_at`. */
 const A_RECORD_WITH_ITS_QUESTION = `WITH record AS (
     INSERT INTO question_asked
       (workspace_id, id, asked_at, asked_by, transport, collections, predicate_role,
@@ -29,11 +28,6 @@ export type RecordOpening = {
   readonly askedAt: Date;
 };
 
-/**
- * Writes the skeleton and the question in the caller's transaction, which the caller commits
- * before anything that can refuse the question. Answers an error where `askedAt` falls in a month
- * no sweep has made a partition for.
- */
 export const openRecord = async (
   asker: UserPrincipal,
   tx: Tx,
@@ -59,7 +53,6 @@ export type RecordedConcept = {
   readonly iri: ConceptIri;
   readonly contentHash: string;
   readonly trust: Trust;
-  /** The judge's word on a candidate; absent for a concept no judge was asked about. */
   readonly judged?: CandidateVerdict;
 };
 
@@ -73,11 +66,9 @@ const COMPLETED = `UPDATE question_asked
    WHERE workspace_id = $1 AND id = $2 AND completed_at IS NULL
   RETURNING asked_at::text AS asked_at`;
 
-/** `asked_at` as the text Postgres gave: a `Date` keeps milliseconds and would miss the row. */
 const ITS_DRAFT = `UPDATE question_content SET drafted = $4
    WHERE workspace_id = $1 AND record_id = $2 AND asked_at = $3::timestamptz`;
 
-/** Who verified a concept is a person and a record is kept for good, so the name is left out. */
 const asKept = ({ iri, contentHash, trust, judged }: RecordedConcept) => ({
   iri,
   contentHash,
@@ -97,9 +88,7 @@ export type RecordCompletion = {
   readonly judgeState: JudgeState;
   readonly concepts: readonly RecordedConcept[];
   readonly unmappedPassages: readonly { readonly locator: string }[];
-  /** Given only when the platform drafted. */
   readonly drafted?: readonly DraftedSentence[];
-  /** Undefined where no model was called for the question; else its reservation, settled first. */
   readonly settled?:
     | {
         readonly reservationId: string;
@@ -108,11 +97,6 @@ export type RecordCompletion = {
     | undefined;
 };
 
-/**
- * Completes an open record once: one completed or not there answers an error and changes
- * nothing. A settle the sweep beat leaves the record open, since both share the transaction. A
- * passage is kept as its locator, and a concept as its IRI, hash and trust, never its text.
- */
 export const completeRecord = async (
   asker: UserPrincipal,
   tx: Tx,
@@ -145,7 +129,6 @@ export const completeRecord = async (
     ]);
   });
 
-/** Joined on the record's own `asked_at`, so the content's partition is found by its key. */
 const DRAFT_KEPT = `UPDATE question_content AS content SET drafted = $3
     FROM question_asked AS record
    WHERE record.workspace_id = $1 AND record.id = $2 AND record.completed_at IS NOT NULL
@@ -154,16 +137,13 @@ const DRAFT_KEPT = `UPDATE question_content AS content SET drafted = $3
 
 export type DraftKeeping = {
   readonly recordId: string;
-  /** Every sentence drafted for the question so far, which replaces what was kept before. */
   readonly drafted: readonly DraftedSentence[];
-  /** The drafting call's reservation, settled first. */
   readonly settled: { readonly reservationId: string; readonly calls: readonly CallSpent[] };
   readonly now: Date;
 };
 
 /**
- * Settles one drafting call and keeps the prose drafted so far on a completed record, in the
- * caller's transaction. A record not completed, or not there, answers an error.
+ * A record not completed, or not there, answers an error.
  */
 export const keepDraft = async (
   asker: UserPrincipal,

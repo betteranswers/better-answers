@@ -29,9 +29,8 @@ def contract_files(root: Path) -> list[str]:
 
 
 def contract_digest(root: Path) -> str:
-    """Hex SHA-256 over each file's path, length and bytes.
-    Length-prefixed so a boundary cannot be forged: without it, content
-    holding a newline and a plausible path could pose as a second file."""
+    """Hex SHA-256 over each file's path, length and bytes. Length-prefixed so a
+    boundary cannot be forged."""
     stream = hashlib.sha256()
     for relative in contract_files(root):
         # Bytes, never decoded or newline-normalised: a CRLF checkout is a different

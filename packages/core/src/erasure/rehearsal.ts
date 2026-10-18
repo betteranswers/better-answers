@@ -80,17 +80,9 @@ const CONCEPT_BODY =
 
 const DOCUMENT_CONNECTED_SOURCE = "Erasure rehearsal";
 
-/**
- * Named for the subject, so a re-run finds its connected source and a subject seeded after an erasure
- * gets a document naming them.
- */
 const documentFileOf = (subject: SyntheticSubject): string =>
   `erasure-rehearsal-${subject.personId.toLowerCase()}.md`;
 
-/**
- * A work address and a name, neither of which a rule in force raises: the index holds both
- * until the erasure withholds them.
- */
 const documentNaming = (subject: SyntheticSubject): string =>
   "# Erasure rehearsal\n\n" +
   `The drill's synthetic document. It names the rehearsal's subject, ${subject.name}, ` +
@@ -196,8 +188,6 @@ const conceptSeeded = async (
       status: "stable",
     },
   );
-  // A re-run meets its own seed as merge-key-taken; path-taken is another concept at the drill's
-  // path, which no drill may run against.
   if (written.ok || written.error === "merge-key-taken") return ok(undefined);
   return err(new Error(`erasure: the rehearsal's concept was refused: ${String(written.error)}`));
 };
@@ -232,7 +222,6 @@ const documentSeeded = async (
   const text = new TextEncoder().encode(documentNaming(subject));
   const bound = await connectUpload(writer, doors, {
     ...connectUploadFields.parse({
-      // A re-run connects under the standing id, which the connect answers with its first outcome.
       connectedSourceId: standing.value ?? ulid(),
       name: DOCUMENT_CONNECTED_SOURCE,
       fileName,
@@ -252,7 +241,6 @@ const documentSeeded = async (
 };
 
 /* jscpd:ignore-start */
-/** A rerun finds the person, member row, concept and connected source the first run seeded. */
 export const seedSyntheticSubject = async (
   platform: ErasurePrincipal,
   doors: ErasureDoors,
@@ -310,7 +298,6 @@ const recordTheRehearsal = async (
   return auditEventId;
 };
 
-/** A too-broad refusal's word, never its sentence, which quotes the identifier. */
 const refusalWordOf = (refused: RecordSubjectRequestRefusal): string =>
   typeof refused === "string" || refused instanceof Error ? String(refused) : refused.word;
 

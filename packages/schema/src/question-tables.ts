@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { check, foreignKey, index, jsonb, primaryKey, text } from "drizzle-orm/pg-core";
 
 import { ACTOR_ID_PATTERN } from "./actor-id.ts";
+import type { DraftedSentence, RecordConcept } from "./boundary-schemas.ts";
 import { listed, stamp } from "./column-helpers.ts";
 import { ROLES } from "./roles.ts";
 import { withRLS } from "./with-rls.ts";
@@ -12,11 +13,9 @@ export type QuestionVerdict = (typeof QUESTION_VERDICTS)[number];
 export const JUDGE_STATES = ["not-judged", "judged", "judging-failed"] as const;
 export type JudgeState = (typeof JUDGE_STATES)[number];
 
-/** The judge's word on one candidate. */
 export const CANDIDATE_VERDICTS = ["yes", "no"] as const;
 export type CandidateVerdict = (typeof CANDIDATE_VERDICTS)[number];
 
-/** Where a question was asked: through an assistant, or on the Ask page. */
 export const QUESTION_TRANSPORTS = ["mcp", "trpc"] as const;
 export type QuestionTransport = (typeof QUESTION_TRANSPORTS)[number];
 
@@ -31,14 +30,9 @@ export const FEEDBACK_REASONS = [
   "should-not-have-shown",
 ] as const;
 
-/** How an Admin closes a flag: the knowledge was at fault and is fixed, or it was not at fault. */
 export const FLAG_CLOSINGS = ["fixed-in-the-knowledge", "no-fault-in-the-knowledge"] as const;
 export type FlagClosing = (typeof FLAG_CLOSINGS)[number];
 
-/**
- * A record's skeleton, kept for good. `concepts` names each by IRI with no foreign key, so a
- * record outlives a concept it returned.
- */
 export const questionAsked = withRLS(
   "question_asked",
   {
@@ -46,27 +40,22 @@ export const questionAsked = withRLS(
     id: text("id").notNull(),
 
     askedAt: stamp("asked_at").notNull(),
-    /** `human:<person id>`, which an erasure rewrites to the erasure pseudonym. */
     askedBy: text("asked_by").notNull(),
     transport: text("transport").notNull(),
     collections: text("collections").array().notNull().default([]),
-    /** The predicate that applied: the role and the groups the asker read under. */
     predicateRole: text("predicate_role").notNull(),
     predicateGroups: text("predicate_groups").array().notNull().default([]),
 
     completedAt: stamp("completed_at"),
     verdict: text("verdict"),
     judgeState: text("judge_state"),
-    /** Each returned or cited concept: its IRI, its content hash and trust then, the judge's word. */
-    concepts: jsonb("concepts").notNull().default([]),
-    /** Locators alone: a passage's text stays in the index. */
+    concepts: jsonb("concepts").$type<RecordConcept[]>().notNull().default([]),
     unmappedPassages: text("unmapped_passages").array().notNull().default([]),
   },
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
     index("question_asked_workspace_id_asked_by_idx").on(table.workspaceId, table.askedBy),
-    /** Questions asked pages newest first, so a page reads its rows and not the workspace's. */
     index("question_asked_workspace_id_asked_at_id_idx").on(
       table.workspaceId,
       table.askedAt.desc(),
@@ -98,10 +87,6 @@ export const questionAsked = withRLS(
   ],
 );
 
-/**
- * The migration partitions it by the month of `asked_at`: a month's content leaves by dropping
- * its partition, and no statement thins a row.
- */
 export const questionContent = withRLS(
   "question_content",
   {
@@ -111,8 +96,7 @@ export const questionContent = withRLS(
     askedAt: stamp("asked_at").notNull(),
 
     question: text("question").notNull(),
-    /** Null unless the platform drafted: each sentence with the concepts its footnotes name. */
-    drafted: jsonb("drafted"),
+    drafted: jsonb("drafted").$type<DraftedSentence[]>(),
   },
   "workspaceId",
   (table) => [
@@ -137,7 +121,6 @@ export const questionFeedback = withRLS(
     recordId: text("record_id").notNull(),
 
     givenAt: stamp("given_at").notNull(),
-    /** As `question_asked.asked_by`, and rewritten with it. */
     givenBy: text("given_by").notNull(),
 
     verdict: text("verdict").notNull(),
@@ -145,10 +128,8 @@ export const questionFeedback = withRLS(
     note: text("note"),
 
     disputedSentence: text("disputed_sentence"),
-    /** The IRI the disputed sentence rested on, with no foreign key. */
     disputedConcept: text("disputed_concept"),
 
-    /** Who closed it is the audit event's actor alone: the row is kept for good. */
     closedAs: text("closed_as"),
     closedAt: stamp("closed_at"),
   },
@@ -172,7 +153,6 @@ export const questionFeedback = withRLS(
       "question_feedback_reason_check",
       sql.raw(`reason IS NULL OR reason IN (${listed(FEEDBACK_REASONS)})`),
     ),
-    // A concept may outlive its sentence: an erasure clears the sentence and keeps what it rested on.
     check(
       "question_feedback_flag_check",
       sql.raw(

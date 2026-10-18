@@ -8,7 +8,6 @@ type Api = ReturnType<typeof useTRPC>;
 
 type QuestionsAskedPage = inferOutput<Api["questions"]["asked"]>;
 
-/** One record as the reading Admin may read it now: a concept they cannot read is simply absent. */
 export type AskedRecord = QuestionsAskedPage["records"][number];
 
 export type Feedback = AskedRecord["feedback"][number];
@@ -24,7 +23,6 @@ export const isAFlag = (feedback: Feedback): boolean => feedback.verdict === FLA
 export const isOpen = (feedback: Feedback): boolean =>
   isAFlag(feedback) && feedback.closedAt === null;
 
-/** Flagged first, then newest, a page at a time; the cursor goes back as the page served it. */
 export const useQuestionsAsked = () => {
   const api = useTRPC();
   return useInfiniteQuery(
@@ -39,7 +37,6 @@ export type QuestionsAsked = ReturnType<typeof useQuestionsAsked>;
 
 export type Closing = { readonly feedbackId: string; readonly closedAs: FlagClosing };
 
-/** Shown until the read answers again with the instant the api recorded. */
 const nowSaid = (): string => new Date().toISOString();
 
 const closedIn = (record: AskedRecord, closing: Closing, at: string): AskedRecord => {
@@ -55,19 +52,16 @@ const closedIn = (record: AskedRecord, closing: Closing, at: string): AskedRecor
 const holdsTheFlag = (page: QuestionsAskedPage, closing: Closing): boolean =>
   page.records.some((record) => record.feedback.some((given) => given.id === closing.feedbackId));
 
-/** A page without the flag keeps its reference, so nothing reading it draws again. */
 const pageClosed = (page: QuestionsAskedPage, closing: Closing, at: string): QuestionsAskedPage =>
   holdsTheFlag(page, closing)
     ? { ...page, records: page.records.map((record) => closedIn(record, closing, at)) }
     : page;
 
-/** What a closing says once answered; held by the hook, so a sheet closed meanwhile loses nothing. */
 type ClosingSaid = {
   readonly onClosed: (closing: Closing) => void;
   readonly onRefused: (failure: ApiError) => void;
 };
 
-/** Reads as done at once. Its undo restores a whole snapshot, so a caller runs one closing at a time. */
 export const useCloseFlag = (said: ClosingSaid) => {
   const api = useTRPC();
   const queryClient = useQueryClient();

@@ -9,10 +9,6 @@ import {
 } from "@/shared/page-toolbar.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs.tsx";
 
-/**
- * Derived, not reset: an id is the declaring page's own, so a page that does not declare
- * the pick opens on its first tab.
- */
 export const openTabIn = (
   tabs: readonly PageTab[] | undefined,
   picked: string | undefined,
@@ -20,10 +16,8 @@ export const openTabIn = (
 
 export type PickedTab = readonly [string | undefined, (picked: string | undefined) => void];
 
-/** Opens on the first tab until one is picked; with no tabs, it holds the view-state slot alone. */
 export function PageTabsRoot(properties: {
   readonly tabs: readonly PageTab[] | undefined;
-  /** The frame's, so the band names the open tab; a root drawn alone keeps its own. */
   readonly picked?: PickedTab;
   readonly children: ReactNode;
 }) {
@@ -32,35 +26,22 @@ export function PageTabsRoot(properties: {
 
   const openTab = openTabIn(properties.tabs, picked)?.id;
 
-  /** Inside the tabs root, so the slot spans every part of the page and each sees one value. */
   const spanned = <ViewStateSlot>{properties.children}</ViewStateSlot>;
 
   if (openTab === undefined) return spanned;
 
   return (
-    // Spanning the toolbar and the content leaves the whole pattern to the registry: its
-    // arrow keys above, its own tabpanel below.
-    <Tabs
-      value={openTab}
-      onValueChange={setPicked}
-      // Out of the layout: the regions stay the content column's own children.
-      className="contents"
-    >
+    <Tabs value={openTab} onValueChange={setPicked} className="contents">
       <OpenTabProvider openTab={openTab}>{spanned}</OpenTabProvider>
     </Tabs>
   );
 }
 
-/** The open tab's panel; with no tab open, its children as they are. */
 export function PagePanel(properties: { readonly children: ReactNode }) {
   const openTab = useOpenTab();
   if (openTab === undefined) return <>{properties.children}</>;
 
-  // The shell's half of the pattern, not the page's: an open tab must control a panel even
-  // where the page inside it failed to draw.
   return (
-    // Keyed, so a picked tab draws on a subtree of its own and asks again for a page that
-    // threw on the last one.
     <TabsContent key={openTab} value={openTab}>
       {properties.children}
     </TabsContent>

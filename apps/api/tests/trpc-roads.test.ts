@@ -94,7 +94,6 @@ const A_SIGNED_IN_PERSON = {
 
 const wire = z.object({ error: z.object({ data: z.object({ refusal: z.unknown() }) }) });
 
-/** No procedure built here asks, so none calls a model. */
 const NO_MODEL = {
   credentials: undefined,
   models: {
@@ -122,7 +121,6 @@ const contextOf = (
   mail: { send: async () => {}, publicUrl: "https://app.example.test" },
 });
 
-/** A procedure whose action answers `answered`, asked as the web asks, through tRPC's own handler. */
 const refusalCrossing = async (
   answered: RefusalAnswer,
   standing: SecondFactorStanding = A_SIGNED_IN_PERSON.standing,
@@ -222,7 +220,6 @@ describe("a pending session crossing tRPC", () => {
 
 const app = appForSuite();
 
-/** One body on both member roads: the same write, through each road's own resolver. */
 const writingRoads = (key: string) => {
   const probeWrite = async (principal: UserPrincipal, tx: Tx) => {
     await configProbeWritten(tx, principal.workspaceId, key);
@@ -243,11 +240,9 @@ type Road = "queried" | "mutated";
 type Asking = {
   readonly readSession: GatedSessionReader;
   readonly log: Logger;
-  /** The workspace the tab names, where it names one. */
   readonly held?: string;
 };
 
-/** Asked as the web asks: a query over GET, a mutation over POST. */
 const askedOver = (road: Road, roads: AnyRouter, { readSession, log, held }: Asking) =>
   fetchRequestHandler({
     endpoint: "/trpc",
@@ -278,7 +273,6 @@ const signedInAs =
     standing: "not-required" as const,
   });
 
-/** Asked as a workspace's Admin. */
 const askedAsAnAdmin = async (road: Road) => {
   const workspace = await app().provision();
   const key = `probe-${workspace.workspaceId}`;
@@ -297,7 +291,6 @@ const askedAsAnAdmin = async (road: Road) => {
 
 const failedLine = z.object({ action: z.string(), err: z.object({ code: z.string() }) });
 
-/** One body on both operator roads: the operator renames themselves, which needs no workspace. */
 const operatorWritingRoads = (name: string) => {
   const probeWrite = async (operator: OperatorPrincipal, tx: Tx) => {
     await tx.query('UPDATE "user" SET name = $2 WHERE id = $1', [operator.userId, name]);
@@ -313,7 +306,6 @@ const operatorWritingRoads = (name: string) => {
   });
 };
 
-/** Asked as the operator: a workspace's Admin who carries the mark. */
 const askedAsTheOperator = async (road: Road) => {
   const workspace = await app().provision();
   await app().markOperator(workspace.admin.email, "grant");
@@ -411,7 +403,6 @@ const answeredWord = z.object({
     .optional(),
 });
 
-/** An Admin of two workspaces whose session names the second, as after a switch in another tab. */
 const switchedAway = async () => {
   const left = await app().provision();
   const here = await app().provision();
@@ -421,7 +412,6 @@ const switchedAway = async () => {
   return { client, left, here };
 };
 
-/** A query asked over GET with no input, by a tab holding `held` when one is given. */
 const queriedFromATab = (client: TestClient, path: string, held?: string): Promise<Response> =>
   client.fetch(`${TRPC_ENDPOINT}/${path}`, {
     headers: held === undefined ? {} : { [TAB_WORKSPACE_HEADER]: held },
@@ -430,7 +420,6 @@ const queriedFromATab = (client: TestClient, path: string, held?: string): Promi
 const wordOf = async (answered: Response): Promise<string | undefined> =>
   answeredWord.parse(await answered.json()).error?.data.refusal?.word;
 
-/** The read that tells a tab where the session is, so the tab can always learn it. */
 const MEMBER_READ = "session.member";
 
 const memberRead = z.object({
@@ -444,7 +433,6 @@ describe("every query the router serves on a workspace road", () => {
       ([path, procedure]) => !namesNoWorkspace(procedure) && path !== MEMBER_READ,
     ).map(([path]) => path);
 
-    // Asked with no input, so only a road that judges ahead of the parse answers the word.
     const words: (readonly [string, string | undefined])[] = [];
     for (const path of paths) {
       words.push([path, await wordOf(await queriedFromATab(client, path, left.workspaceId))]);
@@ -505,7 +493,6 @@ describe("every mutation the router serves", () => {
       ([path]) => path,
     );
 
-    // Asked with no input, so only a road that judges ahead of the parse answers the word.
     const words: (readonly [string, string | undefined])[] = [];
     for (const path of paths) {
       const answered = await postedFromATab(

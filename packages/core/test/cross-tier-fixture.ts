@@ -14,7 +14,6 @@ export const THE_PASSAGE =
   "Overtime is paid at time and a quarter after the fortieth hour.\n\n" +
   "The sort code is [withheld].\n";
 
-/** `THE_PASSAGE` as a rendering quotes it: every line, the empty one its last newline leaves too. */
 export const THE_PASSAGE_QUOTED =
   "> # The depot handbook\n> \n" +
   "> Overtime is paid at time and a quarter after the fortieth hour.\n> \n" +
@@ -74,7 +73,6 @@ export type ConnectedSourceDoors = {
   readonly objects: ObjectDoor;
 };
 
-/** Binds `text` as an Internal Markdown upload of a file named `called`; throws when refused. */
 export const connectTheHandbook = async (
   admin: UserPrincipal,
   doors: ConnectedSourceDoors,

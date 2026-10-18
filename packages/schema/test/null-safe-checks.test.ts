@@ -140,7 +140,6 @@ const guardsAmong = (tree: Extract<Tree, { kind: "node" }>): readonly string[] =
 /** A NULL written into a CHECK answers as a NULL column does, so `x IN ('a', NULL)` is a read. */
 const WRITTEN_NULL = "NULL";
 
-/** `undefined` when the walk must go below the node to find what it reads. */
 const readsAt = (
   at: Extract<Tree, { kind: "node" }>,
   nullable: ReadonlyMap<string, string>,
@@ -179,10 +178,6 @@ type UnsafeCheck = {
   readonly reads: readonly string[];
 };
 
-/**
- * Reads columns and written NULLs only: a subscript, field or function answering NULL on a
- * non-NULL value, as `->` on an absent key, passes unseen.
- */
 const unsafeChecks = async (client: pg.PoolClient): Promise<readonly UnsafeCheck[]> => {
   const { rows } = await client.query<{
     check: string;

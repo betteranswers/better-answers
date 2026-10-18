@@ -38,7 +38,6 @@ export const answeredValue = <T>(answer: Result<T, unknown>): T => {
   return answer.value;
 };
 
-/** When to ask again, if the action answered a ceiling met. */
 export const ceilingOf = (answer: Result<unknown, unknown>): number | undefined =>
   !answer.ok && answer.error instanceof CeilingMet ? answer.error.retryAfterSeconds : undefined;
 
@@ -77,7 +76,6 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
       now,
     );
 
-  /** One address, answering its one invitation as the action answered it. */
   const invite = async (
     workspace: ProvisionedWorkspace,
     address: string,
@@ -96,7 +94,6 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
       resendInvitation(principal, tx, { invitationId, now }),
     );
 
-  /** Five emails to `address` in the hour `INVITED_AT` falls in: an invitation and four resends. */
   const atTheCeiling = async (workspace: ProvisionedWorkspace, address: string) => {
     const invited = answeredValue(await invite(workspace, address, "Viewer"));
     for (let resend = 0; resend < 4; resend += 1) {
@@ -105,7 +102,6 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
     return invited;
   };
 
-  /** `count` new addresses invited in the hour `INVITED_AT` falls in, fifty a send. */
   const invitedMany = async (workspace: ProvisionedWorkspace, count: number) => {
     const sent: InvitationMinted[] = [];
     for (let left = count; left > 0; left -= 50) {
@@ -136,7 +132,6 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
       return person;
     });
 
-  /** A row as an accept or a past send left it, written beside the action. */
   const invitationLeft = (
     workspace: ProvisionedWorkspace,
     row: { readonly email: string; readonly status: string; readonly expiresAt?: Date },
@@ -186,18 +181,15 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
     return counted.rows[0]?.count;
   };
 
-  /** The emails counted to `address` from this workspace, in every window. */
   const emailsCountedTo = (workspace: ProvisionedWorkspace, address: string) =>
     countedUnder(
       workspace,
       createHash("sha256").update(`${workspace.workspaceId}:${address}`).digest("hex"),
     );
 
-  /** The emails counted from this workspace to any address, in every window. */
   const emailsCountedFrom = (workspace: ProvisionedWorkspace) =>
     countedUnder(workspace, "workspace");
 
-  /** Marks the workspace with a testing domain of its own, answering an address on it. */
   const marked = async (workspace: ProvisionedWorkspace) => {
     const testingDomain = `${ulid().toLowerCase()}.testing.invalid`;
     await seedingWith(db().pool, (seed) =>

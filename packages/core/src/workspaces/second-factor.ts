@@ -34,7 +34,6 @@ import { holdThePerson } from "./person-lock.ts";
 import { issuingRecoveryCodes, type RecoveryCodesMade } from "./recovery-codes.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** Ids alone: an authenticator has no name, and its secret never leaves the library's row. */
 const SECOND_FACTOR_ACTIONS = declareIdentitySetActions("people", {
   authenticatorAdded: action("people.person.authenticator_added", { authenticatorId: "id" }),
   authenticatorRemoved: action("people.person.authenticator_removed", { authenticatorId: "id" }),
@@ -42,11 +41,9 @@ const SECOND_FACTOR_ACTIONS = declareIdentitySetActions("people", {
 
 export const ADMIN: Role = "Admin";
 
-/** Whether the person `person` aliases must hold a second factor; `$2` binds `ADMIN`. */
 export const mustHoldOneOf = (person: string): string =>
   `${person}.operator OR EXISTS (SELECT 1 FROM member m WHERE m.user_id = ${person}.id AND m.role = $2)`;
 
-/** A person's action on their own second factor: they are its actor and its subject. */
 export const recordingTheirOwn = async <A extends AuditAction>(
   platform: PlatformPrincipal,
   tx: Tx,
@@ -66,11 +63,9 @@ export const recordingTheirOwn = async <A extends AuditAction>(
 type AuthenticatorState = "none" | "awaiting-code" | "set-up";
 
 type Facts = {
-  /** An Admin in any workspace, or the operator. */
   readonly mustHoldOne: boolean;
   readonly operator: boolean;
 
-  /** Made an Admin or the operator and not yet confirmed since. */
   readonly promoted: boolean;
   readonly passkeys: number;
   readonly authenticator: AuthenticatorState;
@@ -80,7 +75,6 @@ type Facts = {
   readonly codesAcknowledged: boolean;
   readonly passkeyOfferDismissed: boolean;
 
-  /** Restored by the operator: setting up a factor waits on the restore code. */
   readonly restoreRequired: boolean;
 };
 
@@ -118,10 +112,7 @@ type Stamp = Pick<SetUpInput, "sessionId" | "at"> & {
   readonly carried?: SetUpInput["carried"];
 };
 
-/**
- * Stamps only the person's own session; false, having stamped nothing, for any other. With nothing
- * carried, `LEAST` skips the nulls, so the session keeps its own age.
- */
+/** With nothing carried, `LEAST` skips the nulls, so the session keeps its own age. */
 export const stamping = async (tx: Tx, input: Stamp): Promise<boolean> => {
   const stamped = await tx.query(
     `UPDATE session SET second_factor_confirmed_at = $3, pending_since = NULL,
@@ -138,10 +129,6 @@ export const stamping = async (tx: Tx, input: Stamp): Promise<boolean> => {
   return stamped.rowCount === 1;
 };
 
-/**
- * A confirmation does not outlive the factor that may have made it, so every other session of
- * the person confirms again; the session that removed it acted as itself.
- */
 export const unconfirmingTheOthers = async (
   tx: Tx,
   personId: UserId,
@@ -156,14 +143,9 @@ export const unconfirmingTheOthers = async (
 export type SetUpInput = {
   readonly personId: string;
 
-  /** The session the setup ended in: the library's new one when its verify swapped them. */
   readonly sessionId: string;
   readonly at: Date;
 
-  /**
-   * The age of the session the setup began in: revocation and freshness date from creation, so a
-   * swapped-in session is made no younger.
-   */
   readonly carried: { readonly createdAt: Date; readonly expiresAt: Date };
 };
 
@@ -171,10 +153,8 @@ type AuthenticatorSetUp = {
   readonly authenticatorId: string;
   readonly stamped: boolean;
 
-  /** False when another finish recorded this authenticator first, so this one sends no notice. */
   readonly firstRecord: boolean;
 
-  /** Issued only to a person who held none, and shown to them once. */
   readonly issued: RecoveryCodesMade | undefined;
 };
 
@@ -184,10 +164,6 @@ export type RecordAuthenticatorSetUpRefusal = WorkspaceRefusal<
 
 type SetUpAnswer = Result<AuthenticatorSetUp, "person-gone" | "no-authenticator">;
 
-/**
- * Two finishes at once can both pass the route's check: the second waits on the lock, then finds
- * the first's row and records nothing.
- */
 const recordingOnce = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -227,8 +203,8 @@ const settingUp = async (
 };
 
 /**
- * Called once the library has verified the person's first code: records the authenticator, counts
- * the setup as the session's confirmation, and issues recovery codes to a person who holds none.
+ * Called once the library has verified the person's first code. Confirms the session; issues
+ * recovery codes to a person who holds none.
  */
 export const recordAuthenticatorSetUp = async (
   platform: PlatformPrincipal,
@@ -277,8 +253,8 @@ const removing = async (
 };
 
 /**
- * The person is the one caller. An Admin in any workspace, or the operator, keeps their last
- * second factor: the check runs under the person's lock, so two removals cannot each leave one.
+ * The person is the one caller. An Admin in any workspace, or the operator, keeps their last second
+ * factor: two removals cannot each leave one.
  */
 export const removeAuthenticator = async (
   platform: PlatformPrincipal,
@@ -297,7 +273,6 @@ export const removeAuthenticator = async (
   return removed.value;
 };
 
-/** Every instant is ISO, as it crosses the wire; a passkey never used has no last use. */
 type PasskeyHeld = {
   readonly id: string;
   readonly name: string | null;
@@ -328,11 +303,9 @@ type SessionRow = {
   readonly confirmedAt: Date | null;
   readonly setupGranted: boolean;
 
-  /** The name of the session's workspace when the person is an Admin there. */
   readonly adminOf: string | null;
 };
 
-/** As the wire carries it: the session's confirmation named by an ISO instant. */
 type ThisSession = Omit<SessionRow, "confirmedAt"> & {
   readonly confirmedAt: string | null;
   readonly standing: SecondFactorStanding;
@@ -344,13 +317,11 @@ export type SecondFactorHeld = {
   readonly promoted: boolean;
   readonly passkeys: readonly PasskeyHeld[];
   readonly authenticator: AuthenticatorState;
-  /** `madeAt` is an ISO instant, as it crosses the wire. */
   readonly recoveryCodes: { readonly unused: number; readonly madeAt: string } | undefined;
   readonly codesAcknowledged: boolean;
   readonly passkeyOfferDismissed: boolean;
   readonly restoreRequired: boolean;
 
-  /** Seconds before each kind of code may be tried again. */
   readonly waits: WaitSeconds;
 
   /** Only when the read names a session: one the person does not hold is neither. */
@@ -376,10 +347,6 @@ const heldOf = (facts: Facts, around: Around): SecondFactorHeld => ({
   thisSession: around.thisSession,
 });
 
-/**
- * Of session `$1`, held by person `$2`. A grant made before the operator's restore never saw their
- * restore code, so it lapses.
- */
 export const SETUP_GRANTED = `
   setup_granted_at IS NOT NULL
     AND setup_granted_at >= COALESCE(
@@ -439,7 +406,6 @@ const reading = async (
 
 type PersonRead<T> = Result<T, WorkspaceRefusal<"malformed" | "person-gone"> | Error>;
 
-/** One read of a person's own rows by an id the caller hands in, refused where none is held. */
 const readOfThePerson = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -456,7 +422,7 @@ const readOfThePerson = async <T>(
   return answered.value === undefined ? err("person-gone") : ok(answered.value);
 };
 
-/** What the person's own Sign-in section and the confirm pages show; nothing in it is a secret. */
+/** Nothing in it is a secret. */
 export const readSecondFactor = (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -485,21 +451,19 @@ const credentialsOf = async (tx: Tx, personId: UserId): Promise<CredentialsHeld 
   return { address, passkeys, authenticator: facts.authenticator === "set-up" };
 };
 
-/** What the held read says of the acting session's confirmation, as the freshness rule reads it. */
 const confirmedAtMsOf = (held: SecondFactorHeld): number | null => {
   const confirmedAt = held.thisSession?.confirmedAt;
   return confirmedAt === undefined || confirmedAt === null ? null : Date.parse(confirmedAt);
 };
 
 /**
- * A person who already holds a factor confirms within the hour before changing one; a first
- * factor has nothing to confirm against and needs none.
+ * A person who already holds a factor confirms within the hour before changing one; a first factor
+ * needs none.
  */
 export const factorChangeStale = (held: SecondFactorHeld, at: Date): boolean =>
   (held.passkeys.length > 0 || held.authenticator === "set-up") &&
   !requireFreshConfirmation({ secondFactorConfirmedAtMs: confirmedAtMsOf(held) }, at).ok;
 
-/** What a promotion's notice lists: the address, and every credential that can confirm a sign-in. */
 export const readCredentialsHeld = (
   platform: PlatformPrincipal,
   door: PostgresDoor,

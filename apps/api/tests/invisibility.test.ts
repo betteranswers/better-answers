@@ -448,7 +448,6 @@ const MINUTES_TITLE = "Minutes of the board, March 2026";
 const MINUTES_TEXT = "The board approved the kingfisher review in closed session.";
 const HERON_TITLE = "Heron policy";
 
-/** A concept citing a passage, Restricted minutes no evidence row holds, and a page. */
 const aConceptCitingRestrictedMinutes = async () => {
   const workspace = await app.provision();
   const viewer = await app.person();

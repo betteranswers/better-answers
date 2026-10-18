@@ -9,10 +9,8 @@ import {
   type Theme,
 } from "@/shared/theme-switch.ts";
 
-/** A theme kept on this browser, or the device's. */
 export type ThemeChoice = Theme | "device";
 
-/** The choice made in this tab, which holds when the browser refuses to keep it. */
 let chosenHere: ThemeChoice | undefined;
 
 const kept = (): string | null => {
@@ -25,7 +23,6 @@ const choiceKept = (): ThemeChoice => {
   return theme === "light" || theme === "dark" ? theme : "device";
 };
 
-/** Undefined where the browser answers no media query, as a test's document does not. */
 const device = (): MediaQueryList | undefined =>
   typeof matchMedia === "function" ? matchMedia(DEVICE_DARK) : undefined;
 
@@ -56,7 +53,6 @@ export const chooseTheme = (choice: ThemeChoice): void => {
 
 export const useThemeChoice = (): ThemeChoice => useSyncExternalStore(subscribe, choiceKept);
 
-/** Mounted once: the page follows the device while no theme is kept, and another tab's choice. */
 export const useThemeFollowed = (): void => {
   useEffect(() => {
     shown();

@@ -73,7 +73,6 @@ test("offers a way out, shell intact, when a page throws", async ({
   await expect(navigation.getByRole("link", { name: "Audit Log" })).toBeVisible();
 
   await skipLinkReachesThePage(page);
-  // The tabs lead the content, then the open tab's panel, so the way out is the stop after it.
   await page.keyboard.press("Tab");
   await expect(page.getByRole("tab", { name: "Model Choices" })).toBeFocused();
   await page.keyboard.press("Tab");
@@ -83,7 +82,6 @@ test("offers a way out, shell intact, when a page throws", async ({
 
   await passesTheAccessibilityGate();
 
-  // The toolbar stands too, and its other tab is a way back in: the page is asked again.
   await expect(page.getByRole("tab", { name: "Model Choices" })).toHaveAttribute(
     "aria-selected",
     "true",

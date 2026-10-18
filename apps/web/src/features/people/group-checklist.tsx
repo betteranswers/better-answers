@@ -11,7 +11,6 @@ import { outcomeOfGroupFailure } from "./refusal.tsx";
 type Choice = {
   readonly id: string;
   readonly label: string;
-  /** A member's address, read out after the label as the box's description. */
   readonly detail: string | undefined;
   readonly checked: boolean;
 };
@@ -22,10 +21,6 @@ type Pair = {
   readonly group: string;
 };
 
-/**
- * The multi-select both sheets carry: each box puts one member in one group, or takes them out,
- * the moment it is ticked or cleared.
- */
 export function GroupChecklist(properties: {
   readonly legend: string;
   readonly hint: string;
@@ -57,7 +52,6 @@ export function GroupChecklist(properties: {
 
   return (
     <>
-      {/* Boxless, so the line takes none of its card's gaps while it is empty. */}
       <OutcomeLine outcome={outcome} className="contents" />
       <fieldset ref={listRef} aria-describedby={ids.hint} className="grid gap-3">
         <legend className="sr-only">{legend}</legend>

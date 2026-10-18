@@ -72,7 +72,6 @@ describe("the api's health endpoint", () => {
   });
 
   it("reports unhealthy when the identity provider could not start", async () => {
-    // Several runs can share one server, so the scratch name carries this process.
     const unmigrated = `unmigrated_${String(process.pid)}`;
     await app.database.superuser.query(`DROP DATABASE IF EXISTS ${unmigrated} WITH (FORCE)`);
     await app.database.superuser.query(`CREATE DATABASE ${unmigrated}`);

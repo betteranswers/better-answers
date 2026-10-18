@@ -34,7 +34,6 @@ const NO_SESSION: Answer = {
   },
 };
 
-/** What the api answers a console read asked by a person without the mark. */
 const WITHOUT_THE_MARK: Answer = {
   error: {
     message: NOT_THE_OPERATOR,
@@ -47,7 +46,6 @@ const WITHOUT_THE_MARK: Answer = {
   },
 };
 
-/** What the api answers the read of a person erased since the list was read. */
 const SINCE_ERASED: Answer = {
   error: {
     message: "no-such-user",
@@ -60,10 +58,6 @@ const SINCE_ERASED: Answer = {
   },
 };
 
-/**
- * The api answers a batch as one array, one entry per procedure it names; a read neither `held` nor
- * `refused` is empty.
- */
 const answering =
   (
     standing: Answer,
@@ -76,7 +70,6 @@ const answering =
 
     const answerTo = (name: string): Answer => {
       if (name === "session.operator") return standing;
-      // The shell reads the second factor wherever it draws, and the dialog shares that read.
       return (
         refused.get(name) ?? {
           result: { data: held[name] ?? (name === "person.secondFactor" ? NOTHING_HELD : []) },
@@ -88,7 +81,6 @@ const answering =
 
 const THE_OPERATOR: Answer = { result: { data: { operator: true, name: "Ada" } } };
 
-/** The shell's own second-factor read, answered as a person holding nothing is. */
 const NOTHING_HELD = {
   mustHoldOne: false,
   operator: false,
@@ -134,7 +126,6 @@ const NAMES_WAITING = [
   { personId: "p2", displayName: "Sam Okoro", flags: [flaggedBy(DALES)] },
 ];
 
-/** The header row is a row too, so a list's own rows are the ones with a cell. */
 const rowsOf = (list: HTMLElement): readonly HTMLElement[] =>
   within(list)
     .getAllByRole("row")
@@ -142,7 +133,6 @@ const rowsOf = (list: HTMLElement): readonly HTMLElement[] =>
 
 const textOf = (each: HTMLElement): string => each.textContent;
 
-/** Each of `words` found after the one before it, as a reader meets them down the page. */
 const readsInOrder = (page: HTMLElement, words: readonly string[]): boolean => {
   let from = 0;
   for (const each of words) {
@@ -243,7 +233,6 @@ const EVERY_WORKSPACE = "/console/workspaces/every-workspace";
 
 const NAMES_WAITING_PAGE = "/console/people/names-waiting";
 
-/** The names the page gives each list's region and its search box. */
 const WORKSPACES_LIST = { heading: "Every Workspace", search: "Search by name or short name" };
 
 const NAMES_WAITING_LIST = { heading: "Names Waiting", search: "Search by name or workspace" };
@@ -413,7 +402,6 @@ const PRIYA = {
   credentialsRevokedAt: null,
 };
 
-/** Priya's sheet, opened from Everyone, whose read of what she holds the api refuses. */
 const sheetRefusedWith = async (refusal: Answer) => {
   vi.stubGlobal(
     "fetch",

@@ -52,11 +52,6 @@ import type { Acceptance } from "./index.ts";
 import { markDeciding } from "./suggestions.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
 
-/**
- * Commits as the member with their member row held until the commit is in git, so ending the
- * member waits for a commit under way and refuses one that starts after it. The repository lock
- * cannot: it fences one process, and the erasure routine runs in another.
- */
 export const commitAsMember = async (
   principal: UserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
@@ -69,7 +64,6 @@ export const commitAsMember = async (
   return held.value.ok ? held.value.value : err(held.value.error);
 };
 
-/** Title-cases each word and drops a plural: `policies` and `Policy` both fold to `Policy`. */
 export const foldKind = (kind: string): string =>
   kind.replaceAll(/\S+/g, (word) => {
     const cased = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
@@ -79,7 +73,6 @@ export const foldKind = (kind: string): string =>
     return cased.slice(0, -1);
   });
 
-/** Trims the title, collapses its whitespace and lower-cases it; the kind is used as given. */
 export const mergeKeyOf = (foldedKind: string, title: string): string =>
   `${foldedKind}:${title.trim().replaceAll(/\s+/g, " ").toLowerCase()}`;
 
@@ -119,7 +112,6 @@ type HeldRow = {
   readonly published_at: Date | null;
 };
 
-/** `undefined` when no concept holds `iri`, or when a user principal may not read it. */
 export const heldByIri = async (
   principal: Principal,
   tx: Tx,
@@ -156,7 +148,6 @@ export const heldByIri = async (
       };
 };
 
-/** The IRI at `path` whatever its visibility; `undefined` when no concept holds the path. */
 export const holderOfPath = async (
   principal: Principal,
   tx: Tx,
@@ -169,7 +160,6 @@ export const holderOfPath = async (
   return found.rows[0]?.iri;
 };
 
-/** True when the workspace holds every listed source document, and for an empty list. */
 export const holdsEveryDocument = async (
   principal: Principal,
   tx: Tx,
@@ -236,11 +226,6 @@ const rowVisibilityOf = (facts: RowFacts, held: Held | undefined) =>
         audienceGroups: held.audienceGroups,
       };
 
-/**
- * The status is the one asked for, else the file's, else the held row's, else draft. A held
- * concept keeps its visibility and its publication time; `now` stamps a published row that has
- * none.
- */
 export const indexRowOf = (facts: RowFacts, held: Held | undefined, now: Date) => {
   const status = statusOf(facts, held);
   return conceptRow.safeParse({
@@ -325,11 +310,6 @@ const landEvidence = async (
   await replaceCitations(principal, tx, iri, evidence);
 };
 
-/**
- * Writes the concept's identity, evidence, citations, index row, bundle commit and map delta,
- * recomputes write-ups when its visibility moved, and decides an accepted suggestion.
- * @throws when somebody else decided that suggestion first.
- */
 export const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<void> => {
   await tx.query(
     `INSERT INTO concept_identity (workspace_id, iri, merge_key) VALUES ($1, $2, $3)
@@ -431,10 +411,6 @@ const landAcceptance = async (tx: Tx, index: Landing, acceptance: Acceptance): P
   );
 };
 
-/**
- * Swaps each `[before, after]` sha in `bundle_commit` and `concept_index`; answers how many bundle
- * commits changed.
- */
 export const moveBundleCommits = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -479,11 +455,6 @@ type RewrittenRow = {
   readonly content_hash: string;
 };
 
-/**
- * Re-reads each rewritten path at its indexed commit, refreshes the index row, and moves the
- * concept's verifications onto a changed hash.
- * @throws when the bundle holds a file the platform cannot read.
- */
 export const carryVerificationsOntoRewrite = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -510,8 +481,6 @@ export const carryVerificationsOntoRewrite = async (
     }
     const contentHash = contentHashOf(read.value.frontmatter, read.value.body, row.path);
 
-    // The hash leaves out keys a rewrite touches, `verified` among them, so the stored copy is
-    // compared whole; verifications move only with the hash.
     const reindexed = await tx.query(
       `UPDATE concept_index SET frontmatter = $3, body = $4, content_hash = $5
         WHERE workspace_id = ${scopeClause(1)} AND iri = $2

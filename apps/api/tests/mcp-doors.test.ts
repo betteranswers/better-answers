@@ -26,13 +26,10 @@ const app = appForSuite();
 
 type ServedEntry = Entry<z.ZodObject, z.ZodType>;
 
-/** A step refuses as the member's door does, or for groups that moved during the call. */
 type Steps = AskSteps<PrincipalRefusal | "changed-meanwhile">;
 
-/** What a probe keeps of the entry it stands for: its road, its name and what it declares. */
 type Declared = Pick<ServedEntry, "road" | "name" | "scopes" | "annotations">;
 
-/** The schemas are the probe's own, so the call reaches the action whatever its entry takes. */
 const PROBE = {
   title: "Probe",
   description: "Writes one row.",
@@ -41,10 +38,6 @@ const PROBE = {
   render: () => "landed",
 };
 
-/**
- * Writes through the transaction its road lends: its own, or its read step's. A road types its
- * own `run`, so each literal names both.
- */
 const writing = ({ road, ...declared }: Declared, key: string): ServedEntry => {
   const probe = { ...declared, ...PROBE };
   return road === "own-transaction"
@@ -68,7 +61,6 @@ const writing = ({ road, ...declared }: Declared, key: string): ServedEntry => {
       };
 };
 
-/** The bearer check alone is stood in for; the gate and the member resolve behind it are real. */
 const verifiedAs = (claims: {
   readonly workspaceId: string;
   readonly userId: string;
@@ -84,7 +76,6 @@ const verifiedAs = (claims: {
 
 const failedLine = z.object({ entry: z.string(), err: z.object({ code: z.string() }) });
 
-/** No probe calls a model: one that did would fail its call here. */
 const NO_MODEL: ModelClient & StreamingClient = {
   callModel: () => {
     throw new Error("a probe called a model");
@@ -97,7 +88,6 @@ const NO_MODEL: ModelClient & StreamingClient = {
   },
 };
 
-/** Called through the surface as a workspace's Admin, the probe standing for `declared`. */
 const calledAsAnAdmin = async (declared: Declared) => {
   const workspace = await app().provision();
   const key = `probe-${workspace.workspaceId}`;
@@ -144,7 +134,6 @@ const probe = (
   annotations: { readOnlyHint },
 });
 
-/** Postgres refused the write at its statement, and the transaction left no row. */
 const FAILED_AT_ITS_STATEMENT = {
   said: "probe failed.",
   rows: 0,

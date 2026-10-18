@@ -215,10 +215,7 @@ const credited = (person: NamedPerson | undefined): Credited => {
   return ok(person);
 };
 
-/**
- * Creates the workspace with its partition, its default config and the admin's member row at
- * `CREATOR_ROLE`. The admin must already exist and have a display name.
- */
+/** The admin must already exist and have a display name. */
 export const provisionWorkspace = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -446,14 +443,12 @@ export const endEverySignInAndTokenInput = z.object({
 });
 
 type EndEverySignInAndTokenInput = z.output<typeof endEverySignInAndTokenInput> & {
-  /** When the action happens: the sign-in's age is judged against it, and it is the revocation's. */
   readonly at: Date;
 };
 
 type CredentialsRevoked = {
   readonly personId: UserId;
 
-  /** Later than the `at` asked for where an earlier revocation already held a later instant. */
   readonly revokedAt: string;
 };
 
@@ -463,7 +458,6 @@ export type EndEverySignInAndTokenRefusal = WorkspaceRefusal<
 
 type CredentialsEnded = { readonly held: Date; readonly grants: readonly EndedGrant[] };
 
-/** Undefined, having changed nothing, when no person holds the id. */
 const endingCredentials = async (
   tx: Tx,
   personId: UserId,
@@ -482,8 +476,7 @@ const endingCredentials = async (
 
 /**
  * Ends every session and OAuth token the person was issued before the revocation instant, in every
- * workspace, and records the action under the operator. The instant only moves forward: an `at`
- * before the one held keeps the held one.
+ * workspace. The instant only moves forward.
  */
 export const endEverySignInAndToken = async (
   operator: OperatorPrincipal,
@@ -514,10 +507,6 @@ export type RevokeWorkspaceTokensInput = {
   readonly at: Date;
 };
 
-/**
- * The step inside an action's own transaction: the tokens whose consented workspace is this one. It
- * takes the principal its action admitted, and judges none.
- */
 export const endWorkspaceTokens = (
   _admitted: PlatformPrincipal | AdminUserPrincipal,
   tx: Tx,
@@ -525,11 +514,6 @@ export const endWorkspaceTokens = (
 ): Promise<TokensEnded> =>
   endTokens(tx, { personId: input.personId, before: input.at, workspaceId: input.workspaceId });
 
-/**
- * Ends the person's OAuth tokens for this workspace issued before `at`. Sessions are deliberately
- * untouched: a browser session belongs to the person, not to one workspace, so ending it would
- * reach another tenant.
- */
 export const revokeWorkspaceTokens = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -596,13 +580,12 @@ export const workspacesHeldBy = async (
 };
 
 type ReadWorkspacesHeldInput = {
-  /** The session's own person, never one the request names. */
   readonly personId: string;
 };
 
 /**
  * In name order; empty, not refused, for an id no person holds. A workspace where the person's
- * sign-ins were ended stays listed, since entering it is what refuses them.
+ * sign-ins were ended stays listed.
  */
 export const readWorkspacesHeld = async (
   platform: PlatformPrincipal,
@@ -637,7 +620,6 @@ export const workspaceIds = async (
   return ok(listed.value);
 };
 
-/** Undefined for a malformed short name, as for one no workspace holds. */
 export const workspaceIdByShortName = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

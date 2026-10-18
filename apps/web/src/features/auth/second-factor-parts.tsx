@@ -34,21 +34,17 @@ export const READ_AGAIN: Keystroke = { key: "r", action: ACCOUNT_ACTIONS.readAga
 
 const MS_PER_SECOND = 1000;
 
-/** The throttle's first wait, for a refusal whose answer named none. */
 const SHORTEST_WAIT_SECONDS = 30;
 
 export const holdsAFactor = (held: SecondFactor): boolean =>
   held.passkeys.length > 0 || held.authenticator === "set-up";
 
-/** The session the read names; one it cannot name is neither confirmed nor granted. */
 export const sessionOf = (held: SecondFactor) =>
   held.thisSession ?? { confirmed: false, setupGranted: false };
 
-/** A wordless failure of the read itself, which only reading again can mend. */
 export const readUnanswered = (read: SecondFactorRead): boolean =>
   read.data === undefined && read.error !== null && refusalOf(read.error) === undefined;
 
-/** What a failed read or action says, with Read again when the read went unanswered. */
 export function SecondFactorRefused(properties: {
   readonly id: string;
   readonly read: SecondFactorRead;
@@ -79,7 +75,6 @@ export function SecondFactorRefused(properties: {
   );
 }
 
-/** A reread that lands on the same place goes nowhere new. */
 export const useGoingTo = (to: string | undefined) => {
   const navigate = useNavigate();
   useEffect(() => {
@@ -87,7 +82,6 @@ export const useGoingTo = (to: string | undefined) => {
   }, [to, navigate]);
 };
 
-/** The first way on takes focus once, as it first appears after the read. */
 export const useArrivalFocus = () => {
   const arrived = useRef(false);
   return useCallback((node: HTMLElement | null) => {
@@ -99,7 +93,6 @@ export const useArrivalFocus = () => {
 
 export type FocusOnArrival = ReturnType<typeof useArrivalFocus>;
 
-/** No countdown: the wait is named once, and its lifting said once. */
 const useWaiting = (secondsAtArrival: number, onLifted: () => void) => {
   const [wait, setWait] = useState<{ readonly seconds: number | undefined } | undefined>(
     secondsAtArrival > 0 ? { seconds: secondsAtArrival } : undefined,
@@ -135,7 +128,6 @@ const useWaiting = (secondsAtArrival: number, onLifted: () => void) => {
   };
 };
 
-/** A code's send as its field reads it. */
 type SendingState = {
   readonly isPending: boolean;
   readonly isSuccess: boolean;
@@ -143,7 +135,6 @@ type SendingState = {
   readonly reset: () => void;
 };
 
-/** Held while it sends, once it lands and through a wait; a wait is said in place of a refusal. */
 export const useThrottledSend = (
   sending: SendingState,
   waitSecondsAtArrival: number,
@@ -159,7 +150,6 @@ export const useThrottledSend = (
       ? tooManyCodesTriedOr(waiting.seconds, others)
       : saidOfFailure(sending.error),
     lifted: waiting.lifted,
-    /** A throttle starts the wait; any other refusal goes to `otherwise`. */
     refused: (failure: Error, otherwise: (failure: Error) => void) => {
       if (isTooMany(failure)) waiting.waitFor(failure.waitSeconds);
       else otherwise(failure);
@@ -167,7 +157,6 @@ export const useThrottledSend = (
   };
 };
 
-/** A real link, so it opens in a new tab too; a press keeps the page's query. */
 export function StepLink(properties: {
   readonly href: string;
   readonly keystroke: Keystroke;
@@ -199,7 +188,6 @@ export function StepLink(properties: {
   );
 }
 
-/** Before the read lands, Read again is the one action with a key, once the read went unanswered. */
 const listedKeystrokes = (
   read: SecondFactorRead,
   keystrokes: readonly Keystroke[],
@@ -208,14 +196,12 @@ const listedKeystrokes = (
   return readUnanswered(read) ? [READ_AGAIN] : undefined;
 };
 
-/** Each read the pending page draws from is kept, as the detours keep theirs. */
 const useStandingRemembered = (held: SecondFactor | undefined) => {
   useEffect(() => {
     rememberTheStanding(held);
   }, [held]);
 };
 
-/** h1 from the first draw and Sign out last; until the read lands, nothing between them. */
 export function PendingFrame(properties: {
   readonly title: string;
   readonly read: SecondFactorRead;
@@ -245,7 +231,6 @@ export function PendingFrame(properties: {
   );
 }
 
-/** A code field's two regions: the wait lifting, and what refused the code. */
 export function CodeOutcomes(properties: {
   readonly lifted: boolean;
   readonly said: string | undefined;
@@ -262,19 +247,16 @@ export function CodeOutcomes(properties: {
   );
 }
 
-/** A throttle is said by its wait. With no response the api may have spent the code. */
 const saidOfSending = (failure: Error | null, wrong: string): string | undefined => {
   if (failure === null || isTooMany(failure)) return undefined;
   if (!(failure instanceof CodeRefused)) return STOCK.unconfirmed;
   return failure.status === SIGNED_OUT ? STOCK.session : wrong;
 };
 
-/** A recovery or restore code, sent as typed: the api ignores its spaces, dashes and case. */
 export function OneTimeCodeForm(properties: {
   readonly label: string;
   readonly sending: SendingACode;
 
-  /** What a code the api refused says. */
   readonly wrong: string;
   readonly others: readonly OtherWay[];
   readonly waitSecondsAtArrival: number;

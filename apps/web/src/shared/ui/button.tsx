@@ -42,10 +42,6 @@ type ButtonVariants = VariantProps<typeof buttonVariants>;
 
 const MARKED_SIZES: ReadonlySet<ButtonVariants["size"]> = new Set(["default", "sm", "lg"]);
 
-/**
- * Only the primary registers, and never under 32px. `accent` is its fill unmarked, for an action
- * repeated per row.
- */
 const marksItself = (variant: ButtonVariants["variant"], size: ButtonVariants["size"]): boolean =>
   variant === "default" && MARKED_SIZES.has(size ?? "default");
 

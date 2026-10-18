@@ -26,7 +26,6 @@ const OUTSIDE_ANY_STEP = "outside any step";
 /** A timeout or a stop leaves its step unfinished, with no error and a duration of -1. */
 const endedThere = (step: TestStep): boolean => step.error !== undefined || step.duration < 0;
 
-/** A page or an action is a `test.step`, and one may sit inside a fixture's step, as sign-in does. */
 const failingStepsOf = (steps: readonly TestStep[]): readonly string[] => {
   const failing = steps.find(endedThere);
   if (failing === undefined) return [];
@@ -38,11 +37,9 @@ const whyOf = (result: TestResult): string | undefined =>
   whyItCouldNotRun(result.annotations) ??
   (result.status === "interrupted" ? "the run was stopped before the journey ended" : undefined);
 
-/** The preflight plays no role, so its project names it. */
 const roleOf = (test: TestCase, result: TestResult): string =>
   roleIn(result.annotations) ?? test.parent.project()?.name ?? "";
 
-/** Built from titles and authored reasons alone: an error's message may hold an address. */
 const findingOf = (test: TestCase, result: TestResult): Finding => {
   const why = whyOf(result);
   const path = failingStepsOf(result.steps);
@@ -55,7 +52,6 @@ const findingOf = (test: TestCase, result: TestResult): Finding => {
   };
 };
 
-/** Held only once a test person's journey ran, so a run of the preflight alone judges nothing. */
 const outcomeOf = (findings: readonly Finding[], everyJourneyPassed: boolean): Outcome => {
   if (findings.some((finding) => finding.outcome === "could-not-run")) return "could-not-run";
   if (findings.length > 0) return "fail";
@@ -88,10 +84,8 @@ const titleOf = (test: TestCase): string =>
     .filter((title) => title !== "")
     .join(" › ");
 
-/** One line a test, from its title and outcome alone, so the run's log never holds an error. */
 const lineOf = (test: TestCase, said: string): string => `  ${said}  ${titleOf(test)}\n`;
 
-/** The run's only output: the word in `outcomeFile`, the run's summary, and each test's title on stdout. */
 export default class OutcomeReporter implements Reporter {
   readonly #outcomeFile: string;
   #root: Suite | undefined;

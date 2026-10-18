@@ -2,13 +2,11 @@ import { PERSON_PREFIX, type PlatformPrincipal } from "../kernel/index.ts";
 import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 
 export type QuestionsSwept = {
-  /** The records whose asker was rewritten; each keeps its skeleton. */
   readonly rewritten: number;
   readonly questionsRemoved: number;
   readonly feedbackRewritten: number;
 };
 
-/** The actor ids a record may name the person by, given each as an actor id or a person id. */
 export const askersOf = (people: readonly (string | null)[]): readonly string[] => [
   ...new Set(
     people
@@ -17,19 +15,13 @@ export const askersOf = (people: readonly (string | null)[]): readonly string[] 
   ),
 ];
 
-/** `asked_at` as text: a `Date` keeps milliseconds, and the delete must match the instant stored. */
 const REWRITE_THE_ASKER = `UPDATE question_asked SET asked_by = $3
    WHERE workspace_id = $1 AND asked_by = ANY($2)
   RETURNING id, asked_at::text AS asked_at`;
 
-/** Named by `asked_at` too, so only the months those records were asked in are read. */
 const REMOVE_THE_QUESTIONS = `DELETE FROM question_content
    WHERE workspace_id = $1 AND record_id = ANY($2) AND asked_at = ANY($3::timestamptz[])`;
 
-/**
- * The note and the disputed sentence go, as free text sent on the person's behalf. The reason and
- * the concept the sentence rested on stay.
- */
 const REWRITE_THE_FEEDBACK = `UPDATE question_feedback
      SET given_by = $3, note = NULL, disputed_sentence = NULL
    WHERE workspace_id = $1 AND given_by = ANY($2)`;
@@ -40,10 +32,6 @@ export const NO_QUESTIONS_SWEPT: QuestionsSwept = {
   feedbackRewritten: 0,
 };
 
-/**
- * Rewrites who asked and who gave feedback to the erasure pseudonym, deletes the questions and
- * clears the notes, in this workspace alone and in the caller's transaction. The skeletons stay.
- */
 export const sweepTheQuestions = async (
   tx: Tx,
   subject: {
@@ -75,7 +63,6 @@ export const sweepTheQuestions = async (
   };
 };
 
-/** As sweepTheQuestions, in one transaction of its own. Does nothing where no person is named. */
 export const eraseFromTheQuestions = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

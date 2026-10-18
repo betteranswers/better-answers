@@ -32,9 +32,8 @@ def _keyed(key: bytes) -> AESGCM:
 
 
 def sealed(key: bytes, plaintext: bytes) -> bytes:
-    """One version byte, a random 12-byte nonce, then the AES-256-GCM
-    ciphertext and tag, with the version byte as associated data.
-    Raises `ValueError` for a key that is not 32 bytes."""
+    """One version byte, a random 12-byte nonce, AES-256-GCM ciphertext and tag; the
+    version byte is associated data. Raises `ValueError` unless the key is 32 bytes."""
     cipher = _keyed(key)
     version = bytes([ENVELOPE_VERSION])
     # Never a counter: two processes share the key and would hand out one number
@@ -45,8 +44,8 @@ def sealed(key: bytes, plaintext: bytes) -> bytes:
 
 
 def opened(key: bytes, frame: bytes) -> bytes:
-    """Raises `UnopenableError` for a frame that is too short, of a version this tier
-    cannot read, or not authentic, and `ValueError` for a key that is not 32 bytes."""
+    """Raises `UnopenableError` for a frame too short, of a version this tier cannot
+    read, or not authentic; `ValueError` unless the key is 32 bytes."""
     cipher = _keyed(key)
     if not frame:
         raise UnopenableError("envelope-malformed", "envelope: a frame has no version")

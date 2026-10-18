@@ -17,7 +17,6 @@ const keysOf = (app: TestApp): Map<string, string> => {
   return held;
 };
 
-/** Sealed as the plugin seals one, so its verify accepts the key's codes; no email, no notice. */
 export const holdAnAuthenticator = async (app: TestApp, personId: string): Promise<string> => {
   const { sealed, setupAddress } = await mintAuthenticatorKey(authOver(app), personId);
   const client = await app.database.superuser.connect();
@@ -31,7 +30,6 @@ export const holdAnAuthenticator = async (app: TestApp, personId: string): Promi
   return key;
 };
 
-/** As a first setup leaves a person: ten codes, ticked as saved. One already holding a set keeps it. */
 export const savedRecoveryCodes = async (
   app: TestApp,
   personId: string,
@@ -50,7 +48,6 @@ export const savedRecoveryCodes = async (
   return recoveryCodes;
 };
 
-/** The key of an authenticator `holdAnAuthenticator` gave the person, if it gave one. */
 export const authenticatorKeyOf = (app: TestApp, personId: string): string | undefined =>
   keysOf(app).get(personId);
 
@@ -66,7 +63,6 @@ const STANDING = `
            OR EXISTS (SELECT 1 FROM authenticator a WHERE a.user_id = u.id AND a.verified) AS holds
     FROM "user" u WHERE u.id = $1`;
 
-/** A person who must hold a factor is given one if none, and the session stamped as a confirm stamps it. */
 export const confirmedByTheHarness = async (app: TestApp, client: TestClient): Promise<void> => {
   const read = sessionRead.parse(await (await client.fetch("/get-session")).json());
   const standing = await app.database.superuser.query<{ required: boolean; holds: boolean }>(

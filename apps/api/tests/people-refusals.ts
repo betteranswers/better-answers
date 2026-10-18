@@ -12,7 +12,6 @@ export const NOT_A_MEMBER_ANSWERED = {
   data: { httpStatus: 401, refusal: { word: "not-a-member", class: "unauthenticated" } },
 } as const;
 
-/** For a refusal of what was asked rather than of who asked: the workspace's own Admin calls. */
 export const refusalToTheAdmin = async (
   app: TestApp,
   call: (api: WebApi) => Promise<unknown>,
@@ -22,7 +21,6 @@ export const refusalToTheAdmin = async (
   return refusalOfCall(call(api));
 };
 
-/** Every People procedure is an Admin's, so each is called by a member who is not one. */
 export const refusalToAMemberAt = async (
   app: TestApp,
   role: "Editor" | "Viewer",
@@ -35,7 +33,6 @@ export const refusalToAMemberAt = async (
   return refusalOfCall(call(api));
 };
 
-/** Signed in to a workspace of their own, with a session that names `workspaceId` instead. */
 export const anAdminOfElsewherePointedAt = async (
   app: TestApp,
   workspaceId: string,
@@ -43,11 +40,9 @@ export const anAdminOfElsewherePointedAt = async (
   const elsewhere = await app.provision();
   const client = await signedInClient(app, elsewhere.admin.email);
   await sessionPointedAt(app, elsewhere.admin.id, workspaceId);
-  // Naming the session's workspace, so the refusal heard is of who asks and not of a stale tab.
   return webClientOf(client, workspaceId).api;
 };
 
-/** An Admin of another workspace, their session pointed here: each People procedure refuses them. */
 export const refusalToAnotherWorkspacesAdmin = async (
   app: TestApp,
   call: (api: WebApi) => Promise<unknown>,

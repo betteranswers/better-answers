@@ -21,7 +21,6 @@ const LANDED = new Map([
   ["third", "iri:third"],
 ]);
 
-/** Answers each entry point written for a title in `yes` with its probability, the rest nought. */
 const decidingBy =
   (yes: ReadonlyMap<string, number>): EntryScoringDoors["decide"] =>
   async (call: DecisionModelCall) => ({

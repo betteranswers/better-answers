@@ -80,14 +80,12 @@ const protectedResourceMetadata = z.object({
   resource_documentation: z.string(),
 });
 
-/** `strictObject`, because the suite asserts the whole answer and nothing more. */
 const whoAmI = z.strictObject({ workspaceId: z.string(), userId: z.string(), role: z.string() });
 
 const refusal = z.object({ error: z.string() });
 
 const rotatedTokens = z.object({ refresh_token: z.string() });
 
-/** A page's words as a person reads them: its tags gone and its escapes undone. */
 const readOf = (html: string): string =>
   html
     .replaceAll(/<[^>]*>/g, "")
@@ -97,7 +95,6 @@ const readOf = (html: string): string =>
     .replaceAll("&amp;", "&")
     .trim();
 
-/** The page's one link, its address unescaped. */
 const linkOn = (html: string): { readonly href: string; readonly label: string } => {
   const [, href = "", label = ""] = /<a href="([^"]*)">([^<]*)<\/a>/.exec(html) ?? [];
   return { href: href.replaceAll("&amp;", "&"), label };
@@ -105,7 +102,6 @@ const linkOn = (html: string): { readonly href: string; readonly label: string }
 
 type RefusalWords = (typeof REFUSAL_PAGES)[keyof typeof REFUSAL_PAGES];
 
-/** The page says what went wrong, and its last words are the next step. */
 const expectRefusalPage = (html: string, said: RefusalWords): void => {
   const read = readOf(html);
   const next = "next" in said ? said.next : said.signIn;
@@ -114,7 +110,6 @@ const expectRefusalPage = (html: string, said: RefusalWords): void => {
   expect(read.slice(-next.length)).toBe(next);
 };
 
-/** Signs `email` in on `client`, then follows `href` on as the sign-in page does. */
 const backThroughSignIn = async (
   client: ReturnType<TestApp["client"]>,
   email: string,
@@ -521,7 +516,6 @@ describe("the pages, as a person walks them", () => {
     expect(decided.headers.get("location")).toBeNull();
   });
 
-  /** Consent drawn in Acme, then the session moved to Zenith, as a switch in another tab does. */
   const drawnThenMoved = async () => {
     const acme = await app.provision({ name: "Acme" });
     const zenith = await app.provision({ name: "Zenith" });
@@ -552,7 +546,6 @@ describe("the pages, as a person walks them", () => {
     const { acme, client, consent } = await drawnThenMoved();
     const before = await consentsGiven();
 
-    // The route's check saw Acme; the library's own read of the session now finds Zenith.
     const grant = await grantingFor(acme.workspaceId, () =>
       authOver(app).api.oauth2Consent({
         headers: new Headers({ cookie: client.cookies() }),
@@ -984,7 +977,6 @@ describe("the audit logs", () => {
 });
 
 describe("the limits", () => {
-  /** Sends `max` the ceiling lets through, then one past it. */
   const onePast = async (send: () => Promise<Response>, max: number): Promise<number[]> => {
     const statuses: number[] = [];
     for (let attempt = 0; attempt <= max; attempt += 1) statuses.push((await send()).status);
@@ -1001,7 +993,6 @@ describe("the limits", () => {
   type Counted = {
     readonly name: string;
     readonly max: number;
-    /** A minute, where none is named. */
     readonly windowMs?: number;
     readonly ask: (client: Client) => Promise<Response>;
   };
@@ -1010,14 +1001,12 @@ describe("the limits", () => {
 
   let sends = 0;
 
-  /** A code asked for an address nobody else asks for, so the count by email never refuses it. */
   const aSend = (client: Client): Promise<Response> =>
     client.json(SEND_EMAIL_CODE_PATH, {
       email: `send-${(sends += 1)}-${Date.now()}@example.invalid`,
       type: "sign-in",
     });
 
-  /** Every count by client address, each with one request to a route it counts and its ceiling. */
   const COUNTS = {
     trpc: { name: "tRPC", max: 120, ask: (client) => client.fetch("/trpc/session.member") },
     "email-code-send": { name: "a code's send", max: 5, windowMs: TEN_MINUTES_MS, ask: aSend },
@@ -1061,7 +1050,6 @@ describe("the limits", () => {
     ([group, counted]) => ({ group, ...counted }),
   );
 
-  /** What a count by address logged since `from`: each line whole, as the logger wrote it. */
   const ceilingsMetSince = (from: number) =>
     app.logs.slice(from).filter((line) => line["event"] === "ingress.address_ceiling_met");
 
@@ -1079,7 +1067,6 @@ describe("the limits", () => {
     expect((await client.fetch("/.well-known/oauth-protected-resource/mcp")).status).toBe(200);
   });
 
-  /** Stopped at a window's first instant, so a test can move to its last second and past it. */
   const atAWindowsStart = (windowMs: number): void => {
     stopTheClock();
     moveTheClock(windowMs - (clock.now().getTime() % windowMs));
@@ -1257,7 +1244,6 @@ describe("the limits", () => {
     return held.rows.map((row) => row.key.slice(ip.length + 1));
   };
 
-  /** The api's refusal, with its wait, and no count of Better Auth's for the address. */
   const isOursAlone = async (past: Response, ip: string): Promise<void> => {
     expect(past.status).toBe(429);
     expect(Number(past.headers.get("retry-after"))).toBeGreaterThan(0);
@@ -1289,7 +1275,6 @@ describe("the limits", () => {
     expect(await countedByBetterAuth(client.ip)).toEqual([]);
   });
 
-  /** The route group the api counted an address under, if any. */
   const countedByTheApi = async (ip: string): Promise<string[]> => {
     const held = await app.database.superuser.query<{ key: string }>(
       "SELECT key FROM ingress_counter WHERE scope = 'ip' AND key LIKE $1 ORDER BY key",
@@ -1378,7 +1363,6 @@ describe("the limits", () => {
       body: A_POST_BODY,
     });
 
-  /** Past the client, which names its own origin on any post that names none. */
   const postedNamingNoOrigin = async (client: Client, path: string): Promise<Response> =>
     app.server.request(
       new Request(`${PUBLIC_URL}${path}`, {
@@ -1388,7 +1372,6 @@ describe("the limits", () => {
       }),
     );
 
-  /** As an image or a link on another site asks, then as its form, frame or script posts. */
   const askedFromAnotherSite = async (client: Client, path: string): Promise<number[]> => {
     const statuses: number[] = [];
     for (let asked = 0; asked < 11; asked += 1) {

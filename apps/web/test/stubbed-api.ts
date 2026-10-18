@@ -4,11 +4,9 @@ import { vi } from "vitest";
 import { createAppClients } from "@/app/providers.tsx";
 import type { Role } from "@/shared/navigation.ts";
 
-/** A failed call as the tRPC client hands it over, with whatever `data` the api's formatter sent. */
 export const carrying = (data: unknown): Error =>
   Object.assign(new TRPCClientError("refused"), { data });
 
-/** The address a stubbed `fetch` was asked for, whichever of its three shapes the caller used. */
 export const addressOf = (input: string | URL | Request): URL =>
   new URL(
     typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
@@ -25,7 +23,6 @@ export const answered = (body: unknown): Promise<Response> =>
 
 const A_SESSION = { session: { activeOrganizationId: "w" }, user: { id: "p", name: "Ada" } };
 
-/** A refusal is never asked again, so no retry outlives the test onto the next stub. */
 const REFUSED = {
   error: {
     message: "forbidden",
@@ -38,10 +35,6 @@ const REFUSED = {
   },
 };
 
-/**
- * Ada, a member of Northern Tooling at `role`. Every other read is refused, so a page draws
- * its own state and never another test's data.
- */
 export const answeringAs =
   (role: Role, operator = false) =>
   (input: string | URL | Request): Promise<Response> => {
@@ -62,7 +55,6 @@ export const answeringAs =
     );
   };
 
-/** No role held: the member read fails, and is not retried onto the next test's stub. */
 export const withTheApiDown = () => {
   vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the network is down")));
   const clients = createAppClients();

@@ -22,20 +22,16 @@ import { outcomeOfGroupFailure } from "./refusal.tsx";
 
 const CREATE_KEYSTROKE = GROUPS_KEYSTROKES.create;
 
-/** The page's primary act: the list's head holds it, and its dialog holds the name it asks for. */
 export function CreateGroupAction(properties: {
   readonly onCreated: (groupId: string, name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  // A refusal keeps the dialog open, so its line is the dialog's, where the reader is.
   const [refused, setRefused] = useState<Outcome>();
   const createGroup = useCreateGroup();
   const fieldRef = useRef<HTMLInputElement>(null);
-  // The group a create made, so the closing dialog hands focus to the row it made.
   const created = useRef<string | undefined>(undefined);
   const ids = { field: useId() };
 
-  // The trigger and the keystroke open by one path, so nothing from the last open outlives its close.
   const show = () => {
     created.current = undefined;
     setRefused(undefined);
@@ -43,7 +39,6 @@ export function CreateGroupAction(properties: {
   };
   useKeystroke(CREATE_KEYSTROKE, show);
 
-  // Never disabled: the field keeps the name and focus while the answer comes back.
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -88,7 +83,6 @@ export function CreateGroupAction(properties: {
             created.current === undefined
               ? null
               : document.getElementById(groupButtonId(created.current));
-          // A row the search hides has no button, so Radix's own return to the trigger stands.
           if (row === null) return;
           event.preventDefault();
           row.focus();

@@ -12,7 +12,6 @@ export const PERSON = "admin@journeys.example";
 
 export const PRODUCTION = "Better Answers <sign-in@better-answers.example>";
 
-/** As long as the shortest token the Worker accepts. */
 export const TOKEN = "0123456789abcdef0123456789abcdef";
 
 export const receivedAt = (receivedAtMs: number): Received => ({
@@ -23,14 +22,12 @@ export const receivedAt = (receivedAtMs: number): Received => ({
   raw: new TextEncoder().encode(`Subject: Sent at ${String(receivedAtMs)}\r\n\r\nYour code\r\n`),
 });
 
-/** `null` leaves the header out, or the secret unset. */
 type Asked = {
   readonly method?: string;
   readonly authorization?: string | null;
   readonly token?: string | null;
 };
 
-/** A request to the Worker's fetch handler, carrying the token unless `how` says otherwise. */
 export const asked = (d1: D1StandIn, path: string, how: Asked = {}): Promise<Response> => {
   const authorization = how.authorization === undefined ? `Bearer ${TOKEN}` : how.authorization;
   const token = how.token === undefined ? TOKEN : how.token;

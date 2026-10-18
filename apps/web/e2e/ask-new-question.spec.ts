@@ -33,7 +33,6 @@ import {
 } from "./harness.ts";
 import { scrolledSideways, windowRefocused } from "./knowledge.ts";
 
-/** The answer's first content is a read, so it takes the read's second. */
 const ANSWER_BUDGET_MS = 1000;
 
 const NEW_QUESTION = pageNamed(menuGroupIn(ASK, "ask"), "New Question");
@@ -64,7 +63,6 @@ const POLICY = {
   body: "Buyers access audit information through the console's audit page.",
 } as const;
 
-/** Directly under the knowledge folder, so in no collection. */
 const UNFILED = {
   title: "How do buyers access audit information they exported?",
   kind: "Answer",
@@ -73,7 +71,6 @@ const UNFILED = {
 
 const DRAFTED = "Buyers use the console's audit page.";
 
-/** The policy is the one concept no judge is asked about, so the drafter cites it. */
 const DRAFTING = { writes: [{ citing: POLICY.title, sentence: DRAFTED }] } as const;
 
 type Script = Omit<AskingScript, "workspaceId">;
@@ -85,7 +82,6 @@ type Asking = {
   readonly viewerEmail: string;
 };
 
-/** A workspace holding the audit concepts, its models scripted, and a Viewer of it. */
 const aWorkspaceToAsk = async (api: APIRequestContext, script: Script): Promise<Asking> => {
   const adminEmail = anAddress("admin");
   const workspace = await provision(api, { name: "Calder Audits", adminEmail });
@@ -108,7 +104,6 @@ const signedInAsTheViewer = async (page: Page, api: APIRequestContext, asking: A
   await landedAtHome(page, "Viewer");
 };
 
-/** A Viewer's home is New question. */
 const aViewerAsking = async (
   page: Page,
   api: APIRequestContext,
@@ -129,7 +124,6 @@ const said = (page: Page) => newQuestion(page).getByRole("status");
 
 const alerted = (page: Page) => newQuestion(page).getByRole("alert");
 
-/** The result is a region named by its verdict. */
 const answered = (page: Page, verdict: string) =>
   page.getByRole("region", { name: verdict, exact: true });
 
@@ -143,7 +137,6 @@ const asked = async (page: Page, question = QUESTION): Promise<void> => {
 
 const NOTE = "It leaves out the LMS.";
 
-/** Flags the answer as incomplete with a note, answering its popover. */
 const flagSent = async (page: Page, result: Locator): Promise<Locator> => {
   await result.getByRole("button", { name: "Flag This Answer" }).click();
   const flagging = page.getByRole("dialog", { name: "Flag This Answer" });
@@ -153,7 +146,6 @@ const flagSent = async (page: Page, result: Locator): Promise<Locator> => {
   return flagging;
 };
 
-/** Counts each ask the page sends from here on. */
 const asksCounted = (page: Page): string[] => {
   const sent: string[] = [];
   page.on("request", (request) => {
@@ -239,7 +231,6 @@ test.describe("Ask › New question", () => {
     });
   }
 
-  // The streaming budget: the first sentence is on the page while the model still holds the rest.
   test("shows the first drafted sentence before the stream ends", async ({ page, request }) => {
     const { workspaceId } = await aViewerAsking(page, request, {
       judging: { fits: [] },
@@ -263,7 +254,6 @@ test.describe("Ask › New question", () => {
     await expect(askButton(page)).not.toHaveAttribute("aria-disabled", "true");
   });
 
-  // A failed draft was asked of the model once and not again; a paused one never reached it.
   for (const [how, script, calls] of [
     ["fails", { judging: { fits: [] }, drafting: "fails" }, { judge: 1, draft: 1 }],
     ["pauses", { drafting: DRAFTING, limitGbp: "0.001" }, { judge: 0, draft: 0 }],
@@ -304,7 +294,6 @@ test.describe("Ask › New question", () => {
     const sending = page.waitForResponse((response) => response.url().includes("ask.giveFeedback"));
     await flagging.getByRole("button", { name: "Send Flag" }).click();
     await expect(audits.getByRole("button", { name: "Flagged" })).toBeVisible();
-    // Shown flagged at the press; leaving before the api answers would cancel the send.
     expect((await sending).ok(), "the flag was not stored").toBe(true);
 
     await page.goto(QUESTIONS_ASKED.path);
@@ -607,12 +596,10 @@ test.describe("Ask › New question", () => {
     await asked(page);
     const result = answered(page, "Answered");
     await expect(result).toBeVisible();
-    // Off the question box, where a single key is typed, not pressed.
     await result.getByRole("heading", { level: 2 }).click();
 
     await page.keyboard.press(KEY.helpful.key);
     await expect(result.getByRole("button", { name: "Marked Helpful" })).toBeVisible();
-    // Said once the api has kept it; the button changes as it is pressed.
     await expect(result.getByRole("status").filter({ hasText: /\S/ })).toHaveCount(1);
     await page.keyboard.press(KEY.flag.key);
     await expect(page.getByRole("dialog", { name: "Flag This Answer" })).toBeVisible();

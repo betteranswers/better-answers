@@ -25,10 +25,8 @@ const RECOVERY_CODE_ACTIONS = declareIdentitySetActions("people", {
   used: action("people.person.recovery_code_used", {}),
 });
 
-/** Crockford's base32, without the letters a reader takes for a digit. */
 const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
 
-/** Sixteen characters carry 80 bits, past guessing from a leaked hash, so the hash needs no key. */
 const GROUPS_IN_A_CODE = 4;
 
 const CHARACTERS_IN_A_GROUP = 4;
@@ -38,35 +36,25 @@ const mintGroup = (): string =>
     "",
   );
 
-/** A recovery or restore code, in the one form `hashOfTyped` reads back. */
 export const mintOneTimeCode = (): string =>
   Array.from({ length: GROUPS_IN_A_CODE }, mintGroup).join("-");
 
-/** What a person types, as it was minted: no spaces, no dashes, lower case. */
 const asMinted = (typed: string): string => typed.toLowerCase().replaceAll(/[\s-]/g, "");
 
 const hashOf = (code: string): string => createHash("sha256").update(code).digest("hex");
 
-/** A typed recovery or restore code's stored form: however it was spaced or cased, one hash. */
 export const hashOfTyped = (typed: string): string => hashOf(asMinted(typed));
 
 export type RecoveryCodesMade = {
   readonly recoveryCodes: readonly string[];
 
-  /** An ISO instant, as it crosses the wire: acknowledging names the set by it. */
   readonly madeAt: string;
 };
 
 type RecoveryCodesIssued = RecoveryCodesMade & {
-  /** Whether a set stood before, which this one voided. */
   readonly replaced: boolean;
 };
 
-/**
- * Voids the person's codes and keeps ten new ones as hashes, answering the codes themselves: the
- * one time they exist outside the person's hands. Every row carries `now`, which names the set
- * when it is acknowledged.
- */
 export const issuingRecoveryCodes = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -114,7 +102,6 @@ const holdsASet = async (tx: Tx, personId: UserId): Promise<boolean> => {
   return (held.rowCount ?? 0) > 0;
 };
 
-/** Marked by the operator's restore, which only their restore code lifts. */
 export const restoredByTheOperator = async (tx: Tx, personId: UserId): Promise<boolean> => {
   const marked = await tx.query(
     'SELECT 1 FROM "user" WHERE id = $1 AND restore_required_at IS NOT NULL',
@@ -124,8 +111,8 @@ export const restoredByTheOperator = async (tx: Tx, personId: UserId): Promise<b
 };
 
 /**
- * The person is the one caller: a transport hands the id of the session's own person. A caller
- * asking for a first set is refused while one stands, so a stale page never voids a set unasked.
+ * The person is the one caller: a transport hands the id of the session's own person. A first set
+ * is refused while one stands.
  */
 export const replaceRecoveryCodes = async (
   platform: PlatformPrincipal,
@@ -138,7 +125,6 @@ export const replaceRecoveryCodes = async (
   const issued = await attempt(() =>
     withIdentityWrite(platform, door, async (tx): Promise<Replaced> => {
       if (!(await holdThePerson(tx, personId.data))) return err("person-gone");
-      // A code minted now would open setup to whoever holds only the mailbox.
       if (await restoredByTheOperator(tx, personId.data)) return err("restore-code-needed");
       if (!input.replacing && (await holdsASet(tx, personId.data))) {
         return err("recovery-codes-held");
@@ -150,10 +136,6 @@ export const replaceRecoveryCodes = async (
   return issued.value;
 };
 
-/**
- * A conditional delete spends the code, so of two spends at once only one finds it. Answers the
- * codes left, or nothing when no stored hash matches what was typed.
- */
 export const spendingARecoveryCode = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -195,8 +177,8 @@ const ACKNOWLEDGING = `
      AND EXISTS (SELECT 1 FROM recovery_code r WHERE r.user_id = $1 AND r.created_at = $2)`;
 
 /**
- * The person has saved the set, so it is never shown again. Only the set they were shown is
- * marked: a page still showing one since replaced is refused, and marks nothing.
+ * Only the set they were shown is marked: a page still showing one since replaced is refused, and
+ * marks nothing.
  */
 export const acknowledgeRecoveryCodes = async (
   platform: PlatformPrincipal,

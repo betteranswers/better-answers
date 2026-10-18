@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import { keepOnThisBrowser, onThisBrowser } from "@/shared/browser-storage.ts";
 
-/** Stored on readers' browsers, so the key keeps its first name (R22). */
 const KEPT_UNDER = "better-answers.secondary-nav";
 
 const OPEN = "open";
@@ -14,7 +13,6 @@ export type MenuShowing = {
   readonly show: (showing: boolean) => void;
 };
 
-/** Kept on this browser: the nav shows unless the reader last hid it here. */
 export const useMenuShowing = (): MenuShowing => {
   const [showing, setShowing] = useState(() => onThisBrowser()?.getItem(KEPT_UNDER) !== CLOSED);
 

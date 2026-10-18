@@ -20,11 +20,9 @@ import { useRoomBeside } from "@/shared/wide-layout.ts";
 import { FlagControl, HelpfulControl } from "./answer-feedback.tsx";
 import { ASK_WORDS as WORDS } from "./ask-words.ts";
 
-/** A concept as the view draws it: an `Answer` comes with its words and its sources. */
 type ShownConcept = {
   readonly iri: string;
   readonly kind: string;
-  /** For an `Answer`, the question it answered. */
   readonly title: string;
   readonly collection: string | null;
   readonly trustWords: string;
@@ -32,16 +30,10 @@ type ShownConcept = {
   readonly evidence?: readonly Evidence[];
 };
 
-/**
- * What the view draws: a live answer folded from its stream, or one a record kept, whose prose
- * parts carry the outcome they ended with.
- */
 export type ShownAnswer = {
   readonly verdict: QuestionVerdict;
   readonly judgeState: JudgeState;
-  /** Every `Answer` a judge found to fit. */
   readonly answers: readonly ShownConcept[];
-  /** The concepts that bear on the question, an `Answer` no judge passed among them. */
   readonly related: readonly ShownConcept[];
   readonly unmappedPassages: readonly {
     readonly locator: string;
@@ -60,14 +52,12 @@ type Panel = {
 
 const PanelContext = createContext<Panel | undefined>(undefined);
 
-/** @throws when drawn outside the view, which holds the one panel. */
 const usePanel = (): Panel => {
   const panel = useContext(PanelContext);
   if (panel === undefined) throw new Error("a part of the answer is drawn outside its view");
   return panel;
 };
 
-/** Where the narrow layout draws the panel: beneath the block that holds what opened it. */
 function InlineHere(properties: { readonly openerIds: readonly string[] }) {
   const { opened, beside, close } = usePanel();
   if (beside || opened === undefined || !properties.openerIds.includes(opened.openerId)) {
@@ -76,7 +66,6 @@ function InlineHere(properties: { readonly openerIds: readonly string[] }) {
   return <EvidenceInline opened={opened} onClose={close} />;
 }
 
-/** An `Answer`'s marks open its sources in the one panel, as a concept page's do. */
 const useMarks = (concept: ShownConcept): MarkOpening => {
   const { opened, beside, open, close } = usePanel();
   const evidence = concept.evidence ?? [];
@@ -129,7 +118,6 @@ function CollectionSection(properties: {
   );
 }
 
-/** An `Answer` a judge found to fit, word for word, with who verified it. */
 function FittingAnswer(properties: {
   readonly concept: ShownConcept;
   readonly recordId: string | undefined;
@@ -155,11 +143,9 @@ function FittingAnswer(properties: {
   );
 }
 
-/** A title wraps on a line of its own where the tags beside it leave too little room. */
 const OPENER =
   "h-auto min-w-0 grow basis-48 justify-start px-0 text-left font-medium break-words whitespace-normal";
 
-/** A concept by its line; its title opens it in the panel, and an `Answer` shows its words. */
 function ConceptItem(properties: { readonly concept: ShownConcept }) {
   const { concept } = properties;
   const { opened, open } = usePanel();
@@ -206,7 +192,6 @@ const MARK = "h-auto min-h-6 min-w-6 px-0.5 py-0 font-mono [font-size:var(--text
 
 type Cited = { readonly concept: ShownConcept; readonly place: number; readonly openerId: string };
 
-/** A footnote takes its concept's place in the list below, and opens that concept beside. */
 function Footnote(properties: { readonly cited: Cited }) {
   const { concept, place, openerId } = properties.cited;
   const { opened, open } = usePanel();
@@ -235,7 +220,6 @@ function Footnote(properties: { readonly cited: Cited }) {
 
 type Sentence = ProsePart["sentences"][number];
 
-/** Each concept the sentence cites, by its place in its part's list; one it no longer holds is left out. */
 const citedBy = (
   sentence: Sentence,
   concepts: readonly ShownConcept[],
@@ -247,7 +231,6 @@ const citedBy = (
     return concept === undefined ? [] : [{ concept, place: at + 1, openerId: idOf(at + 1) }];
   });
 
-/** Its flag sends the sentence and the first concept it cites. */
 function DraftedSentence(properties: {
   readonly sentence: Sentence;
   readonly concepts: readonly ShownConcept[];
@@ -290,13 +273,7 @@ function Prose(properties: {
   return (
     <div className="grid gap-2">
       {part.sentences.map((sentence, at) => (
-        <DraftedSentence
-          // A draft may repeat a sentence word for word, and a part only grows, so its place is its key.
-          key={at}
-          sentence={sentence}
-          concepts={concepts}
-          recordId={recordId}
-        />
+        <DraftedSentence key={at} sentence={sentence} concepts={concepts} recordId={recordId} />
       ))}
       {unwritten === null ? null : (
         <p className="text-muted-foreground">{WORDS.unwritten[unwritten]}</p>
@@ -311,7 +288,6 @@ type Group = {
   readonly part: ProsePart | undefined;
 };
 
-/** In the order each collection first appears, the prose's own among them. */
 const groupsOf = (
   concepts: readonly ShownConcept[],
   prose: readonly ProsePart[],
@@ -346,7 +322,6 @@ function Fitting(properties: {
       ))}
       {answer.related.length === 0 ? null : (
         <Collapsible
-          // Folding the list takes away what opened the panel, and the panel's only way back.
           onOpenChange={(open) => {
             if (!open) close();
           }}
@@ -408,7 +383,6 @@ function PassageItem(properties: { readonly passage: ShownAnswer["unmappedPassag
   );
 }
 
-/** What nothing on the map answers: passages no concept rests on, never the company's answer. */
 function Unmapped(properties: { readonly passages: ShownAnswer["unmappedPassages"] }) {
   const headingId = useId();
   if (properties.passages.length === 0) return null;
@@ -449,7 +423,6 @@ const usePanelState = (): Panel => {
   };
 };
 
-/** How the judge stood, which a refusal has no use for, then whether drafting goes on. */
 function Standing(properties: { readonly answer: ShownAnswer; readonly drafting: boolean }) {
   const { answer, drafting } = properties;
   return (
@@ -475,15 +448,9 @@ function AnswerFeedback(properties: { readonly recordId: string | undefined }) {
   );
 }
 
-/**
- * The verdict, each `Answer` under its collection, prose over the related knowledge, then what
- * nothing on the map answers. A record's id takes feedback.
- */
 export function AnswerView(properties: {
   readonly answer: ShownAnswer;
-  /** The live answer's record, which feedback is given on; absent, nothing takes feedback. */
   readonly recordId?: string;
-  /** While the stream still drafts, which a kept answer never does. */
   readonly drafting?: boolean;
 }) {
   const { answer, recordId, drafting = false } = properties;
@@ -495,7 +462,6 @@ export function AnswerView(properties: {
       <section
         aria-labelledby={headingId}
         aria-busy={drafting ? true : undefined}
-        // Room for the panel beside the answer, so it covers none of it.
         className={cn("mt-8 grid gap-6", sheet && "pr-[var(--container-md)]")}
       >
         <h2 id={headingId}>{WORDS.verdictHeading[answer.verdict]}</h2>

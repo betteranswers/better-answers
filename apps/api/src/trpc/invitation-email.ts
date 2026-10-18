@@ -7,7 +7,6 @@ import { LONG_UK_DATE } from "../email-page.ts";
 import type { EmailMessage, Mail } from "../email.ts";
 import { PRODUCT_NAME } from "../product-name.ts";
 
-/** The SPA's accept page, which the link in the email opens with the invitation's id after it. */
 const ACCEPT_INVITATION_PATH = "/invitations";
 
 const ROLE_WITH_ARTICLE = {
@@ -29,7 +28,6 @@ const invitationEmail = (publicUrl: string, invitation: InvitationToSend): Email
   ].join("\n"),
 });
 
-/** A failed send leaves the invitation standing: the answer says so, and the Admin resends. */
 export const sentInvitation = async (
   ctx: { readonly mail: Mail; readonly log: Logger },
   invitation: InvitationToSend,
@@ -37,7 +35,6 @@ export const sentInvitation = async (
   const { mail } = ctx;
   const sent = await attempt(() => mail.send(invitationEmail(mail.publicUrl, invitation)));
   if (!sent.ok) {
-    // The error is the relay's, which may quote the address; the id is enough to find it.
     ctx.log.warn(
       { event: "trpc.email_failed", invitation_id: invitation.invitationId },
       "the invitation email did not go",

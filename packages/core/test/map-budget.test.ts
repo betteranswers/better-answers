@@ -20,33 +20,21 @@ const EDGES = 159;
 
 const WIDE_NODES = 3_000;
 
-/** Each node's six links, as steps round the ring of nodes: no two short routes end together. */
 const WIDE_LINKS = [1, 7, 43, 211, 617, 1_499];
 
 const ENTRIES = 40;
 
-/** Every node of the wide map is a concept filed here, so a walk narrowed to it prunes nothing. */
 const WIDE_COLLECTION = "wide";
 
-/** The most connections one api process opens to Postgres: its pool holds ten. */
 const IN_FLIGHT = 10;
 const ROUNDS = 5;
 
 const readers = runtimePoolFor(db, IN_FLIGHT);
 
-/** The cap counts concepts: a node is one row at its least depth, however many paths reach it. */
 const CONCEPTS_UNDER_THE_CAP = 1_000;
 
-/**
- * Priced in one-row walks on the same connection, so load slows both alike. The forty-entry walk
- * measured 20 to 24.
- */
 const WALK_BUDGET_IN_ONE_ROW_WALKS = 100;
 
-/**
- * The walk's own statement timeout, a wall clock: on fourteen cores, ten in flight ran 128 ms
- * at the slowest.
- */
 const WALK_TIMEOUT_MS = 2_000;
 
 const REBUILD_BUDGET_MS = 120_000;
@@ -96,10 +84,6 @@ const nodeAt = (uids: readonly string[], at: number): string => {
   return uid;
 };
 
-/**
- * Every seventy-fifth node is an entry: forty entries, whose four hops reach more nodes than the
- * row limit holds.
- */
 const seedWideMap = async (scenario: Scenario): Promise<WideMap> => {
   const workspaceId = scenario.workspaceId;
   const seeded = await seedingWith(db().pool, async (seed) => {
@@ -238,10 +222,6 @@ describe("the map under concurrent read load", () => {
     });
     if (!queued.ok) throw new Error(`the rebuild was not queued: ${String(queued.error)}`);
 
-    /**
-     * The whole hop's wall clock, boot included: over-counting is the safe direction for a
-     * promise.
-     */
     const started = performance.now();
     await runWorkerOnce(db().connectionUri, bundles().root, "map-budget");
     const wallClockMs = performance.now() - started;

@@ -374,7 +374,6 @@ describe("inspecting a person", () => {
 describe("inspecting a person's ended grants", () => {
   const ISSUED = new Date("2026-09-20T09:00:00.000Z");
 
-  /** Newest first, as the inspection lists them. */
   const endedAtOf = async (action: string, personId: string) => {
     const found = await db().pool.query<{ at: Date }>(
       "SELECT at FROM identity_audit_event WHERE subject_id = $1 AND action = $2 ORDER BY at DESC",
@@ -383,7 +382,6 @@ describe("inspecting a person's ended grants", () => {
     return found.rows.map((row) => row.at.toISOString());
   };
 
-  /** A member of both workspaces, with a Claude grant in each and one naming none. */
   const connectedIn = async (...workspaces: readonly { readonly workspaceId: string }[]) => {
     const personId = await seedPerson(db().pool);
     const clientId = await seedingWith(db().pool, async (seed) => {
@@ -404,7 +402,6 @@ describe("inspecting a person's ended grants", () => {
     return { personId, clientId };
   };
 
-  /** Ada, Acme's Admin, revokes a connected member's credentials there. */
   const revokedHereByAda = async () => {
     const acme = await provisionedWorkspace(db(), "Acme", { name: "Ada Okafor" });
     const { personId } = await connectedIn(acme);
@@ -595,7 +592,6 @@ describe("inspecting a person's ended grants", () => {
       value: { ended: [{ endedBy: { kind: "former-member" } }] },
     });
   });
-  /** A grant whose standing token the authorization server marked, at sign-out or at `/oauth2/revoke`. */
   const endedByTheServer = async (personId: string, issued: Date, ended: Date) =>
     seedingWith(db().pool, async (seed) => {
       const client = await seed.oauthClient({ name: "Claude" });

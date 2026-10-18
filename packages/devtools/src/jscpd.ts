@@ -16,10 +16,6 @@ export type JscpdConfig = {
   readonly ignore: readonly string[];
 };
 
-/**
- * A command line, never jscpd's own config file: it reports a config it could not parse,
- * then scans on its defaults and exits zero.
- */
 export const jscpdArgv = (config: JscpdConfig): readonly string[] => [
   "--min-lines",
   String(config.minLines),
@@ -49,8 +45,6 @@ const clonesIn = (output: string): readonly Clone[] => {
     .filter((file): file is string => file !== undefined);
   const clones: Clone[] = [];
   for (let index = 0; index + 1 < files.length; index += 2) {
-    // SAFETY: the loop condition holds both indices inside the array, and
-    // `noUncheckedIndexedAccess` cannot see that.
     clones.push({ left: files[index] ?? "", right: files[index + 1] ?? "" });
   }
   return clones;
@@ -58,7 +52,6 @@ const clonesIn = (output: string): readonly Clone[] => {
 
 export type JscpdRunner = (tree: Tree) => readonly Clone[];
 
-/** The smoke tree must report exactly `smoke.clones` clones. */
 export const jscpdOver = (
   config: JscpdConfig,
   smoke: { readonly tree: Tree; readonly clones: number },

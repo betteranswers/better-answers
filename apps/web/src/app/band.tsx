@@ -21,7 +21,6 @@ import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { BandBreadcrumb, type Part } from "./breadcrumb.tsx";
 
-/** A role is a workspace's; outside one, the person has none to show. */
 export type Person = {
   readonly name: string;
   readonly role?: string | undefined;
@@ -29,14 +28,10 @@ export type Person = {
 
 type BandProperties = {
   readonly wide: boolean;
-  /** Where the logo leads: the person's home, or the index while their role is unread. */
   readonly home: string;
-  /** Absent while the workspace is unread. */
   readonly switcher: ReactNode;
-  /** The toggle when wide, the sheet's button when narrow. */
   readonly navigation: ReactNode;
   readonly jumpTo: ReactNode;
-  /** Drawn by the narrow band alone: the wide one leaves it to the rail's foot. */
   readonly keystrokes: ReactNode;
   readonly parts: readonly Part[];
   readonly person: Person | undefined;
@@ -95,10 +90,6 @@ function PersonMenu(properties: Pick<BandProperties, "person" | "signingOut" | "
   );
 }
 
-/**
- * A row of its own across the band, taking no room until it has words. Never `hidden`: its status
- * must stay in the tree.
- */
 function BandOutcome(properties: { readonly outcome: Outcome | undefined; readonly rule: string }) {
   return (
     <div
@@ -111,12 +102,7 @@ function BandOutcome(properties: { readonly outcome: Outcome | undefined; readon
 
 const BAND_DRAWN_H = "--band-drawn-h";
 
-/**
- * The outcome row grows the band past its token's height, so the height is measured. Declared
- * once, so React attaches it once.
- */
 const publishTheDrawnHeight = (band: HTMLElement) => {
-  // Where no observer is offered, the band keeps the token's height.
   if (typeof ResizeObserver === "undefined") return undefined;
   const root = document.documentElement;
   const observer = new ResizeObserver(() => {
@@ -129,12 +115,10 @@ const publishTheDrawnHeight = (band: HTMLElement) => {
   };
 };
 
-/** Each cell is as wide as the region below it, so hiding the nav moves nothing here. */
 function WideBand(properties: BandProperties) {
   return (
     <header ref={publishTheDrawnHeight} className="sticky top-0 z-10 bg-background">
       <div className="flex h-band">
-        {/* No rule beneath: the logo's cell and the rail read as one column. */}
         <LogoLink home={properties.home} className="w-rail border-r border-border bg-sidebar" />
 
         <div className="flex w-sidebar shrink-0 items-center justify-end gap-1 border-r border-b border-border px-2">
@@ -156,7 +140,6 @@ function WideBand(properties: BandProperties) {
   );
 }
 
-/** Two rows that scroll with the page: a fixed band would take a short page's content. */
 function NarrowBand(properties: BandProperties) {
   return (
     <header className="border-b border-border bg-background">
@@ -171,7 +154,6 @@ function NarrowBand(properties: BandProperties) {
         </div>
       </div>
 
-      {/* Its own row, where it wraps rather than cut a reader's place short. */}
       <BandBreadcrumb parts={properties.parts} wide={false} className="px-4 pb-2" />
 
       <BandOutcome outcome={properties.outcome} rule="border-t" />

@@ -32,7 +32,6 @@ const column = createColumnHelper<typeof memberFeatures, ListedMember>();
 
 export const SORTABLE: ReadonlySet<string> = new Set(["person", "role", "joined"]);
 
-/** Every column but the person can hide, so a row always says who it is. */
 export const HIDEABLE = [
   { id: "role", label: "Role" },
   { id: "groups", label: "Groups" },
@@ -40,18 +39,12 @@ export const HIDEABLE = [
 ] as const;
 
 type MemberActions = {
-  /** Opens the member's page, where the link alone would lose a search still settling. */
   readonly open: (personId: string) => void;
   readonly focusedOn: (personId: string) => void;
 };
 
-/**
- * The list's actions reach each cell here, not through the columns: new columns draw every link
- * afresh, dropping focus a press just gave.
- */
 export const MemberActionsContext = createContext<MemberActions | undefined>(undefined);
 
-/** Each person the last bulk action's refusal named; the outcome's own line says why. */
 export type RefusedRows = ReadonlySet<string>;
 
 export const NO_MARKS: RefusedRows = new Set();
@@ -62,7 +55,6 @@ function PersonCell(properties: { readonly member: ListedMember; readonly refuse
   const { personId, displayName, address } = member;
   return (
     <span className="flex min-w-0 items-start gap-2">
-      {/* Below the small breakpoint the name needs the room more than its initials do. */}
       <Avatar aria-hidden className="mt-0.5 size-7 max-sm:hidden">
         <AvatarFallback className="text-xs">{initialsOf(nameOf(member))}</AvatarFallback>
       </Avatar>
@@ -82,7 +74,6 @@ function PersonCell(properties: { readonly member: ListedMember; readonly refuse
             displayName
           )}
         </RowLink>
-        {/* Still `anywhere`: a cell is as wide as its longest part, which would scroll the table at 320px. */}
         <Address address={address} className="text-xs text-muted-foreground" />
         {refused ? (
           <span className="mt-1 flex text-xs">
@@ -94,7 +85,6 @@ function PersonCell(properties: { readonly member: ListedMember; readonly refuse
   );
 }
 
-/** The person's own cell marks a row a bulk action refused, so the refusals ride in. */
 export const memberColumns = (refused: RefusedRows) =>
   column.columns([
     column.accessor((member) => nameOf(member), {

@@ -138,8 +138,6 @@ export const sourceDocument = withRLS(
 
     sensitivity: text("sensitivity"),
 
-    // Kept apart from the seam's verdict it is folded with, so a lifted verdict returns the
-    // document to the Admin's narrowing and never past it.
     narrowedTo: text("narrowed_to"),
   },
   "workspaceId",

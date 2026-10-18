@@ -25,7 +25,6 @@ export type WarmPostgres = {
 
   readonly templateDatabase: string;
 
-  /** The vitest main process's pid, which every per-file database name ends with. */
   readonly runId: number;
 
   readonly source: "shared" | "container";
@@ -100,7 +99,6 @@ const filesUnder = async (folder: string): Promise<readonly string[]> => {
 
 const TEMPLATE_PREFIX = "tpl_ts_";
 
-/** Named for everything the build reads, so a branch with other migrations never clones it. */
 export const templateNameOver = async (folder: string): Promise<string> => {
   const files = await filesUnder(folder);
   const contents = await Promise.all(files.map((file) => readFile(path.join(folder, file))));
@@ -130,7 +128,6 @@ const dropTemplate = async (admin: pg.Client, database: string): Promise<void> =
 const stampUse = (admin: pg.Client, database: string): Promise<unknown> =>
   admin.query(`COMMENT ON DATABASE ${quoted(database)} IS '${new Date().toISOString()}'`);
 
-/** `stale` is null for a template with no use stamp yet, which is stamped now rather than dropped. */
 type TemplateAge = { readonly datname: string; readonly stale: boolean | null };
 
 const agesOf = async (admin: pg.Client): Promise<readonly TemplateAge[]> =>
@@ -143,7 +140,6 @@ const agesOf = async (admin: pg.Client): Promise<readonly TemplateAge[]> =>
     )
   ).rows;
 
-/** Holds the tmpfs to a day of templates; a run still cloning one keeps it until the clone ends. */
 const ageOut = async (admin: pg.Client): Promise<void> => {
   for (const { datname, stale } of await agesOf(admin)) {
     if (stale === null) await stampUse(admin, datname);
@@ -151,7 +147,6 @@ const ageOut = async (admin: pg.Client): Promise<void> => {
   }
 };
 
-/** Under the build lock no build of this tier is live, so every one found was killed. */
 const dropKilledBuilds = async (admin: pg.Client): Promise<void> => {
   const found = await admin.query<{ datname: string }>(
     "SELECT datname FROM pg_database WHERE starts_with(datname, $1) AND datname LIKE '%\\_building'",
@@ -173,14 +168,12 @@ const buildAndPublish = async (
   await untilSessionsGone(admin, building);
   await admin.query(`ALTER DATABASE ${quoted(building)} WITH ALLOW_CONNECTIONS false`);
   await admin.query(`ALTER DATABASE ${quoted(building)} WITH IS_TEMPLATE true`);
-  // Published last, so a killed build never leaves a database under the name runs clone.
   await admin.query(`ALTER DATABASE ${quoted(building)} RENAME TO ${quoted(name)}`);
 };
 
 /** One key for the instance: every build creates the same cluster-wide roles, so builds take turns. */
 const BUILD_LOCK = "hashtextextended('better-answers template build', 0)";
 
-/** Builds `name` unless published, stamps its use, drops this tier's day-old templates; one caller at a time. */
 export const ensureTemplate = (
   adminUri: string,
   name: string,
@@ -259,7 +252,6 @@ const sweepDeadRuns = (adminUri: string): Promise<void> =>
 
 type Started = { readonly provided: WarmPostgres; readonly teardown: () => Promise<void> };
 
-/** The run's own testcontainer carries no stamp, so only `shared` demands one. */
 const imageFault = ({ image }: Server, shared: boolean): string | undefined => {
   if (image === null) return shared ? "names a server with no image stamp" : undefined;
   if (image === POSTGRES_IMAGE) return undefined;
@@ -279,7 +271,6 @@ const startShared = async ({ uri, shared }: Locator): Promise<Started> => {
   const templateDatabase = await ensureTemplate(adminUri, name, migrateInto);
   return {
     provided: { connectionUri: adminUri, templateDatabase, runId: process.pid, source: "shared" },
-    // The instance and its template outlive the run; each file's stop drops its own database.
     teardown: () => Promise.resolve(),
   };
 };
@@ -315,7 +306,6 @@ const SHARED_BASE_PORT = 55_434;
 
 const SHARED_PORT_SPREAD = 1000;
 
-/** Mirrors `deploy/test-postgres.sh address`, so a worktree on another pin reaches its own server. */
 export const sharedUri = (): string => {
   const digest = POSTGRES_IMAGE.split("@sha256:")[1];
   if (digest === undefined)
@@ -372,7 +362,6 @@ const runningTestFile = (): string => {
   return testPath;
 };
 
-/** A fresh copy of `warm`'s template, named after `databaseKey` and the run; `stop` drops it. */
 export const clonedFrom = async (
   warm: WarmPostgres,
   databaseKey: string,

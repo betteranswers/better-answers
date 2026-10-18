@@ -33,7 +33,6 @@ export type ConceptVerification = {
 
   readonly contentHash: string | null;
 
-  /** Read by person id, so it stands after the member leaves; null once erasure clears the name. */
   readonly verifierName: string | null;
 };
 
@@ -71,7 +70,6 @@ const verificationWords = (trust: Trust): string => {
   }
 };
 
-/** `verifiedBy` falls back to the person's actor id once erasure has cleared their name. */
 const verifierWords = (verifiedBy: string | null): string => {
   if (verifiedBy === null) return "a person";
   return isActorId(verifiedBy) && isPersonActor(verifiedBy) ? "a former member" : verifiedBy;

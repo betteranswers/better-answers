@@ -6,14 +6,12 @@ import { carrying } from "./stubbed-api.ts";
 
 const NOON_MS = new Date("2026-10-10T12:00:00Z").getTime();
 
-/** A read as the query cache holds it, failed at noon. */
 const failedAtNoon = (error: Error | null) => ({ state: { error, errorUpdatedAt: NOON_MS } });
 
 const PAST_ITS_CEILING = failedAtNoon(carrying({ retryAfterSeconds: 30 }));
 
 const { retry, ...unasked } = HOLDS;
 
-/** Each way the page asks a held read again with no one pressing anything: every hold but the retry. */
 const UNASKED = Object.entries(unasked);
 
 afterEach(() => {

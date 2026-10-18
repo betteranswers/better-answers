@@ -71,13 +71,11 @@ export type AuthRoutesDependencies = {
 
   readonly clock: Clock;
 
-  /** The auth secret, which seals what a sign-in link carries. */
   readonly secret: string;
 
   readonly sendEmail: EmailSender;
 };
 
-/** A session that must confirm its second factor first holds no claims to act on. */
 const PENDING = "pending";
 
 type Pending = typeof PENDING;
@@ -125,10 +123,6 @@ const flowHeaders = (request: Request, publicUrl: string): Headers => {
   return headers;
 };
 
-/**
- * Consent shares the product's origin, so a script's fetch passes the same-origin check; only a
- * document navigation follows the redirect.
- */
 const navigationOnly: MiddlewareHandler = async (context, next) => {
   if (context.req.method === "POST" && context.req.header("sec-fetch-dest") !== "document") {
     return context.html(refusedPage(REFUSAL_PAGES.notNavigated), 403);
@@ -170,7 +164,6 @@ type FlowBody =
   | { readonly postLogin: true; readonly oauth_query: string }
   | { readonly email: string; readonly otp: string; readonly oauth_query?: string };
 
-/** Closed to HTTP; the consent route alone reaches it, as a server function. */
 const LIBRARY_CONSENT_PATH = "/oauth2/consent";
 
 const callFlow = (
@@ -227,7 +220,6 @@ const failureOf = async (decided: Result<Response>) =>
     ? { status: decided.value.status, detail: await decided.value.clone().text() }
     : { status: null, detail: decided.error.message };
 
-/** A path on this origin alone: anything else would be an open redirect once the link signs in. */
 const returnPath = z
   .string()
   .max(512)
@@ -245,7 +237,6 @@ const secureOrigin = (publicUrl: string): boolean => publicUrl.startsWith("https
 const bindingCookieName = (publicUrl: string): string =>
   secureOrigin(publicUrl) ? `__Host-${SIGN_IN_LINK_COOKIE}` : SIGN_IN_LINK_COOKIE;
 
-/** The nonce goes to the email's link and, once the request has gone through, to this browser. */
 const bindTheLink =
   (publicUrl: string): MiddlewareHandler =>
   async (context, next) => {
@@ -277,14 +268,12 @@ const tokenOf = async (request: Request): Promise<string | undefined> => {
   return read.ok ? linkToken.safeParse(read.value).data?.token : undefined;
 };
 
-/** The sign-in route's refusal bodies; a read answers every dead link with its state alone. */
 const LINK_REFUSALS = {
   dead: { error: "link-dead" },
   notThisBrowser: { error: "not-this-browser" },
   unanswered: { error: "unanswered" },
 } as const;
 
-/** The library answers its own failure as a 500 response rather than throwing it. */
 const SERVER_FAILED = 500;
 
 const linkSignInBody = (use: LinkUse): FlowBody =>
@@ -308,7 +297,6 @@ const displayNameGivenIn = async (answered: Response): Promise<boolean> => {
 const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void => {
   const { auth, door, publicUrl, clock } = deps;
 
-  /** Reads and sign-ins count apart, so re-reading a link never spends the sign-in it offers. */
   const ceilingOf = async (
     route: "describe" | "sign-in",
     token: string,
@@ -334,7 +322,6 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
     return linkSeen(read, contents, read !== undefined && isBound(cookie, read.nonceHash));
   };
 
-  /** The link may still stand, so the page offers Sign in again rather than the dead page. */
   const unanswered = (context: Context, reason: string): Response => {
     deps.logger.warn(
       { event: "auth.link_sign_in_failed", reason },
@@ -353,7 +340,6 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
       return unanswered(context, `library ${String(answered.status)}`);
     if (!answered.ok) return context.json(LINK_REFUSALS.dead, 410);
     forwardCookies(answered, context.res.headers);
-    // The spent code already makes the link dead, so a failed delete must not cost the session.
     const dropped = await attempt(() => dropALink(door, token));
     if (!dropped.ok) {
       deps.logger.warn(
@@ -440,13 +426,11 @@ const takesOrSendsACode = (path: string): boolean =>
   path.startsWith("/email-otp/") ||
   path.startsWith("/forget-password/");
 
-/** Another site can make a browser send any other method, so a post alone spends the count. */
 const countingPostsAlone =
   (limit: MiddlewareHandler): MiddlewareHandler =>
   (context, next) =>
     context.req.method === "POST" ? limit(context, next) : next();
 
-/** The `oauth` group counts its own of Better Auth's endpoints, and nothing counts discovery. */
 const countedByItsOwnGroup = (path: string): boolean =>
   !path.startsWith("/oauth2/") && path !== "/jwks" && !path.startsWith("/.well-known/");
 
@@ -454,7 +438,6 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   const routes = new Hono();
   const { auth, door, publicUrl, clock } = deps;
 
-  /** A session ended meanwhile holds none at all. */
   const claimsFrom = async (headers: Headers): Promise<Claims | Pending | undefined> => {
     const read = await auth.api.getSession({ headers });
     const sessionId = sessionNamed.safeParse(read).data?.session.id;
@@ -476,14 +459,12 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     if (!(await holds(claims))) {
       return context.html(signInPage(REFUSAL_PAGES.sessionEnded, carry(context.req.url)), 401);
     }
-    // A token's workspace is fixed at consent, so it must be the one the page named when drawn.
     if (form.get(CONSENT_WORKSPACE_FIELD) !== claims?.workspaceId) {
       return context.html(refusedPage(REFUSAL_PAGES.workspaceMoved), 409);
     }
     return undefined;
   };
 
-  /** Bound to the workspace grantRefused checked a Connect against; a Cancel grants nothing. */
   const grantInTheLibrary = (context: Context, accept: boolean, claims: Claims | undefined) => {
     const headers = flowHeaders(context.req.raw, publicUrl);
     return grantingFor(claims?.workspaceId ?? "", () =>
@@ -499,7 +480,6 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     );
   };
 
-  /** Confirming first carries the signed query, so the flow resumes once the session is confirmed. */
   const confirmFirst = (context: Context): Response =>
     context.redirect(`/confirm${carry(context.req.url)}`, 302);
 
@@ -528,7 +508,6 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   }
 
   const mounted = mountedPaths(auth);
-  /** Ahead of every count, so a post from another site spends none. */
   for (const path of mounted.filter(takesOrSendsACode)) {
     routes.use(path, sameOriginOnly(publicUrl));
   }
@@ -544,10 +523,6 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     if (path === SIGN_IN_BY_EMAIL_CODE_PATH) return limitSignIns;
     return takesOrSendsACode(path) ? limitSends : limitIdentity;
   };
-  /**
-   * Here, so the count by email refuses a send first. Read off the instance, so an endpoint
-   * an upgrade adds is counted too.
-   */
   for (const path of mounted.filter(countedByItsOwnGroup)) {
     routes.use(path, limitOf(path));
   }

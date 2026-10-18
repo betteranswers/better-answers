@@ -11,7 +11,6 @@ const invitations = (count: number): string => counted(count, "invitation", "inv
 const invitationsIn = (status: InvitationStatus, count: number): string =>
   counted(count, `${status} invitation`, `${status} invitations`);
 
-/** A failed email is said as loudly as a refusal: the invitation stands, and nobody knows of it. */
 const outcomeOfSending = (
   sent: SentInvitation,
   words: { readonly went: string; readonly didNotGo: string },
@@ -33,7 +32,6 @@ export const resentOutcome = (sent: SentInvitation): Outcome =>
 const addressesOf = (sent: readonly SentInvitation[]): string =>
   sent.map((one) => one.address).join(", ");
 
-/** Each email that did not go has a Resend beside the outcome, which this line points at. */
 const unsentSaid = (unsent: readonly SentInvitation[]): string =>
   unsent.length === 1
     ? `The email to ${addressesOf(unsent)} could not be sent, but the invitation is still valid. Please resend it below.`
@@ -62,7 +60,6 @@ const ledBy = (invited: readonly InvitedOne[], role: Role): string => {
     : `${only.address} has been invited as ${aRole(role)}.`;
 };
 
-/** With one address the lead names it; with several, the re-sent ones are named apart. */
 const resentSaid = (invited: readonly InvitedOne[]): string => {
   const replaced = invited.filter((one) => one.replaced);
   if (invited.length === 1 || replaced.length === 0) return "";
@@ -141,7 +138,6 @@ export const INVITATIONS_WORDS = {
   resendTo: (address: string) => `Resend Invitation to ${address}`,
 } as const;
 
-/** The dialog's words; its title and its button are the action's own name. */
 export const INVITE_WORDS = {
   description: "Invite people to your workspace with a specific role.",
   field: "Email Addresses",

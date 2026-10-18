@@ -28,7 +28,6 @@ export type ActingOnConnectedSource = {
   readonly connectedSourceId: ConnectedSourceId;
 };
 
-/** The platform carries no workspace, so its standing names the one its action was asked for. */
 export type PlatformOnConnectedSource = {
   readonly platform: PlatformPrincipal;
   readonly workspaceId: WorkspaceId;
@@ -48,10 +47,6 @@ type ConnectedSourceRead = {
 
 type ConnectedSourceNamedRefusal = SourceRefusal<"no-such-binding"> | Error;
 
-/**
- * `columns` is spliced into the SQL unescaped, so it takes a literal list, never input.
- * `for-update` holds the row until the transaction ends.
- */
 export const connectedSourceNamed = async <Row extends TxRow>(
   acting: ActingOnConnectedSource | PlatformOnConnectedSource,
   tx: Tx,

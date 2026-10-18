@@ -29,7 +29,6 @@ const conceptsSeeded = async (body: unknown) => {
   return landedConcepts.parse(await answered.json()).concepts;
 };
 
-/** What the harness answers a seed it refuses: the status, and the fields its schema named. */
 const seedRefused = async (concepts: readonly unknown[]) => {
   const workspace = await app().provision();
   const answered = await harnessControl(app()).request("/__harness/concepts", {
@@ -44,7 +43,6 @@ const seedRefused = async (concepts: readonly unknown[]) => {
   return { status: answered.status, said: await answered.json() };
 };
 
-/** One MCP call by `person`, over a token of their own. */
 const calledBy = async (person: { readonly email: string }, tool: string, args: Rpc) => {
   const client = app().client();
   const { accessToken } = await connectAsHost(app(), client, person, {
@@ -362,14 +360,12 @@ const seedingBy = (workspace: Provisioned) => ({
   userId: workspace.admin.id,
 });
 
-/** The repository's commit on `main`, or null where it has none. */
 const headOf = async (workspace: Provisioned): Promise<string | null> =>
   head(
     await actingIn(app(), seedingBy(workspace), async (principal) => principal),
     openTestGit(app()),
   );
 
-/** Both stores, read as a refused seed leaves them. */
 const leftIn = async (workspace: Provisioned) => ({
   concepts: await heldIn("concept_index", workspace.workspaceId),
   connectedSources: await heldIn("connected_source", workspace.workspaceId),

@@ -87,10 +87,6 @@ const located = async (
   return found.rows.map((row) => row.location);
 };
 
-/**
- * By the request's person and by the member an address finds, so a former member's rows are
- * named as a present one's are.
- */
 const aboutTheActors = async (
   tx: Tx,
   subject: SubjectHere,
@@ -119,10 +115,6 @@ const MEMBER_HERE = `SELECT u.id AS location
     WHERE m.workspace_id = $1 AND (u.id = $2 OR lower(u.email) = ANY($3))
     LIMIT 1`;
 
-/**
- * The suppression adds the addresses the person signs in with, so the documents naming them are
- * the ones its erasure re-indexes.
- */
 const SIGN_IN_ADDRESSES = `SELECT email AS location FROM "user" WHERE id = ANY($1::text[])`;
 
 const ERASURE_FAMILY_DESCRIPTORS = {
@@ -169,7 +161,6 @@ const ERASURE_FAMILY_DESCRIPTORS = {
       aboutTheMember(tx, subject, "SELECT id AS location FROM session WHERE user_id = $1"),
   },
 
-  /** Keyed by an address, or by one of the person's sessions. */
   "identity-verification": {
     categories: ["email-address"],
     find: (platform, subject, tx) =>
@@ -206,7 +197,6 @@ const ERASURE_FAMILY_DESCRIPTORS = {
     find: rowsOfThePersonIn("account"),
   },
 
-  /** A passkey's last use sits in its own row, named after the passkey it belongs to. */
   "identity-passkey": {
     categories: ["sign-in", "device"],
     find: (platform, subject, tx) =>
@@ -231,7 +221,6 @@ const ERASURE_FAMILY_DESCRIPTORS = {
     find: rowsOfThePersonIn("recovery_code"),
   },
 
-  /** One row a kind of code, named by the kind: the row has no id of its own. */
   "identity-confirm-failures": {
     categories: ["sign-in"],
     find: (platform, subject, tx) =>
@@ -242,7 +231,6 @@ const ERASURE_FAMILY_DESCRIPTORS = {
       ),
   },
 
-  /** This workspace's row alone: another's would say where else the person has been. */
   "identity-last-active": {
     categories: ["sign-in"],
     find: (platform, subject, tx) =>
@@ -301,7 +289,6 @@ const subjectHereOf = async (tx: Tx, request: SubjectRequest): Promise<SubjectHe
   };
 };
 
-/** Reads only. One entry per family, in `ERASURE_FAMILIES` order, its locations sorted. */
 export const erasureMapOf = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -335,7 +322,6 @@ export type AccessAnswer = {
   readonly locations: readonly AccessAnswerLocation[];
 };
 
-/** Only the categories some location holds, in `PERSONAL_DATA_CATEGORIES` order. */
 export const accessAnswerOf = (map: ErasureMap): AccessAnswer => {
   const locations = map.flatMap((entry) =>
     entry.locations.map((location) => ({

@@ -27,7 +27,6 @@ const CONFIRM_BY_CODE = "/second-factor/confirm/authenticator";
 
 const TOO_MANY_REQUESTS = 429;
 
-/** The route's own ceiling; the throttle's wait comes well before it. */
 const MOST_TRIES = 10;
 
 const heading = (page: Page, name: string) => page.getByRole("heading", { level: 1, name });
@@ -51,36 +50,30 @@ const authenticatorInstead = (page: Page) =>
 const codesListed = (page: Page) =>
   page.getByRole("list", { name: "Recovery Codes" }).getByRole("listitem");
 
-/** What the codes' block says of its set: one line for a first set, and one more for a set that replaces one. */
 const saidOfTheSet = (page: Page) =>
   page.getByRole("region", { name: "Save Your Recovery Codes" }).getByRole("paragraph");
 
-/** Every refusal region stands from the first draw, so the one saying something is the refusal. */
 const theRefusal = (page: Page) => page.getByRole("alert").filter({ hasText: /\S/ });
 
 const codeOf = (key: string): string => authenticatorCodeAt(key, new Date());
 
-/** Never the code shown now, nor one refused before, which the field would not send again. */
 const aWrongCode = (right: string, nth = 1): string =>
   String((Number(right) + nth) % 10 ** AUTHENTICATOR_CODE_LENGTH).padStart(
     AUTHENTICATOR_CODE_LENGTH,
     "0",
   );
 
-/** By email alone, so the sign-in waits on the page that confirms or sets up its second factor. */
 const signedInWaiting = async (page: Page, api: APIRequestContext, email: string, on: string) => {
   await page.goto("/sign-in");
   await signInByEmail(page, api, email);
   await expect(heading(page, on)).toBeVisible();
 };
 
-/** Drops the cookie alone, so the session it named stays open on the server. */
 const signedInAgain = async (page: Page, api: APIRequestContext, email: string) => {
   await page.context().clearCookies();
   await signedInWaiting(page, api, email, CONFIRM_HEADING);
 };
 
-/** Left on the confirm page, not yet confirmed, holding ten saved codes unless told none. */
 const anAdminWithAnAuthenticator = async (
   page: Page,
   api: APIRequestContext,
@@ -92,23 +85,17 @@ const anAdminWithAnAuthenticator = async (
   return { email: admin.email, key, codes: recoveryCodes };
 };
 
-/** The gate opens the Account page only to a confirmed session. */
 const confirmedByCode = async (page: Page, key: string): Promise<void> => {
   await codeField(page).fill(codeOf(key));
   await landedAtHome(page, "Admin");
 };
 
-/** Ticked on the page showing them, so no later sign-in shows them again. */
 const codesTicked = async (page: Page, finish: string): Promise<void> => {
   await page.getByRole("checkbox", { name: "I have saved these codes" }).check();
   await page.getByRole("button", { name: finish }).click();
   await expect(codesListed(page)).toHaveCount(0);
 };
 
-/**
- * The add confirms its own session, so the Admin signs in by email again with the device
- * unattended, or its autofill signs in instead.
- */
 const anAdminWithBothFactors = async (page: Page, api: APIRequestContext) => {
   const device = await aVirtualAuthenticator(page);
   const admin = await anAdminWithAnAuthenticator(page, api);
@@ -126,7 +113,6 @@ const anAdminWithBothFactors = async (page: Page, api: APIRequestContext) => {
   return admin;
 };
 
-/** A recovery or restore code, sent with the button beside its field. */
 const codeUsed = async (field: Locator, code: string): Promise<void> => {
   await field.fill(code);
   await field.page().getByRole("button", { name: "Use Code" }).click();
@@ -140,7 +126,6 @@ const recoveryCodeSpent = async (page: Page, code: string): Promise<void> => {
   await expect(page).toHaveURL(/\/setup$/);
 };
 
-/** From the setup page's disclosure to its ten codes; answers the new key. */
 const authenticatorSetUpThere = async (page: Page): Promise<string> => {
   await authenticatorInstead(page).click();
   const key = await keyShown(page);
@@ -150,7 +135,6 @@ const authenticatorSetUpThere = async (page: Page): Promise<string> => {
   return key;
 };
 
-/** Wrong codes until the field must wait; answers the wait the api named, and what a wrong code said. */
 const wrongCodesUntilTheWait = async (page: Page, key: string) => {
   let saidOfAWrongCode = "";
   for (let tried = 1; tried <= MOST_TRIES; tried += 1) {

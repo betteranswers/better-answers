@@ -4,7 +4,7 @@ The repository's own gate tooling. **It is imported and never deployed** — `pa
 is imported, `apps/` is what deploys (ADR 0029) — so nothing under `apps/` copies this
 directory into an image, and every dependency here is a development dependency.
 
-Eleven things live here.
+Twelve things live here.
 
 ## `src/throwaway-tree.ts` — the runner
 
@@ -34,6 +34,8 @@ Beside the runner, for the tools whose subject is a git repository rather than a
 the worktree provisioning stage, the mutant probe — `throwawayRepository`, `gitIn` and
 `writeUnder` make one, run git in it and write under it; the suite that uses them builds the
 commits, links and worktrees its case needs and keeps the runner's two fences by hand.
+A suite that reads a tree back after a tool changed it makes the tree with `sweptFolder`, which
+puts it under the runner's folder, so a killed run's tree is still swept.
 
 A tool's binary is found through the module graph, and a package that withholds its own
 manifest from its `exports` map — knip does — is reached through its entry instead, so the
@@ -162,16 +164,24 @@ Three of the suites read documents as well, so the docs lane runs them through
 ## `lint-rules/` — the `better-answers` oxlint plugin
 
 The repository's own rules: the ones that hold a rule in `CODING_STANDARDS.md` or an ADR rather
-than a generic hygiene pattern. Loaded by `.oxlintrc.json` as a `jsPlugins` specifier. A rule
-whose line lives in the root `CODING_STANDARDS.md` names that file in the message it prints.
-Each rule lands with a functional test through the runner.
+than a generic hygiene pattern. Loaded by `.oxlintrc.json` as a `jsPlugins` specifier. A rule's
+message states the rule and its fix, and points at no document. Each rule lands with a
+functional test through the runner.
 
-Three rules today. The two MCP entry rules hold ADR 0018's line at the declaration and are
+The two MCP entry rules hold ADR 0018's line at the declaration and are
 run by `apps/api/tests/lint-rules.test.ts`. `import-direction` holds all five of ADR 0029's
 import-direction rules over `packages/core` as one rule, by placing both ends of an import in
 a zone from their position under the package whose manifest names `@better-answers/core`;
 the rule file says what it refuses, and `packages/core/test/import-direction.test.ts` runs it
 both ways and over the committed tree.
+
+`import-statically` refuses a dynamic `import()`. An override in `.oxlintrc.json` turns it off
+for tests, `e2e/` and `scripts/`, and `test/import-statically.test.ts` runs it under that
+override, both ways.
+
+`parameter-never-mutated` refuses an in-place array method, or `Object.assign`, on a function's
+parameter. It resolves the receiver through scope, so a local that shadows a parameter goes
+past, and `test/parameter-never-mutated.test.ts` runs it both ways.
 
 ## The comment gate — three parts, all in root `check`
 
@@ -192,8 +202,7 @@ No config key reports a disable that suppresses nothing, so the `lint` script pa
 `lint` pass it too.
 
 Three rules are this plugin's own. `comment-only-the-why` holds the 25-word cap and the citation
-ban. A `/** */` block on an exported function under `packages/core/src` or `packages/schema/src` may
-run to 50 words. A disable gives its reason on the same line, and a directive's reason counts against
+ban, and a doc block has no longer cap than any other comment. A disable gives its reason on the same line, and a directive's reason counts against
 the cap. A notice is exempt by its opening text. A directive is dropped before blocks are
 grouped, so it cannot lend a paragraph its exemption.
 
@@ -212,11 +221,11 @@ usage text is long by design. A test file is exempt in both tiers. Every other f
 gate's own source included.
 
 The Python check reads `.py` files and nothing else: its comments, grouped into blocks of
-touching lines, and its docstrings. A docstring on a public module-level function under
-`apps/worker/src/` may run to 50 words, and every other block to 25. A directive or a notice is
+touching lines, and its docstrings, each held to 25 words. A directive or a notice is
 dropped by its opening text before blocks are grouped, so it cannot lend a paragraph its
 exemption. A suppression's reason is a block of its own. It is prose and counts, whether it
-follows a second `#` or the codes of a `noqa` or a `type: ignore` directly. A docstring is exempt only when it opens with a
+follows a second `#` or the codes of a `noqa` or a `type: ignore` directly, and a suppression
+without one is refused. A docstring is exempt only when it opens with a
 notice. No gate reads a comment in YAML, shell, TOML or SQL.
 
 | Part | What runs it | Its suite |
@@ -256,8 +265,8 @@ a linter that did not run leaves the text as it was, and both halves of that ass
 It spawns the binary the runner would, through the runner's own `executableOf`, so the two
 resolutions cannot drift.
 
-**The two word limits, 25 and 50, are written twice, once per language** — the citation
-patterns are not, since both tiers compile `contracts/citation/cases.json`. Each limit is two
+**The word limit, 25, is written twice, once per language** — the citation
+patterns are not, since both tiers compile `contracts/citation/cases.json`. The limit is two
 implementations of one rule, and nothing either tier could import at run time binds them, so
 what holds them together is the pair of suites: both run the same table — the same
 over-the-ceiling fixture, the same five citations, the same directive cases — so a limit that
@@ -374,6 +383,30 @@ a namespace re-export are not followed, so the reader throws on either.
 names with the steps that suite lists, both ways. It reads every directory but the four it names,
 and holds that each face in core's exports map is one of those directories' `index.ts`. `test/face-admission.test.ts` holds each
 condition over sources written in the test.
+
+## `src/comment-inventory.ts` — the comment inventory
+
+The comment sweep's lever, behind `scripts/comment-inventory.mjs` (`pnpm comment-inventory`). An
+agent classifies comments and the tool alone deletes them. `inventory <path>...` writes one TSV
+row per comment block in the TypeScript under each path: `path`, `start`, `end`, `kind`,
+`attached`, `words`, `text`, then four columns the classifier fills: `class`, `holder`,
+`structure` and `unit`. Blocks are grouped as the comment gate groups them. A directive or notice
+is a row of its own, and a generated file is skipped. `text` is the block's source, with a
+backslash, tab, newline and carriage return written `\\`, `\t`, `\n` and `\r`.
+
+`apply <tsv> --unit <unit>` deletes the unit's rows, except `foreign`, `contract` and
+`suppression` ones. `check <tsv> [--unit <unit>]` runs the same checks and writes nothing. Each
+row is found again by its exact text, so a moved line never deletes the wrong block. The whole
+unit is refused, and no file changes, when any row is unclassified, when a row's text is not in
+its file as often as the unit names it, or when a `held` or `structure` row's holder does not
+resolve. A holder is `path › text`, several joined by `; `. It resolves when the file, with
+every block the TSV deletes in any unit taken out, holds `text` exactly once. The text can be a
+test title or a code line such as `REVOKE DELETE ON "user"`. A holder anchors on text, never a
+line number, because a deletion above a line moves it and the number then names another line. An
+`open` row's reason has no holder in the tree yet: its holder is the tracker issue the reason went
+to, such as `BA-196`. The tool deletes it without resolving anything, and refuses one whose holder
+is not an issue id. A refused unit exits 1, and a malformed TSV exits 2 and names its line. `test/comment-inventory.test.ts` runs each command
+over a throwaway tree.
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
 

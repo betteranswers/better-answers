@@ -28,10 +28,8 @@ const MODELS = menuGroupIn(CONTROL_CENTRE, "models");
 
 const MODELS_AND_SPEND = pageNamed(MODELS, "Models and Spend");
 
-/** Declared and never built, so no reader may find it. */
 const SIGNALS = "Signals";
 
-/** Throws once no declared page has that name, so the test never types a word that names none. */
 const SIGNALS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), SIGNALS);
 
 const EVERY_WORKSPACE = pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every Workspace");
@@ -55,7 +53,6 @@ const optionOf = (page: Page, name: string | RegExp) =>
 
 const groupOf = (page: Page, name: string) => dialogOf(page).getByRole("group", { name });
 
-/** The row that takes what is typed to Search, listed under its area's name. */
 const searchRowOf = (page: Page) => groupOf(page, "Knowledge").getByRole("option");
 
 const searchBoxOf = (page: Page) =>
@@ -72,7 +69,6 @@ const searchBox = (page: Page) =>
 
 const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
 
-/** The header row is a row too, so the members are the rows with a cell. */
 const memberRows = (page: Page): Locator =>
   membersRegion(page)
     .getByRole("row")
@@ -81,7 +77,6 @@ const memberRows = (page: Page): Locator =>
 /** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 const theMembersRead = (url: URL) => url.pathname.includes("members.list");
 
-/** Signed in on a page that reads no members, so jump-to's own read is the first. */
 const signedInOffMembers = async (page: Page, api: APIRequestContext, email: string) => {
   await page.goto("/sign-in");
   await signIn(page, api, email);
@@ -93,7 +88,6 @@ type Teammate = { readonly address: string; readonly id: string };
 
 type Team = { readonly priya: Teammate; readonly tom: Teammate };
 
-/** An Admin of a workspace with two other members, on a page that reads none of them. */
 const anAdminWithATeam = async (page: Page, api: APIRequestContext, name: string) => {
   const email = anAddress("jump-to");
   const workspace = await provision(api, { name, adminEmail: email });
@@ -135,10 +129,8 @@ test("hides People from a Viewer, reading no members", async ({ page, request })
   await typed(page, "people");
 
   await expect(saidIn(page)).toContainText("people");
-  // Search's row is no match, so it stands beside the line that says nothing matches.
   await expect(dialogOf(page).getByRole("option")).toHaveText(["Search for “people”"]);
   await expect(groupOf(page, "Members")).toHaveCount(0);
-  // Of the three kinds jump-to finds, a Viewer is promised pages alone.
   await expect(inputOf(page)).toHaveAttribute("placeholder", /page/i);
   await expect(inputOf(page)).not.toHaveAttribute("placeholder", /member|action/i);
   expect(membersReads, "a Viewer's jump-to asked for the members").toEqual([]);
@@ -156,7 +148,6 @@ test("opens the invite action on Members for an Admin", async ({ page, request }
   await expect(invite).toBeVisible();
   await expect(invite.getByLabel("Email Addresses")).toBeFocused();
   await expect(dialogOf(page)).toHaveCount(0);
-  // The action takes its ask off the address, so a reload or a step back does not reopen it.
   await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}$`));
 
   await page.keyboard.press("Escape");
@@ -180,7 +171,6 @@ test("opens on either chord anywhere, Escape handing focus back", async ({ page,
   await expect(dialogOf(page)).toHaveCount(0);
   await expect(triggerOf(page)).toBeFocused();
 
-  // From inside a field on another page: the chord is never the field's.
   await page.goto(MEMBERS.path);
   await searchBox(page).focus();
   await opened(page, "Control+k");
@@ -194,7 +184,6 @@ test("opens on either chord anywhere, Escape handing focus back", async ({ page,
   await expect(triggerOf(page)).toBeFocused();
 });
 
-/** A member's page, told by the person its heading names. */
 const memberPageNaming = (page: Page, name: string) =>
   page.getByRole("main").getByRole("heading", { level: 2, name, exact: true });
 
@@ -206,14 +195,12 @@ test("lands an Admin on the member they chose", async ({ page, request }) => {
   await expect(groupOf(page, "Members")).toBeVisible();
   await optionOf(page, new RegExp(PRIYA)).click();
 
-  // The person's own page, not a list narrowed to them.
   await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}/${team.priya.id}$`));
   await expect(memberPageNaming(page, PRIYA)).toBeVisible();
   await expect(page.getByRole("main")).toContainText(team.priya.address);
   await expect(memberRows(page)).toHaveCount(0);
   await expect(page.getByRole("main")).toBeFocused();
 
-  // From another tab of Members, the next one chosen opens their page as well.
   await page.goto(MEMBERS.path);
   await page.getByRole("tab", { name: "Invitations" }).click();
   await opened(page, "Meta+k");
@@ -223,7 +210,6 @@ test("lands an Admin on the member they chose", async ({ page, request }) => {
   await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}/${team.tom.id}$`));
   await expect(memberPageNaming(page, TOM)).toBeVisible();
 
-  // From one member's page to another's, so the page names the person it now holds.
   await opened(page, "Meta+k");
   await typed(page, "priya");
   await expect(optionOf(page, new RegExp(PRIYA))).toBeVisible();
@@ -262,7 +248,6 @@ test("lands on Search with the typed query and its matches", async ({ page, requ
   ).toContainText("Audit Logs Retention");
   await expect(dialogOf(page)).toHaveCount(0);
   await expect(page.getByRole("main")).toBeFocused();
-  // Search takes the ask off the address and keeps the query under its own key.
   await expect(page).toHaveURL(
     new RegExp(`${SEARCH.path}\\?knowledge\\.search=audit(?:\\+|%20)logs$`),
   );
@@ -281,7 +266,6 @@ for (const [what, words] of [
     await searchRowOf(page).click();
 
     await expect(searchBoxOf(page)).toHaveValue(words);
-    // Search's own key holds it too, once the box has settled.
     await expect(page).toHaveURL(/knowledge\.search=/);
     await page.reload();
     await expect(searchBoxOf(page)).toHaveValue(words);
@@ -303,7 +287,6 @@ test("reaches the search row by the arrow keys", async ({ page, request }) => {
   await opened(page, "Control+k");
   await typed(page, "search");
   await expect(optionOf(page, /^Search/).first()).toHaveAttribute("aria-selected", "true");
-  // The list loops, so one step up from the first match is the last row.
   await page.keyboard.press("ArrowUp");
   await expect(searchRowOf(page)).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Enter");
@@ -386,7 +369,6 @@ test("finds nothing by an unbuilt page's name", async ({ page, request }) => {
 
 test("draws the list within its second, timed in the page", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Ryedale Metalwork");
-  // A fresh document, so no members read is cached to answer it.
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Models" })).toBeVisible();
 
@@ -412,7 +394,6 @@ test("keeps pages and actions through a held, then failed, read", async ({ page,
   await opened(page, "Meta+k");
   await typed(page, "invite");
   await expect(optionOf(page, INVITE_A_PERSON)).toBeEnabled();
-  // A row matches, so what the status says is the read still held.
   await expect(saidIn(page)).toHaveText(/\S/);
   const whileHeld = await saidIn(page).innerText();
 
@@ -423,7 +404,6 @@ test("keeps pages and actions through a held, then failed, read", async ({ page,
   );
 
   held.resolve();
-  // The query client asks again twice before it gives up.
   await saysARefusal(refusedIn(page), { timeout: 15_000 });
   await expect(saidIn(page), "the status still says the read is held").not.toHaveText(whileHeld);
   await expect(saidIn(page)).toHaveText(/\S/);

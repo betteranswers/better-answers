@@ -23,7 +23,6 @@ const AFTER = new Date("2026-09-25T11:00:00.000Z");
 const revocationsIn = (workspace: ProvisionedWorkspace) =>
   auditRowsOf(workspace, "people.member.credentials_revoked");
 
-/** The same person, a member of a second workspace too. */
 const alsoJoining = (workspace: ProvisionedWorkspace, role: Role, userId: string) =>
   seedingWith(db().pool, (seed) =>
     seed.member({ workspaceId: workspace.workspaceId, userId, role }),
@@ -49,7 +48,6 @@ const instantHeld = async (
   return held.rows[0]?.at;
 };
 
-/** Whether a credential the person was issued at `issuedAt` still resolves in the workspace. */
 const resolvedIn = async (workspace: ProvisionedWorkspace, userId: string, issuedAt: Date) => {
   const resolved = await withPrincipal(
     workspace.door,

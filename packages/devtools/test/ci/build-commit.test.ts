@@ -80,7 +80,6 @@ const shelfFor = (commit: string): Shelf => ({
 const acceptsBoth = (heard: Heard): boolean =>
   [DOCKER_MANIFEST, OCI_MANIFEST].every((type) => (heard.headers["accept"] ?? "").includes(type));
 
-/** ghcr's answers, each behind its credential; a blob redirects to storage on another origin, as ghcr's does. */
 const registry =
   (shelf: Shelf, storage: string) =>
   (heard: Heard): Answer => {

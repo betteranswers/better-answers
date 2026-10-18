@@ -11,7 +11,6 @@ import type { EmailSender } from "./email.ts";
  */
 export const EMAILS_PER_SECOND = 5;
 
-/** Build one per process: a second pool would pace itself apart and double the rate. */
 export const pacedTransport = (smtpUrl: string): Transporter =>
   createTransport({
     url: smtpUrl,
@@ -24,7 +23,6 @@ export const pacedTransport = (smtpUrl: string): Transporter =>
 
 const domainOf = (address: string): string | null => address.split("@")[1] ?? null;
 
-/** With no transport every send throws, so a sign-in code that cannot go never reads as sent. */
 export const emailSender = (
   transport: Transporter | undefined,
   from: string,

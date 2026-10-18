@@ -17,7 +17,6 @@ export const focusOn = (id: string) => {
   document.getElementById(id)?.focus();
 };
 
-/** The card's marks stand for its primary button's. With no title, the children's first heading is the `h1`. */
 export function AuthPage(properties: { readonly title?: string; readonly children: ReactNode }) {
   return (
     <GridPattern>
@@ -79,7 +78,6 @@ export function ReadAgain(properties: {
   readonly className?: string;
 }) {
   const readAgain = () => {
-    // Enabled while reading, so the focus a click gave the button is not dropped.
     if (!properties.reading) properties.onReadAgain();
   };
   useKeystroke(properties.keystroke, readAgain);
@@ -114,7 +112,6 @@ function SignInAgain(properties: { readonly signInAt: string }) {
   );
 }
 
-/** An ended session says the same on every page, since the button after it is the same. */
 const failureSentence = (
   refusal: Refusal | undefined,
   saidOf: (refusal: Refusal) => string,
@@ -124,10 +121,6 @@ const failureSentence = (
   return refusal.class === "unauthenticated" ? STOCK.session : saidOf(refusal);
 };
 
-/**
- * What went wrong and what to do. A wordless failure says `unanswered`; an ended session gets a
- * button that signs in at `signInAt`.
- */
 export function Refused(properties: {
   readonly id: string;
   readonly failure: Error | ApiError | null;

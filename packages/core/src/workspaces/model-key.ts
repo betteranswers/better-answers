@@ -17,7 +17,6 @@ import type { ModelKeySetting } from "../llm/index.ts";
 import { type PostgresDoor, withScope } from "../store/postgres/index.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** The event names the model provider and never the key: its detail takes one of a closed set. */
 const MODEL_KEY_ACTIONS = declareActions("platform", {
   set: action("platform.workspace.model_key_set", {
     [STORED_DETAIL_KEYS.modelProvider]: "modelProvider",
@@ -42,10 +41,7 @@ type ModelKeySet = {
 
 export type SetModelKeyRefusal = KernelRefusal<"malformed"> | WorkspaceRefusal<"no-such-workspace">;
 
-/**
- * Sets the workspace's key for one model provider, replacing any it held, and records that it was
- * set. The key is neither answered nor recorded.
- */
+/** The key is neither answered nor recorded. */
 export const setModelKey = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

@@ -21,7 +21,6 @@ const LATER = new Date("2026-10-03T09:41:00.000Z");
 
 const confirmedAt = async (sessionId: string) => (await reads.confirmedAt(sessionId))?.confirmed;
 
-/** A person, and a passkey somebody else holds. */
 const aStrangersPasskey = async () => {
   const personId = await seedPerson(db().pool);
   const strangerId = await seedPerson(db().pool);

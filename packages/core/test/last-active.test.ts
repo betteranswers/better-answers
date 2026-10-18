@@ -31,10 +31,6 @@ const HOUR_MS = 3_600_000;
 
 const TEN_MINUTES_MS = 10 * 60_000;
 
-/**
- * Resolves the member's claims and answers their role, as every door on a request does.
- * `meanwhile` runs as the request's own work, inside its transaction.
- */
 const resolvedIn = async (
   workspaceId: string,
   userId: string,
@@ -51,7 +47,6 @@ const resolvedIn = async (
   return opened;
 };
 
-/** As the MCP surface's own door resolves a mutating call. */
 const mcpCallIn = (workspaceId: string, userId: string) =>
   withHeldPrincipal(door(), { workspaceId, userId, issuedAt: new Date() }, async (principal) => ({
     role: principal.role,
@@ -67,7 +62,6 @@ const stampedIn = async (workspaceId: string, userId: string): Promise<Date | un
     )
   ).rows[0]?.at;
 
-/** A row `agoMs` old: within the hour no request writes it again, past the hour the next one does. */
 const stampedAgo = (workspaceId: string, userId: string, agoMs: number) =>
   seedingWith(db().pool, async (seed) =>
     seed.workspaceLastActive({
@@ -77,7 +71,6 @@ const stampedAgo = (workspaceId: string, userId: string, agoMs: number) =>
     }),
   );
 
-/** Holds the member's own last-active row, from a connection of its own, while `work` runs. */
 const holdingTheStamp = <T>(workspaceId: string, userId: string, work: () => Promise<T>) =>
   holdingRows(
     db().pool,
@@ -86,7 +79,6 @@ const holdingTheStamp = <T>(workspaceId: string, userId: string, work: () => Pro
     work,
   );
 
-/** The workspace's Admin removes the member, as the transport holds the Admin. */
 const removing = (workspace: ProvisionedWorkspace, personId: string) =>
   heldAs(workspace, workspace.adminUserId, (principal, tx) =>
     removeMember(principal, tx, { ...inputOf(removeMemberInput, { personId }), at: new Date() }),
@@ -278,7 +270,6 @@ describe("stamping a member's last activity", () => {
       openPostgres(pool),
       { workspaceId: workspace.workspaceId, userId: viewer, issuedAt: new Date() },
       async (principal) => {
-        // A shutdown mid-request: the request's own connection serves until it is released.
         ending = pool.end();
         return principal.role;
       },

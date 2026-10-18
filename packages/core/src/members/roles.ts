@@ -32,10 +32,8 @@ const ROLE_ACTIONS = declareActions("people", {
 
 const ROLE = boundarySchemas.member.select.shape.role;
 
-/** The role is any text, so a role outside the three reaches the action and is refused in its word. */
 export const changeRoleInput = memberKeyed.extend({ role: z.string() });
 
-/** When the action happens: a confirmation older than an hour makes the change wait on a re-confirm. */
 export type ChangeRoleInput = z.output<typeof changeRoleInput> & { readonly at: Date };
 
 const changeRoleAction = declareAction({
@@ -68,7 +66,6 @@ export type RoleChanged = {
   readonly role: Role;
 };
 
-/** As changed, and whether the move made them hold a second factor for the first time. */
 export type RoleMoved = RoleChanged & { readonly promoted: boolean };
 
 type Asked = { readonly personId: UserId; readonly role: Role };
@@ -96,10 +93,6 @@ const roleWrittenBy = async (
   return promoted;
 };
 
-/**
- * A step on a member row its action holds: the role moves, and its audit event lands in `batchId`.
- * True when the move made the person hold a second factor for the first time.
- */
 export const roleWritten = (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -109,10 +102,6 @@ export const roleWritten = (
 
 const ROLE_HELD = "SELECT role FROM member WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE";
 
-/**
- * As `roleWritten`, by the platform under `workspaceId`'s scope, judging no last Admin. It holds
- * the row itself, so a role moved or a member removed since the caller read records nothing stale.
- */
 export const roleWrittenByPlatform = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -143,9 +132,8 @@ const roleSetUnderTheLock = (
   });
 
 /**
- * Refuses `last-admin` for a change that would leave the workspace with no Admin; an Admin may
- * demote themself while another remains. Roles are read afresh on every call, so the change holds
- * from the member's next request. Asking for the role already held writes nothing.
+ * Refuses `last-admin` for a change that would leave the workspace with no Admin. Asking for the
+ * role already held writes nothing.
  */
 export const changeRole = async (
   principal: UserPrincipal,

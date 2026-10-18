@@ -18,10 +18,6 @@ import { reasonOf } from "./ops/index.ts";
 
 export const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-/**
- * Soon after a start, not a day after: releases more often than daily would restart the wait
- * before any pass ran.
- */
 export const SWEEP_FIRST_PASS_MS = 10 * 60 * 1000;
 
 export type SweepsDependencies = {
@@ -61,10 +57,6 @@ const countOf = (deletion: Deletion): number => (deletion.ok ? deletion.value : 
 const refusalOf = (sweep: string, swept: Result<unknown, Error>) =>
   swept.ok ? [] : [{ sweep, reason: reasonOf(swept.error) }];
 
-/**
- * No workspace holds an identity-set row or a month's partition of the questions' content, so a
- * refused one names its sweep alone.
- */
 const sweptOutsideAnyWorkspace = async (postgres: PostgresDoor, now: Date) => {
   const { sessions, verifications, ingressWindows } = await sweepIdentitySet(SWEEPS, postgres, {
     now,
@@ -85,7 +77,6 @@ const sweptOutsideAnyWorkspace = async (postgres: PostgresDoor, now: Date) => {
   };
 };
 
-/** Counts, never a workspace, a key or an error. */
 const sizesOf = (pass: SweepPass): string => {
   const { workspaces, refused, found, removed, generations } = pass.totals;
   return `workspaces=${workspaces} refused=${refused} upload_sweep=${pass.uploadSweep} found=${found} removed=${removed} generations=${generations}`;
@@ -110,8 +101,6 @@ export const startSweeps = (dependencies: SweepsDependencies): Result<Sweeps, Sw
       logger.warn("a sweep pass was skipped: another holder has the sweeps' lock");
       return;
     }
-    // Neither the deletions nor the months need a workspace, so a failed workspace sweep must
-    // not keep expired rows or leave next month unmade.
     const outside = await sweptOutsideAnyWorkspace(postgres, clock.now());
     if (!swept.ok) {
       const { deleted, refusals } = outside;

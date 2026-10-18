@@ -16,10 +16,6 @@ export type OpenEnvelopeRefusal = KernelRefusal<
   "envelope-version-unknown" | "envelope-malformed" | "envelope-not-authentic"
 >;
 
-/**
- * A wrong key length is the caller's defect: a refusal word here would let a mis-provisioned key
- * read as somebody's bad envelope.
- */
 const keyed = (key: Uint8Array): Uint8Array => {
   if (key.length !== ENVELOPE_KEY_BYTES) {
     throw new Error(`envelope: a key is ${ENVELOPE_KEY_BYTES} bytes, not ${key.length}`);
@@ -27,11 +23,6 @@ const keyed = (key: Uint8Array): Uint8Array => {
   return key;
 };
 
-/**
- * A frame of the version byte, a fresh nonce, the ciphertext and the tag, in that order.
- *
- * @throws when `key` is not `ENVELOPE_KEY_BYTES` long.
- */
 export const sealEnvelope = (key: Uint8Array, plaintext: Uint8Array): Uint8Array => {
   const version = Uint8Array.of(ENVELOPE_VERSION);
   /**
@@ -48,12 +39,6 @@ export const sealEnvelope = (key: Uint8Array, plaintext: Uint8Array): Uint8Array
   return new Uint8Array(Buffer.concat([version, nonce, ciphertext, cipher.getAuthTag()]));
 };
 
-/**
- * The plaintext of a frame sealEnvelope wrote under `key`. Refuses a frame of another version, one
- * too short to hold a nonce and tag, and one whose tag does not verify.
- *
- * @throws when `key` is not `ENVELOPE_KEY_BYTES` long.
- */
 export const openEnvelope = (
   key: Uint8Array,
   frame: Uint8Array,
@@ -61,8 +46,6 @@ export const openEnvelope = (
   const opener = keyed(key);
   const version = frame.at(0);
   if (version === undefined) return err("envelope-malformed");
-  // Before anything is decrypted, so a version this tier cannot read answers what is wrong
-  // rather than what the tag made of it.
   if (version !== ENVELOPE_VERSION) return err("envelope-version-unknown");
   if (frame.length < SHORTEST_FRAME) return err("envelope-malformed");
 
@@ -82,8 +65,6 @@ export const openEnvelope = (
   try {
     return ok(new Uint8Array(Buffer.concat([decipher.update(ciphertext), decipher.final()])));
   } catch {
-    // The library says a tag did not verify by throwing, and tells nobody whether a byte moved
-    // or the key was wrong.
     return err("envelope-not-authentic");
   }
 };

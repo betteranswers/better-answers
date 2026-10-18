@@ -21,13 +21,11 @@ const sessionsRegion = (page: Page) => page.getByRole("region", { name: "Session
 
 const rowsIn = (page: Page): Locator => sessionsRegion(page).getByRole("listitem");
 
-/** A session row's name: the row says which session of which device it is. */
 const rowNamed = (device: string): string => `A session on ${device}`;
 
 const rowOf = (page: Page, device: string) =>
   sessionsRegion(page).getByRole("listitem", { name: rowNamed(device), exact: true });
 
-/** The status an action's outcome is said in: the one holding words. */
 const saidIn = (page: Page) => sessionsRegion(page).getByRole("status").filter({ hasText: /\S/ });
 
 const accountOpened = async (page: Page): Promise<void> => {
@@ -35,14 +33,12 @@ const accountOpened = async (page: Page): Promise<void> => {
   await expect(page.getByRole("heading", { level: 1, name: "Account" })).toBeVisible();
 };
 
-/** A person in no workspace, whose Account page lists only their own sessions. */
 const aPersonOnTheAccountPage = async (page: Page, api: APIRequestContext, who: string) => {
   const signedIn = await signedInWithNoWorkspace(page, api, who);
   await accountOpened(page);
   return signedIn;
 };
 
-/** `Last active 14:05 · 3 March 2026`, as the row shows a session's last activity. */
 const LAST_ACTIVE = /Last active \d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}/;
 
 test("shows the current session first, tagged, without a sign-out", async ({ page, request }) => {
@@ -216,7 +212,6 @@ test("a second sign-out waits for the first to answer", async ({ page, request }
     name: "Sign out Safari on iOS",
   });
 
-  // The first sign-out reaches the api and its answer is held, so the second press meets it pending.
   const held = await holdingTheFirstAnswer(page, SIGN_OUT_ONE);
 
   await rowOf(page, "Edge on Windows")

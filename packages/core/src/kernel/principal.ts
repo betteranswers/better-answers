@@ -16,11 +16,6 @@ export type { AccessRequestId, AuditEventId, GroupId, UserId, WorkspaceId };
 
 export type Role = z.infer<typeof boundarySchemas.member.select>["role"];
 
-/**
- * A Principal outlives the transaction that resolved it only where an action opens its own; never
- * the request, and that action's door re-judges it.
- */
-/** What the one freshness rule reads of whoever it judges: a member, the operator, or a session. */
 export type CarriesAConfirmation = { readonly secondFactorConfirmedAtMs: number | null };
 
 export type UserPrincipal = {
@@ -33,7 +28,6 @@ export type UserPrincipal = {
 
   readonly credentialIssuedAtMs: number;
 
-  /** When the session last confirmed a second factor; null where the claims name no session. */
   readonly secondFactorConfirmedAtMs: number | null;
 };
 
@@ -45,17 +39,12 @@ export type PlatformPrincipal = {
 
 export type Principal = UserPrincipal | PlatformPrincipal;
 
-/**
- * Kept out of `Principal`, so no action over a workspace's data can be handed a caller who belongs
- * to none of them.
- */
 export type OperatorPrincipal = {
   readonly kind: "operator";
   readonly userId: UserId;
 
   readonly credentialIssuedAtMs: number;
 
-  /** When the session last confirmed a second factor; null where the claims name no session. */
   readonly secondFactorConfirmedAtMs: number | null;
 };
 
@@ -65,7 +54,6 @@ export type Claims = {
   readonly issuedAt: Date;
   readonly role?: Role;
 
-  /** The session a cookie names, whose confirmation stamp is the person's; a bearer names none. */
   readonly sessionId?: string;
 };
 

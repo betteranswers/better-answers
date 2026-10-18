@@ -38,14 +38,12 @@ const GROUPS_PAGE = pageNamed(people, "Groups").path;
 
 const MEMBERS_PAGE = pageNamed(people, "Members").path;
 
-/** A member's row leads with its tick, then the person and their role. */
 const GROUPS_CELL = 3;
 
 const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
 
 const groupsRegion = (page: Page) => page.getByRole("region", { name: "Groups" });
 
-/** The header row is a row too, so the groups are the rows with a cell. */
 const groupRows = (page: Page): Locator =>
   groupsRegion(page)
     .getByRole("row")
@@ -70,7 +68,6 @@ const searchBox = (page: Page): Locator =>
 const renameDialog = (page: Page, name: string): Locator =>
   page.getByRole("dialog", { name: `Rename ${name}` });
 
-/** Opens a group's row menu and picks Rename, as a pointer would. */
 const renamingFromTheRowMenu = async (page: Page, name: string): Promise<Locator> => {
   await rowOf(page, name)
     .getByRole("button", { name: `Actions for ${name}` })
@@ -79,22 +76,18 @@ const renamingFromTheRowMenu = async (page: Page, name: string): Promise<Locator
   return renameDialog(page, name);
 };
 
-/** The action a keystroke list sets beside a key: the definition after the key's term. */
 const actionBeside = (keystrokes: Locator, key: string): Locator =>
   keystrokes
     .getByRole("term")
     .filter({ hasText: new RegExp(`^${key}$`) })
     .locator("xpath=following-sibling::*[1]");
 
-/** A group being created is a name before it is a button, so its row is found by its text. */
 const countCellOf = (name: string): string => `//tr[td[1][normalize-space(.)='${name}']]/td[2]`;
 
-/** What the open sheet says under its heading: a group's member count. */
 const SHEET_COUNT = "//div[@role='dialog']//h2/following-sibling::p[1]";
 
 const LIST_COUNT = "//section[h2[normalize-space(.)='Groups']]/div/output";
 
-/** The warning before a group is deleted: what it says of the members it takes, and where focus sits. */
 const warnedOfDeleting = async (page: Page, name: string, members: number) => {
   const confirming = page.getByRole("alertdialog", { name: `Delete ${name}` });
   await expect(
@@ -105,14 +98,12 @@ const warnedOfDeleting = async (page: Page, name: string, members: number) => {
   return confirming;
 };
 
-/** Confirms the open deletion warning by its key, timed from the key to the row leaving. */
 const confirmedAtAKey = async (page: Page, confirming: Locator, left: number) => {
   await confirming.getByRole("button", { name: "Delete", exact: true }).focus();
   await clockTheNextKey(page, { at: LIST_COUNT, reads: String(left) });
   await page.keyboard.press("Enter");
 };
 
-/** Deletes an empty group through its sheet, answering how long its confirming key took to land. */
 const deletedAtAKey = async (page: Page, name: string, left: number): Promise<number> => {
   await groupButton(page, name).click();
   await sheetOf(page, name).getByRole("button", { name: "Delete Group" }).click();
@@ -122,14 +113,11 @@ const deletedAtAKey = async (page: Page, name: string, left: number): Promise<nu
   return actionClocked(page);
 };
 
-/** A group's label on a member's page, found only while the box beside it is ticked. */
 const tickedGroup = (name: string): string =>
   `//fieldset//div[button[@role='checkbox'][@aria-checked='true']]//label[normalize-space(.)='${name}']`;
 
-/** A card's inner gap and a little over: text further beneath its header has a band above it. */
 const ONE_GAP_PX = 16;
 
-/** An empty outcome line that took a gap of its own would push the card's first text down. */
 const startsUnderItsHeader = async (card: Locator): Promise<void> => {
   const header = await card.locator("[data-slot='card-header']").boundingBox();
   const firstLine = await card.getByRole("paragraph").first().boundingBox();
@@ -140,7 +128,6 @@ const startsUnderItsHeader = async (card: Locator): Promise<void> => {
   ).toBeLessThanOrEqual(ONE_GAP_PX);
 };
 
-/** Another workspace's group is made alongside, so a list that leaked would show it. */
 const anAdminAtGroups = async (
   page: Page,
   api: APIRequestContext,
@@ -167,7 +154,6 @@ const anAdminAtGroups = async (
     names: ["Una's crew"],
   });
 
-  // Asked for before signing in, so the sign-in page carries the Admin back to it.
   await page.goto(GROUPS_PAGE);
   await signIn(page, api, adminEmail);
   await expect(page).toHaveURL(new RegExp(`${GROUPS_PAGE}$`));
@@ -186,7 +172,6 @@ test.describe("the People group's Groups page", () => {
       "aria-current",
       "page",
     );
-    // With no tabs to name the list, its own heading shows, under the page's.
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
         - heading "People" [level=1]
@@ -225,7 +210,6 @@ test.describe("the People group's Groups page", () => {
               - cell:
                 - button "Actions for HR team"
     `);
-    // A name alone does not say that its row opens, so each name carries a caret at rest.
     for (const name of ["Bid writers", "HR team"]) {
       const opens = groupsRegion(page).getByRole("button", { name, exact: true });
       await expect(opens).toHaveAttribute("aria-haspopup", "dialog");
@@ -237,7 +221,6 @@ test.describe("the People group's Groups page", () => {
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Dales Engineering");
 
-    // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
     await page.goto(GROUPS_PAGE);
     await expect(groupRows(page)).toHaveCount(2);
@@ -298,14 +281,12 @@ test.describe("a group's actions", () => {
     await createDialog(page).getByRole("button", { name: "Create Group" }).click();
 
     expect(await refused).toMatchObject({ word: "name-taken" });
-    // The dialog stays open on a refusal, so its line is the dialog's own.
     await saysARefusal(createDialog(page).getByRole("alert"));
     await keepsItsWordOffThePage(page, "name-taken");
     await expect(nameField(page)).toHaveValue("HR team");
     await createDialog(page).getByRole("button", { name: "Close" }).click();
     await expect(groupRows(page)).toHaveCount(2);
 
-    // Opened by its key this time, the dialog carries nothing of the refused try.
     await page.keyboard.press(GROUPS_KEYSTROKES.create.key);
     await expect(nameField(page)).toBeFocused();
     await expect(
@@ -574,7 +555,6 @@ test.describe("a group's actions", () => {
 
   test("lets an Admin reach every group action by keyboard alone", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Calder Castings");
-    // A fresh document, so the first Tab starts from the top rather than from the rail's link.
     await page.goto(GROUPS_PAGE);
     await expect(groupRows(page)).toHaveCount(2);
     await skipLinkReachesThePage(page);
@@ -774,7 +754,6 @@ test.describe("a member's groups, on their row and their page", () => {
       .getByRole("link", { name: "Test person", exact: true })
       .click();
     const groups = page.getByRole("main").getByRole("region", { name: "Groups", exact: true });
-    // The page has no way to create a group, so its empty state carries the one action.
     await expect(groups).toMatchAriaSnapshot(`
       - region "Groups":
         - /children: equal

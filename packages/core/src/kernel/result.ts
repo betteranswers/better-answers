@@ -11,8 +11,8 @@ export function err<E>(error: E): Result<never, E> {
 }
 
 /**
- * An Error as it came, a string as an Error's message, and anything else as an Error that names
- * its type and keeps it as `cause`.
+ * An Error as it came, a string as an Error's message, anything else as an Error that names its
+ * type and keeps it as `cause`.
  */
 export function normalizeError(cause: unknown): Error {
   if (cause instanceof Error) return cause;
@@ -22,8 +22,6 @@ export function normalizeError(cause: unknown): Error {
 
 /**
  * What `operation` resolves to, or its rejection as a normalised Error; it never rejects itself.
- * After an action's first write, anything the action calls rejects: a word it might not read commits the
- * action without its step.
  */
 export async function attempt<T>(operation: () => Promise<T>): Promise<Result<T>> {
   try {
@@ -33,7 +31,6 @@ export async function attempt<T>(operation: () => Promise<T>): Promise<Result<T>
   }
 }
 
-/** As `attempt`, for an operation that answers a Result: its refusal and a rejection meet in one. */
 export async function attemptResult<T, E>(
   operation: () => Promise<Result<T, E>>,
 ): Promise<Result<T, E | Error>> {

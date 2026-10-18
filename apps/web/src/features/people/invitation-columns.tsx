@@ -27,16 +27,10 @@ const EXPIRY = { id: "expires", label: "Expires" } as const;
 
 const INVITED_BY = { id: "invitedBy", label: "Invited By" } as const;
 
-/** Every column but the address can hide, so a row always says whose invitation it is. */
 const HIDEABLE = [ROLE, SENT, EXPIRY, INVITED_BY] as const;
 
-/** Address and role are what a narrow window has room for; the rest can be shown again. */
 export const NARROW_HIDES: ReadonlySet<string> = new Set([SENT.id, EXPIRY.id, INVITED_BY.id]);
 
-/**
- * An accepted or cancelled invitation's expiry no longer bears on anything, so its list neither
- * offers nor shows the column.
- */
 export const columnsUnder = (status: InvitationStatus, hidden: ReadonlySet<string>) =>
   isActable(status)
     ? { hideable: HIDEABLE, hidden }
@@ -49,7 +43,6 @@ export const INVITATION_COLUMNS = column.columns([
   column.accessor("address", {
     id: "address",
     header: "Address",
-    // Still `anywhere`: a cell is as wide as its longest part, which would scroll the table at 320px.
     cell: ({ getValue }) => <Address address={getValue()} className="font-medium" />,
   }),
   column.accessor("role", {

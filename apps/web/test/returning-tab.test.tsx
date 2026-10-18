@@ -45,7 +45,6 @@ const SET_ACTIVE = "/organization/set-active";
 
 const said = () => band().getByRole("status").textContent;
 
-/** The session moves to Holme Valley Tools as this tab's own request for it is answered. */
 const movingTheSession = (api: Api, request: string, answer: unknown) => {
   api.set(request, () => {
     aSwitchInAnotherTab(api, "Viewer");
@@ -53,19 +52,15 @@ const movingTheSession = (api: Api, request: string, answer: unknown) => {
   });
 };
 
-/** Landed in Holme Valley Tools by this tab's own doing, which another tab had no part in. */
 const landedAtHome = async (router: Awaited<ReturnType<typeof openAt>>) => {
-  // Found afresh at each look: a pick and a join are made on a page with a band of its own.
   await waitFor(() => expect(switcherDrawn(HOLME)).not.toBeNull());
   expect(router.state.location.pathname).toBe(HOMES.Viewer.path);
 };
 
-/** The hidden tab is shown again, so each read a page is drawing is asked again. */
 const shownAgain = () => {
   globalThis.dispatchEvent(new Event("visibilitychange"));
 };
 
-/** Members under Northern Tooling, its list asked again and that answer held back. */
 const openMembersWithTheListOnItsWay = async (api: Api, answer: unknown) => {
   const router = await openAt(MEMBERS, api);
   await waitFor(() => expect(tickOf(GRACE.displayName)).not.toBeNull());

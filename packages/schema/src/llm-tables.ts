@@ -27,7 +27,6 @@ export const llmPurpose = pgEnum("llm_purpose", [
   "embedding",
 ]);
 
-/** Who hosts a model a model choice names; a model key is held for one of these and no other. */
 export const MODEL_PROVIDERS = ["anthropic", "mistral", "cloudflare"] as const;
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
 
@@ -35,7 +34,6 @@ const sealedFrame = customType<{ data: Uint8Array; driverData: Buffer }>({
   dataType: () => "bytea",
 });
 
-/** Sealed and never hashed, because the key is sent: the row holds no readable part of it. */
 export const modelKey = withRLS(
   "model_key",
   {
@@ -52,33 +50,23 @@ export const modelKey = withRLS(
   ],
 );
 
-/** Lower case, digits, dots and hyphens, as providers name models: too narrow to carry a key. */
 export const MODEL_NAME = /^[a-z0-9][a-z0-9.-]{0,63}$/;
 
-/** A sum of pounds sterling as a decimal string: money is never a float. */
-export const GBP = /^\d+(\.\d+)?$/;
+export const DECIMAL_STRING = /^\d+(\.\d+)?$/;
 
 export const CALENDAR_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** The words `contracts/cost-ledger/rows.json` gives an `llm_call` row's outcome. */
 export const LLM_CALL_OUTCOMES = ["succeeded", "failed"] as const;
 export type LlmCallOutcome = (typeof LLM_CALL_OUTCOMES)[number];
 
 export const LLM_CALL_FAILED = "failed" satisfies LlmCallOutcome;
 
-/** What was called, for what, and its tokens: a fresh set of builders each time a table takes them. */
 const theCall = () => ({
   purpose: llmPurpose("purpose").notNull(),
   modelChoiceId: text("model_choice_id").notNull(),
   model: text("model").notNull(),
-  tokensIn: integer("tokens_in").notNull(),
-  tokensOut: integer("tokens_out").notNull(),
 });
 
-/**
- * Never the prompt or the completion. A model choice is edited in place, so `model_choice_id` keeps
- * no foreign key and `model` says what ran.
- */
 export const llmCall = withRLS(
   "llm_call",
   {
@@ -88,6 +76,8 @@ export const llmCall = withRLS(
     id: text("id").notNull(),
     calledAt: stamp("called_at").notNull(),
     ...theCall(),
+    tokensIn: integer("tokens_in").notNull(),
+    tokensOut: integer("tokens_out").notNull(),
     seconds: doublePrecision("seconds").notNull(),
     costGbp: numeric("cost_gbp").notNull(),
     outcome: text("outcome").notNull(),
@@ -97,7 +87,6 @@ export const llmCall = withRLS(
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    // The spending limit sums a calendar month of these.
     index("llm_call_workspace_id_called_at_idx").on(table.workspaceId, table.calledAt),
     foreignKey({
       name: "llm_call_answer_fk",
@@ -113,10 +102,6 @@ export const llmCall = withRLS(
   ],
 );
 
-/**
- * Counted against the spending limit until settled as `llm_call` rows, which are priced at the rates
- * it carries.
- */
 export const spendReservation = withRLS(
   "spend_reservation",
   {
@@ -126,8 +111,9 @@ export const spendReservation = withRLS(
     id: text("id").notNull(),
     takenAt: stamp("taken_at").notNull(),
     expiresAt: stamp("expires_at").notNull(),
-    // Its tokens are the most the call may send and return, over every attempt.
     ...theCall(),
+    mostTokensIn: integer("tokens_in").notNull(),
+    mostTokensOut: integer("tokens_out").notNull(),
     gbpPerMillionIn: numeric("gbp_per_million_in").notNull(),
     gbpPerMillionOut: numeric("gbp_per_million_out").notNull(),
     reservedGbp: numeric("reserved_gbp").notNull(),
@@ -152,10 +138,6 @@ export const spendReservation = withRLS(
   ],
 );
 
-/**
- * A fact about the provider, so it names no workspace. A call is priced by the latest row on or
- * before its day.
- */
 export const modelPrice = pgTable(
   "model_price",
   {

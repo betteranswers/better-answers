@@ -74,12 +74,10 @@ export type BulkResendInvitationsRefusal = SetRefusal<
 
 export type BulkCancelInvitationsRefusal = SetRefusal<MemberRefusal<"no-such-invitation">>;
 
-/** One statement, in id order, so two actions holding overlapping sets take them alike. */
 const HELD_INVITATIONS = `SELECT id, status FROM invitation
                            WHERE workspace_id = $1 AND id = ANY($2::text[])
                            ORDER BY id FOR UPDATE`;
 
-/** Each id asked for and held here in none of `standing`, named `no-such-invitation`. */
 const refusedOutside = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -140,9 +138,8 @@ export type BulkResendInvitationsInput = z.output<typeof bulkInvitationsInput> &
 };
 
 /**
- * Renews every ticked invitation a week from `now`, or none: one accepted, cancelled, not held here
- * or off a marked workspace's testing domain refuses the set naming each. Past an address's ceiling
- * or the workspace's, the set fails whole.
+ * All or none, each renewed a week from `now`: one accepted, cancelled, not held here, or off a
+ * marked workspace's testing domain refuses the set.
  */
 export const bulkResendInvitations = async (
   principal: UserPrincipal,
@@ -192,8 +189,8 @@ const cancelledUnderHold = async (
 };
 
 /**
- * Cancels every ticked invitation still waiting, or none: one accepted or not held here refuses
- * the set naming each. One already cancelled is skipped, counted from what the update landed.
+ * Cancels every ticked invitation still waiting, or none: one accepted or not held here refuses the
+ * set naming each. One already cancelled is skipped.
  */
 export const bulkCancelInvitations = async (
   principal: UserPrincipal,

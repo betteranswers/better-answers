@@ -21,23 +21,18 @@ import { CONCEPT_WORDS, EVIDENCE_WORDS } from "./concept-words.ts";
 import { useConcept, usePassage, type Opening } from "./knowledge-reads.ts";
 import { failedReadWords } from "./refusal.tsx";
 
-/** `unmapped` is a match no concept rests on, which the panel says beside the passage's sensitivity. */
 type OpenedSource =
   | (Extract<Opening, { readonly kind: "passage" }> & { readonly unmapped?: true })
   | Extract<Opening, { readonly kind: "concept" }>;
 
-/** A source opened beside the page, and the control that opened it, where focus goes back. */
 export type Opened = {
   readonly key: string;
-  /** What its opener calls it, which names the panel until the read names the source itself. */
   readonly title: string;
   readonly source: OpenedSource;
   readonly openerId: string;
-  /** Counts its opener's presses, so pressing it again brings focus back to the panel. */
   readonly pressed: number;
 };
 
-/** Mounted afresh for each source, so a second one chosen with the panel open takes focus too. */
 const focusOnMount = (heading: HTMLHeadingElement | null): void => {
   heading?.focus();
 };
@@ -73,14 +68,12 @@ const QUOTED =
 
 type PassageSource = Extract<OpenedSource, { readonly kind: "passage" }>;
 
-/** The read's own title takes the match's place as it lands, and a refused read gives the match's back. */
 function TitleRead(properties: { readonly locator: string; readonly until: string }) {
   const passage = usePassage(properties.locator);
   if (passage.error !== null) return properties.until;
   return passage.data?.passage?.source ?? properties.until;
 }
 
-/** The sensitivity is the read's own; the document's title stands under a concept's label for it. */
 function PassageRead(properties: {
   readonly opened: Opened;
   readonly source: PassageSource;
@@ -114,7 +107,6 @@ function PassageRead(properties: {
   );
 }
 
-/** One level only: its own marks are text, and its page is where they open. */
 function CitedConcept(properties: {
   readonly opened: Opened;
   readonly iri: string;
@@ -163,7 +155,6 @@ function CitedConcept(properties: {
 
 const HEADING = "pr-8 font-semibold wrap-anywhere";
 
-/** The sheet's title names the sheet; inline, the heading names its region. */
 function PanelBody(properties: {
   readonly opened: Opened;
   readonly at: { readonly kind: "sheet" } | { readonly kind: "inline"; readonly headingId: string };
@@ -171,7 +162,6 @@ function PanelBody(properties: {
   const { opened, at } = properties;
   const { source } = opened;
   const heading = useRef<HTMLHeadingElement>(null);
-  // Stable, so a render of the page around the panel never takes focus back to its heading.
   const held = useCallback((node: HTMLHeadingElement | null) => {
     heading.current = node;
     focusOnMount(node);
@@ -209,7 +199,6 @@ function PanelBody(properties: {
   );
 }
 
-/** Beside the page at the wide layout: the list stays live, and a click on it never closes this. */
 export function EvidenceSheet(properties: {
   readonly opened: Opened;
   readonly onClose: () => void;
@@ -232,7 +221,6 @@ export function EvidenceSheet(properties: {
         onOpenAutoFocus={(event) => {
           event.preventDefault();
         }}
-        // Focus left on the page, as by typing a new search, stays where the reader put it.
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           if (document.activeElement === document.body) returnFocus(opened);
@@ -240,13 +228,11 @@ export function EvidenceSheet(properties: {
         onInteractOutside={(event) => {
           event.preventDefault();
         }}
-        // Beside its opener in the tab order: Tab off the panel lands on the match that opened it.
         onKeyDown={(event) => {
           if (!tabsOff(event)) return;
           event.preventDefault();
           returnFocus(opened);
         }}
-        // Escape is the panel's only while focus is in it; elsewhere it is the control's own.
         onEscapeKeyDown={(event) => {
           if (!content.current?.contains(document.activeElement)) event.preventDefault();
         }}
@@ -261,7 +247,6 @@ export function EvidenceSheet(properties: {
   );
 }
 
-/** Beneath its match at the narrow layout, where a panel beside it would scroll the page sideways. */
 export function EvidenceInline(properties: {
   readonly opened: Opened;
   readonly onClose: () => void;
@@ -279,7 +264,6 @@ export function EvidenceInline(properties: {
     close();
   });
 
-  // From anywhere inside, as the sheet's own Escape is.
   useEffect(() => {
     const here = region.current;
     here?.addEventListener("keydown", closeOnEscape);

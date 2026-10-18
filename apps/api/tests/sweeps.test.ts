@@ -80,10 +80,8 @@ const onePass = async (
   return sweeps;
 };
 
-/** Late in the month after this one, when a pass makes the month after that. */
 const LATE_NEXT_MONTH = inTheMonth(1, 27);
 
-/** One pass with its clock stopped at `now`. */
 const onePassAt = (now: Date): Promise<Running> =>
   onePass(
     { uploadSweep: "list", pingUrl: PING_URL },
@@ -161,7 +159,6 @@ const withMapLeftovers = async () => {
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 
-/** A sign-in code's row expiring `fromThePassMs` after the pass's own clock reads. */
 const codeExpiring = async (fromThePassMs: number): Promise<string> => {
   const client = await db().pool.connect();
   try {
@@ -493,7 +490,6 @@ describe("the sweeps' daily pass", () => {
   });
 });
 
-/** Taken now, so on the suite's clock, a day on, it is past its expiry. */
 const aReservationTaken = async (workspaceId: string): Promise<void> => {
   const client = await db().pool.connect();
   try {

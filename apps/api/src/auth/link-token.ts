@@ -19,20 +19,16 @@ const IV_BYTES = 12;
 const TAG_BYTES = 16;
 const KEY_INFO = "better-answers sign-in link";
 
-/** About 256 bits, in letters and digits alone, so it reads whole in any mail client. */
 export const mintLinkToken = (): string => generateRandomString(TOKEN_LENGTH, "a-z", "A-Z", "0-9");
 
 export const mintNonce = (): string => randomBytes(NONCE_BYTES).toString("base64url");
 
-/** The only form of a token or a nonce the database holds. */
 export const hashOf = (secret: string): string => createHash("sha256").update(secret).digest("hex");
 
 const opened = z.strictObject({ code: z.string(), carried: z.string(), returnTo: z.string() });
 
-/** What a link seals: its code, a carried flow's signed query, and the sign-in page's return path. */
 export type Opened = Readonly<z.infer<typeof opened>>;
 
-/** The query the sign-in page carried, so the link's page lands where that page would have. */
 const carriedQueryOf = (contents: Opened): string => {
   if (contents.carried !== "") return `?${contents.carried}`;
   return contents.returnTo === "" ? "" : `?redirect=${encodeURIComponent(contents.returnTo)}`;
@@ -41,7 +37,6 @@ const carriedQueryOf = (contents: Opened): string => {
 const keyOf = (token: string, salt: string): Buffer =>
   Buffer.from(hkdfSync("sha256", token, salt, KEY_INFO, KEY_BYTES));
 
-/** `boundTo` is authenticated with the contents, so a sealed value moved to another row opens nowhere. */
 export const seal = (token: string, salt: string, boundTo: string, contents: Opened): string => {
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv("aes-256-gcm", keyOf(token, salt), iv, {
@@ -73,7 +68,6 @@ const openedFrom = (
   return opened.safeParse(JSON.parse(text)).data;
 };
 
-/** Undefined for a wrong token, a wrong row, or contents altered since they were sealed. */
 export const unseal = (
   token: string,
   salt: string,
@@ -83,12 +77,10 @@ export const unseal = (
   try {
     return openedFrom(token, salt, boundTo, Buffer.from(sealed, "base64url"));
   } catch {
-    // The cipher throws on a short value or a failed tag; a link that will not open is dead.
     return undefined;
   }
 };
 
-/** Whether the cookie a request carried holds the nonce the link was bound to. */
 export const isBound = (cookie: string | undefined, nonceHash: string): boolean => {
   if (cookie === undefined) return false;
   const offered = Buffer.from(hashOf(cookie), "hex");
@@ -96,7 +88,6 @@ export const isBound = (cookie: string | undefined, nonceHash: string): boolean 
   return offered.length === kept.length && timingSafeEqual(offered, kept);
 };
 
-/** A link's row and its code's, as read together: each with whether it is still within its time. */
 export type LinkRead = {
   readonly address: string;
   readonly nonceHash: string;
@@ -107,7 +98,6 @@ export type LinkRead = {
     | undefined;
 };
 
-/** `carried` is the sign-in page's own query, which the browser that asked already held. */
 export type LinkState =
   | { readonly state: "bound"; readonly address: string; readonly carried: string }
   | { readonly state: "elsewhere"; readonly code: string; readonly until: string }
@@ -115,7 +105,6 @@ export type LinkState =
 
 export const DEAD_LINK: LinkState = { state: "dead" };
 
-/** What a sign-in through the link spends: never said to the browser, only used. */
 export type LinkUse = {
   readonly email: string;
   readonly code: string;
@@ -123,12 +112,10 @@ export type LinkUse = {
   readonly carried: string;
 };
 
-/** `use` stands only beside a bound state. */
 export type SeenLink = { readonly state: LinkState; readonly use: LinkUse | undefined };
 
 const NOTHING_TO_SEE: SeenLink = { state: DEAD_LINK, use: undefined };
 
-/** The library stores each code under this hash (`storeOTP.hash`), so a link compares like for like. */
 export const codeHashOf = (code: string): string =>
   createHash("sha256").update(code).digest("base64url");
 
@@ -137,7 +124,6 @@ const triesSpentOn = (value: string): number => Number(value.slice(value.lastInd
 
 const hashKeptFor = (value: string): string => value.slice(0, value.lastIndexOf(":"));
 
-/** A link sealed before its code was replaced would only spend a try of the code that replaced it. */
 const codeLive = (
   code: LinkRead["code"],
   sealedCode: string,
@@ -147,7 +133,6 @@ const codeLive = (
   triesSpentOn(code.value) < EMAIL_CODE_ATTEMPTS &&
   hashKeptFor(code.value) === codeHashOf(sealedCode);
 
-/** One answer for every dead link, so a read never says whether a token was ever real. */
 export const linkSeen = (
   read: LinkRead | undefined,
   contents: Opened | undefined,

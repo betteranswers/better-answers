@@ -12,7 +12,6 @@ const WRITTEN = z.string().trim().min(1);
 const wordsAt = (frontmatter: Frontmatter, key: string): string | undefined =>
   WRITTEN.safeParse(frontmatter[key]).data;
 
-/** A file need not title itself, and its identity is never what a page calls it. */
 export const titleOf = (frontmatter: Frontmatter): string =>
   wordsAt(frontmatter, "title") ?? WORDS.untitled;
 
@@ -34,18 +33,15 @@ const A_PERSON = "human:";
 
 type VerifiedEvent = { readonly at: string; readonly byAPerson: boolean };
 
-/** Who verified is said as a person or not: an actor's id is no word a reader meets. */
 export const verifiedEventsOf = (frontmatter: Frontmatter): readonly VerifiedEvent[] =>
   VERIFIED.parse(frontmatter["verified"] ?? []).map(({ by, at }) => ({
     at,
     byAPerson: by.startsWith(A_PERSON),
   }));
 
-/** The UK long form; a date the file wrote no parser reads is shown as the file wrote it. */
 export const dayOf = (event: VerifiedEvent): string =>
   Number.isNaN(Date.parse(event.at)) ? event.at : dayWords(event.at);
 
-/** Drawn elsewhere on the page, or an identity a reader never meets. */
 const SHOWN_ELSEWHERE: ReadonlySet<string> = new Set([
   "title",
   "type",
@@ -65,7 +61,6 @@ const wordsOf = (value: Frontmatter[string]): string | undefined => {
   return listed.success ? listed.data.join(", ") : undefined;
 };
 
-/** The file's remaining keys under their own names, each a word or a list of words. */
 export const furtherKeysOf = (frontmatter: Frontmatter): readonly (readonly [string, string])[] =>
   Object.entries(frontmatter).flatMap(([key, value]) => {
     const words = SHOWN_ELSEWHERE.has(key) ? undefined : wordsOf(value);

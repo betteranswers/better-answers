@@ -20,16 +20,10 @@ import {
 } from "../store/postgres/index.ts";
 import type { LlmPurpose } from "./index.ts";
 
-/** Its value is a decimal string of pounds sterling, the currency every price is set in. */
 export const SPENDING_LIMIT_KEY = "llm.spending_limit_gbp";
 
-/**
- * Past the longest a call's timeout and its provider's retries can run, so a live call is never
- * settled as failed under it.
- */
 export const RESERVATION_LIFETIME_MS = 10 * 60_000;
 
-/** The most one call may send and return, over every attempt it makes. */
 export type CallSize = { readonly tokensIn: number; readonly tokensOut: number };
 
 export type SpendReserved = {
@@ -40,7 +34,6 @@ export type SpendReserved = {
   readonly model: string;
 };
 
-/** No model may be called, so nothing was reserved: not a refusal, since `ask` still answers. */
 export type NoModelToCall = {
   readonly reserved: false;
   readonly because: "no-model-choice" | "no-price" | "no-spending-limit";
@@ -61,7 +54,6 @@ type Priced = PricedChoice & {
   readonly gbpPerMillionOut: string;
 };
 
-/** A price takes effect on a UTC day; the latest on or before the call's day prices it. */
 const PRICED_CHOICE = `SELECT c.id, c.provider, c.model,
        p.gbp_per_million_in AS "gbpPerMillionIn", p.gbp_per_million_out AS "gbpPerMillionOut"
   FROM model_choice c
@@ -73,10 +65,6 @@ const PRICED_CHOICE = `SELECT c.id, c.provider, c.model,
   ) AS p ON true
  WHERE c.workspace_id = $1 AND c.purpose = $2`;
 
-/**
- * Inserts nothing past the limit. Open reservations count whatever month they were taken in, since
- * each lives minutes.
- */
 const RESERVED_UNDER_THE_LIMIT = `WITH spent AS (
     SELECT (SELECT COALESCE(sum(cost_gbp), 0) FROM llm_call
              WHERE workspace_id = $1 AND called_at >= $2 AND called_at < $3)
@@ -94,14 +82,12 @@ const RESERVED_UNDER_THE_LIMIT = `WITH spent AS (
    WHERE spent.gbp + sized.gbp <= $15::numeric
   RETURNING id`;
 
-/** The calendar month `now` falls in, by UTC. */
 const monthOf = (now: Date) => ({
   from: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
   to: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)),
 });
 
 type ReserveSpendInput = {
-  /** The question's record the call serves. */
   readonly answerId: string;
   readonly purpose: LlmPurpose;
   readonly most: CallSize;
@@ -144,10 +130,6 @@ const reservedUnderTheLimit = async (
   });
 };
 
-/**
- * Reserves the most one call may cost, in the caller's transaction, which a refusal rolls back
- * whole. The limit's row is held to the commit, so two reservations cannot both pass it.
- */
 export const reserveSpend = async (
   asker: UserPrincipal,
   tx: Tx,
@@ -176,7 +158,6 @@ export const reserveSpend = async (
     );
   });
 
-/** What one attempt of the call spent. */
 export type CallSpent = {
   readonly tokensIn: number;
   readonly tokensOut: number;
@@ -184,7 +165,6 @@ export type CallSpent = {
   readonly outcome: LlmCallOutcome;
 };
 
-/** Each attempt is priced at the rates its reservation carries, so a settle bills what was sized. */
 const SETTLED = `WITH taken AS (
     DELETE FROM spend_reservation WHERE workspace_id = $1 AND id = $2 RETURNING *
   ), written AS (
@@ -202,11 +182,6 @@ const SETTLED = `WITH taken AS (
   )
   SELECT count(*)::integer AS taken FROM taken`;
 
-/**
- * Replaces the reservation with one `llm_call` row per attempt, in the caller's transaction; what
- * was reserved and not spent is released, all of it when no attempt was made. A reservation the
- * sweep already settled is an error, and writes nothing.
- */
 export const settleSpend = async (
   asker: UserPrincipal,
   tx: Tx,
@@ -231,10 +206,6 @@ export const settleSpend = async (
     return err(new Error(`llm: no open reservation ${input.reservationId} to settle`));
   });
 
-/**
- * Billed whole: a provider may have billed a call cut off. It returned no tokens; the most it could
- * send and run stand in.
- */
 const EXPIRED_SETTLED = `WITH expired AS (
     DELETE FROM spend_reservation WHERE workspace_id = $1 AND expires_at < $2 RETURNING *
   )
@@ -245,10 +216,6 @@ const EXPIRED_SETTLED = `WITH expired AS (
          extract(epoch FROM expires_at - taken_at), reserved_gbp, $3, run_id, answer_id
     FROM expired`;
 
-/**
- * Settles each reservation of the workspace past its expiry as one failed `llm_call` row at its
- * reserved cost, and answers how many.
- */
 export const settleExpiredSpend = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

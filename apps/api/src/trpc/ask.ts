@@ -23,20 +23,16 @@ import {
 } from "./base.ts";
 import { KNOWLEDGE_CEILING } from "./knowledge.ts";
 
-/** What an answer is doing while nothing else is sent: reading, judging, then drafting. */
 type AskPhase = "reading" | "judging" | "drafting";
 
-/** Its phase at once, then the whole result before any prose; a keep-alive carries nothing. */
 type AskEvent =
   | { readonly kind: "phase"; readonly phase: AskPhase }
   | { readonly kind: "result"; readonly result: AnswerResult }
   | DraftEvent
   | KeepAlive;
 
-/** Holds no transaction while the model is called, and spends from the knowledge reads' budget. */
 export const askingProcedure = ownTransactionCounted(KNOWLEDGE_CEILING);
 
-/** Runs apart from the stream's reader, so a reader who leaves still leaves a completed record. */
 const answered = async (
   ctx: AskingContext,
   input: Result<AskInput, Malformed>,
@@ -51,7 +47,6 @@ const answered = async (
   const doors = { door: ctx.doors.postgres, clock: ctx.clock, ...ctx.modelDoors };
   const steps = stepsFor(doors, ctx.principal, "trpc", leaving);
   let judgingSaid = false;
-  // A decision model is asked once per candidate; the phase is said once.
   const sayJudging = (): void => {
     if (!judgingSaid) emit({ kind: "phase", phase: "judging" });
     judgingSaid = true;
@@ -90,15 +85,10 @@ const answered = async (
     emit(step.value);
     step = await drafted.next();
   }
-  // The result and each part's end are sent already, so a refusal here is logged and not thrown.
   await crossing(ctx, draftAnswer.name, Promise.resolve(step.value)).catch(() => {});
 };
 
 export const askRouter = router({
-  /**
-   * A mutation, so it is refused over GET, carries the question in its body and is never retried:
-   * a failed call cannot pay twice.
-   */
   question: askingProcedure.input(parsedBy(askInput)).mutation(async function* ({
     ctx,
     input,
@@ -114,7 +104,6 @@ export const askRouter = router({
         leaving,
       );
     } finally {
-      // The reader is gone or the answer is done; either way no model call is left to run.
       reading.abort();
     }
   }),

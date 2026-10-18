@@ -47,7 +47,6 @@ const invitationsRegion = (page: Page) => page.getByRole("region", { name: "Invi
 const invitationsHeading = (page: Page) =>
   invitationsRegion(page).getByRole("heading", { name: "Invitations" });
 
-/** Every invitation names an address, so its row is the one holding an @; the empty state's does not. */
 const invitationRows = (page: Page): Locator =>
   invitationsRegion(page).getByRole("row").filter({ hasText: "@" });
 
@@ -76,20 +75,16 @@ const selectionAction = (page: Page, action: string): Locator =>
     .getByRole("toolbar", { name: "Selected Invitations" })
     .getByRole("button", { name: action, exact: true });
 
-/** The tab's outcome line naming an address, which its count beside it never does. */
 const saidInTheTab = (page: Page, address: string | RegExp): Locator =>
   invitationsRegion(page).getByRole("status").filter({ hasText: address });
 
-/** An empty list draws one cell, which says so; a row of an invitation draws several. */
 const theOneCell = (page: Page): Locator => invitationsRegion(page).getByRole("cell");
 
-/** The tab's second status, after its count, is its outcome line. */
 const outcomeIn = (page: Page): Locator => invitationsRegion(page).getByRole("status").nth(1);
 
 const selectionSaid = (page: Page): Locator =>
   page.getByRole("toolbar", { name: "Selected Invitations" }).getByRole("status");
 
-/** The count output under the Invitations region's heading. */
 const THE_COUNT = "//section[.//h2[.='Invitations']]//output";
 
 const INVITE = "Invite a Person";
@@ -108,18 +103,14 @@ const heldAddresses = (page: Page) =>
 const removeOf = (page: Page, address: string) =>
   inviteDialog(page).getByRole("button", { name: `Remove ${address}`, exact: true });
 
-/** Every button whose name starts by inviting, so a second one under another name is counted. */
 const invitingButtons = (page: Page) => page.getByRole("button", { name: /^invite/i });
 
-/** The capitalised spelling of an address, which the api folds into the lower-cased one. */
 const capitalised = (address: string): string =>
   `${address.slice(0, 1).toUpperCase()}${address.slice(1)}`;
 
-/** The browser suite's api delivers nothing to this domain, so its invitations' emails never go. */
 const anUnreachableAddress = (who: string): string =>
   anAddress(who).replace("@example.test", "@unreachable.example");
 
-/** A Resend's answer as if its email went, which it never does to that domain. */
 const resentAsIfItWent = (page: Page) =>
   page.route(
     (url) => url.pathname.includes("members.resendInvitation"),
@@ -138,7 +129,6 @@ const resentAsIfItWent = (page: Page) =>
 
 const unsentIn = (where: Locator): Locator => where.getByRole("region", { name: "Unsent Emails" });
 
-/** The action as the page's own tRPC client would send it, under the Admin's session. */
 const actedAside = async (
   page: Page,
   { workspaceId }: AtInvitations,
@@ -158,7 +148,6 @@ type AtInvitations = {
   readonly editor: string;
 };
 
-/** The Editor is a member already, so a spec can invite them and be refused. */
 const anAdminAtInvitations = async (
   page: Page,
   api: APIRequestContext,
@@ -179,7 +168,6 @@ const anAdminAtInvitations = async (
   return at;
 };
 
-/** Signed in at Members in a role that may not see it. */
 const aMemberBelowAdminAtPeople = async (
   page: Page,
   api: APIRequestContext,
@@ -200,7 +188,6 @@ const openInvitations = async (page: Page): Promise<void> => {
   await expect(invitationsRegion(page).getByRole("heading", { name: "Invitations" })).toBeVisible();
 };
 
-/** Seeds waiting invitations by address, answering each one's id in the same order. */
 const invitedEach = async (
   api: APIRequestContext,
   at: AtInvitations,
@@ -291,7 +278,6 @@ test.describe("the People page's Invitations tab", () => {
       await expect(inviteDialog(page)).toHaveCount(0);
       await expect(inviteAction(page), `focus left the action on ${name}`).toBeFocused();
 
-      // Each tab's list sets its own action beside d: the definition after the key's term.
       const keystrokes = await keystrokesListed(page, "Members");
       const action = keystrokes
         .getByRole("term")
@@ -369,7 +355,6 @@ test.describe("the People page's Invitations tab", () => {
     const refused = refusalAnswering(page, "members.invite");
     await sendButton(page).click();
 
-    // An item is named by its address's place in the send.
     expect((await refused).items).toEqual({ 1: "already-a-member" });
     await saysARefusal(inviteDialog(page).getByRole("alert"));
     await expect(removeOf(page, joined)).toBeFocused();
@@ -411,7 +396,6 @@ test.describe("the People page's Invitations tab", () => {
     await expect(sendButton(page)).toHaveText("Send 2 Invitations");
     await sendButton(page).click();
 
-    // The form counts its two addresses in a status too, so the outcome is read once Done shows.
     await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeVisible();
     await expect(inviteDialog(page).getByRole("status").first()).toHaveText(/\b2\b/);
     await inviteDialog(page).getByRole("button", { name: "Done" }).click();
@@ -648,7 +632,6 @@ test.describe("the People page's Invitations tab", () => {
       invitedEach(request, at, ["sam", "una", "ola"].map(anAddress)).then(() => undefined),
     );
 
-    // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
     await page.goto(MEMBERS_PAGE);
     await openInvitations(page);
@@ -860,7 +843,6 @@ test.describe("the People page's Invitations tab", () => {
 
     await tabUntilFocused(page, menuOf(page, dropped));
     await page.keyboard.press(PEOPLE_KEYSTROKES.resend.key);
-    // A resend still going names the address too; one that landed goes on to the day it lasts until.
     await expect(saidInTheTab(page, new RegExp(`${dropped}.*\\d{4}`))).toBeVisible();
     const saidOfTheResend = await outcomeIn(page).innerText();
 
@@ -877,7 +859,6 @@ test.describe("the People page's Invitations tab", () => {
     await expect(
       invitationsRegion(page).getByRole("heading", { name: "Invitations" }),
     ).toBeFocused();
-    // The line named the same address for the resend, so the cancel shows in what else it says.
     await expect(outcomeIn(page)).toContainText(dropped);
     await expect(outcomeIn(page), "the cancel said nothing of its own").not.toHaveText(
       saidOfTheResend,

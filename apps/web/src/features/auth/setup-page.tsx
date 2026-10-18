@@ -53,7 +53,6 @@ import { SignOutButton } from "./sign-out-button.tsx";
 
 const SET_UP_INSTEAD: Keystroke = { key: "s", action: SETUP_WORDS.authenticatorInstead };
 
-/** First: holds none. New: a recovery code granted this session. Restored: by the operator. */
 type Variant = "first" | "new" | "restored";
 
 type SettingUp = {
@@ -64,7 +63,6 @@ type SettingUp = {
 
 type Standing = { readonly kind: "elsewhere"; readonly to: string } | SettingUp;
 
-/** A session that holds a factor but no grant must confirm, and setup never shows it. */
 const standingOf = (held: SecondFactor, query: string): Standing => {
   const { setupGranted } = sessionOf(held);
   if (held.restoreRequired)
@@ -80,7 +78,6 @@ const HEADINGS = {
   restored: { title: SETUP_WORDS.heading, why: SETUP_WORDS.why },
 } satisfies Record<Variant, { readonly title: string; readonly why: string }>;
 
-/** Promoted mid-session, the person is told which workspace made them an Admin. */
 const whyOf = (held: SecondFactor, variant: Variant): string => {
   const adminOf = held.thisSession?.adminOf ?? null;
   const promotedHere = variant !== "new" && held.promoted && adminOf !== null;
@@ -88,7 +85,6 @@ const whyOf = (held: SecondFactor, variant: Variant): string => {
   return promotedHere ? `${SETUP_WORDS.nowAnAdmin(adminOf)} ${why}` : why;
 };
 
-/** A restored person's ways wait on the restore code; everyone else's are open at once. */
 const waysOpen = (standing: Standing | undefined): boolean =>
   standing?.kind === "setting-up" && (standing.variant !== "restored" || standing.granted);
 
@@ -99,7 +95,6 @@ const headingRefOnMount = (node: HTMLHeadingElement | null): void => {
   node?.focus();
 };
 
-/** The codes as the page itself: its `h1`, then Finish setup and on to the display name. */
 function CodesToFinish(properties: { readonly inHand: CodesInHand; readonly query: string }) {
   const navigate = useNavigate();
   const acknowledge = useAcknowledgeRecoveryCodes();
@@ -145,13 +140,11 @@ const useOnArrival = (run: () => void) => {
   }, []);
 };
 
-/** Listed open or closed: closing the authenticator is the way back to the passkey. */
 const keystrokesOf = (ready: boolean, open: boolean, keyShown: boolean): readonly Keystroke[] => {
   if (!ready) return [];
   return open && keyShown ? [SET_UP_INSTEAD, COPY_KEY] : [SET_UP_INSTEAD];
 };
 
-/** The authenticator's disclosure and its start live here, so the keystrokes list follows them. */
 const useSetup = (standing: Standing | undefined, onNotGranted: () => void) => {
   const granted = standing?.kind === "setting-up" && standing.granted;
   const routes = granted ? NEW_AUTHENTICATOR : FIRST_AUTHENTICATOR;
@@ -182,15 +175,10 @@ const useSetup = (standing: Standing | undefined, onNotGranted: () => void) => {
 
 type Setup = ReturnType<typeof useSetup>;
 
-/**
- * Its keystroke hides the authenticator as well as showing it. Focusable while a setup finishes,
- * so focus never drops as it waits.
- */
 function AuthenticatorInstead(properties: {
   readonly setup: Setup;
   readonly controls: string;
   readonly unavailable: boolean;
-  /** Lands focus on arrival where no passkey can be made here. */
   readonly onArrival: FocusOnArrival | null;
 }) {
   const { setup, controls, unavailable, onArrival } = properties;
@@ -205,7 +193,6 @@ function AuthenticatorInstead(properties: {
   const toggle = () => {
     if (!unavailable) setup.toggle();
   };
-  // Focus first: the key may be pressed from inside the part that opening this hides.
   useKeystroke(SET_UP_INSTEAD, () => {
     if (unavailable) return;
     own.current?.focus();
@@ -229,10 +216,6 @@ function AuthenticatorInstead(properties: {
   );
 }
 
-/**
- * One choice: a passkey first, where one can be made, and the authenticator behind its disclosure,
- * which takes the passkey's place while open.
- */
 function SetupWays(properties: {
   readonly setup: Setup;
   readonly onCodes: (codes: readonly string[], madeAt: string) => void;
@@ -247,7 +230,6 @@ function SetupWays(properties: {
     typeof navigator === "undefined" ? PASSKEY_WORDS.unnamed : passkeyNameFor(navigator.userAgent),
   );
   const finishing = useFinishingTheSetup(setup.routes);
-  // Open from the first draw where no passkey can be made, so the key is minted as it mounts.
   useOnArrival(() => {
     if (setup.open) setup.mint();
   });
@@ -263,7 +245,6 @@ function SetupWays(properties: {
 
   return (
     <>
-      {/* Hidden, not unmounted: the name typed is kept, and focus stays on the button that hid it. */}
       {here ? (
         <div className="mt-6" hidden={setup.open}>
           <p>{SETUP_WORDS.passkey}</p>
@@ -296,7 +277,6 @@ function SetupWays(properties: {
   );
 }
 
-/** Asked first after an operator's restore; the ways open once it is accepted. */
 function RestoreCode(properties: { readonly held: SecondFactor; readonly granted: boolean }) {
   const accept = useAcceptARestoreCode();
   const first = useArrivalFocus();
@@ -343,7 +323,6 @@ function SettingUpBody(properties: {
   );
 }
 
-/** Codes in hand hold the page; a refusal of the grant, or a setup with none, moves on. */
 const goesTo = (
   standing: Standing | undefined,
   inHand: CodesInHand | undefined,
@@ -360,7 +339,6 @@ const settingUpOf = (
 ): SettingUp | undefined =>
   goingOn === undefined && standing?.kind === "setting-up" ? standing : undefined;
 
-/** No skip and no later: the person leaves by setting up a factor, or by signing out. */
 export function SetupPage() {
   const read = useSecondFactor();
   const [query] = useState(pageQuery);
@@ -399,7 +377,6 @@ export function SetupPage() {
   );
 }
 
-/** Each arrival makes a new set, voiding any unseen one; a reload never shows a set twice. */
 export function CodesPage() {
   const [query] = useState(pageQuery);
   const make = useReplaceRecoveryCodes();
@@ -419,7 +396,6 @@ export function CodesPage() {
   return (
     <AuthPage title={RECOVERY_CODE_WORDS.saveHeading}>
       <Outcome tone="said">{make.isPending ? RECOVERY_CODE_WORDS.makingLine : null}</Outcome>
-      {/* A repeat voids only a set never shown, as a reload would, so it is safe to ask for. */}
       <Refused
         id={refusedId}
         failure={make.error}

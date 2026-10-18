@@ -142,10 +142,6 @@ const vitestReport = z.object({
 });
 type VitestReport = z.infer<typeof vitestReport>;
 
-/**
- * A reporter that changed shape reads as a suite that never ran, as does a report torn by
- * killing vitest mid-write.
- */
 const readReport = (file: string): VitestReport | undefined => {
   if (!existsSync(file)) return undefined;
   const text = readFileSync(file, "utf8");
@@ -207,8 +203,6 @@ const runSuite = (workspace: string, entry: string, mutation: Mutation): Promise
         `--outputFile.json=${reportFile}`,
         ...(mutation.suite === undefined ? [] : [mutation.suite]),
       ],
-      // Its own process group, so a timeout or an interrupt reaches vitest's workers: one
-      // stuck in a mutated loop answers no message from its parent.
       { cwd: workspace, stdio: ["ignore", 2, 2], detached: true },
     );
 
@@ -369,10 +363,6 @@ const printSrcAgainstHead = (workspace: string, status: number): number => {
   return status === 0 ? 1 : status;
 };
 
-/**
- * Resolves to 2 refused, 130 interrupted, 0 a verdict over a clean `src`, else 1, and to 1
- * whenever `git diff` over `src` fails.
- */
 export const mutantProbe = async (argv: readonly string[]): Promise<number> => {
   const probe = prepare(argv);
   if ("refused" in probe) {

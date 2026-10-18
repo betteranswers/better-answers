@@ -62,7 +62,6 @@ const useNarrowedRequests = () => {
   return { ...list, read, listed, data };
 };
 
-/** A keystroke acts on the row in focus, and says which row to pick when none is. */
 const useInFocusKeystrokes = (properties: {
   readonly inFocus: WaitingRequest | undefined;
   readonly approve: (request: WaitingRequest) => void;
@@ -102,14 +101,12 @@ function RequestsList(properties: {
     getRowId: (request) => request.id,
   });
 
-  // Read when the dialog opens, by a click or a key, since either leaves focus where the action began.
   const toApprove = (request: WaitingRequest) => {
     const { activeElement } = document;
     openedFrom.current = activeElement instanceof HTMLElement ? activeElement : null;
     setApproving(request);
   };
 
-  /** Where the dialog was opened from, unless the approval went and took that row with it. */
   const focusBack = (sent: boolean) => {
     const from = openedFrom.current;
     (sent || from?.isConnected !== true ? heading.current : from)?.focus();
@@ -134,7 +131,6 @@ function RequestsList(properties: {
     );
   };
 
-  /** The row leaves before the api answers, and comes back if the api refuses the decision. */
   const declined = (request: WaitingRequest) => {
     heading.current?.focus();
     setOutcome({
@@ -239,7 +235,6 @@ export function RequestsTab() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      {/* Its heading is focusable, so a decided row's focus lands there rather than on the page. */}
       <RequestsList headingId={headingId} heading={heading} />
     </section>
   );

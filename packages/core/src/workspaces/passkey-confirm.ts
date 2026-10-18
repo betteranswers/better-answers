@@ -5,12 +5,10 @@ import { type PostgresDoor, withIdentityRead, withIdentityWrite } from "../store
 import { PASSKEY_CHALLENGE_PREFIX } from "./sign-in-and-consent.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** How long a passkey confirm's challenge waits for the device's answer. */
 const CHALLENGE_KEPT_FOR_MS = 5 * 60_000;
 
 const challengeUnder = (sessionId: string): string => `${PASSKEY_CHALLENGE_PREFIX}${sessionId}`;
 
-/** Written only under a session the person holds, so no caller keeps one for a stranger's. */
 const KEEPING = `
   INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at)
   SELECT $1, $2, $3, $4, $5, $5 FROM session WHERE id = $6 AND user_id = $7`;
@@ -24,10 +22,7 @@ type ChallengeInput = {
 
 type KeepPasskeyChallengeRefusal = WorkspaceRefusal<"malformed" | "session-gone">;
 
-/**
- * Keeps the challenge the api handed a session's passkey confirm, for five minutes. A session
- * keeps one at a time: a later ask replaces the earlier.
- */
+/** Kept for five minutes. A session keeps one at a time: a later ask replaces the earlier. */
 export const keepPasskeyChallenge = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -55,7 +50,6 @@ export const keepPasskeyChallenge = async (
   return kept.value.rowCount === 1 ? ok(undefined) : err("session-gone");
 };
 
-/** Spent by its first answer, live or not, so one challenge never verifies twice. */
 const TAKING = `
   DELETE FROM verification WHERE identifier = $1
   RETURNING value, expires_at > $2 AS live`;
@@ -90,14 +84,13 @@ type PasskeyCredential = {
   readonly transports: string | null;
 };
 
-/** The counter is a bigint column, which the driver would hand over as text. */
 const CREDENTIALS = `
   SELECT credential_id AS "credentialId", public_key AS "publicKey",
          counter::double precision AS counter, transports
     FROM passkey WHERE user_id = $1
    ORDER BY created_at, id`;
 
-/** The person's own passkeys, as a verifier needs them; a public key is no secret. */
+/** The person's own passkeys, as a verifier needs them. */
 export const readPasskeyCredentials = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

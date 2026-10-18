@@ -23,20 +23,14 @@ import type { Tx } from "../store/postgres/index.ts";
 import { DISPLAY_NAME_CORRECTED, holdTheNameOf, notErasedAt } from "../workspaces/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-/** Neither row holds the name: the person row keeps the one copy, which erasure blanks. */
 const FLAGGED_ACTIONS = declareActions("people", {
   flagged: action("people.person.name_flagged", {}),
 });
 
-/** The operator reads what waits from here, since no workspace's audit log is theirs to read. */
 const RAISED_ACTIONS = declareIdentitySetActions("people", {
   raised: action("people.name_flag.raised", { workspaceId: "id" }),
 });
 
-/**
- * Over the rows aliased `raised`. It takes `$1` and `$2` from `WAITING_ACTIONS`, so a query using it
- * numbers its own parameters from `$3`.
- */
 const STILL_WAITING = `raised.subject_kind = split_part($1, '.', 2) AND raised.action = $1
     AND raised.at > COALESCE(
       (SELECT max(corrected.at) FROM identity_audit_event corrected
@@ -60,7 +54,6 @@ const flagDisplayNameAction = declareAction({
 
 export type FlagDisplayNameRefusal = MemberRefusal<"role-forbids" | "no-such-member"> | Error;
 
-/** What the operator is told of a flag just raised. */
 export type RaisedFlag = {
   readonly workspaceId: WorkspaceId;
   readonly workspaceName: string;
@@ -71,7 +64,6 @@ export type RaisedFlag = {
 export type NameFlagged = {
   readonly personId: UserId;
 
-  /** Null where this workspace's flag on the person already waited, and nothing was written. */
   readonly raised: RaisedFlag | null;
 };
 
@@ -124,9 +116,8 @@ const flagging = async (
 };
 
 /**
- * Flags a member's display name to the operator. The caller's answer is the same for every member
- * and whether or not a flag already waits; only the transport learns whether one was raised, to
- * tell the operator once it commits. An Admin has no action that changes the name itself.
+ * The caller's answer is the same for every member and whether or not a flag already waits; only
+ * the transport learns whether one was raised.
  */
 export const flagDisplayName = async (
   principal: UserPrincipal,
@@ -148,7 +139,6 @@ type NameWaiting = {
   readonly personId: UserId;
   readonly displayName: string;
 
-  /** A workspace's second flag is never raised while its first waits, so each appears once. */
   readonly flags: readonly FlagWaiting[];
 };
 
@@ -168,7 +158,6 @@ const WAITING_ROW = z.object({
   raisedAt: boundarySchemas.identityAuditEvent.select.shape.at,
 });
 
-/** The rows come oldest first, so a Map keeps each person where their oldest flag put them. */
 const byPerson = (rows: readonly z.output<typeof WAITING_ROW>[]): readonly NameWaiting[] => {
   const people = new Map<UserId, NameWaiting>();
   for (const row of rows) {
@@ -189,8 +178,7 @@ const byPerson = (rows: readonly z.output<typeof WAITING_ROW>[]): readonly NameW
 
 /**
  * Every person flagged since the operator last corrected their display name, the longest waiting
- * first, each with the workspaces that flagged them and when. A person's own renaming leaves a
- * flag waiting; an erased person's flags wait no more.
+ * first. A person's own renaming leaves a flag waiting.
  */
 export const listNamesWaiting = (
   _operator: OperatorPrincipal,

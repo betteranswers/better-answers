@@ -63,7 +63,6 @@ import type { SourceRefusal } from "./vocabulary.ts";
 
 export const UPLOAD_ORIGINALS_PREFIX = "uploads/";
 
-/** One key per attempt: a concurrent repeat that loses writes beside the committed original. */
 const originalKeyOf = (connectedSourceId: string, documentId: string): string =>
   `${UPLOAD_ORIGINALS_PREFIX}${connectedSourceId.toLowerCase()}/${documentId.toLowerCase()}/original`;
 
@@ -93,10 +92,6 @@ type CountField<Word extends string> = `findings${Pascal<Word>}`;
 type FindingCounts = { readonly [Word in RedactionCategoryWord as CountField<Word>]: number };
 type FindingCountShape = { readonly [Word in RedactionCategoryWord as CountField<Word>]: "count" };
 
-/**
- * Spelled out: `Object.fromEntries` would lose what the two types hold, and a category the list
- * gains fails here at compile time.
- */
 const FINDING_COUNT_SHAPE: FindingCountShape = {
   findingsSpecialCategory: "count",
   findingsBankDetails: "count",
@@ -171,7 +166,6 @@ export type ConnectUploadInput = ConnectUploadFields & {
   readonly body: ReadableStream<Uint8Array>;
 };
 
-/** The stream travels beside these fields, which are all an entry parses. */
 const connectUploadAction = declareAction({
   admits: ADMIN_ALONE,
   input: connectUploadFields,
@@ -325,9 +319,8 @@ const storeOriginal = async (
 };
 
 /**
- * Once the first connect commits, a repeat returns its outcome and reads no byte. A concurrent repeat
- * that loses the insert returns it too, its own object left to the upload sweep. `too-large`
- * answers a declared size or streamed body over the cap; the document records the size streamed.
+ * Once the first connect commits, a repeat returns its outcome and reads no byte. `too-large`
+ * answers a declared size or streamed body over the cap.
  */
 export const connectUpload = async (
   principal: UserPrincipal,
@@ -345,7 +338,6 @@ export const connectUpload = async (
   const held = await everyGroupHeld(principal, doors.postgres, visibility);
   if (!held.ok) return err(held.error);
 
-  // Before a byte is read: a repeat of a committed connect would otherwise stream a copy no row names.
   const standing = await inTransaction(principal, doors.postgres, (fresh, tx) =>
     firstOutcomeOf(tx, workspaceId, connectedSourceId),
   );
@@ -423,7 +415,6 @@ export const publishConnectedSourceInput = z.object({
   } satisfies Record<(typeof CONFIRMATIONS)[number], z.ZodBoolean>),
 });
 
-/** The instant is the Clock's, never a caller's, so it travels beside the parsed fields. */
 export type PublishConnectedSourceInput = z.output<typeof publishConnectedSourceInput> & {
   readonly publishedAt: Date;
 };
@@ -451,10 +442,6 @@ export type ConnectedSourcePublished = {
   readonly dpiaHash: string;
 };
 
-/**
- * The job row, not connected_source.state: the worker holds only SELECT on that table and cannot
- * write its progress there.
- */
 const LATEST_SYNC = `SELECT status FROM job
     WHERE workspace_id = $1 AND kind = $2 AND subject_id = $3
     ORDER BY enqueued_at DESC, id DESC
@@ -576,8 +563,7 @@ const publishWritten = async (
 
 /**
  * `confirmation-missing` unless all three confirmations are true, and `not-indexed` unless the
- * latest sync is done. Stamps the connected source published, writes an audit event with the DPIA hash
- * and the last sync's finding count per category, and recomputes what cites its documents.
+ * latest sync is done.
  */
 export const publishConnectedSource = async (
   principal: UserPrincipal,
@@ -641,8 +627,6 @@ const actingOn = (
     admittedAs.kind === "user"
       ? { admin: admittedAs, workspaceId: admittedAs.workspaceId, connectedSourceId }
       : { platform: admittedAs, workspaceId: input.workspaceId, connectedSourceId };
-  // A person may act only where it was proved a member, so a workspace it names otherwise holds none of
-  // its connected sources.
   if (acting.workspaceId !== input.workspaceId) return err("no-such-binding");
   return ok(acting);
 };
@@ -676,11 +660,6 @@ const emptyTheConnectedSource = async (
   return ok({ passages: wiped.value.rowCount ?? 0, findings: raised.value.rowCount ?? 0 });
 };
 
-/**
- * Queues a sync, then deletes the connected source's passages and its unreviewed, unrestored findings;
- * `passages` and `findings` count the rows deleted. A person reaches only its own workspace, and any
- * other is `no-such-binding`.
- */
 export const reprocessConnectedSource = async (
   principal: Principal,
   tx: Tx,

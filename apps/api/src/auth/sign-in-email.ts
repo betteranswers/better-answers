@@ -19,7 +19,6 @@ const BUTTON =
 
 const page = (body: string): string => emailPage(WORDS.subject, body);
 
-/** `code` is digits alone and `link` the api's own address and token, so nothing here needs escaping. */
 const htmlOf = (code: string, link: string | undefined): string =>
   link === undefined
     ? page(`<p style="${PARAGRAPH}">${WORDS.codeFollows}</p>
@@ -50,7 +49,6 @@ const textOf = (code: string, link: string | undefined): string =>
       ]
   ).join("\n");
 
-/** The text part keeps the code and the link each on a line of its own, where a reader finds them. */
 export const signInEmail = (to: string, code: string, link: string | undefined): EmailMessage => ({
   to,
   subject: WORDS.subject,

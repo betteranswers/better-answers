@@ -6,7 +6,7 @@ import pytest
 OWN_PACKAGE = "better_answers_worker"
 
 REFUSAL = (
-    "Our own code is never mocked (the root `CODING_STANDARDS.md`), and `{action}` "
+    "Our own code is never mocked, and `{action}` "
     "targets {where}. Exercise the module through its entry point, or replace the "
     "external service behind its adapter with an in-memory implementation."
 )
@@ -82,7 +82,7 @@ MOST_TITLE_WORDS = 10
 
 TITLE_REFUSAL = (
     "A test name is a present-tense phrase of 10 words at most, never "
-    '"should" (the root `CODING_STANDARDS.md`): `{name}` runs to {words}'
+    '"should": `{name}` runs to {words}'
 )
 
 

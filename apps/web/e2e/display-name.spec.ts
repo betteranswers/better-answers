@@ -31,7 +31,6 @@ const saveButton = (page: Page) => page.getByRole("button", { name: "Save and Co
 
 const SET_DISPLAY_NAME = "person.setDisplayName";
 
-/** Every page the browser was shown, so a page that came and went cannot pass unseen. */
 const pagesShown = (page: Page): readonly string[] => {
   const shown: string[] = [];
   page.on("framenavigated", (frame) => {
@@ -92,7 +91,6 @@ test("credits a new member by their given name, asking once", async ({ page, req
   expect(shown).not.toContain("/display-name");
 });
 
-// An Editor, since an Admin's sign-in passes the second-factor pages first.
 test("signs a named member straight into the shell, never asking", async ({ page, request }) => {
   const email = anAddress("already");
   const who = await person(request, email, { displayName: "Alys Named" });

@@ -11,14 +11,12 @@ import { gitIn, throwawayRepository, writeUnder } from "./throwaway-tree.ts";
 export const hookScript = (name: string): string =>
   path.join(repositoryRoot, ".claude", "hooks", `${name}.sh`);
 
-/** A temporary directory, removed by the `afterAll` this call registers. */
 export const scratchRoot = (prefix: string): string => {
   const root = mkdtempSync(path.join(tmpdir(), `${prefix}-`));
   afterAll(() => rmSync(root, { recursive: true, force: true }));
   return root;
 };
 
-/** Makes `root` a new repository whose one commit holds `files`. */
 export const repositoryHolding = (
   root: string,
   files: Readonly<Record<string, string>>,
@@ -30,7 +28,6 @@ export const repositoryHolding = (
   return root;
 };
 
-/** An origin holding `files`, and a clone as the main checkout, whose `main` lags origin's. */
 export const originAndClone = (
   scratch: string,
   name: string,
@@ -44,7 +41,6 @@ export const originAndClone = (
   return { origin, primary };
 };
 
-/** Commits a new file named `file` in `worktree`, and returns the commit's id. */
 export const commitIn = (worktree: string, file: string): string => {
   writeUnder(worktree, file, `${file}\n`);
   gitIn(worktree, "add", "-A");
@@ -52,7 +48,6 @@ export const commitIn = (worktree: string, file: string): string => {
   return gitIn(worktree, "rev-parse", "HEAD").trim();
 };
 
-/** Merges `branch` of `primary` into origin's `main` as the queue does, dated `at` (ISO 8601). */
 export const mergeOnOrigin = (
   origin: string,
   primary: string,
@@ -72,7 +67,6 @@ export const mergeOnOrigin = (
   if (result.status !== 0) throw new Error(`git merge of ${branch} failed:\n${result.stderr}`);
 };
 
-/** A worktree of `root` at `<scratch>/<name>-worktree`, on a new branch `t-<name>`. */
 export const worktreeUnder = (
   scratch: string,
   root: string,
@@ -85,7 +79,6 @@ export const worktreeUnder = (
   return worktree;
 };
 
-/** Creates `directory` holding an executable bash stub per tool; the caller puts it on PATH. */
 export const stubsOnPath = (
   directory: string,
   bodies: Readonly<Record<string, string>>,
@@ -99,7 +92,6 @@ export const stubsOnPath = (
   return directory;
 };
 
-/** A stub's body: it appends its arguments to `log` as one line, runs `andThen`, then exits 0. */
 export const recordsItsArgv = (log: string, andThen: readonly string[] = []): string =>
   [`printf '%s\\n' "$*" >> '${log}'`, ...andThen, "exit 0", ""].join("\n");
 
@@ -126,7 +118,6 @@ const alive = (pid: number): boolean => {
   }
 };
 
-/** Named by the physical path, as the hooks resolve it; `orphaned` leaves it to pid 1 at once. */
 export const decoyWorker = (worktree: string, orphaned: boolean): Decoy => {
   const marker = path.join(realpathSync(worktree), "node_modules/vitest/dist/workers/forks.js");
   if (orphaned) {
@@ -143,7 +134,6 @@ export const decoyWorker = (worktree: string, orphaned: boolean): Decoy => {
   return { pid, alive: () => alive(pid), stop: () => child.kill() };
 };
 
-/** Runs `script` under bash, with `env` laid over this process's environment. */
 export const runHook = (
   script: string,
   options: {

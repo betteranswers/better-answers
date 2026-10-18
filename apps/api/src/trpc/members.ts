@@ -89,7 +89,6 @@ type Minting<Asked, Minted> = (
   input: Asked & { readonly now: Date },
 ) => Promise<Result<Minted, RefusalAnswer | Error>>;
 
-/** The moment is the server's, and the action answers only once it committed. */
 const committedNow = <Asked, Minted>(
   ctx: Emailing,
   action: Minting<Asked, Minted>,
@@ -114,10 +113,6 @@ const answerOf = (invitation: InvitationToSend, emailSent: boolean) => ({
   emailSent,
 });
 
-/**
- * Runs an action that mints or renews an invitation, then emails it once the action committed, and
- * answers the invitation with whether its email went.
- */
 const committedThenEmailed =
   <Asked>(action: Minting<Asked, InvitationToSend>) =>
   async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
@@ -125,10 +120,6 @@ const committedThenEmailed =
     return answerOf(invitation, await sentInvitation(ctx, invitation));
   };
 
-/**
- * A round keeps the shared queue one second deep, so another email, such as a sign-in code,
- * waits behind one round, not the whole send.
- */
 const emailedEach = async (
   ctx: Emailing,
   invitations: readonly InvitationToSend[],
@@ -141,7 +132,6 @@ const emailedEach = async (
   return sent;
 };
 
-/** As `committedThenEmailed`, for an action on many: each email goes, or fails, on its own. */
 const committedThenEmailedEach =
   <Asked, Minted extends InvitationToSend, Answer>(
     action: Minting<Asked, readonly Minted[]>,
@@ -159,7 +149,6 @@ type Moving<Asked, Moved> = (
   input: Asked,
 ) => Promise<Result<Moved, RefusalAnswer | Error>>;
 
-/** Once the move committed, tells each person it promoted what can confirm their sign-in. */
 const movedThenTold =
   <Asked extends object, Moved extends object, Answer>(
     action: Moving<Asked & { readonly at: Date }, Moved>,
@@ -192,7 +181,6 @@ type AtTheClock = {
   readonly clock: Clock;
 };
 
-/** The moment is the server's, read as the action runs. The action's function name labels its logs. */
 const answeredAt =
   <Asked, Value>(
     action: (
@@ -275,7 +263,6 @@ export const membersRouter = router({
     .input(parsedBy(bulkAddToGroupInput))
     .mutation(answeredAt(bulkAddToGroup)),
 
-  /** A constant answer: whether a flag was raised or already waited is the operator's to know. */
   flagDisplayName: ownTransactionProcedure
     .input(parsedBy(flagDisplayNameInput))
     .mutation(async ({ ctx, input }) => {

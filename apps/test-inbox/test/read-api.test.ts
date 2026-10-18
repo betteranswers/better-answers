@@ -8,14 +8,12 @@ import { asked, NOW_MS, PERSON, PRODUCTION, receivedAt, TOKEN } from "./fixtures
 
 const RECEIVING = "/emails/receiving";
 
-/** Every answer is JSON, so no answer is a redirect or an HTML page. */
 const answered = async (response: Response) => {
   expect(response.headers.get("content-type")).toMatch(/^application\/json\b/);
   expect(response.headers.get("location")).toBeNull();
   return { status: response.status, body: fields(await response.json()) };
 };
 
-/** Read as JSON, typed only as far as a test asserts on it. */
 const fields = (body: unknown): Readonly<Record<string, unknown>> =>
   typeof body === "object" && body !== null ? Object.fromEntries(Object.entries(body)) : {};
 

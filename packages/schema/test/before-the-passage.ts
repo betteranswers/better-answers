@@ -1,12 +1,9 @@
 import { migrationStatementSaying } from "./journal-statements.ts";
 
-/** The words the sweeps retired from the index's names; none may stand after migration 0069. */
 export const WORDS_RETIRED_FROM_THE_INDEX = ["chunk", "binding", "route"] as const;
 
-/** A workspace's partition as the function before migration 0069 named it. */
 export const thePartitionBeforeThePassage = (workspaceId: string): string => `chunk_${workspaceId}`;
 
-/** The names migration 0069 found, put back so it can run again over a partition made before it. */
 export const NAMES_BEFORE_THE_PASSAGE: readonly string[] = [
   'ALTER TABLE "index".passage RENAME TO chunk',
   'ALTER TABLE "index".chunk RENAME COLUMN connected_source_id TO binding_id',

@@ -9,7 +9,6 @@ export const percentile = (values: readonly number[], fraction: number): number 
 
 export const inMs = (value: number): string => `${Math.round(value)} ms`;
 
-/** Prints the figures under `heading`, and adds them as a table to CI's step summary when it runs. */
 export const recordFigures = async (heading: string, figures: readonly Figure[]): Promise<void> => {
   process.stdout.write(
     `\n${heading}: ${figures.map(([name, value]) => `${name} ${value}`).join("; ")}\n`,

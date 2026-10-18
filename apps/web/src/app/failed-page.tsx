@@ -11,7 +11,6 @@ export function FailedPage(properties: {
 }) {
   return (
     <>
-      {/* The heading is what happened, so the alert carries it to a screen reader too. */}
       <div role="alert">
         <h1>{FAILED_PAGE.heading}</h1>
         <p className="mt-2 text-muted-foreground">{properties.said ?? FAILED_PAGE.said}</p>

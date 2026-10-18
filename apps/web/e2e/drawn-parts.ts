@@ -15,10 +15,6 @@ const entryCodeOf = (built: Built, name: string): string => {
   throw new Error(`the ${name} built no entry chunk`);
 };
 
-/**
- * A unit-suite harness rendered into `#root`, built the way the app's own build compiles its
- * source, because no page draws every shared part yet.
- */
 export const bundledHarness = async (harness: {
   readonly name: string;
   readonly file: URL;
@@ -59,7 +55,6 @@ export const bundledHarness = async (harness: {
   );
 };
 
-/** The served build's own stylesheets, so the parts are measured as a page draws them. */
 const servedStylesheets = async (request: APIRequestContext): Promise<string> => {
   const served = await (await request.get("/")).text();
   const links = served.match(/<link[^>]*rel="stylesheet"[^>]*>/g) ?? [];
@@ -67,7 +62,6 @@ const servedStylesheets = async (request: APIRequestContext): Promise<string> =>
   return links.join("");
 };
 
-/** On the product's origin, so the gate audits it. A class only the harness writes is not served. */
 export const harnessDrawn = async (
   page: Page,
   request: APIRequestContext,

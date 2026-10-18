@@ -20,7 +20,6 @@ import { DeviceRefused, passkeysHere } from "./passkey-hooks.ts";
 import { AUTHENTICATOR_CODE_WRONG, STALE_CONFIRMATION } from "./refusal-words.ts";
 import { CONFIRM_WORDS } from "./second-factor-words.ts";
 
-/** The refused act, kept whole: it runs again with its input once the confirmation lands. */
 type Refused = RefusedAct;
 
 let refused: Refused | undefined;
@@ -36,7 +35,6 @@ const askedAgain = (failure: Error): boolean =>
   refusalOf(failure)?.word === STALE_CONFIRMATION ||
   (failure instanceof CodeRefused && failure.word === STALE_CONFIRMATION);
 
-/** Opens the re-confirm a stale confirmation asked for; false where the failure is another's to say. */
 export const reconfirmAfter = (failure: Error, refusedAct: RefusedAct | undefined): boolean => {
   if (refusedAct === undefined || !askedAgain(failure)) return false;
   heard(refusedAct);
@@ -47,7 +45,6 @@ export const cancelTheRefusedAct = (): void => heard(undefined);
 
 const refusedActHeld = (): Refused | undefined => refused;
 
-/** The act a stale confirmation refused, or none while no dialog is open. */
 export const useTheRefusedAct = (): Refused | undefined =>
   useSyncExternalStore(
     (hear) => {
@@ -67,7 +64,6 @@ const SAID_OF_THE_DEVICE = {
   failed: CONFIRM_WORDS.passkeyNotUsed,
 } satisfies Record<DeviceRefused["reason"], string | undefined>;
 
-/** The words of a passkey that did not confirm, in the dialog's own line. */
 const saidOfAPasskey = (failure: Error | null): string | undefined => {
   if (failure === null) return undefined;
   if (failure instanceof DeviceRefused) return SAID_OF_THE_DEVICE[failure.reason];
@@ -75,17 +71,14 @@ const saidOfAPasskey = (failure: Error | null): string | undefined => {
   return failure instanceof CodeRefused ? CONFIRM_WORDS.passkeyNotUsed : undefined;
 };
 
-/** The words of a code that did not confirm, in the dialog's own line. */
 const saidOfACode = (failure: Error | null): string | undefined => {
   if (failure === null) return undefined;
   if (isTooMany(failure)) return stockWait(failure.waitSeconds);
   return failure instanceof CodeRefused ? AUTHENTICATOR_CODE_WRONG : undefined;
 };
 
-/** One way to confirm, named by what the person holds. */
 type Way = "passkey" | "authenticator";
 
-/** The ways the person can confirm with, read afresh as the dialog opens. */
 const waysHeld = (
   held: { readonly passkeys: readonly unknown[]; readonly authenticator: string } | undefined,
 ): readonly Way[] => {
@@ -164,7 +157,6 @@ function AuthenticatorWay(properties: { readonly onConfirmed: () => void }) {
   );
 }
 
-/** The re-confirm a stale confirmation opens, wherever the refused act was asked for. */
 export function ReconfirmDialog() {
   const refusedAct = useTheRefusedAct();
   const open = refusedAct !== undefined;
@@ -175,7 +167,6 @@ export function ReconfirmDialog() {
   });
   const ways = waysHeld(held.data);
 
-  /** The dialog closes first, so the act's own outcome region takes the focus its answer gives. */
   const confirmedAndRetried = () => {
     const act = refusedAct;
     cancelTheRefusedAct();

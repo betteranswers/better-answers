@@ -15,13 +15,10 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("the browser suite's api needs a port as its one argument");
 }
 
-/** The Sources page connects a document, and a connect puts its bytes in the object store first. */
 const objects = await openObjectStore("browser-suite");
 
-/** No email reaches this domain, so a spec meets an invitation whose email did not go. */
 const UNREACHABLE = "@unreachable.example";
 
-/** Each workspace's model calls are answered as its spec scripted them. */
 const models = scriptedModels();
 
 const app = await startApp({

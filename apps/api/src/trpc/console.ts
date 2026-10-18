@@ -32,10 +32,6 @@ type AsTheOperator = {
   readonly tx: Tx;
 };
 
-/**
- * The sign-in's age is judged against the procedure's own instant. The action's function name labels
- * its logs; never pass an anonymous one.
- */
 const writtenNow =
   <Input, Value>(
     action: (

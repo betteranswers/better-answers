@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 The survey produces one report of **opportunities**: places in the code where a different shape would make the next route block easier to build and to test. The owner reads and annotates the report. Then the architecture review, which runs through `/ce-brainstorm`, starts from it. The run is done when the report and its markdown copy exist with every field of every opportunity filled, or when a stop names what was missing. The report says what the run did without, so a thin result is never mistaken for a full one.
 
-Nothing measures depth. `CODING_STANDARDS.md` says so in its deep-module rule. This survey supplies the judgement that no gate makes, so it reports what the gates and the diff reviewers cannot see and leaves out what they already hold.
+Nothing measures depth. This survey supplies the judgement that no gate makes, so it reports what the gates and the diff reviewers cannot see and leaves out what they already hold.
 
 Invoking this skill authorizes reading anything in the checkout, running read-only git, GitNexus and code-index queries, dispatching read-only subagents, writing the report's two files and opening the report in `lavish-axi`. It does not authorize editing code, `CONCEPTS.md`, `CODING_STANDARDS.md`, a decision doc or an issue. The review that follows owns those changes.
 
@@ -60,7 +60,7 @@ Dispatch one read-only subagent per area, all in one response. A walk reads far 
 Apply the deletion test to anything that looks shallow. Ask whether deleting it would concentrate complexity or only move it. Concentrating is the signal.
 
 **The rules to judge against.**
-- The Design and Tests sections of `CODING_STANDARDS.md`, plus the standards file beside the area (`apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md`, `apps/worker/CODING_STANDARDS.md`). Cite each rule by its heading, word for word.
+- The pstack principles `principle-minimize-reader-load` and `principle-laziness-protocol`, the Tests section of `CODING_STANDARDS.md`, and the `AGENTS.md` beside the area. Quote the rule you cite.
 - The decisions in `docs/solutions/architecture-patterns/`. Match an area to its decisions by each doc's `module` and `applies_when` frontmatter instead of reading all of them. `docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md` gives the slice vocabulary and the shapes it rejected. A matching door list in two slices is not duplication: a slice gets its own type for the doors it takes.
 - `CONCEPTS.md` for the names. A module named off-glossary is friction worth noting.
 

@@ -39,7 +39,6 @@ const joinButton = (page: Page) => page.getByRole("button", { name: "Join Worksp
 
 const nameField = (page: Page) => page.getByLabel("Display Name");
 
-/** The line saying who invited, and as the first role it names after them. */
 const invitedAs = (page: Page, role: Role) =>
   page
     .getByRole("main")
@@ -48,11 +47,9 @@ const invitedAs = (page: Page, role: Role) =>
       hasText: new RegExp(String.raw`${INVITER}(?:(?!Admin|Editor|Viewer).)*${role}\b`),
     });
 
-/** A page's own words as a pattern, so a description is matched for holding them. */
 const holding = (words: string): RegExp =>
   new RegExp(words.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`));
 
-/** A workspace, a named inviter and a waiting invitation to a fresh address, not yet signed in. */
 const anInvitation = async (request: APIRequestContext, workspaceName: string, role: Role) => {
   const workspace = await provision(request, { name: workspaceName });
   const inviter = await person(request, anAddress("morgan"), { displayName: INVITER });
@@ -210,7 +207,6 @@ test("asks for a name when the join finds none given", async ({
   await signIn(page, request, address);
   await expect(nameField(page)).toBeVisible();
 
-  // The page's read of the session names someone the api does not, as a stale read would.
   await page.route(SESSION_READ, async (route) => {
     const answered = await route.fetch();
     const held: { readonly user: object } = await answered.json();

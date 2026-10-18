@@ -11,13 +11,11 @@ export const SEARCH_WORDS = {
       ? `Showing the first matches for ${quoted(query)}.`
       : `Showing matches for ${quoted(query)}.`,
   matches: "Matches",
-  /** True of a match re-ranked past the pages shown as of one withheld, so it says neither. */
   passageLeft: "The passage you had open is no longer listed.",
   more: "More Matches",
   document: "Document",
 } as const;
 
-/** A relation's kind as the map names it, in a reader's words; any other kind is shown untagged. */
 export const RELATION_WORDS: ReadonlyMap<string, string> = new Map([
   ["LINKS_TO", "Links to"],
   ["SUPERSEDES", "Supersedes"],

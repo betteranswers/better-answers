@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 
 import type { Asked } from "./people-api.ts";
 
-/** A pause in typing asks the api once, rather than once a key under its per-address ceiling. */
 const SEARCH_PAUSE_MS = 200;
 
 export function useAsking(initial: string) {
@@ -15,7 +14,6 @@ export function useAsking(initial: string) {
     setTyped("");
     setAsked({ search: "", offset: 0 });
   };
-  /** An emptied box waits on no further key, so Escape and a clear ask at once. */
   const type = (value: string) => {
     if (value === "") {
       clear();

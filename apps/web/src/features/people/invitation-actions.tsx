@@ -23,14 +23,11 @@ import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST, shortcutOf } from "./peo
 import { SAID_OF_TICKED_INVITATIONS } from "./refusal-words.ts";
 import { outcomeOfInvitationFailure, outcomeOfSendingFailure } from "./refusal.tsx";
 
-/** Each ticked invitation by its id, with its address as the tick took it, shown or not. */
 export type Ticked = ReadonlyMap<string, string>;
 
 export const NONE: Ticked = new Map();
 
-/** What the list hands its actions: the ticks, and where an action's outcome and its unsent emails land. */
 type ActedList = {
-  /** False while the list's read waits or has failed, when its rows are not there to act on. */
   readonly readable: boolean;
   readonly ticked: Ticked;
   readonly tick: (ticked: Ticked) => void;
@@ -47,7 +44,6 @@ const STILL_GOING: Outcome = { tone: "said", words: BULK_WORDS.stillGoing };
 
 const TOO_MANY: Outcome = { tone: "said", words: INVITATIONS_WORDS.bulk.tooMany(MOST_AT_ONCE) };
 
-/** A ceiling carries no items, so it is said first; names are those the ticks took. */
 const refusalOf = (failure: Failure, names: Ticked): Outcome =>
   ceilingLiftsIn(failure) === undefined
     ? setRefusalOutcome({
@@ -58,7 +54,6 @@ const refusalOf = (failure: Failure, names: Ticked): Outcome =>
       })
     : outcomeOfSendingFailure(failure);
 
-/** One action at a time: a second call on a mutation takes over the first's callbacks. */
 export const useOneAtATime = (say: (outcome: Outcome) => void) => {
   const [acting, setActing] = useState(false);
   const resend = useResendInvitation();
@@ -106,7 +101,6 @@ export const useInvitationActions = (list: ActedList) => {
   const bulkResend = useBulkResendInvitations();
   const bulkCancel = useBulkCancelInvitations();
 
-  /** Said at the press, so the action reads as taken within a tenth of a second. */
   const begun = (pending: string): boolean => {
     if (!begin()) {
       list.say(STILL_GOING);
@@ -124,7 +118,6 @@ export const useInvitationActions = (list: ActedList) => {
     list.tick(kept);
   };
 
-  /** An expired row leaves the list as it is resent, so focus goes to the list it left. */
   const resendOne = (invitation: ListedInvitation) => {
     if (!begun(INVITATIONS_WORDS.resending(invitation.address))) return;
     if (invitation.status === "expired") {
@@ -155,9 +148,7 @@ export const useInvitationActions = (list: ActedList) => {
     return list.ticked.size > MOST_AT_ONCE ? TOO_MANY : undefined;
   };
 
-  /** The ticks are spent at the press, and come back if the set is refused. */
   const onTheTicked = (pending: (count: number) => string, run: (names: Ticked) => void) => {
-    // The failed or waiting read already says why there is no list to act on.
     if (!list.readable) return;
     const refused = refusedBefore();
     if (refused !== undefined) {

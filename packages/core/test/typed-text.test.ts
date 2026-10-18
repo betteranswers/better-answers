@@ -75,7 +75,6 @@ describe("the typed-text check", () => {
 });
 
 describe("the typed-text check on a long text", () => {
-  // The suite's own timeout would let a check that takes half a minute pass.
   const AT_ONCE = { timeout: 5000 };
   const A_LONG_RUN = 10_000;
 

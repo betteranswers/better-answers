@@ -295,7 +295,6 @@ const createTable = async (databaseUri: string, table: string): Promise<void> =>
 
 const BUILD_PAUSE_MS = 200;
 
-/** Records each build, and the most that ran at once, so a test can see the lock hold. */
 const buildLog = () => {
   const built: string[] = [];
   let running = 0;
@@ -316,7 +315,6 @@ const buildLog = () => {
   return { building, built: () => [...built], mostAtOnce: () => mostAtOnce };
 };
 
-/** The worker's pid keeps a concurrent run of this file on a shared server off these names. */
 const scratchTemplates: string[] = [];
 
 const scratchTemplate = (label: string): string => {
@@ -331,7 +329,6 @@ afterAll(async () => {
 
 const LONG_AGO = "2020-01-01T00:00:00.000Z";
 
-/** A published template under a tier's prefix, stamped `stamp` or left unstamped. */
 const plantedTemplate = async (
   label: string,
   stamp: string | null,
@@ -642,7 +639,6 @@ describe("a shared template", () => {
     });
   });
 
-  // The worker tier's real sweep would drop a tpl_py_ plant, so a prefix no tier sweeps stands in.
   it("leaves stale templates outside its prefix alone", async () => {
     const theirs = await plantedTemplate("theirs", LONG_AGO, "tpl_t_");
 
@@ -704,7 +700,6 @@ const throwawayPostgres = (command: readonly string[]): Promise<StartedPostgreSq
     .start();
 
 const scriptUriLine = async (): Promise<string | undefined> => {
-  // The script lets TEST_POSTGRES_IMAGE replace the pin; this harness always reads the pin.
   const printed = await run("bash", ["deploy/test-postgres.sh", "address"], {
     cwd: repoRoot,
     env: { ...process.env, TEST_POSTGRES_IMAGE: undefined },

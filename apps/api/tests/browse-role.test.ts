@@ -103,7 +103,6 @@ beforeAll(async () => {
     const first = await data.connectedSource();
     const second = await data.connectedSource();
     await data.oauthRefreshToken();
-    // The partition's lifecycle function reads a transaction's scope, so it runs in one.
     await client.query("BEGIN");
     await data.passage({ workspaceId: first.workspaceId });
     await client.query("COMMIT");

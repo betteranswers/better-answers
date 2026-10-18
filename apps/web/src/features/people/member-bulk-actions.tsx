@@ -44,16 +44,13 @@ type Settled = {
   readonly onError: (failure: Error | ApiError) => void;
 };
 
-/** What the list hands its bulk actions: the ticks, and where an action's outcome and marks land. */
 export type BulkList = {
-  /** False while the list's read waits or has failed, when its rows are not there to act on. */
   readonly readable: boolean;
   readonly ticked: ReadonlySet<string>;
   readonly tick: (ticked: ReadonlySet<string>) => void;
   readonly nameOf: (personId: string) => string;
   readonly heading: RefObject<HTMLElement | null>;
 
-  /** One write for the line and the rows it marks, so a mark never outlives its reason. */
   readonly say: (outcome: Outcome | undefined, refused?: RefusedRows) => void;
 };
 
@@ -61,7 +58,6 @@ const NOTHING_TICKED = selectFirst(PEOPLE_SELECT_FIRST.member);
 
 const STILL_GOING: Outcome = { tone: "said", words: BULK_WORDS.stillGoing };
 
-/** Matches the api's cap for one action, which refuses any more as input it cannot read. */
 const MOST_TICKED = 200;
 
 const TOO_MANY: Outcome = { tone: "said", words: BULK_WORDS.tooMany(MOST_TICKED) };
@@ -69,7 +65,6 @@ const TOO_MANY: Outcome = { tone: "said", words: BULK_WORDS.tooMany(MOST_TICKED)
 const refusedRowsOf = (failure: Error | ApiError): RefusedRows =>
   new Set(saidOfItems(SAID_OF_TICKED_MEMBERS, failure).map(({ id }) => id));
 
-/** Names are taken at the press, so a person the list has since lost is still named. */
 const refusalOf = (failure: Error | ApiError, names: ReadonlyMap<string, string>): Outcome =>
   setRefusalOutcome({
     featureWords: SAID_OF_TICKED_MEMBERS,
@@ -83,7 +78,6 @@ export const useMemberBulkActions = (list: BulkList) => {
   const [asked, setAsked] = useState<readonly string[]>([]);
   const [role, setRole] = useState<Role>(ROLE_OFFERED_FIRST);
   const [groupId, setGroupId] = useState<string>();
-  // One action at a time: a dialog's second call on its mutation takes over the first's callbacks.
   const [acting, setActing] = useState(false);
   const opener = useRef<HTMLElement>(null);
   const sent = useRef(false);
@@ -91,7 +85,6 @@ export const useMemberBulkActions = (list: BulkList) => {
   const { goHome } = useSelfActionHome();
 
   const show = (action: BulkAction) => {
-    // The failed or waiting read already says why there is no list to act on.
     if (!list.readable) return;
     if (acting) {
       list.say(STILL_GOING);
@@ -113,14 +106,12 @@ export const useMemberBulkActions = (list: BulkList) => {
     setOpen(action);
   };
 
-  /** A sent action spends the ticks that showed its button, so focus goes to the list it changed. */
   const returnFocus = (event: Event) => {
     event.preventDefault();
     if (!sent.current) opener.current?.focus();
     if (document.activeElement !== opener.current || sent.current) list.heading.current?.focus();
   };
 
-  /** Spent at the press, so the action reads as taken within a tenth of a second. */
   const command = (said: {
     readonly pending: string;
     readonly done: (answer: BulkChanged) => string;
@@ -162,7 +153,6 @@ export const useMemberBulkActions = (list: BulkList) => {
     show("remove");
   });
 
-  // A read failing under an open dialog shuts it for good, rather than reopening it once read.
   if (!list.readable && open !== undefined) setOpen(undefined);
 
   return {
@@ -192,7 +182,6 @@ const BAR_ACTIONS: readonly {
   { action: "remove", keystroke: KEY.removeSelected, label: BULK_WORDS.remove.action },
 ];
 
-/** The bar's actions; each opens one dialog holding its value and its confirmation. */
 export function MemberBulkActions(properties: { readonly actions: Actions }) {
   const { actions } = properties;
   return (
@@ -296,7 +285,6 @@ function GroupSelect(properties: {
   );
 }
 
-/** Only an answered read may say there are no groups; a waiting or failed one says so instead. */
 function GroupChoice(properties: {
   readonly actions: Actions;
   readonly groups: ReturnType<typeof useGroups>;
@@ -391,7 +379,6 @@ function RemoveDialog(properties: { readonly actions: Actions }) {
   );
 }
 
-/** Mounted with the list, so an action still pending when its dialog shuts keeps its answer. */
 export function MemberBulkDialogs(properties: { readonly actions: Actions }) {
   return (
     <>

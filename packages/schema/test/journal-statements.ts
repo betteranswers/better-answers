@@ -6,10 +6,6 @@ import { journalMigrationFiles } from "../src/journal.ts";
 
 const SEPARATOR = "--> statement-breakpoint";
 
-/**
- * The statements of the migration whose file name ends with `tag`, trimmed, blanks dropped.
- * @throws when no journal entry's file ends with `tag`.
- */
 export const migrationStatements = (tag: string): readonly string[] => {
   const file = journalMigrationFiles().find((name) => name.endsWith(tag));
   if (file === undefined) throw new Error(`${tag} is not in the journal`);
@@ -19,10 +15,6 @@ export const migrationStatements = (tag: string): readonly string[] => {
     .filter((statement) => statement !== "");
 };
 
-/**
- * The first statement of `tag`'s migration that contains `word`.
- * @throws when the journal has no `tag`, or no statement contains `word`.
- */
 export const migrationStatementSaying = (tag: string, word: string): string => {
   const statement = migrationStatements(tag).find((part) => part.includes(word));
   if (statement === undefined) throw new Error(`no statement of ${tag} says ${word}`);

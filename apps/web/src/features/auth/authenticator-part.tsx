@@ -32,7 +32,6 @@ export const COPY_KEY: Keystroke = { key: "k", action: ACCOUNT_ACTIONS.copyKey }
 
 const CONFLICT = 409;
 
-/** A setup's own words, read before its status: the replacing routes answer 409 for each. */
 const SAID_OF_A_SETUP_WORD: ReadonlyMap<string, string> = new Map([
   ["setup-not-granted", SETUP_NOT_GRANTED],
   ["restore-code-needed", RESTORE_CODE_NEEDED],
@@ -40,7 +39,6 @@ const SAID_OF_A_SETUP_WORD: ReadonlyMap<string, string> = new Map([
   ["changed-meanwhile", STOCK.changed],
 ]);
 
-/** A 409 is another tab's doing: it finished the setup, or started one with a new key. */
 const saidOfStartingByStatus = (refused: CodeRefused): string => {
   switch (refused.status) {
     case SIGNED_OUT:
@@ -63,14 +61,12 @@ const saidOfStarting = (refused: CodeRefused): string =>
 const saidOfFinishing = (refused: CodeRefused): string =>
   SAID_OF_A_SETUP_WORD.get(refused.word ?? "") ?? saidOfFinishingByStatus(refused);
 
-/** A failure with no status went unanswered. */
 const saidOfFailure = (
   failure: Error,
   saidOf: (refused: CodeRefused) => string,
   unanswered: string,
 ): string => (failure instanceof CodeRefused ? saidOf(failure) : unanswered);
 
-/** Grouped as a phone's keyboard is typed from it; copied whole, with no space. */
 const inFours = (key: string): string => key.match(/.{1,4}/g)?.join(" ") ?? key;
 
 function TheKey(properties: { readonly started: SetupStarted }) {
@@ -114,13 +110,11 @@ function TheKey(properties: { readonly started: SetupStarted }) {
   );
 }
 
-/** Where a setup finishes, and who hears of a refusal there; the first setup's route by default. */
 type Finishing = {
   readonly routes?: AuthenticatorRoutes | undefined;
   readonly onRefused?: ((failure: Error) => void) | undefined;
 };
 
-/** The key shown, then the code it makes; keyed by the key, so a new one starts clean. */
 function KeyAndCode(
   properties: Finishing & {
     readonly started: SetupStarted;
@@ -162,7 +156,6 @@ function KeyAndCode(
           {finishing ? AUTHENTICATOR_WORDS.finishing : AUTHENTICATOR_WORDS.finish}
         </Button>
       </form>
-      {/* Unconfirmed: the api may have finished the setup before its answer was lost. */}
       <Outcome tone="refused" id={refusedId}>
         {failure === null ? null : saidOfFailure(failure, saidOfFinishing, STOCK.unconfirmed)}
       </Outcome>
@@ -170,7 +163,6 @@ function KeyAndCode(
   );
 }
 
-/** The opener holds the start, so a key outlives closing the setup and opening it again. */
 export function AuthenticatorSetup(
   properties: Finishing & {
     readonly id: string;

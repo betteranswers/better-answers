@@ -65,10 +65,6 @@ export type ErasureLogLine = {
   readonly last_active_deleted: number;
 };
 
-/**
- * What one sweep of the questions did, the questions step's or the identity step's; a rerun
- * finds it done and counts nothing.
- */
 export type QuestionsLogLine = {
   readonly actor: typeof ERASURE_ACTOR;
   readonly erasure_request_id: string;
@@ -77,10 +73,6 @@ export type QuestionsLogLine = {
   readonly feedback_rewritten: number;
 };
 
-/**
- * The row and the report are the erasing workspace's to read, so what varies with another
- * workspace's records goes to the tier's log.
- */
 export type ErasureLog = {
   readonly info: (line: ErasureLogLine | QuestionsLogLine, message: string) => void;
 };
@@ -93,10 +85,6 @@ const QUESTIONS_SINCE_LOGGED =
 const IDENTITY_STEP_LOGGED =
   "erasure: the identity step's arm, and what it pseudonymised and deleted";
 
-/**
- * deploy/backup.sh takes the same advisory lock by this number; change one and a dump runs
- * beside an erasure.
- */
 const DUMP_LOCK = 41;
 
 const ERASURE_ACTIONS = declareActions("people", {
@@ -128,10 +116,6 @@ export type ErasureRun = {
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
-/**
- * Months are calendar months, as deploy/backup.sh's interval writes them;
- * packages/schema/test/factory.ts spells the same four and moves with this.
- */
 const BEYOND_USE = { hourlyHours: 48, dailyDays: 30, weeklyWeeks: 8, monthlyMonths: 6 } as const;
 
 export const beyondUseFrom = (anchoredAt: Date) => ({
@@ -309,7 +293,6 @@ const withTheActorsStep = (actions: ErasureActions, swept: ActorsSwept): Erasure
   },
 });
 
-/** Held alone across processes: a write or reconciler tick between rewrite and rows names a pruned commit. */
 const rewritingTheBundle = (
   platform: ErasurePrincipal,
   doors: ErasureDoors,
@@ -330,10 +313,6 @@ const rewritingTheBundle = (
     }),
   );
 
-/**
- * The suppression still holds the sign-in address once the user row is tombstoned. Actor rows go
- * again for a commit the reconciler replayed.
- */
 const afterTheMembersEnd = async (
   platform: ErasurePrincipal,
   doors: ErasureDoors,
@@ -349,7 +328,6 @@ const afterTheMembersEnd = async (
     withScope(platform, doors.postgres, workspaceId, (tx) => addressesSuppressedFor(tx, subject)),
   );
   if (!suppressed.ok) return err(suppressed.error);
-  // An address typed into the request may be another erasure's tombstone, which stays as it is.
   const addresses = [...new Set([...subject.addresses, ...suppressed.value])].filter(
     (address) => !isTombstone(address),
   );
@@ -359,13 +337,8 @@ const afterTheMembersEnd = async (
   return actors.ok ? ok({ git: git.value, actors: actors.value }) : err(actors.error);
 };
 
-/**
- * The arm, pseudonymisation and deletes go to the operator's log line: on this workspace's row
- * they would say whether another workspace holds the person.
- */
 const withTheIdentityStep = (actions: ErasureActions, swept: IdentitySwept): ErasureActions => ({
   ...actions,
-  // Stored on the request's row and printed in its report, so the key keeps its first name (R22).
   "identity-user": { ...actions["identity-user"], membershipsEnded: swept.membersEnded },
 });
 
@@ -423,7 +396,6 @@ const questionsStepLineOf = (
   feedback_rewritten: swept.feedbackRewritten,
 });
 
-/** A sweep that found nothing has no count to keep. */
 const logTheSweep = (log: ErasureLog, line: QuestionsLogLine, message: string): void => {
   if (line.records_rewritten + line.feedback_rewritten > 0) log.info(line, message);
 };
@@ -497,11 +469,9 @@ type ErasureOpened = {
   readonly concepts: readonly string[];
   readonly addresses: SubjectAddresses;
 
-  /** People a rerun cannot reach through a member row. */
   readonly namedPeople: readonly string[];
 };
 
-/** By this request's tombstone, or by an address it holds, a person held elsewhere among them. */
 const NAMED_PEOPLE = `SELECT id FROM "user" WHERE email = $1 OR lower(email) = ANY($2::text[])`;
 
 const peopleNamedBy = async (
@@ -589,10 +559,6 @@ const completeTheRequest = async (
 
   const standsAt = standingCompletion ?? completedAt;
 
-  /**
-   * Written before the completion commits: a run that leaves no copy loses the erasure to
-   * every restore from a dump older than the request.
-   */
   const copied = await attempt(() =>
     writeReplayCopy(platform, doors.objects, {
       workspaceId,
@@ -648,11 +614,6 @@ const completeTheRequest = async (
   });
 };
 
-/**
- * Waits on the backup dump's lock. A rerun is safe, and answers the first completion's time and
- * report. Refuses `no-address` when the bundle names the person but no address to rewrite is known.
- * A step that fails answers its error, and the steps before it stay applied.
- */
 export const runErasure = async (
   platform: ErasurePrincipal,
   doors: ErasureDoors,
@@ -683,10 +644,6 @@ export const runErasure = async (
     });
     if (!rewritten.ok) return err(rewritten.error);
 
-    /**
-     * Before the identity step, which pseudonymises the sign-in address: a rerun after it would
-     * read no address to add.
-     */
     const suppressed = await attempt(() =>
       withScope(platform, doors.postgres, workspaceId, (tx) =>
         suppressInTheWorkspace(platform, tx, {
@@ -699,14 +656,9 @@ export const runErasure = async (
     );
     if (!suppressed.ok) return err(suppressed.error);
 
-    /**
-     * Before the identity step, which ends the member: a rerun after it would find no person
-     * behind an address, and leave their questions and ids.
-     */
     const named = { workspaceId, personIds, pseudonym };
     const swept = await attempt(async () => {
       const questions = await eraseFromTheQuestions(platform, doors.postgres, named);
-      // Logged as the step commits, for the identity step's reason below.
       logTheSweep(
         doors.log,
         questionsStepLineOf(platform, erasure.id, questions),
@@ -725,8 +677,6 @@ export const runErasure = async (
       }),
     );
     if (!identity.ok) return err(identity.error);
-    // Logged as the step commits, not at completion: a run that dies after it leaves the next
-    // run nothing left to count.
     doors.log.info(identityStepLineOf(platform, erasure.id, identity.value), IDENTITY_STEP_LOGGED);
     logTheSweep(
       doors.log,

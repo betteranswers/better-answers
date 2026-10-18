@@ -11,7 +11,6 @@ const web = fileURLToPath(new URL("..", import.meta.url));
 
 const ADDRESS = "admin@journeys.example";
 
-/** A spec whose journeys name their role and raise could-not-run as the real ones do. */
 const specOf = (...lines: readonly string[]): string =>
   [
     'import { expect, test } from "@playwright/test";',
@@ -31,7 +30,6 @@ const ADMIN_FAILS_ON_MEMBERS = [
   "});",
 ];
 
-/** The address comes from the environment, as a journey's does, and shows on the page and in a diff. */
 const ADMIN_FAILS_TO_SIGN_IN = [
   "const address = process.env.JOURNEYS_ADMIN_EMAIL;",
   "const status = '<main><p role=\"status\">Sign-in email sent to ' + address + '.</p></main>';",
@@ -59,7 +57,6 @@ const WITH_THE_ADDRESS = { JOURNEYS_ADMIN_EMAIL: ADDRESS };
 
 const NO_ROLE_JOURNEY = "No role journey ran to its end.";
 
-/** The journeys' configured reporters, written so the tree resolves them and keeps its own word. */
 const configuredReporters = async (): Promise<string> => {
   vi.stubEnv("PUBLIC_URL", "https://app.better-answers.example");
   vi.resetModules();

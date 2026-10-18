@@ -52,10 +52,6 @@ const askOf = (ready: TickedGroups) => ({
 
 const reasonedAsk = (ready: TickedGroups, reason: string) => ({ ...askOf(ready), reason });
 
-/**
- * Inert until this connected source's review has ticked groups the action takes: an action over nothing is
- * disabled and reads as such.
- */
 const useBulkAction = (
   connectedSourceId: string,
   takes: (group: GroupOfFindings) => boolean = takesAnyGroup,
@@ -76,10 +72,6 @@ const useBulkAction = (
     setOpen(true);
   };
 
-  /**
-   * The action's own button is disabled once the selection is spent, so focus it cannot take goes to
-   * the review.
-   */
   const returnFocus = (event: Event) => {
     event.preventDefault();
     opener.current?.focus();
@@ -88,10 +80,6 @@ const useBulkAction = (
     }
   };
 
-  /**
-   * A command must read as taken within a tenth of a second, so the dialog closes and the
-   * selection is spent before the api answers.
-   */
   const command = <Answer,>(said: {
     readonly pending: string;
     readonly done: (answer: Answer) => ReactNode;
@@ -119,7 +107,6 @@ type BulkActionState = ReturnType<typeof useBulkAction>;
 
 type ActionProperties = {
   readonly connectedSourceId: string;
-  /** The id of the line that says what enables the action, while no group is ticked. */
   readonly enabledBy: string | undefined;
 };
 
@@ -161,7 +148,6 @@ function BulkAction(properties: {
   );
 }
 
-/** A rule the page has no word for shows its id, in the face every id takes. */
 export function RuleWord(properties: { readonly ruleId: string }) {
   const word = ruleWordOf(properties.ruleId);
   return word === properties.ruleId ? <span className="font-mono">{word}</span> : word;
@@ -180,10 +166,6 @@ function TickedList(properties: { readonly groups: readonly GroupOfFindings[] })
   );
 }
 
-/**
- * Both reasoned actions land the reason in the audit log beside the Admin who gave it, so they ask for
- * it alike.
- */
 function ReasonedDialog(properties: {
   readonly action: BulkActionState;
   readonly title: string;
@@ -228,7 +210,6 @@ function KeepInTextAction(properties: ActionProperties) {
   const keep = useKeepInText();
   const words = REVIEW_WORDS.keep;
   const groups = action.ready?.groups ?? [];
-  /** Counted off the groups the review listed, so the page reads nothing of the findings kept. */
   const findings = groups.reduce((sum, group) => sum + group.found, 0);
 
   const kept = (reason: string) => {
@@ -359,7 +340,6 @@ function DismissAsNotSpecialCategoryAction(properties: ActionProperties) {
   );
 }
 
-/** While no group is ticked, one line above the three says what enables them. */
 export function ReviewActions(properties: { readonly connectedSourceId: string }) {
   const { connectedSourceId } = properties;
   const [ticked] = useTickedGroups();

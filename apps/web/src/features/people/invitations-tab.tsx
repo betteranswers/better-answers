@@ -45,7 +45,6 @@ import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST } from "./people-state.ts
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
 import { UnsentEmails } from "./unsent-emails.tsx";
 
-/** Each status's list is read whole, so the browser pages it. */
 const PAGE_SIZE = 25;
 
 const INVITATIONS_HEADING = "Invitations";
@@ -62,7 +61,6 @@ const matching = (search: string) => {
     invitation.address.toLowerCase().includes(sought);
 };
 
-/** A clear empties the search and stays on the status the reader chose. */
 const KEPT_ON_CLEAR = ["status"] as const;
 
 const useNarrowedInvitations = () => {
@@ -148,7 +146,6 @@ function NoneShown(properties: {
   );
 }
 
-/** A tick taken on another status or page keeps the address it was taken with. */
 const tickedFrom =
   (ticked: Ticked, listed: readonly ListedInvitation[]) =>
   (ids: ReadonlySet<string>): Ticked =>
@@ -161,7 +158,6 @@ const tickedFrom =
       ]),
     );
 
-/** The row focus is in stands while the list still holds it. */
 const useInFocusKeystrokes = (properties: {
   readonly inFocus: ListedInvitation | undefined;
   readonly resend: (invitation: ListedInvitation) => void;
@@ -179,7 +175,6 @@ const useInFocusKeystrokes = (properties: {
   useKeystroke(KEY.tickInvitation, onTheRowInFocus(properties.tick));
 };
 
-/** An action that takes its row away hands focus to the list once the menu has shut. */
 const rowMenuOf =
   (actions: ReturnType<typeof useInvitationActions>, heading: RefObject<HTMLElement | null>) =>
   (invitation: ListedInvitation) => {
@@ -208,7 +203,6 @@ const rowMenuOf =
     );
   };
 
-/** Ticks and an action's outcome are the page's; what narrows the rows is the address's. */
 function InvitationList(properties: {
   readonly headingId: string;
   readonly heading: RefObject<HTMLHeadingElement | null>;
@@ -217,7 +211,6 @@ function InvitationList(properties: {
   const narrowed = useNarrowedInvitations();
   const { read, listed, state } = narrowed;
   const actable = isActable(state.status);
-  // A tick outlives its row and its status, so the next action refuses or skips it and says so.
   const [ticked, setTicked] = useState<Ticked>(NONE);
   const [inFocusId, setInFocusId] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
@@ -344,7 +337,6 @@ export function InvitationsTab() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      {/* Its heading is focusable, so focus lands there when an action takes the row it was in. */}
       <InvitationList headingId={headingId} heading={heading} />
     </section>
   );

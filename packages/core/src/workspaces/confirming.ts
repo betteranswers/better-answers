@@ -45,14 +45,12 @@ import {
 import { AUTHENTICATOR_SECRET_PREFIX, OPERATOR_RESTORE_PREFIX } from "./sign-in-and-consent.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** The factor's kind alone: which passkey or code was used is no change to any factor. */
 const CONFIRMING_ACTIONS = declareIdentitySetActions("people", {
   confirmed: action("people.person.second_factor_confirmed", { method: "secondFactor" }),
   replaced: action("people.person.factors_replaced", { by: "secondFactor" }),
   restoreAccepted: action("people.person.restore_code_accepted", {}),
 });
 
-/** How long a replacement setup's sealed secret waits for its first working code. */
 const PARKED_FOR_MS = 10 * 60_000;
 
 type Confirm = {
@@ -69,10 +67,6 @@ const HOLDING_THE_SESSION = `
   SELECT ${SETUP_GRANTED} AS "setupGranted"
     FROM session WHERE id = $1 AND user_id = $2 FOR UPDATE`;
 
-/**
- * Person, then session, in every action here, so none holds what another waits on. A held session
- * cannot be signed out before the stamp lands.
- */
 const holding = async (
   tx: Tx,
   held: Held,
@@ -95,7 +89,6 @@ const holdingTheGrant = async (
   return session.value.setupGranted ? ok(undefined) : err("setup-not-granted");
 };
 
-/** The person's id is refused once, where it enters; the work runs in one transaction. */
 const asThePerson = async <T, R>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -112,7 +105,6 @@ const asThePerson = async <T, R>(
   return done.value;
 };
 
-/** Either factor proves the person, so it forgets the authenticator's failures as a code would. */
 const confirming = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -142,7 +134,7 @@ export type ConfirmByPasskeyRefusal = WorkspaceRefusal<
 
 /**
  * Called once the api has verified an assertion against its own challenge. Only the person's own
- * credential confirms, and it stamps the session the person already holds: no session is made.
+ * credential confirms: no session is made.
  */
 export const confirmByPasskey = async (
   platform: PlatformPrincipal,
@@ -199,7 +191,6 @@ export const confirmByAuthenticator = async (
 
 type WrongCodeRefusal = WorkspaceRefusal<"recovery-code-wrong" | "restore-code-wrong">;
 
-/** Not a refusal: the failure it counts must commit, and the notice it may make due goes with it. */
 type Wrong = { readonly granted: false; readonly refusal: WrongCodeRefusal } & Counted;
 
 type CodeKind = {
@@ -213,10 +204,6 @@ const RESTORE_CODE: CodeKind = { kind: "restore-code", refusal: "restore-code-wr
 
 const GRANTING = "UPDATE session SET setup_granted_at = $3 WHERE id = $1 AND user_id = $2";
 
-/**
- * Run once the person and session are held. A kind still waiting refuses even the right code, so
- * no guess is spent while it waits.
- */
 const tryingACode = async <Accepted>(
   tx: Tx,
   held: Held,
@@ -245,10 +232,7 @@ type Spent = { readonly granted: true; readonly unused: number } | Wrong;
 
 type Spending = Result<Spent, Gone | "restore-code-needed" | CeilingMet>;
 
-/**
- * Spends one of the person's recovery codes in place of their second factor. Only this session
- * may then replace the factors, and it is still unconfirmed until it has.
- */
+/** Only this session may then replace the factors, and it is still unconfirmed until it has. */
 export const spendRecoveryCode = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -257,7 +241,6 @@ export const spendRecoveryCode = async (
   asThePerson(platform, door, input, async (tx, held): Promise<Spending> => {
     const session = await holding(tx, held);
     if (!session.ok) return session;
-    // A restore stands for the operator's own check, which a code from the mailbox must not skip.
     if (await restoredByTheOperator(tx, held.personId)) return err("restore-code-needed");
     return tryingACode(tx, held, RECOVERY_CODE, async () => {
       const unused = await spendingARecoveryCode(platform, tx, held.personId, input.code);
@@ -265,7 +248,6 @@ export const spendRecoveryCode = async (
     });
   });
 
-/** Only while the restore stands, before the code's day is out, and once. */
 const CONSUMING_THE_RESTORE = `
   DELETE FROM verification v USING "user" u
    WHERE u.id = $1 AND u.restore_required_at IS NOT NULL
@@ -275,7 +257,7 @@ type Accepted = { readonly granted: true } | Wrong;
 
 type Accepting = Result<Accepted, Gone | CeilingMet>;
 
-/** Accepts the operator's restore code; like a spent recovery code, it lets only this session set up a factor. */
+/** Like a spent recovery code, it lets only this session set up a factor. */
 export const acceptRestoreCode = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -308,8 +290,8 @@ export type ParkAuthenticatorSecretRefusal = WorkspaceRefusal<
 >;
 
 /**
- * Parks a replacement authenticator's secret, sealed by the api, until its first code works. A
- * session parks one at a time: a later setup replaces the earlier.
+ * Parks the secret, sealed by the api, until its first code works. A session parks one at a time: a
+ * later setup replaces the earlier.
  */
 export const parkAuthenticatorSecret = async (
   platform: PlatformPrincipal,
@@ -378,12 +360,10 @@ const keepingThePasskey = async (
   return ok(undefined);
 };
 
-/** The columns the library writes, so its own verify reads the secret as one it set up. */
 const INSTALLING = `
   INSERT INTO authenticator (id, secret, backup_codes, user_id, verified)
   VALUES ($1, $2, '', $3, true)`;
 
-/** Only the secret parked under this session's grant, so the one installed is the one its code proved. */
 const installingTheAuthenticator = async (
   tx: Tx,
   held: Held,
@@ -408,10 +388,6 @@ type Replaced = { readonly issued: RecoveryCodesMade };
 const REPLACED_FLAGS = `
   UPDATE "user" SET authenticator_enabled = $2, restore_required_at = NULL WHERE id = $1`;
 
-/**
- * Every session's grant goes, and every other session's stamp: either left standing would outlast
- * the lost factors.
- */
 const finishingTheReplacement = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -455,8 +431,8 @@ export type ReplaceFactorsRefusal = WorkspaceRefusal<
 >;
 
 /**
- * Finishes a granted session's setup with the passkey the library just kept: every other passkey
- * and the authenticator go, and ten fresh codes come back to be shown once.
+ * Finishes a granted session's setup: every other passkey and the authenticator go, and ten fresh
+ * codes come back to be shown once.
  */
 export const replaceFactorsByPasskey = async (
   platform: PlatformPrincipal,
@@ -468,8 +444,8 @@ export const replaceFactorsByPasskey = async (
   );
 
 /**
- * Finishes a granted session's setup with the authenticator secret it parked, once the api has
- * checked a code against it: every passkey and the old authenticator go, ten fresh codes come back.
+ * For a granted session, once the api checked a code against its parked secret: every passkey and
+ * the old authenticator go, ten fresh codes return.
  */
 export const replaceFactorsByAuthenticator = async (
   platform: PlatformPrincipal,

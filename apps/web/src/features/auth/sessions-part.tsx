@@ -30,11 +30,9 @@ import {
 
 const SESSIONS_HEADING = "sessions-heading";
 
-/** The sessions the read holds, without the ones a sign-out has already taken away. */
 const heldAfter = (read: SessionsRead, taken: ReadonlySet<string>): readonly SessionShown[] =>
   (read.data ?? []).filter((session) => !taken.has(session.id));
 
-/** The row's own name, so a session never reads the same as another list's row. */
 const named = (device: string): string => `A session on ${device}`;
 
 function CurrentSession(properties: { readonly session: SessionShown }) {
@@ -54,7 +52,6 @@ function CurrentSession(properties: { readonly session: SessionShown }) {
 function AnotherSession(properties: {
   readonly session: SessionShown;
   readonly landsAt: LandsAt;
-  /** A sign-out in flight: a second one sent now would drop the first's answer. */
   readonly pending: boolean;
   readonly onSignOut: (session: SessionShown) => void;
 }) {
@@ -83,7 +80,6 @@ function AnotherSession(properties: {
   );
 }
 
-/** The Sessions section of the Account page: the person's own, and no one else's. */
 export function SessionsSection() {
   const read = useSessions();
   const signOut = useSignOutSession();
@@ -111,7 +107,6 @@ export function SessionsSection() {
     });
   };
 
-  /** The row leaves at once; on success focus reaches the next Sign out, or the heading. */
   const signOutOne = (session: SessionShown) => {
     setSaid(undefined);
     setRefused(undefined);

@@ -4,7 +4,6 @@ import { ruleBaseline } from "./rule-baseline.ts";
 
 const OFF_THE_LIST = "packages/core/src/probe.ts";
 
-/** Plain JavaScript, so one fixture parses in a `.ts`, a `.tsx` and an `.mjs` file alike. */
 const ofComplexity = (complexity: number): string => {
   const branches = Array.from(
     { length: complexity - 1 },

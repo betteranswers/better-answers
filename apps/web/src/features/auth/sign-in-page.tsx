@@ -52,7 +52,6 @@ const REFUSED = "sign-in-refused";
 
 const TOO_MANY_REQUESTS = 429;
 
-/** What each action's failure says when refused, and when never answered. */
 type SaidOfAnAction = { readonly refused: string; readonly unanswered: string };
 
 const SAID_OF_SENDING: SaidOfAnAction = {
@@ -60,13 +59,11 @@ const SAID_OF_SENDING: SaidOfAnAction = {
   unanswered: STOCK.tryAgain,
 };
 
-/** The api may have spent the code before its answer was lost, so no one is told to send it again. */
 const saidOfSigningIn = (left: number): SaidOfAnAction => ({
   refused: codeWrong(left),
   unanswered: STOCK.unconfirmed,
 });
 
-/** One reading of a failed action, which the page's words, tries count and styling all follow. */
 type Failed =
   | { readonly kind: "unanswered" }
   | { readonly kind: "too-many"; readonly waitSeconds: number | undefined }
@@ -86,7 +83,6 @@ const saidOf = (action: SaidOfAnAction, failure: Error): string => {
   return failed.kind === "refused" ? action.refused : action.unanswered;
 };
 
-/** Each action clears the other as it starts, so at most one has failed. */
 const failureSaid = (
   sendFailure: Error | null,
   signInFailure: Error | null,
@@ -96,7 +92,6 @@ const failureSaid = (
   return sendFailure === null ? undefined : saidOf(SAID_OF_SENDING, sendFailure);
 };
 
-/** A ceiling's refusal says nothing of the code, so it spends none of its tries. */
 const isAWrongCode = (failure: Error | null): boolean =>
   failure !== null && failedAs(failure).kind === "refused";
 
@@ -131,11 +126,9 @@ type SessionRead = {
     | undefined;
 };
 
-/** Undefined for a failed read, which keeps whatever it held before and proves nothing. */
 const sessionIdOf = (read: SessionRead): string | null | undefined =>
   read.isError ? undefined : (read.data?.session.id ?? null);
 
-/** Until the standing session is known nothing is new, and another address's sign-in is not awaited. */
 const isANewSignInOf = (
   read: SessionRead,
   standing: string | null | undefined,
@@ -150,13 +143,8 @@ const isANewSignInOf = (
   );
 };
 
-/**
- * Moves on once another browser tab signs in: on hearing it announced, or on being shown again,
- * having missed the announcement.
- */
 function useFollowsASignInElsewhere(waiting: boolean, sentTo: string, follow: () => void) {
   const session = useSession();
-  // Signing in again starts here with a session standing, and only a different one is a sign-in.
   const standing = useRef<string | null | undefined>(undefined);
   const readWhatStands = useEffectEvent(() => {
     void session.refetch().then((read) => {
@@ -168,7 +156,6 @@ function useFollowsASignInElsewhere(waiting: boolean, sentTo: string, follow: ()
   });
   const recheck = useEffectEvent(() => {
     if (!waiting) return;
-    // With no standing session read yet there is nothing to compare, so this read becomes it.
     if (standing.current === undefined) readWhatStands();
     else void session.refetch().then(followIfNew);
   });
@@ -201,7 +188,6 @@ function CodeStepActions(properties: {
 
   return (
     <div className="mt-6 flex flex-wrap items-center gap-2">
-      {/* Enabled while sending, so the focus a click gave the button is not dropped. */}
       <Button
         id={SEND_AGAIN_BUTTON}
         type="button"
@@ -287,7 +273,6 @@ type CodeStep = {
   readonly actions: ReactNode;
 };
 
-/** No `maxLength`: a browser would cut a pasted `123-456` to `123-45` before it is read. */
 const codeStepOf = (step: CodeStep): Step => ({
   title: SIGN_IN_WORDS.codeTitle,
   said: step.said,
@@ -339,10 +324,6 @@ export function SignInPage() {
   const signingIn = signIn.isPending || signIn.isSuccess;
   const left = triesLeftAfter(refused, signIn.error);
 
-  /**
-   * The query rides along, a connector's signed one included, so that page sends the person
-   * where this one would have.
-   */
   const moveOnAfterSignIn = (signedIn: SignedIn) => {
     queryClient.clear();
     void stepAfterSignIn(pageQuery(), signedIn.displayNameGiven).then((next) =>
@@ -400,7 +381,6 @@ export function SignInPage() {
   const countTheRefusal = (digits: string, failure: Error) => {
     if (!isAWrongCode(failure)) return;
     const nowRefused = [...refused, digits];
-    // Committed before the mutation's own render, so the alert never names a try already spent.
     flushSync(() => {
       setRefused(nowRefused);
     });
@@ -468,7 +448,6 @@ export function SignInPage() {
                 sendANewCode(sentTo);
               }}
               onChangeAddress={changeAddress}
-              // Nothing here read the name, so the display-name page's own read forwards a named person.
               onSignedInElsewhere={() => {
                 moveOnAfterSignIn({ displayNameGiven: false });
               }}
@@ -476,8 +455,6 @@ export function SignInPage() {
           ),
         });
 
-  // Each slot keeps its element across the steps, so the code step speaks in the regions that
-  // stood and focus stays in the field.
   return (
     <AuthPage title={step.title}>
       <Outcome tone="said">{step.said}</Outcome>

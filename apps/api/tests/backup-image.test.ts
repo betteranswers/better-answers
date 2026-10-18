@@ -85,10 +85,6 @@ const contentsSchema = z.object({
 
 type ImageContents = z.infer<typeof contentsSchema>;
 
-/**
- * String.raw keeps \t and \n as the characters printf interprets; a plain literal makes them a
- * real tab and newline.
- */
 const probe = String.raw`
 printf 'pgDump\t%s\n' "$(pg_dump --version 2>&1)"
 for tool in ${REQUIRED_TOOLS.join(" ")}; do
@@ -414,17 +410,12 @@ describe("the backup jobs' allow-list", () => {
 });
 
 const WORKSPACE = "ws-probe";
-/** A job that reads one repository and loses the rest of its list leaves this one out. */
 const SECOND_WORKSPACE = "ws-second";
-/** As `provision-workspace` leaves a workspace before its first write: a repository with no ref. */
 const UNWRITTEN_WORKSPACE = "ws-unwritten";
-/** Its HEAD is gone, so git finds no repository there. */
 const UNREADABLE_WORKSPACE = "ws-unreadable";
 const LEFT_BY_A_FAILED_RUN = "/staging/globals-20260904T143652Z.sql.age";
-/** The stores stack's init hands /data/git to this uid, the one the api writes as. */
 const API_UID = 1000;
 
-/** As ssh to VPC 2: runs the mirror's forced command, and drains stdin to it unless `-n`. */
 const SSH_STAND_IN = String.raw`#!/usr/bin/env bash
 forwarded=yes
 while [ "$#" -gt 1 ]; do
@@ -517,7 +508,6 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
   it("bundles each api-owned repository with a ref, skipping one without", () => {
     const bundles = files.filter((file) => file.startsWith("/buckets/dumps/git/")).sort();
 
-    // The log rides along so a failure shows where the run stopped.
     expect({ bundles, log }).toMatchObject({
       bundles: [bundleOf(WORKSPACE), bundleOf(SECOND_WORKSPACE)],
     });
@@ -574,11 +564,9 @@ const fenced = (script: string, step: string): string => {
 };
 
 const NOTHING_LISTENS = "postgresql://restore@127.0.0.1:9/betteranswers";
-/** A prefix in the dumps bucket that holds no object, as before any workspace's first bundle. */
 const NOTHING_BUNDLED = "before-the-first-bundle";
 const NOT_THE_KEY = "a-rotated-secret";
 
-/** As both restores run their git step: as root, `mktemp -d`'s directories, `init`'s git store. */
 const restoringTheGitStore = String.raw`
 set -euo pipefail
 git init --quiet --initial-branch=main /tmp/workspace
@@ -626,21 +614,18 @@ interface Seeded {
   readonly neverWritten: string;
 }
 
-/** A port the host publishes, as a container that `reachesTheHost` dials it. */
 const seenFromTheImage = (address: string): string => {
   const uri = new URL(address);
   uri.hostname = THE_HOST;
   return uri.toString();
 };
 
-/** The script's own line, so a uid other than `init`'s fails the sudo below. */
 const theApisUid = (script: string): string => {
   const line = /^API_UID=\S+$/m.exec(read(script))?.[0];
   if (line === undefined) throw new Error(`${script} no longer names the api's uid as API_UID`);
   return line;
 };
 
-/** The image has no sudo, and a git the step's root shell runs itself is noted. */
 const AS_THE_HOSTS_RUN_IT = [
   `sudo() { [ "$1 $2" = "-u #${API_UID}" ] || return 2; shift 2; HOME=/tmp setpriv --reuid=${API_UID} --regid=${API_UID} --clear-groups "$@"; }`,
   'git() { printf "%s\\n" "$*" >> /tmp/root-ran-git; command git "$@"; }',
@@ -663,7 +648,6 @@ const restoreEnvironment = (
   STAGING_DATABASE_URL: database,
   BUNDLED: seeded.bundled,
   NEVER_WRITTEN: seeded.neverWritten,
-  // As each script leaves them by its git step; production's `tool` runs in this image anyway.
   PRODUCTION_STEP: [
     "set -euo pipefail",
     "WORK=/work BUNDLES=/bundles",
@@ -726,7 +710,6 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
   it.each(["production", "drill"])(
     "%s: clones each bundle as the api, keeping WORK closed",
     (restore) => {
-      // What the step said rides along, so a failure shows where it stopped.
       expect(stateAfter(restore)).toMatchObject({
         state: [
           "ran 0",

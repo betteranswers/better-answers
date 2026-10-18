@@ -20,7 +20,6 @@ const answered = z.object({
   related: z.array(z.object({ iri: z.string() })),
 });
 
-/** An Admin who asked the retention question twice over MCP and flagged the first answer. */
 const aFlaggedRecordAndANewerOne = async () => {
   const workspace = await app().provision();
   const client = app().client();

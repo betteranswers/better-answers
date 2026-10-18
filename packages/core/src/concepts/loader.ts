@@ -106,10 +106,6 @@ type YamlFrontmatter = z.infer<typeof yamlFrontmatter>;
 const isMapping = (value: YamlFrontmatter[string]): value is FrontmatterSource =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/**
- * The platform's frontmatter holds scalars and lists, so a flow mapping such as OKF's
- * `generated {by, at}` is carried as a one-entry list.
- */
 const frontmatterOf = (decoded: YamlFrontmatter): Frontmatter =>
   Object.fromEntries(
     Object.entries(decoded).map(([key, value]) => [key, isMapping(value) ? [value] : value]),
@@ -205,10 +201,6 @@ export type RewrittenBody = {
   readonly links: number;
 };
 
-/**
- * Swaps each relative `.md` link that `iriOf` knows for its IRI, keeping any `#fragment`;
- * `links` counts the swaps.
- */
 export const rewriteLinks = (
   body: string,
   path: string,
@@ -305,7 +297,6 @@ const manifestOf = (text: string): Result<BundleManifest, Unsound> => {
   return decoded.ok ? decoded : err(unsound(MANIFEST_FILE, "manifest-malformed", decoded.error));
 };
 
-/** Refuses the whole bundle at its first unsound file, taken in path order. */
 export const readBundle = (tree: BundleTree): Result<LoadedBundle, Unsound> => {
   const manifestText = tree.get(MANIFEST_FILE);
   if (manifestText === undefined) {
@@ -328,7 +319,6 @@ export const readBundle = (tree: BundleTree): Result<LoadedBundle, Unsound> => {
   return ok({ manifest: manifest.value, concepts });
 };
 
-/** Person ids keyed by lower-cased email; an address with no member in the workspace is absent. */
 export const personIdsByEmail = async (
   principal: Principal,
   tx: Tx,
@@ -348,7 +338,6 @@ export const personIdsByEmail = async (
   );
 };
 
-/** @throws when `personId` is no member of the workspace. */
 export const authorOf = async (
   principal: Principal,
   tx: Tx,
@@ -384,7 +373,6 @@ type StandingRow = {
   readonly content_hash: string;
 };
 
-/** Keyed by path; a path no concept holds is absent. */
 export const standingAt = async (
   principal: Principal,
   tx: Tx,
@@ -420,7 +408,6 @@ export type ImportedVerification = {
 const verificationKey = (iri: string, verification: ImportedVerification): string =>
   `${iri} ${verification.actor} ${verification.at.toISOString()}`;
 
-/** The verifications already recorded on `iris`, as opaque keys for `countVerifications`. */
 export const presentVerifications = async (
   principal: Principal,
   tx: Tx,
@@ -442,7 +429,6 @@ export type VerificationsRecorded = {
   readonly present: number;
 };
 
-/** An `undefined` IRI is a concept not held yet, so every verification counts as recorded. */
 export const countVerifications = (
   iri: string | undefined,
   verifications: readonly ImportedVerification[],
@@ -455,7 +441,6 @@ export const countVerifications = (
   return { recorded: missing.length, present: verifications.length - missing.length };
 };
 
-/** Records each verification not already there, with an audit event each; `present` counts the rest. */
 export const recordImportedVerifications = async (
   principal: Principal,
   tx: Tx,

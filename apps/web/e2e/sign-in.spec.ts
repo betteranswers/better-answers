@@ -40,11 +40,9 @@ const SEND_PATH = "/email-otp/send-verification-otp";
 
 const codeField = (page: Page) => page.getByLabel("Verification Code", { exact: true });
 
-/** Asked for before the action that sends, or the answer can land before anything waits for it. */
 const theSendsAnswer = (page: Page) =>
   page.waitForResponse((response) => new URL(response.url()).pathname === SEND_PATH);
 
-/** The wait the ceiling named, in whole seconds. */
 const waitNamedBy = async (answered: ReturnType<typeof theSendsAnswer>): Promise<number> => {
   const response = await answered;
   expect(response.status(), "the send was not refused by a ceiling").toBe(429);
@@ -53,7 +51,6 @@ const waitNamedBy = async (answered: ReturnType<typeof theSendsAnswer>): Promise
   return waitSeconds;
 };
 
-/** A code asked for at the email step meets a ceiling, and the page says the wait it named. */
 const theSendIsRefusedNamingItsWait = async (page: Page, email: string): Promise<void> => {
   await page.getByLabel("Email Address").fill(email);
   const answered = theSendsAnswer(page);
@@ -62,7 +59,6 @@ const theSendIsRefusedNamingItsWait = async (page: Page, email: string): Promise
   await saysTheWait(page.getByRole("alert"), await waitNamedBy(answered));
 };
 
-/** From the email step the page shows to the code step, through the product's own page. */
 const sendTheFirstCode = async (page: Page, email: string): Promise<void> => {
   await page.getByLabel("Email Address").fill(email);
   await page.getByRole("button", { name: "Send Code" }).click();
@@ -70,10 +66,6 @@ const sendTheFirstCode = async (page: Page, email: string): Promise<void> => {
   await expect(page.getByRole("status"), "the page says nothing of the email").toHaveText(/\S/);
 };
 
-/**
- * A send still out says something new too, so the status is compared only once the button that
- * sends is free again.
- */
 const saysANewEmailWent = async (page: Page, earlier: string): Promise<void> => {
   await expect(
     page.getByRole("button", { name: "Send a New Code" }),
@@ -82,7 +74,6 @@ const saysANewEmailWent = async (page: Page, earlier: string): Promise<void> => 
   await saysSomethingNew(page.getByRole("status"), earlier);
 };
 
-/** A page's own words as an XPath string, whatever quotes they hold. */
 const asXPath = (words: string): string =>
   `concat(${words
     .split('"')
@@ -94,22 +85,18 @@ const atTheCodeStep = async (page: Page, email: string): Promise<void> => {
   await sendTheFirstCode(page, email);
 };
 
-/** The page counts the tries left itself, so the alert's number is all that says them. */
 const triesLeft = (left: number): RegExp => new RegExp(String.raw`\b${String(left)}\b`);
 
-/** Wrong unless the code sent was six zeros, one chance in a million. */
 const aWrongCodeIsRefused = async (page: Page): Promise<void> => {
   await codeField(page).fill("000000");
   await expect(page.getByRole("alert")).toHaveText(triesLeft(2));
 };
 
-/** Never the code sent: six digits `step` past it, wrapping at a million. */
 const notTheCode = (code: string, step: number): string =>
   String((Number(code) + step) % 1_000_000).padStart(6, "0");
 
 const SIGN_IN_PATH = "/sign-in/email-otp";
 
-/** Every code the page sends the api from now on, so a resend shows as a second entry. */
 const codesSentFrom = (page: Page): readonly string[] => {
   const sent: string[] = [];
   page.on("request", (asked) => {
@@ -118,7 +105,6 @@ const codesSentFrom = (page: Page): readonly string[] => {
   return sent;
 };
 
-/** Through the clipboard and the keyboard, as a person pastes a code copied from the email. */
 const pastedIntoTheField = async (page: Page, copied: string): Promise<void> => {
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.evaluate((text) => navigator.clipboard.writeText(text), copied);
@@ -142,7 +128,6 @@ const aFramePassed = (page: Page): Promise<void> =>
       }),
   );
 
-/** Runs what makes the page re-read its session, then holds that the page still waits at /sign-in. */
 const stillWaitingOnceReread = async (page: Page, prompt: () => Promise<void>): Promise<void> => {
   const reread = page.waitForRequest((asked) => new URL(asked.url()).pathname === "/get-session");
   await prompt();
@@ -155,7 +140,6 @@ const SESSION_READ = "**/get-session*";
 
 const heldSession = z.object({ session: z.object({ id: z.string() }) });
 
-/** As the api reads this browser's cookie, so a session begun since names a new id. */
 const sessionHeldBy = async (page: Page): Promise<string> =>
   heldSession.parse(await (await page.request.get("/get-session")).json()).session.id;
 
@@ -182,7 +166,6 @@ const memberOfTwoWorkspaces = async (
 
 const LIST_BUDGET_MS = 1000;
 
-/** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 const theWorkspacesRead = (url: URL): boolean => url.pathname.includes("person.workspaces");
 
 const rowsOf = (page: Page) => page.getByRole("main").getByRole("listitem");
@@ -224,7 +207,6 @@ test("lists a member's workspaces within a second", async ({ page, request }) =>
   await signIn(page, request, email);
   await expect(rowsOf(page)).toHaveCount(2);
 
-  // A fresh document, so no list is already in the page's cache.
   const started = Date.now();
   await page.goto("/choose-workspace");
   await expect(rowsOf(page)).toHaveCount(2);
@@ -387,13 +369,11 @@ test("says a code is sent, wrong, or asked too often", async ({
   await aWrongCodeIsRefused(page);
   await passesTheAccessibilityGate();
 
-  // `request` has a client address of its own, so the ceiling this trips is the per-email one.
   const flooded = anAddress("flood");
   await floodCodesTo(request, flooded, 6);
 
   await page.getByRole("button", { name: "Use a Different Email Address" }).click();
   await theSendIsRefusedNamingItsWait(page, flooded);
-  // Red words alone: the system never draws a coloured rule beside them.
   await expect(page.getByRole("alert")).toHaveCSS("border-left-width", "0px");
 });
 
@@ -431,7 +411,6 @@ test("draws a row of secondary actions in one treatment", async ({ page, request
 
 test("names the wait when one client asks too many codes", async ({ page }) => {
   await page.goto("/sign-in");
-  // The page's own client address asks each code for another email, so no per-email ceiling is met.
   for (let asked = 0; asked < 5; asked += 1) {
     await page.request.post(SEND_PATH, { data: { email: anAddress("spread"), type: "sign-in" } });
   }
@@ -487,7 +466,6 @@ test("a new code sent from the code step signs in", async ({
 
   await page.getByRole("button", { name: "Send a New Code" }).click();
 
-  // The press took focus, and the field takes it back only once the new email has gone.
   await expect(codeField(page), "the new code's field did not take focus").toBeFocused();
   await expect(codeField(page), "the refused digits outlived the new code").toHaveValue("");
   await saysANewEmailWent(page, saidOfTheFirst);
@@ -518,7 +496,6 @@ test("names the wait when a new code meets the ceiling", async ({
   const email = anAddress("ceiling");
   await provision(request, { name: "Ceiling Ltd", adminEmail: email });
   await atTheCodeStep(page, email);
-  // The page sent one, so four more reach the per-email ceiling and the next is refused.
   await floodCodesTo(request, email, 4);
 
   await page.keyboard.press("Tab");
@@ -527,7 +504,6 @@ test("names the wait when a new code meets the ceiling", async ({
   await expect(listed.getByRole("term").filter({ hasText: /^e$/ })).toBeVisible();
   await keystrokesDismissed(page, listed);
 
-  // Landed once the status stops saying the first email's line; the page is read by its heading.
   const saidOfTheFirst = await page.getByRole("status").evaluate((status) => status.textContent);
   await clockTheNextKey(page, {
     at: `//main[.//*[@role='status'][string(.)!=${asXPath(saidOfTheFirst)}]]`,
@@ -629,13 +605,11 @@ test("sends a wrong code once, selected, naming two tries left", async ({ page, 
   expect(sent, "the refused code was sent again").toHaveLength(2);
 });
 
-/** A spent code leaves focus on sending another, so Enter alone asks for the code that signs in. */
 const anotherCodeSignsIn = async (page: Page, request: APIRequestContext, email: string) => {
   await expect(page.getByRole("button", { name: "Send a New Code" })).toBeFocused();
   const saidOfTheFirst = await page.getByRole("status").innerText();
 
   await page.keyboard.press("Enter");
-  // The field takes focus only once the new email has gone, so the code read next is the new one.
   await expect(codeField(page)).toBeFocused();
   await expect(codeField(page), "the spent digits outlived the new code").toHaveValue("");
   await saysANewEmailWent(page, saidOfTheFirst);
@@ -654,7 +628,6 @@ test("a third wrong code hands focus to sending another", async ({ page, request
     await expect(page.getByRole("alert")).toHaveText(triesLeft(left));
   }
   const oneLeft = await page.getByRole("alert").innerText();
-  // The api refuses the third as it did the first; the page's own count makes it the last.
   const third = authAnswering(page, SIGN_IN_PATH);
   await codeField(page).fill(notTheCode(code, 3));
   expect(await third).toMatchObject({ status: 400, code: "INVALID_OTP" });
@@ -680,10 +653,6 @@ test("an expired code reads as spent, handing focus to another", async ({ page, 
   await anotherCodeSignsIn(page, request, email);
 });
 
-/**
- * A following tab reads where to go before the other tab confirms, so an Editor, needing no second
- * factor, shows the following alone.
- */
 const anEditorOf = async (request: APIRequestContext, name: string): Promise<string> => {
   const email = anAddress("tabs");
   const who = await person(request, email, { displayName: "Tam Editor" });
@@ -726,7 +695,6 @@ test("a tab waiting on one address ignores another's sign-in", async ({
   await landedAtHome(page, "Admin");
 });
 
-/** The query client asks a failed read three times before it gives up. */
 const READ_ATTEMPTS = 3;
 
 test("a tab whose first read failed still follows a sign-in", async ({
@@ -757,7 +725,6 @@ test("a tab whose first read failed still follows a sign-in", async ({
 });
 
 test("a tab hidden through a sign-in lands once shown", async ({ page, context, request }) => {
-  // This tab never hears the announcement, so only its being shown again can land it.
   await page.addInitScript(() => {
     Reflect.deleteProperty(globalThis, "BroadcastChannel");
   });
@@ -792,7 +759,6 @@ test("a shown tab waits for a sign-in of its own", async ({ page, request }) => 
   expect(await sessionHeldBy(page), "the tab landed on the session that stood").not.toBe(standing);
 });
 
-/** A session begun before the person joined names no workspace, so the picker opens the one joined since. */
 const joinedAfterSigningIn = async (page: Page, request: APIRequestContext, name: string) => {
   const who = await signedInWithNoWorkspace(page, request, "later");
   const workspace = await provision(request, { name });

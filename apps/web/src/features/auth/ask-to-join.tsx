@@ -50,7 +50,6 @@ const unansweredOf = (failure: Error | ApiError): string => {
   return liftsInSeconds === undefined ? STOCK.tryAgain : stockWait(liftsInSeconds);
 };
 
-/** Focus is moved here once the ask lands, so the answer is what a reader meets next. */
 function RequestSent() {
   return (
     <Card id={SENT} role="alert" aria-labelledby={SENT_TITLE} tabIndex={-1} className="mt-4 p-3">
@@ -62,7 +61,6 @@ function RequestSent() {
   );
 }
 
-/** The refusal's region stands empty from the first render; the sent answer is met by focus. */
 function AskOutcome(properties: {
   readonly sent: boolean;
   readonly failure: Error | ApiError | null;
@@ -97,7 +95,6 @@ export function AskToJoin() {
 
   const ask = (event: FormEvent) => {
     event.preventDefault();
-    // The button stays enabled while asking, so the focus a click gave it is not dropped.
     if (requestAccess.isPending) return;
     setSent(false);
     requestAccess.mutate(

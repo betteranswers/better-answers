@@ -34,13 +34,11 @@ const LISTED_FROM = `Better Answers <${PRODUCTION}>`;
 
 let kept = 0;
 
-/** Minted in order, as the Worker's ids sort by arrival: a message made later lists as newer. */
 const nextId = (): string => {
   kept += 1;
   return `0000-${String(kept).padStart(4, "0")}`;
 };
 
-/** As the inbox keeps a message: to the person, from production's sender, unless overridden. */
 const stored = (raw: string, overrides: Partial<Stored> = {}): Stored => ({
   id: nextId(),
   to: [PERSON],
@@ -71,7 +69,6 @@ const notedOf = async (inbox: StandIn, overrides: Partial<Inbox> = {}) => {
   return noted;
 };
 
-/** Notes the inbox, lets `arriving` land as a Send would, then waits for the code. */
 const codeAfter = async (inbox: StandIn, ...arriving: readonly Stored[]) => {
   const noted = await notedOf(inbox);
   inbox.arrive(...arriving);
@@ -229,7 +226,6 @@ describe("noteInbox", () => {
 
   it("reads an email that lands just before the deadline", async () => {
     const inbox = await standIn();
-    // Two polls alone, the second at the deadline: the email lands between them.
     const noted = await notedOf(inbox, { deadlineMs: 1_000, pollIntervalMs: 60_000 });
     const arriving = await mail("305117");
     const answer = noted.codeSent();
@@ -287,7 +283,6 @@ describe("noteInbox", () => {
 });
 
 describe("noteInbox, judging a message's signature", () => {
-  /** Notes the inbox, lets `arriving` land, and times the wait for the code. */
   const timedAfter = async (inbox: StandIn, ...arriving: readonly Stored[]) => {
     const startedAt = Date.now();
     const answer = await codeAfter(inbox, ...arriving);
@@ -410,7 +405,6 @@ describe("noteInbox, judging a message's signature", () => {
       return publishedKeys(name, rrtype);
     };
     const noted = await notedOf(inbox, { keyLookup: slow });
-    // Signed as the sender's domain, so each key lookup reaches the slow resolver.
     const unpublished = async () =>
       stored(await signed(composed({ body: signInText("111111") }), { by: [AN_UNPUBLISHED_KEY] }));
     const candidates = await Promise.all(Array.from({ length: 12 }, unpublished));
@@ -455,7 +449,6 @@ describe("noteInbox, looking the signing key up", () => {
     const inbox = await standIn();
     const asked: string[] = [];
     const noted = await notedOf(inbox, {
-      // Every other domain's nameservers never answer.
       keyLookup: (name, rrtype) => {
         asked.push(name);
         return name === SENDERS_KEY ? publishedKeys(name, rrtype) : new Promise(() => {});
@@ -514,7 +507,6 @@ describe("noteInbox, looking the signing key up", () => {
     const startedAt = Date.now();
 
     expect(await noted.codeSent()).toEqual({ answer: "unverified" });
-    // Under the runner's own 2 s lookup timeout, so ignoring this one still fails.
     expect(Date.now() - startedAt).toBeLessThan(DEADLINE_MS + 1_000);
   });
 });

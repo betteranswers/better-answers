@@ -15,7 +15,6 @@ const aTaskLater = () =>
     setTimeout(resolve, 0);
   });
 
-/** At an address that is no page, so the wide layout has no navigation control. */
 function AtNoPage(properties: { readonly wide: boolean }) {
   const sheet = useNavigationSheet();
 

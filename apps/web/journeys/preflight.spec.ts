@@ -9,7 +9,6 @@ test("the release answers before anyone signs in", async ({ page, request }) => 
     expect(health.ok(), `the health check answered ${health.status()}`).toBe(true);
   });
 
-  // Last on a page of the product's own, which the accessibility gate audits.
   await test.step("The sign-in page", async () => {
     const opened = await page.goto("/sign-in");
     if (opened !== null) refusedByTheEdge(opened, "the sign-in page");

@@ -198,11 +198,9 @@ def unreadable_catalogue(
 def reconcile_catalogue(
     cursor: Cursor[Any], documents: Sequence[ReadDocument]
 ) -> tuple[str, ...]:
-    """Marks each document converted with its hash, key and
-    version. Its sensitivity only narrows, except that a
-    lifted verdict returns it to the Admin's own narrowing.
-    Answers the ids of the documents whose stored sensitivity
-    it changed, a NULL on either side included."""
+    """Marks documents converted; sensitivity only narrows, except a lifted verdict
+    restores the Admin's own narrowing. Answers ids whose sensitivity changed, NULL on
+    either side included."""
     moved: list[str] = []
     for document in documents:
         cursor.execute(

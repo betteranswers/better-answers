@@ -32,7 +32,6 @@ const testOptionsOf = async (workspace: string) => {
   return testOptions.parse(loaded).default.test;
 };
 
-/** Read off pnpm's workspace list, so a new workspace that takes vitest is held to these. */
 const WORKSPACES = workspacePackages().filter((workspace) =>
   readFileSync(path.join(repositoryRoot, workspace, "package.json"), "utf8").includes('"vitest"'),
 );
@@ -91,7 +90,6 @@ const vitest = runsOverThrowawayTree({
 
 const KINDS = ["each", "template", "loop"] as const;
 
-/** `<kind> word1 … word<count - 1>`, its last word filled in only as the test runs. */
 const renderedTitle = (kind: string, count: number): string => `${kind} ${wordsOf(count - 1)}`;
 
 const renderedSuite = (count: number): string => {
@@ -121,12 +119,10 @@ describe("the rendered test-title hold", () => {
     expect(statusesOf(10)).toEqual({ each: "passed", template: "passed", loop: "passed" });
   });
 
-  it("prints the rules file and the title it refuses", () => {
+  it("prints the rule and the title it refuses", () => {
     const outcomes = outcomesIn(vitest(suite(`it(${JSON.stringify(ELEVEN)}, () => {});\n`)));
 
-    expect(outcomes.get(ELEVEN)?.message).toContain(
-      `(the root \`CODING_STANDARDS.md\`): "${ELEVEN}"`,
-    );
+    expect(outcomes.get(ELEVEN)?.message).toContain(`never "should": "${ELEVEN}"`);
   });
 
   it("fails a short title holding the forbidden word", () => {

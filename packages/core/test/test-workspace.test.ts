@@ -74,7 +74,6 @@ const peopleOn = async (fixture: Fixture) =>
     )
   ).rows;
 
-/** A fixture made fresh, and the invented people it holds, in address order. */
 const inventedMade = async () => {
   const fixture = aFixture();
   answeredValue(await ensured(fixture));
@@ -149,7 +148,6 @@ const isWaitingOnTheRoleRead = async (): Promise<boolean> => {
   return (found.rowCount ?? 0) > 0;
 };
 
-/** As the page does it: the test Admin, holding their own member row. */
 const asTheAdmin = async <T>(
   fixture: Fixture,
   workspaceId: WorkspaceId,
@@ -166,7 +164,6 @@ const asTheAdmin = async <T>(
   return heldAs(workspace, adminUserId, work);
 };
 
-/** The Admin moves `personId` to Editor, from a session confirmed now. */
 const theRoleOf = async (fixture: Fixture, workspaceId: WorkspaceId, personId: UserId) =>
   answeredValue(
     await asTheAdmin(fixture, workspaceId, (principal, tx) =>

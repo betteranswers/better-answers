@@ -4,8 +4,6 @@ export const WORKSPACE_REFUSALS = {
   "no-such-user": "absent",
   "no-such-workspace": "absent",
 
-  // The row a live session stands on, gone under it: the remedy is a fresh sign-in, never a hunt
-  // for something the reader never named.
   "workspace-gone": "unauthenticated",
   "person-gone": "unauthenticated",
   "session-gone": "unauthenticated",
@@ -15,7 +13,6 @@ export const WORKSPACE_REFUSALS = {
   "already-a-member": "conflict",
   "person-exists": "conflict",
 
-  // A person is credited by name wherever they act, so nobody is let in without one.
   "no-display-name": "precondition",
 
   "display-name-empty": "malformed",
@@ -30,25 +27,19 @@ export const WORKSPACE_REFUSALS = {
   "restore-code-wrong": "absent",
   "passkey-not-yours": "forbidden",
 
-  // Only the session that spent a recovery code or accepted a restore code may replace the factors.
   "setup-not-granted": "precondition",
 
-  // Restored by the operator: only their restore code opens setup, never what the mailbox can reach.
   "restore-code-needed": "precondition",
 
   "passkey-name-empty": "malformed",
   "passkey-name-too-long": "malformed",
 
-  // Asked for a first set while one stands: a page read before it was made would void it unasked.
   "recovery-codes-held": "conflict",
 
-  // Only a model the DPIA names a sub-processor for, priced before it is called, may be chosen.
   "no-sub-processor": "precondition",
   "no-model-price": "precondition",
-  // The index's vectors are the embedding model's: another could not read them.
   "fixed-model-choice": "inapplicable",
 
-  // An Admin, or the operator, may hold no fewer than one: removing it waits on adding another.
   "last-second-factor": "precondition",
 } as const satisfies Vocabulary;
 

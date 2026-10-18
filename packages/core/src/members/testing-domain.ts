@@ -9,7 +9,6 @@ export const OFF_TESTING_DOMAIN =
 
 const MARKED = "SELECT testing_domain FROM test_workspace_mark WHERE workspace_id = $1";
 
-/** Undefined for an unmarked workspace, which invites any address. */
 export const testingDomainOf = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -18,7 +17,6 @@ export const testingDomainOf = async (
   return marked.rows[0]?.testing_domain;
 };
 
-/** The part after the last `@`, as the mark holds it, so a subdomain is another domain. */
 export const isOffDomain = (domain: string | undefined, address: string): boolean =>
   domain !== undefined && address.slice(address.lastIndexOf("@") + 1).toLowerCase() !== domain;
 
@@ -26,7 +24,6 @@ const WAITING_ADDRESSES = `SELECT id, lower(email) AS address FROM invitation
                             WHERE workspace_id = $1 AND id = ANY($2::text[]) AND status = $3
                             ORDER BY id`;
 
-/** Read unlocked, so a resend still takes its counters before any invitation row it holds. */
 export const invitationsOffDomain = async (
   admin: AdminUserPrincipal,
   tx: Tx,

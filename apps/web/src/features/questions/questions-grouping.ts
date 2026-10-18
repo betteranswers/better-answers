@@ -1,6 +1,5 @@
 import type { AskedRecord } from "./questions-api.ts";
 
-/** Null is the group for none: a refusal that matched no concept the reader may read. */
 type RefusalGroup = {
   readonly collection: string | null;
   readonly records: readonly AskedRecord[];
@@ -12,7 +11,6 @@ export type Grouped = {
   readonly notAnswered: readonly RefusalGroup[];
 };
 
-/** A flag closed after its page was served lets a later page serve its record again; the later copy wins. */
 export const latestOfEach = (served: readonly AskedRecord[]): readonly AskedRecord[] => [
   ...new Map(served.map((record) => [record.id, record])).values(),
 ];
@@ -38,7 +36,6 @@ const byRefusalGroup = (refusals: readonly AskedRecord[]): readonly RefusalGroup
     .toSorted(byCollection);
 };
 
-/** Sorted here too, so a record whose flag just closed takes its place before the read answers. */
 export const groupedForReading = (records: readonly AskedRecord[]): Grouped => {
   const sorted = records.toSorted(newestFirst);
   const unflagged = sorted.filter((record) => !record.flagged);

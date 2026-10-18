@@ -75,7 +75,6 @@ const imageBody = (pair: string): string =>
     layers: [{ mediaType: LAYER, ...blob(pair.split("").reverse().join(""), 29_000_000) }],
   });
 
-/** Shaped as a provenance push's untagged manifest in the backup package. */
 const ATTESTATION_BODY = JSON.stringify({
   schemaVersion: 2,
   mediaType: OCI_MANIFEST,
@@ -517,7 +516,6 @@ const startOf = (file: string): { readonly minute: number; readonly weekly: stri
   return { minute: Number(hour) * 60 + Number(minute), weekly: rest.join(" ") };
 };
 
-/** A nightly mutation run takes about two and a half hours, and a scan's job is held to thirty minutes. */
 const MUTATION_MINUTES = 150;
 const SCAN_MINUTES = 30;
 

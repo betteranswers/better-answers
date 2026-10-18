@@ -41,7 +41,6 @@ const MARK_ACTIONS = declareActions("platform", {
 
 const TEST_WORKSPACE_NAME = "Test workspace";
 
-/** Enough that a list paged at 25 runs to three pages; the journeys read the same number. */
 export { INVENTED_MEMBERS };
 
 const TESTING_DOMAIN = boundarySchemas.testWorkspaceMark.insert.shape.testingDomain;
@@ -62,7 +61,6 @@ export type TestWorkspaceInput = {
 
 type AddressWord = MemberRefusal<"off-testing-domain" | "operator-marked" | "member-elsewhere">;
 
-/** Names the address, which only the operator running the fixture reads. */
 type AddressRefused = { readonly word: AddressWord; readonly address: string };
 
 type ShortNameTaken = Extract<keyof typeof WORKSPACE_REFUSALS, "slug-taken">;
@@ -82,7 +80,6 @@ type MembersEnsured = {
   readonly membersAdded: number;
   readonly rolesReset: number;
 
-  /** On the testing domain and outside the fixture: reported, never removed. */
   readonly unexpected: readonly { readonly address: string; readonly role: Role }[];
 };
 
@@ -155,7 +152,6 @@ const fixtureOf = (input: TestWorkspaceInput): Parsed<Fixture> => {
   const others = [...people.value.others, ...inventedOn(testingDomain.data)];
   const everyone = [people.value.admin, ...others];
   const addresses = new Set(everyone.map((one) => one.address));
-  // A long domain can pass its own check yet make an invented address too long; refuse before any write.
   const wellFormed = everyone.every((one) => emailAddressOf(one.address) !== undefined);
   if (!wellFormed || addresses.size !== everyone.length) return err(MALFORMED);
   return ok({
@@ -182,12 +178,10 @@ type MemberStanding = z.output<typeof MEMBER_ROW>;
 type Standing = {
   readonly workspaceId: WorkspaceId | undefined;
 
-  /** By address, each fixture person who already exists, with every workspace they belong to. */
   readonly people: ReadonlyMap<string, PersonStanding>;
 
   readonly members: readonly MemberStanding[];
 
-  /** Accepting never reads the mark, so an off-domain address here could still join once marked. */
   readonly invited: readonly string[];
 };
 
@@ -246,7 +240,6 @@ const standingOf = (
     };
   });
 
-/** In the fixture's order, so the first person a refusal could name is the one named. */
 const refusalOf = (
   fixture: Fixture,
   standing: Standing,
@@ -386,7 +379,6 @@ const driftedAmong = (
     return [{ personId: one.id, previousRole, role: one.role }];
   });
 
-/** The Admin comes first, so no reset leaves the workspace without one. */
 const membersEnsured = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -414,10 +406,6 @@ const membersEnsured = async (
   });
 };
 
-/**
- * Each step is an existing action with its own transaction; a failure leaves what landed, and a
- * re-run repairs from there.
- */
 const fixtureWritten = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -457,10 +445,8 @@ const fixtureWritten = async (
 };
 
 /**
- * Creates or repairs the test workspace, its mark, three test people and 51 invented Viewers.
- * Before writing anything it refuses an address off the testing domain, the operator's or a
- * member's elsewhere, and a short name whose workspace holds a member or waiting invitation off it.
- * It removes nobody.
+ * Creates or repairs the test workspace, its mark, three test people and 51 invented Viewers. It
+ * removes nobody.
  */
 export const ensureTestWorkspace = async (
   platform: PlatformPrincipal,

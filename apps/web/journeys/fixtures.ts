@@ -17,7 +17,6 @@ import {
 import { refusedByTheEdge, signIn, type CodeSource } from "./sign-in.ts";
 
 type JourneyFixtures = {
-  /** The test person a journey signs in as. The preflight names none, and signs nobody in. */
   readonly role: Role | undefined;
   readonly signedIn: void;
 };
@@ -25,7 +24,6 @@ type JourneyFixtures = {
 const ADDRESS = z.email();
 const SENDER = z.string().min(1);
 
-/** The reader adds each path itself, and sends the key nowhere but over https. */
 const INBOX_URL = z
   .url({ protocol: /^https$/ })
   .transform((value) => new URL(value))
@@ -33,14 +31,12 @@ const INBOX_URL = z
 const CODE_SOURCES = ["inbox", "harness"] as const;
 const CODE_SOURCE = z.enum(CODE_SOURCES);
 
-/** The setting is named and its value never is: the addresses are secrets. */
 const addressOf = (role: Role): string => {
   const name = `JOURNEYS_${role.toUpperCase()}_EMAIL`;
   const parsed = ADDRESS.safeParse(process.env[name]);
   return parsed.success ? parsed.data : couldNotRun(`${name} is not set to an address`);
 };
 
-/** Each test person's address, by role. A caller never prints one. */
 export const theTestPeople = () => ({
   Admin: addressOf("Admin"),
   Editor: addressOf("Editor"),
@@ -49,13 +45,10 @@ export const theTestPeople = () => ({
 
 type Reader = {
   readonly source: CodeSource;
-  /** Whether the code source can hold a code at all, asked once before anyone signs in. */
   readonly stands: () => Promise<boolean>;
-  /** Where the test Admin's authenticator key comes from, beside the codes. */
   readonly factorKey: (address: string) => FactorKey;
 };
 
-/** The URL's value is never named: it is a secret, as the addresses are. */
 const inboxReader = (): Reader => {
   const sender = SENDER.safeParse(process.env["JOURNEYS_SENDER"]);
   if (!sender.success) return couldNotRun("JOURNEYS_SENDER is not set");
@@ -68,7 +61,6 @@ const inboxReader = (): Reader => {
   };
 };
 
-/** By hand, against the browser suite's api, its capture holds the code nobody is mailed. */
 const harnessReader = (request: APIRequestContext): Reader => ({
   source: async (address) => ({
     answer: "noted",
@@ -88,10 +80,6 @@ const readerOf = (request: APIRequestContext): Reader => {
   return named.data === "inbox" ? inboxReader() : harnessReader(request);
 };
 
-/**
- * Before anyone signs in, so a missing setting or an inbox that is silent or cannot store spends no
- * sign-in. Neither check sends anything.
- */
 export const theSettingsAndInboxHold = (request: APIRequestContext): Promise<void> =>
   suite.step("Read the journeys' settings and note the test inbox", async () => {
     const reader = readerOf(request);
@@ -100,7 +88,6 @@ export const theSettingsAndInboxHold = (request: APIRequestContext): Promise<voi
     if (!(await reader.stands())) couldNotRun("the test inbox could not store a message");
   });
 
-/** Through the context's own cookies, so it holds when the page does not. */
 const signedOut = (context: BrowserContext, baseURL: string | undefined): Promise<void> =>
   suite.step("Sign out on the server", async () => {
     const signOut = new URL("/sign-out", baseURL);
@@ -112,10 +99,6 @@ const signedOut = (context: BrowserContext, baseURL: string | undefined): Promis
     expect(answered.ok(), `signing out answered ${answered.status()}`).toBe(true);
   });
 
-/**
- * The browser suite's `test`, with no client address of its own, since production's edge sets
- * one. A journey names its person with `test.use({ role })`.
- */
 export const test = suite.extend<JourneyFixtures>({
   role: [undefined, { option: true }],
 
@@ -145,7 +128,6 @@ export const test = suite.extend<JourneyFixtures>({
           () => {
             const named = addressOf(role);
             const reader = readerOf(request);
-            // Only the Admin must confirm a second factor; asked here, so a missing key spends no code.
             const key = role === "Admin" ? reader.factorKey(named) : undefined;
             return { address: named, source: reader.source, factorKey: key };
           },

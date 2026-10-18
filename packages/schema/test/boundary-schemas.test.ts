@@ -59,10 +59,8 @@ const MEMBER_ERASURE_ID = "01J6YYYYYYYYYYYYYYYYYYYYY3";
 const QUESTION_RECORD_ID = "01J6QQQQQQQQQQQQQQQQQQQQQQ";
 const DRAFTED_RECORD_ID = "01J6QQQQQQQQQQQQQQQQQQQQQ2";
 
-/** Bytes of a frame's length that seal nothing: no key was ever behind them. */
 const A_SEALED_FRAME = new Uint8Array(40).fill(7);
 
-/** Inside the month the migration made a content partition for, which is the month it ran in. */
 const ASKED_THIS_MONTH = new Date();
 
 const DUE = new Date("2026-10-01T00:00:00Z");
@@ -140,8 +138,8 @@ const acceptedRows = {
       purpose: "judging",
       modelChoiceId: "model-choice-judge",
       model: "claude-sonnet-5-5",
-      tokensIn: 40_000,
-      tokensOut: 2_000,
+      mostTokensIn: 40_000,
+      mostTokensOut: 2_000,
       gbpPerMillionIn: "3",
       gbpPerMillionOut: "15",
       reservedGbp: "0.15",
@@ -1346,6 +1344,27 @@ describe("what a finding may hold", () => {
   });
 });
 
+describe("what a flag on an answer holds", () => {
+  it("names no one who closed it: the audit event does", () => {
+    expect(Object.keys(boundarySchemas.questionFeedback.select.shape).toSorted()).toEqual(
+      [
+        "workspaceId",
+        "id",
+        "recordId",
+        "givenAt",
+        "givenBy",
+        "verdict",
+        "reason",
+        "note",
+        "disputedSentence",
+        "disputedConcept",
+        "closedAs",
+        "closedAt",
+      ].toSorted(),
+    );
+  });
+});
+
 describe("the rules in force a connected source carries", () => {
   const asKey = (tier: string) => tier.replaceAll("-", "_");
   const keyed: readonly string[] = RULES_IN_FORCE_KEYS;
@@ -1543,7 +1562,6 @@ describe("5 — the inferred type is pinned", () => {
     (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
   type NoneOf<T extends never> = T;
 
-  // Spelled out, not read off `ids`: an id's type comes from the column it is pinned against.
   type Branded<Brand extends string> = string & z.core.$brand<Brand>;
   type WorkspaceId = Branded<"WorkspaceId">;
   type UserId = Branded<"UserId">;
@@ -1572,7 +1590,6 @@ describe("5 — the inferred type is pinned", () => {
     }[keyof typeof ids]
   >;
 
-  // The wrapper's type for an unrefined jsonb column, read off a table outside the registry.
   const jsonProbe = createSelectSchema(pgTable("json_probe", { value: jsonb("value").notNull() }));
   type UnrefinedJson = z.infer<typeof jsonProbe>["value"];
 
@@ -1640,8 +1657,8 @@ describe("5 — the inferred type is pinned", () => {
       purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
       modelChoiceId: string;
       model: string;
-      tokensIn: number;
-      tokensOut: number;
+      mostTokensIn: number;
+      mostTokensOut: number;
       gbpPerMillionIn: string;
       gbpPerMillionOut: string;
       reservedGbp: string;

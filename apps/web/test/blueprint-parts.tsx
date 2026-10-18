@@ -2,7 +2,6 @@ import { DotPattern, GridPattern, MarkedRegion } from "@/shared/blueprint.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card.tsx";
 
-/** Every blueprint part on one board, for the browser suite to measure as the served build draws it. */
 export function BlueprintParts() {
   return (
     <GridPattern>

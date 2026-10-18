@@ -46,7 +46,6 @@ export type Citation = {
   readonly locator: string;
 };
 
-/** Recomputes no sensitivity: the caller derives it once the citations stand. */
 export const replaceCitations = async (
   principal: Principal,
   tx: Tx,
@@ -94,11 +93,6 @@ const restingOn = (row: SourcedVisibilityRow): readonly Visibility[] => [
   ...(row.published ? [] : [RESTRICTED_TO_ADMINS]),
 ];
 
-/**
- * Derives the sensitivity from the connected sources and documents the concept cites, or from `citing` in
- * place of its standing citations. `alsoOn` adds sensitivities, `onTheRow` adds its index row locked
- * for update, and an override wins outright. Share-locks each connected source it reads.
- */
 export const conceptVisibilityFrom = async (
   principal: Principal,
   tx: Tx,
@@ -129,8 +123,6 @@ export const conceptVisibilityFrom = async (
             WHERE d.workspace_id = ${scopeClause(1)} AND d.id = ANY($2::text[])`,
           parameters: [scopeParameter(principal), [...new Set(concept.citing)]],
         };
-  // A statement that waited on a lock still reads unlocked rows at its first snapshot, so the
-  // document's sensitivity is read in the next.
   await tx.query(`SELECT 1 ${rowsCited.clause} FOR SHARE OF b`, rowsCited.parameters);
   const connectedSources = await tx.query<SourcedVisibilityRow>(
     `SELECT b.sensitivity, b.audience, b.audience_groups, d.sensitivity AS document_sensitivity,
@@ -140,10 +132,6 @@ export const conceptVisibilityFrom = async (
   );
   const override = await overrideOf(principal, tx, concept.iri);
 
-  /**
-   * After the connected sources, never before: taking this row first is the one order that deadlocks
-   * with a narrowing.
-   */
   const row =
     concept.onTheRow === true
       ? await tx.query<VisibilityRow>(
@@ -166,10 +154,6 @@ export const conceptVisibilityFrom = async (
 
 type IndexVisibilityRow = VisibilityRow & { readonly workspace_id: string; readonly kind: string };
 
-/**
- * Every action that cascades takes this at its head; without it two narrowings each hold what
- * the other wants.
- */
 const serialisingCascades = async (principal: Principal, tx: Tx): Promise<void> => {
   await tx.query(
     `SELECT pg_advisory_xact_lock(hashtext('visibility-cascade'), hashtext(${scopeClause(1)}))`,
@@ -177,10 +161,6 @@ const serialisingCascades = async (principal: Principal, tx: Tx): Promise<void> 
   );
 };
 
-/**
- * Row first, citations after, the opposite order to conceptVisibilityFrom: waiting on the row
- * is what makes a re-write's citations the ones read.
- */
 const recomputeConceptVisibility = async (
   principal: Principal,
   tx: Tx,
@@ -212,10 +192,6 @@ const recomputeConceptVisibility = async (
   return visibility;
 };
 
-/**
- * Recomputes each indexed concept citing the connected source's documents, or only those among
- * `documentIds`, and returns every one, whether or not its sensitivity moved.
- */
 const recomputeVisibilitySourcedFrom = async (
   principal: Principal,
   tx: Tx,
@@ -241,10 +217,6 @@ const recomputeVisibilitySourcedFrom = async (
   return recomputed;
 };
 
-/**
- * The concepts citing a connected source's documents, all of them or only `documentIds`, or the one
- * concept an override names.
- */
 type CascadeTarget =
   | {
       readonly connectedSourceId: string;
@@ -276,11 +248,6 @@ const rederived = async (principal: Principal, tx: Tx, target: CascadeTarget) =>
   return { concepts, writeUps };
 };
 
-/**
- * Takes the workspace's cascade lock, runs `write`, then recomputes the target's concepts and every
- * write-up including them. A refusal from `write` comes back as it is, with nothing recomputed. The
- * caller's own checks belong inside `write`, after the lock and before any row it locks.
- */
 export const cascadingVisibility = async <T, E>(
   principal: Principal,
   tx: Tx,

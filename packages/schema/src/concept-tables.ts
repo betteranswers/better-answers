@@ -44,7 +44,13 @@ export const VERIFICATION_CITATION_FIX_ORIGIN =
 export const VERIFICATION_ERASURE_ORIGIN =
   "erasure-rewrite" satisfies (typeof VERIFICATION_ORIGINS)[number];
 
-export { CONCEPT_IRI_PREFIX, conceptIriOf, IRI, type CitedSource } from "./concept-file.ts";
+export {
+  CONCEPT_IRI,
+  CONCEPT_IRI_PREFIX,
+  conceptIriOf,
+  IRI,
+  type CitedSource,
+} from "./concept-file.ts";
 
 export const GIT_SHA = /^[0-9a-f]{40}$/;
 
@@ -72,9 +78,8 @@ const citedByKeys = (entry: SourceEntry): CitedSource | undefined => {
 };
 
 /**
- * Reads one `sources` entry: a string splits at its last `#`, and a record reads its `resource`
- * and `locator` keys. Undefined means the resource is missing or blank; it is trimmed, the
- * locator never. A record's locator is stringified, and one not given is null.
+ * A string splits at its last `#`. Undefined means the resource is missing or blank; it is trimmed,
+ * the locator never.
  */
 export const citedSourceOf = (entry: SourceEntry | string): CitedSource | undefined =>
   typeof entry === "string" ? citedByText(entry) : citedByKeys(entry);
@@ -96,9 +101,8 @@ export const citedSourcesOf = (value: SourcesValue): readonly CitedSource[] =>
   });
 
 /**
- * A URL, or a resource starting `//`, comes back unchanged. Any other resolves against the root
- * when it starts with `/`, else against the directory of `from`, the root when `from` holds no `/`.
- * The answer is rooted, with `.` and `..` folded; `..` stops at the root.
+ * A URL, or a resource starting `//`, comes back unchanged. Others resolve against the root when
+ * starting `/`, else against `from`'s directory.
  */
 export const resolvedResource = (resource: string, from: string): string => {
   if (resource.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(resource)) return resource;
@@ -128,7 +132,6 @@ export const CONTENT_HASH = /^[0-9a-f]{64}$/;
  */
 export const CONCEPT_FRONTMATTER_MAX = 64_000;
 
-/** The body's cap: refused at the write's boundary and held by a CHECK. */
 export const CONCEPT_BODY_MAX = 100_000;
 
 export const conceptIdentity = withRLS(
@@ -202,7 +205,6 @@ const CONCEPT_SEARCH = [
   `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, body), 'C')`,
 ].join(" || ");
 
-/** The folder directly under `knowledge/`, and null for a file that sits in none. */
 const CONCEPT_COLLECTION = `substring(path from '^knowledge/([^/]+)/')`;
 
 export const conceptIndex = withRLS(

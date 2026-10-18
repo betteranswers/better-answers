@@ -36,8 +36,7 @@ export type ObjectDoor = {
 export type ObjectStoreRefusal = "endpoint-not-a-url" | "no-bucket";
 
 /**
- * Reaches no store: it checks only that the bucket is named and the endpoint parses as a URL, so a
- * wrong address or credential shows at the first call.
+ * Reaches no store: it checks only that the bucket is named and the endpoint parses as a URL.
  */
 export const openObjects = (
   settings: ObjectStoreSettings,
@@ -173,7 +172,6 @@ const storedInside = async (
   if (!walked.ok) return err(walked.error);
   const dated: StoredObject[] = [];
   for (const entry of walked.value) {
-    // A stamp the store withheld leaves the age unknowable, which is all this listing is for.
     if (entry.storedAt !== undefined) dated.push({ key: entry.key, storedAt: entry.storedAt });
   }
   return ok(dated);
@@ -206,7 +204,7 @@ export const getObject = (
 
 /**
  * Every key in the principal's workspace that starts with `under`, relative to the workspace.
- * `under` matches as a plain prefix: `docs` also lists `docs2/a`, and `docs/` does not.
+ * `under` matches as a plain prefix.
  */
 export const listObjects = (
   principal: UserPrincipal,
@@ -214,7 +212,6 @@ export const listObjects = (
   under: string,
 ): Promise<Result<readonly string[], KeyRefusal>> => listInside(door, prefixOf(principal), under);
 
-/** As putObject, in the platform's own space outside every workspace. */
 export const putPlatformObject = (
   platform: PlatformPrincipal,
   door: ObjectDoor,
@@ -222,7 +219,6 @@ export const putPlatformObject = (
   body: ReadableStream<Uint8Array>,
 ): Promise<Result<void, KeyRefusal>> => putInside(door, PLATFORM_PREFIX, key, body);
 
-/** As getObject, in the platform's own space outside every workspace. */
 export const getPlatformObject = (
   platform: PlatformPrincipal,
   door: ObjectDoor,
@@ -230,17 +226,12 @@ export const getPlatformObject = (
 ): Promise<Result<ReadableStream<Uint8Array>, ReadRefusal>> =>
   getInside(door, PLATFORM_PREFIX, key);
 
-/** As listObjects, in the platform's own space outside every workspace. */
 export const listPlatformObjects = (
   platform: PlatformPrincipal,
   door: ObjectDoor,
   under: string,
 ): Promise<Result<readonly string[], KeyRefusal>> => listInside(door, PLATFORM_PREFIX, under);
 
-/**
- * The platform's listing of one workspace's objects under `under`, each with when it was stored.
- * An object whose stamp the store withheld is left out.
- */
 export const listWorkspaceObjects = (
   platform: PlatformPrincipal,
   door: ObjectDoor,

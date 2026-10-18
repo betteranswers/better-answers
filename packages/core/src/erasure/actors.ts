@@ -15,10 +15,6 @@ const REWRITE_THE_COMMITS = `UPDATE bundle_commit SET actor = $3
 const REWRITE_THE_VERIFICATIONS = `UPDATE concept_verification SET actor = $3
    WHERE workspace_id = $1 AND actor = ANY($2)`;
 
-/**
- * Rewrites the person's actor id on the commit and verification rows to the erasure pseudonym,
- * in this workspace alone and in the caller's transaction. The audit log keeps the person id.
- */
 export const sweepTheActors = async (
   tx: Tx,
   subject: {
@@ -33,7 +29,6 @@ export const sweepTheActors = async (
   return { commits: commits.rowCount ?? 0, verifications: verifications.rowCount ?? 0 };
 };
 
-/** As sweepTheActors, in one transaction of its own. Does nothing where no person is named. */
 export const eraseFromTheActors = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

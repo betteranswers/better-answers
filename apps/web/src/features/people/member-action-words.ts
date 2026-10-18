@@ -61,11 +61,9 @@ const membersTitled = (count: number): string => counted(count, "Member", "Membe
 
 const membersHave = (count: number): string => counted(count, "member has", "members have");
 
-/** A bulk action that changed nobody says so, and counts no success. */
 const changedSaid = (changed: number, none: string, done: string): string =>
   changed === 0 ? none : `${membersHave(changed)} been ${done} successfully.`;
 
-/** A row whose change was already true is counted, never refused. */
 const andAlready = (skipped: number, already: string): string =>
   skipped === 0 ? "" : ` ${String(skipped)} ${skipped === 1 ? "was" : "were"} ${already}.`;
 

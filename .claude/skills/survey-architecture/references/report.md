@@ -28,7 +28,7 @@ Use the words in `CONCEPTS.md` for the product's concepts, and the slice and doo
 
 - **Files:** the files and modules involved.
 - **Problem:** the friction, in terms of what is hard to change or to test.
-- **Rule:** the heading of the rule it breaks, quoted from `CODING_STANDARDS.md` or the standards file beside the area.
+- **Rule:** the rule or principle it breaks, quoted from `CODING_STANDARDS.md`, the `AGENTS.md` beside the area, or a pstack principle.
 - **Proposal:** the shape it would take, in plain words.
 - **Before and after:** a diagram of each, side by side, wherever a picture helps the decision.
 - **Test note:** from the walk.

@@ -38,7 +38,6 @@ const SEARCH_LABEL = "Search by name";
 
 const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.group);
 
-/** A row is a group, or a name asked for whose group the api has not answered yet. */
 type GroupRow = {
   readonly key: string;
   readonly name: string;
@@ -69,12 +68,10 @@ const column = createColumnHelper<typeof features, GroupRow>();
 type GroupActions = {
   readonly open: (groupId: string) => void;
   readonly focusedOn: (groupId: string) => void;
-  /** The group just created: its button takes focus as its row arrives, once. */
   readonly landOn: string | undefined;
   readonly landed: (button: HTMLButtonElement | null) => void;
 };
 
-/** Read by each cell, so a change of what the page does leaves the columns, and their cells, standing. */
 const GroupActionsContext = createContext<GroupActions | undefined>(undefined);
 
 function GroupCell(properties: { readonly row: GroupRow }) {
@@ -129,7 +126,6 @@ const saidOfCount = (shown: number, total: number, search: string): string =>
 
 type Opened = { readonly groupId: string; readonly at: GroupOpenedAt };
 
-/** Read once the groups are listed: sooner, it rides the request a switch's follow waits on. */
 function MembersRead() {
   useMembers();
   return null;
@@ -147,7 +143,6 @@ function GroupsList(properties: { readonly headingId: string }) {
   const [outcome, setOutcome] = useState<Outcome>();
   const [landOn, setLandOn] = useState<string>();
   const deleteGroup = useDeleteGroup();
-  // Set before the deleted row leaves the cache, so nothing hands focus to it meanwhile.
   const closingOnADeletion = useRef(false);
 
   const rows = useMemo(() => rowsOf(read.data ?? [], pending), [read.data, pending]);
@@ -160,7 +155,6 @@ function GroupsList(properties: { readonly headingId: string }) {
     },
     focusedOn: setInFocus,
     landOn,
-    // Cleared as the button takes focus, so the row's later remounts under a search take none.
     landed: (button) => {
       if (button === null) return;
       button.focus();
@@ -178,13 +172,11 @@ function GroupsList(properties: { readonly headingId: string }) {
   const groupOf = (groupId: string | undefined) =>
     (read.data ?? []).find((group) => group.id === groupId);
 
-  /** A row the search hides, or that another Admin deleted meanwhile, has nothing to land on. */
   const landOnOrHeading = (elementId: string | undefined) => {
     const target = elementId === undefined ? null : document.getElementById(elementId);
     (target ?? heading.current)?.focus();
   };
 
-  /** A letter pressed outside the list still needs a group, so the one last in focus stands. */
   const openInFocus = (at: GroupOpenedAt) => {
     const group = groupOf(inFocus);
     setOutcome(group === undefined ? NOTHING_IN_FOCUS : undefined);
@@ -203,7 +195,6 @@ function GroupsList(properties: { readonly headingId: string }) {
     openInFocus("delete");
   });
 
-  /** A name the api has not answered yet has no group to act on. */
   const rowMenuOf = (row: GroupRow) =>
     row.group === undefined ? null : (
       <RowMenu

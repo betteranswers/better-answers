@@ -40,7 +40,6 @@ import { type GatedSessionReader, PENDING_PROCEDURES, refusalFor } from "../seco
 type TrpcContext = {
   readonly doors: Doors;
   readonly modelDoors: ModelDoors;
-  /** The longest an answer's stream stays quiet before it sends a keep-alive. */
   readonly askKeepAliveMs: number;
   readonly clock: Clock;
   readonly readSession: GatedSessionReader;
@@ -60,10 +59,6 @@ type StandardParser<Input, Output> = {
   };
 };
 
-/**
- * A refusal rides through as the input too, so a malformed input crosses, and is logged, where
- * every other refusal is.
- */
 export const parsedBy = <Schema extends z.ZodType>(
   schema: Schema,
 ): StandardParser<z.input<Schema>, Result<z.output<Schema>, Malformed>> => ({
@@ -80,7 +75,6 @@ export const given = <Input, Value, Refused>(
 ): Promise<Result<Value, Refused | Malformed>> =>
   parsed.ok ? run(parsed.value) : Promise.resolve(err(parsed.error));
 
-/** The seven classes sort a word by what its caller can do, which is why each falls on one status. */
 const CODE_OF_CLASS = {
   unauthenticated: "UNAUTHORIZED",
   forbidden: "FORBIDDEN",
@@ -116,10 +110,6 @@ const throttled = (log: Logger, action: string, met: CeilingMet): TRPCError => {
   });
 };
 
-/**
- * Throws a TRPCError for a refusal, a ceiling met or a failure. A rejection is caught here, not by
- * tRPC, so it is logged once.
- */
 export const crossing = async <Value>(
   ctx: { readonly log: Logger },
   action: string,
@@ -139,10 +129,6 @@ type InTheTransaction = {
   readonly tx: Tx;
 };
 
-/**
- * Answers a procedure with one action, as the resolved member in its transaction. The action's function
- * name labels its logs; never pass an anonymous one.
- */
 export const answeredBy =
   <Input, Value>(
     action: (
@@ -184,7 +170,6 @@ const OPERATOR_RESOLVER = "withOperator";
 
 type Session = NonNullable<Awaited<ReturnType<GatedSessionReader>>>;
 
-/** Every root a procedure passes through: a pending session reaches only the pending set. */
 const sessionOf = async (ctx: TrpcContext, path: string): Promise<Session> => {
   const read = await attempt(() => ctx.readSession(ctx.headers));
 
@@ -203,10 +188,8 @@ const claimsOf = async (ctx: TrpcContext, path: string): Promise<Claims> => {
   return claims;
 };
 
-/** The read that tells a tab where the session is, so a tab left behind can always learn it. */
 const MEMBER_READ = "session.member";
 
-/** An action must name the session's workspace; a read from a tab holding no member yet names none. */
 const leftBehind = (
   held: string | null,
   claims: Claims,
@@ -217,10 +200,6 @@ const leftBehind = (
   return path !== MEMBER_READ && held !== null && held !== claims.workspaceId;
 };
 
-/**
- * One browser holds one session, so a tab left behind by a switch would act in, or draw rows from,
- * the session's new workspace.
- */
 const claimsInTheTabsWorkspace = async (
   ctx: TrpcContext,
   path: string,
@@ -240,7 +219,6 @@ const settled = <Ran>(
   resolved: Result<Result<Ran, RefusalAnswer>, Error>,
 ): Ran => {
   if (!resolved.ok) {
-    // The procedure's own answer has crossed already; logging it here would say it twice.
     if (resolved.error instanceof TRPCError) throw resolved.error;
     throw failed(ctx.log, resolver, resolved.error);
   }
@@ -261,7 +239,6 @@ const thrownIfFailed = <
   return ran;
 };
 
-/** Past the ceiling the call answers 429 and when to ask again. */
 const consumeCeiling = async (
   ctx: Pick<TrpcContext, "doors" | "clock" | "log">,
   path: string,
@@ -277,10 +254,8 @@ const consumeCeiling = async (
   }
 };
 
-/** One count per person that every procedure built on the road spends. */
 export type RoadCeiling = { readonly budget: string; readonly rule: CounterRule };
 
-/** The count comes before the transaction, so a call held at its ceiling holds no connection. */
 const claimsCounted = async (
   ctx: TrpcContext,
   path: string,
@@ -310,16 +285,11 @@ const inTheResolversTransaction = (resolve: typeof withPrincipal, ceiling?: Road
 
 export const queryProcedure = inTheResolversTransaction(withPrincipalRead);
 
-/** As queryProcedure, its procedures counted together against `ceiling`. */
 export const queryCeiling = (ceiling: RoadCeiling) =>
   inTheResolversTransaction(withPrincipalRead, ceiling);
 
 export const mutationProcedure = inTheResolversTransaction(withHeldPrincipal);
 
-/**
- * A Principal outlives the transaction that resolved it only here; never the request, and the
- * action's own door re-judges it.
- */
 const onItsOwnTransactions = (ceiling?: RoadCeiling) =>
   trpc.procedure.use(async ({ ctx, path, type, next }) => {
     const claims = await claimsCounted(ctx, path, type, ceiling);
@@ -333,25 +303,18 @@ const onItsOwnTransactions = (ceiling?: RoadCeiling) =>
     return next({ ctx: { principal: resolved.value.value, doors: ctx.doors } });
   });
 
-/** What a procedure on the own-transaction road is handed: the member, and no transaction. */
 export type AskingContext = TrpcContext & { readonly principal: UserPrincipal };
 
 export const ownTransactionProcedure = onItsOwnTransactions();
 
-/** As ownTransactionProcedure, its procedures counted together against `ceiling`. */
 export const ownTransactionCounted = (ceiling: RoadCeiling) => onItsOwnTransactions(ceiling);
 
-/** Answers only once the action committed, so a follow-up such as an email never outruns the write. */
 export const committedAs = async <Value, Refused>(
   ctx: { readonly principal: UserPrincipal; readonly doors: Doors },
   action: (principal: UserPrincipal, tx: Tx) => Promise<Result<Value, Refused>>,
 ): Promise<Folded<Result<Value, Refused>>> =>
   folded<Result<Value, Refused>>(await withMember(ctx.principal, ctx.doors.postgres, action));
 
-/**
- * An action on the person themselves needs no workspace; the person is the session's, never a
- * value the request names.
- */
 export const personProcedure = trpc.procedure.use(async ({ ctx, path, next }) => {
   const { user, session } = await sessionOf(ctx, path);
   return next({
@@ -365,24 +328,18 @@ export const personProcedure = trpc.procedure.use(async ({ ctx, path, next }) =>
   });
 });
 
-/** Counted per person and procedure. */
 export const personCeiling = (rule: CounterRule) =>
   personProcedure.use(async ({ ctx, path, next }) => {
     await consumeCeiling(ctx, path, `${path}:${ctx.personId}`, rule);
     return next();
   });
 
-/** As personCeiling, for an action on the own-transaction road. */
 export const ownTransactionCeiling = (rule: CounterRule) =>
   ownTransactionProcedure.use(async ({ ctx, path, next }) => {
     await consumeCeiling(ctx, path, `${path}:${ctx.principal.userId}`, rule);
     return next();
   });
 
-/**
- * Built from the session alone: this surface reads no bearer, so a token never becomes the
- * operator.
- */
 const inTheOperatorsTransaction = (resolve: typeof withOperator) =>
   trpc.procedure.use(async ({ ctx, path, next }) => {
     const { user, session } = await sessionOf(ctx, path);
@@ -390,8 +347,6 @@ const inTheOperatorsTransaction = (resolve: typeof withOperator) =>
     const resolved = await attempt(() =>
       resolve(
         ctx.doors.postgres,
-        // The session the cookie names: its confirmation is what the operator's writes ask for,
-        // and its creation still anchors the revocation rule.
         { userId: user.id, issuedAt: session.createdAt, sessionId: session.id },
         async (operator, tx) =>
           thrownIfFailed(

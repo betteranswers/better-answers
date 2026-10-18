@@ -6,8 +6,7 @@ import { isTestPath } from "./paths.ts";
 import { executableOf, runsOverThrowawayTree } from "./throwaway-tree.ts";
 import type { Tree } from "./throwaway-tree.ts";
 
-/** Comment lines per code line; an arm over its figure fails the gate. */
-export const CEILING = { source: 0.1, test: 0.05 } as const;
+export const CEILING = { source: 0.075, test: 0.05 } as const;
 
 export type Arm = keyof typeof CEILING;
 
@@ -33,11 +32,8 @@ export const clocArgv = (paths: readonly string[]): readonly string[] => [
   "--by-file",
   "--quiet",
 
-  // Without it cloc counts a file with a twin elsewhere once, and an arm loses its lines.
   "--skip-uniqueness",
 
-  // The per-file guard drops the file it fires on and writes prose after the JSON, so the
-  // count is short and the parse fails.
   "--timeout",
   "0",
   `--exclude-dir=${NEVER_WALKED.join(",")}`,
@@ -51,10 +47,6 @@ export type Counted = {
   readonly comment: number;
 };
 
-/**
- * cloc's by-file JSON, with a `header` and a `SUM` beside the files; the smoke case proves
- * the contract.
- */
 const clocReport = z.record(
   z.string(),
   z.looseObject({
@@ -76,7 +68,6 @@ const countedIn = (output: string): readonly Counted[] =>
     .filter((counted) => MEASURED_LANGUAGES.has(counted.language))
     .sort((left, right) => left.file.localeCompare(right.file));
 
-/** A file under an `e2e`, `test` or `tests` directory, or named as a test, is `test`. */
 export const armOf = (file: string): Arm => (isTestPath(file) ? "test" : "source");
 
 export type Measured = {
@@ -94,14 +85,12 @@ const workspaceOf = (file: string, longestFirst: readonly string[]): string | un
 
 type Total = { code: number; comment: number };
 
-/** A file no workspace holds is dropped. */
 export const measure = (
   counted: readonly Counted[],
   workspaces: readonly string[],
 ): readonly Measured[] => {
   const totals = new Map<string, Map<Arm, Total>>();
 
-  // Longest path first, so a workspace inside another takes the files it holds.
   const longestFirst = [...workspaces].sort((left, right) => right.length - left.length);
   for (const row of counted) {
     const workspace = workspaceOf(row.file, longestFirst);
@@ -131,9 +120,8 @@ export const overTheCeiling = (measured: readonly Measured[]): readonly Measured
   measured.filter((one) => one.code > 0 && one.ratio > CEILING[one.arm]);
 
 export const reportOf = (one: Measured): string =>
-  `${one.workspace} ${one.arm}: ${one.ratio.toFixed(2)} comment lines per code line, over the ${CEILING[one.arm].toFixed(2)} ceiling. A comment says only what the code cannot, so delete what it restates (the root \`CODING_STANDARDS.md\`).`;
+  `${one.workspace} ${one.arm}: ${one.ratio.toFixed(3)} comment lines per code line, over the ${CEILING[one.arm].toFixed(3)} ceiling. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. Any other comment is deleted: hold its reason in a name, a type, a test, a grant or a lint, or report it open in the tracker.`;
 
-/** Runs cloc over `paths` from `cwd`; throws when cloc fails or writes no JSON. */
 export const countOver = (cwd: string, paths: readonly string[]): readonly Counted[] =>
   countedIn(
     execFileSync(executableOf(CLOC_EXECUTABLE), [...clocArgv(paths)], {
@@ -148,7 +136,6 @@ export const WRAPPER_EXECUTABLE = {
   path: ["..", "..", "scripts", "comment-density.mjs"],
 } as const;
 
-/** The smoke tree must count exactly `smoke.counted` measured files. */
 export const clocOver = (
   paths: readonly string[],
   smoke: { readonly tree: Tree; readonly counted: number },

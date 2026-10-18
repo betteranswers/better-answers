@@ -21,7 +21,6 @@ afterEach(() => {
 
 const RAW_MOST_BYTES = 256 * 1024;
 
-/** Every message kept, newest first, read back through the store. */
 const keptIn = async (d1: D1StandIn) => {
   const store = storeOver(d1.database);
   const page = await store.page({ after: undefined, limit: 100 });

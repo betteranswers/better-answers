@@ -39,14 +39,12 @@ function Stream(properties: { readonly activity: Activity; readonly name: string
         events={events}
         landing={landing}
         line={(event: ActivityEvent) => (
-          // The marker wraps below a sentence too long to share its line, rather than squeeze it.
           <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <span className="min-w-0 wrap-anywhere">{sentenceOf(event)}</span>
             <Pill>{WORDS.direction[event.direction](name)}</Pill>
           </div>
         )}
       />
-      {/* The lines read so far stay; Load more is the way to ask again. */}
       <OutcomeLine
         outcome={activity.error === null ? undefined : outcomeOfFailure(activity.error, "read")}
         className="px-4 has-[[role=alert]:not(:empty)]:py-2"
@@ -65,11 +63,9 @@ function Stream(properties: { readonly activity: Activity; readonly name: string
   );
 }
 
-/** An empty stream has nowhere to say a later read failed, so a failure stands in for it. */
 const streamStands = (activity: Activity): boolean =>
   activity.error === null || activity.data?.pages.some((page) => page.events.length > 0) === true;
 
-/** The actions the member took and the actions done to them, in one stream, read a page at a time. */
 export function MemberActivity(properties: {
   readonly member: ListedMember;
   readonly heading: RefObject<HTMLHeadingElement | null>;

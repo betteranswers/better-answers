@@ -55,10 +55,6 @@ deploy/wizard-41.env
 # untracked, which the remove hook reads as work to keep and `git add -A` would commit.
 .planning
 .scratch
-# the personas ce-dogfood reads, a link into .planning/personas made by the same script
-docs/personas
-.compound-engineering/*.local.yaml
-.context/compound-engineering/
 .lavish/
 15-user-feedback.md
 old-suggested-schema.md
@@ -69,16 +65,13 @@ AGENTS.md.bak
 !.claude/skills/browser-suite/
 !.claude/skills/renovate-prs/
 !.claude/skills/better-answers-design
-!.claude/skills/ce-skill-work/
-!.claude/skills/code-comments/
 !.claude/skills/complexity-gate/
 !.claude/skills/mutation-testing/
 !.claude/skills/pixel-perfect/
-!.claude/skills/repo-quality-sweep/
-!.claude/skills/session-retro/
 !.claude/skills/survey-architecture/
 !.claude/skills/THIRD_PARTY_NOTICES.md
-.agents/
+.agents/*
+!.agents/playbooks/
 tasks/AGENTS.md
 apps/api/.claude/skills/*
 !apps/api/.claude/skills/email-best-practices/

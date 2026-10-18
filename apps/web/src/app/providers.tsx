@@ -13,7 +13,6 @@ import {
 import { workspaceHeld } from "@/shared/member.ts";
 import { useThemeFollowed } from "@/shared/theme.ts";
 
-/** What hears a failure once a router can say where it leads: the router is made after the cache. */
 type FailureListener = {
   readonly heard: FailureHeard;
   readonly answeredBy: (answer: FailureHeard) => void;
@@ -37,15 +36,9 @@ export type AppClients = {
   readonly failures: FailureListener;
 };
 
-/**
- * A module-scope query client is one cache shared by every render in the process, so a second
- * test render would see the first one's data.
- */
 export const createAppClients = (): AppClients => {
   const failures = aFailureListener();
   const queryClient = createQueryClient(failures.heard);
-  // The member read's key comes from a proxy over the client this link belongs to, so the link
-  // reads the proxy only at a send.
   const apiClient: ApiClient = createApiClient(() => workspaceHeld(queryClient, api));
   const api: ApiProxy = createApiProxy(apiClient, queryClient);
   forgetAWorkspaceLeftElsewhere(queryClient, api);

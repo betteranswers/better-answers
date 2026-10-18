@@ -7,7 +7,6 @@ const FILE = "slice.ts";
 const wordsIn = (source: string): readonly string[] =>
   refusalWordsIn(FILE, source).map(({ word }) => word);
 
-/** The regex the walk replaced: it read a union only when its text named one of five vocabularies. */
 const BUILT_FROM_A_VOCABULARY = /\b(?:Kernel|Member|Source|Workspace|Erasure)Refusal</;
 
 describe("the words a refusal union is built from", () => {

@@ -28,7 +28,6 @@ export type DismissedAsNotSpecialCategory = inferOutput<
 
 export type Sensitivity = ListedConnectedSource["sensitivity"];
 
-/** Narrowest first, the order a narrowing moves in. */
 export const SENSITIVITIES: readonly Sensitivity[] = ["Restricted", "Internal", "Public"];
 
 export const NARROWEST: Sensitivity = "Restricted";
@@ -54,7 +53,6 @@ export const useConnectedSources = () => {
   const api = useTRPC();
   return useQuery({
     ...api.sources.list.queryOptions(),
-    // A sync in flight moves the state word, so the list watches until every sync has landed.
     refetchInterval: (query) => (aSyncIsInFlight(query.state.data) ? WATCHING_A_SYNC_MS : false),
   });
 };
@@ -84,7 +82,6 @@ export const useConnect = () => {
   });
 };
 
-/** Every settled action reads again what it changed, so the cache ends as the api left it. */
 const useReconcile = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -115,7 +112,6 @@ export const usePublish = () => {
   const api = useTRPC();
   const optimistic = useOptimistic();
   const reconcile = useReconcile();
-  // The callbacks go to the hook itself: the React lint takes one passed through `mutationOptions` as called during render.
   return useMutation({
     ...api.sources.publish.mutationOptions<Undo>(),
     onMutate: (asked) =>
@@ -132,10 +128,6 @@ export const usePublish = () => {
   });
 };
 
-/**
- * Text until parsed: the input's sensitivity and audience are the api's words as the wire carries
- * them.
- */
 type SensitivityAsked = inferInput<Api["sources"]["widen"]>;
 
 const sensitivitySetAsAsked =
@@ -148,7 +140,6 @@ const sensitivitySetAsAsked =
       : { ...connectedSource, sensitivity };
   };
 
-/** A narrowing and a widening draw the same sensitivity on the row, and undo it the same way. */
 const useSensitivitySetOnTheRow = () => {
   const api = useTRPC();
   const optimistic = useOptimistic();
@@ -192,7 +183,6 @@ export const keyOf = (group: GroupOfFindingsKey): GroupOfFindingsKey => ({
   tier: group.tier,
 });
 
-/** What a group is, as one string for a list's key: it names no finding and no span. */
 export const groupKeyText = (group: GroupOfFindingsKey): string =>
   [group.documentId, group.category, group.ruleId, group.tier].join(" ");
 
@@ -228,10 +218,6 @@ export const useNarrowDocuments = () => {
   );
 };
 
-/**
- * A bulk action's answer reaches the page through the review that sent it, so that review stays
- * drawn until the api has answered.
- */
 export const useBulkActionPending = (): boolean => {
   const api = useTRPC();
   const keeping = useIsMutating({ mutationKey: api.sources.keepInText.mutationKey() });

@@ -26,7 +26,6 @@ const prefix64Of = (ipv6: string): string => {
   return `${expanded.slice(0, 4).join(":")}::/64`;
 };
 
-/** An IPv6 address keys as its /64, an IPv4-mapped one as that IPv4, anything else as given. */
 export const clientKeyOf = (address: string): string => {
   const bare = address.replace(/^\[|\]$/g, "").split("%")[0] ?? "";
   if (!isIPv6(bare)) return address;
@@ -37,7 +36,6 @@ export const clientKeyOf = (address: string): string => {
   return prefix64Of(bare);
 };
 
-/** The key of the address the edge names; every request naming none shares `UNKNOWN_CLIENT_IP`. */
 export const clientIpOf = (headers: Headers): string => {
   const address = headers.get(CLIENT_IP_HEADER)?.trim();
   return address === undefined || address === "" ? UNKNOWN_CLIENT_IP : clientKeyOf(address);
@@ -49,7 +47,6 @@ export const tooManyRequests = (retryAfterSeconds: number, description: string):
     { status: 429, headers: { "retry-after": String(retryAfterSeconds) } },
   );
 
-/** The route groups the api counts by client address. */
 export type AddressScope =
   | "consent"
   | "email-code-send"
@@ -62,14 +59,12 @@ export type AddressScope =
   | "sign-in-link-sign-in"
   | "trpc";
 
-/** Under its route group's name, so one group's requests spend none of another's count. */
 export const addressKeyOf = (scope: AddressScope, headers: Headers): string =>
   `${scope}:${clientIpOf(headers)}`;
 
 const anthropicRange = new BlockList();
 anthropicRange.addSubnet(ANTHROPIC_EGRESS_RANGE.network, ANTHROPIC_EGRESS_RANGE.prefix);
 
-/** Whether a client key is an address in Anthropic's published range; a /64 or `unknown` is not. */
 export const inAnthropicRange = (clientKey: string): boolean =>
   isIPv4(clientKey) && anthropicRange.check(clientKey);
 
@@ -79,10 +74,6 @@ export type AddressCounter = {
   readonly logger: Logger;
 };
 
-/**
- * A window's first refusal is logged and no later one, so a flood writes one line. The line
- * never holds the address.
- */
 export const countByAddress = async (
   counter: AddressCounter,
   rule: CounterRule,

@@ -28,7 +28,6 @@ const resolvesTo =
   async () =>
     answers;
 
-/** The fetcher sends every header as one string; Node's wider shapes are not its. */
 const stringHeadersOf = (headers: RequestOptions["headers"]): Readonly<Record<string, string>> =>
   Object.fromEntries(
     Object.entries(headers ?? {}).flatMap(([name, value]) =>
@@ -40,9 +39,7 @@ type Canned = {
   status: number;
   body?: string | Buffer;
   headers?: IncomingHttpHeaders;
-  /** The body never ends, so only the fetcher's own `destroy` closes it. */
   holdOpen?: boolean;
-  /** The request fails with this instead of answering. */
   failWith?: Error;
 };
 
@@ -104,7 +101,6 @@ const observedAnswering = (
 
 const answering = (response: Canned): HttpsRequest => observedAnswering(response).request;
 
-/** A resolver that answers only when the test says so. */
 const heldLookups = (): { readonly lookup: Lookup; readonly settleOne: () => void } => {
   const held: Array<() => void> = [];
   return {

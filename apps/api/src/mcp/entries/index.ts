@@ -43,7 +43,6 @@ const trust = z.object({
 
 type WireTrust = z.infer<typeof trust>;
 
-/** Core says who verified a concept and when; the wire keeps the keys its clients read. */
 const wireTrust = ({ tier, status, verifiedBy, verifiedAt, rider }: Trust): WireTrust => ({
   tier,
   status,
@@ -88,7 +87,6 @@ const openedOnTheWire = (opened: OpenResult<string>) => {
   if (!opened.found) return opened;
   const { concept, ...rest } = opened;
   if (concept === undefined) return rest;
-  // The pane's words are the web page's; MCP's view keeps to `open`'s schema.
   const { iri, frontmatter, body, relations, bodyLinks, trustWords, evidence } = concept;
   const trusted = wireTrust(concept.trust);
   return {
@@ -141,7 +139,6 @@ type WireAnswered = Omit<AnswerResult<string>, "answers" | "related"> & {
   readonly related: readonly WireMatch<RelatedConcept<string>>[];
 };
 
-/** Core names a concept's page by its path; an outside client can only open it under our origin. */
 const answeredOnTheWire = (
   origin: string,
   { answers, related, ...answer }: AnswerResult,
@@ -218,7 +215,6 @@ const giveFeedbackEntry = defineEntry({
   description:
     "Store a person's verdict on an answer `ask` gave, on the record of that question: helpful, or a flag — wrong, out of date, incomplete, or should not have been shown — with a note in their words. Name the record by the `recordId` the answer carried; only the person who asked can give feedback on it. For a flag on a sentence you wrote from the answer, send that sentence and the concept it rested on as `disputed`. Call it on the person's explicit ask. Each call stores another verdict beside the last, so a call repeated after a timeout stores it twice. The feedback is kept with the record, and no one is notified of it. The note, the disputed sentence and who gave it are kept until that person is erased; the verdict, reason and disputed concept are kept for good.",
   scopes: ["knowledge:read", "feedback:write"],
-  // A flag with no reason is the action's own refusal, not a rule the flat wire shape could carry.
   input: z.object({
     recordId: feedbackFields.shape.recordId,
     verdict: feedbackFields.shape.verdict,
@@ -244,7 +240,6 @@ const giveFeedbackEntry = defineEntry({
   render: renderFeedback,
 });
 
-/** `origin` is the product's public origin, which a citation's address is under. */
 export const entriesAt = (origin: string): readonly Entry<z.ZodObject, z.ZodType>[] => [
   findEntry,
   askEntryAt(origin),

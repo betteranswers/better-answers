@@ -23,7 +23,6 @@ const CONFIGS: Tree = { ...realFile(".github/actionlint.yaml"), ...realFile(".gi
 
 type Ran = { readonly status: number | null; readonly said: string };
 
-/** The root script, run from a repository holding `tree` beside the worker's locked linters. */
 const ran = (script: string, tree: Tree): Ran => {
   const command = rootScripts()[script];
   if (command === undefined) throw new Error(`the root manifest has no \`${script}\` script`);

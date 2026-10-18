@@ -17,7 +17,6 @@ const TOKEN = `${"aB3".repeat(14)}z`;
 
 const BOUND = { state: "bound", address: "ada@example.test", carried: "" };
 
-/** The link read as this browser's own; its sign-in answers as `signIn` does. */
 const aLinkWhoseSignIn =
   (signIn: () => Promise<Response>) =>
   (input: string | URL | Request): Promise<Response> =>

@@ -86,7 +86,6 @@ describe("knip over a throwaway tree", () => {
 });
 
 describe("knipOver's smoke case", () => {
-  /** Code-unit order puts `Upper` first and `lower` last; a locale's order does the reverse. */
   const CASED_TREE: Tree = {
     "src/main.ts": MAIN,
     "src/reached.ts": `${REACHED}export const Upper = 2;\nexport const lower = 3;\n`,

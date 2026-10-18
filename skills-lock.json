@@ -55,12 +55,6 @@
       "skillPath": "packages/client/skills/client-setup/SKILL.md",
       "computedHash": "65b2f97d796665441ec9044e422d549184836684b2f15b8586d978b9f8bb0406"
     },
-    "code-comments": {
-      "source": "jspiro/skills",
-      "sourceType": "github",
-      "skillPath": "skills/code-comments/SKILL.md",
-      "computedHash": "5f4e9eb405a3c54e5b8fe37daea20cb5b07a90aa3e251c28e662478f9fa23cde"
-    },
     "complexity-gate": {
       "source": "jspiro/skills",
       "sourceType": "github",
@@ -180,12 +174,6 @@
       "sourceType": "github",
       "skillPath": "packages/tanstack-react-query/skills/react-query-setup/SKILL.md",
       "computedHash": "34fc54299a4669024ee8e42ccde8f384533c3641f4c67306e5ebc454a7141484"
-    },
-    "repo-quality-sweep": {
-      "source": "jspiro/skills",
-      "sourceType": "github",
-      "skillPath": "skills/repo-quality-sweep/SKILL.md",
-      "computedHash": "09825ce8212ac56c75a6093bb1620a4b6ce0f8a33f03061302b3805a6a3164f6"
     },
     "resend": {
       "source": "resend/resend-skills",

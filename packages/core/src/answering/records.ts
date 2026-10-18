@@ -46,13 +46,11 @@ const QUESTIONS_ASKED_PAGE_MAX = 100;
 
 const recordId = boundarySchemas.questionAsked.select.shape.id;
 
-/** Where a page was cut: its last record, and whether it was flagged when served. */
 const questionsAskedCursor = z.object({ id: recordId, flagged: z.boolean() });
 
 type QuestionsAskedCursor = z.output<typeof questionsAskedCursor>;
 
 export const questionsAskedInput = z.object({
-  /** Absent for the first page. */
   cursor: questionsAskedCursor.optional(),
   limit: z.number().int().min(1).max(QUESTIONS_ASKED_PAGE_MAX).default(QUESTIONS_ASKED_PAGE),
 });
@@ -69,15 +67,12 @@ const skeleton = boundarySchemas.questionAsked.select;
 
 type KeptConcept = NonNullable<z.output<typeof skeleton>["concepts"]>[number];
 
-/** A concept a record cites, as the reader may read it now, with the trust it had then. */
 type ConceptAsRead = {
   readonly iri: ConceptIri;
   readonly kind: string;
   readonly title: string;
-  /** Null for a concept in no collection. */
   readonly collection: string | null;
   readonly trustThen: KeptConcept["trust"];
-  /** The judge's word on it; absent where no judge was asked. */
   readonly judged?: CandidateVerdict;
 };
 
@@ -89,7 +84,6 @@ type FeedbackAsRead = {
   readonly verdict: z.output<typeof boundarySchemas.questionFeedback.select>["verdict"];
   readonly reason: z.output<typeof boundarySchemas.questionFeedback.select>["reason"];
   readonly note: string | null;
-  /** Given only where the reader may read the concept the sentence rested on. */
   readonly disputed?: { readonly sentence: string | null; readonly concept: ConceptIri };
   readonly closedAs: FlagClosing | null;
   readonly closedAt: string | null;
@@ -101,30 +95,23 @@ type RecordAsRead = {
   readonly askedBy: AuditEventActor;
   readonly transport: QuestionTransport;
   readonly collectionsNamed: readonly string[];
-  /** Null once an erasure removed it. */
   readonly question: string | null;
-  /** Null while the record is open. */
   readonly verdict: QuestionVerdict | null;
   readonly judgeState: JudgeState | null;
-  /** It holds a flag no Admin has closed. */
   readonly flagged: boolean;
   readonly concepts: readonly ConceptAsRead[];
-  /** Null unless the platform drafted; a sentence citing a concept the reader cannot read is left out. */
   readonly drafted: readonly DraftedSentence[] | null;
   readonly feedback: readonly FeedbackAsRead[];
-  /** A refusal's group: the first readable matched concept's collection, null for none; absent otherwise. */
   readonly refusedUnder?: string | null;
 };
 
 export type QuestionsAskedPage = {
   readonly records: readonly RecordAsRead[];
-  /** Null on the last page. */
   readonly nextCursor: QuestionsAskedCursor | null;
 };
 
 export type QuestionsAskedRefusal = RefusalOf<typeof readQuestionsAskedAction> | Error;
 
-/** Each arm reads one page by its index; the cut keeps its served flag, so a closing mid-read loses nothing. */
 const A_PAGE_OF_RECORDS = `WITH open_flags AS (
     SELECT DISTINCT record_id FROM question_feedback
      WHERE workspace_id = $1 AND verdict = '${FEEDBACK_FLAG_VERDICT}' AND closed_at IS NULL
@@ -197,7 +184,6 @@ type FeedbackRow = z.output<typeof feedbackRow>;
 
 type Readable = ReadonlyMap<string, OpenedConcept>;
 
-/** Every concept a page names anywhere, so each is read once under the reader's predicate. */
 const irisNamedIn = (rows: readonly PageRow[], feedback: readonly FeedbackRow[]): ConceptIri[] => [
   ...new Set([
     ...rows.flatMap((row) => (row.concepts ?? []).map((concept) => concept.iri)),
@@ -318,11 +304,6 @@ const pageParameters = (admin: AdminUserPrincipal, { cursor, limit }: QuestionsA
   cursor?.flagged ?? null,
 ];
 
-/**
- * Every record for an Admin, a page at a time, open flags first, then newest. Each concept is read
- * under the Admin's predicate now: one they cannot read is absent with no sign, as is a drafted or
- * disputed sentence resting on it.
- */
 export const readQuestionsAsked = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -368,7 +349,6 @@ export type FlagClosed = {
   readonly closedAs: FlagClosing;
 };
 
-/** Helpful feedback is never a flag, so it answers as one that is not there. */
 const THE_FLAG = `SELECT record_id, closed_at IS NOT NULL AS closed
     FROM question_feedback
    WHERE workspace_id = $1 AND id = $2 AND verdict = '${FEEDBACK_FLAG_VERDICT}'
@@ -378,10 +358,6 @@ const ITS_CLOSING = `UPDATE question_feedback SET closed_as = $3, closed_at = $4
    WHERE workspace_id = $1 AND id = $2 AND closed_at IS NULL
   RETURNING id`;
 
-/**
- * Closes an open flag once, as fixed in the knowledge or as no fault in the knowledge, and audits
- * it in the same transaction. The row keeps how and when; who is the audit event's actor alone.
- */
 export const closeFlag = async (
   principal: UserPrincipal,
   tx: Tx,

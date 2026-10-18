@@ -19,7 +19,6 @@ const NOWHERE = "/nothing-here";
 
 const NOT_FOUND = "Page Not Found";
 
-/** Not built, so hidden from every role, an Admin too. */
 const GUIDES = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Guides");
 
 const notFound = (page: Page) => page.getByRole("heading", { level: 1, name: NOT_FOUND });

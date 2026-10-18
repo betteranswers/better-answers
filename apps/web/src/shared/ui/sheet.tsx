@@ -45,7 +45,6 @@ const SIDES = {
     "inset-x-0 bottom-0 h-auto border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
 } as const;
 
-/** With `overlay` off and the root's `modal={false}`, the sheet sits beside a page that stays live. */
 function SheetContent({
   className,
   children,

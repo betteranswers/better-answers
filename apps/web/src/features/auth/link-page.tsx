@@ -54,7 +54,6 @@ const DEAD: Seen = { state: "dead" };
 
 const CHECKING: Seen = { state: "checking" };
 
-/** Any refusal but a wait is a link spent since its read, or bound to another browser. */
 const linkDied = (failure: Error | null): boolean =>
   failure instanceof CodeRefused && !isTooMany(failure);
 
@@ -63,7 +62,6 @@ const saidOfFailure = (failure: Error, unanswered: string): string =>
 
 type Read = { readonly data: LinkDescribed | undefined; readonly error: Error | null };
 
-/** What the person clicked Sign in on stands: success clears every held read, this one too. */
 const seenOf = (
   token: string | undefined,
   read: Read,
@@ -76,7 +74,6 @@ const seenOf = (
   return read.error === null ? CHECKING : { state: "unread", failure: read.error };
 };
 
-/** What the page's actions stand on, handed to whichever state is shown. */
 type Acting = {
   readonly signingIn: boolean;
   readonly signInFailure: Error | null;
@@ -85,7 +82,6 @@ type Acting = {
   readonly onCopy: (code: string) => void;
   readonly reading: boolean;
   readonly onReadAgain: () => void;
-  /** The query the clicked link carried, or nothing before a click. */
   readonly carried: string;
 };
 
@@ -99,7 +95,6 @@ type Slots = {
 
 function SignInHere(properties: { readonly signingIn: boolean; readonly onSignIn: () => void }) {
   return (
-    // Enabled while signing in, so the focus the page gave the button is not dropped.
     <Button
       type="button"
       className="mt-6 aria-disabled:opacity-50"
@@ -148,7 +143,6 @@ function CodeToType(properties: {
   );
 }
 
-/** `carried` is the flow the clicked link carried, so a fresh sign-in still returns where it would. */
 function BackToSignIn(properties: { readonly focused: boolean; readonly carried: string }) {
   const navigate = useNavigate();
   const back = `/sign-in${properties.carried}`;
@@ -191,7 +185,6 @@ const unreadSlots = (failure: Error, acting: Acting): Slots => ({
   said: null,
   body: null,
   refused: saidOfFailure(failure, STOCK.tryAgain),
-  // The fragment is gone from the address, so a reload would show the dead page.
   actions: (
     <div className="mt-6 flex flex-wrap items-center gap-2">
       <ReadAgain
@@ -266,10 +259,6 @@ const slotsOf = (seen: Seen, acting: Acting): Slots => {
   }
 };
 
-/**
- * Signs in only the browser that asked for the code, and only on a click, so a scanner opening
- * the link changes nothing.
- */
 export function LinkPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -280,7 +269,6 @@ export function LinkPage() {
   const read = useDescribeTheLink(token, clicked === undefined);
   const signIn = useSignInByLink();
 
-  // The browser's history is outside React; the token leaves it once this page has read it.
   useEffect(dropTheLinkToken, []);
 
   const landAfterSignIn = (signedIn: SignedInByLink) => {
@@ -299,7 +287,6 @@ export function LinkPage() {
       signIn.mutate(token, { onSuccess: landAfterSignIn });
     },
     copied: copiedIt,
-    // Written whole, with no space, so it pastes into the code field as it is.
     onCopy: (code) => {
       void copiedToTheClipboard(code).then(setCopiedIt);
     },
@@ -312,8 +299,6 @@ export function LinkPage() {
 
   const slots = slotsOf(seenOf(token, read, clicked, signIn.error), acting);
 
-  // Each slot keeps its element across the states, so each new state speaks in the regions that
-  // stood.
   return (
     <AuthPage title={slots.title}>
       <Outcome tone="said">{slots.said}</Outcome>

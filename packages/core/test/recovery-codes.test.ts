@@ -30,7 +30,6 @@ const codesFor = async (personId: string, replacing = false): Promise<readonly s
 
 const firstOf = (codes: readonly string[]): string => codes[0] ?? "";
 
-/** Each spend from a session of its own, as two devices would send them. */
 const spending = async (personId: string, code: string) =>
   spendRecoveryCode(bootstrap, door(), {
     personId,

@@ -6,7 +6,6 @@ import { Button } from "@/shared/ui/button.tsx";
 
 import { goHome } from "./words.ts";
 
-/** The way to the reader's own home, or nothing where they are on it already. */
 export function GoHome(properties: {
   readonly home?: Page | undefined;
   readonly className: string;
@@ -20,7 +19,6 @@ export function GoHome(properties: {
   );
 }
 
-/** Asked only here, so the console never reads a workspace its reader need not be a member of. */
 function RoleHomeLink(properties: { readonly className: string }) {
   const role = useRole();
 
@@ -32,7 +30,6 @@ function RoleHomeLink(properties: { readonly className: string }) {
   );
 }
 
-/** The index finds the home of a reader whose role is not known yet. */
 function HomeLink(properties: { readonly home: Page | undefined; readonly className: string }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const to = properties.home?.path ?? "/";

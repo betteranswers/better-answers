@@ -32,7 +32,6 @@ const A_CALL: StreamedCall = { system: SYSTEM, prompt: PROMPT, most: MOST };
 
 type Answering = (signal: AbortSignal | null | undefined) => Response | Promise<Response>;
 
-/** A fake at the wire answering each attempt in turn; past its answers it answers a teapot. */
 const theWire = (...answers: readonly Answering[]) => {
   const sent: { readonly url: string; readonly init: RequestInit }[] = [];
   const fetch = async (input: string | URL | Request, init: RequestInit = {}) => {
@@ -63,7 +62,6 @@ const doorsOn = (wire: Wire) => {
   };
 };
 
-/** Every text a streamed call yields, and how it ended. */
 const drained = async (
   wire: Wire,
   call: StreamedCall = A_CALL,
@@ -96,7 +94,6 @@ const ANSWERED_WHOLE = {
   spent: [{ tokensIn: 2_100, tokensOut: 140, seconds: 0, outcome: "succeeded" }],
 };
 
-/** Cut off after sending and before any reply, it counts at the size reserved for it. */
 const CUT_AT_FULL_SIZE = {
   outcome: "failed",
   spent: [{ tokensIn: 40_000, tokensOut: 16_000, seconds: 0, outcome: "failed" }],
@@ -113,7 +110,6 @@ const endedOnAbort =
     return new Response("", { status: 500 });
   };
 
-/** Its input as the reply opened with it, and its output at the size reserved, never counted. */
 const FAILED_AT_FULL_SIZE = {
   outcome: "failed",
   spent: [{ tokensIn: 2_100, tokensOut: 16_000, seconds: 0, outcome: "failed" }],
@@ -385,7 +381,6 @@ describe("the streamed Messages shape", () => {
   });
 });
 
-/** A judge's call, with no stream, that `signal` may end. */
 const judgedUntil = (doors: ReturnType<typeof doorsOn>["doors"], signal: AbortSignal) =>
   openModelClient(doors).callModel(TO_SONNET, {
     system: SYSTEM,

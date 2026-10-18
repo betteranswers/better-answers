@@ -65,19 +65,15 @@ const CLAUDE_METADATA_DOCUMENT = {
   token_endpoint_auth_method: "none",
 } as const;
 
-/** A claude.ai assistant whose metadata document names no `client_name`. */
 export const NAMELESS_CLIENT_ID = "https://claude.ai/oauth/nameless-client-metadata";
 
-/** A claude.ai assistant that signs its token requests with a key it publishes at `jwks_uri`. */
 export const KEYED_CLIENT_ID = "https://claude.ai/oauth/keyed-client-metadata";
 export const KEYED_CLIENT_JWKS_URI = "https://claude.ai/oauth/keyed-client-jwks.json";
-/** Shared by the assertion's header and the published key, so the two cannot drift. */
 const KEYED_CLIENT_KEY = { alg: "ES256", kid: "keyed" } as const;
 let keyedClientKeyPair: Promise<GenerateKeyPairResult> | undefined;
 const keyPairOfKeyedClient = () =>
   (keyedClientKeyPair ??= generateKeyPair(KEYED_CLIENT_KEY.alg, { extractable: true }));
 
-/** A `private_key_jwt` client assertion from the keyed client, for `audience`. */
 export const keyedClientAssertion = async (audience: string): Promise<string> =>
   new SignJWT({})
     .setProtectedHeader(KEYED_CLIENT_KEY)
@@ -93,11 +89,9 @@ const keyedClientJwks = async () => ({
   keys: [{ ...(await exportJWK((await keyPairOfKeyedClient()).publicKey)), ...KEYED_CLIENT_KEY }],
 });
 
-/** On a host that only resembles Claude's; the metadata fixture serves it a document too. */
 export const LOOKALIKE_CLIENT_ID = "https://claude-ai.example/oauth/mcp-oauth-client-metadata";
 const LOOKALIKE_REDIRECT_URI = "https://claude-ai.example/api/mcp/auth_callback";
 
-/** pino writes one JSON object per line: its own level and time, then whatever the call logged. */
 const logLine = z.looseObject({ level: z.number(), time: z.number() });
 export type LogLine = Readonly<z.infer<typeof logLine>>;
 
@@ -115,11 +109,9 @@ export const capturingLogger = (level: "debug" | "info" = "info") => {
   return { logger: pino({ level }, sink), logs };
 };
 
-/** The sign-in code stands alone on its line, so digits in a link or an id are never read as it. */
 export const codeIn = (message: EmailMessage): string | undefined =>
   /^(\d{6})$/m.exec(message.text)?.[1];
 
-/** The token a sign-in link carries in its fragment, read off the text part's link line. */
 const linkTokenIn = (message: EmailMessage): string | undefined =>
   /\/sign-in\/link#([A-Za-z0-9]+)$/m.exec(message.text)?.[1];
 
@@ -127,7 +119,6 @@ export type TestApp = {
   readonly server: Hono;
   readonly database: TestDatabase;
 
-  /** The origin the api serves and signs cookies for; the browser suite's differs from the suites'. */
   readonly publicUrl: string;
 
   readonly doors: Doors;
@@ -136,24 +127,14 @@ export type TestApp = {
 
   readonly emails: EmailMessage[];
 
-  /** Each URL the api asked for an assistant's metadata document, in order. */
   readonly metadataFetches: string[];
 
   readonly logs: LogLine[];
 
-  /**
-   * The six-digit code in the latest email to `email`.
-   * @throws when none went to it, or the latest holds no code.
-   */
   codeSentTo(email: string): string;
 
-  /**
-   * The sign-in link's token in the latest email to `email`.
-   * @throws when none went to it, or the latest holds no link.
-   */
   linkSentTo(email: string): string;
 
-  /** A new workspace, and a new person as its Admin. */
   provision(input?: {
     name?: string | undefined;
     adminEmail?: string | undefined;
@@ -167,7 +148,6 @@ export type TestApp = {
     role: "Admin" | "Editor" | "Viewer",
   ): Promise<{ id: string }>;
 
-  /** An invitation written as a row: waiting a week from now at the factory's role, unless named. */
   invite(input: {
     workspaceId: string;
     email: string;
@@ -181,21 +161,12 @@ export type TestApp = {
 
   endEverySignInAndToken(userId: string, at: Date): Promise<void>;
 
-  /**
-   * Grants or clears the operator mark of the person holding `email`, as the ops command does.
-   * @throws when no person holds it.
-   */
   markOperator(email: string, change: "grant" | "revoke"): Promise<void>;
 
   removeMember(workspaceId: string, userId: string): Promise<void>;
 
-  /** Updates a key the workspace already holds; a key it lacks stays absent, silently. */
   setWorkspaceConfig(workspaceId: string, key: string, value: string): Promise<void>;
 
-  /**
-   * A TestClient with its own cookie jar; without `ip` it takes the next default address, and
-   * without `hostname` it is on `publicUrl`'s origin.
-   */
   client(ip?: string, hostname?: string): TestClient;
   stop(): Promise<void>;
 };
@@ -217,14 +188,11 @@ export type TestClient = {
   readonly ip: string;
 
   readonly origin: string;
-  /** A path resolves on `origin`; cookies go from and to the jar, and a non-GET gains `origin`. */
   fetch(path: string, init?: RequestInit): Promise<Response>;
 
-  /** Posts `fields` as a browser's same-origin form navigation does. */
   form(path: string, fields: Readonly<Record<string, string>>): Promise<Response>;
 
   json(path: string, body: unknown): Promise<Response>;
-  /** The jar as a `cookie` header's value. */
   cookies(): string;
 };
 
@@ -261,10 +229,8 @@ const cimdFixture = async (input: string | URL | Request): Promise<Response> => 
   return new Response("no such document", { status: 404 });
 };
 
-/** Invented: it seals nothing outside the suites. */
 export const HARNESS_ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => 31 - index);
 
-/** No suite reaches a model provider: a call no test set a wire for fails, and is never tried again. */
 const noModelWire = async (): Promise<Response> =>
   new Response("no model provider answers in the suites", { status: 418 });
 
@@ -277,7 +243,6 @@ type DoorOptions = {
 export const doorsFor = (database: Pool | string, options: DoorOptions = {}): Doors =>
   openDoors({ database, ...options });
 
-/** A server over `pool` with no TestApp around it: emails go nowhere and nothing is logged. */
 export const serverFor = (
   pool: Pool,
   options: {
@@ -298,10 +263,6 @@ export const serverFor = (
     imageDigest: options.imageDigest,
   });
 
-/**
- * Runs `work` in one transaction as the member `who` names.
- * @throws when the member read or `work` answers a refusal.
- */
 export const actingIn = async <T>(
   app: TestApp,
   who: { readonly workspaceId: string; readonly userId: string },
@@ -314,7 +275,6 @@ export const actingIn = async <T>(
   return answered.value;
 };
 
-/** @throws when the TestApp's repositories' root did not open. */
 export const openTestGit = (app: TestApp): GitDoor => {
   if (app.doors.git?.ok !== true) {
     throw new Error(`the TestApp's repositories' root is ${app.doors.git?.error ?? "not set"}`);
@@ -329,38 +289,26 @@ export type TestAppOptions = {
 
   readonly publicUrl?: string | undefined;
 
-  /** Awaited by the transport, so a test can hold a message the way a slow relay would. */
   readonly onEmail?: ((message: EmailMessage) => void | Promise<void>) | undefined;
 
   readonly clock?: Clock | undefined;
 
   readonly objectStore?: ObjectStoreSettings | undefined;
 
-  /**
-   * A count of connections below the pool's ceiling reads what was asked for, and the suite's
-   * runtime pool is small.
-   */
   readonly poolSize?: number | undefined;
 
-  /** The model provider's wire; with none, every model call fails at once. */
   readonly fetchModel?:
     | ((input: string | URL | Request, init?: RequestInit) => Promise<Response>)
     | undefined;
 
-  /** Null serves with none, as an api whose envelope key would not read. */
   readonly envelopeKey?: Uint8Array | null | undefined;
 
-  /** Shortens the quiet an answer's stream keeps before a keep-alive, so a test need not wait. */
   readonly askKeepAliveMs?: number | undefined;
 };
 
 const envelopeKeyOf = ({ envelopeKey }: TestAppOptions): Uint8Array | undefined =>
   envelopeKey === null ? undefined : (envelopeKey ?? HARNESS_ENVELOPE_KEY);
 
-/**
- * A healthy TestApp over a fresh migrated database and git root; `stop` removes both.
- * @throws when `publicUrl`'s host is not `hostnames.app`, or it starts unhealthy.
- */
 export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> => {
   const hostnames = options.hostnames ?? HOSTNAMES;
   const publicUrl = options.publicUrl ?? PUBLIC_URL;
@@ -412,8 +360,6 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     await removeBundleRoot(gitStoreDir);
   };
 
-  // Its authorization server seeds a resource row on start; an `authOver` seeding beside it
-  // loses the unique insert and never starts.
   const health = await server.request(new URL("/health", publicUrl));
   if (health.status !== 200) {
     const answered = await health.text();
@@ -484,7 +430,6 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     ]);
   };
 
-  /** Made on the first revocation, so a suite that never revokes holds no extra person. */
   let operatorMade: Promise<string> | undefined;
   const operatorsId = (): Promise<string> => {
     operatorMade ??= (async () => {
@@ -499,7 +444,6 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
   };
 
   const endEverySignInAndToken: TestApp["endEverySignInAndToken"] = async (userId, at) => {
-    // The harness's own action runs as the operator's confirmed session would, never pending.
     const operatorId = await operatorsId();
     const client = await database.superuser.connect();
     let confirmedId: string;

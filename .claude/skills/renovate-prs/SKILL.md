@@ -5,7 +5,7 @@ description: Clears Renovate's dependency pull requests, one or a batch — list
 
 # Renovate's pull requests
 
-Renovate's pull requests are labelled `deps`, on `renovate/<group>` branches. `renovate.json` holds the schedule, the groups, the limits, the age rule, every hold and every rule that turns an update off; read it rather than trusting a summary. The schedule and limits bound only what Renovate opens by itself: the owner can create pending updates from the Mend dependency dashboard, and its "Select All" opens every one at once. A batch made there is cleared like any other. `automerge` is off, and `arm-merge.yml` arms only a person's pull request, so nothing of Renovate's lands until a session arms it.
+Renovate's pull requests are labelled `deps`, on `renovate/<group>` branches. `renovate.json` holds the schedule, the groups, the limits, the age rule, every hold and every rule that turns an update off; read it rather than trusting a summary. The schedule and limits bound only what Renovate opens by itself: the owner can create pending updates from the Mend dependency dashboard, and its "Select All" opens every one at once. A batch made there is cleared like any other. `automerge` is off, so nothing of Renovate's lands until a session queues it.
 
 The unit of work is the **cause**, not the package. Five red pull requests are often two causes, and each cause is fixed once, by one of four paths. No ticket is needed for any of this unless the fix outgrows a pull request.
 
@@ -57,7 +57,7 @@ The test between the first two: check the fix out on `main` and run the suite. G
 
 Order matters because Renovate **regenerates** a branch when its rebase box is ticked, force-pushing its own commit and dropping everyone else's.
 
-1. **Main first and rules land.** A branch off `origin/main`, one commit in the commit's form (`docs/agents/workflow.md`, *The commit's form*), and a pull request through `ce-commit-push-pr`. `arm-merge.yml` arms it once Cubic's check on its head succeeds; when that check ends any other way (neutral when Cubic hits its line limit), nothing arms it, and you arm it as in step 5. Wait for each to merge.
+1. **Main first and rules land.** A branch off `origin/main`, one commit in the commit's form (`docs/agents/workflow.md`, *The commit's form*), and a pull request under pstack's *Opening a PR* playbook, queued as in step 5 once its verdict is `PASS` (`docs/agents/workflow.md`, *Merging*). Wait for each to merge.
 2. **Tick the rebase box** on every pull request they touch, so Renovate regenerates it over the new `main`:
 
    ```bash
@@ -74,7 +74,7 @@ What a fix owes, whichever path:
 - **Every file still naming the old version**: `git grep -nF '<old version>' -- ':!*.lock' ':!pnpm-lock.yaml'`. jCodeMunch's index leaves Dockerfiles out, so its answer is not evidence here. A test comparing the manifest's pin to a literal moves with the pin; a literal handed to a function as input stays.
 - **The comment above each moved pin** in `apps/worker/pyproject.toml` and the Dockerfiles. Many carry a dated reading (licence, wheel tags, digest) and say what a bump owes: a probe to re-run, a reading to re-date. Re-read the licence and wheels at the source (`curl -s https://pypi.org/pypi/<name>/<version>/json`), re-date, run what it names.
 - **Suites by file**: the first row of *What `check` runs where* in `docs/agents/workflow.md`. That row sets `IMAGE_PROBE_DEFERRED=true`, which skips the image suites; when the red line is in one (`apps/worker/tests/test_image.py`, `apps/api/tests/image.test.ts`), run the failing test by its node id without it. The suite builds its image by id, so it is safe beside other sessions, and the worker's takes about three minutes. The queue's run is the arbiter, and it runs the image suites whenever a manifest or a lockfile moved.
-- **Review**: `impact` before an edit and `detect_changes` before each commit, then the two reviews in `docs/agents/code-review.md`: `/ce-code-review` before the pull request, Cubic on it. GitNexus leaves test files out, so `impact` on a test answers *not found*, and the blast radius is the assertion itself. One commit per fix, in the commit's form; a branch fix has no `Refs:` footer.
+- **Review**: `impact` before an edit and `detect_changes` before each commit, then the review in `docs/agents/code-review.md`. GitNexus leaves test files out, so `impact` on a test answers *not found*, and the blast radius is the assertion itself. One commit per fix, in the commit's form; a branch fix has no `Refs:` footer.
 - **An issue**, when the path says so: filed in Linear (`docs/agents/issue-tracker.md`), with the pull request's number and the log line in its Notes. When the fix cannot land ahead of the new version, the issue carries the bump too, and the Renovate pull request closes as redundant once it lands (T-356 carried #211's).
 
 **Done when** every pull request on the first three paths has a head whose red leg's failing line is gone from a local run of that suite.
@@ -82,7 +82,7 @@ What a fix owes, whichever path:
 ## 5. Arm and watch
 
 ```bash
-gh pr merge <n> --auto --merge
+gh pr merge <n> --auto --match-head-commit <head sha>
 gh api graphql -F owner='{owner}' -F name='{repo}' -F number=<n> -f query='
   query($owner: String!, $name: String!, $number: Int!) {
     repository(owner: $owner, name: $name) {

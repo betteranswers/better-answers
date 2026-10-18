@@ -31,7 +31,6 @@ const INSTALLED = `<?xml version="1.0" encoding="UTF-8"?>
 
 let made = 0;
 
-/** A plist at its own path, or none, and a `launchctl` stub that logs its argv and finds the job `loaded`. */
 const machine = (
   plist: string | undefined,
   loaded = true,

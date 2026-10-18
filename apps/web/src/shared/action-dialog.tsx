@@ -13,10 +13,6 @@ import {
 
 type Content = Pick<ComponentProps<typeof DialogContent>, "className" | "onCloseAutoFocus">;
 
-/**
- * The consequence is a required part, so no action on the page can ask for the click before
- * saying what it does.
- */
 export function ActionDialog(properties: {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
@@ -52,10 +48,6 @@ type Parts = Pick<
   "title" | "consequence" | "commit" | "children"
 >;
 
-/**
- * Open for as long as its opener mounts it. No Radix trigger opened it, so `onFocusBack` says
- * where focus goes as it closes.
- */
 export function MountedActionDialog(
   properties: Parts & { readonly onClose: () => void; readonly onFocusBack: () => void },
 ) {

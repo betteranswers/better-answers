@@ -50,7 +50,6 @@ const groupsHeldBy = async (workspace: ProvisionedWorkspace, personId: string) =
 
 const A_MINUTE_AGO = new Date(Date.now() - 60_000);
 
-/** A refresh and an access token for each grant, named so an assertion reads which ended. */
 const grantsTo = async (
   personId: string,
   grants: Readonly<Record<string, { readonly workspaceId: string; readonly personId?: string }>>,
@@ -214,7 +213,6 @@ describe("the last Admin, removed", () => {
     const other = await joining(workspace, "Admin");
     const firstActed = Promise.withResolvers<undefined>();
 
-    /** It commits only once the second waits on it, so the second's count comes after. */
     const removingTheOther = heldAs(workspace, adminUserId, async (principal, tx) => {
       const removed = await removing(principal, tx, other);
       firstActed.resolve(undefined);

@@ -36,7 +36,6 @@ const focusOnArrival = (node: HTMLElement | null) => {
 type NameActions = {
   readonly correct: (personId: string) => void;
   readonly focusedOn: (personId: string) => void;
-  /** The person whose action takes focus as it arrives: back from signing in, or refused. */
   readonly personToFocus: string | undefined;
 };
 
@@ -88,7 +87,6 @@ function CorrectAction(properties: {
   );
 }
 
-/** The row's own action corrects it, so the actions ride into the columns. */
 const columnsFor = (actions: NameActions) =>
   column.columns([
     column.display({
@@ -108,7 +106,6 @@ const columnsFor = (actions: NameActions) =>
     }),
   ]);
 
-/** A name is found by itself or by a workspace that flagged it; the read carries no address. */
 const wordsOf = (waiting: NameWaiting): string =>
   [waiting.displayName, ...waiting.flags.map((flag) => flag.workspace.name)].join("\n");
 
@@ -164,7 +161,6 @@ export function NamesWaitingList() {
   const [inFocus, setInFocus] = useState<string>();
   const [openFor, setOpenFor] = useState<string>();
   const [said, setSaid] = useState<Outcome>();
-  // A refused read leaves nothing listed: what it held may no longer be the reader's to see.
   const waiting = listed.error === null ? listed.data : undefined;
   const names = waiting ?? NO_NAME;
   const narrowed = useNarrowedRows(names, wordsOf);
@@ -181,23 +177,19 @@ export function NamesWaitingList() {
     getRowId: (each) => each.personId,
   });
 
-  /** A letter pressed outside the list still needs a name it shows, so the one last in focus stands. */
   useKeystroke(NAMES_WAITING_KEYSTROKES.correct, () => {
     const held = narrowed.shown.find((each) => each.personId === inFocus);
     setSaid(held === undefined ? NO_NAME_IN_FOCUS : undefined);
     if (held !== undefined) setOpenFor(held.personId);
   });
 
-  /** The dialog closes first, so the row leaves the list as the dialog does. */
   const save = (asked: NameWaiting, displayName: string) => {
     setOpenFor(undefined);
     setSaid(undefined);
-    // The address that brought focus back to this person has served once they are corrected.
     if (asked.personId === arrivedFor) void navigate({ to: NAMES_WAITING_PATH, replace: true });
     correcting.save({ personId: asked.personId, was: asked.displayName, displayName });
   };
 
-  /** A saved name takes its row away, so focus waits on the heading until the api answers. */
   const focusBack = (personId: string, saved: boolean) => {
     const row = saved ? null : document.getElementById(correctButtonId(personId));
     (row ?? headingRef.current)?.focus();
@@ -216,7 +208,6 @@ export function NamesWaitingList() {
       <OutcomeLine outcome={said ?? correcting.outcome} className="mt-2" />
 
       <Card className="mt-4">
-        {/* Drawn whatever the read says, so a refused read of it again takes no focus from the search. */}
         <FilterRow
           search={{
             label: WORDS.search,

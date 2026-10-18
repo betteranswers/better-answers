@@ -12,7 +12,6 @@ import { gatesNamed } from "@better-answers/devtools/root-commands";
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");
 
-/** A manifest without `scripts` reads as a workspace with none. */
 const manifest = z.object({ scripts: z.record(z.string(), z.string()).optional() });
 type Manifest = z.infer<typeof manifest>;
 
@@ -84,10 +83,6 @@ describe("the workspaces' scripts", () => {
   });
 });
 
-/**
- * The tree's oxlint runs once from the root; a workspace copy would annotate every warning
- * twice, on paths CI cannot place on a diff.
- */
 const GATE_STEPS = ["lint:python", "lint:python-format", "typecheck", "test", "e2e"] as const;
 
 const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<steps>.+)$/;
@@ -139,7 +134,6 @@ describe("one run of check names every failure", () => {
 describe("the gates a branch never narrows", () => {
   it("come before the tiers, each running over the whole tree", () => {
     const scripts = scriptsOf(".");
-    /** Expanded, because the root check names `check:gates` and the gates are that script's. */
     const steps = gatesNamed(scripts["check"] ?? "");
     const tiers = steps.indexOf("check:workspaces");
     const gates = steps.slice(0, tiers);
@@ -156,14 +150,11 @@ describe("the gates a branch never narrows", () => {
   });
 });
 
-/** A runner's command word, which pnpm resolves to its `.bin` shim. */
 const SHIMMED_RUNNERS: readonly string[] = ["vitest", "stryker"];
 
-/** The package whose runner each script starts. */
 const RUNNER_SCRIPTS: Readonly<Record<string, string>> = {
   test: "vitest",
   mutation: "@stryker-mutator/core",
-  // Knip loads the config a `--config` names, and the journeys' refuses to load without PUBLIC_URL.
   journeys: "@playwright/test",
 };
 

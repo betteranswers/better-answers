@@ -23,7 +23,6 @@ const PAGED = {
   page: PAGE_NUMBER,
 };
 
-/** A list read a page of older items at a time, so its address holds no page. */
 const UNPAGED = {
   search: z.string().catch(""),
   family: z.enum(FAMILIES).optional().catch(undefined),
@@ -31,12 +30,10 @@ const UNPAGED = {
 
 const KEPT_ON_CLEAR = ["sort"] as const;
 
-/** Twelve rows, five to a page. */
 const ROWS = 12;
 
 const PAGE_SIZE = 5;
 
-/** The draft in the box, the settled search in the address. */
 function Searched() {
   const list = useSearchedList("list", PAGED, KEPT_ON_CLEAR);
   const navigate = useNavigate();
@@ -97,7 +94,6 @@ const typeIn = (typed: string) => {
   });
 };
 
-/** Longer than the box's settle, so any write it would make has landed. */
 const pastTheSettle = () =>
   new Promise((resolve) => {
     setTimeout(resolve, 450);

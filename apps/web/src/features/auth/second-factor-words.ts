@@ -1,9 +1,7 @@
 import { dayWords, PRODUCT_NAME } from "@/shared/words.ts";
 
-/** Said when a field that waited on a throttle takes codes again. */
 export const CODE_AGAIN = "You can enter a code again.";
 
-/** The recovery code's button and the restore code's alike. */
 export const USE_CODE = "Use Code";
 
 export const CONFIRM_WORDS = {
@@ -21,18 +19,15 @@ export const CONFIRM_WORDS = {
   recoveryCode: "Use a Recovery Code",
 } as const;
 
-/** Shown to a person just made an Admin, until they first confirm, so a planted factor is seen. */
 export const PROMOTION_WORDS = {
   lead: "You’re now an Admin. You can confirm your sign-in with:",
   authenticator: "Authenticator",
   after: `If you don’t recognise one, confirm with one you do, then remove it from your Account page. If you don’t recognise any, sign out and contact ${PRODUCT_NAME} support.`,
 } as const;
 
-/** `Passkey · MacBook · added 3 March 2026`; an unnamed one is the passkey added that day. */
 export const passkeyThatConfirms = (name: string | null, createdAt: string): string =>
   ["Passkey", ...(name === null ? [] : [name]), `added ${dayWords(createdAt)}`].join(" · ");
 
-/** Said in the band on the page a refused change came from, once the person has confirmed. */
 export const UNSAVED_AFTER_CONFIRMING =
   "Confirmed. Your last change wasn't saved, so please make it again.";
 

@@ -18,7 +18,6 @@ const db = postgresForSuite();
 
 const door = () => openPostgres(db().runtimePool);
 
-/** A workspace, a waiting Editor invitation to a verified, named person, and that person. */
 const anInvitation = async (name: string) => {
   const workspace = await provisionedWorkspace(db(), name);
   const address = addressOf("priya");

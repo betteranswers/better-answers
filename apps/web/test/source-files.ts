@@ -10,7 +10,6 @@ const filesUnder = (directory: string, named: RegExp): readonly string[] =>
     return named.test(entry.name) ? [path.relative(source, here)] : [];
   });
 
-/** Each file under `src/` whose name matches, by its path from `src/`, with its text. */
 export const sourceFiles = (named: RegExp) =>
   filesUnder(source, named).map((file) => ({
     file,

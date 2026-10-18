@@ -13,7 +13,6 @@ export type ModelChoiceStored = {
   readonly model: string;
 };
 
-/** A retention tail is the provider's, so it is kept only while the provider stays the same. */
 const CHOICE_STORED = `INSERT INTO model_choice (id, workspace_id, purpose, provider, model)
   VALUES ($1, $2, $3, $4, $5)
   ON CONFLICT (workspace_id, purpose) DO UPDATE
@@ -22,7 +21,6 @@ const CHOICE_STORED = `INSERT INTO model_choice (id, workspace_id, purpose, prov
         retention_tail = CASE WHEN model_choice.provider = EXCLUDED.provider
                               THEN model_choice.retention_tail END`;
 
-/** Replaces the workspace's choice for the purpose in place, so its id outlives the change. */
 export const storeModelChoice = async (tx: Tx, choice: ModelChoiceStored): Promise<void> => {
   await tx.query(CHOICE_STORED, [
     ulid(),
@@ -40,7 +38,6 @@ const PRICED_ON = `SELECT provider FROM model_price
 
 const pricedRow = z.object({ provider: z.enum(MODEL_PROVIDERS) });
 
-/** The provider, as a price names it, when a price for the model is in effect on `now`'s day. */
 export const pricedProviderOn = async (
   tx: Tx,
   model: { readonly provider: string; readonly model: string },

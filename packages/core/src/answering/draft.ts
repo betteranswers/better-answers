@@ -25,10 +25,8 @@ import { ANSWER_KIND, type PlannedAnswer, type ReadStep, type RelatedConcept } f
 import type { DraftedSentence, DraftKeeping } from "./record.ts";
 import { checkedSentence, finishedSentences, type Citable } from "./sentences.ts";
 
-/** How a collection's part ended; after `paused`, at the spending limit, nothing more is drafted. */
 type DraftOutcome = "drafted" | "refused" | "failed" | "paused";
 
-/** Each event the drafter sends after the result: a sentence that passed, then its part's end. */
 export type DraftEvent<Iri extends string = ConceptIri> =
   | {
       readonly kind: "sentence";
@@ -38,24 +36,20 @@ export type DraftEvent<Iri extends string = ConceptIri> =
     }
   | { readonly kind: "part"; readonly collection: string | null; readonly outcome: DraftOutcome };
 
-/** What the drafter is handed in place of a door; each runs in a transaction of its own. */
+/** Each step runs in a transaction of its own. */
 export type DraftSteps<Refused = never> = {
   readonly read: ReadStep<Refused>;
-  /** Stamps its own time, so a later part's reservation lives its full ten minutes. */
   readonly reserve: (
     reserving: Omit<DraftReserving, "now">,
   ) => Promise<Result<CallReserved | undefined, Refused | JudgeRefusal>>;
-  /** Called with no transaction open. */
   readonly streamModel: StreamModel;
   readonly keepDraft: (kept: Omit<DraftKeeping, "now">) => Promise<Result<void, Refused | Error>>;
 };
 
-/** One collection's concepts that are no `Answer`, each with the label its footnote carries. */
 type Part = { readonly collection: string | null; readonly citable: readonly Citable[] };
 
 const isPreview = (concept: RelatedConcept): boolean => concept.kind !== ANSWER_KIND;
 
-/** An `Answer` is never drafted from. Labels run across the result, so no two parts share one. */
 const partsOf = (answer: PlannedAnswer): readonly Part[] => {
   const parts = new Map<string | null, Citable[]>();
   for (const [place, concept] of answer.related.filter(isPreview).entries()) {
@@ -86,13 +80,11 @@ const conceptBlock = (label: string, concept: OpenedConcept): string =>
     "</concept>",
   ].join("\n");
 
-/** Bounds the request's own framing, as the judge's does. */
 const FRAMING_TOKENS = 2_000;
 
 /** Each attempt's `max_tokens`, the model's thinking and a part's few sentences together. */
 const DRAFT_TOKENS_OUT = 16_000;
 
-/** A part's call, every attempt inside it, well within the ten minutes its reservation lasts. */
 const DRAFT_WITHIN_MS = 150_000;
 
 const utf8 = new TextEncoder();
@@ -105,7 +97,6 @@ const sizeOf = (prompt: string): CallSize => ({
 
 type Read = { readonly label: string; readonly concept: OpenedConcept };
 
-/** The question as the typed-text check leaves it, and each concept apart from the others. */
 const draftCall = (
   question: string,
   collection: string | null,
@@ -126,7 +117,6 @@ const draftCall = (
 
 type Drafted = { readonly sentences: readonly DraftedSentence[]; readonly ended: StreamedOutcome };
 
-/** Each sentence that passes, sent as soon as it is finished; one that fails is never sent. */
 async function* sentencesOf(
   reply: AsyncGenerator<string, StreamedOutcome, undefined>,
   part: Part,
@@ -153,7 +143,6 @@ async function* sentencesOf(
   }
 }
 
-/** An answered reply with no sentence left is replaced by the refusal. */
 const outcomeOf = ({ sentences, ended }: Drafted): DraftOutcome => {
   if (ended.outcome !== "answered") return "failed";
   return sentences.length === 0 ? "refused" : "drafted";
@@ -169,27 +158,18 @@ type DraftRefusal = RefusalOf<typeof draftAction> | Error;
 
 type Drafting = {
   readonly question: string;
-  /** The asker's: once it aborts, no further part is drafted. */
   readonly signal?: AbortSignal;
 };
 
 type PartDone<Refused> = {
   readonly outcome: DraftOutcome;
-  /** What a step answered that ends drafting, once its part's end is sent. */
   readonly failure?: DraftRefusal | Refused;
 };
 
-/** The workspace has no answering model, so no part is drafted. */
 const NO_MODEL = "no-model";
 
-/** `undefined` for a part with no concept the reader may still read, which is passed over. */
 type PartTried<Refused> = PartDone<Refused> | typeof NO_MODEL | undefined;
 
-/**
- * Drafts prose over an evidence result, one part per collection, under the same reservation
- * rules as the judge. A part's concepts are read again as the reader may read them now. At the
- * spending limit, drafting stops with that part paused.
- */
 export async function* draftAnswer<Refused = never>(
   principal: UserPrincipal,
   steps: DraftSteps<Refused>,
@@ -204,7 +184,6 @@ export async function* draftAnswer<Refused = never>(
   const everyCitable = parts.flatMap((part) => part.citable);
   const drafted: DraftedSentence[] = [];
 
-  /** One part: its concepts read, its call reserved, streamed and settled with what it drafted. */
   async function* partDrafted(
     part: Part,
   ): AsyncGenerator<DraftEvent, PartTried<Refused>, undefined> {
@@ -216,7 +195,6 @@ export async function* draftAnswer<Refused = never>(
       const concept = byIri.get(iri);
       return concept === undefined ? [] : [{ label, concept }];
     });
-    // A concept the reader can no longer read is not drafted from, nor citable.
     if (read.length === 0) return undefined;
     const readable = { ...part, citable: part.citable.filter(({ iri }) => byIri.has(iri)) };
     const call = draftCall(drafting.question, part.collection, read, drafting.signal);
@@ -235,14 +213,12 @@ export async function* draftAnswer<Refused = never>(
       drafted: [...drafted],
       settled: { reservationId, calls: done.ended.spent },
     });
-    // Prose sent but not kept is no draft the record holds, so its part ends as failed.
     return kept.ok ? { outcome: outcomeOf(done) } : { outcome: "failed", failure: kept.error };
   }
 
   return yield* eachPart(parts, partDrafted, drafting.signal);
 }
 
-/** Each part in turn, until one is paused or fails, or the asker leaves. */
 async function* eachPart<Refused>(
   parts: readonly Part[],
   partDrafted: (part: Part) => AsyncGenerator<DraftEvent, PartTried<Refused>, undefined>,

@@ -33,7 +33,6 @@ const RINGING = "Heron ringing records";
 
 const MALFORMED = { data: { httpStatus: 400, refusal: { word: "malformed", class: "malformed" } } };
 
-/** A workspace with a Viewer, holding the concepts its Admin wrote in the order given. */
 const aWorkspaceHolding = async (written: readonly Readonly<Record<string, unknown>>[]) => {
   const workspace = await app().provision();
   const viewer = await app().person();
@@ -67,7 +66,6 @@ const RINGING_WRITTEN = {
 
 const NESTING_BODY = "Herons nest on the synthetic reservoir island from March.";
 
-/** Four concepts naming herons, the last Restricted, in a workspace with a Viewer. */
 const aWorkspaceOfHerons = () =>
   aWorkspaceHolding([
     { title: NESTING, body: NESTING_BODY, trust: "machine-confirmed" },
@@ -76,7 +74,6 @@ const aWorkspaceOfHerons = () =>
     RINGING_WRITTEN,
   ]);
 
-/** Nesting, its body linking Feeding and the Restricted Ringing by their files, with a Viewer. */
 const aConceptLinkingTwo = () =>
   aWorkspaceHolding([
     FEEDING_WRITTEN,
@@ -88,7 +85,6 @@ const HANDBOOK_TITLE = "The synthetic heron handbook";
 const MINUTES_LABEL = "Warden minutes";
 const MINUTES_TITLE = "Synthetic warden minutes, March";
 
-/** A workspace with a Viewer, its Admin writing to a fresh repository through the doors a write takes. */
 const aWorkspaceBeingWritten = async () => {
   const { workspaceId, admin } = await app().provision();
   const git = openTestGit(app());
@@ -100,7 +96,6 @@ const aWorkspaceBeingWritten = async () => {
   return { workspaceId, admin, viewer, git, writer, doors };
 };
 
-/** A concept citing an Internal handbook passage and a Restricted one of minutes, with a Viewer. */
 const aConceptCitingRestrictedMinutes = async () => {
   const { workspaceId, admin, viewer, git, writer, doors } = await aWorkspaceBeingWritten();
   const landed = (shape: DocumentShape) =>
@@ -149,7 +144,6 @@ const aConceptCitingRestrictedMinutes = async () => {
   };
 };
 
-/** The MCP edge names a verifier's keys its own way; core's are what the web reads. */
 const inCoresKeys = (hit: Rpc): Rpc => {
   if (hit["trust"] === undefined) return hit;
   const { checkedBy, checkedAt, ...trust } = rpcOf(hit["trust"]);
@@ -263,7 +257,6 @@ const mcpOpenedBy = async (person: { readonly email: string }, iri: string) => {
 
 const ASKS_THE_BOARD = "Ask [the board](../board.md).";
 
-/** Three notes alike, whose link names a Restricted concept, a file nobody wrote, and a path outside the bundle. */
 const threeNotesAskingTheBoard = async () => {
   const { admin, viewer, git, writer, doors } = await aWorkspaceBeingWritten();
   const written = async (
@@ -486,7 +479,6 @@ describe("the knowledge router, signed out", () => {
   });
 });
 
-/** tRPC's own GET for one procedure, unbatched, as a browser or a cache in between sees it. */
 const readAt = (procedure: "find" | "open", input: Rpc): string =>
   `${TRPC_ENDPOINT}/knowledge.${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`;
 
@@ -514,7 +506,6 @@ describe("a knowledge read's answer over GET", () => {
   });
 });
 
-/** MCP_TOKEN_RULE's numbers: one connection's calls a minute. */
 const READS_A_MINUTE = 120;
 
 const SHARED_ADDRESS = "203.0.113.118";

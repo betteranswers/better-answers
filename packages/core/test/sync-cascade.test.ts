@@ -48,7 +48,6 @@ type SyncShape = {
   readonly status?: "done" | "failed" | "poisoned";
   readonly attempts?: number;
   readonly finishedAt?: Date;
-  /** Omitted: the outcome carries no key at all. */
   readonly moved?: readonly string[];
 };
 
@@ -102,7 +101,6 @@ const syncLapsed = (scenario: Scenario, connectedSourceId: string): Promise<stri
     return job.id;
   });
 
-/** What a sync's catalogue write leaves on a document; no index job is touched. */
 const documentSetTo = (scenario: Scenario, documentId: string, sensitivity: string | null) =>
   db().pool.query(
     "UPDATE source_document SET sensitivity = $3 WHERE workspace_id = $1 AND id = $2",
@@ -144,7 +142,6 @@ const pass = async (scenario: Scenario) => {
 const followedEvents = (scenario: Scenario) =>
   auditEventRowsOf(db().pool, scenario.workspaceId, FOLLOWED);
 
-/** A source of two documents, a concept on each; the first document is the one a sync narrows. */
 const twoCitedDocuments = async (scenario: Scenario) => {
   const narrowed = await connectedSourceHolding(db(), scenario.workspaceId);
   const untouched = await documentUnder(
@@ -347,7 +344,6 @@ describe("a sync that narrows a cited document", () => {
   });
 });
 
-/** Refuses the step's event for one job, so that sync's transaction fails as a real fault would. */
 const refusingTheMarkerOf = async <T>(jobId: string, work: () => Promise<T>): Promise<T> => {
   const name = `refuse_marker_${jobId.toLowerCase()}`;
   await db().pool.query(

@@ -53,10 +53,7 @@ export type SetModelChoiceRefusal =
       "no-such-workspace" | "fixed-model-choice" | "no-sub-processor" | "no-model-price"
     >;
 
-/**
- * Sets the model a workspace calls for one purpose, replacing the one it held, and records who set
- * which. Only a provider the DPIA names as a sub-processor, and a model priced today, is taken.
- */
+/** Only a provider the DPIA names as a sub-processor, and a model priced today, is taken. */
 export const setModelChoice = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

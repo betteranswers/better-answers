@@ -21,7 +21,6 @@ import { inputOf } from "./suite-input.ts";
 import { answered, readingAs } from "./suite-postgres.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
-/** A suite over bundles whose `reading` works as a principal under row-level security. */
 export const visibilitySuite = () => {
   const { db, arrange } = suiteWithBundles();
   return {
@@ -34,7 +33,6 @@ export const visibilitySuite = () => {
   };
 };
 
-/** Seeds rows straight into the tables on the privileged pool; no action runs. */
 export const seededBy = async <T>(
   db: MigratedPostgres,
   work: (seed: TestData) => Promise<T>,
@@ -59,7 +57,6 @@ export type Sourced = {
   readonly documentId: string;
 };
 
-/** A connected source of one document; unset `shape` fields default to published, Internal, everyone. */
 export const connectedSourceHolding = (
   db: MigratedPostgres,
   workspaceId: string,
@@ -81,7 +78,6 @@ export const connectedSourceHolding = (
 const INDEXED_AT = new Date("2026-09-24T09:00:00.000Z");
 const PUBLISHED_AT = new Date("2026-09-24T10:00:00.000Z");
 
-/** Seeds a finished sync, then publishes as `admin`; the action's answer comes back unverified. */
 export const publishedOnceIndexed = async (
   db: MigratedPostgres,
   admin: UserPrincipal,
@@ -130,7 +126,6 @@ export const connectedSourceForGroups = (
     audienceGroups: groups,
   });
 
-/** `sensitivity` is the document's own class; `null` leaves it at its connected source's. */
 export const documentUnder = (
   db: MigratedPostgres,
   workspaceId: string,
@@ -154,7 +149,6 @@ export type PassageShape = {
   readonly charEnd: number;
 };
 
-/** The row's locator holds the span alone, without the document id. */
 export const passageUnder = (
   db: MigratedPostgres,
   workspaceId: string,
@@ -191,7 +185,6 @@ export const passageVersionsOf = async (
   return read.rows.map((row) => row.version);
 };
 
-/** Documents under a Restricted and an Internal connected source, and a Restricted one under Internal. */
 export const restrictedAndInternal = async (
   db: MigratedPostgres,
   workspaceId: string,
@@ -240,7 +233,6 @@ export type SourcedConcept = ConceptWritten & {
 
 let sequence = 0;
 
-/** Writes a stable Note citing each document once, through the action; throws on a refusal. */
 export const conceptCiting = async (
   scenario: Scenario,
   writer: UserPrincipal,
@@ -273,7 +265,6 @@ export const conceptCiting = async (
   return { ...written.value, path, mergeKey, title };
 };
 
-/** Re-writes the note through the action, citing `documents` in place of what it cited. */
 export const rewriteCiting = async (
   scenario: Scenario,
   writer: UserPrincipal,
@@ -300,7 +291,6 @@ export const rewriteCiting = async (
     ...overrides,
   });
 
-/** The scenario's Admin overrides the concept's sensitivity, its audience everyone. */
 export const overriddenBy = (
   db: MigratedPostgres,
   scenario: Scenario,
@@ -311,7 +301,6 @@ export const overriddenBy = (
     overrideConceptSensitivity(admin, tx, { iri, sensitivity, audience: "everyone" }),
   );
 
-/** Makes a group of `people` and returns its id; throws when the create or an add is refused. */
 export const groupNamed = async (
   db: MigratedPostgres,
   scenario: Scenario,
@@ -333,7 +322,6 @@ export const groupNamed = async (
     }),
   );
 
-/** Makes a group of `people`, and a concept citing the one document of a connected source for it alone. */
 export const conceptForGroup = async (
   db: MigratedPostgres,
   scenario: Scenario,

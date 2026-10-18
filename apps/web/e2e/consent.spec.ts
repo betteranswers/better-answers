@@ -33,11 +33,9 @@ const displayNameHeading = (page: Page) =>
 
 const themeOf = (page: Page) => page.evaluate(() => document.documentElement.dataset["theme"]);
 
-/** The api's pages paint their surface on `<body>`, where the SPA paints `<html>`. */
 const pagePainted = (page: Page) =>
   page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
-/** Answers the colour painted. A token nothing declares paints transparent on both sides of the comparison. */
 const paintsTheDarkPage = async (page: Page): Promise<string> => {
   expect(await themeOf(page), "the page ignored the theme kept").toBe("dark");
   const painted = await pagePainted(page);
@@ -46,7 +44,6 @@ const paintsTheDarkPage = async (page: Page): Promise<string> => {
   return painted;
 };
 
-/** A new workspace's Admin, signed in and on the consent page Claude asked for. */
 const anAdminAtConsent = async (
   page: Page,
   api: APIRequestContext,

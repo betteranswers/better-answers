@@ -50,7 +50,6 @@ const LISTED = Object.values(KEY);
 const keyOf = (match: Match): string =>
   match.layer === "bundles" ? conceptMatchKey(match.iri) : `sources:${match.locator}`;
 
-/** A concept rewritten between pages can come back on the next, so a repeat is dropped. */
 const matchesOf = (data: Matches["data"]): readonly Match[] => {
   const seen = new Set<string>();
   return (data?.pages ?? [])
@@ -63,7 +62,6 @@ const matchesOf = (data: Matches["data"]): readonly Match[] => {
     });
 };
 
-/** Every state is said here, a region that stays mounted, and never with a count. */
 const saidOf = (query: string, matches: Matches, shown: number): string => {
   if (asksNothing(query)) return WORDS.nothingAsked;
   if (matches.isPending) return WORDS.searching(query);
@@ -73,14 +71,11 @@ const saidOf = (query: string, matches: Matches, shown: number): string => {
 
 type OpenedFor = Opened & { readonly query: string };
 
-/** Open for the search on the page, with its match still among the ones a re-read lists. */
 const stillListed = (opened: OpenedFor, query: string, shown: readonly Match[]): boolean =>
   opened.query === query && shown.some((match) => keyOf(match) === opened.key);
 
-/** Takes a line of its own where the kind beside it leaves too little room. */
 const TITLE = "min-w-0 grow basis-48 font-medium break-words";
 
-/** The match whose page the reader opened and came back from, where focus goes once. */
 type Returning = { readonly key: string | undefined; readonly landed: () => void };
 
 type Reading = {
@@ -254,16 +249,13 @@ function Results(properties: {
   );
 }
 
-/** Search's history entry keeps the match opened, for Back; the concept's keeps the query left. */
 const useReading = (query: string): Reading => {
   const router = useRouter();
   const navigate = useNavigate();
   const returned = useRouterState({
     select: (state) => RETURNED_TO.safeParse(state.location.state).data?.openedMatch,
   });
-  // Taken as the page opens: marking the entry on the way out must move no focus.
   const [returning, setReturning] = useState({ key: returned, query });
-  // A match the search returned to never drew is not waited for under the next one.
   if (returning.key !== undefined && returning.query !== query) {
     setReturning({ key: undefined, query });
   }
@@ -293,10 +285,6 @@ const useReading = (query: string): Reading => {
   };
 };
 
-/**
- * A passage closes as its match leaves the list: with its search, or when a re-read no longer
- * lists it, which the page says.
- */
 const useOpening = (
   query: string,
   shown: readonly Match[],
@@ -311,7 +299,6 @@ const useOpening = (
   const left = leftIn === query;
   if (leftIn !== undefined && !left) setLeftIn(undefined);
 
-  // Focus that went with the panel has no opener to go back to, so it goes to the list's heading.
   useEffect(() => {
     if (left && document.activeElement === document.body) heading.current?.focus();
   }, [left, heading]);
@@ -348,7 +335,6 @@ function SearchRegion() {
   return (
     <section
       aria-labelledby={headingId}
-      // Room for the panel beside the list, so it covers none of the matches.
       className={cn("mt-6", opened !== undefined && beside && "pr-[var(--container-md)]")}
     >
       <h2 ref={heading} id={headingId} tabIndex={-1}>
@@ -369,7 +355,6 @@ function SearchRegion() {
           {saidOf(query, matches, shown.length)}
           {left ? ` ${WORDS.passageLeft}` : null}
         </output>
-        {/* Keyed, so a page landing late for the last search never reaches this one's list. */}
         <Results
           key={query}
           query={query}

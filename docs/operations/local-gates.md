@@ -146,7 +146,6 @@ It adds the cap and reloads the service with `launchctl bootout` and `bootstrap`
 | skills | `provision-skills.sh`: the installed, ignored agent tooling |
 | scratch | the primary checkout's `.scratch`, linked |
 | planning | the primary checkout's `.planning`, linked, for the same reasons as `.scratch` |
-| personas | `docs/personas`, a relative link to `.planning/personas`, where `/ce-dogfood` reads personas |
 
 **The upstream.** `git worktree add -b <branch> <path> origin/main` sets the new branch to track `origin/main`, silently: a bare `git push` from the worktree then aims at `main`. `push.default` is unset here, so git's `simple` refuses the mismatched push — the tracking is surprising rather than harmful — and the stage unsets it so the branch's upstream is set on its first `git push -u`, by the session that means it. Here and not in the create hook, because a worktree made by hand fires no hook and runs this.
 
@@ -158,9 +157,7 @@ It adds the cap and reloads the service with `launchctl bootout` and `bootstrap`
 
 The link cannot bloat the worktree's jCodeMunch index, for two independent reasons: `jcodemunch-mcp index` walks a directory symlink only under `--follow-symlinks`, which this script does not pass, and `.gitignore` names `.scratch` besides. Measured over a throwaway tree: 3 files indexed, then the 45,256-file `.scratch` linked into it and re-indexed — 0 new files, and 0 again for a symlinked directory that no ignore pattern covered.
 
-That `.gitignore` pattern carries no trailing slash on purpose. Git reads a symlink as a file, so `.scratch/` would match the primary's directory and leave every worktree's link showing as `?? .scratch`: the remove hook would then keep each worktree as one holding untracked work, and a `git add -A` would commit the link. `.planning` and `docs/personas` are ignored the same way.
-
-**Why the personas are linked, not committed.** They carry customer material, and the repository is public. `docs/personas` is relative, so the one link resolves in the primary checkout and, through the `.planning` link, in every worktree. A cloud session has neither, and `/ce-dogfood` there infers a persona and says so.
+That `.gitignore` pattern carries no trailing slash on purpose. Git reads a symlink as a file, so `.scratch/` would match the primary's directory and leave every worktree's link showing as `?? .scratch`: the remove hook would then keep each worktree as one holding untracked work, and a `git add -A` would commit the link. `.planning` is ignored the same way.
 
 Nothing is copied from `.env.local`: no workspace, test or compose file reads it, and tests reach Postgres through Testcontainers. If that changes, copy the file here — a `WorktreeCreate` hook suppresses `.worktreeinclude`.
 

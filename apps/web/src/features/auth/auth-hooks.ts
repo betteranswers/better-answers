@@ -64,19 +64,15 @@ const sessionOptions = () =>
     queryFn: () => unwrap(authClient.getSession()),
   });
 
-/** Its `data` is null when this browser holds no session. */
 export const useSession = () => useQuery(sessionOptions());
 
-/** The person's own, read before any workspace is open, so it belongs to none of them. */
 const theWorkspaceList = (api: ApiProxy) => api.person.workspaces.pathFilter();
 
 type WorkspacesHeld = inferOutput<ApiProxy["person"]["workspaces"]>;
 
-/** One level, as the picker and the switcher both list a workspace: its name, then the role. */
 const withTheRole = (held: WorkspacesHeld) =>
   held.map(({ workspace, role }) => ({ ...workspace, role }));
 
-/** `asked` false reads nothing yet, for a list shown only once a menu opens. */
 export const useWorkspacesHeld = (asked = true) => {
   const api = useTRPC();
   return useQuery(
@@ -95,18 +91,15 @@ const waitNamedBy = (response: Response): number | undefined =>
 
 const SERVER_FAILED = 500;
 
-/** The two refusals our own routes answer by status alone. */
 export const SIGNED_OUT = 401;
 
 export const TOO_MANY_REQUESTS = 429;
 
-/** The api refused a code's send or its check, by form or by link, with the wait a ceiling named. */
 export class CodeRefused extends Error {
   readonly status: number;
   readonly waitSeconds: number | undefined;
   readonly libraryCode: string | undefined;
 
-  /** The refusal's word, when one of our own routes named it. */
   readonly word: string | undefined;
 
   constructor(
@@ -149,7 +142,6 @@ const unwrapWithTheWait = async <TData>(
   throw new CodeRefused(error.status, waitSeconds, error.code);
 };
 
-/** Sealed into the email's link, so a sign-in through it returns where this page would. */
 const returnPathOf = (query: string): { readonly redirect?: string } => {
   const redirect = new URLSearchParams(query).get("redirect");
   return redirect === null ? {} : { redirect };
@@ -168,7 +160,6 @@ const sendVerificationOtpOptions = () =>
 
 export const useSendVerificationOtp = () => useMutation(sendVerificationOtpOptions());
 
-/** Whitespace alone is no name. */
 export const hasADisplayName = (name: string): boolean => name.trim() !== "";
 
 export type SignedIn = { readonly displayNameGiven: boolean };
@@ -179,8 +170,6 @@ const signInEmailOtpOptions = () =>
       const answer = await unwrapWithTheWait((reading) =>
         authClient.signIn.emailOtp(input, reading),
       );
-      // An answer naming nobody sends the person to the display-name page, whose own read
-      // decides.
       return { displayNameGiven: answer !== null && hasADisplayName(answer.user.name) };
     },
     onSuccess: signedInHere,
@@ -188,13 +177,11 @@ const signInEmailOtpOptions = () =>
 
 export const useSignInEmailOtp = () => useMutation(signInEmailOtpOptions());
 
-/** The shape the api accepts, not the one it mints, so a change of length never reads as no link. */
 const LINK_TOKEN = /^#([A-Za-z0-9]{1,128})$/;
 
 export const linkTokenOnThisPage = (): string | undefined =>
   LINK_TOKEN.exec(globalThis.location.hash)?.[1];
 
-/** History keeps its state, so the router's key for this entry survives. */
 export const dropTheLinkToken = (): void => {
   const { hash, pathname, search } = globalThis.location;
   if (hash === "") return;
@@ -213,7 +200,6 @@ const linkDescribed = z.discriminatedUnion("state", [
 
 export type LinkDescribed = z.infer<typeof linkDescribed>;
 
-/** Strings, or the browser's own answer to a passkey's ask. */
 type RouteBody =
   | Readonly<Record<string, string>>
   | { readonly name: string; readonly response: RegistrationResponseJSON }
@@ -221,11 +207,9 @@ type RouteBody =
 
 const refusalWord = z.object({ error: z.string() });
 
-/** The word a route's refusal names, if its answer names one. */
 const wordOf = async (answered: Response): Promise<string | undefined> =>
   refusalWord.safeParse(await answered.json().catch(() => undefined)).data?.error;
 
-/** Neither Better Auth's nor tRPC's, so a ceiling's wait is read off the answer here. */
 export const askOfOurRoute = async <T>(
   path: string,
   body: RouteBody,
@@ -251,7 +235,6 @@ export const askOfOurRoute = async <T>(
 
 const ASKED_AGAIN_AT_MOST = 2;
 
-/** Each read spends the link's ceiling, and a failed read stays stale, so only Read again reads twice. */
 export const useDescribeTheLink = (token: string | undefined, reading: boolean) =>
   useQuery({
     queryKey: [...AUTH_KEYS.all, "link", token],
@@ -280,17 +263,12 @@ const signInByLinkOptions = () =>
 
 export const useSignInByLink = () => useMutation(signInByLinkOptions());
 
-/** A session left pending ended on its hour; one confirmed or never pending just ended. */
 const ARRIVAL_AFTER = {
   held: "session-ended",
   pending: "confirm-timed-out",
   "signed-out": "signed-out",
 } as const satisfies Record<NonNullable<ReturnType<typeof sessionRemembered>>, Arrival>;
 
-/**
- * Said only once the api reads no session: a failed sign-out, or a visit while signed in, leaves
- * one standing.
- */
 export const useArrival = (): Arrival | undefined => {
   const [remembered] = useState(sessionRemembered);
   const session = useQuery({ ...sessionOptions(), enabled: remembered !== undefined });
@@ -298,17 +276,9 @@ export const useArrival = (): Arrival | undefined => {
   return ARRIVAL_AFTER[remembered];
 };
 
-/**
- * Undefined when unread: the page then stands, and its own next request says in words what went
- * wrong.
- */
 const sessionOrUnread = (queryClient: QueryClient) =>
   queryClient.fetchQuery(sessionOptions()).catch(() => undefined);
 
-/**
- * Read before the page draws, so a person it has nothing to ask never sees it; an invitation
- * asks its invitee's name.
- */
 export const displayNameDetour = async (
   queryClient: QueryClient,
   api: ApiProxy,
@@ -323,7 +293,6 @@ export const displayNameDetour = async (
   return hasADisplayName(session.user.name) || isAnInvitation(next) ? next : undefined;
 };
 
-/** Only a signed-out visitor is sent on, to sign in and come back to `path`. Undefined: it draws. */
 export const signedOutDetour = async (
   queryClient: QueryClient,
   path: string,
@@ -332,7 +301,6 @@ export const signedOutDetour = async (
   return session === null ? backTo("/sign-in", path) : undefined;
 };
 
-/** A step's query already names where the person returns, so sign-in keeps it whole. */
 export const signedOutOfAStep = async (
   queryClient: QueryClient,
   query: string,
@@ -341,18 +309,14 @@ export const signedOutOfAStep = async (
   return session === null ? `/sign-in${query}` : undefined;
 };
 
-/** Read again rather than dropped, for a page that shows whose session it is. */
 export const rereadTheSession = (queryClient: QueryClient): Promise<void> =>
   queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
 
-/** A save drops the held session, so the next read of it carries the new name. */
 export const useSetDisplayName = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   return useMutation(
     api.person.setDisplayName.mutationOptions({
-      // Removed, not invalidated: no page watches it here, so a stale answer would be the next
-      // page's first read.
       onSuccess: () => {
         queryClient.removeQueries({ queryKey: AUTH_KEYS.session });
       },
@@ -360,10 +324,6 @@ export const useSetDisplayName = () => {
   );
 };
 
-/**
- * A join points the session at the workspace joined, so what is held of the workspace left is
- * dropped before the shell reads it.
- */
 export const useAcceptInvitation = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -389,10 +349,6 @@ const signOutOptions = () =>
     },
   });
 
-/**
- * Whatever the server answers, clears every held query and goes to the sign-in page, which
- * comes back to `returnTo` when one is named.
- */
 export const useSignOut = (returnTo?: string) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -402,8 +358,6 @@ export const useSignOut = (returnTo?: string) => {
     signingOut: signOut.isPending,
     signOut: () => {
       signOut.mutate(undefined, {
-        // On settle, not success: whatever the server said, this browser is done with the
-        // session the person asked to leave.
         onSettled: () => {
           queryClient.clear();
           rememberTheSession("signed-out");
@@ -416,16 +370,13 @@ export const useSignOut = (returnTo?: string) => {
   };
 };
 
-/** Better Auth's code for a pick of a workspace the person is not a member of. */
 const notAMember = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") });
 
 const libraryCode = z.object({ code: z.string() });
 
-/** A refused switch or pick in the platform's terms, so no page reads the provider's error. */
 export class SwitchRefused extends Error {
   readonly noLongerAMember: boolean;
 
-  /** The library's own, so a pending refusal heard app-wide is still told apart. */
   readonly code: string | undefined;
 
   constructor(noLongerAMember: boolean, code?: string) {
@@ -449,10 +400,6 @@ const setActiveOrganizationOptions = () =>
     mutationFn: (input) => setActiveWorkspace(input.organizationId),
   });
 
-/**
- * The session's, the console's and the workspace list's reads belong to no workspace, so a switch
- * keeps them. One left off is read again.
- */
 const aboutTheWorkspace = (api: ApiProxy) => {
   const theirOwn = [
     { queryKey: AUTH_KEYS.all },
@@ -463,18 +410,10 @@ const aboutTheWorkspace = (api: ApiProxy) => {
   return (query: Query) => !theirOwn.some((filters) => matchQuery(filters, query));
 };
 
-/**
- * Some reads, such as the members, name no workspace in their key, so a held answer is the left
- * workspace's.
- */
 const forgetTheWorkspaceLeft = (queryClient: QueryClient, api: ApiProxy) => {
   queryClient.removeQueries({ predicate: aboutTheWorkspace(api) });
 };
 
-/**
- * Another tab moved the session. The reads go as the cache hears the answer, before the frame
- * draws a page under it.
- */
 export const forgetAWorkspaceLeftElsewhere = (queryClient: QueryClient, api: ApiProxy): void => {
   const memberHash = hashKey(memberOptions(api).queryKey);
   let held = workspaceHeld(queryClient, api);
@@ -486,10 +425,6 @@ export const forgetAWorkspaceLeftElsewhere = (queryClient: QueryClient, api: Api
   });
 };
 
-/**
- * A pick drops the member read held and every read of the workspace left, and marks the held
- * session and workspace list stale.
- */
 export const useSetActiveOrganization = () => {
   const queryClient = useQueryClient();
   const api = useTRPC();
@@ -508,13 +443,8 @@ export const useSetActiveOrganization = () => {
 
 export type SwitchedTo = { readonly id: string; readonly name: string };
 
-/**
- * Whichever tab moved the session. The reads go before the first wait, so a rollback still on
- * its way finds them gone.
- */
 export const followTheSession = async (queryClient: QueryClient, api: ApiProxy): Promise<void> => {
   forgetTheWorkspaceLeft(queryClient, api);
-  // In place, not dropped, so the band blanks between the two only when the read fails or waits.
   await memberChanged(queryClient, api, { readAgain: true, ifUnread: "reset" });
   void queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
 };
@@ -541,7 +471,6 @@ const oauthContinueOptions = () =>
     mutationFn: async (input) => {
       const { data, error } = await authClient.oauth2.continue(input);
       if (error !== null) {
-        // The library's code rides along, so a pending refusal heard app-wide is still told apart.
         throw Object.assign(new Error(`answered ${String(error.status)}`), { code: error.code });
       }
       return resumeAnswer.parse(data);

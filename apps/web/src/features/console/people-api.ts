@@ -21,12 +21,10 @@ export type HeldGrant = PersonInspected["grants"][number];
 
 export type EndedGrant = PersonInspected["ended"][number];
 
-/** The api answers a hundred at most; fifty keeps a page inside the list's second. */
 export const PAGE_SIZE = 50;
 
 export type Asked = { readonly search: string; readonly offset: number };
 
-/** The page showing stays while the next is read, so a search never blanks the table. */
 export const usePeople = (asked: Asked) => {
   const api = useTRPC();
   return useQuery(
@@ -42,10 +40,6 @@ export const useInspected = (personId: string) => {
   return useQuery(api.console.people.inspect.queryOptions({ personId }));
 };
 
-/**
- * In the api's order, newest action first. A grant the server ended leaves, since the action deletes the
- * tokens its end is read from.
- */
 const endedEverywhere = (held: PersonInspected, at: string, by: DoneBy): PersonInspected => ({
   sessions: [],
   grants: [],
@@ -64,7 +58,6 @@ const endedEverywhere = (held: PersonInspected, at: string, by: DoneBy): PersonI
   ],
 });
 
-/** The operator, named as the api will name them once it answers. */
 const useTheOperator = (): DoneBy => {
   const standing = useOperatorStanding().data;
   return standing?.operator === true && standing.name.trim() !== ""
@@ -79,7 +72,6 @@ const revokedIn = (page: PeoplePage, personId: string, at: string): PeoplePage =
   ),
 });
 
-/** Every page of the list read so far, where `useOptimistic` takes one query. */
 const useOnEveryPage = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -102,7 +94,6 @@ const undoEach = (undos: readonly Undo[] | undefined) => {
   for (const each of undos ?? []) each.undo();
 };
 
-/** Everything reads ended before the api answers, so the action lands within 100 ms. */
 export const useEndEverySignInEverywhere = (personId: string) => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -110,7 +101,6 @@ export const useEndEverySignInEverywhere = (personId: string) => {
   const onEveryPage = useOnEveryPage();
   const operator = useTheOperator();
   const inspectedKey = api.console.people.inspect.queryKey({ personId });
-  // The callbacks go to the hook itself: the React lint takes one passed through `mutationOptions` as run during render.
   return useMutation({
     ...api.console.people.endEverySignInAndToken.mutationOptions<readonly Undo[]>(),
     onMutate: () => {
@@ -147,7 +137,6 @@ const renamedIn = (page: PeoplePage, personId: string, displayName: string): Peo
   ),
 });
 
-/** Corrected and off the names waiting before the api answers; trimmed, as the api keeps it. */
 export const useCorrectDisplayName = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

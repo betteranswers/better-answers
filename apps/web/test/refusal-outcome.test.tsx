@@ -19,7 +19,6 @@ const A_FEATURES_OWN = {
   "last-admin": "What this feature alone says of the last Admin.",
 } satisfies OwnSentences;
 
-/** Any word and class, as the api would send them: a word the web has never met still shows. */
 const refusedWith = (word: string, refusalClass: string): Error =>
   carrying({ refusal: { word, class: refusalClass } });
 
@@ -131,7 +130,6 @@ const THE_PEOPLES_OWN = {
 
 const nameOf = (id: string): string => (id === "p1" ? "Ada Lovelace" : "Grace Hopper");
 
-/** A set refused whole for its first item's word, naming each item it refused. */
 const refusedForItems = (items: Readonly<Record<string, string>>): Error =>
   carrying({ refusal: { word: "last-admin", class: "precondition", items } });
 

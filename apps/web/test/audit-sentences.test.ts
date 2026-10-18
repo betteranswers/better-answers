@@ -33,17 +33,14 @@ const byHannah = (
 
 const BY_THE_PLATFORM = { kind: "platform" } as const;
 
-/** Matches a sentence that opens with its actor and then holds each part, in this order. */
 const ledBy = (actor: string, ...parts: readonly string[]): RegExp =>
   new RegExp(
     `^${[actor, ...parts].map((part) => part.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)).join(".*")}`,
     "v",
   );
 
-/** A sentence whose actor is no person opens on the platform's own word, with a capital. */
 const LED_BY_NO_PERSON = /^\p{Lu}/v;
 
-/** A detail line as the data it shows; its label is the web's wording. */
 const shownIn = (lines: readonly DetailLine[]): readonly (readonly [string, string])[] =>
   lines.map(({ key, value }) => [key, value]);
 

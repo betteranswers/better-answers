@@ -9,10 +9,6 @@ import type { OperationContext } from "@trpc/client";
 
 import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 
-/**
- * The bytes are the mutation's input, so this rides beside them where the router's types never
- * reach; the api harness holds the pair.
- */
 export type UploadDescriptor = {
   readonly connectedSourceId: string;
   readonly name: string;
@@ -39,10 +35,6 @@ const HEADER_OF_FIELD = new Map<string, string>(Object.entries(UPLOAD_HEADER_OF_
 
 const UPLOAD_CONTEXT = "upload";
 
-/**
- * A header carries bytes and a file's name may not be one, so each value is its JSON,
- * percent-encoded.
- */
 export const uploadOptions = (descriptor: UploadDescriptor) => {
   const headers = new Headers();
   for (const [field, value] of Object.entries(descriptor)) {
@@ -60,7 +52,6 @@ const uploadHeadersOf = (context: OperationContext): Headers => {
 
 type ApiLinkOptions = Pick<Parameters<typeof httpBatchLink>[0], "url" | "fetch"> & {
   readonly uploadFetch?: Parameters<typeof httpLink>[0]["fetch"];
-  /** Asked at each send, and undefined while the tab holds no member read. */
   readonly heldWorkspace: () => string | undefined;
 };
 
@@ -70,7 +61,6 @@ type ApiLinkOptions = Pick<Parameters<typeof httpBatchLink>[0], "url" | "fetch">
  */
 const BATCH_URL_CEILING = 2083;
 
-/** Answered as a stream: its result first, then prose as it is drafted. */
 const STREAMED_PATH = "ask.question";
 
 export const apiLink = ({ uploadFetch, heldWorkspace, ...options }: ApiLinkOptions) => {
@@ -89,7 +79,6 @@ export const apiLink = ({ uploadFetch, heldWorkspace, ...options }: ApiLinkOptio
     }),
     false: splitLink({
       condition: (op) => op.path === STREAMED_PATH,
-      // Alone in its request, so no other call waits on the stream's end.
       true: httpBatchStreamLink({
         ...options,
         maxItems: 1,

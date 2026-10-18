@@ -34,7 +34,6 @@ describe("the release's wait against the api's own /health", () => {
 
   beforeAll(async () => {
     app = await startApp();
-    // Two authorization servers initialising at once on one database race for one row, so the harness's own settles first.
     await app.server.request("/health");
   });
 

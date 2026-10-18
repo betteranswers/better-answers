@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 
 import { journeysOver, moduleAt } from "./playwright-tree.ts";
 
-/** The sign-in page in the product's words, keeping the one behaviour the helper leans on: six digits submit. */
 const STAND_IN = String.raw`
 import { expect, test } from "@playwright/test";
 import { SIGN_IN_WORDS } from ${moduleAt("src/features/auth/sign-in-words.ts")};

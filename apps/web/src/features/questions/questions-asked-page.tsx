@@ -35,7 +35,6 @@ const questions = menuGroupIn(CONTROL_CENTRE, "questions");
 
 const LISTED = Object.values(KEY);
 
-/** The read has no sentence of its own, so each refusal shows its class's. */
 const { outcomeOfFailure } = refusalsOf({});
 
 const NOTHING_IN_FOCUS = selectFirst(WORDS.selectFirst);
@@ -46,7 +45,6 @@ const recordsOf = (data: QuestionsAsked["data"]): readonly AskedRecord[] =>
 type RowActions = {
   readonly open: (recordId: string) => void;
   readonly focusedOn: (recordId: string) => void;
-  /** Where each record stands in the order the read served it, which Load more lands by. */
   readonly servedAt: ReadonlyMap<string, number>;
   readonly landing: Landing;
 };
@@ -148,7 +146,6 @@ function Records(properties: { readonly asked: QuestionsAsked }) {
   const [inFocus, setInFocus] = useState<string>();
   const [openedId, setOpenedId] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
-  // A closing can carry its record past the loaded pages; its sheet stays on the last read.
   const opened = useLastRead(records, openedId);
   const closing = useFlagClosing();
 
@@ -212,7 +209,6 @@ function QuestionsAskedRegion() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      {/* No count: a total of questions asked is never shown. */}
       <ListHead heading={WORDS.heading} headingId={headingId} headingRef={headingRef} count="" />
       <Card className="mt-4 gap-0 py-0">
         <ListRead

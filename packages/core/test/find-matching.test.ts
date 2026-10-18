@@ -163,7 +163,6 @@ describe("find, by any of the query's words", () => {
   });
 });
 
-/** Two strong concepts, a passage, and two weak concepts, each run in a known order. */
 const threeRunsLanded = async (workspaceId: string): Promise<void> => {
   await documentLanded(db().pool, workspaceId, {
     title: "The audit log handbook",
@@ -198,7 +197,6 @@ const pagesOf = async (
 const titlesOrLocatorsOf = (result: FindResult): readonly string[] =>
   result.matches.map((match) => (match.layer === "bundles" ? match.title : match.locator));
 
-/** Two passages alike but for their span, so only the key orders them. */
 const ALIKE = "Audit logs, kept long.";
 
 describe("find's pages", () => {
@@ -220,7 +218,6 @@ describe("find's pages", () => {
 
     const page = await searching(viewer, QUESTION, 1);
 
-    // Of two concepts, audit is held by one and log by both: ln(1 + 1.5 / 1.5) + ln(1 + 0.5 / 2.5).
     expect(findCursor.parse(page.nextCursor)).toEqual({
       run: "strong",
       bound: { weight: expect.closeTo(Math.log(2.4), 12), rank: 2, key: retention },
@@ -417,7 +414,6 @@ describe("find's pages", () => {
   });
 });
 
-/** Runs `work` after a statement has failed, so every read it makes fails too. */
 const afterAFailedStatement = async <T, Refused>(
   person: UserPrincipal,
   work: (reader: UserPrincipal, tx: Tx) => Promise<Result<T, Refused>>,

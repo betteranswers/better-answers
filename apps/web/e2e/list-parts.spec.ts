@@ -15,7 +15,6 @@ test.beforeAll(async () => {
   });
 });
 
-/** No page draws every shared part yet, so the unit suite's Members list is drawn on its own. */
 const drawn = async (page: Page, request: APIRequestContext) => {
   await harnessDrawn(page, request, { title: "Members", script: parts ?? "" });
   await expect(page.getByRole("table")).toBeVisible();
@@ -25,7 +24,6 @@ const bar = (page: Page) => page.getByRole("toolbar", { name: "Selected Members"
 
 const tickOf = (page: Page, name: string) => page.getByRole("checkbox", { name: `Select ${name}` });
 
-/** The bar sits above the table, so a reader on a row's tick goes back to reach it. */
 const backUntilFocused = async (page: Page, target: Locator) => {
   for (let pressed = 0; pressed < 10; pressed += 1) {
     if (await target.evaluate((node) => node === document.activeElement)) return;
@@ -34,10 +32,8 @@ const backUntilFocused = async (page: Page, target: Locator) => {
   await expect(target, "Shift+Tab never reached it").toBeFocused();
 };
 
-/** WCAG's minimum target, measured as the points around a box that a press on it reaches. */
 const TARGET = 24;
 
-/** The box as drawn, and each corner of a 24-pixel square on its centre that misses it. */
 const targetOf = (tick: Locator) =>
   tick.evaluate((node, side) => {
     const box = node.getBoundingClientRect();
@@ -85,7 +81,6 @@ test.describe("the shared list parts, drawn together", () => {
     });
     expect(room.scrolls, "the page scrolls sideways").toBeLessThanOrEqual(room.holds);
     expect(room.pastTheEdge, "a part outside the table reaches past the edge").toEqual([]);
-    // Six columns cannot wrap into 320 pixels; the table scrolls in its own box, and this says how far.
     test.info().annotations.push({
       type: "table at 320 pixels",
       description: `${String(room.tableScrolls)} px of columns in ${String(room.tableHolds)} px`,

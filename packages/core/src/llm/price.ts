@@ -2,11 +2,9 @@ import type { ModelProvider } from "@better-answers/schema";
 
 import type { Tx } from "../store/postgres/index.ts";
 
-/** What a model costs in pounds per million tokens from a day on. */
 export type ModelPrice = {
   readonly provider: ModelProvider;
   readonly model: string;
-  /** A day, `yyyy-mm-dd`, from which the price applies. */
   readonly effectiveFrom: string;
   readonly gbpPerMillionIn: string;
   readonly gbpPerMillionOut: string;
@@ -19,7 +17,6 @@ const PRICE_SET = `INSERT INTO model_price
   DO UPDATE SET gbp_per_million_in = EXCLUDED.gbp_per_million_in,
                 gbp_per_million_out = EXCLUDED.gbp_per_million_out`;
 
-/** Replaces a price set for the same day; the audited action that calls it records the change. */
 export const storeModelPrice = async (tx: Tx, price: ModelPrice): Promise<void> => {
   await tx.query(PRICE_SET, [
     price.provider,

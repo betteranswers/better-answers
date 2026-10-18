@@ -15,13 +15,11 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-/** The api asks for any passkey, and refuses the one picked as no longer held. */
 const passkeyRoutes = (input: string | URL | Request): Promise<Response> =>
   addressOf(input).pathname === "/passkeys/sign-in"
     ? Promise.resolve(Response.json({ error: "passkey-unknown" }, { status: 401 }))
     : answered(A_CHALLENGE);
 
-/** A wait still open ends as the browser ends it, when another ceremony starts. */
 const waitingUntilAborted = (signal: AbortSignal | null | undefined): Promise<never> =>
   new Promise((_, reject) => {
     signal?.addEventListener("abort", () => {
@@ -29,7 +27,6 @@ const waitingUntilAborted = (signal: AbortSignal | null | undefined): Promise<ne
     });
   });
 
-/** The person cancels the press's prompt, then picks from the email field the second time. */
 const aDevice = () => {
   let autofills = 0;
   return vi.fn<(options: CredentialRequestOptions) => Promise<unknown>>((options) => {

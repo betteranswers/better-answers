@@ -6,10 +6,8 @@ export const AT = new Date("2026-10-02T12:00:00.000Z");
 
 const EXPIRES_AT = new Date("2026-10-09T12:00:00.000Z");
 
-/** The age `aSession` writes, so carrying it moves nothing. */
 export const ITS_OWN_AGE = { createdAt: AT, expiresAt: EXPIRES_AT };
 
-/** A suite's database, and the reads its second-factor tests share; called once per test file. */
 export const secondFactorSuite = () => {
   const db = postgresForSuite();
   const query = <Row extends object>(sql: string, values: readonly unknown[]) =>

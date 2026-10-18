@@ -71,10 +71,6 @@ const manifestScripts = (workspace: string): Readonly<Record<string, string>> =>
 
 const SCRIPT_CALL = /(?:pnpm run|check\.mjs)\s+([\w:.\- ]+)/g;
 
-/**
- * A delegating command names its binary in the script it runs, or in the steps that script
- * hands the `check` runner.
- */
 const reachedFrom = (workspace: string, run: string): string => {
   const scripts = manifestScripts(workspace);
   const namedIn = (text: string): readonly string[] =>

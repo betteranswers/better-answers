@@ -38,7 +38,6 @@ const indexesNamed = async (client: pg.PoolClient): Promise<readonly string[]> =
     )
   ).rows.map((row) => row.indexdef);
 
-/** The shape a database held before the migration, inside the caller's transaction. */
 const migratedFromBefore = async <T>(client: pg.PoolClient, read: () => Promise<T>): Promise<T> => {
   await client.query(`DROP INDEX "${THE_INDEX}"`);
   await migrated(client);
@@ -79,7 +78,6 @@ describe("the migration that indexes the audit log by actor", () => {
       await expect(blocked).rejects.toThrow(/canceling statement due to lock timeout/);
       expect(await withRollback(db.pool, indexesNamed)).toEqual([]);
     } finally {
-      // Puts the index back for the cases after, as `migrate` would have left it.
       await withCommit(db.pool, migrated);
     }
   });

@@ -19,7 +19,6 @@ export const TEST_INBOX_PAGE = z.object({
   data: z.array(TEST_INBOX_LISTED),
 });
 
-/** One message with its raw bytes in base64, so the reader can verify their signature itself. */
 export const TEST_INBOX_MESSAGE = TEST_INBOX_LISTED.extend({ raw: z.base64() });
 
 export type TestInboxListed = z.infer<typeof TEST_INBOX_LISTED>;

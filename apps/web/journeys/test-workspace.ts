@@ -8,7 +8,6 @@ import { counted } from "@/shared/words.ts";
 import { roleOfTheAdmin, standingOf, type Checked, type Member } from "./reads.ts";
 import { stopTheRun } from "./run-stop.ts";
 
-/** The Admin's journey moves these and puts them back, so a failed run may leave them Editors. */
 const REPAIR_MEMBERS = 3;
 
 export type TestPeople = Readonly<Record<Role, string>>;
@@ -19,18 +18,15 @@ export type Standing = {
   readonly connectedSources: number;
 };
 
-/** The part after the last `@`, as the fixture command reads it: a subdomain is another domain. */
 const domainOf = (address: string): string =>
   address.slice(address.lastIndexOf("@") + 1).toLowerCase();
 
-/** On the test people's own domain, as the fixture command puts them. */
 const inventedAt = (people: TestPeople, index: number): string =>
   inventedMemberAddress(index + 1, domainOf(people.Admin));
 
 const repairAddressesOf = (people: TestPeople): readonly string[] =>
   Array.from({ length: REPAIR_MEMBERS }, (_, index) => inventedAt(people, index));
 
-/** Each address the fixture holds, with the roles it may stand in. */
 const fixtureOf = (people: TestPeople): ReadonlyMap<string, readonly string[]> => {
   const invented = Array.from({ length: INVENTED_MEMBERS }, (_, index) => {
     const roles: readonly string[] = index < REPAIR_MEMBERS ? ["Viewer", "Editor"] : ["Viewer"];
@@ -43,7 +39,6 @@ const fixtureOf = (people: TestPeople): ReadonlyMap<string, readonly string[]> =
   return new Map([...testPeople, ...invented]);
 };
 
-/** Counts alone, since the reason reaches the run's summary and an address must not. */
 export const findingsIn = (standing: Standing, people: TestPeople): readonly string[] => {
   const fixture = fixtureOf(people);
   const rolesOf = (member: Standing["members"][number]) =>
@@ -71,13 +66,10 @@ export const findingsIn = (standing: Standing, people: TestPeople): readonly str
 };
 
 export type RepairMembers = {
-  /** Display names, as the Members page's ticks are labelled. */
   readonly names: readonly string[];
-  /** Those an earlier run left as Editors. */
   readonly editors: readonly string[];
 };
 
-/** Each repair member is here: a missing one is a finding, which stopped the run before now. */
 const repairMembersAmong = (members: readonly Member[], people: TestPeople): RepairMembers => {
   const addresses = repairAddressesOf(people);
   const repair = members.filter((member) => addresses.includes(member.address.toLowerCase()));
@@ -89,7 +81,6 @@ const repairMembersAmong = (members: readonly Member[], people: TestPeople): Rep
   };
 };
 
-/** A refusal the product named means the Admin lost their standing, which only someone changed. */
 const readOrStop = <T>(checked: Checked<T>): T =>
   checked.kind === "read"
     ? checked.value
@@ -97,10 +88,6 @@ const readOrStop = <T>(checked: Checked<T>): T =>
         `the test workspace refused the Admin's read of ${checked.procedure} (${checked.word})`,
       );
 
-/**
- * Read through the Admin's session before any action, their own role first. A finding stops the
- * run, so the Editor and Viewer never sign in.
- */
 export const theFixtureHolds = async (page: Page, people: TestPeople): Promise<RepairMembers> => {
   const role = readOrStop(await roleOfTheAdmin(page));
   if (role !== "Admin") stopTheRun("the test Admin no longer holds the Admin role");

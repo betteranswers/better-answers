@@ -9,7 +9,6 @@ import type * as ThemeStore from "@/shared/theme.ts";
 
 import { sourceFiles } from "./source-files.ts";
 
-/** A device whose colour scheme a test sets, and tells the page of as a browser does. */
 const aDevice = (dark: boolean) => {
   const listeners = new Set<() => void>();
   const media = {
@@ -33,7 +32,6 @@ const firstPaint = () => {
   new Function(FIRST_PAINT)();
 };
 
-/** Fresh per test: the store holds the choice made in this tab. */
 let store: typeof ThemeStore;
 
 beforeEach(async () => {
@@ -93,6 +91,12 @@ describe("the head script", () => {
         );
       }
     }
+  });
+});
+
+describe("the key a theme is kept under", () => {
+  it("keeps the name readers' browsers already hold", () => {
+    expect(THEME_KEPT_UNDER).toBe("better-answers.theme");
   });
 });
 

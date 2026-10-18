@@ -17,10 +17,8 @@ export const POSTGRES_COMMAND = [
 ] as const;
 
 export type MigratedPostgres = {
-  /** Connects as the superuser, whom no policy binds. */
   readonly pool: pg.Pool;
 
-  /** Connects as `app_rt`, the api's role, which every policy binds. */
   readonly runtimePool: pg.Pool;
 
   readonly connectionUri: string;
@@ -49,7 +47,6 @@ export const endPool = async (pool: pg.Pool): Promise<void> => {
   await closed;
 };
 
-/** Migrates nothing: opens both pools over `connectionUri`; `stop` ends them, then `release`. */
 export const migratedPostgresOver = (
   connectionUri: string,
   release: () => Promise<void>,
@@ -106,7 +103,6 @@ export const withRollback = async <T>(
   }
 };
 
-/** As `withRollback`, but keeps what `fn` wrote for the cases after it. */
 export const withCommit = async (
   pool: pg.Pool,
   fn: (client: pg.PoolClient) => Promise<void>,
@@ -124,7 +120,6 @@ export const withCommit = async (
   }
 };
 
-/** An action's transaction that has written to the audit log and not yet committed. */
 export const whileAnAuditWriteIsOpen = async <T>(
   pool: pg.Pool,
   work: () => Promise<T>,

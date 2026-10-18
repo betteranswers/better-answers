@@ -36,7 +36,6 @@ export function EndEverySignInEverywhere(properties: {
   const consequenceId = useId();
   const name = nameOf(person);
 
-  /** The dialog closes first, so focus is back on the action when the sessions empty. */
   const commit = () => {
     setConfirming(false);
     revocation.mutate({ personId: person.id });

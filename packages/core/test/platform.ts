@@ -78,7 +78,6 @@ export const seedPerson = async (pool: pg.Pool, overrides?: PersonOverrides): Pr
   }
 };
 
-/** Answers the new operator's id, the actor on every row they write, beside the resolver's answer. */
 export const asANewOperator = async <T>(
   db: MigratedPostgres,
   signedInAt: Date,
@@ -99,10 +98,6 @@ export const asANewOperator = async <T>(
   return { operatorId, answered };
 };
 
-/**
- * Answers `work` as a new operator signed in just now.
- * @throws when the resolver refuses them.
- */
 export const asTheOperator = async <T>(
   db: MigratedPostgres,
   work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
@@ -112,7 +107,6 @@ export const asTheOperator = async <T>(
   return answered.value;
 };
 
-/** The person row as an erasure on their last workspace leaves it, that member ended. */
 export const erasedFromTheSet = async (
   db: MigratedPostgres,
   workspaceId: string,

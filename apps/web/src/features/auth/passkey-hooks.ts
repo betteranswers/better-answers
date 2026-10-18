@@ -27,12 +27,10 @@ const SIGN_IN_OPTIONS_PATH = "/passkeys/sign-in-options";
 
 const SIGN_IN_PATH = "/passkeys/sign-in";
 
-/** Whether this browser can make or use a passkey at all. */
 export const passkeysHere = (): boolean => browserSupportsWebAuthn();
 
 export type DeviceRefusal = "cancelled" | "held" | "unverified" | "failed";
 
-/** The device answered without a passkey: the person cancelled, or it could not do the asking. */
 export class DeviceRefused extends Error {
   readonly reason: DeviceRefusal;
 
@@ -59,7 +57,6 @@ const deviceRefusalOf = (failure: Error): DeviceRefused =>
 export const isCancelled = (failure: Error | null | undefined): boolean =>
   failure instanceof DeviceRefused && failure.reason === "cancelled";
 
-/** The library checks every value; this reads only what tells an ask from anything else. */
 const challenged = z.object({ challenge: z.string() });
 
 const askedFor = <Options>() => z.custom<Options>((value) => challenged.safeParse(value).success);
@@ -68,7 +65,6 @@ const askedToAdd = askedFor<PublicKeyCredentialCreationOptionsJSON>();
 
 const askedToSignIn = askedFor<PublicKeyCredentialRequestOptionsJSON>();
 
-/** Null when the person already held codes, which an add leaves standing. */
 const passkeyAdded = z.union([
   z.object({ passkeyId: z.string(), recoveryCodes: z.array(z.string()), madeAt: z.iso.datetime() }),
   z.object({ passkeyId: z.string(), recoveryCodes: z.null() }),
@@ -84,10 +80,6 @@ const addAPasskey = async (name: string): Promise<PasskeyAdded> => {
   return askOfOurRoute(ADD_PATH, { name, response }, passkeyAdded);
 };
 
-/**
- * Codes show once, so the add hands them over before the page reads again, even if the form has
- * closed.
- */
 export const useAddPasskey = (onAdded: (added: PasskeyAdded, name: string) => void) => {
   const reread = useRereadTheSecondFactor();
   return useMutation({
@@ -111,7 +103,6 @@ export const useRemovePasskey = () => {
   return useMutation(api.person.removePasskey.mutationOptions({ onSettled: reread }));
 };
 
-/** The offer goes as it is dismissed; a dismissal that fails offers it again on the next read. */
 export const useDismissPasskeyOffer = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -134,7 +125,6 @@ const askToSignIn = () => askOfOurRoute(SIGN_IN_OPTIONS_PATH, {}, askedToSignIn)
 const signInWith = (response: AuthenticationResponseJSON): Promise<SignedIn> =>
   askOfOurRoute(SIGN_IN_PATH, { response }, signedInByPasskey);
 
-/** The route's challenge, answered by this device; a device's refusal reads as `DeviceRefused`. */
 export const answeredByThisDevice = async (
   optionsPath: string,
 ): Promise<AuthenticationResponseJSON> => {
@@ -147,10 +137,6 @@ export const answeredByThisDevice = async (
 const signInWithAPasskey = async (): Promise<SignedIn> =>
   signInWith(await answeredByThisDevice(SIGN_IN_OPTIONS_PATH));
 
-/**
- * Nothing is said until the person picks a passkey: a browser with none to offer refuses the wait
- * in its own way.
- */
 const chosenFromTheAutofill = async (
   live: () => boolean,
 ): Promise<AuthenticationResponseJSON | undefined> => {

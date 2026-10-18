@@ -26,18 +26,12 @@ export type RoleChanged = inferOutput<Api["members"]["changeRole"]>;
 
 export type ActivityEvent = inferOutput<Api["members"]["activity"]>["events"][number];
 
-/** Whether the person took the action, it was done to them, or both, as a self-demotion is. */
 export type Direction = ActivityEvent["direction"];
 
-/** By name, so a row the cache takes sits among the others where a reader looks for it. */
 export const inNameOrder = <Named extends { readonly name: string }>(
   named: readonly Named[],
 ): Named[] => named.toSorted((one, other) => one.name.localeCompare(other.name));
 
-/**
- * Newest first, a page at a time. Its key names no workspace: a switch drops it with every read of
- * the workspace left.
- */
 export const useActivity = (personId: string) => {
   const api = useTRPC();
   return useInfiniteQuery(
@@ -71,7 +65,6 @@ export const useMembers = () => {
   return useQuery(api.members.list.queryOptions());
 };
 
-/** Each action on the list is asked of one person or of a ticked set. */
 const ASKED_OF = z.union([
   z.object({ personId: z.string() }).transform((asked) => [asked.personId]),
   z.object({ personIds: z.array(z.string()) }).transform((asked) => asked.personIds),
@@ -93,10 +86,6 @@ const toldAtOnce = (change: () => void): void => {
   }
 };
 
-/**
- * The list takes the action before the api answers, so it lands within 100 ms. The action may touch the
- * reader's own member row.
- */
 const useReconciledList = <Asked>(
   reshape: (listed: readonly ListedMember[], asked: Asked) => readonly ListedMember[],
 ) => {
@@ -105,9 +94,7 @@ const useReconciledList = <Asked>(
   const activityReadAgain = useActivityReadAgain();
   const readerId = useReaderId();
   const listKey = api.members.list.queryKey();
-  // Callers spread these into `useMutation`: the React lint takes a callback passed through `mutationOptions` as called during render.
   return {
-    // Not awaited: a cancel reverts a read in flight at once and drops its answer, so the change below stands.
     onMutate: (asked: Asked): Undo => {
       void queryClient.cancelQueries({ queryKey: listKey });
       const taken = takenFrom(queryClient, listKey);
@@ -121,7 +108,6 @@ const useReconciledList = <Asked>(
     onError: (_refusal: ApiError, _asked: Asked, taken: Undo | undefined) => {
       taken?.undo();
     },
-    // Here, not on the page that asked: a reader gone from it before the answer still holds what they read.
     onSuccess: <Answer>(_answer: Answer, asked: Asked) => {
       if (readerId === undefined) return;
       const own = ASKED_OF.safeParse(asked).data?.includes(readerId) === true;
@@ -150,7 +136,6 @@ export const useChangeRole = () => {
   return useMutation({ ...api.members.changeRole.mutationOptions<Undo>(), ...reconciled });
 };
 
-/** The instant shown at once is the browser's; the list read after the answer holds the api's. */
 export const useEndEverySignInAndToken = () => {
   const api = useTRPC();
   const reconciled = useReconciledList((listed, asked: { readonly personId: string }) => {
@@ -165,18 +150,12 @@ export const useEndEverySignInAndToken = () => {
   });
 };
 
-/** The shell's own read of who is signed in, and where, shared rather than asked again. */
 const useHeldMember = () => useMember().data;
 
 export const useReaderId = (): string | undefined => useHeldMember()?.person.id;
 
-/** A switch keeps a removal's state, and the same person may be a member of both workspaces. */
 const ASKED_IN = z.object({ workspaceId: z.string() });
 
-/**
- * None until the reader's member read answers, which names the workspace a removal is matched by and
- * whether it removes the reader.
- */
 export const useRemoveMember = () => {
   const api = useTRPC();
   const workspaceId = useHeldMember()?.workspace.id;
@@ -192,10 +171,6 @@ export const useRemoveMember = () => {
 
 const ASKED_OF_ONE = z.object({ personId: z.string() });
 
-/**
- * The latest removal of one person, read where it was not asked: a removal leaves the page it was
- * asked on before the api answers.
- */
 export const useRemovalOf = (personId: string | undefined) => {
   const api = useTRPC();
   const workspaceId = useHeldMember()?.workspace.id;
@@ -212,7 +187,6 @@ export const useRemovalOf = (personId: string | undefined) => {
   }).at(-1);
 };
 
-/** Who a bulk action changed; the rest of the set was already as asked. */
 export type BulkChanged = inferOutput<Api["members"]["bulkChangeRole"]>;
 
 type Ticked = { readonly personIds: readonly string[] };
@@ -234,7 +208,6 @@ export const useBulkChangeRole = () => {
   return useMutation({ ...api.members.bulkChangeRole.mutationOptions<Undo>(), ...reconciled });
 };
 
-/** A group's member count moves with these actions, so the groups are read again beside the list. */
 const useGroupsReadAgain = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -264,7 +237,6 @@ const joinedTo =
       ? member
       : { ...member, groups: inNameOrder([...member.groups, group]) };
 
-/** The group's name is the groups read's, so the rows show it before the api answers. */
 export const useBulkAddToGroup = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

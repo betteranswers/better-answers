@@ -5,7 +5,6 @@ import { timeWords, weekdayWords } from "@/shared/words.ts";
 
 type Dated = { readonly id: string; readonly at: string };
 
-/** Newest first, so a day's lines stand together. A loop: `Map.groupBy` is newer than the build's browsers. */
 const daysOf = <Event extends Dated>(events: readonly Event[]) => {
   const days = new Map<string, [number, Event][]>();
   for (const [index, event] of events.entries()) {
@@ -34,7 +33,6 @@ function Line(properties: {
   );
 }
 
-/** One heading a day, newest first, each event a line beneath its time. */
 export function EventDays<Event extends Dated>(properties: {
   readonly events: readonly Event[];
   readonly landing: Landing;

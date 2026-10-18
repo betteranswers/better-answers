@@ -13,7 +13,6 @@ import { createAppClients, Providers } from "@/app/providers.tsx";
 import type { IconName } from "@/shared/icon.tsx";
 import type { Page, VisibleTree } from "@/shared/navigation.ts";
 
-/** No role reaches two areas yet, so the shell is handed a tree that does. */
 const aPage = (name: string, path: string, icon: IconName): Page => ({
   name,
   path,
@@ -109,7 +108,6 @@ describe("a rail of two areas", () => {
     expect(await screen.findByRole("tooltip")).toBeDefined();
     expect(tooltipsShowing()).toEqual(["First"]);
 
-    // The pointer moves on while the keyboard stays: the first gives way, not both at once.
     fireEvent.pointerMove(second, { pointerType: "mouse" });
     await vi.waitFor(() => expect(tooltipsShowing()).toEqual(["Second"]));
     expect(document.activeElement).toBe(first);

@@ -22,7 +22,6 @@ const nameFlagEmail = (to: string, raised: RaisedFlag): EmailMessage => ({
   ].join("\n"),
 });
 
-/** A missed email loses no flag: it stands on the identity-set audit log, and the answer is unmoved. */
 export const tellTheOperator = async (
   ctx: { readonly doors: Doors; readonly mail: Mail; readonly log: Logger },
   raised: RaisedFlag,
@@ -44,7 +43,6 @@ export const tellTheOperator = async (
   await Promise.all(
     addresses.value.map(async (address) => {
       const sent = await attempt(() => mail.send(nameFlagEmail(address, raised)));
-      // The error is the relay's, which may quote the name; the person id is enough to find it.
       if (!sent.ok) log.warn(facts, "the name flag's email to the operator did not go");
     }),
   );

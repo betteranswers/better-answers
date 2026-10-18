@@ -12,7 +12,6 @@ import { appForSuite } from "./suite-app.ts";
 
 const app = appForSuite();
 
-/** Typed out rather than imported, so a wrong prefix in the api cannot seed its own test. */
 const LOCK_PREFIX = "revoke-unproven-account-access:";
 
 const MINUTE_MS = 60_000;
@@ -30,7 +29,6 @@ const withSuperuser = async <T>(work: (data: ReturnType<typeof testData>) => Pro
   }
 };
 
-/** A promotion lock for `personId`, as the library writes one. */
 const lockFor = (personId: string, expiresAt: Date) =>
   withSuperuser((data) =>
     data.verification({
@@ -50,7 +48,6 @@ const anUnprovenPerson = async () => {
   return person;
 };
 
-/** Signed in once, so holding a session, with an account linked and the address unproven again. */
 const anUnprovenPersonWithAccess = async () => {
   const person = await app().person();
   await signIn(app(), app().client(), person.email);
@@ -116,7 +113,6 @@ const whileTheFirstLockDeleteIsRefused = async <T>(work: () => Promise<T>): Prom
   }
 };
 
-/** Finds the lock by its value, a person's id, so it is orphaned whatever form its name is stored in. */
 const whileLockDeletesAreRefused = async <T>(work: () => Promise<T>): Promise<T> => {
   const superuser = app().database.superuser;
   await superuser.query(
@@ -147,7 +143,6 @@ const locksHeldFor = (personId: string) =>
     [personId],
   );
 
-/** The lock lands after the code is asked for, so only the sign-in itself can clear it. */
 const askedThenLeftALock = async (person: { readonly id: string; readonly email: string }) => {
   const asking = app().client();
   const asked = await asking.json("/email-otp/send-verification-otp", {

@@ -224,10 +224,6 @@ type EvidenceInput = {
   readonly contentVersion?: string;
 };
 
-/**
- * `head` expects the bundle's head commit, `null` for an empty bundle; `base` expects the
- * standing concept's content hash, `null` for a new concept.
- */
 type WritePrecondition = { readonly head: string | null } | { readonly base: string | null };
 
 export type Acceptance = {
@@ -308,9 +304,8 @@ const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
 type WriteDoors = { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock };
 
 /**
- * Commits one concept file under the repository lock, then writes its rows and audit event in
- * one transaction. An `iri` edits a concept that must already stand; an `acceptance` asks for
- * an Admin and a `base` precondition.
+ * An `iri` edits a concept that must already stand; an `acceptance` asks for an Admin and a
+ * `base` precondition.
  */
 export const writeConcept = async (
   principal: UserPrincipal,
@@ -323,7 +318,6 @@ export const writeConcept = async (
   return commitConcept(admitted.value, doors, input);
 };
 
-/** The write once admitted: nothing below judges who asked. */
 const commitConcept = async (
   principal: AdmittedOf<typeof writeConceptAction>,
   doors: WriteDoors,
@@ -461,7 +455,6 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
     }),
   );
 
-/** Order is precedence: the first entry that holds is the word the caller reads. */
 const WRITE_REFUSALS: readonly (readonly [
   WriteConceptRefusal,
   (write: ParsedWrite, existing: Existing) => boolean,
@@ -645,11 +638,6 @@ const acceptSuggestionsAction = declareAction({
   refuses: ["role-forbids", "malformed"],
 });
 
-/**
- * Accepts each decision on its own, in order: one refused leaves the rest to go ahead. A
- * suggestion whose concept moved or went stale goes back to its proposer. Two or more decisions
- * share one audit batch.
- */
 export const acceptSuggestions = async (
   principal: UserPrincipal,
   doors: WriteDoors,
@@ -760,7 +748,6 @@ const acceptOne = async (
 export type ImportBundleInput = {
   readonly tree: BundleTree;
 
-  /** The sensitivity every landed concept takes; `IMPORT_SENSITIVITY_DEFAULT` when absent. */
   readonly sensitivity?: (typeof SENSITIVITIES)[number] | undefined;
 
   readonly dryRun?: boolean | undefined;
@@ -840,7 +827,6 @@ const manifestRefusalOf = (refusal: WriteManifestRefusal | Error): ImportBundleR
   switch (refusal) {
     case "path-taken":
       return "manifest-taken";
-    // Only a defect in the import makes its manifest commit malformed, so no caller can act on it.
     case "malformed":
     case "malformed-path":
     case "malformed-message":
@@ -870,7 +856,6 @@ const dryRunOf = (
       countVerifications(held?.iri, concept.verifications, present),
     );
 
-    /** No iri is minted on a dry run, so the target's path stands in and only the count is read. */
     const { links } = rewriteLinks(held?.body ?? concept.body, concept.path, (target) =>
       paths.has(target) ? target : undefined,
     );
@@ -1126,10 +1111,6 @@ const runImport = async (
   });
 };
 
-/**
- * Not one transaction: a run stopped part way keeps what landed and names it in `progress`, and
- * a rerun skips it. A dry run writes nothing and counts what a run would do.
- */
 export const importBundle = async (
   principal: UserPrincipal,
   doors: WriteDoors,
@@ -1139,8 +1120,6 @@ export const importBundle = async (
   if (!admitted.ok) return err(admitted.error);
   const sensitivity = input.sensitivity ?? IMPORT_SENSITIVITY_DEFAULT;
 
-  // The second pass reads back what the first landed; a sensitivity the runner cannot read would stop
-  // the run after everything was written.
   if (!readsSensitivity(principal, sensitivity)) return err("class-unreadable");
   const opened = await openImport(principal, doors.postgres, input);
   if (!opened.ok) return err(opened.error);
@@ -1152,7 +1131,6 @@ export const importBundle = async (
 export type OpenedConcept = {
   readonly iri: ConceptIri;
   readonly path: string;
-  /** Null for a concept in no collection. */
   readonly collection: string | null;
   readonly kind: string;
   readonly title: string;
@@ -1223,7 +1201,6 @@ const conceptByIriAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/** `undefined` both when no concept holds the iri and when this principal may not read it. */
 export const conceptByIri = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -1250,7 +1227,6 @@ const conceptsByIrisAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/** Those of `iris` this principal may read, by iri. A withheld one is absent, as an unwritten one is. */
 export const conceptsByIris = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -1280,7 +1256,6 @@ const CONCEPT_READ = `${conceptSelect({
                  ON o.workspace_id = c.workspace_id AND o.iri = c.iri`,
 })} AND c.iri = $4`;
 
-/** What a reader is shown of a concept: its frontmatter keeps a source's locator only where they may open it. */
 export type ConceptRead = {
   readonly iri: ConceptIri;
   readonly frontmatter: Frontmatter;
@@ -1298,10 +1273,6 @@ const sharerOfRow = (row: ReadRow) =>
     ? undefined
     : { actor: row.shared_by, at: row.shared_at };
 
-/**
- * `undefined` both when no concept holds the iri and when this principal may not read it. Each
- * source opens a passage only through `passageAt`, read for this principal.
- */
 export const readConcept = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -1341,10 +1312,6 @@ export const readConcept = async (
   });
 };
 
-/**
- * A concept's sources as this reader may open them, in the file's order. A source they cannot
- * open keeps the file's own label and nothing that leads to it.
- */
 export const evidenceOf = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -1355,10 +1322,6 @@ export const evidenceOf = async (
   return sources.ok ? ok(sources.value.map((source) => source.item)) : err(sources.error);
 };
 
-/**
- * The corpus counts `anyWordMatch` weighs by, over `documents` with `parameters` bound before the
- * query's words. A text with no words counts nothing: it matches nothing.
- */
 export const corpusCountsOf = (
   tx: Tx,
   documents: string,
@@ -1377,7 +1340,6 @@ export const corpusCountsOf = (
     return counts;
   });
 
-/** The concepts `principal` may read, counted for `query`'s words. */
 export const conceptCountsOf = (
   principal: UserPrincipal,
   tx: Tx,
@@ -1392,7 +1354,6 @@ export const conceptCountsOf = (
 
 const MATCH = anyWordMatch("c.search", "$4", ["c.iri"], { size: "$5", frequencies: "$6" });
 
-/** Collections bind eighth when named; the bound follows them, else binds eighth itself. */
 const matchingConcepts = (strength: MatchStrength, narrowed: boolean, after: boolean): string => {
   const bound = narrowed ? 9 : 8;
   const placed = (at: number): `$${number}` => `$${bound + at}`;
@@ -1411,12 +1372,6 @@ export type ConceptFound = { readonly concept: OpenedConcept; readonly bound: Co
 
 type MatchingConceptRow = ConceptRow & { readonly weight: number; readonly rank: number };
 
-/**
- * Readable concepts by the any-word rule, after `after` when given. A strong match holds at least
- * half the query's distinct words, a weak one fewer. `collections`, when given, leaves only the
- * concepts in one of them, so a concept in no collection is left out. `counts` freeze a cursor's
- * ranking.
- */
 export const findConcepts = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -1470,7 +1425,6 @@ const readableCollectionsAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/** Each collection holding a concept this principal may read, in the order Postgres sorts them. */
 export const readableCollections = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -1492,7 +1446,6 @@ export const readableCollections = async (
   });
 };
 
-/** Whether a document is evidence for a concept the caller can read, `alias` naming its passage. */
 export const evidenceForAReadableConcept = (alias: string, roleParameter: number): string =>
   `EXISTS (SELECT 1
              FROM concept_evidence ce

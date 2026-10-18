@@ -25,7 +25,6 @@ import {
 } from "./second-factor.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** Ids alone: the log is append-only, so a name a person later changes never lands in it. */
 const PASSKEY_ACTIONS = declareIdentitySetActions("people", {
   passkeyAdded: action("people.person.passkey_added", { passkeyId: "id" }),
   passkeyRenamed: action("people.person.passkey_renamed", { passkeyId: "id" }),
@@ -34,7 +33,6 @@ const PASSKEY_ACTIONS = declareIdentitySetActions("people", {
 
 const passkeyId = z.string().regex(ULID);
 
-/** A browser's own field sends no control character, so one here came from a script. */
 const CONTROL_CHARACTER = /\p{Cc}/u;
 
 type PasskeyNameRefusal = WorkspaceRefusal<
@@ -52,7 +50,6 @@ export const applyPasskeyNameRule = (asked: string): Result<string, PasskeyNameR
 
 type Ids = { readonly personId: UserId; readonly passkeyId: string };
 
-/** Each id as the boundary names it, or nothing: a caller's id is never trusted to be well formed. */
 const idsOf = (input: { readonly personId: string; readonly passkeyId: string }) => {
   const person = boundarySchemas.user.select.shape.id.safeParse(input.personId);
   const passkey = passkeyId.safeParse(input.passkeyId);
@@ -81,7 +78,6 @@ type PasskeyAdded = {
   readonly passkeyId: string;
   readonly stamped: boolean;
 
-  /** Issued only to a person who must hold a factor and held no codes, and shown to them once. */
   readonly issued: RecoveryCodesMade | undefined;
 };
 
@@ -109,9 +105,8 @@ const recordingAdded = async (
 };
 
 /**
- * Called once the library has verified and kept a new passkey: records it, counts the adding as
- * the session's confirmation, and issues recovery codes to a person who must hold a factor and
- * holds none.
+ * Called once the library has kept a new passkey. Confirms the session; issues recovery codes to
+ * one who must hold a factor and holds none.
  */
 export const recordPasskeyAdded = async (
   platform: PlatformPrincipal,
@@ -128,7 +123,6 @@ export const recordPasskeyAdded = async (
   return added.value;
 };
 
-/** What a page sends to rename one of the person's own passkeys. */
 export const renamePasskeyInput = z.object({ passkeyId: z.string(), name: z.string() });
 
 export type RenamePasskeyRefusal = WorkspaceRefusal<
@@ -168,7 +162,6 @@ export const renamePasskey = async (
   return renamed.value;
 };
 
-/** What a page sends to remove one of the person's own passkeys. */
 export const removePasskeyInput = z.object({ passkeyId: z.string() });
 
 export type RemovePasskeyRefusal = WorkspaceRefusal<
@@ -177,7 +170,6 @@ export type RemovePasskeyRefusal = WorkspaceRefusal<
 
 type Removal = Result<{ readonly passkeyId: string }, RemovePasskeyRefusal>;
 
-/** An authenticator still waiting on its code holds nothing, so it keeps no passkey standing. */
 const removing = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -197,8 +189,8 @@ const removing = async (
 };
 
 /**
- * The person is the one caller. An Admin in any workspace, or the operator, keeps their last
- * second factor: the check runs under the person's lock, so two removals cannot each leave one.
+ * The person is the one caller. An Admin in any workspace, or the operator, keeps their last second
+ * factor: two removals cannot each leave one.
  */
 export const removePasskey = async (
   platform: PlatformPrincipal,
@@ -222,10 +214,7 @@ const USING = `
   SELECT id, $2 FROM passkey WHERE credential_id = $1
   ON CONFLICT (passkey_id) DO UPDATE SET at = EXCLUDED.at`;
 
-/**
- * Keyed by the credential a sign-in presents, the one id the library's verify hands on. A use is
- * no change to the factor, so nothing is recorded on the log.
- */
+/** Keyed by the credential a sign-in presents, the one id the library's verify hands on. */
 export const recordPasskeyUse = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -242,7 +231,6 @@ const DISMISSING = `
   UPDATE "user" SET passkey_offer_dismissed_at = COALESCE(passkey_offer_dismissed_at, $2)
    WHERE id = $1 AND ${notErasedAt("email")}`;
 
-/** A preference, not a change to any factor, so nothing is recorded on the log. */
 export const dismissPasskeyOffer = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

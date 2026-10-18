@@ -9,7 +9,6 @@ import type { EmailMessage, Mail } from "./email.ts";
 import { IDENTITY_PRINCIPAL } from "./identity-principal.ts";
 import { PRODUCT_NAME } from "./product-name.ts";
 
-/** The SPA's Account page, where a person removes a passkey or authenticator that is not theirs. */
 const ACCOUNT_PATH = "/account";
 
 const WORDS = {
@@ -46,7 +45,6 @@ const htmlOf = (lines: readonly string[], account: string): string =>
 <p style="margin:0"><a href="${account}">${account}</a></p>`,
   );
 
-/** Lists every credential by name and date, as the confirm page does; never a key or a code. */
 const promotionNoticeEmail = (held: CredentialsHeld, publicUrl: string): EmailMessage => {
   const lines = linesOf(held);
   const account = `${publicUrl}${ACCOUNT_PATH}`;
@@ -62,7 +60,6 @@ const promotionNoticeEmail = (held: CredentialsHeld, publicUrl: string): EmailMe
   };
 };
 
-/** Never rejects, so a caller need not await it; a missed notice is a log line, never a refused promotion. */
 export const sendPromotionNotice = async (
   ctx: {
     readonly mail: Mail;

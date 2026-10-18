@@ -21,7 +21,6 @@ const app = appForSuite({ fetchModel: wire.fetch });
 
 const { users: USERS, supplier: SUPPLIER, retention: RETENTION, lms: LMS } = AUDIT_ANSWERS;
 
-/** A workspace holding the four `Answer`s, set to judge, and an assistant connected as its Admin. */
 const anAdminAsking = async (limitGbp?: string) => {
   const asking = await anAdminAskingIn(app(), [USERS, SUPPLIER, RETENTION, LMS]);
   await judgingSetUp(app(), asking.workspaceId, limitGbp === undefined ? {} : { limitGbp });
@@ -48,7 +47,6 @@ describe("ask, judged over MCP", () => {
     const answer = judged.parse(structured(result));
     expect([answer.verdict, answer.judgeState]).toEqual(["ok", "judged"]);
     expect(answer.answers.map(({ title, body }) => ({ title, body })).toSorted()).toEqual(
-      // The seed ends a body with a newline, as a concept file does.
       [USERS, SUPPLIER].map(({ title, body }) => ({ title, body: `${body}\n` })).toSorted(),
     );
     expect(answer.related.map(({ title }) => title)).toEqual([RETENTION.title]);

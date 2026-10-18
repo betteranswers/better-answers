@@ -11,7 +11,6 @@ import { WorkspaceFrame } from "./frame.tsx";
 import { GoHome } from "./go-home.tsx";
 import { UNKNOWN_PAGE } from "./words.ts";
 
-/** `home` for a reader who holds no role, as in the console; otherwise the role's own. */
 export function UnknownPage(properties: { readonly home?: Page | undefined }) {
   useBreadcrumbLastPart(UNKNOWN_PAGE.heading);
 
@@ -23,7 +22,6 @@ export function UnknownPage(properties: { readonly home?: Page | undefined }) {
   );
 }
 
-/** A signed-out visitor has no home yet, so signing in is the one way on. */
 function UnknownSignedOut() {
   return (
     <>
@@ -37,17 +35,11 @@ function UnknownSignedOut() {
   );
 }
 
-/**
- * An address no route names reaches no shell's route, so it draws a member's shell itself, and
- * the sign-in pages' layout for anyone else.
- */
 export function UnknownAddress() {
   const member = useMemberAskedOnce();
   if (member.data !== undefined) return <WorkspaceFrame page={{ draw: <UnknownPage /> }} />;
-  // Only a first read in flight draws nothing: a refusal read again keeps its page, and offline draws.
   if (!member.isFetched && member.fetchStatus === "fetching") return null;
 
-  // A person in no workspace is refused in the same class, so the word tells them apart.
   const signedOut = member.error !== null && refusalOf(member.error)?.word === NO_SESSION;
   return <AuthPage>{signedOut ? <UnknownSignedOut /> : <UnknownPage />}</AuthPage>;
 }

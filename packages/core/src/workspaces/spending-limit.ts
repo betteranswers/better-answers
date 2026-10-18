@@ -17,12 +17,10 @@ import { SPENDING_LIMIT_KEY } from "../llm/index.ts";
 import { type PostgresDoor, withScope, writeWorkspaceConfig } from "../store/postgres/index.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** The amount stays in the setting it sets: no detail key holds a sum of money. */
 const SPENDING_LIMIT_ACTIONS = declareActions("platform", {
   set: action("platform.workspace.spending_limit_set", {}),
 });
 
-/** Whole pounds and pence beyond them, as a decimal string: money is never a float. */
 const named = z.object({
   workspaceId: boundarySchemas.workspace.select.shape.id,
   gbp: z.string().regex(/^\d{1,9}(\.\d{1,6})?$/),

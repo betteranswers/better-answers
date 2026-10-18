@@ -28,7 +28,6 @@ const CONNECT_CLAUDE = pageNamed(ASKING, "Connect Claude");
 
 const LISTED = Object.values(KEY);
 
-/** The spending limit names the one person who can lift it; any other refusal is its class's. */
 const { outcomeOfFailure } = refusalsOf(SAID_OF_KNOWLEDGE);
 
 const refusedWords = (failure: Error | ApiError): ReactNode => {
@@ -38,7 +37,6 @@ const refusedWords = (failure: Error | ApiError): ReactNode => {
     : stockWait(liftsInSeconds);
 };
 
-/** The status says the phase until the verdict, then the verdict, once; a refusal is an alert. */
 const saidOf = (answering: Answering): Outcome | undefined => {
   const { failure, answer, streaming, phase } = answering;
   if (failure !== undefined) return { tone: "refused", words: refusedWords(failure) };
@@ -53,7 +51,6 @@ const toggled = (named: ReadonlySet<string>, collection: string, on: boolean) =>
   return next;
 };
 
-/** Offered once an answer has said which collections the reader may name; none is every one. */
 function Collections(properties: {
   readonly readable: readonly string[];
   readonly named: ReadonlySet<string>;
@@ -88,7 +85,6 @@ function Collections(properties: {
   );
 }
 
-/** Enter asks and Shift+Enter starts a new line, as a message box does. */
 const asksOnEnter = (event: KeyboardEvent<HTMLTextAreaElement>): boolean =>
   event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing;
 
@@ -106,7 +102,6 @@ function QuestionForm(properties: {
     box.current?.focus();
   });
 
-  // Focus stays in the box, so the next question is typed where the last one was.
   const ask = () => {
     box.current?.focus();
     if (answering.streaming) return;
@@ -167,7 +162,6 @@ function QuestionForm(properties: {
   );
 }
 
-/** The collections the last answer said the reader may name, kept while the next is asked. */
 const useReadable = (answering: Answering): readonly string[] => {
   const [readable, setReadable] = useState<readonly string[]>([]);
   const known = answering.answer?.readableCollections;

@@ -117,7 +117,6 @@ export const NOT_COMPANY_KNOWLEDGE = "Not company knowledge";
 
 const NO_COLLECTION = "No collection";
 
-/** `Iri` is `string` where an iri is only read as text, as a renderer reads it. */
 type ConceptMatch<Iri extends string> = {
   readonly layer: "bundles";
   readonly iri: Iri;
@@ -125,7 +124,6 @@ type ConceptMatch<Iri extends string> = {
   readonly title: string;
   readonly trust: Trust;
   readonly trustWords: string;
-  /** Null for a concept in no collection. */
   readonly collection: string | null;
   readonly tags: readonly string[];
 };
@@ -158,7 +156,6 @@ type ConceptView<Iri extends string> = {
     readonly target: Iri;
     readonly title: string;
   }[];
-  /** Each link in the body that leads to a concept the reader may read; `open` always answers it. */
   readonly bodyLinks?: readonly {
     readonly ordinal: number;
     readonly address: string;
@@ -181,10 +178,8 @@ type Opened<Iri extends string, View> =
       readonly locator?: string | undefined;
     };
 
-/** What MCP and the renderer read of an open. */
 export type OpenView<Iri extends string = ConceptIri> = Opened<Iri, ConceptView<Iri>>;
 
-/** The pane's words, which the web's concept page leads and ends its sources with. */
 type PaneWords = Pick<ConceptRead["pane"], "access" | "lead" | "next">;
 
 export type OpenResult<Iri extends string = ConceptIri> = Opened<
@@ -192,7 +187,6 @@ export type OpenResult<Iri extends string = ConceptIri> = Opened<
   ConceptView<Iri> & PaneWords & Required<Pick<ConceptView<Iri>, "bodyLinks">>
 >;
 
-/** What `ask` answers: the answer as planned, and the id of the record kept of the question. */
 export type AnswerResult<Iri extends string = ConceptIri> = PlannedAnswer<Iri> & {
   readonly recordId: string;
 };
@@ -229,7 +223,6 @@ type Search = {
 
 type Counted = () => Promise<Result<CorpusCounts, Error>>;
 
-/** Counts once a request, or takes the counts of a cursor that stopped in one of `runs`. */
 const countedOnce = (
   runs: readonly FindRun[],
   after: FindPosition | undefined,
@@ -290,7 +283,6 @@ const passageRun =
 
 type Page<Match> = { readonly matches: readonly Match[]; readonly next: FindPosition | undefined };
 
-/** Reads one row past `limit`, so a page names where it ended only when more follow. */
 const pageOf = async <Match>(
   runs: readonly (readonly [FindRun, RunReader<Match>])[],
   limit: number,
@@ -328,9 +320,8 @@ const findAction = declareAction({
 export type FindRefusal = RefusalOf<typeof findAction> | Error;
 
 /**
- * Concepts holding at least half the query's words, then passages, then concepts holding fewer,
- * `limit` to a page, after `cursor` when given. `now` decides which concepts are past their shelf
- * life.
+ * Concepts holding at least half the query's words, then passages, then concepts holding fewer.
+ * `now` decides which concepts are past their shelf life.
  */
 export const find = async (
   principal: UserPrincipal,
@@ -472,25 +463,18 @@ const askAction = declareAction({
 export type AskRefusal = RefusalOf<typeof askAction> | Error;
 
 /**
- * `ask` is handed these in place of a door. Each runs in a transaction of its own, so none stays
- * open across the judge's call.
+ * Each runs in a transaction of its own, so none stays open across the judge's call.
  */
 export type AskSteps<Refused = never> = JudgeSteps<Refused> & {
-  /** Commits before it answers: a question refused later is still on record. */
   readonly openRecord: (
     opening: Omit<RecordOpening, "transport">,
   ) => Promise<Result<{ readonly recordId: string }, Refused | Error>>;
   readonly read: ReadStep<Refused>;
-  /** Settles the judge's reservation, when one was taken, in the same transaction. */
   readonly completeRecord: (
     completion: Omit<RecordCompletion, "completedAt" | "drafted">,
   ) => Promise<Result<void, Refused | Error>>;
 };
 
-/**
- * What `ask` would answer, read through `read` alone: no record is opened, so the answer carries
- * no record's id.
- */
 export const planAnswer = async <Refused = never>(
   principal: UserPrincipal,
   read: ReadStep<Refused>,
@@ -506,10 +490,8 @@ export const planAnswer = async <Refused = never>(
 };
 
 /**
- * Opens the question's record, reads what bears on it, has the workspace's judge say which
- * `Answer`s fit, and completes the record. With no judge to call, every `Answer` is related
- * knowledge. At the spending limit it refuses, leaving the record open. `now` decides which
- * concepts are past their shelf life.
+ * With no judge to call, every `Answer` is related knowledge. At the spending limit it refuses,
+ * leaving the record open.
  */
 export const ask = async <Refused = never>(
   principal: UserPrincipal,
@@ -547,7 +529,6 @@ const findLine = (match: FindMatch<string>): string =>
     ? `${match.kind} · ${match.title} · ${match.collection ?? NO_COLLECTION} · ${match.trustWords} · ${match.iri}`
     : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator}`;
 
-/** A client may read only the text, so the way to the next page is written out too. */
 export const renderFind = (result: FindResult<string>): string => {
   if (result.matches.length === 0) return "Nothing in the company's knowledge matches that.";
   const lines = result.matches.map(findLine);
@@ -556,7 +537,6 @@ export const renderFind = (result: FindResult<string>): string => {
     : [...lines, "", `More follow: call find again with cursor ${result.nextCursor}`].join("\n");
 };
 
-/** Every line quoted: a document's own line never reads as a heading or a concept of the answer. */
 const quoted = (text: string): readonly string[] => text.split(/\r?\n/).map((line) => `> ${line}`);
 
 export const renderOpen = (result: OpenView<string>): string => {
@@ -620,7 +600,6 @@ export const mapWords = (map: MapState): string => {
   }
 };
 
-/** The related line tells an assistant what to do, and never says the question was answered. */
 const VERDICT_LINES = {
   ok: "**Answered from the company's knowledge.**",
   warn: "**Answered with a warning for your role.**",
@@ -656,7 +635,6 @@ const PREVIEWS_HEADING =
 const previewLine = (concept: PreviewedConcept<string>): string =>
   `- ${concept.kind} · ${concept.title} · ${concept.collection ?? NO_COLLECTION} · ${concept.trustWords} · ${concept.iri} — ${concept.url}`;
 
-/** An `Answer` in full, then every other concept by its line, each in the order it bears. */
 const relatedText = (related: readonly RelatedConcept<string>[]): readonly string[] => [
   ...related.flatMap((concept) => ("body" in concept ? returnedText(concept) : [])),
   ...listed(
@@ -675,7 +653,6 @@ const unmappedText = (passage: PassageView): readonly string[] => [
 const FITS_THEN_RELATED =
   "**Related knowledge, which the judge did not find answers the question as asked.**";
 
-/** Each `Answer` that fits in full first, so an assistant reads the fits before what only bears. */
 const answeredText = (answer: PlannedAnswer<string>): readonly string[] =>
   answer.answers.length === 0
     ? relatedText(answer.related)

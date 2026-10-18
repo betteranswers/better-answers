@@ -274,7 +274,6 @@ describe("one guard per condition, never re-refusing what the type refused", () 
 
 const SORT_COMPARE = "typescript/require-array-sort-compare";
 
-/** Every override that re-sets the rule, so an exemption widened in the config widens here. */
 const sortCompareOverrides = config.overrides.flatMap((override) => {
   const setting = override.rules?.[SORT_COMPARE];
   return setting === undefined
@@ -533,7 +532,6 @@ describe("no MCP entry takes a workspace argument", () => {
       "apps/api/src/mcp/mount.ts": `server.registerTool(entry.name, { annotations: entry.annotations, inputSchema: entry.input }, entry.run);\n`,
     });
 
-    // The one mount over ENTRIES carries the disable that names its runtime fence.
     expect(output).toContain("mcp-entry-no-workspace-argument");
   });
 });

@@ -19,7 +19,6 @@ const DECLARATIONS = new Set([
   "TSExportAssignment",
 ]);
 
-/** A line comment's text after `//`, any further slashes, and the one space that follows. */
 const lineOf = (comment: Comment): string => comment.value.replace(/^\/* ?/, "").trimEnd();
 
 const docBlockOf = (block: Block): string => {
@@ -28,7 +27,6 @@ const docBlockOf = (block: Block): string => {
   return ["/**", ...starred, " */"].join("\n");
 };
 
-/** A directive reaches past `//` lines to the code, so the run under one stays `//`. */
 const underADirective = (text: string, comments: readonly Comment[], block: Block): boolean =>
   comments.some(
     (comment) =>
@@ -37,7 +35,6 @@ const underADirective = (text: string, comments: readonly Comment[], block: Bloc
       directiveIn(proseOf(comment)) !== undefined,
   );
 
-/** Each run of stand-alone line comments, keyed by the line just below it. */
 const lineBlocksAbove = (
   text: string,
   comments: readonly Comment[],
@@ -57,11 +54,11 @@ export const declarationDocBlockRule = defineRule({
     fixable: "code",
     docs: {
       description:
-        "A comment on a module-scope declaration or export is a `/** */` doc block, so an editor shows it wherever the name is used (the root `CODING_STANDARDS.md`).",
+        "A comment on a module-scope declaration or export is a `/** */` doc block, so an editor shows it wherever the name is used.",
     },
     messages: {
       lineComment:
-        "A declaration's comment is a `/** */` doc block, never `//` (the root `CODING_STANDARDS.md`); an editor shows a doc block wherever the name is used. Write this block as `/** … */`.",
+        "A declaration's comment is a `/** */` doc block, never `//`; an editor shows a doc block wherever the name is used. Write this block as `/** … */`.",
     },
   },
   createOnce(context) {

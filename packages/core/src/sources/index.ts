@@ -119,10 +119,6 @@ const SOURCE_ACTIONS = declareActions("sources", {
   }),
 });
 
-/**
- * A narrowing and a widening ask for the same pair; built twice, since one schema exported under
- * two names is a duplicate export.
- */
 const theSensitivityAsked = () =>
   CONNECTED_SOURCE_VISIBILITY.extend({
     connectedSourceId: CONNECTED_SOURCE_ID,
@@ -201,10 +197,6 @@ type SensitivityChecked<A extends AuditAction, E> = (
   tx: Tx,
 ) => Promise<Result<Pick<AuditEvent<A>, "action" | "detail">, E>>;
 
-/**
- * Inside the cascade's lock, before the connected source's: a narrowing and a widening then queue
- * behind each other rather than deadlock.
- */
 const sensitivityAskedOf = async (
   acting: ActingOnConnectedSource,
   tx: Tx,
@@ -244,7 +236,6 @@ const sensitivityWritten = async <A extends AuditAction>(
   return ok(auditEventId);
 };
 
-/** `checked` refuses the move, or names the audit event that records it. */
 const sensitivitySet = async <A extends AuditAction, E>(
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -323,10 +314,6 @@ export const narrowConnectedSource = async (
   return sensitivitySet(admitted.value, tx, input, narrowing);
 };
 
-/**
- * `not-wider` unless the visibility asked is wider in sensitivity or audience and narrower in neither.
- * A document's own sensitivity is left alone: the derivation reads the narrower of it and the connected source's.
- */
 export const widenConnectedSource = async (
   principal: UserPrincipal,
   tx: Tx,

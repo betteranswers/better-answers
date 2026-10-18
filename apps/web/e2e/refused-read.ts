@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 
-/** The api's refusal of a console read for want of the mark, as a batch carries one answer back. */
 const WITHOUT_THE_MARK = {
   error: {
     message: NOT_THE_OPERATOR,
@@ -20,7 +19,6 @@ const WITHOUT_THE_MARK = {
 const askedAt = (url: string): readonly string[] =>
   new URL(url).pathname.replace("/trpc/", "").split(",");
 
-/** The batch's other answers stay the api's own: a refused standing would close the whole console. */
 export const refusedFromNowOn = (page: Page, procedure: string) =>
   page.route(
     (url) => askedAt(url.href).includes(procedure),
@@ -51,10 +49,6 @@ const aRefusedCall = z.object({
   }),
 });
 
-/**
- * Asked for before the action that calls, or the answer can land unwaited for. A ceiling carries a
- * wait and no word.
- */
 export const refusalAnswering = async (page: Page, procedure: string) => {
   const answered = await page.waitForResponse((answer) =>
     askedAt(answer.url()).includes(procedure),
@@ -69,12 +63,10 @@ export const refusalAnswering = async (page: Page, procedure: string) => {
   return { status: httpStatus, ...refusal, waitSeconds: retryAfterSeconds };
 };
 
-/** Better Auth names a refusal in `code`, and one of the api's own routes in `error`. */
 const aRefusalOutsideTrpc = z.object({ code: z.string().optional(), error: z.string().optional() });
 
 const wholeSeconds = z.coerce.number().int().optional();
 
-/** A path outside tRPC, Better Auth's or the api's own, asked for before the action as `refusalAnswering` is. */
 export const authAnswering = async (page: Page, path: string) => {
   const answered = await page.waitForResponse((answer) => new URL(answer.url()).pathname === path);
   if (answered.ok()) throw new Error(`the api did not refuse ${path}`);

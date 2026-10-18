@@ -20,7 +20,6 @@ import { entriesAt } from "./mcp/entries/index.ts";
 import { createMcpSurface } from "./mcp/surface.ts";
 import { createTrpcRoutes } from "./trpc/mount.ts";
 
-/** The shape of `fetch`, so a test hands the server a fake at the wire. */
 type Fetching = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 export type ServerDependencies = {
@@ -35,13 +34,10 @@ export type ServerDependencies = {
 
   readonly fetchClientMetadataResource?: Fetching;
 
-  /** How a model provider is reached; `fetch` unless a test hands a fake. */
   readonly fetchModel?: Fetching;
 
-  /** The key each workspace's model key is sealed under; with none, no model is called. */
   readonly envelopeKey?: Uint8Array | undefined;
 
-  /** The longest an answer's stream stays quiet before it sends a keep-alive; a test shortens it. */
   readonly askKeepAliveMs?: number | undefined;
   readonly serverVersion?: string;
 

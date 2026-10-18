@@ -4,7 +4,6 @@ import { counted, instantWords } from "@/shared/words.ts";
 
 export const SESSIONS_HEADING_WORD = "Sessions";
 
-/** A session that ended elsewhere leaves the row standing, so the person reads why it refused. */
 const SAID_OF_A_SIGN_OUT = {
   "session-gone": "This session has already ended.",
 } satisfies OwnSentences;
@@ -23,10 +22,8 @@ export const SESSIONS_WORDS = {
   consequence: "Each one ends now. Personal tokens keep working, and Claude stays connected.",
 } as const;
 
-/** The line under a session's device: when it was last active. */
 export const lastActiveAt = (iso: string): string => `Last active ${instantWords(iso)}`;
 
-/** The button a row carries, named by the device the row shows. */
 export const signOutNamed = (device: string): string => `Sign out ${device}`;
 
 export const everywhereTitle = (others: number): string =>

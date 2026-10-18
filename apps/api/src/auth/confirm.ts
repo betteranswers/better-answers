@@ -66,7 +66,6 @@ const REFUSALS = {
   changedMeanwhile: { error: "changed-meanwhile" },
 } as const;
 
-/** As typed: spaces, dashes and case are the store's to ignore. */
 const typedCode = z.object({ code: z.string().min(1).max(100) });
 
 const TRANSPORTS = [
@@ -102,10 +101,6 @@ type Answer = {
 
 type SpendsACode = typeof spendRecoveryCode | typeof acceptRestoreCode;
 
-/**
- * Confirm, recovery and the replacement setup they lead to. None makes a session: each stamps
- * or grants the one the person already holds.
- */
 export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): void => {
   const { auth, door, clock } = deps;
   const fenced = personRoutesAt(routes, "/second-factor/*", deps);
@@ -116,7 +111,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
   const unanswered = (context: Context, reason: string): Response =>
     fenced.unanswered(context, "auth.confirm_failed", reason);
 
-  /** A refusal no page can act on reads as unanswered; a lost session as signed out. */
   const refused = (context: Context, why: string | Error): Response => {
     if (why instanceof CeilingMet) return tooManyTries(why.retryAfterSeconds);
     if (why === "person-gone" || why === "session-gone") {
@@ -128,7 +122,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     return unanswered(context, why instanceof Error ? why.message : why);
   };
 
-  /** Never awaited, so a slow relay holds no answer. */
   const notify = (person: SignedIn, change: FactorChange): void => {
     void sendFactorNotice({ mail, log }, person.user.email, change);
   };
@@ -157,7 +150,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     return kept.ok ? context.json(options.value) : refused(context, kept.error);
   };
 
-  /** Our own check of the answer, since the library's verify would make a new session. */
   const verifyingTheAnswer = async (context: Context, person: SignedIn, answer: Answer) => {
     const verified = await attempt(() =>
       verifyAuthenticationResponse({
@@ -173,7 +165,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
         requireUserVerification: true,
       }),
     );
-    // A bad signature throws, and an unverified user may only be reported: either refuses alike.
     const info = verified.ok && verified.value.verified ? verified.value.authenticationInfo : null;
     if (info?.userVerified !== true) return context.json(PERSON_ROUTE_REFUSALS.notVerified, 400);
     const stamped = await confirmByPasskey(IDENTITY_PRINCIPAL, door, {
@@ -215,10 +206,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
       : refused(context, stamped.error);
   };
 
-  /**
-   * With a whole session and a set-up authenticator, the library's verify only checks the code; the
-   * try was already counted.
-   */
   const verifyingTheCode = async (
     context: Context,
     person: SignedIn,
@@ -236,7 +223,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     return unanswered(context, verified.error.message);
   };
 
-  /** An authenticator's code as sent, with what the person holds; or the answer refusing either. */
   const codeAndHeld = async (context: Context, person: SignedIn) => {
     const sent = await parsedBody(context, codeAsked);
     if (!sent.success) return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
@@ -248,7 +234,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
   const confirmWithACode = async (context: Context, person: SignedIn): Promise<Response> => {
     const asked = await codeAndHeld(context, person);
     if (asked instanceof Response) return asked;
-    // A setup still waiting on its code would be finished by the verify, and its session swapped.
     if (asked.held.authenticator !== "set-up") return context.json(REFUSALS.noAuthenticator, 409);
     const reserved = await reserveAuthenticatorTry(
       IDENTITY_PRINCIPAL,
@@ -259,7 +244,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     return verifyingTheCode(context, person, asked.code, reserved.value.noticeDue);
   };
 
-  /** The action counts its own failures, and refuses a kind still waiting with the ceiling met. */
   const spending =
     (action: SpendsACode, wrong: { readonly error: string }, used?: FactorChange) =>
     async (context: Context, person: SignedIn): Promise<Response> => {
@@ -284,7 +268,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     return refused(context, why);
   };
 
-  /** Kept aside until its first code works. */
   const startTheReplacement = async (context: Context, person: SignedIn): Promise<Response> => {
     const minted = await attempt(() => mintAuthenticatorKey(auth, person.user.email));
     if (!minted.ok) return unanswered(context, minted.error.message);
@@ -327,12 +310,10 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
       askedBy(clock, person),
     );
     if (!parked.ok) return refused(context, parked.error);
-    // Granted, but its key is gone: expired, or replaced by a later start.
     if (parked.value === undefined) return context.json(REFUSALS.changedMeanwhile, 409);
     return replacingWith(context, person, asked.code, parked.value);
   };
 
-  /** Each counts apart; only the code routes meet the throttle as well. */
   routes.post(
     CONFIRM_PASSKEY_OPTIONS_PATH,
     fenced.asThePerson("confirm-passkey-options", CONFIRM_PERSON_RULE, "confirm", askToConfirm),

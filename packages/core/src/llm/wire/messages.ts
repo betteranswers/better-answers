@@ -8,13 +8,11 @@ import {
   type WireRequest,
 } from "./read.ts";
 
-/** Each a value the provider publishes; the version pins the shape this file reads and writes. */
 const MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const MESSAGES_VERSION = "2023-06-01";
 
 export type AnswerSchema = z.core.JSONSchema.JSONSchema;
 
-/** One attempt as the Messages API takes it: the answer constrained to a JSON schema. */
 export type MessagesCall = {
   readonly model: string;
   readonly key: string;
@@ -24,14 +22,8 @@ export type MessagesCall = {
   readonly tokensOut: number;
 };
 
-/** One attempt whose answer is prose, sent as it is written. */
 export type MessagesStreamCall = Omit<MessagesCall, "answerSchema">;
 
-/**
- * No `thinking` and no sampling field: a model choice may name a model that refuses either, and
- * each model's default stands.
- */
-/** What the reply is asked to be: JSON of a schema, or prose streamed as it is written. */
 type Asking =
   | {
       readonly output_config: {
@@ -60,17 +52,14 @@ const requestWith = (call: MessagesStreamCall, asking: Asking): WireRequest => (
 export const messagesRequest = ({ answerSchema, ...call }: MessagesCall): WireRequest =>
   requestWith(call, { output_config: { format: { type: "json_schema", schema: answerSchema } } });
 
-/** With no answer shape, prose arrives as server-sent events. */
 export const messagesStreamRequest = (call: MessagesStreamCall): WireRequest =>
   requestWith(call, { stream: true });
 
-/** An answer is the text of the reply's blocks, which the caller reads as JSON. */
 type MessagesRead = WireRead<string>;
 
 const count = z.number().int().nonnegative();
 
 const reply = z.object({
-  // Only a text block carries `text`; a thinking block's is under `thinking`.
   content: z.array(z.object({ text: z.string().optional() })),
   stop_reason: z.string().nullable(),
   usage: z.object({
@@ -89,16 +78,10 @@ const errorReply = z.object({
   }),
 });
 
-/** A tier's own monthly cap: a 429 that waiting does not lift. */
 const TIER_SPEND_CAP = "enforced_spend_limit_reached";
 
-/**
- * How the provider begins a 400 that only the account's billing lifts: a spend limit the
- * organisation or a workspace set, or credit run out.
- */
 const BILLED_OUT = ["You have reached your specified", "Your credit balance is too low"] as const;
 
-/** The provider's own faults and overload, which another attempt may get past. */
 const UNAVAILABLE_STATUSES: ReadonlySet<number> = new Set([500, 504, 529]);
 
 const BILLING = 402;
@@ -106,7 +89,6 @@ const RATE_LIMITED = 429;
 const BAD_REQUEST = 400;
 const ANSWERED = 200;
 
-/** Cached input is billed too, at its own rate, so every input token is counted. */
 const spentOf = (usage: z.output<typeof reply>["usage"]) => ({
   tokensIn:
     usage.input_tokens +
@@ -137,7 +119,6 @@ const badRequestRead = (text: string): MessagesRead => {
     : { read: "failed" };
 };
 
-/** Reads one reply by its status first, then its body, which it never hands on beyond the answer. */
 export const messagesRead = (
   status: number,
   text: string,
@@ -146,12 +127,10 @@ export const messagesRead = (
   if (status === ANSWERED) return answeredRead(text);
   if (status === RATE_LIMITED) return rateLimitedRead(text, retryAfter);
   if (status === BAD_REQUEST) return badRequestRead(text);
-  // A billing fault is lifted by paying, never by waiting, as a spend cap is.
   if (status === BILLING) return { read: "spend-cap" };
   return UNAVAILABLE_STATUSES.has(status) ? { read: "unavailable" } : { read: "failed" };
 };
 
-/** Each event's data, and what is left over until the blank line that ends the next one. */
 type SseRead = { readonly data: readonly string[]; readonly rest: string };
 
 export const sseDataIn = (buffered: string): SseRead => {
@@ -166,7 +145,6 @@ export const sseDataIn = (buffered: string): SseRead => {
   return { data, rest };
 };
 
-/** What one event of a streamed reply says; an event this file does not read is `other`. */
 export type StreamEventRead =
   | { readonly event: "text"; readonly text: string }
   | { readonly event: "started"; readonly spent: TokensSpent }
@@ -180,7 +158,6 @@ const started = z.object({
   message: z.object({ usage: reply.shape.usage }),
 });
 
-/** Its counts are the whole reply's so far; an input count rides along only where it moved. */
 const delta = z.object({
   type: z.literal("message_delta"),
   delta: z.object({ stop_reason: z.string().nullable() }),
@@ -194,7 +171,6 @@ const textDelta = z.object({
 
 const typed = z.object({ type: z.string() });
 
-/** Data that is no JSON, or no event at all, is read as an error: the reply cannot be trusted. */
 export const streamEventRead = (data: string): StreamEventRead => {
   const event = jsonAs(typed, data);
   if (event === undefined || event.type === "error") return { event: "error" };

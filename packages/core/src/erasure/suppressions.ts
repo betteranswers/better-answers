@@ -8,10 +8,6 @@ export type Suppressed = {
 
 const NAMES_NOBODY: SubjectIdentifiers = { emails: [], names: [], other: [] };
 
-/**
- * A member's request may name them by person id alone, and the address they sign in with is the
- * one a company document holds.
- */
 const withTheSignInAddresses = (
   identifiers: SubjectIdentifiers,
   signInAddresses: readonly string[],
@@ -23,10 +19,6 @@ const withTheSignInAddresses = (
   return { ...identifiers, emails: [...identifiers.emails, ...added] };
 };
 
-/**
- * The addresses the request's suppression holds, lower-cased. It is written before the identity
- * step and never replaced, so it still holds the sign-in address once the user row is tombstoned.
- */
 export const addressesSuppressedFor = async (
   tx: Tx,
   input: { readonly workspaceId: string; readonly erasureRequestId: string },
@@ -40,10 +32,6 @@ export const addressesSuppressedFor = async (
   return held.rows.map((row) => row.email);
 };
 
-/**
- * Writes nothing for an empty set, and keeps the first set a request wrote. Answers the count of
- * the set that stands.
- */
 export const suppressInTheWorkspace = async (
   platform: PlatformPrincipal,
   tx: Tx,

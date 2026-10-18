@@ -8,13 +8,11 @@ import type { Hono } from "hono";
 
 const STYLES = fileURLToPath(import.meta.resolve("@better-answers/design-system/styles.css"));
 
-/** An inline sheet resolves no relative `@import`: the browser would ask this origin for `/tokens/…`. */
 const expanded = (file: string): string =>
   readFileSync(file, "utf8").replace(/^@import "(\.\/[^"]+)";$/gm, (_line, relative: string) =>
     expanded(path.resolve(path.dirname(file), relative)),
   );
 
-/** The faces the design system depends on, resolved from it because the api does not list them. */
 const fromDesignSystem = createRequire(STYLES);
 
 const FACES = [
@@ -29,7 +27,6 @@ const FACES = [
   };
 });
 
-/** Unlayered, so it outranks the pattern rule: set `background-color` there, never the shorthand, which clears the pattern's image. */
 const PAGE_RULES = `
 *,::before,::after{box-sizing:border-box}
 html{font-family:var(--font-sans);font-size:var(--text-base);line-height:var(--leading-normal);letter-spacing:var(--tracking-body);color:var(--text-body)}
@@ -58,12 +55,10 @@ button[data-variant=outline]:active{background-color:var(--surface-active)}
 @media (min-width:48rem){body>header,main{padding-inline:var(--space-8)}[data-slot=card]{margin-top:var(--space-16)}}
 `;
 
-/** One sheet per process: the design system's, the faces at this tier's mounts, then the page's rules. */
 export const PAGE_STYLE = [expanded(STYLES), ...FACES.map((face) => face.css), PAGE_RULES].join(
   "\n",
 );
 
-/** The face files the sheet names, ahead of the catch-all that would otherwise answer them. */
 export const serveFaces = (server: Hono): void => {
   for (const face of FACES) {
     server.get(

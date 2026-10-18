@@ -16,7 +16,6 @@ import {
 } from "./harness.ts";
 import { refusalAnswering } from "./refused-read.ts";
 
-/** Stated, not imported: `apps/web` takes nothing from `apps/api` at runtime. */
 const ASK_TO_JOIN = "person.requestAccess";
 
 const ASK_TO_JOIN_ENDPOINT = `/trpc/${ASK_TO_JOIN}`;
@@ -25,10 +24,8 @@ const REASON = "I run the estimating desk and need the tender library.";
 
 const A_SHORT_NAME = "acme-joinery";
 
-/** The short name's old word, spelled in halves so this file keeps none of it. */
 const OLD_WORD = ["sl", "ug"].join("");
 
-/** A reader has no use for the short name's old word, and a workspace is never an organisation. */
 const UNSAID = [
   { word: "an organisation", pattern: /organi[sz]ation/i },
   { word: `a ${OLD_WORD}`, pattern: new RegExp(String.raw`\b${OLD_WORD}\b`, "i") },
@@ -51,7 +48,6 @@ const askToJoin = async (page: Page, shortName: string, reason = REASON): Promis
   await askButton(page).click();
 };
 
-/** The body as read and as heard, so a word in an accessible name is caught too. */
 const thePageSaysNeither = async (page: Page, when: string): Promise<void> => {
   const said = `${await page.locator("body").innerText()}\n${await page.locator("body").ariaSnapshot()}`;
   for (const { word, pattern } of UNSAID) {
@@ -115,7 +111,6 @@ test("answers known, unknown and repeated short names alike", async ({ page, req
   const said: string[] = [];
   for (const shortName of [workspace.shortName, `nobody-${Date.now()}`, workspace.shortName]) {
     await askToJoin(page, shortName);
-    // The fields empty only once this ask is acknowledged, so the banner read is this ask's.
     await expect(shortNameField(page)).toHaveValue("");
     said.push(await requestSent(page).innerText());
   }
@@ -156,8 +151,6 @@ test("refuses a blank reason, saying what to send", async ({
 test("tells a person past the ceiling when to ask again", async ({ page, request }) => {
   await signedInWithNoWorkspace(page, request, "asker");
 
-  // The window is wall-clock aligned, so a burst straddling a boundary starts its count again:
-  // ask until refused, not a fixed number.
   let status = 200;
   for (let attempt = 0; attempt < 30 && status !== 429; attempt += 1) {
     const answered = await page.request.post(ASK_TO_JOIN_ENDPOINT, {

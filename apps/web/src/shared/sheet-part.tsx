@@ -2,7 +2,6 @@ import { useId, type ReactNode } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card.tsx";
 
-/** One titled part, a region a screen reader jumps to by its heading; its rule spans the part. */
 export function SheetPart(properties: { readonly title: string; readonly children: ReactNode }) {
   const headingId = useId();
   return (

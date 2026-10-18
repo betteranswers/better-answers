@@ -9,11 +9,9 @@ const GROUPS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Groups").p
 
 const groupsRegion = (page: Page) => page.getByRole("region", { name: "Groups" });
 
-/** Hidden regions left out, as a screen reader leaves them: only a region in the tree is found. */
 const emptyStatusIn = (scope: Locator): Locator =>
   scope.getByRole("status").filter({ hasNotText: /\S/ });
 
-/** Rendered, so it is tracked, yet no taller than a visually hidden pixel, so it leaves no gap. */
 const standsWithoutRoom = async (status: Locator) => {
   await expect(status).not.toHaveCSS("display", "none");
   const box = await status.boundingBox();
@@ -32,13 +30,11 @@ test.describe("an action's outcome region", () => {
     await expect(inTheBand, "the band's outcome region is out of the tree").toHaveCount(1);
     await standsWithoutRoom(inTheBand);
 
-    // The list's count is a status too, empty until its read lands and says no group.
     await expect(
       groupsRegion(page).getByRole("status").filter({ hasText: /\b0\b/ }),
       "the groups are still unread",
     ).toHaveCount(1);
 
-    // The create dialog's outcome is its own, behind its scrim, and closes with the dialog.
     const onThePage = emptyStatusIn(groupsRegion(page));
     await expect(onThePage, "the page's outcome region is out of the tree").toHaveCount(1);
     for (const status of await onThePage.all()) {

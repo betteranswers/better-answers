@@ -8,15 +8,12 @@ import { webTabOf } from "./web-client.ts";
 
 const app = appForSuite();
 
-/** The session a client holds, or null once a sign-out ended it: `/get-session` answers the
- * whole read as null then. */
 const sessionIdOf = async (client: TestClient): Promise<string | null> =>
   z
     .object({ session: z.object({ id: z.string() }) })
     .nullable()
     .parse(await (await client.fetch("/get-session")).json())?.session.id ?? null;
 
-/** The read's shape, held strict: no field may join it, and none may leave unnamed. */
 const sessionsRead = z.array(
   z.strictObject({
     id: z.string(),

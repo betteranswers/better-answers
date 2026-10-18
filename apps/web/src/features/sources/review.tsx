@@ -75,7 +75,6 @@ function GroupNotes(properties: {
   );
 }
 
-/** Its own component, so the region and the read's words it holds mount together, on opening. */
 function PreviewPassages(properties: {
   readonly preview: ReturnType<typeof usePreview>;
   readonly open: boolean;
@@ -145,10 +144,6 @@ function FindingsTable(properties: {
     if (group !== undefined) toggle(group);
   });
 
-  /**
-   * A dismissed span narrows nothing once a sync reads it, so only a span nobody dismissed says the
-   * seam narrowed its document.
-   */
   const narrowedBySeam = new Set(
     groups
       .filter((group) => group.specialCategory && group.dismissed < group.found)

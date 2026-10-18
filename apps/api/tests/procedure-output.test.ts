@@ -12,22 +12,15 @@ import { appRouter, type AppRouter } from "../src/trpc/router.ts";
 const API_SOURCE = fileURLToPath(new URL("../src/", import.meta.url));
 const CORE_SOURCE = fileURLToPath(new URL("../../../packages/core/src/", import.meta.url));
 
-/** Each TypeScript file under `root` whose text matches, by its path from `root`. */
 const filesMatching = (root: string, pattern: RegExp): readonly string[] =>
   readdirSync(root, { recursive: true, encoding: "utf8" })
     .filter((file) => file.endsWith(".ts"))
     .filter((file) => pattern.test(readFileSync(path.join(root, file), "utf8")))
     .toSorted();
 
-/** Any mention, read or write, raw or through the schema, so a new one is a reviewed change. */
 const NAMES_THE_MARK = /test_workspace_mark|testWorkspaceMark/;
 
-const NAMING_THE_MARK_IN_CORE = [
-  // The fixture, the mark's one writer, which reads it first to keep or correct it.
-  "members/test-workspace.ts",
-  // The invitation guard, which only reads it.
-  "members/testing-domain.ts",
-];
+const NAMING_THE_MARK_IN_CORE = ["members/test-workspace.ts", "members/testing-domain.ts"];
 
 type Leaf<Path extends string, Output> = { readonly path: Path; readonly output: Output };
 

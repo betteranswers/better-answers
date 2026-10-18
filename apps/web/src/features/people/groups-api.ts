@@ -11,12 +11,10 @@ type Api = ReturnType<typeof useTRPC>;
 
 export type ListedGroup = inferOutput<Api["members"]["groups"]>[number];
 
-/** One member and one group: who a box puts in the group, or takes out of it. */
 export type InGroup = inferInput<Api["members"]["addToGroup"]>;
 
 type HeldGroup = ListedMember["groups"][number];
 
-/** The one origin an Admin's own action gives a group; the wire's type holds it to the api's word. */
 const CURATED: ListedGroup["origin"] = "admin-curated";
 
 export const useGroups = () => {
@@ -30,10 +28,6 @@ const undoingEach = (undos: readonly Undo[]): Undo => ({
   },
 });
 
-/**
- * A group's count and each member's groups say the same thing twice, so every settled action reads
- * both again.
- */
 const useReconcile = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -49,10 +43,6 @@ const useReconcile = () => {
 
 const ASKED_NAME = z.object({ name: z.string() });
 
-/**
- * The api mints a group's id, so a name asked for and not yet answered is drawn as a row of its
- * own until then.
- */
 export const usePendingGroupNames = (): readonly (string | undefined)[] => {
   const api = useTRPC();
   return useMutationState({
@@ -67,7 +57,6 @@ export const useCreateGroup = () => {
   const reconcile = useReconcile();
   return useMutation(
     api.members.createGroup.mutationOptions({
-      // Written before the pending name is let go, so the row never blinks out between the two.
       onSuccess: ({ groupId }, { name }) => {
         queryClient.setQueryData(api.members.groups.queryKey(), (listed) =>
           listed === undefined
@@ -149,7 +138,6 @@ const groupsHeld = (
   return joined === undefined ? others : inNameOrder([...others, joined]);
 };
 
-/** Putting a member in and taking them out move the same two lists, in opposite directions. */
 const useGroupMoved = (way: Way) => {
   const api = useTRPC();
   const queryClient = useQueryClient();

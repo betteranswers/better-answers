@@ -64,7 +64,6 @@ const recordSubjectRequestAction = declareAction({
   refuses: ["role-forbids", "malformed", "identifier-too-broad"],
 });
 
-/** `identifier-too-broad` is answered beside what was said, never as a bare word. */
 export type RecordSubjectRequestRefusal =
   | Exclude<RefusalOf<typeof recordSubjectRequestAction>, IdentifierTooBroad["word"]>
   | IdentifierTooBroad
@@ -80,7 +79,6 @@ export type ReadSubjectRequestRefusal = RefusalOf<typeof subjectRequestForAction
 
 const REQUEST_ID = boundarySchemas.subjectRequest.select.shape.id;
 
-/** A day past the end of the month it lands in clamps to that month's last day. */
 export const monthsOn = (from: Date, months: number): Date => {
   const dayAsked = from.getUTCDate();
   const landed = new Date(from);
@@ -94,10 +92,6 @@ export const monthsOn = (from: Date, months: number): Date => {
   return landed;
 };
 
-/**
- * A statutory deadline moved later is one already missed, so a short month clamps back;
- * packages/schema/test/factory.ts seeds the same clamp.
- */
 export const dueDateOf = (clockStartedAt: Date): Date => monthsOn(clockStartedAt, 1);
 
 export const deadlineOf = (request: Pick<SubjectRequest, "dueAt" | "extendedTo">): Date =>

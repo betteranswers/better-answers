@@ -53,7 +53,6 @@ import { outcomeOfSendingFailure } from "./refusal.tsx";
 import { ROLE_OFFERED_FIRST, RoleChoice } from "./role-choice.tsx";
 import { UnsentEmails } from "./unsent-emails.tsx";
 
-/** The keystroke list names the action as the button does, so inviting has one name. */
 const ACTION_NAME = PEOPLE_KEYSTROKES.invite.action;
 
 const NO_FLAGS: ReadonlyMap<string, Flag> = new Map();
@@ -66,7 +65,6 @@ type FieldRef = RefObject<HTMLInputElement | null>;
 
 type ListRef = RefObject<HTMLUListElement | null>;
 
-/** A paste holding several addresses, put where the caret was; one address pastes as typing. */
 const pastedInto = (event: ClipboardEvent<HTMLInputElement>): string | undefined => {
   const pasted = event.clipboardData.getData("text");
   if (!hasSeparator(pasted)) return undefined;
@@ -74,7 +72,6 @@ const pastedInto = (event: ClipboardEvent<HTMLInputElement>): string | undefined
   return `${value.slice(0, selectionStart ?? value.length)}${pasted}${value.slice(selectionEnd ?? value.length)}`;
 };
 
-/** The addresses the dialog holds, each with what flags it, and where focus goes as one leaves. */
 const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef, left: string) => {
   const [held, setHeld] = useState(NOTHING_HELD);
   const [field, setField] = useState(left);
@@ -87,7 +84,6 @@ const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef, left: str
     setField(moved.field);
   };
 
-  /** Drawn at once, so the press that moved the field can check the list and move focus into it. */
   const placedNow = (moved: Moved): readonly Held[] => {
     flushSync(() => {
       place(moved);
@@ -108,7 +104,6 @@ const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef, left: str
     focusFirstFlagged();
   };
 
-  /** Each row's Remove by its key: focus finds a row by what it holds, not by counting buttons. */
   const removeRefOf = (key: string) => (button: HTMLButtonElement) => {
     removers.current.set(key, button);
     return () => {
@@ -116,7 +111,6 @@ const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef, left: str
     };
   };
 
-  /** Focus goes to the row that took its place, else the one before, else the field. */
   const remove = (key: string, fieldRef: FieldRef) => {
     const at = held.findIndex((one) => one.key === key);
     const kept = held.filter((one) => one.key !== key);
@@ -214,7 +208,6 @@ const summaryOf = (addresses: Addresses): string => {
     : INVITE_WORDS.summary(addresses.held.length - flagged, flagged);
 };
 
-/** Typed, pasted or entered, whole addresses move into the list below; the one being typed stays. */
 function AddressField(properties: {
   readonly addresses: Addresses;
   readonly list: ListRef;
@@ -244,7 +237,6 @@ function AddressField(properties: {
           placed(typedInto(addresses.held, event.target.value));
         }}
         onKeyDown={(event) => {
-          // An empty field leaves Enter to the form, which sends.
           if (event.key !== "Enter" || addresses.field.trim() === "") return;
           event.preventDefault();
           placed(allInto(addresses.held, addresses.field));
@@ -267,7 +259,6 @@ function AddressField(properties: {
   );
 }
 
-/** Read in the outcome's own live region, which stood before the Sent view did. */
 const withWaiting = (outcome: Outcome | undefined, waiting: number): Outcome | undefined =>
   outcome === undefined || waiting === 0
     ? outcome
@@ -280,7 +271,6 @@ const withWaiting = (outcome: Outcome | undefined, waiting: number): Outcome | u
         ),
       };
 
-/** Addresses still waiting lead to the next invite, since Done drops them. */
 function Sent(properties: {
   readonly sent: readonly InvitedOne[];
   readonly waiting: boolean;
@@ -311,7 +301,6 @@ function Sent(properties: {
   );
 }
 
-/** Mounted afresh for each invite, so nothing from the last one is in it but what its cap left. */
 function InviteForm(properties: {
   readonly members: readonly ListedMember[] | undefined;
   readonly fieldRef: FieldRef;
@@ -335,7 +324,6 @@ function InviteForm(properties: {
   const toSend = allInto(addresses.held, addresses.field).held.length;
   const waiting = sent === undefined ? 0 : addressesCounted(addresses.field);
 
-  /** Never refused at the cap: the list holds what one send takes, the rest wait in the field. */
   const refusedBefore = (held: readonly Held[]): Outcome | undefined => {
     if (held.some(addresses.isFlagged)) {
       addresses.focusFirstFlagged();
@@ -371,7 +359,6 @@ function InviteForm(properties: {
     );
   };
 
-  // Never disabled: a disabled button drops focus, and a refusal would land nowhere.
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (sending) return;
@@ -437,7 +424,6 @@ export function InviteAction() {
   const [invites, setInvites] = useState(0);
   const [left, setLeft] = useState("");
   const fieldRef = useRef<HTMLInputElement>(null);
-  // Held here, where the dialog opens on the list already read: it checks against no fresher one.
   const members = useMembers().data;
 
   const show = () => {
@@ -448,7 +434,6 @@ export function InviteAction() {
     if (action === INVITE_A_PERSON.asks) show();
   });
 
-  /** A fresh form in the open dialog, focus on its field where the pressed button was. */
   const again = (leftInTheField: string) => {
     flushSync(() => {
       setLeft(leftInTheField);
@@ -457,7 +442,6 @@ export function InviteAction() {
     fieldRef.current?.focus();
   };
 
-  // A closed dialog's content unmounts, so what a capped send left must not reach the next opening.
   const openedOrClosed = (opened: boolean) => {
     setOpen(opened);
     if (!opened) setLeft("");
@@ -465,7 +449,6 @@ export function InviteAction() {
 
   return (
     <Dialog open={open} onOpenChange={openedOrClosed}>
-      {/* The trigger is where a closed dialog hands focus back, however it was opened. */}
       <DialogTrigger asChild>
         <Button size="sm" aria-keyshortcuts={PEOPLE_KEYSTROKES.invite.key}>
           {ACTION_NAME}

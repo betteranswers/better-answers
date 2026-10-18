@@ -36,7 +36,6 @@ const askToAdd = async (client: TestClient): Promise<unknown> => {
   return asked.json();
 };
 
-/** A passkey added from `device` through the api's two steps, as the Account page adds one. */
 const addOn = async (
   client: TestClient,
   device: PasskeyDevice,

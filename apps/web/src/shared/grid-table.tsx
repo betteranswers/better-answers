@@ -21,7 +21,6 @@ import {
   TableRow,
 } from "@/shared/ui/table.tsx";
 
-/** Ticks are row ids the page holds, so a row a search or a page hides stays ticked. */
 type Ticks = {
   readonly ticked: ReadonlySet<string>;
   readonly onTickedChange: (ticked: ReadonlySet<string>) => void;
@@ -43,31 +42,23 @@ type Opted<Data> = {
   readonly sorting?: SortHeads | undefined;
   readonly hidden?: ReadonlySet<string> | undefined;
   readonly rowMenu?: ((row: Data) => ReactNode) | undefined;
-  /** The row focus is in, for keystrokes that act on it; `undefined` once focus leaves it. */
   readonly onRowFocus?: ((row: Data | undefined) => void) | undefined;
 };
 
 const HEAD =
   "h-9 px-3 font-medium whitespace-normal text-muted-foreground [font-size:var(--text-xs)]";
 
-/** Wrapping, not scrolling, is what keeps a 320px page from hiding a column. */
 const CELL = "h-10 px-3 py-2 whitespace-normal";
 
-/**
- * The drawn box is 16px; a press needs 24px. Centred, not inset, since an inset counts from inside
- * the border.
- */
 const TICK =
   "relative after:absolute after:top-1/2 after:left-1/2 after:size-6 after:-translate-x-1/2 after:-translate-y-1/2";
 
 const opensElsewhere = (event: MouseEvent<HTMLAnchorElement>): boolean =>
   event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
 
-/** A link the caller sent to another window, or to a download, is the browser's to follow. */
 const leavesThePage = (link: HTMLAnchorElement): boolean =>
   !["", "_self"].includes(link.target) || link.hasAttribute("download");
 
-/** A real link, so a new tab or a copied address still reaches the row; a plain click opens it here. */
 export function RowLink(
   properties: Omit<ComponentProps<"a">, "href" | "onClick"> & {
     readonly href: string;
@@ -113,7 +104,6 @@ const pageTickState = (ticked: ReadonlySet<string>, ids: readonly string[]) => {
   return count === ids.length ? true : "indeterminate";
 };
 
-/** Ticks the rows this page shows and no others; a tick on another page stands. */
 function PageTick(properties: { readonly ids: readonly string[]; readonly ticking: Ticks }) {
   const { ids, ticking } = properties;
   return (
@@ -153,7 +143,6 @@ const ariaSortOf = (sorted: ColumnSort | undefined) => {
   return sorted.desc ? "descending" : "ascending";
 };
 
-/** Ascending first, then each press turns it round; a list always holds some order. */
 const nextSort = (sorted: ColumnSort | undefined, id: string): ColumnSort => ({
   id,
   desc: sorted?.id === id && !sorted.desc,
@@ -191,7 +180,6 @@ function ColumnHead<Features extends TableFeatures, Data extends RowData>(proper
 const isShown = (hidden: ReadonlySet<string> | undefined, columnId: string): boolean =>
   hidden?.has(columnId) !== true;
 
-/** Focus moving between the row's own controls keeps it; only leaving the row lets it go. */
 const focusHandlersOf = <Data,>(
   onRowFocus: ((row: Data | undefined) => void) | undefined,
   row: Data,
@@ -253,13 +241,8 @@ const columnCount = <Features extends TableFeatures, Data extends RowData>(
   (opted.ticking === undefined ? 0 : 1) +
   (opted.rowMenu === undefined ? 0 : 1);
 
-/**
- * `empty` fills the body when no row is left, so the header still names the columns. An opt-in
- * part left out draws nothing.
- */
 export function GridTable<Features extends TableFeatures, Data extends RowData>(
   properties: Opted<Data> & {
-    /** Flat columns only: the header draws no spans, so a column group's header would misalign. */
     readonly table: HeldTable<Features, Data>;
     readonly caption: string;
     readonly empty: ReactNode;

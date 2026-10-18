@@ -39,7 +39,6 @@ const isPromoted = async (personId: string) =>
     )
   ).rows[0]?.promoted;
 
-/** The Admin moves `personId` to the role named, from a session confirmed now. */
 const movedByTheAdmin = (
   workspace: ProvisionedWorkspace,
   personId: string,
@@ -137,7 +136,6 @@ describe("becoming one who must hold a second factor", () => {
 
 type Removal = (personId: string, removing: string) => Promise<unknown>;
 
-/** The removing session's stamp and another's, once `remove` has run on the first. */
 const stampsAfter = async (personId: string, remove: Removal) => {
   const removing = await confirmedSession(personId);
   const other = await confirmedSession(personId);

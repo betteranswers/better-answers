@@ -10,7 +10,6 @@ type Named = Exclude<NamedOrList, readonly unknown[]>;
 
 const isList = (named: NamedOrList): named is readonly Named[] => Array.isArray(named);
 
-/** One thing a detail key names; a key naming a list names no one thing. */
 export const namedIn = (named: ReadAuditEvent["named"], key: string): Named | undefined => {
   const held = named[key];
   return held === undefined || isList(held) ? undefined : held;
@@ -18,7 +17,6 @@ export const namedIn = (named: ReadAuditEvent["named"], key: string): Named | un
 
 type DetailValue = ReadAuditEvent["detail"][string];
 
-/** One line of an event's detail: its label, the value in words, and an address to show beneath. */
 export type DetailLine = {
   readonly key: string;
   readonly label: string;
@@ -26,7 +24,6 @@ export type DetailLine = {
   readonly address?: string;
 };
 
-/** Stored keys holding an id, which the read names; one it could not name is left off. */
 const NAMED_LABELS = new Map(
   Object.entries({
     userId: "Person",
@@ -42,7 +39,6 @@ const NAMED_LABELS = new Map(
   }),
 );
 
-/** Stored keys, as the register pins them; a key listed nowhere is left off the page. */
 const VALUE_LABELS = new Map(
   Object.entries({
     role: "Role",
@@ -96,7 +92,6 @@ export const LABELLED_DETAIL_KEYS: readonly string[] = [
   ...VALUE_LABELS.keys(),
 ];
 
-/** Ids and hashes the read never names, and a sweep's subject and row counts no reader acts on. */
 export const KEPT_OFF_DETAIL_KEYS: Readonly<Partial<Record<DeclaredAction, readonly string[]>>> = {
   "knowledge.check.imported": ["verificationId"],
   "knowledge.concept.committed": ["commitSha", "contentHash"],
@@ -122,7 +117,6 @@ export const KEPT_OFF_DETAIL_KEYS: Readonly<Partial<Record<DeclaredAction, reado
   "sources.finding.restored": ["findingId"],
 };
 
-/** Stored values a reader would not say: a sign-in method, an audience, a family, an AI provider. */
 const VALUE_WORDS: ReadonlyMap<unknown, string> = new Map([
   ["email_code", "Emailed code"],
   ["email_link", "Sign-in link"],
@@ -159,13 +153,11 @@ const saidOf = (named: Named): Said => {
   }
 };
 
-/** A list, such as an export's matches, reads as its names alone. */
 const namedLine = (key: string, label: string, named: NamedOrList): DetailLine =>
   isList(named)
     ? { key, label, value: named.map((one) => saidOf(one).value).join(", ") }
     : { key, label, ...saidOf(named) };
 
-/** A list is the assistant access or the sessions an action ended, each named by what it is. */
 const wordsOfValue = (value: DetailValue): string => {
   if (Array.isArray(value)) {
     const named = value.map(
@@ -177,7 +169,6 @@ const wordsOfValue = (value: DetailValue): string => {
   return VALUE_WORDS.get(value) ?? String(value);
 };
 
-/** An id is said by what it names, never as itself, and a key with no word is left off. */
 export const detailLinesOf = (
   event: Pick<ReadAuditEvent, "detail" | "named">,
 ): readonly DetailLine[] =>

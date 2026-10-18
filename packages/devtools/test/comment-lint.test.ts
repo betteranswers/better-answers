@@ -17,12 +17,10 @@ const COMMENT_RULES = [
   "better-answers/string-cites-nothing",
 ];
 
-/** A rule a directive can suppress, so a used disable is told apart from an unused one. */
 const SUPPRESSIBLE = "no-console";
 
 const config = readOxlintConfig();
 
-/** Each rule at the setting the root config holds it, so a rule it drops or softens fails here. */
 const CONFIG = JSON.stringify({
   plugins: config.plugins,
   jsPlugins: config.jsPlugins

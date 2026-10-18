@@ -15,7 +15,6 @@ const hook = hookScript("worktree-create-hook");
 
 const scratch = scratchRoot("worktree-create-hook");
 
-/** Longer than a creation may take, so a hook that waited on the sweep shows in its time. */
 const SWEEP_SECONDS = 10;
 
 describe("creating a worktree", () => {

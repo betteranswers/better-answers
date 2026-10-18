@@ -337,7 +337,6 @@ describe("the worker on the passage index", () => {
   });
 });
 
-/** Migration 0037 names the table as it stood then; migration 0069 renamed it. */
 const migrationStatementMatching = (word: string): string =>
   migrationStatementSaying("the-chunk-substrate.sql", word).replace(
     "parent.relname = 'chunk'",

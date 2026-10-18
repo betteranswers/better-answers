@@ -55,7 +55,6 @@ import { outcomeOfFailure } from "./refusal.tsx";
 import { ROLES } from "./role-meanings.ts";
 import { nameOf } from "./words.tsx";
 
-/** The members read returns the whole workspace, so the browser pages it. */
 const PAGE_SIZE = 25;
 
 const MEMBERS_HEADING = "Members";
@@ -68,7 +67,6 @@ const NONE: ReadonlySet<string> = new Set();
 
 const NO_ONE: readonly ListedMember[] = [];
 
-/** Person and role are what a narrow window has room for; the rest can be shown again. */
 const NARROW_HIDES: ReadonlySet<string> = new Set(["groups", "joined"]);
 
 const countOfMembers = (count: number): string => counted(count, "member", "members");
@@ -97,7 +95,6 @@ const matching = (narrowing: Narrowing) => {
     `${member.displayName} ${member.address}`.toLowerCase().includes(search);
 };
 
-/** A clear empties the search and filters and keeps the reader's sort. */
 const KEPT_ON_CLEAR = ["sort"] as const;
 
 const useNarrowedMembers = (listed: readonly ListedMember[]) => {
@@ -121,10 +118,6 @@ const toggled = (ticked: ReadonlySet<string>, personId: string): ReadonlySet<str
   return next;
 };
 
-/**
- * Pushed, so Back comes to these rows again; a search still settling is sent first, or Back would
- * lose its last keys.
- */
 const useOpenMember = (flush: () => void) => {
   const navigate = useNavigate();
   const router = useRouter();
@@ -138,7 +131,6 @@ const useOpenMember = (flush: () => void) => {
   };
 };
 
-/** A removal asked on a member's own page lands here before the api answers it. */
 const removalSaid = (
   name: string | undefined,
   removal: ReturnType<typeof useRemovalOf>,
@@ -154,7 +146,6 @@ const removalSaid = (
   };
 };
 
-/** Arriving from a removal: the list it changed takes focus, and says how the removal went. */
 const useReturnedFromARemoval = (heading: RefObject<HTMLElement | null>): Outcome | undefined => {
   const personId = useRouterState({
     select: (state) =>
@@ -172,7 +163,6 @@ const useReturnedFromARemoval = (heading: RefObject<HTMLElement | null>): Outcom
   return removalSaid(name, removal);
 };
 
-/** Each of the row's actions opens the member's page at that action's control. */
 const ROW_ACTIONS: readonly { readonly label: string; readonly at: OpenedAt }[] = [
   { label: "Open", at: "member" },
   { label: "Change Role", at: "role" },
@@ -229,7 +219,6 @@ function MemberFilters(properties: {
             narrowed.write({ role: ROLES.find((each) => each === role), page: 1 });
           },
         },
-        // A filter with nothing to choose is no filter, so it waits for a group to exist.
         ...(groups.length === 0 ? [] : [groupFilter]),
       ]}
       columns={{
@@ -241,7 +230,6 @@ function MemberFilters(properties: {
   );
 }
 
-/** A failed read stands in for the rows, even stale ones: the reader must not act on them. */
 function MembersRead(properties: {
   readonly read: ReturnType<typeof useMembers>;
   readonly searchRef: RefObject<HTMLInputElement | null>;
@@ -289,7 +277,6 @@ function NoOneMatches(properties: {
   );
 }
 
-/** A ticked person the list has since lost is still named by the action that refused them. */
 const namedIn =
   (listed: readonly ListedMember[]) =>
   (personId: string): string => {
@@ -297,12 +284,10 @@ const namedIn =
     return member === undefined ? NO_LONGER_LISTED : nameOf(member);
   };
 
-/** The list's line and the rows it marks, held as one so a mark never outlives its reason. */
 type Shown = { readonly outcome: Outcome | undefined; readonly refused: RefusedRows };
 
 const NOTHING_SHOWN: Shown = { outcome: undefined, refused: NO_MARKS };
 
-/** Ticks and an action's outcome are the page's; what narrows the rows is the address's. */
 function MemberList(properties: {
   readonly read: ReturnType<typeof useMembers>;
   readonly headingId: string;
@@ -311,7 +296,6 @@ function MemberList(properties: {
   const { read, heading } = properties;
   const listed = read.data ?? NO_ONE;
   const narrowed = useNarrowedMembers(listed);
-  // A tick outlives its row, so the next action refuses or skips that person and says so.
   const [ticked, setTicked] = useState<ReadonlySet<string>>(NONE);
   const [inFocus, setInFocus] = useState<string>();
   const [shown, setShown] = useState<Shown>(NOTHING_SHOWN);
@@ -444,7 +428,6 @@ function MemberList(properties: {
   );
 }
 
-/** A letter pressed outside the list still needs a member, so the one last in focus stands. */
 function useInFocusKeystrokes(properties: {
   readonly inFocus: ListedMember | undefined;
   readonly open: (personId: string, at: OpenedAt) => void;
@@ -474,7 +457,6 @@ export function MembersTab() {
   const members = useMembers();
   const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
-  // Read with the list, so a member's page opened on its groups has boxes to land focus on.
   useGroups();
 
   return (

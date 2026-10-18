@@ -42,11 +42,16 @@ const findings = (tree: Tree): readonly string[] =>
     .filter((line) => line !== "");
 
 describe("the Python check fires on a long or citing comment", () => {
-  it("refuses a long comment, naming its count and rules file", () => {
+  it("refuses a long comment, naming its count and the fix", () => {
     const output = run(holding(TOO_LONG));
 
     expect(output).toContain("runs to 29 words");
-    expect(output).toContain("the root `CODING_STANDARDS.md`");
+    expect(output).toContain(
+      "A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason.",
+    );
+    expect(output).toContain(
+      "Any other comment is deleted: hold its reason in a name, a type, a test, a grant or a lint, or report it open in the tracker.",
+    );
   });
 
   it("counts a docstring as a comment, unlike any ruff rule", () => {
@@ -109,8 +114,8 @@ describe("the Python check fires on a long or citing comment", () => {
 describe("the Python check's exemptions", () => {
   it.each([
     ["a why inside the ceiling", "# Deleting this changes what the engine memoises.\n"],
-    ["a type-checker escape", "# type: ignore[attr-defined]\n"],
-    ["a linter escape", "# noqa: E501\n"],
+    ["a type-checker escape", "# type: ignore[attr-defined]  # the stub lags the runtime\n"],
+    ["a linter escape", "# noqa: E501  # a URL cannot wrap\n"],
     ["a coverage pragma", "# pragma: no cover\n"],
     ["a copy-detection fence", "# jscpd:ignore-start\n# jscpd:ignore-end\n"],
     ["a licence notice", "# SPDX-License-Identifier: MIT\n"],
@@ -139,7 +144,9 @@ describe("the Python check's exemptions", () => {
   });
 
   it("keeps a directive's exemption off the paragraph under it", () => {
-    expect(findings(holding(`# type: ignore[attr-defined]\n${TOO_LONG}`))).toHaveLength(1);
+    const below = `# type: ignore[attr-defined]  # the stub lags the runtime\n${TOO_LONG}`;
+
+    expect(findings(holding(below))).toHaveLength(1);
   });
 
   it("stays silent over short comments that cite nothing", () => {
@@ -159,11 +166,11 @@ describe("a directive's reason counts against the twenty-five words", () => {
   it.each([
     ["a noqa", "import os  # noqa: F401"],
     ["a type-checker escape", "KEEP: int = 1  # type: ignore[assignment]"],
-  ])("refuses %s's twenty-six-word reason, naming its rules file", (_what, line) => {
+  ])("refuses %s's twenty-six-word reason, naming the fix", (_what, line) => {
     const output = run({ [FILE]: `${line}  # ${wordsOf(26)}\n` });
 
     expect(output).toContain("reason runs to 26 words");
-    expect(output).toContain("the root `CODING_STANDARDS.md`");
+    expect(output).toContain("Say the constraint alone.");
   });
 
   it("counts a reason apart from the comment above it", () => {
@@ -184,7 +191,7 @@ describe("a directive's reason counts against the twenty-five words", () => {
   it("counts none of the directive's own words", () => {
     const codes = Array.from({ length: 30 }, (_, index) => `E${String(index + 100)}`).join(", ");
 
-    expect(findings({ [FILE]: `KEEP = 1  # noqa: ${codes}\n` })).toEqual([]);
+    expect(findings({ [FILE]: `KEEP = 1  # noqa: ${codes}  # a generated table\n` })).toEqual([]);
   });
 
   it("accepts a noqa whose reason fits the ceiling", () => {
@@ -200,22 +207,35 @@ describe("a directive's reason counts against the twenty-five words", () => {
   });
 });
 
-describe("a public worker function's docstring may run to fifty words", () => {
+describe("a suppression gives its reason on the same line", () => {
   it.each([
-    ["a public worker function", "def reads() -> int:"],
-    ["a public async worker function", "async def reads() -> int:"],
-  ])("accepts a fifty-word docstring on %s", (_what, signature) => {
-    expect(findings({ [WORKER_MODULE]: documented(signature, 50) })).toEqual([]);
-  });
+    ["a bare noqa", "KEEP = 1  # noqa: E501"],
+    ["a bare type-checker escape", "KEEP = 1  # type: ignore[attr-defined]"],
+    ["a blanket noqa", "KEEP = 1  # noqa"],
+    ["a bare noqa then a directive", "KEEP = 1  # noqa: E501  # fmt: skip"],
+  ])("refuses %s, naming the fix", (_what, line) => {
+    const output = run({ [FILE]: `${line}\n` });
 
-  it("refuses a fifty-one-word docstring on a public worker function", () => {
-    const output = run({ [WORKER_MODULE]: documented("def reads() -> int:", 51) });
-
-    expect(output).toContain("runs to 51 words");
-    expect(output).toContain("in 50 at most");
+    expect(output).toMatch(/^probe\.py:1: this suppression gives no reason; /m);
+    expect(output).toContain("Add the reason after a second `#`.");
   });
 
   it.each([
+    ["a noqa", "import os  # noqa: F401  # pytest finds the fixture by import"],
+    [
+      "a type-checker escape",
+      "KEEP = 1  # type: ignore[attr-defined]  # torch installs `patch` at runtime",
+    ],
+    ["a reason after the codes", "import os  # noqa: F401 - pytest finds it"],
+  ])("accepts %s", (_what, line) => {
+    expect(findings({ [FILE]: `${line}\n` })).toEqual([]);
+  });
+});
+
+describe("a docstring holds to twenty-five words wherever it sits", () => {
+  it.each([
+    ["a public worker function", WORKER_MODULE, documented("def reads() -> int:", 26)],
+    ["a public async worker function", WORKER_MODULE, documented("async def reads() -> int:", 26)],
     ["an internal worker function", WORKER_MODULE, documented("def _reads() -> int:", 26)],
     [
       "a method, which is a member",
@@ -247,7 +267,7 @@ describe("a public worker function's docstring may run to fifty words", () => {
     const output = run({ [file]: source });
 
     expect(output).toContain("runs to 26 words");
-    expect(output).toContain("in 25 at most");
+    expect(output).toContain("over the cap of 25");
   });
 });
 

@@ -13,7 +13,6 @@ import {
   type ReuseSet,
 } from "./reuse-set.ts";
 
-/** List prices in US dollars per million tokens, and each model's own effort; check the price page before a run. */
 const MODELS = [
   { name: "Claude Sonnet 5.5", model: "claude-sonnet-5-5", usdIn: 2, usdOut: 10, effort: "high" },
   {
@@ -71,7 +70,6 @@ describe("the owner's reuse reading", () => {
         const priced = `$${usdIn} in and $${usdOut} out per million tokens, at £${rate} to the dollar`;
         await recordReuseReading(`Reuse reading, ${name} at effort ${asked}`, reading, priced);
 
-        // A refused key fails every call, and a run that judged nothing has no figures to record.
         expect(reading.judged).toBeGreaterThan(0);
       });
     }

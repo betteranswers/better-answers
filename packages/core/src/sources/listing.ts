@@ -90,9 +90,6 @@ const CONNECTED_SOURCES = `SELECT b.id, b.name, b.connector, b.sensitivity, b.au
       WHERE b.workspace_id = $1
       ORDER BY b.name, b.id`;
 
-/**
- * The reason is the converter's own name for why, so an Admin is told without a log being read.
- */
 const UNREADABLE = `SELECT connected_source_id, id, title, unreadable_reason FROM source_document
       WHERE workspace_id = $1 AND outcome = $2 AND unreadable_reason IS NOT NULL
       ORDER BY connected_source_id, title, id`;
@@ -101,10 +98,6 @@ const UNREADABLE_CONNECTED_SOURCE = new Error(
   "a connected source's row is not the shape its table admits",
 );
 
-/**
- * The worker cannot write the connected source's state column, so everything short of a publish is read
- * off the connected source's latest sync.
- */
 const stateOf = (publishedAt: Date | null, lastSync: SubjectRun | null): ConnectedSourceState => {
   if (publishedAt !== null) return CONNECTED_SOURCE_PUBLISHED_STATE;
   if (lastSync?.status === JOB_DONE_STATUS) return CONNECTED_SOURCE_INDEXED_STATE;

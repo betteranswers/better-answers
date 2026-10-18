@@ -22,17 +22,14 @@ const outline = (groups: readonly JumpGroup[]) =>
 const valuesOf = (groups: readonly JumpGroup[]) =>
   groups.flatMap((group) => group.jumps.map((jump) => jump.value));
 
-/** Open on no page an action or a member asks, so no query carries into a jump. */
 const AT_ROOT = { pathname: "/", searchStr: "" };
 
 const PRIYA = { personId: "p1", displayName: "Priya Shah", address: "priya@example.test" };
 
 const NAMELESS = { personId: "p2", displayName: "", address: "new@example.test" };
 
-/** A second Priya Shah, so two members share every word a reader sees but their address. */
 const ANOTHER_PRIYA = { personId: "p3", displayName: "Priya Shah", address: "ps@example.test" };
 
-/** One area, a built page with an action, and an unbuilt page with one. */
 const STUB: readonly Area[] = [
   {
     id: "yard",
@@ -234,7 +231,6 @@ describe("what typing leaves", () => {
 });
 
 describe("what jump-to offers to search", () => {
-  /** Each row's name and where it leads, under its heading. */
   const offered = (group: JumpGroup | undefined) =>
     group === undefined
       ? undefined

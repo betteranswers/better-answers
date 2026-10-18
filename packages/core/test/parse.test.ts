@@ -41,7 +41,6 @@ const refusalOf = (read: ReturnType<typeof parse>) => (read.ok ? "ok" : read.err
 
 const A_AND_B = ["a", "b"] as const;
 
-/** One case per word, so the walk below proves both directions of the register. */
 const EVERY_ISSUE: ReadonlyArray<readonly [IssueWord, string, z.ZodType, unknown]> = [
   ["missing", "field", z.object({ field: z.string() }), {}],
   ["wrong-type", "field", z.object({ field: z.string() }), { field: 1 }],

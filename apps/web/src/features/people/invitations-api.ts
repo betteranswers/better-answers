@@ -14,17 +14,14 @@ export type InvitationStatus = NonNullable<
   Exclude<inferInput<Api["members"]["invitations"]>, void | undefined>["status"]
 >;
 
-/** One invitation and whether its email went, as every action that sends one answers it. */
 export type SentInvitation = inferOutput<Api["members"]["resendInvitation"]>;
 
-/** What inviting answers for each address: its invitation, and whether it replaced one waiting. */
 export type InvitedOne = inferOutput<Api["members"]["invite"]>["invitations"][number];
 
 export type BulkResent = inferOutput<Api["members"]["bulkResendInvitations"]>;
 
 export type BulkCancelled = inferOutput<Api["members"]["bulkCancelInvitations"]>;
 
-/** Its key names no workspace: a switch drops it with every read of the workspace left. */
 export const useInvitations = (status: InvitationStatus) => {
   const api = useTRPC();
   return useQuery(api.members.invitations.queryOptions({ status }));
@@ -35,10 +32,8 @@ export const useInvitationCounts = () => {
   return useQuery(api.members.invitationCounts.queryOptions());
 };
 
-/** One for each status's list an action took rows from. */
 type Snapshot = { readonly taken: readonly Undo[] };
 
-/** Every settled action reads each status and the counts again; an action is a line of its Admin's Activity. */
 const useReconcile = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -50,7 +45,6 @@ const useReconcile = () => {
   };
 };
 
-/** The rows an action moves leave before the api answers, so it lands within 100 ms; a refusal puts them back. */
 const useMoving = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -94,7 +88,6 @@ export const useInvite = () => {
   return useMutation(api.members.invite.mutationOptions({ onSettled: () => reconcile() }));
 };
 
-/** A resent expired invitation is waiting again, so it leaves the expired list at once. */
 export const useResendInvitation = () => {
   const api = useTRPC();
   const moving = useMoving();

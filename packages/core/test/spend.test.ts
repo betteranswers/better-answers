@@ -22,7 +22,6 @@ const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better
 
 const SONNET = "claude-sonnet-5-5";
 
-/** At $3 and $15 a million, 40,000 in and 2,000 out cost $0.15. */
 const MOST: CallSize = { tokensIn: 40_000, tokensOut: 2_000 };
 
 const A_CALL: CallSpent = { tokensIn: 1_580, tokensOut: 96, seconds: 1.118, outcome: "succeeded" };
@@ -34,7 +33,6 @@ const A_FAILED_ATTEMPT: CallSpent = {
   outcome: "failed",
 };
 
-/** A stopped clock, mid-month, so no case's month runs out under it. */
 const NOW = new Date("2026-10-14T12:00:00.000Z");
 
 type Asker = { readonly asker: UserPrincipal; readonly recordId: string };
@@ -55,7 +53,6 @@ const priced = async (
     }),
   );
 
-/** A workspace judging on `model`, its question on record, under `limit` when one is given. */
 const anAsker = async (limit?: string, model: string = SONNET): Promise<Asker> => {
   const workspace = await provisionedWorkspace(db(), "Acme");
   const asker = await principalFor(db(), workspace.workspaceId, workspace.adminUserId);
@@ -129,7 +126,6 @@ const spentAt = ({ asker, recordId }: Asker, calledAt: Date, costGbp: string) =>
     seed.llmCall({ workspaceId: asker.workspaceId, calledAt, costGbp, answerId: recordId }),
   );
 
-/** Priced at $3 and $15 a million, under a $10 limit, one reservation settled as `calls`. */
 const settledOnce = async (calls: readonly CallSpent[]): Promise<Asker> => {
   await priced("2026-10-01", "3", "15");
   const asking = await anAsker("10");

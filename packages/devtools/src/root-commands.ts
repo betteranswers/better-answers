@@ -20,14 +20,12 @@ const provableCommand = (name: string): readonly string[] => {
   return words;
 };
 
-/** The root `lint` script's words after `oxlint`; throws when it runs another tool. */
 export const lintFlags = (): readonly string[] => {
   const [tool, ...flags] = scriptWords("lint");
   if (tool !== "oxlint") throw new Error(`\`lint\` no longer runs oxlint: ${String(tool)}`);
   return flags;
 };
 
-/** The `.py` file `comment-gate:python` runs; throws when it names none. */
 export const pythonGateChecker = (): string => {
   const [, checker] = provableCommand("comment-gate:python");
   if (checker === undefined || !checker.endsWith(".py")) {
@@ -36,7 +34,6 @@ export const pythonGateChecker = (): string => {
   return checker;
 };
 
-/** Both fields are optional, so a manifest missing either reads as a workspace without it. */
 const workspaceManifest = z.object({
   name: z.string().optional(),
   scripts: z.record(z.string(), z.string()).optional(),
@@ -56,28 +53,18 @@ const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<gates>[\s\S]+)$/;
 const stepsNamed = (command: string): readonly string[] =>
   (RUNNER.exec(command.trim())?.groups?.["gates"] ?? "").split(/\s+/).filter((gate) => gate !== "");
 
-/**
- * A step that is itself a runner call stands for its own steps, so `check:gates` holds the
- * tree-walking gates once.
- */
 const expand = (command: string, seen: readonly string[]): readonly string[] =>
   stepsNamed(command).flatMap((gate) => {
-    // A script that reaches itself is a cycle, named here rather than left to the stack.
     if (seen.includes(gate)) throw new Error(`${gate} is a step of itself: ${seen.join(" -> ")}`);
 
     const under = expand(rootScripts()[gate] ?? "", [...seen, gate]);
     return under.length === 0 ? [gate] : under;
   });
 
-/**
- * The leaf steps a runner call runs; none for any other command.
- * @throws on a cycle.
- */
 export const gatesNamed = (command: string): readonly string[] => expand(command, []);
 
 const SCRIPT_RUN = /^pnpm\s+(?<script>[\w:@./-]+)$/;
 
-/** A workflow step names one root script; a script that is a runner call stands for its steps. */
 export const gatesUnder = (command: string): readonly string[] => {
   const script = SCRIPT_RUN.exec(command.trim())?.groups?.["script"];
   if (script === undefined) return [];
@@ -89,10 +76,8 @@ export const gatesUnder = (command: string): readonly string[] => {
 const FILTERED = /--filter\s+(?<workspace>\S+)/g;
 const ENTERED = /\bcd\s+(?<directory>[\w./-]+)/g;
 
-/** A command that ends in a named file runs that file, not the workspace's whole suite. */
 const RUNS_A_WHOLE_CHECK = /\bcheck$/;
 
-/** A pnpm workspace is named by its package, the worker's uv one by being stepped into. */
 export const workspacesChecked = (command: string): readonly string[] => {
   if (!RUNS_A_WHOLE_CHECK.test(command.trim())) return [];
 

@@ -85,7 +85,6 @@ const entriesOf = (
 const readManifest = (root: string): CorePackage | null => {
   const manifest: unknown = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
 
-  // A manifest without the core's name is no core package, whatever else it holds.
   if (typeof manifest !== "object" || manifest === null) return null;
   if (!("name" in manifest) || manifest.name !== CORE) return null;
   const exported =
@@ -244,7 +243,7 @@ export const importDirectionRule = defineRule({
       internal:
         "`{{fromDir}}` ({{from}}) reaches `{{dir}}` only through its own index.ts, never `{{inside}}`. Export what you need from that face and import it from there.",
       unexported:
-        "`{{dir}}/index.ts` is a face packages/core's exports map does not name. Add `./{{entry}}` to the map, so a sibling and a transport reach one face and a test reaches an entry point (the root `CODING_STANDARDS.md`).",
+        "`{{dir}}/index.ts` is a face packages/core's exports map does not name. Add `./{{entry}}` to the map, so a sibling and a transport reach one face and a test reaches an entry point.",
     },
   },
   createOnce(context) {

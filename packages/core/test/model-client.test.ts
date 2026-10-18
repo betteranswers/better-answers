@@ -28,7 +28,6 @@ const db = postgresForSuite();
 
 const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-ops" };
 
-/** Invented: it seals nothing outside this file. */
 const ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => index);
 const A_KEY = "sk-test-u12-invented-key-0001";
 
@@ -83,7 +82,6 @@ type Reply = {
   readonly headers?: Readonly<Record<string, string>>;
 };
 
-/** A reply whose connection drops once its status is in, so its body never arrives. */
 type Dropped = { readonly droppedAfter: number };
 
 type Answer = Reply | Dropped | "hang" | "unreachable";
@@ -94,7 +92,6 @@ const sentOf = (input: string | URL | Request, init: RequestInit = {}): Sent => 
   body: typeof init.body === "string" ? init.body : "",
 });
 
-/** Past its replies the wire answers a teapot, so an attempt too many shows in what was spent. */
 const NO_MORE: Reply = { status: 418, body: "" };
 
 /** A hung attempt rejects once its timeout has fired, as `fetch` does on an aborted signal. */
@@ -113,7 +110,6 @@ const answering = (next: Answer, signal: AbortSignal | null | undefined) => {
   return new Response(next.body, { status: next.status, headers: next.headers ?? {} });
 };
 
-/** A fake at the wire: it keeps what it is sent and answers each attempt in turn. */
 const theWire = (...replies: readonly Answer[]) => {
   const sent: Sent[] = [];
   const fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -350,7 +346,6 @@ describe("the Messages shape", () => {
   });
 });
 
-/** Invented: an account id, a colon, then a token. */
 const ACCOUNT_ID = "0123456789abcdef0123456789abcdef";
 const A_WORKERS_AI_KEY = `${ACCOUNT_ID}:invented_Token-u15`;
 
@@ -393,7 +388,6 @@ const cloudflareError = (code: number, message: string) =>
 const deciding = (wire: Wire, call: DecisionModelCall = A_DECISION, to = TO_CLEF_FLASH) =>
   clientOn(wire).client.decide(to, call);
 
-/** Bytes of the body Workers AI is sent for `model`, an empty state and one question. */
 const emptyBodyBytes = (model: string): number =>
   Buffer.byteLength(
     JSON.stringify({
@@ -403,10 +397,8 @@ const emptyBodyBytes = (model: string): number =>
     }),
   );
 
-/** Clef-flash's window of 24,576 tokens, at three bytes a token. */
 const WINDOW_BYTES = 73_728;
 
-/** A call of one question whose body for `model` is exactly `bytes` long. */
 const callOfBytes = (bytes: number, model = "clef-flash"): DecisionModelCall => ({
   state: "s".repeat(bytes - emptyBodyBytes(model)),
   questions: { "1": { ask: "Is it?" } },
@@ -628,7 +620,6 @@ describe("a decision model's window", () => {
   it("holds Clef to its own larger window", async () => {
     const wire = theWire(DECIDED, DECIDED);
     const toClef = { ...TO_CLEF_FLASH, model: "clef" };
-    // 65,536 tokens at three bytes a token.
     const clefBytes = 196_608;
 
     await deciding(wire, callOfBytes(clefBytes, "clef"), toClef);
@@ -1023,7 +1014,6 @@ describe("the client's own clock", () => {
 
 const credentials = openCredentials(ENVELOPE_KEY);
 
-/** A workspace with a judging choice of `provider`, holding a key when `keyed`. */
 const aWorkspace = async (
   choice: { readonly provider: string; readonly purpose?: "judging" | "answering" } | undefined,
   keyed = true,

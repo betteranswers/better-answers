@@ -20,12 +20,10 @@ import { outcomeOfFailure } from "./refusal.tsx";
 import { submitRename } from "./rename-group-form.ts";
 import { nameOf } from "./words.tsx";
 
-/** Where focus lands when the sheet opens: on the group, or straight on one of its actions. */
 export type GroupOpenedAt = "group" | "members" | "rename" | "delete";
 
 export const groupButtonId = (groupId: string): string => `group-${groupId}`;
 
-/** The row menu's trigger, so a dialog opened from the menu hands focus back to it. */
 export const groupMenuId = (groupId: string): string => `group-actions-${groupId}`;
 
 function GroupMembers(properties: {
@@ -39,7 +37,6 @@ function GroupMembers(properties: {
 
   return (
     <SheetPart title="Members">
-      {/* Boxless, so the line takes none of its card's gaps while it is empty. */}
       <OutcomeLine
         outcome={said.error === null ? undefined : outcomeOfFailure(said.error, "read")}
         className="contents"
@@ -84,7 +81,6 @@ function RenameGroup(properties: {
   const renameGroup = useRenameGroup();
   const ids = { field: useId(), hint: useId() };
 
-  // Never disabled: the button a reader pressed keeps focus while the answer comes back.
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setOutcome(undefined);
@@ -145,7 +141,6 @@ export function GroupSheet(properties: {
   readonly openedAt: GroupOpenedAt;
   readonly onClose: () => void;
 
-  /** Deleting the group takes its row away, so the list decides where focus lands. */
   readonly returnFocus: () => void;
   readonly onDelete: (group: ListedGroup) => void;
 }) {

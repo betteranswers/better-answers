@@ -1,5 +1,3 @@
-/** Scanning both readers share: a body is tenant input, so each read walks it once. */
-
 /** The next position at or after each index whose character `stops` holds, `-1` where
  * there is none. */
 export const nextStopsOf = (text: string, stops: (ch: string) => boolean): Int32Array => {
@@ -17,7 +15,6 @@ export const nextOf = (text: string, close: string): Int32Array =>
 
 const SCHEME = /[a-z0-9+.-]/i;
 
-/** Where the autolink's scheme and colon end, or `undefined` when `at` opens none. */
 const colonAfter = (text: string, at: number): number | undefined => {
   if (!/[a-z]/i.test(text[at + 1] ?? "")) return undefined;
   let scheme = at + 2;

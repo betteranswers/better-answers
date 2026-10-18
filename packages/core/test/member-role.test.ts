@@ -166,7 +166,6 @@ describe("the last Admin", () => {
     const other = await joining(workspace, "Admin");
     const firstActed = Promise.withResolvers<undefined>();
 
-    /** It commits only once the second waits on it, so the second's count comes after. */
     const demotingTheOther = heldAs(workspace, adminUserId, async (principal, tx) => {
       const changed = await changing(principal, tx, other, "Viewer");
       firstActed.resolve(undefined);

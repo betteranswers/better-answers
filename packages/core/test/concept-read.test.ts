@@ -47,7 +47,6 @@ const readFor = async (person: UserPrincipal, iri: ConceptIri) =>
 const paneFor = async (person: UserPrincipal, iri: ConceptIri) =>
   (await readFor(person, iri))?.pane;
 
-/** A passage covering all of `HOLIDAY` in the document, and the locator that opens it. */
 const passageIn = async (scenario: Scenario, document: Sourced): Promise<string> => {
   await passageUnder(db(), scenario.workspaceId, document, {
     content: HOLIDAY,
@@ -65,7 +64,6 @@ const sourcesAt = (locators: readonly string[]) =>
     locator,
   }));
 
-/** A note citing each document, its frontmatter naming a passage in each as a source. */
 const sourcedNote = async (
   scenario: Scenario,
   writer: UserPrincipal,
@@ -122,7 +120,6 @@ const restrictedPassage = async (scenario: Scenario) => {
   return { restricted, locator: await passageIn(scenario, restricted) };
 };
 
-/** A note citing a Restricted and an Internal document, which an Admin shares with everyone. */
 const sharedPastItsEvidence = async (scenario: Scenario) => {
   const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
   const noted = await sourcedNote(scenario, scenario.editor, [restricted, internal]);
@@ -139,7 +136,6 @@ const readableAndWithheld = async (scenario: Scenario) => {
   };
 };
 
-/** A read takes no lock a write could hold, so the read is paused through its `tx` after its first statement. */
 const readAcross = async (
   reader: UserPrincipal,
   iri: ConceptIri,
@@ -169,7 +165,6 @@ const readAcross = async (
   return { read: answered(read), wrote };
 };
 
-/** Reads `iri` with every statement holding `marker` failing, as that table's read would. */
 const readFailingAt = (reader: UserPrincipal, iri: ConceptIri, marker: string, failure: Error) =>
   reading(reader, (principal, tx) =>
     readingThrough(
@@ -617,7 +612,6 @@ describe("a concept's projected frontmatter", () => {
   });
 });
 
-/** Concepts seeded straight into the index, published and readable by everyone. */
 const targetsSeeded = (workspaceId: string, titles: readonly string[]) =>
   seededBy(db(), async (seed) => {
     const iris: ConceptIri[] = [];
@@ -755,13 +749,11 @@ const AUDIT_COMMITTEE = "knowledge/roles/audit-committee.md";
 
 const TO_THE_COMMITTEE = "See the [Audit Committee](../roles/audit-committee.md).";
 
-/** A stable Internal note at `path`, everyone's to read. */
 const noteAt = (scenario: Scenario, path: string, overrides: Partial<WriteConceptInput> = {}) =>
   conceptCiting(scenario, scenario.editor, [], { sensitivity: "Internal", path, ...overrides });
 
 type SeededConcept = Parameters<Parameters<typeof seededBy>[1]>[0]["conceptIndex"];
 
-/** A concept seeded straight into the index, so no write derives an edge to it. */
 const indexedAt = (
   scenario: Scenario,
   path: string,
@@ -788,7 +780,6 @@ const edgeSeeded = (
     seed.mapEdge({ workspaceId: scenario.workspaceId, fromUid, toUid, ...overrides }),
   );
 
-/** Expenses, whose body links the board's file beside it, and the board seeded with no edge to it. */
 const expensesNamingTheBoard = async (
   scenario: Scenario,
   board: NonNullable<Parameters<SeededConcept>[0]> = {},

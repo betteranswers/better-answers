@@ -105,10 +105,6 @@ const connectedSourceIn = (workspaceId: string, publishedAt: Date | null): Promi
 
 const A_SORT_CODE = { category: "bank-details", ruleId: "sort-code-with-account-number" };
 
-/**
- * One word stands for its class: a class falls on one status, and the walk holds every word to
- * its class.
- */
 const A_WORD_OF_EACH_CLASS = [
   [
     "malformed",
@@ -307,7 +303,6 @@ describe("a refusal crossing tRPC", () => {
     const workspace = await app.provision();
     const client = await signedInClient(app, workspace.admin.email);
 
-    // A column the gate's read leaves alone, so the fault reaches the resolver.
     await withColumnRenamed("member", "credentials_revoked_at", async () => {
       const response = await member(client);
 

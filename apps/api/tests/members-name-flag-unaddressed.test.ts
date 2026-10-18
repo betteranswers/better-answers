@@ -5,7 +5,6 @@ import { webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
 
-// A file of its own, so no person in its database carries the operator mark.
 beforeAll(async () => {
   app = await startApp();
 });

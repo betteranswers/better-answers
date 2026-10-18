@@ -11,16 +11,11 @@ const db = postgresForSuite();
 
 const THE_MIGRATION = "0072_the-knowledge-words.sql";
 
-/**
- * Its value rewrites alone: the renames and the function ran with the database, and their old
- * names are gone.
- */
 const itsValueRewrites = (): readonly string[] =>
   migrationStatements(THE_MIGRATION).filter(
     (statement) => !/RENAME|FUNCTION public\.submit_suggestion_set|SET LOCAL/u.test(statement),
   );
 
-/** The CHECKs as 0071 left them, by the names 0072 drops; the column rename already ran. */
 const THE_CHECKS_BEFORE = [
   'ALTER TABLE "suggestion" DROP CONSTRAINT "suggestion_kind_check"',
   `ALTER TABLE "suggestion" ADD CONSTRAINT "suggestion_kind_check" CHECK (kind IN ('edit', 'candidate', 'promotion', 'repair'))`,
@@ -49,7 +44,6 @@ type Seeded = {
   readonly node: string;
 };
 
-/** One of each old value in `workspaceId`; the decided suggestion is one the trigger guards. */
 const oldValuesIn = async (client: pg.PoolClient, workspaceId: string): Promise<Seeded> => {
   const seed = testData(client);
   await seed.workspace({ id: workspaceId, name: workspaceId });

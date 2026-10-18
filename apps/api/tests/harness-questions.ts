@@ -17,7 +17,6 @@ import { testData, type TestData } from "@better-answers/schema/testing";
 import { inOneTransaction } from "./harness-sources.ts";
 import type { TestApp } from "./harness.ts";
 
-/** Kept by the record as its trust then; the hash is never shown, so one stands for any. */
 const A_CONTENT_HASH = "a".repeat(64);
 
 const aRecordedConcept = z.object({
@@ -40,11 +39,9 @@ const aDraftedSentence = z.object({
 });
 
 const aRecord = z.object({
-  /** A person's id; left out, the asker is one an erasure renamed, whom no name is found for. */
   askedBy: boundarySchemas.user.select.shape.id.optional(),
   transport: z.enum(QUESTION_TRANSPORTS).default("mcp"),
   collections: z.array(z.string().min(1)).default([]),
-  /** Null once an erasure removed the record's content. */
   question: z.string().min(1).nullable(),
   verdict: z.enum(QUESTION_VERDICTS),
   judgeState: z.enum(JUDGE_STATES).default("not-judged"),
@@ -53,7 +50,6 @@ const aRecord = z.object({
   flags: z.array(aFlag).default([]),
 });
 
-/** Listed oldest first: each is asked a second after the one before it, the last the newest. */
 export const questionsSeeding = z.object({
   workspaceId: z.string().min(1),
   records: z.array(aRecord).min(1),
@@ -122,7 +118,6 @@ const seedRecord = async (
   return { recordId: row.id, flagIds };
 };
 
-/** Records as `ask` and `give_feedback` leave them, in one transaction; a concept is named by IRI alone. */
 export const seedQuestions = async (
   app: TestApp,
   asked: z.output<typeof questionsSeeding>,
@@ -138,7 +133,6 @@ export const seedQuestions = async (
     return seeded;
   });
 
-/** Each record the workspace holds, with its question while the content is kept. */
 export const recordsIn = async (app: TestApp, workspaceId: string) => {
   const kept = await app.database.superuser.query(
     `SELECT r.transport, r.verdict, r.judge_state, r.completed_at IS NOT NULL AS completed, c.question
@@ -149,7 +143,6 @@ export const recordsIn = async (app: TestApp, workspaceId: string) => {
   return kept.rows;
 };
 
-/** The feedback stored on a record, oldest first. */
 export const feedbackKeptOn = async (app: TestApp, recordId: string) => {
   const kept = await app.database.superuser.query(
     `SELECT given_by, verdict, reason, note, disputed_sentence, disputed_concept

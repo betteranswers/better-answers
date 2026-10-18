@@ -33,7 +33,6 @@ const JOINING_ACTIONS = declareActions("people", {
   joined: action("people.member.joined", { invitationId: "id", role: "role" }),
 });
 
-/** Borrowed from the workspaces slice, whose words they are: adding a member refuses them too. */
 type Borrowed = Extract<
   keyof typeof WORKSPACE_REFUSALS,
   "already-a-member" | "no-display-name" | "person-gone"
@@ -114,10 +113,6 @@ const inviteeOf = async (
   return row === undefined ? undefined : INVITEE.parse(row);
 };
 
-/**
- * The address is judged first, so a person holding another's link learns nothing of the
- * invitation's state.
- */
 const refusalAgainst = (
   { invitation, invitee }: Held,
   now: Date,
@@ -146,12 +141,10 @@ const judged = async (
 export type ReadInvitationInput = {
   readonly invitationId: string;
 
-  /** The session's own person, never one the request names. */
   readonly personId: string;
   readonly now: Date;
 };
 
-/** An id that parses as none names no invitation, which is what a mistyped link is. */
 const askedOf = (
   input: ReadInvitationInput,
 ): Result<Asked, MemberRefusal<"malformed" | "no-such-invitation">> => {
@@ -167,7 +160,6 @@ export type InvitationRead = {
   readonly workspaceName: string;
   readonly role: Role;
 
-  /** By display name, read from the inviter's person row, so it stands after they leave. */
   readonly invitedBy: string;
   readonly expiresAt: string;
 };
@@ -181,9 +173,8 @@ const readOf = (invitationId: InvitationId, invitation: HeldInvitation): Invitat
 });
 
 /**
- * What accepting would join, for the person the invitation is addressed to. It refuses as
- * accepting would, so the page says so before the click, save a missing display name: the page
- * asks for that beside the join.
+ * What accepting would join, for the person the invitation is addressed to. Refuses as accepting
+ * would, save a missing display name.
  */
 export const readInvitation = async (
   platform: PlatformPrincipal,
@@ -219,7 +210,6 @@ const waitingTo = async (tx: Tx, personId: UserId): Promise<readonly InvitationI
     )
     .map((waiting) => waiting.id);
 
-/** Judged one by one as `readInvitation` judges, so the two can never disagree on what is open. */
 const openTo = async (tx: Tx, personId: UserId, now: Date): Promise<readonly InvitationRead[]> => {
   const waiting = await waitingTo(tx, personId);
   const judgedEach = await Promise.all(
@@ -234,7 +224,6 @@ const openTo = async (tx: Tx, personId: UserId, now: Date): Promise<readonly Inv
 };
 
 export type ReadOpenInvitationsInput = {
-  /** The session's own person, never one the request names. */
   readonly personId: string;
   readonly now: Date;
 };
@@ -274,7 +263,6 @@ export type Joined = {
   readonly workspaceName: string;
   readonly role: Role;
 
-  /** Joining as an Admin made the person hold a second factor for the first time. */
   readonly promoted: boolean;
 };
 
@@ -285,7 +273,6 @@ const join = async (
   tx: Tx,
   joining: Joining,
 ): Promise<Result<Joined, AcceptInvitationRefusal>> => {
-  // The invitation's row lock queues a second accept of it, which then finds the member.
   const held = await judged(tx, joining, "lock");
   if (!held.ok) return held;
   if (hasNoDisplayName(held.value.invitee.name)) return err("no-display-name");
@@ -300,8 +287,6 @@ const join = async (
     "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, $4, now())",
     [ulid(), workspaceId, joining.personId, role],
   );
-  // A session ended meanwhile matches no row: the person is still a member, and the next sign-in
-  // finds it.
   await tx.query(
     `UPDATE session SET active_workspace_id = $1, updated_at = now()
       WHERE id = $2 AND user_id = $3`,
@@ -322,7 +307,6 @@ const JOIN_CONSTRAINTS = {
 } as const satisfies Record<string, AcceptInvitationRefusal>;
 
 export type AcceptInvitationInput = ReadInvitationInput & {
-  /** The session the request came on, which the joined workspace becomes the active one of. */
   readonly sessionId: string;
 };
 

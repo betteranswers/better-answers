@@ -26,7 +26,6 @@ const FIRST_WAIT_SECONDS = 30;
 
 const LONGEST_WAIT_SECONDS = 15 * 60;
 
-/** Capped rather than a lock: whoever holds only the mailbox can slow an Admin's confirms, never shut the Admin out. */
 const waitSecondsAfter = (failures: number): number =>
   failures <= FREE_FAILURES
     ? 0
@@ -49,7 +48,6 @@ const ROWS = `
 const rowsOf = async (tx: Tx, personId: UserId): Promise<readonly ThrottleRow[]> =>
   (await tx.query<ThrottleRow>(ROWS, [personId])).rows;
 
-/** Each kind's wait left, in seconds: none for a kind with no failures counted. */
 export const waitsOf = async (tx: Tx, personId: UserId, now: Date): Promise<WaitSeconds> => {
   const rows = await rowsOf(tx, personId);
   const waitOf = (kind: ThrottledKind) =>
@@ -64,7 +62,6 @@ export const waitsOf = async (tx: Tx, personId: UserId, now: Date): Promise<Wait
 export type Counted = {
   readonly waitSeconds: number;
 
-  /** True at the failure that makes the run long enough to warn the person, and never again before a success. */
   readonly noticeDue: boolean;
 };
 
@@ -89,7 +86,6 @@ const afterOneMore = (earlier: Pick<ThrottleRow, "failures" | "noticedAt">, now:
   };
 };
 
-/** Run under the person's lock, so two failures at once each count. */
 export const countingAFailure = async (
   tx: Tx,
   personId: UserId,
@@ -102,7 +98,6 @@ export const countingAFailure = async (
   return next.counted;
 };
 
-/** A success forgets the kind's failures, its wait and its notice. */
 export const resettingTheThrottle = async (
   tx: Tx,
   personId: UserId,
@@ -123,10 +118,7 @@ export type ReserveAuthenticatorTryRefusal = WorkspaceRefusal<"malformed" | "per
 
 type Reserved = Result<Counted, "person-gone" | CeilingMet>;
 
-/**
- * Counted as a failure before its code is checked, under the person's lock, so tries sent at once
- * meet the wait one by one. A confirm forgets it.
- */
+/** Counted as a failure before its code is checked. A confirm forgets it. */
 export const reserveAuthenticatorTry = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

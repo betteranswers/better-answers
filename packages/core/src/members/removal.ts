@@ -31,7 +31,6 @@ const REMOVAL_ACTIONS = declareActions("people", {
 export const removeMemberInput = memberKeyed;
 
 export type RemoveMemberInput = z.output<typeof removeMemberInput> & {
-  /** When the action happens: the person's tokens for this workspace issued before it end. */
   readonly at: Date;
 };
 
@@ -60,29 +59,21 @@ export type RemoveMemberRefusal =
 export type MemberRemoved = {
   readonly personId: UserId;
 
-  /** The role the member held when it ended. */
   readonly role: Role;
 };
 
-/** When a removal happens, and the batch its audit event stands in. */
 type RemovedAt = { readonly at: Date; readonly batchId: string | undefined };
 
-/**
- * A step on a member row its action holds: the member, their last-activity row here and their
- * tokens for this workspace issued before `at` end, and the removal's audit events land.
- */
 export const memberRemovedHere = async (
   admin: AdminUserPrincipal,
   tx: Tx,
   removed: MemberRemoved,
   { at, batchId }: RemovedAt,
 ): Promise<void> => {
-  // The composite foreign key takes the person's group_member rows here with the row.
   await tx.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
     admin.workspaceId,
     removed.personId,
   ]);
-  // An erasure from a workspace the person already left cannot reach this row, so it goes here.
   await tx.query("DELETE FROM workspace_last_active WHERE workspace_id = $1 AND user_id = $2", [
     admin.workspaceId,
     removed.personId,
@@ -116,9 +107,8 @@ const removedUnderTheLock = (
   });
 
 /**
- * Ends the person as a member here, and their tokens for this workspace; their sessions stand for
- * any other workspace and are refused here. Refuses `last-admin` for the workspace's one Admin; an
- * Admin may remove themself while another remains.
+ * Ends the person as a member here, and their tokens for this workspace. Refuses `last-admin` for
+ * the workspace's one Admin.
  */
 export const removeMember = async (
   principal: UserPrincipal,

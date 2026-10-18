@@ -16,13 +16,11 @@ const refusalOutcome = (
   refusalClass: RefusalClass,
 ): Outcome => refusedWith(refusalSentence(featureWords, word, refusalClass));
 
-/** A read saves nothing, so its failure with no word says only that nothing loaded. */
 const UNANSWERED = {
   action: STOCK.tryAgain,
   read: STOCK.notLoaded,
 } satisfies Record<FailedDuring, string>;
 
-/** A failure with no refusal word is the network's, never the reader's to fix. */
 const failureOutcome = (
   featureWords: OwnSentences,
   failure: Error | ApiError,
@@ -34,7 +32,6 @@ const failureOutcome = (
     : refusalOutcome(featureWords, refusal.word, refusal.class);
 };
 
-/** A feature's sentences, named once: its own for the word, then the class's, then no response. */
 export const refusalsOf = (featureWords: OwnSentences) => ({
   outcomeOfFailure: (failure: Error | ApiError, during: FailedDuring): Outcome =>
     failureOutcome(featureWords, failure, during),
@@ -44,7 +41,6 @@ export const refusalsOf = (featureWords: OwnSentences) => ({
 
 type ItemSaid = { readonly id: string; readonly said: string };
 
-/** An item's word crosses with no class, so a word the feature lacks takes the whole set's sentence. */
 export const saidOfItems = (
   featureWords: OwnSentences,
   failure: Error | ApiError,
@@ -76,7 +72,6 @@ export function RefusedItemLines(properties: {
   );
 }
 
-/** A set refused whole; each item is named as the page named it at the press, shown or not. */
 export const setRefusalOutcome = (refused: {
   readonly featureWords: OwnSentences;
   readonly failure: Error | ApiError;

@@ -23,7 +23,6 @@ import { holdsNoNul } from "./boundary.ts";
 
 const WRITTEN_CHARACTERS_AT_MOST = 2_000;
 
-/** Kept as it was sent, apart from the space around it. */
 const written = (what: string) =>
   z
     .string()
@@ -42,7 +41,6 @@ const disputed = z.object({
   sentence: written("a disputed sentence").describe(
     "The sentence the person disputes, as you wrote it.",
   ),
-  /** Read as text alone: it is compared with what the record kept, and stored. */
   concept: z
     .string()
     .regex(IRI)
@@ -62,7 +60,6 @@ export const feedbackFields = z.object({
     ),
 });
 
-/** Sent with `helpful`, a flag's field is refused by name: stripped, it would be lost unsaid. */
 const flagOnly = z.never().optional();
 
 export const feedbackInput = z.discriminatedUnion("verdict", [
@@ -97,10 +94,6 @@ const giveFeedbackAction = declareAction({
   refuses: ["role-forbids", "not-found"],
 });
 
-/**
- * `asked_by` withholds a colleague's record, which row-level security shows. The share lock makes
- * an erasure's rewrite wait, so it finds this feedback too.
- */
 const THE_GIVERS_RECORD = `SELECT ($4::jsonb IS NULL OR concepts @> $4::jsonb) AS cites
    FROM question_asked
   WHERE workspace_id = $1 AND id = $2 AND asked_by = $3 AND completed_at IS NOT NULL
@@ -111,13 +104,11 @@ const ITS_FEEDBACK = `INSERT INTO question_feedback
      disputed_sentence, disputed_concept)
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`;
 
-/** Answered only of the giver's own record, so it tells them nothing of anyone else's. */
 const NOT_A_CONCEPT_IT_RETURNED: Malformed = {
   word: MALFORMED,
   fields: { "disputed.concept": "not-in-set" },
 };
 
-/** A flag's columns, each null on `helpful`. */
 const columnsOf = (input: FeedbackInput) =>
   input.verdict === "helpful"
     ? { reason: null, note: null, sentence: null, concept: null }
@@ -160,11 +151,6 @@ const storedOn = async (
   return ok({ outcome: "stored", feedback: input });
 };
 
-/**
- * Stores a verdict on a record its giver asked, once that record has a verdict of its own. A
- * record another person asked, and one left open, answer as a record that is not there. A
- * disputed concept must be one the record returned. Nothing is queued for anyone.
- */
 export const giveFeedback = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -192,7 +178,6 @@ const flagSaid = (flag: Extract<FeedbackInput, { readonly verdict: "flag" }>): s
   return `flagged as ${REASON_WORDS[flag.reason]}${noted}${disputing}`;
 };
 
-/** Says where the feedback is kept and that it reaches nobody: all that is true of it. */
 export const renderFeedback = ({ feedback }: FeedbackReceipt): string => {
   const what = feedback.verdict === "helpful" ? "marked helpful" : flagSaid(feedback);
   return `Stored on record ${feedback.recordId}: ${what}. No one is notified of it.`;

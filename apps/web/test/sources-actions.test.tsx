@@ -55,7 +55,6 @@ const HEALTH_CUE: GroupOfFindings = {
   dismissed: 0,
 };
 
-/** Raised by a rule the page's list of rules has not met. */
 const A_PASSPORT: GroupOfFindings = {
   ...BANK_DETAILS,
   category: "government-identifier",
@@ -64,7 +63,6 @@ const A_PASSPORT: GroupOfFindings = {
 
 const NOT_SPECIAL_CATEGORY = SAID_OF_A_CONNECTED_SOURCE["not-special-category"];
 
-/** The review's half of the slot, standing in for the findings table a click writes through. */
 function TicksIn(properties: { readonly connectedSourceId: string }) {
   const [, tick] = useTickedGroups();
   const ticking = (groups: readonly GroupOfFindings[]) => () => {
@@ -253,7 +251,6 @@ const ANSWERS: Readonly<Record<string, unknown>> = {
   "sources.widen": { visibility: WIDENED, concepts: [], writeUps: [] },
 };
 
-/** The api's refusal of a keep, as the tRPC client's batch carries it back. */
 const KEEP_REFUSED = {
   error: {
     message: "refused",
@@ -266,7 +263,6 @@ const KEEP_REFUSED = {
   },
 };
 
-/** The api's refusal for the reader's role, in a word this feature lists no sentence for. */
 const ROLE_FORBIDS = {
   error: {
     message: "refused",
@@ -287,18 +283,14 @@ const HELD: ReadonlySet<string> = new Set([
 ]);
 
 type SourcesApi = {
-  /** Read as each held call arrives, so a test may hold a later call and not an earlier one. */
   held?: Promise<void>;
   readonly findings?: readonly GroupOfFindings[];
 
-  /** The actions the api refuses for the reader's role. */
   readonly forbidden?: readonly string[];
 
-  /** The connected sources the list read answers, where a test needs its own. */
   readonly listed?: readonly unknown[];
 };
 
-/** Reads are answered at once; a widening is taken and a keep refused once `held` lets them. */
 const atSources = (api: SourcesApi = {}) => {
   const asked: string[] = [];
   const answers: Readonly<Record<string, unknown>> = {
@@ -328,7 +320,6 @@ const atSources = (api: SourcesApi = {}) => {
 
 const rowOf = async (name: string) => within(await screen.findByRole("listitem", { name }));
 
-/** Each row action's label, which the row follows with its source's name. */
 const ROW_ACTIONS = {
   review: "Review Findings",
   publish: "Publish",
@@ -350,7 +341,6 @@ const panelOf = (change: "narrow" | "widen", name: string) =>
 
 const reviewOf = (name: string) => screen.queryByRole("region", { name: `Review of ${name}` });
 
-/** The handbook's widening opened from its row's button, which then holds focus as the opener. */
 const widenOpened = (row: ReturnType<typeof within>): HTMLElement => {
   const widen = rowAction(row, ROW_ACTIONS.widen, "Staff handbook");
   widen.focus();
@@ -367,7 +357,6 @@ const TICKING = {
   name: `Select bank details by Sort code and account number in ${BANK_DETAILS.title}`,
 };
 
-/** A keep sent from the handbook's review, its answer held and the hold already drawn. */
 const aKeepHeldPending = async () => {
   const answer = Promise.withResolvers<void>();
   atSources({ held: answer.promise, findings: [BANK_DETAILS] });
@@ -379,14 +368,12 @@ const aKeepHeldPending = async () => {
   const reason = screen.getByLabelText("Reason");
   fireEvent.change(reason, { target: { value: "Printed on every invoice" } });
   fireEvent.submit(reason);
-  // The hold is drawn a task after the keep is sent, as a second press would find it.
   await waitFor(() => {
     expect(review.getAttribute("aria-disabled")).toBe("true");
   });
   return { answer, row, review };
 };
 
-/** Which reviews are drawn, and whether the page said why a held press did nothing. */
 const reviewsDrawn = () => ({
   handbook: reviewOf("Staff handbook") !== null,
   priceBook: reviewOf("Price book") !== null,
@@ -395,7 +382,6 @@ const reviewsDrawn = () => ({
 
 const HELD_AS_IT_WAS = { handbook: true, priceBook: false, saidWhy: true };
 
-/** The review that sent the keep is still drawn, so the refusal reaches it and its group. */
 const theKeepIsRefusedInItsReview = async (held: Awaited<ReturnType<typeof aKeepHeldPending>>) => {
   held.answer.resolve();
   expect(await held.row.findByText(SAID_OF_A_CONNECTED_SOURCE["not-the-always-set"])).toBeDefined();
@@ -480,7 +466,6 @@ describe("a connected source's row", () => {
   it("holds r in another row while a keep is pending", async () => {
     const held = await aKeepHeldPending();
     const priceBook = await rowOf("Price book");
-    // Flushed, so the row is the one in focus before the key is read.
     act(() => {
       rowAction(priceBook, ROW_ACTIONS.review, "Price book").focus();
     });
@@ -508,7 +493,6 @@ describe("widening a connected source in its row", () => {
   it("opens on w with focus on the sensitivity", async () => {
     atSources();
     const row = await rowOf("Staff handbook");
-    // Flushed, so the row is the one in focus before the key is read.
     act(() => {
       rowAction(row, ROW_ACTIONS.review, "Staff handbook").focus();
     });
@@ -635,7 +619,6 @@ const widenTheHandbook = async () => {
   fireEvent.click(commitIn(row));
 };
 
-/** The price book's publish, opened from its row, every confirmation ticked, then sent. */
 const publishThePriceBook = async () => {
   const row = await rowOf("Price book");
   fireEvent.click(rowAction(row, ROW_ACTIONS.publish, "Price book"));
@@ -656,7 +639,6 @@ const SENT_FROM_A_ROW = [
   { action: "narrowing", procedure: "sources.narrow", send: narrowThePriceBook },
 ];
 
-/** Every status on the page that holds words, the list's count among them. */
 const saidNow = (): readonly string[] =>
   screen
     .getAllByRole("status")
@@ -682,7 +664,6 @@ describe("a connected source's action in flight", () => {
   );
 });
 
-/** The same sentence said twice is announced once, so the alert stands empty between them. */
 describe("a connected source's action refused twice", () => {
   it.each(SENT_FROM_A_ROW)(
     "empties the alert when a refused $action is sent again",

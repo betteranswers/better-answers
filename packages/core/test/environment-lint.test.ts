@@ -62,10 +62,6 @@ describe("the environment lint passes where a read is deliberate", () => {
   });
 });
 
-/**
- * Without this control a silence above would read as an excuse, when it could as easily be a
- * file extension the linter never opened.
- */
 const unexcused = oxlintOver(
   JSON.stringify({ plugins: config.plugins, rules: { [RULE]: SEVERITY } }),
   { tree: { [SOURCE]: READS_A_SETTING }, flagged: [SOURCE] },

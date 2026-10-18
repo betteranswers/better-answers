@@ -31,7 +31,7 @@ The tenancy rule lives here:
 - Every tenant table carries the workspace id and is created `withRLS()`, under `FORCE ROW LEVEL SECURITY`. The non-owner `app_rt` reads it with `SET LOCAL app.workspace_id` set from the Principal. A table with no policy returns no rows.
 - The one exemption is the identity set, Better Auth's tables, named in `IDENTITY_SET`.
 - The store door is ergonomics over this guarantee, never a substitute for it.
-- The checkable sentences are two rules in `CODING_STANDARDS.md`: *Take a `Principal` as the first parameter*, and *Ship a tenant table, a grant or a definer function with the test of what it refuses*. The `neo4j` ban is this decision's alone.
+- The checkable sentences are the principal rule in `packages/core/AGENTS.md` and the tenant-table, grant and definer-function rules in `packages/schema/AGENTS.md`. The `neo4j` ban is this decision's alone.
 
 The substrate:
 

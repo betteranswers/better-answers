@@ -26,7 +26,7 @@ type WorkspaceRow = {
   readonly created_at: Date;
 };
 
-/** Every workspace on the platform, by name. It reads the identity set alone. */
+/** Every workspace on the platform, by name. */
 export const listWorkspaces = async (
   _operator: OperatorPrincipal,
   tx: Tx,

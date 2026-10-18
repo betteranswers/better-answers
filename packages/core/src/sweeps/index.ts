@@ -41,13 +41,8 @@ export type SweepsPrincipal = PlatformPrincipal & {
   readonly actorId: typeof SWEEPS_ACTOR;
 };
 
-/**
- * Holds the lock and lists the workspaces; each sweep still runs, and is audited, as its own
- * actor, the same as a run by hand.
- */
 export const SWEEPS: SweepsPrincipal = { kind: "platform", actorId: SWEEPS_ACTOR };
 
-/** 41 is the dump's, which the erasure routine and the backup job share. */
 const SWEEP_LOCK = 42;
 
 /** `list` finds the orphaned uploads and removes none; `remove` removes them. */
@@ -63,7 +58,6 @@ type WorkspaceSwept = {
   readonly workspaceId: WorkspaceId;
   readonly uploads: Result<SweptUploads, SweepUploadsRefusal>;
   readonly map: Result<readonly SweptGeneration[], MapMaintenanceRefusal | Error>;
-  /** How many reservations past their expiry were settled as failed calls. */
   readonly spend: Result<number, Error>;
 };
 
@@ -104,9 +98,6 @@ const RECORD_THE_PASS = `INSERT INTO sweep_pass
     (id, upload_sweep, workspaces, refused, found, removed, generations)
   VALUES ($1, $2, $3, $4, $5, $6, $7)`;
 
-/**
- * One statement and no scope: the row names no workspace, so no transaction is needed around it.
- */
 const recordThePass = async (
   door: PostgresDoor,
   uploadSweep: UploadSweepMode,
@@ -149,11 +140,6 @@ const sweepOne = async (
   }),
 });
 
-/**
- * Answers `held` at once when another pass holds the lock. A workspace whose sweep is refused is
- * counted in `refused` and the pass goes on. Writes one `sweep_pass` row; failing to write it
- * fails the pass, though every sweep ran.
- */
 export const sweepEveryWorkspace = async (
   platform: SweepsPrincipal,
   doors: SweepDoors,
@@ -180,8 +166,7 @@ export const sweepEveryWorkspace = async (
 };
 
 /**
- * A run by hand waits for a pass that holds the lock rather than skipping, since a person
- * asked for it.
+ * A run by hand waits for a pass that holds the lock rather than skipping.
  */
 export const withSweepLock = <T>(
   platform: SweepsPrincipal,
@@ -189,7 +174,6 @@ export const withSweepLock = <T>(
   work: () => Promise<T>,
 ): Promise<T> => withSessionLock(platform, door, SWEEP_LOCK, () => work());
 
-/** The day an ISO instant opens with, which Postgres reads as a date. */
 const ISO_DAY = "yyyy-mm-dd";
 
 const firstOfTheMonth = (now: Date, monthsOn: number): string =>
@@ -197,11 +181,6 @@ const firstOfTheMonth = (now: Date, monthsOn: number): string =>
     .toISOString()
     .slice(0, ISO_DAY.length);
 
-/**
- * Makes the partitions a question's content is stored in, since a request cannot make its own.
- * The clock's own month is asked for beside the next, so a database restored from an older dump
- * has it by the first pass.
- */
 export const makeQuestionMonths = (
   door: PostgresDoor,
   input: { readonly now: Date },
@@ -214,10 +193,8 @@ export const makeQuestionMonths = (
     }
   });
 
-/** Past any wait to type a code from an email, so one that expired just before a pass reads as spent. */
 const VERIFICATION_KEPT_PAST_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
-/** Far past the longest ingress rule's window, an hour, so no live count goes. */
 const INGRESS_WINDOW_KEPT_MS = 24 * 60 * 60 * 1000;
 
 const EXPIRED_SESSIONS = "DELETE FROM session WHERE expires_at < $1 OR pending_since < $2";
@@ -245,11 +222,6 @@ const countDeleted = (
     return dropped.rowCount ?? 0;
   });
 
-/**
- * Deletes sessions past their expiry or their pending hour, verification rows a day past expiry,
- * and ingress windows a day old. Each delete stands alone, so a refused one keeps no other's
- * rows. Failed-confirm counts stay: deleting one would reset a person's backoff.
- */
 export const sweepIdentitySet = async (
   platform: SweepsPrincipal,
   door: PostgresDoor,

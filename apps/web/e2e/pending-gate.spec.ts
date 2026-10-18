@@ -36,7 +36,6 @@ const codeField = (page: Page) => page.getByRole("textbox", { name: "Authenticat
 
 const landedAt = (page: Page): URL => new URL(page.url());
 
-/** An Admin holding the harness's authenticator, signed in by email and waiting on confirm. */
 const anAdminWaiting = async (page: Page, api: APIRequestContext, workspaceName: string) => {
   const workspace = await provision(api, { name: workspaceName });
   const key = await withAnAuthenticator(api, workspace.admin.email);
@@ -129,7 +128,6 @@ test("an hour unconfirmed ends the sign-in; signing in returns there", async ({
   await signIn(page, request, workspace.admin.email);
   await expect(page).toHaveURL(new RegExp(`${GROUPS}$`));
 
-  // A confirmed session that ends is told apart from one never confirmed.
   await page.context().clearCookies();
   await page.reload();
   await expect(signInHeading(page)).toBeVisible();
@@ -149,7 +147,6 @@ test("a confirmed session opening confirm goes straight to its return", async ({
   await expect(confirmHeading(page)).toHaveCount(0);
 });
 
-/** A person in no workspace holding a passkey from this device and the harness's authenticator. */
 const someoneHoldingBoth = async (page: Page, api: APIRequestContext) => {
   const device = await aVirtualAuthenticator(page);
   const email = anAddress("priya");
@@ -158,7 +155,6 @@ const someoneHoldingBoth = async (page: Page, api: APIRequestContext) => {
   await page.goto("/sign-in");
   await signIn(page, api, email);
   await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
-  // Adding a passkey beside a held factor asks for a fresh confirmation first, so confirm here.
   const codeNow = authenticatorCodeAt(key, new Date());
   await page.goto("/confirm");
   await authenticatorCodeField(page).fill(codeNow);
@@ -168,7 +164,6 @@ const someoneHoldingBoth = async (page: Page, api: APIRequestContext) => {
   await page.getByRole("button", { name: "Add a Passkey" }).click();
   const passkey = await page.getByLabel("Passkey Name").inputValue();
   await page.getByRole("button", { name: "Add Passkey" }).click();
-  // Codes come only with a first factor, and the harness's authenticator came first.
   await expect(page.getByRole("listitem", { name: passkey, exact: true })).toBeFocused();
   return { device, who, key, passkey };
 };

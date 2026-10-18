@@ -28,7 +28,7 @@ def test_a_run_that_skipped_every_daemon_case_says_so_once() -> None:
         }
     )
 
-    pytest_terminal_summary(reporter)  # type: ignore[arg-type]
+    pytest_terminal_summary(reporter)  # type: ignore[arg-type]  # a stub stands in for the pytest reporter
 
     assert len(reporter.lines) == 1
     line = reporter.lines[0]
@@ -43,7 +43,7 @@ def test_a_run_with_no_daemon_skip_leaves_the_reporter_untouched() -> None:
         stats={"skipped": [_StubReport(longreprtext="Skipped: an unrelated reason")]}
     )
 
-    pytest_terminal_summary(reporter)  # type: ignore[arg-type]
+    pytest_terminal_summary(reporter)  # type: ignore[arg-type]  # a stub stands in for the pytest reporter
 
     assert reporter.lines == []
 
@@ -51,6 +51,6 @@ def test_a_run_with_no_daemon_skip_leaves_the_reporter_untouched() -> None:
 def test_a_run_with_no_skips_leaves_the_reporter_untouched() -> None:
     reporter = _StubReporter()
 
-    pytest_terminal_summary(reporter)  # type: ignore[arg-type]
+    pytest_terminal_summary(reporter)  # type: ignore[arg-type]  # a stub stands in for the pytest reporter
 
     assert reporter.lines == []

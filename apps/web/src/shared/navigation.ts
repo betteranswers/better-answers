@@ -2,16 +2,12 @@ import type { ROLES } from "@better-answers/schema";
 
 import type { IconName } from "./icon.tsx";
 
-/** A workspace role, as the session's member names it. */
 export type Role = (typeof ROLES)[number];
 
-/** The operator holds no role in the console, so its pages are shown to the mark instead. */
 export type RoleOrOperator = Role | "operator";
 
-/** Something a page does that jump-to offers by name, to whoever may see the page. */
 type Action = {
   readonly name: string;
-  /** What the page's address carries to open it. */
   readonly asks: string;
   readonly icon: IconName;
 };
@@ -22,7 +18,6 @@ export const INVITE_A_PERSON = {
   icon: "invite",
 } as const satisfies Action;
 
-/** One segment beneath a page, naming a row: listed nowhere, gated and framed as its page. */
 type Detail = {
   readonly param: string;
 };
@@ -33,9 +28,7 @@ export type Page = {
   readonly icon: IconName;
   readonly built: boolean;
   readonly seenBy: readonly RoleOrOperator[];
-  /** Shown as well to anyone owning a collection, whatever their role. */
   readonly owners?: true;
-  /** Every older address, each leading here only for a person who may see the page. */
   readonly movedFrom?: readonly string[];
   readonly actions?: readonly Action[];
   readonly detail?: Detail;
@@ -43,11 +36,9 @@ export type Page = {
 
 export type MenuGroup = {
   readonly id: string;
-  /** Absent where the area lists its pages alone, as Ask and Inbox do. */
   readonly name?: string;
   readonly summary?: string;
   readonly pages: readonly Page[];
-  /** Every older address naming the group, each leading to its first page the person may see. */
   readonly movedFrom?: readonly string[];
 };
 
@@ -399,7 +390,6 @@ export const CONTROL_CENTRE = {
   ],
 } as const satisfies Area;
 
-/** Reached from the workspace switcher, never the rail. */
 export const CONSOLE = {
   id: "console",
   name: "Console",
@@ -445,7 +435,6 @@ export const CONSOLE = {
   ],
 } as const satisfies Area;
 
-/** The workspace's rail, in its order. */
 export const AREAS: readonly Area[] = [ASK, KNOWLEDGE, INBOX, CONTROL_CENTRE];
 
 export const EVERY_AREA: readonly Area[] = [...AREAS, CONSOLE];
@@ -457,7 +446,6 @@ type Declared =
   | typeof CONTROL_CENTRE
   | typeof CONSOLE;
 
-/** Every declared address, so a link written outside the list stops compiling when it moves. */
 export type PagePath = Declared["menuGroups"][number]["pages"][number]["path"];
 
 type MenuGroupOf<Held extends Area> = Held["menuGroups"][number];
@@ -474,7 +462,6 @@ export const menuGroupIn = <Held extends Area, Id extends MenuGroupOf<Held>["id"
   return group;
 };
 
-/** A page's address read off the list, so a link to it is never a second copy. */
 export const pageNamed = <Held extends MenuGroup>(
   group: Held,
   name: Held["pages"][number]["name"],
@@ -486,7 +473,6 @@ export const pageNamed = <Held extends MenuGroup>(
 
 const NEW_QUESTION = pageNamed(menuGroupIn(ASK, "ask"), "New Question");
 
-/** Where each reader lands, and the way back offered when they are lost. */
 export const HOMES = {
   Admin: pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members"),
   Editor: NEW_QUESTION,
@@ -495,22 +481,18 @@ export const HOMES = {
 } as const satisfies { readonly [who in RoleOrOperator]: Page };
 
 export type Reader = {
-  /** Undefined until the member read answers, so nothing role-gated shows meanwhile. */
   readonly role: RoleOrOperator | undefined;
   readonly owns: readonly string[];
 };
 
-/** Nothing records who owns a collection, so a page marked for owners shows by role alone. */
 export const readerOf = (role: RoleOrOperator | undefined): Reader => ({ role, owns: [] });
 
 export const OPERATOR_READER: Reader = readerOf("operator");
 
-/** `opensAt` is where its rail entry leads: the reader's home when it is here. */
 export type VisibleArea = Area & { readonly opensAt: Page };
 
 export type VisibleTree = {
   readonly areas: readonly VisibleArea[];
-  /** Undefined exactly when no role is held. */
   readonly home: Page | undefined;
 };
 
@@ -540,7 +522,6 @@ const shownOf = (
   };
 };
 
-/** Built-ness and the reader filter the list; a role's home shows whether built or not. */
 export const visibleTo = (reader: Reader, areas: readonly Area[]): VisibleTree => {
   const { role, owns } = reader;
   if (role === undefined) return NO_TREE;
@@ -557,7 +538,6 @@ export type Place<Held extends Area = Area> = {
   readonly area: Held;
   readonly menuGroup: MenuGroup | undefined;
   readonly page: Page;
-  /** The segment a page's detail address holds, still encoded as the address has it. */
   readonly detail?: string;
 };
 
@@ -569,7 +549,6 @@ const placesIn = <Held extends Area>(area: Held): readonly Place<Held>[] =>
 export const pagesOf = (areas: readonly Area[]): readonly Page[] =>
   areas.flatMap(placesIn).map(({ page }) => page);
 
-/** One segment and no more, so a deeper address beneath a row names nothing. */
 const detailIn = (page: Page, pathname: string): string | undefined => {
   const beneath = `${page.path}/`;
   if (page.detail === undefined || !pathname.startsWith(beneath)) return undefined;
@@ -577,7 +556,6 @@ const detailIn = (page: Page, pathname: string): string | undefined => {
   return segment === "" || segment.includes("/") ? undefined : segment;
 };
 
-/** An exact match first, then a page's declared detail address; anything deeper is no place. */
 export const placeAt = <Held extends Area>(
   areas: readonly Held[],
   pathname: string,
@@ -592,23 +570,19 @@ export const placeAt = <Held extends Area>(
   return undefined;
 };
 
-/** The address of one row beneath a page that declares a detail address. */
 export const detailAt = (page: Page, value: string): string => {
   if (page.detail === undefined) throw new Error(`${page.path} declares no detail address`);
   return `${page.path}/${encodeURIComponent(value)}`;
 };
 
-/** With no role held nothing is hidden, so a page draws its own loading or failed state. */
 export const hides = (tree: VisibleTree, path: string): boolean =>
   tree.home !== undefined && placeAt(tree.areas, path) === undefined;
 
-/** What a page's first heading says: its group's name, or its area's where it has none. */
 export const headingOf = (page: Page): string => {
   const place = placeAt(EVERY_AREA, page.path);
   return place?.menuGroup?.name ?? place?.area.name ?? page.name;
 };
 
-/** `to` is in order: an older address leads to the first page in it the reader may see. */
 export type Moved = { readonly from: string; readonly to: readonly Page[] };
 
 const movesOf = (from: readonly string[] = [], to: readonly Page[]): readonly Moved[] =>
@@ -622,7 +596,6 @@ export const movedWithin = (areas: readonly Area[]): readonly Moved[] =>
     ]),
   );
 
-/** Undefined where the reader may see nothing the older address now names. */
 export const leadsTo = (tree: VisibleTree, moved: Moved): Page | undefined => {
   const shown = pagesOf(tree.areas);
   return moved.to.find((page) => shown.includes(page));

@@ -23,23 +23,14 @@ export type PostgresDoor = {
 
 export const openPostgres = (pool: pg.Pool): PostgresDoor => ({ pool });
 
-/**
- * A SQL expression for the workspace in parameter `$at`, or for the transaction's own scope when
- * that parameter is null.
- */
 export const scopeClause = (at: number): string =>
   `COALESCE($${at}::text, (select current_workspace_id()))`;
 
-/**
- * Null for the platform and the operator, so that scopeClause falls back to the transaction's
- * scope; the operator's holds none, so no row of a workspace's lands under them.
- */
 export const scopeParameter = (principal: Principal | OperatorPrincipal): string | null =>
   principal.kind === "user" ? principal.workspaceId : null;
 
 type Bindable = string | number | Date | null | readonly string[];
 
-/** A placeholder is the number `bind` answers for its own value, so the two cannot drift apart. */
 export const boundValues = () => {
   const values: Bindable[] = [];
   return { values, bind: (value: Bindable): number => values.push(value) };
@@ -47,7 +38,6 @@ export const boundValues = () => {
 
 export type Bind = ReturnType<typeof boundValues>["bind"];
 
-/** An `ILIKE` pattern matching `text` anywhere, its own `%`, `_` and `\` taken literally. */
 export const containing = (text: string): string =>
   `%${text.replaceAll(/[\\%_]/g, String.raw`\$&`)}%`;
 
@@ -65,10 +55,6 @@ type Unwrapped<T> = T extends { readonly ok: true; readonly value: infer Value }
 
 type Refused<T> = T extends { readonly ok: false; readonly error: infer Refusal } ? Refusal : never;
 
-/**
- * A union only partly a Result has no answer to fold: its Result members would reach the caller
- * as values, a refusal among them.
- */
 type OnlyPartlyAResult<T> = WhollyAResult<T> extends true ? false : PartlyAResult<T>;
 
 export type Answered<T> =
@@ -91,10 +77,6 @@ const answersAResult = <T>(answer: T): answer is T & AnyResult =>
 
 const answersARefusal = <T>(answer: T): boolean => answersAResult(answer) && !answer.ok;
 
-/**
- * One Result for an opened work: the principal's refusal, the Result the work answered, or else
- * the work's answer as the value.
- */
 export const folded = <T>(opened: Opened<Foldable<T>>): Folded<T> => {
   if (!opened.ok) return err(opened.error);
   const answer = opened.value;
@@ -123,10 +105,6 @@ const commit = async (client: pg.PoolClient): Promise<void> => {
 const SETTLED =
   "the transaction has settled: a query kept past its commit or rollback reaches no transaction";
 
-/**
- * Refuses once the work settles, before the commit is sent: the pool hands the client on, so a kept
- * `Tx` could query inside another's transaction.
- */
 const lent = async <T>(client: pg.PoolClient, work: (tx: Tx) => Promise<T>): Promise<T> => {
   let settled = false;
   const query = new Proxy(client.query.bind(client), {
@@ -144,10 +122,6 @@ const lent = async <T>(client: pg.PoolClient, work: (tx: Tx) => Promise<T>): Pro
 
 type Opening = "BEGIN" | "BEGIN READ ONLY";
 
-/**
- * Every door opens its transaction here, so a refusal after a write leaves nothing behind
- * whichever door the work came through.
- */
 const transaction = async <T>(
   door: PostgresDoor,
   work: (tx: Tx) => Promise<T>,
@@ -171,10 +145,6 @@ const transaction = async <T>(
 
 const DEADLOCK_DETECTED = "40P01";
 
-/**
- * Two actions each waiting on a lock the other holds: Postgres aborts one, and that action answers
- * `changed-meanwhile` rather than failing. Any other error is itself.
- */
 export const refusalOfDeadlock = (error: Error): KernelRefusal<"changed-meanwhile"> | Error =>
   "code" in error && error.code === DEADLOCK_DETECTED ? "changed-meanwhile" : error;
 
@@ -191,10 +161,6 @@ const scopedTo =
     return work(tx, platform);
   };
 
-/**
- * Runs `work` in one transaction scoped to `workspaceId`. It rolls back when `work` throws or
- * answers a refused Result.
- */
 export const withScope = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -202,7 +168,6 @@ export const withScope = async <T>(
   work: ScopedWork<T>,
 ): Promise<T> => transaction(door, scopedTo(platform, workspaceId, work));
 
-/** As withScope, but read-only: a write inside the work fails at its own statement. */
 export const withScopeRead = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -211,7 +176,6 @@ export const withScopeRead = async <T>(
 ): Promise<T> =>
   transaction(door, scopedTo(platform, workspaceId, work), answersARefusal, "BEGIN READ ONLY");
 
-/** A connection whose unlock failed may still hold its session lock, so it is destroyed, not pooled. */
 const failedUnlocks = new WeakMap<pg.PoolClient, Error>();
 
 const unlocking = async (
@@ -253,10 +217,6 @@ const unlockingAfter = async <T>(
   }
 };
 
-/**
- * Waits for the session lock on `key`, runs `work` outside any transaction, and unlocks once
- * `work` settles, failed or not.
- */
 export const withSessionLock = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -270,10 +230,6 @@ export const withSessionLock = async <T>(
 
 export type LockHeld = "held";
 
-/**
- * As withSessionLock, but `held` at once while another session holds `key`, so a second holder
- * skips its work rather than queueing behind the first.
- */
 export const withSessionTryLock = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -289,7 +245,6 @@ export const withSessionTryLock = async <T>(
     return ok(await unlockingAfter(holder, key, () => work(platform)));
   });
 
-/** Shared by every write to a workspace's bundle; exclusive for a rewrite of its history. */
 export type FenceHold = "shared" | "exclusive";
 
 const FENCE_KEY = "hashtext('bundle'), hashtext($1)";
@@ -310,7 +265,6 @@ const FENCE_SQL = {
   { readonly wait: string; readonly try: string; readonly free: string }
 >;
 
-/** Each holder needs two connections: three take six of the api's ten, leaving four for other queries. */
 export const FENCE_HOLDERS_PER_POOL = 3;
 
 type Slots = { free: number; readonly waiting: (() => void)[] };
@@ -325,7 +279,6 @@ const slotsOf = (pool: pg.Pool): Slots => {
   return slots;
 };
 
-/** A freed slot goes straight to the longest waiter, so the count of holders never passes the cap. */
 const freeASlot = (pool: pg.Pool): void => {
   const slots = slotsOf(pool);
   const next = slots.waiting.shift();
@@ -333,7 +286,6 @@ const freeASlot = (pool: pg.Pool): void => {
   else next();
 };
 
-/** Waits for one of the pool's fence slots before taking any connection, so a waiter holds none. */
 const inAFenceSlot = async <T>(pool: pg.Pool, work: () => Promise<T>): Promise<T> => {
   const slots = slotsOf(pool);
   if (slots.free > 0) slots.free -= 1;
@@ -345,7 +297,6 @@ const inAFenceSlot = async <T>(pool: pg.Pool, work: () => Promise<T>): Promise<T
   }
 };
 
-/** As inAFenceSlot, but `held` at once when every slot is taken, rather than waiting for one. */
 const inAFreeFenceSlot = async <T>(
   pool: pg.Pool,
   work: () => Promise<Result<T, LockHeld>>,
@@ -373,10 +324,6 @@ const fencedOn = async <T>(
   }
 };
 
-/**
- * Holds the workspace's bundle fence across processes while `work` runs, outside any
- * transaction. Taken before a transaction opens, so a waiter holds no row.
- */
 export const withWorkspaceFence = async <T>(
   principal: Principal,
   door: PostgresDoor,
@@ -391,10 +338,6 @@ export const withWorkspaceFence = async <T>(
     }),
   );
 
-/**
- * As withWorkspaceFence, but `held` at once while a hold elsewhere excludes this one, or while
- * every fence slot is taken: nothing here waits.
- */
 export const tryWorkspaceFence = async <T>(
   principal: Principal,
   door: PostgresDoor,
@@ -410,24 +353,18 @@ export const tryWorkspaceFence = async <T>(
     }),
   );
 
-/**
- * Runs `work` in one transaction with no workspace scope. It rolls back when `work` throws or
- * answers a refused Result.
- */
 export const withIdentityWrite = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
   work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
 ): Promise<T> => transaction(door, (tx) => work(tx, platform));
 
-/** As withIdentityWrite, but read-only: a write inside the work fails at its own statement. */
 export const withIdentityRead = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
   work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
 ): Promise<T> => transaction(door, (tx) => work(tx, platform), answersARefusal, "BEGIN READ ONLY");
 
-/** How long a last-active stamp stands before a request writes it again. */
 const STAMP_STANDS_FOR = "interval '1 hour'";
 
 const MEMBER_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS person_revoked_at,
@@ -445,10 +382,6 @@ const MEMBER_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS person_
      JOIN "user" u ON u.id = m.user_id
     WHERE m.workspace_id = $1 AND m.user_id = $2`;
 
-/**
- * Both rows held, or a revocation lands between the read and the commit; never on the boundary
- * read, which every request runs.
- */
 const MEMBER_QUERY_HELD = `${MEMBER_QUERY} FOR SHARE OF m, u`;
 
 const isRole = (value: string): value is Role => ROLES.some((role) => role === value);
@@ -459,14 +392,11 @@ type MemberRow = {
   readonly member_revoked_at: Date | null;
   readonly group_ids: readonly string[];
 
-  /** The named session's confirmation, read beside the rows; null where the claims name none. */
   readonly confirmedAt: Date | null;
 
-  /** Read beside the rows, so a request within the hour opens no second transaction. */
   readonly lastActiveStale: boolean;
 };
 
-/** For a member still here: a removal that landed since the read leaves no row behind. */
 const STAMP = `INSERT INTO workspace_last_active (workspace_id, user_id, at)
        SELECT $1, $2, now()
         WHERE EXISTS (SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2)
@@ -474,7 +404,6 @@ const STAMP = `INSERT INTO workspace_last_active (workspace_id, user_id, at)
            DO UPDATE SET at = now()
             WHERE workspace_last_active.at < now() - ${STAMP_STANDS_FOR}`;
 
-/** One conditional write in its own scoped transaction, never waiting on a held row. */
 const stampLastActive = async (
   door: PostgresDoor,
   workspaceId: string,
@@ -504,7 +433,6 @@ const resolveClaims = async <T>(
 
   const credentialIssuedAtMs = claims.issuedAt.getTime();
 
-  // A holder, not a `let`: the closure's assignment is invisible to the narrowing at the check below.
   const seen = { lastActiveStale: false };
   const opened = await resolveScoped(
     door,
@@ -535,11 +463,6 @@ const resolveClaims = async <T>(
   return opened;
 };
 
-/**
- * Resolves `claims` to a member of the workspace they name, then runs `work` as that member in one
- * transaction scoped to it. Refuses malformed claims, a non-member, an unknown role, credentials
- * issued before a revocation, and a role the claims name that the member row does not hold.
- */
 export const withPrincipal = async <T>(
   door: PostgresDoor,
   claims: Claims,
@@ -548,7 +471,7 @@ export const withPrincipal = async <T>(
 
 /**
  * As withPrincipal, but read-only: a write inside the work fails at its own statement. A stale
- * last-active stamp is still written, in a transaction of its own after this one.
+ * last-active stamp is still written.
  */
 export const withPrincipalRead = async <T>(
   door: PostgresDoor,
@@ -558,8 +481,7 @@ export const withPrincipalRead = async <T>(
 
 /**
  * As withPrincipal, but the member and user rows stay held until commit, so a revocation cannot
- * land between the read and the commit. The last-active stamp lands only once this transaction
- * has released them.
+ * land between the read and the commit.
  */
 export const withHeldPrincipal = async <T>(
   door: PostgresDoor,
@@ -584,7 +506,6 @@ const withMemberQuery = async <T>(
       const refusal = refuse(row, principal.credentialIssuedAtMs);
       if (!refusal.ok) return refusal;
 
-      // The session is not named again: its confirmation travels with the principal that read it.
       const resolved: ResolvedMember = {
         ...refusal.value,
         confirmedAtMs: principal.secondFactorConfirmedAtMs,
@@ -597,9 +518,7 @@ const withMemberQuery = async <T>(
   );
 
 /**
- * Reads the principal's member row again, held as withHeldPrincipal holds it, and runs `work` as
- * the principal read back, groups included. Refuses a non-member, an unknown role, revoked
- * credentials, and a role that has moved.
+ * Refuses a non-member, an unknown role, revoked credentials, and a role that has moved.
  */
 export const withMember = async <T>(
   principal: UserPrincipal,
@@ -680,7 +599,6 @@ type OperatorRow = {
   readonly operator: boolean;
   readonly revoked_at: Date | null;
 
-  /** The named session's confirmation; null where the claims name no session. */
   readonly confirmedAt: Date | null;
 };
 
@@ -726,18 +644,12 @@ const resolveOperator = async <T>(
   );
 };
 
-/**
- * Resolves a signed-in person to the operator, then runs `work` as them in one transaction scoped
- * to no workspace. Refuses `not-the-operator` to anyone else: a person without the mark, credentials
- * issued before their revocation, an id no person holds.
- */
 export const withOperator = async <T>(
   door: PostgresDoor,
   claims: Pick<Claims, "userId" | "issuedAt" | "sessionId">,
   work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
 ): Promise<Result<T, OperatorRefusal>> => resolveOperator(door, claims, work, "BEGIN");
 
-/** As withOperator, but read-only: a write inside the work fails at its own statement. */
 export const withOperatorRead = async <T>(
   door: PostgresDoor,
   claims: Pick<Claims, "userId" | "issuedAt" | "sessionId">,
@@ -754,7 +666,6 @@ export type CounterOutcome = {
 
   readonly retryAfterSeconds: number;
 
-  /** The window's count with this attempt in it: one past the rule's max is its first refusal. */
   readonly count: number;
 };
 
@@ -781,9 +692,8 @@ const countInWindow = async (
 };
 
 /**
- * Counts one attempt against `scope` and `key` in the fixed window `now` falls in, and drops the
- * pair's earlier windows. It commits at once. `retryAfterSeconds` runs to the window's end, 1 at
- * least.
+ * Counts one attempt in the fixed window `now` falls in. It commits at once. `retryAfterSeconds`
+ * runs to the window's end, 1 at least.
  */
 export const consumeIngress = async (
   door: PostgresDoor,
@@ -804,10 +714,6 @@ export const consumeIngress = async (
     ),
   );
 
-/**
- * Drops every pair's windows that started before `before`, which `consumeIngress` leaves for a
- * pair never counted again. Answers how many went.
- */
 export const dropIngressWindowsBefore = async (
   door: PostgresDoor,
   before: Date,
@@ -818,7 +724,6 @@ export const dropIngressWindowsBefore = async (
   return dropped.rowCount ?? 0;
 };
 
-/** Only these literals reach the statement's text, so no caller's string becomes SQL. */
 const WORKSPACE_COUNTERS = {
   call: { table: "mcp_call_counter", keyColumn: "token_id", sweptBy: "token_id = $2" },
   invitationEmail: {
@@ -853,7 +758,6 @@ const countForWorkspace = async (
   );
 };
 
-/** As consumeIngress, for one call on the token `tokenId`, inside the caller's transaction. */
 export const consumeCall = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -862,10 +766,6 @@ export const consumeCall = async (
   now: Date,
 ): Promise<CounterOutcome> => countForWorkspace(principal, tx, "call", tokenId, rule, now, 1);
 
-/**
- * As consumeCall, counting `amount` invitation emails against `key` at once. An action that refuses
- * or fails after it rolls the count back, and the counter row stays held until it commits.
- */
 export const consumeInvitationEmails = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -888,10 +788,6 @@ export const readWorkspaceConfig = async (
   return found.rows[0]?.value;
 };
 
-/**
- * As readWorkspaceConfig, the row held until the transaction ends, so a second caller holding the
- * same key reads it only after the first commits.
- */
 export const holdWorkspaceConfig = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -904,7 +800,6 @@ export const holdWorkspaceConfig = async (
   return found.rows[0]?.value;
 };
 
-/** Sets one setting by key in the workspace `tx` is scoped to, replacing any value it held. */
 export const writeWorkspaceConfig = async (
   tx: Tx,
   setting: { readonly workspaceId: WorkspaceId; readonly key: string; readonly value: string },
@@ -918,7 +813,7 @@ export const writeWorkspaceConfig = async (
 
 /**
  * Those of `names` that `information_schema.tables` lists in `public`, in no set order: a view
- * counts, and a table the role holds no privilege on does not.
+ * counts, a table the role holds no privilege on does not.
  */
 export const tablesPresent = async (
   door: PostgresDoor,

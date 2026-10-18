@@ -45,7 +45,6 @@ export const INVITATION_ACTIONS = declareActions("people", {
   cancelled: action("people.invitation.cancelled", { replacedByInvitationId: "id?" }),
 });
 
-/** One action sends to, or holds, at most this many invitations until it commits. */
 export const MOST_AT_ONCE = 50;
 
 const ROLE = boundarySchemas.member.select.shape.role;
@@ -55,7 +54,6 @@ export const INVITATION_ID = boundarySchemas.invitation.select.shape.id;
 export const NO_SUCH_INVITATION =
   "no-such-invitation" satisfies MemberRefusal<"no-such-invitation">;
 
-/** An address any case spells, or none, reaches the action, which names each it refuses. */
 export const inviteMembersInput = z.object({
   addresses: z.array(z.string()).min(1).max(MOST_AT_ONCE),
   role: z.string(),
@@ -97,7 +95,6 @@ const cancelInvitationAction = declareAction({
   refuses: ON_AN_INVITATION,
 });
 
-/** Borrowed from the workspaces slice, whose word it is: joining refuses a member in it too. */
 type AlreadyAMember = Extract<keyof typeof WORKSPACE_REFUSALS, "already-a-member">;
 
 export type InviteMembersRefusal =
@@ -123,16 +120,13 @@ export const WAITING_ROW = z.object({
 
 type WaitingRow = z.output<typeof WAITING_ROW>;
 
-/** The instants are ISO strings, which is what a `Date` becomes on the wire anyway. */
 export type WaitingInvitation = Omit<WaitingRow, "invitedAt" | "expiresAt"> & {
   readonly invitedAt: string;
   readonly expiresAt: string;
 };
 
-/** What the email to the invited address is written from. */
 export type InvitationToSend = WaitingInvitation & { readonly workspaceName: string };
 
-/** Each invitation a send minted, and whether it replaced the one waiting for its address. */
 export type InvitationMinted = InvitationToSend & { readonly replaced: boolean };
 
 export const RETURNED = `id AS "invitationId", email AS address, role, created_at AS "invitedAt",
@@ -156,7 +150,6 @@ const windowOf = (now: Date): Pick<WaitingInvitation, "invitedAt" | "expiresAt">
   expiresAt: expiryFrom(now).toISOString(),
 });
 
-/** The admitted Admin's own workspace, so a row the parse finds missing is a failure. */
 export const workspaceNameOf = async (admin: AdminUserPrincipal, tx: Tx): Promise<string> =>
   WORKSPACE_NAMED.parse(
     (await tx.query("SELECT name FROM workspace WHERE id = $1", [admin.workspaceId])).rows[0],
@@ -168,7 +161,6 @@ type Minting = {
   readonly now: Date;
 };
 
-/** Two sends naming one address queue here, so the later replaces the earlier's invitation. */
 const ADDRESS_LOCK =
   "SELECT pg_advisory_xact_lock(hashtext('invitation'), hashtext($1 || ' ' || $2))";
 
@@ -184,7 +176,6 @@ const MINTED = `INSERT INTO invitation (id, workspace_id, email, role, status, c
                 SELECT minted.id, $1, minted.address, $4, $5, $6, $7, $8
                   FROM unnest($2::text[], $3::text[]) AS minted(id, address)`;
 
-/** Answers the id of each waiting invitation it cancelled, by its address. */
 const waitingCancelled = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -235,16 +226,11 @@ const mintsRecorded = async (
 };
 
 type Minted = {
-  /** Each address whose waiting invitation the mint replaced. */
   readonly replaced: ReadonlySet<string>;
 
   readonly workspaceName: string;
 };
 
-/**
- * Mints each invitation, cancelling the one waiting for its address, with their events in one
- * batch, and answers what the emails need beside the invitations.
- */
 const mintedEach = async (admin: AdminUserPrincipal, tx: Tx, minting: Minting): Promise<Minted> => {
   const addresses = minting.invitations.map((one) => one.address);
   const replaced = await waitingCancelled(admin, tx, addresses);
@@ -263,18 +249,11 @@ const mintedEach = async (admin: AdminUserPrincipal, tx: Tx, minting: Minting): 
 };
 
 export type MintInvitationInput = {
-  /** Lower-cased here, however the Admin or the person's own row spelled it. */
   readonly address: string;
   readonly role: Role;
   readonly now: Date;
 };
 
-/**
- * The one step every invitation is minted by: a direct invite and an approved access request
- * alike. It cancels the address's waiting invitation in the same transaction, so only the newest
- * link stands, and writes `people.invitation.created`, with the replaced one's cancellation beside
- * it in one batch.
- */
 export const mintInvitation = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -304,7 +283,6 @@ export const mintInvitation = async (
 const MEMBERS_AMONG = `SELECT lower(u.email) AS address FROM member m JOIN "user" u ON u.id = m.user_id
                         WHERE m.workspace_id = $1 AND lower(u.email) = ANY($2::text[])`;
 
-/** Each position in the send whose address `belongs`, as the key a refused item takes. */
 const positionsWhere = (
   addresses: readonly string[],
   belongs: (address: string) => boolean,
@@ -313,7 +291,6 @@ const positionsWhere = (
 
 type Parsed = { readonly addresses: readonly string[]; readonly malformed: readonly string[] };
 
-/** Each address as the mint keys it, and the position of each that is none. */
 const addressesOf = (asked: readonly string[]): Parsed =>
   asked.reduce<Parsed>(
     (parsed, raw, position) => {
@@ -343,7 +320,6 @@ const offDomainRefused = async (
 
 type SendRefusal = RefusedItems<AlreadyAMember | MemberRefusal<"off-testing-domain">> | CeilingMet;
 
-/** Refuses each address off a marked workspace's domain, counts every email, refuses members, mints. */
 const sentUnderLocks = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -387,9 +363,8 @@ const sentUnderLocks = async (
 export type InviteMembersInput = z.output<typeof inviteMembersInput> & { readonly now: Date };
 
 /**
- * One invitation per address, folded however it is cased, or none: an address of no known form,
- * off a marked workspace's testing domain, or a member's here refuses the send naming each by its
- * position. A waiting invitation to an address is replaced, and the answer says so.
+ * One invitation per case-folded address, or none: one of no known form, off a marked workspace's
+ * testing domain, or a member's here refuses the send.
  */
 export const inviteMembers = async (
   principal: UserPrincipal,
@@ -400,7 +375,6 @@ export const inviteMembers = async (
   if (!admitted.ok) return err(admitted.error);
   const role = ROLE.safeParse(input.role);
   if (!role.success) return err("no-such-role");
-  // Only a hand reached for the Admin role asks for a recent confirmation.
   if (role.data === "Admin") {
     const fresh = requireFreshConfirmation(admitted.value, input.now);
     if (!fresh.ok) return err(fresh.error);
@@ -419,7 +393,6 @@ export const inviteMembers = async (
 
 export type ResendInvitationInput = z.output<typeof invitationInput> & { readonly now: Date };
 
-/** The parse brands the ids; a row it throws on fails the action like the query would. */
 const firstWaitingOf = (rows: readonly unknown[]): WaitingInvitation | undefined => {
   const [row] = rows;
   return row === undefined ? undefined : waitingOf(WAITING_ROW.parse(row));
@@ -462,8 +435,8 @@ const renewedOne = async (
 };
 
 /**
- * A resent invitation keeps its link and runs seven days from `now`, as the new email says. Each
- * resend counts against the address's ceiling and the workspace's.
+ * A resent invitation keeps its link and runs seven days from `now`. Each resend counts against the
+ * address's ceiling and the workspace's.
  */
 export const resendInvitation = async (
   principal: UserPrincipal,

@@ -49,10 +49,6 @@ const STRYKER_CONFIG = `export default {
 };
 `;
 
-/**
- * Models CI's contention: a slow sibling sleeps only while a mutant runs, so a whole-suite run
- * outlasts the short dry run's timeout budget.
- */
 const CONTENDED_WORKSPACE = {
   "stryker.config.mjs": `export default {
   testRunner: "vitest",
@@ -241,7 +237,6 @@ describe("the vitest runner's patch over a throwaway workspace", () => {
       statusReason: expect.stringContaining("is not a family"),
     });
 
-    // Reached only while a test runs, so its run is filtered to that test by its full name.
     expect(rowAt(rows, 10, "BlockStatement", "{}")).toMatchObject({
       status: "Killed",
       testsCompleted: 1,

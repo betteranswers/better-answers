@@ -300,9 +300,9 @@ def redact_landed_copies(
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> LandedSync:
-    """Writes each document's redacted text to its `normalised_key`; one that
-    cannot be converted or runs past its time is marked unreadable rather than raised.
-    `detection_key` defaults to the detector's own, which loads presidio."""
+    """Writes redacted text to each document's `normalised_key`; one unconvertible or
+    timed out is marked unreadable, not raised. `detection_key` defaults to the
+    detector's own, loading presidio."""
     # Reading the key builds a recogniser of every rule, so presidio arrives with it. A
     # spawn that lands nothing must not pay that.
     from ..redaction.detection_key import detection_key as the_detection_key

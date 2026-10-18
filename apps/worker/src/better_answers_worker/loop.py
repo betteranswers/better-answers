@@ -168,8 +168,8 @@ def tick(
     *,
     heartbeat_every_seconds: float = queue.HEARTBEAT_SECONDS,
 ) -> bool:
-    """One pass over every workspace, running at most one job in each and
-    enqueuing a nightly audit where one is due. True when any job ran."""
+    """Runs at most one job in each workspace, enqueuing a nightly audit where one is
+    due. True when any job ran."""
     worked = False
     for workspace_id in queue.workspace_ids(connection):
         served = _serve_workspace(

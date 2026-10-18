@@ -7,7 +7,6 @@ afterEach(cleanup);
 
 type Modifier = { readonly metaKey: true } | { readonly ctrlKey: true };
 
-/** Answers whether the browser may still act on the chord. */
 const pressTheChord = (modifier: Modifier, repeat = false): boolean => {
   let browsers = true;
   act(() => {

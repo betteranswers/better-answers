@@ -10,7 +10,6 @@ import {
 } from "@/features/auth/refusal-words.ts";
 import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 
-/** What every wrong-code sentence opens with, read up to the count of tries. */
 const wrongCodeLead = (): string => codeWrong(2).split(/\d/)[0] ?? "";
 
 describe("what a refused sign-in code says", () => {

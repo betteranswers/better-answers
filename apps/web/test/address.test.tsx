@@ -10,7 +10,6 @@ const drawn = (address: string) => {
   return container;
 };
 
-/** The text before each break the part allows, so a test reads where an address may wrap. */
 const breaksAfter = (container: HTMLElement): string[] =>
   [...container.querySelectorAll("wbr")].map((wbr) => wbr.previousSibling?.textContent ?? "");
 

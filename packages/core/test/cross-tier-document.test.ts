@@ -187,9 +187,7 @@ const bytesUnder = (directory: string): Buffer => {
 const storeOf = (workspaceId: string, connectedSourceId: string): string =>
   path.join(lmdbRootUnder(bundles().root), workspaceId, connectedSourceId);
 
-/** A connected source's own store, which a wipe removes; the findings memo's sits beside it. */
 const CONNECTED_SOURCE_STORE = "connected_source";
-/** The findings memo's store, beside the connected source's own, which a wipe spares. */
 const FINDINGS_STORE = "findings";
 
 const connectedSourceStoreOf = (workspaceId: string, connectedSourceId: string): string =>
@@ -573,7 +571,6 @@ describe("one uploaded document, read back through both tiers", () => {
           ),
         ),
       );
-      // This delete stands in for withdrawing the connected source's documents, and leaves the same rows.
       await db().pool.query(
         "DELETE FROM source_document WHERE workspace_id = $1 AND connected_source_id = $2",
         [scenario.workspaceId, dropped.connectedSourceId],
@@ -592,7 +589,6 @@ describe("one uploaded document, read back through both tiers", () => {
   );
 });
 
-/** A work address no detector rule raises, so only the erasure withholds it. */
 const THE_WORK_ADDRESS = "ann.raman@meridianfenland.co.uk";
 const THE_NAME = "Ann Raman";
 const THE_SURNAME = "Raman";

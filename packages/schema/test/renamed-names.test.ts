@@ -16,7 +16,6 @@ const RENAMED_TABLE_PREFIXES = [
   "concept_class_override",
 ];
 
-/** Matched mid-name, as an index names its columns and a partition its parent. */
 const RENAMED_WORDS = [
   "binding",
   "candidate",
@@ -51,7 +50,6 @@ const NAMES = `
 
 const WORKSPACE = "01J6EAAAAAAAAAAAAAAAAAAAAA";
 
-/** A workspace's partition, its indexes and its constraints are named only once one is made. */
 const namesWithAPartition = async (client: pg.PoolClient) => {
   const seed = testData(client);
   await seed.workspace({ id: WORKSPACE, name: "A" });

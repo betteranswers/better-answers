@@ -5,13 +5,10 @@ import { HOMES, type Role } from "@/shared/navigation.ts";
 import { saysARefusal, switcherMenuOf, switcherOf } from "../e2e/locators.ts";
 import { expect } from "./fixtures.ts";
 
-/** The audit of the page the journey is about to leave. */
 export type Gate = () => Promise<void>;
 
-/** An item of the switcher reads its workspace's name, then the person's role there. */
 const listedAs = (name: string, role: Role): string => `${name} ${role}`;
 
-/** A test person belongs to the test workspace alone, and no menu offers them the console. */
 export const theSwitcherListsOneWorkspace = async (
   page: Page,
   workspace: string,
@@ -25,7 +22,6 @@ export const theSwitcherListsOneWorkspace = async (
   await expect(menu).toHaveCount(0);
 };
 
-/** No test person is the operator. A standing left unread alerts too, under another heading. */
 export const theConsoleIsRefused = async (page: Page, gate: Gate): Promise<void> => {
   await page.goto(HOMES.operator.path);
   await expect(page.getByRole("heading", { level: 1, name: "Access Denied" })).toBeVisible();

@@ -60,7 +60,6 @@ describe("the keystrokes list", () => {
   it("leaves focus where a sooner key moved it", async () => {
     render(<APage />);
     listDismissedByEscape();
-    // The next key's action, in the task the list left in, before focus is handed back.
     screen.getByRole("textbox", { name: SEARCH }).focus();
 
     await aTaskLater();
@@ -83,7 +82,6 @@ function Registering(properties: { readonly keystrokes: readonly Keystroke[] }) 
   return null;
 }
 
-/** The shell as the frame draws it: the trigger in one place, the open page beneath. */
 function AShell(properties: { readonly page: string | undefined; readonly children?: ReactNode }) {
   return (
     <ShellKeystrokes page={properties.page} shell={[JUMP_TO]}>

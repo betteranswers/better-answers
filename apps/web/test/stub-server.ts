@@ -1,6 +1,5 @@
 export type Asked = string | URL | Request;
 
-/** Answers nothing until a test hands it an api. */
 export const server = {
   answer: (_asked: Asked): Promise<Response> => Promise.reject(new TypeError("unanswered")),
 };

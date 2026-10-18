@@ -27,33 +27,25 @@ const spawnFailure = z.object({
   stderr: z.string().nullish(),
 });
 
-/** A test's own timeout cannot interrupt a synchronous run, so this is the one a hung tool meets. */
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
-/** A live tree lasts one run, inside the time limit, so a tree this old outlived a killed run. */
 const STALE_AFTER_MS = 60 * 60 * 1000;
 
 export type Tree = Readonly<Record<string, string>>;
 
 export type Tool = {
-  /** The package that ships the binary, and the binary's path inside that package. */
   readonly executable: { readonly package: string; readonly path: readonly string[] };
 
   readonly argv: readonly string[];
 
-  /** Written under every tree before the tree's own files, which win on a shared path. */
   readonly scaffold?: Tree;
 
-  /** Laid over this process's environment, never in place of it. */
   readonly env?: Readonly<Record<string, string>>;
 
-  /** The exits that mean the tool ran and reported something; any other non-zero exit throws. */
   readonly foundSomething: readonly number[];
 
-  /** Under an hour, or the sweep could take a live tree for one a killed run left. */
   readonly timeoutMs?: number;
 
-  /** A tree the tool must report on, run once when the runner is made. */
   readonly smoke: { readonly tree: Tree; readonly reports: (output: string) => boolean };
 };
 
@@ -79,10 +71,6 @@ const packageRoot = (from: ReturnType<typeof createRequire>, name: string): stri
   return directory;
 };
 
-/**
- * The binary's absolute path; throws when the package is not a dependency here or ships no such
- * file.
- */
 export const executableOf = (executable: Tool["executable"]): string => {
   const from = createRequire(import.meta.url);
   const root = packageRoot(from, executable.package);
@@ -110,7 +98,6 @@ const writeTree = (directory: string, tree: Tree): void => {
   for (const [file, source] of Object.entries(tree)) writeUnder(directory, file, source);
 };
 
-/** git's stdout; a non-zero exit throws, carrying both streams. */
 export const gitIn = (directory: string, ...args: readonly string[]): string => {
   const result = spawnSync("git", ["-C", directory, ...args], { encoding: "utf8" });
   if (result.status !== 0) {
@@ -119,7 +106,6 @@ export const gitIn = (directory: string, ...args: readonly string[]): string => 
   return result.stdout;
 };
 
-/** Makes `root`, which must not exist yet, a repository on `main` with a throwaway identity. */
 export const throwawayRepository = (root: string): string => {
   mkdirSync(root);
   gitIn(root, "init", "-q", "-b", "main");
@@ -160,7 +146,6 @@ const reportOrThrow = (tool: Tool, binary: string, timeoutMs: number, cause: unk
   );
 };
 
-/** Keyed by folder, not a flag, because the temp directory is read afresh on every run. */
 const sweptFolders = new Set<string>();
 
 const sweepStaleTrees = (folder: string): void => {
@@ -183,10 +168,8 @@ const sweptTreesFolder = (): string => {
   return folder;
 };
 
-/**
- * Resolves the binary and runs the smoke case now, throwing if either fails or the time limit is
- * an hour or more.
- */
+export const sweptFolder = (): string => mkdtempSync(path.join(sweptTreesFolder(), "tree-"));
+
 export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
   const binary = executableOf(tool.executable);
   const timeoutMs = timeoutMsFor(tool);
@@ -207,7 +190,7 @@ export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
   };
 
   const run: RunOverTree = (tree) => {
-    const directory = mkdtempSync(path.join(sweptTreesFolder(), "tree-"));
+    const directory = sweptFolder();
     try {
       writeTree(directory, tool.scaffold ?? {});
       writeTree(directory, tree);
@@ -257,11 +240,9 @@ const sameInOrder = (found: readonly string[], expected: readonly string[]): boo
 
 export type OxlintRunner = {
   readonly output: (tree: Tree) => string;
-  /** Each file the report names, once, sorted. */
   readonly flagged: (tree: Tree) => readonly string[];
 };
 
-/** The smoke tree must flag exactly the files `smoke.flagged` names, in any order. */
 export const oxlintOver = (
   configJson: string,
   smoke: { readonly tree: Tree; readonly flagged: readonly string[] },
@@ -304,10 +285,6 @@ export type KnipRunner = {
 
 const namedIssues = z.array(z.object({ name: z.string() })).optional();
 
-/**
- * knip's JSON reporter, its kinds spelled out against the tuple. The smoke case proves the
- * shape, so an unreadable report is refused there.
- */
 const knipReport = z.object({
   issues: z
     .array(
@@ -329,7 +306,6 @@ const knipReport = z.object({
 
 const sortKey = (finding: KnipFinding): string => `${finding.kind}:${finding.file}:${finding.name}`;
 
-/** The smoke case compares the expected and found findings in order, so both sort by this. */
 const byFinding = (left: KnipFinding, right: KnipFinding): number =>
   sortKey(left).localeCompare(sortKey(right));
 
@@ -346,7 +322,6 @@ const findingsIn = (output: string): readonly KnipFinding[] =>
     )
     .sort(byFinding);
 
-/** Each tree is laid over `scaffold`; the smoke tree must report exactly `smoke.findings`. */
 export const knipOver = (
   scaffold: Tree,
   smoke: { readonly tree: Tree; readonly findings: readonly KnipFinding[] },

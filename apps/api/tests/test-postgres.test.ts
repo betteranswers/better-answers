@@ -25,7 +25,6 @@ import { freePort } from "./loopback-port.ts";
 const script = path.join(repositoryRoot, "deploy/test-postgres.sh");
 const composeFile = path.join(repositoryRoot, "deploy/test-postgres.compose.yaml");
 
-/** Its own stem and port, so a developer's shared servers are never the ones this stops. */
 const stem = `ba-test-postgres-test-${String(process.pid)}`;
 
 const projectOf = (stemName: string): string => {
@@ -45,7 +44,6 @@ const testPostgres = (port: number, argv: readonly string[], stemName: string = 
 const uriOn = (port: number): string =>
   `postgresql://postgres:postgres@127.0.0.1:${String(port)}/postgres`;
 
-/** Started straight through compose, so the script's derivation and refusals are bypassed. */
 const composeUp = (projectName: string, port: number, image: string = POSTGRES_IMAGE): void => {
   execFileSync("docker", ["compose", "-f", composeFile, "-p", projectName, "up", "-d"], {
     env: { ...process.env, TEST_POSTGRES_IMAGE: image, TEST_POSTGRES_PORT: String(port) },
@@ -256,7 +254,6 @@ describe("the shared test postgres", () => {
 
 describe("the shared test postgres's servers under one stem", () => {
   const allStem = `${stem}-all`;
-  /** Shares the stem's prefix but not its shape, so a prefix match would take it. */
   const outsider = `${allStem}-0123456789abcd`;
   let allPort: number;
   let upBeside: Run;

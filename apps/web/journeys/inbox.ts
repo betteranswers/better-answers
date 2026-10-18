@@ -21,16 +21,13 @@ const POLL_INTERVAL_MS = 2_000;
 const REQUEST_TIMEOUT_MS = 5_000;
 const LOOKUP_TIMEOUT_MS = 2_000;
 
-/** Alone on its line, so digits in the link are never read as it. */
 const SIGN_IN_CODE = /^(\d{6})$/m;
 
 export type Inbox = {
   readonly recipient: string;
   readonly sender: string;
   readonly apiUrl: URL;
-  /** Answers a signing key's TXT record: the runner's own DNS, unless a test answers it. */
   readonly keyLookup?: DNSResolver;
-  /** Counted from the call to `codeSent`. */
   readonly deadlineMs?: number;
   readonly pollIntervalMs?: number;
   readonly lookupTimeoutMs?: number;
@@ -45,7 +42,6 @@ export type InboxAnswer =
 export type Noted =
   | {
       readonly answer: "noted";
-      /** Ask again after a refused code: one rotated since reads as ambiguous, not as a failure. */
       readonly codeSent: () => Promise<InboxAnswer>;
     }
   | { readonly answer: "unreachable" };
@@ -61,7 +57,6 @@ const PROBED = z.object({ probed: z.literal(true) });
 const KEY = z.string().min(1);
 
 const inboxKey = (): string | undefined => {
-  // Read here alone, so no caller ever holds the key to print it.
   const parsed = KEY.safeParse(process.env["JOURNEYS_INBOX_KEY"]);
   return parsed.success ? parsed.data : undefined;
 };
@@ -76,7 +71,6 @@ const fetched = async <T>(
     const response = await fetch(url, {
       method,
       headers: { authorization: `Bearer ${key}`, "user-agent": USER_AGENT },
-      // Following one would carry the key wherever it points.
       redirect: "error",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
@@ -87,7 +81,6 @@ const fetched = async <T>(
     const parsed = schema.safeParse(await response.json());
     return parsed.success ? parsed.data : undefined;
   } catch {
-    // A refused connection, a redirect, a timeout and a body that is not JSON all mean no answer.
     return undefined;
   }
 };
@@ -129,10 +122,6 @@ const bounded =
 const runnersDns: DNSResolver = (name) =>
   new Resolver({ timeout: LOOKUP_TIMEOUT_MS, tries: 1 }).resolveTxt(name);
 
-/**
- * Only the sender's domain vouches, and the verifier asks for each signature's key in turn, so a
- * forger's many domains would otherwise outlast the sign-in.
- */
 const sendersOwn =
   (lookup: DNSResolver, senderDomain: string): DNSResolver =>
   (name, rrtype) =>
@@ -149,7 +138,6 @@ type Watch = {
   readonly keyLookup: DNSResolver;
 };
 
-/** The inbox lists newest first, so everything from the first noted message on was there before. */
 const arrivalsAfter = async (
   watch: Watch,
   after: string | undefined,
@@ -171,12 +159,10 @@ const isCandidate = (watch: Watch, listed: TestInboxListed): boolean =>
   addressOf(listed.from) === watch.sender &&
   listed.to.some((to) => addressOf(to) === watch.recipient);
 
-/** A message the sender's own signature vouches for, with the text part its code is read from. */
 type Vouched = { readonly messageId: string; readonly text: string };
 
 const SET_ASIDE = "set aside";
 
-/** Judged once; a message whose key could not be looked up is not judged yet. */
 type Verdict = Vouched | typeof SET_ASIDE;
 
 const LOOK_AGAIN = "look again";
@@ -184,10 +170,6 @@ const LOOK_AGAIN = "look again";
 const signedFields = (result: DKIMResult): readonly string[] =>
   (result.signingHeaders?.keys ?? "").split(":").map((field) => field.trim().toLowerCase());
 
-/**
- * Over the whole body, since content appended past an `l=` would pass. The verifier already fails
- * a signature leaving From unsigned.
- */
 const vouches = (result: DKIMResult, domain: string): boolean =>
   result.status.result === "pass" &&
   result.signingDomain?.toLowerCase() === domain &&
@@ -197,18 +179,15 @@ const vouches = (result: DKIMResult, domain: string): boolean =>
 const fieldCount = (verified: DKIMVerifyResult, name: string): number =>
   verified.headers?.parsed.filter(({ key }) => key === name).length ?? 0;
 
-/** A From or To added above the signed one leaves the signature passing. */
 const singlyAddressed = (verified: DKIMVerifyResult): boolean =>
   fieldCount(verified, "from") === 1 && fieldCount(verified, "to") === 1;
 
-/** A lookup that failed says nothing of the message; one that found no key does. */
 const keyUnread = (verified: DKIMVerifyResult, domain: string): boolean =>
   verified.results.some(
     (result) =>
       result.signingDomain?.toLowerCase() === domain && result.status.result === "temperror",
   );
 
-/** The text part alone, so an email that lost it reads as carrying no code. */
 const PARSING = { skipHtmlToText: true, skipTextToHtml: true, skipImageLinks: true } as const;
 
 const addressesIn = (to: ParsedMail["to"]): readonly string[] =>
@@ -218,7 +197,6 @@ const addressesIn = (to: ParsedMail["to"]): readonly string[] =>
     .flatMap((mailbox) => mailbox.group ?? [mailbox])
     .map(({ address }) => (address ?? "").toLowerCase());
 
-/** A genuine email to someone else, re-sent to the person, names them nowhere it was signed. */
 const readOf = async (watch: Watch, raw: Buffer, id: string): Promise<Verdict> => {
   const mail = await simpleParser(raw, PARSING);
   if (!addressesIn(mail.to).includes(watch.recipient)) return SET_ASIDE;
@@ -236,14 +214,12 @@ const judged = async (
     if (vouched && singlyAddressed(verified)) return await readOf(watch, raw, id);
     return keyUnread(verified, watch.senderDomain) ? LOOK_AGAIN : SET_ASIDE;
   } catch {
-    // Bytes the verifier or the parser cannot read vouch for nothing, and must not end the wait.
     return SET_ASIDE;
   }
 };
 
 type Verdicts = ReadonlyMap<string, Verdict>;
 
-/** The first unjudged candidate even past the deadline, so the last poll still reads what it lists. */
 const withVerdicts = async (
   watch: Watch,
   verdicts: Verdicts,
@@ -263,7 +239,6 @@ const withVerdicts = async (
 
 const isVouched = (verdict: Verdict | undefined): verdict is Vouched => typeof verdict === "object";
 
-/** Copies of one email share its Message-ID, so only a second Message-ID is a second email. */
 const answerOf = (vouched: readonly Vouched[]): InboxAnswer | undefined => {
   const emails = new Map(vouched.map(({ messageId, text }) => [messageId, text]));
   if (emails.size > 1) return AMBIGUOUS;
@@ -274,9 +249,7 @@ const answerOf = (vouched: readonly Vouched[]): InboxAnswer | undefined => {
 };
 
 type Poll = {
-  /** Undefined while no email the sender vouches for has arrived for the person. */
   readonly answer: InboxAnswer | undefined;
-  /** Kept for the re-ask, so an email vouched for once is never judged again. */
   readonly verdicts: Verdicts;
   readonly arrived: boolean;
 };
@@ -317,10 +290,6 @@ const watchOf = (inbox: Inbox, client: Client, page: TestInboxPage): Watch => {
   };
 };
 
-/**
- * Notes the inbox before Send. An inbox fault answers rather than throws, and no answer holds the
- * key or an address.
- */
 export const noteInbox = async (inbox: Inbox): Promise<Noted> => {
   const key = inboxKey();
   if (key === undefined) return UNREACHABLE;
@@ -338,13 +307,11 @@ export const noteInbox = async (inbox: Inbox): Promise<Noted> => {
     codeSent: async () => {
       const poll = await codeWithin(watch, verdicts, timing);
       verdicts = poll.verdicts;
-      // Only emails nobody vouched for, or whose key could not be looked up, ever arrived.
       return poll.answer ?? (poll.arrived ? UNVERIFIED : NO_MAIL);
     },
   };
 };
 
-/** Before any Send, so a store that cannot write stops the run rather than reading as no mail. */
 export const probeInbox = async (apiUrl: URL): Promise<boolean> => {
   const key = inboxKey();
   if (key === undefined) return false;

@@ -6,7 +6,6 @@ import { useTRPC, type ApiError } from "@/shared/api/trpc.ts";
 
 export type WaitingRequest = inferOutput<ReturnType<typeof useTRPC>["members"]["requests"]>[number];
 
-/** A requester who has given no display name yet is named by their address. */
 export const requesterName = (request: WaitingRequest): string =>
   request.requester.name === "" ? request.requester.email : request.requester.name;
 
@@ -15,7 +14,6 @@ export const useRequests = () => {
   return useQuery(api.members.requests.queryOptions());
 };
 
-/** A decision reads as done within a tenth of a second: the row leaves before the api answers. */
 const useLeavesAtOnce = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -42,7 +40,6 @@ const useLeavesAtOnce = () => {
   };
 };
 
-/** An approval mints an invitation, so the invitations are read again with the requests. */
 export const useApproveRequest = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

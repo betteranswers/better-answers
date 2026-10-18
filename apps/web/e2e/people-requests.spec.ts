@@ -37,17 +37,13 @@ const NAMES_AN_ORGANISATION = /organi[sz]ation/i;
 
 const requestsRegion = (page: Page) => page.getByRole("region", { name: "Requests" });
 
-/** The region's outcome line: its count is a status too, and stands before it. */
 const saidIn = (page: Page): Locator => requestsRegion(page).getByRole("status").last();
 
-/** An empty list is the empty state's title, where a list of requests draws a table. */
 const emptyLine = (page: Page): Locator =>
   requestsRegion(page).locator("[data-slot='empty-title']");
 
-/** The output in the row under the Requests region's heading: the count of requests. */
 const THE_COUNT = "//section[h2='Requests']/div/output";
 
-/** The header row is a row too, so the requests are the rows with a cell. */
 const requestRows = (page: Page): Locator =>
   requestsRegion(page)
     .getByRole("row")
@@ -64,7 +60,6 @@ const asks =
   (url: URL): boolean =>
     url.pathname.replace("/trpc/", "").split(",").includes(procedure);
 
-/** A refusal that leaves the request waiting on the api, unlike one that says it was decided. */
 const DECLINE_FORBIDDEN = {
   error: {
     message: "role-forbids",
@@ -77,7 +72,6 @@ const DECLINE_FORBIDDEN = {
   },
 };
 
-/** A route answered only once the returned call is made, so what the page does meanwhile is seen. */
 const heldUntilReleased = async (
   page: Page,
   procedure: string,
@@ -94,17 +88,14 @@ const heldUntilReleased = async (
   return release;
 };
 
-/** The decline, refused once released, so the row's leaving is seen before the api's answer lands. */
 const refusingTheDeclineOnRelease = (page: Page) =>
   heldUntilReleased(page, "members.declineRequest", (route) =>
     route.fulfill({ json: [DECLINE_FORBIDDEN] }),
   );
 
-/** The read, answered once released: only the undo restores a row meanwhile, and the act settles on it. */
 const holdingTheRequestsRead = (page: Page) =>
   heldUntilReleased(page, "members.requests", (route) => route.continue());
 
-/** A role select is described by its role's meaning, so a pick shows in a description that changed. */
 const describedAfresh = async (select: Locator, pick: () => Promise<void>): Promise<void> => {
   const described = await select.getAttribute("aria-describedby");
   const before = await select
@@ -119,7 +110,6 @@ const describedAfresh = async (select: Locator, pick: () => Promise<void>): Prom
   ).not.toHaveAccessibleDescription(before);
 };
 
-/** Every button whose name starts by inviting, so a second one under another name is counted. */
 const invitingButtons = (page: Page) => page.getByRole("button", { name: /^invite/i });
 
 type Asking = { readonly displayName: string; readonly reason?: string };
@@ -143,7 +133,6 @@ const asksToJoin = async (
   return { displayName: asking.displayName, email };
 };
 
-/** Asked one at a time, so the list's oldest-first order is the order given here. */
 const anAdminAtRequests = async (
   page: Page,
   api: APIRequestContext,
@@ -199,7 +188,6 @@ test.describe("the People page's Requests tab", () => {
     await expect(approving).toHaveCount(0);
     await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeFocused();
     await expect(saidIn(page)).toContainText(priya);
-    // The empty state draws as a row, so the request's own row is the one counted.
     await expect(rowOf(page, "Priya Shah")).toHaveCount(0);
     await expect(emptyLine(page)).toHaveText(/\S/);
 
@@ -218,7 +206,6 @@ test.describe("the People page's Requests tab", () => {
       { displayName: "Ola Nowak" },
     ]);
 
-    // A fresh document, so no list is already in the page's cache.
     const startedAtMs = Date.now();
     await page.goto(MEMBERS_PAGE);
     await openRequests(page);
@@ -331,7 +318,6 @@ test.describe("the People page's Requests tab", () => {
     await theActionLandedWithinItsBudget(page, "decline");
     const landed = requestsRegion(page).getByRole("heading", { name: "Requests" });
     await expect(landed).toBeFocused();
-    // The tab names the list, so focus on its hidden heading rings the count line.
     await expect(
       countOf(requestsRegion(page)).locator(".."),
       "focus landed out of sight",

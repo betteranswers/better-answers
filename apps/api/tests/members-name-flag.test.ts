@@ -8,15 +8,12 @@ import { refusalOfCall, webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
 
-/** What the relay took; the harness's own list keeps a refused message too. */
 const delivered: EmailMessage[] = [];
 
-/** In address order, as the relay's messages are sorted before they are compared. */
 let operators: readonly [string, string];
 
 let formerOperator: string;
 
-/** While set, the transport refuses mail to it, as an SMTP relay refusing that address would. */
 let relayRefuses: string | undefined;
 
 beforeAll(async () => {
@@ -71,7 +68,6 @@ const raisedFor = async (personId: string) =>
     )
   ).rows;
 
-/** Every email about the person the relay took, whoever it went to. */
 const toldTheOperatorOf = (personId: string) =>
   delivered.filter((message) => message.text.includes(personId));
 
@@ -85,7 +81,6 @@ const whatLanded = async (workspaceId: string, personId: string) => ({
 
 const NOTHING_LANDED = { flagged: [], raised: [], told: [] };
 
-/** A member of the workspace at `role`, on the web's own tRPC client. */
 const signedInAs = async (workspaceId: string, role: "Editor" | "Viewer") => {
   const member = await app.person();
   await app.addMember(workspaceId, member.id, role);

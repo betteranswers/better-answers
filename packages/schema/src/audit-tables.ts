@@ -13,7 +13,6 @@ export const ACTION = new RegExp(ACTION_PATTERN);
 
 const familyList = listed(FAMILIES);
 
-/** Both audit logs name an action the same way and carry the same row after the key. */
 const auditLogColumns = () => ({
   action: text("action").notNull(),
 
@@ -61,9 +60,6 @@ export const auditEvent = withRLS(
   ],
 );
 
-/**
- * An action on the identity set belongs to no workspace, so no workspace's scope can hold its row.
- */
 export const identityAuditEvent = pgTable(
   "identity_audit_event",
   {

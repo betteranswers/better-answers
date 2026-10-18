@@ -46,7 +46,6 @@ const tool = z.object({
   name: z.string(),
   description: z.string().optional(),
   annotations: z.looseObject({ readOnlyHint: z.boolean().optional() }).optional(),
-  /** Loose, because one case reads the whole schema as text for a header it must not carry. */
   inputSchema: z.looseObject({ properties: z.record(z.string(), z.unknown()).optional() }),
   outputSchema: z.looseObject({}).optional(),
 });
@@ -91,7 +90,6 @@ const ENVELOPE = {
   "io.modelcontextprotocol/clientInfo": { name: "Anthropic/ClaudeAI", version: "1.0.0" },
 };
 
-/** An override of "" leaves the header off the request. */
 const withoutEmpty = (headers: Record<string, string>): Record<string, string> =>
   Object.fromEntries(Object.entries(headers).filter(([, value]) => value !== ""));
 
@@ -161,7 +159,6 @@ const connect = async (scope = "knowledge:read feedback:write offline_access") =
   return { workspace, client, token: tokens.accessToken };
 };
 
-/** Sends `max` the ceiling lets through, then one past it, the clock stopped while it counts. */
 const pastTheCeiling = async (max: number, send: () => Promise<Response>) => {
   stopTheClock();
   const letThrough: number[] = [];
@@ -201,10 +198,8 @@ const REFUSED_AT_THE_CEILING = {
  */
 const RESULT_CHARACTERS_CHECKED_UNDER = 50_000;
 
-/** A passage is split near 1,200 bytes and may run past it. */
 const PASSAGE_CHARACTERS = 2_000;
 
-/** The seed ends a body with a newline, and a link line where the concept links. */
 const NEAR_THE_BODY_CAP = CONCEPT_BODY_MAX - 1_000;
 
 const aSizedBodyOf = (sentence: string, characters: number): string =>
@@ -234,7 +229,6 @@ const theMapCounted = async (): Promise<void> => {
   await app().database.superuser.query("ANALYZE map_node, map_edge");
 };
 
-/** `groups` is the predicate each record says applied. */
 const recordsKeptIn = async (workspaceId: string) => {
   const kept = await app().database.superuser.query<{
     id: string;
@@ -259,7 +253,6 @@ const AN_OPEN_RECORD = {
   completed: false,
 };
 
-/** A Viewer's own token, for a test that turns on what the asker's groups let them read. */
 const connectAViewer = async () => {
   const workspace = await app().provision();
   const viewer = await app().person();
@@ -271,7 +264,6 @@ const connectAViewer = async () => {
   return { workspace, viewer, client, token: tokens.accessToken };
 };
 
-/** What `ask` says where it answers an error: whether it did, its text, and no structured content. */
 const theErrorAskAnswers = async (client: TestClient, token: string) => {
   const called = await result(
     await callTool(client, token, "ask", { question: RETENTION_QUESTION }),
@@ -799,8 +791,6 @@ describe("ask, on the own-transaction road", () => {
     expect(refused).toEqual([true, "Refused: not-a-member (unauthenticated).", undefined]);
   });
 
-  // An erasure sweeps the asker's records once it has deleted their member row, and trusts
-  // that delete to have waited for each of these writes.
   it.each([
     ["opens its record", "INSERT", false],
     ["completes its record", "UPDATE", true],
@@ -876,7 +866,6 @@ describe("ask, on the own-transaction road", () => {
 
   it("returns an `Answer` at the body cap word for word", async () => {
     const { workspace, client, token } = await connect();
-    // The seed ends it with a newline, which brings it to the cap.
     const body = aSizedBodyOf("Audit logs are kept for thirteen months. ", CONCEPT_BODY_MAX - 1);
     await seedConcepts(
       app(),

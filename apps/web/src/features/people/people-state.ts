@@ -1,7 +1,6 @@
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 import { INVITE_A_PERSON } from "@/shared/navigation.ts";
 
-/** Said when a row's keystroke is pressed and no row has held focus, naming the row to pick. */
 export const PEOPLE_SELECT_FIRST = {
   member: "Please select a member first.",
   group: "Please select a group first.",
@@ -41,13 +40,8 @@ export const PEOPLE_KEYSTROKES = {
   decline: { key: "d", action: "Decline the Request in Focus" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
-/** Shifted, so an action on the selection never shares a key with the action on the row in focus. */
 export const shortcutOf = (keystroke: Keystroke): string => `Shift+${keystroke.key}`;
 
-/**
- * Members' own letters, so a reader who opened the page by one finds each action under it again, and
- * the Audit log's for older events.
- */
 export const MEMBER_PAGE_KEYSTROKES = {
   changeRole: { key: "c", action: "Change This Member’s Role" },
   changeGroups: { key: "g", action: "Change This Member’s Groups" },

@@ -4,8 +4,10 @@ import { actionAdmitsBeforeAwaitRule } from "./rules/action-admits-before-await.
 import { commentOnlyTheWhyRule } from "./rules/comment-only-the-why.ts";
 import { declarationDocBlockRule } from "./rules/declaration-doc-block.ts";
 import { importDirectionRule } from "./rules/import-direction.ts";
+import { importStaticallyRule } from "./rules/import-statically.ts";
 import { mcpEntryAnnotationsRule } from "./rules/mcp-entry-annotations.ts";
 import { mcpEntryNoWorkspaceArgumentRule } from "./rules/mcp-entry-no-workspace-argument.ts";
+import { parameterNeverMutatedRule } from "./rules/parameter-never-mutated.ts";
 import { stringCitesNothingRule } from "./rules/string-cites-nothing.ts";
 
 const betterAnswersPlugin = eslintCompatPlugin({
@@ -15,8 +17,10 @@ const betterAnswersPlugin = eslintCompatPlugin({
     "comment-only-the-why": commentOnlyTheWhyRule,
     "declaration-doc-block": declarationDocBlockRule,
     "import-direction": importDirectionRule,
+    "import-statically": importStaticallyRule,
     "mcp-entry-annotations": mcpEntryAnnotationsRule,
     "mcp-entry-no-workspace-argument": mcpEntryNoWorkspaceArgumentRule,
+    "parameter-never-mutated": parameterNeverMutatedRule,
     "string-cites-nothing": stringCitesNothingRule,
   },
 });

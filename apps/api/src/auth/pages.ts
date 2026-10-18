@@ -15,7 +15,6 @@ const LOGO = readFileSync(
 
 const strong = (value: string): string => `<strong>${escaped(value)}</strong>`;
 
-/** The consent page's words. The page's body passes each value in escaped and marked up. */
 export const CONSENT_WORDS = {
   title: (assistant: string) => `Connect ${assistant}`,
   asYou: (assistant: string, workspace: string) => `${assistant} will act as you, at ${workspace}.`,
@@ -33,15 +32,12 @@ export const CONSENT_WORDS = {
   cancel: "Cancel",
 } as const;
 
-/** The Connect form's field naming the workspace the page was drawn for. */
 export const CONSENT_WORKSPACE_FIELD = "workspace";
 
 type RefusalWords = { readonly title: string; readonly why: string };
 
-/** A refusal whose last line says what to do. */
 type ReadNext = RefusalWords & { readonly next: string };
 
-/** A refusal whose last line is a link to sign in, labelled `signIn`. */
 type SignInNext = RefusalWords & { readonly signIn: string };
 
 const START_AGAIN = "Start the connection again from where you began it.";
@@ -79,10 +75,6 @@ export const REFUSAL_PAGES = {
   },
 } as const satisfies Record<string, ReadNext | SignInNext>;
 
-/**
- * One marked card on the grid, its marks standing for its primary button's. The head script
- * precedes the stylesheet, so the first paint is themed.
- */
 const shell = (title: string, body: string): string => `<!doctype html>
 <html lang="en-GB"><head><meta charset="utf-8"><script>${FIRST_PAINT}</script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -91,7 +83,6 @@ const shell = (title: string, body: string): string => `<!doctype html>
 <main id="page"><div data-slot="card" data-marks><div data-slot="card-header"><h1>${escaped(title)}</h1></div>
 <div data-slot="card-content">${body}</div></div></main></body></html>`;
 
-/** `query` is the signed search string, leading `?` included. Every value is escaped here. */
 export const consentPage = (
   query: string,
   params: {
@@ -101,7 +92,6 @@ export const consentPage = (
 
     readonly sendsCodeTo: string;
     readonly workspace: string;
-    /** Sent back with Connect, so a grant after a switch elsewhere is told apart. */
     readonly workspaceId: string;
     readonly scopes: readonly string[];
   },
@@ -133,6 +123,5 @@ const refusal = (words: RefusalWords, next: string): string =>
 
 export const refusedPage = (words: ReadNext): string => refusal(words, escaped(words.next));
 
-/** `query` is the signed search string, leading `?` included: sign-in carries it back here. */
 export const signInPage = (words: SignInNext, query: string): string =>
   refusal(words, `<a href="${escaped(`${SIGN_IN_PATH}${query}`)}">${escaped(words.signIn)}</a>`);

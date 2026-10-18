@@ -12,7 +12,6 @@ export function GroupsReadSaid(properties: {
   const { error, isPending } = useReadSaid(properties);
   return (
     <>
-      {/* Boxless, so the line takes none of its card's gaps while it is empty. */}
       <OutcomeLine
         outcome={error === null ? undefined : outcomeOfGroupFailure(error, "read")}
         className="contents"

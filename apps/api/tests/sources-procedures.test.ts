@@ -30,7 +30,6 @@ const store = objectStoreForSuite();
 
 const PINNED_AT = new Date("2026-09-23T09:00:00.000Z");
 
-/** The api's own pool size, so ten uploads each holding two would have found it full. */
 const UPLOADS_AT_ONCE = POSTGRES_POOL_MAX;
 
 let app: TestApp;
@@ -177,10 +176,6 @@ const refusalIn = async (response: Response) =>
 const FIRST_PART = new TextEncoder().encode("The handbook says ");
 const LAST_PART = new TextEncoder().encode("what the company decided.");
 
-/**
- * Each read of this body past its first part waits for the test, so the action can be caught
- * mid-stream.
- */
 const heldOpenBody = () => {
   const held = { asked: 0, ended: false };
   const gate = Promise.withResolvers<void>();

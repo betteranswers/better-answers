@@ -16,7 +16,6 @@ const partsOf = (rule: string): { readonly plugin: string; readonly name: string
     : { plugin: rule.slice(0, slash), name: rule.slice(slash + 1) };
 };
 
-/** Lints fixture trees under `rule` as the root config sets it, its overrides included. */
 export const ruleBaseline = (rule: string, smoke: Smoke): RuleBaseline => {
   const { plugin, name } = partsOf(rule);
   const config = readOxlintConfig();
@@ -27,7 +26,6 @@ export const ruleBaseline = (rule: string, smoke: Smoke): RuleBaseline => {
       : [{ files: override.files ?? [], rules: { [rule]: setting } }];
   });
 
-  /** Read off the root config, so a setting it loosens or an exemption it widens fails here. */
   const lint = oxlintOver(
     JSON.stringify({
       plugins: plugin === "eslint" ? undefined : [plugin],

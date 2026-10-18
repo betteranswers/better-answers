@@ -11,7 +11,6 @@ const reached = (store: (browser: Window) => Storage): Storage | undefined => {
   }
 };
 
-/** A full or refusing store throws on a write; the choice is then not kept, and the action goes on. */
 const kept = (store: Storage | undefined, key: string, value: string): void => {
   try {
     store?.setItem(key, value);
@@ -26,7 +25,6 @@ export const keepOnThisBrowser = (key: string, value: string): void => {
   kept(onThisBrowser(), key, value);
 };
 
-/** Kept by this tab alone, through a reload. */
 export const inThisTab = (): Storage | undefined => reached((browser) => browser.sessionStorage);
 
 export const keepInThisTab = (key: string, value: string): void => {

@@ -4,20 +4,16 @@ import { GROUP_WORDS } from "./group-words.ts";
 import { type ListedGroup, type useRenameGroup } from "./groups-api.ts";
 import { outcomeOfGroupFailure } from "./refusal.tsx";
 
-/** The trimmed name a group form holds, or nothing when the form carried none. */
 const nameOfGroupForm = (form: HTMLFormElement): string | undefined => {
   const asked = new FormData(form).get("name");
   return typeof asked === "string" ? asked.trim() : undefined;
 };
 
-/** Sends what a rename form holds; a name the group already has is said, never sent. */
 export const submitRename = (properties: {
   readonly group: ListedGroup;
   readonly form: HTMLFormElement;
   readonly renameGroup: ReturnType<typeof useRenameGroup>;
-  /** Hears each outcome that leaves the form where it is. */
   readonly say: (outcome: Outcome) => void;
-  /** Hears a rename that went, in `say`'s place, where the form closes on it. */
   readonly sent?: ((outcome: Outcome) => void) | undefined;
 }): void => {
   const { group } = properties;

@@ -30,17 +30,14 @@ afterEach(() => {
 
 const main = () => screen.getByRole("main");
 
-/** Each number the alerts name, which for a wait is its whole minutes. */
 const numbersSaid = (): readonly string[] => alertsSaying().join(" ").match(/\d+/g) ?? [];
 
-/** Every control a keyboard meets on the page, in document order. */
 const controls = (): readonly Element[] => [...main().querySelectorAll("a, button, input")];
 
 const CONFIRMED = { ...BOTH_HELD, thisSession: sessionStanding("confirmed", { confirmed: true }) };
 
 const GRANTED = { ...BOTH_HELD, thisSession: sessionStanding("setup", { setupGranted: true }) };
 
-/** The api confirms by passkey, and after it each read says the session is confirmed. */
 const confirmingByPasskey = (refusedCode: () => Promise<Response>) => {
   let confirmed = false;
   const asked = adasApi(

@@ -39,10 +39,6 @@ const connectedSourcesHolding = async (
   return found.rows.map((row) => CONNECTED_SOURCE_ID.parse(row.connected_source_id));
 };
 
-/**
- * A transaction per connected source: a refusal takes back that connected source's wipe alone, and a rerun repeats
- * the rest harmlessly.
- */
 const wipe = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -55,10 +51,6 @@ const wipe = async (
   if (!wiped.ok) throw normalizeError(wiped.error);
 };
 
-/**
- * Queues the full rebuild only for a request not yet completed; `rebuildJobId` is null otherwise.
- * Throws when a connected source's wipe or the rebuild is refused.
- */
 export const rederiveAfterErasure = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -72,7 +64,6 @@ export const rederiveAfterErasure = async (
     connectedSourcesHolding(tx, input.workspaceId, documentsTheMapFound(input.map)),
   );
 
-  // A replay wipes too, since a restore from an older dump brings the passage rows back.
   for (const connectedSourceId of connectedSourcesToReprocess) {
     await wipe(platform, door, input.workspaceId, connectedSourceId);
   }

@@ -41,7 +41,6 @@ import type { MemberRefusal } from "./vocabulary.ts";
 
 const AUDIT_LOG_PAGE = 50;
 
-/** People's names and addresses, group names, or an action's words; never stored, never logged. */
 const auditSearch = z.string().trim().max(100);
 
 export const readAuditLogInput = z.object({
@@ -62,13 +61,8 @@ const readAuditLogAction = declareAction({
 
 export type ReadAuditLogRefusal = MemberRefusal<RefusalOf<typeof readAuditLogAction>> | Error;
 
-/** A thing an event names that has a name of its own; one since removed is said by its kind. */
 type ThingKind = "connected-source" | "document" | "concept";
 
-/**
- * The kind, not the words, as an actor's is. Only erasure deletes an invitation, so an invitation
- * no row holds was erased.
- */
 export type AuditEventSubject =
   | Extract<AuditEventActor, { kind: "person" | "former-member" }>
   | { readonly kind: "group"; readonly name: string }
@@ -82,13 +76,10 @@ export type ReadAuditEvent = Pick<
   AuditEventRow,
   "id" | "action" | "family" | "subjectKind" | "subjectId" | "actor"
 > & {
-  /** An ISO instant, which is what a `Date` becomes on the wire anyway. */
   readonly at: string;
   readonly by: AuditEventActor;
-  /** Null for a subject with no name of its own, such as a suggestion or a request. */
   readonly subject: AuditEventSubject | null;
   readonly detail: NonNullable<AuditEventRow["detail"]>;
-  /** Each detail key holding the id of something named, or a list of them, as it stands now. */
   readonly named: Readonly<Record<string, AuditEventSubject | readonly AuditEventSubject[]>>;
 };
 
@@ -97,19 +88,13 @@ export type AuditLogPage = Omit<AuditEventPage, "rows"> & {
 };
 
 export type SearchedAuditLogPage = AuditLogPage & {
-  /** The search named more than 100 people or groups, and only the first 100 were read. */
   readonly searchTooBroad: boolean;
 };
 
 type NamedKind = "person" | "group" | "invitation" | ThingKind;
 
-/** The subject kinds a person's id stands under. */
 export const PERSON_SUBJECT_KINDS = ["member", "person"] as const;
 
-/**
- * The only places a person's id is read beyond the actor. An invitation names an address, so it
- * reaches its inviter alone.
- */
 export const PERSON_NAMED_IN = [
   {
     key: "userId",
@@ -128,16 +113,13 @@ export const PERSON_NAMED_IN = [
   },
 ] as const satisfies readonly DetailNaming[];
 
-/** What a search names inside the workspace; each list is empty when nothing of its kind matched. */
 type Found = {
   readonly people: readonly UserId[];
   readonly groups: readonly string[];
   readonly actions: readonly string[];
-  /** More people or groups matched than are read, so the events of the rest are left out. */
   readonly tooBroad: boolean;
 };
 
-/** The events naming any of the people or groups, or taking any of the actions. */
 export const soughtFor = (found: Omit<Found, "tooBroad">): EventsSought => ({
   people: found.people,
   subjects: [
@@ -148,17 +130,11 @@ export const soughtFor = (found: Omit<Found, "tooBroad">): EventsSought => ({
   detail: PERSON_NAMED_IN,
 });
 
-/** Enough for any search a person types; one row past it says the search named more. */
 const IDS_SOUGHT = 100;
 
-/** A subject and verb, as `member.role_changed` reads "member role changed". */
 const wordsOfAction = (name: string): string =>
   name.split(".").slice(1).join(" ").replaceAll("_", " ");
 
-/**
- * The stored register, since the declarations hold only the slices this process imported. The
- * page's words find an action, and so do its stored name's.
- */
 const actionsWorded = (search: string): readonly string[] => {
   const words = search.toLowerCase().split(/\s+/).join(" ");
   return STORED_ACT_NAMES.filter(
@@ -167,7 +143,6 @@ const actionsWorded = (search: string): readonly string[] => {
   );
 };
 
-/** An event of the workspace in `$scope` naming the person `u` in its detail, as the read finds them. */
 const namedInDetail = (scope: number, bind: Bind): string =>
   PERSON_NAMED_IN.map(
     ({ key, subjectKinds, actions }) =>
@@ -178,7 +153,6 @@ const namedInDetail = (scope: number, bind: Bind): string =>
                      AND e.detail ->> $${bind(key)}::text = u.id)`,
   ).join("\n");
 
-/** Members and people its events name: a former member is found, an outsider never. */
 const peopleNamed = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -216,7 +190,6 @@ const groupsNamed = async (
   return found.rows.map((row) => row.id);
 };
 
-/** The people, groups and actions a search names, each read inside the principal's workspace. */
 const foundBy = async (principal: UserPrincipal, tx: Tx, search: string): Promise<Found> => {
   const pattern = containing(search);
   const people = await peopleNamed(principal, tx, pattern);
@@ -229,7 +202,6 @@ const foundBy = async (principal: UserPrincipal, tx: Tx, search: string): Promis
   };
 };
 
-/** Newest first, narrowed to the search's events, and what it found, when there is a search. */
 export const eventsAsked = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -253,7 +225,6 @@ const NAMED_KINDS: ReadonlyMap<string, NamedKind> = new Map([
   ["concept", "concept"],
 ]);
 
-/** Stored detail keys holding an id, by what the id names. */
 const DETAIL_NAMED_KINDS: ReadonlyMap<string, NamedKind> = new Map([
   [STORED_DETAIL_KEYS.userId, "person"],
   [STORED_DETAIL_KEYS.requesterId, "person"],
@@ -270,7 +241,6 @@ type Names = ReadonlyMap<string, string>;
 
 type ThingNames = Readonly<Record<Exclude<NamedKind, "person">, Names>>;
 
-/** The invitation table has no row-level security, so the workspace is named here or nowhere. */
 const NAMES_IN = {
   group: 'SELECT id, name FROM "group" WHERE workspace_id = $1 AND id = ANY($2::text[])',
   invitation:
@@ -299,10 +269,8 @@ const detailIds = (row: AuditEventRow): readonly DetailId[] =>
     return kind === undefined || typeof value !== "string" ? [] : [[key, kind, value]];
   });
 
-/** A row with its detail's ids read once, since every kind's lookup asks for them. */
 type Scanned = { readonly row: AuditEventRow; readonly ids: readonly DetailId[] };
 
-/** The ids of one kind the rows name, as subject or in detail. */
 const idsNamedAs = (scanned: readonly Scanned[], kind: NamedKind): readonly string[] => [
   ...new Set(
     scanned.flatMap(({ row, ids }) => [
@@ -387,10 +355,6 @@ const thingNames = async (
   };
 };
 
-/**
- * Each event of the principal's workspace with its actor, subject, detail ids and ended grants
- * named as they stand now, reading each table once for all the rows.
- */
 export const eventsNamed = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -410,8 +374,8 @@ export const eventsNamed = async (
 };
 
 /**
- * The workspace's own audit log, newest first; the identity-set audit log is never read. A grant
- * an action ended is named from its assistant and workspace as they stand now.
+ * The workspace's own audit log, newest first. A grant an action ended is named from its assistant
+ * and workspace as they stand now.
  */
 export const readAuditLog = async (
   principal: UserPrincipal,

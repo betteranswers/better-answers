@@ -10,7 +10,6 @@ export type Logged = (event: string, detail: Readonly<Record<string, string | nu
 
 type ReadApi = {
   readonly store: Store;
-  /** Undefined while the secret is unset or too short to trust. */
   readonly token: string | undefined;
   readonly nowMs: number;
   readonly logged: Logged;
@@ -52,7 +51,6 @@ const unavailable = (api: ReadApi, error: string): Response => {
 const digestOf = async (text: string): Promise<Uint8Array> =>
   new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
 
-/** Compares digests, so a token of any length takes the same time and reveals nothing of it. */
 const admits = async (authorization: string | null, token: string): Promise<boolean> => {
   const offered = BEARER.exec(authorization ?? "")?.[1];
   if (offered === undefined) return false;
@@ -115,7 +113,6 @@ type Route = {
   readonly answer: (api: ReadApi, url: URL) => Promise<Response>;
 };
 
-/** Matches the id as the path carries it, so a malformed escape is an unknown id, not a throw. */
 const routeOf = (pathname: string): Route | undefined => {
   if (pathname === RECEIVING) return { allowed: "GET", answer: listed };
   if (pathname === PROBE_PATH) return { allowed: "POST", answer: probed };
@@ -123,7 +120,6 @@ const routeOf = (pathname: string): Route | undefined => {
   return id === undefined ? undefined : { allowed: "GET", answer: (api) => retrieved(api, id) };
 };
 
-/** Answers JSON on every path, never a redirect or a page, and reads nothing for a refused one. */
 export const answer = async (request: Request, api: ReadApi): Promise<Response> => {
   if (api.token === undefined) return refused(503, "not_configured");
   if (!(await admits(request.headers.get("authorization"), api.token))) {

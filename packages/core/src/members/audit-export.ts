@@ -41,12 +41,10 @@ const EXPORT_ACTIONS = declareActions("platform", {
   }),
 });
 
-/** About 3 to 5 MB of text, which the browser saves as one file. */
 const EXPORT_CAP = 10_000;
 
 export const exportAuditLogInput = readAuditLogInput.pick({ family: true, search: true });
 
-/** When the action happens: a confirmation older than an hour makes the export wait on a re-confirm. */
 export type ExportAuditLogInput = z.output<typeof exportAuditLogInput> & { readonly at: Date };
 
 const exportAuditLogAction = declareAction({
@@ -63,9 +61,7 @@ export type ExportAuditLogRefusal =
 export type AuditExport = {
   readonly csv: string;
   readonly count: number;
-  /** Whether more events matched than the file holds. */
   readonly capped: boolean;
-  /** Whether the search named more people or groups than were read. */
   readonly searchTooBroad: boolean;
 };
 
@@ -98,7 +94,6 @@ const REMOVED_WORDS = {
   Record<Extract<AuditEventSubject, { kind: "removed" }>["of"], string>
 >;
 
-/** A person who has given no display name yet is named by their address. */
 const personWords = (person: { readonly displayName: string; readonly address: string }): string =>
   person.displayName === "" ? person.address : person.displayName;
 
@@ -137,7 +132,6 @@ const STOPPED = `The export stopped at ${EXPORT_CAP.toLocaleString("en-GB")} eve
 const TOO_BROAD =
   "The search named more than 100 people or groups. Only the first 100 were read; narrow it for the rest.";
 
-/** A file read short says so in its own last lines, so a copy passed on still says it. */
 const csvOf = (read: Read): string =>
   [
     HEADER,
@@ -148,7 +142,6 @@ const csvOf = (read: Read): string =>
     .map((cells) => `${lineOf(cells)}\r\n`)
     .join("");
 
-/** Built a field at a time, as the family is stored only when the export was narrowed to one. */
 type ExportedDetail = {
   -readonly [Key in keyof DetailOf<typeof EXPORT_ACTIONS.exported.detail>]: DetailOf<
     typeof EXPORT_ACTIONS.exported.detail

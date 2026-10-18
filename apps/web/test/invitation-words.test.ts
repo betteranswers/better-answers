@@ -28,10 +28,8 @@ const invited = (address: string, sent: Partial<InvitedOne> = {}): InvitedOne =>
   ...sent,
 });
 
-/** A count's line with its number taken out: what is left is the form the number chose. */
 const formOf = (said: string): string => said.replaceAll(/\d+/g, "");
 
-/** Each count a line shows, in order. A count of none may be a word, so no zero is read. */
 const countsIn = (said: string): readonly string[] => said.match(/\b[1-9]\d*\b/g) ?? [];
 
 describe("an invite's outcome", () => {

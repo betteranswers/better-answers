@@ -26,10 +26,6 @@ import {
 
 import { ulid } from "../src/kernel/index.ts";
 
-/**
- * Hardcoded on purpose, never read from a shared constant: that is what fails a tier not yet
- * taught a contract change.
- */
 const SPOKEN_AGREEMENTS = {
   citation: "fixtured",
   "concept-file": "fixtured",
@@ -235,10 +231,6 @@ describe("the tier contract", () => {
   });
 });
 
-/**
- * Each hex below is worked out of band from the framing, never by calling this tier's own
- * reading a second time.
- */
 const DIGEST_CASES = [
   { why: "the manifest alone", tree: { "manifest.json": "{}" } },
   { why: "a nested directory", tree: { "manifest.json": "{}", "deep/under/cases.json": "[1]" } },

@@ -1,13 +1,13 @@
-import { parseSync, type Program } from "oxc-parser";
+import { type Comment, parseSync, type Program } from "oxc-parser";
 
 export type ParsedSource = {
   readonly program: Program;
 
-  /** Counts from 1. */
+  readonly comments: readonly Comment[];
+
   readonly lineOf: (offset: number) => number;
 };
 
-/** @throws when the file does not parse, which would otherwise read as holding nothing. */
 export const parsedSource = (file: string, source: string): ParsedSource => {
   const parsed = parseSync(file, source);
   const [first] = parsed.errors;
@@ -15,6 +15,7 @@ export const parsedSource = (file: string, source: string): ParsedSource => {
   const starts = [0, ...[...source.matchAll(/\n/g)].map((match) => match.index + 1)];
   return {
     program: parsed.program,
+    comments: parsed.comments,
     lineOf: (offset) => starts.findLastIndex((start) => start <= offset) + 1,
   };
 };

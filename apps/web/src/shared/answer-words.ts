@@ -1,6 +1,5 @@
 import type { FEEDBACK_REASONS, JudgeState, QuestionVerdict } from "@better-answers/schema";
 
-/** Related knowledge is never called an answer, so its word says only what it is. */
 export const VERDICT_WORDS = {
   ok: "Answered",
   warn: "Answered with a warning",
@@ -23,7 +22,6 @@ export const REASON_WORDS = {
   "should-not-have-shown": "Should not have shown",
 } as const satisfies Readonly<Record<FlagReason, string>>;
 
-/** The order a flag's reasons are offered in; the schema's list stays out of the browser's bundle. */
 export const FLAG_REASONS = [
   "wrong",
   "out-of-date",

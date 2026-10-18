@@ -313,7 +313,6 @@ type SpansRefusal<GroupRefusal> =
   | SourceRefusal<"no-such-binding" | "no-such-finding">
   | Error;
 
-/** Every group is judged before the first read, so a refused one lands nothing beside it. */
 const spansCommanded = async <GroupRefusal extends string>(
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -366,19 +365,13 @@ const syncQueued = async (
 
 const KEPT_IN_TEXT = "kept-in-text" satisfies (typeof FINDING_REVIEW_STATES)[number];
 
-/**
- * A later keep does not revise what a dismissal said the span is; the keep has the restore
- * columns.
- */
 const KEPT_IN_TEXT_REVIEW = `UPDATE finding
         SET review_state = $3, reviewed_by = restored_by,
             reviewed_at = restored_at, review_reason = restore_reason
       WHERE workspace_id = $1 AND id = ANY($2::text[]) AND review_state <> $4`;
 
 /**
- * Restores each span the document's last redaction raised in the groups, marks those not
- * dismissed as kept in text, and queues a sync. A group outside the always tier refuses the
- * whole command.
+ * A group outside the always tier refuses the whole command.
  */
 export const keepInText = async (
   principal: UserPrincipal,
@@ -395,7 +388,6 @@ export const keepInText = async (
   const { admin, workspaceId, connectedSourceId } = acting;
 
   const named = spans.map((span) => span.id);
-  /** One audit event per span, so the batch counts spans, not the documents the answer names. */
   const batchId = batchIdFor(named.length);
   for (const findingId of named) {
     const restored = await restoreFinding(admin, tx, {
@@ -553,11 +545,6 @@ const documentsNarrowedBy = async (
   return ok({ documentIds, batchId });
 };
 
-/**
- * Sets each named document's sensitivity, marks the groups' unreviewed findings narrowed, and
- * recomputes the visibility of what those documents source. A sensitivity wider than any
- * document's effective class, the narrower of its own and its source's, refuses the whole command.
- */
 export const narrowDocuments = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -617,11 +604,6 @@ const DISMISSED_REVIEW = `UPDATE finding
         SET review_state = $3, reviewed_by = $4, reviewed_at = now(), review_reason = $5
       WHERE workspace_id = $1 AND id = ANY($2::text[])`;
 
-/**
- * Dismisses each finding the document's last redaction raised in the groups, with an audit event per
- * document, and queues a sync. A group outside the special category refuses the whole
- * command.
- */
 export const dismissAsNotSpecialCategory = async (
   principal: UserPrincipal,
   tx: Tx,

@@ -39,10 +39,6 @@ const workspaceTree = (source: string, test: string): Tree => ({
 const UNDER = workspaceTree(withRatio(1, 40), withRatio(1, 40));
 const OVER = workspaceTree(withRatio(20, 40), withRatio(1, 40));
 
-/**
- * SQL that is mostly comment, beside ten times as much TypeScript, reads under the ceiling
- * when the two share one number.
- */
 const diluting = (sql: string): Tree => ({
   [`${WORKSPACE}/package.json`]: JSON.stringify({ name: "@better-answers/probe" }),
   [`${WORKSPACE}/src/one.ts`]: withRatio(1, 400),
@@ -97,6 +93,8 @@ describe("the arm a file is measured under", () => {
   });
 });
 
+const OVER_THE_SOURCE_CEILING = `over the ${CEILING.source.toFixed(3)} ceiling`;
+
 describe("the ceiling over a throwaway tree", () => {
   it("names workspace, arm and ratio when an arm is over", () => {
     const over = overTheCeiling(measure(cloc(OVER), [WORKSPACE]));
@@ -106,7 +104,7 @@ describe("the ceiling over a throwaway tree", () => {
     expect(over[0]?.arm).toBe("source");
     expect(
       reportOf(over[0] ?? { workspace: "", arm: "source", code: 0, comment: 0, ratio: 0 }),
-    ).toContain("0.50 comment lines per code line, over the 0.10 ceiling");
+    ).toContain(`0.500 comment lines per code line, ${OVER_THE_SOURCE_CEILING}`);
   });
 
   it("stays silent over a tree under both ceilings", () => {
@@ -135,18 +133,22 @@ describe("the ceiling's wrapper, run as the root manifest runs it", () => {
     executable: WRAPPER_EXECUTABLE,
     argv: ["packages"],
     foundSomething: [1],
-    smoke: { tree: OVER, reports: (output) => output.includes("over the 0.10 ceiling") },
+    smoke: { tree: OVER, reports: (output) => output.includes(OVER_THE_SOURCE_CEILING) },
   });
 
   it("fails naming the workspace and ratio over the ceiling", () => {
-    expect(wrapper(OVER)).toContain(`${WORKSPACE} source: 0.50 comment lines per code line`);
+    expect(wrapper(OVER)).toContain(`${WORKSPACE} source: 0.500 comment lines per code line`);
   });
 
-  it("says the fix and names the rules file", () => {
+  it("says the fix", () => {
     const output = wrapper(OVER);
 
-    expect(output).toContain("over the 0.10 ceiling. A comment says only what the code cannot");
-    expect(output).toContain("so delete what it restates (the root `CODING_STANDARDS.md`).");
+    expect(output).toContain(
+      `${OVER_THE_SOURCE_CEILING}. A comment stays only for a constraint outside this repository`,
+    );
+    expect(output).toContain(
+      "Any other comment is deleted: hold its reason in a name, a type, a test, a grant or a lint, or report it open in the tracker.",
+    );
   });
 
   it("passes over a tree under both ceilings", () => {

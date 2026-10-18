@@ -75,7 +75,6 @@ const narrowerThan = (sensitivity: Sensitivity): readonly Sensitivity[] =>
 const asWideOrWiderThan = (sensitivity: Sensitivity): readonly Sensitivity[] =>
   SENSITIVITIES.slice(SENSITIVITIES.indexOf(sensitivity));
 
-/** The panel opens on a widening, so the one click it asks for is never refused as not wider. */
 const firstWidening = (connectedSource: ListedConnectedSource): SensitivityAndAudience => {
   const wider = SENSITIVITIES[SENSITIVITIES.indexOf(connectedSource.sensitivity) + 1];
   return wider === undefined
@@ -83,10 +82,6 @@ const firstWidening = (connectedSource: ListedConnectedSource): SensitivityAndAu
     : { sensitivity: wider, audience: connectedSource.audience };
 };
 
-/**
- * The panel offers no narrower sensitivity and no other groups, so a wider term is the whole
- * question.
- */
 const asksWider = (
   connectedSource: ListedConnectedSource,
   asked: SensitivityAndAudience,
@@ -96,10 +91,8 @@ const asksWider = (
 
 type Offer = {
   readonly sensitivities: (connectedSource: ListedConnectedSource) => readonly Sensitivity[];
-  /** None where the change leaves the audience alone, and the panel then draws no field for it. */
   readonly audiences: (connectedSource: ListedConnectedSource) => readonly Audience[];
   readonly opensOn: (connectedSource: ListedConnectedSource) => SensitivityAndAudience;
-  /** What the api would refuse, said before the click in its own words. */
   readonly refusedWhy: (
     connectedSource: ListedConnectedSource,
     asked: SensitivityAndAudience,
@@ -126,14 +119,9 @@ const OFFERS = {
   },
 } satisfies Record<SensitivityChange, Offer>;
 
-/**
- * A narrowing takes reach away and a widening gives it back, so both are one group in the row,
- * never a modal.
- */
 export function SensitivityPanel(properties: {
   readonly change: SensitivityChange;
   readonly connectedSource: ListedConnectedSource;
-  /** Lets the page tell a control inside the panel from the one that opened it. */
   readonly groupRef: RefObject<HTMLFieldSetElement | null>;
   /** A second action sent before the first answers would drop the first one's answer. */
   readonly pending: boolean;

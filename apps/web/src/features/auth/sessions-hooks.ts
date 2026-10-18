@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
 
-/** The person's own sessions, as the Sessions section shows them. */
 export const useSessions = () => {
   const api = useTRPC();
   return useQuery(api.person.sessions.queryOptions());
@@ -12,7 +11,6 @@ export type SessionsRead = ReturnType<typeof useSessions>;
 
 export type SessionShown = NonNullable<SessionsRead["data"]>[number];
 
-/** Awaited by each sign-out that landed; a refused one keeps its row with its alert. */
 const useRereadTheSessions = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

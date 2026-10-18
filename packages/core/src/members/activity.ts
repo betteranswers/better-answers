@@ -46,7 +46,6 @@ export type ReadActivityRefusal = MemberRefusal<RefusalOf<typeof readActivityAct
 
 type ReadEvent = AuditLogPage["events"][number];
 
-/** Whether the person took the action, it was done to them, or both, as a self-demotion is. */
 type Direction = "by" | "to" | "both";
 
 export type ActivityPage = Omit<AuditLogPage, "events"> & {
@@ -66,7 +65,6 @@ const isDoneTo = (event: ReadEvent, personId: UserId): boolean =>
       event.detail[key] === personId,
   );
 
-/** An event naming the person neither way means the read and `PERSON_NAMED_IN` have drifted. */
 const directionOf = (event: ReadEvent, personId: UserId): Direction => {
   const by = isTakenBy(event, personId);
   const to = isDoneTo(event, personId);
@@ -77,8 +75,8 @@ const directionOf = (event: ReadEvent, personId: UserId): Direction => {
 };
 
 /**
- * The events of the principal's workspace the person took or that were done to them, newest
- * first, across every time they have been a member here. The identity-set audit log is never read.
+ * The principal's workspace's events the person took or that were done to them, newest first,
+ * across every time they have been a member here.
  */
 export const readActivity = async (
   principal: UserPrincipal,

@@ -5,14 +5,8 @@ import type pg from "pg";
 import { hashOfTyped } from "../src/workspaces/index.ts";
 import { restoreCodeFor } from "./identity-rows.ts";
 
-/** How long the operator's restore code stays good. */
 const RESTORE_CODE_LIFETIME_MS = 24 * 60 * 60_000;
 
-/**
- * As a session outliving a restore meets it: marked, a hashed code, sessions and factors kept.
- * Answers the code.
- * @throws when no person holds `email`.
- */
 export const restoredWithACode = async (
   pool: pg.Pool,
   email: string,

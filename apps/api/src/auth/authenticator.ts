@@ -33,20 +33,14 @@ import {
 const REFUSALS = {
   held: { error: "authenticator-held" },
   noSetupWaiting: { error: "no-setup-waiting" },
-  /** A first setup would leave the old factors standing, so a granted session uses the replacing routes. */
   replacementSetupNeeded: { error: "replacement-setup-needed" },
 } as const;
 
 const setUpAnswer = z.object({ totpURI: z.string() });
 
-/** A name and value alone, as a `cookie` header carries each `Set-Cookie` line. */
 const cookieOf = (setCookies: readonly string[]): string =>
   setCookies.map((line) => line.split(";", 1)[0] ?? "").join("; ");
 
-/**
- * The library's first verify swaps the session, yet its answer names the old one: the stamp goes
- * to the session the new cookie holds.
- */
 export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependencies): void => {
   const { auth, door, clock } = deps;
   const fenced = personRoutesAt(routes, "/authenticator/*", deps);
@@ -56,13 +50,11 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
   const unanswered = (context: Context, reason: string): Response =>
     fenced.unanswered(context, "auth.authenticator_failed", reason);
 
-  /** Both steps check, since a setup started before a restore or a grant waits on its code unbounded. */
   const refusedAFirstSetup = (context: Context, held: SecondFactorHeld): Response | undefined => {
     if (waitsOnTheRestoreCode(held)) {
       return context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409);
     }
     if (mayReplace(held)) return context.json(REFUSALS.replacementSetupNeeded, 409);
-    // A person already holding a factor re-confirms before adding another, so no key is minted.
     return factorChangeStale(held, clock.now())
       ? context.json(PERSON_ROUTE_REFUSALS.confirmationTooOld, 412)
       : undefined;
@@ -78,7 +70,6 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
       auth.api.enableTwoFactor({ headers: context.req.raw.headers, body: { method: "totp" } }),
     );
     if (!started.ok) return unanswered(context, started.error.message);
-    // The library's own code set is dropped here: recovery codes are ours.
     return context.json({ setupAddress: setUpAnswer.parse(started.value).totpURI });
   };
 
@@ -114,8 +105,6 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
     const swapped = await sessionAfter(setCookies);
     const recorded = await record(person, swapped ?? person.session.id);
     if (recorded === undefined) return context.json(PERSON_ROUTE_REFUSALS.unanswered, 502);
-    // The browser gets the new cookie only once its session carries the old one's age; otherwise
-    // the old cookie, now void, signs it out.
     if (recorded.stamped && swapped !== undefined) {
       for (const cookie of setCookies) context.header("set-cookie", cookie, { append: true });
     }
@@ -147,12 +136,10 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
     if (held === undefined) return unanswered(context, "the second factor was not read");
     const refused = refusedAFirstSetup(context, held);
     if (refused !== undefined) return refused;
-    // Past setup the library checks a code with no count of tries, so no route may reach it.
     if (held.authenticator !== "awaiting-code") return context.json(REFUSALS.noSetupWaiting, 409);
     return verify(context, person, asked.data.code);
   };
 
-  /** Starts and codes count apart. */
   routes.post(
     AUTHENTICATOR_START_PATH,
     fenced.asThePerson("authenticator-start", AUTHENTICATOR_PERSON_RULE, "set-up-a-factor", start),

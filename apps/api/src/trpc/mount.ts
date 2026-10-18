@@ -16,7 +16,6 @@ import { appRouter } from "./router.ts";
 
 export const TRPC_ENDPOINT = "/trpc";
 
-/** Every answer is one reader's, a refusal too: a kept not-found would outlive the grant ending it. */
 const UNCACHED = "private, no-store";
 
 type TrpcRoutesDependencies = {
@@ -36,7 +35,6 @@ export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
     clock: deps.doors.clock,
   });
 
-  /** A batch's procedures share one request's headers, so they share its one judged read. */
   const readOncePerRequest = (): GatedSessionReader => {
     let read: ReturnType<GatedSessionReader> | undefined;
     return (headers) => (read ??= gated(headers));

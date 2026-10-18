@@ -20,6 +20,5 @@ const PROVIDER_WORDS = new Map([
   ["local", "The platform’s own servers"],
 ]);
 
-/** A provider the table has not met is shown as itself rather than dropped. */
 export const providerWordOf = (provider: string): string =>
   PROVIDER_WORDS.get(provider) ?? provider;

@@ -10,7 +10,6 @@ export type SaidEvent = Pick<ReadAuditEvent, "action" | "by" | "subject" | "deta
 type Subject = SaidEvent["subject"];
 
 type Slots = {
-  /** Who acted, ready to open a sentence. */
   readonly by: string;
   readonly subject: Subject;
   readonly detail: SaidEvent["detail"];
@@ -23,17 +22,14 @@ type DeclaredAction = (typeof DECLARED_ACTIONS)[number];
 
 const sentenceCase = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 
-/** `people.member.role_changed` reads "Member role changed": the action's subject, then its verb. */
 const wordsOfName = (action: string): string => {
   const [, subject = "", verb = ""] = action.split(".");
   return sentenceCase(`${subject} ${verb}`.replaceAll("_", " "));
 };
 
-/** A display name is the person's own, so only words the platform supplies take a capital. */
 const opening = (by: SaidEvent["by"]): string =>
   by.kind === "person" ? nameOrAddress(by.displayName, by.address) : sentenceCase(byWords(by));
 
-/** An action on a person's identity alone names no member, so its subject reads as a person. */
 const person = (subject: Subject | undefined): string => {
   if (subject?.kind === "person") return nameOrAddress(subject.displayName, subject.address);
   return subject?.kind === "former-member" ? GONE_WORDS["former-member"] : "a person";
@@ -47,11 +43,9 @@ const group = (subject: Subject): string =>
 const groupNow = (subject: Subject): string =>
   subject?.kind === "group" ? `the group now called ${subject.name}` : GONE_WORDS["deleted-group"];
 
-/** An invitation erasure deleted is said without the address it went to. */
 const invitation = (subject: Subject): string =>
   subject?.kind === "invitation" ? `an invitation to ${subject.address}` : "an invitation";
 
-/** Named as it stands now, or by its kind alone once it is removed. */
 const thing = (kind: Thing) => {
   const noun = THING_NOUNS[kind];
   return (subject: Subject | undefined): string => {
@@ -71,7 +65,6 @@ const role = (detail: Slots["detail"]): string => {
   return typeof held === "string" ? held : "a role";
 };
 
-/** The sessions a sign-out ended; none named reads as one, which no sign-out ends. */
 const sessionsIn = (detail: Slots["detail"]): number => {
   const held = detail["sessions"];
   return Array.isArray(held) ? held.length : 1;
@@ -203,12 +196,10 @@ const SAID: ReadonlyMap<string, Sentence> = new Map(Object.entries(SENTENCES));
 
 const HEADED: ReadonlyMap<string, string> = new Map(Object.entries(HEADLINES));
 
-/** Each action a sentence says, so a test can hold the list to the actions core declares. */
 export const ACTIONS_SAID: readonly string[] = [...SAID.keys()];
 
 export const ACTIONS_HEADED: readonly string[] = [...HEADED.keys()];
 
-/** An action the web was built before falls back to its stored name in words. */
 export const headlineOf = (action: string): string => HEADED.get(action) ?? wordsOfName(action);
 
 export const sentenceOf = (event: SaidEvent): string => {

@@ -55,18 +55,17 @@ BYTES_PER_PAGE = 3107
 
 
 def pages_of(body: bytes, media_type: str) -> int:
-    """A PDF's own page count; any other document's is its size
-    in `BYTES_PER_PAGE` pages, rounded up and at least one.
-    Raises `UnreadableError` for a PDF that cannot be read."""
+    """A PDF's own page count; other documents' size in `BYTES_PER_PAGE` pages, rounded
+    up, at least one. Raises `UnreadableError` for an unreadable PDF."""
     if media_type == PDF_MEDIA_TYPE:
         return int(_classified(body).page_count)
     return max(1, -(-len(body) // BYTES_PER_PAGE))
 
 
 def converted(body: bytes, media_type: str) -> str:
-    """A DOCX or PDF as Markdown, and Markdown or plain text as it is.
-    Raises `UnreadableError` for an unsupported type, text not in
-    UTF-8, a PDF page with no text layer, or a converter's failure."""
+    """DOCX or PDF as Markdown; Markdown and plain text unchanged. Raises
+    `UnreadableError` on unsupported types, non-UTF-8 text, PDF pages lacking text
+    layers, or converter failure."""
     converter = CONVERTERS.get(media_type)
     if converter is None:
         raise UnreadableError(

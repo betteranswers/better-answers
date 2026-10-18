@@ -8,7 +8,6 @@ import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 const OXLINT = { package: "oxlint", path: ["bin", "oxlint"] } as const;
 
-/** Spawned, not run through the runner, which reports and never rewrites; a finding left unfixed exits 1. */
 export const fixedByOxlint = (configJson: string, tree: Tree, file: string, exit = 0): string => {
   const directory = mkdtempSync(path.join(tmpdir(), "oxlint-fix-"));
   writeUnder(directory, ".oxlintrc.json", configJson);

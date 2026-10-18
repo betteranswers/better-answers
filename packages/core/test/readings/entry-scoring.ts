@@ -2,12 +2,10 @@ import type { DecisionModelCall, ModelOutcome, Probabilities } from "../../src/l
 import { percentile } from "../figures.ts";
 import { recallAt, type RecallQuestion, type Recalls } from "../recall.ts";
 
-/** A concept the entry step returned, as a decision model is asked about it. */
 export type EntryPoint = { readonly iri: string; readonly title: string; readonly body?: string };
 
 const ENTRY_ASK = "Does this approved answer answer the question in the state?";
 
-/** The question as the state, and one true-or-false question per entry point, numbered in order. */
 export const scoringCall = (
   question: string,
   entries: readonly EntryPoint[],
@@ -21,14 +19,12 @@ export const scoringCall = (
   ),
 });
 
-/** The entry points by their probability of yes, highest first; a tie keeps the entry step's order. */
 export const reranked = (entries: readonly EntryPoint[], yes: Probabilities): readonly string[] =>
   entries
     .map(({ iri }, place) => ({ iri, place, yes: yes[String(place + 1)] ?? 0 }))
     .toSorted((one, other) => other.yes - one.yes || one.place - other.place)
     .map(({ iri }) => iri);
 
-/** How the reading reaches `find`, the entry step and the decision model. */
 export type EntryScoringDoors = {
   readonly found: (question: string) => Promise<readonly string[]>;
   readonly planned: (question: string) => Promise<readonly EntryPoint[]>;
@@ -39,13 +35,11 @@ export type EntryScoring = {
   readonly byFind: Recalls;
   readonly byEntryStep: Recalls;
   readonly byDecision: Recalls;
-  /** Questions whose call failed; their entry step's own order stands in the decision's figure. */
   readonly unscored: number;
   readonly tokensIn: number;
   readonly scoreMs: { readonly median: number; readonly worst: number };
 };
 
-/** Recall at `depth` by `find`, by the entry step, and by its points as a decision model reorders them. */
 export const readEntryScoring = async (
   questions: readonly RecallQuestion[],
   landed: ReadonlyMap<string, string>,

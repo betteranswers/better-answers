@@ -25,31 +25,22 @@ import {
 } from "@better-answers/core/store/postgres";
 import type { QuestionTransport } from "@better-answers/schema";
 
-/** What `ask` calls a model through, on whichever transport asked. */
 export type ModelDoors = {
-  /** Absent where the api holds no envelope key: no model key opens, so no judge is called. */
   readonly credentials: Credentials | undefined;
   readonly models: ModelClient & StreamingClient;
 };
 
-/** What a road opens its transactions with and calls a model through; `ask` is handed none. */
 export type StepDoors = ModelDoors & {
   readonly door: PostgresDoor;
   readonly clock: Clock;
 };
 
-/** A step refuses a member who is gone, or whose groups moved since the call resolved them. */
 export type StepRefusal = PrincipalRefusal | KernelRefusal<"changed-meanwhile">;
 
-/** Both readings come sorted from the one member query, so they agree place by place or not at all. */
 const inTheSameGroups = (resolved: UserPrincipal, readBack: UserPrincipal): boolean =>
   resolved.groups.length === readBack.groups.length &&
   resolved.groups.every((group, place) => group === readBack.groups[place]);
 
-/**
- * Reads the member again through `open`, which refuses a moved role. Moved groups would read
- * under another predicate than the record keeps.
- */
 const steppedAs = async <Value, Refused>(
   open: typeof withMember,
   door: PostgresDoor,
@@ -65,7 +56,6 @@ const steppedAs = async <Value, Refused>(
   return opened.ok ? opened.value : opened;
 };
 
-/** No model key opens where the api holds no envelope key, so nothing is reserved. */
 const reservingBy =
   <Reserving>(
     reserve: (
@@ -84,10 +74,6 @@ const reservingBy =
           reserve(member, tx, credentials, reserving),
         );
 
-/**
- * Each step opens and settles its own transaction, so none is held between them. Only the read
- * lends its transaction, which opens read-only.
- */
 export const stepsFor = (
   doors: StepDoors,
   asker: UserPrincipal,
@@ -110,7 +96,6 @@ export const stepsFor = (
     ),
 });
 
-/** The drafter's steps, each a transaction of its own as `stepsFor`'s are. */
 export const draftStepsFor = (doors: StepDoors, asker: UserPrincipal): DraftSteps<StepRefusal> => {
   const { door, clock, models } = doors;
   const reserve = reservingBy(reserveDrafting, doors, asker);

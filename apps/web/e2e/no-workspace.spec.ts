@@ -23,7 +23,6 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-/** Stated, not imported: `apps/web` takes nothing from `apps/api` at runtime. */
 const INVITATIONS_READ = "/trpc/person.invitations";
 
 const INVITATIONS_READ_ROUTE = `**${INVITATIONS_READ}*`;
@@ -33,7 +32,6 @@ const landedAt = (page: Page): URL => new URL(page.url());
 const noWorkspaceHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "No Workspace Yet" });
 
-/** The page names Claude only to a person who came to connect it. */
 const claudeLine = (page: Page) => page.getByRole("main").getByText(/\bClaude\b/);
 
 const invitations = (page: Page) => page.getByRole("region", { name: "Your Invitations" });
@@ -46,11 +44,9 @@ const askRegion = (page: Page) => page.getByRole("region", { name: "Ask to Join 
 const consentHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "Connect Claude" });
 
-/** Asked for before the page loads, so an absence asserted after it is the read's answer. */
 const invitationsAnswered = (page: Page): Promise<Response> =>
   page.waitForResponse((response) => response.url().includes(INVITATIONS_READ));
 
-/** A named person and their Admin's waiting invitation to them, before either signs in. */
 const anInvitation = async (request: APIRequestContext, workspaceName: string, role: Role) => {
   const address = anAddress("priya");
   await person(request, address, { displayName: "Priya Shah" });
@@ -74,7 +70,6 @@ const lapsed = (search: string): string => {
   return `?${query.toString()}`;
 };
 
-/** Signed in from Claude's request, so the no-workspace page still carries its signed query. */
 const landedConnecting = async (
   page: Page,
   request: APIRequestContext,
@@ -278,7 +273,6 @@ test("carries Claude's request through a join to consent", async ({
   await page.getByRole("button", { name: "Join Workspace" }).click();
 
   await expect(consentHeading(page)).toBeVisible();
-  // The consent's own line names the workspace, apart from any heading or band that might.
   await expect(
     page
       .getByRole("main")

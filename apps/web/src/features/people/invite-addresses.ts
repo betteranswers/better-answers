@@ -1,20 +1,13 @@
 import { EMAIL_ADDRESS } from "@better-answers/schema/email-address";
 
-/**
- * Matches the api's cap for one send or one action on a set, which refuses any more as input it
- * cannot read.
- */
 export const MOST_AT_ONCE = 50;
 
 const SEPARATORS = /[,;\r\n]+/;
 
-/** The two words the api refuses one address of a send with, keyed by its place in the send. */
 export type Flag = "malformed" | "already-a-member";
 
-/** One address the dialog holds, by the key the api mints it under. */
 export type Held = { readonly key: string; readonly address: string };
 
-/** Trimmed and lower-cased, as the api keys an invitation, so two spellings fold into one. */
 const keyOf = (address: string): string => address.trim().toLowerCase();
 
 const addressesIn = (parts: readonly string[]): readonly string[] =>
@@ -33,7 +26,6 @@ const takenInto = (held: readonly Held[], addresses: readonly string[]): Taken =
     { held, left: [] },
   );
 
-/** What the field holds after its text moves into the list; `capped` when the cap left some behind. */
 export type Moved = {
   readonly held: readonly Held[];
   readonly field: string;
@@ -46,24 +38,20 @@ const movedOf = (taken: Taken, rest: readonly string[]): Moved => ({
   capped: taken.left.length > 0,
 });
 
-/** Every whole address moves into the list; the one still being typed stays in the field. */
 export const typedInto = (held: readonly Held[], text: string): Moved => {
   const parts = text.split(SEPARATORS);
   const typing = (parts.pop() ?? "").trimStart();
   return movedOf(takenInto(held, addressesIn(parts)), typing === "" ? [] : [typing]);
 };
 
-/** Pasted, or the field sent as it stands: every address in it moves into the list. */
 export const allInto = (held: readonly Held[], text: string): Moved =>
   movedOf(takenInto(held, addressesIn(text.split(SEPARATORS))), []);
 
 export const hasSeparator = (text: string): boolean => SEPARATORS.test(text);
 
-/** Counted as the list would hold them, two spellings of one address once. */
 export const addressesCounted = (text: string): number =>
   new Set(addressesIn(text.split(SEPARATORS)).map(keyOf)).size;
 
-/** The web's own checks first, then what the api said of the address when it last refused it. */
 export const flagOf = (
   one: Held,
   members: ReadonlySet<string>,
@@ -76,7 +64,6 @@ export const flagOf = (
 
 const isFlag = (word: string): word is Flag => word === "malformed" || word === "already-a-member";
 
-/** The api names each refused address by its place in the send, which is the list's order. */
 export const flagsFrom = (
   sent: readonly Held[],
   items: Readonly<Record<string, string>>,

@@ -25,7 +25,6 @@ const POLICY = {
   body: "Buyers access audit information through the console's audit page.",
 };
 
-/** Mounted as `serve.ts` mounts it, with the wire the TestApp's model calls reach. */
 const harness = (path: string, init?: RequestInit) =>
   new Hono().route("/", harnessControl(app(), models)).request(path, init);
 
@@ -44,7 +43,6 @@ const released = (workspaceId: string) => posted("/__harness/asking/releases", {
 
 const SENTENCE = "Buyers use the console's audit page.";
 
-/** The policy is the one concept no judge is asked about, so the drafter cites it. */
 const DRAFTING = { writes: [{ citing: POLICY.title, sentence: SENTENCE }] };
 
 const calls = z.object({ judge: z.number(), draft: z.number() });
@@ -52,7 +50,6 @@ const calls = z.object({ judge: z.number(), draft: z.number() });
 const callsTo = async (workspaceId: string) =>
   calls.parse(await (await harness(`/__harness/asking/calls?workspaceId=${workspaceId}`)).json());
 
-/** A workspace holding the two audit `Answer`s and the policy, and its Admin on the web. */
 const anAdminAsking = async () => {
   const { workspace, api } = await anAdminOnTheWeb(app());
   await seedConcepts(
@@ -70,7 +67,6 @@ type Web = Awaited<ReturnType<typeof anAdminAsking>>["api"];
 
 const kept = z.object({ drafted: z.array(z.unknown()).nullable() });
 
-/** The prose a record keeps, none while drafting goes on. */
 const draftedOn = async (recordId: string): Promise<readonly unknown[]> => {
   const found = await app().database.superuser.query(
     "SELECT drafted FROM question_content WHERE record_id = $1",
@@ -144,7 +140,6 @@ describe("the browser suite's scripted model", () => {
     for await (const event of await api.ask.question.mutate({ question: QUESTION })) {
       if (event.kind === "result") recordId = event.result.recordId;
       if (event.kind !== "sentence") continue;
-      // A part's prose is kept once its model call ends, so none is kept while the call is held.
       keptWhileHeld.push((await draftedOn(recordId)).length);
       await released(workspaceId);
     }

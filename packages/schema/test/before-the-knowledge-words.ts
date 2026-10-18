@@ -13,7 +13,6 @@ const THE_LAST_BEFORE = "0071_the-short-name";
 
 type Journal = { readonly entries: readonly { readonly idx: number; readonly tag: string }[] };
 
-/** A copy of the migrations folder whose journal stops at 0071, so `migrate` leaves 0072 pending. */
 export const migrationsFolderBefore0072 = (): string => {
   const journalPath = path.join(journalMetaFolder, "_journal.json");
   // oxlint-disable-next-line typescript/consistent-type-assertions -- the journal's own schema is in src/journal.ts; this copy only drops entries
@@ -44,10 +43,6 @@ export type SeededBefore0072 = {
   readonly decidedSuggestions: readonly string[];
 };
 
-/**
- * One row of every old stored word in `workspaceId`, as 0071 stores it, beside one control row
- * per table that 0072 must leave alone.
- */
 export const oldWordsStoredIn = async (
   client: pg.PoolClient,
   workspaceId: string,

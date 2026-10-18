@@ -170,7 +170,6 @@ const plantTree = (temp: string, name: string, ageMs = 0): void => {
 
 const treesIn = (temp: string): readonly string[] => readdirSync(path.join(temp, TREES)).sort();
 
-/** The last two end in the smoke run, which is a run like any other. */
 const runEndings: readonly { readonly ending: string; readonly run: () => void }[] = [
   {
     ending: "a finding",

@@ -58,10 +58,6 @@ const THE_BEARER = "the bearer";
 const CEILING_MESSAGE =
   "This connection has made too many calls this minute; an Admin can raise the ceiling in System.";
 
-/**
- * The bearer gate's reason stays off the wire; the word and class an agent reads are the tool's,
- * past the gate.
- */
 const refused = (): OAuthError =>
   new OAuthError(OAuthErrorCode.InvalidToken, "the bearer was refused");
 
@@ -77,10 +73,6 @@ export const doorOf = ({ readOnlyHint }: ToolAnnotations): typeof withPrincipal 
 
 type ServedEntry = Entry<z.ZodObject, z.ZodType>;
 
-/**
- * One transaction holds the first road's entry. The own-transaction road's member outlives the
- * transaction that resolved it, and each step re-judges it.
- */
 const answeredOnItsRoad = async (
   doors: StepDoors,
   entry: ServedEntry,

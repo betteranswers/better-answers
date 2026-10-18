@@ -16,7 +16,6 @@ import {
 import type { Tx } from "../store/postgres/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-/** Every action on one member names them by person id, as the list does. */
 export const memberKeyed = z.object({ personId: boundarySchemas.user.select.shape.id });
 
 const listMembersAction = declareAction({
@@ -45,10 +44,8 @@ const LISTED_ROW = z.object({
 type ListedRow = z.output<typeof LISTED_ROW>;
 
 export type ListedMember = Omit<ListedRow, "joinedAt" | "credentialsRevokedAt"> & {
-  /** An ISO instant, which is what a `Date` becomes on the wire anyway. */
   readonly joinedAt: string;
 
-  /** A credential issued before it is refused here; null where no Admin here has revoked any. */
   readonly credentialsRevokedAt: string | null;
 };
 
@@ -68,8 +65,7 @@ const MEMBERS = `SELECT u.id AS "personId", u.name AS "displayName", u.email AS 
       ORDER BY lower(u.name), lower(u.email), u.id`;
 
 /**
- * In display-name order, then by address. A member is named by their person id: the member row's
- * own key names nothing outside its table.
+ * In display-name order, then by address. A member is named by their person id.
  */
 export const listMembers = async (
   principal: UserPrincipal,
@@ -78,7 +74,6 @@ export const listMembers = async (
   const admitted = admit(listMembersAction, principal, {});
   if (!admitted.ok) return err(admitted.error);
 
-  // The parse brands the ids; a row it throws on fails the read like the query would.
   const listed = await attempt(async () =>
     z.array(LISTED_ROW).parse((await tx.query(MEMBERS, [admitted.value.workspaceId])).rows),
   );

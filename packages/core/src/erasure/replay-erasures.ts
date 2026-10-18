@@ -54,8 +54,6 @@ const erasureRequestsSince = async (
   if (!held.ok) return err(held.error);
 
   const found: ReplayableErasure[] = [];
-  // One scoped transaction per workspace: erasure_request sits under row-level security, and an
-  // unscoped read of it answers nothing.
   for (const workspaceId of held.value) {
     const read = await attempt(() =>
       withScope(platform, door, workspaceId, (tx: Tx) =>
@@ -83,7 +81,6 @@ const erasureRequestsSince = async (
   return ok(found);
 };
 
-/** Oldest completion first. A request's own row wins over its replay copy. */
 export const replayableErasures = async (
   platform: PlatformPrincipal,
   doors: Pick<ErasureDoors, "postgres" | "objects">,
@@ -189,7 +186,6 @@ const recordTheReplay = async (
   return auditEventId;
 };
 
-/** Stops at the first erasure that fails, naming it and how many were replayed before it. */
 export const replayErasures = async (
   platform: ErasurePrincipal,
   doors: ErasureDoors,

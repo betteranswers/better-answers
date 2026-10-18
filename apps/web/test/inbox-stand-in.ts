@@ -11,16 +11,11 @@ import type {
   TestInboxPage,
 } from "@better-answers/schema/test-inbox";
 
-/** One message as the test inbox keeps it. */
 export type Stored = {
   readonly id: string;
-  /** The envelope's recipients. */
   readonly to: readonly string[];
-  /** The header `From`, as sent. */
   readonly from: string;
-  /** As a retrieve answers it: base64, unless a test breaks it. */
   readonly raw: string;
-  /** Listed, but gone by the time it is retrieved, as an expired message is. */
   readonly vanished?: boolean;
 };
 
@@ -40,7 +35,6 @@ type Heard = {
 export type StandIn = {
   readonly origin: string;
   readonly heard: readonly Heard[];
-  /** Listed by id, so a test mints its ids in the order its messages arrive. */
   readonly arrive: (...arriving: readonly Stored[]) => void;
   readonly answerEverythingWith: (answer: Answer) => void;
   readonly probeAnswers: (answer: Answer) => void;
@@ -66,7 +60,6 @@ const listedOf = (one: Stored): TestInboxListed => ({
 
 const LIMIT_MOST = 100;
 
-/** As the Worker reads it: a missing or unreadable `limit` is the most a page holds. */
 const limitOf = (given: string | null): number => {
   const asked = given === null || given === "" ? Number.NaN : Math.trunc(Number(given));
   return Number.isNaN(asked) ? LIMIT_MOST : Math.min(LIMIT_MOST, Math.max(1, asked));
@@ -75,10 +68,6 @@ const limitOf = (given: string | null): number => {
 const newestFirst = (one: Stored, other: Stored): number =>
   Number(other.id > one.id) - Number(other.id < one.id);
 
-/**
- * The Worker's cursor rule: ids sort as arrivals do, so a page continues below `after` even once
- * that message is gone.
- */
 const pageOf = (inbox: readonly Stored[], query: URLSearchParams): TestInboxPage => {
   const after = query.get("after");
   const below = inbox.filter(({ id }) => after === null || id < after).toSorted(newestFirst);
@@ -106,16 +95,13 @@ const answerTo = (held: Held, heard: Heard): Answer => {
 };
 
 type Opening = {
-  /** The bearer token the stand-in admits. */
   readonly key: string;
   readonly before?: readonly Stored[];
-  /** Served over https with this certificate when given. */
   readonly tls?: Tls;
 };
 
 const closers: (() => Promise<void>)[] = [];
 
-/** A stand-in for the test inbox's read API, listing the greatest id first as the Worker does. */
 export const inboxStandIn = async ({ key, before = [], tls }: Opening): Promise<StandIn> => {
   const inbox: Stored[] = [...before];
   const heard: Heard[] = [];
@@ -157,7 +143,6 @@ export const inboxStandIn = async ({ key, before = [], tls }: Opening): Promise<
   };
 };
 
-/** Every stand-in opened since the last call, for a suite's `afterEach`. */
 export const closeEveryStandIn = (): Promise<void[]> =>
   Promise.all(closers.splice(0).map((close) => close()));
 

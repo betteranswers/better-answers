@@ -22,7 +22,6 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
-/** Two days on, so a row the store stamps with its own `now()` is long past by the pass. */
 const NOW = new Date(Date.now() + 2 * DAY_MS);
 
 const at = (fromNowMs: number): Date => new Date(NOW.getTime() + fromNowMs);

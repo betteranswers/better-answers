@@ -24,24 +24,14 @@ export type IdentitySwept = {
   readonly authenticators: number;
   readonly recoveryCodes: number;
 
-  /** The kinds of code with failures counted against the person. */
   readonly confirmFailures: number;
   readonly lastActive: number;
   readonly invitationsHere: number;
 
-  /**
-   * The delete reaches every workspace, so this count varies with records the erasing one may
-   * not read: it is the operator's, and never the report's.
-   */
   readonly invitationsEverywhere: number;
 
-  /**
-   * What the person asked or flagged after the questions step. Swept in the transaction ending
-   * the member: a failed run's rerun still finds them.
-   */
   readonly questionsSince: QuestionsSwept;
 
-  /** The commit and verification rows the person's writes landed after the actors step. */
   readonly actorsSince: ActorsSwept;
 };
 
@@ -67,10 +57,6 @@ export type ErasureSubject = {
 
   readonly personId: string | null;
 
-  /**
-   * The subject's own resolved addresses, never the identifiers an Admin typed: the deletes
-   * keyed by these reach past every fence.
-   */
   readonly emails: readonly string[];
 
   readonly pseudonym: string;
@@ -86,7 +72,6 @@ type HeldByThePerson =
   | "recovery_code"
   | "second_factor_throttle";
 
-/** Before the sessions go: a row keyed by a session is found only through it. */
 const VERIFICATIONS = `
   DELETE FROM verification
    WHERE lower(identifier) = ANY($1)
@@ -137,19 +122,10 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
   };
 };
 
-/**
- * Held to the erasure's commit, so a removal elsewhere waits and the arm read here is still true
- * when the step commits.
- */
 const HELD_ELSEWHERE = `SELECT workspace_id FROM member
    WHERE user_id = $1 AND workspace_id <> $2
      FOR KEY SHARE`;
 
-/**
- * Does nothing without a person. Otherwise ends the member here, sweeps their questions and actor
- * ids again, and, when no other workspace holds them once the member has ended, deletes their
- * sign-in identity and pseudonymises them.
- */
 export const eraseFromTheIdentitySet = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -158,8 +134,6 @@ export const eraseFromTheIdentitySet = async (
   const { personId } = subject;
   if (personId === null) return { arm: "no-person", ...SWEPT_NOTHING };
 
-  // One transaction for the step: only its last-activity, questions and actor tables are under
-  // row-level security, so the workspace's scope narrows nothing else.
   return withScope(platform, door, subject.workspaceId, async (tx) => {
     const lastActive = rowsOf(
       await tx.query("DELETE FROM workspace_last_active WHERE user_id = $1", [personId]),
@@ -169,8 +143,6 @@ export const eraseFromTheIdentitySet = async (
       personId,
     ]);
     const membersEnded = rowsOf(ended);
-    // The delete waited for each write holding the member's row. READ COMMITTED: each
-    // statement's snapshot is fresh, so it sees what they committed.
     const named = { workspaceId: subject.workspaceId, pseudonym: subject.pseudonym };
     const questionsSince = await sweepTheQuestions(tx, { ...named, askers: askersOf([personId]) });
     const actorsSince = await sweepTheActors(tx, { ...named, actors: askersOf([personId]) });

@@ -47,7 +47,6 @@ const NOT_BUILT_EXIT = 3;
 const SYNTHETIC_WORKSPACE = "01M2SYNTHET1CAAAAAAAAAAAAA";
 const STAGING_COUNTS = '{"live_gen":3,"nodes":{"Concept":2},"edges":{"links_to":1}}';
 
-/** Off stdout, as the drill's own writes, so no redirect or command substitution swallows it. */
 const ASIDE = ["exec 4>&1", 'aside() { say "$@" >&4; }'];
 
 const countsRan = (staging: string, stagingStatus: number): BashRun => {
@@ -96,7 +95,6 @@ const postgresPinManager = () =>
       ),
     );
 
-/** Renovate's regex versioning reads these named groups; the pin's major must be Postgres's. */
 const postgresVersioning = (): ((tag: string) => Record<string, string> | undefined) => {
   const versioning = postgresPinManager()?.versioningTemplate ?? "";
   const pattern = new RegExp(versioning.replace(/^regex:/, ""));
@@ -140,7 +138,67 @@ const composeServices = (file: string): readonly { name: string; body: string }[
   }));
 };
 
+const PINNED_BY_DIGEST = /^[^\s@$]+@(?:sha256:[0-9a-f]{64}|\$\{\w+_DIGEST:\?[^}]*\})$/;
+
+const SET_FROM_THE_POSTGRES_PIN = /^\$\{(?:LOCAL|TEST)_POSTGRES_IMAGE:\?[^}]*\}$/;
+
+const digestless = (directory: string): readonly string[] =>
+  readdirSync(directory)
+    .filter((file) => /\.ya?ml$/.test(file))
+    .flatMap((file) =>
+      [...readFileSync(path.join(directory, file), "utf8").matchAll(/^[ \t]+(image|build):(.*)$/gm)]
+        .map(([, key, raw]) => {
+          const value = (raw ?? "").trim().replace(/^(["'])(.*)\1$/, "$2");
+          return { key, value: value.replace(SET_FROM_THE_POSTGRES_PIN, POSTGRES_IMAGE) };
+        })
+        .filter(({ key, value }) => key === "build" || !PINNED_BY_DIGEST.test(value))
+        .map(({ key, value }) => `${file}: ${key ?? ""}: ${value}`),
+    );
+
+const DIGEST_RULE =
+  "Every image a deploy compose file runs is pinned by digest, as name@sha256:<64 hex> or name@${<NAME>_DIGEST:?…}, so the file refuses to start without one; no service builds its image";
+
 describe("the deploy tree", () => {
+  it("runs every compose image by its digest", () => {
+    expect({
+      rule: DIGEST_RULE,
+      unpinned: digestless(path.join(repositoryRoot, "deploy")),
+    }).toEqual({
+      rule: DIGEST_RULE,
+      unpinned: [],
+    });
+  });
+
+  it("reports a compose image a digest does not pin", () => {
+    const work = mkdtempSync(path.join(tmpdir(), "compose-digests-"));
+    onTestFinished(() => {
+      rmSync(work, { recursive: true, force: true });
+    });
+    writeFileSync(
+      path.join(work, "stores.compose.yaml"),
+      read("deploy/stores.compose.yaml").replace(
+        /(image: alpine:[^@\s]+)@sha256:[0-9a-f]{64}/,
+        "$1",
+      ),
+    );
+    writeFileSync(
+      path.join(work, "platform.compose.yaml"),
+      read("deploy/platform.compose.yaml").replace("WORKER_IMAGE_DIGEST:?", "WORKER_IMAGE_DIGEST?"),
+    );
+    writeFileSync(path.join(work, "built.compose.yaml"), "services:\n  db:\n    build: .\n");
+    writeFileSync(
+      path.join(work, "copy.compose.yaml"),
+      "services:\n  db:\n    image: ${DB_IMAGE:?}\n",
+    );
+
+    expect([...digestless(work)].sort()).toEqual([
+      "built.compose.yaml: build: .",
+      "copy.compose.yaml: image: ${DB_IMAGE:?}",
+      "platform.compose.yaml: image: ghcr.io/betteranswers/worker@${WORKER_IMAGE_DIGEST?set by the release workflow}",
+      "stores.compose.yaml: image: alpine:3.23.5",
+    ]);
+  });
+
   it("carries no `<read on the day>` placeholder in parsed fields", () => {
     for (const file of [
       "deploy/backup.Dockerfile",
@@ -176,7 +234,6 @@ describe("the deploy tree", () => {
   it("runs the backup service by the digest build.yml pushes", () => {
     const stores = read("deploy/stores.compose.yaml");
     expect(stores).toContain("ghcr.io/betteranswers/backup@${BACKUP_IMAGE_DIGEST:?");
-    expect(stores).not.toMatch(/^\s+build:/m);
     expect(read(".github/workflows/build.yml")).toMatch(
       /tier: backup\n\s+context: deploy\n\s+dockerfile: deploy\/backup\.Dockerfile/,
     );
@@ -627,7 +684,6 @@ describe("the deploy tree", () => {
     const newest = fencedIn(read("deploy/restore-drill.sh"), "the newest dump");
     expect({ markers: newest !== undefined }).toEqual({ markers: true });
 
-    // As the bucket stands at 03:00 on the 1st, when the drill runs.
     const listed: Readonly<Record<string, readonly string[]>> = {
       hourly: [
         "globals-20261001T010512Z.sql.age",
@@ -678,7 +734,6 @@ describe("the deploy tree", () => {
     expect(read("deploy/backup.sh")).toContain("init-repo");
   });
 
-  /** The longest await-release.sh can run at `polls`, from its first poll to its last. */
   const awaitSeconds = (polls: number): number => {
     const script = read("deploy/await-release.sh");
     const delaySeconds = Number(/AWAIT_RELEASE_DELAY_SECONDS:-(\d+)/.exec(script)?.[1]);
@@ -693,7 +748,6 @@ describe("the deploy tree", () => {
     const polls = Number(/AWAIT_RELEASE_POLLS:-(\d+)/.exec(script)?.[1]);
     const delaySeconds = Number(/AWAIT_RELEASE_DELAY_SECONDS:-(\d+)/.exec(script)?.[1]);
 
-    // Twice the three minutes a fresh image took to pull and start, end to end; no sleep follows the last poll.
     expect((polls - 1) * delaySeconds).toBeGreaterThanOrEqual(360);
     expect(awaitSeconds(polls)).toBeLessThan(
       (releaseJob("promote")?.["timeout-minutes"] ?? 0) * 60,
@@ -711,7 +765,6 @@ describe("the deploy tree", () => {
       return { name, polls, fits: awaitSeconds(polls) < (job?.["timeout-minutes"] ?? 0) * 60 };
     });
 
-    // Production already answered on this digest at the smoke, so a few polls ride out a blip.
     expect(rereads).toEqual([
       { name: "journeys", polls: 3, fits: true },
       { name: "record", polls: 3, fits: true },
@@ -739,13 +792,10 @@ describe("the deploy tree", () => {
     expect(releases).toContain("| When (UTC) | By | api | worker | Rode on |");
     expect(releases).toContain("release/<UTC stamp>-<short commit>");
     expect(releases).toContain("git tag --list 'release/*' --sort=-creatordate");
-    // An on-box promotion, which the unreachable-Coolify carve-out still allows, has a
-    // recorded home: the same tag, made by hand.
     expect(releases).toContain("Access debt recorded 04/09/2026");
     expect(releases).toContain('git push origin "refs/tags/${tag}"');
 
     const rows = releases.split("\n").filter((line) => /^\| 20\d\d-/.test(line));
-    // Nothing appends to the table again, so its last row stays the last promotion in it.
     expect(rows.at(-1)).toContain("2026-09-23T04:26:58Z");
     expect(read(".github/workflows/release.yml")).not.toContain("deploy/RELEASES.md");
 

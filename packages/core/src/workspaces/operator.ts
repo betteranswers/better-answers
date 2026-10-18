@@ -38,7 +38,6 @@ type OperatorMarkInput = {
 type OperatorMarkSet = {
   readonly personId: UserId;
 
-  /** False where the person already stood as asked, and nothing was written. */
   readonly changed: boolean;
 };
 
@@ -74,9 +73,8 @@ const marking = async (
 };
 
 /**
- * Grants or revokes the operator mark of the person holding `email`, matched case-insensitively,
- * and records the change in the identity-set audit log under the platform's own actor. A person
- * already as asked is left alone, with nothing written.
+ * Grants or revokes the operator mark of the person holding `email`, matched case-insensitively. A
+ * person already as asked is left alone, with nothing written.
  */
 export const setOperatorMark = async (
   platform: PlatformPrincipal,
@@ -104,20 +102,17 @@ type RestoreSignInInput = {
 export type SignInRestored = {
   readonly personId: UserId;
 
-  /** As the person's row holds it: where the notice goes. */
+  /** As the person's row holds it. */
   readonly email: string;
 
-  /** The one time it exists outside the person's hands: only its hash is kept. */
   readonly code: string;
   readonly expiresAt: Date;
 };
 
-/** The acceptor keys the code by the stored address, lowered by Postgres, so this does too. */
 const HOLDING_BY_ADDRESS = `
   SELECT id, email, $2 || lower(email) AS identifier
     FROM "user" WHERE lower(email) = lower($1) FOR UPDATE`;
 
-/** Before the sessions go: a row keyed by a session is found only through it. */
 const SESSION_ROWS = `
   DELETE FROM verification
    WHERE identifier IN (SELECT prefix || s.id FROM session s, unnest($2::text[]) AS prefix
@@ -129,7 +124,6 @@ const KEEPING_THE_CODE = `
   INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at)
   VALUES ($1, $2, $3, $4, $5, $5)`;
 
-/** Ending every session ends every setup grant with it. */
 const clearingTheFactors = async (tx: Tx, personId: UserId, now: Date): Promise<void> => {
   await tx.query(SESSION_ROWS, [personId, [...SESSION_VERIFICATION_PREFIXES]]);
   for (const table of HELD_BY_THE_PERSON) {
@@ -175,9 +169,8 @@ const restoring = async (
 };
 
 /**
- * Restores the sign-in of the person holding `email`, under their lock: their factors, codes and
- * sessions end, and setting up a factor waits on a one-time restore code. Recorded under the
- * platform's actor. Answers the code, which replaces any earlier one.
+ * Their factors, codes and sessions end, and setting up a factor waits on a one-time restore code.
+ * Answers the code, which replaces any earlier one.
  */
 export const restoreSignIn = async (
   platform: PlatformPrincipal,
@@ -191,7 +184,6 @@ export const restoreSignIn = async (
   return restored.value;
 };
 
-/** Every person carrying the mark, by address: where the platform writes to its operator. */
 export const operatorAddresses = (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -211,7 +203,7 @@ type OperatorStanding =
 
 /**
  * Whether a signed-in person stands as the operator, by the rule every console action is resolved
- * on, and their display name where they do. It answers no rather than refusing.
+ * on. It answers no rather than refusing.
  */
 export const standingAsOperator = async (
   door: PostgresDoor,

@@ -38,14 +38,13 @@ const REQUEST_ACTIONS = declareActions("people", {
   declined: action("people.request.declined", { requesterId: "id" }),
 });
 
-/** The role an approval grants when it names none. */
 export const REQUEST_ROLE_DEFAULT = "Viewer" satisfies Role;
 
 export type Acknowledgement = { readonly acknowledged: true };
 
 const ACKNOWLEDGED: Acknowledgement = { acknowledged: true };
 
-/** What a person sends: the requester is the session's own person, never a field they fill. */
+/** The requester is the session's own person, never a field they fill. */
 export const requestAccessInput = z.object({ shortName: z.string(), reason: z.string() });
 
 export type RequestAccessInput = {
@@ -64,9 +63,8 @@ const NEUTRAL_CONSTRAINTS = {
 } as const;
 
 /**
- * Acknowledges alike whether a request was written, one already waits, the requester is a member
- * or unknown, or no workspace has the short name, so the answer reveals none of these. Only a malformed
- * requester or reason is refused.
+ * Acknowledges alike whether a request was written, one already waits, the requester is a member or
+ * unknown, or no workspace has the short name.
  */
 export const requestAccess = async (
   platform: PlatformPrincipal,
@@ -120,7 +118,6 @@ type Claim = {
   readonly email: string;
 };
 
-/** Takes its face's admission as answered, and passes a refusal on before it reads a row. */
 const claimForDecision = async (
   admitted: Result<AdminUserPrincipal, MemberRefusal<"role-forbids">>,
   tx: Tx,
@@ -202,13 +199,11 @@ const approveRequestAction = declareAction({
 
 export type ApproveRefusal = MemberRefusal<RefusalOf<typeof approveRequestAction>>;
 
-/** The invitation the approval minted, which the transport emails once the approval commits. */
 export type Approved = InvitationToSend & { readonly requestId: AccessRequestId };
 
 /**
- * Mints an invitation to the requester's address at `role`, or `REQUEST_ROLE_DEFAULT`, through the
- * one step a direct invite takes. The request row is locked, so of two decisions at once the
- * second answers `already-decided`.
+ * Mints an invitation to the requester's address at `role`, or `REQUEST_ROLE_DEFAULT`. Of two
+ * decisions at once, the second answers `already-decided`.
  */
 export const approveRequest = async (
   principal: UserPrincipal,

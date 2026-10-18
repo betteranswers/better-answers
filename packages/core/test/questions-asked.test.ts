@@ -55,7 +55,6 @@ const anAsker = async (): Promise<UserPrincipal> => {
   return principalFor(db(), workspace.workspaceId, workspace.adminUserId);
 };
 
-/** As `app_rt`, under the asker's scope: the grants and the policy are part of what is stored. */
 const opening = (
   asker: UserPrincipal,
   askedAt: Date = new Date(),
@@ -169,7 +168,6 @@ describe("opening a record", () => {
     });
   });
 
-  /** The sweep's clock is stopped at `sweptAt`, and the question is asked at `askedAt`. */
   const askedAfterASweep = async (sweptAt: Date, askedAt: Date) => {
     const asker = await anAsker();
     answered(await makeQuestionMonths(openPostgres(db().runtimePool), { now: sweptAt }));
@@ -281,6 +279,15 @@ describe("completing a record", () => {
     expect(await contentOf(recordId)).toEqual([expect.objectContaining({ drafted })]);
   });
 
+  it("leaves drafted null when the platform drafts nothing", async () => {
+    const asker = await anAsker();
+    const { recordId } = answered(await opening(asker));
+
+    answered(await completing(asker, recordId, REFUSED));
+
+    expect(await contentOf(recordId)).toEqual([expect.objectContaining({ drafted: null })]);
+  });
+
   it("keeps an unmapped passage's locator and none of its text", async () => {
     const asker = await anAsker();
     const { recordId } = answered(await opening(asker));
@@ -345,7 +352,6 @@ describe("completing a record", () => {
 
 const KEPT_TRUST = { tier: "unverified", status: "current", verifiedAt: null, rider: null };
 
-/** As the api reads and writes, under the reader's own scope and predicate. */
 const asked = (reader: UserPrincipal, input: Partial<QuestionsAskedInput> = {}) =>
   readingAs(db().runtimePool, reader, (principal, tx) =>
     readQuestionsAsked(principal, tx, questionsAskedInput.parse(input)),
@@ -371,7 +377,6 @@ const draftedOf = (drafted: RecordShape["drafted"]) =>
     concepts: concepts.map(({ iri }) => iri),
   }));
 
-/** A completed record the Admin asked, with its question, citing `cited` in order. */
 const aRecord = (admin: UserPrincipal, shape: RecordShape = {}) =>
   seedingWith(db().pool, async (seed) => {
     const record = await seed.questionAsked({
@@ -414,7 +419,6 @@ const aFlagOn = (
     }),
   );
 
-/** A concept in `collection` that every member reads. */
 const aConceptIn = (admin: UserPrincipal, collection: string) =>
   seedingWith(db().pool, (seed) =>
     seed.conceptIndex({
@@ -423,7 +427,6 @@ const aConceptIn = (admin: UserPrincipal, collection: string) =>
     }),
   );
 
-/** A concept in `collection` narrowed to a group the Admin is not in. */
 const aConceptNarrowedIn = (admin: UserPrincipal, collection: string) =>
   seedingWith(db().pool, async (seed) => {
     const group = await seed.group({ workspaceId: admin.workspaceId });
@@ -442,14 +445,12 @@ const aMemberOf = async (admin: UserPrincipal, role: "Editor" | "Viewer") => {
   return principalFor(db(), admin.workspaceId, member.userId);
 };
 
-/** The first two pages of one record each, the second read from the first's cut. */
 const pagesOfOne = async (admin: UserPrincipal) => {
   const first = answered(await asked(admin, { limit: 1 }));
   const next = answered(await asked(admin, { limit: 1, cursor: first.nextCursor ?? undefined }));
   return [first, next];
 };
 
-/** An Admin with one record asked and one open flag on it. */
 const anOpenFlag = async () => {
   const admin = await anAsker();
   const record = await aRecord(admin);

@@ -10,12 +10,10 @@ const app = appForSuite();
 
 const asBuilt = authAsBuiltForSuite();
 
-/** Read off the instance, so a path a plugin adds on an upgrade is held closed here too. */
 const FACTOR_PATHS = mountedPaths(asBuilt).filter(
   (path) => path.startsWith("/passkey/") || path.startsWith("/two-factor/"),
 );
 
-/** Written out, not imported: a path dropped from `disabledPaths` then fails here. */
 const CLOSED_SESSION_PATHS = [
   "/list-sessions",
   "/revoke-other-sessions",

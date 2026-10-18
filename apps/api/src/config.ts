@@ -108,7 +108,6 @@ const envelopeKeySchema = z.object({
   KEK: z.string().regex(new RegExp(`^[0-9a-fA-F]{${String(ENVELOPE_KEY_BYTES * 2)}}$`)),
 });
 
-/** One sentence for a key that is absent and one that is malformed, and neither repeats it. */
 const NO_ENVELOPE_KEY = `KEK must be set to the envelope key: ${String(ENVELOPE_KEY_BYTES * 2)} hexadecimal characters, its ${String(ENVELOPE_KEY_BYTES)} bytes`;
 
 export type Bootstrap = {
@@ -215,7 +214,6 @@ export function readRunningImage(
   return ok({ digest: parsed.data.API_IMAGE_DIGEST });
 }
 
-/** The key every sealed credential row opens under; held by this tier alone. */
 export function readEnvelopeKey(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): Result<Uint8Array> {

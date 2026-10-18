@@ -535,7 +535,6 @@ describe("a restore from a dump older than the request", () => {
     await theIndexRestored(workspaceId, [naming, beside]);
     const erased = await completedInTheRows(workspaceId, INDEX_RESTORED_AT);
     await leavingAReplayCopy(scenario, erased, INDEX_RESTORED_AT);
-    // The passage beside it was never wiped, so the restore brings back the one the wipe took.
     await asIfRestoredFromADumpOlderThanIt(workspaceId, erased, [naming]);
     const restored = await whatTheReplayLeft(workspaceId);
 

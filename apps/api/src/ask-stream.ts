@@ -4,12 +4,10 @@
  */
 export const ASK_KEEP_ALIVE_MS = 25_000;
 
-/** Sent when nothing else has been for a while; it carries nothing to show. */
 export type KeepAlive = { readonly kind: "keep-alive" };
 
 const KEEP_ALIVE: KeepAlive = { kind: "keep-alive" };
 
-/** Whether `quietMs` passed, or `stop` aborted, before `woken` settled. */
 const quietFor = async (
   woken: Promise<void>,
   quietMs: number,
@@ -37,10 +35,6 @@ const quietFor = async (
 
 type Ended = { readonly threw: false } | { readonly threw: true; readonly error: Error };
 
-/**
- * `work` runs apart from the reader, so one who leaves never cuts its bookkeeping short. A
- * keep-alive fills each `quietMs` with no event.
- */
 export async function* eventsOf<Event extends object>(
   work: (emit: (event: Event) => void) => Promise<void>,
   quietMs: number,

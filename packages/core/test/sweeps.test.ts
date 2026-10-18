@@ -262,10 +262,6 @@ describe("a sweep by hand", () => {
   });
 });
 
-/**
- * Read from the suite's own pool, so a lock left on a connection back in the runtime pool still
- * counts.
- */
 const sessionLocksHeld = async (): Promise<number> => {
   const found = await db().pool.query<{ held: string }>(
     `SELECT count(*) AS held FROM pg_locks

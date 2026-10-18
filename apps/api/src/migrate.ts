@@ -18,7 +18,6 @@ const database = drizzle(bootstrap.databaseUrl);
 const applied = await attempt(async () => {
   await migrate(database, { migrationsFolder });
   await database.$client.query(MARK_THE_MATCH_LEAKPROOF);
-  // After the journal, because the stamp writes to a table a migration creates.
   await database.$client.query(STAMP_THE_CONTRACT, [CONTRACT_DIGEST]);
   await database.$client.end();
 });

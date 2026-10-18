@@ -8,7 +8,6 @@ import {
   WORKSPACES_WORDS,
 } from "@/features/console/list-words.ts";
 
-/** A count's line with its number taken out: what is left is the form the number chose. */
 const formOf = (said: string): string => said.replaceAll(/\d+/g, "");
 
 const LISTS = [

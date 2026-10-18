@@ -27,17 +27,14 @@ import {
 
 type ConnectedSourceActions = {
   readonly onFocusConnectedSource: (connectedSourceId: string) => void;
-  /** The row's button is a disclosure: a second press closes the review it opened. */
   readonly onReview: (connectedSourceId: string) => void;
   readonly onPublish: (connectedSource: ListedConnectedSource) => void;
   readonly onNarrow: (connectedSource: ListedConnectedSource) => void;
   readonly onWiden: (connectedSource: ListedConnectedSource) => void;
 };
 
-/** What is open inside a row: one review, and one narrowing or widening, on the page at a time. */
 type OpenInARow = {
   readonly reviewing: string | undefined;
-  /** A bulk action waits on its answer, so no row's button opens, closes or replaces a review. */
   readonly reviewHeld: boolean;
   readonly panel: { readonly connectedSourceId: string; readonly part: ReactNode } | undefined;
 };
@@ -51,7 +48,6 @@ const audienceWords = (connectedSource: ListedConnectedSource): string => {
   return named === 0 ? words : `${words} (${counted(named, "group", "groups")})`;
 };
 
-/** The one disclosure: what a reader weighs after the lead, never an action of its own. */
 function MoreAbout(properties: {
   readonly connectedSource: ListedConnectedSource;
   readonly onFocus: () => void;
@@ -201,7 +197,6 @@ function ConnectedSourceItem(properties: {
 }) {
   const { connectedSource, actions } = properties;
   const headingId = connectedSourceHeadingId(connectedSource.connectedSourceId);
-  /** Every control in the row names its connected source as the one in focus, for the keystrokes. */
   const focused = () => {
     actions.onFocusConnectedSource(connectedSource.connectedSourceId);
   };

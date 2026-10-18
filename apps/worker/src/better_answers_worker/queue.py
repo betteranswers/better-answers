@@ -58,9 +58,9 @@ def workspace_ids(connection: psycopg.Connection) -> list[str]:
 def claim(
     cursor: psycopg.Cursor, workspace_id: str, worker_id: str, kinds: Sequence[str]
 ) -> ClaimedJob | None:
-    """`cursor` must be `scoped` to `workspace_id`: row-level
-    security picks the job's workspace, and `workspace_id` only
-    labels the answer. None when no job of `kinds` is claimable."""
+    """`cursor` must be `scoped` to `workspace_id`: row-level security picks the
+    workspace; `workspace_id` only labels the answer. None when no job of `kinds` is
+    claimable."""
     cursor.execute(
         "SELECT id, kind, reason, subject_id, attempts"
         " FROM claim_job(%s, %s::interval, %s)",
@@ -80,10 +80,8 @@ def claim(
 
 
 def hold_the_claim(cursor: psycopg.Cursor, job_id: str, worker_id: str) -> None:
-    """Locks the job's row `FOR KEY SHARE` until `cursor`'s transaction ends: no one
-    takes the claim while the worker writes under it, yet its heartbeat renews. Raises
-    `ClaimLostError` when the claim is not live: the job ended, its lease lapsed or
-    another worker holds it."""
+    """Locks the job's row `FOR KEY SHARE` until `cursor`'s transaction ends. Raises
+    `ClaimLostError` when the job ended, its lease lapsed or another worker holds it."""
     cursor.execute(
         "SELECT 1 FROM job WHERE id = %s AND claimed_by = %s AND status = 'claimed'"
         " AND lease_expires_at > clock_timestamp() FOR KEY SHARE",
@@ -111,9 +109,8 @@ def keeping_alive(
     worker_id: str,
     every_seconds: float = HEARTBEAT_SECONDS,
 ) -> Iterator[None]:
-    """Heartbeats the job every `every_seconds` on a connection of its own while
-    the block runs. A lost lease stops the beat silently and a database error
-    with a warning; neither interrupts the block."""
+    """Heartbeats on a connection of its own. A lost lease stops the beat silently, a
+    database error with a warning; neither interrupts the block."""
     stop = threading.Event()
 
     def beat() -> None:

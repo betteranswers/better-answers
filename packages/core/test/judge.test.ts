@@ -39,17 +39,13 @@ const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better
 const A_KEY = "sk-test-u13-invented-key-0001";
 
 type Judging = {
-  /** No limit is set where it is null. */
   readonly limitGbp?: string | null;
   readonly chosen?: boolean;
-  /** The envelope key the model key is sealed under; none is set where it is null. */
   readonly sealedUnder?: Uint8Array | null;
 };
 
-/** Invented, and not the key the suite's steps open model keys under. */
 const ANOTHER_ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => index);
 
-/** A workspace whose Admin asks, judging on Sonnet with a key, priced, under a limit. */
 const aJudgingWorkspace = ({
   limitGbp = "100",
   chosen = true,
@@ -84,7 +80,6 @@ type Wire = {
   readonly client: ModelClient;
 };
 
-/** A judge at the wire saying yes to the candidates written for `fits`, and no to the rest. */
 const judgeSaying = (fits: readonly string[], during: () => Promise<void> = async () => {}): Wire =>
   clientAnswering(async (body) => {
     await during();
@@ -112,7 +107,6 @@ const askedWith = (asker: UserPrincipal, asking: Asking, wire: Wire, caps?: AskC
     ...(caps === undefined ? {} : { caps }),
   });
 
-/** `ask` answered as it stands, a refusal included: the question is `QUESTION`. */
 const askedOutright = (asker: UserPrincipal, wire: Wire) =>
   ask(
     asker,
@@ -124,7 +118,6 @@ const askedOutright = (asker: UserPrincipal, wire: Wire) =>
 const seededIn = (workspaceId: string, shapes: readonly SeededConcept[]) =>
   conceptsSeeded(db(), workspaceId, shapes);
 
-/** A judging workspace holding `shapes`, and a judge at the wire saying yes to `fits`. */
 const arranged = async (
   shapes: readonly SeededConcept[],
   fits: readonly string[] = [],
@@ -156,7 +149,6 @@ const spendOf = async (workspaceId: string) => {
   return { open: reservations.rows[0]?.open, calls: calls.rows };
 };
 
-/** Nothing was sent to the model, and nothing reserved or spent. */
 const expectNoCall = async (workspaceId: string, wire: Wire) => {
   expect(wire.sent).toEqual([]);
   expect(await spendOf(workspaceId)).toEqual({ open: 0, calls: [] });
@@ -232,7 +224,6 @@ describe("the judge's call", () => {
   it("reserves every byte sent and room to think", () => {
     const call = judgeCall("Who pays the £50 fee?", [candidate]);
 
-    // 710 bytes of system prompt, 231 of prompt (the pound sign is two), 2,000 of framing.
     expect(call.most).toEqual({ tokensIn: 2_941, tokensOut: 16_000 });
   });
 

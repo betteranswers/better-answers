@@ -48,7 +48,7 @@ All five are one rule in the repository's own lint plugin, `better-answers/impor
 
 Every query reaches its store through a store door in `packages/core/src/store/`. Row-level security is the tenancy guarantee (ADR 0032), and the door is ergonomics over it. A transaction that spans slices lives in the slice that owns the action.
 
-Every one of the four doors is real in a test, and none may be faked. That is `CODING_STANDARDS.md`'s rule *Run every store the platform runs, for real*. An in-memory adapter is for a service someone else runs, such as an LLM provider, behind that service's own adapter. The test inbox's D1 is such a service. Its store takes the few D1 calls it makes, and its suite runs the same SQL through `node:sqlite`.
+Every one of the four doors is real in a test, and none may be faked. `CODING_STANDARDS.md` keeps that as a test rule. An in-memory adapter is for a service someone else runs, such as an LLM provider, behind that service's own adapter. The test inbox's D1 is such a service. Its store takes the few D1 calls it makes, and its suite runs the same SQL through `node:sqlite`.
 
 ## Why
 

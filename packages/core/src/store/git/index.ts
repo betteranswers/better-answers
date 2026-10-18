@@ -26,7 +26,6 @@ const run = promisify(execFile);
 export type GitDoor = {
   readonly root: string;
 
-  /** How long one commit, every git child in it, may run; a test shortens it. */
   readonly commitBudgetMs?: number;
 };
 
@@ -64,7 +63,6 @@ export type CommitAuthor = {
   readonly email: string;
 };
 
-/** No precondition on the head: the commit lands on whichever stands, the ref move still guarded. */
 export const ANY_HEAD: unique symbol = Symbol("any head");
 
 export type CommitRequest = {
@@ -108,7 +106,6 @@ const childEnvironment = (added: Readonly<Record<string, string>> = {}): NodeJS.
   LC_ALL: "C",
 });
 
-/** A child stopped mid-write closes its stdin; its exit, not the broken pipe, says what happened. */
 const feeding = (child: ChildProcess, input: string | undefined): void => {
   if (input === undefined) return;
   child.stdin?.on("error", (cause: NodeJS.ErrnoException) => {
@@ -117,7 +114,6 @@ const feeding = (child: ChildProcess, input: string | undefined): void => {
   child.stdin?.end(input);
 };
 
-/** execFile settles on abort before the child exits; five seconds lets git clear its lock files first. */
 const EXIT_GRACE_MS = 5_000;
 
 const exitedWithin = async (child: ChildProcess, graceMs: number): Promise<void> => {
@@ -179,10 +175,6 @@ const stdoutOf = (cause: unknown): string => {
   return typeof stdout === "string" ? stdout.trim() : "";
 };
 
-/**
- * git prints `--git-dir` only for a repository it recognises, before the ref read can fail: a
- * corrupt `packed-refs` exits 128 yet reads as no head.
- */
 const standingHead = async (
   gitDir: string,
   signal?: AbortSignal,
@@ -295,7 +287,6 @@ const commitFailure = (cause: unknown): "stale-precondition" | Error => {
   return cause instanceof Error ? cause : new Error(message);
 };
 
-/** A one-file commit takes milliseconds; a minute allows a slow disk yet frees the member row held across it. */
 const COMMIT_BUDGET_MS = 60_000;
 
 type Budget = { readonly ms: number; readonly signal: AbortSignal };
@@ -334,11 +325,6 @@ const commitWithin = async (
   }
 };
 
-/**
- * Writes one file as one commit on `main`, compare-and-swap against the head it reads, which must
- * be `expectedHead` (null for the first commit) unless that is `ANY_HEAD`. The committer is always
- * the platform bot; the author is the request's. A git child past the budget is stopped.
- */
 export const commit = async (
   principal: UserPrincipal,
   door: GitDoor,
@@ -353,17 +339,12 @@ export const commit = async (
 
 const locks = new Map<string, Promise<unknown>>();
 
-/**
- * Runs `work` once every earlier holder's work on the same repository has settled, failed or
- * not. The lock holds within this process only.
- */
 export const withRepositoryLock = <T>(
   principal: UserPrincipal,
   door: GitDoor,
   work: () => Promise<T>,
 ): Promise<T> => lockedRepository(bundleOf(door, principal), work);
 
-/** Shares withRepositoryLock's lock, so user and platform work on one repository queue together. */
 export const withRepositoryLockAs = <T>(
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -371,7 +352,6 @@ export const withRepositoryLockAs = <T>(
   work: () => Promise<T>,
 ): Promise<T> => lockedRepository(repositoryPath(door, workspaceId), work);
 
-/** As withRepositoryLockAs, but `held` at once while work in this process has the repository. */
 export const tryRepositoryLockAs = async <T>(
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -396,11 +376,6 @@ const lockedRepository = async <T>(key: string, work: () => Promise<T>): Promise
   }
 };
 
-/**
- * The commits on `main` after `since`, oldest first, or all of them when `since` is null.
- * `history-diverged` when git cannot show that the head still descends from `since`; an `Error`
- * when it reads the head but cannot list the commits behind it.
- */
 export const commitsAfter = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -449,10 +424,6 @@ const carries = (line: string, needles: readonly string[]): boolean => {
   return needles.some((needle) => lowered.includes(needle.toLowerCase()));
 };
 
-/**
- * git grep exits 1 both for no match and for an object it could not read; only the silent one
- * means nobody is named.
- */
 const blobsNaming = async (
   gitDir: string,
   needles: readonly string[],
@@ -493,10 +464,6 @@ const authorsNaming = async (
 const allCommits = async (gitDir: string): Promise<readonly string[]> =>
   (await git(gitDir, ["rev-list", "--all"])).split("\n").filter((sha) => sha !== "");
 
-/**
- * Each commit's text files that carry one of `needles`, and each commit whose author does, matched
- * without case across all refs. `authors` holds commit shas. Blank needles are dropped.
- */
 export const historyNaming = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -525,10 +492,6 @@ export type CommitRead = {
 
 const TRAILER_LINE = /^([A-Za-z][A-Za-z-]*): (.+)$/;
 
-/**
- * The last paragraph, never the first match: isSubjectLine keeps a forged trailer out at the
- * write door, and this is the read half.
- */
 const trailersOf = (message: string) => {
   const block = message.trimEnd().split("\n\n").at(-1) ?? "";
   return Object.fromEntries(
@@ -574,10 +537,6 @@ const changeIn = async (gitDir: string, sha: string): Promise<CommitRead["change
     : undefined;
 };
 
-/**
- * `parent` is null for a root or a merge commit. `change` is set only when the commit adds or
- * modifies exactly one file.
- */
 export const readCommit = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -611,9 +570,6 @@ const fileIn = async (
   }
 };
 
-/**
- * Null when the path is not portable or the commit holds no such file; any other failure throws.
- */
 export const fileAt = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -623,7 +579,6 @@ export const fileAt = async (
 ): Promise<string | null> =>
   isPortablePath(filePath) ? fileIn(repositoryPath(door, workspaceId), sha, filePath) : null;
 
-/** Null when the path is not portable, `head` would answer null, or `main` holds no such file. */
 export const fileAtHead = async (
   principal: UserPrincipal,
   door: GitDoor,
@@ -637,7 +592,6 @@ export const fileAtHead = async (
 export type Pseudonymisation = {
   readonly addresses: readonly string[];
 
-  /** Person ids, rewritten where history names them as `human:<id>`, trailers included. */
   readonly people: readonly string[];
   readonly pseudonym: string;
 };
@@ -645,7 +599,6 @@ export type Pseudonymisation = {
 export type HistoryRewritten = {
   readonly moved: readonly (readonly [string, string])[];
 
-  /** Each path whose file, at some commit, named an address or a person id. */
   readonly paths: readonly string[];
 };
 
@@ -658,7 +611,6 @@ const PYTHON_SPECIAL = /[()[\]{}?*+\-|^$\\.&~# \t\n\r\v\f]/g;
 const escapedForPython = (literal: string): string =>
   literal.replace(PYTHON_SPECIAL, (character) => `\\${character}`);
 
-/** A person id is a ULID, so its actor id is matched literally and no longer one extends it. */
 const replacementsFor = (
   addresses: readonly string[],
   people: readonly string[],
@@ -672,7 +624,6 @@ const replacementsFor = (
     ...people.map((person) => `${PERSON_PREFIX}${person}==>${PERSON_PREFIX}${pseudonym}\n`),
   ].join("");
 
-/** A trailer is in the message, which no file search reads. */
 const messagesNaming = async (gitDir: string, needles: readonly string[]): Promise<boolean> => {
   const logged = await git(gitDir, ["log", "--all", "--format=%B%x00"]);
   return logged.split("\0").some((message) => carries(message, needles));
@@ -747,11 +698,6 @@ const commitMapOf = async (
 const trimmed = (values: readonly string[]): readonly string[] =>
   values.map((value) => value.trim()).filter((value) => value !== "");
 
-/**
- * Only when history names an address or a person id, rewrites every ref: each actor id naming
- * one, in files and messages, and each author or committer carrying an address, takes the
- * pseudonym, and old objects are pruned. A dropped commit throws.
- */
 export const rewriteHistory = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -794,8 +740,6 @@ export const rewriteHistory = async (
     ]);
     const moved = await commitMapOf(gitDir, started);
 
-    // The reflog first: an entry in it is a reference, and gc prunes nothing something still
-    // refers to.
     await git(gitDir, ["reflog", "expire", "--expire=now", "--all"]);
     await git(gitDir, ["gc", "--prune=now", "--quiet"]);
     return { moved, paths: [...new Set(naming.blobs.map((blob) => blob.path))] };

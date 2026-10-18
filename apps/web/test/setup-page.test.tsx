@@ -36,14 +36,12 @@ const heading = () => screen.getByRole("heading", { level: 1 });
 
 const disclosure = () => screen.getByRole("button", { name: "Set Up an Authenticator Instead" });
 
-/** The authenticator's setup, opened if it is not yet, then finished with a working code. */
 const finishTheAuthenticator = async () => {
   if (disclosure().getAttribute("aria-expanded") === "false") fireEvent.click(disclosure());
   const field = await screen.findByRole("textbox", { name: "Authenticator Code" });
   fireEvent.change(field, { target: { value: "123456" } });
 };
 
-/** The setup page where a passkey can be made, drawn as far as its passkey field. */
 const openedWithBothWays = async () => {
   withPasskeysHere();
   adasApi(() => NOTHING_HELD, new Map([["/authenticator/start", answering(A_KEY)]]));
@@ -200,7 +198,6 @@ describe("the setup page", () => {
 
 const DROPPED: Route = () => Promise.reject(new TypeError("the network is down"));
 
-/** Enough of an ask to add a passkey that the browser's library hands it to the device. */
 const ASKED_TO_ADD = {
   challenge: "Y2hhbGxlbmdl",
   rp: { name: "better-answers" },
@@ -208,7 +205,6 @@ const ASKED_TO_ADD = {
   pubKeyCredParams: [],
 };
 
-/** A browser that can make a passkey, where the person closes the device's prompt. */
 const withThePromptClosed = () => {
   const create = vi.fn<() => Promise<never>>(() =>
     Promise.reject(new DOMException("closed", "NotAllowedError")),
@@ -218,7 +214,6 @@ const withThePromptClosed = () => {
   return create;
 };
 
-/** The setup page with a key made, whose finish answers as `finish` does. */
 const finishedWith = async (finish: Route) => {
   adasApi(
     () => NOTHING_HELD,
@@ -364,7 +359,6 @@ describe("the recovery codes detour", () => {
   });
 });
 
-/** Ada's api as `held` says, where the call that makes a set of codes gets no response. */
 const withTheMakeDropped = (held: () => unknown): void => {
   adasApi(held);
   const answer = globalThis.fetch;
@@ -375,7 +369,6 @@ const withTheMakeDropped = (held: () => unknown): void => {
   );
 };
 
-/** Free to hold no codes, so the Account page offers a first set and no detour makes one. */
 const NO_CODES_YET = { ...CONFIRMED, mustHoldOne: false, recoveryCodes: undefined };
 
 describe("a set of recovery codes whose making got no response", () => {

@@ -19,7 +19,6 @@ const confirmed = z.object({ confirmed: z.literal(true) });
 
 const granted = z.object({ granted: z.literal(true) });
 
-/** Asks this session's own challenge, never a sign-in's, so no second session is made. */
 const confirmWithAPasskey = async () =>
   askOfOurRoute(
     PASSKEY_PATH,
@@ -32,7 +31,6 @@ export const useConfirmByPasskey = () => {
   return useMutation({ mutationFn: confirmWithAPasskey, onSuccess: reread });
 };
 
-/** Rereads on a refusal too, so a throttle's wait reaches the read. */
 const useSendACode = <Answer>(path: string, answer: z.ZodType<Answer>) => {
   const reread = useRereadTheSecondFactor();
   return useMutation({
@@ -43,7 +41,6 @@ const useSendACode = <Answer>(path: string, answer: z.ZodType<Answer>) => {
 
 export const useConfirmByAuthenticator = () => useSendACode(AUTHENTICATOR_PATH, confirmed);
 
-/** The api reads the code as typed, ignoring its spaces, dashes and case. */
 export const useSpendARecoveryCode = () => useSendACode(RECOVERY_PATH, granted);
 
 export const useAcceptARestoreCode = () => useSendACode(RESTORE_PATH, granted);

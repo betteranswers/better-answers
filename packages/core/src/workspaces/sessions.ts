@@ -21,12 +21,10 @@ import { holdThePerson } from "./person-lock.ts";
 import { recordingTheirOwn } from "./second-factor.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** A sign-out names what it ended, so the rows it deleted are recorded before they go. */
 const SESSION_ACTIONS = declareIdentitySetActions("people", {
   sessionsEnded: action("people.person.sessions_ended", { sessions: "sessions" }),
 });
 
-/** An agent the lists cannot name is still a session, so it is named by what no device claims. */
 const UNKNOWN_DEVICE = "Unknown device";
 
 const BROWSERS: readonly (readonly [RegExp, string])[] = [
@@ -36,7 +34,6 @@ const BROWSERS: readonly (readonly [RegExp, string])[] = [
   [/Safari\//, "Safari"],
 ];
 
-/** An iPhone names Mac OS X and Android names Linux, so each is read before those. */
 const SYSTEMS: readonly (readonly [RegExp, string])[] = [
   [/iPhone|iPad/, "iOS"],
   [/Android/, "Android"],
@@ -51,7 +48,6 @@ const wordIn = (
   words: readonly (readonly [RegExp, string])[],
 ): string | undefined => words.find(([names]) => names.test(userAgent))?.[1];
 
-/** `Chrome on macOS`, read from the agent alone; never the raw string, and no address beside it. */
 const deviceOf = (userAgent: string | null): string => {
   if (userAgent === null) return UNKNOWN_DEVICE;
   const browser = wordIn(userAgent, BROWSERS);
@@ -59,17 +55,13 @@ const deviceOf = (userAgent: string | null): string => {
   return browser === undefined || system === undefined ? UNKNOWN_DEVICE : `${browser} on ${system}`;
 };
 
-/** One of the person's own sessions, as the Sessions section shows it. */
 export type SessionShown = {
   readonly id: string;
 
-  /** Read from the session's user agent; an unreadable one reads as no known device. */
   readonly device: string;
 
-  /** An ISO instant, as it crosses the wire. */
   readonly lastActiveAt: string;
 
-  /** The session the read is made from, which alone carries no sign-out. */
   readonly current: boolean;
 };
 
@@ -79,7 +71,6 @@ type SessionRow = {
   readonly lastActiveAt: Date;
 };
 
-/** Each id as the boundary names it, or nothing: a caller's id is never trusted to be well formed. */
 const idsOf = (input: { readonly personId: string; readonly sessionId: string }) => {
   const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
   const sessionId = boundarySchemas.session.select.shape.id.safeParse(input.sessionId);
@@ -88,7 +79,6 @@ const idsOf = (input: { readonly personId: string; readonly sessionId: string })
     : undefined;
 };
 
-/** The current session first, then the rest newest first. No address is read; an expired row is the sweep's. */
 const SESSIONS_OF_PERSON = `SELECT id, user_agent AS "userAgent", updated_at AS "lastActiveAt"
                        FROM session WHERE user_id = $1 AND expires_at > $3
                       ORDER BY (id = $2) DESC, updated_at DESC, id DESC`;
@@ -122,7 +112,6 @@ export const readSessions = async (
   return read;
 };
 
-/** What a page sends to sign one of the person's own sessions out. */
 export const endOneSessionInput = z.object({ sessionId: z.string() });
 
 type EndedRow = {
@@ -131,7 +120,6 @@ type EndedRow = {
   readonly lastActiveAt: Date;
 };
 
-/** The detail's name for each session an act ended: its id, its device, and when it was last active. */
 const endedSessions = (rows: readonly EndedRow[]): readonly EndedSession[] =>
   rows.map((row) => ({
     sessionId: row.id,
@@ -139,7 +127,6 @@ const endedSessions = (rows: readonly EndedRow[]): readonly EndedSession[] =>
     lastActiveAt: row.lastActiveAt.toISOString(),
   }));
 
-/** One record of the person's own, naming the sessions their sign-out ended. */
 const recording = (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -154,10 +141,8 @@ const recording = (
 
 const RETURNED_ENDED = `RETURNING id, user_agent AS "userAgent", updated_at AS "lastActiveAt"`;
 
-/** $1 binds the read's own session, $2 the person, $3 the instant: an expired row is the sweep's, never an act's. */
 const GONE = `DELETE FROM session WHERE expires_at > $3 AND`;
 
-/** Holds the person's row, ends the live sessions `rest` names, and records the act naming them. */
 const ending = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -208,8 +193,8 @@ export const endOneSession = async (
 export type EndOtherSessionsRefusal = WorkspaceRefusal<"malformed" | "person-gone"> | Error;
 
 /**
- * Ends every session the person holds but the one the request runs in, and no token of theirs.
- * No record is written when the current session was the only one.
+ * Ends the person's other sessions, not the current one nor their tokens. Writes no record when the
+ * current session was the only one.
  */
 export const endOtherSessions = async (
   platform: PlatformPrincipal,

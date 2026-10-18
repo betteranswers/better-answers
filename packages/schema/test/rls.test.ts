@@ -151,8 +151,6 @@ describe("the exemption list", () => {
   });
 });
 
-// A partitioned table is read here as its declared parent; question-tables.test.ts holds
-// each month's partition of the questions' content.
 describe("every tenant table", () => {
   it("carries RLS and FORCE ROW LEVEL SECURITY in the catalogue", async () => {
     for (const qualified of tenantTableNames()) {
@@ -1741,16 +1739,8 @@ describe("the suggestions under app_rt", () => {
 
 const INSUFFICIENT_PRIVILEGE = "42501";
 
-/**
- * The one proposer form every kind's CHECK accepts, a citation fix's platform-only one included, so
- * the pair under test is all the probe varies.
- */
 const A_PLATFORM_PROPOSER = "process:better-answers-test";
 
-/**
- * Under role NONE the function reads its caller off `session_user` instead: the migrator
- * who applied the journal, whom its CASE names no branch for.
- */
 const THE_CALLERS = [
   { caller: "app_rt", mayRaise: SUGGESTION_KINDS_FROM_THE_APP, role: "app_rt" },
   { caller: "worker_rt", mayRaise: SUGGESTION_KINDS_FROM_A_RUN, role: "worker_rt" },
@@ -1787,8 +1777,6 @@ describe("the kinds a caller may raise, asked of the function", () => {
       await seedTwoWorkspaces(client);
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      // Owning the function, the migrator may execute it, so what refuses it below is the
-      // CASE's silence rather than a missing grant.
       const owner = await client.query<{ holds: boolean }>(
         "SELECT has_function_privilege(session_user, 'submit_suggestion_set(text, text, text, jsonb)', 'EXECUTE') AS holds",
       );

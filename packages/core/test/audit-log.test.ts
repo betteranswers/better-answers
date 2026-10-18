@@ -65,7 +65,6 @@ const acting = async <T>(
     work,
   );
 
-/** One transaction each, so each group's event holds an instant of its own. */
 const groupsMadeBy = async (
   workspace: ProvisionedWorkspace,
   userId: string,
@@ -128,7 +127,6 @@ const invitedBy = async (workspace: ProvisionedWorkspace, address: string): Prom
   return sent?.invitationId ?? "";
 };
 
-/** An event in `workspace` whose subject is a row `elsewhere` holds under the same id. */
 const eventAboutTheirs = async (
   workspace: ProvisionedWorkspace,
   action: "people.invitation.created" | "people.group.created",
@@ -394,18 +392,15 @@ describe("the audit log", () => {
   });
 });
 
-/** The member row alone goes, as a removal leaves the person and their events behind. */
 const memberRemoved = (workspace: ProvisionedWorkspace, userId: string) =>
   db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
     workspace.workspaceId,
     userId,
   ]);
 
-/** One address per workspace, as an address is one person's across the platform. */
 const addressOf = (workspace: ProvisionedWorkspace): string =>
   `priya.${workspace.workspaceId.toLowerCase()}@example.com`;
 
-/** Priya made a group herself, was added to another, then had her role changed. */
 const priyaOf = async (workspace: ProvisionedWorkspace) => {
   const priya = await seedPerson(db().pool, { name: "Priya Shah", email: addressOf(workspace) });
   await seedingWith(db().pool, (seed) =>
@@ -422,7 +417,6 @@ const priyaOf = async (workspace: ProvisionedWorkspace) => {
   return { priya, estimators, bidWriters };
 };
 
-/** Groups "Crew 001" upward, each with its creation's event; answers their ids in id order. */
 const crewsSeeded = (workspace: ProvisionedWorkspace, count: number) =>
   seedingWith(db().pool, async (seed) => {
     const ids: string[] = [];

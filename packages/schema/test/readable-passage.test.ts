@@ -11,10 +11,6 @@ const db = postgresForSuite();
 const WS_A = "01J6EAAAAAAAAAAAAAAAAAAAAA";
 const WS_B = "01J6EBBBBBBBBBBBBBBBBBBBBB";
 
-/**
- * Spelled here, not imported: `packages/core` owns the builder and depends on this package,
- * so the arrow points one way.
- */
 const READABLE = `SELECT id FROM "index".readable_passage AS v
      WHERE v.published_at IS NOT NULL
        AND (v.sensitivity <> 'Restricted' OR $1 = 'Admin')
@@ -414,8 +410,6 @@ describe("what the view withholds", () => {
   it("drops a passage whose source has gone, keeping its neighbour", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      // A passage naming a document cascades away with the connected source; one naming none outlives
-      // it, and the inner join is what withholds it.
       const orphaned = await aPassageUnderAConnectedSource(client, {
         connectedSourceSensitivity: "Public",
         withoutADocument: true,

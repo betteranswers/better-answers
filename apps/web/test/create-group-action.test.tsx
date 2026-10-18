@@ -14,7 +14,6 @@ afterEach(() => {
 
 const NAME = "Create a Group";
 
-/** The stub refuses every action, so a submitted name ends in the dialog's own refusal line. */
 const refusedOnce = async () => {
   vi.stubGlobal("fetch", answeringAs("Admin"));
   render(

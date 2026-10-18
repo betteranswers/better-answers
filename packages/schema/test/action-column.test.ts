@@ -33,7 +33,6 @@ const replayed = async (client: pg.PoolClient): Promise<void> => {
   for (const statement of migrationStatements(THE_MIGRATION)) await client.query(statement);
 };
 
-/** Run as a non-superuser owner of the two audit logs, as `migrate` connects. */
 const migrated = (client: pg.PoolClient): Promise<void> =>
   asTheMigrationOwnerOf(
     client,
@@ -41,7 +40,6 @@ const migrated = (client: pg.PoolClient): Promise<void> =>
     () => replayed(client),
   );
 
-/** Reads after 0073 runs again over the names before it, inside a transaction rolled back after. */
 const replayedThen = <T>(read: (client: pg.PoolClient) => Promise<T>): Promise<T> =>
   withRollback(db().pool, async (client) => {
     await namedAsBefore(client);
@@ -56,7 +54,6 @@ const STORED_ACTIONS = [
   ["identity_audit_event", "people.person.grants_ended"],
 ] as const;
 
-/** Two workspaces' events and the identity set's, written under the old column's name. */
 const seededBefore = async (client: pg.PoolClient): Promise<void> => {
   const seed = testData(client);
   for (const workspace of [await seed.workspace(), await seed.workspace()]) {
@@ -89,7 +86,6 @@ const filesOf = async (client: pg.PoolClient) =>
     )
   ).rows;
 
-/** Each row with its place on disk and every value it holds. */
 const rowsOf = async (client: pg.PoolClient, column: "act" | "action") => {
   const rows: Record<string, string>[] = [];
   for (const log of AUDIT_LOGS) {

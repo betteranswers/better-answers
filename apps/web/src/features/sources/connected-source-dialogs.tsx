@@ -18,7 +18,6 @@ type DialogProperties = {
   readonly onConfirm: (confirmations: Confirmations) => void;
 };
 
-/** The action's own row may lose the control that opened it, so focus goes back to the connected source. */
 const toTheConnectedSource = (connectedSourceId: string) => (event: Event) => {
   event.preventDefault();
   document.getElementById(connectedSourceHeadingId(connectedSourceId))?.focus();
@@ -28,7 +27,6 @@ const closedBy = (onClose: () => void) => (open: boolean) => {
   if (!open) onClose();
 };
 
-/** `said` is the tick box's label and `term` the same words as the audit summary's term. */
 const CONFIRMATIONS = [
   { field: "lawfulBasisRecorded", said: "Lawful basis recorded", term: "Lawful Basis Recorded" },
   {

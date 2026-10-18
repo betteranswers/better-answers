@@ -8,7 +8,6 @@ await vi.hoisted(() => import("./stub-server.ts"));
 
 placedWithoutMeasuring();
 
-/** What the api answers an export past its ceiling: no word, and the seconds until it lifts. */
 const PAST_ITS_CEILING = {
   error: {
     message: "too many requests",

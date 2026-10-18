@@ -39,7 +39,6 @@ export const ADD_A_PASSKEY: Keystroke = { key: "a", action: ACCOUNT_ACTIONS.addP
 
 const PASSKEYS_HEADING = "passkeys-heading";
 
-/** The offer banner's link lands on this button. */
 export const ADD_A_PASSKEY_BUTTON = "add-a-passkey";
 
 export type Passkey = SecondFactor["passkeys"][number];
@@ -68,7 +67,6 @@ const saidOfTheRoute = (refused: CodeRefused): string => {
   return SAID_OF_THE_ROUTE.get(refused.word ?? "") ?? STOCK.general;
 };
 
-/** A cancelled prompt is no refusal. With no response the api may have kept the passkey. */
 const saidOfAdding = (failure: Error | null): string | undefined => {
   if (failure === null) return undefined;
   if (failure instanceof DeviceRefused) return SAID_OF_THE_DEVICE[failure.reason];
@@ -82,12 +80,10 @@ const saidWhileAdding = (pending: boolean, failure: Error | null): string | null
 
 const blankName = SAID_OF_SECOND_FACTOR["passkey-name-empty"];
 
-/** Selected as it mounts, so typing replaces the name it was given. */
 const selectOnMount = (node: HTMLInputElement | null): void => {
   node?.select();
 };
 
-/** For a page where adding a passkey is the first way on. */
 const focusOnMount = (node: HTMLInputElement | null): void => {
   node?.focus();
   node?.select();
@@ -135,7 +131,6 @@ export function AddAPasskey(properties: {
           setName(event.target.value);
         }}
       />
-      {/* Enabled while the device asks, so a cancelled prompt hands focus back to the button. */}
       <Button type="submit" className="mt-4 aria-disabled:opacity-50" aria-disabled={pending}>
         {properties.commit ?? PASSKEY_WORDS.addCommit}
       </Button>
@@ -153,7 +148,6 @@ const saidOfRenaming = (failure: Error | ApiError | null): string | undefined =>
   return refusal === undefined ? STOCK.tryAgain : saidOfASecondFactorRefusal(refusal);
 };
 
-/** Enter saves and Escape puts the name back; either way focus returns to Rename. */
 function RenameAPasskey(properties: {
   readonly passkey: Passkey;
   readonly onDone: (renamedTo: string | undefined) => void;
@@ -242,7 +236,6 @@ function PasskeyRow(properties: {
   const backToRename = useRef(false);
   const [renaming, setRenaming] = useState(false);
 
-  /** Rename is drawn again once the field closes, and takes focus as it mounts. */
   const renameMounted = (node: HTMLButtonElement | null) => {
     if (node === null || !backToRename.current) return;
     backToRename.current = false;
@@ -303,7 +296,6 @@ function PasskeyRow(properties: {
   );
 }
 
-/** Whoever must hold a factor keeps their last: a passkey alone, with no authenticator set up. */
 const isTheLastFactor = (held: SecondFactor): boolean =>
   held.mustHoldOne && held.authenticator !== "set-up" && held.passkeys.length === 1;
 
@@ -340,7 +332,6 @@ function PasskeyRows(properties: PasskeysProperties & { readonly held: SecondFac
   );
 }
 
-/** A browser with no WebAuthn adds nothing, but its rows can still be renamed and removed. */
 function AddingHere(properties: PasskeysProperties) {
   const formId = useId();
   if (!properties.here) return <p className="mt-3">{PASSKEY_WORDS.noWebAuthn}</p>;
@@ -368,7 +359,6 @@ function AddingHere(properties: PasskeysProperties) {
   );
 }
 
-/** The heading stands while the read is out or has failed; the rows come once it is read. */
 export function PasskeysSection(properties: PasskeysProperties) {
   const { held } = properties;
   return (

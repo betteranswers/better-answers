@@ -27,7 +27,6 @@ import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-/** Any id the platform mints: the page shows none, a finding's least of all. */
 const AN_ID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/;
 
 const CONNECTED_SOURCES = pageNamed(menuGroupIn(CONTROL_CENTRE, "sources"), "Connected Sources");
@@ -43,18 +42,14 @@ const DESTINATIONS_TERM = "Destinations";
 const connectedSourcesRegion = (page: Page) =>
   page.getByRole("region", { name: "Connected Sources" });
 
-/** The region's outcome line: its count and the connect action's progress are statuses before it. */
 const saidIn = (page: Page): Locator => connectedSourcesRegion(page).getByRole("status").last();
 
-/** What a region says now, as `toHaveText` reads it, for telling a later state from this one. */
 const saidNowIn = async (region: Locator): Promise<string> => (await region.textContent()) ?? "";
 
-/** A sync not yet finished is said in words before its time; a finished one is its time alone. */
 const A_SYNC_UNDER_WAY = /^\D+\d{2}:\d{2}/;
 
 const isTheList = (url: URL): boolean => url.pathname.includes("sources.list");
 
-/** True where the list's own call, alone or in a batch, was answered with a result. */
 const answeredTheList = async (answer: Response): Promise<boolean> => {
   const calls = new URL(answer.url()).pathname.split("/").at(-1)?.split(",") ?? [];
   const body: unknown = await answer.json();
@@ -62,10 +57,6 @@ const answeredTheList = async (answer: Response): Promise<boolean> => {
   return typeof own === "object" && own !== null && "result" in own;
 };
 
-/**
- * The empty list's line draws as a loading or failed read's does, so the read must be answered
- * and the line move on.
- */
 const listsNothingConnected = async (page: Page, open: () => Promise<unknown>): Promise<void> => {
   const list = await heldBack(page, isTheList);
   await open();
@@ -89,7 +80,6 @@ const connectedSourceNamed = (page: Page, name: string): Locator =>
     .getByRole("listitem")
     .filter({ has: page.getByRole("heading", { level: 3, name, exact: true }) });
 
-/** The lead's one definition a term names, read the way a screen reader pairs them. */
 const leadOf = (page: Page, name: string, term: string): Locator =>
   connectedSourceNamed(page, name)
     .getByRole("term")
@@ -103,7 +93,6 @@ const lastSyncedOf = (page: Page, name: string) => leadOf(page, name, "Last Sync
 
 const sensitivityOf = (page: Page, name: string) => leadOf(page, name, "Sensitivity");
 
-/** The lead's terms come first in a row, so the last of a name is More Details'. */
 const detailOf = (page: Page, name: string, term: string): Locator =>
   connectedSourceNamed(page, name)
     .getByRole("term")
@@ -118,14 +107,12 @@ const ROW_ACTIONS = {
   widen: "Widen Sensitivity or Audience",
 } as const;
 
-/** A row's action, named for its effect and then, for a screen reader, its connected source. */
 const rowAction = (page: Page, name: string, action: keyof typeof ROW_ACTIONS): Locator =>
   connectedSourceNamed(page, name).getByRole("button", {
     name: `${ROW_ACTIONS[action]} ${name}`,
     exact: true,
   });
 
-/** A sensitivity panel's name, which holds its connected source's, and its commit. */
 const SENSITIVITY_PANELS = {
   narrow: { named: (name: string) => `Narrow the Sensitivity of ${name}`, commit: "Narrow" },
   widen: {
@@ -136,7 +123,6 @@ const SENSITIVITY_PANELS = {
 
 type SensitivityChange = keyof typeof SENSITIVITY_PANELS;
 
-/** Found inside its connected source's row, so a panel drawn anywhere else is not found. */
 const panelOf = (page: Page, name: string, change: SensitivityChange): Locator =>
   connectedSourceNamed(page, name).getByRole("group", {
     name: SENSITIVITY_PANELS[change].named(name),
@@ -148,7 +134,6 @@ const commitOf = (page: Page, name: string, change: SensitivityChange): Locator 
     exact: true,
   });
 
-/** An Admin of a fresh workspace, signed in on the product's own page and standing on Sources. */
 const anAdminAtSources = async (
   page: Page,
   api: APIRequestContext,
@@ -210,7 +195,6 @@ test.describe("the Sources page's list of connected sources", () => {
     ];
     await anAdminAtSources(page, request, { workspace: "Calder Joinery", connectedSources: ten });
 
-    // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
     await page.goto("/sources/connected-sources");
     await expect(connectedSourcesRegion(page).getByRole("heading", { level: 3 })).toHaveCount(10);
@@ -279,7 +263,6 @@ test.describe("the Sources page's list of connected sources", () => {
     await expect(handbook.getByRole("term").filter({ hasText: DESTINATIONS_TERM })).toHaveCount(0);
     await handbook.getByRole("button", { name: "More Details Staff handbook" }).click();
 
-    // A stored value is one word, and what More Details says of it is several.
     const aSentence = /\S\s+\S/;
     await expect(detailOf(page, "Staff handbook", "State")).toHaveText(aSentence);
     await expect(handbook.getByRole("term").filter({ hasText: /^Destination/ })).toHaveText([
@@ -318,7 +301,6 @@ test.describe("the Sources page's list of connected sources", () => {
       .getByRole("button", { name: "More Details Site archive" })
       .click();
     const archive = detailOf(page, "Site archive", "Unreadable");
-    // Four unreadable, two of them scans.
     await expect(archive.getByRole("paragraph")).toHaveText(/^\D*\b4\b\D+\b2\b\D*$/);
     const titles = ["Archive", "Floor plan", "Old minutes", "Site survey"];
     const unreadable = archive.getByRole("listitem");
@@ -364,7 +346,6 @@ test.describe("the Sources page's list of connected sources", () => {
     });
     await page.goto("/sign-in");
     await signIn(page, request, email);
-    // Control Centre is the Admin's alone, so an Editor reaches Connected Sources by address only.
     await page.goto(CONNECTED_SOURCES.path);
 
     await notFoundOfferingHome(page, "Editor");
@@ -421,7 +402,6 @@ test.describe("connecting a document on the Sources page", () => {
     await expect(dialog.getByLabel("File")).toBeFocused();
 
     await page.keyboard.press("Space");
-    // Large enough for the throttled upload to be seen partway.
     await (
       await choosing
     ).setFiles({
@@ -452,7 +432,6 @@ test.describe("connecting a document on the Sources page", () => {
       uploadThroughput: -1,
     });
 
-    // The connect action's own outcome: no other status names what was connected.
     await expect(
       connectedSourcesRegion(page).getByRole("status").filter({ hasText: "The staff handbook" }),
     ).toContainText("handbook.md");
@@ -497,7 +476,6 @@ test.describe("connecting a document on the Sources page", () => {
 
   test("says in the dialog that the api refused an upload", async ({ page, request }) => {
     await anAdminAtSources(page, request, { workspace: "Ryburn Stores" });
-    // The page lets a markdown file through, so the kind is changed on its way to the api.
     await page.route(
       (url) => url.pathname.endsWith("sources.connect"),
       (route) =>
@@ -543,7 +521,6 @@ const SUPPLIER_FORMS: SeedConnectedSource = indexed("Supplier forms", {
   ],
 });
 
-/** The words the review shows for the three rules seeded here. */
 const BANK_ACCOUNT_RULE = "Sort code and account number";
 
 const HOME_ADDRESS_RULE = "Home address";
@@ -559,13 +536,8 @@ const healthCueBoxIn = (title: string): string =>
 
 const HEALTH_CUE_BOX = healthCueBoxIn("Staff survey");
 
-/** A note that a document is narrowed counts nothing; one of findings dismissed or kept does. */
 const aNoteOf = (findings: number): RegExp => new RegExp(String.raw`\b${String(findings)}\b`);
 
-/**
- * Two documents as a sync leaves them after a dismissal: one lifted to its connected source's sensitivity, one
- * still holding a span nobody dismissed.
- */
 const SERVICE_RECORDS: SeedConnectedSource = indexed("Service records", {
   documents: [
     {
@@ -596,11 +568,9 @@ const SERVICE_RECORDS: SeedConnectedSource = indexed("Service records", {
   ],
 });
 
-/** A connected source's review wherever the page draws it, for saying none is drawn. */
 const reviewNamed = (page: Page, name: string) =>
   page.getByRole("region", { name: `Review of ${name}` });
 
-/** Found inside its connected source's row, so a review drawn anywhere else is not found. */
 const reviewOf = (page: Page, name: string) =>
   connectedSourceNamed(page, name).getByRole("region", { name: `Review of ${name}` });
 
@@ -612,11 +582,9 @@ const reviewHeading = (page: Page, name: string) =>
 const findingRow = (page: Page, name: string, document: string, rule: string) =>
   reviewOf(page, name).getByRole("row").filter({ hasText: document }).filter({ hasText: rule });
 
-/** A finding's notes, each a line of its own under the document's sensitivity. */
 const notesOf = (page: Page, name: string, document: string, rule: string) =>
   findingRow(page, name, document, rule).getByRole("paragraph");
 
-/** The outcomes the review's actions have said, in the actions' order: keep, narrow, dismiss. */
 const outcomesOf = (page: Page, name: string) =>
   reviewOf(page, name).getByRole("status").filter({ hasText: /\S/ });
 
@@ -767,7 +735,6 @@ test.describe("reviewing a connected source's findings", () => {
     await rowAction(page, "Supplier forms", "review").click();
     const review = reviewOf(page, "Supplier forms");
 
-    // One line on the page describes all three while nothing is ticked.
     const describedBy =
       (await review
         .getByRole("button", { name: "Keep in Text", exact: true })
@@ -823,7 +790,6 @@ test.describe("reviewing a connected source's findings", () => {
     await page.keyboard.type("The company's own bank details, printed on every invoice");
     await page.keyboard.press("Enter");
 
-    // One group kept, its two findings restored: the line while it is pending counts no finding.
     const kept = /\b1\b\D+\b2\b/;
     await expect(outcomesOf(page, "Supplier forms")).toHaveText([kept]);
     await expect(
@@ -838,7 +804,6 @@ test.describe("reviewing a connected source's findings", () => {
     await narrowing.getByRole("button", { name: "Narrow", exact: true }).focus();
     await page.keyboard.press("Enter");
 
-    // One document narrowed, and no concept or write-up moved with it.
     await expect(outcomesOf(page, "Supplier forms")).toHaveText([
       kept,
       /\b1\b\D+Restricted\D+\b0\b\D+\b0\b/,
@@ -896,7 +861,6 @@ test.describe("reviewing a connected source's findings", () => {
     await page.keyboard.press("Enter");
     await theActionLandedWithinItsBudget(page, "dismissal");
 
-    // One group dismissed, in one document: the line while it is pending counts no document.
     const dismissed = outcomesOf(page, "Supplier forms");
     await expect(dismissed).toHaveText([/\b1\b\D+\b1\b/]);
     const whileQueued = await saidNowIn(dismissed);
@@ -1118,7 +1082,6 @@ test.describe("publishing, narrowing and widening a connected source", () => {
         - definition
     `);
 
-    // What the row carries of a confirmation not yet made, which a tick must change.
     const waiting = carried.getByRole("definition").filter({
       hasText: await saidNowIn(
         carried
@@ -1190,7 +1153,6 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(panel).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 3, name: "Supplier payments" })).toBeFocused();
     await expect(sensitivityOf(page, "Supplier payments")).toHaveText("Restricted");
-    // One concept and one write-up moved with it.
     await expect(saidIn(page)).toHaveText(/Supplier payments\D+Restricted\D+\b1\b\D+\b1\b/);
     await expect(page.getByText(citedBy?.iri ?? "")).toBeVisible();
   });
@@ -1259,7 +1221,6 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await page.keyboard.press("Enter");
     await theActionLandedWithinItsBudget(page, "widen");
 
-    // One concept and one write-up moved with it.
     await expect(saidIn(page)).toHaveText(/Tender answers\D+Internal\D+\b1\b\D+\b1\b/);
     await expect(page.getByText(citedBy?.iri ?? "")).toBeVisible();
     await expect(sensitivityOf(page, "Tender answers")).toHaveText("Internal");
@@ -1357,7 +1318,6 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       connectedSources: [indexed("Bid library"), indexed("Case studies")],
     });
 
-    // The first widening reaches the api and its answer is held, so the second press meets it pending.
     const reached = Promise.withResolvers<void>();
     const answered = Promise.withResolvers<void>();
     let asked = 0;
@@ -1418,8 +1378,6 @@ test.describe("publishing, narrowing and widening a connected source", () => {
 
     await commitOf(page, "Price book", "widen").press("Enter");
 
-    // The row reads widened before the api answers, and a late answer overwrites what the next
-    // `w` says. The answer's counts tell it has landed.
     await expect(saidIn(page)).toHaveText(/Price book\D+Public\D+\b0\b\D+\b0\b/);
     const whenWidened = await saidNowIn(saidIn(page));
     await expect(audienceOf).toHaveText(EVERYONE);
@@ -1486,14 +1444,12 @@ test.describe("the Sources page's keystrokes", () => {
         - term: /⌘K|Ctrl K/
         - definition
     `);
-    // Each of the eleven keys has an action of its own, and `b` the name of the button it presses.
     const actions = listed.getByRole("definition");
     await expect(actions).toHaveText(Array.from({ length: 11 }, () => /\S/));
     const said = await actions.allInnerTexts();
     expect(new Set(said).size, "two keys are listed with one action").toBe(said.length);
     await page.keyboard.press("Escape");
     await expect(listed).toHaveCount(0);
-    // The rail's: the toolbar keeps the page's own actions alone.
     const keystrokes = page
       .getByRole("navigation", { name: "Areas" })
       .getByRole("button", { name: "Keyboard Shortcuts" });
@@ -1508,7 +1464,6 @@ test.describe("the Sources page's keystrokes", () => {
 
     await keystrokes.click();
     await listed.getByRole("checkbox", { name: turnedOn }).press("Space");
-    // A key sent into the closing list is ignored as the list's own, however the setting reads.
     await keystrokesDismissed(page, listed);
     await page.keyboard.press("b");
     await page.keyboard.press("?");

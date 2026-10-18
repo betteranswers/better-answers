@@ -25,7 +25,6 @@ const saidOfTheDevice = (refused: DeviceRefused): string | undefined => {
   return refused.reason === "unverified" ? PASSKEY_SIGN_IN_NOT_VERIFIED : PASSKEY_SIGN_IN_REFUSED;
 };
 
-/** A dismissed prompt is no refusal; the status line says no passkey was used. */
 export const saidOfAPasskeySignIn = (failure: Error | null): string | undefined => {
   if (failure === null) return undefined;
   if (failure instanceof DeviceRefused) return saidOfTheDevice(failure);
@@ -40,7 +39,6 @@ export const saidWhileSigningInWithAPasskey = (
   return isCancelled(failure) ? SIGN_IN_WORDS.passkeyNotUsed : null;
 };
 
-/** Offered only where the browser can use a passkey; the email field's autofill offers it too. */
 export function PasskeyAction(properties: {
   readonly pending: boolean;
   readonly onSignIn: () => void;
@@ -48,7 +46,6 @@ export function PasskeyAction(properties: {
   return (
     <div className="mt-6">
       <p className="text-muted-foreground">{SIGN_IN_WORDS.or}</p>
-      {/* Enabled while the device asks, so a cancelled prompt hands focus back to the button. */}
       <Button
         type="button"
         variant="outline"

@@ -92,7 +92,6 @@ describe("a page that throws", () => {
     expect(shown).not.toContain("Error");
     expect(container.querySelector("pre")).toBeNull();
 
-    // Everything the failed page draws is in the main region; the shell's names are not its claim.
     expect(screen.getByRole("main").textContent).not.toMatch(
       /report|logged|recorded|notified|team/i,
     );

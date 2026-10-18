@@ -8,7 +8,6 @@ import { repositoryRoot } from "./paths.ts";
 
 const ruleSetting = z.union([z.string(), z.tuple([z.string()], z.unknown())]);
 
-/** The keys the suites read; a key that stopped being there fails here, by name. */
 const oxlintConfig = z.object({
   rules: z.record(z.string(), ruleSetting),
   overrides: z.array(
@@ -35,8 +34,6 @@ export const readOxlintConfig = (): OxlintConfig =>
   oxlintConfig.parse(
     JSON.parse(
       readFileSync(path.join(repositoryRoot, ".oxlintrc.json"), "utf8").replaceAll(
-        // Whole-line comments only: a wider match would swallow a `//` inside a string, such
-        // as a URL.
         /^\s*\/\/.*$/gm,
         "",
       ),
@@ -53,10 +50,6 @@ export const loadableAnywhere = (plugin: JsPlugin): JsPlugin => ({
     : requireFromRoot.resolve(plugin.specifier),
 });
 
-/**
- * The specifier is read off the real config, so a plugin that stopped loading fails the case
- * rather than leaving every rule under it silent.
- */
 export const pluginConfigFor = (rules: Readonly<Record<string, RuleSetting>>): string => {
   const named = new Set(Object.keys(rules).map((rule) => rule.split("/")[0] ?? rule));
   const plugins = readOxlintConfig().jsPlugins.filter((one) => named.has(one.name));
@@ -71,7 +64,6 @@ type GlobbedOverride = OxlintConfig["overrides"][number] & {
   readonly files: readonly string[];
 };
 
-/** The first override whose `files` holds `glob` verbatim; throws when none does. */
 export const oxlintOverrideFor = (glob: string): GlobbedOverride => {
   const found = readOxlintConfig().overrides.find(
     (override): override is GlobbedOverride => override.files?.includes(glob) === true,

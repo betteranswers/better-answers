@@ -15,7 +15,6 @@ type Readonlyish<T> = T extends (infer Item)[]
     ? { readonly [Key in keyof T]: Readonlyish<T[Key]> }
     : T;
 
-/** An entry on one road, handed what that road lends it and never a door. */
 type EntryOn<Road extends string, Lent, Input extends z.ZodObject, Output extends z.ZodType> = {
   readonly road: Road;
   readonly name: string;
@@ -36,7 +35,6 @@ type EntryOn<Road extends string, Lent, Input extends z.ZodObject, Output extend
   readonly render: (result: Readonlyish<z.infer<Output>>) => string;
 };
 
-/** Runs in the one transaction that resolved its member, opened as its hint declares. */
 export type TransactionEntry<Input extends z.ZodObject, Output extends z.ZodType> = EntryOn<
   "resolvers-transaction",
   Tx,
@@ -44,10 +42,6 @@ export type TransactionEntry<Input extends z.ZodObject, Output extends z.ZodType
   Output
 >;
 
-/**
- * Holds no transaction of its own: each step it is handed opens one and settles it, so no
- * connection is held between them.
- */
 export type StepsEntry<Input extends z.ZodObject, Output extends z.ZodType> = EntryOn<
   "own-transaction",
   AskSteps<StepRefusal>,

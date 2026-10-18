@@ -70,14 +70,12 @@ const aMemberOfTwoWorkspaces = async () => {
   return { here, elsewhere, person, admin: api };
 };
 
-/** A member of two workspaces signs in with neither active, so each session picks this one. */
 const signedInHere = async (email: string, workspaceId: string) => {
   const signedIn = await webSignedIn(app(), email);
   expect((await setActiveWorkspace(signedIn.client, workspaceId)).status).toBe(200);
   return signedIn;
 };
 
-/** The member's assistant holds a grant in each workspace, and a third host presents them. */
 const connectedInBoth = async () => {
   const members = await aMemberOfTwoWorkspaces();
   const { here, elsewhere, person } = members;

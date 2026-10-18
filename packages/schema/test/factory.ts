@@ -40,7 +40,7 @@ export type TestData = {
 
   user(overrides?: Partial<InsertInput<"user">>): Promise<Row<"user">>;
 
-  /** As the library writes one; `secondFactorConfirmedAt` where the session confirmed a factor. */
+  /** As the library writes one. */
   session(overrides?: Partial<InsertInput<"session">>): Promise<Row<"session">>;
 
   account(overrides?: Partial<InsertInput<"account">>): Promise<Row<"account">>;
@@ -76,7 +76,6 @@ export type TestData = {
 
   verification(overrides?: Partial<InsertInput<"verification">>): Promise<Row<"verification">>;
 
-  /** Set up past its first code; `secret` is sealed as the plugin seals one, by the caller. */
   authenticator(
     overrides: Partial<InsertInput<"authenticator">> & { readonly secret: string },
   ): Promise<Row<"authenticator">>;
@@ -163,7 +162,7 @@ export type TestData = {
 
   /**
    * Seeds its record too when given none, asked now. A `recordId` comes with that record's
-   * `askedAt`, so the row lands in its record's month.
+   * `askedAt`.
    */
   questionContent(
     overrides?: Partial<Omit<InsertInput<"questionContent">, "recordId" | "askedAt">> &
@@ -180,10 +179,7 @@ export type TestData = {
   /** Serves a question it seeds, asked now, when given no run and no answer. */
   llmCall(overrides?: Partial<InsertInput<"llmCall">>): Promise<Row<"llmCall">>;
 
-  /**
-   * Taken now for ten minutes, at $0.15 the most, serving a question it seeds when given no run
-   * and no answer.
-   */
+  /** Taken now for ten minutes, serving a question it seeds when given no run and no answer. */
   spendReservation(
     overrides?: Partial<InsertInput<"spendReservation">>,
   ): Promise<Row<"spendReservation">>;
@@ -386,7 +382,6 @@ export const testData = (client: pg.PoolClient): TestData => {
   const passage: TestData["passage"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     if (!(await partitionExists(client, workspaceId))) {
-      // The lifecycle function refuses a workspace the transaction is not scoped to.
       const previous = await client.query("SELECT current_workspace_id() AS ws");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
       await client.query("SELECT create_workspace_partition($1)", [workspaceId]);
@@ -796,7 +791,6 @@ export const testData = (client: pg.PoolClient): TestData => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const documentId = overrides.documentId ?? (await sourceDocument({ workspaceId })).id;
 
-    // Two defaults seeded at once in one document read the same end and collide; seed them in turn.
     const furthest = await client.query<{ char_end: number | null }>(
       "SELECT max(char_end) AS char_end FROM finding WHERE workspace_id = $1 AND document_id = $2",
       [workspaceId, documentId],
@@ -833,8 +827,6 @@ export const testData = (client: pg.PoolClient): TestData => {
     const receivedAt = overrides.receivedAt ?? new Date();
     const clockStartedAt = overrides.clockStartedAt ?? receivedAt;
 
-    // `dueDateOf` in `packages/core/src/erasure/requests.ts` runs the same month rule in its
-    // own lines; change one and change this.
     const dayAsked = clockStartedAt.getUTCDate();
     const dueAt = new Date(clockStartedAt);
     dueAt.setUTCDate(1);
@@ -867,8 +859,6 @@ export const testData = (client: pg.PoolClient): TestData => {
       overrides.subjectRequestId ?? (await subjectRequest({ workspaceId, kind: "erasure" })).id;
     const anchoredAt = overrides.anchoredAt ?? new Date();
 
-    // `beyondUseFrom` in `packages/core/src/erasure/routine.ts`, over `monthsOn` in the same
-    // slice, spells the same four lifetimes; change one and change this.
     const outFrom = (milliseconds: number) => new Date(anchoredAt.getTime() + milliseconds);
     const hour = 60 * 60 * 1000;
     const dayAsked = anchoredAt.getUTCDate();
@@ -1063,8 +1053,8 @@ export const testData = (client: pg.PoolClient): TestData => {
       purpose: "judging",
       modelChoiceId: "model-choice-judge",
       model: "claude-sonnet-5-5",
-      tokensIn: 40_000,
-      tokensOut: 2_000,
+      mostTokensIn: 40_000,
+      mostTokensOut: 2_000,
       gbpPerMillionIn: "3",
       gbpPerMillionOut: "15",
       reservedGbp: "0.15",

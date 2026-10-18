@@ -727,7 +727,6 @@ const readWhole = (jobId: string, status: string, attempts: number, endedMinutes
   moved: { kind: "whole-source" },
 });
 
-/** Takes the lapsed-sync lock in a step whose transaction stays open until `release`. */
 const lockHeldOpen = async (scenario: Scenario, jobId: string) => {
   let locked = false;
   let release = () => {};

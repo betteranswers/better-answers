@@ -5,10 +5,6 @@ import { describe, expect, it } from "vitest";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 
-/**
- * Text, never imported: one half is Python, and importing either asks one language to answer
- * for the other.
- */
 const TIER_STAMPS = {
   "the api tier": "packages/schema/src/contract-stamp.ts",
   "the worker tier": "apps/worker/src/better_answers_worker/contract_stamp.py",

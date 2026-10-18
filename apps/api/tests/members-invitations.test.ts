@@ -35,7 +35,6 @@ const app = appForSuite(unreachable, clock);
 
 const INVITE = `${TRPC_ENDPOINT}/members.invite`;
 
-/** The same figure the browser suite holds a list to: the send answers inside it. */
 const SEND_BUDGET_MS = 1000;
 
 const A_DAY_MS = 24 * 60 * 60 * 1000;
@@ -43,14 +42,12 @@ const A_DAY_MS = 24 * 60 * 60 * 1000;
 const inviting = (api: Api, addresses: readonly string[], role = "Viewer") =>
   api.members.invite.mutate({ addresses: [...addresses], role });
 
-/** One address's invitation, as the send answered it. */
 const invitedOne = async (api: Api, address: string, role = "Viewer") => {
   const [one] = (await inviting(api, [address], role)).invitations;
   if (one === undefined) throw new Error("the send answered no invitation");
   return one;
 };
 
-/** A resend answers the same invitation, its email gone this time. */
 const resentWithItsEmail = async (api: Api, invitationId: string): Promise<void> => {
   const resent = await api.members.resendInvitation.mutate({ invitationId });
   expect(resent).toMatchObject({ invitationId, emailSent: true });
@@ -61,12 +58,10 @@ const anAdmin = async () => {
   return { workspace, ...(await webSignedIn(app(), workspace.admin.email)) };
 };
 
-/** One workspace emails an address at most this often in an hour. */
 const PER_ADDRESS_CEILING = 5;
 
 const TO_THE_CEILING = [...Array.from({ length: PER_ADDRESS_CEILING }, () => 200), 429];
 
-/** Sends to `address` up to its ceiling and once past it, the clock stopped while it counts. */
 const sentToTheCeiling = async (api: Api, address: string): Promise<readonly number[]> => {
   const statuses: number[] = [];
   stopTheClock();

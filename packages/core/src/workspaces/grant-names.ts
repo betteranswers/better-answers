@@ -9,14 +9,12 @@ export type GrantNames = {
   readonly workspaces: ReadonlyMap<string, string>;
 };
 
-/** An ended grant as it is shown: named from the assistant and workspace rows as they stand now. */
 export type GrantNamed = {
   readonly assistant: { readonly id: string; readonly name: string };
   readonly workspace: { readonly id: WorkspaceId; readonly name: string } | null;
   readonly issuedAt: string;
 };
 
-/** One read of each table, by id, whatever the number of grants. */
 export const namesOfGrants = async (tx: Tx, grants: readonly EndedGrant[]): Promise<GrantNames> => {
   const assistantIds = [...new Set(grants.map((grant) => grant.clientId))];
   const workspaceIds = [...new Set(grants.flatMap((grant) => grant.workspaceId ?? []))];
@@ -34,7 +32,6 @@ export const namesOfGrants = async (tx: Tx, grants: readonly EndedGrant[]): Prom
   };
 };
 
-/** An assistant or workspace with no name, or gone since, reads as its id, which a reader can look up. */
 export const grantNamed = (grant: EndedGrant, names: GrantNames): GrantNamed => ({
   assistant: { id: grant.clientId, name: names.assistants.get(grant.clientId) ?? grant.clientId },
   workspace:
@@ -51,7 +48,6 @@ type Detail = NonNullable<AuditEventRow["detail"]>;
 
 const listOfGrants = z.array(endedGrant);
 
-/** A field read once: a list of grants as the grant kind wrote it, or any other value as it was. */
 type FieldRead =
   | { readonly field: string; readonly grants: readonly EndedGrant[] }
   | { readonly field: string; readonly value: Detail[string] };
@@ -77,10 +73,6 @@ const namedField = (read: FieldRead, names: GrantNames): Detail[string] =>
       })
     : read.value;
 
-/**
- * Each detail with its grants beside the names their ids hold now, read with one query to each
- * table for all the details together.
- */
 export const detailsNamed = async (
   tx: Tx,
   details: readonly Detail[],

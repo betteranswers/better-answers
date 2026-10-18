@@ -4,8 +4,6 @@ import { pluginConfigFor, readOxlintConfig } from "@better-answers/devtools/oxli
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-const RULES_FILE = "the root `CODING_STANDARDS.md`";
-
 const RULE = "eslint-js/no-restricted-syntax";
 
 const setting = readOxlintConfig().rules[RULE];
@@ -56,7 +54,7 @@ describe("the syntax the lint refuses, with what to write instead", () => {
       parsing('  return z.enum(["a", "b"] satisfies readonly string[]);'),
       "as const",
     ],
-  ])("refuses %s, naming its rules file", (_shape, tree, instead) => {
+  ])("refuses %s, naming the fix", (_shape, tree, instead) => {
     const findings = lint
       .output(tree)
       .split("\n")
@@ -65,7 +63,6 @@ describe("the syntax the lint refuses, with what to write instead", () => {
     expect(findings).toHaveLength(1);
     expect(findings[0]).toContain("eslint-js(no-restricted-syntax)");
     expect(findings[0]).toContain(instead);
-    expect(findings[0]).toContain(RULES_FILE);
   });
 
   it.each([

@@ -7,21 +7,17 @@ import { authenticatorCodeField } from "../e2e/locators.ts";
 import { couldNotRun, failed } from "./outcome.ts";
 import { refusedTheRun } from "./sign-in.ts";
 
-/** Named, not imported: `apps/web` takes nothing from `apps/api` at runtime. */
 const CONFIRM_PATH = "/second-factor/confirm/authenticator";
 
-/** The product answers this when the session's person holds no authenticator to confirm with. */
 const NOTHING_TO_CONFIRM = 409;
 
 const OTPAUTH = /^otpauth:\/\//i;
 
-/** The `secret` of the `otpauth://` link a setup's QR code carries, or the value as given. */
 const secretOf = (value: string): string =>
   OTPAUTH.test(value) && URL.canParse(value)
     ? (new URL(value).searchParams.get("secret") ?? "")
     : value;
 
-/** An authenticator's key as its setup shows it: base32, perhaps in spaced groups or lower case. */
 const KEY = z
   .string()
   .transform((value) => secretOf(value.trim()).replaceAll(/\s/g, "").toUpperCase())
@@ -29,16 +25,13 @@ const KEY = z
 
 const enrolled = z.object({ key: KEY });
 
-/** The key as the code generator takes it, from the key or its link; nothing if neither parses. */
 export const authenticatorKeyOf = (value: string | undefined): string | undefined => {
   const parsed = KEY.safeParse(value);
   return parsed.success ? parsed.data : undefined;
 };
 
-/** Where the test Admin's authenticator key comes from; asked before the sign-in, so none is spent. */
 export type FactorKey = () => Promise<string>;
 
-/** The setting is named and its value never is: the key is a secret. */
 export const keyFromTheSetting = (): FactorKey => {
   const key =
     authenticatorKeyOf(process.env["JOURNEYS_ADMIN_AUTHENTICATOR_KEY"]) ??
@@ -46,7 +39,6 @@ export const keyFromTheSetting = (): FactorKey => {
   return async () => key;
 };
 
-/** By hand, against the browser suite's api, the harness writes the test Admin an authenticator. */
 export const keyFromTheHarness =
   (request: APIRequestContext, address: string): FactorKey =>
   async () => {
@@ -55,7 +47,6 @@ export const keyFromTheHarness =
     return enrolled.parse(await answered.json()).key;
   };
 
-/** A page that sets a factor up, not one that confirms it, means the test Admin holds none. */
 const theConfirmPage = async (page: Page): Promise<void> => {
   const field = authenticatorCodeField(page);
   const setup = page.getByRole("heading", { level: 1, name: "Set Up a Second Factor" });
@@ -65,7 +56,6 @@ const theConfirmPage = async (page: Page): Promise<void> => {
   }
 };
 
-/** A code the product refuses is the release's; an Admin holding no authenticator is the ground's. */
 const judged = (status: number): void => {
   if (status === NOTHING_TO_CONFIRM)
     couldNotRun("the test Admin holds no authenticator to confirm");
@@ -74,7 +64,6 @@ const judged = (status: number): void => {
   );
 };
 
-/** Through the product's own confirm page, with the code the key makes now. */
 export const confirmedWith = (page: Page, key: string): Promise<void> =>
   test.step("Confirm the second factor", async () => {
     await theConfirmPage(page);
@@ -87,6 +76,5 @@ export const confirmedWith = (page: Page, key: string): Promise<void> =>
     const response = await answered;
     refusedTheRun(response, "the confirm");
     if (!response.ok()) judged(response.status());
-    // Six digits confirm on their own; leaving the page sooner cancels the request.
     await expect(field).toHaveCount(0);
   });

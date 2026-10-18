@@ -18,7 +18,6 @@ const invented = (number: number, role = "Viewer") => ({
   role,
 });
 
-/** The fixture as the command leaves it, from the shape it shares with the journeys. */
 const FIXTURE: Standing["members"] = [
   { address: "admin@journeys.example", role: "Admin" },
   { address: "editor@journeys.example", role: "Editor" },

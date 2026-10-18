@@ -34,7 +34,6 @@ const fixture = z
 
 type Evidence = Parameters<typeof ConceptBody>[0]["evidence"];
 
-/** Each source as the read gives it: its label, its id where the entry has one, and a passage to open. */
 const evidenceOf = (sources: z.output<typeof linksCase>["sources"]): Evidence =>
   sources.map((entry, at) => {
     const locator = `01J6QQQQQQQQQQQQQQQQQQQQQQ/chars:${String(at)}-9`;
@@ -71,12 +70,10 @@ const marksIn = (article: HTMLElement): readonly (string | null)[] =>
     .queryAllByRole("button")
     .map((mark) => mark.getAttribute("aria-label"));
 
-/** The two private-use characters a mark is carried between, which no file may write its own. */
 const OPENS = String.fromCodePoint(0xe000);
 
 const CLOSES = String.fromCodePoint(0xe001);
 
-/** A body whose marks open a panel, drawn where the body puts it. */
 function Opening(properties: { readonly body: string }) {
   const [openerId, setOpenerId] = useState<string>();
   return (
@@ -96,7 +93,6 @@ function Opening(properties: { readonly body: string }) {
   );
 }
 
-/** The body's blocks as drawn, less every attribute, each mark as its number alone. */
 const blocksOf = (article: HTMLElement): string => {
   const copy = article.firstElementChild?.cloneNode(true);
   if (!(copy instanceof HTMLElement)) return "";
@@ -408,7 +404,6 @@ const TO_THE_COMMITTEE = "../roles/audit-committee.md";
 
 type BodyLinks = NonNullable<Parameters<typeof ConceptBody>[0]["bodyLinks"]>;
 
-/** Each address answered with the committee's concept. */
 const answering = (...addresses: readonly string[]): BodyLinks =>
   addresses.map((address) => ({ address, target: `https://better-answers.com/c/${COMMITTEE}` }));
 

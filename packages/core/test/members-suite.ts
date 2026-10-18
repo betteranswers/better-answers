@@ -12,10 +12,6 @@ import { confirmedSessionFor, endedGrants, type NamedGrants } from "./identity-r
 import type { ProvisionedWorkspace } from "./platform.ts";
 import { seedingWith } from "./suite-postgres.ts";
 
-/**
- * As the transport holds a mutation's caller: their own member row `FOR SHARE` until commit, on a
- * session confirmed as the clock reads now.
- */
 export const heldAs = async <T>(
   workspace: ProvisionedWorkspace,
   userId: string,
@@ -67,7 +63,6 @@ export const bothHoldingTheirOwnRow = <T>(
 
 /** `db` answers the suite's database once its hooks have run, so it is read at each call. */
 export const membersSuite = (db: () => MigratedPostgres) => {
-  /** A new person, a member of `workspace` at `role`; answers their person id. */
   const joining = (workspace: ProvisionedWorkspace, role: Role): Promise<string> =>
     seedingWith(db().pool, async (seed) => {
       const { id } = await seed.user();
@@ -90,7 +85,6 @@ export const membersSuite = (db: () => MigratedPostgres) => {
       .filter(([, role]) => role === "Admin")
       .map(([userId]) => userId);
 
-  /** The workspace's audit rows for `action`, in the order they were written. */
   const auditRowsOf = async (workspace: ProvisionedWorkspace, action: string) => {
     const rows = await db().pool.query<{
       actor: string;
@@ -103,7 +97,6 @@ export const membersSuite = (db: () => MigratedPostgres) => {
     return rows.rows;
   };
 
-  /** The batch each of the workspace's `action` events stands in, in the order they were written. */
   const batchesOf = async (workspace: ProvisionedWorkspace, action: string) => {
     const rows = await db().pool.query<{ batch_id: string | null }>(
       "SELECT batch_id FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY id",
@@ -112,7 +105,6 @@ export const membersSuite = (db: () => MigratedPostgres) => {
     return rows.rows.map((row) => row.batch_id);
   };
 
-  /** The person's ended grants an Admin's action filed on the identity-set audit log. */
   const grantsEndedAbout = async (personId: string) => {
     const rows = await db().pool.query<{
       actor: string;
@@ -125,7 +117,6 @@ export const membersSuite = (db: () => MigratedPostgres) => {
     return rows.rows;
   };
 
-  /** A refresh and an access token here for each holder, named so an assertion reads whose ended. */
   const grantsHere = (workspace: ProvisionedWorkspace, holders: Readonly<Record<string, string>>) =>
     seedingWith(db().pool, async (seed) => {
       const { clientId } = await seed.oauthClient();

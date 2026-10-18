@@ -29,7 +29,6 @@ const wrapperOf = (clients: AppClients) =>
     return <Providers clients={clients}>{properties.children}</Providers>;
   };
 
-/** The member read as the frame draws it: one read, mounted across every move between pages. */
 function FrameRole() {
   const held = useMember();
   return <p>{`Held: ${held.data?.role ?? "none"}`}</p>;
@@ -45,7 +44,6 @@ const framedBy = (clients: AppClients) =>
     );
   };
 
-/** Members, where the action that included the reader has just succeeded. */
 function ActedOnMyself() {
   const { goHome } = useSelfActionHome();
   const [outcome, setOutcome] = useState<Outcome>();
@@ -86,7 +84,6 @@ const MEMBERS = "/people/members";
 
 const CHOOSER = "/choose-workspace";
 
-/** The reader, an Admin, on Members with their member read; a failed read is not asked again. */
 const actingAt = async () => {
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false } });
@@ -100,11 +97,9 @@ const actingAt = async () => {
   return { ...opened, clients };
 };
 
-/** The chooser's list, as the band's switcher leaves it once its menu has been opened and shut. */
 const workspacesHeldIn = (clients: AppClients) =>
   createApiProxy(clients.apiClient, clients.queryClient).person.workspaces.queryKey();
 
-/** A search read as an Admin and left behind: no page shows it while People is open. */
 const MATCHES_HELD = [
   ["knowledge", "find"],
   { input: { query: "salary bands" }, type: "infinite" },
@@ -112,7 +107,6 @@ const MATCHES_HELD = [
 
 const AS_AN_ADMIN = { pages: [{ matches: [{ title: "Audit Salary Bands" }] }], pageParams: [null] };
 
-/** The reader's own demotion, answered: they are on the Editor's home, having held a search. */
 const demotedToEditor = async () => {
   const acting = await actingAt();
   acting.clients.queryClient.setQueryData(MATCHES_HELD, AS_AN_ADMIN);
@@ -122,7 +116,6 @@ const demotedToEditor = async () => {
   return acting;
 };
 
-/** Ada, an Admin holding a search, whose role change is answered only when the test lets it be. */
 const changingARole = async () => {
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false } });

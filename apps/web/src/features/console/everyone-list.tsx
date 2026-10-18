@@ -62,7 +62,6 @@ function PersonCell(properties: {
   );
 }
 
-/** The person's own cell opens them, so its actions ride into the columns. */
 const columnsFor = (actions: PersonActions) =>
   column.columns([
     column.display({
@@ -85,13 +84,11 @@ type Listed = ReturnType<typeof usePeople>;
 
 const NO_ONE: readonly ListedPerson[] = [];
 
-/** A refused read leaves nothing listed: what it held may no longer be the reader's to see. */
 const readOf = (listed: Listed) => {
   const page = listed.error === null ? listed.data : undefined;
   return { page, people: page?.people ?? NO_ONE, total: page?.total ?? 0 };
 };
 
-/** The page showing stays while the next is read, so its count would be the last search's. */
 const countSaid = (readingAgain: boolean, total: number, search: string): string => {
   if (readingAgain) return WORDS.readingAgain;
   return search === "" ? WORDS.counted(total) : WORDS.matching(total, search);
@@ -99,7 +96,6 @@ const countSaid = (readingAgain: boolean, total: number, search: string): string
 
 type Opened = { readonly personId: string; readonly at: OpenedAt };
 
-/** Signing in again comes back with the person named, to be reopened at the action. */
 const reopened = (arrived: Arrival): Opened | undefined =>
   arrived.personId === undefined ? undefined : { personId: arrived.personId, at: arrived.action };
 
@@ -110,7 +106,6 @@ function OpenedSheet(properties: {
   readonly returnFocus: (personId: string) => void;
 }) {
   const { opened } = properties;
-  // Correcting a name can take its person out of the search; their sheet stays on the last read.
   const person = useLastRead(properties.people, opened?.personId);
   if (opened === undefined || person === undefined) return null;
   return (
@@ -126,7 +121,6 @@ function OpenedSheet(properties: {
   );
 }
 
-/** A keystroke that cannot act says why through `say`; the search's own is the filter row's. */
 function usePeopleKeystrokes(properties: {
   readonly openInFocus: (at: OpenedAt) => void;
   readonly turns: PageTurns;
@@ -181,7 +175,6 @@ export function EveryoneList() {
   );
   const table = useTable({ features, columns, data: people, getRowId: (person) => person.id });
 
-  /** A letter pressed outside the list still needs a person, so the one last in focus stands. */
   const openInFocus = (at: OpenedAt) => {
     const person = people.find((listedPerson) => listedPerson.id === inFocus);
     setOutcome(person === undefined ? NO_PERSON_IN_FOCUS : undefined);
@@ -189,7 +182,6 @@ export function EveryoneList() {
   };
   usePeopleKeystrokes({ openInFocus, turns, turnTo, say: setOutcome });
 
-  // The address that reopened the person has served once they are closed; a reload starts afresh.
   const close = () => {
     setOpened(undefined);
     if (arrived.personId !== undefined) void navigate({ to: EVERYONE_PATH, replace: true });
@@ -252,7 +244,6 @@ export function EveryoneList() {
         people={people}
         onClose={close}
         returnFocus={(personId) => {
-          // A person the list no longer holds has no row to go back to.
           (document.getElementById(personButtonId(personId)) ?? searchRef.current)?.focus();
         }}
       />

@@ -31,17 +31,14 @@ placedWithoutMeasuring();
 
 const CALDER = { id: "c", name: "Calder Pressings" };
 
-/** What the api answers every read of a workspace the session names and the person has left. */
 const NOT_A_MEMBER = aRefusalAnswer("not-a-member", "unauthenticated", 401);
 
 const SET_ACTIVE = "/organization/set-active";
 
 const MEMBER_PAGE = memberPageOf(ADA.personId);
 
-/** Ada's own page, with Editor picked and the change pressed. */
 const ROLE_CHANGED = read({ personId: ADA.personId, previousRole: "Admin", role: "Editor" });
 
-/** `memberAfter` is what the member read answers once the change has landed. */
 const demotingHerself = async (api: Api, memberAfter: Parameters<Api["set"]>[1]) => {
   api.set("members.changeRole", () => {
     api.set("session.member", memberAfter);
@@ -61,14 +58,12 @@ describe("a change to the reader's own member", () => {
     api.set("members.remove", () => {
       api.set("session.member", () => NOT_A_MEMBER);
       api.set("members.list", () => NOT_A_MEMBER);
-      // Two are left, so the chooser stands rather than opening the only one.
       api.set("person.workspaces", () =>
         read([
           { workspace: HOLME, role: "Viewer" },
           { workspace: CALDER, role: "Viewer" },
         ]),
       );
-      // The chooser reads this before it draws, so the frame stands until the test lets it answer.
       api.set("person.secondFactor", () => landing.promise.then(() => FORBIDDEN));
       return read({});
     });

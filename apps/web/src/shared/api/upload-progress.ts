@@ -15,7 +15,6 @@ type Watcher = (progress: UploadProgress) => void;
 
 const watchers = new Map<string, Watcher>();
 
-/** The connected source's id is minted before the bytes leave, so it names the upload a form is watching. */
 export const watchUpload = (connectedSourceId: string, watcher: Watcher): (() => void) => {
   watchers.set(connectedSourceId, watcher);
   return () => {

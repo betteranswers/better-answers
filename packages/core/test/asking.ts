@@ -49,10 +49,8 @@ const flat = <Value, Inner, Outer>(
   opened: Result<Result<Value, Inner>, Outer>,
 ): Result<Value, Inner | Outer> => (opened.ok ? opened.value : opened);
 
-/** Invented: it seals nothing outside the suites. */
 export const SUITE_ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => 255 - index);
 
-/** The judge's model client, and the keys it opens; a call with no client set fails its test. */
 export type Judging = {
   readonly credentials?: Credentials;
   readonly callModel?: ModelClient["callModel"];
@@ -63,7 +61,6 @@ const NO_MODEL_CALL = (): never => {
   throw new Error("a model was called where the test set up no model client");
 };
 
-/** The steps a transport hands `ask`: each one a transaction of its own, as the asker. */
 export const stepsFor = (
   pool: pg.Pool,
   asker: UserPrincipal,
@@ -96,7 +93,6 @@ export const stepsFor = (
   };
 };
 
-/** The drafter's steps as a transport hands them: each a transaction of its own, as the asker. */
 export const draftStepsFor = (
   pool: pg.Pool,
   asker: UserPrincipal,
@@ -124,7 +120,6 @@ export const draftStepsFor = (
 
 export type Asking = z.input<typeof askInput>;
 
-/** The tokens out each open reservation of the workspace holds, as `read` finds them when called. */
 export const reservationsRead = (db: MigratedPostgres, workspaceId: string) => {
   const reserved: unknown[] = [];
   const read = async (): Promise<void> => {
@@ -139,7 +134,6 @@ export const reservationsRead = (db: MigratedPostgres, workspaceId: string) => {
 
 export type Told = { readonly caps?: AskCaps; readonly now?: Date; readonly judging?: Judging };
 
-/** Asks as `asker` through steps on the runtime pool; `now` is this instant unless told. */
 export const askedAsIs = async (
   db: MigratedPostgres,
   asker: UserPrincipal,
@@ -156,7 +150,6 @@ export const askedAsIs = async (
     ),
   );
 
-/** As `askedAsIs`, the map's tables counted first. */
 export const asked = async (
   db: MigratedPostgres,
   asker: UserPrincipal,
@@ -168,11 +161,9 @@ export const asked = async (
   return askedAsIs(db, asker, asking, told);
 };
 
-/** What `ask` would answer, planned on the one transaction its caller already holds. */
 export const plannedOn = (reader: UserPrincipal, tx: Tx, asking: Asking) =>
   planAnswer(reader, (work) => work(tx), inputOf(askInput, asking), new Date());
 
-/** What `ask` answers, apart from its record's id, where nothing bears on the question. */
 export const REFUSED = {
   verdict: "refuse",
   judgeState: "not-judged",
@@ -185,26 +176,21 @@ export const REFUSED = {
   readableCollections: [],
 };
 
-/** An answer apart from its record's id, which no two answers share. */
 export const withoutRecord = ({ recordId: _recordId, ...answer }: AnswerResult) => answer;
 
 export type SeededConcept = {
-  /** The folder under `knowledge/`, or null for none. */
   readonly collection: string | null;
   readonly kind?: string;
   readonly title: string;
   readonly body: string;
   readonly contentHash?: string;
   readonly sensitivity?: string;
-  /** Minted by the caller where the order of two concepts' IRIs matters. */
   readonly iri?: ConceptIri;
-  /** Each concept this one's node has an edge to. */
   readonly linksTo?: readonly ConceptIri[];
 };
 
 let seededConcepts = 0;
 
-/** A published concept's index row with its node on the map, and an edge to each it links to. */
 export const conceptSeeded = (
   db: MigratedPostgres,
   workspaceId: string,
@@ -236,7 +222,6 @@ export const conceptSeeded = (
     return ids.conceptIri.parse(indexed.iri);
   });
 
-/** One at a time: the seeder numbers each concept's path as it writes it. */
 export const conceptsSeeded = async (
   db: MigratedPostgres,
   workspaceId: string,
@@ -252,16 +237,12 @@ const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better
 const SONNET = "claude-sonnet-5-5";
 
 type SonnetSetUp = {
-  /** The purpose Sonnet is chosen for; none is chosen where it is null. */
   readonly purpose: LlmPurpose | null;
-  /** No limit is set where it is null. */
   readonly limitGbp: string | null;
-  /** The envelope key the model key is sealed under; none is set where it is null. */
   readonly sealedUnder: Uint8Array | null;
   readonly key: string;
 };
 
-/** A workspace whose Admin asks, with Sonnet priced, chosen, its key sealed and a limit set. */
 export const aSonnetWorkspace = async (
   db: MigratedPostgres,
   { purpose, limitGbp, sealedUnder, key }: SonnetSetUp,
@@ -305,14 +286,12 @@ export const aSonnetWorkspace = async (
 
 export type WrittenAnswer = {
   readonly collection: string;
-  /** The file's name, and the merge key's. */
   readonly slug: string;
   readonly title: string;
   readonly body: string;
   readonly sensitivity?: "Internal" | "Restricted";
 };
 
-/** Writes a stable `Answer` under its collection through the governed write, citing nothing. */
 export const answerWritten = (scenario: Scenario, shape: WrittenAnswer): Promise<SourcedConcept> =>
   conceptCiting(scenario, scenario.editor, [], {
     mergeKey: `answer:${shape.slug}`,

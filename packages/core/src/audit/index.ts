@@ -60,10 +60,6 @@ export type AuditEvent<A extends AuditAction> = {
 
   readonly batchId?: string | undefined;
 
-  /**
-   * Stamps `at` as the row is written, not as its transaction began, so rows a lock serialises
-   * sort in the lock's order.
-   */
   readonly stampedAsWritten?: true;
 };
 
@@ -77,7 +73,6 @@ export type AuditEventRow = z.infer<typeof boundarySchemas.auditEvent.select>;
 const AUDIT_EVENT_ROW = `id, workspace_id AS "workspaceId", action, family, actor, subject_kind AS "subjectKind",
             subject_id AS "subjectId", at, detail, batch_id AS "batchId"`;
 
-/** Oldest first; `since` is inclusive. */
 export const eventsOfAction = async (
   principal: PlatformPrincipal,
   tx: Tx,
@@ -97,10 +92,6 @@ export const eventsOfAction = async (
   return found.rows.map((row) => boundarySchemas.auditEvent.select.parse(row));
 };
 
-/**
- * The latest instant each subject met `action` on the identity-set audit log; a subject that never
- * did is left out. Naming the subject kind reaches the log's index on kind and subject.
- */
 export const latestOnIdentitySet = async (
   _operator: OperatorPrincipal,
   tx: Tx,
@@ -118,7 +109,6 @@ export const latestOnIdentitySet = async (
 
 export type AuditEventPage = {
   readonly rows: readonly AuditEventRow[];
-  /** The last row's id when an older row follows it; null when this page holds the oldest. */
   readonly nextCursor: AuditEventId | null;
 };
 
@@ -130,16 +120,11 @@ const afterTheCursor = (at: CursorAt): string =>
      SELECT page_end.at, page_end.id FROM audit_event page_end
       WHERE page_end.workspace_id = ${scopeClause(at.scope)} AND page_end.id = $${at.cursor}))`;
 
-/** Fetched one row past the page, so that row says another follows. */
 const pageOf = (rows: readonly AuditEventRow[], limit: number): AuditEventPage => {
   const lastOfAFullPage = rows.length > limit ? rows[limit - 1] : undefined;
   return { rows: rows.slice(0, limit), nextCursor: lastOfAFullPage?.id ?? null };
 };
 
-/**
- * Newest first, from the row after `cursor`. A cursor naming no row in scope reads nothing, so
- * another workspace's id learns nothing of it; one row past the page says another follows.
- */
 export const eventsNewestFirst = async (
   principal: Principal,
   tx: Tx,
@@ -166,32 +151,26 @@ export const eventsNewestFirst = async (
   );
 };
 
-/** Ids under subject kinds; a kind left out of `kinds` hides the events its subjects stand under. */
 type SoughtSubjects = {
   readonly kinds: readonly string[];
   readonly ids: readonly string[];
 };
 
-/** Where a person's id may stand in an event's detail: under `key`, in the listed actions alone. */
 export type DetailNaming = {
   readonly key: string;
-  /** Every kind the actions' subjects take, so the arm reaches the subject index. */
   readonly subjectKinds: readonly string[];
   readonly actions: readonly ActionName[];
 };
 
-/** What a read looks for, each list read as its own arm; an empty list adds no arm. */
 export type EventsSought = {
   readonly people: readonly UserId[];
   readonly subjects: readonly SoughtSubjects[];
   readonly actions: readonly string[];
-  /** The keys a person's id stands under in detail, matched against `people`. */
   readonly detail: readonly DetailNaming[];
 };
 
 type ArmAt = CursorAt & { readonly limit: number; readonly family: number };
 
-/** Each arm is limited on its own index; one query that ORs them would scan the workspace. */
 const armOf = (at: ArmAt, predicate: string): string =>
   `(SELECT ${AUDIT_EVENT_ROW}
       FROM audit_event
@@ -201,7 +180,6 @@ const armOf = (at: ArmAt, predicate: string): string =>
      ORDER BY at DESC, id DESC
      LIMIT $${at.limit} + 1)`;
 
-/** One value compares by `=`, so an arm on one person keeps its index's order and needs no sort. */
 const oneOf = (values: readonly string[], bind: Bind): string =>
   values.length === 1 ? `= $${bind(values[0] ?? "")}` : `= ANY($${bind(values)}::text[])`;
 
@@ -232,11 +210,6 @@ const predicatesOf = (sought: EventsSought, bind: Bind): readonly string[] => {
   ];
 };
 
-/**
- * Newest first, from the row after `cursor`, within `family` when one is asked for: the events
- * whose actor or detail names one of the people, whose subject is one sought, or whose action is.
- * An event two arms reach is answered once, and nothing sought reads nothing.
- */
 export const eventsSoughtNewestFirst = async (
   principal: Principal,
   tx: Tx,
@@ -270,7 +243,6 @@ const eventInsert = boundarySchemas.auditEvent.insert.omit({ workspaceId: true }
 
 const identitySetInsert = boundarySchemas.identityAuditEvent.insert;
 
-/** Both audit logs take the same row; only a workspace's audit log adds the workspace it belongs to. */
 const ROW_COLUMNS = "id, action, actor, subject_id, detail, batch_id";
 
 const AN_KINDS: ReadonlySet<string> = new Set(["id", "iri", "audience"]);
@@ -349,21 +321,14 @@ const write = async <A extends AuditAction>(
   return { id: boundarySchemas.auditEvent.select.shape.id.parse(id), actorId: actor };
 };
 
-/**
- * Writes the event to the audit log its action was declared for. Rejects when the action was never
- * declared, or the event does not fit the audit log's row or its action's detail shape; under the
- * operator, who stands in no workspace, when the action is not the identity set's.
- */
 export const record = <A extends AuditAction>(
   principal: Principal | OperatorPrincipal,
   tx: Tx,
   event: AuditEvent<A>,
 ): Promise<Recorded> => write(tx, scopeParameter(principal), actorIdOf(principal), event);
 
-/** A lone event stands in no batch. */
 export const batchIdFor = (count: number): string | undefined => (count > 1 ? ulid() : undefined);
 
-/** Answers the batch the events share, or undefined for a lone one, which stands in none. */
 export const recordEach = async <A extends AuditAction>(
   principal: Principal | OperatorPrincipal,
   tx: Tx,
@@ -377,7 +342,6 @@ export const recordEach = async <A extends AuditAction>(
   return batchId;
 };
 
-/** As `record`, but the event's own `actor` is recorded rather than the platform. */
 export const recordFor = <A extends AuditAction>(
   platform: PlatformPrincipal,
   tx: Tx,

@@ -51,7 +51,6 @@ import { RELATION_WORDS } from "./knowledge-words.ts";
 
 const LISTED = Object.values(KEY);
 
-/** Focus goes back to the match only where this page was opened from one: no other way here left a row. */
 const useWayBack = (iri: string | undefined) => {
   const navigate = useNavigate();
   const searchQuery = useRouterState({
@@ -78,7 +77,6 @@ function WayBack(properties: { readonly iri: string | undefined }) {
   );
 }
 
-/** One state for a malformed, absent or withheld address, whose way back carries nothing of it. */
 function NoSuchConcept() {
   return (
     <ListState
@@ -166,7 +164,6 @@ function SourceLine(properties: {
   );
 }
 
-/** The evidence pane: the reader's access first, every source the file cites, then where to go next. */
 function Sources(properties: {
   readonly concept: Concept;
   readonly opening: MarkOpening;
@@ -186,7 +183,6 @@ function Sources(properties: {
         {concept.evidence.length === 0 ? null : (
           <ol className="divide-y divide-border border-t border-border">
             {concept.evidence.map((item, source) => (
-              // The file's order is the only identity a source has: two may share every word.
               <SourceLine key={source} item={item} source={source} opening={opening} />
             ))}
           </ol>
@@ -258,7 +254,6 @@ function Links(properties: { readonly concept: Concept; readonly heading: Headin
   );
 }
 
-/** The one disclosure: what else the file says of itself, under the file's own key names. */
 function Details(properties: { readonly concept: Concept }) {
   const further = furtherKeysOf(properties.concept.frontmatter);
   if (further.length === 0) return null;
@@ -282,7 +277,6 @@ function Details(properties: { readonly concept: Concept }) {
   );
 }
 
-/** One reading column, as wide as the body's own measure, so the sources sit under what cites them. */
 const COLUMN = "max-w-measure [font-size:var(--prose-size,var(--text-lg))]";
 
 const INTERFACE = "[font-size:var(--text-base)]";
@@ -332,7 +326,6 @@ function ConceptShown(properties: { readonly iri: string; readonly concept: Conc
   return (
     <article
       aria-labelledby={titleId}
-      // Room for the panel beside the page, so it covers none of the claim it was opened from.
       className={cn("mt-6", opened !== undefined && beside && "pr-[var(--container-md)]")}
     >
       <div className={COLUMN}>
@@ -362,7 +355,6 @@ function ConceptShown(properties: { readonly iri: string; readonly concept: Conc
   );
 }
 
-/** A failed read stands in for even a stale page, so nothing once read outlives being withheld. */
 function ConceptRead(properties: { readonly iri: string; readonly heading: Heading }) {
   const { iri } = properties;
   const concept = useConcept(iri);
@@ -386,7 +378,6 @@ function ConceptRead(properties: { readonly iri: string; readonly heading: Headi
   if (read === undefined) {
     return (
       <>
-        {/* The title's own room, so the page does not move down as the read lands. */}
         <div aria-hidden className="mt-6 min-h-24" />
         <ListState state={{ kind: "loading", words: WORDS.loading }} />
       </>
@@ -395,7 +386,6 @@ function ConceptRead(properties: { readonly iri: string; readonly heading: Headi
   return <ConceptShown iri={iri} concept={read} />;
 }
 
-/** `iri` is undefined where the address holds no concept's id, so nothing is asked about it. */
 export function ConceptPage(properties: { readonly iri: string | undefined }) {
   const { iri } = properties;
   const heading = useRef<HTMLHeadingElement>(null);

@@ -164,10 +164,6 @@ const contentsOf = (file: string): string | undefined =>
 
 const REFUSED = Symbol("the artifacts API refuses the token");
 
-/**
- * Answers the runs API as asked, lists `pages.json` as the artifacts API, and downloads a run's
- * checkpoint as one naming that run.
- */
 const fakeGh = (
   file: (name: string) => string,
   answer: unknown,
@@ -374,9 +370,7 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
   });
 });
 
-/** The organisation's plan runs 20 jobs at once. */
 const CONCURRENT_JOBS = 20;
-/** A pull request runs a lane job, a title job, a lockfile job and, when its dependencies moved, a typecheck. */
 const PULL_REQUEST_JOBS = 4;
 const A_LANE_JOB = 1;
 
@@ -389,7 +383,6 @@ const checkLegsSchema = z.object({
   ),
 });
 
-/** A merge group runs the full lane's legs after its lane job, a sharded leg once per shard. */
 const mergeGroupLegJobs = (): number =>
   Object.entries(readWorkflow("check.yml", checkLegsSchema).jobs)
     .filter(([job]) => job.startsWith("full-"))
@@ -537,8 +530,6 @@ describe("each mutation leg, run as shards and summed once", () => {
     );
   });
 
-  // A shard named wrongly would run nothing, and the run would come back green having tested
-  // nothing.
   it.each([
     { shards: "core-1,api-2", leg: "core", of: 16, refused: false },
     { shards: "api-6", leg: "core", of: 16, refused: false },

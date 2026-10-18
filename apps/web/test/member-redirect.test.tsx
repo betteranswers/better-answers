@@ -32,7 +32,6 @@ const TWO_WORKSPACES = [
 
 let asked: string[] = [];
 
-/** The person's own list is answered with no workspace open, so no refusal of the member read reaches it. */
 const answerTo = (name: string, refusal: string | undefined, role: Role) => {
   if (name === WORKSPACES_READ) return { result: { data: TWO_WORKSPACES } };
   if (refusal === undefined) return { result: { data: { ...A_MEMBER, role } } };
@@ -50,7 +49,6 @@ const answerTo = (name: string, refusal: string | undefined, role: Role) => {
   };
 };
 
-/** The api answers a batch as one array with an entry per procedure, a refusal being an entry. */
 const answering =
   (refusal?: string, role: Role = "Admin") =>
   (input: string | URL | Request): Promise<Response> => {
@@ -62,7 +60,6 @@ const answering =
     return answered(names.map((name) => answerTo(name, refusal, role)));
   };
 
-/** The shell's one member read is dropped; the frame's read after it answers. */
 const losingTheShellsRead = (role: Role) => {
   const answer = answeringAs(role);
   let lost = false;
@@ -73,7 +70,6 @@ const losingTheShellsRead = (role: Role) => {
   };
 };
 
-/** What a page's `beforeLoad` finds once the role is in hand and lets the reader see it. */
 const TAKEN = { hidden: false, unread: false };
 
 const INVITE = "Invite a Person";
@@ -84,7 +80,6 @@ const openAt = async (path: string, clients?: AppClients) => (await openApp(path
 
 const heading = () => screen.getByRole("heading", { level: 1 }).textContent;
 
-/** The tag a row's button is described by, which a screen reader says after the button's name. */
 const roleBeside = (button: HTMLElement) =>
   document.getElementById(button.getAttribute("aria-describedby") ?? "")?.textContent;
 
@@ -169,7 +164,6 @@ describe("a person the api will not answer about", () => {
     await vi.waitFor(() => expect(router.state.matches.at(-1)?.context).toMatchObject(TAKEN));
     expect(await screen.findByRole("button", { name: INVITE })).toBeDefined();
 
-    // An Admin who demotes themself reads their role again, as a Viewer.
     vi.stubGlobal("fetch", answeringAs("Viewer"));
     await clients.queryClient.refetchQueries({ queryKey: [["session", "member"]] });
     await rail().findByRole("link", { name: "Ask" });

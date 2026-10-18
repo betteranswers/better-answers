@@ -4,13 +4,11 @@ import { hasNoDisplayName, notErasedAt } from "./display-name.ts";
 
 type NamedPerson = { readonly displayName: string; readonly address: string };
 
-/** The kind, not the words: a person may give any display name, "the platform" among them. */
 export type AuditEventActor =
   | ({ readonly kind: "person" } & NamedPerson)
   | { readonly kind: "former-member" }
   | { readonly kind: "platform" };
 
-/** Erasure keeps the person row, so an erased person is one no name is found for. */
 export type PeopleNames = ReadonlyMap<string, NamedPerson>;
 
 const personIn = (actor: string): UserId | undefined =>
@@ -19,7 +17,6 @@ const personIn = (actor: string): UserId | undefined =>
 export const peopleAmong = (actors: readonly string[]): readonly UserId[] =>
   actors.flatMap((actor) => personIn(actor) ?? []);
 
-/** By person id, never through the member row, so a name stands after its member leaves. */
 export const namesOfPeople = async (tx: Tx, personIds: readonly string[]): Promise<PeopleNames> => {
   if (personIds.length === 0) return new Map();
   const found = await tx.query<{ id: string; name: string; email: string }>(

@@ -40,7 +40,6 @@ import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-/** The read gives at most 20 matches a page. */
 const A_PAGE = 20;
 
 const searchRegion = (page: Page) => page.getByRole("region", { name: "Search" });
@@ -53,24 +52,20 @@ const matchesOf = (page: Page): Locator =>
 
 const loadMore = (page: Page) => searchRegion(page).getByRole("button", { name: "Load More" });
 
-/** The search's own status: a passage opened beneath its match says its read in another. */
 const said = (page: Page) => searchRegion(page).getByRole("status").first();
 
 const alerted = (page: Page) => searchRegion(page).getByRole("alert");
 
 const passagePanel = (page: Page, title: string) => page.getByRole("dialog", { name: title });
 
-/** The mark of a document no concept rests on, then its sensitivity, whatever stands between. */
 const markedAt = (sensitivity: string): RegExp =>
   new RegExp(`Not company knowledge\\W+${sensitivity}`);
 
 const asked = (query: string): string =>
   `${SEARCH.path}?${new URLSearchParams({ "knowledge.search": query }).toString()}`;
 
-/** No document holds this id, so an open of a passage in it reads nothing. */
 const NO_SUCH_DOCUMENT = "01JBZ6Q2V7Y9K3M5N8P0R2T4W6";
 
-/** The api's own refusal: the open is asked of a passage in a document nobody holds. */
 const asOfADocumentNobodyHolds = (route: Route): Promise<void> =>
   route.continue({
     url: route
@@ -79,13 +74,11 @@ const asOfADocumentNobodyHolds = (route: Route): Promise<void> =>
       .replace(/[0-9A-Z]{26}(?=(?:\/|%2F)chars)/, NO_SUCH_DOCUMENT),
   });
 
-/** A page past the first names its cursor in the batched input. */
 const isAFindPastTheFirstPage = (url: URL): boolean =>
   isAFind(url) && (url.searchParams.get("input") ?? "").includes('"cursor"');
 
 const HANDBOOK = "Warehouse handbook";
 
-/** Five more than a page, so a second page follows the first. */
 const PALLET_PASSAGES = Array.from(
   { length: A_PAGE + 5 },
   (_, index) => `Pallet bay ${index + 1} takes stock wrapped and labelled before it is racked.`,
@@ -93,7 +86,6 @@ const PALLET_PASSAGES = Array.from(
 
 type Seeded = { readonly workspaceId: string; readonly adminId: string };
 
-/** Four concepts by an Admin, one of them Restricted. */
 const conceptsSeeded = async (api: APIRequestContext, workspace: Seeded): Promise<void> => {
   await seedConcepts(api, {
     workspaceId: workspace.workspaceId,
@@ -115,7 +107,6 @@ const conceptsSeeded = async (api: APIRequestContext, workspace: Seeded): Promis
   });
 };
 
-/** A handbook no concept cites, so each of its passages matches as a document of its own. */
 const handbookSeeded = async (api: APIRequestContext, workspace: Seeded): Promise<void> => {
   await seedConnectedSources(api, {
     workspaceId: workspace.workspaceId,
@@ -133,7 +124,6 @@ const handbookSeeded = async (api: APIRequestContext, workspace: Seeded): Promis
 
 const PAY_REVIEW = "Pay review minutes";
 
-/** A Restricted document no concept cites, which only an Admin's search may find. */
 const payReviewSeeded = async (api: APIRequestContext, workspace: Seeded): Promise<void> => {
   await seedConnectedSources(api, {
     workspaceId: workspace.workspaceId,
@@ -153,7 +143,6 @@ const payReviewSeeded = async (api: APIRequestContext, workspace: Seeded): Promi
 
 type Seeding = (api: APIRequestContext, workspace: Seeded) => Promise<void>;
 
-/** Each test seeds only what it searches, since a concept's write is a commit of its own. */
 const anAdminAtSearch = async (
   page: Page,
   api: APIRequestContext,
@@ -172,13 +161,8 @@ const anAdminAtSearch = async (
   return workspace;
 };
 
-/** What the status says now, as `toHaveText` reads it, for telling a later state from this one. */
 const saidNow = async (page: Page): Promise<string> => (await said(page).textContent()) ?? "";
 
-/**
- * The last search's rows stand until the typed one reaches the address, whose search keys the
- * list: it draws nothing while asking.
- */
 const searched = async (page: Page, query: string): Promise<void> => {
   await searchBox(page).fill(query);
   await expect(page, "the typed search has not settled into the address").toHaveURL(
@@ -188,10 +172,6 @@ const searched = async (page: Page, query: string): Promise<void> => {
   await expect(matchesOf(page).first()).toBeVisible();
 };
 
-/**
- * No row tells a search that found nothing from one still asking, so the status must move on
- * from what it said while held.
- */
 const foundNothing = async (
   page: Page,
   query: string,
@@ -212,7 +192,6 @@ const foundNothing = async (
 
 const handbookMatches = (page: Page) => matchesOf(page).filter({ hasText: HANDBOOK });
 
-/** The handbook searched, then Load more pressed with its page held back until `release`. */
 const moreAskedForAndHeld = async (page: Page) => {
   await searched(page, "pallet");
   await expect(matchesOf(page)).toHaveCount(A_PAGE);
@@ -260,7 +239,6 @@ test.describe("the Knowledge Search page", () => {
     );
     expect(finds, "the page asked for matches with nothing asked").toHaveLength(0);
 
-    // An ask the page sent late for nothing would have left before this one, and been counted.
     await foundNothing(page, "audit");
     expect(
       finds.map((sent) => new URL(sent.url()).searchParams.get("input")),
@@ -338,7 +316,6 @@ test.describe("the Knowledge Search page", () => {
     await searched(page, "pallet");
     const [repeated] = await matchesAnswered(await first);
     if (repeated === undefined) throw new Error("the first page answered no match");
-    // As a concept rewritten between two pages comes back: the next page opens on a match already shown.
     await page.route(
       isAFindPastTheFirstPage,
       matchesBecome((matches) => [repeated, ...matches.slice(1)]),
@@ -368,7 +345,6 @@ test.describe("the Knowledge Search page", () => {
 
     await expect(matchesOf(page)).toHaveText([/Forklift Licences/]);
     await expect(handbookMatches(page)).toHaveCount(0);
-    // The late page landed in its own search's list, which the next visit to it shows whole.
     await searchBox(page).fill("pallet");
     await expect(matchesOf(page)).toHaveCount(PALLET_PASSAGES.length);
   });
@@ -537,7 +513,6 @@ test.describe("the Knowledge Search page", () => {
     await anAdminAtSearch(page, request, "Holme Archives", [handbookSeeded]);
     await searched(page, "pallet");
     const renamed = "Warehouse handbook, second edition";
-    // As a document renamed and held closer between the search and the open.
     await page.route(isAnOpen, passageBecomes({ source: renamed, sensitivity: "Restricted" }));
     const first = handbookMatches(page).first();
     await first.getByRole("button", { name: HANDBOOK }).click();
@@ -548,7 +523,6 @@ test.describe("the Knowledge Search page", () => {
     await expect(panel, "the panel copied the match's sensitivity").not.toContainText("Internal");
     await expect(first).toContainText(markedAt("Internal"));
 
-    // The same passage refused on its next read: the title once read does not stand over the refusal.
     await page.keyboard.press("Escape");
     await expect(panel).toHaveCount(0);
     await page.unroute(isAnOpen);
@@ -571,7 +545,6 @@ test.describe("the Knowledge Search page", () => {
       await expect(heading).toBeFocused();
       await expect(page.getByText(PALLET_PASSAGES[0] ?? "")).toBeVisible();
 
-      // As the passage's document withheld or removed since: the next read of the list lacks it.
       let withheld = 1;
       await page.route(
         isAFind,
@@ -678,7 +651,6 @@ test.describe("the Knowledge Search page", () => {
       await page.keyboard.press("Escape");
       await expect(panel).toHaveCount(0);
     };
-    // One passage is read before the ceiling and one never: a mount asks each again by its own road.
     const read = handbookMatches(page).nth(1).getByRole("button", { name: HANDBOOK });
     const unread = handbookMatches(page).first().getByRole("button", { name: HANDBOOK });
     await read.click();
@@ -709,7 +681,6 @@ test.describe("the Knowledge Search page", () => {
     await page.route(isAFind, (route) => route.abort());
 
     await searchBox(page).fill("pallet");
-    // The query asks twice more before it answers, as it does of any failure with no word.
     await saysARefusal(alerted(page));
     await page.unroute(isAFind);
     await searchRegion(page).getByRole("button", { name: "Retry" }).click();
@@ -728,7 +699,6 @@ test.describe("the Knowledge Search page", () => {
     await saysARefusal(alerted(page));
     await expect(matchesOf(page)).toHaveCount(A_PAGE);
 
-    // A retry that fails again says so again: the alert leaves while it runs.
     const retry = searchRegion(page).getByRole("button", { name: "Retry" });
     await retry.click();
     await expect(alerted(page)).toHaveCount(0);
@@ -748,7 +718,6 @@ test.describe("the Knowledge Search page", () => {
   test("renders matches within the list's budget", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Ryedale Archives", [handbookSeeded]);
 
-    // A fresh document, so no page of matches is already in the page's cache.
     const started = Date.now();
     await page.goto(asked("pallet"));
     await expect(matchesOf(page)).toHaveCount(A_PAGE);

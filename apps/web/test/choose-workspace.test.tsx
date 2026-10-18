@@ -16,10 +16,8 @@ const NORTHERN = { workspace: { id: "w", name: "Northern Tooling" }, role: "Admi
 
 const SOUTHERN = { workspace: { id: "x", name: "Southern Castings" }, role: "Viewer" };
 
-/** Signed in and named, with no workspace open yet. */
 const A_SESSION = { session: { id: "s" }, user: { id: "p", name: "Ada" } };
 
-/** What every read but the person's own list answers a session with no workspace open. */
 const NEEDS_A_PICK = {
   error: {
     message: "no-active-workspace",
@@ -35,7 +33,6 @@ const NEEDS_A_PICK = {
 const refused = (): Promise<Response> =>
   Promise.resolve(Response.json({ code: "FORBIDDEN", message: "refused" }, { status: 403 }));
 
-/** Ada holds `held`, and the api refuses each pick for a reason other than her membership. */
 const everyPickRefused =
   (held: readonly unknown[]) =>
   (asked: Asked): Promise<Response> => {

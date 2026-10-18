@@ -27,7 +27,6 @@ const db = postgresForSuite();
 
 type Replying = (body: string, set: ReuseSet) => Response;
 
-/** The question a judging prompt asks. */
 const questionIn = (body: string): string =>
   /<question>\n([^<]*)\n<\/question>/.exec(promptOf(body))?.[1] ?? "";
 
@@ -36,13 +35,11 @@ const titlesOf = (set: ReuseSet, keys: readonly string[]): readonly string[] =>
     answers.flatMap(({ key, title }) => (keys.includes(key) ? [title] : [])),
   );
 
-/** Says yes to exactly the fits the set names for the question asked. */
 const judgingAsLabelled: Replying = (body, set) => {
   const asked = set.questions.find(({ question }) => question === questionIn(body));
   return new Response(judgeReplyTo(titlesOf(set, asked?.fits ?? []), body), { status: 200 });
 };
 
-/** Says yes to every candidate it is sent. */
 const judgingAllFit: Replying = (body, set) =>
   new Response(
     judgeReplyTo(
@@ -62,7 +59,6 @@ const judgingRefused: Replying = () =>
     status: 400,
   });
 
-/** The reading of `set` with a judge at the wire answering as `replying` does. */
 const readWith = async (set: ReuseSet, replying: Replying, effort?: Effort) => {
   const sent: string[] = [];
   const client = openModelClient({
@@ -167,7 +163,6 @@ describe("the reuse reading", () => {
       { named: 36, yes: 0, no: 36, unsent: 0 },
     ]);
     expect(atHalf.negatives).toEqual({ named: 36, yes: 36, no: 0, unsent: 0 });
-    // 34 calls of 2,400 tokens in at £0.03 a million.
     expect(atSevenTenths.spentGbp).toBe("0.002448");
   }, 300_000);
 
@@ -192,7 +187,6 @@ beforeAll(async () => {
 
 afterAll(() => rm(scratch, { recursive: true }));
 
-/** The set with its first question changed. */
 const altered = (held: ReuseSet, question: object): unknown => {
   const [first, ...rest] = held.questions;
   return { ...held, questions: [{ ...first, ...question }, ...rest] };

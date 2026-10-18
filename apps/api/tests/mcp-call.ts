@@ -24,14 +24,11 @@ export type Rpc = Readonly<Record<string, unknown>>;
 const isRpc = (value: unknown): value is Rpc =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** Anything but a plain object reads as an empty one. */
 export const rpcOf = (value: unknown): Rpc => (isRpc(value) ? value : {});
 
-/** The list's objects alone; anything but a list reads as empty. */
 export const rpcListOf = (value: unknown): readonly Rpc[] =>
   Array.isArray(value) ? value.filter(isRpc) : [];
 
-/** The tool's own answer, a tool error included. Fails the test when the call answers an error. */
 export const toolAnswered = async (
   client: Pick<TestClient, "fetch">,
   token: string,
@@ -47,7 +44,6 @@ export const toolAnswered = async (
   return rpcOf(body["result"]);
 };
 
-/** Fails the test when the call answers an error, or the tool reports one. */
 export const calledTool = async (
   client: TestClient,
   token: string,
@@ -61,6 +57,5 @@ export const calledTool = async (
 
 export const structured = (result: Rpc): Rpc => rpcOf(result["structuredContent"]);
 
-/** The first content item's text; the string `undefined` when there is no such text. */
 export const rendered = (result: Rpc): string =>
   String(rpcOf(rpcListOf(result["content"])[0])["text"]);

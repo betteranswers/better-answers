@@ -38,7 +38,6 @@ const wire = aModelWire();
 
 const { clock, stopTheClock } = aStoppableClock();
 
-/** Short, so a test sees a keep-alive without waiting the production interval. */
 const QUIET_MS = 200;
 
 const app = appForSuite({
@@ -51,10 +50,8 @@ const { users: USERS, supplier: SUPPLIER, retention: RETENTION } = AUDIT_ANSWERS
 
 const A_NOTE = "The period changed in May.";
 
-/** MCP_TOKEN_RULE's numbers: one connection's calls a minute. */
 const READS_A_MINUTE = 120;
 
-/** Signed in on the web and connected over MCP as the same person. */
 const bothWays = async (person: { readonly id: string; readonly email: string }, held: string) => {
   const client = app().client();
   const tokens = await connectAsHost(app(), client, person, {
@@ -68,7 +65,6 @@ const bothWays = async (person: { readonly id: string; readonly email: string },
   };
 };
 
-/** A concept no judge is asked about, which the drafter drafts from. */
 const ACCESS_POLICY = {
   title: "Audit information access for buyers",
   collection: "audits",
@@ -78,10 +74,6 @@ const ACCESS_POLICY = {
 
 type Arranged = { readonly limitGbp?: string; readonly drafting?: boolean };
 
-/**
- * A workspace holding three `Answer`s, set to judge, and its Admin both ways. Set to draft, it
- * holds a policy too, and an answering model.
- */
 const anAdminAsking = async ({ limitGbp, drafting = false }: Arranged = {}) => {
   const workspace = await app().provision();
   await seedConcepts(
@@ -108,7 +100,6 @@ type Web = Awaited<ReturnType<typeof anAdminAsking>>["web"];
 
 type Asking = Parameters<Web["ask"]["question"]["mutate"]>[0];
 
-/** Every event of one stream, in the order it arrived. */
 const streamed = async (web: Web, asking: Asking) => {
   const events = [];
   for await (const event of await web.ask.question.mutate(asking)) {
@@ -119,14 +110,11 @@ const streamed = async (web: Web, asking: Asking) => {
 
 type Streamed = Awaited<ReturnType<typeof streamed>>;
 
-/** Sent only when the stream is quiet, so a loaded machine may add one anywhere. */
 const isNotKeptAlive = (event: { readonly kind: string }) => event.kind !== "keep-alive";
 
-/** The events that carry something, in order: each phase and keep-alive left out. */
 const told = (events: Streamed) =>
   events.filter((event) => event.kind !== "phase" && event.kind !== "keep-alive");
 
-/** The result a stream carried. */
 const resultIn = (events: Streamed) => {
   const opened = events.find((event) => event.kind === "result");
   if (opened?.kind !== "result") throw new Error("the stream carried no result");
@@ -135,7 +123,6 @@ const resultIn = (events: Streamed) => {
 
 const recordsIn = (workspaceId: string) => recordsOf(app(), workspaceId);
 
-/** The spend a workspace holds: reservations not yet settled, and the calls settled. */
 const spendIn = async (workspaceId: string) => {
   const counted = await app().database.superuser.query(
     `SELECT (SELECT count(*)::int FROM spend_reservation WHERE workspace_id = $1) AS reserved,
@@ -219,7 +206,6 @@ describe("ask over tRPC", () => {
         retryAfterSeconds: expect.any(Number),
       },
     });
-    // A stream sends its status before any call settles, so the wait rides in the error alone.
     expect([onTheWire.status, onTheWire.headers.get("retry-after")]).toEqual([200, null]);
     expect(await onTheWire.text()).toContain('"retryAfterSeconds"');
     expect(resultIn(answered).verdict).toBe("ok");
@@ -291,7 +277,6 @@ describe("ask over tRPC", () => {
     await until(async () => (await spendIn(workspace.workspaceId))?.["called"] === 1);
 
     expect(sent.signal?.aborted).toBe(true);
-    // Cut off after it was sent, the judge's call may have been billed: it counts at full size.
     const billed = await app().database.superuser.query(
       "SELECT tokens_out FROM llm_call WHERE workspace_id = $1",
       [workspace.workspaceId],
@@ -342,17 +327,14 @@ describe("ask over tRPC", () => {
   });
 });
 
-/** A drafting request streams; the judge's does not. */
 const isDrafting = (sent: SentToModel): boolean =>
   z.object({ stream: z.literal(true) }).safeParse(JSON.parse(sent.body)).success;
 
-/** The judge saying no to every candidate, and the drafter writing `lines` from its prompt. */
 const judgedNoThenDrafting =
   (lines: (prompt: string) => readonly string[]) =>
   (sent: SentToModel): Response | Promise<Response> =>
     isDrafting(sent) ? drafterWriting(lines)(sent) : judgeSaying([])(sent);
 
-/** The policy's number in a drafting prompt. */
 const policyIn = (prompt: string): string =>
   conceptNumbersIn(prompt).get(ACCESS_POLICY.title) ?? "";
 
@@ -503,7 +485,6 @@ const wireAnswer = z.looseObject({
   related: z.array(wireConcept),
 });
 
-/** MCP's answer in core's words: its trust keys renamed back, and each address under no origin. */
 const inCoreTerms = (answered: Rpc, origin: string) => {
   const { answers, related, ...rest } = wireAnswer.parse(answered);
   const core = ({ url, trust, ...concept }: z.infer<typeof wireConcept>) => {
@@ -538,7 +519,6 @@ describe("a streamed mutation through the Hono mount", () => {
       const waited = Promise.withResolvers<"still held">();
       const timer = setTimeout(() => waited.resolve("still held"), 5_000);
       const events = (async () => (await streamed.twice.mutate())[Symbol.asyncIterator]())();
-      // A buffered mount sends nothing until the second is released, so the race ends it.
       const first = await Promise.race([events.then((stream) => stream.next()), waited.promise]);
       clearTimeout(timer);
       held.resolve();

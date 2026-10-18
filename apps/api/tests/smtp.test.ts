@@ -23,7 +23,6 @@ const replyTo = (line: string): string => {
   return REPLIES.get(verb) ?? "250 ok";
 };
 
-/** Speaks just enough SMTP for one session, and says when each message's data ends. */
 const converse = (socket: Socket, arrived: () => void): void => {
   let inData = false;
   socket.write("220 loopback\r\n");
@@ -41,7 +40,6 @@ const converse = (socket: Socket, arrived: () => void): void => {
   });
 };
 
-/** A relay on loopback that keeps when each message arrived and how many connections it took. */
 const loopbackRelay = async () => {
   const arrivedAtMs: number[] = [];
   const sockets: Socket[] = [];
@@ -76,7 +74,6 @@ const pacedThroughLoopback = async () => {
 
 const sixAddresses = Array.from({ length: 6 }, (_, at) => `person${String(at)}@example.test`);
 
-/** A transport that keeps what it was handed, in place of a relay. */
 const keepingTransport = () => {
   const kept: SendMailOptions[] = [];
   const transport = createTransport({

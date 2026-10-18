@@ -24,10 +24,8 @@ const FIRST_PAGE = "/people/groups";
 
 const NEXT_PAGE = "/people/members";
 
-/** A switch of workspace lands an Admin here again, at the address it left. */
 const HOME = HOMES.Admin.path;
 
-/** Confirmed and holding only an authenticator: the person the offer is for. */
 const NO_PASSKEY = {
   ...BOTH_HELD,
   passkeys: [],
@@ -62,13 +60,11 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   if (kept !== undefined) Object.defineProperty(globalThis, "localStorage", kept);
-  // The module remembers a page load's offer, and one module serves every test here.
   forgetThePasskeyOfferShown();
   globalThis.localStorage.clear();
   globalThis.history.replaceState(null, "", "/");
 });
 
-/** By its dismissal, which the Account page's own passkeys region does not hold. */
 const DISMISSAL = { name: "Dismiss Passkey Offer" };
 
 const offer = () => screen.queryByRole("button", DISMISSAL);
@@ -80,7 +76,6 @@ const adaHoldingNoPasskey = (reads: ReadonlyMap<string, () => unknown> = SHELL_R
   adasApi(() => NO_PASSKEY, PASSKEY_SIGN_IN, reads);
 };
 
-/** A page load on a frame page, drawn as far as the offer. */
 const loadedOnTheOffer = async () => {
   adaHoldingNoPasskey();
   const loaded = await openAsAda(FIRST_PAGE);
@@ -88,10 +83,6 @@ const loadedOnTheOffer = async () => {
   return loaded;
 };
 
-/**
- * As a switch of workspace leaves her: her second factor's read dropped, her member read again,
- * and home asked for.
- */
 const switchedOnTheOffer = async () => {
   let workspace = NORTHERN_TOOLING;
   adaHoldingNoPasskey(new Map([...SHELL_READS, ["session.member", () => adaIn(workspace)]]));
@@ -106,20 +97,17 @@ const switchedOnTheOffer = async () => {
     await loaded.router.navigate({ href: "/" });
   });
 
-  // The band names the workspace read, so the page beneath it has been drawn afresh for it.
   await within(screen.getByRole("banner")).findByRole("button", { name: HOLME_PRESSINGS.name });
   return loaded;
 };
 
 type Loaded = Awaited<ReturnType<typeof loadedOnTheOffer>>;
 
-/** A move to another page: where it left her, and the offer drawn there, if any. */
 const movedTo = async (router: Loaded["router"], href: string) => {
   await act(() => router.navigate({ href }));
   return { at: router.state.location.pathname, offer: offer() };
 };
 
-/** As a browser told to block storage answers the page that asks for it. */
 const refuseStorage = (): void => {
   Object.defineProperty(globalThis, "localStorage", {
     configurable: true,
@@ -154,7 +142,6 @@ describe("the passkey offer", () => {
 
   it("stays quiet on a page load after another showed it", async () => {
     adaHoldingNoPasskey();
-    // Account reads the second factor and draws no offer, so the next load finds the read held.
     const { clients, rendered } = await openAsAda("/account");
     await screen.findByRole("button", { name: "Add a Passkey" });
     rendered.unmount();
@@ -187,7 +174,6 @@ describe("the passkey offer", () => {
 
     expect(offer()).toBeNull();
     rendered.unmount();
-    // A page load starts the modules afresh, and with them what this one remembered.
     vi.resetModules();
     const nextLoad = await import("./second-factor-api.ts");
 

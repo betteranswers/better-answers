@@ -46,7 +46,6 @@ const sentOf = (heard: Heard): Sent => ({
   body: heard.body,
 });
 
-/** Answers each ping with the next status given, and every ping past the list with the last. */
 const answering = (statuses: readonly number[]) => {
   let asked = 0;
   return (): Answer => {

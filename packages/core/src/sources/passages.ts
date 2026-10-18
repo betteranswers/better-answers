@@ -39,10 +39,6 @@ export type Passage = {
   readonly sensitivity: Sensitivity;
 };
 
-/**
- * The view's sensitivity is NULL only for a word both source columns' CHECKs refuse; the predicate's
- * Admin arm passes it, and the parse fails it.
- */
 const PASSAGE_SENSITIVITY = z.enum(SENSITIVITIES);
 
 const COVERING_ROWS = `SELECT c.content, c.char_start, c.char_end, c.sensitivity, d.title
@@ -63,10 +59,6 @@ type CoveringRow = {
   readonly title: string;
 };
 
-/**
- * `not-found` unless passages the caller can read cover the whole span without a gap. The sensitivity is
- * the narrowest among them.
- */
 export const passageAt = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -88,8 +80,6 @@ export const passageAt = async (
 
     return read.rows.map((row) => {
       const points = Array.from(row.content).length;
-      // No CHECK holds a row's content to its span; one that misses shifts every later offset or
-      // opens a passage no row covers.
       if (points !== row.char_end - row.char_start) {
         throw new Error(
           `the passage row at ${locatorOf(sourceDocumentId, row.char_start, row.char_end)} holds ${String(points)} code points`,
@@ -150,7 +140,6 @@ const MATCH = anyWordMatch("c.search", "$2", ["c.source_document_id", "c.char_st
   frequencies: "$9",
 });
 
-/** The passages `principal` may read, counted for `query`'s words. */
 export const passageCountsOf = (
   principal: UserPrincipal,
   tx: Tx,
@@ -215,10 +204,6 @@ type PassageSearch = {
   readonly after?: PassageBound | undefined;
 };
 
-/**
- * By the any-word rule, after `after` when given. Leaves out a passage whose document is evidence for
- * a concept the caller can read. `counts`, when given, weigh the words in place of a fresh count.
- */
 export const findPassages = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -310,7 +295,6 @@ const previewPassagesAction = declareAction({
 
 type PreviewPassagesRefusal = SourceRefusal<RefusalOf<typeof previewPassagesAction>> | Error;
 
-/** `limit` is held to 20 at most. */
 export const previewPassages = async (
   principal: UserPrincipal,
   tx: Tx,

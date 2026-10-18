@@ -36,17 +36,13 @@ const rowOf = (page: Page, name: string) => page.getByRole("listitem", { name, e
 const theNoWorkspacePage = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "No Workspace Yet" });
 
-/** The status an action's outcome is said in: the one holding words. */
 const outcomeOf = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ });
 
-/** A passkey's last use is shown to the minute, and the day it was added as a day alone. */
 const A_TIME_OF_USE = /\b\d{1,2}:\d{2}\b/;
 
-/** The name the page suggests, read from the browser it runs in. */
 const suggestedName = (page: Page): Promise<string> =>
   page.evaluate(() => navigator.userAgent).then(passkeyNameFor);
 
-/** From the Account page: open the add, keep the suggested name, and add it. */
 const passkeyAdded = async (page: Page): Promise<string> => {
   const name = await suggestedName(page);
   await page.getByRole("button", { name: "Add a Passkey" }).click();
@@ -60,13 +56,11 @@ const accountOpened = async (page: Page): Promise<void> => {
   await expect(accountHeading(page)).toBeVisible();
 };
 
-/** Sign out by dropping the session's cookie, so the next sign-in starts with nothing held. */
 const signedOut = async (page: Page): Promise<void> => {
   await page.context().clearCookies();
   await page.goto("/sign-in");
 };
 
-/** A person in no workspace whose device holds the one passkey they added on the Account page. */
 const withAPasskey = async (
   page: Page,
   api: Parameters<typeof signedInWithNoWorkspace>[1],
@@ -80,7 +74,6 @@ const withAPasskey = async (
   return { device, person, name };
 };
 
-/** Rename opened on the passkey's row, its field holding `typed`. */
 const renameTyped = async (page: Page, name: string, typed: string): Promise<void> => {
   await rowOf(page, name).getByRole("button", { name: "Rename" }).click();
   await page.getByRole("textbox", { name: "Passkey Name" }).fill(typed);
@@ -186,7 +179,6 @@ test("a second passkey from the same device is refused", async ({ page, request 
 test("an Admin keeps their only passkey, told why beside Remove", async ({ page, request }) => {
   await aVirtualAuthenticator(page);
   const { admin } = await provision(request, { name: "Passkeys Ltd" });
-  // An Admin holding no factor sets their first one up before anything else.
   await page.goto("/sign-in");
   await signInByEmail(page, request, admin.email);
   const name = await suggestedName(page);
@@ -203,10 +195,6 @@ test("an Admin keeps their only passkey, told why beside Remove", async ({ page,
   await expect(remove).toHaveAccessibleDescription(/\S/);
 });
 
-/**
- * A prompt that used no passkey is no refusal. Waiting says something too, so the status is read
- * again once the button is free.
- */
 const saysNoPasskeyWasUsed = async (page: Page, saidBefore: string): Promise<void> => {
   await saysSomethingNew(page.getByRole("status"), saidBefore);
   await expect(page.getByRole("button", { name: "Sign In with a Passkey" })).toHaveAttribute(
@@ -225,7 +213,6 @@ test("a device whose user check fails signs nothing in", async ({ page, request 
   await device.stopsVerifying();
 
   await signedOut(page);
-  // The page already says the session ended, so an unused passkey shows by what is said next.
   await expect(page.getByRole("status")).toHaveText(/\S/);
   const saidOnArriving = await page.getByRole("status").innerText();
   await page.getByRole("button", { name: "Sign In with a Passkey" }).click();
@@ -261,16 +248,13 @@ test("the email step reads email, send, then the passkey", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Sign In with a Passkey" })).toBeFocused();
 });
 
-/** The offer, found by the one control it alone draws. */
 const offerOf = (page: Page) => page.getByRole("button", { name: "Dismiss Passkey Offer" });
 
 const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
 
-/** Asked for before the page loads or signs in, so an absence asserted after it is the read's answer. */
 const secondFactorRead = (page: Page) =>
   page.waitForResponse((answer) => answer.url().includes("person.secondFactor"));
 
-/** A Viewer holding no passkey, on Ask from their sign-in, who signs in again by the address answered. */
 const aViewerOffered = async (page: Page, api: APIRequestContext) => {
   await aVirtualAuthenticator(page);
   const email = anAddress("offered");
@@ -282,7 +266,6 @@ const aViewerOffered = async (page: Page, api: APIRequestContext) => {
   return { email, name: viewer.name };
 };
 
-/** Through the avatar menu, so the sign-in after it happens in the page that showed the offer. */
 const signedInAgain = async (
   page: Page,
   api: APIRequestContext,
@@ -296,10 +279,8 @@ const signedInAgain = async (
   await read;
 };
 
-/** On to another page, where the offer must not follow. */
 const movedOnWithoutTheOffer = async (page: Page): Promise<void> => {
   await railOf(page).getByRole("link", { name: "Knowledge" }).click();
-  // Knowledge's first group heads the page its rail link opens.
   await expect(page.getByRole("heading", { level: 1, name: "Browse" })).toBeVisible();
   await expect(offerOf(page), "the offer followed the Viewer to the next page").toHaveCount(0);
 };
@@ -334,7 +315,6 @@ test("a dismissed offer stays away after the next sign-in", async ({ page, reque
   await expect(offerOf(page), "a dismissed offer came back with the next sign-in").toHaveCount(0);
 });
 
-/** A Viewer of two workspaces, each homed on Ask, offered a passkey on the home of the first. */
 const aViewerOfTwoOffered = async (page: Page, api: APIRequestContext) => {
   await aVirtualAuthenticator(page);
   const email = anAddress("offered-in-two");
@@ -372,7 +352,6 @@ test("a Viewer's offer ends on a trip through All workspaces", async ({ page, re
   const { first, second } = await aViewerOfTwoOffered(page, request);
 
   await allWorkspacesPicked(page, first.name);
-  // A pick drops the second factor's read, so the home it opens reads it again.
   const read = secondFactorRead(page);
   await page.getByRole("button", { name: second.name }).click();
 
@@ -404,7 +383,6 @@ test("a browser without WebAuthn keeps the email path alone", async ({ page, req
   await signedInWithNoWorkspace(page, request, "no-webauthn");
   await accountOpened(page);
 
-  // The add's place holds a line more than a list with no passkey shows, and no button.
   const passkeys = page.getByRole("region", { name: "Passkeys" });
   await expect(passkeys.getByRole("paragraph"), "nothing stands in the add's place").toHaveCount(2);
   await expect(passkeys.getByRole("button", { name: "Add a Passkey" })).toHaveCount(0);

@@ -13,7 +13,6 @@ import {
   signOutFromTheShell,
 } from "./harness.ts";
 
-/** Says why the person is there in the region a status is read from, and answers what it said. */
 const signInSaysWhy = async (page: Page): Promise<string> => {
   await expect(signInHeading(page)).toBeVisible();
   await expect(page.getByRole("status"), "the sign-in page says nothing of the arrival").toHaveText(
@@ -48,7 +47,6 @@ test("brings an ended session through sign-in back to its page", async ({
   const workspace = await provision(request, { name: "Returning", adminEmail: email });
   await page.goto("/sign-in");
   await signIn(page, request, email);
-  // Not the Admin's home, which sign-in would reach without carrying the page back.
   const elsewhere = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log");
   await page.getByRole("link", { name: "Audit Log" }).click();
   await expect(page).toHaveURL(new RegExp(`${elsewhere.path}$`));
@@ -73,7 +71,6 @@ test("refuses revoked credentials on the next request", async ({ page, request }
   await page.goto("/sign-in");
   await signIn(page, request, email);
   await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
-  // A sign-out first, so the line revoked credentials meet can be held as another.
   await signOutFromTheShell(page, workspace.admin.name);
   const signedOut = await signInSaysWhy(page);
   await signIn(page, request, email);

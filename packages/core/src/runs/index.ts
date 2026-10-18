@@ -132,7 +132,6 @@ export const enqueueJobInput = z.discriminatedUnion("kind", [
 ]);
 
 export const enqueueJobAction = declareAction({
-  /** The level is the kind's own, and a kind with no descriptor is left to the highest role. */
   admits: (input: z.output<typeof enqueueJobInput>) => ({
     role: descriptorOf(input.kind)?.enqueuedBy ?? ROLES[0],
     purposes: EVERY_PURPOSE,
@@ -212,11 +211,6 @@ const landJob = async (tx: Tx, workspaceId: string, job: JobInsert): Promise<str
   return answered;
 };
 
-/**
- * Reuses a job already queued for the subject and answers its id; a reason that empties the
- * connected source replaces a queued reason that does not. Refuses `malformed` for input its kind does not
- * take, or another workspace's. Rejects when another action queues the subject meanwhile.
- */
 export const enqueueJobIn = async (
   principal: Principal,
   tx: Tx,
@@ -225,7 +219,6 @@ export const enqueueJobIn = async (
   const descriptor = descriptorOf(input.kind);
   if (descriptor === undefined) return err("malformed");
 
-  /** Both ways into the enqueue pass here, so the gate stands where the door has not yet opened. */
   const admitted = admit(enqueueJobAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   if (principal.kind !== "platform" && input.workspaceId !== principal.workspaceId) {
@@ -237,7 +230,6 @@ export const enqueueJobIn = async (
   return ok({ jobId: await landJob(tx, input.workspaceId, job) });
 };
 
-/** As `enqueueJobIn`, in a transaction of its own. */
 export const enqueueJob = async (
   principal: Principal,
   door: PostgresDoor,
@@ -245,7 +237,6 @@ export const enqueueJob = async (
 ): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> =>
   inWorkspace(principal, door, input.workspaceId, (tx) => enqueueJobIn(principal, tx, input));
 
-/** An Admin, or the platform acting for any purpose. */
 const ADMIN_OR_THE_PLATFORM = { role: "Admin", purposes: EVERY_PURPOSE } as const;
 
 type JobByIdInput = { readonly workspaceId: string; readonly jobId: string };
@@ -258,7 +249,6 @@ const jobByIdAction = declareAction({
 
 export type JobByIdRefusal = RefusalOf<typeof jobByIdAction> | PrincipalRefusal;
 
-/** A job in another workspace answers `no-such-job`, as a missing one does. */
 export const jobById = async (
   principal: Principal,
   door: PostgresDoor,
@@ -293,7 +283,6 @@ export const jobById = async (
 
 type OutcomeRow = { readonly outcome: OutcomeColumn };
 
-/** The outcome of the connected source's newest `done` sync; null when there is none or it has none. */
 export const latestIndexOutcomeIn = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -312,7 +301,6 @@ export const latestIndexOutcomeIn = async (
   return row === undefined ? ok(null) : outcomeOf(row.outcome);
 };
 
-/** The index job outcome's key naming each document whose stored sensitivity the sync changed. */
 export const SENSITIVITY_MOVED_KEY = "sensitivity_moved";
 
 export type SyncMoved =
@@ -329,10 +317,6 @@ const movedByTheKey = (outcome: JobOutcome | null): SyncMoved => {
   return named.success ? { kind: "documents", documentIds: named.data } : WHOLE_SOURCE;
 };
 
-/**
- * Only a done first attempt's key is trusted: a retry finds nothing left to move, and a failed,
- * poisoned or lapsed sync may have moved documents it never named.
- */
 export const whatTheSyncMoved = (sync: {
   readonly status: JobStatus;
   readonly attempts: number;
@@ -342,7 +326,6 @@ export const whatTheSyncMoved = (sync: {
     ? movedByTheKey(sync.outcome)
     : WHOLE_SOURCE;
 
-/** `endedAt` is a lapsed claim's lease expiry, and every other sync's `finished_at`. */
 export type EndedSync = {
   readonly jobId: string;
   readonly connectedSourceId: string;
@@ -419,10 +402,6 @@ const endedSyncsAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/**
- * Index jobs that ended, or whose claim lapsed, oldest first; never a queued job or a live claim.
- * `newest-per-source` answers each connected source's newest ended sync and every lapsed claim.
- */
 export const endedSyncs = async (
   principal: Principal,
   door: PostgresDoor,
@@ -452,7 +431,6 @@ const lockSyncAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/** Locks the sync's job row until `tx` ends, so a claimant whose lease lapsed cannot write after it. */
 export const lockSyncIn = async (
   principal: Principal,
   tx: Tx,
@@ -461,7 +439,6 @@ export const lockSyncIn = async (
   const locker = admit(lockSyncAction, principal, input);
   if (!locker.ok) return err(locker.error);
 
-  // A claim renewed or taken again since the listing is live: locking it would stall its heartbeat.
   const locked = await attempt(() =>
     tx.query(
       `SELECT 1 FROM job
@@ -484,10 +461,6 @@ const runsOfSubjectAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/**
- * Its outcome stays on the job row: a sync's outcome locates each overridden span, the
- * address of withheld text.
- */
 export type SubjectRun = {
   readonly jobId: string;
   readonly kind: JobKind;
@@ -524,7 +497,6 @@ const subjectRunsOf = (
     },
   ]);
 
-/** Newest first. */
 export const runsOfSubject = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -545,7 +517,6 @@ export const runsOfSubject = async (
   return ok(subjectRunsOf(read.value.rows).map(([, subjectRun]) => subjectRun));
 };
 
-/** Each subject's newest job; a subject with no job is absent from the map. */
 export const latestRunsOf = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -571,7 +542,6 @@ const bundleHealthAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-/** Read from the newest `done` nightly audit; an outcome that cannot be read is `mismatched`. */
 export const bundleHealth = async (
   principal: UserPrincipal,
   door: PostgresDoor,

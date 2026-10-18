@@ -39,7 +39,6 @@ type OpenInvitation = NonNullable<InvitationsRead["data"]>[number];
 
 const saidOf = (refusal: Refusal): string => refusalSentence({}, refusal.word, refusal.class);
 
-/** A list already read stands through a refetch that fails, so only a first read's failure is said. */
 const failureOf = (read: InvitationsRead): Error | ApiError | null =>
   read.data === undefined ? read.error : null;
 
@@ -64,7 +63,6 @@ function InvitationItem(properties: {
   return (
     <li>
       <Button asChild variant="outline" className="w-full justify-start">
-        {/* A document navigation, so the router never re-serialises a carried signed query. */}
         <a
           href={`${invitationAt(invitation.invitationId)}${properties.carried}`}
           aria-describedby={invitedById}
@@ -103,10 +101,6 @@ function InvitationList(properties: {
   );
 }
 
-/**
- * The refusal's region stands empty from the first render. Nothing else shows while the read is
- * out, or when it finds none.
- */
 function Invitations(properties: { readonly read: InvitationsRead; readonly carried: string }) {
   const { read } = properties;
   const listed = listedIn(read);
@@ -136,14 +130,12 @@ function Invitations(properties: { readonly read: InvitationsRead; readonly carr
   );
 }
 
-/** In the order the page shows their actions. */
 const keystrokesOf = (read: InvitationsRead): readonly Keystroke[] => [
   ...(unanswered(read) ? [READ_AGAIN] : []),
   ...(listedIn(read).length > 0 ? [TO_INVITATIONS] : []),
   ASK_TO_JOIN,
 ];
 
-/** A waiting invitation is the quickest way in, so it stands above asking to join. */
 export function NoWorkspacePage() {
   const carried = carriedFlow(pageQuery());
   const invitations = useOpenInvitations();

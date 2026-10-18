@@ -282,10 +282,6 @@ const REWRITTEN_IN_ORDER = [
   { path: LINKED.standardAnswer, links: 1 },
 ];
 
-/**
- * Stands in for another writer's commit between the passes: the row's hash moves when the
- * concept's first verification lands, before pass two reads it.
- */
 const movedBetweenThePasses = async <T>(path: string, work: () => Promise<T>): Promise<T> => {
   const pool = db().pool;
   await pool.query(
@@ -325,10 +321,6 @@ const standingConcept = (
     ...overrides,
   });
 
-/**
- * Held at the manifest's row, the run has read the standing paths; the writer queues behind it
- * on the bundle's lock.
- */
 const landedBetweenTheReadAndTheWrite = async (
   scenario: Scenario,
   path: string,

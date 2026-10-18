@@ -2,7 +2,6 @@ import { Button } from "@/shared/ui/button.tsx";
 
 import { PAGE_SIZE } from "./people-api.ts";
 
-/** The offset each turn would ask for, and none past either end. */
 export type PageTurns = {
   readonly previous: number | undefined;
   readonly next: number | undefined;
@@ -13,7 +12,6 @@ export const turnsOf = (offset: number, total: number): PageTurns => ({
   next: offset + PAGE_SIZE < total ? offset + PAGE_SIZE : undefined,
 });
 
-/** A page's end stays focusable, so a reader who reaches it keeps their place. */
 function PageTurn(properties: {
   readonly label: string;
   readonly keystroke: string;

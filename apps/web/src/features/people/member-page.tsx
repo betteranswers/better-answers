@@ -50,7 +50,6 @@ type Drawn = {
   readonly member: ListedMember;
   readonly landings: Landings;
   readonly removal: Removal;
-  /** The section's own heading, where focus goes when what the section drew is replaced. */
   readonly heading: RefObject<HTMLHeadingElement | null>;
 };
 
@@ -58,11 +57,9 @@ type Section = {
   readonly id: string;
   readonly title: string;
   readonly draw: ComponentType<Drawn>;
-  /** Set apart below the rest, since its actions end the person's access. */
   readonly apart?: true;
 };
 
-/** One page, each section drawn at once, in order. The security work adds Sign-in and Sessions. */
 const SECTIONS: readonly Section[] = [
   { id: "access", title: WORDS.access, draw: Access },
   { id: "activity", title: WORDS.activity, draw: MemberActivity },
@@ -76,7 +73,6 @@ const SECTIONS: readonly Section[] = [
 
 const headingIdOf = (section: Section): string => `member-${section.id}`;
 
-/** What the move that opened the page asked of it, kept in the page's own history entry. */
 const useOpening = () => {
   const openedAt = useRouterState({
     select: (state) => OPENING.safeParse(state.location.state).data?.openedAt,
@@ -87,10 +83,6 @@ const useOpening = () => {
   return { openedAt, membersQuery };
 };
 
-/**
- * Someone else's removal returns to Members before the api answers, and Members says how it
- * went. Your own waits: where you land depends on it.
- */
 const useRemoval = (
   membersQuery: string | undefined,
   hold: (member: ListedMember | undefined) => void,
@@ -111,7 +103,6 @@ const useRemoval = (
     if (personId !== readerId) {
       removeMember.mutate({ personId });
       const removed: Removed = { personId, name: nameOf(member) };
-      // Pushed, so Back finds this page with no one on it rather than skipping it.
       void navigate({ href: membersAt(membersQuery), state: (held) => ({ ...held, removed }) });
       return;
     }
@@ -171,7 +162,6 @@ function MemberHeader(properties: {
   );
 }
 
-/** Its links move focus within the page and leave the address alone: a section has none. */
 function SectionNav() {
   const toSection = (event: MouseEvent<HTMLAnchorElement>, section: Section) => {
     event.preventDefault();
@@ -199,7 +189,6 @@ function SectionNav() {
   );
 }
 
-/** Each action's control, and focus put on it: by a keystroke, or as the page opens at the action. */
 const useLandings = () => {
   const title = useRef<HTMLHeadingElement>(null);
   const landings: Landings = {
@@ -213,9 +202,7 @@ const useLandings = () => {
   const controlAt = {
     member: () => title.current,
     role: () => landings.role.current?.querySelector<HTMLElement>('[aria-checked="true"]'),
-    // A workspace with no groups offers its link to the Groups page in their place.
     groups: () => landings.groups.current?.querySelector<HTMLElement>('[role="checkbox"], a'),
-    // A member with no display name has no flag to land on, so focus goes to who they are.
     flag: () => landings.flag.current ?? title.current,
     credentials: () => landings.credentials.current,
     removal: () => landings.removal.current,
@@ -275,7 +262,6 @@ function MemberShown(properties: {
     landOn("removal");
   });
 
-  // The page is opened at an action by a move from Members, which hands focus on to its control.
   const arrive = useEffectEvent((at: OpenedAt) => {
     landOn(at);
   });
@@ -296,14 +282,12 @@ function MemberShown(properties: {
   );
 }
 
-/** Drawn from the members list already held. A failed read stands in for even a stale page. */
 function MemberRead(properties: {
   readonly personId: string;
   readonly heading: RefObject<HTMLHeadingElement | null>;
 }) {
   const members = useMembers();
   const { openedAt, membersQuery } = useOpening();
-  // Held while it goes, so the list taking the removal first draws no "no such member" meanwhile.
   const [leaving, setLeaving] = useState<ListedMember>();
   const removal = useRemoval(membersQuery, setLeaving);
 
@@ -331,7 +315,6 @@ function MemberRead(properties: {
   return <MemberShown member={member} openedAt={openedAt} removal={removal} />;
 }
 
-/** `personId` is undefined where the address holds no person's id, so nothing is asked about it. */
 export function MemberPage(properties: { readonly personId: string | undefined }) {
   const { personId } = properties;
   const heading = useRef<HTMLHeadingElement>(null);

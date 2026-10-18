@@ -56,7 +56,6 @@ export type ManifestWritten =
   | { readonly written: true; readonly sha: string; readonly auditEventId: string }
   | { readonly written: false };
 
-/** Whoever may write to the bundle: an Editor or above. */
 export const BUNDLE_WRITERS = { role: "Editor", purposes: [] } as const;
 
 const writeManifestAction = declareAction({
@@ -70,11 +69,6 @@ export type WriteManifestRefusal =
   | PassedOnCommitRefusal
   | PrincipalRefusal;
 
-/**
- * Reads the bundle's head against `manifest`: `absent` when no manifest stands, `standing` when
- * one with the same id does, and `taken` when anything else holds the path, a malformed file
- * included.
- */
 export const manifestAtHead = async (
   principal: UserPrincipal,
   git: GitDoor,
@@ -88,8 +82,8 @@ export const manifestAtHead = async (
 };
 
 /**
- * Writes the manifest as a commit of its own, once: `written: false` when a manifest with the
- * same id already stands, `path-taken` when anything else holds the path.
+ * `written: false` when a manifest with the same id already stands, `path-taken` when anything
+ * else holds the path.
  */
 export const writeManifest = async (
   principal: UserPrincipal,

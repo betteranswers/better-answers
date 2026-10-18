@@ -25,10 +25,8 @@ const EDITOR = "editor@journeys.example";
 const CODE = "305117";
 const SESSION = "session=a-journeys-session";
 
-/** The test Admin's authenticator key, as the harness answers it. */
 const KEY = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
 
-/** Six digits submit on their own, as the product's page does, and then six more confirm. */
 const PAGE = [
   '<!doctype html><html lang="en"><title>Sign in</title><main>',
   '<label>Email Address <input type="email"></label>',
@@ -67,22 +65,18 @@ type Heard = {
 
 type Product = {
   readonly origin: string;
-  /** Every request but the browser's favicon, in the order it arrived. */
   readonly heard: readonly Heard[];
 };
 
 type Replies = {
   readonly send?: Reply;
-  /** The confirm's answer, in place of judging the code against the key. */
   readonly confirm?: Reply;
   readonly signOuts?: readonly Reply[];
-  /** By request, such as `GET /trpc/members.list`, answered whoever asks. */
   readonly reads?: ReadonlyMap<string, Reply>;
 };
 
 const OK: Reply = { status: 200, body: "{}" };
 
-/** A sign-in opens at `/`, which the product's SPA takes to its sign-in page. */
 const SHOWING_THE_PAGE = new Set(["GET /", "GET /sign-in"]);
 
 const THE_PAGE: Reply = { status: 200, headers: { "content-type": "text/html" }, body: PAGE };
@@ -90,7 +84,6 @@ const THE_PAGE: Reply = { status: 200, headers: { "content-type": "text/html" },
 const readReplyTo = (asked: string, replies: Replies): Reply | undefined =>
   SHOWING_THE_PAGE.has(asked) ? THE_PAGE : replies.reads?.get(asked);
 
-/** The harness's authenticator for the test Admin, and the confirm page's post. */
 const factorReplyTo = (asked: string, body: string, replies: Replies): Reply | undefined => {
   if (asked === "POST /__harness/authenticators") {
     return { status: 200, body: JSON.stringify({ key: KEY, recoveryCodes: [] }) };
@@ -121,7 +114,6 @@ const replyTo = (asked: string, body: string, replies: Replies, signOut: () => R
 
 const STEP_MS = 30_000;
 
-/** The code the key shows now, or the step either side, so a step's edge never flakes. */
 const confirmed = (body: string): Reply => {
   const now = Date.now();
   const shown = [now - STEP_MS, now, now + STEP_MS].map((at) =>
@@ -138,7 +130,6 @@ const bodyOf = async (request: IncomingMessage): Promise<string> => {
 
 const closers: (() => Promise<void>)[] = [];
 
-/** The product's sign-in page and posts, the harness's code reader and the sign-out. */
 const theProduct = async (replies: Replies = {}): Promise<Product> => {
   const heard: Heard[] = [];
   const signOuts = [...(replies.signOuts ?? [])];
@@ -167,7 +158,6 @@ afterEach(async () => {
   await closeEveryStandIn();
 });
 
-/** Every setting a journey reads, as the journeys' step holds them, unset where left empty. */
 const SETTINGS = {
   JOURNEYS_CODE_SOURCE: "harness",
   JOURNEYS_ADMIN_EMAIL: ADMIN,
@@ -437,7 +427,6 @@ const NO_INBOX_URL = "JOURNEYS_INBOX_URL is not set to a bare https origin";
 
 const ALL_THREE = { ...SETTINGS, JOURNEYS_VIEWER_EMAIL: VIEWER };
 
-/** The Editor's and Viewer's journeys, which sign in and pass through. */
 const THE_OTHER_TWO = {
   "editor.spec.ts": journeyOf(...AS_THE_EDITOR),
   "viewer.spec.ts": journeyOf(
@@ -446,7 +435,6 @@ const THE_OTHER_TWO = {
   ),
 };
 
-/** The three journeys under their own names, the Admin's ending as `adminEnds` says. */
 const theThreeJourneys = (adminEnds: string) => ({
   "admin.spec.ts": journeyOf(
     `import { stopTheRun } from ${moduleAt("journeys/run-stop.ts")};`,
@@ -495,7 +483,6 @@ describe("a run the Admin's journey stops", () => {
   }, 120_000);
 });
 
-/** The Admin's journey as far as its check, with the other two after it. */
 const THE_CHECK = {
   "admin.spec.ts": [
     `import { test, theTestPeople } from ${moduleAt("journeys/fixtures.ts")};`,
@@ -526,7 +513,6 @@ const SOUND_MEMBERS = [
   })),
 ];
 
-/** The test workspace's reads as the fixture command leaves it, less what `changed` answers. */
 const aWorkspace = (changed: Readonly<Record<string, Reply>> = {}): ReadonlyMap<string, Reply> =>
   new Map(
     Object.entries({
@@ -615,7 +601,6 @@ describe("the Admin's check of the test workspace, through its reads", () => {
   }, 120_000);
 });
 
-/** As the api answers a refused action: its word as the message, and the word again in `data`. */
 const refusedWith = (word: string, status: number): Reply => ({
   status,
   headers: { "content-type": "application/json" },
@@ -693,7 +678,6 @@ describe("the Admin's check, when the Admin's own standing changed", () => {
 
 const INBOX_KEY = "a-stand-in-token";
 
-/** The preflight's last two steps: the sign-in page, then the settings and the test inbox. */
 const PREFLIGHT = [
   `import { test, theSettingsAndInboxHold } from ${moduleAt("journeys/fixtures.ts")};`,
   'test("the preflight checks the settings", async ({ page, request }) => {',

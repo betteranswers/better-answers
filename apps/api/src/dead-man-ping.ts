@@ -18,10 +18,6 @@ type DeadManPingDependencies = {
   readonly fetch?: PingFetch | undefined;
 };
 
-/**
- * The URL is the check's only credential: whoever holds it can ping over a silence, so no line
- * names it.
- */
 export const deadManPing = ({
   check,
   url,
@@ -36,7 +32,6 @@ export const deadManPing = ({
         body: sizes === undefined ? outcome : `${outcome} ${sizes}`,
         signal: AbortSignal.timeout(PING_TIMEOUT_MS),
       });
-      // An unread body holds its connection until a collection frees it, and a ping recurs.
       await response.body?.cancel();
       return response;
     });

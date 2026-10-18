@@ -31,14 +31,12 @@ export const doorsOf = (scenario: Scenario) => ({
   clock: systemClock(),
 });
 
-/** Registers the suite's database and bundle hooks; each `arrange` makes a fresh workspace. */
 export const suiteWithBundles = () => {
   const db = postgresForSuite();
   const bundles = bundlesForSuite();
   return { db, bundles, arrange: (): Promise<Scenario> => arrangeWorkspace(db(), bundles()) };
 };
 
-/** Resolves the member; `confirmed` names a session confirmed now, and a scenario's principal names none, or the erasure map would count its row. */
 export const principalFor = async (
   db: MigratedPostgres,
   workspaceId: string,
@@ -60,7 +58,6 @@ export const principalFor = async (
   return resolved.value;
 };
 
-/** Seeds Priya Anand as an Editor of the workspace, under the email given. */
 export const memberOf = (pool: pg.Pool, workspaceId: string, email: string) =>
   seedingWith(pool, async (seed) => {
     const person = await seed.user({ name: "Priya Anand", email });
@@ -68,7 +65,6 @@ export const memberOf = (pool: pg.Pool, workspaceId: string, email: string) =>
     return person;
   });
 
-/** Provisions Acme with an Admin, an Editor and a Viewer, and an empty bundle repository. */
 export const arrangeWorkspace = async (db: MigratedPostgres, git: GitDoor): Promise<Scenario> => {
   const { door: postgres, workspaceId, adminUserId } = await provisionedWorkspace(db, "Acme");
 

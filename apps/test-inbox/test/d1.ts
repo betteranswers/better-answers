@@ -16,15 +16,12 @@ const rowOf = (row: Readonly<Record<string, SQLOutputValue>>): Row =>
 
 export type D1StandIn = {
   readonly database: Database;
-  /** Every statement run or read, in order, so a suite can tell that a request touched nothing. */
   readonly ran: readonly string[];
-  /** Deletes one row outside the store, as a prune deletes the row a reader's cursor names. */
   readonly forget: (id: string) => void;
   /** Overwrites one column with text, which SQLite stores whatever the column's type, so D1 answers a row the store cannot read. */
   readonly corrupt: (id: string, column: "received_at" | "raw") => void;
 };
 
-/** D1 over `node:sqlite`, set up by the Worker's own migration; `failsOn` names what it refuses. */
 export const d1StandIn = (failsOn?: RegExp): D1StandIn => {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec(MIGRATION);

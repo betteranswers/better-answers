@@ -70,13 +70,11 @@ type LaneCase = {
 
   readonly images: string;
 
-  /** Names the change in the test's title; `because` holds the reason, printed on failure. */
   readonly diff: string;
 
   readonly because: string;
 };
 
-/** The paths are what a merge group's diff hands the script; the answer is what the legs read. */
 const LANES: readonly LaneCase[] = [
   {
     changed: ["apps/web/src/app.tsx"],
@@ -228,9 +226,7 @@ describe("which paths reach which lane", () => {
 describe("which lane a change runs in", () => {
   it("takes the docs lane when every changed path is markdown", () => {
     expect(laneOf(["docs/adr/0043-what-an-action-is.md"])).toEqual("docs");
-    expect(laneOf(["docs/specs/T-121.md", "CONCEPTS.md", "apps/web/CODING_STANDARDS.md"])).toEqual(
-      "docs",
-    );
+    expect(laneOf(["docs/specs/T-121.md", "CONCEPTS.md", "apps/web/AGENTS.md"])).toEqual("docs");
     expect(laneOf(["docs/specs/old-name.md", "docs/specs/new-name.md"])).toEqual("docs");
   });
 
@@ -301,7 +297,6 @@ const imageLegs = (): readonly ImageLeg[] =>
     })
     .parse(parse(read(".github/workflows/build.yml"))).jobs.image.strategy.matrix.include;
 
-/** The probe command ends in its file, relative to whichever workspace it runs in. */
 const probeFilesOf = (leg: ImageLeg): readonly string[] => {
   const file = (leg.probe ?? "").trim().split(/\s+/).at(-1) ?? "";
   return [...workspacePackages(), "apps/worker"]
@@ -311,7 +306,6 @@ const probeFilesOf = (leg: ImageLeg): readonly string[] => {
 
 const COPY = /^COPY\s+(?<words>.+)$/gm;
 
-/** A stage's own output is no path in the tree, so a `--from` copy names nothing to watch. */
 const copiedBy = (leg: ImageLeg): readonly string[] =>
   [...read(leg.dockerfile).matchAll(COPY)].flatMap((found) => {
     const words = (found.groups?.["words"] ?? "").trim().split(/\s+/);
@@ -325,7 +319,6 @@ const copiedBy = (leg: ImageLeg): readonly string[] =>
 const aChangeTo = (copied: string): string =>
   statSync(path.join(repositoryRoot, copied)).isDirectory() ? `${copied}/a-changed-file` : copied;
 
-/** Copied into an image as it stands; the suites read it on every run and build.yml probes the image. */
 const COPIED_SOURCE: readonly string[] = [
   "apps/api/src",
   "apps/web",
@@ -412,18 +405,6 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     file: "packages/devtools/test/ci/provision-skills.test.ts",
     reads:
       "packages/design-system/SKILL.md through its symlink, and which of the pixel-perfect plugin's files git tracks",
-    inTheLane: "check:docs:devtools",
-  },
-  {
-    file: "packages/devtools/test/ci/session-retro-skill.test.ts",
-    reads:
-      ".claude/skills/session-retro/SKILL.md and its reference, every path they name, and the made-up session logs under fixtures/session-retro/",
-    inTheLane: "check:docs:devtools",
-  },
-  {
-    file: "packages/devtools/test/ci/survey-architecture-skill.test.ts",
-    reads:
-      ".claude/skills/survey-architecture/SKILL.md and its two references, and every path they name",
     inTheLane: "check:docs:devtools",
   },
   {
@@ -551,20 +532,16 @@ const workflow = (name: string): Workflow => readWorkflow(name, workflowFile);
 
 const LANE = "lane";
 
-/** The branch ruleset's required context, and the job build.yml's `image` waits on. */
 const FAN_IN = "check";
 
-/** No lane's leg, though its name starts like the pr lane's: it reads the title in the queue too. */
 const TITLE_JOB = "pr-title";
 
-/** No lane's leg either: it runs on a pull request whose dependencies moved, and nowhere else. */
 const TYPECHECK_JOB = "dependency-typecheck";
 
 const LOCKFILE_JOB = "pr-lockfile";
 
 const checkJobs = (): Readonly<Record<string, Job>> => workflow("check.yml").jobs;
 
-/** The fan-in reads the prefix to decide what it requires, so it is load-bearing, not tidiness. */
 const legsOf = (lane: string): readonly string[] =>
   Object.keys(checkJobs()).filter((job) => job.startsWith(`${lane}-`) && job !== TITLE_JOB);
 
@@ -572,7 +549,6 @@ const stepsOfJob = (job: string): readonly Step[] => checkJobs()[job]?.steps ?? 
 
 const laneStep = (): Step | undefined => stepsOfJob(LANE).find((one) => one.id === LANE);
 
-/** The matrix leg hands each of its jobs one slice of a root script's files. */
 const SHARD_ARGUMENT = / --shard="\$\{SHARD\}"$/;
 
 const gatesOf = (job: string): readonly string[] =>
@@ -580,7 +556,6 @@ const gatesOf = (job: string): readonly string[] =>
     gatesUnder((step.run ?? "").trim().replace(SHARD_ARGUMENT, "")),
   );
 
-/** One step cannot run on every leg, so the legs run these narrowings and this folds them back. */
 const NARROWED: Readonly<Record<string, readonly string[]>> = {
   "check:workspaces": [
     "check:libraries:unsharded",
@@ -593,13 +568,11 @@ const NARROWED: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-/** A workspace whose suite is sharded runs its check as the steps it names, each a root script. */
 const RUN_BY_STEP: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   "packages/core": { typecheck: "check:core:typecheck", test: "check:core:suite" },
   "apps/web": { typecheck: "check:web:typecheck", test: "check:web:test", e2e: "check:web:e2e" },
 };
 
-/** Each sharded leg, in the workflow's order, and the one root script it slices. */
 const SHARDED_LEGS: Readonly<Record<string, string>> = {
   "full-core": "check:core:suite",
   "full-web-browser": "check:web:e2e",
@@ -615,14 +588,12 @@ const manifestAt = (directory: string): { readonly name: string; readonly check:
 const wholeGateOf = (gate: string): string =>
   Object.entries(NARROWED).find(([, parts]) => parts.includes(gate))?.[0] ?? gate;
 
-/** The lane that runs the root check's gates. The docs lane runs the prose suites, held above. */
 const CODE_LANE = "full";
 
 const A_BASE = "0123456789abcdef0123456789abcdef01234567";
 
 const TARGET = "refs/heads/main";
 
-/** Where `TARGET` points, which every group in the queue descends from. */
 const TARGET_TIP = "1111111111111111111111111111111111111111";
 
 /** The head of the group queued ahead, which GitHub gives the group behind it as `base_sha`. */
@@ -644,10 +615,8 @@ type LaneStepCase = {
 
   readonly github: Context;
 
-  /** Whether the stubbed `git fetch` finds the base. */
   readonly fetched: boolean;
 
-  /** What `git diff` names from each base to HEAD; a base absent here is one git cannot read. */
   readonly changedSince: Readonly<Record<string, readonly string[]>>;
 
   readonly lane: string;
@@ -802,7 +771,6 @@ type LaneStepRun = {
 
   readonly published: Decision & { readonly dependencies: string };
 
-  /** The git subcommands the step ran, in order. */
   readonly asked: readonly string[];
 
   readonly output: string;
@@ -815,7 +783,6 @@ const stub = (bin: string, name: string, script: string): void => {
 
 const EXPRESSION = /^\$\{\{ (?<path>[\w.]+) \}\}$/;
 
-/** The step's `env:` as GitHub expands it over `github`, refusing any expression but one path. */
 const laneStepEnv = (github: Context): Readonly<Record<string, string>> =>
   Object.fromEntries(
     Object.entries(laneStep()?.env ?? {}).map(([name, value]) => {
@@ -830,13 +797,11 @@ type Scratch = {
 
   readonly fetched: boolean;
 
-  /** A file per base that `git diff` can read, holding the paths it names from there. */
   readonly since: string;
 
   readonly fetchHead: string;
 };
 
-/** Fetches `TARGET` as `TARGET_TIP` and a sha as itself, as the remote would. */
 const gitOver = ({ asked, fetched, since, fetchHead }: Scratch): string =>
   [
     `echo "$1" >> '${asked}'`,
@@ -852,7 +817,6 @@ const gitOver = ({ asked, fetched, since, fetchHead }: Scratch): string =>
     "",
   ].join("\n");
 
-/** Over a `git` answering from `changedSince`; `answered` replaces the lane script's answer. */
 const runTheLaneStep = (
   { github, fetched, changedSince }: LaneStepCase,
   answered?: string,
@@ -1078,17 +1042,14 @@ type VerdictCase = {
 
   readonly lane: string;
 
-  /** The legs that ended in success; every other leg was skipped. */
   readonly ran: readonly string[];
 
   readonly title: string;
 
   readonly wanted: string;
 
-  /** The dependency typecheck's result and what the fan-in wants of it; both `skipped` if absent. */
   readonly typecheck?: { readonly was: string; readonly wanted: string };
 
-  /** Drops the lane's legs from the jobs the verdict reads, as a lane with no leg would. */
   readonly withoutItsLegs?: boolean;
 
   readonly says?: string;
@@ -1336,14 +1297,12 @@ describe("the pull request's title, read by check.yml", () => {
       .object({ version: z.string() })
       .parse(JSON.parse(read(path.join("node_modules", name, "package.json")))).version;
 
-  /** The installed commitlint, run in dlx's place so the test never reaches the registry. */
   const offlineDlx = (): string => {
     const asked = COMMITLINT.map((name) => `--package=${name}@${installedVersion(name)}`);
     const installed = path.join(repositoryRoot, "node_modules", ".bin", "commitlint");
     return `#!/bin/sh\n[ "$*" = "dlx ${asked.join(" ")} commitlint" ] || { echo "pnpm was asked: $*" >&2; exit 3; }\nexec '${installed}'\n`;
   };
 
-  /** gh answers the one question the step should ask, and fails any other. */
   const titleStepWith = (
     title: string,
     event: { readonly PULL_REQUEST: string; readonly QUEUED_REF: string },

@@ -49,7 +49,6 @@ const FACTS_BY_TOKEN = facts("token");
 const keyOf = (session: SessionNamed): readonly [string, string] =>
   "id" in session ? [FACTS_BY_ID, session.id] : [FACTS_BY_TOKEN, session.token];
 
-/** A row another transaction holds is skipped, never waited on: the next read writes it. */
 const UNHELD_SESSION = "(SELECT id FROM session WHERE id = $1 FOR UPDATE SKIP LOCKED)";
 
 const STARTED = `UPDATE session SET pending_since = $2
@@ -68,7 +67,6 @@ type Due = { readonly clock: PendingClock; readonly unpromoted: boolean };
 
 const dueOf = (row: StandingRow, now: Date): Due => ({
   clock: pendingClockOf(standingOf(row), row.pendingSince, now),
-  // A promotion cleared every stamp, so any stamp now is a confirmation made since.
   unpromoted: row.promoted && standingOf(row) === "confirmed",
 });
 
@@ -82,7 +80,6 @@ const writing = async (tx: Tx, row: StandingRow, due: Due, now: Date): Promise<v
   if (due.unpromoted) await tx.query(NO_LONGER_PROMOTED, [row.personId]);
 };
 
-/** Read outside a transaction, which opens only when a write is due: most reads write nothing. */
 const judging = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -95,15 +92,13 @@ const judging = async (
   if (!writesNothing(due)) {
     await withIdentityWrite(platform, door, (tx) => writing(tx, row, due, input.now));
   }
-  // Past its hour, a session reads as gone whether or not this read could end it.
   if (due.clock === "end") return undefined;
   return { sessionId: row.sessionId, personId: row.personId, standing: standingOf(row) };
 };
 
 /**
- * The gate's one read of a session: its second-factor standing, derived afresh. It starts a
- * pending session's hour on the first pending read, stops it once the session is no longer
- * pending, and ends a session pending past its hour, answering `session-gone`.
+ * Starts a pending session's hour on its first pending read, stops it once not pending, and ends
+ * one pending past its hour, answering `session-gone`.
  */
 export const judgeTheSession = async (
   platform: PlatformPrincipal,

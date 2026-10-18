@@ -34,13 +34,10 @@ const aSync = (status: Sync["status"], finishedAt: string | null): Sync => ({
   finishedAt,
 });
 
-/** A count's line with its number taken out: what is left is the form the number chose. */
 const formOf = (said: string): string => said.replaceAll(/\d+/g, "");
 
-/** Each count a line shows, in the line's own order. */
 const countsIn = (said: string): readonly string[] => said.match(/\b\d+\b/g) ?? [];
 
-/** A closed-set word as it is held: its casing and its apostrophe are the page's to choose. */
 const spoken = (word: string): string => word.toLowerCase().replaceAll("’", "'");
 
 describe("a connected source's last sync", () => {
@@ -130,7 +127,6 @@ describe("a connected source's stored values", () => {
   });
 });
 
-/** Each id the worker's redaction descriptors raise, beside its word in lower case. */
 const RULES_RAISED = {
   HEALTH_CUE: "health wording",
   UK_BANK_ACCOUNT: "sort code and account number",

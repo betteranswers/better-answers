@@ -42,12 +42,10 @@ const LIST_BUDGET_MS = 1000;
 
 const PEOPLE = menuGroupIn(CONSOLE, "people");
 
-/** Where the console's People group opens. */
 const EVERYONE_PAGE = pageNamed(PEOPLE, "Everyone").path;
 
 const NAMES_WAITING_PAGE = pageNamed(PEOPLE, "Names Waiting").path;
 
-/** Written once, so an aria snapshot can set it after a workspace's name. */
 const INSTANT_WORDS = String.raw`\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}`;
 
 const INSTANT = new RegExp(`^${INSTANT_WORDS}$`);
@@ -56,32 +54,25 @@ const REVOKE = "End Every Sign-In and Token";
 
 const CORRECT_A_NAME = "console.people.correctDisplayName";
 
-/** The instant an ending is said with: a line still on its way holds none. */
 const ENDED_AT = /\d{2}:\d{2}/;
 
-/** Fifty-one people over pages of fifty, as each page counts its own. */
 const THE_FIRST_PAGE = /\b1\D+50\D+51\b/;
 
 const THE_LAST_PAGE = /\b51\D+51\D+51\b/;
 
-/** What the page said, as a pattern's own text, so its full stop matches a full stop alone. */
 const asWritten = (said: string): string => said.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`);
 
-/** Everyone the run makes is on this list, so a test finds its own by a tag in their address. */
 const aTag = (): string => `t${Date.now()}${Math.floor(Math.random() * 1e6)}`;
 
-/** A page's own regions, under the head its group gives it. */
 const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
 
 const everyone = (page: Page) => page.getByRole("region", { name: "Everyone" });
 
-/** An outcome's status stands beside its alert. A list's count and its pages' count have none. */
 const outcomeOf = (list: Locator): Locator => list.locator("output:has(+ [role='alert'])");
 
 const searchBox = (page: Page) =>
   everyone(page).getByRole("searchbox", { name: "Search by name or address" });
 
-/** The header row is a row too, so the people are the rows with a cell. */
 const personRows = (page: Page): Locator =>
   everyone(page)
     .getByRole("row")
@@ -97,13 +88,11 @@ const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", 
 const regionOf = (sheet: Locator, name: string): Locator =>
   sheet.getByRole("region", { name, exact: true });
 
-/** One item for each session the person holds open. */
 const sessionsOf = (sheet: Locator): Locator => regionOf(sheet, "Sessions").getByRole("listitem");
 
 const confirmationOf = (page: Page): Locator =>
   page.getByRole("dialog", { name: `${REVOKE} for Priya Shah` });
 
-/** A workspace whose Admin carries the mark. */
 const theOperatorsWorkspace = async (api: APIRequestContext, tag: string) => {
   const email = anAddress(`${tag}-operator`);
   const workspace = await provision(api, { name: `Operators ${tag}`, adminEmail: email });
@@ -117,13 +106,11 @@ const signedInAsTheOperator = async (page: Page, api: APIRequestContext, tag: st
   return workspace;
 };
 
-/** The resource Claude asks for is the MCP surface on the suite's own origin. */
 const originOf = (baseURL: string | undefined): string => {
   if (baseURL === undefined) throw new Error("playwright.config.ts gives the suite no baseURL");
   return baseURL;
 };
 
-/** Consented in the page, so the person holds a session and a grant; the page is signed out after. */
 const claudeConnectedAs = async (
   page: Page,
   api: APIRequestContext,
@@ -144,10 +131,6 @@ const claudeConnectedAs = async (
   return exchanged;
 };
 
-/**
- * Priya is an Editor in the operator's workspace, where Claude is connected as her; then the
- * operator signs in.
- */
 const priyaConnected = async (
   page: Page,
   api: APIRequestContext,
@@ -170,13 +153,11 @@ const openPriya = async (page: Page, tag: string): Promise<Locator> => {
   return sheet;
 };
 
-/** The dialog's title, and the name of the action each waiting row repeats. */
 const correctionOf = (name: string): string => `Correct ${name}’s Display Name`;
 
 const dialogToCorrect = (page: Page, name: string): Locator =>
   page.getByRole("dialog", { name: correctionOf(name) });
 
-/** Saves the correction typed, answers its refusal, and re-confirms so the saved name goes ahead. */
 const correctionReconfirmed = async (
   page: Page,
   request: APIRequestContext,
@@ -191,17 +172,12 @@ const correctionReconfirmed = async (
 const nameFieldOf = (dialog: Locator): Locator =>
   dialog.getByRole("textbox", { name: "Display Name" });
 
-/** A name saved from a sheet: its part says so, and focus is back on its action. */
 const savedInTheSheet = async (sheet: Locator): Promise<void> => {
   const part = regionOf(sheet, "Display Name");
   await expect(part.getByRole("status")).toHaveText(/\S/);
   await expect(part.getByRole("button", { name: "Correct Display Name" })).toBeFocused();
 };
 
-/**
- * Opens on the name as it stands, described by its rule and its consequence; Cancel hands focus
- * back. `audit` runs on the open dialog.
- */
 const correctingCancelled = async (
   page: Page,
   correct: Locator,
@@ -228,13 +204,11 @@ const waitingCount = (page: Page): Locator => countOf(namesWaiting(page));
 const waitingSearch = (page: Page): Locator =>
   namesWaiting(page).getByRole("searchbox", { name: "Search by name or workspace" });
 
-/** The header row is a row too, so the names are the rows with a cell. */
 const waitingRows = (page: Page): Locator =>
   namesWaiting(page)
     .getByRole("row")
     .filter({ has: page.getByRole("cell") });
 
-/** Every name the run flags waits on this list, so a test's own name carries its tag. */
 const waitingRowOf = (page: Page, name: string): Locator =>
   namesWaiting(page)
     .getByRole("row")
@@ -243,7 +217,6 @@ const waitingRowOf = (page: Page, name: string): Locator =>
 const correctButtonOf = (page: Page, name: string): Locator =>
   waitingRowOf(page, name).getByRole("button", { name: correctionOf(name) });
 
-/** Priya, named `displayName`, is an Editor in the operator's workspace. */
 const priyaWithTheOperator = async (
   page: Page,
   api: APIRequestContext,
@@ -257,7 +230,6 @@ const priyaWithTheOperator = async (
   return { operators, priya };
 };
 
-/** The operator, as Admin of her workspace, flags her name. */
 const priyaFlagged = async (page: Page, api: APIRequestContext, tag: string) => {
   const name = `Priya Shah ${tag}`;
   const { operators, priya } = await priyaWithTheOperator(page, api, { tag, displayName: name });
@@ -269,14 +241,12 @@ const priyaFlagged = async (page: Page, api: APIRequestContext, tag: string) => 
   return { operators, priya, name };
 };
 
-/** From the key that saves to the list holding the name no more. */
 const clockTheRowLeaving = (page: Page, name: string) =>
   clockTheNextKey(page, {
     at: `//section[h2[normalize-space(.)='Names Waiting']][not(.//td[normalize-space(.)='${name}'])]`,
     reads: "Names Waiting",
   });
 
-/** The operator lands on Everyone, searched for her. */
 const priyaListed = async (page: Page, api: APIRequestContext, tag: string) => {
   const held = await priyaWithTheOperator(page, api, { tag, displayName: "Priya Shah" });
   await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
@@ -342,7 +312,6 @@ test.describe("the console's Everyone page", () => {
 
     await searchBox(page).fill(`nobody ${tag}`);
     await expect(countOf(everyone(page))).toHaveText(/\b0\b/);
-    // The one row left is the list's own, saying none match and offering to clear.
     await expect(personRows(page)).toHaveCount(1);
     await expect(personRows(page).getByRole("button")).toHaveText(["Clear Search"]);
     const narrowed = await countOf(everyone(page)).innerText();
@@ -385,7 +354,6 @@ test.describe("the console's Everyone page", () => {
     await paging.getByRole("button", { name: "Previous Page" }).click();
     await expect(personRows(page)).toHaveCount(50);
 
-    // A turn past either end moves nowhere, and the list's outcome says so.
     const said = outcomeOf(everyone(page));
     await expect(said).toBeEmpty();
     await page.keyboard.press(PEOPLE_KEYSTROKES.previous.key);
@@ -405,7 +373,6 @@ test.describe("the console's Everyone page", () => {
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {
     await signedInAsTheOperator(page, request, aTag());
 
-    // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
     await page.goto(EVERYONE_PAGE);
     await expect(personRows(page).first()).toBeVisible();
@@ -424,7 +391,6 @@ test.describe("the console's Everyone page", () => {
     await expect(personRows(page)).toHaveCount(1);
 
     await markTheOperator(request, operators.admin.email, "revoke");
-    // A move between the console's own pages keeps its standing, so the list asks again alone.
     await navOf(page, "Console").getByRole("link", { name: "Every Workspace" }).click();
     const refused = refusalAnswering(page, "console.people.list");
     await navOf(page, "Console").getByRole("link", { name: "Everyone" }).click();
@@ -446,7 +412,6 @@ test.describe("the console's Everyone page", () => {
     await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
     await expect(personRows(page)).toHaveCount(2);
 
-    // The search sits in the list's own row, between its count and its table.
     await expect(thePage(page)).toMatchAriaSnapshot(`
       - main "Page":
         - heading "People" [level=1]
@@ -673,7 +638,6 @@ test.describe("a person, opened from Everyone as a sheet", () => {
       ENDED_AT,
     );
     await expect(revoke).toBeFocused();
-    // Ended in every workspace, so the last fact names no one workspace.
     const endedEverywhere = `
       - listitem "Claude":
         - heading "Claude" [level=4]
@@ -712,13 +676,11 @@ test.describe("a person, opened from Everyone as a sheet", () => {
 
     expect(await refused).toMatchObject({ word: STALE_CONFIRMATION });
 
-    // The refused act waits in the dialog; its confirmation runs it again with the person kept.
     await reconfirmedOn(page, request, operators.admin.email);
     const ended = regionOf(sheet, "End Every Sign-In Everywhere");
     await expect(ended.getByRole("status")).toHaveText(ENDED_AT);
     await expect(sessionsOf(sheet)).toHaveCount(0);
 
-    // The sheet closes on the person the search still names, and focus goes back to them.
     await page.keyboard.press("Escape");
     await expect(personButton(page, "Priya Shah")).toBeFocused();
   });
@@ -804,7 +766,6 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await nameFieldOf(dialogToCorrect(page, flagged)).fill("Priya Shah");
     await page.keyboard.press("Enter");
 
-    // Behind the sheet, so read with what it hides: the list, read again, holds the operator alone.
     await expect(
       page
         .getByRole("region", { name: "Everyone", includeHidden: true })
@@ -846,7 +807,6 @@ test.describe("the console's Names Waiting page", () => {
       personId: priya.id,
     });
 
-    // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
     await page.goto(NAMES_WAITING_PAGE);
     await expect(waitingRowOf(page, name)).toBeVisible();
@@ -855,7 +815,6 @@ test.describe("the console's Names Waiting page", () => {
     test.info().annotations.push({ type: "names waiting list", description: `${elapsed} ms` });
     expect(elapsed, "the names waiting rendered past their budget").toBeLessThan(LIST_BUDGET_MS);
 
-    // Every name the run flags waits here, so the page is read narrowed to this test's own.
     await waitingSearch(page).fill(name);
     await expect(waitingRows(page)).toHaveCount(1);
     await expect(thePage(page)).toMatchAriaSnapshot(`
@@ -890,7 +849,6 @@ test.describe("the console's Names Waiting page", () => {
     await signedInAsTheOperator(page, request, aTag());
     await page.goto(NAMES_WAITING_PAGE);
 
-    // A page's line follows its heading, and a list's description its own.
     const summary = thePage(page).locator("h1 + p");
     const descriptions = thePage(page).locator("h2 + p");
     await expect(summary).toHaveText(/\S/);
@@ -928,7 +886,6 @@ test.describe("the console's Names Waiting page", () => {
     await expect(waitingRowOf(page, name)).toBeVisible();
     await expect(waitingCount(page)).toHaveText(/\b1\b/);
 
-    // Her own name holds no word of the workspace that flagged it.
     await waitingSearch(page).fill(operators.name);
     await expect(waitingRows(page)).toHaveCount(1);
     await expect(waitingRowOf(page, name)).toBeVisible();
@@ -936,7 +893,6 @@ test.describe("the console's Names Waiting page", () => {
     const nobody = `nobody ${tag}`;
     await waitingSearch(page).fill(nobody);
     await expect(waitingCount(page)).toHaveText(/\b0\b/);
-    // The one row left is the list's own, saying none match and offering to clear.
     await expect(waitingRows(page)).toHaveCount(1);
     await expect(waitingRows(page).getByRole("button")).toHaveText(["Clear Search"]);
     const narrowed = await waitingCount(page).innerText();
@@ -1005,7 +961,6 @@ test.describe("the console's Names Waiting page", () => {
     await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
     await expect(personButton(page, corrected)).toBeVisible();
     await page.goto(NAMES_WAITING_PAGE);
-    // The count stands empty until the list is read.
     await expect(waitingCount(page)).toHaveText(/\S/);
     await expect(waitingRowOf(page, name)).toHaveCount(0);
   });
@@ -1043,7 +998,6 @@ test.describe("the console's Names Waiting page", () => {
     await correctionReconfirmed(page, request, operators.admin.email);
     await expect(waitingRowOf(page, name)).toHaveCount(0);
     await expect(outcomeOf(namesWaiting(page))).toHaveText(/\S/);
-    // The way back has served once the name is corrected, so a reload lands nowhere in particular.
     await expect(page).toHaveURL(NAMES_WAITING_PAGE);
   });
 

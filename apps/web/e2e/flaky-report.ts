@@ -23,7 +23,6 @@ const firstLineOf = (message: string | undefined): string =>
     .map((line) => line.trim())
     .find((line) => line !== "") ?? "no error message";
 
-/** The trace's path in the artifact CI uploads, or in the workspace when no artifact is named. */
 const traceOf = (test: TestCase): string | undefined => {
   const trace = test.results
     .flatMap((result) => result.attachments)

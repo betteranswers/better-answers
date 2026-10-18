@@ -2,7 +2,6 @@ import type { MiddlewareHandler } from "hono";
 
 import { refusedPage, REFUSAL_PAGES } from "./pages.ts";
 
-/** Refuses a post from another site; a library check never reaches a route of our own. */
 export const sameOriginOnly = (publicUrl: string): MiddlewareHandler => {
   return async (context, next) => {
     if (context.req.method !== "POST") {

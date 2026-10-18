@@ -27,7 +27,6 @@ const MEMBERS = "/people/members";
 
 const AT_MOST = BULK_WORDS.tooMany(200);
 
-/** Members' bar and dialogs over `count` ticks, standing in for the table that ticked them. */
 const tickedMembers = (count: number, readable: boolean) =>
   function TickedMembers() {
     const [ticked, tick] = useState<ReadonlySet<string>>(
@@ -130,7 +129,6 @@ describe("the members' bulk actions", () => {
 
     fireEvent.keyDown(document.body, { key, shiftKey: true });
 
-    // A dialog draws after the press, so its absence is waited on rather than read at once.
     await expect(screen.findByRole("dialog", undefined, { timeout: 300 })).rejects.toThrow(
       'Unable to find role="dialog"',
     );

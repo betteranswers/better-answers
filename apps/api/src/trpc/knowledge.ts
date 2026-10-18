@@ -6,7 +6,6 @@ import { crossing, given, parsedBy, queryCeiling, router, type RoadCeiling } fro
 
 type Found = Extract<OpenResult, { readonly found: true }>;
 
-/** An absent concept and a withheld one are the one refusal, so neither tells the web which. */
 const foundOrRefused = <Refused>(
   opened: Result<OpenResult, Refused>,
 ): Result<Found, Refused | typeof NOT_FOUND> => {
@@ -14,7 +13,6 @@ const foundOrRefused = <Refused>(
   return opened.value.found ? ok(opened.value) : err(NOT_FOUND);
 };
 
-/** A person on the web spends what one connection does over MCP: find, open and ask together. */
 export const KNOWLEDGE_CEILING: RoadCeiling = { budget: "knowledge", rule: MCP_TOKEN_RULE };
 
 export const knowledgeReadProcedure = queryCeiling(KNOWLEDGE_CEILING);

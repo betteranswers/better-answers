@@ -30,22 +30,17 @@ import { nameOrAddress, nothingMatches } from "@/shared/words.ts";
 
 import { findWhat, JUMP_TO, searchFor } from "./words.ts";
 
-/** The search row's value, constant so the row keeps the selection while more is typed. */
 const SEARCH_ROW = "search";
 
-/** Where focus goes once chosen: a place hands it to the page, an action to its own dialog. */
 type Kind = "place" | "member" | "action";
 
 type Jump = {
-  /** Unique across the list, so two namesakes are never one selection. */
   readonly value: string;
   readonly name: string;
-  /** Where it sits, or whose address it is. */
   readonly said: string | undefined;
   readonly icon: IconName;
   readonly to: string;
   readonly kind: Kind;
-  /** Lower-cased, and only words the reader sees: never an id or a path. */
   readonly words: string;
 };
 
@@ -104,7 +99,6 @@ const actionJumps = (page: Page, here: Here): readonly Jump[] =>
     }),
   );
 
-/** A member opens on their own page, never as a narrowed list. */
 const memberJump = (member: Member): Jump =>
   jumpOf({
     value: `member ${member.personId}`,
@@ -115,7 +109,6 @@ const memberJump = (member: Member): Jump =>
     kind: "member",
   });
 
-/** Only what the visible tree holds, so an unbuilt or hidden page and its actions never show. */
 export const jumpsIn = (
   tree: VisibleTree,
   members: readonly Member[] | undefined,
@@ -136,7 +129,6 @@ export const jumpsIn = (
   return groups.filter((group) => group.jumps.length > 0);
 };
 
-/** Every typed word must appear somewhere in what the reader sees of an item. */
 export const matching = (groups: readonly JumpGroup[], typed: string): readonly JumpGroup[] => {
   const terms = typed
     .toLowerCase()
@@ -150,10 +142,6 @@ export const matching = (groups: readonly JumpGroup[], typed: string): readonly 
     .filter((group) => group.jumps.length > 0);
 };
 
-/**
- * What is typed, as far as Search takes it. Never a match, so it is listed apart, and only where
- * the reader's tree holds Search.
- */
 export const searchGroup = (
   tree: VisibleTree,
   typed: string,
@@ -178,10 +166,6 @@ export const searchGroup = (
   };
 };
 
-/**
- * The list keeps its selection while that row shows, so Enter would pass over a first match
- * landing after the search row took it.
- */
 const useSelected = (shown: readonly JumpGroup[]) => {
   const [selected, setSelected] = useState("");
   const first = shown[0]?.jumps[0]?.value;
@@ -196,12 +180,10 @@ const useSelected = (shown: readonly JumpGroup[]) => {
   return [selected, setSelected] as const;
 };
 
-/** `unasked` for a reader who may not see People, whose dialog reads no members. */
 type MembersRead = "unasked" | "pending" | "failed" | "read";
 
 type Lines = { readonly said: string | undefined; readonly refused: string | undefined };
 
-/** Nothing matches only once nothing is still loading that might. */
 export const linesOf = (read: MembersRead, shown: number, typed: string): Lines => {
   const words = typed.trim();
   const nothing = shown === 0 && words !== "" ? nothingMatches(words) : undefined;
@@ -224,19 +206,16 @@ type Jumping = {
   readonly triggerRef: RefObject<HTMLButtonElement | null>;
 };
 
-/** The frame's, so an open dialog survives the band redrawing at the breakpoint. */
 export const useJumping = (offered: boolean): Jumping => {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   const pressed = useEffectEvent((event: KeyboardEvent) => {
     if (!offered || !isTheChord(event)) return;
-    // Both chords open the browser's own search bar unless refused here, a held key's repeats too.
     event.preventDefault();
     if (!event.repeat) setOpen((was) => !was);
   });
 
-  // The document, so the chord works from inside a field as well as anywhere else.
   useEffect(() => {
     document.addEventListener("keydown", pressed);
     return () => {
@@ -249,10 +228,8 @@ export const useJumping = (offered: boolean): Jumping => {
 
 const ON_APPLE = typeof navigator !== "undefined" && /Mac|iPhone|iPad/u.test(navigator.platform);
 
-/** As the reader's own keyboard labels it; either chord works on any. */
 const CHORD = ON_APPLE ? "⌘K" : "Ctrl K";
 
-/** For the shell's list of keystrokes, which names it on every page. */
 export const JUMP_TO_KEYSTROKE: Keystroke = { key: CHORD, action: JUMP_TO.name };
 
 function Trigger(properties: {
@@ -347,7 +324,6 @@ function JumpList(
   ];
 
   return (
-    // The list is filtered here, so "Nothing matches" can wait on a read still loading.
     <Command
       label={JUMP_TO.name}
       value={selected}
@@ -355,7 +331,6 @@ function JumpList(
       shouldFilter={false}
       vimBindings={false}
       loop
-      // Room on the right, so the dialog's close button stands clear of the field.
       className="**:data-[slot=command-input-wrapper]:h-12 **:data-[slot=command-input-wrapper]:pr-12 [&_[cmdk-item]]:py-2"
     >
       <CommandInput value={typed} onValueChange={setTyped} placeholder={findWhat(kinds)} />
@@ -378,7 +353,6 @@ function JumpList(
   );
 }
 
-/** Read as the dialog opens, by the Members list's own query, so a list it read shows at once. */
 function WithMembers(properties: Listed) {
   const members = useMembers();
   const read = members.error === null ? "pending" : "failed";
@@ -392,7 +366,6 @@ function WithMembers(properties: Listed) {
   );
 }
 
-/** The frame says whether it is offered, as it does for the chord and the list of keystrokes. */
 export function JumpTo(properties: {
   readonly offered: boolean;
   readonly wide: boolean;
@@ -411,7 +384,6 @@ export function JumpTo(properties: {
     void navigate({ href: jump.to });
   };
 
-  // Fired once the dialog has gone, which is after an action's own dialog has opened.
   const landFocus = (event: Event) => {
     event.preventDefault();
     const kind = chosen.current;

@@ -52,7 +52,6 @@ const SYNTHETIC_WORKSPACE = "01M2SYNTHET1CAAAAAAAAAAAAA";
 
 const SEEDED_LOCALLY = `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, short name synthetic, 1 connected source, 1 document, 3 passages, 3 concepts`;
 
-/** Its own project and port, so a developer's own local database is never the one this stops. */
 const project = `ba-local-database-test-${String(process.pid)}`;
 
 const localDatabase = (port: number, argv: readonly string[], projectName: string = project): Run =>

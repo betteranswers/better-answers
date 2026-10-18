@@ -108,13 +108,11 @@ const unverified: Trust = {
   rider: null,
 };
 
-/** Core's own trust, handed to an output schema as an edge that renames nothing would. */
 const trust = z.custom<Trust>();
 
 const messagesOf = (parsed: { readonly error?: z.ZodError }): readonly string[] | undefined =>
   parsed.error?.issues.map(({ message }) => message);
 
-/** Whether each field carries the words an MCP client's model reads beside it. */
 const described = (shape: Readonly<Record<string, z.ZodType>>): Readonly<Record<string, boolean>> =>
   Object.fromEntries(
     Object.entries(shape).map(([key, field]) => [key, (field.description ?? "").trim() !== ""]),
@@ -662,7 +660,6 @@ describe("open's and feedback's renderings", () => {
 
 const A_RECORD = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
 
-/** The one concept `recordOf` says a completed record returned. */
 const CITED = conceptIriOf("01J6CCCCCCCCCCCCCCCCCCCCCC");
 
 describe("what the slice's four actions answer", () => {
@@ -772,7 +769,6 @@ describe("feedback given on a record", () => {
     return principalFor(db(), reader.workspaceId, reader.userId);
   };
 
-  /** A record `asker` asked: completed, having returned `CITED`, unless left `open`. */
   const recordOf = async (asker: UserPrincipal, left?: "open"): Promise<string> => {
     const record = await seedingWith(db().pool, (seed) =>
       seed.questionAsked({
@@ -856,7 +852,6 @@ describe("feedback given on a record", () => {
     ]);
   });
 
-  /** A completed record another Viewer of the giver's workspace asked. */
   const aColleaguesRecord = async (giver: UserPrincipal): Promise<string> => {
     const colleague = await seedingWith(db().pool, (seed) =>
       seed.member({ workspaceId: giver.workspaceId, role: "Viewer" }),
@@ -880,7 +875,6 @@ describe("feedback given on a record", () => {
     expect(refused).toEqual({ ok: false, error: "not-found" });
   });
 
-  /** A flag on a sentence resting on `ABSENT`, a concept no record here returned. */
   const disputingAnUncitedConcept = (giver: UserPrincipal, recordId: string) =>
     acting(giver, (principal, tx) =>
       giveFeedback(
@@ -1383,7 +1377,6 @@ describe("what ask answers with no model", () => {
     const { workspaceId, asker } = await anAsker();
     const uids = Array.from({ length: 1_002 }, () => conceptIriOf(ulid())).toSorted();
     const sections = uids.slice(0, 1_001);
-    // The greatest uid is the concept: a cap that counts the sections drops exactly it.
     const reached = await seededIn(workspaceId, {
       ...CONSOLE_EXPORTS,
       collection: "audits",
@@ -1522,7 +1515,6 @@ describe("what ask answers with no model", () => {
     ]);
   });
 
-  /** The steps a transport hands `ask`, and the id of each record they open. */
   const stepsKeepingTheirRecords = (asker: UserPrincipal) => {
     const steps = stepsFor(db().runtimePool, asker);
     const opened: string[] = [];
@@ -1689,10 +1681,6 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     }
   };
 
-  /**
-   * A Policy naming a passage of `handbook`, a page and a second concept as its sources, with a
-   * map edge to that concept.
-   */
   const conceptOfThreeSources = async (
     workspaceId: string,
     handbook: LandedDocument,
@@ -2102,7 +2090,6 @@ describe("the links in an opened concept's body", () => {
     }
   };
 
-  /** Expenses at `path`, its body as given, and a link edge to each concept named. */
   const expensesLinking = (
     workspaceId: string,
     path: string,

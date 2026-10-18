@@ -24,7 +24,6 @@ const A_DISPUTED_SENTENCE = "Audit logs are kept for a year.";
 
 const A_CONCEPT_NEVER_RETURNED = "https://better-answers.com/c/01ARZ3NDEKTSV4RRFFQ69G5FAV";
 
-/** What the tool says of a record the caller may not give feedback on, whatever the reason. */
 const NO_SUCH_RECORD = {
   content: [{ type: "text", text: "Refused: not-found (absent)." }],
   isError: true,
@@ -32,7 +31,6 @@ const NO_SUCH_RECORD = {
 
 type Connected = { readonly client: TestClient; readonly token: string };
 
-/** An Admin's token over a workspace whose one `Answer` the retention question reaches. */
 const connected = async () => {
   const workspace = await app().provision();
   const client = app().client();
@@ -48,7 +46,6 @@ const connected = async () => {
   return { workspace, client, token: tokens.accessToken };
 };
 
-/** A Viewer of `workspaceId` with a token of their own that may give feedback. */
 const aColleagueIn = async (workspaceId: string) => {
   const viewer = await app().person();
   await app().addMember(workspaceId, viewer.id, "Viewer");
@@ -62,7 +59,6 @@ const answered = z.object({
   related: z.array(z.object({ iri: z.string() })),
 });
 
-/** Asks the retention question: the record's id and the concepts, as the wire gave them. */
 const asked = async ({ client, token }: Connected) => {
   const said = await calledTool(client, token, "ask", { question: RETENTION_QUESTION });
   return answered.parse(structured(said));
@@ -73,7 +69,6 @@ const given = ({ client, token }: Connected, feedback: Rpc): Promise<Rpc> =>
 
 const feedbackKeptOn = (recordId: string) => feedbackOf(app(), recordId);
 
-/** How many rows the workspace holds in each table a queue is read from. */
 const queuedIn = async (workspaceId: string) => {
   const counted = await app().database.superuser.query<{ suggestions: number; jobs: number }>(
     `SELECT (SELECT count(*)::int FROM suggestion WHERE workspace_id = $1) AS suggestions,
@@ -253,7 +248,6 @@ describe("feedback an assistant sends on a record", () => {
     const store = app().database.superuser;
     const landed: string[] = [];
 
-    // Wrapped, or the lock would be held until the call it blocks had ended.
     const held = await holdingTable(store, "question_feedback", async () => {
       const giving = given(host, { recordId, verdict: "helpful" }).then((said) => {
         landed.push("the feedback");

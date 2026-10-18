@@ -11,7 +11,6 @@ const A_PASSAGE = "documents/handbook.pdf#page=4";
 
 type Flag = "incomplete" | "wrong";
 
-/** A completed record with one flag of `reason` on it per entry in `flags`. */
 const aRecordFlagged = (
   workspaceId: string,
   flags: readonly Flag[],
@@ -34,7 +33,6 @@ const aRecordFlagged = (
 const rateOf = (workspace: ProvisionedWorkspace, workspaceId: string = workspace.workspaceId) =>
   unmappedPassageRate(ANSWER_MEASURES, workspace.door, { workspaceId });
 
-/** The workspace's door, keeping the text of every statement its connections run. */
 const doorKeepingStatements = (workspace: ProvisionedWorkspace) => {
   const { pool } = workspace.door;
   const statements: string[] = [];

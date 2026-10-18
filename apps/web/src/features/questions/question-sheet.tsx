@@ -26,12 +26,10 @@ import { CLOSE_AS, CLOSINGS, QUESTIONS_WORDS as WORDS, trustThenWords } from "./
 
 const SEARCH_PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Search");
 
-/** A closed flag has no sentence of its own, so each refusal shows its class's. */
 const { outcomeOfFailure } = refusalsOf({});
 
 const LINK = "font-medium text-brand underline underline-offset-4";
 
-/** Its own row's button, which the sheet hands focus back to. */
 export const recordButtonId = (recordId: string): string => `question-${recordId.toLowerCase()}`;
 
 export const askerWords = (askedBy: AskedRecord["askedBy"]): string =>
@@ -132,7 +130,6 @@ const focusOnArrival = (line: HTMLElement | null): void => {
 
 function CloseActions(properties: {
   readonly pending: boolean;
-  /** Focus comes back to the first button when a refused closing puts the flag back. */
   readonly landsHere: boolean;
   readonly onClose: (closedAs: FlagClosing) => void;
 }) {
@@ -162,7 +159,6 @@ function CloseActions(properties: {
   );
 }
 
-/** Given only where the reader may read the concept the sentence rested on; an erasure clears the sentence. */
 function DisputedRows(properties: {
   readonly disputed: Feedback["disputed"];
   readonly concepts: readonly ConceptRead[];
@@ -186,7 +182,6 @@ function DisputedRows(properties: {
   );
 }
 
-/** Focus lands here once the flag it was closing is closed, since the buttons go with it. */
 function ClosedRow(properties: { readonly feedback: Feedback; readonly landsHere: boolean }) {
   const { closedAs, closedAt } = properties.feedback;
   if (closedAs === null || closedAt === null) return null;
@@ -227,10 +222,8 @@ function FlagItem(properties: {
   );
 }
 
-/** The page's closing of a flag: it outlives the sheet, so an answer landing after it closes is kept. */
 export type FlagClosingState = {
   readonly pending: boolean;
-  /** The record and flag the reader last asked to close. */
   readonly last: { readonly recordId: string; readonly feedbackId: string } | undefined;
   readonly outcome: Outcome | undefined;
   readonly close: (recordId: string, feedbackId: string, closedAs: FlagClosing) => void;
@@ -307,7 +300,6 @@ function AskedLine(properties: { readonly record: AskedRecord }) {
   );
 }
 
-/** One record over its list: what was asked, what `ask` gave, and the flags on it. */
 export function QuestionSheet(properties: {
   readonly record: AskedRecord;
   readonly closing: FlagClosingState;

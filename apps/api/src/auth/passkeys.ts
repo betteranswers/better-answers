@@ -45,7 +45,6 @@ const REFUSALS = {
 
 type Refused = { readonly body: { readonly error: string }; readonly status: 400 | 401 };
 
-/** What the library's refusal of a ceremony means to the person, by the code it carries. */
 const REFUSED_AS: ReadonlyMap<string, Refused> = new Map([
   [USER_NOT_VERIFIED, { body: PERSON_ROUTE_REFUSALS.notVerified, status: 400 }],
   ["CHALLENGE_NOT_FOUND", { body: PERSON_ROUTE_REFUSALS.challengeGone, status: 400 }],
@@ -56,7 +55,6 @@ const REFUSED_AS: ReadonlyMap<string, Refused> = new Map([
 
 const codeOf = z.object({ code: z.string() }).catch({ code: "" });
 
-/** A server failure carries a refusal's code too, so only a 4xx is the person's to hear. */
 const refusalOf = (failure: Error): Refused | undefined =>
   failure instanceof APIError && failure.statusCode < 500
     ? REFUSED_AS.get(codeOf.parse(failure.body).code)
@@ -70,7 +68,6 @@ type Assertion = NonNullable<
   Parameters<Auth["api"]["verifyPasskeyAuthentication"]>[0]
 >["body"]["response"];
 
-/** The shape the browser's assertion takes; the library verifies every value in it. */
 const assertionShape = z.object({
   id: z.string(),
   rawId: z.string(),
@@ -83,7 +80,6 @@ const assertionShape = z.object({
   clientExtensionResults: z.object({}),
 });
 
-/** A passkey's answer to a sign-in's or a confirm's challenge, as the browser posts it. */
 export const presented = z.object({
   response: z.custom<Assertion>((value) => assertionShape.safeParse(value).success),
 });
@@ -95,10 +91,6 @@ const signedInAs = z.object({ user: z.object({ name: z.string() }) });
 const nameRefused = (context: Context, word: string): Response =>
   context.json({ error: word }, 400);
 
-/**
- * Each route calls a closed library endpoint as a server function, so it brings what the router
- * would: a rate rule and the same-origin fence.
- */
 export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): void => {
   const { auth, door, clock } = deps;
   const fenced = personRoutesAt(routes, "/passkeys/*", deps);
@@ -115,13 +107,11 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
       : context.json(refused.body, refused.status);
   };
 
-  /** Hands the browser what the library set: the challenge's cookie, or a new session's. */
   const forward = (context: Context, headers: Headers): void => {
     for (const cookie of headers.getSetCookie())
       context.header("set-cookie", cookie, { append: true });
   };
 
-  /** Both steps check, since a challenge asked for before a restore lives five minutes. */
   const heldForAnAdd = async (
     context: Context,
     person: SignedIn,
@@ -131,15 +121,12 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     if (waitsOnTheRestoreCode(held)) {
       return context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409);
     }
-    // A grant a spent code made needs no re-confirm: the code was the stronger proof.
     if (mayReplace(held)) return held;
-    // An add to a person already holding a factor re-confirms first, so nothing reaches the device.
     return factorChangeStale(held, clock.now())
       ? context.json(PERSON_ROUTE_REFUSALS.confirmationTooOld, 412)
       : held;
   };
 
-  /** The name is judged before the device is asked, so a refused one leaves no passkey on it. */
   const askToAdd = async (context: Context, person: SignedIn): Promise<Response> => {
     const named = await parsedBody(context, naming);
     if (!named.success) return context.json(REFUSALS.malformed, 400);
@@ -158,7 +145,6 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     return context.json(asked.value.response);
   };
 
-  /** The library has kept the passkey, so its notice goes whether or not the record lands. */
   const settle = async (context: Context, person: SignedIn, passkeyId: string) => {
     void sendFactorNotice({ mail, log }, person.user.email, "passkey-added");
     const recorded = await recordPasskeyAdded(IDENTITY_PRINCIPAL, door, {
@@ -178,7 +164,6 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     return context.json({ passkeyId, ...finishedWith(recorded.value.issued) });
   };
 
-  /** The library has kept the passkey, so a grant spent meanwhile leaves it an ordinary add. */
   const replace = async (context: Context, person: SignedIn, passkeyId: string) => {
     const replaced = await replaceFactorsByPasskey(IDENTITY_PRINCIPAL, door, {
       ...askedBy(clock, person),
@@ -198,7 +183,6 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     return context.json({ passkeyId, ...finishedWith(replaced.value.issued) });
   };
 
-  /** A session granted setup by a spent code replaces the person's factors with this passkey. */
   const add = async (context: Context, person: SignedIn): Promise<Response> => {
     const asked = await parsedBody(context, added);
     if (!asked.success) return context.json(REFUSALS.malformed, 400);
@@ -221,10 +205,6 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
       : settle(context, person, passkeyId);
   };
 
-  /**
-   * No cookie goes in, since a standing session narrows the ask to its own passkeys. The library
-   * only prefers user verification; ours requires it.
-   */
   const askToSignIn = async (context: Context): Promise<Response> => {
     const asked = await attempt(() =>
       auth.api.generatePasskeyAuthenticationOptions({
@@ -257,7 +237,6 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
 
   routes.use(PASSKEY_SIGN_IN_OPTIONS_PATH, limitByAddress);
   routes.use(PASSKEY_SIGN_IN_PATH, limitByAddress);
-  /** Asks and adds count apart. */
   routes.post(
     PASSKEY_ADD_OPTIONS_PATH,
     fenced.asThePerson("passkey-ask", PASSKEY_PERSON_RULE, "set-up-a-factor", askToAdd),

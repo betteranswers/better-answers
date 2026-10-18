@@ -54,9 +54,8 @@ def clears_the_floor(kind: str, identifier: str) -> bool:
 def erasure_matches_in(
     text: str, suppressions: Sequence[Mapping[str, Sequence[str]]]
 ) -> tuple[ErasureMatch, ...]:
-    """Each whole-word, case-folded occurrence of an erased
-    identifier that clears the floor, in the text's own offsets.
-    An email address must not run on into a longer one."""
+    """Whole-word, case-folded occurrences of erased identifiers clearing the floor, in
+    the text's own offsets. An email address must not run on into a longer one."""
     sought = {
         (normalised(identifier), kind == EMAILS)
         for suppression in suppressions

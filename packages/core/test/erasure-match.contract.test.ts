@@ -117,7 +117,6 @@ const matchesOf = (kind: (typeof SUBJECT_IDENTIFIER_KINDS)[number], identifier: 
 
 let theWordCharacters: ReadonlySet<string> | undefined;
 
-/** Read once for the two tests that need it: a walk of every code point takes seconds. */
 const wordCharacters = (): ReadonlySet<string> => {
   if (theWordCharacters !== undefined) return theWordCharacters;
   const ofABC = matchesOf("other", "abc");

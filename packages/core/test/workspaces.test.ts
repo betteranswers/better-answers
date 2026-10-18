@@ -139,8 +139,6 @@ describe("provisioning a workspace", () => {
       "SELECT key FROM workspace_config WHERE workspace_id = $1",
       [id],
     );
-    // The MCP transport looks this row up by the literal string; the key read back through
-    // its own constant would agree with any name.
     expect(written.rows).toEqual([{ key: "mcp.tools_list_ttl_ms" }]);
   });
 
@@ -874,7 +872,6 @@ describe("a person's workspaces, each with their role there", () => {
     return { email, personId: await seedPerson(db().pool, { email }) };
   };
 
-  /** A new workspace under its own Admin, which the person holding `email` joins at `role`. */
   const joinedAs = async (name: string, email: string, role: "Admin" | "Editor" | "Viewer") => {
     const workspace = await provisionedWorkspace(db(), name);
     const added = await addMember(bootstrap, workspace.door, {

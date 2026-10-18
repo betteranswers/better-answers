@@ -19,8 +19,6 @@ UNREADABLE = (OSError, SyntaxError, tokenize.TokenError, UnicodeDecodeError)
 
 WORD_LIMIT = 25
 
-DOCSTRING_LIMIT = 50
-
 Comment = tuple[int, int, str]
 
 
@@ -54,34 +52,34 @@ SUPPRESSION = re.compile(
 MARKER = re.compile(r"(?:^|\s)#+")
 
 TOO_LONG = (
-    "{path}:{line}: this comment runs to {words} words; a comment says only what the "
-    "code cannot — a constraint, a trade-off, a trap — in {limit} at most "
-    "(the root `CODING_STANDARDS.md`). Delete what the code already says."
+    "{path}:{line}: this comment runs to {words} words, over the cap of {limit}. A "
+    "comment stays only for a constraint outside this repository (a library, platform "
+    "or protocol), a public contract, a generated-file marker, a license, or a "
+    "suppression's reason. Any other comment is deleted: hold its reason in a name, a "
+    "type, a test, a grant or a lint, or report it open in the tracker."
 )
 
 REASON_TOO_LONG = (
     "{path}:{line}: this directive's reason runs to {words} words, and a reason counts "
-    "against the comment cap of {limit} (the root `CODING_STANDARDS.md`). Say the "
-    "constraint alone."
+    "against the comment cap of {limit}. Say the constraint alone."
 )
 
-DOCSTRING_TOO_LONG = (
-    "{path}:{line}: this docstring runs to {words} words; a public function's "
-    "docstring says only what its signature cannot — units, ranges, what None means, "
-    "a side effect, a refusal — in {limit} at most (the root `CODING_STANDARDS.md`). "
-    "Delete the rest."
+NO_REASON = (
+    "{path}:{line}: this suppression gives no reason; a `noqa` or a `type: ignore` "
+    "says on the same line why the rule does not hold here. Add the reason after a "
+    "second `#`."
 )
 
 CITES = (
     "{path}:{line}: this comment cites {what} (`{cited}`); a comment never says which "
-    "ticket, decision or rule asked for the code (the root `CODING_STANDARDS.md`). "
-    "git, a spec and an ADR are where that is read."
+    "ticket, decision or rule asked for the code. git, a spec and an ADR are where "
+    "that is read."
 )
 
 STRING_CITES = (
     "{path}:{line}: this string cites {what} (`{cited}`); a string that reaches a "
     "person names what they can act on, never a document they cannot open from where "
-    "they read it (the root `CODING_STANDARDS.md`). Say the thing instead."
+    "they read it. Say the thing instead."
 )
 
 
@@ -90,13 +88,12 @@ class Block(NamedTuple):
     prose: str
     limit: int = WORD_LIMIT
     too_long: str = TOO_LONG
+    unreasoned: str | None = None
 
 
 DOCSTRING_HOLDERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 
 A_TEST_PATH = re.compile(r"(?:^|/)(?:tests?|e2e)/|(?:^|/)(?:test_[^/]*|conftest)\.py$")
-
-A_WORKER_MODULE = re.compile(r"(?:^|/)apps/worker/src/")
 
 A_SPACE = re.compile(r"\s")
 
@@ -136,27 +133,27 @@ def _suppresses(written: str) -> bool:
 
 
 def _blocks(lines: list[str], comments: Iterable[Comment]) -> list[Block]:
-    runs: list[tuple[int, list[str], str]] = []
+    runs: list[tuple[int, list[str], str, str | None]] = []
     previous = -2
     for row, column, written in comments:
-        text = _prose(written)
-        if text is None:
-            previous = -2
-            continue
         # A reason is held to its own directive, never to the comments around it.
         if _suppresses(written):
-            runs.append((row, [text], REASON_TOO_LONG))
+            runs.append((row, [_prose(written) or ""], REASON_TOO_LONG, NO_REASON))
+            previous = -2
+            continue
+        text = _prose(written)
+        if text is None:
             previous = -2
             continue
         own_line = lines[row - 1][:column].strip() == ""
         if own_line and row == previous + 1:
             runs[-1][1].append(text)
         else:
-            runs.append((row, [text], TOO_LONG))
+            runs.append((row, [text], TOO_LONG, None))
         previous = row if own_line else -2
     return [
-        Block(start, "\n".join(parts), WORD_LIMIT, template)
-        for start, parts, template in runs
+        Block(start, "\n".join(parts), WORD_LIMIT, template, unreasoned)
+        for start, parts, template, unreasoned in runs
     ]
 
 
@@ -170,19 +167,7 @@ def _python_comments(source: str) -> list[Comment]:
     return found
 
 
-def _public_worker_functions(path: Path, tree: ast.Module) -> set[ast.AST]:
-    if A_WORKER_MODULE.search(path.as_posix()) is None:
-        return set()
-    return {
-        node
-        for node in tree.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        and not node.name.startswith("_")
-    }
-
-
-def _docstrings(path: Path, tree: ast.Module) -> list[Block]:
-    public = _public_worker_functions(path, tree)
+def _docstrings(tree: ast.Module) -> list[Block]:
     found: list[Block] = []
     for node in ast.walk(tree):
         if not isinstance(node, DOCSTRING_HOLDERS):
@@ -191,10 +176,7 @@ def _docstrings(path: Path, tree: ast.Module) -> list[Block]:
         if text is None or A_NOTICE.match(text.strip()) is not None:
             continue
         line = getattr(node.body[0], "lineno", 1)
-        if node in public:
-            found.append(Block(line, text, DOCSTRING_LIMIT, DOCSTRING_TOO_LONG))
-        else:
-            found.append(Block(line, text))
+        found.append(Block(line, text))
     return found
 
 
@@ -245,7 +227,7 @@ def _findings(path: Path, source: str) -> list[str]:
     tree = ast.parse(source)
     said = _string_findings(path, tree)
     comments = _blocks(source.splitlines(), _python_comments(source))
-    for line, prose, limit, too_long in comments + _docstrings(path, tree):
+    for line, prose, limit, too_long, unreasoned in comments + _docstrings(tree):
         cited = citation_in(prose)
         if cited is not None:
             what, citation = cited
@@ -254,6 +236,8 @@ def _findings(path: Path, source: str) -> list[str]:
         words = len(prose.split())
         if words > limit:
             said.append(too_long.format(path=path, line=line, words=words, limit=limit))
+        elif not words and unreasoned is not None:
+            said.append(unreasoned.format(path=path, line=line))
     return said
 
 

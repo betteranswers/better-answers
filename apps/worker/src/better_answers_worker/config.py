@@ -91,9 +91,9 @@ def _positive_bytes(source: Mapping[str, str], name: str, fallback: int) -> int:
 
 
 def read_bootstrap(environment: Mapping[str, str] | None = None) -> Bootstrap:
-    """Reads `os.environ` when `environment` is None; `WORKER_ID` falls back to
-    the host name. Raises `BootstrapError` naming every missing variable, or for
-    a size that is not a positive number or `MAX_CONCURRENT_RUNS` other than one."""
+    """None means `os.environ`; `WORKER_ID` defaults to the hostname. Raises
+    `BootstrapError` naming every missing variable, for a non-numeric or non-positive
+    size, or `MAX_CONCURRENT_RUNS` other than one."""
     source = environ if environment is None else environment
 
     missing = [name for name in REQUIRED if not source.get(name)]

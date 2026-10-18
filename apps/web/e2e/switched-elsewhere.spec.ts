@@ -19,7 +19,6 @@ import { refusalAnswering } from "./refused-read.ts";
 
 const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
 
-/** What the api answers an action that named a workspace the session has left. */
 const SWITCHED = { word: "workspace-switched", class: "conflict" } as const;
 
 type Role = "Admin" | "Editor" | "Viewer";
@@ -30,7 +29,6 @@ type Two = { readonly first: Workspace; readonly second: Workspace };
 
 const membersRegion = (page: Page): Locator => page.getByRole("region", { name: "Members" });
 
-/** A row's cells are its tick, the person and then their role. */
 const roleOf = (page: Page, name: string): Locator =>
   membersRegion(page).getByRole("row").filter({ hasText: name }).getByRole("cell").nth(2);
 
@@ -46,7 +44,6 @@ const invitationTo = (page: Page, address: string): Locator =>
 const removalOf = (samsPage: Locator): Locator =>
   samsPage.getByRole("region", { name: "Removal", exact: true });
 
-/** In both, or no action could land on the wrong one; a role apiece tells the two lists apart. */
 const aMemberOfBoth = async (
   api: APIRequestContext,
   { first, second }: Two,
@@ -59,7 +56,6 @@ const aMemberOfBoth = async (
   return member.id;
 };
 
-/** `page` takes no fresh document from here on: it would read the member and learn of the switch. */
 const switchedInAnotherTab = async (
   context: BrowserContext,
   page: Page,
@@ -74,13 +70,11 @@ const switchedInAnotherTab = async (
   return elsewhere;
 };
 
-/** A fresh document, so its rows are read from the workspace the session is in now. */
 const membersReadAfresh = async (tab: Page, here: Workspace): Promise<void> => {
   await tab.goto(MEMBERS.path);
   await expect(switcherOf(tab, here.name)).toBeVisible();
 };
 
-/** The other tab switches back, only once the refused tab has landed: it follows the session. */
 const backIn = async (elsewhere: Page, { first, second }: Two): Promise<void> => {
   await switched(elsewhere, second.name, first.name);
   await expect(switcherOf(elsewhere, first.name)).toBeVisible();
@@ -107,11 +101,9 @@ const landedHomeSayingWhy = async (page: Page, now: Workspace): Promise<void> =>
   await expect(switcherOf(page, now.name), "the band names the workspace left").toBeVisible();
 };
 
-/** A batch's address names its procedures; a call sent alone names one. */
 const askedIn = (url: string): readonly string[] =>
   new URL(url).pathname.replace("/trpc/", "").split(",");
 
-/** Sam's page under `first`, read before the other tab switches. */
 const atSamsPage = async (page: Page, api: APIRequestContext, two: Two): Promise<Locator> => {
   const sam = await aMemberOfBoth(api, two, "Sam Okoro", { first: "Editor", second: "Viewer" });
   await page.goto(`${MEMBERS.path}/${sam}`);
@@ -137,7 +129,6 @@ test.describe("an action from a tab left in another workspace", () => {
     const answered = refusalAnswering(page, "members.remove");
     await removal.getByRole("button", { name: "Remove Member" }).click();
     await removal.getByRole("button", { name: "Remove", exact: true }).click();
-    // Awaited before either workspace is read, so what the action left is read after it landed.
     expect(await answered).toMatchObject(SWITCHED);
 
     await membersReadAfresh(elsewhere, two.second);
@@ -252,7 +243,6 @@ test.describe("an action from a tab left in another workspace", () => {
         if (JSON.stringify(each).includes(`"${SWITCHED.word}"`)) refused.add(asked[at] ?? "");
       });
     });
-    // Each follow of the session reads the member again; history cannot tell two moves home apart.
     let memberReads = 0;
     page.on("request", (asking) => {
       if (asking.url().includes("/trpc/") && askedIn(asking.url()).includes("session.member")) {
@@ -260,7 +250,6 @@ test.describe("an action from a tab left in another workspace", () => {
       }
     });
 
-    // In the app, not a fresh document: the band keeps its member, and the page asks its reads together.
     await page
       .getByRole("navigation", { name: "Areas" })
       .getByRole("link", { name: "Control Centre" })
@@ -280,7 +269,6 @@ test.describe("an action from a tab left in another workspace", () => {
     const elsewhere = await switchedInAnotherTab(context, page, two);
     await samsPage.getByRole("radio", { name: "Admin", exact: true }).click();
 
-    // Answered by the api and held on its way back, so the second press meets the first pending.
     const held = Promise.withResolvers<void>();
     let asked = 0;
     await page.route(
@@ -293,7 +281,6 @@ test.describe("an action from a tab left in another workspace", () => {
       },
     );
     const answered = refusalAnswering(page, "members.changeRole");
-    // By pointer: the first press hands focus to the picked role, so a key's second would miss.
     await samsPage.getByRole("button", { name: "Change Role" }).dblclick();
     await expect.poll(() => asked, { message: "neither press asked the api" }).toBe(1);
     held.resolve();

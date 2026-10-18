@@ -2,7 +2,6 @@ import type { z } from "zod";
 
 import { boundarySchemas } from "./boundary-schemas.ts";
 
-/** Each branded id's parser is its table's own select column, so the brand has one definition. */
 export const ids = {
   workspaceId: boundarySchemas.workspace.select.shape.id,
   userId: boundarySchemas.user.select.shape.id,

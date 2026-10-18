@@ -15,7 +15,6 @@ export const INVITATION_WORDS = {
   readingAgain: "Reading",
 } as const;
 
-/** Each keystroke's action, as the list of keystrokes names it; a way on's action names its button too. */
 export const INVITATION_ACTIONS = {
   join: "Join the Workspace",
   readAgain: "Read the Invitation Again",

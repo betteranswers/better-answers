@@ -15,7 +15,6 @@ const ULID = "01J6MMMMMMMMMMMMMMMMMMMMMM";
 
 const AT = "https://better-answers.com/c/";
 
-/** Each string, and whether the IRI pattern accepts it. */
 const CANDIDATES: readonly (readonly [string, boolean])[] = [
   [`${AT}${ULID}`, true],
   [`${AT}00000000000000000000000000`, true],
@@ -52,7 +51,6 @@ const insertingAt = (client: pg.PoolClient, iri: string, commitSha: string) =>
     new Date(),
   ]);
 
-/** Runs `work` in a rolled-back transaction holding workspace A and one bundle commit. */
 const withACommit = (work: (client: pg.PoolClient, seed: TestData, sha: string) => Promise<void>) =>
   withRollback(db().pool, async (client) => {
     const seed = testData(client);

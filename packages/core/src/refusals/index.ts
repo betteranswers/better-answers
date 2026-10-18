@@ -6,10 +6,6 @@ import { RUN_REFUSALS } from "../runs/index.ts";
 import { SOURCE_REFUSALS } from "../sources/index.ts";
 import { WORKSPACE_REFUSALS } from "../workspaces/index.ts";
 
-/**
- * Every refusal word core answers. No other list holds one: a transport reads this and adds only
- * its own.
- */
 export const REFUSAL_CATALOGUE = {
   kernel: KERNEL_REFUSALS,
   sources: SOURCE_REFUSALS,

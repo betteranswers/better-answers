@@ -11,7 +11,6 @@ const drawAPictureWithNoAltText = (): void => {
   document.querySelector("main")?.append(picture);
 };
 
-/** A refused action's button, held at its disabled look until the fade's last moment. */
 const fadeAButtonBackFromItsDisabledLook = (): void => {
   const button = document.createElement("button");
   button.textContent = "Change Role";
@@ -40,7 +39,6 @@ const markFourObjects = (): void => {
   }
 };
 
-/** Faint words inside a marked object, where a mark's own paint would leave axe undecided. */
 const writeFaintWordsInAMarkedObject = (): void => {
   const region = document.createElement("section");
   region.dataset["marks"] = "";
@@ -52,7 +50,6 @@ const writeFaintWordsInAMarkedObject = (): void => {
   document.querySelector("main")?.append(region);
 };
 
-/** Words over an image no set-aside clears, so axe cannot decide their contrast. */
 const writeWordsOverAnImage = (): void => {
   const words = document.createElement("p");
   words.style.backgroundImage =
@@ -73,7 +70,6 @@ const writeWordsLostInTheDark = (): void => {
   document.querySelector("main")?.append(words);
 };
 
-/** A field whose edge and fill are the page's own colour, so nothing shows where it is. */
 const drawAFieldWithNoEdge = (): void => {
   const field = document.createElement("input");
   field.setAttribute("aria-label", "A field nobody can find");
@@ -81,7 +77,6 @@ const drawAFieldWithNoEdge = (): void => {
   document.querySelector("main")?.append(field);
 };
 
-/** A white-edged field on a see-through tint, as a hovered row paints it: lost in light alone. */
 const drawAFieldWithNoEdgeOnATint = (): void => {
   const tint = document.createElement("div");
   tint.style.cssText =
@@ -93,7 +88,6 @@ const drawAFieldWithNoEdgeOnATint = (): void => {
   document.querySelector("main")?.append(tint);
 };
 
-/** Edgeless fields in a box whose strong border stands a grid step off them: a layout's edge, not a field's. */
 const drawEdgelessFieldsInABorderedBox = (): void => {
   const box = document.createElement("div");
   box.style.cssText = "padding: 8px; border: 1px solid var(--text-primary)";
@@ -107,7 +101,6 @@ const drawEdgelessFieldsInABorderedBox = (): void => {
   document.querySelector("main")?.append(box);
 };
 
-/** An edgeless, see-through field in a filled box: the box's fill is the field's only where a side hugs. */
 const drawAnEdgelessFieldInAFilledBox = (padding: string): void => {
   const box = document.createElement("div");
   box.style.cssText = `padding: ${padding}; background: var(--text-primary)`;
@@ -119,7 +112,6 @@ const drawAnEdgelessFieldInAFilledBox = (padding: string): void => {
   document.querySelector("main")?.append(box);
 };
 
-/** An edgeless field whose row draws a strong rule close under it, as Jump to's row does. */
 const drawAFieldOnItsRowsRule = (): void => {
   const row = document.createElement("div");
   row.style.cssText = "padding: 4px 24px; border-bottom: 1px solid var(--text-primary)";
@@ -147,7 +139,6 @@ const drawAWordlessCheckbox = (dimmedTo: number): void => {
   document.querySelector("main")?.append(box);
 };
 
-/** A band that stays put, and the page scrolled until its button half covers a control. */
 const scrollAControlHalfUnderABand = (): boolean => {
   const band = document.createElement("header");
   band.style.cssText =
@@ -165,7 +156,6 @@ const scrollAControlHalfUnderABand = (): boolean => {
   room.style.height = "200vh";
   document.body.append(underIt, room);
 
-  // Two pixels show below the band, so the band does not hide it whole, and its button covers the rest.
   window.scrollBy(0, underIt.getBoundingClientRect().top - 26);
   const covering = inTheBand.getBoundingClientRect();
   const cut = underIt.getBoundingClientRect();

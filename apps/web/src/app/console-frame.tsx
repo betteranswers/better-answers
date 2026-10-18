@@ -10,7 +10,6 @@ import { Button } from "@/shared/ui/button.tsx";
 
 import { Frame } from "./frame.tsx";
 
-/** The console frame draws for the operator alone, so what it shows is theirs. */
 const THE_OPERATORS = visibleTo(OPERATOR_READER, [CONSOLE]);
 
 const BACK_TO_YOUR_WORKSPACES = {
@@ -29,7 +28,6 @@ function WaysOut() {
   );
 }
 
-/** Outside the shell, so a person who is not the operator never sees the console's pages. */
 function ConsoleClosed(properties: { readonly standing: ReturnType<typeof useOperatorStanding> }) {
   const { standing } = properties;
 

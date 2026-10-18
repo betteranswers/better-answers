@@ -53,7 +53,6 @@ type ThePerson = {
   readonly log: Logger;
 };
 
-/** A factor change re-confirms where the person already holds a factor; a first one needs none. */
 const reconfirmingTheirFactors = async (
   ctx: ThePerson,
 ): Promise<Result<undefined, "confirmation-too-old" | RefusalAnswer | Error>> => {
@@ -63,7 +62,6 @@ const reconfirmingTheirFactors = async (
     now: ctx.clock.now(),
   });
   if (!held.ok) return held;
-  // A restored person's factor change waits on their restore code alone, never a re-confirm.
   if (held.value.restoreRequired || !factorChangeStale(held.value, ctx.clock.now())) {
     return ok(undefined);
   }

@@ -15,7 +15,6 @@ import { useGiveFeedback, type FeedbackInput } from "./ask-api.ts";
 import { ASK_KEYSTROKES as KEY, NOTE_MAX } from "./ask-state.ts";
 import { ASK_WORDS as WORDS } from "./ask-words.ts";
 
-/** A flag on a sentence or an `Answer` names it and the concept it rested on. */
 type Disputed = { readonly sentence: string; readonly concept: string };
 
 const { outcomeOfFailure } = refusalsOf({});
@@ -23,17 +22,14 @@ const { outcomeOfFailure } = refusalsOf({});
 const reasonOf = (value: string): Reason | undefined =>
   FLAG_REASONS.find((reason) => reason === value);
 
-/** Lands on the control that took the trigger's place, since the trigger is gone. */
 const focusOnArrival = (control: HTMLButtonElement | null): void => {
   control?.focus();
 };
 
-/** What the reader has written into a flag, kept by its control so a refused send loses none of it. */
 type Draft = { readonly reason: Reason | undefined; readonly note: string };
 
 const NO_DRAFT: Draft = { reason: undefined, note: "" };
 
-/** No reason is chosen for the reader: the api takes none without one, so sending says so. */
 function FlagForm(properties: {
   readonly draft: Draft;
   readonly onDraft: (draft: Draft) => void;
@@ -101,12 +97,9 @@ function FlagForm(properties: {
 
 type Flagging = {
   readonly recordId: string;
-  /** The control's name, which names its popover too. */
   readonly name: string;
-  /** The words it shows, which its name begins with; absent, it shows its glyph alone. */
   readonly label?: string;
   readonly disputed?: Disputed;
-  /** Opened by the answer's own keystroke. */
   readonly keyed?: boolean;
 };
 
@@ -115,10 +108,6 @@ function OpensOnItsKey(properties: { readonly onOpen: () => void }) {
   return null;
 }
 
-/**
- * Shown sent when pressed; a refused send reopens with its draft. Its own mutation keeps one
- * control's answer from another's callbacks.
- */
 export function FlagControl(properties: Flagging) {
   const { recordId, name, label, disputed } = properties;
   const giving = useGiveFeedback();
@@ -195,7 +184,6 @@ export function FlagControl(properties: Flagging) {
   );
 }
 
-/** Marked as pressed, and put back with the refusal if the api refuses it. */
 export function HelpfulControl(properties: { readonly recordId: string }) {
   const giving = useGiveFeedback();
   const [sent, setSent] = useState(false);

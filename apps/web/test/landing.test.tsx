@@ -19,7 +19,6 @@ function Line(properties: {
   );
 }
 
-/** Two lines, a box to move focus to, and a page of two more that lands when it is told to. */
 function Lines() {
   const [lines, setLines] = useState(["line 1", "line 2"]);
   const landing = useLanding();
@@ -68,7 +67,6 @@ const askedForMore = (): void => {
   fireEvent.click(more);
 };
 
-/** A click fired, not pressed: a press would move focus, and the page lands under whatever holds it. */
 const thePageLands = (): void => {
   fireEvent.click(screen.getByRole("button", { name: "The page lands" }));
 };
@@ -107,7 +105,6 @@ describe("where focus goes when Load More's page lands", () => {
     render(<Lines />);
 
     askedForMore();
-    // As a browser does for the control that held focus when its window is brought to the front again.
     fireEvent.focusIn(screen.getByRole("button", { name: "Load More" }));
     thePageLands();
 

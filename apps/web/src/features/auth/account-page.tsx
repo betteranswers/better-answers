@@ -59,7 +59,6 @@ const SIGN_IN_HEADING = "sign-in-heading";
 
 const REFUSED = "account-refused";
 
-/** Each action clears what the last one said, so the page speaks of one action at a time. */
 const useAccountActions = (
   address: string,
   firstLanding: Landing | undefined,
@@ -86,7 +85,6 @@ const useAccountActions = (
     acknowledge.reset();
   };
 
-  /** The name is suggested as the add opens, from the browser that will hold the passkey. */
   const toggleAdd = () => {
     if (!addOpen) setSuggestedName(passkeyNameFor(navigator.userAgent));
     setAddOpen(!addOpen);
@@ -207,7 +205,6 @@ const useAccountActions = (
 
 type AccountActions = ReturnType<typeof useAccountActions>;
 
-/** A read already drawn stands through a refetch that fails, so only a first read's is said. */
 const failureOnThePage = (read: SecondFactorRead, actions: AccountActions) => {
   if (read.data === undefined && read.error !== null) {
     return { failure: read.error, unanswered: STOCK.notLoaded };
@@ -216,11 +213,9 @@ const failureOnThePage = (read: SecondFactorRead, actions: AccountActions) => {
   if (removal !== null) return { failure: removal, unanswered: STOCK.tryAgain };
   const made = actions.make.error;
   if (made === null) return { failure: made, unanswered: STOCK.tryAgain };
-  // With no response a set may have been made, so no one is told to make another.
   return { failure: made, unanswered: codesUnanswered(made, STOCK.unconfirmed) };
 };
 
-/** The opening actions of the passkeys and the authenticator, each offered while it is closed. */
 const openingKeystrokes = (
   read: SecondFactorRead,
   actions: AccountActions,
@@ -231,7 +226,6 @@ const openingKeystrokes = (
   return [...(offersAdd ? [ADD_A_PASSKEY] : []), ...(offersSetup ? [SET_UP] : [])];
 };
 
-/** In the order the page shows their actions. */
 const keystrokesOf = (read: SecondFactorRead, actions: AccountActions): readonly Keystroke[] => {
   const keyShown = actions.setupOpen && actions.starting.data !== undefined;
   return [
@@ -245,14 +239,12 @@ const keystrokesOf = (read: SecondFactorRead, actions: AccountActions): readonly
 const sameKeys = (one: readonly Keystroke[], other: readonly Keystroke[]): boolean =>
   one.length === other.length && one.every((keystroke, at) => keystroke === other[at]);
 
-/** The same list while its keys are, so the shell registers it once per change, not per draw. */
 const useSteadyKeystrokes = (keystrokes: readonly Keystroke[]): readonly Keystroke[] => {
   const [steady, keep] = useState(keystrokes);
   if (!sameKeys(steady, keystrokes)) keep(keystrokes);
   return steady;
 };
 
-/** In the shell, whose band holds sign-out and the way on, and whose list holds these keys. */
 function InTheShell(properties: {
   readonly keystrokes: readonly Keystroke[];
   readonly children: ReactNode;
@@ -268,12 +260,10 @@ function InTheShell(properties: {
   );
 }
 
-/** `framed` in a member's shell; outside it, so a person with no workspace reaches it too. */
 export function AccountPage(properties: { readonly framed?: boolean }) {
   const read = useSecondFactor();
   const address = useSession().data?.user.email ?? "";
   const hash = useLocation({ select: (location) => location.hash });
-  // A session a code granted must swap the factors, which only the replacing routes do.
   const routes =
     read.data?.thisSession?.setupGranted === true ? NEW_AUTHENTICATOR : FIRST_AUTHENTICATOR;
   const actions = useAccountActions(

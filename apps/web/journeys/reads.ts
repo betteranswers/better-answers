@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { refusedTheRun } from "./sign-in.ts";
 
-/** Named, not imported: the SPA's tRPC client module brings React's own with it. */
 const TRPC = "/trpc";
 
 const asked = async (page: Page, procedure: string): Promise<APIResponse> => {
@@ -21,7 +20,6 @@ const readFrom = async <T>(
   return z.object({ result: z.object({ data }) }).parse(await answered.json()).result.data;
 };
 
-/** Through the person's own session, as their page asks it, so it reads what they may read. */
 const readThroughTheSession = async <T>(
   page: Page,
   procedure: string,
@@ -32,7 +30,6 @@ const readThroughTheSession = async <T>(
 const askedAt = (url: string): readonly string[] =>
   new URL(url).pathname.replace(`${TRPC}/`, "").split(",");
 
-/** Asked for before the journey's own action that calls, or the answer can land unwaited for. */
 const answerTo = async <T>(page: Page, procedure: string, data: z.ZodType<T>): Promise<T> => {
   const answered = await page.waitForResponse((answer) =>
     askedAt(answer.url()).includes(procedure),
@@ -46,7 +43,6 @@ const answerTo = async <T>(page: Page, procedure: string, data: z.ZodType<T>): P
   return z.object({ result: z.object({ data }) }).parse(answer).result.data;
 };
 
-/** The api's refusal of an action: its word, alone, as the message. An edge or a failure says none. */
 const REFUSED = z.object({
   error: z.object({ message: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/) }),
 });
@@ -56,7 +52,6 @@ const refusalWordOf = (text: string): string | undefined => {
     const refused = REFUSED.safeParse(JSON.parse(text));
     return refused.success ? refused.data.error.message : undefined;
   } catch {
-    // An edge answers in HTML, which holds no refusal of the product's.
     return undefined;
   }
 };
@@ -64,7 +59,6 @@ const refusalWordOf = (text: string): string | undefined => {
 const refusalWordIn = async (answered: APIResponse): Promise<string | undefined> =>
   answered.ok() ? undefined : refusalWordOf(await answered.text());
 
-/** What a read through the Admin's session found, or the word the product refused it with. */
 export type Checked<T> =
   | { readonly kind: "read"; readonly value: T }
   | { readonly kind: "refused"; readonly procedure: string; readonly word: string };
@@ -82,7 +76,6 @@ const checkedThroughTheSession = async <T>(
 
 const PROTECTED_RESOURCE = z.object({ resource: z.string() });
 
-/** The address the release publishes for an assistant to connect to, read as an assistant reads it. */
 export const publishedAddressOf = async (page: Page): Promise<string> => {
   const answered = await page.request.get("/.well-known/oauth-protected-resource/mcp");
   refusedTheRun(answered, "the read of the protected-resource document");
@@ -123,7 +116,6 @@ export type StandingRead = {
   readonly connectedSources: number;
 };
 
-/** The three reads the fixture check judges; the first refusal, if any, stands for them all. */
 export const standingOf = async (page: Page): Promise<Checked<StandingRead>> => {
   const [members, counts, connectedSources] = await Promise.all([
     checkedThroughTheSession(page, "members.list", MEMBERS),
@@ -143,18 +135,15 @@ export const standingOf = async (page: Page): Promise<Checked<StandingRead>> => 
   };
 };
 
-/** The api's answer to an action of the journey's own, with nothing read from it. */
 export const answeredOk = async (page: Page, procedure: string): Promise<void> => {
   await answerTo(page, procedure, z.unknown());
 };
 
-/** How many the page's own read of the connected sources lists. */
 export const connectedSourcesRead = async (page: Page): Promise<number> =>
   (await answerTo(page, "sources.list", CONNECTED_SOURCES)).length;
 
 const BULK_CHANGED = z.object({ changed: z.array(z.unknown()), skipped: z.number() });
 
-/** How many a bulk action the journey committed changed, and how many it passed over. */
 export const bulkAnswerTo = async (
   page: Page,
   procedure: string,
