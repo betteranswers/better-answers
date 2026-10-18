@@ -273,7 +273,6 @@ still shown the api refused.
   proves the page was left. Never a fixed sleep, and never a load state.
 - **Title says what the system does for whom** — `"a member of two workspaces picks
   one, and everything after is scoped to the pick"`, not `"picker test"`.
-- **Minimal comments** — only comment to clarify non-obvious intent; never restate what the next line of code does.
 - **Give an assertion a message wherever the failure would not name itself.** The harness's own
   `${path} answered ${status}` is the pattern, and so are the axe assertion and the gate's refusal
   in `apps/web/e2e/browser.ts`.
@@ -517,8 +516,8 @@ The donor is Onyx's Playwright skill. Its practices that are ours too:
 - **The Page Object Model.** A page is located by role and accessible name where it is used, so
   the spec says the words a person would hear rather than a name only the suite knows.
 - **An import alias for the suite.** Onyx forbids relative imports and resolves `@tests/e2e/`;
-  there are three modules to import here, `./browser.ts`, `./harness.ts` and
-  `./virtual-authenticator.ts`.
+  a spec here imports its sibling modules by relative path: `./browser.ts`, `./harness.ts`,
+  `./refused-read.ts`, `./knowledge.ts`, `./drawn-parts.ts` and `./virtual-authenticator.ts`.
 - **Visual regression.** Out of scope for v0.1; the aria snapshot is the structural record instead.
 - **Long-running dev servers.** Onyx runs against `next dev` and a separate backend; Playwright
   starts the one process here and stops it, so a run reads the build the same way CI does.

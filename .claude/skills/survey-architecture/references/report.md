@@ -64,7 +64,7 @@ Then print these lines, with absolute paths:
 Architecture survey: <html path>
 Markdown copy: <md path>
 Annotations: in the next session, `lavish-axi poll <html path>` returns what the owner queued on the page.
-Next: start the architecture review with /ce-brainstorm, giving it these two paths.
+Next: start the architecture review with /poteto-mode, giving it these two paths.
 ```
 
-Leave out the annotations line when `lavish-axi` was not available. On Codex, write the next step as `$ce-brainstorm`.
+Leave out the annotations line when `lavish-axi` was not available. On Codex, write the next step as `$poteto-mode`.

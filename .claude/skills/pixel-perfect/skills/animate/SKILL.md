@@ -9,6 +9,8 @@ user-invocable: true
 
 Add purposeful animations and celebration moments, then verify in a real browser. Record demos, test reduced motion, and confirm 60fps.
 
+Read `.pixel-perfect.md` in the project root first, if it exists. Where it names motion rules or a design system, that governs over this skill's defaults, its timing table and celebrations included.
+
 ## Step 1: Identify Animation Opportunities
 
 ```bash

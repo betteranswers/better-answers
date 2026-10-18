@@ -1,12 +1,12 @@
 ---
 name: survey-architecture
-description: Surveys the whole codebase for modules worth reshaping — picks areas from git history and GitNexus, walks each for friction against this repository's design rules and decisions, rebuilds each proposal from first principles, and writes an annotatable report of opportunities. Use before a route block that the route spec holds behind an architecture review, or when the owner names an area to survey. Use `ce-code-review` for a diff. Invoked as `/survey-architecture`, optionally followed by an area.
+description: Surveys the whole codebase for modules worth reshaping — picks areas from git history and GitNexus, walks each for friction against this repository's design rules and decisions, rebuilds each proposal from first principles, and writes an annotatable report of opportunities. Use before a route block that the route spec holds behind an architecture review, or when the owner names an area to survey. Use `/thermos` for a diff. Invoked as `/survey-architecture`, optionally followed by an area.
 disable-model-invocation: true
 ---
 
 # Survey the architecture
 
-The survey produces one report of **opportunities**: places in the code where a different shape would make the next route block easier to build and to test. The owner reads and annotates the report. Then the architecture review, which runs through `/ce-brainstorm`, starts from it. The run is done when the report and its markdown copy exist with every field of every opportunity filled, or when a stop names what was missing. The report says what the run did without, so a thin result is never mistaken for a full one.
+The survey produces one report of **opportunities**: places in the code where a different shape would make the next route block easier to build and to test. The owner reads and annotates the report. Then the architecture review starts from it, run through `/poteto-mode` as `docs/agents/workflow.md` sets out. The run is done when the report and its markdown copy exist with every field of every opportunity filled, or when a stop names what was missing. The report says what the run did without, so a thin result is never mistaken for a full one.
 
 Nothing measures depth. This survey supplies the judgement that no gate makes, so it reports what the gates and the diff reviewers cannot see and leaves out what they already hold.
 
@@ -92,4 +92,4 @@ When no opportunity survives the walks, still write the report. List the areas w
 
 ## 4. Hand off
 
-End the run with the hand-off lines `references/report.md` gives: the report's path, its markdown copy, how to collect the owner's annotations and the next step, `/ce-brainstorm`. Then stop. The review starts in its own session.
+End the run with the hand-off lines `references/report.md` gives: the report's path, its markdown copy, how to collect the owner's annotations and the next step, `/poteto-mode`. Then stop. The review starts in its own session.

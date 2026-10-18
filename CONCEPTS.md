@@ -7,9 +7,8 @@ entry carries the name its code uses. Names the platform does not own keep their
 nouns and the keys written into concept files, the MCP wire, a library's or a protocol's own names,
 and stored history. Terms not listed here are still draft.
 
-Compound Engineering's skills add, refine, fold and retire entries under their own rules for
-`CONCEPTS.md`, and each edit is reviewed in its pull request. Four exceptions to those rules hold
-here. The `_Internal._` mark stays where it opens a definition. The file carries no lines of words
+A change adds, refines, folds or retires the entries it needs, and each edit is reviewed in its
+pull request. Four rules hold. The `_Internal._` mark stays where it opens a definition. The file carries no lines of words
 to avoid, and an entry that absorbs another does not name the word it replaced, so an agent reads
 only the word to write. The retired words are kept outside the repository. A name the platform
 does not own keeps its code form in an entry, a value on the MCP wire included. A rule scoped to
@@ -2311,8 +2310,8 @@ _Internal._ one section of the route spec: a destination a product session can p
 the ADRs and words it rests on, what in the tree it builds on, what it must carry, its blocking
 edges, a seam sketch.
 
-Taken to `/ce-brainstorm` and `/ce-plan` before its build; the block itself is never one of its
-plans. Each block lands its own page. A slice is a core package capability, never a block.
+Taken to `/poteto-mode`, and planned first when it is several changes; the block itself is never
+one of its plans. Each block lands its own page. A slice is a core package capability, never a block.
 
 ### strand
 

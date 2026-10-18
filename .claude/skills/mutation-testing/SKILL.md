@@ -28,16 +28,11 @@ Skip: UI/copy/style-only diffs, config changes, prototypes, generated code.
 Two modes:
 - **PR-scoped (the default)**: mutate only the changed logic files. Minutes,
   not hours. This is the practice.
-- **Full-repo baseline**: occasional audit (manually-dispatched workflow or
-  background run) to track the overall mutation score. Never block a PR on
-  it. Reference setup: a `mutation:full` package script (`node
-  ./node_modules/@stryker-mutator/core/bin/stryker.js run --incrementalFile reports/stryker-incremental-full.json --mutate
-  'src/**/*.ts,!src/**/*.test.ts,!<generated>,!<test-utils>'` — separate
-  incremental file so audit and scoped runs don't poison each other's
-  cache) plus a `workflow_dispatch`-only GitHub Actions job that runs it
-  and uploads `reports/` as an artifact (pair it with the CRAP report from
-  the `complexity-gate` skill — one artifact answers both "what's untested"
-  and "what's risky").
+- **Full-repo baseline**: the nightly `mutation` workflow
+  (`.github/workflows/mutation.yml`, also dispatchable by hand) runs each
+  workspace's `stryker.config.mjs` in shards that `scripts/mutation-shards.mjs`
+  cuts from its `mutate` glob, and tracks the overall score. Never block a PR
+  on it.
 
 ## Tools (use the ecosystem's standard — no custom mutators)
 
@@ -51,9 +46,10 @@ Two modes:
 
 ## JS/TS recipe (StrykerJS + Vitest)
 
-Reference implementations in `references/` (working configs, battle-tested):
-- `references/stryker.config.json` — a starting config for a workspace that has none; `apps/api` and `packages/core` already keep `stryker.config.mjs`
-- `references/vitest.stryker.config.mts` — the isolated unit-only runner config
+Start a workspace that has no config from `apps/api/stryker.config.mjs` and
+its `vitest.stryker.config.ts`, which carry this repository's settings
+(`inPlace`, the JSON report, no `break`). `references/` holds the upstream
+samples, which predate them.
 
 ```bash
 pnpm add -D @stryker-mutator/core @stryker-mutator/vitest-runner
@@ -82,10 +78,10 @@ Known sharp edges (hit in practice):
 - **Parsing results**: read `reports/mutation/mutation.json` (add the
   `json` reporter) — the HTML report's embedded data is NOT valid JSON
   (`<` sequences are split into JS string concatenations).
-- **Sandbox recursion**: Stryker copies the repo into `.stryker-tmp/`
-  sandboxes; exclude `.stryker-tmp/**` from the test runner's discovery
-  and add bulky gitignored dirs (worktrees, reports) to Stryker's
-  `ignorePatterns`, or sandboxes balloon and tests double-run.
+- **In place**: this repository's configs set `inPlace: true`, because
+  Stryker's sandbox cannot resolve the shared tsconfig, so a run instruments
+  `src` itself. Edit nothing under `src` while it runs, and recover an
+  interrupted run as `docs/agents/mutation-triage.md` says.
 - Add package scripts so runs/cleanup are one approvable command, e.g.
   `"mutation": "node ./node_modules/@stryker-mutator/core/bin/stryker.js
   run"`, `"clean:mutation": "rm -rf reports/mutation"` (this repository's temp dir

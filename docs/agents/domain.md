@@ -36,7 +36,7 @@ This repo is **single-context**: one root `CONCEPTS.md` and one set of decisions
 
 When your output names a domain concept (in a task title, a refactor proposal, a hypothesis, a test name), use the term as defined in `CONCEPTS.md`. Don't drift to a synonym.
 
-The rule this repo runs on: **a domain word code uses is defined in `CONCEPTS.md` in the same change, or before it**. Compound Engineering's skills keep the file: `ce-brainstorm` and `ce-plan` add the terms a dialogue or a plan settles, and `ce-compound` and `ce-compound-refresh` add, refine, fold and retire entries as CE's rules for the file define. The exceptions that hold here are in the glossary's own opening paragraph. So if the concept you need isn't in the glossary yet, either you're inventing language the project doesn't use (reconsider) or there's a real gap (define it in the same change).
+The rule this repo runs on: **a domain word code uses is defined in `CONCEPTS.md` in the same change, or before it**. The change that settles a term adds, refines, folds or retires its entry, under the rules in the glossary's own opening paragraph. So if the concept you need isn't in the glossary yet, either you're inventing language the project doesn't use (reconsider) or there's a real gap (define it in the same change).
 
 ## Flag decision conflicts
 
