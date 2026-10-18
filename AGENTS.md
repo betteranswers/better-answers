@@ -55,7 +55,7 @@ Other skills belong in the `.claude/skills/` folder beside the files they serve,
 
 `project_tracker: linear`
 
-The backlog lives in **Linear**: team `better-answers` (issue ids `BA-N`), project `better-answers`, reached through the `linear-server` MCP. A plan in `docs/plans/` is the unit of build work. The procedure is in `docs/agents/issue-tracker.md`.
+The backlog lives in **Linear**: team `better-answers` (issue ids `BA-N`), project `better-answers`, reached through the `linear-server` MCP. A pull request is the unit of build work, and work that spans several gets a plan in `docs/plans/` first. The procedure is in `docs/agents/issue-tracker.md`.
 
 ### Workflow
 
