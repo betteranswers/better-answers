@@ -99,7 +99,7 @@ describe("the api's health endpoint", () => {
       );
     } finally {
       await bare.end();
-      await app.database.superuser.query(`DROP DATABASE IF EXISTS ${unmigrated} WITH (FORCE)`);
+      await app.database.superuser.query(`DROP DATABASE IF EXISTS ${unmigrated}`);
     }
   });
 });
