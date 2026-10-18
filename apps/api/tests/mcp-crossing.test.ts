@@ -9,7 +9,6 @@ import { capturingLogger } from "./harness.ts";
 const FIRST_ID = "01K6H0A7Q3W9E2R5T8Y1U4I6O0";
 const SECOND_ID = "01K6H0A7Q3W9E2R5T8Y1U4I6O1";
 
-/** No entry answers items yet, so the crossing is reached as the surface's entries reach it. */
 describe("a refusal naming items, crossing the MCP surface", () => {
   it("answers the set's word and class alone", async () => {
     const { logger, logs } = capturingLogger();

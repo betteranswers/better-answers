@@ -38,7 +38,6 @@ export const SEND_EMAIL_CODE_PATH = "/email-otp/send-verification-otp";
 
 export const SIGN_IN_BY_EMAIL_CODE_PATH = "/sign-in/email-otp";
 
-/** Behind the count by email. Every email-code endpoint but the sign-in spends it too. */
 export const EMAIL_CODE_SEND_IP_RULE: CounterRule = { windowMs: 10 * 60_000, max: 5 };
 
 export const EMAIL_CODE_SIGN_IN_IP_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
@@ -51,7 +50,6 @@ export const SIGN_IN_LINK_DESCRIBE_PATH = "/sign-in-link/describe";
 
 export const SIGN_IN_LINK_SIGN_IN_PATH = "/sign-in-link/sign-in";
 
-/** Ties a link to the browser that asked for its code. */
 export const SIGN_IN_LINK_COOKIE = "better-answers.sign-in-link";
 
 export const SIGN_IN_LINK_DESCRIBE_IP_RULE: CounterRule = { windowMs: 60_000, max: 30 };
@@ -64,13 +62,8 @@ export const AUTHENTICATOR_START_PATH = "/authenticator/start";
 
 export const AUTHENTICATOR_FINISH_PATH = "/authenticator/finish";
 
-/**
- * Starts and codes of one person's setup, each counted apart: the library's own limit never
- * reaches a call our route makes.
- */
 export const AUTHENTICATOR_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
 
-/** Each replacement mails a notice, so a script cannot fill the person's inbox. */
 export const RECOVERY_CODES_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
 
 export const AUTHENTICATOR_STEP_SECONDS = 30;
@@ -89,15 +82,10 @@ export const REPLACE_AUTHENTICATOR_START_PATH = "/second-factor/replace/authenti
 
 export const REPLACE_AUTHENTICATOR_FINISH_PATH = "/second-factor/replace/authenticator-finish";
 
-/**
- * Asks and tries of one person's confirm, each counted apart. Wrong codes meet the throttle well
- * before this; it bounds everything else.
- */
 export const CONFIRM_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
 
 export const SPEND_A_CODE_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
 
-/** Outside `/passkey/`, where the library's own closed paths answer 404. */
 export const PASSKEY_ADD_OPTIONS_PATH = "/passkeys/add-options";
 
 export const PASSKEY_ADD_PATH = "/passkeys/add";
@@ -110,7 +98,6 @@ export const PASSKEY_VERIFY_PATH = "/passkey/verify-authentication";
 
 export const PASSKEY_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
 
-/** The sign-in page asks once as it opens, for the browser's autofill, and again per press. */
 export const PASSKEY_SIGN_IN_IP_RULE: CounterRule = { windowMs: 60_000, max: 30 };
 
 export const SESSION_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
@@ -121,15 +108,12 @@ export const MCP_UNAUTHENTICATED_IP_RULE: CounterRule = { windowMs: 60_000, max:
 
 export const TRPC_IP_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 
-/** A page load reads the session beside its tRPC calls, so this is tRPC's ceiling. */
 export const IDENTITY_IP_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 
 export const MCP_TOKEN_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 
-/** Each export reads up to 10,000 events, so an Admin's script cannot keep the database busy. */
 export const AUDIT_EXPORT_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
 
-/** Room for a few mistyped short names, not for a list of guesses. */
 export const ASK_TO_JOIN_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
 
 export const ASK_TO_JOIN_ANSWER_FLOOR_MS = 250;

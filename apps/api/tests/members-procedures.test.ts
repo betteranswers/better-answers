@@ -352,7 +352,6 @@ describe("a role change that fails partway", () => {
       );
     });
 
-    // The action holds the member row itself, so its own name labels the failure.
     expect(failureOf(answered)).toEqual({
       message: "changeRole failed",
       httpStatus: 500,

@@ -22,7 +22,6 @@ const identity = requireIdentityBootstrap("the api");
 const image = requireRunningImage("the api");
 const objectStore = readObjectStore();
 const envelopeKey = readEnvelopeKey();
-// Without it no model key opens; the api still serves, and `ask` answers with no judge.
 if (!envelopeKey.ok) {
   logger.warn({ reason: envelopeKey.error.message }, "no model will be called");
 }
@@ -66,8 +65,6 @@ serve(
 );
 
 const headCheck = readHeadCheck();
-// A wrong setting leaves the head check running unwatched rather than stopping it; the scheduler
-// check's silence tells the operator.
 if (!headCheck.ok) {
   logger.error({ reason: headCheck.error.message }, "the scheduler check will not be pinged");
 }
@@ -89,7 +86,6 @@ if (!reconciler.ok) {
 }
 
 const sweepSettings = readSweeps();
-// A wrong setting stops the sweeps and not the api; their check's silence tells the operator.
 if (!sweepSettings.ok) {
   logger.error({ reason: sweepSettings.error.message }, "the sweeps are not running");
 } else {

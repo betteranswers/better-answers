@@ -31,7 +31,6 @@ export type Refusal = { readonly word: RefusalWord; readonly class: RefusalClass
   | Detail
 );
 
-/** By its shape, not its word: `malformed` is also an item's word. */
 const detailOf = (answered: Malformed | RefusedItems<RefusalWord>): Detail =>
   "fields" in answered ? { fields: answered.fields } : { items: answered.items };
 

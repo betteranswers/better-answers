@@ -10,10 +10,6 @@ import {
 } from "@better-answers/core/store/objects";
 import { openPostgres, type PostgresDoor } from "@better-answers/core/store/postgres";
 
-/**
- * One budget for every pool this root opens: requests, the MCP surface, sign-in, the tick and a
- * sweep pass, whose lock holds a connection throughout.
- */
 export const POSTGRES_POOL_MAX = 10;
 
 export type DoorTold<T> = Result<T, string> | undefined;

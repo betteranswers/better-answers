@@ -198,10 +198,8 @@ const REFUSED_AT_THE_CEILING = {
  */
 const RESULT_CHARACTERS_CHECKED_UNDER = 50_000;
 
-/** A passage is split near 1,200 bytes and may run past it. */
 const PASSAGE_CHARACTERS = 2_000;
 
-/** The seed ends a body with a newline, and a link line where the concept links. */
 const NEAR_THE_BODY_CAP = CONCEPT_BODY_MAX - 1_000;
 
 const aSizedBodyOf = (sentence: string, characters: number): string =>
@@ -793,8 +791,6 @@ describe("ask, on the own-transaction road", () => {
     expect(refused).toEqual([true, "Refused: not-a-member (unauthenticated).", undefined]);
   });
 
-  // An erasure sweeps the asker's records once it has deleted their member row, and trusts
-  // that delete to have waited for each of these writes.
   it.each([
     ["opens its record", "INSERT", false],
     ["completes its record", "UPDATE", true],
@@ -870,7 +866,6 @@ describe("ask, on the own-transaction road", () => {
 
   it("returns an `Answer` at the body cap word for word", async () => {
     const { workspace, client, token } = await connect();
-    // The seed ends it with a newline, which brings it to the cap.
     const body = aSizedBodyOf("Audit logs are kept for thirteen months. ", CONCEPT_BODY_MAX - 1);
     await seedConcepts(
       app(),

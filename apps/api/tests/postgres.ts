@@ -3,7 +3,6 @@ import type { Pool } from "pg";
 import { type MigratedPostgres, openMigratedPostgres } from "@better-answers/schema/testing";
 
 export type TestDatabase = {
-  /** Connects as the api's runtime role, so row-level security holds. */
   readonly pool: Pool;
 
   readonly superuser: Pool;

@@ -39,7 +39,6 @@ type Canned = {
   status: number;
   body?: string | Buffer;
   headers?: IncomingHttpHeaders;
-  /** The body never ends, so only the fetcher's own `destroy` closes it. */
   holdOpen?: boolean;
   failWith?: Error;
 };

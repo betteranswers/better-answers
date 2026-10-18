@@ -12,7 +12,6 @@ export const NOT_A_MEMBER_ANSWERED = {
   data: { httpStatus: 401, refusal: { word: "not-a-member", class: "unauthenticated" } },
 } as const;
 
-/** For a refusal of what was asked rather than of who asked: the workspace's own Admin calls. */
 export const refusalToTheAdmin = async (
   app: TestApp,
   call: (api: WebApi) => Promise<unknown>,
@@ -41,7 +40,6 @@ export const anAdminOfElsewherePointedAt = async (
   const elsewhere = await app.provision();
   const client = await signedInClient(app, elsewhere.admin.email);
   await sessionPointedAt(app, elsewhere.admin.id, workspaceId);
-  // Naming the session's workspace, so the refusal heard is of who asks and not of a stale tab.
   return webClientOf(client, workspaceId).api;
 };
 

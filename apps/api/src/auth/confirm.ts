@@ -66,7 +66,6 @@ const REFUSALS = {
   changedMeanwhile: { error: "changed-meanwhile" },
 } as const;
 
-/** As typed: spaces, dashes and case are the store's to ignore. */
 const typedCode = z.object({ code: z.string().min(1).max(100) });
 
 const TRANSPORTS = [
@@ -166,7 +165,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
         requireUserVerification: true,
       }),
     );
-    // A bad signature throws, and an unverified user may only be reported: either refuses alike.
     const info = verified.ok && verified.value.verified ? verified.value.authenticationInfo : null;
     if (info?.userVerified !== true) return context.json(PERSON_ROUTE_REFUSALS.notVerified, 400);
     const stamped = await confirmByPasskey(IDENTITY_PRINCIPAL, door, {
@@ -208,10 +206,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
       : refused(context, stamped.error);
   };
 
-  /**
-   * With a whole session and a set-up authenticator, the library's verify only checks the code; the
-   * try was already counted.
-   */
   const verifyingTheCode = async (
     context: Context,
     person: SignedIn,
@@ -240,7 +234,6 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
   const confirmWithACode = async (context: Context, person: SignedIn): Promise<Response> => {
     const asked = await codeAndHeld(context, person);
     if (asked instanceof Response) return asked;
-    // A setup still waiting on its code would be finished by the verify, and its session swapped.
     if (asked.held.authenticator !== "set-up") return context.json(REFUSALS.noAuthenticator, 409);
     const reserved = await reserveAuthenticatorTry(
       IDENTITY_PRINCIPAL,

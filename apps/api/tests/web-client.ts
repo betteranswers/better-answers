@@ -3,8 +3,6 @@ import { z } from "zod";
 
 import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 
-// A path, not a package: the web already depends on the api, and an edge back is a cycle the
-// api's image would install.
 import {
   apiLink,
   UPLOAD_HEADER_OF_FIELD,
@@ -39,10 +37,6 @@ const memberAnswered = z.object({
   result: z.object({ data: z.object({ workspace: z.object({ id: z.string() }) }) }),
 });
 
-/**
- * The web's own link and wrapper, never a copy, so a field renamed on one side alone refuses the
- * upload here.
- */
 export const webClientOf = (client: TestClient, held?: string) => {
   const sent: Sent[] = [];
   const api = createTRPCClient<AppRouter>({

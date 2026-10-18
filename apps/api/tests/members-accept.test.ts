@@ -46,7 +46,6 @@ const anInvitee = async (role: "Admin" | "Editor" | "Viewer" = "Editor") => {
   return { admin, address, invitationId: linkedInvitationId(address), ...invitee };
 };
 
-/** Written as the harness writes it, since the invite action lower-cases every address it is given. */
 const anUpperCaseInvitation = async () => {
   const { workspace } = await anAdmin();
   const address = anAddress("una");

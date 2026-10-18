@@ -33,7 +33,6 @@ type AskEvent =
   | DraftEvent
   | KeepAlive;
 
-/** Holds no transaction while the model is called, and spends from the knowledge reads' budget. */
 export const askingProcedure = ownTransactionCounted(KNOWLEDGE_CEILING);
 
 const answered = async (
@@ -88,7 +87,6 @@ const answered = async (
     emit(step.value);
     step = await drafted.next();
   }
-  // The result and each part's end are sent already, so a refusal here is logged and not thrown.
   await crossing(ctx, draftAnswer.name, Promise.resolve(step.value)).catch(() => {});
 };
 

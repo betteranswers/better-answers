@@ -35,18 +35,12 @@ export type StepDoors = ModelDoors & {
   readonly clock: Clock;
 };
 
-/** A step refuses a member who is gone, or whose groups moved since the call resolved them. */
 export type StepRefusal = PrincipalRefusal | KernelRefusal<"changed-meanwhile">;
 
-/** Both readings come sorted from the one member query, so they agree place by place or not at all. */
 const inTheSameGroups = (resolved: UserPrincipal, readBack: UserPrincipal): boolean =>
   resolved.groups.length === readBack.groups.length &&
   resolved.groups.every((group, place) => group === readBack.groups[place]);
 
-/**
- * Reads the member again through `open`, which refuses a moved role. Moved groups would read
- * under another predicate than the record keeps.
- */
 const steppedAs = async <Value, Refused>(
   open: typeof withMember,
   door: PostgresDoor,

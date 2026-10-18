@@ -102,10 +102,6 @@ type Run = {
   readonly logs: readonly LogLine[];
 };
 
-/**
- * A replay reads every workspace, so each case erases at an instant of its own and asks for the
- * window holding only that one.
- */
 const FROM_THE_ROWS_AT = new Date("2026-06-01T12:00:00.000Z");
 const FROM_THE_ROWS_SINCE = "2026-05-31T00:00:00Z";
 const FROM_THE_COPY_AT = new Date("2026-07-01T12:00:00.000Z");
@@ -974,10 +970,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const bound = await connectUpload(admin, doors, handbook());
       if (!bound.ok) throw new Error(`the connect was refused: ${String(bound.error)}`);
 
-      /**
-       * The job is the transaction's last statement, so refusing it leaves the object the action put
-       * before it and no row that names the object.
-       */
       const failed = await whileWritesAreRefused(app().database.superuser, "job", () =>
         connectUpload(admin, doors, handbook()),
       );
@@ -3681,10 +3673,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
       "knowledge/product/tiers/standard-plan.md",
     ] as const;
 
-    /**
-     * The fixture names its verifiers by a fixed address, so one person row serves every workspace
-     * the block provisions.
-     */
     const verifierIds = new Map<string, string>();
 
     const verifierOf = async (app: TestApp, email: string, name: string): Promise<string> => {

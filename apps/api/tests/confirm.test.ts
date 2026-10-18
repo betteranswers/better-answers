@@ -238,7 +238,6 @@ describe("confirming with an authenticator", () => {
     for (let signedIn = 0; signedIn < 5; signedIn += 1) {
       clients.push(await signedInClient(app(), person.email));
     }
-    // Set up after the five sign-ins: the api's own setup keeps its session signed in.
     const { setupAddress } = await setUpOn(clients.at(-1) ?? app().client());
 
     const statuses = await wrongCodesFrom(clients, keyIn(setupAddress), 7);

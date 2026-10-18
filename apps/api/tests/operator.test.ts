@@ -132,7 +132,6 @@ const everyRoleOnTheWeb = async () => {
   return signedIn;
 };
 
-/** The tRPC surface reads no bearer, so the operator's own token is a caller with no session. */
 const theOperatorsBearerAt = async (path: string, init: RequestInit = {}) => {
   const { workspace } = await theOperatorOnTheWeb();
   const { accessToken } = await connectAsHost(app(), app().client(), workspace.admin);
@@ -455,8 +454,6 @@ describe("ending every sign-in and token everywhere, from the console", () => {
       },
     ]);
 
-    // Consent resolves the person in the workspace picked, so reaching the code at the assistant's
-    // redirect is a fresh sign-in admitted there.
     for (const workspaceId of [acme.workspaceId, beta.workspaceId]) {
       await connectAsHost(app(), app().client(), person, { pick: workspaceId });
     }

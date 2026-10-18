@@ -12,7 +12,6 @@ export const OTP_SETTINGS = {
   period: AUTHENTICATOR_STEP_SECONDS,
 };
 
-/** The plugin's own length for a new key. */
 const SECRET_LENGTH = 32;
 
 export type MintedKey = {
@@ -21,7 +20,6 @@ export type MintedKey = {
   readonly setupAddress: string;
 };
 
-/** The plugin's own making and sealing of a key; it rejects as the library does. */
 export const mintAuthenticatorKey = async (auth: Auth, label: string): Promise<MintedKey> => {
   const secret = generateRandomString(SECRET_LENGTH);
   const sealed = await symmetricEncrypt({ key: (await auth.$context).secretConfig, data: secret });

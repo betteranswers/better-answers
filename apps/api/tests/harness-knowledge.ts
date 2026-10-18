@@ -232,14 +232,12 @@ const passagesCited = async (
   }));
 };
 
-/** The seed's schema has already refused a title no earlier concept carries. */
 const conceptCited = (seeding: Seeding, title: string): readonly Unnumbered[] =>
   seeding.earlier
     .filter((seeded) => seeded.title === title)
     .slice(0, 1)
     .map((named) => ({ title, resource: named.iri }));
 
-/** The schema holds a source to one form, so the two empty answers here are never reached. */
 const cited = async (seeding: Seeding, source: AskedSource): Promise<readonly Unnumbered[]> => {
   const { title, passages, concept, at } = source;
   if (concept !== undefined) return conceptCited(seeding, concept);
@@ -342,7 +340,6 @@ const conceptWritten = async (
   return { ...written.value, path, citations };
 };
 
-/** The Admin's own override, to a group holding `groupMemberIds`: a write alone leaves a new concept everyone's. */
 const narrowedToAGroup = async (
   app: TestApp,
   writer: Writer,
@@ -464,7 +461,6 @@ const heldAhead = async (app: TestApp, asked: Asked) => {
   };
 };
 
-/** A title two concepts of one seed share is the schema's to refuse, from the body alone. */
 const titlesHeld = (asked: Asked, held: ReadonlySet<string>): readonly Refusal[] =>
   asked.concepts.flatMap((concept, at) => {
     const file = pathOf(concept);
@@ -518,10 +514,6 @@ const writerRefused = (asked: Asked, writer: UserPrincipal): readonly Refusal[] 
   return [{ path: ["userId"], message: "a concept is written by an Editor or an Admin" }];
 };
 
-/**
- * The slice commits each concept as written, so no transaction spans the seed.
- * @throws as a schema's `parse` does, for the 400.
- */
 const refusedBeforeAnyWrite = async (
   app: TestApp,
   asked: Asked,

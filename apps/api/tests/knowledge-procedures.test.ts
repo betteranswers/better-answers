@@ -506,7 +506,6 @@ describe("a knowledge read's answer over GET", () => {
   });
 });
 
-/** MCP_TOKEN_RULE's numbers: one connection's calls a minute. */
 const READS_A_MINUTE = 120;
 
 const SHARED_ADDRESS = "203.0.113.118";

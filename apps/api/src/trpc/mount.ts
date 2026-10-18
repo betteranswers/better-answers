@@ -35,7 +35,6 @@ export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
     clock: deps.doors.clock,
   });
 
-  /** A batch's procedures share one request's headers, so they share its one judged read. */
   const readOncePerRequest = (): GatedSessionReader => {
     let read: ReturnType<GatedSessionReader> | undefined;
     return (headers) => (read ??= gated(headers));

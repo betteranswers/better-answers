@@ -150,7 +150,6 @@ export type OpsIo = {
 
   readonly mail?: Mail | undefined;
 
-  /** A refusal where no envelope key is configured, in the config module's own sentence. */
   readonly modelKeySetting: Result<ModelKeySetting, string>;
 };
 
@@ -764,7 +763,6 @@ const importReason = (refusal: ImportBundleRefusal | Error, email: string): stri
   return `stopped at ${refusal.file} (${reasonOf(refusal.reason)}); landed ${landed.length}, skipped ${skipped.length}, verifications ${verifications.recorded} recorded, ${counted(linksOf(rewritten), "link")} rewritten; what landed stays, and a rerun continues from there`;
 };
 
-/** A word exits with its class's code; an unsound tree and a stopped import are no one word's. */
 const importRefused = (
   workspaceId: string,
   refusal: ImportBundleRefusal | Error,
@@ -903,8 +901,6 @@ const seedingToBeDumped = async (
   if (!seeded.ok) {
     return refused("erasure-rehearsal", workspaceId, seeded.error, io, rehearsalSaid(seeded.error));
   }
-  // A dump taken before the worker indexes the document holds no passage naming the subject,
-  // and phase two would then prove nothing about the index.
   const { indexJobId } = seeded.value.document;
   const indexed = await jobAfterWaiting(
     ERASURE,
@@ -1076,10 +1072,6 @@ const provisionRefused = (
   return exitOf(refusal);
 };
 
-/**
- * The repository lives outside the Postgres transaction, so the root is checked before the action
- * and the repository made after it.
- */
 const provisionWorkspaceCommand = async (
   doors: Doors,
   flags: Flags,
@@ -1368,10 +1360,6 @@ const modelKeyReason = (refusal: SetModelKeyRefusal | Error, workspaceId: string
   }
 };
 
-/**
- * The key comes on standard input, which no shell history and no process list keeps, and no line
- * this says repeats it.
- */
 const setModelKeyCommand = async (
   doors: Doors,
   workspaceId: string,

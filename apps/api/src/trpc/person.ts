@@ -62,7 +62,6 @@ const reconfirmingTheirFactors = async (
     now: ctx.clock.now(),
   });
   if (!held.ok) return held;
-  // A restored person's factor change waits on their restore code alone, never a re-confirm.
   if (held.value.restoreRequired || !factorChangeStale(held.value, ctx.clock.now())) {
     return ok(undefined);
   }

@@ -72,7 +72,6 @@ describe("a consent grant in the library", () => {
     const consent = await driveToPage(app(), client, editor);
     expect(consent.pathname).toBe("/consent");
     const before = await consentsGiven();
-    // An Admin anywhere must hold a factor, so the session holds none and is pending.
     landingBeforeTheLibrary(() => app().addMember(zenith.workspaceId, editor.id, "Admin"));
 
     const refused = await client.form(`/consent${consent.search}`, connectIn(acme.workspaceId));

@@ -80,10 +80,6 @@ const surfaceTokenOf = (verified: JWTPayload): SurfaceToken => {
   };
 };
 
-/**
- * The verifier refuses with `invalid_token` when a bearer's signature, issuer, audience, expiry or
- * claims fail. An unseen key id rereads the key set once.
- */
 export const createTokenVerifier = (options: {
   readonly issuer: string;
   readonly audience: string;

@@ -22,7 +22,6 @@ type LinkAsk = { readonly nonce: string; readonly carried: string; readonly retu
 /** The library's body validation drops the carried flow before its email hook runs. */
 const asks = new AsyncLocalStorage<LinkAsk>();
 
-/** Never a header, which any caller of the library's own sign-in could set. */
 const linkSignIns = new AsyncLocalStorage<SignInMethod>();
 
 export const askingWithALink = <T>(ask: LinkAsk, work: () => Promise<T>): Promise<T> =>
@@ -41,7 +40,6 @@ type LinkStore = {
 
 const identifierOf = (email: string): string => `${SIGN_IN_LINK_PREFIX}${email.toLowerCase()}`;
 
-/** Replaces the address's earlier link in one write. A code asked outside a route gets none. */
 export const keepALink = async (
   store: LinkStore,
   email: string,

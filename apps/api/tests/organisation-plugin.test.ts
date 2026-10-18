@@ -29,7 +29,6 @@ type Row<Of> = readonly [path: string, callOf: (scene: Of) => Call];
 
 const anAddress = (): string => `${ulid().toLowerCase()}@example.invalid`;
 
-/** Each with a call the plugin would act on, were the path open. */
 const CLOSED: readonly Row<Scene>[] = [
   [
     "/organization/invite-member",

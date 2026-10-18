@@ -116,7 +116,6 @@ describe("the pending set in the library's endpoints", () => {
 
     const pending = await refusedAsPending(answered);
     const absent = answered.status === 404;
-    // An open path never meets the gate; any other meets it, or is closed before any gate.
     expect(OPEN_TO_A_PENDING_SESSION.has(path) ? pending : !(pending || absent)).toBe(false);
   });
 });

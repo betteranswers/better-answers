@@ -84,7 +84,6 @@ const WORDS = {
   ifNot: `If you didn't, sign in and check your Account page now, then tell ${PRODUCT_NAME} support:`,
 } as const;
 
-/** Every value is a fixed phrase or the api's own address, so nothing here needs escaping. */
 const htmlOf = (change: Required<Change>, account: string): string =>
   emailPage(
     change.subject,
@@ -94,7 +93,6 @@ const htmlOf = (change: Required<Change>, account: string): string =>
 <p style="margin:0"><a href="${account}">${account}</a></p>`,
   );
 
-/** Names what changed and never the factor itself: no key, no code, no device. */
 const factorNoticeEmail = (to: string, change: FactorChange, publicUrl: string): EmailMessage => {
   const said: Required<Change> = { ifYou: WORDS.ifYou, ifNot: WORDS.ifNot, ...CHANGES[change] };
   const account = `${publicUrl}${ACCOUNT_PATH}`;
@@ -106,10 +104,6 @@ const factorNoticeEmail = (to: string, change: FactorChange, publicUrl: string):
   };
 };
 
-/**
- * Never rejects, so a caller need not await it and a slow relay holds no answer. A missed notice
- * is a log line and false.
- */
 export const sendFactorNotice = async (
   ctx: { readonly mail: Mail; readonly log: Logger },
   to: string,

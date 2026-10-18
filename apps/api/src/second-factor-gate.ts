@@ -56,14 +56,12 @@ export const AUTHORIZE_PATH = "/oauth2/authorize";
 
 export type Gatekeeping = { readonly door: PostgresDoor; readonly clock: Clock };
 
-/** The session's standing now, its pending hour started, stopped or ended by this read. */
 export const judged = (
   deps: Gatekeeping,
   session: SessionNamed,
 ): Promise<Result<SessionStanding, "session-gone" | Error>> =>
   judgeTheSession(IDENTITY_PRINCIPAL, deps.door, { session, now: deps.clock.now() });
 
-/** A failed read is pending too: the gate never opens on a fault. */
 export const pendingOr = (read: Result<SessionStanding, "session-gone" | Error>): boolean =>
   !read.ok || isPending(read.value.standing);
 
@@ -79,7 +77,6 @@ type GatedSession = SessionRead & { readonly standing: SecondFactorStanding };
 
 export type GatedSessionReader = (headers: Headers) => Promise<GatedSession | null>;
 
-/** The library's session, judged: a fault throws, so the gate never opens on one. */
 export const gatedReader =
   (read: SessionReader, deps: Gatekeeping): GatedSessionReader =>
   async (headers) => {

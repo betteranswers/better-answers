@@ -104,7 +104,6 @@ export const personRoutesAt = (routes: Hono, prefix: string, deps: PersonRoutes)
   });
   const log = deps.logger.child({ module: "auth" });
 
-  /** The step may have landed, so the page reads again rather than starting over. */
   const unanswered = (context: Context, event: string, reason: string): Response => {
     log.warn({ event, reason }, "a second-factor step went unanswered");
     return context.json(PERSON_ROUTE_REFUSALS.unanswered, 502);

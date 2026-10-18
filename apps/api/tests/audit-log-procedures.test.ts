@@ -13,7 +13,6 @@ import { webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
 
-/** Held still while a test counts past a ceiling: on the wall clock its asks can straddle two fixed windows. */
 const stopped: { at: number | undefined } = { at: undefined };
 
 beforeAll(async () => {

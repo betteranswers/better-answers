@@ -112,7 +112,6 @@ const modelChosen = (app: TestApp, workspaceId: string, purpose: string) =>
     SONNET,
   ]);
 
-/** In the RUNBOOK's order: the key, the price, the limit, then the choice, which needs the price. */
 export const judgingSetUp = async (
   app: TestApp,
   workspaceId: string,

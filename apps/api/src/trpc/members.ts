@@ -120,10 +120,6 @@ const committedThenEmailed =
     return answerOf(invitation, await sentInvitation(ctx, invitation));
   };
 
-/**
- * A round keeps the shared queue one second deep, so another email, such as a sign-in code,
- * waits behind one round, not the whole send.
- */
 const emailedEach = async (
   ctx: Emailing,
   invitations: readonly InvitationToSend[],
@@ -185,7 +181,6 @@ type AtTheClock = {
   readonly clock: Clock;
 };
 
-/** The moment is the server's, read as the action runs. The action's function name labels its logs. */
 const answeredAt =
   <Asked, Value>(
     action: (

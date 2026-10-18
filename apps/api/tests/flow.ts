@@ -80,7 +80,6 @@ export type Tokens = {
   readonly accessToken: string;
   readonly refreshToken: string | undefined;
   readonly expiresIn: number;
-  /** Decoded from the access token, never verified. */
   readonly claims: Readonly<Record<string, unknown>>;
 };
 

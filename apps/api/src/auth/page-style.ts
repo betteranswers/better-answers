@@ -27,7 +27,6 @@ const FACES = [
   };
 });
 
-/** Unlayered, so it outranks the pattern rule: set `background-color` there, never the shorthand, which clears the pattern's image. */
 const PAGE_RULES = `
 *,::before,::after{box-sizing:border-box}
 html{font-family:var(--font-sans);font-size:var(--text-base);line-height:var(--leading-normal);letter-spacing:var(--tracking-body);color:var(--text-body)}
@@ -60,7 +59,6 @@ export const PAGE_STYLE = [expanded(STYLES), ...FACES.map((face) => face.css), P
   "\n",
 );
 
-/** The face files the sheet names, ahead of the catch-all that would otherwise answer them. */
 export const serveFaces = (server: Hono): void => {
   for (const face of FACES) {
     server.get(

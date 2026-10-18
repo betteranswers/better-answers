@@ -18,10 +18,6 @@ import { reasonOf } from "./ops/index.ts";
 
 export const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-/**
- * Soon after a start, not a day after: releases more often than daily would restart the wait
- * before any pass ran.
- */
 export const SWEEP_FIRST_PASS_MS = 10 * 60 * 1000;
 
 export type SweepsDependencies = {
@@ -105,8 +101,6 @@ export const startSweeps = (dependencies: SweepsDependencies): Result<Sweeps, Sw
       logger.warn("a sweep pass was skipped: another holder has the sweeps' lock");
       return;
     }
-    // Neither the deletions nor the months need a workspace, so a failed workspace sweep must
-    // not keep expired rows or leave next month unmade.
     const outside = await sweptOutsideAnyWorkspace(postgres, clock.now());
     if (!swept.ok) {
       const { deleted, refusals } = outside;

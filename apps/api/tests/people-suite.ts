@@ -62,7 +62,6 @@ export const asksToJoin = async (
   return requester;
 };
 
-/** Keyed by role, so an assertion names the role a wrong answer went to. */
 export const answeredBelowAdmin = async (
   app: TestApp,
   workspaceId: string,

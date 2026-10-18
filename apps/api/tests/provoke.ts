@@ -294,10 +294,6 @@ export const whileCommitsAreRefused = async <T>(
   }
 };
 
-/**
- * The api's role lacks `privilege` on `table` in the whole database, so no suite whose tests run
- * together may use it.
- */
 export const whileTheApiLacks = async <T>(
   app: TestApp,
   privilege: "SELECT" | "UPDATE",

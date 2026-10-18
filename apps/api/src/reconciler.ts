@@ -18,10 +18,6 @@ import { reasonOf } from "./ops/index.ts";
 
 export const RECONCILER_INTERVAL_MS = 30_000;
 
-/**
- * At thirty seconds a tick, every second tick is once a minute, the scheduler check's period; a
- * ping each tick tells it nothing more.
- */
 const TICKS_PER_PING = 2;
 
 export type ReconcilerDependencies = {

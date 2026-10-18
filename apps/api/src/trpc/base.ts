@@ -129,10 +129,6 @@ type InTheTransaction = {
   readonly tx: Tx;
 };
 
-/**
- * Answers a procedure with one action, as the resolved member in its transaction. The action's function
- * name labels its logs; never pass an anonymous one.
- */
 export const answeredBy =
   <Input, Value>(
     action: (
@@ -174,7 +170,6 @@ const OPERATOR_RESOLVER = "withOperator";
 
 type Session = NonNullable<Awaited<ReturnType<GatedSessionReader>>>;
 
-/** Every root a procedure passes through: a pending session reaches only the pending set. */
 const sessionOf = async (ctx: TrpcContext, path: string): Promise<Session> => {
   const read = await attempt(() => ctx.readSession(ctx.headers));
 
@@ -261,7 +256,6 @@ const consumeCeiling = async (
 
 export type RoadCeiling = { readonly budget: string; readonly rule: CounterRule };
 
-/** The count comes before the transaction, so a call held at its ceiling holds no connection. */
 const claimsCounted = async (
   ctx: TrpcContext,
   path: string,
@@ -296,10 +290,6 @@ export const queryCeiling = (ceiling: RoadCeiling) =>
 
 export const mutationProcedure = inTheResolversTransaction(withHeldPrincipal);
 
-/**
- * A Principal outlives the transaction that resolved it only here; never the request, and the
- * action's own door re-judges it.
- */
 const onItsOwnTransactions = (ceiling?: RoadCeiling) =>
   trpc.procedure.use(async ({ ctx, path, type, next }) => {
     const claims = await claimsCounted(ctx, path, type, ceiling);
@@ -357,8 +347,6 @@ const inTheOperatorsTransaction = (resolve: typeof withOperator) =>
     const resolved = await attempt(() =>
       resolve(
         ctx.doors.postgres,
-        // The session the cookie names: its confirmation is what the operator's writes ask for,
-        // and its creation still anchors the revocation rule.
         { userId: user.id, issuedAt: session.createdAt, sessionId: session.id },
         async (operator, tx) =>
           thrownIfFailed(

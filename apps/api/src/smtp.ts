@@ -11,7 +11,6 @@ import type { EmailSender } from "./email.ts";
  */
 export const EMAILS_PER_SECOND = 5;
 
-/** Build one per process: a second pool would pace itself apart and double the rate. */
 export const pacedTransport = (smtpUrl: string): Transporter =>
   createTransport({
     url: smtpUrl,

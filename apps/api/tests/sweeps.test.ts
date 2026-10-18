@@ -80,7 +80,6 @@ const onePass = async (
   return sweeps;
 };
 
-/** Late in the month after this one, when a pass makes the month after that. */
 const LATE_NEXT_MONTH = inTheMonth(1, 27);
 
 const onePassAt = (now: Date): Promise<Running> =>

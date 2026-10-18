@@ -25,10 +25,6 @@ export const appForSuite = (options: TestAppOptions = {}): (() => TestApp) => {
   };
 };
 
-/**
- * Stopped while a test counts past a ceiling: on the wall clock its asks can straddle two fixed
- * windows. Moved, it stays stopped.
- */
 export const aStoppableClock = (): {
   readonly clock: Clock;
   readonly stopTheClock: () => void;

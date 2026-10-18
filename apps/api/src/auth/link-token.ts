@@ -19,12 +19,10 @@ const IV_BYTES = 12;
 const TAG_BYTES = 16;
 const KEY_INFO = "better-answers sign-in link";
 
-/** About 256 bits, in letters and digits alone, so it reads whole in any mail client. */
 export const mintLinkToken = (): string => generateRandomString(TOKEN_LENGTH, "a-z", "A-Z", "0-9");
 
 export const mintNonce = (): string => randomBytes(NONCE_BYTES).toString("base64url");
 
-/** The only form of a token or a nonce the database holds. */
 export const hashOf = (secret: string): string => createHash("sha256").update(secret).digest("hex");
 
 const opened = z.strictObject({ code: z.string(), carried: z.string(), returnTo: z.string() });
@@ -39,7 +37,6 @@ const carriedQueryOf = (contents: Opened): string => {
 const keyOf = (token: string, salt: string): Buffer =>
   Buffer.from(hkdfSync("sha256", token, salt, KEY_INFO, KEY_BYTES));
 
-/** `boundTo` is authenticated with the contents, so a sealed value moved to another row opens nowhere. */
 export const seal = (token: string, salt: string, boundTo: string, contents: Opened): string => {
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv("aes-256-gcm", keyOf(token, salt), iv, {
@@ -101,7 +98,6 @@ export type LinkRead = {
     | undefined;
 };
 
-/** `carried` is the sign-in page's own query, which the browser that asked already held. */
 export type LinkState =
   | { readonly state: "bound"; readonly address: string; readonly carried: string }
   | { readonly state: "elsewhere"; readonly code: string; readonly until: string }
@@ -116,7 +112,6 @@ export type LinkUse = {
   readonly carried: string;
 };
 
-/** `use` stands only beside a bound state. */
 export type SeenLink = { readonly state: LinkState; readonly use: LinkUse | undefined };
 
 const NOTHING_TO_SEE: SeenLink = { state: DEAD_LINK, use: undefined };

@@ -27,7 +27,6 @@ const ticks = (logs: readonly LogLine[]): readonly LogLine[] => saying(logs, "re
 const skips = (logs: readonly LogLine[]): readonly LogLine[] =>
   saying(logs, "a reconciler tick was skipped: the previous one is still running");
 
-/** The sync cascade runs last, so its line ends a tick. */
 const finished = (logs: readonly LogLine[]): number =>
   saying(logs, "sync cascade tick").length + saying(logs, FOLLOWING_FAILED).length;
 
@@ -128,7 +127,6 @@ describe("the periodic head check", () => {
     return { lines: ticks(head.logs), heldId: held.workspaceId };
   };
 
-  // First in the file: workspaces later cases leave without a repository would turn this to warn.
   it("logs a bundle held by a rewrite elsewhere at info", async () => {
     const { lines, heldId } = await aTickBesideARewrite();
 

@@ -35,7 +35,6 @@ const app = appForSuite(unreachable, clock);
 
 const INVITE = `${TRPC_ENDPOINT}/members.invite`;
 
-/** The same figure the browser suite holds a list to: the send answers inside it. */
 const SEND_BUDGET_MS = 1000;
 
 const A_DAY_MS = 24 * 60 * 60 * 1000;

@@ -420,7 +420,6 @@ const queriedFromATab = (client: TestClient, path: string, held?: string): Promi
 const wordOf = async (answered: Response): Promise<string | undefined> =>
   answeredWord.parse(await answered.json()).error?.data.refusal?.word;
 
-/** The read that tells a tab where the session is, so the tab can always learn it. */
 const MEMBER_READ = "session.member";
 
 const memberRead = z.object({
@@ -434,7 +433,6 @@ describe("every query the router serves on a workspace road", () => {
       ([path, procedure]) => !namesNoWorkspace(procedure) && path !== MEMBER_READ,
     ).map(([path]) => path);
 
-    // Asked with no input, so only a road that judges ahead of the parse answers the word.
     const words: (readonly [string, string | undefined])[] = [];
     for (const path of paths) {
       words.push([path, await wordOf(await queriedFromATab(client, path, left.workspaceId))]);
@@ -495,7 +493,6 @@ describe("every mutation the router serves", () => {
       ([path]) => path,
     );
 
-    // Asked with no input, so only a road that judges ahead of the parse answers the word.
     const words: (readonly [string, string | undefined])[] = [];
     for (const path of paths) {
       const answered = await postedFromATab(

@@ -43,7 +43,6 @@ const released = (workspaceId: string) => posted("/__harness/asking/releases", {
 
 const SENTENCE = "Buyers use the console's audit page.";
 
-/** The policy is the one concept no judge is asked about, so the drafter cites it. */
 const DRAFTING = { writes: [{ citing: POLICY.title, sentence: SENTENCE }] };
 
 const calls = z.object({ judge: z.number(), draft: z.number() });
@@ -141,7 +140,6 @@ describe("the browser suite's scripted model", () => {
     for await (const event of await api.ask.question.mutate({ question: QUESTION })) {
       if (event.kind === "result") recordId = event.result.recordId;
       if (event.kind !== "sentence") continue;
-      // A part's prose is kept once its model call ends, so none is kept while the call is held.
       keptWhileHeld.push((await draftedOn(recordId)).length);
       await released(workspaceId);
     }

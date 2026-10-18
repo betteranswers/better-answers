@@ -220,7 +220,6 @@ const failureOf = async (decided: Result<Response>) =>
     ? { status: decided.value.status, detail: await decided.value.clone().text() }
     : { status: null, detail: decided.error.message };
 
-/** A path on this origin alone: anything else would be an open redirect once the link signs in. */
 const returnPath = z
   .string()
   .max(512)
@@ -341,7 +340,6 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
       return unanswered(context, `library ${String(answered.status)}`);
     if (!answered.ok) return context.json(LINK_REFUSALS.dead, 410);
     forwardCookies(answered, context.res.headers);
-    // The spent code already makes the link dead, so a failed delete must not cost the session.
     const dropped = await attempt(() => dropALink(door, token));
     if (!dropped.ok) {
       deps.logger.warn(
@@ -467,7 +465,6 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     return undefined;
   };
 
-  /** Bound to the workspace grantRefused checked a Connect against; a Cancel grants nothing. */
   const grantInTheLibrary = (context: Context, accept: boolean, claims: Claims | undefined) => {
     const headers = flowHeaders(context.req.raw, publicUrl);
     return grantingFor(claims?.workspaceId ?? "", () =>
@@ -483,7 +480,6 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     );
   };
 
-  /** Confirming first carries the signed query, so the flow resumes once the session is confirmed. */
   const confirmFirst = (context: Context): Response =>
     context.redirect(`/confirm${carry(context.req.url)}`, 302);
 

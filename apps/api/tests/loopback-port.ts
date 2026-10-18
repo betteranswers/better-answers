@@ -16,7 +16,6 @@ export const heldPort = async (): Promise<Held> => {
 export const released = (held: Held): Promise<void> =>
   new Promise((resolve) => held.server.close(() => resolve()));
 
-/** A port free a moment ago; another process may bind it before the caller does. */
 export const freePort = async (): Promise<number> => {
   const held = await heldPort();
   await released(held);

@@ -12,7 +12,6 @@ import { appForSuite } from "./suite-app.ts";
 
 const app = appForSuite();
 
-/** Typed out rather than imported, so a wrong prefix in the api cannot seed its own test. */
 const LOCK_PREFIX = "revoke-unproven-account-access:";
 
 const MINUTE_MS = 60_000;
@@ -114,7 +113,6 @@ const whileTheFirstLockDeleteIsRefused = async <T>(work: () => Promise<T>): Prom
   }
 };
 
-/** Finds the lock by its value, a person's id, so it is orphaned whatever form its name is stored in. */
 const whileLockDeletesAreRefused = async <T>(work: () => Promise<T>): Promise<T> => {
   const superuser = app().database.superuser;
   await superuser.query(
@@ -145,7 +143,6 @@ const locksHeldFor = (personId: string) =>
     [personId],
   );
 
-/** The lock lands after the code is asked for, so only the sign-in itself can clear it. */
 const askedThenLeftALock = async (person: { readonly id: string; readonly email: string }) => {
   const asking = app().client();
   const asked = await asking.json("/email-otp/send-verification-otp", {

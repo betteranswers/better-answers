@@ -20,12 +20,7 @@ const filesMatching = (root: string, pattern: RegExp): readonly string[] =>
 
 const NAMES_THE_MARK = /test_workspace_mark|testWorkspaceMark/;
 
-const NAMING_THE_MARK_IN_CORE = [
-  // The fixture, the mark's one writer, which reads it first to keep or correct it.
-  "members/test-workspace.ts",
-  // The invitation guard, which only reads it.
-  "members/testing-domain.ts",
-];
+const NAMING_THE_MARK_IN_CORE = ["members/test-workspace.ts", "members/testing-domain.ts"];
 
 type Leaf<Path extends string, Output> = { readonly path: Path; readonly output: Output };
 

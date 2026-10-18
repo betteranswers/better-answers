@@ -169,7 +169,6 @@ const theImageToRun = async (image: ImageUnderTest): Promise<ImageToRun> => {
 
 const discardIfBuiltHere = async (image: ImageToRun): Promise<void> => {
   if (image.builtHere) {
-    // An image left behind costs disk alone, and the next build reuses its layers.
     await run("docker", ["rmi", "--force", image.id], { timeout: CONTAINER_ALLOWANCE }).catch(
       () => undefined,
     );

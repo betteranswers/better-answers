@@ -83,7 +83,6 @@ const shell = (title: string, body: string): string => `<!doctype html>
 <main id="page"><div data-slot="card" data-marks><div data-slot="card-header"><h1>${escaped(title)}</h1></div>
 <div data-slot="card-content">${body}</div></div></main></body></html>`;
 
-/** `query` is the signed search string, leading `?` included. Every value is escaped here. */
 export const consentPage = (
   query: string,
   params: {
@@ -93,7 +92,6 @@ export const consentPage = (
 
     readonly sendsCodeTo: string;
     readonly workspace: string;
-    /** Sent back with Connect, so a grant after a switch elsewhere is told apart. */
     readonly workspaceId: string;
     readonly scopes: readonly string[];
   },
@@ -125,6 +123,5 @@ const refusal = (words: RefusalWords, next: string): string =>
 
 export const refusedPage = (words: ReadNext): string => refusal(words, escaped(words.next));
 
-/** `query` is the signed search string, leading `?` included: sign-in carries it back here. */
 export const signInPage = (words: SignInNext, query: string): string =>
   refusal(words, `<a href="${escaped(`${SIGN_IN_PATH}${query}`)}">${escaped(words.signIn)}</a>`);

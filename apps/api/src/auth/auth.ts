@@ -183,10 +183,6 @@ const CLOSED_FACTOR_PATHS = [
   "/two-factor/verify-totp",
 ] as const;
 
-/**
- * `/update-session` lets a session write its own fields; the rest list sessions with their
- * addresses, end them unrecorded, or drop a linked account.
- */
 const CLOSED_SESSION_PATHS = [
   "/list-sessions",
   "/revoke-other-sessions",
@@ -348,10 +344,6 @@ type Recorder = (line: AuditLine, session: Session | undefined) => Promise<Writt
 const reasonOf = (error: string | Error): string =>
   error instanceof Error ? error.message : error;
 
-/**
- * A sign-in or a consent is an audit event; anything else, and anything refused, declined or
- * deferred, is a log line to `logger`.
- */
 export const createAuth = (deps: AuthDependencies) => {
   const audit = deps.logger.child({ module: "auth" });
 
@@ -428,7 +420,6 @@ export const createAuth = (deps: AuthDependencies) => {
       );
   };
 
-  /** Counts as both factors. A last use not kept is a log line, never a refused sign-in. */
   const confirmingAPasskeySignIn = async (
     presented: z.output<typeof presentedCredential>,
   ): Promise<{ readonly secondFactorConfirmedAt: Date }> => {
@@ -469,7 +460,6 @@ export const createAuth = (deps: AuthDependencies) => {
     return readWithoutRenewal(ctx);
   };
 
-  /** A pending session reads itself without renewing it, and reaches nothing else here. */
   const gateTheLibrary = async (ctx: GateContext) => {
     const token = await gatedToken(ctx);
     if (token === undefined) return undefined;
@@ -498,10 +488,6 @@ export const createAuth = (deps: AuthDependencies) => {
     ),
 
     trustedOrigins: [deps.publicUrl],
-    /**
-     * /token serves callers with no OAuth flow; /update-user writes a name past its rule;
-     * /oauth2/consent grants past the consent route, which calls it in process.
-     */
     disabledPaths: [
       "/token",
       "/update-user",
@@ -721,7 +707,6 @@ export const createAuth = (deps: AuthDependencies) => {
       twoFactor({
         issuer: PRODUCT_NAME,
         allowPasswordless: true,
-        /** Its lock counts per account, so a mailbox holder guessing codes could lock an Admin out. */
         accountLockout: { enabled: false },
         schema: {
           twoFactor: { modelName: "authenticator" },

@@ -55,7 +55,6 @@ const REFUSED_AS: ReadonlyMap<string, Refused> = new Map([
 
 const codeOf = z.object({ code: z.string() }).catch({ code: "" });
 
-/** A server failure carries a refusal's code too, so only a 4xx is the person's to hear. */
 const refusalOf = (failure: Error): Refused | undefined =>
   failure instanceof APIError && failure.statusCode < 500
     ? REFUSED_AS.get(codeOf.parse(failure.body).code)
@@ -146,7 +145,6 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     return context.json(asked.value.response);
   };
 
-  /** The library has kept the passkey, so its notice goes whether or not the record lands. */
   const settle = async (context: Context, person: SignedIn, passkeyId: string) => {
     void sendFactorNotice({ mail, log }, person.user.email, "passkey-added");
     const recorded = await recordPasskeyAdded(IDENTITY_PRINCIPAL, door, {
@@ -166,7 +164,6 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     return context.json({ passkeyId, ...finishedWith(recorded.value.issued) });
   };
 
-  /** The library has kept the passkey, so a grant spent meanwhile leaves it an ordinary add. */
   const replace = async (context: Context, person: SignedIn, passkeyId: string) => {
     const replaced = await replaceFactorsByPasskey(IDENTITY_PRINCIPAL, door, {
       ...askedBy(clock, person),

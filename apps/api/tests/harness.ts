@@ -165,7 +165,6 @@ export type TestApp = {
 
   removeMember(workspaceId: string, userId: string): Promise<void>;
 
-  /** Updates a key the workspace already holds; a key it lacks stays absent, silently. */
   setWorkspaceConfig(workspaceId: string, key: string, value: string): Promise<void>;
 
   client(ip?: string, hostname?: string): TestClient;
@@ -361,8 +360,6 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     await removeBundleRoot(gitStoreDir);
   };
 
-  // Its authorization server seeds a resource row on start; an `authOver` seeding beside it
-  // loses the unique insert and never starts.
   const health = await server.request(new URL("/health", publicUrl));
   if (health.status !== 200) {
     const answered = await health.text();

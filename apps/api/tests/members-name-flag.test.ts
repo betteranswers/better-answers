@@ -10,7 +10,6 @@ let app: TestApp;
 
 const delivered: EmailMessage[] = [];
 
-/** In address order, as the relay's messages are sorted before they are compared. */
 let operators: readonly [string, string];
 
 let formerOperator: string;

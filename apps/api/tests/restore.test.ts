@@ -62,10 +62,6 @@ const inTheContainer = (
   return { code: ran.status, said: `${ran.stdout}${ran.stderr}` };
 };
 
-/**
- * Production's `tool` runs a command in the backup image with the work directory at /work; the
- * database's own image carries the same PostgreSQL client.
- */
 const replacing = (database: string): Ran =>
   inTheContainer(
     [
@@ -137,10 +133,6 @@ const GRANTEE = "CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.gr
 
 const surfaceSchema = z.array(z.object({ line: z.string() }));
 
-/**
- * Every partition of one parent reads as one, so databases holding different workspaces compare
- * on what a partition is given, not its name.
- */
 const securitySurface = async (pool: pg.Pool): Promise<readonly string[]> => {
   const read = await pool.query(
     `WITH relation AS (
@@ -204,7 +196,6 @@ const seedAWorkspace = async (pool: pg.Pool): Promise<void> => {
     const document = await data.sourceDocument();
     await data.member({ workspaceId: document.workspaceId });
     await data.oauthRefreshToken();
-    // The partition's lifecycle function reads a transaction's scope, so it runs in one.
     await client.query("BEGIN");
     await data.passage({ workspaceId: document.workspaceId });
     await client.query("COMMIT");
@@ -320,7 +311,6 @@ describe("the production restore, given a whole dump that fails part-way", () =>
   let replaced: Ran;
 
   beforeAll(async () => {
-    // A grant to a role the cluster no longer holds is refused, and it sits near the dump's end.
     await untouched.query(`CREATE ROLE ${GONE}`);
     await untouched.query(`GRANT SELECT ON workspace TO ${GONE}`);
     mustSucceed(

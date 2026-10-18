@@ -1001,7 +1001,6 @@ describe("the limits", () => {
 
   let sends = 0;
 
-  /** A code asked for an address nobody else asks for, so the count by email never refuses it. */
   const aSend = (client: Client): Promise<Response> =>
     client.json(SEND_EMAIL_CODE_PATH, {
       email: `send-${(sends += 1)}-${Date.now()}@example.invalid`,
@@ -1364,7 +1363,6 @@ describe("the limits", () => {
       body: A_POST_BODY,
     });
 
-  /** Past the client, which names its own origin on any post that names none. */
   const postedNamingNoOrigin = async (client: Client, path: string): Promise<Response> =>
     app.server.request(
       new Request(`${PUBLIC_URL}${path}`, {

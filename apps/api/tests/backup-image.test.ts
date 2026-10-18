@@ -411,7 +411,6 @@ describe("the backup jobs' allow-list", () => {
 
 const WORKSPACE = "ws-probe";
 const SECOND_WORKSPACE = "ws-second";
-/** As `provision-workspace` leaves a workspace before its first write: a repository with no ref. */
 const UNWRITTEN_WORKSPACE = "ws-unwritten";
 const UNREADABLE_WORKSPACE = "ws-unreadable";
 const LEFT_BY_A_FAILED_RUN = "/staging/globals-20260904T143652Z.sql.age";
@@ -509,7 +508,6 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
   it("bundles each api-owned repository with a ref, skipping one without", () => {
     const bundles = files.filter((file) => file.startsWith("/buckets/dumps/git/")).sort();
 
-    // The log rides along so a failure shows where the run stopped.
     expect({ bundles, log }).toMatchObject({
       bundles: [bundleOf(WORKSPACE), bundleOf(SECOND_WORKSPACE)],
     });
@@ -650,7 +648,6 @@ const restoreEnvironment = (
   STAGING_DATABASE_URL: database,
   BUNDLED: seeded.bundled,
   NEVER_WRITTEN: seeded.neverWritten,
-  // As each script leaves them by its git step; production's `tool` runs in this image anyway.
   PRODUCTION_STEP: [
     "set -euo pipefail",
     "WORK=/work BUNDLES=/bundles",
@@ -713,7 +710,6 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
   it.each(["production", "drill"])(
     "%s: clones each bundle as the api, keeping WORK closed",
     (restore) => {
-      // What the step said rides along, so a failure shows where it stopped.
       expect(stateAfter(restore)).toMatchObject({
         state: [
           "ran 0",

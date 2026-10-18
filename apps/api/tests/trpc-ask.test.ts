@@ -50,7 +50,6 @@ const { users: USERS, supplier: SUPPLIER, retention: RETENTION } = AUDIT_ANSWERS
 
 const A_NOTE = "The period changed in May.";
 
-/** MCP_TOKEN_RULE's numbers: one connection's calls a minute. */
 const READS_A_MINUTE = 120;
 
 const bothWays = async (person: { readonly id: string; readonly email: string }, held: string) => {
@@ -207,7 +206,6 @@ describe("ask over tRPC", () => {
         retryAfterSeconds: expect.any(Number),
       },
     });
-    // A stream sends its status before any call settles, so the wait rides in the error alone.
     expect([onTheWire.status, onTheWire.headers.get("retry-after")]).toEqual([200, null]);
     expect(await onTheWire.text()).toContain('"retryAfterSeconds"');
     expect(resultIn(answered).verdict).toBe("ok");
@@ -279,7 +277,6 @@ describe("ask over tRPC", () => {
     await until(async () => (await spendIn(workspace.workspaceId))?.["called"] === 1);
 
     expect(sent.signal?.aborted).toBe(true);
-    // Cut off after it was sent, the judge's call may have been billed: it counts at full size.
     const billed = await app().database.superuser.query(
       "SELECT tokens_out FROM llm_call WHERE workspace_id = $1",
       [workspace.workspaceId],

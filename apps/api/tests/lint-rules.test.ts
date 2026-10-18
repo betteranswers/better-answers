@@ -532,7 +532,6 @@ describe("no MCP entry takes a workspace argument", () => {
       "apps/api/src/mcp/mount.ts": `server.registerTool(entry.name, { annotations: entry.annotations, inputSchema: entry.input }, entry.run);\n`,
     });
 
-    // The one mount over ENTRIES carries the disable that names its runtime fence.
     expect(output).toContain("mcp-entry-no-workspace-argument");
   });
 });

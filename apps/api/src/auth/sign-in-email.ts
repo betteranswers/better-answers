@@ -19,7 +19,6 @@ const BUTTON =
 
 const page = (body: string): string => emailPage(WORDS.subject, body);
 
-/** `code` is digits alone and `link` the api's own address and token, so nothing here needs escaping. */
 const htmlOf = (code: string, link: string | undefined): string =>
   link === undefined
     ? page(`<p style="${PARAGRAPH}">${WORDS.codeFollows}</p>

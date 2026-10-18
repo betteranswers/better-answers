@@ -50,13 +50,11 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
   const unanswered = (context: Context, reason: string): Response =>
     fenced.unanswered(context, "auth.authenticator_failed", reason);
 
-  /** Both steps check, since a setup started before a restore or a grant waits on its code unbounded. */
   const refusedAFirstSetup = (context: Context, held: SecondFactorHeld): Response | undefined => {
     if (waitsOnTheRestoreCode(held)) {
       return context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409);
     }
     if (mayReplace(held)) return context.json(REFUSALS.replacementSetupNeeded, 409);
-    // A person already holding a factor re-confirms before adding another, so no key is minted.
     return factorChangeStale(held, clock.now())
       ? context.json(PERSON_ROUTE_REFUSALS.confirmationTooOld, 412)
       : undefined;
@@ -72,7 +70,6 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
       auth.api.enableTwoFactor({ headers: context.req.raw.headers, body: { method: "totp" } }),
     );
     if (!started.ok) return unanswered(context, started.error.message);
-    // The library's own code set is dropped here: recovery codes are ours.
     return context.json({ setupAddress: setUpAnswer.parse(started.value).totpURI });
   };
 
@@ -108,8 +105,6 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
     const swapped = await sessionAfter(setCookies);
     const recorded = await record(person, swapped ?? person.session.id);
     if (recorded === undefined) return context.json(PERSON_ROUTE_REFUSALS.unanswered, 502);
-    // The browser gets the new cookie only once its session carries the old one's age; otherwise
-    // the old cookie, now void, signs it out.
     if (recorded.stamped && swapped !== undefined) {
       for (const cookie of setCookies) context.header("set-cookie", cookie, { append: true });
     }
