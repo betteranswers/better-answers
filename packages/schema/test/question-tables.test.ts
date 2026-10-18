@@ -386,7 +386,6 @@ describe("a month's partition of the content", () => {
     await withRollback(db().pool, async (client) => {
       const record = await aRecordInAMonthNotMade(client);
 
-      // A request never makes its own partition, so the row has nowhere to go.
       await expect(client.query(A_QUESTION, [WS_A, record.id, record.askedAt])).rejects.toThrow(
         /no partition of relation "question_content" found for row/,
       );
@@ -494,8 +493,6 @@ describe("a month's partition of the content", () => {
     });
   });
 
-  // `every tenant table` in rls.test.ts reads the declared parent alone; no partition is declared,
-  // so this is what holds each one.
   it("is forced and granted to no runtime role, each one", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(MAKE_THE_MONTH, [A_MONTH_NOT_MADE]);

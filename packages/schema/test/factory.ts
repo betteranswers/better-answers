@@ -76,7 +76,6 @@ export type TestData = {
 
   verification(overrides?: Partial<InsertInput<"verification">>): Promise<Row<"verification">>;
 
-  /** Set up past its first code; `secret` is sealed as the plugin seals one, by the caller. */
   authenticator(
     overrides: Partial<InsertInput<"authenticator">> & { readonly secret: string },
   ): Promise<Row<"authenticator">>;
@@ -795,7 +794,6 @@ export const testData = (client: pg.PoolClient): TestData => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const documentId = overrides.documentId ?? (await sourceDocument({ workspaceId })).id;
 
-    // Two defaults seeded at once in one document read the same end and collide; seed them in turn.
     const furthest = await client.query<{ char_end: number | null }>(
       "SELECT max(char_end) AS char_end FROM finding WHERE workspace_id = $1 AND document_id = $2",
       [workspaceId, documentId],
@@ -832,8 +830,6 @@ export const testData = (client: pg.PoolClient): TestData => {
     const receivedAt = overrides.receivedAt ?? new Date();
     const clockStartedAt = overrides.clockStartedAt ?? receivedAt;
 
-    // `dueDateOf` in `packages/core/src/erasure/requests.ts` runs the same month rule in its
-    // own lines; change one and change this.
     const dayAsked = clockStartedAt.getUTCDate();
     const dueAt = new Date(clockStartedAt);
     dueAt.setUTCDate(1);
@@ -866,8 +862,6 @@ export const testData = (client: pg.PoolClient): TestData => {
       overrides.subjectRequestId ?? (await subjectRequest({ workspaceId, kind: "erasure" })).id;
     const anchoredAt = overrides.anchoredAt ?? new Date();
 
-    // `beyondUseFrom` in `packages/core/src/erasure/routine.ts`, over `monthsOn` in the same
-    // slice, spells the same four lifetimes; change one and change this.
     const outFrom = (milliseconds: number) => new Date(anchoredAt.getTime() + milliseconds);
     const hour = 60 * 60 * 1000;
     const dayAsked = anchoredAt.getUTCDate();

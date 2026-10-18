@@ -43,10 +43,6 @@ export type SeededBefore0072 = {
   readonly decidedSuggestions: readonly string[];
 };
 
-/**
- * One row of every old stored word in `workspaceId`, as 0071 stores it, beside one control row
- * per table that 0072 must leave alone.
- */
 export const oldWordsStoredIn = async (
   client: pg.PoolClient,
   workspaceId: string,

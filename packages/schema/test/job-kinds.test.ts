@@ -589,10 +589,6 @@ const SNAPSHOT_CHECKS = z.object({
   ),
 });
 
-/**
- * A CHECK declared in its CREATE TABLE has no statement to replay. `table` is the snapshot's
- * key; the CHECK goes onto `connected_source`.
- */
 const aCheckFrom = (
   snapshot: string,
   suffix: string,

@@ -84,7 +84,6 @@ const aTenantAtWork = async (
   }
 };
 
-/** The order a sign-up takes them in, so the wait below is the one a real sign-up would be in. */
 const provisionStarted = async (
   workspaceId: string,
 ): Promise<{ client: pg.PoolClient; provisioned: Promise<string> }> => {

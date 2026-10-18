@@ -27,7 +27,6 @@ const linksTo = (link: string, target: string): boolean => {
   }
 };
 
-/** Staged under a name of this process's own and renamed over, so two suites starting at once each leave a whole link. */
 const linkGit = (linkDirectory: string, target: string): void => {
   const git = path.join(linkDirectory, "git");
   if (linksTo(git, target)) return;

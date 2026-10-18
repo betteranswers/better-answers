@@ -39,10 +39,6 @@ const constraintOf = (error: unknown): string => {
   return typeof named === "string" ? named : `nothing named a constraint: ${String(error)}`;
 };
 
-/**
- * The closed set the pinned image has, so a privilege the journal never mentions is answered
- * false rather than left out of the question.
- */
 const TABLE_PRIVILEGES = [
   "SELECT",
   "INSERT",
@@ -229,7 +225,6 @@ export type SuggestionRow = {
   readonly decided?: { readonly targetIri: string; readonly decider: string };
 };
 
-/** Past the boundary schema, so a kind the package no longer declares can still be written. */
 export const suggestionWritten = (client: Writer, row: SuggestionRow): Promise<unknown> =>
   client.query(
     `INSERT INTO suggestion

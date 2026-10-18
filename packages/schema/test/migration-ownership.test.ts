@@ -309,7 +309,6 @@ describe("what the audience substrate copies from the schema package", () => {
     if (file === undefined) throw new Error("the audience substrate is not in the journal");
     const sql = readFileSync(file, "utf8");
 
-    // The substrate migration predates the map's, so it writes the tables' names before 0067.
     for (const table of ["graph_node", "graph_edge"]) {
       expect(sql).toContain(`"${table}_audience_check" CHECK (${AUDIENCE_CHECK})`);
     }

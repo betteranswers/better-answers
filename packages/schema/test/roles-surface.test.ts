@@ -21,10 +21,6 @@ import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./ha
 import { privilegesHeld, refusesEach } from "./probes.ts";
 import { A_MAP_NODE } from "./rls-probes.ts";
 
-/**
- * Read from the database, not parsed back out of the file: the drift test ties the two, so
- * nothing else has to trust the bytes.
- */
 let surface: RolesSurface;
 
 const NOTHING_OF_THE_EIGHT = {

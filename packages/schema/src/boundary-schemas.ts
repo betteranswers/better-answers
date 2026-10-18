@@ -817,7 +817,6 @@ const questionAskedRefinements = {
   predicateGroups: (schema: z.ZodArray<z.ZodString>) => z.array(groupId(schema.element)),
   verdict: (schema: z.ZodString) => schema.pipe(z.enum(QUESTION_VERDICTS)),
   judgeState: (schema: z.ZodString) => schema.pipe(z.enum(JUDGE_STATES)),
-  // Null parses because the column's type takes a JSON null; the table's CHECK refuses one.
   concepts: (schema: z.ZodType) => schema.pipe(z.union([z.array(recordConcept), z.null()])),
   unmappedPassages: (schema: z.ZodArray<z.ZodString>) => z.array(schema.element.trim().min(1)),
 };

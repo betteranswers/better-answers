@@ -178,10 +178,6 @@ type UnsafeCheck = {
   readonly reads: readonly string[];
 };
 
-/**
- * Reads columns and written NULLs only: a subscript, field or function answering NULL on a
- * non-NULL value, as `->` on an absent key, passes unseen.
- */
 const unsafeChecks = async (client: pg.PoolClient): Promise<readonly UnsafeCheck[]> => {
   const { rows } = await client.query<{
     check: string;

@@ -11,7 +11,6 @@ export const IRI = new RegExp(
 
 export const CONCEPT_IRI = z.string().regex(IRI).brand<"ConceptIri">();
 
-/** `minted` is a fresh ULID, so a throw here is a broken invariant, not input to refuse. */
 export const conceptIriOf = (minted: string): z.output<typeof CONCEPT_IRI> =>
   CONCEPT_IRI.parse(`${CONCEPT_IRI_PREFIX}${minted}`);
 

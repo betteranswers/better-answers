@@ -13,10 +13,6 @@ export const SUBJECT_IDENTIFIER_KINDS = ["emails", "names", "other"] as const;
 export const SUBJECT_IDENTIFIER_MAX = 320;
 export const SUBJECT_IDENTIFIERS_MAX = 50;
 
-/**
- * An erasure adds to a suppression's emails the sign-in addresses of the two people it can
- * name: the request's and its map's.
- */
 export const SUPPRESSION_SIGN_IN_ADDRESSES_MAX = 2;
 
 export const SUBJECT_IDENTIFIER_FLOOR = 3;

@@ -61,7 +61,6 @@ const SQL_STRING = /^'(.*)'$/;
 const PLANTED_CATEGORY = "sort-code";
 const FINDING_TABLE = "finding";
 
-/** The table is named apart so the tree's scan for raw inserts reads this sample as text. */
 const plantedCategoryWords = (): string =>
   `{ ...row, category: "${PLANTED_CATEGORY}", tier: "always" },
        INSERT INTO ${FINDING_TABLE} (workspace_id, id, category, tier, rule_id)

@@ -141,7 +141,6 @@ const agesOf = async (admin: pg.Client): Promise<readonly TemplateAge[]> =>
     )
   ).rows;
 
-/** Holds the tmpfs to a day of templates; a run still cloning one keeps it until the clone ends. */
 const ageOut = async (admin: pg.Client): Promise<void> => {
   for (const { datname, stale } of await agesOf(admin)) {
     if (stale === null) await stampUse(admin, datname);
@@ -149,7 +148,6 @@ const ageOut = async (admin: pg.Client): Promise<void> => {
   }
 };
 
-/** Under the build lock no build of this tier is live, so every one found was killed. */
 const dropKilledBuilds = async (admin: pg.Client): Promise<void> => {
   const found = await admin.query<{ datname: string }>(
     "SELECT datname FROM pg_database WHERE starts_with(datname, $1) AND datname LIKE '%\\_building'",
@@ -171,7 +169,6 @@ const buildAndPublish = async (
   await untilSessionsGone(admin, building);
   await admin.query(`ALTER DATABASE ${quoted(building)} WITH ALLOW_CONNECTIONS false`);
   await admin.query(`ALTER DATABASE ${quoted(building)} WITH IS_TEMPLATE true`);
-  // Published last, so a killed build never leaves a database under the name runs clone.
   await admin.query(`ALTER DATABASE ${quoted(building)} RENAME TO ${quoted(name)}`);
 };
 

@@ -17,7 +17,6 @@ export const POSTGRES_COMMAND = [
 ] as const;
 
 export type MigratedPostgres = {
-  /** Connects as the superuser, whom no policy binds. */
   readonly pool: pg.Pool;
 
   readonly runtimePool: pg.Pool;
@@ -48,7 +47,6 @@ export const endPool = async (pool: pg.Pool): Promise<void> => {
   await closed;
 };
 
-/** Migrates nothing: opens both pools over `connectionUri`; `stop` ends them, then `release`. */
 export const migratedPostgresOver = (
   connectionUri: string,
   release: () => Promise<void>,

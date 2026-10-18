@@ -44,7 +44,6 @@ export const user = pgTable("user", {
 
   restoreRequiredAt: stamp("restore_required_at"),
 
-  /** Made an Admin or the operator while needing no second factor; cleared at the first confirmation since. */
   promotedAt: stamp("promoted_at"),
 });
 

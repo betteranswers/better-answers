@@ -315,7 +315,6 @@ const buildLog = () => {
   return { building, built: () => [...built], mostAtOnce: () => mostAtOnce };
 };
 
-/** The worker's pid keeps a concurrent run of this file on a shared server off these names. */
 const scratchTemplates: string[] = [];
 
 const scratchTemplate = (label: string): string => {
@@ -640,7 +639,6 @@ describe("a shared template", () => {
     });
   });
 
-  // The worker tier's real sweep would drop a tpl_py_ plant, so a prefix no tier sweeps stands in.
   it("leaves stale templates outside its prefix alone", async () => {
     const theirs = await plantedTemplate("theirs", LONG_AGO, "tpl_t_");
 
@@ -702,7 +700,6 @@ const throwawayPostgres = (command: readonly string[]): Promise<StartedPostgreSq
     .start();
 
 const scriptUriLine = async (): Promise<string | undefined> => {
-  // The script lets TEST_POSTGRES_IMAGE replace the pin; this harness always reads the pin.
   const printed = await run("bash", ["deploy/test-postgres.sh", "address"], {
     cwd: repoRoot,
     env: { ...process.env, TEST_POSTGRES_IMAGE: undefined },

@@ -61,7 +61,6 @@ const DRAFTED_RECORD_ID = "01J6QQQQQQQQQQQQQQQQQQQQQ2";
 
 const A_SEALED_FRAME = new Uint8Array(40).fill(7);
 
-/** Inside the month the migration made a content partition for, which is the month it ran in. */
 const ASKED_THIS_MONTH = new Date();
 
 const DUE = new Date("2026-10-01T00:00:00Z");
@@ -1563,7 +1562,6 @@ describe("5 — the inferred type is pinned", () => {
     (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
   type NoneOf<T extends never> = T;
 
-  // Spelled out, not read off `ids`: an id's type comes from the column it is pinned against.
   type Branded<Brand extends string> = string & z.core.$brand<Brand>;
   type WorkspaceId = Branded<"WorkspaceId">;
   type UserId = Branded<"UserId">;

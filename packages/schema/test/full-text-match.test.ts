@@ -280,7 +280,6 @@ describe("the any-word rule over concept rows", () => {
       "audit log retention",
     );
 
-    // Of four rows, audit and log are each held by three and retention by one.
     const common = Math.log(1 + 1.5 / 3.5);
     const rare = Math.log(1 + 3.5 / 1.5);
     expect(matched).toEqual([

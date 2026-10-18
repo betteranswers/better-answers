@@ -106,7 +106,6 @@ const reshaped = (client: pg.PoolClient): Promise<void> =>
   asTheMigrationOwnerOf(
     client,
     [
-      // The new key's index is created in the schema, which the owner `migrate` runs as holds.
       "SCHEMA public",
       "TABLE public.suppression",
       "TABLE public.erasure_request",

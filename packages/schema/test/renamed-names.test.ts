@@ -16,7 +16,6 @@ const RENAMED_TABLE_PREFIXES = [
   "concept_class_override",
 ];
 
-/** Matched mid-name, as an index names its columns and a partition its parent. */
 const RENAMED_WORDS = [
   "binding",
   "candidate",
