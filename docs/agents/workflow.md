@@ -1,47 +1,42 @@
-# The workflow: Compound Engineering, then the merge queue
+# The workflow: pstack, then the merge queue
 
-How a change becomes merged code. The Compound Engineering plugin (CE) runs the loop in the session. Cubic reviews the pull request, and the merge queue merges it when CI's `check` is green.
+How a change becomes merged code. pstack runs the work in the session. An agent that did not write the change gives it a verdict, the session puts it in the merge queue, and the queue merges it when CI's `check` is green.
 
 ## The loop
 
-**`/lfg <what to do>`** runs a change end to end and never pauses for approval: a plan (`/ce-debug` for a bug), the work, a simplifying pass, `/ce-code-review` with its fixes, `/ce-compound`, a browser test of the pages the diff touches, `ce-commit-push-pr`, then `ce-babysit-pr` for up to three rounds of CI or review fixes. It asks a question only when what to build is unclear, and it never merges.
+**`/poteto-mode <what to do>`** matches the task to a pstack playbook and runs it: Feature, Bug fix, Refactoring and the rest. Its Feature playbook explains the subsystem with `how`, settles the shape with `architect`, delegates the code, verifies it on the real surface, then opens the pull request. Name the goal and how to tell it is done, not the skills.
 
-By hand, the same loop is three skills:
+- `/sharpen` or `/in-your-own-words` first when what to build is still open.
+- A design question that a run can answer is settled by the Prototype playbook or `/architect`, not by asking the owner.
+- Work that spans several pull requests gets a plan first: `/poteto-mode plan <the work> in docs/plans/` runs the Multi-phase plan playbook, which writes the plan and stops. Its `check-plan.mjs` holds the plan's shape. A plan has no status field: git says what shipped.
 
-- `/ce-brainstorm` when what to build is still open. It asks one question at a time and writes the requirements to `docs/plans/`.
-- `/ce-plan` writes the plan to `docs/plans/`, after searching `docs/solutions/` for what past work learned. A plan has no status field: git says what shipped.
-- `/ce-work` builds a plan, unit by unit, and ends in a pull request.
+A route block (`docs/specs/v01-route.md`) that is one change goes straight to `/poteto-mode`. A block of several changes is planned first, then built under the plan's execution playbook. The personas in `docs/personas/` ground a design: read the ones a screen serves before shaping it.
 
-A route block (`docs/specs/v01-route.md`) is one `/ce-brainstorm`, then `/ce-plan`, then one `/lfg` or `/ce-work` per plan. `/ce-dogfood` walks a branch's pages as the personas in `docs/personas/` and fixes the small breakages it finds. It is the way to judge a signed-in page's UX against its spec: it walks the change as the personas on its own build, beside the browser suite's behaviour and accessibility checks.
-
-## What CE does not know about this repository
+## What pstack does not know about this repository
 
 - Two kinds of change run alone until they merge: one that adds a migration, because the drizzle journal does not merge, and one that edits `contracts/`, because it moves both tiers' generated digest constants, which do not merge either.
-- CE's review reads its rules from `CODING_STANDARDS.md`, plus the `AGENTS.md` of each directory the change touches: `apps/api/`, `apps/web/`, `apps/worker/`, `deploy/`, `packages/core/` and `packages/schema/`.
+- A review reads the rules from `CODING_STANDARDS.md`, plus the `AGENTS.md` of each directory the change touches: `apps/api/`, `apps/web/`, `apps/worker/`, `deploy/`, `packages/core/` and `packages/schema/`. Hand them to `/thermos` and to the verifier, since their rubrics do not load them.
 - A worker prompt names each test scenario by the behaviour it checks, and a test's title is that behaviour, in 10 words at most.
-- A worker prompt hands `ce-commit-push-pr` pointers, never a drafted body or a list of what the body must say: the plan, the RUNBOOK entry, the review's run directory and the issue. An owner decision, a probe's numbers or a list a reviewer must check goes in the plan or the issue, and the body links to it. On 08/10/2026 the longest bodies on `main` (#613, #615, #616) were drafts a build agent wrote and told the skill to use as they stood, so the skill sized nothing.
 - A change to a page a journey walks (`apps/web/journeys/`) changes that journey in the same pull request, and runs the journeys against the browser suite's api, with the harness code source, before it lands. Nothing else runs them before the release does: `check` never runs a journey, and the release runs the journeys of the commit its api image was built from, so a page that moved without its journey ends that night's run `fail`. The browser-suite skill's *The journeys* gives the run.
 - `/mutation-testing` runs after the tests are green, on refactors and on changes to validation, parsing or auth. Skip it for UI, copy and config diffs.
 - A change that moves an architecture decision edits its doc in `docs/solutions/architecture-patterns/` in the same commit, and a new decision lands there as a new doc with the code it decides. `docs/archive/adr/` is frozen.
 
 ## Merging
 
-**Every commit reaches `main` through the merge queue.**
+**Every commit reaches `main` through the merge queue. Until v0.1 the session lands its own pull request, with no press from the owner, once the verdict is `PASS`.**
 
-1. `ce-commit-push-pr` opens the pull request. Its title is the commit's subject, and its body takes the form `AGENTS.md` states in *Workflow*. Repository settings make these the merge commit's subject and body.
-2. Cubic reviews the head. When its check completes with success, `arm-merge.yml` arms the merge. A push disarms it, and Cubic's check on the new head arms it again, so the queue never takes a head Cubic has not read.
-3. The `main` ruleset holds the merge until every review thread is resolved. `ce-babysit-pr` fixes or answers Cubic's threads, and Cubic resolves the ones it sees addressed.
-4. The PR's own `check` reads only its title, so it goes green in a minute or two and the armed PR enters the **merge queue**. The queue runs the suites on the merge group and merges on green.
-
-A check that completes neutral arms nothing. That happens when Cubic's allowance has run out, or when a push rewrote the branch and Cubic did not start. The workflow's summary names the reason. Comment `@cubic-dev-ai` on the pull request to have Cubic review it, or arm it by hand. `arm-merge.yml` arms with the `ARM_MERGE_TOKEN` secret, because a merge armed with `GITHUB_TOKEN` starts no workflow and the queue's `check` would never run. Without the secret, arm by hand: `gh pr merge <n> --auto --merge`.
-
-A red merge group takes the PR out of the queue. Its timeline then ends in a `RemovedFromMergeQueueEvent` whose `reason` is `failed_checks`. The failure is in the merge group's run, not the PR's, so read that run's log and fix what it names:
+1. Open the pull request ready, never draft, under pstack's *Opening a PR* playbook. Its title is the commit subject the commit's form below states. Its body takes that playbook's sections, then the closing lines `AGENTS.md` states in *Workflow*.
+2. An agent that did not write the change runs it the way a user would and posts its verdict on the pull request: `PASS`, `PASS+NOTES` or `FAIL`, with the head SHA it read. This is pstack's *Shipping* verdict. A pull request whose every change is a `.md` file gets a reviewer reading the diff against its intent instead of a run.
+3. Once the pull request's own `check` is green, the session queues the verified head: `gh pr merge <n> --match-head-commit <sha>`. A push after the verdict needs a new verdict. The queue runs the suites on the merge group, squashes it and merges it. Read the pull request back (`gh pr view <n> --json state,mergedAt`): queued is not merged.
+4. A red merge group takes the pull request out of the queue. Read the merge group's log before anything else, and fix what it names. Put a flake back in the queue once. The same failure twice is real.
 
 ```
 gh run list --workflow check.yml --event merge_group --json databaseId,headBranch,conclusion \
   --jq '.[] | select(.headBranch | contains("/pr-<n>-"))'
 gh run view <id> --log-failed
 ```
+
+The `main` ruleset holds the merge until every review thread is resolved. A review bot's thread is triaged under pstack's bugbot triage: fix it, or answer why not and resolve it.
 
 GitHub deletes the merged branch. Then run `node .gitnexus/run.cjs analyze` in the main checkout, so GitNexus reads the new `main`.
 
@@ -58,10 +53,9 @@ gh api graphql -F owner='{owner}' -F name='{repo}' -f query='
 
 ### Merge queue facts
 
-- GitHub clears the auto-merge flag when a PR enters the merge queue. Do not read that as 'disarmed'.
-- A PR armed with `gh pr merge --auto` enters the queue only once its required checks pass. Until then it has no queue entry, which does not mean it left the queue: `autoMergeRequest` is set and the state is still `OPEN`. A PR that left the queue unmerged has neither a queue entry nor `autoMergeRequest`.
 - `gh pr view` has no `isInMergeQueue` field. Use GraphQL: `gh api graphql -f query='{repository(owner:"O",name:"R"){pullRequest(number:N){mergeQueueEntry{state position}}}}'`.
-- Land sibling PRs that touch the same files one at a time, rebasing between merges.
+- A pull request that left the queue unmerged has no queue entry and is still `OPEN`. Its timeline ends in a `RemovedFromMergeQueueEvent` whose `reason` names why.
+- Land sibling pull requests that touch the same files one at a time, rebasing between merges.
 
 ### The commit's form
 
@@ -83,9 +77,9 @@ Refs: BA-123
 One commitlint config, `commitlint.config.mjs`, holds the form in two places. Each refusal names the rule it broke.
 
 - lefthook's `commit-msg` hook checks every commit.
-- The `pr-title` job in `check.yml` checks the pull request's title, which becomes the merge commit's subject. The job runs on the pull request and again in the merge queue. It reads the title when it runs, so a retitle is read before the merge, and a red `pr-title` goes green on `gh run rerun <run> --failed`.
+- The `pr-title` job in `check.yml` checks the pull request's title, which becomes the squash commit's subject. The job runs on the pull request and again in the merge queue. It reads the title when it runs, so a retitle is read before the merge, and a red `pr-title` goes green on `gh run rerun <run> --failed`.
 
-The repository's `merge_commit_message` is `PR_BODY`. So the pull request's body, in the form `AGENTS.md` states, becomes the merge commit's body on `main`. The branch's own commits reach `main` too, each with its `Refs:` footer.
+The queue squashes each pull request into one commit. The repository's squash title is `PR_TITLE` and its message is `PR_BODY`, so the pull request's body becomes that commit's body on `main`, and its closing issue line is the link from `main` to Linear. The branch's own commits stay on the pull request page.
 
 ## What `check` runs where
 
@@ -114,8 +108,8 @@ You need:
 
 - GitHub's GraphQL API is closed to cloud sessions, and no setting opens it. So `gh pr create`, `gh pr merge` and every GraphQL query in this document fail. REST works, through `gh api` or the GitHub MCP.
 - **Open** the PR with the MCP's `create_pull_request`, or `gh api -X POST repos/{owner}/{repo}/pulls -f title=<subject> -f head=<branch> -f base=main -f body=<body>`.
-- `arm-merge.yml` arms it as it arms any other. To arm by hand, use `gh api -X PUT repos/{owner}/{repo}/pulls/<n>/ccr/auto_merge`, or the MCP's `enable_pr_auto_merge`, in place of `gh pr merge <n>`.
-- CE is not installed from `.claude/settings.json` in a cloud session, which never shows the workspace trust dialog. `scripts/cloud-setup.sh` installs it.
+- **Queue** it with the MCP's `enable_pr_auto_merge`, or `gh api -X PUT repos/{owner}/{repo}/pulls/<n>/ccr/auto_merge`, in place of `gh pr merge <n>`.
+- pstack is not installed from `.claude/settings.json` in a cloud session, which never shows the workspace trust dialog. `scripts/cloud-setup.sh` installs it.
 - **Read it back** from the merge group's run, not `isInMergeQueue`:
 
   ```
