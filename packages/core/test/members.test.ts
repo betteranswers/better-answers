@@ -26,7 +26,9 @@ import { type ProvisionedWorkspace, provisionedWorkspace, seedPerson } from "./p
 import {
   abortTheTransaction,
   answered,
+  countWaitingOnLocks,
   postgresForSuite,
+  until,
   whileWritesAreRefused,
 } from "./suite-postgres.ts";
 
@@ -333,6 +335,75 @@ describe("who is in a group", () => {
     );
 
     expect(removed).toEqual({ ok: false, error: "no-such-group" });
+  });
+});
+
+const addedWhileDeleting = async (
+  workspace: Workspace,
+  deletion: { readonly text: string; readonly values: readonly string[] },
+  asked: { readonly groupId: string; readonly userId: string },
+) => {
+  const deleter = await db().pool.connect();
+  try {
+    await deleter.query("BEGIN");
+    await deleter.query(deletion.text, [...deletion.values]);
+    const adding = putInGroup(workspace, asked.groupId, asked.userId);
+    await until(async () => (await countWaitingOnLocks(db().pool)) > 0);
+    await deleter.query("COMMIT");
+    return {
+      answer: await adding,
+      rows: await groupMemberRowCount(workspace.workspaceId),
+      events: (await peopleActions(workspace.workspaceId)).filter(
+        (event) => event.action === "people.group.member_added",
+      ).length,
+    };
+  } finally {
+    await deleter.query("ROLLBACK");
+    deleter.release();
+  }
+};
+
+const groupMemberRowCount = async (workspaceId: string): Promise<number> => {
+  const counted = await db().pool.query<{ held: number }>(
+    "SELECT count(*)::int AS held FROM group_member WHERE workspace_id = $1",
+    [workspaceId],
+  );
+  return counted.rows[0]?.held ?? -1;
+};
+
+describe("adding to a group while a delete commits", () => {
+  it("refuses no-such-group when the group is deleted concurrently", async () => {
+    const workspace = await provisioned("Xi");
+    const person = await seedMemberAt(workspace, "Viewer");
+    const groupId = await madeGroup(workspace, "HR team");
+
+    const added = await addedWhileDeleting(
+      workspace,
+      {
+        text: `DELETE FROM "group" WHERE workspace_id = $1 AND id = $2`,
+        values: [workspace.workspaceId, groupId],
+      },
+      { groupId, userId: person },
+    );
+
+    expect(added).toEqual({ answer: { ok: false, error: "no-such-group" }, rows: 0, events: 0 });
+  });
+
+  it("refuses no-such-member when the member is deleted concurrently", async () => {
+    const workspace = await provisioned("Omicron");
+    const person = await seedMemberAt(workspace, "Viewer");
+    const groupId = await madeGroup(workspace, "HR team");
+
+    const added = await addedWhileDeleting(
+      workspace,
+      {
+        text: "DELETE FROM member WHERE workspace_id = $1 AND user_id = $2",
+        values: [workspace.workspaceId, person],
+      },
+      { groupId, userId: person },
+    );
+
+    expect(added).toEqual({ answer: { ok: false, error: "no-such-member" }, rows: 0, events: 0 });
   });
 });
 

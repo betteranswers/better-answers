@@ -4,7 +4,16 @@ import { boundarySchemas, CURATED_ORIGIN } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { action, declareActions, record, recordEach } from "../audit/index.ts";
-import { admit, ADMIN_ALONE, attempt, declareAction, err, ok, ulid } from "../kernel/index.ts";
+import {
+  admit,
+  ADMIN_ALONE,
+  attempt,
+  attemptResult,
+  declareAction,
+  err,
+  ok,
+  ulid,
+} from "../kernel/index.ts";
 import type {
   AdminUserPrincipal,
   GroupId,
@@ -236,10 +245,33 @@ const memberTarget = (
   return ok({ ...target.value, userId: person.data });
 };
 
+type Adding = { readonly groupId: GroupId; readonly personIds: readonly UserId[] };
+
+/** Key-share holds keep the group and each member from going, and wait on no other add. */
+const KEY_SHARED_GROUP = `SELECT 1 FROM "group" WHERE workspace_id = $1 AND id = $2 FOR KEY SHARE`;
+
+const KEY_SHARED_MEMBERS = `SELECT user_id FROM member
+                       WHERE workspace_id = $1 AND user_id = ANY($2::text[])
+                       ORDER BY user_id FOR KEY SHARE`;
+
+export const heldForAdding = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  asked: Adding,
+): Promise<Result<readonly UserId[], MemberRefusal<"no-such-group">>> => {
+  const group = await tx.query(KEY_SHARED_GROUP, [admin.workspaceId, asked.groupId]);
+  if (group.rows[0] === undefined) return err("no-such-group");
+  const held = await tx.query<{ user_id: string }>(KEY_SHARED_MEMBERS, [
+    admin.workspaceId,
+    asked.personIds,
+  ]);
+  return ok(held.rows.map((row) => PERSON_ID.parse(row.user_id)));
+};
+
 export const addedToGroup = async (
   admin: AdminUserPrincipal,
   tx: Tx,
-  asked: { readonly groupId: GroupId; readonly personIds: readonly UserId[] },
+  asked: Adding,
 ): Promise<readonly UserId[]> => {
   const landed = await tx.query<{ user_id: string }>(
     `INSERT INTO group_member (workspace_id, group_id, user_id)
@@ -268,23 +300,17 @@ export const addToGroup = async (
   if (!target.ok) return err(target.error);
   const { admin, groupId, userId } = target.value;
 
-  const known = await attempt(() =>
-    tx.query<{ holds_group: boolean; is_member: boolean }>(
-      `SELECT EXISTS (SELECT 1 FROM "group" WHERE workspace_id = $1 AND id = $2) AS holds_group,
-              EXISTS (SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $3) AS is_member`,
-      [admin.workspaceId, groupId, userId],
-    ),
+  return attemptResult(
+    async (): Promise<
+      Result<{ groupId: GroupId; userId: UserId }, Exclude<AddToGroupRefusal, Error>>
+    > => {
+      const held = await heldForAdding(admin, tx, { groupId, personIds: [userId] });
+      if (!held.ok) return err(held.error);
+      if (held.value.length === 0) return err("no-such-member");
+      const added = await addedToGroup(admin, tx, { groupId, personIds: held.value });
+      return added.length === 0 ? err("already-in-group") : ok({ groupId, userId });
+    },
   );
-  if (!known.ok) return err(known.error);
-
-  const row = known.value.rows[0];
-  if (row?.holds_group !== true) return err("no-such-group");
-  if (!row.is_member) return err("no-such-member");
-
-  const added = await attempt(() => addedToGroup(admin, tx, { groupId, personIds: [userId] }));
-  if (!added.ok) return err(added.error);
-  if (added.value.length === 0) return err("already-in-group");
-  return ok({ groupId, userId });
 };
 
 export const removeFromGroup = async (
