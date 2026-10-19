@@ -237,7 +237,10 @@ describe("the vitest runner's patch over a throwaway workspace", () => {
       statusReason: expect.stringContaining("is not a family"),
     });
 
-    expect(rowAt(rows, 10, "BlockStatement", "{}")).toMatchObject({
+    expect(
+      rowAt(rows, 10, "BlockStatement", "{}"),
+      "reached only while a test runs, so its run is filtered to that test",
+    ).toMatchObject({
       status: "Killed",
       testsCompleted: 1,
     });

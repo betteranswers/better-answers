@@ -81,6 +81,12 @@ exit 0
   };
 };
 
+const PYTHON_RYUK_WITH_NEITHER_LABEL: Listed = {
+  id: "d1",
+  name: "testcontainers-ryuk-5b0c-python",
+  state: "running",
+};
+
 const removals = (daemon: Daemon): string[] =>
   daemon.calls().filter((call) => call.startsWith("rm "));
 
@@ -107,7 +113,7 @@ describe("reap-containers", () => {
           ryuk: "true",
         },
         { id: "c2", name: "stopped_postgres", state: "dead", session: "stopped" },
-        { id: "d1", name: "testcontainers-ryuk-5b0c-python", state: "running" },
+        PYTHON_RYUK_WITH_NEITHER_LABEL,
         { id: "d2", name: "worker_postgres", state: "exited", session: "5b0c-python" },
         { id: "e1", name: "reused_postgres", state: "exited" },
       ]),

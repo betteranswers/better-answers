@@ -82,8 +82,11 @@ describe("the tables a source names", () => {
   });
 
   it("counts the line from the file, not from the string", () => {
-    const [found] = tablesReadIn("one.ts", `// one\n\nconst q = \`\n  SELECT 1\n  FROM job\`;\n`);
-    expect(found?.line).toBe(5);
+    const [found] = tablesReadIn(
+      "one.ts",
+      `// one\n\nconst q = \`\n  SELECT '\\t'\n  FROM job\`;\n`,
+    );
+    expect(found?.line, "an escape before the table moved the offsets off the file's").toBe(5);
   });
 
   it("leaves out a CTE, but never the qualified table", () => {
