@@ -75,16 +75,22 @@ writes the rows:
   sources, documents and passages, then a commit in the workspace's repository, then its rows.
   `scriptAsking` commits each ops command as it runs.
 
+Among the body's rules for `seedConcepts`, a seed gives each title, whatever its case and spacing,
+and each file to one concept, and a group names each member once. Two titles with one file name in
+two collections land as two concepts. A seeded concept's merge key is the one core derives from its
+kind and title.
+
 `seedConcepts` cannot be one transaction, so it reads the workspace before its first write and
 refuses there, with a 400 naming the field, what the body names that the store would refuse later: a
-writer who is a Viewer, an Editor's seed that asks for the Admin's override (a concept shared with a
-group, or one citing a document held at a sensitivity that differs from its own), a title whose file
-the workspace already holds, and, for a concept shared with a group, a group member who is no member
-of the workspace. An Editor's seed that asks no override lands, as the slice's write admits an
-Editor. A seed refused there writes nothing and makes no repository. Any other refusal at one
-concept leaves the concepts before it whole, in the repository, the index and the map. It may leave
-that concept's own connected sources, documents and passages, and the concept itself, written but
-not yet narrowed to its group, shared past its evidence or verified.
+writer who is no member of the workspace or is a Viewer, an Editor's seed that asks for the Admin's
+override (a concept shared with a group, or one citing a document held at a sensitivity that differs
+from its own), a title whose file the workspace already holds, and, for a concept shared with a
+group, a group member who is no member of the workspace. An Editor's seed that asks no override
+lands, as the slice's write admits an Editor. A seed refused there writes nothing and makes no
+repository. Any other refusal at one concept leaves the concepts before it whole, in the repository,
+the index and the map. It may leave that concept's own connected sources, documents and passages,
+and the concept itself, written but not yet narrowed to its group, shared past its evidence or
+verified.
 
 ## The browser helpers
 

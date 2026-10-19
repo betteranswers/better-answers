@@ -130,7 +130,12 @@ export {
   type FrontmatterValue,
 } from "./file.ts";
 export { withBundleFenceAs } from "./fence.ts";
-export { carryVerificationsOntoRewrite, foldKind, moveBundleCommits } from "./landing.ts";
+export {
+  carryVerificationsOntoRewrite,
+  foldKind,
+  mergeKeyOf,
+  moveBundleCommits,
+} from "./landing.ts";
 export {
   ERASURE_REHEARSAL_PATH,
   IMPORT_SENSITIVITY_DEFAULT,
