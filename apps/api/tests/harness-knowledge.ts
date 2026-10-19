@@ -71,21 +71,43 @@ const aSource = z
     }
   });
 
-const aConcept = z.object({
-  title: z.string().min(1),
-  collection: z.string().min(1).optional(),
-  kind: z.string().min(1).default("Answer"),
-  body: z.string().min(1),
-  sensitivity: z.enum(SENSITIVITIES).default("Internal"),
-  audience: z.enum(AUDIENCES).default("everyone"),
-  groupMemberIds: z.array(z.string().min(1)).default([]),
-  trust: z.enum(TRUST_TIERS).default("unverified"),
-  linksTo: z.array(z.string().min(1)).default([]),
-  sources: z.array(aSource).default([]),
-  frontmatter: conceptFrontmatter.default({}),
-});
+const aConcept = z
+  .object({
+    title: z.string().min(1),
+    collection: z.string().min(1).optional(),
+    kind: z.string().min(1).default("Answer"),
+    body: z.string().min(1),
+    sensitivity: z.enum(SENSITIVITIES).default("Internal"),
+    audience: z.enum(AUDIENCES).default("everyone"),
+    groupMemberIds: z.array(z.string().min(1)).default([]),
+    trust: z.enum(TRUST_TIERS).default("unverified"),
+    linksTo: z.array(z.string().min(1)).default([]),
+    sources: z.array(aSource).default([]),
+    frontmatter: conceptFrontmatter.default({}),
+  })
+  .superRefine((concept, context) => {
+    for (const [nth, memberId] of concept.groupMemberIds.entries()) {
+      if (!concept.groupMemberIds.slice(0, nth).includes(memberId)) continue;
+      context.addIssue({
+        code: "custom",
+        path: ["groupMemberIds", nth],
+        message: "a group names each member once",
+      });
+    }
+  });
 
 type AskedConcept = z.output<typeof aConcept>;
+
+const shortNameOf = (title: string): string =>
+  title
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-|-$/g, "");
+
+const pathOf = ({ title, collection }: Pick<AskedConcept, "title" | "collection">): string =>
+  ["knowledge", ...(collection === undefined ? [] : [collection]), `${shortNameOf(title)}.md`].join(
+    "/",
+  );
 
 export const conceptsSeeding = z
   .object({
@@ -108,12 +130,19 @@ export const conceptsSeeding = z
   })
   .superRefine((asked, context) => {
     for (const [at, concept] of asked.concepts.entries()) {
-      const earlier = new Set(asked.concepts.slice(0, at).map((seeded) => seeded.title));
+      const before = asked.concepts.slice(0, at);
+      const earlier = new Set(before.map((seeded) => seeded.title));
       if (earlier.has(concept.title)) {
         context.addIssue({
           code: "custom",
           path: ["concepts", at, "title"],
           message: "a seed gives each title to one concept",
+        });
+      } else if (before.map(pathOf).includes(pathOf(concept))) {
+        context.addIssue({
+          code: "custom",
+          path: ["concepts", at, "title"],
+          message: `a seed gives each file to one concept, and ${pathOf(concept)} is named twice`,
         });
       }
       for (const [place, title] of concept.linksTo.entries()) {
@@ -147,17 +176,6 @@ type Writer = {
   readonly author: { readonly name: string; readonly email: string };
   readonly git: GitDoor;
 };
-
-const shortNameOf = (title: string): string =>
-  title
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, "-")
-    .replaceAll(/^-|-$/g, "");
-
-const pathOf = ({ title, collection }: Pick<AskedConcept, "title" | "collection">): string =>
-  ["knowledge", ...(collection === undefined ? [] : [collection]), `${shortNameOf(title)}.md`].join(
-    "/",
-  );
 
 type AskedSource = AskedConcept["sources"][number];
 
@@ -311,7 +329,7 @@ const conceptWritten = async (
     principal,
     { git, postgres: app.doors.postgres, clock: app.doors.clock },
     {
-      mergeKey: `${shortNameOf(concept.kind)}:${shortNameOf(concept.title)}`,
+      mergeKey: `${shortNameOf(concept.kind)}:${path}`,
       path,
       kind: concept.kind,
       title: concept.title,
@@ -514,17 +532,7 @@ const writerRefused = (asked: Asked, writer: UserPrincipal): readonly Refusal[] 
   return [{ path: ["userId"], message: "a concept is written by an Editor or an Admin" }];
 };
 
-const refusedBeforeAnyWrite = async (
-  app: TestApp,
-  asked: Asked,
-  writer: UserPrincipal,
-): Promise<void> => {
-  const held = await heldAhead(app, asked);
-  const refusals = [
-    ...writerRefused(asked, writer),
-    ...titlesHeld(asked, held.files),
-    ...strangersToTheWorkspace(asked, held.members),
-  ];
+const refuse = (refusals: readonly Refusal[]): void => {
   if (refusals.length === 0) return;
   throw new z.ZodRealError(
     refusals.map(({ path, message }) => ({ code: "custom", path: [...path], message })),
@@ -537,8 +545,16 @@ export const seedConcepts = async (
 ): Promise<{ readonly concepts: readonly SeededConcept[] }> => {
   const { workspaceId, userId } = asked;
   const git = openTestGit(app);
+  const held = await heldAhead(app, asked);
+  if (!held.members.has(userId)) {
+    refuse([{ path: ["userId"], message: "a seed's writer is a member of the workspace" }]);
+  }
   const principal = await actingIn(app, { workspaceId, userId }, async (resolved) => resolved);
-  await refusedBeforeAnyWrite(app, asked, principal);
+  refuse([
+    ...writerRefused(asked, principal),
+    ...titlesHeld(asked, held.files),
+    ...strangersToTheWorkspace(asked, held.members),
+  ]);
   await initRepository(git, workspaceId);
   const writer = { principal, author: await authorOf(app, userId), git };
   const concepts: SeededConcept[] = [];
