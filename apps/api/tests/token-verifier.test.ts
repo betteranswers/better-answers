@@ -24,9 +24,9 @@ const mint = async (
   privateKey: Awaited<ReturnType<typeof generateKeyPair>>["privateKey"],
   kid: string,
   claims: Record<string, unknown>,
-  options: { issuer?: string; audience?: string; expiresIn?: string } = {},
-) =>
-  new SignJWT({
+  options: { issuer?: string; audience?: string; expiresIn?: string | null } = {},
+) => {
+  const token = new SignJWT({
     scope: "knowledge:read feedback:write",
     user: "user-1",
     workspace: "01J6AAAAAAAAAAAAAAAAAAAAAA",
@@ -37,9 +37,10 @@ const mint = async (
     .setAudience(options.audience ?? AUDIENCE)
     .setSubject("user-1")
     .setJti("jti-1")
-    .setIssuedAt()
-    .setExpirationTime(options.expiresIn ?? "1h")
-    .sign(privateKey);
+    .setIssuedAt();
+  const expiresIn = options.expiresIn === undefined ? "1h" : options.expiresIn;
+  return (expiresIn === null ? token : token.setExpirationTime(expiresIn)).sign(privateKey);
+};
 
 const verifierPublishing = (
   ...keys: readonly Awaited<ReturnType<typeof keyed>>["jwk"][]
@@ -78,6 +79,7 @@ describe("the bearer verifier", () => {
     ["another audience", { audience: "https://other.example/mcp" }],
     ["another issuer", { issuer: "https://other.example" }],
     ["an expired token", { expiresIn: "-1s" }],
+    ["a token with no expiry", { expiresIn: null }],
   ])("refuses %s", async (_case, options) => {
     const key = await keyed();
 
