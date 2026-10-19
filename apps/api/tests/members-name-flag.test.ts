@@ -19,7 +19,7 @@ let relayRefuses: string | undefined;
 beforeAll(async () => {
   app = await startApp({
     onEmail: (message) => {
-      if (message.to === relayRefuses) throw new Error("the relay refused the message");
+      if (message.to === relayRefuses) throw new Error(`the relay refused: ${message.text}`);
       delivered.push(message);
     },
   });
@@ -128,6 +128,10 @@ describe("flagging a display name over tRPC", () => {
       })),
     );
     expect(told.map((message) => message.to)).not.toContain(formerOperator);
+    expect(
+      app.logs.filter((line) => line["person_id"] === person.id),
+      "a delivered email was logged as failed",
+    ).toEqual([]);
   });
 
   it("answers a second flag alike, writing and emailing nothing new", async () => {
