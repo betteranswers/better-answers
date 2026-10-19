@@ -4,7 +4,7 @@ import { ruleBaseline } from "./rule-baseline.ts";
 
 const OFF_THE_LIST = "packages/core/src/probe.ts";
 
-const ofComplexity = (complexity: number): string => {
+const plainJavaScriptOfComplexity = (complexity: number): string => {
   const branches = Array.from(
     { length: complexity - 1 },
     (_unused, index) => `  if (value === ${String(index)}) return ${String(index)};\n`,
@@ -13,7 +13,7 @@ const ofComplexity = (complexity: number): string => {
 };
 
 const baseline = ruleBaseline("complexity", {
-  tree: { [OFF_THE_LIST]: ofComplexity(9) },
+  tree: { [OFF_THE_LIST]: plainJavaScriptOfComplexity(9) },
   flagged: [OFF_THE_LIST],
 });
 
@@ -24,10 +24,10 @@ describe("the complexity cap holds every function to 8", () => {
     ["a component", "apps/web/src/shared/ui/probe.tsx"],
     ["a root script", "scripts/probe.mjs"],
   ])("refuses a function of 9 in %s", (_what, file) => {
-    expect(baseline.refusedFiles({ [file]: ofComplexity(9) })).toEqual([file]);
+    expect(baseline.refusedFiles({ [file]: plainJavaScriptOfComplexity(9) })).toEqual([file]);
   });
 
   it("accepts a function of 8", () => {
-    expect(baseline.refusedFiles({ [OFF_THE_LIST]: ofComplexity(8) })).toEqual([]);
+    expect(baseline.refusedFiles({ [OFF_THE_LIST]: plainJavaScriptOfComplexity(8) })).toEqual([]);
   });
 });
