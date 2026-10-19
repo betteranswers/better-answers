@@ -47,7 +47,7 @@ export const endPool = async (pool: pg.Pool): Promise<void> => {
   await closed;
 };
 
-export const migratedPostgresOver = (
+export const poolsOverAMigratedDatabase = (
   connectionUri: string,
   release: () => Promise<void>,
 ): MigratedPostgres => {
@@ -74,7 +74,7 @@ export const startMigratedPostgres = async (): Promise<MigratedPostgres> => {
   const container: StartedPostgreSqlContainer = await new PostgreSqlContainer(POSTGRES_IMAGE)
     .withCommand([...POSTGRES_COMMAND])
     .start();
-  const migrated = migratedPostgresOver(container.getConnectionUri(), async () => {
+  const migrated = poolsOverAMigratedDatabase(container.getConnectionUri(), async () => {
     await container.stop();
   });
   try {

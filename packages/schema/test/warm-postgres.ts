@@ -15,7 +15,7 @@ import {
   endPool,
   migrateAsDeployed,
   type MigratedPostgres,
-  migratedPostgresOver,
+  poolsOverAMigratedDatabase,
   POSTGRES_COMMAND,
   startMigratedPostgres,
 } from "./harness.ts";
@@ -118,7 +118,7 @@ const databaseExists = async (admin: pg.Client, database: string): Promise<boole
   return (found.rowCount ?? 0) > 0;
 };
 
-const dropTemplate = async (admin: pg.Client, database: string): Promise<void> => {
+const dropTemplateOnceItsClonesEnd = async (admin: pg.Client, database: string): Promise<void> => {
   if (!(await databaseExists(admin, database))) return;
   // Postgres refuses to drop a database still marked as a template.
   await admin.query(`ALTER DATABASE ${quoted(database)} WITH IS_TEMPLATE false`);
@@ -143,7 +143,7 @@ const agesOf = async (admin: pg.Client): Promise<readonly TemplateAge[]> =>
 const ageOut = async (admin: pg.Client): Promise<void> => {
   for (const { datname, stale } of await agesOf(admin)) {
     if (stale === null) await stampUse(admin, datname);
-    else if (stale) await dropTemplate(admin, datname);
+    else if (stale) await dropTemplateOnceItsClonesEnd(admin, datname);
   }
 };
 
@@ -152,7 +152,7 @@ const dropKilledBuilds = async (admin: pg.Client): Promise<void> => {
     "SELECT datname FROM pg_database WHERE starts_with(datname, $1) AND datname LIKE '%\\_building'",
     [TEMPLATE_PREFIX],
   );
-  for (const { datname } of found.rows) await dropTemplate(admin, datname);
+  for (const { datname } of found.rows) await dropTemplateOnceItsClonesEnd(admin, datname);
 };
 
 const buildAndPublish = async (
@@ -162,7 +162,7 @@ const buildAndPublish = async (
   build: (databaseUri: string) => Promise<void>,
 ): Promise<void> => {
   const building = `${name}_building`;
-  await dropTemplate(admin, building);
+  await dropTemplateOnceItsClonesEnd(admin, building);
   await admin.query(`CREATE DATABASE ${quoted(building)}`);
   await build(uriForDatabase(adminUri, building));
   await untilSessionsGone(admin, building);
@@ -172,7 +172,7 @@ const buildAndPublish = async (
 };
 
 /** One key for the instance: every build creates the same cluster-wide roles, so builds take turns. */
-const BUILD_LOCK = "hashtextextended('better-answers template build', 0)";
+export const BUILD_LOCK = "hashtextextended('better-answers template build', 0)";
 
 export const ensureTemplate = (
   adminUri: string,
@@ -373,7 +373,7 @@ export const clonedFrom = async (
       `CREATE DATABASE ${quoted(database)} TEMPLATE ${quoted(warm.templateDatabase)}`,
     );
   });
-  return migratedPostgresOver(uriForDatabase(warm.connectionUri, database), async () => {
+  return poolsOverAMigratedDatabase(uriForDatabase(warm.connectionUri, database), async () => {
     await withAdmin(warm.connectionUri, async (admin) => {
       await untilSessionsGone(admin, database);
 
