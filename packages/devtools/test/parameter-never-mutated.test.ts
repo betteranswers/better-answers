@@ -61,8 +61,16 @@ describe("the rule that a function never mutates a parameter", () => {
       "export const ranked = (rows: number[]) => rows.toSorted((a, b) => a - b);\n",
     ],
     [
-      "a Map parameter's `set`",
+      "a collector Map parameter's `set`",
       "export const note = (seen: Map<string, number>) => seen.set('a', 1);\n",
+    ],
+    [
+      "a collector Set parameter's `add`",
+      "export const note = (seen: Set<string>) => seen.add('a');\n",
+    ],
+    [
+      "a collector parameter's `delete` and `clear`",
+      "export const reset = (seen: Set<string>) => {\n  seen.delete('a');\n  seen.clear();\n};\n",
     ],
     [
       "a local that shadows a parameter",

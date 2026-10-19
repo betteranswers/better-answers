@@ -7,14 +7,14 @@ const FILE = "slice.ts";
 const wordsIn = (source: string): readonly string[] =>
   refusalWordsIn(FILE, source).map(({ word }) => word);
 
-const BUILT_FROM_A_VOCABULARY = /\b(?:Kernel|Member|Source|Workspace|Erasure)Refusal</;
+const REGEX_THE_WALK_REPLACED = /\b(?:Kernel|Member|Source|Workspace|Erasure)Refusal</;
 
 describe("the words a refusal union is built from", () => {
   it("names a word in a union the regex never read", () => {
     const union = `RoleRefusal | "invented-word"`;
 
     expect(wordsIn(`export type ReadThingRefusal = ${union};\n`)).toEqual(["invented-word"]);
-    expect(BUILT_FROM_A_VOCABULARY.test(union)).toBe(false);
+    expect(REGEX_THE_WALK_REPLACED.test(union)).toBe(false);
   });
 
   it("names each word once, with its line", () => {

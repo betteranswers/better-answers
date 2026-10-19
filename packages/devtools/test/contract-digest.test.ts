@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 
-const TIER_STAMPS = {
+const TIER_STAMPS_READ_AS_TEXT = {
   "the api tier": "packages/schema/src/contract-stamp.ts",
   "the worker tier": "apps/worker/src/better_answers_worker/contract_stamp.py",
 } as const;
@@ -25,7 +25,7 @@ const digestIn = (relative: string): string => {
 
 describe("the contract's digest, across the two tiers", () => {
   it("is the same hash in both tiers", () => {
-    const read = Object.entries(TIER_STAMPS).map(([tier, relative]) => ({
+    const read = Object.entries(TIER_STAMPS_READ_AS_TEXT).map(([tier, relative]) => ({
       tier,
       digest: digestIn(relative),
     }));

@@ -26,7 +26,7 @@ const ADMIT = "admit";
 
 const FACE_FILE = "index.ts";
 
-type Sources = Readonly<Record<string, string>>;
+type SourcesByPosixPath = Readonly<Record<string, string>>;
 
 export type UnadmittedFace = {
   readonly face: string;
@@ -251,7 +251,7 @@ const beside = (file: string, specifier: string): string =>
   path.posix.join(path.posix.dirname(file), specifier);
 
 export const facesAdmittingNobody = (
-  sources: Sources,
+  sources: SourcesByPosixPath,
   faces: readonly string[],
 ): readonly UnadmittedFace[] => {
   const read = new Map<string, ReadonlyMap<string, Found>>();

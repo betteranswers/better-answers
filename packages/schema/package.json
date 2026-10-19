@@ -8,6 +8,7 @@
     "./ulid": "./src/ulid.ts",
     "./concept-file": "./src/concept-file.ts",
     "./scan": "./src/scan.ts",
+    "./table-ownership": "./src/table-ownership.ts",
     "./code-unit": "./src/code-unit.ts",
     "./test-workspace": "./src/test-workspace.ts",
     "./test-inbox": "./src/test-inbox.ts",

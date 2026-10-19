@@ -3,6 +3,8 @@ import path from "node:path";
 
 import { type Program, Visitor } from "oxc-parser";
 
+import { NEVER_AN_OWNER } from "@better-answers/schema/table-ownership";
+
 import { parsedSource } from "./parsed-source.ts";
 import { filesUnderEach, isTestPath } from "./paths.ts";
 
@@ -14,8 +16,6 @@ export const SCAN_EXECUTABLE = {
 } as const;
 
 const CORE = "packages/core/src";
-
-const NEVER_A_SLICE: ReadonlySet<string> = new Set(["kernel", "store"]);
 
 const SCANNED = /\.tsx?$/;
 
@@ -35,7 +35,7 @@ export type Slice = { readonly name: string; readonly directory: string };
 
 export const slicesUnder = (root: string, outsideCore: readonly string[]): readonly Slice[] => {
   const inCore = readdirSync(path.join(root, CORE), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && !NEVER_A_SLICE.has(entry.name))
+    .filter((entry) => entry.isDirectory() && !NEVER_AN_OWNER.has(entry.name))
     .map((entry) => ({ name: entry.name, directory: `${CORE}/${entry.name}` }));
   const outside = outsideCore.map((owner) => ({ name: owner, directory: owner }));
   return [...inCore, ...outside].toSorted(

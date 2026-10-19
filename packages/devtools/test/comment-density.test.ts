@@ -93,6 +93,15 @@ describe("the arm a file is measured under", () => {
   });
 });
 
+describe("the workspace a file is measured under", () => {
+  it("gives a file to the innermost of two nested workspaces", () => {
+    const inner = `${WORKSPACE}/inner`;
+    const counted = [{ file: `${inner}/src/one.ts`, language: "TypeScript", code: 40, comment: 1 }];
+
+    expect(measure(counted, [WORKSPACE, inner]).map((one) => one.workspace)).toEqual([inner]);
+  });
+});
+
 const OVER_THE_SOURCE_CEILING = `over the ${CEILING.source.toFixed(3)} ceiling`;
 
 describe("the ceiling over a throwaway tree", () => {
@@ -119,11 +128,14 @@ describe("the ceiling over a throwaway tree", () => {
     expect(over.map((one) => one.arm)).toEqual(["test"]);
   });
 
-  it("leaves a workspace blind to the SQL beside it", () => {
+  it("keeps mostly-comment SQL out of its workspace's pooled number", () => {
     const measured = measure(cloc(DILUTED_OVER), [WORKSPACE]);
 
     expect(measured.map((one) => one.workspace)).toEqual([WORKSPACE]);
-    expect(measured[0]?.comment).toBe(1);
+    expect(
+      measured[0]?.comment,
+      "the workspace counted the SQL, whose comments hide in one number with ten times as much TypeScript",
+    ).toBe(1);
     expect(overTheCeiling(measured)).toEqual([]);
   });
 });
