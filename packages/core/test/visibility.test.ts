@@ -354,6 +354,21 @@ describe("what a governed write derives from its cited connected sources", () =>
     });
   });
 
+  it("lands a kind named __proto__ at the fallback sensitivity", async () => {
+    const scenario = await arrange();
+
+    const written = await conceptCiting(scenario, scenario.editor, [], {
+      kind: "__proto__",
+      frontmatter: { title: "A kind named for the prototype", type: "__proto__" },
+      sensitivity: "Internal",
+    });
+
+    expect(await heldRow(scenario.workspaceId, written.iri)).toEqual({
+      sensitivity: "Internal",
+      ...EVERYONE,
+    });
+  });
+
   it("refuses citing an uncatalogued document by name, landing nothing", async () => {
     const scenario = await arrange();
     const uncatalogued = ulid();

@@ -61,8 +61,7 @@ const audienceIntersection = (audiences: readonly Audience[]): Audience | "nobod
   return distinct.length === 0 ? "nobody" : { audience: AUDIENCE_GROUPS, audienceGroups: distinct };
 };
 
-// oxlint-disable-next-line anti-slop/no-known-value-widening -- kinds are open: a concept carries whatever folded kind its file holds, so the floor is looked up by any string
-const KIND_FLOOR: Readonly<Record<string, Sensitivity>> = { Person: RESTRICTED };
+const KIND_FLOOR: ReadonlyMap<string, Sensitivity> = new Map([["Person", RESTRICTED]]);
 
 export type Derivation = {
   readonly kind?: string | undefined;
@@ -83,7 +82,7 @@ const combined = (from: readonly Visibility[]): Visibility | undefined => {
 export const derivedVisibility = (derivation: Derivation): Visibility => {
   if (derivation.override !== undefined) return derivation.override;
   const inherited = combined(derivation.from) ?? derivation.fallback;
-  const floor = derivation.kind === undefined ? undefined : KIND_FLOOR[derivation.kind];
+  const floor = derivation.kind === undefined ? undefined : KIND_FLOOR.get(derivation.kind);
   return floor === undefined
     ? inherited
     : { ...inherited, sensitivity: narrower(inherited.sensitivity, floor) };

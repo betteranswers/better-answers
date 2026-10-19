@@ -1432,6 +1432,80 @@ describe("who a subject request is about", () => {
   });
 });
 
+describe("a __proto__ key in a concept's frontmatter", () => {
+  const frontmatterOf = (json: string) =>
+    boundarySchemas.conceptIndex.insert.safeParse({
+      ...acceptedRows.conceptIndex[0],
+      frontmatter: JSON.parse(json),
+    });
+
+  it("is kept like any other key, in an entry too", () => {
+    const parsed = frontmatterOf(
+      '{"title":"T","__proto__":"x","sources":[{"resource":"/s/a.pdf","__proto__":null}]}',
+    );
+
+    expect(parsed.success && parsed.data.frontmatter).toEqual(
+      Object.fromEntries([
+        ["title", "T"],
+        ["__proto__", "x"],
+        [
+          "sources",
+          [
+            Object.fromEntries([
+              ["resource", "/s/a.pdf"],
+              ["__proto__", null],
+            ]),
+          ],
+        ],
+      ]),
+    );
+    expect(parsed.success && Object.getPrototypeOf(parsed.data.frontmatter)).toBe(Object.prototype);
+  });
+
+  it.each([
+    ["at the top level", '{"__proto__":{"deep":1}}'],
+    ["inside an entry", '{"sources":[{"resource":"/s/a.pdf","__proto__":{"deep":1}}]}'],
+  ])("refuses an object value %s", (_shape, json) => {
+    expect(frontmatterOf(json).success).toBe(false);
+  });
+
+  it("keeps __proto__, ___proto__ and ____proto__ apart, in an entry too", () => {
+    const parsed = frontmatterOf(
+      '{"__proto__":"a","___proto__":"b","____proto__":"c",' +
+        '"sources":[{"resource":"/s/a.pdf","__proto__":"d","___proto__":"e","____proto__":"f"}]}',
+    );
+
+    expect(parsed.success && parsed.data.frontmatter).toEqual(
+      Object.fromEntries([
+        ["__proto__", "a"],
+        ["___proto__", "b"],
+        ["____proto__", "c"],
+        [
+          "sources",
+          [
+            Object.fromEntries([
+              ["resource", "/s/a.pdf"],
+              ["__proto__", "d"],
+              ["___proto__", "e"],
+              ["____proto__", "f"],
+            ]),
+          ],
+        ],
+      ]),
+    );
+  });
+});
+
+describe("a concept's frontmatter that is not a plain object", () => {
+  it.each([
+    ["an array", ["T"]],
+    ["a Map", new Map([["title", "T"]])],
+    ["a Date", new Date(0)],
+  ])("is refused when it is %s", (_shape, frontmatter) => {
+    expect(conceptFrontmatter.safeParse(frontmatter).success).toBe(false);
+  });
+});
+
 describe("the frontmatter bound's unit", () => {
   const astral = (characters: number) => ({ a: "\u{1D11E}".repeat(characters) });
 

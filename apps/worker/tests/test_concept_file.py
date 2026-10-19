@@ -55,6 +55,16 @@ def test_reads_back_every_shape_the_renderer_writes() -> None:
             '---\n"s":\n  - "a"\n  - "k": "v"\n---\n\nb',
         ),
         ("a key written twice", '---\n"t": "one"\n"t": "two"\n---\n\nbody'),
+        (
+            "one entry repeating a key",
+            '---\n"sources":\n  - "resource": "/s/a.pdf"\n    "colour": "red"\n'
+            '    "colour": "blue"\n---\n\nbody',
+        ),
+        (
+            "one entry repeating __proto__",
+            '---\n"sources":\n  - "resource": "/s/a.pdf"\n    "__proto__": "a"\n'
+            '    "__proto__": "b"\n---\n\nbody',
+        ),
         ("a number that is not a number", '---\n"n": NaN\n---\n\nbody'),
         ("an infinity", '---\n"n": -Infinity\n---\n\nbody'),
         ("a key with no value and no items", '---\n"tags":\n"t": "x"\n---\n\nbody'),
