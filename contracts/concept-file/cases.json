@@ -82,6 +82,19 @@
       "body": "Expenses are claimed within thirty days.",
       "canonical": "{\"big\":1e+21,\"huge\":1e+300,\"hundred\":100,\"negative_zero\":0,\"past_exact\":9007199254740992,\"sources\":[[\"/knowledge/policies/receipts.md\",\"4\"]],\"tenth\":0.1,\"tiny\":1e-7}",
       "sha256": "8f1932c7d986f01baeaac903ffbcc24fcc7b7004bbae917fc5590dc70a1fcc84"
+    },
+    {
+      "why": "a __proto__ key is a key like any other, at the top level and inside a list entry, so neither tier drops it from the text it hashes",
+      "path": "knowledge/policies/expenses.md",
+      "frontmatter": {
+        "title": "Expenses",
+        "__proto__": "x",
+        "reviewers": [{ "name": "Ada", "__proto__": "finance" }],
+        "sources": [{ "resource": "./handbook.md", "__proto__": "y", "locator": "p.2" }]
+      },
+      "body": "Expenses are claimed within thirty days.",
+      "canonical": "{\"__proto__\":\"x\",\"reviewers\":[{\"__proto__\":\"finance\",\"name\":\"Ada\"}],\"sources\":[[\"/knowledge/policies/handbook.md\",\"p.2\"]],\"title\":\"Expenses\"}",
+      "sha256": "2987fc03a41d0dc8237435e9c2de265ba2b5ba8009144514ac70dc68ec809126"
     }
   ],
   "numbers": [

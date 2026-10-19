@@ -820,6 +820,72 @@ describe("an acceptance whose rows were lost", () => {
   });
 });
 
+describe("a concept carrying a __proto__ front-matter key", () => {
+  const withProto = (title: string): Frontmatter =>
+    Object.fromEntries([
+      ["title", title],
+      ["type", "Guideline"],
+      ["__proto__", "x"],
+      [
+        "sources",
+        [
+          Object.fromEntries([
+            ["resource", handbook.resource],
+            ["__proto__", "y"],
+          ]),
+        ],
+      ],
+    ]);
+
+  const rowAgainstFile = async (scenario: Scenario, sha: string, path: string) => {
+    const read = parseConceptFile(
+      await fileAtCommit(scenario.git, scenario.workspaceId, sha, path),
+    );
+    if (!read.ok) throw new Error("the landed file is not a concept file");
+    const found = await db().pool.query<{ frontmatter: unknown; content_hash: string }>(
+      "SELECT frontmatter, content_hash FROM concept_index WHERE workspace_id = $1 AND path = $2",
+      [scenario.workspaceId, path],
+    );
+    return {
+      row: found.rows[0],
+      file: {
+        frontmatter: read.value.frontmatter,
+        content_hash: contentHashOf(read.value.frontmatter, read.value.body, path),
+      },
+    };
+  };
+
+  it("replays a lost write, keeping the key in the row", async () => {
+    const scenario = await arrange();
+    const input = guideline("Prototypes", { frontmatter: withProto("Prototypes") });
+    const [sha = ""] = await writeInTheWindow(scenario, scenario.editor, input);
+
+    await reconciled(scenario);
+
+    const { row, file } = await rowAgainstFile(scenario, sha, input.path);
+    expect(Object.hasOwn(file.frontmatter, "__proto__")).toBe(true);
+    expect(row).toEqual(file);
+  });
+
+  it("lands an accepted suggestion, keeping the key in the row", async () => {
+    const scenario = await arrange();
+    const request = requestFor("Proposed prototypes", {
+      frontmatter: withProto("Proposed prototypes"),
+    });
+    const item = await raised(scenario, request);
+
+    const outcomes = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+      decisions: [{ suggestionId: item.suggestionId, expectedTarget: item.target }],
+    });
+
+    expect(outcomes.ok && outcomes.value.map((outcome) => outcome.outcome.ok)).toEqual([true]);
+    const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1) ?? "";
+    const { row, file } = await rowAgainstFile(scenario, sha, request.path);
+    expect(file.frontmatter).toEqual({ ...request.frontmatter, iri: expect.any(String) });
+    expect(row).toEqual(file);
+  });
+});
+
 describe("what the reconciler refuses", () => {
   it("refuses a bundle whose recorded history diverged, landing nothing", async () => {
     const scenario = await arrange();

@@ -6,6 +6,7 @@ import { ids, type ConceptIri } from "@better-answers/schema";
 import { open, renderOpen } from "../src/answering/index.ts";
 import {
   importBundle,
+  parseConceptFile,
   writeConcept,
   writeManifest,
   type BundleImported,
@@ -478,6 +479,46 @@ describe("importing the bundle", () => {
       ].join("\n"),
     );
     expect(file).not.toContain("@");
+  });
+
+  it("keeps __proto__ and constructor keys, as any other key", async () => {
+    const { scenario } = await arranged();
+    const path = "knowledge/company/answers/support-hours.md";
+
+    await imported(
+      scenario,
+      treeOf({
+        "manifest.yaml": MANIFEST,
+        "company/answers/support-hours.md": conceptFile({
+          title: "Support hours",
+          frontmatter: "__proto__: x\nconstructor: y\n",
+          sources: "  - resource: ../sources/a.md\n    __proto__: z\n",
+          body: "Text.",
+        }),
+      }),
+    );
+
+    const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1) ?? "";
+    const read = parseConceptFile(
+      await fileAtCommit(scenario.git, scenario.workspaceId, sha, path),
+    );
+    if (!read.ok) throw new Error("the imported file is not a concept file");
+    const { frontmatter } = read.value;
+    expect([frontmatter["__proto__"], frontmatter["constructor"], frontmatter["sources"]]).toEqual([
+      "x",
+      "y",
+      [
+        Object.fromEntries([
+          ["resource", "../sources/a.md"],
+          ["__proto__", "z"],
+        ]),
+      ],
+    ]);
+    const row = await db().pool.query<{ frontmatter: unknown }>(
+      "SELECT frontmatter FROM concept_index WHERE workspace_id = $1 AND path = $2",
+      [scenario.workspaceId, path],
+    );
+    expect(row.rows[0]?.frontmatter).toEqual(frontmatter);
   });
 
   it("records verified events as imported verifications under the run's batch", async () => {
