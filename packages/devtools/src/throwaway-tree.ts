@@ -51,18 +51,21 @@ export type Tool = {
 
 export type RunOverTree = (tree: Tree) => string;
 
-const packageRoot = (from: ReturnType<typeof createRequire>, name: string): string | undefined => {
+type Resolver = ReturnType<typeof createRequire>;
+
+const directoryResolved = (from: Resolver, specifier: string): string | undefined => {
   try {
-    return path.dirname(from.resolve(`${name}/package.json`));
-  } catch {
-    // The `exports` map withheld the manifest; the entry below is the other way in.
-  }
-  let directory: string;
-  try {
-    directory = path.dirname(from.resolve(name));
+    return path.dirname(from.resolve(specifier));
   } catch {
     return undefined;
   }
+};
+
+const packageRoot = (from: Resolver, name: string): string | undefined => {
+  const manifestExported = directoryResolved(from, `${name}/package.json`);
+  if (manifestExported !== undefined) return manifestExported;
+  let directory = directoryResolved(from, name);
+  if (directory === undefined) return undefined;
   while (!existsSync(path.join(directory, "package.json"))) {
     const parent = path.dirname(directory);
     if (parent === directory) return undefined;
