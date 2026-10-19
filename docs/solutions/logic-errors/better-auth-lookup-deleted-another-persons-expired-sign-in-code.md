@@ -5,6 +5,10 @@ category: logic-errors
 module: apps/api
 problem_type: logic_error
 component: identity
+applies_when:
+  - "Changing the email-code sign-in, Better Auth's `verification` options, or the sweep pass that expires codes"
+  - "Seeing `INVALID_OTP` where `OTP_EXPIRED` was expected, or a flaky expired-code spec in `sign-in.spec.ts`"
+  - "Upgrading `better-auth`"
 symptoms:
   - "A person typing a just-expired email code got INVALID_OTP, which the sign-in page reads as 'That code is wrong.' with tries left, instead of OTP_EXPIRED, which it reads as spent"
   - "It happened only when another request looked up a verification row between the code's expiry and its holder's try; the holder's own lookup alone answered OTP_EXPIRED"

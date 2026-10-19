@@ -6,6 +6,10 @@ module: repository
 problem_type: integration_issue
 component: development-workflow
 severity: high
+applies_when:
+  - "Changing the pre-commit hook or the `lefthook` config, or upgrading `lefthook`"
+  - "Committing from a tree with partially staged files or unstaged edits beside a staged change"
+  - "Seeing `Unable to restore previously hidden unstaged changes` on a commit"
 symptoms:
   - "git commit failed with: Unable to restore previously hidden unstaged changes ... conflict while merging unstaged changes"
   - "The commit did not happen"

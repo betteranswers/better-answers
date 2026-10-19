@@ -6,6 +6,10 @@ module: apps/worker
 problem_type: integration_issue
 component: worker
 severity: high
+applies_when:
+  - "Opening a connected source's store from a worker `Host` soon after another `Host` closed it"
+  - "Changing how the worker's `Host` closes or reopens its cocoindex environment"
+  - "Chasing a flaky `test_pipeline_landed.py` with `environment already open in this program`"
 symptoms:
   - "apps/worker/tests/test_pipeline_landed.py failed intermittently in CI merge groups with RuntimeError: environment already open in this program; close it to be able to open it again with different options"
   - "Merge-group runs 36358367778, 36358640405, 36992793999 and 37061772234 (4 of 78 since PR #448) each dropped an unrelated PR (#472, #470, #506, #514) from the merge queue"
