@@ -1,6 +1,6 @@
 # The journeys
 
-The journeys sign in to production. `SKILL.md` gives the rule for a pull request that changes a page a journey walks.
+The journeys are off (`JOURNEYS_MODE` is `off`) and are being retired until go-live (BA-204). This page describes them as they were, for that retirement.
 
 They sign in as the test workspace's three test people, an Admin, an
 Editor and a Viewer, and walk the pages each role reaches. `.github/workflows/release.yml` runs
