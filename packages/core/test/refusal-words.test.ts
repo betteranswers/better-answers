@@ -34,7 +34,6 @@ import type {
   RequestAccessRefusal,
   ResendInvitationRefusal,
   EndEverySignInAndTokenHereRefusal,
-  TestWorkspaceRefusal,
 } from "../src/members/index.ts";
 import { REFUSAL_CATALOGUE } from "../src/refusals/index.ts";
 import type { ConnectUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
@@ -102,8 +101,6 @@ const CATALOGUED = {
   "invitation-expired": "precondition by members",
   "invitation-for-another-address": "forbidden by members",
   "off-testing-domain": "inapplicable by members",
-  "operator-marked": "inapplicable by members",
-  "member-elsewhere": "inapplicable by members",
 
   "no-such-user": "absent by workspaces",
   "no-such-workspace": "absent by workspaces",
@@ -249,11 +246,6 @@ describe("the refusal-word walk", () => {
     expectTypeOf<EndEverySignInAndTokenHereRefusal>().toExtend<EveryCataloguedWord | Error>();
     expectTypeOf<RemoveMemberRefusal>().toExtend<EveryCataloguedWord | Error>();
     expectTypeOf<AcceptInvitationRefusal>().toExtend<EveryCataloguedWord>();
-    type AddressRefused = Extract<TestWorkspaceRefusal, { readonly address: string }>;
-    expectTypeOf<AddressRefused["word"]>().toExtend<EveryCataloguedWord>();
-    expectTypeOf<Exclude<TestWorkspaceRefusal, AddressRefused>>().toExtend<
-      EveryCataloguedWord | Error
-    >();
     expectTypeOf<SourceRefusal<"no-such-binding"> | "invented">().not.toExtend<
       EveryCataloguedWord | Error
     >();

@@ -11,13 +11,11 @@ import {
   ok,
   type AdminUserPrincipal,
   type AdmittedOf,
-  type PlatformPrincipal,
   type Result,
   type Role,
   requireFreshConfirmation,
   type UserId,
   type UserPrincipal,
-  type WorkspaceId,
   ulid,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
@@ -70,20 +68,19 @@ export type RoleMoved = RoleChanged & { readonly promoted: boolean };
 
 type Asked = { readonly personId: UserId; readonly role: Role };
 
-const roleWrittenBy = async (
-  actor: AdminUserPrincipal | PlatformPrincipal,
+export const roleWritten = async (
+  admin: AdminUserPrincipal,
   tx: Tx,
-  workspaceId: WorkspaceId,
   changed: RoleChanged,
-  batchId: string | undefined,
+  batchId?: string,
 ): Promise<boolean> => {
   const promoted = changed.role === "Admin" && (await promoting(tx, changed.personId));
   await tx.query("UPDATE member SET role = $3 WHERE workspace_id = $1 AND user_id = $2", [
-    workspaceId,
+    admin.workspaceId,
     changed.personId,
     changed.role,
   ]);
-  await record(actor, tx, {
+  await record(admin, tx, {
     id: ulid(),
     action: ROLE_ACTIONS.roleChanged,
     subjectId: changed.personId,
@@ -91,31 +88,6 @@ const roleWrittenBy = async (
     batchId,
   });
   return promoted;
-};
-
-export const roleWritten = (
-  admin: AdminUserPrincipal,
-  tx: Tx,
-  changed: RoleChanged,
-  batchId?: string,
-): Promise<boolean> => roleWrittenBy(admin, tx, admin.workspaceId, changed, batchId);
-
-const ROLE_HELD = "SELECT role FROM member WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE";
-
-export const roleWrittenByPlatform = async (
-  platform: PlatformPrincipal,
-  tx: Tx,
-  workspaceId: WorkspaceId,
-  asked: Pick<RoleChanged, "personId" | "role">,
-  batchId?: string,
-): Promise<boolean> => {
-  const held = await tx.query<{ role: string }>(ROLE_HELD, [workspaceId, asked.personId]);
-  const row = held.rows[0];
-  if (row === undefined) return false;
-  const previousRole = ROLE.parse(row.role);
-  if (previousRole === asked.role) return false;
-  await roleWrittenBy(platform, tx, workspaceId, { ...asked, previousRole }, batchId);
-  return true;
 };
 
 const roleSetUnderTheLock = (

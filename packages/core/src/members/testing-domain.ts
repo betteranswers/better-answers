@@ -1,8 +1,14 @@
 import { INVITATION_WAITING_STATUS } from "@better-answers/schema";
 
+import { action, declareActions } from "../audit/index.ts";
 import type { AdminUserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
+
+// Nothing writes it now, but the rows the retired test-workspace command wrote keep their name.
+declareActions("platform", {
+  marked: action("platform.workspace.marked", { corrected: "flag" }),
+});
 
 export const OFF_TESTING_DOMAIN =
   "off-testing-domain" satisfies MemberRefusal<"off-testing-domain">;

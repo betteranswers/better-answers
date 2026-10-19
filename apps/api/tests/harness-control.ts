@@ -2,8 +2,7 @@ import { Hono } from "hono";
 import { DatabaseError } from "pg";
 import { z } from "zod";
 
-import { ensureTestWorkspace } from "@better-answers/core/members";
-import { BOOTSTRAP, setOperatorMark } from "@better-answers/core/workspaces";
+import { setOperatorMark } from "@better-answers/core/workspaces";
 import {
   INVITATION_ACCEPTED_STATUS,
   INVITATION_CANCELLED_STATUS,
@@ -118,13 +117,6 @@ const enrolments = (app: TestApp) => {
     },
   };
 };
-const testWorkspace = z.object({
-  testingDomain: z.string().min(1),
-  shortName: z.string().min(1),
-  admin: z.string().min(1),
-  editor: z.string().min(1),
-  viewer: z.string().min(1),
-});
 
 const personIdOf = async (app: TestApp, email: string): Promise<string> => {
   const found = await app.database.superuser.query<{ id: string }>(
@@ -291,17 +283,6 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
     const marked = await setOperatorMark(IDENTITY_PRINCIPAL, app.doors.postgres, asked);
     if (!marked.ok) throw new Error(`the operator mark was refused: ${String(marked.error)}`);
     return context.json({ marked: true });
-  });
-
-  control.post(`${HARNESS_PREFIX}/test-workspaces`, async (context) => {
-    const asked = await readBody(context.req.raw, testWorkspace);
-    const ensured = await ensureTestWorkspace(BOOTSTRAP, app.doors.postgres, asked);
-    if (!ensured.ok) {
-      const { error } = ensured;
-      const why = error instanceof Error ? error.message : JSON.stringify(error);
-      throw new Error(`the test workspace was refused: ${why}`);
-    }
-    return context.json({ workspaceId: ensured.value.workspaceId });
   });
 
   control.post(`${HARNESS_PREFIX}/groups`, async (context) => {

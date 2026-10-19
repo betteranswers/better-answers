@@ -20,7 +20,7 @@ const filesMatching = (root: string, pattern: RegExp): readonly string[] =>
 
 const NAMES_THE_MARK = /test_workspace_mark|testWorkspaceMark/;
 
-const NAMING_THE_MARK_IN_CORE = ["members/test-workspace.ts", "members/testing-domain.ts"];
+const NAMING_THE_MARK_IN_CORE = ["members/testing-domain.ts"];
 
 type Leaf<Path extends string, Output> = { readonly path: Path; readonly output: Output };
 
@@ -187,8 +187,7 @@ describe("what a procedure may answer the wire", () => {
     >();
   });
 
-  it("names the mark only in the fixture and the guard", () => {
-    expect(filesMatching(API_SOURCE, /\bensureTestWorkspace\b/)).toEqual(["ops/index.ts"]);
+  it("names the mark only in the guard", () => {
     expect(filesMatching(API_SOURCE, NAMES_THE_MARK)).toEqual([]);
     expect(filesMatching(CORE_SOURCE, NAMES_THE_MARK)).toEqual(NAMING_THE_MARK_IN_CORE);
   });

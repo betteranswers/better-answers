@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { repositoryRoot } from "@better-answers/devtools/paths";
 
 const skillDirectory = ".claude/skills/browser-suite";
-const suiteDirectories = ["apps/web/e2e", "apps/web/journeys"];
+const suiteDirectory = "apps/web/e2e";
 
 const NAMED_PATH = /`(?<file>apps\/[\w./-]+\.(?:tsx?|json))`/g;
 const EXPORTED_NAME = /^export (?:async )?(?:function|const|class) (?<name>\w+)/gm;
@@ -28,7 +28,7 @@ const skillFiles = [
 const skill = skillFiles.map(read).join("\n");
 const named = [...skill.matchAll(NAMED_PATH)].map((match) => match.groups?.["file"] ?? "");
 
-const suiteFiles = suiteDirectories.flatMap(filesIn).filter((file) => file.endsWith(".ts"));
+const suiteFiles = filesIn(suiteDirectory).filter((file) => file.endsWith(".ts"));
 const specs = suiteFiles.filter((file) => file.endsWith(".spec.ts")).map(read);
 const modules = suiteFiles.filter((file) => !file.endsWith(".spec.ts"));
 

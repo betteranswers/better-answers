@@ -41,14 +41,6 @@
     },
     {
       "customType": "regex",
-      "description": "The wrangler the owner deploys the test inbox with, written once in `apps/test-inbox/package.json`'s `wrangler` script and run through `pnpm dlx`. It is no dependency of any workspace, so its binaries stay out of every install and the `npm` manager never sees it",
-      "managerFilePatterns": ["/^apps/test-inbox/package\\.json$/"],
-      "matchStrings": ["pnpm dlx wrangler@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
-      "datasourceTemplate": "npm",
-      "depNameTemplate": "wrangler"
-    },
-    {
-      "customType": "regex",
       "description": "pstack, the agent workflow plugin every session runs, pinned by release tag in `.claude/settings.json`'s marketplace `ref`. Its scripts run in every session with the session's permissions, so a new release arrives as a pull request someone reads, never on its own. No enabled manager reads that file. The marketplace source takes no commit SHA, so the tag is the pin, and `minimumReleaseAge` gives a bad release a day to be noticed",
       "managerFilePatterns": ["/^\\.claude/settings\\.json$/"],
       "matchStrings": ["\"repo\": \"michael-denyer/pstack-claude\",\\s*\"ref\": \"v(?<currentValue>\\d+\\.\\d+\\.\\d+)\""],

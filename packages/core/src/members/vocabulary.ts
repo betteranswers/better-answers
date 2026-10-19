@@ -18,8 +18,6 @@ export const MEMBER_REFUSALS = {
   "invitation-for-another-address": "forbidden",
 
   "off-testing-domain": "inapplicable",
-  "operator-marked": "inapplicable",
-  "member-elsewhere": "inapplicable",
 } as const satisfies Vocabulary;
 
 export type MemberRefusal<W extends RefusalWordFor<typeof MEMBER_REFUSALS>> = W;
