@@ -25,6 +25,9 @@ const DEFAULT_TIMEOUT_MS = 600_000;
 
 const GRACE_MS = 2_000;
 
+const EXIT = { verdict: 0, failed: 1, refused: 2, interrupted: 130 } as const;
+type Exit = (typeof EXIT)[keyof typeof EXIT];
+
 type Refused = { readonly refused: string };
 
 type Parsed = { readonly mutation: Mutation } | Refused;
@@ -181,11 +184,11 @@ const outcomeOf = (report: VitestReport | undefined, exit: string): SuiteOutcome
   };
 };
 
-const killGroup = (pid: number, signal: NodeJS.Signals): void => {
+const killGroupIfAlive = (pid: number, signal: NodeJS.Signals): void => {
   try {
     process.kill(-pid, signal);
   } catch {
-    // The group is already gone, which is what the signal was for.
+    return;
   }
 };
 
@@ -209,8 +212,8 @@ const runSuite = (workspace: string, entry: string, mutation: Mutation): Promise
     const stopSuite = (): void => {
       const pid = child.pid;
       if (pid === undefined) return;
-      killGroup(pid, "SIGTERM");
-      setTimeout(() => killGroup(pid, "SIGKILL"), GRACE_MS).unref();
+      killGroupIfAlive(pid, "SIGTERM");
+      setTimeout(() => killGroupIfAlive(pid, "SIGKILL"), GRACE_MS).unref();
     };
     let timedOut = false;
     let interrupted = false;
@@ -327,47 +330,47 @@ const runMutated = async (probe: Probe): Promise<SuiteOutcome> => {
   }
 };
 
-const printVerdict = (outcome: SuiteOutcome): number => {
+const printVerdict = (outcome: SuiteOutcome): Exit => {
   switch (outcome.kind) {
     case "interrupted":
       complain("interrupted before the suite finished; no verdict");
-      return 130;
+      return EXIT.interrupted;
     case "did not run":
       complain(`the suite did not run (${outcome.detail}); no verdict`);
-      return 1;
+      return EXIT.failed;
     case "timed out":
       say("verdict: timed out");
-      return 0;
+      return EXIT.verdict;
     case "ran": {
       const verdict: Verdict = outcome.success ? "survived" : "killed";
       complain(
         `${String(outcome.failed)} of ${String(outcome.total)} tests failed under the mutation`,
       );
       say(`verdict: ${verdict}`);
-      return 0;
+      return EXIT.verdict;
     }
   }
 };
 
-const printSrcAgainstHead = (workspace: string, status: number): number => {
+const printSrcAgainstHead = (workspace: string, status: Exit): Exit => {
   const stat = gitSync(workspace, ["diff", "--stat", "HEAD", "--", "src"]);
   if (stat.status !== 0) {
     complain(`git diff --stat failed:\n${stat.out}`);
-    return 1;
+    return EXIT.failed;
   }
   if (stat.out.trim().length === 0) {
     say("src: clean against HEAD");
     return status;
   }
   say(`src: NOT clean against HEAD\n${stat.out.trimEnd()}`);
-  return status === 0 ? 1 : status;
+  return status === EXIT.verdict ? EXIT.failed : status;
 };
 
-export const mutantProbe = async (argv: readonly string[]): Promise<number> => {
+export const mutantProbe = async (argv: readonly string[]): Promise<Exit> => {
   const probe = prepare(argv);
   if ("refused" in probe) {
     complain(probe.refused);
-    return 2;
+    return EXIT.refused;
   }
   const outcome = await runMutated(probe);
   return printSrcAgainstHead(probe.workspace, printVerdict(outcome));
