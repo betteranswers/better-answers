@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -113,6 +113,24 @@ describe("the warm harness", () => {
       expect({ one: await modelChoicesIn(one), another: await modelChoicesIn(another) }).toEqual({
         one: 1,
         another: 0,
+      });
+    } finally {
+      await Promise.all([one.stop(), another.stop()]);
+    }
+  });
+
+  it("names each key's clone after the key and the run", async () => {
+    const warm = warmOfThisRun();
+    const one = await clonedFrom(warm, "one-key-named");
+    const another = await clonedFrom(warm, "another-key-named");
+    try {
+      expect({ one: await databaseNameOf(one), another: await databaseNameOf(another) }).toEqual({
+        one: expect.stringMatching(
+          new RegExp(`^ba_one_key_named_[0-9a-f]{12}_${String(warm.runId)}$`, "u"),
+        ),
+        another: expect.stringMatching(
+          new RegExp(`^ba_another_key_named_[0-9a-f]{12}_${String(warm.runId)}$`, "u"),
+        ),
       });
     } finally {
       await Promise.all([one.stop(), another.stop()]);
@@ -315,10 +333,12 @@ const buildLog = () => {
   return { building, built: () => [...built], mostAtOnce: () => mostAtOnce };
 };
 
+const A_PREFIX_NO_TIER_SWEEPS = "tpl_t_";
+
 const scratchTemplates: string[] = [];
 
-const scratchTemplate = (label: string): string => {
-  const name = `tpl_t_${label}_${String(process.pid)}`;
+const scratchTemplateOfThisWorker = (label: string): string => {
+  const name = `${A_PREFIX_NO_TIER_SWEEPS}${label}_${String(process.pid)}`;
   scratchTemplates.push(name, `${name}_building`);
   return name;
 };
@@ -373,8 +393,20 @@ const tablesIn = async (template: string): Promise<readonly string[]> => {
   }
 };
 
+const until = async (met: () => Promise<boolean>): Promise<void> => {
+  while (!(await met())) await sleep(BUILD_PAUSE_MS / 10);
+};
+
+const aBuildWaitsForTheLock = (): Promise<boolean> =>
+  asAdmin(async (admin) => {
+    const waiting = await admin.query(
+      "SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND NOT granted",
+    );
+    return (waiting.rowCount ?? 0) > 0;
+  });
+
 const publishOverALeftover = async (label: string, marked: boolean) => {
-  const name = scratchTemplate(label);
+  const name = scratchTemplateOfThisWorker(label);
   const leftover = `${name}_building`;
   await asAdmin((admin) => admin.query(`CREATE DATABASE ${quoted(leftover)}`));
   await createTable(onDatabase(adminUri(), leftover), "stray");
@@ -548,7 +580,7 @@ describe("the warm harness under TEST_POSTGRES_URI", () => {
 
 describe("a shared template", () => {
   it("builds once when two callers race on one name", async () => {
-    const name = scratchTemplate("raced");
+    const name = scratchTemplateOfThisWorker("raced");
     const log = buildLog();
 
     const returned = await Promise.all([
@@ -560,8 +592,8 @@ describe("a shared template", () => {
   });
 
   it("holds only its own build under another name", async () => {
-    const first = scratchTemplate("first");
-    const second = scratchTemplate("second");
+    const first = scratchTemplateOfThisWorker("first");
+    const second = scratchTemplateOfThisWorker("second");
     await ensureTemplate(adminUri(), first, buildLog().building("first_table"));
     await ensureTemplate(adminUri(), second, buildLog().building("second_table"));
 
@@ -573,7 +605,7 @@ describe("a shared template", () => {
 
   it("builds two different templates one at a time", async () => {
     const log = buildLog();
-    const names = [scratchTemplate("one"), scratchTemplate("other")];
+    const names = [scratchTemplateOfThisWorker("one"), scratchTemplateOfThisWorker("other")];
 
     await Promise.all(names.map((name) => ensureTemplate(adminUri(), name, log.building(name))));
 
@@ -582,6 +614,31 @@ describe("a shared template", () => {
       built: log.built().toSorted(),
       published: await Promise.all(names.map(isOnTheServer)),
     }).toEqual({ mostAtOnce: 1, built: names.toSorted(), published: [true, true] });
+  });
+
+  it("leaves a running build alone while another waits its turn", async () => {
+    const running = `tpl_ts_age_running_${String(process.pid)}`;
+    scratchTemplates.push(running, `${running}_building`);
+    let release = (): void => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const held = ensureTemplate(adminUri(), running, async (databaseUri) => {
+      await gate;
+      await createTable(databaseUri, "running");
+    });
+    await until(() => isOnTheServer(`${running}_building`));
+
+    const queued = ensureTemplate(
+      adminUri(),
+      scratchTemplateOfThisWorker("queued"),
+      buildLog().building("queued"),
+    );
+    await until(aBuildWaitsForTheLock);
+    release();
+    await Promise.all([held, queued]);
+
+    expect(await tablesIn(running)).toEqual(["running"]);
   });
 
   it("drops a leftover build, then publishes", async () => {
@@ -599,7 +656,7 @@ describe("a shared template", () => {
   });
 
   it("seals a published template against every connection", async () => {
-    const name = scratchTemplate("sealed");
+    const name = scratchTemplateOfThisWorker("sealed");
     await ensureTemplate(adminUri(), name, buildLog().building("sealed"));
     const flags = await asAdmin((admin) =>
       admin.query("SELECT datallowconn, datistemplate FROM pg_database WHERE datname = $1", [name]),
@@ -612,11 +669,15 @@ describe("a shared template", () => {
     });
   });
 
-  it("drops a template unused for a day, keeping fresh ones", async () => {
+  it("drops day-unused templates to bound the tmpfs, keeping fresh ones", async () => {
     const stale = await plantedTemplate("stale", LONG_AGO);
     const fresh = await plantedTemplate("fresh", new Date().toISOString());
 
-    await ensureTemplate(adminUri(), scratchTemplate("aged"), buildLog().building("aged"));
+    await ensureTemplate(
+      adminUri(),
+      scratchTemplateOfThisWorker("aged"),
+      buildLog().building("aged"),
+    );
 
     expect({ stale: await isOnTheServer(stale), fresh: await isOnTheServer(fresh) }).toEqual({
       stale: false,
@@ -628,7 +689,11 @@ describe("a shared template", () => {
     const before = Date.now();
     const unstamped = await plantedTemplate("unstamped", null);
 
-    await ensureTemplate(adminUri(), scratchTemplate("stamper"), buildLog().building("stamper"));
+    await ensureTemplate(
+      adminUri(),
+      scratchTemplateOfThisWorker("stamper"),
+      buildLog().building("stamper"),
+    );
 
     expect({
       kept: await isOnTheServer(unstamped),
@@ -640,9 +705,13 @@ describe("a shared template", () => {
   });
 
   it("leaves stale templates outside its prefix alone", async () => {
-    const theirs = await plantedTemplate("theirs", LONG_AGO, "tpl_t_");
+    const theirs = await plantedTemplate("theirs", LONG_AGO, A_PREFIX_NO_TIER_SWEEPS);
 
-    await ensureTemplate(adminUri(), scratchTemplate("ours"), buildLog().building("ours"));
+    await ensureTemplate(
+      adminUri(),
+      scratchTemplateOfThisWorker("ours"),
+      buildLog().building("ours"),
+    );
 
     expect(await isOnTheServer(theirs)).toBe(true);
   });
@@ -652,19 +721,47 @@ describe("a shared template", () => {
     scratchTemplates.push(orphan);
     await asAdmin((admin) => admin.query(`CREATE DATABASE ${quoted(orphan)}`));
 
-    await ensureTemplate(adminUri(), scratchTemplate("sweeper"), buildLog().building("sweeper"));
+    await ensureTemplate(
+      adminUri(),
+      scratchTemplateOfThisWorker("sweeper"),
+      buildLog().building("sweeper"),
+    );
 
     expect(await isOnTheServer(orphan)).toBe(false);
   });
 
   it("stamps the ensured template with the time of use", async () => {
     const before = Date.now();
-    const name = scratchTemplate("used");
+    const name = scratchTemplateOfThisWorker("used");
     await ensureTemplate(adminUri(), name, buildLog().building("used"));
 
     await ensureTemplate(adminUri(), name, buildLog().building("used"));
 
     expect(await stampedSince(name, before)).toBe(true);
+  });
+
+  it("publishes nothing under the name when its build fails", async () => {
+    const name = scratchTemplateOfThisWorker("failed");
+    const failing = async (databaseUri: string): Promise<void> => {
+      await createTable(databaseUri, "half");
+      throw new Error("the build died");
+    };
+
+    await expect(ensureTemplate(adminUri(), name, failing)).rejects.toThrow("the build died");
+    expect(await isOnTheServer(name)).toBe(false);
+  });
+
+  it("changes its name when a migration file is renamed", async () => {
+    const folder = await mkdtemp(path.join(tmpdir(), "warm-template-"));
+    try {
+      await writeFile(path.join(folder, "0000_first.sql"), "CREATE TABLE one ();");
+      const named = await templateNameOver(folder);
+      await rename(path.join(folder, "0000_first.sql"), path.join(folder, "0000_renamed.sql"));
+
+      expect(await templateNameOver(folder)).not.toBe(named);
+    } finally {
+      await rm(folder, { recursive: true });
+    }
   });
 
   it("is named for its migrations' content", async () => {
@@ -699,7 +796,7 @@ const throwawayPostgres = (command: readonly string[]): Promise<StartedPostgreSq
     .withCommand([...command])
     .start();
 
-const scriptUriLine = async (): Promise<string | undefined> => {
+const scriptUriLineForThePin = async (): Promise<string | undefined> => {
   const printed = await run("bash", ["deploy/test-postgres.sh", "address"], {
     cwd: repoRoot,
     env: { ...process.env, TEST_POSTGRES_IMAGE: undefined },
@@ -736,7 +833,7 @@ describe("the warm harness under TEST_POSTGRES_URI=shared", () => {
   });
 
   it("derives the address the script prints", async () => {
-    expect(sharedUri()).toBe(await scriptUriLine());
+    expect(sharedUri()).toBe(await scriptUriLineForThePin());
   });
 
   it("accepts a server stamped with the pinned image", async () => {
