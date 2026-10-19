@@ -50,7 +50,11 @@ import {
   type RunErasureRefusal,
 } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type Result, type UserPrincipal } from "../src/kernel/index.ts";
-import { endEverySignInAndTokenHere } from "../src/members/index.ts";
+import {
+  acceptInvitation,
+  approveRequest,
+  endEverySignInAndTokenHere,
+} from "../src/members/index.ts";
 import { setDisplayName, setOperatorMark } from "../src/workspaces/index.ts";
 import { asAnotherProcess } from "./bundle-fence.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
@@ -1329,6 +1333,32 @@ describe("the verifications the rewrite moved", () => {
   });
 });
 
+const ASKED_FOR_ACCESS = "I have joined the bids team and need the answer library.";
+
+const approvedRequestOf = async (scenario: Scenario, requesterId: string) => {
+  const request = await seedingWith(db().pool, (seed) =>
+    seed.accessRequest({
+      workspaceId: scenario.workspaceId,
+      requesterId,
+      reason: ASKED_FOR_ACCESS,
+    }),
+  );
+  const approved = await readingAs(db().pool, scenario.admin, (principal, tx) =>
+    approveRequest(principal, tx, { requestId: request.id, now: LOCKED_AT }),
+  );
+  if (!approved.ok) throw new Error(`the approval refused: ${String(approved.error)}`);
+  return { requestId: request.id, invitationId: approved.value.invitationId };
+};
+
+const accessRequestsOf = async (requesterId: string) =>
+  (
+    await db().pool.query(
+      `SELECT id, workspace_id, reason, invitation_id FROM access_request
+        WHERE requester_id = $1`,
+      [requesterId],
+    )
+  ).rows;
+
 describe("the identity set on the person's last workspace", () => {
   it("pseudonymises the user row, keeping its id for audit events", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
@@ -1705,6 +1735,60 @@ describe("the identity set on the person's last workspace", () => {
     expect(await identityRowCountsFor(elsewhere.workspaceId, person.id, email)).toMatchObject({
       invitations: 1,
     });
+  });
+
+  it("keeps an approved requester's request, its invitation and reason cleared", async () => {
+    const scenario = await arrange();
+    const email = addressOf("priya");
+    const requester = await seedingWith(db().pool, (seed) =>
+      seed.user({ name: "Priya Anand", email, emailVerified: true }),
+    );
+    const { requestId, invitationId } = await approvedRequestOf(scenario, requester.id);
+    const joined = await acceptInvitation(bootstrap, scenario.postgres, {
+      invitationId,
+      personId: requester.id,
+      sessionId: ulid(),
+      now: LOCKED_AT,
+    });
+    expect(joined.ok).toBe(true);
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, requester.id, email);
+
+    await completing(scenario, subjectRequestId);
+
+    expect(await accessRequestsOf(requester.id)).toEqual([
+      { id: requestId, workspace_id: scenario.workspaceId, reason: "", invitation_id: null },
+    ]);
+  });
+
+  it("clears the request's reason while the person holds another workspace", async () => {
+    const { scenario, email, person } = await memberHereAndElsewhere();
+    const { requestId } = await approvedRequestOf(scenario, person.id);
+
+    await completing(scenario, await erasureRequestAbout(scenario.workspaceId, person.id, email));
+
+    expect(await accessRequestsOf(person.id)).toEqual([
+      { id: requestId, workspace_id: scenario.workspaceId, reason: "", invitation_id: null },
+    ]);
+    expect(await identityRowCountsFor(scenario.workspaceId, person.id, email)).toMatchObject({
+      invitations: 1,
+    });
+  });
+
+  it("unlinks a request approved elsewhere whose invitation it deletes", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const elsewhere = await arrange();
+    const { requestId } = await approvedRequestOf(elsewhere, person.id);
+
+    await completing(scenario, subjectRequestId);
+
+    expect(await accessRequestsOf(person.id)).toEqual([
+      {
+        id: requestId,
+        workspace_id: elsewhere.workspaceId,
+        reason: ASKED_FOR_ACCESS,
+        invitation_id: null,
+      },
+    ]);
   });
 
   it("stores identical identity lines on both arms, never naming elsewhere", async () => {
