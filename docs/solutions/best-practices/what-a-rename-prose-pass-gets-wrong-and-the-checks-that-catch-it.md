@@ -68,7 +68,7 @@ U7's Testing Library rule kept `screen` in `auth-screen.tsx`, so the moved files
 **6. Check where the new word already means something.** U7's new word *page* is also Playwright's `page`, and the pass turned "Every screen the page was shown" into "Every page the page was shown". Reword that sense before the pass, or grep for the new word twice in one clause afterwards:
 
 ```sh
-git diff -U0 origin/main...HEAD -- apps/web/e2e apps/web/journeys | rg -n '^\+.*\bpages?\b[^.;(){}]{0,25}\bpage\b'
+git diff -U0 origin/main...HEAD -- apps/web/e2e | rg -n '^\+.*\bpages?\b[^.;(){}]{0,25}\bpage\b'
 ```
 
 ### After the pass

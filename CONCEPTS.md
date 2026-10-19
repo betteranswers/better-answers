@@ -1499,10 +1499,8 @@ says **estate**.
 _Internal._ the recorded promotion of a built image digest to production, on its own or by an Admin's
 dispatch, as the *release mode* says.
 
-A release is recorded, as a tag, only once it has held: its smoke passed and, under `gate`, its
-*journeys* ended `held` too. A release the build calls after a merge runs no journeys, so it holds on
-its smoke under every value. Under `gate` a release whose journeys end `fail` is tagged rejected
-instead, and the nightly release never promotes that commit again until the tag is deleted.
+A release is recorded, as a tag, only once it has held: its smoke passed. A release whose smoke
+fails is not recorded.
 
 ### release mode
 
@@ -1518,34 +1516,6 @@ The phases run in that order: per-merge until the first customer's bundle lands,
 _Internal._ the day the platform is live for its customers, no earlier than the end of v0.1.
 
 It comes after the day the first customer's data is on the box.
-
-### journeys
-
-_Internal._ the small set of Playwright tests that sign in to production as each *test person*, with
-an email code read from the *test inbox*.
-
-Each **journey** walks the pages its role reaches, taking only actions it can undo and that cost
-nothing, so it leaves the *test workspace* as it found it. They run after a scheduled or dispatched
-*release*'s smoke, and alone against the live release on a scheduled night with nothing newer to
-promote or on a journeys-only dispatch; a release the build calls after a merge never runs them.
-A run ends in one **outcome word**, the body of its *dead-man ping*: `held`, every journey passed;
-`fail`, a page did not do what its journey asks, no code came within 90 seconds, or the promote
-failed and none ran; `could-not-run`, the run could not judge the release, because the inbox, the
-edge, a setting or the commit under test stood in its way, the gate refused the run or its promote
-was cancelled, or the test workspace was found holding something its fixture does not. One setting
-stages them: under `off`, or while it is unset, none run; under `report` they run and report; under
-`gate` a release they ran on is recorded only once they end `held`. Not the browser suite, whose
-specs seed a fresh database through its harness.
-
-### test inbox
-
-_Internal._ named in full, because *Inbox* alone is a person's *area*, which points into *To decide*:
-the Cloudflare Email Worker, on the *testing domain*, an email domain apart from the product's.
-
-It keeps what reaches that domain for a day and judges nothing. The *journeys* read each sign-in code
-from it through its API, with a key that reads it and does nothing else, and verify each email's DKIM
-signature themselves. Outside the *estate*: the owner deploys it by hand, and nothing in CI can change
-it.
 
 ### signal
 
@@ -1563,7 +1533,8 @@ the daily digest) until a *cleared* event closes it.
 
 _Internal._ the outbound heartbeat a job sends only after its work is verified.
 
-Silence is the alert. It carries an outcome word and sizes, never a path or an error.
+Silence is the alert. It carries an **outcome word**, such as `ok` or `fail`, and sizes or counts,
+never a path or an error.
 
 ### escrow
 
@@ -1798,14 +1769,16 @@ sends it again.
 
 ### test workspace
 
-_Internal._ the workspace the *journeys* sign in to in production, made and set back by one ops
-command alone, never by a page: the three *test people* and the 51 *invented members*.
+_Internal._ the workspace in production kept for testing: three **test people**, the test Admin,
+the test Editor and the test Viewer, and 51 **invented members**, Viewers.
 
-A page says *kept for testing*. It carries a **mark**, a row of its own naming its
-*testing domain*, which only that command writes and the api cannot remove. While the mark stands,
-every *invitation* the workspace sends, resends or mints from an *access request* goes to an
-address on that domain, and one off it is refused `off-testing-domain`. Not the *operator*'s mark,
-which is on a person.
+A page calls it a *testing workspace*. It carries a **mark**, a row of its own naming its
+*testing domain*, which the api never writes and cannot remove. While the mark stands, every
+*invitation* the workspace sends, resends or mints from an *access request* goes to an address on
+that domain, and one off it is refused `off-testing-domain`. Not the *operator*'s mark, which is on
+a person. Every member's address is on the testing domain, so anything that lists or counts people
+can tell them from real ones. None is ever erased: erasure tombstones the address for good, so one
+who must go is removed from the test workspace instead.
 
 ### testing domain
 
@@ -1813,19 +1786,6 @@ what follows the `@` of every address a *test workspace* invites, lower-cased an
 a subdomain is another one.
 
 An email domain, never a *collection* of the company's knowledge.
-
-### test person
-
-_Internal._ one of the three people the *journeys* sign in as: the test Admin, the test Editor and
-the test Viewer of the *test workspace*.
-
-The workspace also holds 51 **invented members**, Viewers nobody signs in as, so that every list a
-journey pages through runs past one page. None of them is the *operator* or a *member* of another
-workspace. Each address is on the *testing domain*, so anything that lists or counts people can
-tell them from real ones, and every code sent to one reaches the *test inbox*. None is ever erased:
-erasure tombstones the address for good, so one who must go is removed from the test workspace
-instead. A journey undoes every action it takes, and the next run sets back what a failed one left,
-so the test workspace's *audit log* is their one lasting record.
 
 ### Activity (of a person)
 

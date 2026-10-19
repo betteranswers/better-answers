@@ -27,8 +27,6 @@ tags:
 
 The tree is `apps/` over `packages/`: `apps/` is what deploys and `packages/` is what is imported. `apps/api` is the product's one TypeScript deployable and holds transports only. Business logic is `packages/core`, a library the api depends on, organised as capability slices over four store doors.
 
-`apps/test-inbox` is a second TypeScript deployable, and it is not the product. It is the journeys' test inbox: test infrastructure on Cloudflare, outside the product's two stacks and its four stores. The owner deploys it by hand with a pinned `wrangler`, and no image carries it. It imports nothing from `packages/core` at run time, only types from `packages/schema`.
-
 - `kernel/` holds the Principal, branded ids, the error vocabulary and `Result`: types and pure functions.
 - `access/` holds the read predicate, defined once with one SQL renderer.
 - `store/` holds the four doors, one per shared store, and is the only place a connection is made: `store/postgres`, `store/git`, `store/map` and `store/objects`. Each door is exported under its own name, such as `@better-answers/core/store/postgres`. There is no `store` barrel and no `./store` entry.
@@ -48,7 +46,7 @@ All five are one rule in the repository's own lint plugin, `better-answers/impor
 
 Every query reaches its store through a store door in `packages/core/src/store/`. Row-level security is the tenancy guarantee (ADR 0032), and the door is ergonomics over it. A transaction that spans slices lives in the slice that owns the action.
 
-Every one of the four doors is real in a test, and none may be faked. `CODING_STANDARDS.md` keeps that as a test rule. An in-memory adapter is for a service someone else runs, such as an LLM provider, behind that service's own adapter. The test inbox's D1 is such a service. Its store takes the few D1 calls it makes, and its suite runs the same SQL through `node:sqlite`.
+Every one of the four doors is real in a test, and none may be faked. `CODING_STANDARDS.md` keeps that as a test rule. An in-memory adapter is for a service someone else runs, such as an LLM provider, behind that service's own adapter.
 
 ## Why
 
@@ -74,5 +72,7 @@ Every one of the four doors is real in a test, and none may be faked. `CODING_ST
 ## History
 
 Amended 10/10/2026 by the refusal catalogue plan (`docs/plans/2026-10-10-1241-refactor-one-refusal-catalogue-plan.md`, KTD1). `refusals/` is a zone of its own in the lint rule. Before it, nothing in core but a test imported `erasure`; the catalogue is now the one module that does.
+
+Amended 19/10/2026 on the owner's ruling of 19/10/2026, by BA-204. `apps/test-inbox`, a second TypeScript deployable outside the product, is retired with the signed-in production journeys until go-live, so `apps/api` is again the one TypeScript deployable.
 
 The full record, which retired the constitution's tenancy rule to ADR 0032 and whose tier-contract consequences ADR 0031 enacted and corrected, with its amendments (T-078, T-048, T-053, T-114, T-117, T-118, T-253): `docs/archive/adr/0029-apps-over-packages-capability-slices.md`.

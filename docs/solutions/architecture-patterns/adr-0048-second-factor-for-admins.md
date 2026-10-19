@@ -9,7 +9,7 @@ applies_when:
   - "Adding a tRPC procedure, an api route or a Better Auth plugin endpoint a signed-in browser reaches"
   - "Adding an action that makes a person an Admin or the operator, or removes a second factor"
   - "Changing what a session's confirmation stamp, pending clock or setup grant means"
-  - "Signing an Admin or the operator in from a test suite, the browser suite or the journeys"
+  - "Signing an Admin or the operator in from a test suite or the browser suite"
 tags:
   - adr-0048
   - second-factor

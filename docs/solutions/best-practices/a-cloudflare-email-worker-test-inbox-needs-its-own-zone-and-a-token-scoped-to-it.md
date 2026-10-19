@@ -7,6 +7,7 @@ problem_type: best_practice
 component: testing-framework
 severity: high
 applies_when:
+  - "Rebuilding the signed-in production journeys and their test inbox at go-live"
   - "Giving CI journeys a way to read sign-in emails without a credential that can read real people's mail"
   - "Turning on Cloudflare Email Routing for a testing address range on a zone whose apex already receives mail elsewhere"
   - "Switching a catch-all rule from one Email Worker to another, or deleting the Worker a rule last pointed at"
@@ -34,6 +35,8 @@ tags:
 # A Cloudflare Email Worker test inbox needs a zone of its own, and its deploy token reaches every zone in the account
 
 ## Context
+
+**Retired until go-live.** The test inbox and the journeys that read it were retired on 19/10/2026 (BA-204), and the go-live rebuild starts from this doc. The files it cites left the tree then: read each with `git show a3c19ec8:<path>`. Its `RUNBOOK.md` and `SECRETS.md` line numbers are from 03/10/2026, when `RUNBOOK.md` page 13 set the inbox up.
 
 The journeys' test inbox is a free Cloudflare Email Worker on a testing domain of its own, chosen over a second, paid Resend team. The nightly sign-in journeys must read an email sign-in code through an API. A Resend key that reads received mail must be a full-access key, and a full-access key can also list and retrieve the team's sent mail, so a key in production's team could read any person's sign-in code (`docs/plans/2026-10-02-1625-feat-signed-in-journeys-in-production-plan.md`, Sources / Research).
 
@@ -179,7 +182,7 @@ Moving the catch-all to a new Worker:
 ## Related
 
 - `docs/plans/2026-10-02-1625-feat-signed-in-journeys-in-production-plan.md`: KTD3 (the test inbox's form) and KTD18 to KTD20 (the Worker stores and judges nothing; the reader verifies DKIM; deployed by hand), units U9 and U10.
-- `docs/operations/RUNBOOK.md` page 13 (the owner's setup, go/no-go and leak steps) and `docs/operations/SECRETS.md` (the read token and the deploy token).
-- `docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md`: why `apps/test-inbox` is a second TypeScript deployable.
+- `docs/operations/RUNBOOK.md` page 13 (the owner's setup, go/no-go and leak steps) and `docs/operations/SECRETS.md` (the read token and the deploy token), both as `a3c19ec8` holds them.
+- `docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md`: why `apps/test-inbox` was a second TypeScript deployable, and its amendment of 19/10/2026 retiring it.
 - `docs/solutions/architecture-patterns/adr-0034-one-origin-product-and-authorization-server.md`: a Worker planted on a hostname under the product's zone would also trip its `__Host-` cookie trigger.
 - `docs/solutions/architecture-patterns/adr-0027-open-core-under-apache-2-0.md`: the testing domain, the account and the Worker's URL stay out of public files.
