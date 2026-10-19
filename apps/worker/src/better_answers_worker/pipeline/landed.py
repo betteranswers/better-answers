@@ -310,10 +310,6 @@ def redact_landed_copies(
         for document in documents
         if document.source_document_id in read
     )
-    for document in answered:
-        copies.write(
-            document.normalised_key, document.redacted.text.encode(TEXT_ENCODING)
-        )
     unreadable = tuple(
         UnreadableDocument(
             source_document_id=document.source_document_id,
@@ -338,3 +334,12 @@ def redact_landed_copies(
         unreadable=len(unreadable),
     )
     return outcome
+
+
+def write_normalised_copies(
+    copies: LandedCopies, documents: Sequence[ReadDocument]
+) -> None:
+    for document in documents:
+        copies.write(
+            document.normalised_key, document.redacted.text.encode(TEXT_ENCODING)
+        )

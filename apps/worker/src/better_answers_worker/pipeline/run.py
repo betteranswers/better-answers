@@ -12,7 +12,12 @@ from .catalogue import (
     unreadable_catalogue,
 )
 from .host import Host, Sync
-from .landed import SEAM_MS_PER_PAGE, TIMEOUT_MARGIN_MS, redact_landed_copies
+from .landed import (
+    SEAM_MS_PER_PAGE,
+    TIMEOUT_MARGIN_MS,
+    redact_landed_copies,
+    write_normalised_copies,
+)
 from .objects import Bucket, LandedCopies
 from .rows import PASSAGE_TABLE, rows_of
 
@@ -97,6 +102,7 @@ def index_connected_source(
             )
             with queue.scoped(connection, sync.workspace_id) as cursor:
                 queue.hold_the_claim(cursor, job.id, bootstrap.worker_id)
+                write_normalised_copies(store, landed.documents)
                 record_findings(cursor, sync, landed.documents)
                 moved = reconcile_catalogue(cursor, landed.documents)
                 unreadable_catalogue(cursor, landed.unreadable)

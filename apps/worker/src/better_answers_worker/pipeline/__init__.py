@@ -41,6 +41,7 @@ from .landed import (
     redact_landed_copies,
     suppression_of,
     timeout_for,
+    write_normalised_copies,
 )
 from .objects import Bucket, LandedCopies, object_key_of
 from .passages import (
@@ -113,4 +114,5 @@ __all__ = [
     "split_into_passages",
     "suppression_of",
     "timeout_for",
+    "write_normalised_copies",
 ]
