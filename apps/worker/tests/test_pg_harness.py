@@ -64,13 +64,18 @@ def _row_of(maintenance: str, database: str) -> tuple[bool, bool] | None:
 
 
 def _discard(maintenance: str, database: str) -> None:
-    if _row_of(maintenance, database) is None:
+    row = _row_of(maintenance, database)
+    if row is None:
         return
     with _admin(maintenance) as admin:
-        with suppress(psycopg.errors.InvalidCatalogName):
-            admin.execute(
-                SQL("ALTER DATABASE {} IS_TEMPLATE false").format(Identifier(database))
-            )
+        is_template, _allows_connections = row
+        if is_template:
+            with suppress(psycopg.errors.InvalidCatalogName):
+                admin.execute(
+                    SQL("ALTER DATABASE {} IS_TEMPLATE false").format(
+                        Identifier(database)
+                    )
+                )
         admin.execute(
             SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(Identifier(database))
         )
@@ -605,7 +610,7 @@ def _a_dead_runs_database_held(maintenance: str) -> Iterator[str]:
         _create(maintenance, dead)
         try:
             session = psycopg.connect(on_database(maintenance, dead))
-        except psycopg.errors.InvalidCatalogName:
+        except psycopg.OperationalError:
             continue
         try:
             with session:
@@ -621,3 +626,18 @@ def test_sweep_skips_a_dead_runs_database_still_in_use(maintenance: str) -> None
         sweep_dead_cases(maintenance)
 
         assert dead in _case_names(maintenance)
+
+
+def test_discards_a_database_an_interrupted_drop_left_invalid(
+    maintenance: str, unique: Callable[[str], str]
+) -> None:
+    halted = unique("probe_halted")
+    _create(maintenance, halted)
+    with _admin(maintenance) as admin:
+        admin.execute(
+            "UPDATE pg_database SET datconnlimit = -2 WHERE datname = %s", (halted,)
+        )
+
+    _discard(maintenance, halted)
+
+    assert _row_of(maintenance, halted) is None
