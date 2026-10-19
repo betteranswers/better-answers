@@ -48,6 +48,10 @@ const coseKeyOf = (publicKey: KeyObject): Uint8Array => {
 
 type Ceremony = { readonly verified?: boolean };
 
+export type Assertion = Ceremony & { readonly signedWithAnotherKey?: boolean };
+
+const anotherKey = (): KeyObject => generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey;
+
 export const aPasskeyDevice = (origin: string) => {
   const rpIdHash = sha256(new URL(origin).hostname);
   const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
@@ -104,13 +108,13 @@ export const aPasskeyDevice = (origin: string) => {
       };
     },
 
-    get(asked: unknown, ceremony: Ceremony = {}) {
+    get(asked: unknown, ceremony: Assertion = {}) {
       const authenticatorData = concat(rpIdHash, Uint8Array.of(flagsOf(ceremony)), uint32(0));
       const clientDataJSON = clientData("webauthn.get", asked);
       const signature = sign(
         "sha256",
         concat(authenticatorData, sha256(clientDataJSON)),
-        privateKey,
+        ceremony.signedWithAnotherKey === true ? anotherKey() : privateKey,
       );
       return {
         id,
