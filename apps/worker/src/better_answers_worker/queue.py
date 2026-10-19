@@ -15,6 +15,9 @@ LEASE_SECONDS = 60
 HEARTBEAT_SECONDS = 20
 
 
+HEARTBEAT_CONNECT_SECONDS = 5
+
+
 @dataclass(frozen=True, slots=True)
 class ClaimedJob:
     workspace_id: str
@@ -101,14 +104,32 @@ def keeping_alive(
     stop = threading.Event()
 
     def beat() -> None:
+        connection: psycopg.Connection | None = None
         try:
-            with psycopg.connect(database_url) as connection:
-                while not stop.wait(every_seconds):
+            while not stop.wait(every_seconds):
+                try:
+                    if connection is None:
+                        connection = psycopg.connect(
+                            database_url, connect_timeout=HEARTBEAT_CONNECT_SECONDS
+                        )
                     with scoped(connection, job.workspace_id) as cursor:
-                        if not heartbeat(cursor, job.id, worker_id):
-                            return
-        except psycopg.Error:
-            logger.warning("the heartbeat stopped", job_id=job.id, worker_id=worker_id)
+                        held = heartbeat(cursor, job.id, worker_id)
+                except psycopg.Error:
+                    logger.warning(
+                        "a heartbeat failed", job_id=job.id, worker_id=worker_id
+                    )
+                    if connection is not None:
+                        connection.close()
+                    connection = None
+                    continue
+                if not held:
+                    logger.warning(
+                        "the claim was lost", job_id=job.id, worker_id=worker_id
+                    )
+                    return
+        finally:
+            if connection is not None:
+                connection.close()
 
     thread = threading.Thread(target=beat, name="heartbeat", daemon=True)
     thread.start()
