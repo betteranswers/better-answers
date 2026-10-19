@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   codeWrong,
+  saidOfAnAskToJoinRefusal,
   saidOfASecondFactorRefusal,
   tooManyCodesTriedOr,
   type OtherWay,
@@ -56,5 +57,22 @@ describe("a second-factor action refused after a workspace switch", () => {
 
     expect(sentence).toBe(refusalSentence({}, "workspace-switched", "conflict"));
     expect(sentence).not.toBe(STOCK.changed);
+  });
+});
+
+describe("what a refused ask to join says", () => {
+  it("says every refusal but a missing reason alike", () => {
+    const sentences = [
+      saidOfAnAskToJoinRefusal({ word: "no-session", class: "unauthenticated" }),
+      saidOfAnAskToJoinRefusal({ word: "role-forbids", class: "forbidden" }),
+      saidOfAnAskToJoinRefusal({ word: "no-such-member", class: "absent" }),
+      saidOfAnAskToJoinRefusal({ word: "too-large", class: "inapplicable" }),
+      saidOfAnAskToJoinRefusal({ word: "already-a-member", class: "conflict" }),
+      saidOfAnAskToJoinRefusal({ word: "confirmation-too-old", class: "precondition" }),
+    ];
+    const missingReason = saidOfAnAskToJoinRefusal({ word: "malformed", class: "malformed" });
+
+    expect(new Set(sentences)).toEqual(new Set([STOCK.general]));
+    expect(missingReason).not.toBe(STOCK.general);
   });
 });

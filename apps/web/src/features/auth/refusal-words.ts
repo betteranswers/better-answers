@@ -1,5 +1,5 @@
 import type { Refusal, RefusalWord } from "@/shared/api/trpc.ts";
-import { refusalSentence, type OwnSentences } from "@/shared/refusal-words.ts";
+import { refusalSentence, STOCK, type OwnSentences } from "@/shared/refusal-words.ts";
 import { minutesUntil, PRODUCT_NAME } from "@/shared/words.ts";
 
 export const STALE_CONFIRMATION = "confirmation-too-old" satisfies RefusalWord;
@@ -18,7 +18,10 @@ export const SAID_OF_ACCEPTING = {
   malformed: INVITATION_LINK_INVALID,
 } satisfies OwnSentences;
 
-export const REASON_REFUSED = "Please enter a reason.";
+const REASON_REFUSED = "Please enter a reason.";
+
+export const saidOfAnAskToJoinRefusal = (refusal: Refusal): string =>
+  refusal.class === "malformed" ? REASON_REFUSED : STOCK.general;
 
 export const CODE_NOT_SENT =
   "We couldn't send a code to that address. Please check it, or use a different email address.";
