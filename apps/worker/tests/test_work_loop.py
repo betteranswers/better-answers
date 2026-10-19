@@ -1,7 +1,8 @@
 import contextlib
 import threading
 import time
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, MutableMapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -810,13 +811,18 @@ def test_the_worker_role_counts_a_waiting_job_as_unhealthy(
         assert health.is_healthy(worker, WORKER) is False
 
 
-def test_a_long_run_keeps_its_lease_on_its_own_connection(
-    database: psycopg.Connection, tmp_path: Path
-) -> None:
+def a_claimed_audit(database: psycopg.Connection) -> tuple[str, queue.ClaimedJob]:
     workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
     with scoped(database, workspace) as cursor:
         claimed = queue.claim(cursor, workspace, WORKER, list(KINDS))
     assert claimed is not None
+    return workspace, claimed
+
+
+def test_a_long_run_keeps_its_lease_on_its_own_connection(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace, claimed = a_claimed_audit(database)
 
     dsn = _WHERE[database]
     with psycopg.connect(dsn) as onlooker:
@@ -873,62 +879,67 @@ def _lease_of(onlooker: psycopg.Connection, workspace: str) -> tuple[Any, bool]:
     return row[0], bool(row[1])
 
 
-def _claimed_audit(database: psycopg.Connection) -> tuple[str, queue.ClaimedJob]:
-    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
-    with scoped(database, workspace) as cursor:
-        claimed = queue.claim(cursor, workspace, WORKER, list(KINDS))
-    assert claimed is not None
-    return workspace, claimed
+@dataclass(frozen=True, slots=True)
+class Beating:
+    workspace: str
+    job: queue.ClaimedJob
+    onlooker: psycopg.Connection
+    written: list[MutableMapping[str, Any]]
+    session: int
+
+
+@contextlib.contextmanager
+def a_heartbeat_beating(database: psycopg.Connection) -> Iterator[Beating]:
+    workspace, claimed = a_claimed_audit(database)
+    dsn = _WHERE[database]
+    with (
+        capture_logs() as written,
+        queue.connected(dsn) as onlooker,
+        queue.keeping_alive(dsn, claimed, WORKER, every_seconds=0.05),
+    ):
+        sessions = _within(10, lambda: _heartbeat_sessions(onlooker, database))
+        assert sessions, "the heartbeat never opened a session"
+        yield Beating(workspace, claimed, onlooker, written, sessions[0])
 
 
 def test_a_heartbeat_outlives_a_dropped_connection(
     database: psycopg.Connection,
 ) -> None:
-    workspace, claimed = _claimed_audit(database)
-    dsn = _WHERE[database]
-
-    with (
-        capture_logs() as written,
-        queue.connected(dsn) as onlooker,
-        queue.keeping_alive(dsn, claimed, WORKER, every_seconds=0.05),
-    ):
-        beating = _within(10, lambda: _heartbeat_sessions(onlooker, database))
-        assert beating, "the heartbeat never opened a session"
-        onlooker.execute("SELECT pg_terminate_backend(%s)", (beating[0],))
+    with a_heartbeat_beating(database) as beating:
+        onlooker = beating.onlooker
+        onlooker.execute("SELECT pg_terminate_backend(%s)", (beating.session,))
         assert _within(
             10,
-            lambda: beating[0] not in _heartbeat_sessions(onlooker, database),
+            lambda: beating.session not in _heartbeat_sessions(onlooker, database),
         )
-        dropped_at, _ = _lease_of(onlooker, workspace)
-        renewed = _within(10, lambda: _lease_of(onlooker, workspace)[0] > dropped_at)
-        _, live = _lease_of(onlooker, workspace)
+        dropped_at, _ = _lease_of(onlooker, beating.workspace)
+        renewed = _within(
+            10, lambda: _lease_of(onlooker, beating.workspace)[0] > dropped_at
+        )
+        _, live = _lease_of(onlooker, beating.workspace)
 
     assert renewed, "the heartbeat stopped at the dropped connection"
     assert live, "and the lease lapsed"
     assert [
         line["job_id"]
-        for line in written
+        for line in beating.written
         if line["event"] == "a heartbeat failed" and line["error"]
-    ] == [claimed.id]
+    ] == [beating.job.id]
 
 
 def test_a_heartbeat_whose_claim_is_gone_says_so_and_stops(
     database: psycopg.Connection,
 ) -> None:
-    workspace, claimed = _claimed_audit(database)
-    dsn = _WHERE[database]
-
-    with (
-        capture_logs() as written,
-        queue.connected(dsn) as onlooker,
-        queue.keeping_alive(dsn, claimed, WORKER, every_seconds=0.05),
-    ):
-        assert _within(10, lambda: _heartbeat_sessions(onlooker, database))
-        with scoped(onlooker, workspace) as cursor:
+    with a_heartbeat_beating(database) as beating:
+        with scoped(beating.onlooker, beating.workspace) as cursor:
             cursor.execute("UPDATE job SET claimed_by = 'another-worker'")
-        stopped = _within(10, lambda: not _heartbeat_sessions(onlooker, database))
+        stopped = _within(
+            10, lambda: not _heartbeat_sessions(beating.onlooker, database)
+        )
 
     assert stopped, "the heartbeat kept its session after the claim was gone"
     assert [
-        line["job_id"] for line in written if line["event"] == "the claim was lost"
-    ] == [claimed.id]
+        line["job_id"]
+        for line in beating.written
+        if line["event"] == "the claim was lost"
+    ] == [beating.job.id]
