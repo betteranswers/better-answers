@@ -14,7 +14,7 @@ import {
 
 import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
-import { limitByIp } from "../ingress/limits.ts";
+import { countingPostsAlone, limitByIp } from "../ingress/limits.ts";
 import { type Auth, USER_NOT_VERIFIED } from "./auth.ts";
 import {
   PASSKEY_ADD_OPTIONS_PATH,
@@ -233,7 +233,9 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     return context.json({ displayNameGiven: !hasNoDisplayName(user.name) });
   };
 
-  const limitByAddress = limitByIp(deps, PASSKEY_SIGN_IN_IP_RULE, "passkey-sign-in");
+  const limitByAddress = countingPostsAlone(
+    limitByIp(deps, PASSKEY_SIGN_IN_IP_RULE, "passkey-sign-in"),
+  );
 
   routes.use(PASSKEY_SIGN_IN_OPTIONS_PATH, limitByAddress);
   routes.use(PASSKEY_SIGN_IN_PATH, limitByAddress);

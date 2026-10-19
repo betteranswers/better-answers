@@ -116,3 +116,8 @@ export const limitByIp = (
     await next();
   };
 };
+
+export const countingPostsAlone =
+  (limit: MiddlewareHandler): MiddlewareHandler =>
+  (context, next) =>
+    context.req.method === "POST" ? limit(context, next) : next();

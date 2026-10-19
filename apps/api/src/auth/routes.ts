@@ -12,7 +12,12 @@ import {
 import { hasNoDisplayName } from "@better-answers/core/workspaces";
 
 import type { EmailSender } from "../email.ts";
-import { countByAddress, limitByIp, tooManyRequests } from "../ingress/limits.ts";
+import {
+  countByAddress,
+  countingPostsAlone,
+  limitByIp,
+  tooManyRequests,
+} from "../ingress/limits.ts";
 import { judged, pendingOr, SECOND_FACTOR_PENDING } from "../second-factor-gate.ts";
 import type { Auth } from "./auth.ts";
 import { mountTheAuthenticator } from "./authenticator.ts";
@@ -386,15 +391,15 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
     context.res.headers.set("referrer-policy", "no-referrer");
     context.res.headers.set("cache-control", "no-store");
   });
+  routes.use("/sign-in-link/*", sameOriginOnly(publicUrl));
   routes.use(
     SIGN_IN_LINK_DESCRIBE_PATH,
-    limitByIp(deps, SIGN_IN_LINK_DESCRIBE_IP_RULE, "sign-in-link-read"),
+    countingPostsAlone(limitByIp(deps, SIGN_IN_LINK_DESCRIBE_IP_RULE, "sign-in-link-read")),
   );
   routes.use(
     SIGN_IN_LINK_SIGN_IN_PATH,
-    limitByIp(deps, SIGN_IN_LINK_SIGN_IN_IP_RULE, "sign-in-link-sign-in"),
+    countingPostsAlone(limitByIp(deps, SIGN_IN_LINK_SIGN_IN_IP_RULE, "sign-in-link-sign-in")),
   );
-  routes.use("/sign-in-link/*", sameOriginOnly(publicUrl));
   routes.use("/sign-in-link/*", async (context, next) => {
     await next();
     context.res.headers.set("cache-control", "no-store");
@@ -425,11 +430,6 @@ const takesOrSendsACode = (path: string): boolean =>
   path === SIGN_IN_BY_EMAIL_CODE_PATH ||
   path.startsWith("/email-otp/") ||
   path.startsWith("/forget-password/");
-
-const countingPostsAlone =
-  (limit: MiddlewareHandler): MiddlewareHandler =>
-  (context, next) =>
-    context.req.method === "POST" ? limit(context, next) : next();
 
 const countedByItsOwnGroup = (path: string): boolean =>
   !path.startsWith("/oauth2/") && path !== "/jwks" && !path.startsWith("/.well-known/");
