@@ -521,7 +521,9 @@ def test_runs_a_failed_index_job_again_and_names_it(
     for attempt in (1, 2):
         with queue.connected(bootstrap.database_url) as worker:
             assert loop.tick(worker, bootstrap) is True
-        assert the_job_row(job["id"]) == ("queued", attempt, None)
+        assert the_job_row(job["id"]) == ("queued", attempt, None), (
+            "a failing run goes back to the queue"
+        )
 
     with queue.connected(bootstrap.database_url) as worker:
         assert loop.tick(worker, bootstrap) is True
@@ -531,7 +533,9 @@ def test_runs_a_failed_index_job_again_and_names_it(
     assert outcome["source_document_id"] in {AN_INVOICE_ID, A_SICK_NOTE_ID}
 
     # The binding keeps its last good chunks: nothing was re-uploaded or re-bound.
-    assert passage_rows_of(connection, workspace_id) == passages
+    assert passage_rows_of(connection, workspace_id) == passages, (
+        "the retries kept the good run's passages"
+    )
 
 
 def test_lands_every_passage_column_under_a_source_with_a_visibility(
@@ -1679,7 +1683,7 @@ def test_a_revoked_claimant_moves_no_documents_sensitivity(
         )
 
     # The control: the claim was revoked mid-sync, after the claimant read the source.
-    assert bucket.writes
+    assert bucket.writes, "the claim was revoked after the source was read"
     assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == "Internal"
     assert finding_rows_of(connection, workspace_id) == []
 
@@ -1851,7 +1855,9 @@ def test_a_row_deleting_reason_empties_the_store_before_reading(
     assert set(after_the_wipe.values()).isdisjoint(after_the_rule_change.values())
 
     # The control: without it an empty read below could mean nothing is ever reported.
-    assert first_read == [[AN_INVOICE_ID]]
+    assert first_read == [[AN_INVOICE_ID]], (
+        "the control: a first sync reports what it detects afresh"
+    )
     assert restored_read == [[]], "a restore keeps both stores, the memo among them"
     assert rule_change_read == [[]], (
         "a rule change removes the connected source's store alone"
@@ -1863,7 +1869,7 @@ def test_a_row_deleting_reason_empties_the_store_before_reading(
     assert inodes_of(findings_standing) != {}
     assert inodes_of(files_in(findings_directory)).items() >= (
         inodes_of(findings_standing).items()
-    )
+    ), "the findings store was never removed and remade"
     assert wiped.lmdb_bytes > 0
     assert (
         passage_rows_of(connection, workspace_id)[0]["content"] == AN_INVOICE_REDACTED
@@ -1904,7 +1910,9 @@ def test_a_wipe_leaves_no_old_store_and_tracks_removals_again(
 
     assert old_store.exists() is False
     # The control: without both documents landed, the removal below would prove nothing.
-    assert landed == {AN_INVOICE_ID, A_DELIVERY_NOTE_ID}
+    assert landed == {AN_INVOICE_ID, A_DELIVERY_NOTE_ID}, (
+        "the control: both documents landed before one went"
+    )
     assert {
         row["source_document_id"] for row in passage_rows_of(connection, workspace_id)
     } == {AN_INVOICE_ID}
@@ -1948,6 +1956,26 @@ def test_the_claimant_runs_an_unknown_reason_job_without_raising(
 
     assert (outcome["documents"], outcome["passages"]) == (0, 0)
     assert outcome["lmdb_bytes"] > 0
+
+
+def test_the_job_table_refuses_a_reason_no_descriptor_declares(
+    database: tuple[psycopg.Connection, str],
+) -> None:
+    connection, _dsn = database
+    workspace_id = seed_the_connected_source(connection, documents=())
+
+    with (
+        pytest.raises(psycopg.errors.CheckViolation, match="job_reason_check"),
+        connection.cursor() as cursor,
+    ):
+        seed_job(
+            cursor,
+            workspace_id=workspace_id,
+            kind="index",
+            reason=A_REASON_NO_DESCRIPTOR_DECLARES,
+            subject_id=CONNECTED_SOURCE,
+        )
+    connection.rollback()
 
 
 def test_a_sync_dying_before_landing_leaves_only_the_verdict(

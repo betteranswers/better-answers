@@ -307,7 +307,7 @@ def test_the_seam_answers_plain_numbers_and_opens_the_passage_store(
 
     # The sync writes nothing to a connected source that is gone, so no claim on
     # the job row is ever checked.
-    job = queue.ClaimedJob(
+    job_with_no_row = queue.ClaimedJob(
         workspace_id=workspace_id,
         id="01M2JOBAAAAAAAAAAAAAAAAAAA",
         kind="index",
@@ -316,7 +316,9 @@ def test_the_seam_answers_plain_numbers_and_opens_the_passage_store(
         attempts=1,
     )
 
-    outcome = index_connected_source(bootstrap_for(dsn, tmp_path), sync, job=job)
+    outcome = index_connected_source(
+        bootstrap_for(dsn, tmp_path), sync, job=job_with_no_row
+    )
 
     assert outcome.as_row() == {
         "documents": 0,
@@ -372,6 +374,36 @@ def test_removing_a_store_never_made_passes_quietly(tmp_path: Path) -> None:
         host.remove_connected_source_store(sync)
 
         assert not host.connected_source_directory(sync).exists()
+
+
+def files_under(directory: Path) -> int:
+    return sum(item.stat().st_size for item in directory.rglob("*") if item.is_file())
+
+
+def test_a_sources_lmdb_size_counts_both_its_stores(tmp_path: Path) -> None:
+    sync = a_sync_on("connected-source-one")
+
+    with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
+        host.open_connected_source(sync)
+        passage_store = files_under(host.store_directory(sync, CONNECTED_SOURCE_STORE))
+        findings = files_under(host.store_directory(sync, FINDINGS_STORE))
+
+        assert findings > 0
+        assert host.lmdb_bytes(sync) == passage_store + findings
+
+
+def test_a_removed_store_reopens_fresh_on_disk(tmp_path: Path) -> None:
+    sync = a_sync_on("connected-source-one")
+
+    with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
+        host.open_connected_source(sync)
+        passage_store = host.store_directory(sync, CONNECTED_SOURCE_STORE)
+
+        host.remove_connected_source_store(sync)
+        assert not passage_store.exists()
+
+        host.open_connected_source(sync)
+        assert passage_store.is_dir()
 
 
 def test_a_store_that_cannot_be_removed_fails_the_removal(

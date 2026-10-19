@@ -31,7 +31,13 @@ from factories import (
     seed_map_generation,
     seed_workspace,
 )
-from pg_harness import migrated_postgres_at, stamp_contract, stamp_migration
+from pg_harness import (
+    login_in_role,
+    migrated_postgres_at,
+    stamp_contract_as_migrate_does,
+    stamp_migration,
+)
+from test_pipeline_host import WORKER_LOGIN, WORKER_PASSWORD, as_role
 
 WORKER = "worker-under-test"
 IRI = "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM"
@@ -317,7 +323,9 @@ def test_a_failed_audit_counts_so_idle_ticks_queue_no_other(
             " WHERE workspace_id = %s ORDER BY enqueued_at",
             (workspace,),
         )
-        assert cursor.fetchall() == [("failed", 3)]
+        assert cursor.fetchall() == [("failed", 3)], (
+            "a failed audit runs to its bound of three"
+        )
 
 
 def test_refuses_a_malformed_workspace_id_before_touching_the_store(
@@ -547,13 +555,15 @@ def refusals_in(
 
 REFUSES = "a deploy stamp does not match; claiming nothing"
 
+IDLE_SLEEPS_THE_DETECTORS_IMPORT_MAY_TAKE = 4
+
 
 def test_a_mismatched_schema_stamp_claims_nothing_and_exits_one(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = a_workspace_with_a_queued_audit(database, tmp_path)
     with database.cursor() as cursor:
-        stamp_contract(cursor, digest=CONTRACT_DIGEST)
+        stamp_contract_as_migrate_does(cursor, digest=CONTRACT_DIGEST)
         stamp_migration(
             cursor,
             digest="a-migration-this-worker-has-never-seen",
@@ -573,7 +583,7 @@ def test_a_mismatched_contract_digest_claims_nothing_and_exits_one(
 ) -> None:
     workspace = a_workspace_with_a_queued_audit(database, tmp_path)
     with database.cursor() as cursor:
-        stamp_contract(cursor, digest="a" * 64)
+        stamp_contract_as_migrate_does(cursor, digest="a" * 64)
     database.commit()
 
     with capture_logs() as written:
@@ -588,7 +598,7 @@ def test_a_worker_with_matching_stamps_runs_what_is_queued(
 ) -> None:
     workspace = a_workspace_with_a_queued_audit(database, tmp_path)
     with database.cursor() as cursor:
-        stamp_contract(cursor, digest=CONTRACT_DIGEST)
+        stamp_contract_as_migrate_does(cursor, digest=CONTRACT_DIGEST)
     database.commit()
 
     with capture_logs() as written:
@@ -623,7 +633,7 @@ def test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes(
 ) -> None:
     workspace = a_workspace_with_a_queued_audit(database, tmp_path)
     with database.cursor() as cursor:
-        stamp_contract(cursor, digest="b" * 64)
+        stamp_contract_as_migrate_does(cursor, digest="b" * 64)
     database.commit()
 
     with capture_logs() as written:
@@ -631,7 +641,9 @@ def test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes(
         running.start()
         # A daemon thread because the loop never returns on its own, and the stamp is
         # corrected from a connection of its own while it sleeps.
-        refused_by = time.monotonic() + loop.IDLE_SLEEP_SECONDS * 4
+        refused_by = time.monotonic() + (
+            loop.IDLE_SLEEP_SECONDS * IDLE_SLEEPS_THE_DETECTORS_IMPORT_MAY_TAKE
+        )
         # Not a fixed pause: the loop first imports the detector's stack, which in a
         # process that has not loaded it yet takes longer than one.
         while not refusals_in(written) and time.monotonic() < refused_by:
@@ -640,8 +652,10 @@ def test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes(
             psycopg.connect(_WHERE[database], autocommit=True) as deploying,
             deploying.cursor() as cursor,
         ):
-            stamp_contract(cursor, digest=CONTRACT_DIGEST)
-        deadline = time.monotonic() + loop.IDLE_SLEEP_SECONDS * 4
+            stamp_contract_as_migrate_does(cursor, digest=CONTRACT_DIGEST)
+        deadline = time.monotonic() + (
+            loop.IDLE_SLEEP_SECONDS * IDLE_SLEEPS_THE_DETECTORS_IMPORT_MAY_TAKE
+        )
         while time.monotonic() < deadline:
             if audit_job(database, workspace)[0] == "done":
                 break
@@ -688,6 +702,28 @@ def test_healthy_with_a_fresh_lease_unhealthy_with_a_waiting_queue(
         cursor.execute("UPDATE job SET lease_expires_at = now() - interval '1 minute'")
 
     assert health.is_healthy(database, WORKER) is False
+
+
+def test_the_worker_role_counts_a_waiting_job_as_unhealthy(
+    database: psycopg.Connection,
+) -> None:
+    login_in_role(
+        database, login=WORKER_LOGIN, password=WORKER_PASSWORD, role="worker_rt"
+    )
+    workspace = seed_workspace(database.cursor())["id"]
+    database.commit()
+    with scoped(database, workspace) as cursor:
+        seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="nightly-audit",
+            enqueued_ago_seconds=300,
+        )
+
+    with queue.connected(
+        as_role(_WHERE[database], WORKER_LOGIN, WORKER_PASSWORD)
+    ) as worker:
+        assert health.is_healthy(worker, WORKER) is False
 
 
 def test_a_long_run_keeps_its_lease_on_its_own_connection(

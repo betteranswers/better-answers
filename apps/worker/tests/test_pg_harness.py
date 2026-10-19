@@ -214,6 +214,38 @@ def test_shared_address_matches_the_scripts_uri(
     assert shared_address() == lines["uri"]
 
 
+CHILD_PRINTS_THE_IMAGE_AND_ADDRESS = """
+import sys
+
+sys.path.insert(0, {tests!r})
+
+from pg_harness import pinned_postgres_image, shared_address
+
+print(pinned_postgres_image())
+print(shared_address())
+"""
+
+
+def the_harness_answers_in_a_fresh_process() -> list[str]:
+    script = CHILD_PRINTS_THE_IMAGE_AND_ADDRESS.format(tests=str(Path(__file__).parent))
+    return subprocess.run(
+        (sys.executable, "-c", script), capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+
+
+def test_the_harness_pins_the_image_whatever_the_caller_sets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(PORT_OVERRIDE, raising=False)
+    monkeypatch.delenv("TEST_POSTGRES_IMAGE", raising=False)
+    unset = the_harness_answers_in_a_fresh_process()
+
+    monkeypatch.setenv("TEST_POSTGRES_IMAGE", OTHER_IMAGE)
+
+    assert the_harness_answers_in_a_fresh_process() == unset
+    assert unset == [pinned_postgres_image(), shared_address()]
+
+
 @contextmanager
 def _throwaway_postgres(command: str | None) -> Iterator[int]:
     container = PostgresContainer(
@@ -426,7 +458,8 @@ def test_stamps_an_unstamped_template_rather_than_dropping_it(
 def test_leaves_stale_templates_outside_its_prefix_alone(
     maintenance: str, unique: Callable[[str], str]
 ) -> None:
-    theirs = _planted(maintenance, unique, LONG_AGO, "tpl_probe_age")
+    a_prefix_no_tier_sweeps = "tpl_probe_age"
+    theirs = _planted(maintenance, unique, LONG_AGO, a_prefix_no_tier_sweeps)
 
     _ensure_another(maintenance, unique)
 

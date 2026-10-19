@@ -535,6 +535,14 @@ def test_refuses_a_statement_it_cannot_read_or_prepare(
     assert planted.problems == problems, why
 
 
+def test_prose_opening_with_select_is_never_taken_for_sql(tmp_path: Path) -> None:
+    source = 'HINT = "Select a file"\nNOTE = "Set aside"\nORPHAN = "SELECT 1"\n'
+
+    planted = survey(plant(tmp_path, source), tables={}, unpreparable={})
+
+    assert planted.problems == ["planted:<module> line 3: a statement no send reaches"]
+
+
 def test_sets_aside_an_unpreparable_statement_named_with_its_reason(
     tmp_path: Path,
 ) -> None:

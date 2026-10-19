@@ -1,6 +1,6 @@
 import re
 from collections.abc import Callable, Mapping, Sequence
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 from .concept_file import (
     Frontmatter,
@@ -409,7 +409,10 @@ def _link_target_of(
     return definitions.get(_label_key(text[1:-1]))
 
 
-def _target_of(raw: str, from_path: str) -> tuple[str, str] | None:
+type _TargetShape = Literal["iri", "path"]
+
+
+def _target_of(raw: str, from_path: str) -> tuple[_TargetShape, str] | None:
     bare = raw.split("#")[0]
     if bare == "":
         return None
@@ -625,7 +628,7 @@ class OutgoingReference:
         self,
         relation: str,
         ordinal: int,
-        target: tuple[str, str],
+        target: tuple[_TargetShape, str],
         section: str | None,
         sentence: str | None,
     ) -> None:

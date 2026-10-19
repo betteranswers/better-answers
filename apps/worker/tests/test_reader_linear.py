@@ -27,3 +27,9 @@ def test_reads_a_linked_body_inside_a_second() -> None:
     linked = "[a](b)" * 10_000 + "[" * 20_000
 
     assert taken_by(lambda: links_and_marks_of(linked, FRONTMATTER)) < BODY_MAX_SECONDS
+
+
+def test_reads_four_hundred_thousand_unmatched_backticks_inside_a_second() -> None:
+    no_run_closes = "".join("`" * n + "a" for n in range(1, 900))
+
+    assert taken_by(lambda: prose_of(no_run_closes)) < BODY_MAX_SECONDS

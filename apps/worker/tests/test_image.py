@@ -1475,6 +1475,16 @@ def _root_scripts() -> dict[str, str]:
     return manifest.get("scripts", {})
 
 
+def test_reads_a_run_line_with_or_without_its_dash() -> None:
+    a_step_of_its_own = "      - run: pnpm check:worker"
+    a_step_whose_if_comes_first = "        run: pnpm check:worker"
+
+    assert _gates_of([a_step_of_its_own, a_step_whose_if_comes_first]) == [
+        THIS_TIERS_GATE,
+        THIS_TIERS_GATE,
+    ]
+
+
 def test_this_tier_reads_the_names_the_workflows_actually_hand_it() -> None:
     handed = [
         line
@@ -1503,9 +1513,13 @@ def test_this_tier_reads_the_names_the_workflows_actually_hand_it() -> None:
     assert len(handed) == 1, BUILD_WORKFLOW
     assert mine, CHECK_WORKFLOW
     # One leg per lane, so no run of any lane pays for this tier's gates twice.
-    assert len(mine) == len({job.split("-", 1)[0] for job in mine}), CHECK_WORKFLOW
+    assert len(mine) == len({job.split("-", 1)[0] for job in mine}), (
+        f"{CHECK_WORKFLOW}: one leg per lane runs this tier's gates"
+    )
     assert mine <= deferred, CHECK_WORKFLOW
-    assert misread == set(), CHECK_WORKFLOW
+    assert misread == set(), (
+        f"{CHECK_WORKFLOW}: a leg running named files builds no image"
+    )
 
 
 def test_the_runner_refuses_the_engines_gateway_call_like_the_image() -> None:

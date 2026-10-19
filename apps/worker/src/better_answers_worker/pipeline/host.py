@@ -31,7 +31,7 @@ STILL_OPEN = (
 
 # Sized for a starved runner, not the moment a clone usually takes: a store that stays
 # held raises either way.
-RELEASE_WAIT_SECONDS = 5.0
+STARVED_RUNNER_RELEASE_WAIT_SECONDS = 5.0
 FIRST_PAUSE_SECONDS = 0.05
 LONGEST_PAUSE_SECONDS = 0.5
 
@@ -180,7 +180,7 @@ class Host:
         bootstrap: Bootstrap,
         *,
         environments_held: int = ENVIRONMENTS_HELD,
-        release_wait_seconds: float = RELEASE_WAIT_SECONDS,
+        release_wait_seconds: float = STARVED_RUNNER_RELEASE_WAIT_SECONDS,
     ) -> None:
         # Under one source's handles, the source in use would be the one shed.
         if environments_held < len(STORES_A_CONNECTED_SOURCE_HOLDS):

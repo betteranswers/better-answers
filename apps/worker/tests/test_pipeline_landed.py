@@ -389,7 +389,9 @@ def test_neither_store_holds_any_text_the_seam_withheld(
     )
 
     # Both ways, so an absence below is the store's and never the scan's.
-    assert THE_RULE_THE_MEMO_STORES in findings
+    assert THE_RULE_THE_MEMO_STORES in findings, (
+        "the control: the scan finds what each store holds"
+    )
     assert A_SENTENCE_OF_THE_INVOICE in bytes_under(control)
     for held in (findings, passage_store):
         assert THE_ACCOUNT_NUMBER.encode() not in held
