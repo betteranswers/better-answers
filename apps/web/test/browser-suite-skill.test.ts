@@ -1,25 +1,43 @@
 // @vitest-environment node
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 
-const skillPath = ".claude/skills/browser-suite/SKILL.md";
+const skillDirectory = ".claude/skills/browser-suite";
+const suiteDirectories = ["apps/web/e2e", "apps/web/journeys"];
 
 const NAMED_PATH = /`(?<file>apps\/[\w./-]+\.(?:tsx?|json))`/g;
+const EXPORTED_NAME = /^export (?:async )?(?:function|const|class) (?<name>\w+)/gm;
+const TABLE_ROW_NAME = /^\| `(?<name>\w+)` \|/gm;
+const PLAYWRIGHT_FIXTURES = new Set(["context", "page", "request", "passesTheAccessibilityGate"]);
 
-const skill = readFileSync(path.join(repositoryRoot, skillPath), "utf8");
+function filesIn(directory: string): string[] {
+  return readdirSync(path.join(repositoryRoot, directory)).map((file) => `${directory}/${file}`);
+}
+
+const read = (file: string): string => readFileSync(path.join(repositoryRoot, file), "utf8");
+
+const skillFiles = [
+  `${skillDirectory}/SKILL.md`,
+  ...filesIn(`${skillDirectory}/references`).filter((file) => file.endsWith(".md")),
+];
+const skill = skillFiles.map(read).join("\n");
 const named = [...skill.matchAll(NAMED_PATH)].map((match) => match.groups?.["file"] ?? "");
+
+const suiteFiles = suiteDirectories.flatMap(filesIn).filter((file) => file.endsWith(".ts"));
+const specs = suiteFiles.filter((file) => file.endsWith(".spec.ts")).map(read);
+const modules = suiteFiles.filter((file) => !file.endsWith(".spec.ts"));
 
 describe("the browser-suite skill", () => {
   it("points at files that are in the tree", () => {
     const missing = [...new Set(named)].filter(
       (file) => !existsSync(path.join(repositoryRoot, file)),
     );
-    expect(missing, `${skillPath} names files that do not exist`).toEqual([]);
+    expect(missing, `${skillDirectory} names files that do not exist`).toEqual([]);
   });
 
   it("names the suite's own modules, so the check holds something", () => {
@@ -31,5 +49,33 @@ describe("the browser-suite skill", () => {
         "apps/api/tests/serve.ts",
       ]),
     );
+  });
+
+  it("names every helper that two or more specs share", () => {
+    const shared = modules.flatMap((module) =>
+      [...read(module).matchAll(EXPORTED_NAME)]
+        .map((match) => match.groups?.["name"] ?? "")
+        .filter(
+          (name) => specs.filter((spec) => new RegExp(`\\b${name}\\b`).test(spec)).length >= 2,
+        )
+        .map((name) => ({ module, name })),
+    );
+    expect(shared.length, "no shared helper was found, so the check holds nothing").toBeGreaterThan(
+      0,
+    );
+    const unnamed = shared.filter(({ name }) => !skill.includes(`\`${name}\``));
+    expect(unnamed, `${skillDirectory} leaves out helpers the specs share`).toEqual([]);
+  });
+
+  it("gives rows only to helpers the suite still exports", () => {
+    const exported = new Set(
+      modules.flatMap((module) =>
+        [...read(module).matchAll(EXPORTED_NAME)].map((match) => match.groups?.["name"] ?? ""),
+      ),
+    );
+    const rows = [...skill.matchAll(TABLE_ROW_NAME)].map((match) => match.groups?.["name"] ?? "");
+    const stale = rows.filter((name) => !exported.has(name) && !PLAYWRIGHT_FIXTURES.has(name));
+    expect(rows.length, "no table row was found, so the check holds nothing").toBeGreaterThan(0);
+    expect(stale, `${skillDirectory} has rows for helpers the suite no longer exports`).toEqual([]);
   });
 });
