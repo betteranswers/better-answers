@@ -156,7 +156,7 @@ BA-134 is one line in a tracked skill. It rides here because BA-115 already edit
   - Rejected: module state. It outlives the frame, so a trip through the workspace picker to a home at the same address would draw the offer a second time.
 - KTD13. **The empty state's button takes its words from its caller.** `ListState`'s emptied state gains the button's label, read from one table: "Clear search" on the Console's three lists and on Invitations, whose button clears the search alone, and "Clear filters" on Members and the Audit log.
 - KTD14. **The read is the Console's query for one person, through the read-only identity door.** It lives in `packages/core/src/workspaces/`, answers the Console's row shape, `{ workspace: { id, name }, role }`, in name order, and opens `withIdentityRead` with the platform principal, like `workspacesHeldBy` and `readOpenInvitations`. `member` and `workspace` are outside row-level security on purpose (`packages/schema/src/rls-exemptions.ts`), so the person's id is the only fence, and it comes from the session.
-- KTD15. **The read is declared and admitted before its first await.** It is the first identity-door read to carry a `declareAction`. `admit` passes a platform principal only for a purpose the declaration names, and the api's identity principal is `process:better-answers-identity`.
+- KTD15. **The read carries no declaration.** The kernel cannot declare a platform read for one purpose and no person: a declaration that names a purpose also admits every person whose role reaches the role it names. The fence is the session's person id, which `personProcedure` hands over (KTD16).
 - KTD16. **`person.workspaces` sits on `personProcedure` and takes no input.** The procedure hands the read the session's own person id, so no request can name another person. It is not added to `PENDING_PROCEDURES`: the picker is behind the confirm gate and the switcher is inside the frame.
 - KTD17. **The SPA reads the list from `person.workspaces` and nowhere else.** `useListOrganizations` and its key go.
   - The new read joins `theirOwn` in `aboutTheWorkspace`, or every switch would drop it (`docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md`).
@@ -416,7 +416,7 @@ U1's five parts, U2, U3 and U4 edit disjoint source files and can be built at on
   - modify `apps/api/src/trpc/person.ts`
   - test: modify `packages/core/test/workspaces.test.ts`, `apps/api/tests/procedure-output.test.ts`; modify or create the api's test of the procedure (Deferred to Implementation)
 - **Approach:**
-  1. The read as KTD14 and KTD15 state. Its refusals are the kernel's `malformed`, for an id the boundary will not take, and admission's `role-forbids`. It adds no new word.
+  1. The read as KTD14 and KTD15 state. Its one refusal is the kernel's `malformed`, for an id the boundary will not take. It adds no new word.
   2. The procedure as KTD16 states, through `crossing` with the read's own name as the log label.
   3. Both lists in `procedure-output.test.ts` gain the path. The walks in `apps/api/tests/pending-set.test.ts` and `apps/api/tests/trpc-roads.test.ts` cover it without an edit.
   4. Read `apps/api/CODING_STANDARDS.md` and the `trpc-router` skill under `apps/api/.claude/skills/` before the procedure.
@@ -427,7 +427,6 @@ U1's five parts, U2, U3 and U4 edit disjoint source files and can be built at on
   - Another person's workspace is not in the answer.
   - A person who holds no workspace is answered an empty list, not a refusal.
   - A malformed person id is refused `malformed` before any statement.
-  - A platform principal acting for a purpose the declaration does not name is refused `role-forbids`.
   - The store's failure comes back as an `Error`, never a word. The read joins the two cases in `workspaces.test.ts` that list every identity read by name.
   - A workspace whose member's sign-ins were ended is still listed.
   - Over tRPC, a signed-in member of two workspaces at two roles reads both with their roles.
