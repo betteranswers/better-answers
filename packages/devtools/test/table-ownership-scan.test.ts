@@ -84,7 +84,7 @@ describe("the tables a source names", () => {
   it("counts the line from the file, not from the string", () => {
     const [found] = tablesReadIn(
       "one.ts",
-      `// one\n\nconst q = \`\n  SELECT '\\t'\n  FROM job\`;\n`,
+      `// one\n\nconst q = \`\n  SELECT '\\u{1F600}\\u{1F600}'\nFROM job\`;\n`,
     );
     expect(found?.line, "an escape before the table moved the offsets off the file's").toBe(5);
   });
@@ -177,12 +177,11 @@ describe("the scan over a throwaway tree, slice to map", () => {
     expect(findings(tree)).toEqual([]);
   });
 
-  it("refuses a statement under no slice", () => {
-    const tree = { ...CLEAN, "packages/core/src/kernel/index.ts": statement("SELECT 1 FROM job") };
+  it.each(["kernel", "store"])("refuses a statement under %s, which is no slice", (name) => {
+    const file = `packages/core/src/${name}/index.ts`;
+    const tree = { ...CLEAN, [file]: statement("SELECT 1 FROM job") };
     expect(findings(tree)).toEqual([
-      expect.stringContaining(
-        "packages/core/src/kernel/index.ts:2: names public.job outside every slice",
-      ),
+      expect.stringContaining(`${file}:2: names public.job outside every slice`),
     ]);
   });
 
