@@ -200,6 +200,55 @@ def test_a_claim_hands_the_handler_what_the_job_is_about(
     assert auditing.subject_id is None
 
 
+def test_a_fenced_lapsed_claim_holds_its_subjects_newer_job_back(
+    database: psycopg.Connection,
+) -> None:
+    workspace = str(seed_workspace(database.cursor())["id"])
+    connected_source_id = ulid()
+    with database.cursor() as cursor:
+        older = seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="index",
+            reason="connected",
+            subject_id=connected_source_id,
+            status="claimed",
+            attempts=1,
+            max_attempts=1,
+            enqueued_ago_seconds=60,
+            claimed_by="worker-gone-quiet",
+            lease_expires_in_seconds=600,
+        )
+        newer = seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="index",
+            reason="wiped",
+            subject_id=connected_source_id,
+        )
+    database.commit()
+
+    dsn = _WHERE[database]
+    with queue.connected(dsn) as fencing, queue.connected(dsn) as claiming:
+        with scoped(fencing, workspace) as fence:
+            queue.hold_the_claim(fence, older["id"], "worker-gone-quiet")
+            with scoped(database, workspace) as cursor:
+                cursor.execute(
+                    "UPDATE job SET lease_expires_at = now() - interval '1 second'"
+                    " WHERE id = %s",
+                    (older["id"],),
+                )
+                assert cursor.rowcount == 1
+            with scoped(claiming, workspace) as cursor:
+                while_fenced = queue.claim(cursor, workspace, WORKER, ["index"])
+        with scoped(claiming, workspace) as cursor:
+            once_committed = queue.claim(cursor, workspace, WORKER, ["index"])
+
+    assert while_fenced is None
+    assert once_committed is not None
+    assert once_committed.id == newer["id"]
+
+
 def test_the_loop_runs_a_nightly_audit_it_scheduled_itself(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
