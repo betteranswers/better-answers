@@ -260,17 +260,13 @@ const ERASURE_FAMILY_DESCRIPTORS = {
 } satisfies Record<ErasureFamily, ErasureFamilyDescriptor>;
 
 const soughtWithTheSignInAddresses = (
-  identifiers: SubjectIdentifiers | null,
+  identifiers: SubjectIdentifiers,
   signInAddresses: readonly string[],
 ): readonly SoughtIdentifier[] =>
-  soughtIdentifiersOf({
-    emails: [...(identifiers?.emails ?? []), ...signInAddresses],
-    names: identifiers?.names ?? [],
-    other: identifiers?.other ?? [],
-  });
+  soughtIdentifiersOf({ ...identifiers, emails: [...identifiers.emails, ...signInAddresses] });
 
 const subjectHereOf = async (tx: Tx, request: SubjectRequest): Promise<SubjectHere> => {
-  const emails = (request.identifiers?.emails ?? []).map((email) => email.trim().toLowerCase());
+  const emails = request.identifiers.emails.map((email) => email.trim().toLowerCase());
 
   const personId =
     request.personId === null ? null : boundarySchemas.user.select.shape.id.parse(request.personId);

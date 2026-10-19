@@ -664,13 +664,10 @@ const conceptSensitivityOverrideUpdate = createUpdateSchema(
   conceptSensitivityOverrideRefinements,
 );
 
-const rulesInForce = z.union([
-  z.strictObject({
-    default_on: z.boolean(),
-    default_off: z.boolean(),
-  } satisfies Record<(typeof RULES_IN_FORCE_KEYS)[number], z.ZodBoolean>),
-  z.null(),
-]);
+const rulesInForce = z.strictObject({
+  default_on: z.boolean(),
+  default_off: z.boolean(),
+} satisfies Record<(typeof RULES_IN_FORCE_KEYS)[number], z.ZodBoolean>);
 
 const connectedSourceRefinements = {
   workspaceId,
@@ -737,14 +734,11 @@ const findingUpdate = createUpdateSchema(finding, findingRefinements);
 const subjectIdentifier = z.string().trim().min(1).max(SUBJECT_IDENTIFIER_MAX);
 const subjectIdentifierList = z.array(subjectIdentifier).max(SUBJECT_IDENTIFIERS_MAX);
 const identifierSetOf = (emailsMax: number) =>
-  z.union([
-    z.strictObject({
-      emails: z.array(subjectIdentifier).max(emailsMax),
-      names: subjectIdentifierList,
-      other: subjectIdentifierList,
-    } satisfies Record<(typeof SUBJECT_IDENTIFIER_KINDS)[number], typeof subjectIdentifierList>),
-    z.null(),
-  ]);
+  z.strictObject({
+    emails: z.array(subjectIdentifier).max(emailsMax),
+    names: subjectIdentifierList,
+    other: subjectIdentifierList,
+  } satisfies Record<(typeof SUBJECT_IDENTIFIER_KINDS)[number], typeof subjectIdentifierList>);
 const subjectIdentifiers = identifierSetOf(SUBJECT_IDENTIFIERS_MAX);
 
 const subjectRequestRefinements = {
@@ -761,10 +755,7 @@ const subjectRequestInsert = createInsertSchema(subjectRequest, subjectRequestRe
 const subjectRequestUpdate = createUpdateSchema(subjectRequest, subjectRequestRefinements);
 
 const erasureAction = z.union([z.string(), z.number(), z.boolean(), z.null()]);
-const erasureActions = z.union([
-  z.record(z.string(), z.record(z.string(), erasureAction)),
-  z.null(),
-]);
+const erasureActions = z.record(z.string(), z.record(z.string(), erasureAction));
 
 const erasureRequestRefinements = {
   workspaceId,
@@ -839,7 +830,7 @@ const questionAskedRefinements = {
   predicateGroups: (schema: z.ZodArray<z.ZodString>) => z.array(groupId(schema.element)),
   verdict: (schema: z.ZodString) => schema.pipe(z.enum(QUESTION_VERDICTS)),
   judgeState: (schema: z.ZodString) => schema.pipe(z.enum(JUDGE_STATES)),
-  concepts: (schema: z.ZodType) => schema.pipe(z.union([z.array(recordConcept), z.null()])),
+  concepts: (schema: z.ZodType) => schema.pipe(z.array(recordConcept)),
   unmappedPassages: (schema: z.ZodArray<z.ZodString>) => z.array(schema.element.trim().min(1)),
 };
 

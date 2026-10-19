@@ -515,7 +515,7 @@ const openTheRequest = async (
       const map = await erasureMapOf(platform, tx, doors.git, request);
       const addresses = await addressesOfTheSubject(tx, {
         personIds: [personTheMapFound(map), request.personId],
-        requested: request.identifiers?.emails ?? [],
+        requested: request.identifiers.emails,
       });
       return {
         map,
