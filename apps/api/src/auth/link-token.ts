@@ -116,7 +116,7 @@ export type LinkUse = {
 
 export type SeenLink = Exclude<LinkState, BoundLink> | (BoundLink & { readonly use: LinkUse });
 
-export const shownOf = (link: SeenLink): LinkState =>
+export const shownOf = (link: SeenLink): LinkState & { readonly use?: never } =>
   link.state === "bound" ? { state: "bound", address: link.address, carried: link.carried } : link;
 
 export const codeHashOf = (code: string): string =>
