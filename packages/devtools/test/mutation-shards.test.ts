@@ -306,7 +306,10 @@ describe("a leg's results, merged from its shards", () => {
       ]),
     );
 
-    expect(merged.checkpoint?.testFiles).toEqual(one.testFiles);
+    expect(
+      merged.checkpoint?.testFiles,
+      "a test is keyed by file, line and title, so twins sharing a title stay apart",
+    ).toEqual(one.testFiles);
     expect(
       merged.checkpoint?.files,
       "a test is matched by file, place and title, as Stryker matches one between runs",
@@ -902,7 +905,22 @@ describe("the shards command", () => {
       argv: ["slice", "--leg", "core", "--shard", "1", "--of", "2"],
       says: USAGE,
     },
-    { what: "a flag without its value", argv: ["slice", "--leg"], says: USAGE },
+    {
+      what: "a flag without its value",
+      argv: [
+        "slice",
+        "--leg",
+        "core",
+        "--shard",
+        "1",
+        "--of",
+        "2",
+        "--baseline",
+        NO_PREVIOUS_RUN,
+        "--out",
+      ],
+      says: USAGE,
+    },
     {
       what: "an unknown command",
       argv: [

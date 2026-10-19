@@ -375,7 +375,10 @@ describe("the mutation summary script over files", () => {
   it.each([
     { what: "without a leg", argv: ["--report", reportFile] },
     { what: "without a report", argv: ["--leg", "api"] },
-    { what: "with a flag missing its value", argv: ["--leg", "api", "--report"] },
+    {
+      what: "with --baseline unpaired",
+      argv: ["--leg", "api", "--report", reportFile, "--baseline"],
+    },
   ])("refuses a command line $what", ({ argv }) => {
     expect(() => mutationSummaryFromArgv(argv)).toThrow(
       "usage: mutation-summary --leg <name> --report <path> [--baseline <path>] [--checkpoint <path>]",
