@@ -91,7 +91,7 @@ Enforced by one plugin rule, `better-answers/import-direction` (`packages/devtoo
 
 | Owner | Tables |
 | --- | --- |
-| Better Auth, `apps/api/src/auth` | `user`, `session`, `account`, `verification`, `jwks`, `workspace`, `member`, `invitation`, the `oauth_*` set, `rate_limit` |
+| Better Auth, `apps/api/src/auth` | `user`, `session`, `account`, `verification`, `jwks`, `workspace`, `member`, `invitation`, the `oauth_*` set |
 | the journal's migrator, `apps/api/src` | `contract_stamp` |
 | `store/postgres` | `ingress_counter`, `mcp_call_counter`, `invitation_email_counter` |
 | `workspaces` | `workspace_config` |

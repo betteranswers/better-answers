@@ -1235,20 +1235,10 @@ describe("the limits", () => {
     { path: "/jwks", method: "GET" },
   ] as const;
 
-  /** The paths Better Auth holds a count for, for one address: its key is `address|path`. */
-  const countedByBetterAuth = async (ip: string): Promise<string[]> => {
-    const held = await app.database.superuser.query<{ key: string }>(
-      "SELECT key FROM rate_limit WHERE key LIKE $1 ORDER BY key",
-      [`${ip}|%`],
-    );
-    return held.rows.map((row) => row.key.slice(ip.length + 1));
-  };
-
-  const isOursAlone = async (past: Response, ip: string): Promise<void> => {
+  const isOursAlone = async (past: Response): Promise<void> => {
     expect(past.status).toBe(429);
     expect(Number(past.headers.get("retry-after"))).toBeGreaterThan(0);
     expect(await past.json()).toMatchObject({ error: "too_many_requests" });
-    expect(await countedByBetterAuth(ip)).toEqual([]);
   };
 
   it.each(OAUTH_PATHS)("refuses $path in our words at the 61st only", async ({ path, method }) => {
@@ -1262,17 +1252,16 @@ describe("the limits", () => {
     const past = await client.fetch(path, { method });
 
     expect(statuses).not.toContain(429);
-    await isOursAlone(past, client.ip);
+    await isOursAlone(past);
   });
 
-  it("refuses a client registration outright, before any count", async () => {
+  it("refuses a client registration outright", async () => {
     const client = app.client();
 
     const refused = await client.json("/oauth2/register", { redirect_uris: [CLAUDE_REDIRECT_URI] });
 
     expect(refused.status).toBe(403);
     expect(await refused.json()).toMatchObject({ error: "access_denied" });
-    expect(await countedByBetterAuth(client.ip)).toEqual([]);
   });
 
   const countedByTheApi = async (ip: string): Promise<string[]> => {
@@ -1294,7 +1283,7 @@ describe("the limits", () => {
     const past = await read();
 
     expect([...first, ...second]).not.toContain(429);
-    await isOursAlone(past, client.ip);
+    await isOursAlone(past);
   });
 
   it("refuses no page, however often it is loaded", async () => {
@@ -1308,7 +1297,6 @@ describe("the limits", () => {
     ].map((answer) => answer.status);
 
     expect([...signIn, ...another, ...besideAnEndpoint]).not.toContain(429);
-    expect(await countedByBetterAuth(client.ip)).toEqual([]);
     expect(await countedByTheApi(client.ip)).toEqual([]);
   });
 
@@ -1340,13 +1328,11 @@ describe("the limits", () => {
       await client.fetch(path.replaceAll(/:[a-z_]+/g, "any"), { method: "POST" });
       counts.push({ path, count: (await countedByTheApi(client.ip)).join(" and ") || "none" });
     }
-    const heldByBetterAuth = await app.database.superuser.query("SELECT key FROM rate_limit");
 
     expect(counts).toEqual(counts.map(({ path }) => ({ path, count: counterExpectedFor(path) })));
     expect(counts.map(({ path }) => path)).toEqual(
       expect.arrayContaining([...EMAIL_CODE_PATHS, "/oauth2/end-session/confirm"]),
     );
-    expect(heldByBetterAuth.rows).toEqual([]);
   });
 
   const A_POST_BODY = JSON.stringify({
@@ -1434,7 +1420,7 @@ describe("the limits", () => {
     const past = await aSend(client);
 
     expect(statuses).toEqual([200, 200, 200, 200, 200]);
-    await isOursAlone(past, client.ip);
+    await isOursAlone(past);
   });
 
   it("refuses by email before it counts the address", async () => {

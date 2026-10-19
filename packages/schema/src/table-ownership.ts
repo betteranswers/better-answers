@@ -29,7 +29,6 @@ export const TABLE_OWNERS = {
   "public.oauth_access_token": IDENTITY_PROVIDER,
   "public.oauth_consent": IDENTITY_PROVIDER,
   "public.oauth_client_assertion": IDENTITY_PROVIDER,
-  "public.rate_limit": IDENTITY_PROVIDER,
   "public.authenticator": IDENTITY_PROVIDER,
   "public.passkey": IDENTITY_PROVIDER,
   "public.passkey_last_use": IDENTITY_PROVIDER,

@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0085_the-erased-requester"
+MIGRATION_ID = "0086_the-dropped-rate-limit"
 
-MIGRATION_WHEN = 1792419763064
+MIGRATION_WHEN = 1792437444153
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -517,12 +517,6 @@ TABLES: dict[str, dict[str, str]] = {
         "disputed_concept": "text",
         "closed_as": "text",
         "closed_at": "timestamp with time zone",
-    },
-    "public.rate_limit": {
-        "id": "text NOT NULL",
-        "key": "text NOT NULL",
-        "count": "integer NOT NULL",
-        "last_request": "bigint NOT NULL",
     },
     "public.recovery_code": {
         "id": "text NOT NULL",

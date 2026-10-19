@@ -449,13 +449,6 @@ export const secondFactorThrottle = pgTable(
   ],
 );
 
-export const rateLimit = pgTable("rate_limit", {
-  id: text("id").primaryKey(),
-  key: text("key").notNull().unique(),
-  count: integer("count").notNull(),
-  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
-});
-
 export const IDENTITY_SET = [
   "public.user",
   "public.session",
@@ -472,7 +465,6 @@ export const IDENTITY_SET = [
   "public.oauth_access_token",
   "public.oauth_consent",
   "public.oauth_client_assertion",
-  "public.rate_limit",
   "public.authenticator",
   "public.passkey",
   "public.passkey_last_use",

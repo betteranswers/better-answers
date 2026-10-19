@@ -44,7 +44,6 @@ import {
   oauthRefreshToken,
   oauthResource,
   passkey,
-  rateLimit,
   session,
   user,
   verification,
@@ -127,7 +126,6 @@ const identitySchema = {
   oauthAccessToken,
   oauthConsent,
   oauthClientAssertion,
-  rateLimit,
   authenticator,
   passkey,
 };
