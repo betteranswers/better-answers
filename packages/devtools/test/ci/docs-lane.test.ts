@@ -419,7 +419,8 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   },
   {
     file: "apps/web/test/browser-suite-skill.test.ts",
-    reads: ".claude/skills/browser-suite/SKILL.md, and every path under apps/ it names",
+    reads:
+      ".claude/skills/browser-suite/SKILL.md and its references, every path under apps/ they name, and the suite's modules and specs for the helpers they share",
     inTheLane: "check:docs:web",
   },
   {
