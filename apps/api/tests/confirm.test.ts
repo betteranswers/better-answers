@@ -6,7 +6,7 @@ import { authenticatorCodeAt, keyIn } from "@better-answers/schema/testing/authe
 
 import { confirmWithTheAuthenticator } from "./flow.ts";
 import type { TestClient } from "./harness.ts";
-import { aPasskeyDevice, type PasskeyDevice } from "./passkey-device.ts";
+import { aPasskeyDevice, type Assertion, type PasskeyDevice } from "./passkey-device.ts";
 import {
   aPersonHoldingEverything,
   aPersonSignedIn,
@@ -93,8 +93,8 @@ const askToConfirm = async (client: TestClient): Promise<unknown> => {
   return asked.json();
 };
 
-const confirmOn = async (client: TestClient, device: PasskeyDevice, verified = true) =>
-  client.json(PASSKEY, { response: device.get(await askToConfirm(client), { verified }) });
+const confirmOn = async (client: TestClient, device: PasskeyDevice, assertion?: Assertion) =>
+  client.json(PASSKEY, { response: device.get(await askToConfirm(client), assertion) });
 
 const wrongCodesFrom = async (clients: readonly TestClient[], key: string, times: number) => {
   const statuses: number[] = [];
@@ -149,12 +149,15 @@ describe("confirming with a passkey", () => {
     expect(await confirmedOf(client)).toBeNull();
   });
 
-  it("refuses an answer made without user verification", async () => {
+  it.each([
+    ["made without user verification", { verified: false }],
+    ["signed by another key", { signedWithAnotherKey: true }],
+  ])("refuses an answer %s, stamping nothing", async (_how, assertion) => {
     const { person, client: setUpIn } = await aPersonSignedIn(app());
     const { device } = await passkeyAddedOn(setUpIn);
     const client = await signedInClient(app(), person.email);
 
-    const answered = await confirmOn(client, device, false);
+    const answered = await confirmOn(client, device, assertion);
 
     expect(answered.status).toBe(400);
     expect(await answered.json()).toEqual({ error: "not-verified" });

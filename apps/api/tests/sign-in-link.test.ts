@@ -508,13 +508,16 @@ describe("signing in through a link", () => {
     expect(await signedIn.json()).toMatchObject({ carried: "?redirect=%2Finvitations%2F01ABC" });
   });
 
-  it("drops a return path that leaves this origin", async () => {
-    const person = await app().person();
-    const asking = app().client();
-    const { token } = await askedFor(asking, person.email, { redirect: "//elsewhere.example/x" });
+  it.each(["//elsewhere.example/x", String.raw`/\elsewhere.example/x`, "/\t/elsewhere.example/x"])(
+    "drops a return path that leaves this origin: %s",
+    async (redirect) => {
+      const person = await app().person();
+      const asking = app().client();
+      const { token } = await askedFor(asking, person.email, { redirect });
 
-    expect(await describedAs(asking, token)).toMatchObject({ state: "bound", carried: "" });
-  });
+      expect(await describedAs(asking, token)).toMatchObject({ state: "bound", carried: "" });
+    },
+  );
 
   it.each([
     ["altered", "to_jsonb('A' || (value::jsonb ->> 'sealed'))"],

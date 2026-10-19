@@ -2,13 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { flushSync } from "react-dom";
 
-import {
-  ceilingLiftsIn,
-  refusalOf,
-  useTRPC,
-  type ApiError,
-  type Refusal,
-} from "@/shared/api/trpc.ts";
+import { ceilingLiftsIn, refusalOf, useTRPC, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { STOCK, stockWait } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -22,7 +16,7 @@ import {
   SHORT_NAME_EXAMPLE,
 } from "./ask-to-join-words.ts";
 import { focusOn, Refused } from "./auth-page.tsx";
-import { REASON_REFUSED } from "./refusal-words.ts";
+import { saidOfAnAskToJoinRefusal } from "./refusal-words.ts";
 
 export const ASK_TO_JOIN: Keystroke = { key: "j", action: ASK_TO_JOIN_WORDS.heading };
 
@@ -41,9 +35,6 @@ const REFUSED = "ask-to-join-refused";
 const SENT = "ask-to-join-sent";
 
 const SENT_TITLE = "ask-to-join-sent-title";
-
-const saidOf = (refusal: Refusal): string =>
-  refusal.class === "malformed" ? REASON_REFUSED : STOCK.general;
 
 const unansweredOf = (failure: Error | ApiError): string => {
   const liftsInSeconds = ceilingLiftsIn(failure);
@@ -71,7 +62,7 @@ function AskOutcome(properties: {
       <Refused
         id={REFUSED}
         failure={failure}
-        saidOf={saidOf}
+        saidOf={saidOfAnAskToJoinRefusal}
         unanswered={failure === null ? STOCK.tryAgain : unansweredOf(failure)}
       />
       {properties.sent ? <RequestSent /> : null}

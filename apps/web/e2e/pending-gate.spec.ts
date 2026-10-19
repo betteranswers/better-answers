@@ -96,15 +96,20 @@ test("a pending connection to Claude resumes at the workspace picker", async ({
   await expect(page.getByRole("heading", { level: 1, name: "Connect Claude" })).toBeVisible();
 });
 
-test("a return address on another origin lands on home", async ({ page, request }) => {
-  const { key } = await anAdminWaiting(page, request, "Selby Roofing");
+for (const [redirect, workspaceName] of [
+  ["//evil.example", "Selby Roofing"],
+  ["/\t/evil.example", "Selby Glazing"],
+] as const) {
+  test(`a return address ${JSON.stringify(redirect)} lands on home`, async ({ page, request }) => {
+    const { key } = await anAdminWaiting(page, request, workspaceName);
 
-  await page.goto(`/confirm?redirect=${encodeURIComponent("//evil.example")}`);
-  await confirmedWith(page, key);
+    await page.goto(`/confirm?redirect=${encodeURIComponent(redirect)}`);
+    await confirmedWith(page, key);
 
-  await landedAtHome(page, "Admin");
-  expect(landedAt(page).origin).not.toBe("https://evil.example");
-});
+    await landedAtHome(page, "Admin");
+    expect(landedAt(page).origin).not.toBe("https://evil.example");
+  });
+}
 
 test("an hour unconfirmed ends the sign-in; signing in returns there", async ({
   page,
