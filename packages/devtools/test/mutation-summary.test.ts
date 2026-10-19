@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -148,6 +148,19 @@ describe("the mutation summary", () => {
 
     expect(summary).toContain("### api new survivors: 1\n");
     expect(summary).toContain("- `src/answer.ts:2` — ArithmeticOperator — `n - 1`\n");
+    expect(summary).not.toContain("src/answer.ts:3");
+  });
+
+  it("tells alike mutants apart by the text they mutate", () => {
+    const baseline = report(SOURCE, [mutant("StringLiteral", '""', OTHER, "Survived", 1)]);
+    const current = report(SOURCE, [
+      mutant("StringLiteral", '""', LABEL, "Survived", 1),
+      mutant("StringLiteral", '""', OTHER, "Survived", 1),
+    ]);
+
+    const summary = mutationSummary("api", current, baseline).summary;
+
+    expect(summary).toContain('- `src/answer.ts:2` — StringLiteral — `""` (not in the baseline)\n');
     expect(summary).not.toContain("src/answer.ts:3");
   });
 
@@ -337,8 +350,37 @@ describe("the mutation summary script over files", () => {
     ).toContain("### api new survivors: no baseline — ");
   });
 
-  it("refuses a command line without a leg or a report", () => {
-    expect(() => mutationSummaryFromArgv(["--report", reportFile])).toThrow(
+  it.each([
+    {
+      what: "JSON that is not a report",
+      make: (file: string) => {
+        writeFileSync(file, '{"schemaVersion": "1.0"}');
+      },
+    },
+    {
+      what: "a report path naming a directory",
+      make: (file: string) => {
+        mkdirSync(file);
+      },
+    },
+  ])("reads $what as no report", ({ what, make }) => {
+    const file = path.join(scratch, what.replaceAll(" ", "-"));
+    make(file);
+
+    expect(mutationSummaryFromArgv(["--leg", "core", "--report", file]).summary).toBe(
+      "### core mutation score: no report\n",
+    );
+  });
+
+  it.each([
+    { what: "without a leg", argv: ["--report", reportFile] },
+    { what: "without a report", argv: ["--leg", "api"] },
+    {
+      what: "with --baseline unpaired",
+      argv: ["--leg", "api", "--report", reportFile, "--baseline"],
+    },
+  ])("refuses a command line $what", ({ argv }) => {
+    expect(() => mutationSummaryFromArgv(argv)).toThrow(
       "usage: mutation-summary --leg <name> --report <path> [--baseline <path>] [--checkpoint <path>]",
     );
   });

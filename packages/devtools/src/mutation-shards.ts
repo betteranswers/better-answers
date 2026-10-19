@@ -70,10 +70,10 @@ export const mutateSet = (root: string, patterns: readonly string[]): readonly s
 
 const ORDINARY_SECONDS = 10;
 const STATIC_SECONDS = 13;
-const TIMEOUT_SECONDS = 370;
+const RELATED_SUITE_SECONDS = 370;
 
 const secondsOf = (found: Mutant): number => {
-  if (found.status === "Timeout") return TIMEOUT_SECONDS;
+  if (found.status === "Timeout") return RELATED_SUITE_SECONDS;
   if (found.status === "NoCoverage") return 0;
   return found.static === true ? STATIC_SECONDS : ORDINARY_SECONDS;
 };

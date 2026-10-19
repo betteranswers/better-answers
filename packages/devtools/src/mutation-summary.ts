@@ -60,9 +60,12 @@ const spanText = (source: string, location: ReportMutant["location"]): string =>
 };
 
 const identity = (placed: Placed): string =>
-  [placed.file, placed.mutant.mutatorName, placed.mutant.replacement ?? "", placed.text].join(
-    "\u0000",
-  );
+  JSON.stringify([
+    placed.file,
+    placed.mutant.mutatorName,
+    placed.mutant.replacement ?? "",
+    placed.text,
+  ]);
 
 const placedIn = (report: Report): readonly Placed[] =>
   Object.entries(report.files).flatMap(([file, entry]) =>
