@@ -66,6 +66,8 @@ def _object_item_of(
             raise MalformedConceptFileError(
                 f"a nested list is not written here: {key!r}"
             )
+        if key in entry:
+            raise MalformedConceptFileError(f"a key written twice: {key!r}")
         entry[key] = _scalar_of(rest)
         if at >= close or not lines[at].startswith("    "):
             return entry, at
