@@ -4,7 +4,7 @@ import re
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import Any, Literal, TypedDict, cast
 
 import anydoc
 import asyncpg
@@ -763,10 +763,11 @@ def test_marks_an_unreadable_document_on_its_own_catalogue_row(
         documents=(AN_INVOICE_ID, A_SICK_NOTE_ID),
         media_types={A_SICK_NOTE_ID: "application/pdf"},
     )
-    bucket = a_bucket_holding_the_three()
 
     outcome = indexed(
-        bootstrap_for(dsn, tmp_path), sync_for(workspace_id), copies=bucket
+        bootstrap_for(dsn, tmp_path),
+        sync_for(workspace_id),
+        copies=a_bucket_holding_the_three(),
     )
 
     assert outcome.documents == 1
@@ -783,7 +784,6 @@ def test_marks_an_unreadable_document_on_its_own_catalogue_row(
     assert [
         row["source_document_id"] for row in passage_rows_of(connection, workspace_id)
     ] == [AN_INVOICE_ID]
-    assert bucket.writes == [normalised_key_of(AN_INVOICE_ID)]
 
 
 def test_a_textless_pdf_names_ocr_on_its_row(
@@ -848,6 +848,7 @@ def test_marks_an_unlisted_media_type_unreadable_on_its_row(
     assert {
         row["source_document_id"] for row in passage_rows_of(connection, workspace_id)
     } == {AN_INVOICE_ID}
+    assert bucket.writes == [normalised_key_of(AN_INVOICE_ID)]
 
 
 def test_lands_the_deadline_on_an_overrunning_documents_row(
@@ -1643,10 +1644,12 @@ REVOCATIONS = [
 ]
 
 
-@pytest.mark.parametrize("revoking", REVOCATIONS)
-def test_a_revoked_claimant_writes_no_copy_and_moves_no_sensitivity(
-    database: tuple[psycopg.Connection, str], tmp_path: Path, revoking: str
-) -> None:
+def indexed_by_a_claimant_revoked_on(
+    hook: Literal["read", "write"],
+    database: tuple[psycopg.Connection, str],
+    tmp_path: Path,
+    revoking: str,
+) -> tuple[str, ABucket]:
     connection, dsn = database
     workspace_id = a_connected_source_whose_document_stands_at(
         connection, A_SICK_NOTE_ID, "Internal"
@@ -1662,13 +1665,26 @@ def test_a_revoked_claimant_writes_no_copy_and_moves_no_sensitivity(
 
     bucket = ABucket(
         {original_key_of(A_SICK_NOTE_ID): A_SICK_NOTE.encode()},
-        on_read=revoke_the_claim,
+        on_read=revoke_the_claim if hook == "read" else None,
+        on_write=revoke_the_claim if hook == "write" else None,
     )
 
     with pytest.raises(queue.ClaimLostError):
         index_connected_source(
             bootstrap, sync_for(workspace_id), job=job, copies=bucket
         )
+    return workspace_id, bucket
+
+
+@pytest.mark.parametrize("revoking", REVOCATIONS)
+def test_a_revoked_claimant_writes_no_copy_and_moves_no_sensitivity(
+    database: tuple[psycopg.Connection, str], tmp_path: Path, revoking: str
+) -> None:
+    connection, _ = database
+
+    workspace_id, bucket = indexed_by_a_claimant_revoked_on(
+        "read", database, tmp_path, revoking
+    )
 
     assert bucket.reads == [original_key_of(A_SICK_NOTE_ID)]
     assert bucket.writes == []
@@ -1680,28 +1696,11 @@ def test_a_revoked_claimant_writes_no_copy_and_moves_no_sensitivity(
 def test_a_claim_lost_after_the_catalogue_lands_no_passages(
     database: tuple[psycopg.Connection, str], tmp_path: Path, revoking: str
 ) -> None:
-    connection, dsn = database
-    workspace_id = a_connected_source_whose_document_stands_at(
-        connection, A_SICK_NOTE_ID, "Internal"
+    connection, _ = database
+
+    workspace_id, bucket = indexed_by_a_claimant_revoked_on(
+        "write", database, tmp_path, revoking
     )
-    bootstrap = bootstrap_for(dsn, tmp_path)
-    with connection.cursor() as cursor:
-        job = a_claimed_index_job(cursor, workspace_id, claimed_by=bootstrap.worker_id)
-    connection.commit()
-
-    def revoke_the_claim() -> None:
-        connection.execute(revoking, (job.id,))
-        connection.commit()
-
-    bucket = ABucket(
-        {original_key_of(A_SICK_NOTE_ID): A_SICK_NOTE.encode()},
-        on_write=revoke_the_claim,
-    )
-
-    with pytest.raises(queue.ClaimLostError):
-        index_connected_source(
-            bootstrap, sync_for(workspace_id), job=job, copies=bucket
-        )
 
     assert bucket.writes == [normalised_key_of(A_SICK_NOTE_ID)]
     assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == "Restricted"
