@@ -842,3 +842,87 @@ def test_a_long_run_keeps_its_lease_on_its_own_connection(
 
     assert after is not None, "the heartbeat never reached a reader outside the job"
     assert after[1] > before[1], "and the lease moved with it"
+
+
+def _within[T](seconds: float, read: Callable[[], T]) -> T | None:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        found = read()
+        if found:
+            return found
+        time.sleep(0.05)
+    return None
+
+
+def _heartbeat_sessions(
+    onlooker: psycopg.Connection, database: psycopg.Connection
+) -> list[int]:
+    rows = onlooker.execute(
+        "SELECT pid FROM pg_stat_activity WHERE datname = current_database()"
+        " AND backend_type = 'client backend' AND NOT pid = ANY(%s)",
+        ([onlooker.info.backend_pid, database.info.backend_pid],),
+    ).fetchall()
+    return [int(row[0]) for row in rows]
+
+
+def _lease_of(onlooker: psycopg.Connection, workspace: str) -> tuple[Any, bool]:
+    with scoped(onlooker, workspace) as cursor:
+        cursor.execute("SELECT heartbeat_at, lease_expires_at > now() FROM job")
+        row = cursor.fetchone()
+    assert row is not None
+    return row[0], bool(row[1])
+
+
+def _claimed_audit(database: psycopg.Connection) -> tuple[str, queue.ClaimedJob]:
+    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
+    with scoped(database, workspace) as cursor:
+        claimed = queue.claim(cursor, workspace, WORKER, list(KINDS))
+    assert claimed is not None
+    return workspace, claimed
+
+
+def test_a_heartbeat_outlives_a_dropped_connection(
+    database: psycopg.Connection,
+) -> None:
+    workspace, claimed = _claimed_audit(database)
+    dsn = _WHERE[database]
+
+    with (
+        queue.connected(dsn) as onlooker,
+        queue.keeping_alive(dsn, claimed, WORKER, every_seconds=0.05),
+    ):
+        beating = _within(10, lambda: _heartbeat_sessions(onlooker, database))
+        assert beating, "the heartbeat never opened a session"
+        onlooker.execute("SELECT pg_terminate_backend(%s)", (beating[0],))
+        assert _within(
+            10,
+            lambda: beating[0] not in _heartbeat_sessions(onlooker, database),
+        )
+        dropped_at, _ = _lease_of(onlooker, workspace)
+        renewed = _within(10, lambda: _lease_of(onlooker, workspace)[0] > dropped_at)
+        _, live = _lease_of(onlooker, workspace)
+
+    assert renewed, "the heartbeat stopped at the dropped connection"
+    assert live, "and the lease lapsed"
+
+
+def test_a_heartbeat_whose_claim_is_gone_says_so_and_stops(
+    database: psycopg.Connection,
+) -> None:
+    workspace, claimed = _claimed_audit(database)
+    dsn = _WHERE[database]
+
+    with (
+        capture_logs() as written,
+        queue.connected(dsn) as onlooker,
+        queue.keeping_alive(dsn, claimed, WORKER, every_seconds=0.05),
+    ):
+        assert _within(10, lambda: _heartbeat_sessions(onlooker, database))
+        with scoped(onlooker, workspace) as cursor:
+            cursor.execute("UPDATE job SET claimed_by = 'another-worker'")
+        stopped = _within(10, lambda: not _heartbeat_sessions(onlooker, database))
+
+    assert stopped, "the heartbeat kept its session after the claim was gone"
+    assert [
+        line["job_id"] for line in written if line["event"] == "the claim was lost"
+    ] == [claimed.id]
