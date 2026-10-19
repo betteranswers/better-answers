@@ -156,6 +156,47 @@ describe("the journal's meta folder", () => {
       error: { kind: "chain-unrooted", snapshot: "0000_snapshot.json" },
     });
   });
+
+  it("checks entries, then snapshots, then the chain", () => {
+    const everyFault = aCopyWithAPlantedLink("0002_snapshot.json");
+    rmSync(path.join(everyFault, "0001_snapshot.json"));
+    writeFileSync(path.join(everyFault, "9999_snapshot.json"), "{}");
+    const orphanAndBrokenLink = aCopyWithAPlantedLink("0002_snapshot.json");
+    writeFileSync(path.join(orphanAndBrokenLink, "9999_snapshot.json"), "{}");
+
+    expect([journalSnapshotsIn(everyFault), journalSnapshotsIn(orphanAndBrokenLink)]).toMatchObject(
+      [
+        { ok: false, error: { kind: "snapshot-missing" } },
+        { ok: false, error: { kind: "snapshot-orphaned" } },
+      ],
+    );
+  });
+
+  it("throws on a journal or snapshot that does not parse", () => {
+    const unreadableJournal = aCopyOfMeta();
+    writeFileSync(path.join(unreadableJournal, "_journal.json"), "not a journal");
+    const unreadableSnapshot = aCopyOfMeta();
+    writeFileSync(path.join(unreadableSnapshot, "0000_snapshot.json"), "{}");
+
+    expect(() => journalSnapshotsIn(unreadableJournal)).toThrow(SyntaxError);
+    expect(() => journalSnapshotsIn(unreadableSnapshot)).toThrow(z.ZodError);
+  });
+
+  it("throws on a journal instant that does not increase", () => {
+    const meta = aCopyOfMeta();
+    const journalPath = path.join(meta, "_journal.json");
+    const journal = z
+      .looseObject({ entries: z.array(z.looseObject({ when: z.number() })) })
+      .parse(JSON.parse(readFileSync(journalPath, "utf8")));
+    const [first, second, ...rest] = journal.entries;
+    if (first === undefined || second === undefined) throw new Error("the journal has two entries");
+    writeFileSync(
+      journalPath,
+      JSON.stringify({ ...journal, entries: [first, { ...second, when: first.when }, ...rest] }),
+    );
+
+    expect(() => journalSnapshotsIn(meta)).toThrow(/instants must strictly increase/);
+  });
 });
 
 const A_JOURNAL_AS_DRIZZLE_KIT_WRITES_IT = '{\n  "version": "7",\n  "entries": []\n}';
