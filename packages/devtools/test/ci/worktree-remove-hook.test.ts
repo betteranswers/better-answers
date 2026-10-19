@@ -16,6 +16,7 @@ import {
   scratchRoot,
   stubsOnPath,
   worktreeUnder,
+  type Decoy,
   type HookRun,
 } from "@better-answers/devtools/worktree-hooks";
 
@@ -53,6 +54,23 @@ const argvLines = (log: string): readonly string[] =>
 
 const branchListed = (primary: string, branch: string): boolean =>
   gitIn(primary, "branch", "--list", branch).trim() !== "";
+
+const afterRemoval = async (run: HookRun, worktree: string, worker: Decoy) => {
+  await vi.waitUntil(() => !worker.alive()).catch(() => undefined);
+  return {
+    status: run.status,
+    worktreeStands: existsSync(worktree),
+    workerAlive: worker.alive(),
+    namesTheWorker: run.stderr.includes(`killed the vitest workers ${String(worker.pid)}`),
+  };
+};
+
+const REMOVED_AND_KILLED = {
+  status: 0,
+  worktreeStands: false,
+  workerAlive: false,
+  namesTheWorker: true,
+};
 
 describe("the jCodeMunch index a removed worktree leaves behind", () => {
   it("drops the removed worktree's index, leaving no orphaned root", () => {
@@ -95,17 +113,26 @@ describe("the jCodeMunch index a removed worktree leaves behind", () => {
         stubTools("workers", worktree, path.join(scratch, "w-argv")),
       );
 
-      expect(run.status).toBe(0);
-      expect(existsSync(worktree)).toBe(false);
-      await vi.waitFor(() => {
-        expect(own.alive()).toBe(false);
-      });
-      expect(run.stderr).toContain(`killed the vitest workers ${String(own.pid)}`);
+      expect(await afterRemoval(run, worktree, own)).toEqual(REMOVED_AND_KILLED);
       expect(next.alive()).toBe(true);
     } finally {
       for (const decoy of [own, next]) {
         if (decoy.alive()) decoy.stop();
       }
+    }
+  });
+
+  it("kills the workers of a worktree named through a link", async () => {
+    const { worktree } = worktreeOf("linked");
+    const link = path.join(scratch, "linked-link");
+    symlinkSync(worktree, link);
+    const own = decoyWorker(worktree, false);
+    try {
+      const run = removeHook(link, stubTools("linked", worktree, path.join(scratch, "l-argv")));
+
+      expect(await afterRemoval(run, worktree, own)).toEqual(REMOVED_AND_KILLED);
+    } finally {
+      if (own.alive()) own.stop();
     }
   });
 
