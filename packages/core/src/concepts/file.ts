@@ -156,7 +156,7 @@ const entryOf = (
   let at = from;
   for (;;) {
     const value = scalarOf(field.rest);
-    if (value === undefined) return undefined;
+    if (value === undefined || entry.has(field.key)) return undefined;
     entry.set(field.key, value);
     const continuation = lines[at] ?? "";
     if (at >= close || !continuation.startsWith("    ")) break;
