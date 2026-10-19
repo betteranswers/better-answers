@@ -16,6 +16,7 @@ HEARTBEAT_SECONDS = 20
 
 
 HEARTBEAT_CONNECT_SECONDS = 5
+IDLE_IN_TRANSACTION_SECONDS = 60 * 60
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,8 +45,17 @@ def scoped(connection: psycopg.Connection, workspace_id: str) -> Iterator[Scoped
         yield ScopedCursor(cursor)
 
 
-def connected(database_url: str) -> psycopg.Connection:
-    return psycopg.connect(database_url, autocommit=True)
+def connected(
+    database_url: str,
+    *,
+    idle_in_transaction_seconds: float = IDLE_IN_TRANSACTION_SECONDS,
+) -> psycopg.Connection:
+    connection = psycopg.connect(database_url, autocommit=True)
+    connection.execute(
+        "SELECT set_config('idle_in_transaction_session_timeout', %s, false)",
+        (f"{round(idle_in_transaction_seconds * 1000)}ms",),
+    )
+    return connection
 
 
 def workspace_ids(connection: psycopg.Connection) -> list[str]:
