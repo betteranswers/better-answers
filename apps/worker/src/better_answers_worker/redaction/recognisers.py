@@ -18,8 +18,7 @@ A_SORT_CODE_WITH_AN_ACCOUNT = re.compile(
     r"\b\d{2}[- ]?\d{2}[- ]?\d{2}\b.{0,40}?\b\d{8}\b", re.DOTALL
 )
 A_PAIR_ON_ITS_OWN = 0.2
-# What Presidio's enhancer makes of a pair named before it, so a pair scores alike
-# wherever its naming word sits.
+# Presidio's context enhancer lifts a pair named before it to this score.
 A_PAIR_NAMED_BETWEEN_ITS_NUMBERS = 0.55
 
 
@@ -113,8 +112,8 @@ class SeamRecogniser(LocalRecognizer):
 
 
 class SortCodeWithAccountRecogniser(SeamRecogniser):
-    """Presidio's enhancer reads naming words before a pair alone, so this reads
-    whole naming words, or their plurals, between its two numbers."""
+    """Presidio's context enhancer reads naming words only before a span, never
+    inside it."""
 
     def spans(
         self, text: str, nlp_artifacts: NlpArtifacts | None
@@ -130,7 +129,6 @@ class SortCodeWithAccountRecogniser(SeamRecogniser):
     def _found(self, start: int, end: int, score: float) -> RecognizerResult:
         result = super()._found(start, end, score)
         if score >= self.descriptor.threshold:
-            # Already named: the enhancer must not raise it a second time.
             result.recognition_metadata[
                 RecognizerResult.IS_SCORE_ENHANCED_BY_CONTEXT_KEY
             ] = True
@@ -204,8 +202,6 @@ class HomeAddressRecogniser(SeamRecogniser):
 
 
 class ConsumerEmailRecogniser(SeamRecogniser):
-    """Raises an address only at a consumer mail domain; any other address passes."""
-
     def __init__(self, descriptor: CategoryDescriptor, entity: str) -> None:
         super().__init__(descriptor, entity)
         self.built_in = EmailRecognizer(context=list(descriptor.context))
@@ -220,8 +216,6 @@ class ConsumerEmailRecogniser(SeamRecogniser):
 
 
 def sentence_around(text: str, at: int) -> tuple[int, int]:
-    """`(start, end)` of the sentence holding offset `at`, whitespace
-    trimmed; a blank line ends a sentence as a full stop does."""
     start = 0
     end = len(text)
     for like_a_full_stop in A_SENTENCE_BREAK.finditer(text):

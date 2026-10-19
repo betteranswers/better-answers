@@ -143,8 +143,6 @@ def test_only_pattern_raised_categories_declare_enhancer_words() -> None:
         descriptor.category for descriptor in DESCRIPTORS if not descriptor.context
     ]
 
-    # A cue's sentence scores a fixed figure and the model is handed no context, so
-    # neither has a score a lemma could boost.
     assert without_context == ["special-category", "person-name", "job-title"]
 
 
@@ -315,7 +313,8 @@ def _weights_keys(workflow: str) -> set[str]:
 
 
 def test_main_saves_the_weights_under_the_key_check_restores() -> None:
-    # A merge group's entry sits under its own queue ref, which no later run reads.
+    # GitHub scopes a merge group's cache entry to its queue ref, which no later
+    # run reads.
     check = CHECK_WORKFLOW.read_text(encoding="utf-8")
     build = BUILD_WORKFLOW.read_text(encoding="utf-8")
 

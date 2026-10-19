@@ -47,7 +47,7 @@ def run_over_a_tree(tmp_path_factory: pytest.TempPathFactory) -> str:
         text=True,
         cwd=tree,
         check=False,
-        # Wide, or the summary cuts a long test id short.
+        # pytest's short summary cuts a test id to the terminal's width.
         env={**os.environ, "COLUMNS": "400"},
     )
     return run.stdout

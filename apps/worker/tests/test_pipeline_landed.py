@@ -247,8 +247,8 @@ def read_the_copies(
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> LandedSync:
-    # A Host of its own, as every sync opens one: in a shared Host the engine can still
-    # hold the name the last read registered.
+    # cocoindex can still hold the app name the last read registered, so each read
+    # opens its own Host.
     with Host(bootstrap) as host:
         return redact_landed_copies(
             host,
@@ -301,7 +301,6 @@ def bytes_of(bootstrap: Bootstrap, store: str) -> bytes:
         return bytes_under(host.store_directory(a_sync(), store))
 
 
-# In a process of its own because the tier may not import the engine.
 A_MEMO_THAT_KEEPS_ITS_TEXT = """
 import sys
 
@@ -388,8 +387,9 @@ def test_neither_store_holds_any_text_the_seam_withheld(
         bytes_of(bootstrap, CONNECTED_SOURCE_STORE),
     )
 
-    # Both ways, so an absence below is the store's and never the scan's.
-    assert THE_RULE_THE_MEMO_STORES in findings
+    assert THE_RULE_THE_MEMO_STORES in findings, (
+        "the control: the scan finds what each store holds"
+    )
     assert A_SENTENCE_OF_THE_INVOICE in bytes_under(control)
     for held in (findings, passage_store):
         assert THE_ACCOUNT_NUMBER.encode() not in held
@@ -581,8 +581,6 @@ def test_a_moved_normalised_text_detects_that_document_and_no_other(
 def test_another_converter_over_the_same_normalised_text_detects_nothing_afresh(
     bootstrap: Bootstrap,
 ) -> None:
-    # Two converters, one text: the text is the key, so the second sync answers out of
-    # the memo the first filled.
     bucket = a_bucket_holding_both()
     as_markdown = a_landed_document(AN_INVOICE_ID, media_type="text/markdown")
     as_plain_text = a_landed_document(AN_INVOICE_ID, media_type="text/plain")

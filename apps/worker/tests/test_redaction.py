@@ -5,6 +5,9 @@ import pytest
 from better_answers_worker.redaction import Dismissal, Redaction, Restore, redact
 from better_answers_worker.redaction.engine import Finding, Span, spans_detected
 from better_answers_worker.redaction.pins import VERSION_STRING
+from better_answers_worker.redaction.recognisers import (
+    A_PAIR_NAMED_BETWEEN_ITS_NUMBERS,
+)
 from better_answers_worker.redaction.suppressions import ErasureMatch
 from better_answers_worker.redaction.withholdings import (
     AN_ERASURE,
@@ -801,6 +804,25 @@ def test_the_same_inputs_twice_give_identical_output(
     assert again.version == on_an_hr_shaped_connected_source.version
 
 
+def test_a_pair_scores_alike_wherever_its_naming_word_sits() -> None:
+    named = (
+        "Account 20-00-00 12345678",
+        "20-00-00, account number 12345678",
+        "Account number 20-00-00, account number 12345678",
+    )
+
+    scored = {
+        text: [
+            span.score
+            for span in spans_detected(text)
+            if span.rule_id == "UK_BANK_ACCOUNT"
+        ]
+        for text in named
+    }
+
+    assert scored == {text: [A_PAIR_NAMED_BETWEEN_ITS_NUMBERS] for text in named}
+
+
 THE_COMPANYS_OWN_ACCOUNT = "00-00-00, account number 12345678"
 
 
@@ -843,6 +865,19 @@ def test_a_restore_under_another_rule_restores_nothing(
     found = redact(
         page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [under_another_rule]
     )
+
+    assert found.text == on_a_plain_connected_source.text
+
+
+def test_a_restore_one_character_off_restores_nothing(
+    on_a_plain_connected_source: Redaction,
+    page: str,
+    spans: tuple[Span, ...],
+) -> None:
+    kept = restore_of(on_a_plain_connected_source, page, THE_COMPANYS_OWN_ACCOUNT)
+    one_off = Restore(rule_id=kept.rule_id, start=kept.start + 1, end=kept.end)
+
+    found = redact(page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [one_off])
 
     assert found.text == on_a_plain_connected_source.text
 
@@ -1123,6 +1158,27 @@ def test_a_dismissal_under_another_rule_dismisses_nothing(
     start, end = THE_ENGINEERS_SENTENCE_AT
     both = [
         Dismissal(rule_id="UK_NHS", start=start, end=end),
+        dismissal_at(THE_DIAGNOSED_SENTENCE_AT),
+    ]
+
+    found = redact(
+        service_notes,
+        service_spans,
+        THE_SAFE_SET,
+        NO_SUPPRESSIONS,
+        SEED,
+        dismissals=both,
+    )
+
+    assert (found.verdict, found.lifted) == ("Restricted", False)
+
+
+def test_a_dismissal_one_character_off_dismisses_nothing(
+    service_notes: str, service_spans: tuple[Span, ...]
+) -> None:
+    start, end = THE_ENGINEERS_SENTENCE_AT
+    both = [
+        dismissal_at((start + 1, end)),
         dismissal_at(THE_DIAGNOSED_SENTENCE_AT),
     ]
 

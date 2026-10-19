@@ -19,6 +19,7 @@ from psycopg.sql import SQL, Identifier, Literal
 from testcontainers.community.postgres import PostgresContainer
 
 from pg_harness import (
+    _BUILD_LOCK_KEY,
     LOCATOR,
     PORT_OVERRIDE,
     REPO_ROOT,
@@ -62,7 +63,6 @@ def _row_of(maintenance: str, database: str) -> tuple[bool, bool] | None:
     return None if row is None else (bool(row[0]), bool(row[1]))
 
 
-# Another run's sweep may drop a dead-pid database between any two of these statements.
 def _discard(maintenance: str, database: str) -> None:
     if _row_of(maintenance, database) is None:
         return
@@ -197,7 +197,6 @@ OTHER_IMAGE = f"other/image:tag@sha256:{'0' * 64}"
 def test_shared_address_matches_the_scripts_uri(
     monkeypatch: pytest.MonkeyPatch, port: str | None
 ) -> None:
-    # The script honours a caller-set image and the harness never does.
     monkeypatch.delenv("TEST_POSTGRES_IMAGE", raising=False)
     monkeypatch.delenv(PORT_OVERRIDE, raising=False)
     if port is not None:
@@ -212,6 +211,49 @@ def test_shared_address_matches_the_scripts_uri(
     lines = dict(line.split(" ", 1) for line in printed.splitlines() if " " in line)
 
     assert shared_address() == lines["uri"]
+
+
+def test_takes_the_same_build_lock_as_the_typescript_harness() -> None:
+    harness = REPO_ROOT / "packages" / "schema" / "test" / "warm-postgres.ts"
+    keys = re.findall(
+        r'^export const BUILD_LOCK = "([^"]*)";$',
+        harness.read_text("utf-8"),
+        re.MULTILINE,
+    )
+
+    assert keys == [_BUILD_LOCK_KEY]
+
+
+CHILD_PRINTS_THE_IMAGE_AND_ADDRESS = """
+import sys
+
+sys.path.insert(0, {tests!r})
+
+from pg_harness import pinned_postgres_image, shared_address
+
+print(pinned_postgres_image())
+print(shared_address())
+"""
+
+
+def the_harness_answers_in_a_fresh_process() -> list[str]:
+    script = CHILD_PRINTS_THE_IMAGE_AND_ADDRESS.format(tests=str(Path(__file__).parent))
+    return subprocess.run(
+        (sys.executable, "-c", script), capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+
+
+def test_the_harness_pins_the_image_whatever_the_caller_sets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(PORT_OVERRIDE, raising=False)
+    monkeypatch.delenv("TEST_POSTGRES_IMAGE", raising=False)
+    unset = the_harness_answers_in_a_fresh_process()
+
+    monkeypatch.setenv("TEST_POSTGRES_IMAGE", OTHER_IMAGE)
+
+    assert the_harness_answers_in_a_fresh_process() == unset
+    assert unset == [pinned_postgres_image(), shared_address()]
 
 
 @contextmanager
@@ -421,12 +463,11 @@ def test_stamps_an_unstamped_template_rather_than_dropping_it(
     assert stamp >= before
 
 
-# The vitest tier's real sweep would drop a tpl_ts_ plant, so a prefix no tier sweeps
-# stands in.
 def test_leaves_stale_templates_outside_its_prefix_alone(
     maintenance: str, unique: Callable[[str], str]
 ) -> None:
-    theirs = _planted(maintenance, unique, LONG_AGO, "tpl_probe_age")
+    a_prefix_no_tier_sweeps = "tpl_probe_age"
+    theirs = _planted(maintenance, unique, LONG_AGO, a_prefix_no_tier_sweeps)
 
     _ensure_another(maintenance, unique)
 
@@ -557,7 +598,6 @@ def test_sweeps_a_dead_runs_database_and_keeps_a_live_ones(
             _discard(maintenance, database)
 
 
-# Another run's sweep may drop it before this session connects, so retry.
 @contextmanager
 def _a_dead_runs_database_held(maintenance: str) -> Iterator[str]:
     for _attempt in range(5):

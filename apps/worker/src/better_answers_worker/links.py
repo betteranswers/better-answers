@@ -1,6 +1,6 @@
 import re
 from collections.abc import Callable, Mapping, Sequence
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 from .concept_file import (
     Frontmatter,
@@ -23,27 +23,19 @@ CONCEPT_DEPRECATED_STATUS = "deprecated"
 _IRI = re.compile(r"^https://better-answers\.com/c/[0-9A-HJKMNP-TV-Z]{26}$")
 
 
-# Lines break at `\n` alone and whitespace is these six, so both tiers read alike.
-_SIX = " \t\n\r\f\v"
+_TIER_SHARED_WHITESPACE = " \t\n\r\f\v"
 
-_WS = re.compile(r"\s")
+_UNICODE_SPACE = re.compile(r"\s")
 
 _FOOTNOTE = re.compile(r"^\[\^([^\]]*)\]$")
 
 
 class _Found(NamedTuple):
-    """A scanner's find: where it starts, and what it holds."""
-
     at: int
     text: str
 
 
-def _is_six(char: str) -> bool:
-    return char in _SIX
-
-
 def _line_start_from(text: str, from_: int) -> int:
-    """The first line start at or after `from_`: the start, or after a `\n`."""
     if from_ <= 0:
         return 0
     if from_ > len(text):
@@ -55,7 +47,6 @@ def _line_start_from(text: str, from_: int) -> int:
 
 
 def _next_of(text: str, close: str) -> list[int]:
-    """The next `close` at or after each position, -1 where there is none."""
     next_: list[int] = [-1] * (len(text) + 1)
     for at in range(len(text) - 1, -1, -1):
         next_[at] = at if text[at] == close else next_[at + 1]
@@ -63,7 +54,6 @@ def _next_of(text: str, close: str) -> list[int]:
 
 
 def _next_stops(text: str, stops: Callable[[str], bool]) -> list[int]:
-    """The next position at or after each index whose character `stops` holds."""
     next_: list[int] = [-1] * (len(text) + 1)
     for at in range(len(text) - 1, -1, -1):
         next_[at] = at if stops(text[at]) else next_[at + 1]
@@ -71,10 +61,8 @@ def _next_stops(text: str, stops: Callable[[str], bool]) -> list[int]:
 
 
 def _autolink_ends_of(text: str) -> list[int]:
-    """The next `>` or one of the six at or after each position, -1 if none."""
-
     def stops(char: str) -> bool:
-        return char == ">" or char in _SIX
+        return char == ">" or char in _TIER_SHARED_WHITESPACE
 
     return _next_stops(text, stops)
 
@@ -83,7 +71,6 @@ _SCHEME = re.compile(r"[a-z0-9+.-]", re.I)
 
 
 def _colon_after(text: str, at: int) -> int | None:
-    """Where the autolink's scheme and colon end, or `None` when `at` opens none."""
     if at + 1 >= len(text) or not re.match(r"[a-z]", text[at + 1], re.I):
         return None
     scheme = at + 2
@@ -93,7 +80,6 @@ def _colon_after(text: str, at: int) -> int | None:
 
 
 def _autolink_closes_at(text: str, at: int, ends: list[int]) -> int | None:
-    """Where the autolink starting at `at` closes, or `None` when it is none."""
     colon = _colon_after(text, at)
     if colon is None:
         return None
@@ -102,7 +88,6 @@ def _autolink_closes_at(text: str, at: int, ends: list[int]) -> int | None:
 
 
 def _inline_form_at(prose: str, bracket: int, ending: list[int]) -> int | None:
-    """Where the inline form after `bracket` ends, or `None` when it is none."""
     if prose[bracket + 1 : bracket + 2] != "(":
         return None
     closed = ending[bracket + 2]
@@ -112,7 +97,6 @@ def _inline_form_at(prose: str, bracket: int, ending: list[int]) -> int | None:
 def _reference_form_at(
     prose: str, at: int, bracket: int, close: list[int]
 ) -> int | None:
-    """Where the reference form after `bracket` ends, or `None` when it is none."""
     if prose[bracket + 1 : bracket + 2] != "[" or prose[at + 1 : at + 2] == "^":
         return None
     reference = close[bracket + 2]
@@ -122,7 +106,6 @@ def _reference_form_at(
 def _bracket_form_at(
     prose: str, at: int, close: list[int], ending: list[int]
 ) -> int | None:
-    """Where the `[`-form at `at` ends: inline first, then reference, then bare."""
     bracket = close[at + 1]
     if bracket == -1:
         return None
@@ -133,7 +116,6 @@ def _bracket_form_at(
 
 
 def _link_matches(prose: str) -> list[_Found]:
-    """Every `[`-form and autolink in order and extent, as the old `LINK` held them."""
     close = _next_of(prose, "]")
     ending = _next_of(prose, ")")
     ends = _autolink_ends_of(prose)
@@ -157,7 +139,6 @@ def _link_matches(prose: str) -> list[_Found]:
 
 
 def _leading_spaces(text: str, at: int) -> int:
-    """The spaces before a fence or a definition, at most three of them, or four."""
     spaces = 0
     while spaces < 4 and text[at + spaces : at + spaces + 1] == " ":
         spaces += 1
@@ -165,7 +146,6 @@ def _leading_spaces(text: str, at: int) -> int:
 
 
 def _mark_run(text: str, at: int, mark: str) -> int:
-    """Where the run of `mark` starting at `at` ends."""
     marker = at
     while text[marker : marker + 1] == mark:
         marker += 1
@@ -179,7 +159,6 @@ class _OpenedFence(NamedTuple):
 
 
 def _opened_fence_at(body: str, at: int) -> _OpenedFence | None:
-    """The fence opening at the line start `at`, or `None` when the line opens none."""
     spaces = _leading_spaces(body, at)
     opened = at + spaces
     mark = body[opened : opened + 1]
@@ -193,7 +172,6 @@ def _opened_fence_at(body: str, at: int) -> _OpenedFence | None:
 
 
 def _closing_at(body: str, at: int, mark: str, marks: int) -> int:
-    """Where the line at `at` ends, when only spaces or tabs follow its marks."""
     spaces = _leading_spaces(body, at)
     if spaces > 3:
         return -1
@@ -209,7 +187,6 @@ def _closing_at(body: str, at: int, mark: str, marks: int) -> int:
 
 
 def _closing_line_end(body: str, from_: int, mark: str, marks: int) -> int:
-    """Where the fence opened before `from_` closes, or -1 when no line closes it."""
     at = from_
     while at < len(body):
         end = _closing_at(body, at, mark, marks)
@@ -220,8 +197,6 @@ def _closing_line_end(body: str, from_: int, mark: str, marks: int) -> int:
 
 
 def _fenced_blocks(body: str) -> list[tuple[int, int]]:
-    """Each fenced block's extent: a line of three or more marks, closed by as long a
-    line or the body's end."""
     blocks: list[tuple[int, int]] = []
     at = 0
     while at < len(body):
@@ -249,8 +224,6 @@ def _blank(text: str) -> str:
 
 
 def _blanked_spans(body: str) -> str:
-    # A scanner, because the body is tenant input: a long unmatched run of backticks
-    # would cost a backtracking regular expression quadratic time.
     runs = list(_BACKTICK_RUN.finditer(body))
 
     queued: dict[int, list[int]] = {}
@@ -283,8 +256,6 @@ def _blanked_spans(body: str) -> str:
 
 
 def prose_of(body: str) -> str:
-    """The body with fenced blocks and code spans blanked to spaces,
-    newlines kept, so an offset into it is an offset into the body."""
     pieces: list[str] = []
     cursor = 0
     for start, end in _fenced_blocks(body):
@@ -306,15 +277,13 @@ def _label_key(label: str) -> str:
 
 
 def _target_after(prose: str, from_: int) -> tuple[int, int] | None:
-    """The first run of more than the six after the six that follow `from_`, and where
-    it ends."""
     start = from_
-    while start < len(prose) and prose[start] in _SIX:
+    while start < len(prose) and prose[start] in _TIER_SHARED_WHITESPACE:
         start += 1
     if start == len(prose):
         return None
     end = start
-    while end < len(prose) and prose[end] not in _SIX:
+    while end < len(prose) and prose[end] not in _TIER_SHARED_WHITESPACE:
         end += 1
     return start, end
 
@@ -322,8 +291,6 @@ def _target_after(prose: str, from_: int) -> tuple[int, int] | None:
 def _definition_at(
     prose: str, at: int, close: list[int]
 ) -> tuple[str, str, int] | None:
-    """The definition at the line start `at`: a label without `]`, a colon at once, a
-    target after the six."""
     spaces = _leading_spaces(prose, at)
     opened = at + spaces
     if spaces > 3 or prose[opened : opened + 1] != "[":
@@ -343,7 +310,6 @@ def _definition_at(
 
 
 def _definitions_of(prose: str) -> dict[str, str]:
-    """Every definition at a line start, keyed as a label is keyed."""
     definitions: dict[str, str] = {}
     close = _next_of(prose, "]")
     at = 0
@@ -409,7 +375,10 @@ def _link_target_of(
     return definitions.get(_label_key(text[1:-1]))
 
 
-def _target_of(raw: str, from_path: str) -> tuple[str, str] | None:
+type _TargetShape = Literal["iri", "path"]
+
+
+def _target_of(raw: str, from_path: str) -> tuple[_TargetShape, str] | None:
     bare = raw.split("#")[0]
     if bare == "":
         return None
@@ -433,8 +402,6 @@ type _SpanOf = Callable[[str, int, list[int], list[int]], int | None]
 
 
 def _labels_of(text: str, span_of: _SpanOf) -> str:
-    """One bracket pass: the label replaces the match, leftmost and non-overlapping,
-    as the pass's `re.sub` held it."""
     close = _next_of(text, "]")
     ending = _next_of(text, ")")
     pieces: list[str] = []
@@ -484,10 +451,8 @@ def _bare_span(
     return bracket + 1
 
 
-def _angle_bracketed(text: str) -> str:
-    """The autolink pass: what each link holds replaces it, leftmost and
-    non-overlapping."""
-    ends = _next_stops(text, _pass_four_stops)
+def _flattened_autolinks(text: str) -> str:
+    ends = _next_stops(text, _autolink_stops_on_unicode_space)
     pieces: list[str] = []
     cursor = 0
     at = 0
@@ -507,17 +472,15 @@ def _angle_bracketed(text: str) -> str:
     return "".join(pieces)
 
 
-def _pass_four_stops(char: str) -> bool:
-    return char == ">" or _WS.fullmatch(char) is not None
+def _autolink_stops_on_unicode_space(char: str) -> bool:
+    return char == ">" or _UNICODE_SPACE.fullmatch(char) is not None
 
 
 def _flattened_links(text: str) -> str:
-    """Every link form collapsed to what it held, in the four passes' order: inline,
-    reference, bare, autolink."""
     flattened = _labels_of(text, _inline_span)
     flattened = _labels_of(flattened, _reference_span)
     flattened = _labels_of(flattened, _bare_span)
-    return _angle_bracketed(flattened)
+    return _flattened_autolinks(flattened)
 
 
 def _sentence_at(body: str, index: int) -> str:
@@ -594,9 +557,6 @@ def _reading_of(
 def links_and_marks_of(
     body: str, frontmatter: Frontmatter
 ) -> tuple[list[BodyLink], list[CitationMark]]:
-    """Ordinals count prose links, images and links naming nothing included. Footnotes
-    naming a source are citation marks, without ordinals; others are links only when
-    defined."""
     prose = prose_of(body)
     definitions = _definitions_of(prose)
     sources_by_id = _sources_by_id(_cited_entries(frontmatter))
@@ -616,16 +576,13 @@ def links_and_marks_of(
 
 
 class OutgoingReference:
-    """`target` is `('iri', iri)` or `('path', bundle path)`;
-    `section` and `sentence` are None for lineage."""
-
     __slots__ = ("ordinal", "relation", "section", "sentence", "target")
 
     def __init__(
         self,
         relation: str,
         ordinal: int,
-        target: tuple[str, str],
+        target: tuple[_TargetShape, str],
         section: str | None,
         sentence: str | None,
     ) -> None:
@@ -639,8 +596,6 @@ class OutgoingReference:
 def references_of(
     body: str, frontmatter: Frontmatter, path: str
 ) -> list[OutgoingReference]:
-    """The body's links, then the `sources` entries as lineage; a URL
-    other than a concept IRI is dropped."""
     prose = prose_of(body)
 
     links: list[OutgoingReference] = []
@@ -712,9 +667,6 @@ def outgoing_edges(
     by_path: dict[str, ResolvedTarget],
     by_iri: dict[str, ResolvedTarget],
 ) -> list[OutgoingEdge]:
-    """Unresolved paths are dropped; unresolved IRIs still make an edge, with no kind.
-    Each cited concept gives one lineage edge, `SUPERSEDES` when deprecated and
-    same-kind."""
     edges: list[OutgoingEdge] = []
     cited: set[str] = set()
     for reference in references_of(body, frontmatter, path):

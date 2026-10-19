@@ -14,17 +14,12 @@ _SHORTEST_FRAME = ENVELOPE_VERSION_BYTES + ENVELOPE_NONCE_BYTES + ENVELOPE_TAG_B
 
 
 class UnopenableError(Exception):
-    """`name` is the refusal word: `envelope-malformed`,
-    `envelope-version-unknown` or `envelope-not-authentic`."""
-
     def __init__(self, name: str, message: str) -> None:
         super().__init__(message)
         self.name = name
 
 
 def _keyed(key: bytes) -> AESGCM:
-    """A wrong key length is the caller's defect: a refusal word here
-    would let a mis-provisioned key read as somebody's bad envelope."""
     if len(key) != ENVELOPE_KEY_BYTES:
         message = f"envelope: a key is {ENVELOPE_KEY_BYTES} bytes, not {len(key)}"
         raise ValueError(message)
@@ -32,25 +27,19 @@ def _keyed(key: bytes) -> AESGCM:
 
 
 def sealed(key: bytes, plaintext: bytes) -> bytes:
-    """One version byte, a random 12-byte nonce, AES-256-GCM ciphertext and tag; the
-    version byte is associated data. Raises `ValueError` unless the key is 32 bytes."""
     cipher = _keyed(key)
     version = bytes([ENVELOPE_VERSION])
-    # Never a counter: two processes share the key and would hand out one number
-    # twice, which under GCM hands out the plaintexts.
+    # Random: a GCM nonce repeated under one key leaks the plaintexts' XOR and the
+    # authentication key.
     nonce = secrets.token_bytes(ENVELOPE_NONCE_BYTES)
 
     return version + nonce + cipher.encrypt(nonce, plaintext, version)
 
 
 def opened(key: bytes, frame: bytes) -> bytes:
-    """Raises `UnopenableError` for a frame too short, of a version this tier cannot
-    read, or not authentic; `ValueError` unless the key is 32 bytes."""
     cipher = _keyed(key)
     if not frame:
         raise UnopenableError("envelope-malformed", "envelope: a frame has no version")
-    # Before anything is decrypted, so a version this tier cannot read answers what
-    # is wrong rather than what the tag made of it.
     if frame[0] != ENVELOPE_VERSION:
         message = f"envelope: this tier opens no version {frame[0]}"
         raise UnopenableError("envelope-version-unknown", message)
@@ -67,8 +56,6 @@ def opened(key: bytes, frame: bytes) -> bytes:
             frame[ENVELOPE_VERSION_BYTES + ENVELOPE_NONCE_BYTES :],
             frame[:ENVELOPE_VERSION_BYTES],
         )
-    # The library says a tag did not verify by raising, and tells nobody whether a
-    # byte moved or the key was wrong.
     except InvalidTag as refused:
         message = "envelope: this frame did not open"
         raise UnopenableError("envelope-not-authentic", message) from refused

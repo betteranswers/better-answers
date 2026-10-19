@@ -20,8 +20,6 @@ WIPED_REASON = "wiped"
 
 RULE_CHANGE_REASON = "rule-change"
 
-# The store is the target-state tracking: rows the api deleted beside a store
-# left standing are re-upserted by nothing, the engine believing them landed.
 REASONS_EMPTYING_THE_CONNECTED_SOURCE = frozenset({WIPED_REASON, RULE_CHANGE_REASON})
 
 SENSITIVITY_MOVED_KEY = "sensitivity_moved"
@@ -37,10 +35,6 @@ class OverriddenRestore:
 
 @dataclass(frozen=True, slots=True)
 class IndexOutcome:
-    """`lmdb_bytes` is the connected source's stores on disk after the sync;
-    `restores_overridden_by_erasure`, restored spans an erasure withholds again;
-    `sensitivity_moved`, documents whose stored sensitivity changed."""
-
     documents: int
     passages: int
     lmdb_bytes: int
@@ -75,9 +69,6 @@ def index_connected_source(
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> IndexOutcome:
-    """`wiped` and `rule-change` syncs first empty the store; gone sources land nothing.
-    A lost claim raises `ClaimLostError`, writing nothing. `copies` defaults to the
-    workspace's bucket."""
     with Host(bootstrap) as host:
         if sync.reason in REASONS_EMPTYING_THE_CONNECTED_SOURCE:
             host.remove_connected_source_store(sync)
@@ -104,8 +95,6 @@ def index_connected_source(
                 ms_per_page=ms_per_page,
                 margin_ms=margin_ms,
             )
-            # A document's sensitivity is on its row before any passage of it
-            # is read.
             with queue.scoped(connection, sync.workspace_id) as cursor:
                 queue.hold_the_claim(cursor, job.id, bootstrap.worker_id)
                 record_findings(cursor, sync, landed.documents)

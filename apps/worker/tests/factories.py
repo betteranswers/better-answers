@@ -426,7 +426,6 @@ def seed_map_generation(
 
 
 def hold_map_generation(cursor: Cursor[Any], *, workspace_id: str) -> int:
-    # The no-op update takes the row lock a rebuild beside it must wait on.
     cursor.execute(
         "INSERT INTO map_generation (workspace_id, live_gen) VALUES (%s, 1)"
         " ON CONFLICT (workspace_id) DO UPDATE"
@@ -454,7 +453,6 @@ def seed_passage(
 
 
 async def land_passage(connection: asyncpg.Connection, row: dict[str, Any]) -> None:
-    # Placeholders are asyncpg's: the pools a row is landed through are asyncpg's.
     await connection.execute(
         'INSERT INTO "index".passage (id, workspace_id, content, connected_source_id)'
         " VALUES ($1, $2, $3, $4)",
@@ -474,7 +472,6 @@ def enqueue_job(
     reason: str | None,
     subject_id: str | None,
 ) -> None:
-    # Only the columns an enqueue names, so a refusal is the contract's.
     cursor.execute(
         "INSERT INTO job (workspace_id, id, kind, reason, subject_id, status)"
         " VALUES (%s, %s, %s, %s, %s, 'queued')",

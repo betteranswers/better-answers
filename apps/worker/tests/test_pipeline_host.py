@@ -1,7 +1,6 @@
 import asyncio
 import gc
 import os
-import re
 import threading
 import time
 from collections.abc import Iterator, Mapping, Sequence
@@ -28,10 +27,7 @@ from better_answers_worker.pipeline import (
     open_pool,
 )
 from factories import land_passage, seed_workspace
-from pg_harness import login_in_role, migrated_postgres_at
-
-WORKER_LOGIN = "worker_login_under_test"
-WORKER_PASSWORD = "worker-login-under-test"
+from pg_harness import migrated_postgres_at, worker_login_dsn
 
 
 def passage_row(
@@ -55,25 +51,10 @@ def passage_row(
     }
 
 
-# jscpd:ignore-start
 @pytest.fixture(name="database")
 def a_migrated_database() -> Iterator[tuple[psycopg.Connection, str]]:
     with migrated_postgres_at() as (connection, conninfo):
-        login_in_role(
-            connection, login=WORKER_LOGIN, password=WORKER_PASSWORD, role="worker_rt"
-        )
-        yield connection, as_role(conninfo, WORKER_LOGIN, WORKER_PASSWORD)
-
-
-# jscpd:ignore-end
-
-
-def as_role(conninfo: str, role: str, password: str) -> str:
-    replaced, count = re.subn(r"//[^@/]*@", f"//{role}:{password}@", conninfo, count=1)
-    if count != 1:
-        message = f"expected credentials in the harness's conninfo, found {count}"
-        raise RuntimeError(message)
-    return replaced
+        yield connection, worker_login_dsn(connection, conninfo)
 
 
 def seed_partitioned_workspace(connection: psycopg.Connection) -> str:
@@ -203,8 +184,8 @@ def test_dropping_a_sources_state_keeps_the_table_indexes_and_rows(
         indexes_before = passage_indexes(connection, workspace_id)
         assert indexes_before != []
 
-    # Its own Host, as a sync's would be: the engine can still hold the name the
-    # landing Host registered.
+    # cocoindex can still hold the app name the landing Host registered, so this
+    # opens its own Host.
     with Host(bootstrap_for(dsn, tmp_path)) as host:
         host.drop_connected_source(first)
 
@@ -305,9 +286,7 @@ def test_the_seam_answers_plain_numbers_and_opens_the_passage_store(
         reason="connected",
     )
 
-    # The sync writes nothing to a connected source that is gone, so no claim on
-    # the job row is ever checked.
-    job = queue.ClaimedJob(
+    job_with_no_row = queue.ClaimedJob(
         workspace_id=workspace_id,
         id="01M2JOBAAAAAAAAAAAAAAAAAAA",
         kind="index",
@@ -316,7 +295,9 @@ def test_the_seam_answers_plain_numbers_and_opens_the_passage_store(
         attempts=1,
     )
 
-    outcome = index_connected_source(bootstrap_for(dsn, tmp_path), sync, job=job)
+    outcome = index_connected_source(
+        bootstrap_for(dsn, tmp_path), sync, job=job_with_no_row
+    )
 
     assert outcome.as_row() == {
         "documents": 0,
@@ -372,6 +353,38 @@ def test_removing_a_store_never_made_passes_quietly(tmp_path: Path) -> None:
         host.remove_connected_source_store(sync)
 
         assert not host.connected_source_directory(sync).exists()
+
+
+def bytes_on_disk_under(directory: Path) -> int:
+    return sum(item.stat().st_size for item in directory.rglob("*") if item.is_file())
+
+
+def test_a_sources_lmdb_size_counts_both_its_stores(tmp_path: Path) -> None:
+    sync = a_sync_on("connected-source-one")
+
+    with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
+        host.open_connected_source(sync)
+        passage_store = bytes_on_disk_under(
+            host.store_directory(sync, CONNECTED_SOURCE_STORE)
+        )
+        findings = bytes_on_disk_under(host.store_directory(sync, FINDINGS_STORE))
+
+        assert findings > 0
+        assert host.lmdb_bytes(sync) == passage_store + findings
+
+
+def test_a_removed_store_reopens_on_disk(tmp_path: Path) -> None:
+    sync = a_sync_on("connected-source-one")
+
+    with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
+        host.open_connected_source(sync)
+        passage_store = host.store_directory(sync, CONNECTED_SOURCE_STORE)
+
+        host.remove_connected_source_store(sync)
+        assert not passage_store.exists()
+
+        host.open_connected_source(sync)
+        assert passage_store.is_dir()
 
 
 def test_a_store_that_cannot_be_removed_fails_the_removal(
@@ -438,8 +451,8 @@ def waits_in(written: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
 
 
 def hold_until_waited_on(store: object, written: Sequence[Mapping[str, Any]]) -> None:
-    """Holding `store` keeps the engine's handle open until this returns, as an
-    engine task does after its update."""
+    """Keeps `store`'s handle open until a wait is logged, as a cocoindex engine
+    task holds it after its update."""
     deadline = time.monotonic() + HOLDS_AT_MOST_SECONDS
     while not waits_in(written) and time.monotonic() < deadline:
         time.sleep(0.05)
@@ -479,7 +492,6 @@ def test_a_store_held_in_a_cycle_opens_after_a_collection(tmp_path: Path) -> Non
     bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
     sync = a_sync_on("connected-source-one")
 
-    # Off, so that only the open's own collection can free the cycle.
     gc.disable()
     try:
         with Host(bootstrap) as first:

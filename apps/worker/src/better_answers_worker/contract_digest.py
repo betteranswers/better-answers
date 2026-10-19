@@ -5,18 +5,14 @@ CONTRACTS_ROOT = Path(__file__).resolve().parents[4] / "contracts"
 
 CONTRACT_STAMP_MODULE = Path(__file__).resolve().parent / "contract_stamp.py"
 
-# It carries no agreement, and a typo fix in prose must not idle this worker.
 OUTSIDE_THE_DIGEST = "README.md"
 
 GENERATE = "cd apps/worker && uv run --frozen generate-contract-stamp"
 
 
 def contract_files(root: Path) -> list[str]:
-    """Paths under `root`, relative and `/`-joined, in UTF-8 byte order.
-    Links, dot-named paths and the top-level `README.md` are left out."""
     found: list[str] = []
     for file in root.rglob("*"):
-        # A link is a path, not content. Said here because `is_file` follows one.
         if file.is_symlink() or not file.is_file():
             continue
         relative = file.relative_to(root)
@@ -29,12 +25,8 @@ def contract_files(root: Path) -> list[str]:
 
 
 def contract_digest(root: Path) -> str:
-    """Hex SHA-256 over each file's path, length and bytes. Length-prefixed so a
-    boundary cannot be forged."""
     stream = hashlib.sha256()
     for relative in contract_files(root):
-        # Bytes, never decoded or newline-normalised: a CRLF checkout is a different
-        # digest, and that is right — the tiers would be reading different bytes.
         content = (root / relative).read_bytes()
         stream.update(relative.encode("utf-8"))
         stream.update(b"\n")

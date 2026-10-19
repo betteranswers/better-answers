@@ -177,9 +177,7 @@ def materialise_broken_contracts(root: Path) -> None:
     )
 
 
-# Each hex below is worked out of band from the framing, never by calling this
-# tier's own reading a second time.
-DIGEST_CASES: list[tuple[str, dict[str, bytes], str]] = [
+DIGESTS_WORKED_OUT_OF_BAND: list[tuple[str, dict[str, bytes], str]] = [
     (
         "the manifest alone",
         {"manifest.json": b"{}"},
@@ -221,7 +219,7 @@ DIGEST_CASES: list[tuple[str, dict[str, bytes], str]] = [
         "672dd81724a921629ec57079d240c5d4240d85207c5c577acc3d938a1da9a4b2",
     ),
     (
-        "a README that must not count",
+        "a README carries no agreement, so its prose never idles a worker",
         {"manifest.json": b"{}", "README.md": b"prose for a person"},
         "672dd81724a921629ec57079d240c5d4240d85207c5c577acc3d938a1da9a4b2",
     ),
@@ -243,10 +241,12 @@ def test_the_digest_answers_the_agreed_hex_for_every_case_tree(
 
     answered = [
         (why, contract_digest(materialised(tmp_path / str(index), tree)))
-        for index, (why, tree, _hex) in enumerate(DIGEST_CASES)
+        for index, (why, tree, _hex) in enumerate(DIGESTS_WORKED_OUT_OF_BAND)
     ]
 
-    assert answered == [(why, expected) for why, _tree, expected in DIGEST_CASES]
+    assert answered == [
+        (why, expected) for why, _tree, expected in DIGESTS_WORKED_OUT_OF_BAND
+    ]
 
 
 def test_a_symlink_counts_for_nothing_in_the_digest(
@@ -258,7 +258,21 @@ def test_a_symlink_counts_for_nothing_in_the_digest(
     (root / "queue").mkdir()
     (root / "queue" / "cases.json").symlink_to(root / "manifest.json")
 
-    assert contract_digest(root) == DIGEST_CASES[0][2]
+    assert contract_digest(root) == DIGESTS_WORKED_OUT_OF_BAND[0][2]
+
+
+def test_no_content_poses_as_a_second_file(tmp_path: Path) -> None:
+    from better_answers_worker.contract_digest import contract_digest
+
+    two_files = contract_digest(
+        materialised(tmp_path / "two", {"manifest.json": b"{}", "a": b"1", "b": b"2"})
+    )
+
+    for index, forged in enumerate((b"1b\n2", b"1b\n\n2")):
+        one_file = materialised(
+            tmp_path / str(index), {"manifest.json": b"{}", "a": forged}
+        )
+        assert contract_digest(one_file) != two_files, forged
 
 
 def test_the_carried_digest_is_whole_never_a_short_form() -> None:

@@ -23,8 +23,6 @@ def fetch() -> None:
 
 
 def carried_repositories() -> tuple[Path, ...]:
-    """The hub cache directory of each model and of the encoder its config names.
-    Offline: raises when `fetch` has not run."""
     found: dict[str, Path] = {}
     for model_id in WEIGHTS:
         snapshot = Path(snapshot_download(model_id, local_files_only=True))
@@ -46,8 +44,7 @@ def copy_out(target: Path) -> None:
     for repository in carried_repositories():
         carried = target / cache.name / repository.name
         shutil.copytree(repository, carried, symlinks=True)
-        # huggingface_hub 1.32 links a repository's Xet files into a store beside it,
-        # and the image carries no store.
+        # huggingface_hub links a repository's Xet files into a store beside it.
         for blob in carried.glob("blobs/*"):
             if blob.is_symlink():
                 shared = (repository / "blobs" / blob.name).resolve()

@@ -5,10 +5,6 @@ from types import MappingProxyType
 
 @dataclass(frozen=True, slots=True)
 class CategoryDescriptor:
-    """`context` words lift a nearby span's score; `cues` are lemmas that raise their
-    whole sentence; `narrows_to` is the sensitivity a finding narrows its document
-    to."""
-
     category: str
     tier: str
     raised_by: tuple[str, ...]

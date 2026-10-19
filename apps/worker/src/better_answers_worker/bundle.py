@@ -28,8 +28,6 @@ class NotAWorkspaceIdError(ValueError):
 
 
 def repository_path(git_store_dir: str, workspace_id: str) -> Path:
-    """Raises `NotAWorkspaceIdError` for an id that is not a ULID or would resolve
-    outside the store; the bundle need not exist yet."""
     if not ID_SHAPE.fullmatch(workspace_id):
         raise NotAWorkspaceIdError(f"not a workspace id: {workspace_id!r}")
     store = Path(git_store_dir).resolve()
@@ -56,9 +54,6 @@ def _walk(repository: Repo, tree: Tree, prefix: str) -> list[ConceptBlob]:
 
 
 def concepts_at_head(git_store_dir: str, workspace_id: str) -> list[ConceptBlob]:
-    """Every `.md` blob under `knowledge/` on `main`, sorted by path; empty without that
-    tree. Raises `NotAWorkspaceIdError`, or `NoSuchBundleError` when the repository or
-    `main` is missing."""
     path = repository_path(git_store_dir, workspace_id)
     if not path.exists():
         raise NoSuchBundleError(f"no bundle for workspace {workspace_id}")
