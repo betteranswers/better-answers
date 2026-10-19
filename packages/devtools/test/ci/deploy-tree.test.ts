@@ -140,7 +140,7 @@ const composeServices = (file: string): readonly { name: string; body: string }[
 
 const PINNED_BY_DIGEST = /^[^\s@$]+@(?:sha256:[0-9a-f]{64}|\$\{\w+_DIGEST:\?[^}]*\})$/;
 
-const PIN_THE_POSTGRES_LAUNCHERS_EXPORT = /^\$\{(?:LOCAL|TEST)_POSTGRES_IMAGE:\?[^}]*\}$/;
+const EXPORTED_BY_THE_POSTGRES_LAUNCHERS = /^\$\{(?:LOCAL|TEST)_POSTGRES_IMAGE:\?[^}]*\}$/;
 
 const digestless = (directory: string): readonly string[] =>
   readdirSync(directory)
@@ -149,7 +149,7 @@ const digestless = (directory: string): readonly string[] =>
       [...readFileSync(path.join(directory, file), "utf8").matchAll(/^[ \t]+(image|build):(.*)$/gm)]
         .map(([, key, raw]) => {
           const value = (raw ?? "").trim().replace(/^(["'])(.*)\1$/, "$2");
-          return { key, value: value.replace(PIN_THE_POSTGRES_LAUNCHERS_EXPORT, POSTGRES_IMAGE) };
+          return { key, value: value.replace(EXPORTED_BY_THE_POSTGRES_LAUNCHERS, POSTGRES_IMAGE) };
         })
         .filter(({ key, value }) => key === "build" || !PINNED_BY_DIGEST.test(value))
         .map(({ key, value }) => `${file}: ${key ?? ""}: ${value}`),
