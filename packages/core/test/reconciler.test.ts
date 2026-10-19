@@ -1195,6 +1195,14 @@ describe("a concept file read back", () => {
 
     ["a key written twice", '---\n"title": "one"\n"title": "two"\n---\n\n'],
     ["a __proto__ key written twice", '---\n"__proto__": "one"\n"__proto__": "two"\n---\n\n'],
+    [
+      "one entry repeating a key",
+      '---\n"sources":\n  - "resource": "/s/a.pdf"\n    "colour": "red"\n    "colour": "blue"\n---\n\n',
+    ],
+    [
+      "one entry repeating __proto__",
+      '---\n"sources":\n  - "resource": "/s/a.pdf"\n    "__proto__": "a"\n    "__proto__": "b"\n---\n\n',
+    ],
 
     ["a valueless key before another", '---\n"tags":\n"title": "x"\n---\n\n'],
     ["a valueless key closing the frontmatter", '---\n"title": "x"\n"tags":\n---\n\n'],
