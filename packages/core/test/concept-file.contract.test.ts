@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { recordKeepingEveryKey } from "@better-answers/schema";
+
 import { canonicalFrontmatter, contentHashOf } from "../src/concepts/index.ts";
 import { contractFixture } from "./contract-fixture.ts";
 
@@ -11,9 +13,8 @@ const fixtureSchema = z.object({
     z.object({
       why: z.string(),
       path: z.string(),
-      frontmatter: z.record(
-        z.string(),
-        z.union([scalar, z.array(z.string()), z.array(z.record(z.string(), scalar))]),
+      frontmatter: recordKeepingEveryKey(
+        z.union([scalar, z.array(z.string()), z.array(recordKeepingEveryKey(scalar))]),
       ),
       body: z.string(),
       canonical: z.string(),

@@ -475,47 +475,69 @@ const accessRequestUpdate = createUpdateSchema(accessRequest, accessRequestRefin
 
 const conceptIri = (schema: z.ZodString) => schema.pipe(CONCEPT_IRI);
 
-const frontmatterEntry = z
-  .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
-  .refine((entry) => Object.keys(entry).length > 0, {
-    message: "a list entry carries at least one key",
-  });
+const PROTO_FAMILY = /^_{2,}proto__$/;
+const ESCAPED_PROTO_FAMILY = /^_{3,}proto__$/;
+
+const withKeysRenamed = <Value>(
+  record: Readonly<Record<string, Value>>,
+  rename: (key: string) => string,
+): Record<string, Value> =>
+  Object.fromEntries(Object.entries(record).map(([key, value]) => [rename(key), value]));
+
+/** zod's record drops an own "__proto__" key unvalidated, so the key is escaped past it and restored. */
+export const recordKeepingEveryKey = <Value extends z.ZodType>(value: Value) =>
+  z
+    .preprocess(
+      (input) =>
+        typeof input === "object" &&
+        input !== null &&
+        [Object.prototype, null].includes(Object.getPrototypeOf(input))
+          ? withKeysRenamed({ ...input }, (key) => (PROTO_FAMILY.test(key) ? `_${key}` : key))
+          : input,
+      z.record(z.string(), value),
+    )
+    .overwrite((record) =>
+      withKeysRenamed(record, (key) => (ESCAPED_PROTO_FAMILY.test(key) ? key.slice(1) : key)),
+    );
+
+const frontmatterEntry = recordKeepingEveryKey(
+  z.union([z.string(), z.number(), z.boolean(), z.null()]),
+).refine((entry) => Object.keys(entry).length > 0, {
+  message: "a list entry carries at least one key",
+});
 
 const namesAResource = (entry: z.infer<typeof frontmatterEntry> | string): boolean =>
   citedSourceOf(entry) !== undefined;
 
-export const conceptFrontmatter = z
-  .record(
+export const conceptFrontmatter = recordKeepingEveryKey(
+  z.union([
     z.string(),
-    z.union([
-      z.string(),
-      z.number(),
-      z.boolean(),
-      z.null(),
-      z.array(z.string()),
-      z.array(frontmatterEntry),
-    ]),
-  )
-  .superRefine((value, context) => {
-    let characters = 0;
-    for (const _ of JSON.stringify(value)) characters += 1;
-    if (characters > CONCEPT_FRONTMATTER_MAX) {
-      context.addIssue({
-        code: "custom",
-        message: `a concept's frontmatter is at most ${CONCEPT_FRONTMATTER_MAX} characters of JSON`,
-      });
-    }
-    const sources = value["sources"];
-    if (!Array.isArray(sources)) return;
-    for (const [index, entry] of sources.entries()) {
-      if (namesAResource(entry)) continue;
-      context.addIssue({
-        code: "custom",
-        path: ["sources", index],
-        message: "a sources[] entry names the resource it cites",
-      });
-    }
-  });
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(z.string()),
+    z.array(frontmatterEntry),
+  ]),
+).superRefine((value, context) => {
+  let characters = 0;
+  for (const _ of JSON.stringify(value)) characters += 1;
+  if (characters > CONCEPT_FRONTMATTER_MAX) {
+    context.addIssue({
+      code: "custom",
+      message: `a concept's frontmatter is at most ${CONCEPT_FRONTMATTER_MAX} characters of JSON`,
+    });
+  }
+  const sources = value["sources"];
+  if (!Array.isArray(sources)) return;
+  for (const [index, entry] of sources.entries()) {
+    if (namesAResource(entry)) continue;
+    context.addIssue({
+      code: "custom",
+      path: ["sources", index],
+      message: "a sources[] entry names the resource it cites",
+    });
+  }
+});
 
 const frontmatter = z.union([conceptFrontmatter, z.null()]);
 
@@ -532,7 +554,7 @@ const conceptIdentityUpdate = createUpdateSchema(conceptIdentity, conceptIdentit
 const conceptFileRefinements = {
   path: (schema: z.ZodString) => schema.regex(CONCEPT_PATH),
   title: (schema: z.ZodString) => schema.trim().min(1),
-  frontmatter: (schema: z.ZodType) => schema.pipe(frontmatter),
+  frontmatter: () => frontmatter,
 };
 
 const conceptKind = (schema: z.ZodString) => schema.trim().min(1);

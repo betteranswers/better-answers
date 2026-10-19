@@ -5,6 +5,7 @@ import {
   boundarySchemas,
   bundleManifest,
   CONCEPT_PATH,
+  recordKeepingEveryKey,
   resolvedResource,
   VERIFICATION_IMPORTED_ORIGIN,
   type BundleManifest,
@@ -97,9 +98,9 @@ const unsound = (file: string, reason: UnsoundReason, about: string): Unsound =>
 });
 
 const scalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
-const mapping = z.record(z.string(), scalar);
+const mapping = recordKeepingEveryKey(scalar);
 const yamlValue = z.union([scalar, z.array(z.string()), z.array(mapping), mapping]);
-const yamlFrontmatter = z.record(z.string(), yamlValue);
+const yamlFrontmatter = recordKeepingEveryKey(yamlValue);
 
 type YamlFrontmatter = z.infer<typeof yamlFrontmatter>;
 
