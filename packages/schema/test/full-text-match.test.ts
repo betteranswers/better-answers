@@ -280,17 +280,24 @@ describe("the any-word rule over concept rows", () => {
       "audit log retention",
     );
 
-    const common = Math.log(1 + 1.5 / 3.5);
-    const rare = Math.log(1 + 3.5 / 1.5);
+    const idfOfAWordInThreeOfFourRows = Math.log(1 + 1.5 / 3.5);
+    const idfOfAWordInOneOfFourRows = Math.log(1 + 3.5 / 1.5);
     expect(matched).toEqual([
-      { title: "Audit Logs Retention", weight: expect.closeTo(2 * common + rare, 12), rank: 3 },
+      {
+        title: "Audit Logs Retention",
+        weight: expect.closeTo(2 * idfOfAWordInThreeOfFourRows + idfOfAWordInOneOfFourRows, 12),
+        rank: 3,
+      },
       {
         title: "Logs",
-        weight: expect.closeTo(common + (common * 1.2 * 2.2) / (1.2 + 1.2), 12),
+        weight: expect.closeTo(
+          idfOfAWordInThreeOfFourRows + (idfOfAWordInThreeOfFourRows * 1.2 * 2.2) / (1.2 + 1.2),
+          12,
+        ),
         rank: 2.200000047683716,
       },
-      { title: "Audit", weight: expect.closeTo(common, 12), rank: 1 },
-      { title: "Log", weight: expect.closeTo(common, 12), rank: 1 },
+      { title: "Audit", weight: expect.closeTo(idfOfAWordInThreeOfFourRows, 12), rank: 1 },
+      { title: "Log", weight: expect.closeTo(idfOfAWordInThreeOfFourRows, 12), rank: 1 },
     ]);
   });
 

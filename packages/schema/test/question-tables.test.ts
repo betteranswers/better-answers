@@ -382,7 +382,7 @@ describe("a month's partition of the content", () => {
     expect(made).toEqual([contentPartitionOf(inTheMonth(0)), contentPartitionOf(inTheMonth(1))]);
   });
 
-  it("refuses a question whose month has no partition", async () => {
+  it("refuses a question in an unmade month; inserting makes none", async () => {
     await withRollback(db().pool, async (client) => {
       const record = await aRecordInAMonthNotMade(client);
 
@@ -493,7 +493,7 @@ describe("a month's partition of the content", () => {
     });
   });
 
-  it("is forced and granted to no runtime role, each one", async () => {
+  it("is forced and granted no runtime role, partition by partition", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(MAKE_THE_MONTH, [A_MONTH_NOT_MADE]);
 

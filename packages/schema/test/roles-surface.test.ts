@@ -21,7 +21,7 @@ import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./ha
 import { privilegesHeld, refusesEach } from "./probes.ts";
 import { A_MAP_NODE } from "./rls-probes.ts";
 
-let surface: RolesSurface;
+let surfaceReadFromTheDatabase: RolesSurface;
 
 const NOTHING_OF_THE_EIGHT = {
   SELECT: false,
@@ -85,7 +85,7 @@ beforeAll(async () => {
   } finally {
     client.release();
   }
-  surface = await readRolesSurface(db.pool);
+  surfaceReadFromTheDatabase = await readRolesSurface(db.pool);
 });
 
 afterAll(async () => {
@@ -106,16 +106,21 @@ describe("the roles' surface", () => {
     const migrator = catalogued.rows.map((row) => row.rolname).find((name) => !isRuntimeRole(name));
 
     expect(
-      surface.roles.map((role) => (role.role === MIGRATOR ? migrator : role.role)).toSorted(),
+      surfaceReadFromTheDatabase.roles
+        .map((role) => (role.role === MIGRATOR ? migrator : role.role))
+        .toSorted(),
     ).toEqual(catalogued.rows.map((row) => row.rolname).toSorted());
 
-    const named = new Set([...surface.roles.map((role) => role.role), PUBLIC_GRANTEE]);
+    const named = new Set([
+      ...surfaceReadFromTheDatabase.roles.map((role) => role.role),
+      PUBLIC_GRANTEE,
+    ]);
     const grantees = [
-      ...surface.defaults,
-      ...surface.schemas,
-      ...surface.relations,
-      ...surface.columns,
-      ...surface.functions,
+      ...surfaceReadFromTheDatabase.defaults,
+      ...surfaceReadFromTheDatabase.schemas,
+      ...surfaceReadFromTheDatabase.relations,
+      ...surfaceReadFromTheDatabase.columns,
+      ...surfaceReadFromTheDatabase.functions,
     ].map((row) => row.role);
     expect([...new Set(grantees)].filter((grantee) => !named.has(grantee))).toEqual([]);
   });
@@ -128,7 +133,7 @@ describe("the roles' surface", () => {
 
   it("carries neither rolbypassrls nor rolsuper on either runtime role", () => {
     expect(
-      surface.roles
+      surfaceReadFromTheDatabase.roles
         .filter((role) => isRuntimeRole(role.role))
         .map(({ role, superuser, bypass_rls }) => ({ role, superuser, bypass_rls })),
     ).toEqual([
@@ -351,7 +356,9 @@ describe("the functions the journal installs", () => {
     );
 
     expect(toPublic.rows).toEqual([]);
-    expect(surface.functions.filter((row) => row.role === PUBLIC_GRANTEE)).toEqual([]);
+    expect(
+      surfaceReadFromTheDatabase.functions.filter((row) => row.role === PUBLIC_GRANTEE),
+    ).toEqual([]);
   });
 
   it("would show a PUBLIC EXECUTE the moment one arrived", async () => {
@@ -384,8 +391,10 @@ describe("the functions the journal installs", () => {
 
     expect({
       inTheImage: (shipped.rows[0]?.n ?? 0) > 0,
-      inTheFile: surface.functions.some((row) => row.object.endsWith(".vector_dims")),
-    }).toEqual({ inTheImage: true, inTheFile: false });
+      inTheSurface: surfaceReadFromTheDatabase.functions.some((row) =>
+        row.object.endsWith(".vector_dims"),
+      ),
+    }).toEqual({ inTheImage: true, inTheSurface: false });
   });
 
   it("still fire as triggers, though nobody holds EXECUTE on them", async () => {
@@ -448,7 +457,7 @@ describe("the declared note over the SECURITY DEFINER functions", () => {
 
   it("names a reason and declared tables, some the surface omits", () => {
     const declared = declaredTableNames();
-    const stated = new Set(surface.relations.map((row) => row.object));
+    const stated = new Set(surfaceReadFromTheDatabase.relations.map((row) => row.object));
 
     for (const entry of SECURITY_DEFINER_REACH) {
       expect({
@@ -465,7 +474,7 @@ describe("the declared note over the SECURITY DEFINER functions", () => {
   });
 
   it("matches the definer rows in the surface itself", () => {
-    const definers = surface.functions
+    const definers = surfaceReadFromTheDatabase.functions
       .filter((row) => row.security_definer)
       .map((row) => identityOf({ fn: row.object, args: row.args }));
 
