@@ -33,7 +33,6 @@ PREPARABLE = re.compile(
     r"\s*(?:SELECT|INSERT|UPDATE|DELETE|MERGE|VALUES|WITH)\b", re.IGNORECASE
 )
 
-# Upper case only, so prose opening with "Select" or "Set" is never taken for SQL.
 STATEMENT_SHAPED = re.compile(
     r"\s*(?:SELECT|INSERT|UPDATE|DELETE|MERGE|VALUES|WITH|COPY|SET|CREATE|ALTER"
     r"|DROP|TRUNCATE|BEGIN|COMMIT|ROLLBACK)\b"
@@ -41,8 +40,6 @@ STATEMENT_SHAPED = re.compile(
 
 PLACEHOLDER = re.compile(r"%\((\w+)\)s|%s|%%")
 
-# Statement text to why Postgres cannot prepare it. Empty: the worker sends no DDL,
-# COPY, SET or transaction control as text.
 UNPREPARABLE: Mapping[str, str] = {}
 
 # cocoindex writes these from the worker's own table and column names.
@@ -216,7 +213,6 @@ def _readings_of_joined(
 
 
 def readings_of(module: Module, node: ast.expr, seen: set[ast.AST]) -> list[Reading]:
-    """Every text `node` can hold, each with the parameter values that gave it."""
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         seen.add(node)
         return [(node.value, ())]
@@ -371,7 +367,6 @@ def _set_aside_unpreparable(found: Survey, unpreparable: Mapping[str, str]) -> N
 def survey(
     root: Path, *, tables: Mapping[str, Table], unpreparable: Mapping[str, str]
 ) -> Survey:
-    """Every statement the modules under `root` send, and why any was missed."""
     found = Survey()
     built: list[str] = []
     for path in sorted(root.rglob("*.py")):
@@ -404,11 +399,11 @@ def numbered(text: str) -> str:
 def failures_preparing(
     connection: psycopg.Connection, statements: Sequence[Statement]
 ) -> list[str]:
-    """Each statement Postgres refuses to plan, by its label and Postgres's words."""
     failures: list[str] = []
     with connection.transaction():
         for number, statement in enumerate(statements):
-            # A savepoint each, so one refusal leaves the rest preparable.
+            # An error aborts a Postgres transaction, so a savepoint each keeps
+            # the rest preparable.
             try:
                 with connection.transaction():
                     connection.execute(

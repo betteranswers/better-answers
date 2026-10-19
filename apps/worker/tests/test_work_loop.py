@@ -311,7 +311,6 @@ def test_a_failed_audit_counts_so_idle_ticks_queue_no_other(
     assert loop.tick(database, bootstrap) is False
     assert loop.tick(database, bootstrap) is True
 
-    # A failure no longer ends the job: the audit runs to its bound, then idles.
     assert loop.tick(database, bootstrap) is True
     assert loop.tick(database, bootstrap) is True
 
@@ -610,7 +609,6 @@ def test_a_worker_with_matching_stamps_runs_what_is_queued(
 
 def a_daemon(bootstrap: Bootstrap) -> threading.Thread:
     def serve() -> None:
-        # The loop ends only when its connection does, so that error is how it stops.
         with contextlib.suppress(psycopg.OperationalError):
             loop.run(bootstrap, once=False)
 
@@ -639,13 +637,9 @@ def test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes(
     with capture_logs() as written:
         running = a_daemon(bootstrap_for(database, tmp_path))
         running.start()
-        # A daemon thread because the loop never returns on its own, and the stamp is
-        # corrected from a connection of its own while it sleeps.
         refused_by = time.monotonic() + (
             loop.IDLE_SLEEP_SECONDS * IDLE_SLEEPS_THE_DETECTORS_IMPORT_MAY_TAKE
         )
-        # Not a fixed pause: the loop first imports the detector's stack, which in a
-        # process that has not loaded it yet takes longer than one.
         while not refusals_in(written) and time.monotonic() < refused_by:
             time.sleep(0.05)
         with (

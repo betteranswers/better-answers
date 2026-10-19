@@ -7,8 +7,6 @@ LETTERS = ascii_uppercase
 
 
 def normalised(value: str) -> str:
-    """Whitespace collapsed to single spaces and case
-    folded: the form names and identifiers are compared in."""
     return " ".join(value.split()).casefold()
 
 
@@ -19,8 +17,6 @@ def letters_from(seed: str) -> tuple[str, ...]:
 
 
 def pseudonyms_for(names: Iterable[str], seed: str) -> Mapping[str, str]:
-    """A letter per distinct name, keyed by `normalised` form, in first-appearance order
-    from the seed's shuffle of A to Z; past 26 names, letters double."""
     letters = letters_from(seed)
     taken: dict[str, str] = {}
     for name in names:

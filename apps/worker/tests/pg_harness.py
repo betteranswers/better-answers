@@ -62,7 +62,6 @@ def stamp_migration(cursor: psycopg.Cursor[Any], *, digest: str, when: object) -
     )
 
 
-# What `migrate` writes after the journal, which on its own leaves the table empty.
 def stamp_contract_as_migrate_does(cursor: psycopg.Cursor[Any], *, digest: str) -> None:
     cursor.execute(
         "INSERT INTO contract_stamp (only_row, digest) VALUES (true, %s)"
@@ -109,7 +108,7 @@ SHARED = "shared"
 PORT_OVERRIDE = "TEST_POSTGRES_PORT"
 UP_COMMAND = "deploy/test-postgres.sh up"
 
-# Advisory locks conflict only within one database; the vitest tier shares this key.
+# Postgres advisory locks conflict only within one database.
 _BUILD_LOCK_KEY = "hashtextextended('better-answers template build', 0)"
 _TAKE_BUILD_LOCK = f"SELECT pg_advisory_lock({_BUILD_LOCK_KEY})"
 _RELEASE_BUILD_LOCK = f"SELECT pg_advisory_unlock({_BUILD_LOCK_KEY})"
@@ -121,8 +120,6 @@ class Cluster(NamedTuple):
     template: str
 
 
-# A container costs a second and a half and a clone a fiftieth: one container per
-# process, one clone per test.
 @cache
 def _migrated_cluster() -> Cluster:
     locator = os.environ.get(LOCATOR, "").strip()
@@ -142,7 +139,6 @@ def _pinned_digest() -> str:
     return found.group(1)
 
 
-# deploy/test-postgres.sh derives the same port: one server per pinned image.
 def shared_address() -> str:
     override = os.environ.get(PORT_OVERRIDE, "").strip()
     port = int(override) if override else 55434 + int(_pinned_digest()[:4], 16) % 1000
@@ -183,7 +179,6 @@ def _server_facts(maintenance: str) -> tuple[bool, str | None]:
     return (False, None) if row is None else (bool(row[0]), row[1])
 
 
-# This process's own container carries no stamp, so only `shared` demands one.
 def _refuse_unless_fit(maintenance: str, *, shared: bool) -> None:
     superuser, stamp = _server_facts(maintenance)
     if not superuser:
@@ -284,7 +279,6 @@ def _stamp_use(admin: psycopg.Connection, database: str) -> None:
     )
 
 
-# A null age is a template with no use stamp yet, which is stamped rather than dropped.
 _AGES = r"""
 SELECT datname, CASE WHEN shobj_description(oid, 'pg_database') ~ '^\d{4}-\d{2}-\d{2}T'
   THEN shobj_description(oid, 'pg_database')::timestamptz < now() - interval '1 day' END
@@ -292,8 +286,8 @@ FROM pg_database WHERE datistemplate AND starts_with(datname, %s)
 """
 
 
-# Holds the tmpfs to a day of templates; a run still cloning one keeps it until the
-# clone ends.
+# DROP DATABASE waits on a CREATE DATABASE cloning it, so a run still cloning keeps
+# its template until the clone ends.
 def _age_out(admin: psycopg.Connection) -> None:
     for database, stale in admin.execute(_AGES, (_TEMPLATE_PREFIX,)).fetchall():
         if stale is None:
@@ -302,7 +296,6 @@ def _age_out(admin: psycopg.Connection) -> None:
             _drop_template(admin, str(database))
 
 
-# Under the build lock no build of this tier is live, so every one found was killed.
 def _drop_killed_builds(admin: psycopg.Connection) -> None:
     found = admin.execute(
         r"SELECT datname FROM pg_database"
@@ -316,8 +309,8 @@ def _drop_killed_builds(admin: psycopg.Connection) -> None:
 def ensure_template(
     maintenance_conninfo: str, name: str, build: Callable[[str], None]
 ) -> str:
-    """Build `name` once per instance, stamp its use, and drop day-old templates."""
-    # The session ends on any failure, which releases the lock.
+    # Postgres frees a session-level advisory lock when the session ends, so any
+    # failure here releases it.
     with psycopg.connect(maintenance_conninfo, autocommit=True) as admin:
         admin.execute(_TAKE_BUILD_LOCK)
         if not _exists(admin, name):
@@ -350,8 +343,6 @@ def sweep_dead_cases(maintenance: str) -> None:
         for database in names:
             if _is_alive(int(database.split("_")[1])):
                 continue
-            # Every worker sweeps the same leftovers; FORCE would end a session the
-            # liveness check misjudged.
             with suppress(errors.ObjectInUse, errors.InvalidCatalogName):
                 admin.execute(
                     SQL("DROP DATABASE IF EXISTS {}").format(Identifier(database))

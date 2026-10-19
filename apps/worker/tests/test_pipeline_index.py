@@ -274,7 +274,6 @@ A_LEASE_NO_TEST_OUTLIVES_SECONDS = 600
 def a_claimed_index_job(
     cursor: psycopg.Cursor[Any], workspace_id: str, *, claimed_by: str
 ) -> queue.ClaimedJob:
-    """The fence reads the claim alone, so the row's reason is any the table admits."""
     row = seed_job(
         cursor,
         workspace_id=workspace_id,
@@ -304,7 +303,6 @@ def indexed(
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> IndexOutcome:
-    """Under a live claim of the bootstrap's own worker, as the loop runs a sync."""
     with (
         queue.connected(bootstrap.database_url) as worker,
         queue.scoped(worker, sync.workspace_id) as cursor,
@@ -426,7 +424,6 @@ def test_the_loop_claims_runs_and_finishes_an_index_job(
 def a_workspace_with_an_invoice_and_a_sick_note(
     connection: psycopg.Connection,
 ) -> str:
-    """The two-document connected source a failing sync reads."""
     return seed_the_connected_source(
         connection,
         documents=(AN_INVOICE_ID, A_SICK_NOTE_ID),
@@ -435,8 +432,6 @@ def a_workspace_with_an_invoice_and_a_sick_note(
 
 
 class AnInMemoryObjectStore:
-    """The S3 service in memory, behind the adapter that always speaks to it."""
-
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
 
@@ -487,7 +482,6 @@ def test_runs_a_failed_index_job_again_and_names_it(
         assert answered is not None
         return answered
 
-    # A good run first, so the binding holds passages the retries must not lose.
     with connection.cursor() as cursor:
         good = seed_job(
             cursor,
@@ -517,7 +511,6 @@ def test_runs_a_failed_index_job_again_and_names_it(
         )
     connection.commit()
 
-    # Each failing run goes back to the queue until the bound ends the job.
     for attempt in (1, 2):
         with queue.connected(bootstrap.database_url) as worker:
             assert loop.tick(worker, bootstrap) is True
@@ -532,7 +525,6 @@ def test_runs_a_failed_index_job_again_and_names_it(
     assert outcome["error"] == "DocumentFailedError"
     assert outcome["source_document_id"] in {AN_INVOICE_ID, A_SICK_NOTE_ID}
 
-    # The binding keeps its last good chunks: nothing was re-uploaded or re-bound.
     assert passage_rows_of(connection, workspace_id) == passages, (
         "the retries kept the good run's passages"
     )
@@ -1682,7 +1674,6 @@ def test_a_revoked_claimant_moves_no_documents_sensitivity(
             bootstrap, sync_for(workspace_id), job=job, copies=bucket
         )
 
-    # The control: the claim was revoked mid-sync, after the claimant read the source.
     assert bucket.writes, "the claim was revoked after the source was read"
     assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == "Internal"
     assert finding_rows_of(connection, workspace_id) == []
@@ -1709,7 +1700,6 @@ def test_a_heartbeat_renews_while_the_catalogue_write_holds_the_claim(
             queue.connected(dsn) as beating,
             queue.scoped(beating, workspace_id) as beat,
         ):
-            # A wait fails here rather than hangs: no beat may queue behind the fence.
             beat.execute("SET LOCAL lock_timeout = '2s'")
             renewed = queue.heartbeat(beat, job.id, worker_id)
 
@@ -1854,7 +1844,6 @@ def test_a_row_deleting_reason_empties_the_store_before_reading(
     assert set(after_the_wipe) & set(after_the_rule_change) != set()
     assert set(after_the_wipe.values()).isdisjoint(after_the_rule_change.values())
 
-    # The control: without it an empty read below could mean nothing is ever reported.
     assert first_read == [[AN_INVOICE_ID]], (
         "the control: a first sync reports what it detects afresh"
     )
@@ -1865,7 +1854,6 @@ def test_a_row_deleting_reason_empties_the_store_before_reading(
     assert wiped_read == [[]], (
         "a wipe removes the connected source's store and spares the memo"
     )
-    # Same inodes, so the second store was never removed and remade under it.
     assert inodes_of(findings_standing) != {}
     assert inodes_of(files_in(findings_directory)).items() >= (
         inodes_of(findings_standing).items()
@@ -1876,7 +1864,6 @@ def test_a_row_deleting_reason_empties_the_store_before_reading(
     )
 
 
-# The store's name before the passage sweep, as an earlier release left it.
 THE_STORE_AN_EARLIER_RELEASE_NAMED = "binding"
 
 
@@ -1909,7 +1896,6 @@ def test_a_wipe_leaves_no_old_store_and_tracks_removals_again(
     indexed(bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three())
 
     assert old_store.exists() is False
-    # The control: without both documents landed, the removal below would prove nothing.
     assert landed == {AN_INVOICE_ID, A_DELIVERY_NOTE_ID}, (
         "the control: both documents landed before one went"
     )
@@ -1946,8 +1932,6 @@ def test_the_claimant_runs_an_unknown_reason_job_without_raising(
     connection, dsn = database
     workspace_id = seed_the_connected_source(connection, documents=())
     bootstrap = bootstrap_for(dsn, tmp_path)
-    # The job table's check refuses an undeclared reason, so the row holds a known
-    # one and the claimant reads the unknown one.
     with connection.cursor() as cursor:
         job = a_claimed_index_job(cursor, workspace_id, claimed_by=bootstrap.worker_id)
     connection.commit()
@@ -1994,8 +1978,8 @@ def test_a_sync_dying_before_landing_leaves_only_the_verdict(
     )
     bootstrap = bootstrap_for(dsn, tmp_path)
 
-    # The group is not held past the assertion: its traceback pins the engine's store
-    # open, and the retry below opens the same one.
+    # A caught exception's traceback pins its frames' locals, the engine's store
+    # among them, so only a flag leaves the `except`.
     refused = False
     try:
         indexed(bootstrap, sync_for(workspace_id), copies=bucket)

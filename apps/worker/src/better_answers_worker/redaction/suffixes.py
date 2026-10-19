@@ -24,8 +24,6 @@ def warmed_entries() -> tuple[Path, ...]:
 
 
 def copy_out(target: Path) -> None:
-    """Copies the warmed cache under `target`, keeping its
-    layout. Raises `RuntimeError` when `fetch` has not run."""
     cache = Path(get_cache_dir())
     entries = warmed_entries()
     if not entries:

@@ -713,8 +713,6 @@ SEAM_READINGS: Mapping[str, SeamReading] = {
 THE_CEILINGS_READING = "T-222"
 
 
-# The margin carries the first document's model load plus conversion and the
-# engine's own work, which nothing times; four loads errs long on purpose.
 LOADS_IN_THE_MARGIN = 4
 
 
@@ -1046,8 +1044,8 @@ def image() -> Iterator[str]:
 
     supplied = os.environ.get(IMAGE_ID_VARIABLE, "").strip()
 
-    # Run by id, never tagged: the daemon is shared, so two worktrees running `check`
-    # at once would overwrite the tag and read each other's image.
+    # A Docker tag is daemon-wide, so two `check` runs on one daemon would overwrite
+    # it; run by id.
     built_here = _build_the_image(matrix_leg("worker")) if not supplied else None
     try:
         yield built_here or supplied
@@ -1438,7 +1436,6 @@ def test_the_image_leaves_this_tiers_tests_out_of_the_runtime(
 
 
 JOB_OPENS = re.compile(r"^ {2}(?P<job>[\w-]+):\s*$")
-# A step's own `if:` pushes its `run:` onto a line of its own, so the dash is optional.
 RUNS_A_ROOT_SCRIPT = re.compile(r"^ +(?:- )?run: pnpm (?P<script>[\w:.-]+)\s*$")
 THIS_TIERS_GATE = "check:worker"
 
@@ -1498,9 +1495,7 @@ def test_this_tier_reads_the_names_the_workflows_actually_hand_it() -> None:
         for job, lines in legs.items()
         if any(f"{PROBE_DEFERRAL_VARIABLE}:" in line for line in lines)
     }
-    # This tier's legs, found by the gate they run rather than by their names.
     mine = {job for job, lines in legs.items() if THIS_TIERS_GATE in _gates_of(lines)}
-    # A leg running named files rather than a workspace's whole check builds no image.
     misread = {
         job
         for job in deferred
@@ -1512,7 +1507,6 @@ def test_this_tier_reads_the_names_the_workflows_actually_hand_it() -> None:
 
     assert len(handed) == 1, BUILD_WORKFLOW
     assert mine, CHECK_WORKFLOW
-    # One leg per lane, so no run of any lane pays for this tier's gates twice.
     assert len(mine) == len({job.split("-", 1)[0] for job in mine}), (
         f"{CHECK_WORKFLOW}: one leg per lane runs this tier's gates"
     )
@@ -1540,7 +1534,6 @@ def test_the_runner_refuses_the_engines_gateway_call_like_the_image() -> None:
     }
 
     assert running, CHECK_WORKFLOW
-    # Every leg that runs the pipeline suite on the runner refuses the call.
     assert declaring == running, CHECK_WORKFLOW
     assert declared == {worker_environment("COCOINDEX_DISABLE_USAGE_TRACKING")}, (
         CHECK_WORKFLOW

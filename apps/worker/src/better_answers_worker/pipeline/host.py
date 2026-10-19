@@ -18,19 +18,16 @@ from ..config import Bootstrap
 from ..log import logger
 from .tables import POOL, Table, declare_nothing, declare_rows
 
-# Sized for four connected sources with both stores open; the bound counts handles.
 ENVIRONMENTS_HELD = 8
 
 
-# heed's whole message, matched exactly, so that any other error raises at once.
+# heed's message for an environment this process still holds open.
 STILL_OPEN = (
     "environment already open in this program;"
     " close it to be able to open it again with different options"
 )
 
 
-# Sized for a starved runner, not the moment a clone usually takes: a store that stays
-# held raises either way.
 STARVED_RUNNER_RELEASE_WAIT_SECONDS = 5.0
 FIRST_PAUSE_SECONDS = 0.05
 LONGEST_PAUSE_SECONDS = 0.5
@@ -44,18 +41,12 @@ LANDED_APP = "landed"
 PASSAGES_APP = "passages"
 
 
-# The connected source's own store: the passage rows and the target-state tracking that
-# says which of them have gone. A wipe removes it.
 CONNECTED_SOURCE_STORE = "connected_source"
 
 
-# Names an earlier release gave the store. Such a store may hold text redacted under a
-# replaced rule, so a wipe removes it too.
 STORES_NAMED_BEFORE_THE_PASSAGE_SWEEP: tuple[str, ...] = ("binding",)
 
 
-# The second store: the landed app and the findings memo, no target declared and so no
-# target-state tracking and no text. A wipe spares it.
 FINDINGS_STORE = "findings"
 
 
@@ -81,9 +72,6 @@ class Sync:
 async def open_pool(
     database_url: str, workspace_id: str, *, max_size: int = POOL_MAX_SIZE
 ) -> asyncpg.Pool:
-    """Every connection is scoped to the workspace for its
-    whole life, since the setting is made per session."""
-
     async def scope(connection: asyncpg.Connection) -> None:
         await connection.execute(
             "SELECT set_config('app.workspace_id', $1, false)", workspace_id
@@ -171,10 +159,6 @@ class _Loop:
 
 
 class Host:
-    """One pool per workspace and each connected source's two engine stores, closing
-    the least recently used source's once more than `environments_held` handles are
-    open."""
-
     def __init__(
         self,
         bootstrap: Bootstrap,
@@ -182,7 +166,6 @@ class Host:
         environments_held: int = ENVIRONMENTS_HELD,
         release_wait_seconds: float = STARVED_RUNNER_RELEASE_WAIT_SECONDS,
     ) -> None:
-        # Under one source's handles, the source in use would be the one shed.
         if environments_held < len(STORES_A_CONNECTED_SOURCE_HOLDS):
             message = (
                 f"the Environment cache must hold a connected source's"
@@ -220,13 +203,9 @@ class Host:
         return self.connected_source_directory(sync) / store
 
     def store_map_bytes(self) -> int:
-        # Split across the source's stores: a whole cap each would let a source hold
-        # twice the operator's number.
         return self._engine.lmdb_map_bytes // len(STORES_A_CONNECTED_SOURCE_HOLDS)
 
     def lmdb_bytes(self, sync: Sync) -> int:
-        # The whole directory, both stores: the operator sizes a volume against what a
-        # connected source holds and the split must not halve the number.
         directory = self.connected_source_directory(sync)
         if not directory.is_dir():
             return 0
@@ -235,11 +214,7 @@ class Host:
         )
 
     def remove_connected_source_store(self, sync: Sync) -> None:
-        # Evicted before the directory goes: removing it under an open handle would
-        # leave the engine writing into a store nothing can read.
         self._evict(sync, CONNECTED_SOURCE_STORE)
-        # Only a store never made is passed over: one left standing keeps its personal
-        # text, so the sync fails rather than index over it.
         for store in (CONNECTED_SOURCE_STORE, *STORES_NAMED_BEFORE_THE_PASSAGE_SWEEP):
             with contextlib.suppress(FileNotFoundError):
                 shutil.rmtree(self.store_directory(sync, store))
@@ -257,7 +232,6 @@ class Host:
             self._environment(sync, store)
 
     def held_connected_sources(self) -> tuple[str, ...]:
-        """Connected source ids with a store open, least recently used first."""
         return tuple(self._environments)
 
     def _evict(self, sync: Sync, store: str) -> None:
@@ -317,20 +291,16 @@ class Host:
     def land_rows(
         self, sync: Sync, table: Table, rows: Sequence[Mapping[str, Any]]
     ) -> int:
-        """A row the store tracks as landed is not written
-        again, and one it tracked that `rows` omits is deleted."""
         declared = tuple(rows)
         app = coco.App(
             self.app_config(sync, PASSAGES_APP), declare_rows, table, declared
         )
-        # From the caller's thread, never the host's loop: the blocking form of an
-        # update never returns when it is called from inside that loop.
+        # cocoindex's `update_blocking` never returns when called from inside the
+        # environment's event loop, so it runs on the caller's thread.
         landed = app.update_blocking()
         return int(landed) if isinstance(landed, int) else len(declared)
 
     def drop_connected_source(self, sync: Sync) -> None:
-        """Drops the engine's record of the connected source's passages,
-        leaving the table, its indexes and every row it landed."""
         coco.App(self.app_config(sync, PASSAGES_APP), declare_nothing).drop_blocking()
 
     def close(self) -> None:

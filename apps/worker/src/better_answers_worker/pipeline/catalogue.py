@@ -31,9 +31,6 @@ class ConnectedSourceSync:
 def read_connected_source(
     cursor: Cursor[Any], sync: Sync
 ) -> ConnectedSourceSync | None:
-    """None when the connected source is gone. Only live documents are read, each
-    carrying the workspace's suppressions and its own restored and dismissed
-    findings."""
     cursor.execute(
         "SELECT rules_in_force FROM connected_source WHERE id = %s",
         (sync.connected_source_id,),
@@ -132,8 +129,6 @@ def record_findings(
     *,
     mint: Callable[[], str] = ulid,
 ) -> int:
-    """Upserts a row per withholding and answers how many rows changed;
-    a restored finding keeps its tier. `mint` makes each new row's id."""
     rows = [
         (
             sync.workspace_id,
@@ -198,9 +193,6 @@ def unreadable_catalogue(
 def reconcile_catalogue(
     cursor: Cursor[Any], documents: Sequence[ReadDocument]
 ) -> tuple[str, ...]:
-    """Marks documents converted; sensitivity only narrows, except a lifted verdict
-    restores the Admin's own narrowing. Answers ids whose sensitivity changed, NULL on
-    either side included."""
     moved: list[str] = []
     for document in documents:
         cursor.execute(
@@ -209,8 +201,6 @@ def reconcile_catalogue(
             " redaction_version = %(version)s, outcome = %(outcome)s,"
             " unreadable_reason = NULL,"
             " last_seen = now(),"
-            # A verdict only narrows, by the database's ranking; a lifted one keeps the
-            # Admin's own word, which the seam never made.
             " sensitivity = CASE"
             "   WHEN %(lifted)s THEN narrowed_to"
             "   WHEN sensitivity IS NULL THEN %(verdict)s::text"

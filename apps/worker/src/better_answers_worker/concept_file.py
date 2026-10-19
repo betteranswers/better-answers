@@ -97,9 +97,6 @@ def _list_items_of(
 
 
 def parse_concept_file(content: str) -> tuple[Frontmatter, str]:
-    """One JSON-quoted key a line, holding a JSON scalar, `[]` or an indented list;
-    anything else raises `MalformedConceptFileError`. The body follows the fence's blank
-    line."""
     lines = content.split("\n")
     if not lines or lines[0] != "---":
         raise MalformedConceptFileError("no frontmatter fence")
@@ -130,17 +127,12 @@ def parse_concept_file(content: str) -> tuple[Frontmatter, str]:
 
 
 def normalised_body(body: str) -> str:
-    """The body as the content hash reads it: LF line ends, no
-    trailing spaces or tabs, and exactly one final newline."""
     without_returns = body.replace("\r\n", "\n")
     trimmed = "\n".join(line.rstrip(" \t") for line in without_returns.split("\n"))
     return trimmed.rstrip("\n") + "\n"
 
 
 def resolved_resource(resource: str, from_path: str) -> str:
-    """`resource` read relative to the concept at `from_path`, as an absolute bundle
-    path. URLs and `//` references return unchanged; `..` never climbs above the
-    root."""
     if resource.startswith("//") or re.match(r"^[a-z][a-z0-9+.-]*:", resource, re.I):
         return resource
     directory = "" if resource.startswith("/") else from_path[: from_path.rfind("/")]
@@ -157,9 +149,6 @@ def resolved_resource(resource: str, from_path: str) -> str:
 
 
 def cited_source(entry: SourceEntry | str) -> tuple[str, str | None] | None:
-    """(resource, locator); None when the entry names no resource. A string's locator
-    follows its last `#`; an object's is written as JavaScript's `String()` writes
-    it."""
     if isinstance(entry, str):
         hash_at = entry.rfind("#")
         resource = (entry if hash_at == -1 else entry[:hash_at]).strip()
@@ -248,8 +237,6 @@ def _reduced_sources(value: FrontmatterValue, path: str) -> list[list[str | None
 
 
 def canonical_frontmatter(frontmatter: Frontmatter, path: str) -> str:
-    """As both tiers hash it: keys in UTF-16 order, `UNHASHED_KEYS` left out, `sources`
-    as resolved resource and locator pairs, numbers as JavaScript writes them."""
     pairs = []
     for key in sorted(frontmatter, key=_utf16_order):
         if key in UNHASHED_KEYS:
@@ -265,7 +252,5 @@ def _utf16_order(key: str) -> tuple[int, ...]:
 
 
 def content_hash_of(frontmatter: Frontmatter, body: str, path: str) -> str:
-    """Hex SHA-256 of the canonical frontmatter and the normalised body; must equal the
-    api's hash of the same file byte for byte."""
     canonical = f"{canonical_frontmatter(frontmatter, path)}\n{normalised_body(body)}"
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()

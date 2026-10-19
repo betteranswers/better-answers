@@ -5,16 +5,13 @@ import cocoindex as coco
 
 from ..redaction.engine import Span, spans_detected
 
-# Read in place of the body's syntax tree, so a body edit is a non-event and a bump is
-# a reprocess somebody chose.
+# cocoindex fingerprints the memo by this in place of the body's syntax tree, so a
+# body edit reprocesses nothing and a bump reprocesses everything.
 THE_MEMOS_VERSION = 1
 
 
 @dataclass(frozen=True, slots=True)
 class Raised:
-    """`afresh` is True when the detector read
-    the text, and False when the memo answered."""
-
     spans: tuple[Span, ...]
     afresh: bool
 
@@ -33,10 +30,8 @@ def detected(normalised_text: str, detection_key: str) -> tuple[Span, ...]:
 
 
 def raised_by_the_detector(normalised_text: str, detection_key: str) -> Raised:
-    """`detection_key` is never read by the detector: it
-    keys the memo, so moving it detects every text afresh."""
-    # A missed body runs inline on this thread, so it appends here;
-    # a cache hit leaves it empty.
+    # cocoindex runs a memo miss inline on this thread, so `detected` appends here;
+    # a memo hit leaves it empty.
     read: list[bool] = []
     token = _READ_AFRESH.set(read)
     try:
@@ -46,7 +41,5 @@ def raised_by_the_detector(normalised_text: str, detection_key: str) -> Raised:
     return Raised(spans=tuple(spans), afresh=bool(read))
 
 
-# Read off the function the engine fingerprints: a literal here would let a rename move
-# the memo while the suite still read the old word.
 THE_MEMOS_MODULE: str = detected._fn.__module__
 THE_MEMOS_NAME: str = detected._fn.__qualname__

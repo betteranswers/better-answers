@@ -23,7 +23,6 @@ DIFFERS = "differs"
 
 
 def schema_stamp_matches(connection: psycopg.Connection) -> bool:
-    """Whether the database's last migration is the one `schema_view` was made from."""
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT created_at FROM drizzle.__drizzle_migrations"
@@ -34,7 +33,6 @@ def schema_stamp_matches(connection: psycopg.Connection) -> bool:
 
 
 def contract_stamp_matches(connection: psycopg.Connection) -> bool:
-    """Whether the `contract_stamp` row holds this build's digest of `contracts/`."""
     with connection.cursor() as cursor:
         cursor.execute("SELECT digest FROM contract_stamp")
         row = cursor.fetchone()
@@ -42,7 +40,6 @@ def contract_stamp_matches(connection: psycopg.Connection) -> bool:
 
 
 def deploy_stamps(connection: psycopg.Connection) -> dict[str, str]:
-    """The log's own words, so one line tells an operator which stamp disagreed."""
     return {
         "schema_stamp": MATCHES if schema_stamp_matches(connection) else DIFFERS,
         "contract_stamp": MATCHES if contract_stamp_matches(connection) else DIFFERS,
@@ -154,7 +151,6 @@ def _serve_workspace(
 
 
 def outcome_counts(outcome: dict[str, Any]) -> dict[str, int]:
-    """A list counts as its length and an int as itself; anything else is dropped."""
     return {
         key: len(value) if isinstance(value, list) else value
         for key, value in outcome.items()
@@ -168,8 +164,6 @@ def tick(
     *,
     heartbeat_every_seconds: float = queue.HEARTBEAT_SECONDS,
 ) -> bool:
-    """Runs at most one job in each workspace, enqueuing a nightly audit where one is
-    due. True when any job ran."""
     worked = False
     for workspace_id in queue.workspace_ids(connection):
         served = _serve_workspace(
@@ -192,20 +186,13 @@ def warm_the_detectors_stack(worker_id: str) -> None:
 
 
 def run(bootstrap: Bootstrap, *, once: bool) -> int:
-    """With `once`, answers 1 when a deploy stamp differs and 0
-    after one pass; without it, runs until the process is stopped."""
-    # The daemon's first job would otherwise pay the stack; a `--once` spawn may never
-    # pay it at all.
     if not once:
         warm_the_detectors_stack(bootstrap.worker_id)
-    # In autocommit: the bare stamp reads and workspace list below would, on a plain
-    # connection, open a transaction turning every scoped block into a savepoint.
     with queue.connected(bootstrap.database_url) as connection:
         said: dict[str, str] | None = None
         while True:
             stamps = deploy_stamps(connection)
             if DIFFERS in stamps.values():
-                # Once rather than once a tick; again only when the disagreement moves.
                 if stamps != said:
                     logger.error(
                         "a deploy stamp does not match; claiming nothing",
@@ -217,8 +204,6 @@ def run(bootstrap: Bootstrap, *, once: bool) -> int:
                     said = stamps
                 if once:
                     return 1
-                # Re-checked rather than exited, so the refusal lifts by itself when the
-                # rest of the deploy lands.
                 time.sleep(IDLE_SLEEP_SECONDS)
                 continue
             said = None

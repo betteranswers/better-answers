@@ -203,8 +203,8 @@ def test_dropping_a_sources_state_keeps_the_table_indexes_and_rows(
         indexes_before = passage_indexes(connection, workspace_id)
         assert indexes_before != []
 
-    # Its own Host, as a sync's would be: the engine can still hold the name the
-    # landing Host registered.
+    # cocoindex can still hold the app name the landing Host registered, so this
+    # opens its own Host.
     with Host(bootstrap_for(dsn, tmp_path)) as host:
         host.drop_connected_source(first)
 
@@ -305,8 +305,6 @@ def test_the_seam_answers_plain_numbers_and_opens_the_passage_store(
         reason="connected",
     )
 
-    # The sync writes nothing to a connected source that is gone, so no claim on
-    # the job row is ever checked.
     job_with_no_row = queue.ClaimedJob(
         workspace_id=workspace_id,
         id="01M2JOBAAAAAAAAAAAAAAAAAAA",
@@ -470,8 +468,8 @@ def waits_in(written: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
 
 
 def hold_until_waited_on(store: object, written: Sequence[Mapping[str, Any]]) -> None:
-    """Holding `store` keeps the engine's handle open until this returns, as an
-    engine task does after its update."""
+    """Keeps `store`'s handle open until a wait is logged, as a cocoindex engine
+    task holds it after its update."""
     deadline = time.monotonic() + HOLDS_AT_MOST_SECONDS
     while not waits_in(written) and time.monotonic() < deadline:
         time.sleep(0.05)
@@ -511,7 +509,6 @@ def test_a_store_held_in_a_cycle_opens_after_a_collection(tmp_path: Path) -> Non
     bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
     sync = a_sync_on("connected-source-one")
 
-    # Off, so that only the open's own collection can free the cycle.
     gc.disable()
     try:
         with Host(bootstrap) as first:

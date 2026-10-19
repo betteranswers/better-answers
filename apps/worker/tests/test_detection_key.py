@@ -52,7 +52,6 @@ THE_DETECTOR_S_OWN_IN_THE_KEY = frozenset(
 THE_DETECTOR_S_OWN_OUTSIDE_THE_KEY = frozenset({"MODEL_RULE_NAME", "RECOGNISERS"})
 
 
-# `typing`'s flag, which reads nothing and stands for nothing the detector does.
 THE_TYPE_CHECKER_S_OWN = frozenset({"TYPE_CHECKING"})
 
 

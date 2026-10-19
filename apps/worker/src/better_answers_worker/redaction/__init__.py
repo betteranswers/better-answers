@@ -34,9 +34,6 @@ ALWAYS_PLACEHOLDER = next(
 
 @dataclass(frozen=True, slots=True)
 class Redaction:
-    """`verdict` is the sensitivity the document narrows to, None when nothing
-    narrows it; `lifted` is True when every narrowing finding was dismissed."""
-
     text: str
     findings: tuple[Finding, ...]
     withholdings: tuple[Withholding, ...]
@@ -57,10 +54,6 @@ def redact(
     restores: Sequence[Restore] = (),
     dismissals: Sequence[Dismissal] = (),
 ) -> Redaction:
-    """Placeholders cover every withheld span, and each erased identifier clearing the
-    length floor wherever it appears, raised or not. A name's letter comes from
-    `seed`."""
-
     policy = Policy(
         rules_in_force=rules_in_force,
         suppressions=suppressions,
@@ -68,7 +61,6 @@ def redact(
         seed=seed,
     )
 
-    # All three outside the detector's memo, so a fix to any re-detects nothing.
     findings = raised_by_the_block_rule(findings_of(spans), text)
     erasure_matches = erasure_matches_in(text, policy.suppressions)
 
@@ -117,8 +109,6 @@ def _written(
     text: str, written_spans: Sequence[WrittenSpan], letters: Mapping[str, str]
 ) -> str:
 
-    # The spans arrive in offset order, so writing from the last keeps every earlier
-    # offset true of the text being rewritten.
     redacted = text
     for span in reversed(written_spans):
         redacted = (

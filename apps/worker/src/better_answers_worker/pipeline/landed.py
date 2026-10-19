@@ -26,13 +26,12 @@ from .host import FINDINGS_STORE, LANDED_APP, Host, Sync
 from .objects import LandedCopies
 from .passages import PASSAGE_SIZE_BYTES, Passage, split_into_passages
 
-# A function memo is fetched by a prefix scan of its calling component's path, so these
-# names are as much its identity as its own.
+# cocoindex fetches a function memo by a prefix scan of its calling component's
+# path, so these names are part of its identity.
 A_DOCUMENTS_COMPONENT = "a-document"
 THE_SEAMS_COMPONENT = "the-seam"
 
 
-# Move any one and every page the estate holds is detected again; the suite pins six.
 THE_MEMOS_IDENTITY: Mapping[str, str] = MappingProxyType(
     {
         "app": LANDED_APP,
@@ -60,7 +59,6 @@ class Suppression:
 
 
 def suppression_of(identifiers: Mapping[str, Sequence[str]]) -> Suppression:
-    """Kinds in sorted order, so the order they arrive in never changes the value."""
     return Suppression(
         identifiers=tuple(
             (kind, tuple(named)) for kind, named in sorted(identifiers.items())
@@ -83,9 +81,6 @@ class LandedDocument:
 
 @dataclass(frozen=True, slots=True)
 class RedactedDocument:
-    """`content_hash` is of the converted text before redaction;
-    `version` is the rule version and detector pin, colon-joined."""
-
     text: str
     findings: tuple[Finding, ...]
     withholdings: tuple[Withholding, ...]
@@ -108,9 +103,6 @@ class ReadDocument:
 
 @dataclass(frozen=True, slots=True)
 class UnreadableDocument:
-    """`reason` is the refusal's name, such as `NeedsOcrError`
-    or `DeadlineExceededError`, never its message."""
-
     source_document_id: str
     reason: str
 
@@ -149,10 +141,6 @@ def landed(
     seed: str,
     detection_key: str,
 ) -> RedactedDocument:
-    """Converts, detects and redacts one document. Raises `UnreadableError`
-    when it cannot be converted; `seed` fixes the pseudonym letters."""
-    # Unmemoised, so a fix to the conversion, the block rule or the withholding reaches
-    # every document on its next sync with no version to remember.
     normalised = converted(body, media_type)
     raised = raised_by_the_detector(normalised, detection_key)
     answer = redact(
@@ -234,11 +222,6 @@ async def _one_document(
 
 
 class DocumentFailedError(RuntimeError):
-    """An unexpected failure inside one document's component, naming the document.
-
-    `error` is what raised; `source_document_id` is `None` when the failure
-    names no document."""
-
     def __init__(self, stable_path: str, error: BaseException) -> None:
         super().__init__(error)
         self.error = error
@@ -246,9 +229,7 @@ class DocumentFailedError(RuntimeError):
 
 
 def _document_of(stable_path: str) -> str | None:
-    """The document id a stable path names, or `None` when it names no document.
-
-    A stable path is quoted segments joined by slashes."""
+    """cocoindex writes a stable path as quoted segments joined by slashes."""
 
     parts = stable_path.split("/")
     for at, part in enumerate(parts):
@@ -258,8 +239,7 @@ def _document_of(stable_path: str) -> str | None:
 
 
 def _fail_the_sync(error: BaseException, ctx: coco.ExceptionContext) -> None:
-    # The engine's default logs and carries on, so the sync would finish with the
-    # document neither read nor unreadable and land_rows would delete its passages.
+    # cocoindex's default exception handler logs a component's failure and carries on.
     raise DocumentFailedError(ctx.stable_path, error) from error
 
 
@@ -282,7 +262,8 @@ async def _every_document(
             refused,
             wave,
         )
-        # The handler's raise surfaces only here: unawaited, the sync still finishes.
+        # cocoindex surfaces the handler's raise only at `ready()`; unawaited, the sync
+        # still finishes.
         await mounted.ready()
     return len(landings)
 
@@ -300,11 +281,6 @@ def redact_landed_copies(
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> LandedSync:
-    """Writes redacted text to each document's `normalised_key`; one unconvertible or
-    timed out is marked unreadable, not raised. `detection_key` defaults to the
-    detector's own, loading presidio."""
-    # Reading the key builds a recogniser of every rule, so presidio arrives with it. A
-    # spawn that lands nothing must not pay that.
     from ..redaction.detection_key import detection_key as the_detection_key
 
     with_bytes = tuple(

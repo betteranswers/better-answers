@@ -47,9 +47,6 @@ class Policy:
 
 @dataclass(frozen=True, slots=True)
 class Withholding:
-    """`tier` is `always` when an erasure names the finding, and the
-    finding's own otherwise; `reason` is a key of `WITHHELD_FOR`."""
-
     finding: Finding
     withheld: bool
     tier: str
@@ -66,8 +63,6 @@ class WrittenSpan:
 def withholdings_over(
     findings: Sequence[Finding], text: str, policy: Policy
 ) -> tuple[Withholding, ...]:
-    """One per finding, in order. An erasure outranks an
-    Admin's restore, which outranks the connected source's switches."""
     erased = suppressed_among(findings, text, policy.suppressions)
     restored = restored_among(findings, policy.restores)
     return tuple(
@@ -79,11 +74,7 @@ def withholdings_over(
 def written_spans_of(
     withholdings: Sequence[Withholding], erasure_matches: Sequence[ErasureMatch]
 ) -> tuple[WrittenSpan, ...]:
-    """In offset order and never overlapping. A span inside a longer one gives way; an
-    overlap goes by tier, then length, then score."""
     withheld = tuple(_competitor_of(one) for one in withholdings if one.withheld)
-    # How a finding was written is read off the spans, so a finding keeps its own span
-    # from a match it already covers.
     uncovered = tuple(
         _competitor_of_the_match(match)
         for match in erasure_matches
@@ -95,7 +86,6 @@ def written_spans_of(
 
 
 def overridden_in(withholdings: Sequence[Withholding]) -> tuple[Finding, ...]:
-    """The restored findings an erasure withholds again."""
     return tuple(
         one.finding for one in withholdings if one.reason == OVERRIDDEN_BY_THE_ERASURE
     )
@@ -165,7 +155,6 @@ def _competitor_of(withholding: Withholding) -> _Competitor:
     )
 
 
-# No detector's score is surer than an identifier a request named.
 _CERTAIN = 1.0
 
 
@@ -174,8 +163,6 @@ def _competitor_of_the_match(match: ErasureMatch) -> _Competitor:
 
 
 def _without_overlaps(raised: Sequence[_Competitor]) -> tuple[WrittenSpan, ...]:
-    """Containment first, then precedence: a span inside a longer one writes none,
-    and a loser gives up only the characters the winner takes."""
     competing = sorted(
         (one for one in raised if not _inside_another(one, raised)),
         key=lambda one: one.precedence,
@@ -189,8 +176,6 @@ def _without_overlaps(raised: Sequence[_Competitor]) -> tuple[WrittenSpan, ...]:
 def _remainder(
     competitor: _Competitor, ahead: Sequence[_Competitor]
 ) -> WrittenSpan | None:
-    # Nothing ahead lies strictly inside this span once containment has run, so each
-    # overlap takes a prefix or a suffix and one run is left.
     start, end = competitor.start, competitor.end
     for winner in ahead:
         if winner.end <= competitor.start or competitor.end <= winner.start:

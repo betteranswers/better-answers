@@ -24,13 +24,9 @@ SELECT count(*) FILTER (
 
 
 def is_healthy(connection: psycopg.Connection, worker_id: str) -> bool:
-    """Healthy while this worker holds a claimed job with a fresh
-    heartbeat, or while no claimable job has waited longer than a lease."""
     stale = f"{STALE_HEARTBEAT_SECONDS} seconds"
     lease = f"{LEASE_SECONDS} seconds"
     waiting = 0
-    # Per workspace, because `job` is under row-level security: one unscoped query over
-    # the table sees no rows at all and would answer healthy for ever.
     for workspace_id in workspace_ids(connection):
         with scoped(connection, workspace_id) as cursor:
             cursor.execute(_STATE, (worker_id, stale, lease))

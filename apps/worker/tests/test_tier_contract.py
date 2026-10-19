@@ -177,8 +177,6 @@ def materialise_broken_contracts(root: Path) -> None:
     )
 
 
-# Each hex below is worked out of band from the framing, never by calling this
-# tier's own reading a second time.
 DIGESTS_WORKED_OUT_OF_BAND: list[tuple[str, dict[str, bytes], str]] = [
     (
         "the manifest alone",

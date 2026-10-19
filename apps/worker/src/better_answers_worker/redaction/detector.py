@@ -57,9 +57,6 @@ RECOGNISERS: Mapping[str, Callable[[CategoryDescriptor], EntityRecognizer]] = (
 
 
 class AnchoredWindows(CharacterBasedTextChunker):
-    """Windows that start at each heading outside a fence; a run over twice
-    `chunk_size` is split at paragraphs, then stepped through with overlap."""
-
     def chunk(self, text: str) -> list[TextChunk]:
         if not text:
             return []
@@ -125,8 +122,6 @@ class AnchoredWindows(CharacterBasedTextChunker):
                 break
 
             stepped = self._word_containing(text, end - self.chunk_overlap)
-            # Never past the window it steps from: a run longer than the overlap with no
-            # boundary would send the start backwards and the loop nowhere.
             start = end if stepped <= start else stepped
         return windows
 

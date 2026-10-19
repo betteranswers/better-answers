@@ -3,16 +3,13 @@ import sys
 
 type Step = tuple[str, tuple[str, ...]]
 
-# They run beside the suite, their output held until it ends, so the log reads one step
-# at a time.
 BESIDE_THE_SUITE: tuple[Step, ...] = (
     ("ruff lint", ("ruff", "check", "src", "tests")),
     ("ruff format", ("ruff", "format", "--check", "src", "tests")),
     ("mypy", ("mypy",)),
 )
 
-# Four, the runner's vCPUs: `auto` ran slower on a larger machine. `loadgroup` keeps
-# each `xdist_group` on one worker, so the image builds once.
+# Four, the CI runner's vCPUs.
 SUITE: Step = ("pytest", ("pytest", "-n", "4", "--dist", "loadgroup"))
 
 

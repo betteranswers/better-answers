@@ -61,7 +61,6 @@ def _records(cursor: psycopg.Cursor, workspace_id: str) -> list[ConceptRecord]:
 
 
 def live_generation(cursor: psycopg.Cursor, workspace_id: str) -> int:
-    """The workspace's live map generation, first created at 1 when it has none."""
     cursor.execute(
         "INSERT INTO map_generation (workspace_id, live_gen) VALUES (%s, 1)"
         " ON CONFLICT (workspace_id) DO UPDATE SET live_gen = map_generation.live_gen"
@@ -77,8 +76,6 @@ def live_generation(cursor: psycopg.Cursor, workspace_id: str) -> int:
 def run_rebuild(
     cursor: psycopg.Cursor, git_store_dir: str, workspace_id: str
 ) -> RebuildOutcome:
-    """Writes the whole map as the next generation and makes it live, leaving older
-    ones. Nodes come from `concept_index` rows, edges from files at head."""
     outcome = RebuildOutcome()
 
     live = live_generation(cursor, workspace_id)

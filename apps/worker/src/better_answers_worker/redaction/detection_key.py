@@ -36,8 +36,6 @@ from .recognisers import (
 RAISED_BY_THE_MODEL = ModelRecogniser.__name__
 
 
-# The officers-block rule reads the text on the finding side, after the detector has
-# answered, so a fix to it re-detects nothing.
 RAISED_AFTER_THE_DETECTOR: tuple[str, ...] = ("AN_OFFICER_HEADING", "ANY_HEADING")
 
 
@@ -91,8 +89,6 @@ class DetectorReading:
 def reading_of(rule_id: str, descriptor: CategoryDescriptor) -> RuleReading:
     build = RECOGNISERS.get(rule_id)
     if build is None:
-        # The model recogniser is handed no context, so a model-raised rule's lemmas
-        # reach no enhancer and are read by nothing.
         return RuleReading(
             rule_id=rule_id,
             recogniser=RAISED_BY_THE_MODEL,
@@ -155,6 +151,4 @@ def detection_key_of(reading: DetectorReading) -> str:
 
 @cache
 def detection_key() -> str:
-    """Hex SHA-256 of everything the detector's answer depends on, cached for the
-    process. Reading it builds a recogniser of every rule."""
     return detection_key_of(what_the_detector_reads())

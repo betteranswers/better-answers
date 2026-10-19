@@ -37,8 +37,6 @@ def locator_of(source_document_id: str, char_start: int, char_end: int) -> str:
 def split_into_passages(
     source_document_id: str, text: str, *, passage_size: int = PASSAGE_SIZE_BYTES
 ) -> tuple[Passage, ...]:
-    """Passages that tile `text` with no gap, each ending where the next
-    begins, so one may run past `passage_size`. Offsets are in characters."""
     splitter = RecursiveSplitter()
     starts = [
         passage.start.char_offset for passage in splitter.split(text, passage_size)
