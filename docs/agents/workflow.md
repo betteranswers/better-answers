@@ -19,6 +19,7 @@ A route block (`docs/specs/v01-route.md`) that one owner can build in one sessio
 - Two kinds of change run alone until they merge: one that adds a migration, because the drizzle journal does not merge, and one that edits `contracts/`, because it moves both tiers' generated digest constants, which do not merge either.
 - A review reads the rules from `CODING_STANDARDS.md`, plus the `AGENTS.md` of each directory the change touches: `apps/api/`, `apps/web/`, `apps/worker/`, `deploy/`, `packages/core/` and `packages/schema/`. Hand them to `/thermos` and to the verifier, since their rubrics do not load them.
 - A worker prompt names each test scenario by the behaviour it checks, and a test's title is that behaviour, in 10 words at most.
+- A worker prompt tells the worker to fix what it finds rather than file it, and to settle a design question with the principle skills. `docs/agents/issue-tracker.md`, *When to file one*, has the rule.
 - `/mutation-testing` runs after the tests are green, on refactors and on changes to validation, parsing or auth. Skip it for UI, copy and config diffs.
 - The rules that fire at a step of pstack's own playbooks live in `.agents/playbooks/`. `knowledge.md` holds the glossary entry, the decision doc edited in the same commit and the lesson routed through `/correct`. `plan.md` holds this repository's facts in a plan. `verification.md` makes the browser suite the surface that Feature, Bug fix and Refactoring prove a change on.
 

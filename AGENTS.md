@@ -88,6 +88,8 @@ When writing or reviewing docs, RFCs, readmes, PR descriptions, or commit messag
 
 ### Triage
 
+Fix what you find in the session that finds it, and open an issue only when the work cannot land there. A design question is settled with pstack's principle skills, and goes to the owner only when they cannot settle it. `docs/agents/issue-tracker.md`, *When to file one*, has the rule.
+
 A new issue lands in Linear's **Triage** state. The owner or an agent moves it to Todo when it is next to build, or to Backlog with what it waits on. An issue that waits on an owner ruling stays in Triage, with the question in a comment. `docs/agents/issue-tracker.md` gives each state's meaning.
 
 ### Domain docs
