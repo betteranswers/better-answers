@@ -231,7 +231,6 @@ const acceptedRows = {
     },
   ],
   oauthClientAssertion: [{ id: "assertion-1", expiresAt: NOW }],
-  rateLimit: [{ id: "limit-1", key: "ip:203.0.113.1", count: 1, lastRequest: 1 }],
   authenticator: [
     { id: "authenticator-1", secret: "sealed", backupCodes: "sealed", userId: USER_ID },
   ],
@@ -963,7 +962,6 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "oauthAccessToken",
         "oauthConsent",
         "oauthClientAssertion",
-        "rateLimit",
         "authenticator",
         "passkey",
         "passkeyLastUse",
@@ -2015,7 +2013,6 @@ describe("5 — the inferred type is pinned", () => {
       updatedAt: Date;
     };
     oauthClientAssertion: { id: string; expiresAt: Date };
-    rateLimit: { id: string; key: string; count: number; lastRequest: number };
     authenticator: {
       id: string;
       secret: string;
