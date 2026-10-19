@@ -309,6 +309,33 @@ export const whileTheApiLacks = async <T>(
   }
 };
 
+export const whileTheApiCannotRead = async <T>(
+  app: TestApp,
+  table: string,
+  column: string,
+  work: () => Promise<T>,
+): Promise<T> => {
+  const store = app.database.superuser;
+  const found = await store.query<{ readable: string | null; withheld: boolean | null }>(
+    `SELECT string_agg(quote_ident(attname), ', ') FILTER (WHERE attname <> $2) AS readable,
+            bool_or(attname = $2) AS withheld
+       FROM pg_attribute WHERE attrelid = $1::regclass AND attnum > 0 AND NOT attisdropped`,
+    [table, column],
+  );
+  const { readable, withheld } = found.rows[0] ?? { readable: null, withheld: null };
+  if (withheld !== true || readable === null) {
+    throw new Error(`cannot withhold ${column} alone from ${table}`);
+  }
+  await store.query(`REVOKE SELECT ON "${table}" FROM app_rt`);
+  try {
+    await store.query(`GRANT SELECT (${readable}) ON "${table}" TO app_rt`);
+    return await work();
+  } finally {
+    await store.query(`REVOKE SELECT ON "${table}" FROM app_rt`);
+    await store.query(`GRANT SELECT ON "${table}" TO app_rt`);
+  }
+};
+
 export const changedWhileItWaitsOn = async <T>(
   app: TestApp,
   table: string,

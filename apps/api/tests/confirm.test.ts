@@ -19,6 +19,7 @@ import {
   setUpOn,
   signedInClient,
   whileCommitsAreRefused,
+  whileTheApiCannotRead,
   whileTheApiLacks,
 } from "./provoke.ts";
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
@@ -210,7 +211,10 @@ describe("confirming with a passkey", () => {
       "the challenge cannot be taken",
       (work) => whileTheApiLacks(app(), "DELETE", "verification", work),
     ],
-    ["the passkeys cannot be read", (work) => whileTheApiLacks(app(), "SELECT", "passkey", work)],
+    [
+      "the passkeys cannot be read",
+      (work) => whileTheApiCannotRead(app(), "passkey", "public_key", work),
+    ],
   ])("answers unanswered when %s, stamping nothing", async (_why, refusing) => {
     const { device, client } = await aPasskeyHolder();
     const response = device.get(await askToConfirm(client));
