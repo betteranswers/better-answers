@@ -621,3 +621,18 @@ def test_sweep_skips_a_dead_runs_database_still_in_use(maintenance: str) -> None
         sweep_dead_cases(maintenance)
 
         assert dead in _case_names(maintenance)
+
+
+def test_discards_a_database_an_interrupted_drop_left_invalid(
+    maintenance: str, unique: Callable[[str], str]
+) -> None:
+    halted = unique("probe_halted")
+    _create(maintenance, halted)
+    with _admin(maintenance) as admin:
+        admin.execute(
+            "UPDATE pg_database SET datconnlimit = -2 WHERE datname = %s", (halted,)
+        )
+
+    _discard(maintenance, halted)
+
+    assert _row_of(maintenance, halted) is None
