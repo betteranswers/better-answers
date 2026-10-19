@@ -21,7 +21,10 @@ export const holdAnAuthenticator = async (app: TestApp, personId: string): Promi
   const { sealed, setupAddress } = await mintAuthenticatorKey(authOver(app), personId);
   const client = await app.database.superuser.connect();
   try {
-    await testData(client).authenticator({ userId: personId, secret: sealed });
+    await testData(client).confirmedAuthenticatorOfASealedSecret({
+      userId: personId,
+      secret: sealed,
+    });
   } finally {
     client.release();
   }

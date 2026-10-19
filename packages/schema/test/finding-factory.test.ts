@@ -59,11 +59,11 @@ const FINDING_ROW_PATTERN = /INSERT INTO finding\s*\(([^)]*)\)\s*VALUES\s*\(/g;
 const SQL_STRING = /^'(.*)'$/;
 
 const PLANTED_CATEGORY = "sort-code";
-const FINDING_TABLE = "finding";
+const FINDING_TABLE_NAMED_APART_FROM_THE_RAW_INSERT_SCAN = "finding";
 
 const plantedCategoryWords = (): string =>
   `{ ...row, category: "${PLANTED_CATEGORY}", tier: "always" },
-       INSERT INTO ${FINDING_TABLE} (workspace_id, id, category, tier, rule_id)
+       INSERT INTO ${FINDING_TABLE_NAMED_APART_FROM_THE_RAW_INSERT_SCAN} (workspace_id, id, category, tier, rule_id)
               VALUES ($1, $2, '${PLANTED_CATEGORY}', 'always', 'sort-code-with-account-number')`;
 
 const categoryWordsIn = (
@@ -129,6 +129,21 @@ describe("the finding factory's default span", () => {
       [0, 8],
       [8, 16],
       [0, 8],
+    ]);
+  });
+
+  it("lands two defaults seeded at once on separate spans", async () => {
+    const spans = await withRollback(db.pool, async (client) => {
+      const seed = testData(client);
+      const document = await seed.sourceDocument();
+      const inDocument = { workspaceId: document.workspaceId, documentId: document.id };
+      const both = await Promise.all([seed.finding(inDocument), seed.finding(inDocument)]);
+      return both.map((row) => [row.charStart, row.charEnd]);
+    });
+
+    expect(spans).toEqual([
+      [0, 8],
+      [8, 16],
     ]);
   });
 

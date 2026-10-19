@@ -887,6 +887,23 @@ describe("the report", () => {
   });
 });
 
+describe("the factory's erasure request", () => {
+  it("dates beyond use as the routine does", async () => {
+    const scenario = await arrange();
+
+    const seeded = await seedingWith(db().pool, (seed) =>
+      seed.erasureRequest({ workspaceId: scenario.workspaceId, anchoredAt: ANCHORED_ON_A_31ST }),
+    );
+
+    expect({
+      hourly: seeded.beyondUseHourlyAt.toISOString(),
+      daily: seeded.beyondUseDailyAt.toISOString(),
+      weekly: seeded.beyondUseWeeklyAt.toISOString(),
+      monthly: seeded.beyondUseMonthlyAt.toISOString(),
+    }).toEqual(BEYOND_USE_FROM_THE_31ST);
+  });
+});
+
 describe("the lock the hourly dump waits behind", () => {
   it("holds the dump's lock throughout the routine, then releases it", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();

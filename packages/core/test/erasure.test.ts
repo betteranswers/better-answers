@@ -290,6 +290,29 @@ describe("the clock", () => {
     );
   });
 
+  it("falls due in the factory's rows as dueDateOf reckons", async () => {
+    const scenario = await arrange();
+    const started = [
+      new Date("2026-01-31T09:00:00.000Z"),
+      new Date("2028-01-31T09:00:00.000Z"),
+      new Date("2026-12-15T08:30:00.000Z"),
+    ];
+
+    const seeded = await seedingWith(db().pool, (seed) =>
+      Promise.all(
+        started.map((clockStartedAt) =>
+          seed.subjectRequest({
+            workspaceId: scenario.workspaceId,
+            receivedAt: clockStartedAt,
+            clockStartedAt,
+          }),
+        ),
+      ),
+    );
+
+    expect(seeded.map((row) => row.dueAt)).toEqual(started.map(dueDateOf));
+  });
+
   it("answers the extension once taken, and the month before", async () => {
     const scenario = await arrange();
     const extended = new Date("2026-07-02T11:00:00.000Z");
