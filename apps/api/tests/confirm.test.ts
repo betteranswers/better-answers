@@ -18,6 +18,9 @@ import {
   restoredByTheOperator,
   setUpOn,
   signedInClient,
+  whileCommitsAreRefused,
+  whileTheApiCannotRead,
+  whileTheApiLacks,
 } from "./provoke.ts";
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
 import { refusalOfCall, webClientOf } from "./web-client.ts";
@@ -93,6 +96,14 @@ const askToConfirm = async (client: TestClient): Promise<unknown> => {
   return asked.json();
 };
 
+const aPasskeyHolder = async () => {
+  const { person, client: setUpIn } = await aPersonSignedIn(app());
+  const { device } = await passkeyAddedOn(setUpIn);
+  return { person, device, client: await signedInClient(app(), person.email) };
+};
+
+type StoreRefusing = (work: () => Promise<Response>) => Promise<Response>;
+
 const confirmOn = async (client: TestClient, device: PasskeyDevice, assertion?: Assertion) =>
   client.json(PASSKEY, { response: device.get(await askToConfirm(client), assertion) });
 
@@ -108,9 +119,7 @@ const wrongCodesFrom = async (clients: readonly TestClient[], key: string, times
 
 describe("confirming with a passkey", () => {
   it("stamps the session it confirms and makes no other", async () => {
-    const { person, client: setUpIn } = await aPersonSignedIn(app());
-    const { device } = await passkeyAddedOn(setUpIn);
-    const client = await signedInClient(app(), person.email);
+    const { person, device, client } = await aPasskeyHolder();
     const before = await sessionsOf(person.id);
 
     const answered = await confirmOn(client, device);
@@ -138,9 +147,7 @@ describe("confirming with a passkey", () => {
 
   it("refuses another person's passkey, stamping nothing", async () => {
     const { device: theirs } = await passkeyAddedOn((await aPersonSignedIn(app())).client);
-    const { person, client: setUpIn } = await aPersonSignedIn(app());
-    await passkeyAddedOn(setUpIn);
-    const client = await signedInClient(app(), person.email);
+    const { client } = await aPasskeyHolder();
 
     const answered = await confirmOn(client, theirs);
 
@@ -153,9 +160,7 @@ describe("confirming with a passkey", () => {
     ["made without user verification", { verified: false }],
     ["signed by another key", { signedWithAnotherKey: true }],
   ])("refuses an answer %s, stamping nothing", async (_how, assertion) => {
-    const { person, client: setUpIn } = await aPersonSignedIn(app());
-    const { device } = await passkeyAddedOn(setUpIn);
-    const client = await signedInClient(app(), person.email);
+    const { device, client } = await aPasskeyHolder();
 
     const answered = await confirmOn(client, device, assertion);
 
@@ -165,9 +170,7 @@ describe("confirming with a passkey", () => {
   });
 
   it("refuses a challenge already answered", async () => {
-    const { person, client: setUpIn } = await aPersonSignedIn(app());
-    const { device } = await passkeyAddedOn(setUpIn);
-    const client = await signedInClient(app(), person.email);
+    const { device, client } = await aPasskeyHolder();
     const response = device.get(await askToConfirm(client));
     expect((await client.json(PASSKEY, { response })).status).toBe(200);
 
@@ -184,6 +187,43 @@ describe("confirming with a passkey", () => {
 
     expect(asked.status).toBe(409);
     expect(await asked.json()).toEqual({ error: "no-passkey" });
+  });
+
+  it("refuses a malformed answer, leaving the challenge to answer", async () => {
+    const { device, client } = await aPasskeyHolder();
+    const options = await askToConfirm(client);
+
+    const malformed = await client.json(PASSKEY, { response: "not an assertion" });
+    const answered = await client.json(PASSKEY, { response: device.get(options) });
+
+    expect(await confirmedOf(client)).toBeInstanceOf(Date);
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toEqual({ error: "not-verified" });
+    expect(answered.status).toBe(200);
+  });
+
+  it.each<[string, StoreRefusing]>([
+    [
+      "the stamp cannot be recorded",
+      (work) => whileCommitsAreRefused(app(), "passkey_last_use", work),
+    ],
+    [
+      "the challenge cannot be taken",
+      (work) => whileTheApiLacks(app(), "DELETE", "verification", work),
+    ],
+    [
+      "the passkeys cannot be read",
+      (work) => whileTheApiCannotRead(app(), "passkey", "public_key", work),
+    ],
+  ])("answers unanswered when %s, stamping nothing", async (_why, refusing) => {
+    const { device, client } = await aPasskeyHolder();
+    const response = device.get(await askToConfirm(client));
+
+    const answered = await refusing(() => client.json(PASSKEY, { response }));
+
+    expect(await confirmedOf(client)).toBeNull();
+    expect(answered.status).toBe(502);
+    expect(await answered.json()).toEqual({ error: "unanswered" });
   });
 });
 
