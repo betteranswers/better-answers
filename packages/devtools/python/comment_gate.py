@@ -2,54 +2,28 @@
 from __future__ import annotations
 
 import ast
-import io
 import re
 import sys
-import token
 import tokenize
 from collections.abc import Iterable
 from pathlib import Path
 from typing import NamedTuple
 
 from citations import citation_in
+from comment_blocks import (
+    DOCSTRING_HOLDERS,
+    Comment,
+    comments_in,
+    docstrings_in,
+    is_notice,
+    runs_in,
+)
 
 SUFFIX = ".py"
 
 UNREADABLE = (OSError, SyntaxError, tokenize.TokenError, UnicodeDecodeError)
 
 WORD_LIMIT = 25
-
-Comment = tuple[int, int, str]
-
-
-NOTICE = r"SPDX-License-Identifier|Copyright"
-
-A_NOTICE = re.compile(rf"^(?:{NOTICE})")
-
-EXEMPT_OPENING = re.compile(
-    r"^(?:!"
-    r"|type:"
-    r"|noqa"
-    r"|pragma:"
-    r"|mypy:"
-    r"|ruff:"
-    r"|fmt:"
-    r"|isort:"
-    r"|nosec"
-    r"|coding[:=]"
-    r"|jscpd:ignore"
-    rf"|{NOTICE}"
-    r")"
-)
-
-# A suppression's codes are machinery; whatever follows them is its reason, and counts.
-SUPPRESSION = re.compile(
-    r"^(?:noqa(?::\s*[A-Z]+[0-9]+(?:[,\s]+[A-Z]+[0-9]+)*)?"
-    r"|type:\s*ignore(?:\[[^\]]*\])?)"
-)
-
-# mypy and ruff take a directive's reason after a second `#`, so each `#` starts a part.
-MARKER = re.compile(r"(?:^|\s)#+")
 
 TOO_LONG = (
     "{path}:{line}: this comment runs to {words} words, over the cap of {limit}. A "
@@ -91,8 +65,6 @@ class Block(NamedTuple):
     unreasoned: str | None = None
 
 
-DOCSTRING_HOLDERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
-
 A_TEST_PATH = re.compile(r"(?:^|/)(?:tests?|e2e)/|(?:^|/)(?:test_[^/]*|conftest)\.py$")
 
 A_SPACE = re.compile(r"\s")
@@ -113,71 +85,22 @@ NEVER_WALKED = frozenset(
 )
 
 
-def _reason(part: str) -> str:
-    suppression = SUPPRESSION.match(part)
-    if suppression is not None:
-        return part[suppression.end() :].lstrip(" -—:")
-    return "" if EXEMPT_OPENING.match(part) else part
-
-
-def _prose(written: str) -> str | None:
-    parts = [part.strip() for part in MARKER.split(written)]
-    reasons = [_reason(part) for part in parts]
-    if reasons != parts and not any(reasons):
-        return None
-    return " ".join(reason for reason in reasons if reason)
-
-
-def _suppresses(written: str) -> bool:
-    return any(SUPPRESSION.match(part.strip()) for part in MARKER.split(written))
-
-
-def _blocks(lines: list[str], comments: Iterable[Comment]) -> list[Block]:
-    runs: list[tuple[int, list[str], str, str | None]] = []
-    previous = -2
-    for row, column, written in comments:
-        # A reason is held to its own directive, never to the comments around it.
-        if _suppresses(written):
-            runs.append((row, [_prose(written) or ""], REASON_TOO_LONG, NO_REASON))
-            previous = -2
-            continue
-        text = _prose(written)
-        if text is None:
-            previous = -2
-            continue
-        own_line = lines[row - 1][:column].strip() == ""
-        if own_line and row == previous + 1:
-            runs[-1][1].append(text)
-        else:
-            runs.append((row, [text], TOO_LONG, None))
-        previous = row if own_line else -2
+def _blocks(comments: Iterable[Comment]) -> list[Block]:
     return [
-        Block(start, "\n".join(parts), WORD_LIMIT, template, unreasoned)
-        for start, parts, template, unreasoned in runs
+        Block(run.comments[0].row, run.prose, WORD_LIMIT, REASON_TOO_LONG, NO_REASON)
+        if run.kind == "suppression"
+        else Block(run.comments[0].row, run.prose)
+        for run in runs_in(comments)
+        if run.kind != "exempt"
     ]
 
 
-def _python_comments(source: str) -> list[Comment]:
-    found: list[Comment] = []
-    for read in tokenize.generate_tokens(io.StringIO(source).readline):
-        if read.type != token.COMMENT:
-            continue
-        row, column = read.start
-        found.append((row, column, read.string))
-    return found
-
-
 def _docstrings(tree: ast.Module) -> list[Block]:
-    found: list[Block] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, DOCSTRING_HOLDERS):
-            continue
-        text = ast.get_docstring(node, clean=False)
-        if text is None or A_NOTICE.match(text.strip()) is not None:
-            continue
-        line = getattr(node.body[0], "lineno", 1)
-        found.append(Block(line, text))
-    return found
+    return [
+        Block(found.statement.lineno, found.text)
+        for found in docstrings_in(tree)
+        if not is_notice(found.text)
+    ]
 
 
 def _docstring_nodes(tree: ast.AST) -> set[int]:
@@ -226,7 +149,7 @@ def _string_findings(path: Path, tree: ast.Module) -> list[str]:
 def _findings(path: Path, source: str) -> list[str]:
     tree = ast.parse(source)
     said = _string_findings(path, tree)
-    comments = _blocks(source.splitlines(), _python_comments(source))
+    comments = _blocks(comments_in(source))
     for line, prose, limit, too_long, unreasoned in comments + _docstrings(tree):
         cited = citation_in(prose)
         if cited is not None:

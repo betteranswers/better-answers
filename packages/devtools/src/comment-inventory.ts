@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -18,7 +18,7 @@ import { blocksIn, isExempt, lastOf, proseOf } from "../lint-rules/shared/commen
 import type { Block } from "../lint-rules/shared/comment-blocks.ts";
 import { flagValues } from "./flags.ts";
 import { parsedSource } from "./parsed-source.ts";
-import { filesUnderEach } from "./paths.ts";
+import { filesUnderEach, repositoryRoot } from "./paths.ts";
 import { executableOf } from "./throwaway-tree.ts";
 
 const KINDS = ["doc", "line", "trailing", "directive"] as const;
@@ -131,7 +131,9 @@ const tsvOf = (rows: readonly Row[]): string =>
     .map((line) => `${line}\n`)
     .join("");
 
-type Cut = { readonly start: number; readonly end: number };
+type Span = { readonly start: number; readonly end: number };
+
+type Cut = Span & { readonly replacement: string };
 
 type Found = { readonly row: Row; readonly cut: Cut };
 
@@ -154,8 +156,8 @@ const grouped = (
   };
 };
 
-const emptyContainersIn = (program: Program): readonly Cut[] => {
-  const found: Cut[] = [];
+const emptyContainersIn = (program: Program): readonly Span[] => {
+  const found: Span[] = [];
   new Visitor({
     JSXExpressionContainer: (node) => {
       if (node.expression.type === "JSXEmptyExpression") found.push(node);
@@ -164,7 +166,7 @@ const emptyContainersIn = (program: Program): readonly Cut[] => {
   return found;
 };
 
-const cutOf = (source: string, block: Block, containers: readonly Cut[]): Cut => {
+const cutOf = (source: string, block: Block, containers: readonly Span[]): Cut => {
   const start = block[0].start;
   const { end } = lastOf(block);
   const holding = containers.find(
@@ -174,7 +176,8 @@ const cutOf = (source: string, block: Block, containers: readonly Cut[]): Cut =>
       source.slice(one.start + 1, start).trim() === "" &&
       source.slice(end, one.end - 1).trim() === "",
   );
-  return holding ?? { start, end };
+  const span = holding ?? { start, end };
+  return { start: span.start, end: span.end, replacement: "" };
 };
 
 const BUNDLER_DIRECTIVE = /^@vite-ignore\b/;
@@ -196,13 +199,13 @@ const bindingName = ({ declarations: [first] }: VariableDeclaration): string | u
 const declaredAt = (program: Program): ReadonlyMap<number, string> => {
   const names = new Map<number, string>();
   const exported: (readonly [number, number])[] = [];
-  const name = (at: Cut, value: string | undefined): void => {
+  const name = (at: Span, value: string | undefined): void => {
     if (value !== undefined) names.set(at.start, value);
   };
-  const byId = (node: Cut & { readonly id: { readonly name: string } | null }): void => {
+  const byId = (node: Span & { readonly id: { readonly name: string } | null }): void => {
     name(node, node.id?.name);
   };
-  const byKey = (node: Cut & { readonly key: PropertyKey }): void => {
+  const byKey = (node: Span & { readonly key: PropertyKey }): void => {
     name(node, keyName(node.key));
   };
   new Visitor({
@@ -262,11 +265,85 @@ const foundIn = (file: string, source: string): readonly Found[] => {
   });
 };
 
-const GENERATED = "// Generated, never edited";
+const LOCATOR = path.join(import.meta.dirname, "../python/comment_locator.py");
 
-const SOURCE_FILE = /\.[cm]?tsx?$/;
+const locatedBlocks = z.array(
+  z.object({
+    start: z.number().int().min(1),
+    end: z.number().int().min(1),
+    kind: z.enum(KINDS),
+    attached: z.string(),
+    words: z.number().int().min(0),
+    text: z.string().min(1),
+    cut: z.object({
+      start: z.number().int().min(0),
+      end: z.number().int().min(0),
+      replacement: z.string(),
+    }),
+  }),
+);
 
-const sourceFilesUnder = (root: string, paths: readonly string[]): readonly string[] =>
+const pythonFoundIn = (file: string, source: string): readonly Found[] => {
+  const ran = spawnSync("python3", [LOCATOR, file], {
+    input: source,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (ran.status !== 0)
+    throw new Error(
+      ran.stderr || `${file}: python3 did not run: ${String(ran.error ?? ran.signal)}`,
+    );
+  return locatedBlocks.parse(JSON.parse(ran.stdout)).map(({ cut, ...block }) => {
+    if (source.slice(cut.start, cut.end) !== block.text) {
+      throw new Error(`${file}:${block.start}: the locator's offsets do not hold the block's text`);
+    }
+    const row: Row = { path: file, ...block, class: "", holder: "", structure: "", unit: "" };
+    return { row, cut };
+  });
+};
+
+type Language = {
+  readonly source: RegExp;
+  readonly generated: string;
+  readonly foundIn: (file: string, source: string) => readonly Found[];
+  readonly formatter: string;
+  readonly formatterCommand: () => readonly [string, ...string[]];
+};
+
+const LANGUAGES: readonly Language[] = [
+  {
+    source: /\.[cm]?tsx?$/,
+    generated: "// Generated, never edited",
+    foundIn,
+    formatter: "oxfmt",
+    formatterCommand: () => [
+      executableOf({ package: "oxfmt", path: ["bin", "oxfmt"] }),
+      "--no-error-on-unmatched-pattern",
+    ],
+  },
+  {
+    source: /\.py$/,
+    generated: "# Generated, never edited",
+    foundIn: pythonFoundIn,
+    formatter: "ruff format",
+    formatterCommand: () => [
+      "uv",
+      "run",
+      "--frozen",
+      "--project",
+      path.join(repositoryRoot, "apps/worker"),
+      "ruff",
+      "format",
+    ],
+  },
+];
+
+const languageOf = (file: string): Language | undefined =>
+  LANGUAGES.find((language) => language.source.test(file));
+
+type SourceFile = { readonly file: string; readonly language: Language };
+
+const sourceFilesUnder = (root: string, paths: readonly string[]): readonly SourceFile[] =>
   [
     ...new Set(
       paths.flatMap((one) =>
@@ -276,8 +353,12 @@ const sourceFilesUnder = (root: string, paths: readonly string[]): readonly stri
       ),
     ),
   ]
-    .filter((file) => SOURCE_FILE.test(file) && !file.split(path.sep).includes("skills"))
-    .sort(byCodeUnit);
+    .filter((file) => !file.split(path.sep).includes("skills"))
+    .sort(byCodeUnit)
+    .flatMap((file) => {
+      const language = languageOf(file);
+      return language === undefined ? [] : [{ file, language }];
+    });
 
 const sourceAt = (root: string, file: string): string | undefined => {
   const at = path.resolve(root, file);
@@ -345,7 +426,11 @@ const located = (
   rows: readonly Row[],
 ): Outcome<Planned> => {
   if (source === undefined) return { refused: rows.map((row) => `${at(row)}: no such file`) };
-  const found = foundIn(file, source);
+  const language = languageOf(file);
+  if (language === undefined) {
+    return { refused: rows.map((row) => `${at(row)}: neither TypeScript nor Python`) };
+  }
+  const found = language.foundIn(file, source);
   const cuts: Found[] = [];
   const refused: string[] = [];
   for (const same of Map.groupBy(rows, (row) => `${row.kind}\n${row.text}`).values()) {
@@ -382,20 +467,61 @@ const planFor = (root: string, rows: readonly Row[], unit: string): Outcome<read
   return { value: planned.flatMap((one) => ("value" in one ? [one.value] : [])) };
 };
 
-const withoutCut = (source: string, { start, end }: Cut): string => {
+const OPENS = /[{[(:]\s*$/;
+
+const CLOSES = /^\s*[}\])]/;
+
+const lastLineOf = (head: string): string =>
+  head.slice(head.lastIndexOf("\n", head.length - 2) + 1, -1);
+
+const firstLineOf = (tail: string): string => tail.split("\n", 1)[0] ?? "";
+
+const isBlank = (line: string | undefined): line is string => line?.trim() === "";
+
+const opensOrEdge = (line: string | undefined): boolean =>
+  line === undefined || isBlank(line) || OPENS.test(line);
+
+const closesOrEdge = (line: string | undefined): boolean => line === undefined || CLOSES.test(line);
+
+const joined = (head: string, tail: string): string => {
+  const previous = head === "" ? undefined : lastLineOf(head);
+  const next = tail === "" ? undefined : firstLineOf(tail);
+  if (isBlank(next) && opensOrEdge(previous)) return head + tail.slice(next.length + 1);
+  if (isBlank(previous) && closesOrEdge(next)) {
+    return head.slice(0, head.length - previous.length - 1) + tail;
+  }
+  return head + tail;
+};
+
+const withoutCut = (source: string, { start, end, replacement }: Cut): string => {
+  if (replacement !== "") return source.slice(0, start) + replacement + source.slice(end);
   const lineStart = lineStartOf(source, start);
   const newline = source.indexOf("\n", end);
   const lineEnd = newline === -1 ? source.length : newline + 1;
-  const alone = `${source.slice(lineStart, start)}${source.slice(end, lineEnd)}`.trim() === "";
-  return alone
-    ? source.slice(0, lineStart) + source.slice(lineEnd)
+  const before = source.slice(lineStart, start);
+  const after = source.slice(end, lineEnd);
+  if (`${before}${after}`.trim() === "") {
+    return joined(source.slice(0, lineStart), source.slice(lineEnd));
+  }
+  return after.trim() === ""
+    ? source.slice(0, lineStart) + before.trimEnd() + source.slice(end)
     : source.slice(0, start) + source.slice(end);
 };
 
-const withCuts = ({ source, cuts }: Planned): string =>
-  [...cuts]
+const BOM = "\uFEFF";
+
+/** String.prototype.trim takes U+FEFF for white space, so a byte order mark waits outside the cuts. */
+const withCuts = ({ source, cuts }: Planned): string => {
+  const mark = source.startsWith(BOM) ? BOM.length : 0;
+  const rest = [...cuts]
     .sort((left, right) => right.cut.start - left.cut.start)
-    .reduce((text, { cut }) => withoutCut(text, cut), source);
+    .reduce(
+      (text, one) =>
+        withoutCut(text, { ...one.cut, start: one.cut.start - mark, end: one.cut.end - mark }),
+      source.slice(mark),
+    );
+  return source.slice(0, mark) + rest;
+};
 
 const linesOf = ({ row }: Found): string =>
   row.start === row.end ? String(row.start) : `${row.start}-${row.end}`;
@@ -413,9 +539,10 @@ const refuse = (lines: readonly string[], status: number): number => {
 
 const inventory = (root: string, paths: readonly string[]): number => {
   if (paths.length === 0) return refuse([USAGE], 2);
-  const rows = sourceFilesUnder(root, paths).flatMap((file) => {
+  const rows = sourceFilesUnder(root, paths).flatMap(({ file, language }) => {
     const source = readFileSync(path.resolve(root, file), "utf8");
-    return source.startsWith(GENERATED) ? [] : foundIn(file, source).map(({ row }) => row);
+    if (source.startsWith(language.generated)) return [];
+    return language.foundIn(file, source).map(({ row }) => row);
   });
   process.stdout.write(tsvOf(rows));
   return 0;
@@ -437,13 +564,31 @@ const requestOf = (root: string, argv: readonly string[]): Outcome<Request> => {
     : { value: { rows: rows.value, unit: flags.get("unit") } };
 };
 
-const FORMATTER = { package: "oxfmt", path: ["bin", "oxfmt"] } as const;
+const formatFailure = (
+  root: string,
+  { formatter, formatterCommand }: Language,
+  files: readonly string[],
+): string | undefined => {
+  try {
+    const [command, ...argv] = formatterCommand();
+    const ran = spawnSync(command, [...argv, "--", ...files], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    if (ran.error !== undefined) return `${formatter}: ${ran.error.message}`;
+    return ran.status === 0 ? undefined : `${formatter}: ${ran.stderr}`;
+  } catch (cause) {
+    return `${formatter}: ${cause instanceof Error ? cause.message : String(cause)}`;
+  }
+};
 
-const format = (root: string, files: readonly string[]): void => {
-  if (files.length === 0) return;
-  execFileSync(executableOf(FORMATTER), ["--no-error-on-unmatched-pattern", "--", ...files], {
-    cwd: root,
-    stdio: ["ignore", "ignore", "pipe"],
+const formatFailures = (root: string, files: readonly string[]): readonly string[] => {
+  const byLanguage = Map.groupBy(files, languageOf);
+  return LANGUAGES.flatMap((language) => {
+    const own = byLanguage.get(language);
+    const failed = own === undefined ? undefined : formatFailure(root, language, own);
+    return failed === undefined ? [] : [failed];
   });
 };
 
@@ -455,14 +600,16 @@ const apply = (root: string, argv: readonly string[]): number => {
   const plan = planFor(root, rows, unit);
   if ("refused" in plan)
     return refuse([`unit ${unit} refused, no file changed:`, ...plan.refused], 1);
-  for (const one of plan.value) {
-    writeFileSync(path.resolve(root, one.file), withCuts(one));
-    process.stdout.write(`${reportOf("deleted", one)}\n`);
-  }
-  format(
+  for (const one of plan.value) writeFileSync(path.resolve(root, one.file), withCuts(one));
+  const failed = formatFailures(
     root,
     plan.value.map(({ file }) => file),
   );
+  if (failed.length > 0) {
+    for (const one of plan.value) writeFileSync(path.resolve(root, one.file), one.source);
+    return refuse([`unit ${unit}: the formatter failed, so no file changed:`, ...failed], 2);
+  }
+  for (const one of plan.value) process.stdout.write(`${reportOf("deleted", one)}\n`);
   return 0;
 };
 
