@@ -2,7 +2,7 @@ import tomllib
 from pathlib import Path
 
 import test_image
-from better_answers_worker.check import SUITE
+from better_answers_worker.check import CI_RUNNER_VCPUS, SUITE
 
 WORKER_ROOT = Path(__file__).resolve().parents[1]
 
@@ -33,7 +33,9 @@ def test_only_the_gate_spreads_the_suite_over_workers() -> None:
     assert isinstance(addopts, str)
     _, command = SUITE
 
-    assert "-n" in command
+    assert command[command.index("-n") + 1] == str(CI_RUNNER_VCPUS), (
+        "-n auto ran slower on a larger machine"
+    )
     assert not {"-n", "--numprocesses"} & set(addopts.split())
 
 
