@@ -62,7 +62,7 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
   - *answering no image named*, `no health answer`: nothing answers, so production is down, with the old container gone and the new one not up; *the last image named* is the build that answered last.
 
   Also: the uptime check goes red within minutes of a promotion; the orchestrator's *failed deployment* or *unhealthy container* mail.
-- **Do:** **list the release tags newest first** and take the newest — a release is tagged only once it has held, its smoke passed, so the newest tag is the last release that held (promotions are `release/*` tags since 23/09/2026, T-342; `deploy/RELEASES.md` is frozen and holds the promotions before that date, its last row read the same way):
+- **Do:** **list the release tags newest first** and take the newest — a release is tagged only once its smoke passed, so the newest tag is the last release that held (promotions are `release/*` tags since 23/09/2026, T-342; `deploy/RELEASES.md` is frozen and holds the promotions before that date, its last row read the same way):
 
   ```sh
   git fetch --tags && git tag --list 'release/*' --sort=-creatordate | head -5
@@ -182,11 +182,12 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
 
 The test workspace stands in production, marked, and no run signs in to it. Its three test people, the test Admin, Editor and Viewer, and its 51 invented members all have addresses on its testing domain. Its mark names that domain in a row the api cannot delete (migrations 0062 and 0063). While the mark stands, an invitation from the workspace to an address off that domain is refused `off-testing-domain`, so an Admin of the workspace cannot invite a real person into it.
 
-**The journeys and the test inbox are retired until go-live.** From 03/10/2026 the nightly journeys signed in to production as the three test people, each with an email code read from the test inbox, a Cloudflare Email Worker. The owner retired both on 19/10/2026 (BA-204). 37 of the last 40 releases had run them, and every run held, while 69 of the 1,894 commits since 25/09/2026 went to keeping them up. The browser suite proves each page before it merges, and the smoke and the uptime check watch production. The go-live rebuild starts from this page as `a3c19ec8` holds it, which set them up step by step, and from `docs/solutions/best-practices/a-cloudflare-email-worker-test-inbox-needs-its-own-zone-and-a-token-scoped-to-it.md`.
+**The journeys and the test inbox are retired until go-live.** From 03/10/2026 the nightly journeys signed in to production as the three test people, each with an email code read from the test inbox, a Cloudflare Email Worker. The owner retired both on 19/10/2026 (BA-204), and ADR 0022 records why. The go-live rebuild starts from this page as `a3c19ec8` holds it, which set them up step by step, and from `docs/solutions/best-practices/a-cloudflare-email-worker-test-inbox-needs-its-own-zone-and-a-token-scoped-to-it.md`.
 
 - **Fires:** nothing. An Admin of the test workspace who meets `off-testing-domain` has met the mark doing its job.
 - **Never erase a test person.** An erasure tombstones the address for good. A test person who must go is removed from the test workspace on its Members page, and never erased.
-- **The test Admin holds a second factor.** An Admin must hold one. Keep its authenticator key and recovery codes in the password manager. If the key leaks, restore the test Admin's sign-in with `pnpm ops restore-sign-in` and set up a new authenticator with the restore code.
+- **The test Admin holds a second factor.** An Admin must hold one. Keep its authenticator key and recovery codes in the password manager. If the key leaks, end its factors and sessions with `pnpm ops restore-sign-in`. No inbox receives the test people's sign-in codes until go-live, so a new authenticator waits for the rebuild.
+- **Keep the testing domain while the test people are members.** Whoever holds the domain receives their sign-in codes, one of them an Admin's. Remove the test people from the workspace before the domain is released.
 - **Rehearsed by:** nothing until go-live.
 
 ## Bring staging up / tear it down

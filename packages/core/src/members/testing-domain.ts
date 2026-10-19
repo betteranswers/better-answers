@@ -5,7 +5,7 @@ import type { AdminUserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-// Nothing writes it now, but the rows the retired test-workspace command wrote keep their name.
+// Declared though no code writes it: production's audit rows carry this name, and the audit log still renders their detail.
 declareActions("platform", {
   marked: action("platform.workspace.marked", { corrected: "flag" }),
 });

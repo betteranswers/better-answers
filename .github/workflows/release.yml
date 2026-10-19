@@ -235,7 +235,6 @@ jobs:
 
   record:
     needs: promote
-    if: ${{ !cancelled() && needs.promote.result == 'success' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     environment: production

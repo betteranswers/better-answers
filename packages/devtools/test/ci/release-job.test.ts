@@ -669,10 +669,7 @@ describe("the tag a release records", () => {
   it("records on the smoke", () => {
     const record = jobOf("record");
 
-    expect({ needs: record.needs, if: record.if }).toEqual({
-      needs: "promote",
-      if: "${{ !cancelled() && needs.promote.result == 'success' }}",
-    });
+    expect({ needs: record.needs, if: record.if }).toEqual({ needs: "promote", if: undefined });
   });
 
   it("tags by hand only a release production answers healthy on", () => {
