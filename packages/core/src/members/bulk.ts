@@ -19,7 +19,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { refusalOfDeadlock, type Tx } from "../store/postgres/index.ts";
-import { addedToGroup } from "./groups.ts";
+import { addedToGroup, heldForAdding } from "./groups.ts";
 import { lastAdminsAmong, withMembersHeld } from "./last-admin.ts";
 import { memberRemovedHere } from "./removal.ts";
 import { roleWritten } from "./roles.ts";
@@ -186,13 +186,6 @@ export type BulkAddToGroupRefusal =
   | RefusedItems<MemberRefusal<"no-such-member">>
   | Error;
 
-/** Key-share holds keep the group and each member from going, and wait on no other add. */
-const KEY_SHARED_GROUP = `SELECT 1 FROM "group" WHERE workspace_id = $1 AND id = $2 FOR KEY SHARE`;
-
-const KEY_SHARED_MEMBERS = `SELECT user_id FROM member
-                       WHERE workspace_id = $1 AND user_id = ANY($2::text[])
-                       ORDER BY user_id FOR KEY SHARE`;
-
 type Adding = { readonly groupId: GroupId; readonly personIds: readonly UserId[] };
 
 const addedUnderKeyShare = async (
@@ -200,13 +193,9 @@ const addedUnderKeyShare = async (
   tx: Tx,
   asked: Adding,
 ): Promise<Result<BulkOutcome, Exclude<BulkAddToGroupRefusal, Error>>> => {
-  const group = await tx.query(KEY_SHARED_GROUP, [admin.workspaceId, asked.groupId]);
-  if (group.rows[0] === undefined) return err("no-such-group");
-  const held = await tx.query<{ user_id: string }>(KEY_SHARED_MEMBERS, [
-    admin.workspaceId,
-    asked.personIds,
-  ]);
-  const members = held.rows.map((row) => PERSON_ID.parse(row.user_id));
+  const held = await heldForAdding(admin, tx, asked);
+  if (!held.ok) return err(held.error);
+  const members = held.value;
   const refused = refusedItemsOf(namedEach(notAmong(asked.personIds, members), "no-such-member"));
   if (refused !== undefined) return err(refused);
 
