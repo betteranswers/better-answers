@@ -4,7 +4,7 @@ import re
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import Any, Literal, TypedDict, cast
 
 import anydoc
 import asyncpg
@@ -138,14 +138,18 @@ class ABucket:
         self,
         objects: Mapping[str, bytes],
         *,
+        on_read: Callable[[], None] | None = None,
         on_write: Callable[[], None] | None = None,
     ) -> None:
         self.objects = dict(objects)
         self.reads: list[str] = []
         self.writes: list[str] = []
+        self._on_read = on_read
         self._on_write = on_write
 
     def read(self, key: str) -> bytes:
+        if self._on_read is not None:
+            self._on_read()
         self.reads.append(key)
         return self.objects[key]
 
@@ -807,6 +811,7 @@ def test_a_textless_pdf_names_ocr_on_its_row(
     assert [
         row["source_document_id"] for row in passage_rows_of(connection, workspace_id)
     ] == [AN_INVOICE_ID]
+    assert bucket.writes == [normalised_key_of(AN_INVOICE_ID)]
 
 
 @pytest.mark.parametrize(
@@ -843,6 +848,7 @@ def test_marks_an_unlisted_media_type_unreadable_on_its_row(
     assert {
         row["source_document_id"] for row in passage_rows_of(connection, workspace_id)
     } == {AN_INVOICE_ID}
+    assert bucket.writes == [normalised_key_of(AN_INVOICE_ID)]
 
 
 def test_lands_the_deadline_on_an_overrunning_documents_row(
@@ -1623,25 +1629,27 @@ def test_a_verdict_the_document_already_holds_names_nothing(
     assert outcome.as_row()["sensitivity_moved"] == []
 
 
-@pytest.mark.parametrize(
-    "revoking",
-    [
-        pytest.param(
-            "UPDATE job SET lease_expires_at = clock_timestamp() WHERE id = %s",
-            id="its lease lapsed",
-        ),
-        pytest.param(
-            "UPDATE job SET claimed_by = 'another-worker',"
-            " claimed_at = clock_timestamp(), heartbeat_at = clock_timestamp(),"
-            " lease_expires_at = clock_timestamp() + interval '60 seconds'"
-            " WHERE id = %s",
-            id="another worker claimed it since",
-        ),
-    ],
-)
-def test_a_revoked_claimant_moves_no_documents_sensitivity(
-    database: tuple[psycopg.Connection, str], tmp_path: Path, revoking: str
-) -> None:
+REVOCATIONS = [
+    pytest.param(
+        "UPDATE job SET lease_expires_at = clock_timestamp() WHERE id = %s",
+        id="its lease lapsed",
+    ),
+    pytest.param(
+        "UPDATE job SET claimed_by = 'another-worker',"
+        " claimed_at = clock_timestamp(), heartbeat_at = clock_timestamp(),"
+        " lease_expires_at = clock_timestamp() + interval '60 seconds'"
+        " WHERE id = %s",
+        id="another worker claimed it since",
+    ),
+]
+
+
+def indexed_by_a_claimant_revoked_on(
+    hook: Literal["read", "write"],
+    database: tuple[psycopg.Connection, str],
+    tmp_path: Path,
+    revoking: str,
+) -> tuple[str, ABucket]:
     connection, dsn = database
     workspace_id = a_connected_source_whose_document_stands_at(
         connection, A_SICK_NOTE_ID, "Internal"
@@ -1657,17 +1665,46 @@ def test_a_revoked_claimant_moves_no_documents_sensitivity(
 
     bucket = ABucket(
         {original_key_of(A_SICK_NOTE_ID): A_SICK_NOTE.encode()},
-        on_write=revoke_the_claim,
+        on_read=revoke_the_claim if hook == "read" else None,
+        on_write=revoke_the_claim if hook == "write" else None,
     )
 
     with pytest.raises(queue.ClaimLostError):
         index_connected_source(
             bootstrap, sync_for(workspace_id), job=job, copies=bucket
         )
+    return workspace_id, bucket
 
-    assert bucket.writes, "the claim was revoked after the source was read"
+
+@pytest.mark.parametrize("revoking", REVOCATIONS)
+def test_a_revoked_claimant_writes_no_copy_and_moves_no_sensitivity(
+    database: tuple[psycopg.Connection, str], tmp_path: Path, revoking: str
+) -> None:
+    connection, _ = database
+
+    workspace_id, bucket = indexed_by_a_claimant_revoked_on(
+        "read", database, tmp_path, revoking
+    )
+
+    assert bucket.reads == [original_key_of(A_SICK_NOTE_ID)]
+    assert bucket.writes == []
     assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == "Internal"
     assert finding_rows_of(connection, workspace_id) == []
+
+
+@pytest.mark.parametrize("revoking", REVOCATIONS)
+def test_a_claim_lost_after_the_catalogue_lands_no_passages(
+    database: tuple[psycopg.Connection, str], tmp_path: Path, revoking: str
+) -> None:
+    connection, _ = database
+
+    workspace_id, bucket = indexed_by_a_claimant_revoked_on(
+        "write", database, tmp_path, revoking
+    )
+
+    assert bucket.writes == [normalised_key_of(A_SICK_NOTE_ID)]
+    assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == "Restricted"
+    assert passage_rows_of(connection, workspace_id) == []
 
 
 def test_a_heartbeat_renews_while_the_catalogue_write_holds_the_claim(

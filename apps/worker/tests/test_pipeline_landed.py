@@ -35,6 +35,7 @@ from better_answers_worker.pipeline import (
     redact_landed_copies,
     suppression_of,
     timeout_for,
+    write_normalised_copies,
 )
 from better_answers_worker.redaction import Restore
 from better_answers_worker.redaction.pins import DETECTOR_PIN, RULE_VERSION
@@ -635,14 +636,16 @@ def test_the_normalised_redacted_text_lands_under_the_documents_normalised_key(
     bootstrap: Bootstrap,
 ) -> None:
     bucket = a_bucket_holding_both()
+    answer = read_the_copies(bootstrap, bucket, (THE_INVOICE,))
 
-    read_the_copies(bootstrap, bucket, (THE_INVOICE,))
+    write_normalised_copies(bucket, answer.documents)
 
+    assert answer.documents[0].normalised_key == THE_INVOICE.normalised_key
     assert bucket.writes == [THE_INVOICE.normalised_key]
     assert bucket.objects[THE_INVOICE.normalised_key] == AN_INVOICE_REDACTED.encode()
 
 
-def test_the_original_landed_copy_is_read_and_never_written(
+def test_reading_the_landed_copies_writes_nothing_to_the_bucket(
     bootstrap: Bootstrap,
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -650,7 +653,7 @@ def test_the_original_landed_copy_is_read_and_never_written(
     read_the_copies(bootstrap, bucket, (THE_INVOICE,))
 
     assert bucket.reads == [THE_INVOICE.original_key]
-    assert THE_INVOICE.original_key not in bucket.writes
+    assert bucket.writes == []
     assert bucket.objects[THE_INVOICE.original_key] == AN_INVOICE.encode()
 
 
@@ -685,7 +688,6 @@ def test_plain_text_lands_redacted_and_cut_into_several_passages(
 
     assert text_of(answer, A_TERMS_ID) == A_TERMS_REDACTED
     assert THE_ACCOUNT_NUMBER not in text_of(answer, A_TERMS_ID)
-    assert bucket.objects[terms.normalised_key] == A_TERMS_REDACTED.encode()
     assert len(passages) == 2
     assert "".join(passage.content for passage in passages) == A_TERMS_REDACTED
     assert [passage.id for passage in passages] == [
@@ -706,7 +708,6 @@ def test_redacts_a_docx_converted_to_markdown_with_its_table(
     assert text_of(answer, A_POLICY_ID) == A_POLICY_REDACTED
     assert "| Hotel | 120 |" in text_of(answer, A_POLICY_ID)
     assert THE_ACCOUNT_NUMBER not in text_of(answer, A_POLICY_ID)
-    assert bucket.objects[policy.normalised_key] == A_POLICY_REDACTED.encode()
 
     assert "".join(passage.content for passage in answer.documents[0].passages) == (
         A_POLICY_REDACTED
@@ -744,7 +745,6 @@ def test_a_pdf_with_a_textless_page_is_unreadable_whole(
     assert [document.source_document_id for document in answer.documents] == [
         A_DELIVERY_NOTE_ID
     ]
-    assert bucket.writes == [THE_DELIVERY_NOTE.normalised_key]
 
 
 def test_an_unreadable_document_takes_no_neighbour_with_it(
@@ -763,7 +763,9 @@ def test_an_unreadable_document_takes_no_neighbour_with_it(
     assert list(unreadable_of(answer)) == [A_TRUNCATED_ID]
     assert unreadable_of(answer)[A_TRUNCATED_ID] != ""
     assert text_of(answer, A_DELIVERY_NOTE_ID) == A_DELIVERY_NOTE
-    assert bucket.writes == [THE_DELIVERY_NOTE.normalised_key]
+    assert [document.source_document_id for document in answer.documents] == [
+        A_DELIVERY_NOTE_ID
+    ]
 
 
 def test_marks_an_unlisted_media_type_unreadable_without_guessing(
@@ -845,7 +847,6 @@ def test_marks_a_document_past_its_ceiling_unreadable_and_finishes(
 
     assert unreadable_of(answer) == {AN_INVOICE_ID: "DeadlineExceededError"}
     assert answer.documents == ()
-    assert bucket.writes == []
 
 
 def test_the_same_document_under_the_shipped_ceiling_lands(
