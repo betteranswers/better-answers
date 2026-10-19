@@ -27,7 +27,7 @@ const linksTo = (link: string, target: string): boolean => {
   }
 };
 
-const linkGit = (linkDirectory: string, target: string): void => {
+const linkGitAtomicallyAcrossSuites = (linkDirectory: string, target: string): void => {
   const git = path.join(linkDirectory, "git");
   if (linksTo(git, target)) return;
   mkdirSync(linkDirectory, { recursive: true });
@@ -40,7 +40,7 @@ const linkGit = (linkDirectory: string, target: string): void => {
 /** Homebrew's `git` queues at `syspolicyd` on every start, which a suite of many commits pays in minutes. */
 export const pathWithAppleGit = (machine: Machine = thisMachine()): string => {
   if (machine.platform !== "darwin" || !existsSync(machine.appleGit)) return machine.searchPath;
-  linkGit(machine.linkDirectory, machine.appleGit);
+  linkGitAtomicallyAcrossSuites(machine.linkDirectory, machine.appleGit);
   const rest = machine.searchPath
     .split(path.delimiter)
     .filter((entry) => entry !== "" && entry !== machine.linkDirectory);
