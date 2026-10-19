@@ -128,6 +128,8 @@ You need:
 
 Never write helper scripts to shared /tmp paths. Other sessions run in parallel and overwrite them. Use a session-scoped directory such as `$(mktemp -d)` or `.claude/tmp/<session-id>/`.
 
+Stop only the processes you started. Keep each one's pid (`$!`), or find it by a working directory inside your own worktree (`lsof -d cwd`). Never match by name: `pkill -f playwright`, `pkill stryker` or `pgrep -x stryker` also hit other sessions' runs. On 19/10/2026 a name match stopped another session's browser suite, and another stopped a mutation run mid-pass, which left its `src` instrumented.
+
 ### Vitest
 
 A vitest run starts its stores once, from `globalSetup`. It then gives each file its own share of them:
