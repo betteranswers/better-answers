@@ -53,6 +53,7 @@ export function Outcome(properties: {
   readonly tone: "said" | "refused";
   readonly children: ReactNode;
   readonly id?: string;
+  readonly className?: string;
 }) {
   return (
     <p
@@ -63,6 +64,7 @@ export function Outcome(properties: {
         properties.tone === "refused"
           ? "text-destructive empty:hidden"
           : "text-muted-foreground empty:sr-only",
+        properties.className,
       )}
     >
       {properties.children}

@@ -63,6 +63,19 @@ export const refusalAnswering = async (page: Page, procedure: string) => {
   return { status: httpStatus, ...refusal, waitSeconds: retryAfterSeconds };
 };
 
+export const aCeilingMet = (waitSeconds: number) => ({
+  status: 429,
+  headers: { "retry-after": String(waitSeconds) },
+  json: { error: "too_many_requests", error_description: "Too many requests." },
+});
+
+export const theNextAskMeetsACeiling = (page: Page, path: string, waitSeconds: number) =>
+  page.route(
+    (url) => url.pathname === path,
+    (route) => route.fulfill(aCeilingMet(waitSeconds)),
+    { times: 1 },
+  );
+
 const aRefusalOutsideTrpc = z.object({ code: z.string().optional(), error: z.string().optional() });
 
 const wholeSeconds = z.coerce.number().int().optional();

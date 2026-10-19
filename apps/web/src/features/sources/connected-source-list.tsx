@@ -7,6 +7,7 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { counted } from "@/shared/words.ts";
 
 import { Review } from "./review.tsx";
+import type { SensitivityChange } from "./sensitivity-panel.tsx";
 import { NARROWEST, widestAlready, type ListedConnectedSource } from "./sources-api.ts";
 import { SOURCES_KEYSTROKES } from "./sources-state.ts";
 import {
@@ -33,10 +34,12 @@ type ConnectedSourceActions = {
   readonly onWiden: (connectedSource: ListedConnectedSource) => void;
 };
 
+type OpenPanel = { readonly change: SensitivityChange; readonly part: ReactNode };
+
 type OpenInARow = {
   readonly reviewing: string | undefined;
   readonly reviewHeld: boolean;
-  readonly panel: { readonly connectedSourceId: string; readonly part: ReactNode } | undefined;
+  readonly panel: (OpenPanel & { readonly connectedSourceId: string }) | undefined;
 };
 
 export const connectedSourceHeadingId = (connectedSourceId: string): string =>
@@ -137,6 +140,7 @@ function RowActions(properties: {
   readonly actions: ConnectedSourceActions;
   readonly reviewing: boolean;
   readonly reviewHeld: boolean;
+  readonly changing: SensitivityChange | undefined;
   readonly onFocus: () => void;
 }) {
   const { connectedSource, actions, onFocus } = properties;
@@ -168,6 +172,7 @@ function RowActions(properties: {
         <RowAction
           action="narrow"
           name={name}
+          expanded={properties.changing === "narrow"}
           onFocus={onFocus}
           onPress={() => {
             actions.onNarrow(connectedSource);
@@ -178,6 +183,7 @@ function RowActions(properties: {
         <RowAction
           action="widen"
           name={name}
+          expanded={properties.changing === "widen"}
           onFocus={onFocus}
           onPress={() => {
             actions.onWiden(connectedSource);
@@ -193,7 +199,7 @@ function ConnectedSourceItem(properties: {
   readonly actions: ConnectedSourceActions;
   readonly reviewing: boolean;
   readonly reviewHeld: boolean;
-  readonly panel: ReactNode;
+  readonly panel: OpenPanel | undefined;
 }) {
   const { connectedSource, actions } = properties;
   const headingId = connectedSourceHeadingId(connectedSource.connectedSourceId);
@@ -215,6 +221,7 @@ function ConnectedSourceItem(properties: {
           actions={actions}
           reviewing={properties.reviewing}
           reviewHeld={properties.reviewHeld}
+          changing={properties.panel?.change}
           onFocus={focused}
         />
       </div>
@@ -232,7 +239,7 @@ function ConnectedSourceItem(properties: {
       </dl>
 
       <MoreAbout connectedSource={connectedSource} onFocus={focused} />
-      {properties.panel}
+      {properties.panel?.part}
       {properties.reviewing ? <Review connectedSource={connectedSource} /> : null}
     </li>
   );
@@ -256,7 +263,7 @@ export function ConnectedSourceList(properties: {
             actions={properties.actions}
             reviewing={open.reviewing === id}
             reviewHeld={open.reviewHeld}
-            panel={open.panel?.connectedSourceId === id ? open.panel.part : null}
+            panel={open.panel?.connectedSourceId === id ? open.panel : undefined}
           />
         );
       })}

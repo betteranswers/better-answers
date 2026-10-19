@@ -58,14 +58,6 @@ const unwrap = async <TData, TError>(
   return data;
 };
 
-const sessionOptions = () =>
-  queryOptions({
-    queryKey: AUTH_KEYS.session,
-    queryFn: () => unwrap(authClient.getSession()),
-  });
-
-export const useSession = () => useQuery(sessionOptions());
-
 const theWorkspaceList = (api: ApiProxy) => api.person.workspaces.pathFilter();
 
 type WorkspacesHeld = inferOutput<ApiProxy["person"]["workspaces"]>;
@@ -141,6 +133,20 @@ const unwrapWithTheWait = async <TData>(
   if (error.status >= SERVER_FAILED) throw new Error(`answered ${String(error.status)}`);
   throw new CodeRefused(error.status, waitSeconds, error.code);
 };
+
+const ASKED_AGAIN_AT_MOST = 2;
+
+const askedAgainUnlessRefused = (failures: number, failure: Error): boolean =>
+  !(failure instanceof CodeRefused) && failures < ASKED_AGAIN_AT_MOST;
+
+const sessionOptions = () =>
+  queryOptions({
+    queryKey: AUTH_KEYS.session,
+    queryFn: () => unwrapWithTheWait((reading) => authClient.getSession({ fetchOptions: reading })),
+    retry: askedAgainUnlessRefused,
+  });
+
+export const useSession = () => useQuery(sessionOptions());
 
 const returnPathOf = (query: string): { readonly redirect?: string } => {
   const redirect = new URLSearchParams(query).get("redirect");
@@ -233,8 +239,6 @@ export const askOfOurRoute = async <T>(
   return answer.parse(await answered.json());
 };
 
-const ASKED_AGAIN_AT_MOST = 2;
-
 export const useDescribeTheLink = (token: string | undefined, reading: boolean) =>
   useQuery({
     queryKey: [...AUTH_KEYS.all, "link", token],
@@ -247,8 +251,7 @@ export const useDescribeTheLink = (token: string | undefined, reading: boolean) 
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
-    retry: (failures, failure) =>
-      !(failure instanceof CodeRefused) && failures < ASKED_AGAIN_AT_MOST,
+    retry: askedAgainUnlessRefused,
   });
 
 const signedInByLink = z.object({ displayNameGiven: z.boolean(), carried: z.string() });
@@ -342,11 +345,8 @@ export const useAcceptInvitation = () => {
 };
 
 const signOutOptions = () =>
-  mutationOptions<unknown, BetterFetchError, void>({
-    mutationFn: () => {
-      dropTheCarriedFlow();
-      return unwrap(authClient.signOut());
-    },
+  mutationOptions<unknown, Error, void>({
+    mutationFn: () => unwrapWithTheWait((reading) => authClient.signOut({ fetchOptions: reading })),
   });
 
 export const useSignOut = (returnTo?: string) => {
@@ -356,9 +356,13 @@ export const useSignOut = (returnTo?: string) => {
 
   return {
     signingOut: signOut.isPending,
+    failure: signOut.error,
     signOut: () => {
+      if (signOut.isPending) return;
+      const keepTheCarriedFlow = dropTheCarriedFlow();
       signOut.mutate(undefined, {
-        onSettled: () => {
+        onError: keepTheCarriedFlow,
+        onSuccess: () => {
           queryClient.clear();
           rememberTheSession("signed-out");
           forgetTheUnsavedChange();

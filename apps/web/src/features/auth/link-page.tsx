@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
-import { STOCK, stockWait } from "@/shared/refusal-words.ts";
+import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import {
@@ -30,6 +30,7 @@ import {
   signingInAs,
   worksUntil,
 } from "./link-words.ts";
+import { saidOfAFailure } from "./refusal-words.ts";
 import { useStepAfterSignIn } from "./second-factor-steps.ts";
 import { SIGN_IN_WORDS } from "./sign-in-words.ts";
 
@@ -56,9 +57,6 @@ const CHECKING: Seen = { state: "checking" };
 
 const linkDied = (failure: Error | null): boolean =>
   failure instanceof CodeRefused && !isTooMany(failure);
-
-const saidOfFailure = (failure: Error, unanswered: string): string =>
-  isTooMany(failure) ? stockWait(failure.waitSeconds) : unanswered;
 
 type Read = { readonly data: LinkDescribed | undefined; readonly error: Error | null };
 
@@ -184,7 +182,7 @@ const unreadSlots = (failure: Error, acting: Acting): Slots => ({
   title: SIGN_IN_TITLE,
   said: null,
   body: null,
-  refused: saidOfFailure(failure, STOCK.tryAgain),
+  refused: saidOfAFailure(failure, STOCK.tryAgain),
   actions: (
     <div className="mt-6 flex flex-wrap items-center gap-2">
       <ReadAgain
@@ -212,7 +210,7 @@ const boundSlots = (bound: Bound, acting: Acting): Slots => ({
   refused:
     acting.signInFailure === null
       ? undefined
-      : saidOfFailure(acting.signInFailure, SIGN_IN_UNCONFIRMED),
+      : saidOfAFailure(acting.signInFailure, SIGN_IN_UNCONFIRMED),
   actions: null,
 });
 

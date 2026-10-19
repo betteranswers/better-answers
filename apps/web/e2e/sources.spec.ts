@@ -1008,6 +1008,19 @@ test.describe("reviewing a connected source's findings", () => {
   });
 });
 
+const aWideningOpened = async (page: Page, api: APIRequestContext, workspace: string) => {
+  await anAdminAtSources(page, api, {
+    workspace,
+    connectedSources: [indexed("Staff handbook", { sensitivity: "Restricted" })],
+  });
+  const opener = rowAction(page, "Staff handbook", "widen");
+  await opener.click();
+  const panel = panelOf(page, "Staff handbook", "widen");
+  const sensitivityPicked = panel.getByRole("combobox", { name: "Sensitivity" });
+  await expect(sensitivityPicked).toBeFocused();
+  return { opener, panel, sensitivityPicked };
+};
+
 test.describe("publishing, narrowing and widening a connected source", () => {
   test("publishes within 100 ms after stating confirmations and audit row", async ({
     page,
@@ -1285,15 +1298,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
   });
 
   test("cancels a widening, focus back on what opened it", async ({ page, request }) => {
-    await anAdminAtSources(page, request, {
-      workspace: "Midgley Ropes",
-      connectedSources: [indexed("Staff handbook", { sensitivity: "Restricted" })],
-    });
-
-    const opener = rowAction(page, "Staff handbook", "widen");
-    await opener.click();
-    const panel = panelOf(page, "Staff handbook", "widen");
-    await expect(panel.getByRole("combobox", { name: "Sensitivity" })).toBeFocused();
+    const { opener, panel } = await aWideningOpened(page, request, "Midgley Ropes");
     await panel.getByRole("button", { name: "Cancel" }).click();
     await expect(panel).toHaveCount(0);
     await expect(opener, "Cancel did not hand focus back to the button").toBeFocused();
@@ -1310,6 +1315,76 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(panel).toHaveCount(0);
     await expect(moreAbout, "Cancel did not hand focus back to where w was pressed").toBeFocused();
     await expect(sensitivityOf(page, "Staff handbook")).toHaveText("Restricted");
+  });
+
+  test("closes a widening on Escape, focus back on Widen", async ({ page, request }) => {
+    const { opener, panel } = await aWideningOpened(page, request, "Mankinholes Rope");
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await expect(commitOf(page, "Staff handbook", "widen")).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+    await expect(opener, "Escape did not hand focus back to the button").toBeFocused();
+    await expect(sensitivityOf(page, "Staff handbook")).toHaveText("Restricted");
+  });
+
+  test("Escape closes an open select, not the panel", async ({ page, request }) => {
+    const { opener, panel, sensitivityPicked } = await aWideningOpened(
+      page,
+      request,
+      "Lumbutts Mill",
+    );
+    await sensitivityPicked.press("Enter");
+    await expect(page.getByRole("option", { name: "Internal" })).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("listbox")).toHaveCount(0);
+    await expect(panel, "the Escape that closed the select closed the panel too").toBeVisible();
+    await expect(sensitivityPicked).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+    await expect(opener).toBeFocused();
+  });
+
+  test("pressing Widen again closes its panel, focus kept", async ({ page, request }) => {
+    const { opener, panel } = await aWideningOpened(page, request, "Todmorden Felt");
+
+    await opener.click();
+
+    await expect(panel).toHaveCount(0);
+    await expect(opener).toHaveAttribute("aria-expanded", "false");
+    await expect(opener, "a second press moved focus off Widen").toBeFocused();
+    await opener.press("Enter");
+    await expect(panel).toBeVisible();
+  });
+
+  test("Narrow and Widen say whether their panel is open", async ({ page, request }) => {
+    await anAdminAtSources(page, request, {
+      workspace: "Walsden Dyeworks",
+      connectedSources: [indexed("Staff handbook"), indexed("Price list")],
+    });
+    const narrow = rowAction(page, "Staff handbook", "narrow");
+    const widen = rowAction(page, "Staff handbook", "widen");
+    const otherWiden = rowAction(page, "Price list", "widen");
+    const expandedAre = async (expected: { readonly narrow: string; readonly widen: string }) => {
+      await expect(narrow).toHaveAttribute("aria-expanded", expected.narrow);
+      await expect(widen).toHaveAttribute("aria-expanded", expected.widen);
+      await expect(otherWiden).toHaveAttribute("aria-expanded", "false");
+    };
+
+    await expandedAre({ narrow: "false", widen: "false" });
+    await widen.click();
+    await expect(panelOf(page, "Staff handbook", "widen")).toBeVisible();
+    await expandedAre({ narrow: "false", widen: "true" });
+
+    await narrow.click();
+    await expect(panelOf(page, "Staff handbook", "narrow")).toBeVisible();
+    await expandedAre({ narrow: "true", widen: "false" });
+
+    await panelOf(page, "Staff handbook", "narrow").getByRole("button", { name: "Cancel" }).click();
+    await expandedAre({ narrow: "false", widen: "false" });
   });
 
   test("holds a second widening while the first is still pending", async ({ page, request }) => {

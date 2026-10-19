@@ -29,7 +29,7 @@ import { AuthPage, Outcome, ReadAgain, Refused } from "./auth-page.tsx";
 import { carriedFlow, invitationAt, leavingFor, pageQuery } from "./carried-flow.ts";
 import { INVITATION_ACTIONS, INVITATION_WORDS } from "./invitation-words.ts";
 import { SAID_OF_ACCEPTING } from "./refusal-words.ts";
-import { SignOutButton } from "./sign-out-button.tsx";
+import { SignOutButton, SignOutRefused } from "./sign-out-button.tsx";
 
 type Invitation = inferOutput<ReturnType<typeof useTRPC>["person"]["invitation"]>;
 
@@ -82,7 +82,7 @@ const wayOf = (failure: Error | ApiError | null): WayOn | undefined => {
 function WayOnAction(properties: { readonly way: WayOn; readonly here: string }) {
   const { way, here } = properties;
   const navigate = useNavigate();
-  const { signOut, signingOut } = useSignOut(way.to(here));
+  const { signOut, signingOut, failure } = useSignOut(way.to(here));
 
   const go = () => {
     if (signingOut) return;
@@ -92,16 +92,19 @@ function WayOnAction(properties: { readonly way: WayOn; readonly here: string })
   useKeystroke(way.keystroke, go);
 
   return (
-    <Button
-      type="button"
-      variant="outline"
-      className="aria-disabled:opacity-50"
-      aria-disabled={signingOut}
-      aria-keyshortcuts={way.keystroke.key}
-      onClick={go}
-    >
-      {way.keystroke.action}
-    </Button>
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        className="aria-disabled:opacity-50"
+        aria-disabled={signingOut}
+        aria-keyshortcuts={way.keystroke.key}
+        onClick={go}
+      >
+        {way.keystroke.action}
+      </Button>
+      <SignOutRefused failure={failure} />
+    </>
   );
 }
 

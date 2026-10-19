@@ -179,7 +179,7 @@ export const readingForever = (): void => {
 const clientsAt = (path: string) => {
   globalThis.history.replaceState(null, "", path);
   const clients = createAppClients();
-  clients.queryClient.setDefaultOptions({ queries: { retry: false } });
+  clients.queryClient.setDefaultOptions({ queries: { retry: false, retryDelay: 0 } });
   clients.queryClient.setQueryData(["auth", "session"], ADAS_SESSION);
   return clients;
 };

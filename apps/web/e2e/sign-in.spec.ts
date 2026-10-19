@@ -1,4 +1,4 @@
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { z } from "zod";
 
 import type { CarriedOn } from "@/features/auth/sign-in-words.ts";
@@ -32,6 +32,7 @@ import {
   theActionLandedWithinItsBudget,
   tokenColour,
 } from "./harness.ts";
+import { scrolledSideways } from "./knowledge.ts";
 import { authAnswering } from "./refused-read.ts";
 
 const thePicker = (page: Page) => page.getByRole("heading", { level: 1, name: "Your Workspaces" });
@@ -198,6 +199,33 @@ test("shows a member of two workspaces their role in each", async ({ page, reque
   await acme.click();
   await landedAtHome(page, "Admin");
   await expect(page.getByRole("banner").getByText(first.name)).toBeVisible();
+});
+
+const linesOf = (button: Locator): Promise<number> =>
+  button.evaluate((drawn) => {
+    const text = document.createRange();
+    text.selectNodeContents(drawn);
+    return new Set([...text.getClientRects()].map((line) => Math.round(line.top))).size;
+  });
+
+test("keeps a long workspace name and role at 320 pixels", async ({ page, request }) => {
+  const email = anAddress("narrow");
+  const { first } = await memberOfTwoWorkspaces(request, email, {
+    first: "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch Community Joinery",
+    second: "Short Joinery",
+  });
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+  await expect(thePicker(page)).toBeVisible();
+
+  const named = page.getByRole("button", { name: first.name, exact: true });
+  await expect(named).toHaveAccessibleDescription("Admin");
+  expect(await linesOf(named), "the long name stays on one line").toBeGreaterThan(1);
+  await expect(
+    rowsOf(page).filter({ has: named }).getByText("Admin", { exact: true }),
+  ).toBeInViewport({ ratio: 1 });
+  expect(await scrolledSideways(page), "the picker scrolls sideways at 320 pixels").toBe(0);
 });
 
 test("lists a member's workspaces within a second", async ({ page, request }) => {

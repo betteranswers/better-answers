@@ -171,11 +171,17 @@ Six more play Claude's part in its OAuth flow on the suite's own origin — `app
 
 ## Reading the api's answers
 
-One helper answers for the api. `refusedFromNowOn` in `apps/web/e2e/refused-read.ts` refuses one
+Three helpers answer for the api. `refusedFromNowOn` in `apps/web/e2e/refused-read.ts` refuses one
 console procedure inside a tRPC batch, in the api's own words for a person without the operator's
 mark, and leaves the batch's other answers real. A spec uses it to meet a list's refused re-read
 while the console stays open, since clearing the mark itself closes the whole console.
 `apps/web/e2e/console.spec.ts` and `apps/web/e2e/console-people.spec.ts` are the worked examples.
+
+`theNextAskMeetsACeiling` in the same module answers the next ask of one path outside tRPC with the
+api's own 429 and the wait it is handed, then lets that path through again. `aCeilingMet` is that
+answer alone, for a spec that refuses every ask and counts them.
+`apps/web/e2e/sign-out.spec.ts` uses both. `apps/web/e2e/accept-invitation.spec.ts` and
+`apps/web/e2e/sign-in-link.spec.ts` use the first.
 
 Two more in that module read what the api answered. `refusalAnswering` waits for the next answer to
 one tRPC procedure, found by its place in a batch or in a call sent alone. It answers the refusal's
