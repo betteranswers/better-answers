@@ -26,9 +26,14 @@ export const nextAfterJoining = (query: string): string =>
  * The Better Auth client plugin sends the page's signed query with every write, and the api refuses a lapsed
  * one, sign-out included.
  */
-export const dropTheCarriedFlow = (): void => {
-  if (carriedFlow(pageQuery()) === "") return;
-  globalThis.history.replaceState(globalThis.history.state, "", globalThis.location.pathname);
+export const dropTheCarriedFlow = (): (() => void) => {
+  const { pathname, search, hash } = globalThis.location;
+  if (carriedFlow(search) === "") return () => undefined;
+  globalThis.history.replaceState(globalThis.history.state, "", pathname);
+  return () => {
+    if (globalThis.location.pathname !== pathname) return;
+    globalThis.history.replaceState(globalThis.history.state, "", `${pathname}${search}${hash}`);
+  };
 };
 
 /** A router navigation would re-serialise a carried query and break its signature. */

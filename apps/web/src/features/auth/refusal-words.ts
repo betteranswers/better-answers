@@ -1,8 +1,16 @@
 import type { Refusal, RefusalWord } from "@/shared/api/trpc.ts";
-import { refusalSentence, STOCK, type OwnSentences } from "@/shared/refusal-words.ts";
+import { refusalSentence, STOCK, stockWait, type OwnSentences } from "@/shared/refusal-words.ts";
 import { minutesUntil, PRODUCT_NAME } from "@/shared/words.ts";
 
+import { isTooMany } from "./auth-hooks.ts";
+
 export const STALE_CONFIRMATION = "confirmation-too-old" satisfies RefusalWord;
+
+export const saidOfAFailure = (failure: Error, unanswered: string): string =>
+  isTooMany(failure) ? stockWait(failure.waitSeconds) : unanswered;
+
+export const saidOfASignOutRefused = (failure: Error): string =>
+  saidOfAFailure(failure, STOCK.tryAgain);
 
 const INVITATION_LINK_INVALID =
   "This invitation link isn't valid. Please ask the person who invited you to send a new one.";

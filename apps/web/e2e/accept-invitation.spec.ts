@@ -16,13 +16,18 @@ import {
   personMenuOpened,
   provision,
   saysARefusal,
+  saysTheWait,
   signIn,
   signInHeading,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
-import { refusalAnswering } from "./refused-read.ts";
+import { refusalAnswering, theNextAskMeetsACeiling } from "./refused-read.ts";
 
 const READ_BUDGET_MS = 1000;
+
+const WAIT_SECONDS = 120;
+
+const SIGN_OUT = "/sign-out";
 
 const INVITER = "Morgan Reid";
 
@@ -233,12 +238,12 @@ test("asks for a name when the join finds none given", async ({
   await expect(page.getByRole("banner").getByRole("button", { name: /Selina Hart/ })).toBeVisible();
 });
 
-test("refuses a person at another address, offering the invited one", async ({
-  page,
-  request,
-  passesTheAccessibilityGate,
-}) => {
-  const { address, link } = await anInvitation(request, "Brightwater Estimating", "Editor");
+const signedInAtAnotherAddress = async (
+  page: Page,
+  request: APIRequestContext,
+  workspaceName: string,
+) => {
+  const { address, link } = await anInvitation(request, workspaceName, "Editor");
   await person(request, address, { displayName: "Priya Shah" });
   const other = anAddress("theo");
   await person(request, other, { displayName: "Theo Other" });
@@ -248,6 +253,15 @@ test("refuses a person at another address, offering the invited one", async ({
   await signIn(page, request, other);
 
   expect(await refused).toMatchObject({ word: "invitation-for-another-address" });
+  return { address, link };
+};
+
+test("refuses a person at another address, offering the invited one", async ({
+  page,
+  request,
+  passesTheAccessibilityGate,
+}) => {
+  const { address } = await signedInAtAnotherAddress(page, request, "Brightwater Estimating");
   await saysARefusal(page.getByRole("alert"));
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
@@ -269,6 +283,18 @@ test("refuses a person at another address, offering the invited one", async ({
   await signIn(page, request, address);
 
   await expect(invitationHeading(page, "Brightwater Estimating")).toBeVisible();
+});
+
+test("a refused sign-out keeps the invitation, saying the wait", async ({ page, request }) => {
+  const { link } = await signedInAtAnotherAddress(page, request, "Glasshouses Estimating");
+  await theNextAskMeetsACeiling(page, SIGN_OUT, WAIT_SECONDS);
+
+  await page.keyboard.press("s");
+
+  const another = page.getByRole("button", { name: "Sign In with Another Address" });
+  await saysTheWait(another.locator("xpath=following-sibling::*[@role='alert'][1]"), WAIT_SECONDS);
+  await expect(page.getByRole("heading", { level: 1, name: "Your Invitation" })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`${link}$`));
 });
 
 test("tells a named person a stray link names no invitation", async ({ page, request }) => {

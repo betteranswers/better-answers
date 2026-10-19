@@ -21,6 +21,7 @@ import {
   signInHeading,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
+import { theNextAskMeetsACeiling } from "./refused-read.ts";
 
 const CLIENT_IP_HEADER = "cf-connecting-ip";
 
@@ -80,18 +81,6 @@ const headingOf = (page: Page, name: string) =>
   page.getByRole("heading", { level: 1, name, exact: true });
 
 const signInButton = (page: Page) => page.getByRole("button", { name: "Sign In", exact: true });
-
-const refusedOnceAt = (page: Page, path: string, waitSeconds: number) =>
-  page.route(
-    `**${path}`,
-    (route) =>
-      route.fulfill({
-        status: 429,
-        headers: { "retry-after": String(waitSeconds) },
-        json: { error: "too-many-requests" },
-      }),
-    { times: 1 },
-  );
 
 const DEAD_PAGE = `
   - main:
@@ -237,7 +226,7 @@ test("a refused read offers to check the link again", async ({
   passesTheAccessibilityGate,
 }) => {
   const { email, token } = await aLinkAskedForIn(context, request, "Reread");
-  await refusedOnceAt(page, DESCRIBE_PATH, 60);
+  await theNextAskMeetsACeiling(page, DESCRIBE_PATH, 60);
 
   await page.goto(linkTo(token));
   await saysTheWait(page.getByRole("alert"), 60);
@@ -256,7 +245,7 @@ test("a ceiling's refusal names its wait, keeping Sign in focused", async ({
   passesTheAccessibilityGate,
 }) => {
   const { token } = await aLinkAskedForIn(context, request, "Ceiling");
-  await refusedOnceAt(page, SIGN_IN_PATH, 120);
+  await theNextAskMeetsACeiling(page, SIGN_IN_PATH, 120);
   await page.goto(linkTo(token));
   await expect(signInButton(page)).toBeFocused();
 

@@ -3,6 +3,7 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { PasskeyOffer, useOfferPlace, type OfferPlace } from "@/features/auth/passkey-offer.tsx";
+import { saidOfASignOutRefused } from "@/features/auth/refusal-words.ts";
 import { useSwitchedElsewhereSaid } from "@/features/auth/switched-elsewhere.ts";
 import { useUnsavedChangeSaid } from "@/features/auth/unsaved-change.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
@@ -24,6 +25,7 @@ import {
 import type { Outcome } from "@/shared/outcome.tsx";
 import { PageHeadSlot } from "@/shared/page-head.tsx";
 import { isFilled, type PageTab, type PageToolbar } from "@/shared/page-toolbar.tsx";
+import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { useWideLayout } from "@/shared/wide-layout.ts";
 
 import { Band, type Person } from "./band.tsx";
@@ -100,15 +102,32 @@ const useSwitchedInAnotherTabSaid = (here: Here | undefined): Outcome | undefine
     : undefined;
 };
 
+type SaidOn = { readonly failure: Error | null; readonly pathname: string | undefined };
+
+const useSignOutRefusedSaid = (failure: Error | null, pathname: string): Outcome | undefined => {
+  const [said, setSaid] = useState<SaidOn>({ failure, pathname });
+  if (failure !== said.failure) setSaid({ failure, pathname });
+  else if (said.pathname !== undefined && said.pathname !== pathname) {
+    setSaid({ failure, pathname: undefined });
+  }
+  return failure !== null && said.pathname === pathname
+    ? refusedWith(saidOfASignOutRefused(failure))
+    : undefined;
+};
+
+type Leaving = ReturnType<typeof useSignOut>;
+
 const useBandOutcome = (
   switching: WorkspaceSwitch,
+  leaving: Leaving,
   here: Here | undefined,
   pathname: string,
 ): Outcome | undefined => {
+  const refusedSigningOut = useSignOutRefusedSaid(leaving.failure, pathname);
   const refusedElsewhere = useSwitchedElsewhereSaid();
   const readElsewhere = useSwitchedInAnotherTabSaid(switching.pending ? undefined : here);
   const unsaved = useUnsavedChangeSaid(pathname);
-  return switching.outcome ?? refusedElsewhere ?? readElsewhere ?? unsaved;
+  return refusedSigningOut ?? switching.outcome ?? refusedElsewhere ?? readElsewhere ?? unsaved;
 };
 
 export function Frame(properties: {
@@ -120,7 +139,7 @@ export function Frame(properties: {
 }) {
   const { visible, here } = properties;
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const { signOut, signingOut } = useSignOut();
+  const leaving = useSignOut();
   const wide = useWideLayout();
   const { showing, show } = useMenuShowing();
   const sheet = useNavigationSheet();
@@ -134,7 +153,7 @@ export function Frame(properties: {
 
   const open = placeAt(visible.areas, pathname);
   const region = useRegion(visible, pathname);
-  const outcome = useBandOutcome(switching, here, pathname);
+  const outcome = useBandOutcome(switching, leaving, here, pathname);
   useArrivalTakenOnceRead(visible);
 
   return (
@@ -177,8 +196,8 @@ export function Frame(properties: {
             }
             jumpTo={<JumpTo offered={offersJumpTo} wide={wide} tree={visible} jumping={jumping} />}
             keystrokes={<ShellKeystrokesAction at="band" />}
-            signingOut={signingOut}
-            onSignOut={signOut}
+            signingOut={leaving.signingOut}
+            onSignOut={leaving.signOut}
             outcome={outcome}
           />
 
