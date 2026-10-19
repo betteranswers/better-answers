@@ -391,22 +391,26 @@ agent classifies comments and the tool alone deletes them. `inventory <path>...`
 row per comment block in the TypeScript under each path: `path`, `start`, `end`, `kind`,
 `attached`, `words`, `text`, then four columns the classifier fills: `class`, `holder`,
 `structure` and `unit`. Blocks are grouped as the comment gate groups them. A directive or notice
-is a row of its own, and a generated file is skipped. `text` is the block's source, with a
-backslash, tab, newline and carriage return written `\\`, `\t`, `\n` and `\r`.
+is a row of its own, and a generated file is skipped. A directive is one the comment gate exempts,
+or `@vite-ignore`, which the gate has no reason to exempt but a bundler reads. `text` is the
+block's source, with a backslash, tab, newline and carriage return written `\\`, `\t`, `\n` and
+`\r`.
 
-`apply <tsv> --unit <unit>` deletes the unit's rows, except `foreign`, `contract` and
-`suppression` ones. `check <tsv> [--unit <unit>]` runs the same checks and writes nothing. Each
-row is found again by its exact text, so a moved line never deletes the wrong block. The whole
-unit is refused, and no file changes, when any row is unclassified, when a row's text is not in
-its file as often as the unit names it, or when a `held` or `structure` row's holder does not
-resolve. A holder is `path › text`, several joined by `; `. It resolves when the file, with
-every block the TSV deletes in any unit taken out, holds `text` exactly once. The text can be a
-test title or a code line such as `REVOKE DELETE ON "user"`. A holder anchors on text, never a
-line number, because a deletion above a line moves it and the number then names another line. An
-`open` row's reason has no holder in the tree yet: its holder is the tracker issue the reason went
-to, such as `BA-196`. The tool deletes it without resolving anything, and refuses one whose holder
-is not an issue id. A refused unit exits 1, and a malformed TSV exits 2 and names its line. `test/comment-inventory.test.ts` runs each command
-over a throwaway tree.
+`apply <tsv> --unit <unit>` deletes the unit's rows, except `foreign`, `contract` and `suppression`
+ones. It takes out a line the deletion left empty, then runs oxfmt over each file it changed, so a
+deletion leaves no blank line or line break the formatter would change. oxfmt is a devDependency of
+this package for that reason. `check <tsv> [--unit <unit>]` runs the same checks and writes nothing.
+Each row is found again by its exact text, so a moved line never deletes the wrong block. The whole
+unit is refused, and no file changes, when any row is unclassified, when a row's text is not in its
+file as often as the unit names it, or when a `held` or `structure` row's holder does not resolve. A
+holder is `path › text`, several joined by `; `. It resolves when the file, with every block the TSV
+deletes in any unit taken out, holds `text` exactly once. The text can be a test title or a code
+line such as `REVOKE DELETE ON "user"`. A holder anchors on text, never a line number, because a
+deletion above a line moves it and the number then names another line. An `open` row's reason has no
+holder in the tree yet: its holder is the tracker issue the reason went to, such as `BA-196`. The
+tool deletes it without resolving anything, and refuses one whose holder is not an issue id. A
+refused unit exits 1, and a malformed TSV exits 2 and names its line.
+`test/comment-inventory.test.ts` runs each command over a throwaway tree.
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
 
