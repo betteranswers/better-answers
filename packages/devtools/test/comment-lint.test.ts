@@ -31,6 +31,7 @@ const CONFIG = JSON.stringify({
       ([name]) => COMMENT_RULES.includes(name) || name === SUPPRESSIBLE,
     ),
   ),
+  ignorePatterns: config.ignorePatterns,
 });
 
 const FILE = "apps/api/src/probe.ts";
@@ -129,5 +130,19 @@ describe("the one lint config accepts a comment keeping the rules", () => {
     ],
   ])("accepts %s", (_what, tree) => {
     expect(lint.flagged(tree)).toEqual([]);
+  });
+});
+
+const bareName = (rule: string): string => rule.slice(rule.lastIndexOf("/") + 1);
+
+const COMMENT_RULE_NAMES = new Set(COMMENT_RULES.map(bareName));
+
+describe("the root lint config", () => {
+  it("lets no override change a comment rule", () => {
+    const overriding = config.overrides.flatMap((override) =>
+      Object.keys(override.rules ?? {}).filter((rule) => COMMENT_RULE_NAMES.has(bareName(rule))),
+    );
+
+    expect(overriding).toEqual([]);
   });
 });

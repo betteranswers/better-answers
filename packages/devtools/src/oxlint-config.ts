@@ -22,6 +22,7 @@ const oxlintConfig = z.object({
   options: z.record(z.string(), z.unknown()).optional(),
 
   categories: z.record(z.string(), z.string()),
+  ignorePatterns: z.array(z.string()).optional(),
 });
 
 export type OxlintConfig = z.infer<typeof oxlintConfig>;
