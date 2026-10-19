@@ -27,6 +27,7 @@ import {
 } from "./asking.ts";
 import {
   connectedSourceForGroups,
+  connectedSourceHolding,
   conceptCiting,
   conceptForGroup,
   documentUnder,
@@ -163,6 +164,36 @@ describe("the audience arm of the read predicate", () => {
       addToGroup(admin, tx, { groupId: board, userId: scenario.admin.userId }),
     );
     expect(await reaches(scenario.admin, forBoardAdmins.iri)).toBe(true);
+  });
+
+  it("reads a group's passage to a member, not an outsider", async () => {
+    const scenario = await arrange();
+    const hr = await groupNamed(db(), scenario, "HR", [scenario.viewer]);
+    const toHr = await connectedSourceForGroups(db(), scenario.workspaceId, [hr]);
+    const passage = await passageOf(scenario.workspaceId, toHr);
+
+    expect({
+      member: await passagesReadableBy(scenario.viewer, toHr.documentId),
+      outsider: await passagesReadableBy(scenario.editor, toHr.documentId),
+    }).toEqual({ member: [passage], outsider: [] });
+  });
+});
+
+describe("the publish arm of the read predicate", () => {
+  it("reads an unpublished source's passage to nobody, Admins included", async () => {
+    const scenario = await arrange();
+    const published = await connectedSourceHolding(db(), scenario.workspaceId);
+    const unpublished = await connectedSourceHolding(db(), scenario.workspaceId, {
+      publishedAt: null,
+    });
+    const shown = await passageOf(scenario.workspaceId, published);
+    await passageOf(scenario.workspaceId, unpublished);
+
+    expect({
+      published: await passagesReadableBy(scenario.admin, published.documentId),
+      admin: await passagesReadableBy(scenario.admin, unpublished.documentId),
+      viewer: await passagesReadableBy(scenario.viewer, unpublished.documentId),
+    }).toEqual({ published: [shown], admin: [], viewer: [] });
   });
 });
 

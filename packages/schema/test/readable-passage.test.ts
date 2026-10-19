@@ -11,12 +11,6 @@ const db = postgresForSuite();
 const WS_A = "01J6EAAAAAAAAAAAAAAAAAAAAA";
 const WS_B = "01J6EBBBBBBBBBBBBBBBBBBBBB";
 
-const READABLE_AS_CORE_SPELLS_IT = `SELECT id FROM "index".readable_passage AS v
-     WHERE v.published_at IS NOT NULL
-       AND (v.sensitivity <> 'Restricted' OR $1 = 'Admin')
-       AND (v.audience = 'everyone' OR v.audience_groups && $2::text[])
-     ORDER BY id`;
-
 const THE_VIEW = `SELECT id, sensitivity, published_at, audience, audience_groups
      FROM "index".readable_passage ORDER BY id`;
 
@@ -30,23 +24,9 @@ const publishedToEveryone = (row: { readonly id: string; readonly sensitivity: s
   audience_groups: null,
 });
 
-type Reader = readonly [role: string, groups: readonly string[]];
-
-const ADMIN: Reader = ["Admin", []];
-
-const VIEWER: Reader = ["Viewer", []];
-
 const asAppRt = async (client: pg.PoolClient, workspaceId: string): Promise<void> => {
   await client.query("SET LOCAL ROLE app_rt");
   await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
-};
-
-const seenBy = async (
-  client: pg.PoolClient,
-  [role, groups]: Reader,
-): Promise<readonly string[]> => {
-  const read = await client.query<{ id: string }>(READABLE_AS_CORE_SPELLS_IT, [role, [...groups]]);
-  return read.rows.map((row) => row.id);
 };
 
 type Arrangement = {
@@ -112,21 +92,21 @@ const columnsOf = async (relation: string): Promise<readonly string[]> => {
 };
 
 const THE_FOLD = [
-  { connectedSource: "Restricted", document: "Restricted", narrower: "Restricted", viewer: false },
-  { connectedSource: "Restricted", document: "Internal", narrower: "Restricted", viewer: false },
-  { connectedSource: "Restricted", document: "Public", narrower: "Restricted", viewer: false },
-  { connectedSource: "Internal", document: "Restricted", narrower: "Restricted", viewer: false },
-  { connectedSource: "Internal", document: "Internal", narrower: "Internal", viewer: true },
-  { connectedSource: "Internal", document: "Public", narrower: "Internal", viewer: true },
-  { connectedSource: "Public", document: "Restricted", narrower: "Restricted", viewer: false },
-  { connectedSource: "Public", document: "Internal", narrower: "Internal", viewer: true },
-  { connectedSource: "Public", document: "Public", narrower: "Public", viewer: true },
+  { connectedSource: "Restricted", document: "Restricted", narrower: "Restricted" },
+  { connectedSource: "Restricted", document: "Internal", narrower: "Restricted" },
+  { connectedSource: "Restricted", document: "Public", narrower: "Restricted" },
+  { connectedSource: "Internal", document: "Restricted", narrower: "Restricted" },
+  { connectedSource: "Internal", document: "Internal", narrower: "Internal" },
+  { connectedSource: "Internal", document: "Public", narrower: "Internal" },
+  { connectedSource: "Public", document: "Restricted", narrower: "Restricted" },
+  { connectedSource: "Public", document: "Internal", narrower: "Internal" },
+  { connectedSource: "Public", document: "Public", narrower: "Public" },
 ] as const;
 
 const THE_DOCUMENT_NAMES_NO_SENSITIVITY = [
-  { connectedSource: "Restricted", document: null, narrower: "Restricted", viewer: false },
-  { connectedSource: "Internal", document: null, narrower: "Internal", viewer: true },
-  { connectedSource: "Public", document: null, narrower: "Public", viewer: true },
+  { connectedSource: "Restricted", document: null, narrower: "Restricted" },
+  { connectedSource: "Internal", document: null, narrower: "Internal" },
+  { connectedSource: "Public", document: null, narrower: "Public" },
 ] as const;
 
 const A_WORD_OUTSIDE_THE_SET = [
@@ -269,17 +249,16 @@ describe("the shape the view presents", () => {
 });
 
 describe("what the view reports for a passage, as app_rt", () => {
-  it("reports the narrower sensitivity and shows permitted readers the row", async () => {
+  it("reports the narrower of the source's and document's sensitivity", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const landed: { readonly id: string; readonly expected: string; readonly viewer: boolean }[] =
-        [];
+      const landed: { readonly id: string; readonly expected: string }[] = [];
       for (const pair of [...THE_FOLD, ...THE_DOCUMENT_NAMES_NO_SENSITIVITY]) {
         const { passage } = await aPassageUnderAConnectedSource(client, {
           connectedSourceSensitivity: pair.connectedSource,
           documentSensitivity: pair.document,
         });
-        landed.push({ id: passage.id, expected: pair.narrower, viewer: pair.viewer });
+        landed.push({ id: passage.id, expected: pair.narrower });
       }
       await asAppRt(client, WS_A);
 
@@ -288,24 +267,13 @@ describe("what the view reports for a passage, as app_rt", () => {
       expect(
         reported.rows.map((row) => ({ id: row.id, sensitivity: row.sensitivity })).toSorted(byId),
       ).toEqual(landed.map(({ id, expected }) => ({ id, sensitivity: expected })).toSorted(byId));
-      expect({
-        admin: (await seenBy(client, ADMIN)).toSorted(),
-        viewer: (await seenBy(client, VIEWER)).toSorted(),
-      }).toEqual({
-        admin: landed.map(({ id }) => id).toSorted(),
-        viewer: landed
-          .filter(({ viewer }) => viewer)
-          .map(({ id }) => id)
-          .toSorted(),
-      });
     });
   });
 
-  it("carries the source's audience, readable only inside the named group", async () => {
+  it("carries the source's audience and the groups it names", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const held = ulid();
-      const unheld = ulid();
       const everyone = await aPassageUnderAConnectedSource(client);
       const toTheGroup = await aPassageUnderAConnectedSource(client, {
         audience: AUDIENCE_GROUPS,
@@ -313,45 +281,49 @@ describe("what the view reports for a passage, as app_rt", () => {
       });
       await asAppRt(client, WS_A);
 
-      expect({
-        inTheGroup: await seenBy(client, ["Viewer", [held]]),
-        outsideIt: await seenBy(client, ["Viewer", [unheld]]),
-        audience: (await client.query<{ audience: string }>(THE_VIEW)).rows.map(
-          (row) => row.audience,
-        ),
-      }).toEqual({
-        inTheGroup: [everyone.passage.id, toTheGroup.passage.id].toSorted(),
-        outsideIt: [everyone.passage.id],
-        audience: expect.arrayContaining([AUDIENCE_EVERYONE, AUDIENCE_GROUPS]),
-      });
+      const reported = await client.query<{
+        id: string;
+        audience: string;
+        audience_groups: string[] | null;
+      }>(THE_VIEW);
+
+      expect(
+        reported.rows
+          .map(({ id, audience, audience_groups }) => ({ id, audience, audience_groups }))
+          .toSorted(byId),
+      ).toEqual(
+        [
+          { id: everyone.passage.id, audience: AUDIENCE_EVERYONE, audience_groups: null },
+          { id: toTheGroup.passage.id, audience: AUDIENCE_GROUPS, audience_groups: [held] },
+        ].toSorted(byId),
+      );
     });
   });
 
-  it("carries the publish stamp, hiding an unpublished connected source's passage", async () => {
+  it("carries the publish stamp, null for an unpublished connected source", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      await aPassageUnderAConnectedSource(client, { publishedAt: null });
+      const unpublished = await aPassageUnderAConnectedSource(client, { publishedAt: null });
       const published = await aPassageUnderAConnectedSource(client);
       await asAppRt(client, WS_A);
 
-      expect({
-        stamps: (await client.query<{ published_at: Date | null }>(THE_VIEW)).rows.filter(
-          (row) => row.published_at === null,
-        ).length,
-        admin: await seenBy(client, ADMIN),
-        viewer: await seenBy(client, VIEWER),
-      }).toEqual({
-        stamps: 1,
-        admin: [published.passage.id],
-        viewer: [published.passage.id],
-      });
+      const reported = await client.query<{ id: string; published_at: Date | null }>(THE_VIEW);
+
+      expect(
+        reported.rows.map(({ id, published_at }) => ({ id, published_at })).toSorted(byId),
+      ).toEqual(
+        [
+          { id: unpublished.passage.id, published_at: null },
+          { id: published.passage.id, published_at: expect.any(Date) },
+        ].toSorted(byId),
+      );
     });
   });
 
   it("reads the source live, so later narrowing shows at once", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const { connectedSource, passage } = await aPassageUnderAConnectedSource(client, {
+      const { connectedSource } = await aPassageUnderAConnectedSource(client, {
         connectedSourceSensitivity: "Public",
       });
       await asAppRt(client, WS_A);
@@ -366,16 +338,9 @@ describe("what the view reports for a passage, as app_rt", () => {
       const after = await client.query<{ sensitivity: string }>(THE_VIEW);
 
       expect({
-        before: before.rows[0]?.sensitivity,
-        after: after.rows[0]?.sensitivity,
-        viewer: await seenBy(client, VIEWER),
-        admin: await seenBy(client, ADMIN),
-      }).toEqual({
-        before: "Public",
-        after: "Restricted",
-        viewer: [],
-        admin: [passage.id],
-      });
+        before: before.rows.map((row) => row.sensitivity),
+        after: after.rows.map((row) => row.sensitivity),
+      }).toEqual({ before: ["Public"], after: ["Restricted"] });
     });
   });
 });
@@ -429,13 +394,11 @@ describe("what the view withholds", () => {
         {
           passageRowStands: standing.rowCount,
           throughTheView: (await client.query<{ id: string }>(THE_VIEW)).rows.map((row) => row.id),
-          readable: await seenBy(client, ADMIN),
         },
         "a passage naming no document outlives its source; the inner join withholds it",
       ).toEqual({
         passageRowStands: 1,
         throughTheView: [neighbour.passage.id],
-        readable: [neighbour.passage.id],
       });
     });
   });
@@ -454,7 +417,6 @@ describe("what the view withholds", () => {
       expect(reported.rows).toEqual(
         [{ id: passage.id, sensitivity: "Public" }].map(publishedToEveryone),
       );
-      expect(await seenBy(client, VIEWER)).toEqual([passage.id]);
     });
   });
 });
@@ -515,7 +477,7 @@ describe("a partition attached after the view was made", () => {
         connectedSourceSensitivity: "Public",
       });
       await asAppRt(client, WS_A);
-      const before = await seenBy(client, VIEWER);
+      const before = (await client.query<{ id: string }>(THE_VIEW)).rows.map((row) => row.id);
 
       await client.query("RESET ROLE");
       const later = await aPassageUnderAConnectedSource(client, {
@@ -524,7 +486,9 @@ describe("a partition attached after the view was made", () => {
       });
       await asAppRt(client, WS_B);
 
-      expect({ before, after: await seenBy(client, VIEWER) }).toEqual({
+      const after = (await client.query<{ id: string }>(THE_VIEW)).rows.map((row) => row.id);
+
+      expect({ before, after }).toEqual({
         before: [first.passage.id],
         after: [later.passage.id],
       });
