@@ -76,7 +76,7 @@ export type TestData = {
 
   verification(overrides?: Partial<InsertInput<"verification">>): Promise<Row<"verification">>;
 
-  authenticator(
+  confirmedAuthenticatorOfASealedSecret(
     overrides: Partial<InsertInput<"authenticator">> & { readonly secret: string },
   ): Promise<Row<"authenticator">>;
 
@@ -238,6 +238,21 @@ const partitionExists = async (client: pg.PoolClient, workspaceId: string): Prom
 };
 
 const SEEDED_SPAN_LENGTH = 8;
+
+const findingsInTurn = new WeakMap<pg.PoolClient, Promise<unknown>>();
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const monthsOn = (from: Date, months: number): Date => {
+  const year = from.getUTCFullYear();
+  const month = from.getUTCMonth();
+  const day = from.getUTCDate();
+  const timeOfDayMs = from.getTime() - Date.UTC(year, month, day);
+  const daysInTarget = new Date(Date.UTC(year, month + months + 1, 0)).getUTCDate();
+  return new Date(
+    Date.UTC(year, month + months, 1) + (Math.min(day, daysInTarget) - 1) * DAY_MS + timeOfDayMs,
+  );
+};
 
 /**
  * Each method writes one row, filling what `overrides` leave out and seeding the parent rows its
@@ -458,18 +473,19 @@ export const testData = (client: pg.PoolClient): TestData => {
       ...overrides,
     });
 
-  const authenticator: TestData["authenticator"] = async (overrides) => {
-    const userId = overrides.userId ?? (await user()).id;
-    const row = await insertRow(client, "authenticator", {
-      id: ulid(),
-      backupCodes: "sealed-codes-nothing-reads",
-      verified: true,
-      ...overrides,
-      userId,
-    });
-    await client.query('UPDATE "user" SET authenticator_enabled = true WHERE id = $1', [userId]);
-    return row;
-  };
+  const confirmedAuthenticatorOfASealedSecret: TestData["confirmedAuthenticatorOfASealedSecret"] =
+    async (overrides) => {
+      const userId = overrides.userId ?? (await user()).id;
+      const row = await insertRow(client, "authenticator", {
+        id: ulid(),
+        backupCodes: "sealed-codes-nothing-reads",
+        verified: true,
+        ...overrides,
+        userId,
+      });
+      await client.query('UPDATE "user" SET authenticator_enabled = true WHERE id = $1', [userId]);
+      return row;
+    };
 
   const auditEvent: TestData["auditEvent"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
@@ -787,7 +803,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
-  const finding: TestData["finding"] = async (overrides = {}) => {
+  const findingPastTheLast: TestData["finding"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const documentId = overrides.documentId ?? (await sourceDocument({ workspaceId })).id;
 
@@ -820,6 +836,17 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const finding: TestData["finding"] = (overrides) => {
+    const seeded = (findingsInTurn.get(client) ?? Promise.resolve()).then(() =>
+      findingPastTheLast(overrides),
+    );
+    findingsInTurn.set(
+      client,
+      seeded.catch(() => undefined),
+    );
+    return seeded;
+  };
+
   const subjectRequest: TestData["subjectRequest"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
 
@@ -827,20 +854,12 @@ export const testData = (client: pg.PoolClient): TestData => {
     const receivedAt = overrides.receivedAt ?? new Date();
     const clockStartedAt = overrides.clockStartedAt ?? receivedAt;
 
-    const dayAsked = clockStartedAt.getUTCDate();
-    const dueAt = new Date(clockStartedAt);
-    dueAt.setUTCDate(1);
-    dueAt.setUTCMonth(dueAt.getUTCMonth() + 1);
-    const lastDayOfTheMonth = new Date(
-      Date.UTC(dueAt.getUTCFullYear(), dueAt.getUTCMonth() + 1, 0),
-    ).getUTCDate();
-    dueAt.setUTCDate(Math.min(dayAsked, lastDayOfTheMonth));
     return insertRow(client, "subjectRequest", {
       id: ulid(),
       kind: "access",
 
       identifiers: { emails: ["subject@example.invalid"], names: [], other: [] },
-      dueAt,
+      dueAt: monthsOn(clockStartedAt, 1),
 
       extendedTo: null,
       answeredAt: null,
@@ -861,14 +880,6 @@ export const testData = (client: pg.PoolClient): TestData => {
 
     const outFrom = (milliseconds: number) => new Date(anchoredAt.getTime() + milliseconds);
     const hour = 60 * 60 * 1000;
-    const dayAsked = anchoredAt.getUTCDate();
-    const sixMonthsOn = new Date(anchoredAt);
-    sixMonthsOn.setUTCDate(1);
-    sixMonthsOn.setUTCMonth(sixMonthsOn.getUTCMonth() + 6);
-    const lastDayOfThatMonth = new Date(
-      Date.UTC(sixMonthsOn.getUTCFullYear(), sixMonthsOn.getUTCMonth() + 1, 0),
-    ).getUTCDate();
-    sixMonthsOn.setUTCDate(Math.min(dayAsked, lastDayOfThatMonth));
     return insertRow(client, "erasureRequest", {
       id: ulid(),
       pseudonym: ulid(),
@@ -876,7 +887,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       beyondUseHourlyAt: outFrom(48 * hour),
       beyondUseDailyAt: outFrom(30 * 24 * hour),
       beyondUseWeeklyAt: outFrom(8 * 7 * 24 * hour),
-      beyondUseMonthlyAt: sixMonthsOn,
+      beyondUseMonthlyAt: monthsOn(anchoredAt, 6),
 
       actions: {},
       completedAt: null,
@@ -1095,7 +1106,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     oauthRefreshToken,
     oauthAccessToken,
     verification,
-    authenticator,
+    confirmedAuthenticatorOfASealedSecret,
     auditEvent,
     identityAuditEvent,
     accessRequest,

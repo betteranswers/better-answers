@@ -36,6 +36,7 @@ import {
   type Frontmatter,
 } from "../src/concepts/index.ts";
 import {
+  beyondUseFrom,
   ERASURE,
   ERASURE_FAMILIES,
   rederiveAfterErasure,
@@ -884,6 +885,23 @@ describe("the report", () => {
     const done = await completing(scenario, subjectRequestId);
 
     expect(done.report).toContain("None: no concept body names this person.");
+  });
+});
+
+describe("the factory's erasure request", () => {
+  it("dates beyond use as the routine does", async () => {
+    const scenario = await arrange();
+
+    const seeded = await seedingWith(db().pool, (seed) =>
+      seed.erasureRequest({ workspaceId: scenario.workspaceId, anchoredAt: ANCHORED_ON_A_31ST }),
+    );
+
+    expect({
+      hourly: seeded.beyondUseHourlyAt,
+      daily: seeded.beyondUseDailyAt,
+      weekly: seeded.beyondUseWeeklyAt,
+      monthly: seeded.beyondUseMonthlyAt,
+    }).toEqual(beyondUseFrom(ANCHORED_ON_A_31ST));
   });
 });
 

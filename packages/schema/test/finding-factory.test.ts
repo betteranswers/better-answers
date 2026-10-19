@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { testData } from "./factory.ts";
+import { type TestData, testData } from "./factory.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
@@ -59,11 +59,11 @@ const FINDING_ROW_PATTERN = /INSERT INTO finding\s*\(([^)]*)\)\s*VALUES\s*\(/g;
 const SQL_STRING = /^'(.*)'$/;
 
 const PLANTED_CATEGORY = "sort-code";
-const FINDING_TABLE = "finding";
+const FINDING_TABLE_NAMED_APART_FROM_THE_RAW_INSERT_SCAN = "finding";
 
 const plantedCategoryWords = (): string =>
   `{ ...row, category: "${PLANTED_CATEGORY}", tier: "always" },
-       INSERT INTO ${FINDING_TABLE} (workspace_id, id, category, tier, rule_id)
+       INSERT INTO ${FINDING_TABLE_NAMED_APART_FROM_THE_RAW_INSERT_SCAN} (workspace_id, id, category, tier, rule_id)
               VALUES ($1, $2, '${PLANTED_CATEGORY}', 'always', 'sort-code-with-account-number')`;
 
 const categoryWordsIn = (
@@ -100,6 +100,18 @@ afterAll(async () => {
   await db.stop();
 });
 
+const seedingInOneDocument = <T>(
+  work: (
+    seed: TestData,
+    inDocument: { readonly workspaceId: string; readonly documentId: string },
+  ) => Promise<T>,
+): Promise<T> =>
+  withRollback(db.pool, async (client) => {
+    const seed = testData(client);
+    const document = await seed.sourceDocument();
+    return work(seed, { workspaceId: document.workspaceId, documentId: document.id });
+  });
+
 describe("the finding factory's default category", () => {
   it("is one of the redaction agreement's own declared categories", async () => {
     const seeded = await withRollback(db.pool, (client) => testData(client).finding());
@@ -130,6 +142,28 @@ describe("the finding factory's default span", () => {
       [8, 16],
       [0, 8],
     ]);
+  });
+
+  it("lands two defaults seeded at once on separate spans", async () => {
+    const spans = await seedingInOneDocument(async (seed, inDocument) => {
+      const both = await Promise.all([seed.finding(inDocument), seed.finding(inDocument)]);
+      return both.map((row) => [row.charStart, row.charEnd]);
+    });
+
+    expect(spans).toEqual([
+      [0, 8],
+      [8, 16],
+    ]);
+  });
+
+  it("seeds again on the same connection after a refused finding", async () => {
+    const spans = await seedingInOneDocument(async (seed, inDocument) => {
+      await expect(seed.finding({ ...inDocument, score: 2 })).rejects.toThrow(/score/);
+      const after = await seed.finding(inDocument);
+      return [after.charStart, after.charEnd];
+    });
+
+    expect(spans).toEqual([0, 8]);
   });
 
   it("lands past every span its document already holds", async () => {
