@@ -3,7 +3,7 @@ import threading
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NewType
 
 import psycopg
 
@@ -29,15 +29,16 @@ class ClaimedJob:
 class ClaimLostError(RuntimeError): ...
 
 
+ScopedCursor = NewType("ScopedCursor", psycopg.Cursor)
+
+
 @contextmanager
-def scoped(
-    connection: psycopg.Connection, workspace_id: str
-) -> Iterator[psycopg.Cursor]:
+def scoped(connection: psycopg.Connection, workspace_id: str) -> Iterator[ScopedCursor]:
     with connection.transaction(), connection.cursor() as cursor:
         cursor.execute(
             "SELECT set_config('app.workspace_id', %s, true)", (workspace_id,)
         )
-        yield cursor
+        yield ScopedCursor(cursor)
 
 
 def connected(database_url: str) -> psycopg.Connection:
@@ -51,7 +52,7 @@ def workspace_ids(connection: psycopg.Connection) -> list[str]:
 
 
 def claim(
-    cursor: psycopg.Cursor, workspace_id: str, worker_id: str, kinds: Sequence[str]
+    cursor: ScopedCursor, workspace_id: str, worker_id: str, kinds: Sequence[str]
 ) -> ClaimedJob | None:
     cursor.execute(
         "SELECT id, kind, reason, subject_id, attempts"
@@ -71,7 +72,7 @@ def claim(
     )
 
 
-def hold_the_claim(cursor: psycopg.Cursor, job_id: str, worker_id: str) -> None:
+def hold_the_claim(cursor: ScopedCursor, job_id: str, worker_id: str) -> None:
     cursor.execute(
         "SELECT 1 FROM job WHERE id = %s AND claimed_by = %s AND status = 'claimed'"
         " AND lease_expires_at > clock_timestamp() FOR KEY SHARE",
@@ -81,7 +82,7 @@ def hold_the_claim(cursor: psycopg.Cursor, job_id: str, worker_id: str) -> None:
         raise ClaimLostError(job_id)
 
 
-def heartbeat(cursor: psycopg.Cursor, job_id: str, worker_id: str) -> bool:
+def heartbeat(cursor: ScopedCursor, job_id: str, worker_id: str) -> bool:
     cursor.execute(
         "SELECT heartbeat_job(%s, %s, %s::interval)",
         (job_id, worker_id, f"{LEASE_SECONDS} seconds"),
@@ -119,7 +120,7 @@ def keeping_alive(
 
 
 def finish(
-    cursor: psycopg.Cursor, job_id: str, worker_id: str, outcome: Mapping[str, Any]
+    cursor: ScopedCursor, job_id: str, worker_id: str, outcome: Mapping[str, Any]
 ) -> bool:
     cursor.execute(
         "SELECT finish_job(%s, %s, %s::jsonb)", (job_id, worker_id, json.dumps(outcome))
@@ -129,7 +130,7 @@ def finish(
 
 
 def fail(
-    cursor: psycopg.Cursor, job_id: str, worker_id: str, outcome: Mapping[str, Any]
+    cursor: ScopedCursor, job_id: str, worker_id: str, outcome: Mapping[str, Any]
 ) -> bool:
     cursor.execute(
         "SELECT fail_job(%s, %s, %s::jsonb)", (job_id, worker_id, json.dumps(outcome))
@@ -139,7 +140,7 @@ def fail(
 
 
 def enqueue(
-    cursor: psycopg.Cursor, job_id: str, kind: str, reason: str | None = None
+    cursor: ScopedCursor, job_id: str, kind: str, reason: str | None = None
 ) -> None:
     cursor.execute(
         "INSERT INTO job (workspace_id, id, kind, reason)"
