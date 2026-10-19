@@ -6,15 +6,7 @@ the hosted product at `app.better-answers.com`.
 
 ---
 
-## 1. Where this came from
-
-| Source | Path / link | What was taken from it |
-| --- | --- | --- |
-| The better-answers repository (mounted, read-only) | `better-answers/` | Product definition, glossary, UX and accessibility rules, the reader-facing word set, Control Centre's pages |
-| `VISION.md` | in that repo | The one-line positioning, the three knowledge layers, who uses it |
-| `CONCEPTS.md` | in that repo | The **domain glossary**: each entry a person meets is headed by the word a page uses, and an entry only the code meets is marked internal |
-
-## 2. The product, in brief
+## 1. The product - summary
 
 Three knowledge layers — **sources** (evidence) → **bundles** (OKF concepts, curated) →
 the **map** (derived) — with **records** the platform keeps over them (guides, write-ups,
@@ -26,25 +18,15 @@ many **workspaces**; a workspace is one company.
 
 The areas the rail lists, each holding groups of pages:
 
-- **Ask** — a question, a cited answer, and what it could not answer. Every role.
-- **Knowledge** — search, guides and the map's concepts for every role; its curation
-  pages for Admins and the owners of a collection. A search match is typed by knowledge layer
-  and wears its trust or sensitivity word.
-- **Inbox** — what waits on a person who decides something: Admins, and the owners of a
-  collection.
-- **Control Centre** — the one Admin area, in eight groups: Overview, Suggestions,
+- **Ask** — a question, a cited answer, and what it could not answer.
+- **Knowledge** — search, guides and the map's concepts.
+- **Inbox** — what waits on a person.
+- **Control Centre** — the Admin area, in eight groups: Overview, Suggestions,
   Sources, Models, Questions, People, Personal data and System.
 
-The avatar menu in the band holds the person's name, their role and the item that signs them
-out.
+## 2. Content fundamentals
 
-## 3. Content fundamentals
-
-A page is written in its reader's words. `CONCEPTS.md` heads every entry a person meets with
-the word a page uses. An entry only the code meets is marked `_Internal._`.
-
-**Write the glossary's word.** A page names each thing by the word that heads its glossary
-entry.
+**To ensure consistency, use the platform's glossary:** `CONCEPTS.md`
 
 **Trust words are a closed set**, written verbatim and always as text:
 Verified by <person> · Verified automatically · Unverified · Changed since verified ·
@@ -55,7 +37,7 @@ Out of date · Draft · Left · Deprecated.
 **Dates and numbers.** UK long form — 3 March 2026; with time, 09:41 · 30 August 2026.
 Money as £1,240.00. Relative time only under a minute.
 
-## 4. Visual foundations
+## 3. Visual foundations
 
 **Register.** Quiet, dense, mechanical — a **blueprint**, not a dashboard. The page is a
 modular grid; cards, figures and buttons are objects drawn on it: square-cornered,
@@ -76,8 +58,7 @@ other line stays a hairline. One accent, **ink blue `#2e4bd4`**, and it is
 unmarked accent button on an action repeated per row. Four semantic hues — green `#137a52`, amber `#a55d09`, red `#c0362c`, violet `#6741c4` — appear only as a
 50-level tint plus a 700-level word, behind a label that already says the same thing.
 Dark theme is a full alias flip on `[data-theme="dark"]`, page `#0b0c0e`. The attribute goes
-on `<html>` and nowhere else, because the Tailwind bridge's aliases resolve at `:root`. A person
-picks light, dark or their device's on the Account page. Never a gradient,
+on `<html>` and nowhere else, because the Tailwind bridge's aliases resolve at `:root`. Never a gradient,
 never a coloured left border, never colour as the only signal.
 
 **Type.** Geist for everything, Geist Mono for identity and machine strings (IRIs, commit
@@ -191,10 +172,7 @@ cards, no translucent panels.
 disclosure reveals more, the action sits beside it. Two levels for a Viewer, never three.
 A modal exists only for an irreversible action.
 
-**Imagery.** None. The product ships no photography or illustration; a page with nothing
-to show says so in words.
-
-## 5. Iconography
+## 4. Iconography
 
 **Phosphor**, at 16px in the interface (18–20px in empty states), regular weight,
 `currentColor`. In the application this is **`@phosphor-icons/react`**; on a static page or
@@ -218,18 +196,16 @@ pictographs. The glyphs in use are the ones `apps/web/src/shared/icon.tsx` maps,
 one is added there. The `Icon` component is the only way to render one.
 
 **The one exception is `lucide-react`, inside the vendored registry primitives under
-`apps/web/src/shared/ui/` and nowhere else**, because a chevron inside a `Select` is behaviour,
-not meaning (ADR 0033).
+`apps/web/src/shared/ui/` and nowhere else**.
 
-**Logo.** Two square brackets with a square between them, like a footnote:
-`assets/logo.svg`, imported as `@better-answers/design-system/assets/logo.svg`.
+**Logo:** `assets/logo.svg`, imported as `@better-answers/design-system/assets/logo.svg`.
 
 **Name.** The product's name is `better-answers` everywhere a person reads it: a page,
 the tab title, the api's pages, an email and its sender name. Lower-case and hyphenated,
 at the start of a sentence as anywhere else. Beside the logo it is set in Geist Mono 500;
 in running text it takes the text's own face. The domain name is `better-answers.com`.
 
-## 6. What is in this repository
+## 5. What is in this repository
 
 ```
 package.json            the workspace package apps/web imports; wires the two self-hosted faces; exports ./assets/*
@@ -259,12 +235,3 @@ the CLI cannot install it. Copy it by hand into `apps/web/src/shared/ui/kibo-ui/
 
 `guidelines/` — Colors (6), Type (5), Spacing (4), Motion (1), Brand (5, including
 **Registration marks** — where a "+" is allowed).
-
-## 7. Flagged substitutions and open questions
-
-1. **Fonts.** No brand font binaries exist in the source. **Geist and Geist Mono** were chosen as the closest match to the stated reference styling, and the substitution stands. Replace the two `tokens/fonts-*.css` files if a licensed brand font exists; `tokens/fonts.css` names the families and stays.
-2. **Icons.** No icon set exists in the source. **Phosphor** — `@phosphor-icons/react` in the app, `@phosphor-icons/web` on a page — flagged above.
-3. **Logo.** `assets/logo.svg` is the logo.
-4. **Accent colour.** Ink blue `#2e4bd4`.
-7. **Textures.** `GridPattern`, `DotPattern` and `NoiseTexture` are ports of the corresponding Magic UI components, retuned to these tokens.
-5. **Dark theme.** Authored on the reference styling's convention. It is measured in the browser: the suite audits every page a test leaves in both themes, words at 4.5:1 and control edges at 3:1.
