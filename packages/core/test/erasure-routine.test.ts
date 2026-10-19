@@ -36,6 +36,7 @@ import {
   type Frontmatter,
 } from "../src/concepts/index.ts";
 import {
+  beyondUseFrom,
   ERASURE,
   ERASURE_FAMILIES,
   rederiveAfterErasure,
@@ -896,11 +897,11 @@ describe("the factory's erasure request", () => {
     );
 
     expect({
-      hourly: seeded.beyondUseHourlyAt.toISOString(),
-      daily: seeded.beyondUseDailyAt.toISOString(),
-      weekly: seeded.beyondUseWeeklyAt.toISOString(),
-      monthly: seeded.beyondUseMonthlyAt.toISOString(),
-    }).toEqual(BEYOND_USE_FROM_THE_31ST);
+      hourly: seeded.beyondUseHourlyAt,
+      daily: seeded.beyondUseDailyAt,
+      weekly: seeded.beyondUseWeeklyAt,
+      monthly: seeded.beyondUseMonthlyAt,
+    }).toEqual(beyondUseFrom(ANCHORED_ON_A_31ST));
   });
 });
 

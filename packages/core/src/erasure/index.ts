@@ -13,7 +13,7 @@ export type { ErasureRehearsed, RehearsalRefusal } from "./rehearsal.ts";
 export { replayCopiesSince } from "./replay.ts";
 export { replayableErasures, replayErasures } from "./replay-erasures.ts";
 export type { ReplayedErasure } from "./replay-erasures.ts";
-export { ERASURE, runErasure } from "./routine.ts";
+export { beyondUseFrom, ERASURE, runErasure } from "./routine.ts";
 export type {
   ErasureDoors,
   ErasureLog,
