@@ -233,6 +233,34 @@ describe("the identity set", () => {
     });
   });
 
+  it("lets the api pseudonymise a person's row, never delete it", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const person = await seed.user({ email: "priya@example.invalid" });
+      expect(await privilegesHeld(client, "app_rt", '"user"')).toMatchObject({
+        UPDATE: true,
+        DELETE: false,
+        TRUNCATE: false,
+      });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      await client.query(`UPDATE "user" SET email = 'p@erased.invalid', name = '' WHERE id = $1`, [
+        person.id,
+      ]);
+      const kept = await client.query(`SELECT email, name FROM "user" WHERE id = $1`, [person.id]);
+      expect(kept.rows).toEqual([{ email: "p@erased.invalid", name: "" }]);
+
+      await refusesEach(client, [
+        [
+          `DELETE FROM "user" WHERE id = $1`,
+          "erasure keeps the row and its id for the audit events naming it",
+          [person.id],
+        ],
+        [`TRUNCATE "user"`, "nor may it empty the table of every person"],
+      ]);
+    });
+  });
+
   it("keeps the three counters UNLOGGED", async () => {
     const persistence = await db.pool.query(
       "SELECT relname, relpersistence FROM pg_class WHERE relname IN ('ingress_counter', 'mcp_call_counter', 'invitation_email_counter') ORDER BY relname",
