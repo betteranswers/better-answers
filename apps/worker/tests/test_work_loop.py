@@ -273,7 +273,7 @@ def test_an_idle_fence_lets_its_subjects_newer_job_go(
     dsn = _WHERE[database]
     freed = None
     with (
-        queue.connected(dsn, idle_in_transaction_seconds=0.2) as hung,
+        queue.connected(dsn, idle_in_transaction_seconds=1) as hung,
         queue.connected(dsn) as claiming,
         pytest.raises(psycopg.errors.IdleInTransactionSessionTimeout),
         scoped(hung, workspace) as held,
