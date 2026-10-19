@@ -51,12 +51,18 @@ const unavailable = (api: ReadApi, error: string): Response => {
 const digestOf = async (text: string): Promise<Uint8Array> =>
   new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
 
+const equalInConstantTime = async (given: string, expected: string): Promise<boolean> => {
+  const [givenDigest, expectedDigest] = await Promise.all([digestOf(given), digestOf(expected)]);
+  const difference = givenDigest.reduce(
+    (folded, byte, at) => folded | (byte ^ (expectedDigest[at] ?? 0)),
+    0,
+  );
+  return difference === 0;
+};
+
 const admits = async (authorization: string | null, token: string): Promise<boolean> => {
   const offered = BEARER.exec(authorization ?? "")?.[1];
-  if (offered === undefined) return false;
-  const [given, expected] = await Promise.all([digestOf(offered), digestOf(token)]);
-  const difference = given.reduce((folded, byte, at) => folded | (byte ^ (expected[at] ?? 0)), 0);
-  return difference === 0;
+  return offered !== undefined && (await equalInConstantTime(offered, token));
 };
 
 const limitOf = (given: string | null): number => {
