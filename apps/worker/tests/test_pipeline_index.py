@@ -138,14 +138,18 @@ class ABucket:
         self,
         objects: Mapping[str, bytes],
         *,
+        on_read: Callable[[], None] | None = None,
         on_write: Callable[[], None] | None = None,
     ) -> None:
         self.objects = dict(objects)
         self.reads: list[str] = []
         self.writes: list[str] = []
+        self._on_read = on_read
         self._on_write = on_write
 
     def read(self, key: str) -> bytes:
+        if self._on_read is not None:
+            self._on_read()
         self.reads.append(key)
         return self.objects[key]
 
@@ -759,11 +763,10 @@ def test_marks_an_unreadable_document_on_its_own_catalogue_row(
         documents=(AN_INVOICE_ID, A_SICK_NOTE_ID),
         media_types={A_SICK_NOTE_ID: "application/pdf"},
     )
+    bucket = a_bucket_holding_the_three()
 
     outcome = indexed(
-        bootstrap_for(dsn, tmp_path),
-        sync_for(workspace_id),
-        copies=a_bucket_holding_the_three(),
+        bootstrap_for(dsn, tmp_path), sync_for(workspace_id), copies=bucket
     )
 
     assert outcome.documents == 1
@@ -780,6 +783,7 @@ def test_marks_an_unreadable_document_on_its_own_catalogue_row(
     assert [
         row["source_document_id"] for row in passage_rows_of(connection, workspace_id)
     ] == [AN_INVOICE_ID]
+    assert bucket.writes == [normalised_key_of(AN_INVOICE_ID)]
 
 
 def test_a_textless_pdf_names_ocr_on_its_row(
@@ -807,6 +811,7 @@ def test_a_textless_pdf_names_ocr_on_its_row(
     assert [
         row["source_document_id"] for row in passage_rows_of(connection, workspace_id)
     ] == [AN_INVOICE_ID]
+    assert bucket.writes == [normalised_key_of(AN_INVOICE_ID)]
 
 
 @pytest.mark.parametrize(
@@ -1639,7 +1644,7 @@ def test_a_verdict_the_document_already_holds_names_nothing(
         ),
     ],
 )
-def test_a_revoked_claimant_moves_no_documents_sensitivity(
+def test_a_revoked_claimant_writes_no_copy_and_moves_no_sensitivity(
     database: tuple[psycopg.Connection, str], tmp_path: Path, revoking: str
 ) -> None:
     connection, dsn = database
@@ -1657,7 +1662,7 @@ def test_a_revoked_claimant_moves_no_documents_sensitivity(
 
     bucket = ABucket(
         {original_key_of(A_SICK_NOTE_ID): A_SICK_NOTE.encode()},
-        on_write=revoke_the_claim,
+        on_read=revoke_the_claim,
     )
 
     with pytest.raises(queue.ClaimLostError):
@@ -1665,7 +1670,8 @@ def test_a_revoked_claimant_moves_no_documents_sensitivity(
             bootstrap, sync_for(workspace_id), job=job, copies=bucket
         )
 
-    assert bucket.writes, "the claim was revoked after the source was read"
+    assert bucket.reads == [original_key_of(A_SICK_NOTE_ID)]
+    assert bucket.writes == []
     assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == "Internal"
     assert finding_rows_of(connection, workspace_id) == []
 
