@@ -56,3 +56,26 @@ def test_the_daemons_boot_warm_up_loads_the_detectors_stack() -> None:
     )
 
     assert THE_DETECTORS_DOOR in loaded
+
+
+A_ONCE_PASS_THAT_CANNOT_CONNECT = """
+import psycopg
+from better_answers_worker.config import Bootstrap, Engine, ObjectStore
+from better_answers_worker.loop import run
+
+unreachable = Bootstrap(
+    database_url="postgresql://nobody@127.0.0.1:1/unreachable",
+    git_store_dir="unused",
+    worker_id="worker-under-test",
+    object_store=ObjectStore(*["unused"] * 5),
+    engine=Engine(lmdb_dir="unused"),
+)
+try:
+    run(unreachable, once=True)
+except psycopg.OperationalError:
+    pass
+"""
+
+
+def test_a_once_pass_loads_none_of_the_detectors_stack() -> None:
+    assert stack_loaded_by(A_ONCE_PASS_THAT_CANNOT_CONNECT) == []
