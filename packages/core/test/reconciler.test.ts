@@ -493,6 +493,24 @@ describe("a manifest commit whose rows were lost", () => {
 
     expect(replay).toEqual(stoppedUnreadableAt(made));
   });
+
+  it.each([
+    ["a constructor key", '"constructor": "x"\n'],
+    ["a __proto__ key", '"__proto__": "x"\n'],
+    ["a null __proto__", '"__proto__": null\n'],
+    ["a __proto__ key twice", '"__proto__": "x"\n"__proto__": "y"\n'],
+  ])("stops at a hand-made manifest with %s", async (_shape, extra) => {
+    const fields = Object.entries(manifest).map(
+      ([key, value]) => `${JSON.stringify(key)}: ${JSON.stringify(value)}\n`,
+    );
+    const { made, replay } = await handMadeFirstAndReplayed(await arrange(), {
+      path: "knowledge/manifest.yaml",
+      content: `${fields.join("")}${extra}`,
+      message: "Write a manifest by hand",
+    });
+
+    expect(replay).toEqual(stoppedUnreadableAt(made));
+  });
 });
 
 describe("a re-write whose rows were lost", () => {
@@ -1176,10 +1194,47 @@ describe("a concept file read back", () => {
     ["an item outside a list", '---\n  - "a"\n---\n\n'],
 
     ["a key written twice", '---\n"title": "one"\n"title": "two"\n---\n\n'],
+    ["a __proto__ key written twice", '---\n"__proto__": "one"\n"__proto__": "two"\n---\n\n'],
 
     ["a valueless key before another", '---\n"tags":\n"title": "x"\n---\n\n'],
     ["a valueless key closing the frontmatter", '---\n"title": "x"\n"tags":\n---\n\n'],
   ])("refuses a file with %s", (_shape, file) => {
     expect(parseConceptFile(file)).toEqual({ ok: false, error: "malformed" });
+  });
+
+  it.each([
+    ["a constructor key", "constructor", ' "x"', "x"],
+    ["a __proto__ string", "__proto__", ' "x"', "x"],
+    ["a __proto__ null", "__proto__", " null", null],
+    ["a __proto__ list", "__proto__", '\n  - "a"', ["a"]],
+  ])("keeps %s and writes it back", (_shape, key, text, value) => {
+    const file = `---\n"title": "T"\n"type": "Policy"\n${JSON.stringify(key)}:${text}\n---\n\nbody\n`;
+
+    const read = parseConceptFile(file);
+
+    if (!read.ok) throw new Error(`the file was refused: ${read.error}`);
+    const { frontmatter, body } = read.value;
+    expect(Object.getPrototypeOf(frontmatter)).toBe(Object.prototype);
+    expect(Object.entries(frontmatter)).toEqual([
+      ["title", "T"],
+      ["type", "Policy"],
+      [key, value],
+    ]);
+    expect(renderConceptFile(frontmatter, body)).toBe(file);
+  });
+
+  it("keeps a __proto__ field inside a sources entry", () => {
+    const file =
+      '---\n"title": "T"\n"type": "Policy"\n"sources":\n  - "resource": "/s/a.pdf"\n    "__proto__": "x"\n---\n\nbody\n';
+
+    const read = parseConceptFile(file);
+
+    if (!read.ok) throw new Error(`the file was refused: ${read.error}`);
+    const [entry] = z.array(z.unknown()).parse(read.value.frontmatter["sources"]);
+    expect(Object.entries(entry ?? {})).toEqual([
+      ["resource", "/s/a.pdf"],
+      ["__proto__", "x"],
+    ]);
+    expect(renderConceptFile(read.value.frontmatter, read.value.body)).toBe(file);
   });
 });
