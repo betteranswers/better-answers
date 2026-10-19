@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any, cast
 
@@ -119,6 +121,36 @@ def test_a_fresh_nonce_makes_each_seal_a_different_frame(
     plaintext = bytes.fromhex(vector["plaintext"])
 
     assert len({sealed(KEY, plaintext) for _ in range(16)}) == 16
+
+
+ONE_SEALS_NONCE = """
+import sys
+from better_answers_worker.envelope import (
+    ENVELOPE_NONCE_BYTES,
+    ENVELOPE_VERSION_BYTES,
+    sealed,
+)
+
+frame = sealed(bytes.fromhex(sys.argv[1]), b"one plaintext")
+print(frame[ENVELOPE_VERSION_BYTES:][:ENVELOPE_NONCE_BYTES].hex())
+"""
+
+
+def a_nonce_sealed_in_a_process_of_its_own() -> str:
+    finished = subprocess.run(
+        [sys.executable, "-c", ONE_SEALS_NONCE, KEY.hex()],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return finished.stdout.strip()
+
+
+def test_two_processes_sealing_under_one_key_draw_different_nonces() -> None:
+    first = a_nonce_sealed_in_a_process_of_its_own()
+    second = a_nonce_sealed_in_a_process_of_its_own()
+
+    assert first != second
 
 
 def test_a_wrong_length_key_raises_a_defect_not_a_refusal() -> None:

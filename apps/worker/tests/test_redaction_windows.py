@@ -1,3 +1,6 @@
+import json
+import subprocess
+import sys
 from collections.abc import Sequence
 from itertools import pairwise
 from typing import NamedTuple
@@ -213,6 +216,33 @@ def test_a_heading_inside_a_code_fence_opens_no_window() -> None:
 
     assert starts == [0]
     assert fenced.index("# not a heading") not in starts
+
+
+A_RUN_WITH_NO_BOUNDARY = "x" * 600 + " " + "y" * 600
+
+
+THE_WINDOWS_OF_A_RUN_WITH_NO_BOUNDARY = f"""
+import json
+from better_answers_worker.redaction.detector import AnchoredWindows
+
+windows = AnchoredWindows().chunk({A_RUN_WITH_NO_BOUNDARY!r})
+print(json.dumps([[one.start, one.end] for one in windows]))
+"""
+
+
+def test_a_run_without_a_boundary_still_steps_forward() -> None:
+    finished = subprocess.run(
+        [sys.executable, "-c", THE_WINDOWS_OF_A_RUN_WITH_NO_BOUNDARY],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    )
+    windows: list[list[int]] = json.loads(finished.stdout.splitlines()[-1])
+
+    starts = [start for start, _ in windows]
+    assert all(before < after for before, after in pairwise(starts)), starts
+    assert windows[-1][1] == len(A_RUN_WITH_NO_BOUNDARY)
 
 
 def test_the_seams_windows_never_cut_a_word_presidio_cuts() -> None:

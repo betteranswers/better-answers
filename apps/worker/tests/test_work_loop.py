@@ -29,6 +29,7 @@ from factories import (
     seed_concept,
     seed_job,
     seed_map_generation,
+    seed_map_node,
     seed_workspace,
 )
 from pg_harness import (
@@ -347,15 +348,21 @@ def test_refuses_a_malformed_workspace_id_before_touching_the_store(
         concepts_at_head(str(tmp_path / "store"), workspace)
 
 
-def test_a_rebuild_holds_the_generation_row_first_so_writes_land(
-    database: psycopg.Connection, tmp_path: Path
-) -> None:
+def a_workspace_live_at_generation_one(
+    database: psycopg.Connection,
+) -> tuple[str, str]:
     workspace = seed_workspace(database.cursor())["id"]
     with database.cursor() as cursor:
         expenses = seed_expenses(cursor, workspace)
-
         seed_map_generation(cursor, workspace_id=workspace)
     database.commit()
+    return str(workspace), expenses
+
+
+def test_a_rebuild_holds_the_generation_row_first_so_writes_land(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace, expenses = a_workspace_live_at_generation_one(database)
     dsn = _WHERE[database]
 
     outcomes: list[Any] = []
@@ -463,6 +470,21 @@ def test_the_audit_counts_unparseable_files_and_rows_without_files(
     assert outcome.missing_file == ["knowledge/gone.md"]
 
 
+def test_an_unparseable_file_with_an_index_row_lands_in_unparsed(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = seed_workspace(database.cursor())["id"]
+    with database.cursor() as cursor:
+        seed_expenses(cursor, workspace)
+    database.commit()
+    write_bundle(tmp_path, workspace, {"knowledge/expenses.md": "not a concept file\n"})
+
+    with scoped(database, workspace) as cursor:
+        outcome = run_audit(cursor, str(tmp_path), workspace)
+
+    assert (outcome.checked, outcome.unparsed) == (0, ["knowledge/expenses.md"])
+
+
 def test_a_rebuild_writes_the_next_generation_aside_then_flips_it(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
@@ -518,6 +540,26 @@ def test_a_rebuild_writes_the_next_generation_aside_then_flips_it(
                 "Expenses rest on receipts.",
             ),
         ]
+
+
+def test_a_rebuild_leaves_the_prior_generation_for_the_apis_prune(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace, expenses = a_workspace_live_at_generation_one(database)
+    with database.cursor() as cursor:
+        seed_map_node(cursor, workspace_id=workspace, gen=1, uid=IRI)
+    database.commit()
+    write_bundle(tmp_path, workspace, {"knowledge/expenses.md": expenses})
+
+    with scoped(database, workspace) as cursor:
+        run_rebuild(cursor, str(tmp_path), workspace)
+
+    with database.cursor() as cursor:
+        cursor.execute(
+            "SELECT gen FROM map_node WHERE workspace_id = %s ORDER BY gen",
+            (workspace,),
+        )
+        assert cursor.fetchall() == [(1,), (2,)]
 
 
 def a_workspace_with_a_queued_audit(

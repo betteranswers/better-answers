@@ -425,6 +425,22 @@ def seed_map_generation(
     return _returning_row(cursor)
 
 
+def seed_map_node(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    gen: int,
+    uid: str,
+    kind: str = "Policy",
+) -> dict[str, Any]:
+    cursor.execute(
+        "INSERT INTO map_node (workspace_id, gen, uid, label, kind)"
+        " VALUES (%s, %s, %s, 'Concept', %s) RETURNING *",
+        (workspace_id, gen, uid, kind),
+    )
+    return _returning_row(cursor)
+
+
 def hold_map_generation(cursor: Cursor[Any], *, workspace_id: str) -> int:
     cursor.execute(
         "INSERT INTO map_generation (workspace_id, live_gen) VALUES (%s, 1)"

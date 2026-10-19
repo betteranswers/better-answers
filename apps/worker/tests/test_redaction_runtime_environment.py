@@ -1,3 +1,8 @@
+import json
+import os
+import subprocess
+import sys
+
 import pytest
 
 from import_watch import held_when_imported
@@ -39,3 +44,26 @@ def test_a_box_that_switches_the_telemetry_on_is_overruled() -> None:
     assert held_when_onnxruntime_was_imported(
         "import better_answers_worker.redaction.detector", {TELEMETRY: "0"}
     ) == [{TELEMETRY: "1"}]
+
+
+THE_PACKAGE_ALONE = f"""
+import json
+import os
+import sys
+
+import better_answers_worker
+
+print(json.dumps([os.environ.get({TELEMETRY!r}), "onnxruntime" in sys.modules]))
+"""
+
+
+def test_the_root_alone_switches_telemetry_off_and_loads_no_onnxruntime() -> None:
+    finished = subprocess.run(
+        [sys.executable, "-c", THE_PACKAGE_ALONE],
+        env={name: value for name, value in os.environ.items() if name != TELEMETRY},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert json.loads(finished.stdout.splitlines()[-1]) == ["1", False]

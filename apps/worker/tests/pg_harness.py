@@ -288,7 +288,7 @@ FROM pg_database WHERE datistemplate AND starts_with(datname, %s)
 
 # DROP DATABASE waits on a CREATE DATABASE cloning it, so a run still cloning keeps
 # its template until the clone ends.
-def _age_out(admin: psycopg.Connection) -> None:
+def _hold_the_tmpfs_to_a_days_templates(admin: psycopg.Connection) -> None:
     for database, stale in admin.execute(_AGES, (_TEMPLATE_PREFIX,)).fetchall():
         if stale is None:
             _stamp_use(admin, str(database))
@@ -316,7 +316,7 @@ def ensure_template(
         if not _exists(admin, name):
             _publish(admin, maintenance_conninfo, name, build)
         _stamp_use(admin, name)
-        _age_out(admin)
+        _hold_the_tmpfs_to_a_days_templates(admin)
         _drop_killed_builds(admin)
         admin.execute(_RELEASE_BUILD_LOCK)
     return name
