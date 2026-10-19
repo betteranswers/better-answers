@@ -408,6 +408,11 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     inTheLane: "check:docs:devtools",
   },
   {
+    file: "packages/devtools/test/solutions-docs.test.ts",
+    reads: "every doc under docs/solutions, for its applies_when",
+    inTheLane: "check:docs:devtools",
+  },
+  {
     file: "packages/devtools/test/ci/docs-lane.test.ts",
     reads: "no markdown — it holds this table against the script the lane runs",
     inTheLane: "check:docs:devtools",

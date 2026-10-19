@@ -6,6 +6,10 @@ module: apps/web
 problem_type: logic_error
 component: web
 severity: high
+applies_when:
+  - "Changing `useSwitchWorkspace`, `followTheSession` or the member read behind the shell's band"
+  - "Using `refetchQueries`, `removeQueries` or `resetQueries` to drop a cached read after a session change"
+  - "Handling a workspace switch that fails or waits offline"
 symptoms:
   - "After a switch whose member re-read failed, the shell kept showing the left workspace's band name, role and page key"
   - "Reads and actions went to the new workspace while the band still named the old one"

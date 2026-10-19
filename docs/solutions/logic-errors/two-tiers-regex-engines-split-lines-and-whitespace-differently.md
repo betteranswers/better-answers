@@ -6,6 +6,10 @@ module: contracts
 problem_type: logic_error
 component: tier-contract
 severity: medium
+applies_when:
+  - "Changing the concept-body reader for links or citation marks in either tier"
+  - "Adding a case to `contracts/links/cases.json`, or any regex both the api and the worker run"
+  - "Seeing the api's map and the worker's rebuild name different edge ids for one body"
 symptoms:
   - "One concept body made a LINKS_TO edge in the api's live map and none in the worker's full rebuild, or the reverse, and every later link on that body took a different ordinal, so the two maps named different edge ids"
   - "Both tiers' suites passed `contracts/links/cases.json`, because every case was ASCII text broken by line feeds"

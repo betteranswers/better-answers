@@ -6,6 +6,9 @@ module: apps/web
 problem_type: logic_error
 component: web
 severity: medium
+applies_when:
+  - "Passing `onSuccess` or `onError` to `mutate()` from a `useMutation` that one control can fire twice"
+  - "Writing a bulk action or a self-action, such as removing yourself, whose landing runs in a per-call callback"
 symptoms:
   - "Removing yourself from your own member page, pressed twice while the first request was in flight, left you on the page with a not-a-member refusal instead of landing on the workspace chooser"
   - "A second bulk action of the same kind, sent from the selection bar before the first answered, lost the first action's refusal marks, its outcome line and, when the first set included the reader, its landing"

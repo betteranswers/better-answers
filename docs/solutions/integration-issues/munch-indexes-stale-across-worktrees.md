@@ -5,6 +5,9 @@ module: .claude/hooks
 problem_type: integration_issue
 component: development-workflow
 severity: medium
+applies_when:
+  - "Searching code or docs with jCodeMunch or jDocMunch from a worktree and finding edited or deleted lines"
+  - "Setting up or debugging the jCodeMunch and jDocMunch watchers or the PostToolUse reindex hook"
 symptoms:
   - jCodeMunch's main-checkout index was four days stale after merges to main
   - jCodeMunch search in a worktree returned lines already edited or deleted

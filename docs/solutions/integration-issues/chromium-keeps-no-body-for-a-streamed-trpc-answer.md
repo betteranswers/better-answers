@@ -7,6 +7,10 @@ problem_type: integration_issue
 component: web
 related_components:
   - testing-framework
+applies_when:
+  - "Reading an `ask.question` response, or another streamed tRPC answer, in a Playwright spec"
+  - "Writing a browser spec that must show the api's refusal word before it asserts the page's sentence"
+  - "Seeing `Protocol error (Network.getResponseBody): No data found for resource` from `response.text()`"
 symptoms:
   - "response.text: Protocol error (Network.getResponseBody): No data found for resource with given identifier"
   - "Playwright's hint blamed a navigation (Response body is not available for a response that was navigated away from), though the page had not navigated"

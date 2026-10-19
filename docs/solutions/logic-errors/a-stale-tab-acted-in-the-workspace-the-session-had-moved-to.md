@@ -6,6 +6,10 @@ module: apps/web
 problem_type: logic_error
 component: web
 severity: high
+applies_when:
+  - "Changing the workspace switch, the session's active workspace, or what a tab caches for it"
+  - "Writing an action or read whose workspace comes from the session rather than from the request"
+  - "Adding an optimistic update that rolls back into the query cache after a refusal"
 symptoms:
   - "A person in two workspaces switched workspace in one browser tab, then removed a member from another tab still showing the old workspace, and the member was removed from the new one"
   - "A stale tab that stayed visible and opened another People page drew the new workspace's invitations under a band that still named the old workspace"
