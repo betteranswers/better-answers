@@ -391,6 +391,54 @@
       "links": [{ "ordinal": 1, "to": "https://better-answers.com/c/01J6TTTTTTTTTTTTTTTTTTTTTT" }],
       "marks": [{ "mark": "[^a]", "source": 0 }],
       "why": "The definition's target is the first run after the colon that is more than the six, and the six include line feeds, so the target may sit on a later line. The definition line itself is a link naming nothing and takes the first ordinal; the reference resolves to the target and takes the next."
+    },
+    {
+      "case": "a space is whitespace in a label and around a definition's target",
+      "body": "Read [the rates].\n\n[the rates]: https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV \"Rates policy\"",
+      "sources": [],
+      "links": [{ "ordinal": 0, "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV" }],
+      "marks": [],
+      "why": "A space is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the space after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
+    },
+    {
+      "case": "a tab is whitespace in a label and around a definition's target",
+      "body": "Read [the\trates].\n\n[the rates]:\thttps://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV\t\"Rates policy\"",
+      "sources": [],
+      "links": [{ "ordinal": 0, "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV" }],
+      "marks": [],
+      "why": "A tab is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the tab after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
+    },
+    {
+      "case": "a line feed is whitespace in a label and around a definition's target",
+      "body": "Read [the\nrates].\n\n[the rates]:\nhttps://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV\n\"Rates policy\"",
+      "sources": [],
+      "links": [{ "ordinal": 0, "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV" }],
+      "marks": [],
+      "why": "A line feed is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the line feed after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
+    },
+    {
+      "case": "a carriage return is whitespace in a label and around a definition's target",
+      "body": "Read [the\rrates].\n\n[the rates]:\rhttps://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV\r\"Rates policy\"",
+      "sources": [],
+      "links": [{ "ordinal": 0, "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV" }],
+      "marks": [],
+      "why": "A carriage return is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the carriage return after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
+    },
+    {
+      "case": "a form feed is whitespace in a label and around a definition's target",
+      "body": "Read [the\frates].\n\n[the rates]:\fhttps://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV\f\"Rates policy\"",
+      "sources": [],
+      "links": [{ "ordinal": 0, "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV" }],
+      "marks": [],
+      "why": "A form feed is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the form feed after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
+    },
+    {
+      "case": "a vertical tab is whitespace in a label and around a definition's target",
+      "body": "Read [the\u000brates].\n\n[the rates]:\u000bhttps://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV\u000b\"Rates policy\"",
+      "sources": [],
+      "links": [{ "ordinal": 0, "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV" }],
+      "marks": [],
+      "why": "A vertical tab is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the vertical tab after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
     }
   ]
 }

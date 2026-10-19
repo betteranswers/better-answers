@@ -25,10 +25,9 @@ export type CitedSource = {
   readonly id: string | null;
 };
 
-/** Lines break at `\n` alone and whitespace is these six, so both tiers read alike. */
-const SIX = " \t\n\r\f\v";
+const ASCII_WHITESPACE = " \t\n\r\f\v";
 
-const isSix = (ch: string): boolean => SIX.includes(ch);
+const isAsciiWhitespace = (ch: string): boolean => ASCII_WHITESPACE.includes(ch);
 
 const lineStartFrom = (text: string, from: number): number => {
   if (from <= 0) return 0;
@@ -40,7 +39,7 @@ const lineStartFrom = (text: string, from: number): number => {
 type Found = { readonly at: number; readonly text: string };
 
 const autolinkEndsOf = (text: string): Int32Array =>
-  nextStopsOf(text, (ch) => ch === ">" || isSix(ch));
+  nextStopsOf(text, (ch) => ch === ">" || isAsciiWhitespace(ch));
 
 const inlineFormAt = (prose: string, bracket: number, ending: Int32Array): number | undefined => {
   if (prose[bracket + 1] !== "(") return undefined;
@@ -237,10 +236,10 @@ const targetAfter = (
   from: number,
 ): { readonly start: number; readonly end: number } | undefined => {
   let start = from;
-  while (start < prose.length && isSix(prose[start] ?? "")) start += 1;
+  while (start < prose.length && isAsciiWhitespace(prose[start] ?? "")) start += 1;
   if (start === prose.length) return undefined;
   let end = start;
-  while (end < prose.length && !isSix(prose[end] ?? "")) end += 1;
+  while (end < prose.length && !isAsciiWhitespace(prose[end] ?? "")) end += 1;
   return { start, end };
 };
 
