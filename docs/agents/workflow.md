@@ -19,18 +19,20 @@ A route block (`docs/specs/v01-route.md`) that one owner can build in one sessio
 - Two kinds of change run alone until they merge: one that adds a migration, because the drizzle journal does not merge, and one that edits `contracts/`, because it moves both tiers' generated digest constants, which do not merge either.
 - A review reads the rules from `CODING_STANDARDS.md`, plus the `AGENTS.md` of each directory the change touches: `apps/api/`, `apps/web/`, `apps/worker/`, `deploy/`, `packages/core/` and `packages/schema/`. Hand them to `/thermos` and to the verifier, since their rubrics do not load them.
 - A worker prompt names each test scenario by the behaviour it checks, and a test's title is that behaviour, in 10 words at most.
+- A worker prompt asks the worker to break each new test once in the production line it guards, not in its fixture or its call path, and to see it fail. A test of a refusal takes an input that differs from a valid input in one field alone.
+- A delegate whose last message says it is waiting on its own background work may never report again. At each status report, the coordinator reads that delegate's pull request head and checks. A green pull request with no report is done, and the coordinator takes it to its verdict.
 - A worker prompt tells the worker to fix what it finds rather than file it, and to settle a design question with the principle skills. This overrides poteto-mode's rule that a correctness gap found mid-task gets a tracked issue. The gap is fixed in the session, and tracked only when it cannot be. `docs/agents/issue-tracker.md`, *When to file one*, has the rule.
 - `/mutation-testing` runs after the tests are green, on refactors and on changes to validation, parsing or auth. Skip it for UI, copy and config diffs.
-- The rules that fire at a step of pstack's own playbooks live in `.agents/playbooks/`. `knowledge.md` holds the glossary entry, the decision doc edited in the same commit and the lesson routed through `/correct`. `plan.md` holds this repository's facts in a plan. `verification.md` makes the browser suite the surface that Feature, Bug fix and Refactoring prove a change on.
+- The rules that fire at a step of pstack's own playbooks live in `.agents/playbooks/`. `knowledge.md` holds the glossary entry, the decision doc edited in the same commit and the lesson routed through `/correct`. `plan.md` holds this repository's facts in a plan. `verification.md` makes the browser suite the surface that Feature, Bug fix and Refactoring prove a change on. `session-pickup.md` routes a pickup that outgrows one coordinator to Orchestrate.
 
 ## Merging
 
 **Every commit reaches `main` through the merge queue. Until v0.1 the session lands its own pull request, with no press from the owner, once the verdict is `PASS`.**
 
 1. Open the pull request ready, never draft, under pstack's *Opening a PR* playbook. Its title is the commit subject the commit's form below states. Its body takes that playbook's sections, then the closing lines `AGENTS.md` states in *Workflow*.
-2. An agent that did not write the change runs it the way a user would and posts its verdict on the pull request: `PASS`, `PASS+NOTES` or `FAIL`, with the head SHA it read. This is pstack's *Shipping* verdict. A pull request whose every change is a `.md` file gets a reviewer reading the diff against its intent instead of a run.
-3. Once the pull request's own `check` is green, the session queues the verified head: `gh pr merge <n> --match-head-commit <sha>`. A push after the verdict needs a new verdict. The queue runs the suites on the merge group, squashes it and merges it. Read the pull request back (`gh pr view <n> --json state,mergedAt`): queued is not merged.
-4. A red merge group takes the pull request out of the queue. Read the merge group's log before anything else, and fix what it names. Put a flake back in the queue once. The same failure twice is real.
+2. An agent that did not write the change runs it the way a user would and posts its verdict on the pull request: `PASS`, `PASS+NOTES` or `FAIL`, with the head SHA it read. This is pstack's *Shipping* verdict. A pull request whose every change is a `.md` file gets a reviewer reading the diff against its intent instead of a run. A fix round updates the pull request's body in the same push as the code, before the change goes back for a verdict, so the verdict also covers the squash commit's message.
+3. Once the pull request's own `check` is green, the session queues the verified head: `gh pr merge <n> --match-head-commit <sha>`. A push after the verdict needs a new verdict. The queue runs the suites on the merge group, squashes it and merges it. Read the pull request back (`gh pr view <n> --json state,mergedAt`): queued is not merged. Watch it with pstack's queued watcher, `scripts/watch-pr/watch-pr --queued-stack --stack-prs <n>` under the poteto-mode skill (Shipping, step 5), not a hand-written poll.
+4. A red merge group takes the pull request out of the queue. Read the merge group's log before anything else, and fix what it names. A failure is a flake only when its log points at nothing in the code under test, and passing locally never decides it. Put a flake back in the queue once. The same failure twice is real.
 
 ```
 gh run list --workflow check.yml --event merge_group --json databaseId,headBranch,conclusion \
@@ -56,7 +58,7 @@ gh api graphql -F owner='{owner}' -F name='{repo}' -f query='
 ### Merge queue facts
 
 - `gh pr view` has no `isInMergeQueue` field. Use GraphQL: `gh api graphql -f query='{repository(owner:"O",name:"R"){pullRequest(number:N){mergeQueueEntry{state position}}}}'`.
-- A pull request that left the queue unmerged has no queue entry and is still `OPEN`. Its timeline ends in a `RemovedFromMergeQueueEvent` whose `reason` names why.
+- A pull request that is `OPEN` with no queue entry has not necessarily left the queue. `gh pr merge --match-head-commit` before the pull request's own `check` is green arms auto-merge (`autoMergeRequest` is set) instead of queueing, and a pull request that has just merged can read `OPEN` for a few seconds. It has left the queue only when its timeline ends in a `RemovedFromMergeQueueEvent`, whose `reason` names why.
 - Land sibling pull requests that touch the same files one at a time, rebasing between merges.
 
 ### The commit's form
