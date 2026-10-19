@@ -311,6 +311,7 @@ describe("the steps after a sign-in", () => {
     "//evil.example",
     "https://evil.example",
     String.raw`/\evil.example`,
+    "/\t/evil.example",
     "evil.example/settings",
   ])("lands a redirect to %s on home", async (redirect) => {
     adasApi(() => CONFIRMED, new Map(), SHELL_READS);

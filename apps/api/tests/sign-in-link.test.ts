@@ -508,7 +508,7 @@ describe("signing in through a link", () => {
     expect(await signedIn.json()).toMatchObject({ carried: "?redirect=%2Finvitations%2F01ABC" });
   });
 
-  it.each(["//elsewhere.example/x", String.raw`/\elsewhere.example/x`])(
+  it.each(["//elsewhere.example/x", String.raw`/\elsewhere.example/x`, "/\t/elsewhere.example/x"])(
     "drops a return path that leaves this origin: %s",
     async (redirect) => {
       const person = await app().person();
