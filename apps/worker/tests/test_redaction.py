@@ -787,6 +787,23 @@ def test_a_one_word_name_withholds_nothing_below_the_floor() -> None:
     assert (found.text, found.erasure_matches) == (text, ())
 
 
+def test_a_below_floor_identifier_still_withholds_the_finding_it_names() -> None:
+    text = "Imogen signed the lease."
+
+    found = redact(
+        text,
+        (span_over(text, "PERSON", "Imogen"),),
+        THE_SAFE_SET,
+        ({"emails": (), "names": ("Imogen",), "other": ()},),
+        SEED,
+    )
+
+    assert [(one.withheld, one.tier) for one in found.withholdings] == [
+        (True, "always")
+    ]
+    assert found.erasure_matches == ()
+
+
 def test_the_same_inputs_twice_give_identical_output(
     on_an_hr_shaped_connected_source: Redaction,
     page: str,
