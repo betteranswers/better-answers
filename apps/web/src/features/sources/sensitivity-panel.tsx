@@ -1,4 +1,4 @@
-import { useId, useState, type RefObject } from "react";
+import { useEffect, useEffectEvent, useId, useState, type RefObject } from "react";
 
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -139,6 +139,17 @@ export function SensitivityPanel(properties: {
   const refusedWhy = properties.pending
     ? THE_CHANGE_BEFORE_IS_STILL_GOING
     : offer.refusedWhy(connectedSource, asked);
+  const cancelOnEscape = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key === "Escape") onCancel();
+  });
+
+  useEffect(() => {
+    const here = groupRef.current;
+    here?.addEventListener("keydown", cancelOnEscape);
+    return () => {
+      here?.removeEventListener("keydown", cancelOnEscape);
+    };
+  }, [groupRef]);
 
   return (
     <fieldset

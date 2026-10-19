@@ -109,7 +109,16 @@ const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tel
     focusOn(SENSITIVITY_FIELD);
   };
 
-  if (changing === undefined || connectedSource === undefined) return { open, panel: undefined };
+  const openOrClose = (asked: Changing) => {
+    const shown =
+      changing?.change === asked.change && changing.connectedSourceId === asked.connectedSourceId;
+    if (shown) setChanging(undefined);
+    else open(asked);
+  };
+
+  if (changing === undefined || connectedSource === undefined) {
+    return { open, openOrClose, panel: undefined };
+  }
 
   const { connectedSourceId, name } = connectedSource;
 
@@ -158,8 +167,10 @@ const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tel
 
   return {
     open,
+    openOrClose,
     panel: {
       connectedSourceId,
+      change: changing.change,
       part: (
         <SensitivityPanel
           key={`${changing.change} ${connectedSourceId}`}
@@ -228,16 +239,14 @@ export function ConnectedSourcesPage() {
     else setOutcome(waitsForItsSync(connectedSource));
   };
 
-  const narrow = (connectedSource: ListedConnectedSource) => {
+  const narrow = (connectedSource: ListedConnectedSource, opening = sensitivity.open) => {
     if (connectedSource.sensitivity === NARROWEST) setOutcome(narrowestAlready(connectedSource));
-    else
-      sensitivity.open({ change: "narrow", connectedSourceId: connectedSource.connectedSourceId });
+    else opening({ change: "narrow", connectedSourceId: connectedSource.connectedSourceId });
   };
 
-  const widen = (connectedSource: ListedConnectedSource) => {
+  const widen = (connectedSource: ListedConnectedSource, opening = sensitivity.open) => {
     if (widestAlready(connectedSource)) setOutcome(nothingWider(connectedSource));
-    else
-      sensitivity.open({ change: "widen", connectedSourceId: connectedSource.connectedSourceId });
+    else opening({ change: "widen", connectedSourceId: connectedSource.connectedSourceId });
   };
 
   const connectedSourceInFocusOrTell = (): ListedConnectedSource | undefined => {
@@ -291,8 +300,12 @@ export function ConnectedSourcesPage() {
               onFocusConnectedSource: setInFocus,
               onReview: reviewOrClose,
               onPublish: publish,
-              onNarrow: narrow,
-              onWiden: widen,
+              onNarrow: (connectedSource) => {
+                narrow(connectedSource, sensitivity.openOrClose);
+              },
+              onWiden: (connectedSource) => {
+                widen(connectedSource, sensitivity.openOrClose);
+              },
             }}
             open={{ reviewing, reviewHeld, panel: sensitivity.panel }}
           />
