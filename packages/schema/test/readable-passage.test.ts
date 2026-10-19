@@ -11,7 +11,7 @@ const db = postgresForSuite();
 const WS_A = "01J6EAAAAAAAAAAAAAAAAAAAAA";
 const WS_B = "01J6EBBBBBBBBBBBBBBBBBBBBB";
 
-const READABLE = `SELECT id FROM "index".readable_passage AS v
+const READABLE_AS_CORE_SPELLS_IT = `SELECT id FROM "index".readable_passage AS v
      WHERE v.published_at IS NOT NULL
        AND (v.sensitivity <> 'Restricted' OR $1 = 'Admin')
        AND (v.audience = 'everyone' OR v.audience_groups && $2::text[])
@@ -45,7 +45,7 @@ const seenBy = async (
   client: pg.PoolClient,
   [role, groups]: Reader,
 ): Promise<readonly string[]> => {
-  const read = await client.query<{ id: string }>(READABLE, [role, [...groups]]);
+  const read = await client.query<{ id: string }>(READABLE_AS_CORE_SPELLS_IT, [role, [...groups]]);
   return read.rows.map((row) => row.id);
 };
 
@@ -425,11 +425,14 @@ describe("what the view withholds", () => {
       ]);
       await asAppRt(client, WS_A);
 
-      expect({
-        passageRowStands: standing.rowCount,
-        throughTheView: (await client.query<{ id: string }>(THE_VIEW)).rows.map((row) => row.id),
-        readable: await seenBy(client, ADMIN),
-      }).toEqual({
+      expect(
+        {
+          passageRowStands: standing.rowCount,
+          throughTheView: (await client.query<{ id: string }>(THE_VIEW)).rows.map((row) => row.id),
+          readable: await seenBy(client, ADMIN),
+        },
+        "a passage naming no document outlives its source; the inner join withholds it",
+      ).toEqual({
         passageRowStands: 1,
         throughTheView: [neighbour.passage.id],
         readable: [neighbour.passage.id],

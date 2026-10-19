@@ -151,7 +151,7 @@ describe("the exemption list", () => {
   });
 });
 
-describe("every tenant table", () => {
+describe("every tenant table, a partitioned one by its declared parent", () => {
   it("carries RLS and FORCE ROW LEVEL SECURITY in the catalogue", async () => {
     for (const qualified of tenantTableNames()) {
       expect({ table: qualified, ...(await rlsFlags(qualified)) }).toEqual({
@@ -1767,7 +1767,7 @@ describe("the suggestions under app_rt", () => {
 
 const INSUFFICIENT_PRIVILEGE = "42501";
 
-const A_PLATFORM_PROPOSER = "process:better-answers-test";
+const A_PROPOSER_EVERY_KIND_ACCEPTS = "process:better-answers-test";
 
 const THE_CALLERS = [
   { caller: "app_rt", mayRaise: SUGGESTION_KINDS_FROM_THE_APP, role: "app_rt" },
@@ -1785,7 +1785,7 @@ const submittingOneRequest = async (client: pg.PoolClient, kind: string): Promis
   try {
     const submitted = await submitSet(client, {
       kind,
-      proposer: A_PLATFORM_PROPOSER,
+      proposer: A_PROPOSER_EVERY_KIND_ACCEPTS,
       requests: [submitRequest({ suggestion_id: suggestionId })],
     });
     const landed = submitted.rows.map((row) => row.submit_suggestion_set);
@@ -1808,7 +1808,10 @@ describe("the kinds a caller may raise, asked of the function", () => {
       const owner = await client.query<{ holds: boolean }>(
         "SELECT has_function_privilege(session_user, 'submit_suggestion_set(text, text, text, jsonb)', 'EXECUTE') AS holds",
       );
-      expect(owner.rows[0]?.holds).toBe(true);
+      expect(
+        owner.rows[0]?.holds,
+        "the migrator owns the function, so only the CASE's silence refuses it",
+      ).toBe(true);
 
       const answered: Record<string, string> = {};
       const theConstantsSay: Record<string, string> = {};

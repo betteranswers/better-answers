@@ -6,10 +6,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const FAR_FUTURE = Date.parse("2099-01-01T00:00:00.000Z");
+const LATER_THAN_ANY_MILLISECOND_MINTED = Date.parse("2099-01-01T00:00:00.000Z");
 const at = (offsetMs: number) => {
   vi.useFakeTimers();
-  vi.setSystemTime(new Date(FAR_FUTURE + offsetMs));
+  vi.setSystemTime(new Date(LATER_THAN_ANY_MILLISECOND_MINTED + offsetMs));
 };
 
 describe("the minter, for anything that keeps an id", () => {
