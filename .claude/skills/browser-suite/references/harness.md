@@ -75,9 +75,13 @@ writes the rows:
   sources, documents and passages, then a commit in the workspace's repository, then its rows.
   `scriptAsking` commits each ops command as it runs.
 
+Among the body's rules for `seedConcepts`, a seed gives each title and each file to one concept,
+and a group names each member once. Two titles with one file name in two collections land as two
+concepts.
+
 `seedConcepts` cannot be one transaction, so it reads the workspace before its first write and
 refuses there, with a 400 naming the field, what the body names that the store would refuse later: a
-writer who is a Viewer, an Editor's seed that asks for the Admin's override (a concept shared with a
+writer who is no member of the workspace or is a Viewer, an Editor's seed that asks for the Admin's override (a concept shared with a
 group, or one citing a document held at a sensitivity that differs from its own), a title whose file
 the workspace already holds, and, for a concept shared with a group, a group member who is no member
 of the workspace. An Editor's seed that asks no override lands, as the slice's write admits an
