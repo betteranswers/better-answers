@@ -12,7 +12,7 @@ export const PERSON = "admin@journeys.example";
 
 export const PRODUCTION = "Better Answers <sign-in@better-answers.example>";
 
-export const TOKEN = "0123456789abcdef0123456789abcdef";
+export const SHORTEST_ACCEPTED_TOKEN = "0123456789abcdef0123456789abcdef";
 
 export const receivedAt = (receivedAtMs: number): Received => ({
   receivedAtMs,
@@ -29,8 +29,9 @@ type Asked = {
 };
 
 export const asked = (d1: D1StandIn, path: string, how: Asked = {}): Promise<Response> => {
-  const authorization = how.authorization === undefined ? `Bearer ${TOKEN}` : how.authorization;
-  const token = how.token === undefined ? TOKEN : how.token;
+  const authorization =
+    how.authorization === undefined ? `Bearer ${SHORTEST_ACCEPTED_TOKEN}` : how.authorization;
+  const token = how.token === undefined ? SHORTEST_ACCEPTED_TOKEN : how.token;
   return worker.fetch(
     new Request(`https://test-inbox.example${path}`, {
       method: how.method ?? "GET",

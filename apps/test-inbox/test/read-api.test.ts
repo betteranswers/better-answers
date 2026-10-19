@@ -4,7 +4,14 @@ import { TEST_INBOX_MESSAGE, TEST_INBOX_PAGE } from "@better-answers/schema/test
 
 import { storeOver } from "../src/store.ts";
 import { d1StandIn, type D1StandIn } from "./d1.ts";
-import { asked, NOW_MS, PERSON, PRODUCTION, receivedAt, TOKEN } from "./fixtures.ts";
+import {
+  asked,
+  NOW_MS,
+  PERSON,
+  PRODUCTION,
+  receivedAt,
+  SHORTEST_ACCEPTED_TOKEN,
+} from "./fixtures.ts";
 
 const RECEIVING = "/emails/receiving";
 
@@ -40,8 +47,8 @@ describe("the test inbox's read API, refusing a caller", () => {
     ["no token", null],
     ["an empty bearer token", "Bearer "],
     ["a shorter token", "Bearer 0123"],
-    ["a same-length token", `Bearer ${"f".repeat(TOKEN.length)}`],
-    ["a Basic token", `Basic ${TOKEN}`],
+    ["a same-length token", `Bearer ${"f".repeat(SHORTEST_ACCEPTED_TOKEN.length)}`],
+    ["a Basic token", `Basic ${SHORTEST_ACCEPTED_TOKEN}`],
   ])("refuses %s with 401 JSON, reading nothing", async (_, authorization) => {
     const d1 = d1StandIn();
 
@@ -61,7 +68,7 @@ describe("the test inbox's read API, refusing a caller", () => {
 
   it.each([
     ["unset", null],
-    ["under 32 characters", TOKEN.slice(1)],
+    ["under 32 characters", SHORTEST_ACCEPTED_TOKEN.slice(1)],
   ])("answers 503 JSON while the token is %s", async (_, token) => {
     const d1 = d1StandIn();
 
@@ -187,6 +194,13 @@ describe("the test inbox's retrieve", () => {
     });
   });
 
+  it("answers an id with a malformed escape with 404 JSON", async () => {
+    expect(
+      await answered(await asked(d1StandIn(), `${RECEIVING}/%E0`)),
+      "the id is matched as the path carries it, never decoded, so it cannot throw",
+    ).toEqual({ status: 404, body: { name: "not_found" } });
+  });
+
   it("answers 503 JSON when D1 fails", async () => {
     const path = `${RECEIVING}/0001791000000000-0000000000000000`;
 
@@ -263,5 +277,16 @@ describe("the test inbox's probe", () => {
     expect(await answered(await asked(d1StandIn(/^DELETE/), "/probe", { method: "POST" }))).toEqual(
       { status: 503, body: { name: "store_unavailable" } },
     );
+  });
+
+  it("strands a row no watch takes when its delete fails", async () => {
+    const d1 = d1StandIn(/^DELETE/);
+    await asked(d1, "/probe", { method: "POST" });
+    const { body } = await answered(await asked(d1, RECEIVING));
+
+    expect(
+      TEST_INBOX_PAGE.parse(body).data.map(({ to, from }) => ({ to, from })),
+      "a watch matches a recipient and a sender, so no reader takes this row before the day's prune",
+    ).toEqual([{ to: [""], from: "" }]);
   });
 });

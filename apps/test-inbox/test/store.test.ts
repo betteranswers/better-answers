@@ -52,7 +52,7 @@ describe("the test inbox's store", () => {
     expect(await listedIds(store, middle, 2)).toEqual({ ids: [oldest], hasMore: false });
   });
 
-  it("pages past an id whose row is already gone", async () => {
+  it("pages past a cursor whose row a prune deleted", async () => {
     const d1 = d1StandIn();
     const store = storeOver(d1.database);
     const [oldest, middle] = await keptAt(store, NOW_MS - 3000, NOW_MS - 2000, NOW_MS - 1000);
