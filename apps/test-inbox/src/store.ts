@@ -36,7 +36,7 @@ export type Store = {
   readonly prune: (nowMs: number) => Promise<Result<undefined>>;
   readonly page: (asked: PageAsked) => Promise<Result<KeptPage>>;
   readonly message: (id: string) => Promise<Result<KeptMessage | undefined>>;
-  readonly probe: (nowMs: number) => Promise<Result<undefined>>;
+  readonly provesWritable: (nowMs: number) => Promise<Result<undefined>>;
 };
 
 const RETENTION_MS = 86_400_000;
@@ -116,7 +116,7 @@ const PROBE_ROW: Omit<Received, "receivedAtMs"> = {
   raw: new TextEncoder().encode("probe"),
 };
 
-const probed = async (database: Database, nowMs: number): Promise<Result<undefined>> => {
+const provenWritable = async (database: Database, nowMs: number): Promise<Result<undefined>> => {
   const id = mintedId(nowMs);
   await inserted(database, id, { ...PROBE_ROW, receivedAtMs: nowMs });
   await database.prepare(FORGET).bind(id).run();
@@ -140,5 +140,5 @@ export const storeOver = (database: Database): Store => ({
     }),
   page: (asked) => attempted(() => pageOf(database, asked)),
   message: (id) => attempted(() => messageOf(database, id)),
-  probe: (nowMs) => attempted(() => probed(database, nowMs)),
+  provesWritable: (nowMs) => attempted(() => provenWritable(database, nowMs)),
 });

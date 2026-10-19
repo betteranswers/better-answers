@@ -109,9 +109,9 @@ const retrieved = async (api: ReadApi, id: string): Promise<Response> => {
   return answered(200, body);
 };
 
-const probed = async (api: ReadApi): Promise<Response> => {
-  const probe = await api.store.probe(api.nowMs);
-  return probe.ok ? answered(200, { probed: true }) : unavailable(api, probe.error);
+const provenWritable = async (api: ReadApi): Promise<Response> => {
+  const writable = await api.store.provesWritable(api.nowMs);
+  return writable.ok ? answered(200, { probed: true }) : unavailable(api, writable.error);
 };
 
 type Route = {
@@ -121,7 +121,7 @@ type Route = {
 
 const routeOf = (pathname: string): Route | undefined => {
   if (pathname === RECEIVING) return { allowed: "GET", answer: listed };
-  if (pathname === PROBE_PATH) return { allowed: "POST", answer: probed };
+  if (pathname === PROBE_PATH) return { allowed: "POST", answer: provenWritable };
   const id = ONE_MESSAGE.exec(pathname)?.[1];
   return id === undefined ? undefined : { allowed: "GET", answer: (api) => retrieved(api, id) };
 };

@@ -111,7 +111,7 @@ describe("the test inbox's store", () => {
     const d1 = d1StandIn();
     const store = storeOver(d1.database);
 
-    expect(valueOf(await store.probe(NOW_MS))).toBeUndefined();
+    expect(valueOf(await store.provesWritable(NOW_MS))).toBeUndefined();
     expect(d1.ran.map((query) => query.split(" ")[0])).toEqual(["INSERT", "DELETE"]);
     expect(await listedIds(store)).toEqual({ ids: [], hasMore: false });
   });
@@ -125,7 +125,7 @@ describe("the test inbox's store over a failing D1", () => {
     ["prune", (store: Store) => store.prune(NOW_MS)],
     ["page", (store: Store) => store.page({ after: undefined, limit: 100 })],
     ["message", (store: Store) => store.message("0001791000000000-0000000000000000")],
-    ["probe", (store: Store) => store.probe(NOW_MS)],
+    ["provesWritable", (store: Store) => store.provesWritable(NOW_MS)],
   ])("answers %s's failure as an error, never a throw", async (_, asked) => {
     expect(await asked(failing())).toEqual({
       ok: false,
@@ -136,7 +136,7 @@ describe("the test inbox's store over a failing D1", () => {
   it("deletes nothing when the probe cannot write", async () => {
     const d1 = d1StandIn(/^INSERT/);
 
-    expect((await storeOver(d1.database).probe(NOW_MS)).ok).toBe(false);
+    expect((await storeOver(d1.database).provesWritable(NOW_MS)).ok).toBe(false);
     expect(d1.ran.map((query) => query.split(" ")[0])).toEqual(["INSERT"]);
   });
 });
@@ -173,7 +173,7 @@ describe("the test inbox's store over a row it cannot read", () => {
   it("answers an error when the probe's delete fails", async () => {
     const d1 = d1StandIn(/^DELETE/);
 
-    expect(await storeOver(d1.database).probe(NOW_MS)).toEqual({
+    expect(await storeOver(d1.database).provesWritable(NOW_MS)).toEqual({
       ok: false,
       error: "D1_ERROR: the stand-in refuses this statement",
     });
