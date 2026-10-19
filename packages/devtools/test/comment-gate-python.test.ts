@@ -97,6 +97,12 @@ describe("the Python check fires on a long or citing comment", () => {
     expect(findings({ [FILE]: above })).toEqual([]);
   });
 
+  it("keeps a trailing comment apart after a form feed", () => {
+    const above = `\f\f\n# ${A_WHY_OF_TWENTY}\nKEEP = 1  # ${A_WHY_OF_TWENTY}\n`;
+
+    expect(findings({ [FILE]: above })).toEqual([]);
+  });
+
   it("keeps a trailing comment out of the block below it", () => {
     const below = `KEEP = 1  # ${A_WHY_OF_TWENTY}\n# ${A_WHY_OF_TWENTY}\nMORE = 2\n`;
 

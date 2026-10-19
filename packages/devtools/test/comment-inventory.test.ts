@@ -52,6 +52,30 @@ it("keeps the answer", () => {});
 it("keeps keeps keeps", () => {});
 `;
 
+const MODULE = "src/sample.py";
+
+const MODULE_SOURCE = `"""Module doc."""
+
+import os  # noqa: E501  # the probe imports it for its side effect
+
+# first line of a block
+# second line of a block
+ANSWER = 42  # trailing note
+VALUE = os.environ.get("X")  # type: ignore[x]
+
+
+# the probe's entry
+@decorated
+def probe() -> int:
+    """Function doc here."""
+
+    return ANSWER
+
+
+class Shape:
+    """A class doc."""
+`;
+
 const trees: string[] = [];
 
 afterAll(() => {
@@ -84,11 +108,15 @@ const classified = (tsv: string, choices: Readonly<Record<string, Classing>>): s
     .split("\n")
     .map((line) => {
       const fields = line.split("\t");
-      const choice = choices[`${fields[0] ?? ""}:${fields[1] ?? ""}`];
+      const at = `${fields[0] ?? ""}:${fields[1] ?? ""}`;
+      const choice = choices[`${at}:${fields[3] ?? ""}`] ?? choices[at];
       if (choice === undefined) return line;
       return [...fields.slice(0, 7), choice.class, choice.holder ?? "", "", choice.unit].join("\t");
     })
     .join("\n");
+
+const unitOne = (classes: Readonly<Record<string, string>>): Record<string, Classing> =>
+  Object.fromEntries(Object.entries(classes).map(([at, one]) => [at, { class: one, unit: "1" }]));
 
 const applied = (root: string, tsv: string, unit: string) => {
   writeFileSync(path.join(root, "rows.tsv"), tsv);
@@ -137,6 +165,38 @@ describe("comment-inventory inventory", () => {
       [SAMPLE]: "// Generated, never edited: run it\nexport const one = 1;\n",
     });
     expect(located(inventoryOf(root))).toEqual([]);
+  });
+
+  it("emits Python comments and docstrings, naming kind and declaration", () => {
+    const root = treeOf({ [MODULE]: MODULE_SOURCE });
+    expect(located(inventoryOf(root))).toEqual([
+      `${MODULE} 1 1 doc  2`,
+      `${MODULE} 3 3 directive  8`,
+      `${MODULE} 5 6 line ANSWER 10`,
+      `${MODULE} 7 7 trailing  2`,
+      `${MODULE} 8 8 directive  0`,
+      `${MODULE} 11 11 line probe 3`,
+      `${MODULE} 14 14 doc probe 3`,
+      `${MODULE} 20 20 doc Shape 3`,
+    ]);
+  });
+
+  it("skips a generated Python file", () => {
+    const root = treeOf({ [MODULE]: "# Generated, never edited: run it\nONE = 1  # a note\n" });
+    expect(located(inventoryOf(root))).toEqual([]);
+  });
+
+  it("refuses a Python file that does not parse", () => {
+    const root = treeOf({ [MODULE]: "def one(:\n    return 1\n" });
+    const ran = run(root, "inventory", "src");
+    expect(ran.status).toBe(2);
+    expect(ran.stderr).toContain(`comment_locator: ${MODULE} could not be read: `);
+    expect(ran.stderr).not.toContain("    at ");
+  });
+
+  it("reads a Python file behind a byte order mark", () => {
+    const root = treeOf({ [MODULE]: "\uFEFF# drop\nONE = 1\n" });
+    expect(located(inventoryOf(root))).toEqual([`${MODULE} 1 1 line ONE 1`]);
   });
 });
 
@@ -296,6 +356,160 @@ export const shape: Shape = { side: 1 };
     expect(applied(root, tsv, "1").status).toBe(0);
     expect(read(root, SAMPLE)).toBe("export const one = 1;\nexport const two = 2;\n");
   });
+
+  it("deletes Python rows, leaving a docstring-only body as `...`", () => {
+    const root = treeOf({ [MODULE]: MODULE_SOURCE });
+    const tsv = classified(
+      inventoryOf(root),
+      unitOne({
+        [`${MODULE}:1`]: "narration",
+        [`${MODULE}:3`]: "suppression",
+        [`${MODULE}:5`]: "foreign",
+        [`${MODULE}:7`]: "narration",
+        [`${MODULE}:8`]: "suppression",
+        [`${MODULE}:11`]: "contract",
+        [`${MODULE}:14`]: "narration",
+        [`${MODULE}:20`]: "narration",
+      }),
+    );
+    const ran = applied(root, tsv, "1");
+    expect(ran.stderr).toBe("");
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toBe(`${MODULE}: deleted 4 blocks, lines 1, 7, 14, 20\n`);
+    expect(read(root, MODULE))
+      .toBe(`import os  # noqa: E501  # the probe imports it for its side effect
+
+# first line of a block
+# second line of a block
+ANSWER = 42
+VALUE = os.environ.get("X")  # type: ignore[x]
+
+
+# the probe's entry
+@decorated
+def probe() -> int:
+    return ANSWER
+
+
+class Shape: ...
+`);
+  });
+
+  it("leaves each Python file as ruff writes it", () => {
+    const source = "def one() -> int:\n    return 1\n# between\ndef two() -> int:\n    return 2\n";
+    const root = treeOf({ [MODULE]: source });
+    const tsv = classified(
+      inventoryOf(root),
+      unitOne({
+        [`${MODULE}:3`]: "narration",
+      }),
+    );
+    expect(applied(root, tsv, "1").status).toBe(0);
+    expect(read(root, MODULE)).toBe(
+      "def one() -> int:\n    return 1\n\n\ndef two() -> int:\n    return 2\n",
+    );
+  });
+
+  it("cuts a trailing comment, never its twin earlier", () => {
+    const root = treeOf({ [MODULE]: 'NOTE = "# note"  # note\n' });
+    const tsv = classified(inventoryOf(root), unitOne({ [`${MODULE}:1`]: "narration" }));
+    expect(applied(root, tsv, "1").status).toBe(0);
+    expect(read(root, MODULE)).toBe('NOTE = "# note"\n');
+  });
+
+  it("cuts a docstring, never its twin in a default", () => {
+    const root = treeOf({ [MODULE]: 'def f(x="a"): "a"  # c\n' });
+    const tsv = classified(inventoryOf(root), unitOne({ [`${MODULE}:1:doc`]: "narration" }));
+    expect(applied(root, tsv, "1").status).toBe(0);
+    expect(read(root, MODULE)).toBe('def f(x="a"): ...  # c\n');
+  });
+
+  it.each([
+    ["a form feed", "\f\f\n", ""],
+    ["a line separator", 'S = "\u2028\u2028\u2028"\n', 'S = "\u2028\u2028\u2028"\n'],
+  ])("keeps a trailing comment trailing after %s", (_, head, kept) => {
+    const root = treeOf({ [MODULE]: `${head}# own\nx = 1  # trailing\n` });
+    const tsv = inventoryOf(root);
+    expect(located(tsv)).toEqual([`${MODULE} 2 2 line x 1`, `${MODULE} 3 3 trailing  1`]);
+    const ran = applied(root, classified(tsv, unitOne({ [`${MODULE}:3`]: "narration" })), "1");
+    expect(ran.status).toBe(0);
+    expect(read(root, MODULE)).toBe(`${kept}# own\nx = 1\n`);
+  });
+
+  it.each([
+    [SAMPLE, "// drop\nexport const one = 1;\n", "\uFEFFexport const one = 1;\n"],
+    [MODULE, "# drop\nONE = 1\n", "ONE = 1\n"],
+  ])("deletes line one of %s behind a byte order mark", (file, source, kept) => {
+    const root = treeOf({ [file]: `\uFEFF${source}` });
+    const tsv = classified(inventoryOf(root), unitOne({ [`${file}:1`]: "narration" }));
+    expect(applied(root, tsv, "1").status).toBe(0);
+    expect(read(root, file)).toBe(kept);
+  });
+
+  it("drops the blanks a deletion leaves where oxfmt cannot", () => {
+    const source =
+      "// top\n\nexport const one = 1;\n\n// between\n\nexport const two = 2; // trailing\n";
+    const root = treeOf({
+      [SAMPLE]: source,
+      ".oxfmtrc.json": `{ "ignorePatterns": ["${SAMPLE}"] }\n`,
+    });
+    const tsv = classified(
+      inventoryOf(root),
+      unitOne({
+        [`${SAMPLE}:1`]: "narration",
+        [`${SAMPLE}:5`]: "narration",
+        [`${SAMPLE}:7`]: "narration",
+      }),
+    );
+    expect(applied(root, tsv, "1").status).toBe(0);
+    expect(read(root, SAMPLE)).toBe("export const one = 1;\n\nexport const two = 2;\n");
+  });
+
+  it("runs no formatter for a language the unit leaves", () => {
+    const root = treeOf({
+      [SAMPLE]: "// drop\nexport const one = 1;\n",
+      [MODULE]: "ONE = 1\n",
+      "pyproject.toml": '[tool.ruff]\nline-length = "wide"\n',
+    });
+    const tsv = classified(
+      inventoryOf(root),
+      unitOne({
+        [`${SAMPLE}:1`]: "narration",
+      }),
+    );
+    const ran = applied(root, tsv, "1");
+    expect(ran.stderr).toBe("");
+    expect(ran.status).toBe(0);
+  });
+});
+
+describe("comment-inventory apply restores every file when a formatter fails", () => {
+  it.each([
+    ["oxfmt", ".oxfmtrc.json", '{ "ignorePatterns": [', "Failed to load configuration file"],
+    ["ruff format", "pyproject.toml", '[tool.ruff]\nline-length = "wide"\n', "Failed to parse"],
+  ])("%s", (formatter, config, broken, says) => {
+    const files = {
+      [SAMPLE]: "// drop\nexport const   one = 1;\n",
+      [MODULE]: "# drop\nONE   = 1\n",
+    };
+    const root = treeOf(files);
+    const tsv = classified(
+      inventoryOf(root),
+      unitOne({
+        [`${SAMPLE}:1`]: "narration",
+        [`${MODULE}:1`]: "narration",
+      }),
+    );
+    writeFileSync(path.join(root, config), broken);
+    const ran = applied(root, tsv, "1");
+    expect(ran.status).toBe(2);
+    expect(ran.stdout).toBe("");
+    expect(ran.stderr).toContain("unit 1: the formatter failed, so no file changed:");
+    expect(ran.stderr).toContain(`${formatter}: `);
+    expect(ran.stderr).toContain(says);
+    expect(ran.stderr).not.toContain("    at ");
+    expect(Object.keys(files).map((file) => read(root, file))).toEqual(Object.values(files));
+  });
 });
 
 describe("comment-inventory apply refuses, changing no file", () => {
@@ -375,6 +589,18 @@ describe("comment-inventory apply refuses, changing no file", () => {
     expect(stderr).toContain(`${SAMPLE}:3: the file holds this block 2 times`);
   });
 
+  it("when a row names a file of neither language", () => {
+    const root = treeOf({ [SAMPLE]: SAMPLE_SOURCE, "src/notes.md": "// a note\n" });
+    const tsv = classified(inventoryOf(root), narrationAt4).replace(
+      `${SAMPLE}\t4\t`,
+      "src/notes.md\t1\t",
+    );
+    const ran = applied(root, tsv, "1");
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toContain("src/notes.md:1: neither TypeScript nor Python");
+    expect(read(root, "src/notes.md")).toBe("// a note\n");
+  });
+
   it("when a row in the unit is unclassified", () => {
     const stderr = refusedOver(
       { [SAMPLE]: SAMPLE_SOURCE },
@@ -412,5 +638,22 @@ describe("comment-inventory check", () => {
       `unit 1: ${SAMPLE}: would delete 1 block, lines 4-5\nunit 2: ${SAMPLE}: would delete 1 block, lines 8-10\n`,
     );
     expect(read(root, SAMPLE)).toBe(SAMPLE_SOURCE);
+  });
+
+  it("reports a Python unit's deletions and writes nothing", () => {
+    const root = treeOf({ [MODULE]: MODULE_SOURCE });
+    const tsv = classified(
+      inventoryOf(root),
+      unitOne({
+        [`${MODULE}:5`]: "narration",
+        [`${MODULE}:20`]: "lost",
+      }),
+    );
+    writeFileSync(path.join(root, "rows.tsv"), tsv);
+    const ran = run(root, "check", "rows.tsv");
+    expect(ran.stderr).toBe("");
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).toBe(`unit 1: ${MODULE}: would delete 2 blocks, lines 5-6, 20\n`);
+    expect(read(root, MODULE)).toBe(MODULE_SOURCE);
   });
 });

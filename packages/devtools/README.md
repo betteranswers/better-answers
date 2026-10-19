@@ -226,7 +226,9 @@ dropped by its opening text before blocks are grouped, so it cannot lend a parag
 exemption. A suppression's reason is a block of its own. It is prose and counts, whether it
 follows a second `#` or the codes of a `noqa` or a `type: ignore` directly, and a suppression
 without one is refused. A docstring is exempt only when it opens with a
-notice. No gate reads a comment in YAML, shell, TOML or SQL.
+notice. No gate reads a comment in YAML, shell, TOML or SQL. The grouping lives in
+`python/comment_blocks.py`, which the comment inventory's Python locator reads too, so both
+see the same blocks.
 
 | Part | What runs it | Its suite |
 | --- | --- | --- |
@@ -388,18 +390,38 @@ condition over sources written in the test.
 
 The comment sweep's lever, behind `scripts/comment-inventory.mjs` (`pnpm comment-inventory`). An
 agent classifies comments and the tool alone deletes them. `inventory <path>...` writes one TSV
-row per comment block in the TypeScript under each path: `path`, `start`, `end`, `kind`,
-`attached`, `words`, `text`, then four columns the classifier fills: `class`, `holder`,
-`structure` and `unit`. Blocks are grouped as the comment gate groups them. A directive or notice
-is a row of its own, and a generated file is skipped. A directive is one the comment gate exempts,
-or `@vite-ignore`, which the gate has no reason to exempt but a bundler reads. `text` is the
-block's source, with a backslash, tab, newline and carriage return written `\\`, `\t`, `\n` and
-`\r`.
+row per comment block and per docstring in the TypeScript and Python under each path: `path`,
+`start`, `end`, `kind`, `attached`, `words`, `text`, then four columns the classifier fills:
+`class`, `holder`, `structure` and `unit`. Blocks are grouped as the comment gate groups them. A
+directive or notice is a row of its own, and a generated file is skipped by its marker,
+`// Generated, never edited` or `# Generated, never edited`. A directive is one the comment gate
+exempts, or `@vite-ignore`, which the gate has no reason to exempt but a bundler reads. `text` is
+the block's source, with a backslash, tab, newline and carriage return written `\\`, `\t`, `\n`
+and `\r`. A Python docstring's `text` is its string, quotes included.
+
+A Python file is read by `python/comment_locator.py`, which takes the source on stdin and writes
+each block's lines, kind, words and text as JSON, with the cut that deletes it. A cut is a start
+and an end offset, counted in the UTF-16 units JavaScript counts, and a replacement: `...` for a
+docstring that is the whole body of its `def` or `class`, otherwise nothing. The tool makes the
+cut as written, so a string on the same line that holds the same text is never cut. When the cut
+does not hold the block's text, the locator and the tool disagree, and the tool stops. A comment
+is on its own line when only white space comes before it on the line tokenize read. The locator
+parses the source after a leading byte order mark and counts its offsets from the mark.
 
 `apply <tsv> --unit <unit>` deletes the unit's rows, except `foreign`, `contract` and `suppression`
-ones. It takes out a line the deletion left empty, then runs oxfmt over each file it changed, so a
-deletion leaves no blank line or line break the formatter would change. oxfmt is a devDependency of
-this package for that reason. `check <tsv> [--unit <unit>]` runs the same checks and writes nothing.
+ones. A docstring that is the whole body of its `def` or `class` becomes `...`, so the body stays
+valid. The tool takes out a line the deletion left empty and the spaces a trailing comment leaves,
+and keeps a leading byte order mark, which oxfmt keeps too and `ruff format` drops.
+It then drops a blank line the deletion left at the file's edge, beside another blank line, after
+a line that opens a block (ends in `{`, `[`, `(` or `:`) or before one that closes it (starts with
+`}`, `]` or `)`). ruff keeps a blank line after `def f():`, and oxfmt never reads a file its
+config ignores, so neither formatter can be left to do it. Then it runs each language's formatter
+over the files it changed in that language: oxfmt for TypeScript, and `ruff format` for Python
+through the worker's uv project, which reads the nearest ruff config above each file. oxfmt is a
+devDependency of this package for that reason. A language the unit deletes nothing from runs no
+formatter. When a formatter fails, the tool writes back every file it changed, prints the
+formatter's error and exits 2, so no file changes. It prints what it deleted only after every
+formatter passed. `check <tsv> [--unit <unit>]` runs the same checks and writes nothing.
 Each row is found again by its exact text, so a moved line never deletes the wrong block. The whole
 unit is refused, and no file changes, when any row is unclassified, when a row's text is not in its
 file as often as the unit names it, or when a `held` or `structure` row's holder does not resolve. A
