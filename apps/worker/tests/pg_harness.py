@@ -389,3 +389,20 @@ def login_in_role(
             )
         )
     connection.commit()
+
+
+WORKER_LOGIN = "worker_login_under_test"
+_WORKER_PASSWORD = "worker-login-under-test"
+
+
+def worker_login_dsn(connection: psycopg.Connection, conninfo: str) -> str:
+    login_in_role(
+        connection, login=WORKER_LOGIN, password=_WORKER_PASSWORD, role="worker_rt"
+    )
+    replaced, count = re.subn(
+        r"//[^@/]*@", f"//{WORKER_LOGIN}:{_WORKER_PASSWORD}@", conninfo, count=1
+    )
+    if count != 1:
+        message = f"expected credentials in the harness's conninfo, found {count}"
+        raise RuntimeError(message)
+    return replaced

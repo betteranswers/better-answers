@@ -19,6 +19,7 @@ from psycopg.sql import SQL, Identifier, Literal
 from testcontainers.community.postgres import PostgresContainer
 
 from pg_harness import (
+    _BUILD_LOCK_KEY,
     LOCATOR,
     PORT_OVERRIDE,
     REPO_ROOT,
@@ -210,6 +211,17 @@ def test_shared_address_matches_the_scripts_uri(
     lines = dict(line.split(" ", 1) for line in printed.splitlines() if " " in line)
 
     assert shared_address() == lines["uri"]
+
+
+def test_takes_the_same_build_lock_as_the_typescript_harness() -> None:
+    harness = REPO_ROOT / "packages" / "schema" / "test" / "warm-postgres.ts"
+    keys = re.findall(
+        r'^export const BUILD_LOCK = "([^"]*)";$',
+        harness.read_text("utf-8"),
+        re.MULTILINE,
+    )
+
+    assert keys == [_BUILD_LOCK_KEY]
 
 
 CHILD_PRINTS_THE_IMAGE_AND_ADDRESS = """

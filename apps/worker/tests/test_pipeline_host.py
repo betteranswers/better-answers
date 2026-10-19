@@ -1,7 +1,6 @@
 import asyncio
 import gc
 import os
-import re
 import threading
 import time
 from collections.abc import Iterator, Mapping, Sequence
@@ -28,10 +27,7 @@ from better_answers_worker.pipeline import (
     open_pool,
 )
 from factories import land_passage, seed_workspace
-from pg_harness import login_in_role, migrated_postgres_at
-
-WORKER_LOGIN = "worker_login_under_test"
-WORKER_PASSWORD = "worker-login-under-test"
+from pg_harness import migrated_postgres_at, worker_login_dsn
 
 
 def passage_row(
@@ -55,25 +51,10 @@ def passage_row(
     }
 
 
-# jscpd:ignore-start
 @pytest.fixture(name="database")
 def a_migrated_database() -> Iterator[tuple[psycopg.Connection, str]]:
     with migrated_postgres_at() as (connection, conninfo):
-        login_in_role(
-            connection, login=WORKER_LOGIN, password=WORKER_PASSWORD, role="worker_rt"
-        )
-        yield connection, as_role(conninfo, WORKER_LOGIN, WORKER_PASSWORD)
-
-
-# jscpd:ignore-end
-
-
-def as_role(conninfo: str, role: str, password: str) -> str:
-    replaced, count = re.subn(r"//[^@/]*@", f"//{role}:{password}@", conninfo, count=1)
-    if count != 1:
-        message = f"expected credentials in the harness's conninfo, found {count}"
-        raise RuntimeError(message)
-    return replaced
+        yield connection, worker_login_dsn(connection, conninfo)
 
 
 def seed_partitioned_workspace(connection: psycopg.Connection) -> str:
@@ -374,7 +355,7 @@ def test_removing_a_store_never_made_passes_quietly(tmp_path: Path) -> None:
         assert not host.connected_source_directory(sync).exists()
 
 
-def files_under(directory: Path) -> int:
+def bytes_on_disk_under(directory: Path) -> int:
     return sum(item.stat().st_size for item in directory.rglob("*") if item.is_file())
 
 
@@ -383,14 +364,16 @@ def test_a_sources_lmdb_size_counts_both_its_stores(tmp_path: Path) -> None:
 
     with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
         host.open_connected_source(sync)
-        passage_store = files_under(host.store_directory(sync, CONNECTED_SOURCE_STORE))
-        findings = files_under(host.store_directory(sync, FINDINGS_STORE))
+        passage_store = bytes_on_disk_under(
+            host.store_directory(sync, CONNECTED_SOURCE_STORE)
+        )
+        findings = bytes_on_disk_under(host.store_directory(sync, FINDINGS_STORE))
 
         assert findings > 0
         assert host.lmdb_bytes(sync) == passage_store + findings
 
 
-def test_a_removed_store_reopens_fresh_on_disk(tmp_path: Path) -> None:
+def test_a_removed_store_reopens_on_disk(tmp_path: Path) -> None:
     sync = a_sync_on("connected-source-one")
 
     with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:

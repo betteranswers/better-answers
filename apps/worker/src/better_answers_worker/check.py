@@ -9,8 +9,12 @@ BESIDE_THE_SUITE: tuple[Step, ...] = (
     ("mypy", ("mypy",)),
 )
 
-# Four, the CI runner's vCPUs.
-SUITE: Step = ("pytest", ("pytest", "-n", "4", "--dist", "loadgroup"))
+CI_RUNNER_VCPUS = 4
+
+SUITE: Step = (
+    "pytest",
+    ("pytest", "-n", str(CI_RUNNER_VCPUS), "--dist", "loadgroup"),
+)
 
 
 def main() -> int:

@@ -29,7 +29,8 @@ def _keyed(key: bytes) -> AESGCM:
 def sealed(key: bytes, plaintext: bytes) -> bytes:
     cipher = _keyed(key)
     version = bytes([ENVELOPE_VERSION])
-    # Random: a GCM nonce repeated under one key exposes both plaintexts.
+    # Random: a GCM nonce repeated under one key leaks the plaintexts' XOR and the
+    # authentication key.
     nonce = secrets.token_bytes(ENVELOPE_NONCE_BYTES)
 
     return version + nonce + cipher.encrypt(nonce, plaintext, version)

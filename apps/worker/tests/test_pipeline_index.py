@@ -52,20 +52,14 @@ from factories import (
     seed_source_document,
     seed_suppression,
 )
-from pg_harness import login_in_role, migrated_postgres_at
+from pg_harness import WORKER_LOGIN, migrated_postgres_at, worker_login_dsn
 from planted_page import (
     SERVICE_NOTES_PAGE,
     THE_DIAGNOSED_SENTENCE_AT,
     THE_ENGINEERS_SENTENCE_AT,
     the_engineers_section,
 )
-from test_pipeline_host import (
-    WORKER_LOGIN,
-    WORKER_PASSWORD,
-    as_role,
-    bootstrap_for,
-    seed_partitioned_workspace,
-)
+from test_pipeline_host import bootstrap_for, seed_partitioned_workspace
 from test_upload_media_types_contract import read_upload_media_types
 
 CONNECTED_SOURCE = "01M2B1ND1NGAAAAAAAAAAAAAAA"
@@ -165,10 +159,7 @@ class ABucket:
 @pytest.fixture(name="database")
 def a_migrated_database() -> Iterator[tuple[psycopg.Connection, str]]:
     with migrated_postgres_at() as (connection, conninfo):
-        login_in_role(
-            connection, login=WORKER_LOGIN, password=WORKER_PASSWORD, role="worker_rt"
-        )
-        yield connection, as_role(conninfo, WORKER_LOGIN, WORKER_PASSWORD)
+        yield connection, worker_login_dsn(connection, conninfo)
 
 
 def original_key_of(document_id: str) -> str:

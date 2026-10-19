@@ -874,7 +874,6 @@ def test_a_restore_one_character_off_restores_nothing(
     page: str,
     spans: tuple[Span, ...],
 ) -> None:
-
     kept = restore_of(on_a_plain_connected_source, page, THE_COMPANYS_OWN_ACCOUNT)
     one_off = Restore(rule_id=kept.rule_id, start=kept.start + 1, end=kept.end)
 

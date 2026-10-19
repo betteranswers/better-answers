@@ -52,7 +52,7 @@ The api (TypeScript) and the worker (Python) each read a concept body's links an
 Both readers now state the line and whitespace rules explicitly, without relying on either engine's defaults (this PR, S2a U2):
 
 - **Lines break at `\n` alone.** At S2a U2 the TypeScript patterns dropped the `m` flag and anchored with `(?<=^|\n)`, and Python anchored with `(?:^|(?<=\n))` without `re.M`. A later fix, "read a concept body in one walk", replaced every expression with a hand-written scanner that keeps the rule: a line starts at the string's start or after a `\n` (`lineStartFrom`, `packages/schema/src/concept-file.ts:35-41`; `_line_start_from`, `apps/worker/src/better_answers_worker/links.py:45-54`).
-- **Whitespace is `[ \t\n\r\f\v]`.** That set, `SIX` and `_SIX`, replaces `\s`, `\S`, `trim()` and `strip()` in labels, definitions and inline targets (`normalisedLabel`, `targetAfter` and `INLINE_TARGET`, `concept-file.ts:239-261`, `:305`; `_normalised_label`, `_target_after` and `_INLINE_TARGET`, `links.py:298-319`, `:384`).
+- **Whitespace is `[ \t\n\r\f\v]`.** That set, `SIX` and `_TIER_SHARED_WHITESPACE`, replaces `\s`, `\S`, `trim()` and `strip()` in labels, definitions and inline targets (`normalisedLabel`, `targetAfter` and `INLINE_TARGET`, `concept-file.ts:239-261`, `:305`; `_normalised_label`, `_target_after` and `_INLINE_TARGET`, `links.py:298-319`, `:384`).
 - **The fixture pins each difference.** `contracts/links/cases.json` gains *only plain whitespace is trimmed from a label* (U+FEFF, U+0085) and *a definition starts only after a line feed* (a lone `\r`, U+2028). Both were shown to fail against the earlier readers before the fix.
 
 ```ts

@@ -32,12 +32,11 @@ from factories import (
     seed_workspace,
 )
 from pg_harness import (
-    login_in_role,
     migrated_postgres_at,
     stamp_contract_as_migrate_does,
     stamp_migration,
+    worker_login_dsn,
 )
-from test_pipeline_host import WORKER_LOGIN, WORKER_PASSWORD, as_role
 
 WORKER = "worker-under-test"
 IRI = "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM"
@@ -555,6 +554,7 @@ def refusals_in(
 REFUSES = "a deploy stamp does not match; claiming nothing"
 
 IDLE_SLEEPS_THE_DETECTORS_IMPORT_MAY_TAKE = 4
+IDLE_SLEEPS_THE_LIFTED_AUDIT_MAY_TAKE = 4
 
 
 def test_a_mismatched_schema_stamp_claims_nothing_and_exits_one(
@@ -648,7 +648,7 @@ def test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes(
         ):
             stamp_contract_as_migrate_does(cursor, digest=CONTRACT_DIGEST)
         deadline = time.monotonic() + (
-            loop.IDLE_SLEEP_SECONDS * IDLE_SLEEPS_THE_DETECTORS_IMPORT_MAY_TAKE
+            loop.IDLE_SLEEP_SECONDS * IDLE_SLEEPS_THE_LIFTED_AUDIT_MAY_TAKE
         )
         while time.monotonic() < deadline:
             if audit_job(database, workspace)[0] == "done":
@@ -701,9 +701,7 @@ def test_healthy_with_a_fresh_lease_unhealthy_with_a_waiting_queue(
 def test_the_worker_role_counts_a_waiting_job_as_unhealthy(
     database: psycopg.Connection,
 ) -> None:
-    login_in_role(
-        database, login=WORKER_LOGIN, password=WORKER_PASSWORD, role="worker_rt"
-    )
+    worker_dsn = worker_login_dsn(database, _WHERE[database])
     workspace = seed_workspace(database.cursor())["id"]
     database.commit()
     with scoped(database, workspace) as cursor:
@@ -714,9 +712,7 @@ def test_the_worker_role_counts_a_waiting_job_as_unhealthy(
             enqueued_ago_seconds=300,
         )
 
-    with queue.connected(
-        as_role(_WHERE[database], WORKER_LOGIN, WORKER_PASSWORD)
-    ) as worker:
+    with queue.connected(worker_dsn) as worker:
         assert health.is_healthy(worker, WORKER) is False
 
 

@@ -44,7 +44,7 @@ def copy_out(target: Path) -> None:
     for repository in carried_repositories():
         carried = target / cache.name / repository.name
         shutil.copytree(repository, carried, symlinks=True)
-        # huggingface_hub 1.32 links a repository's Xet files into a store beside it.
+        # huggingface_hub links a repository's Xet files into a store beside it.
         for blob in carried.glob("blobs/*"):
             if blob.is_symlink():
                 shared = (repository / "blobs" / blob.name).resolve()

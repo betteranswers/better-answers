@@ -23,9 +23,9 @@ CONCEPT_DEPRECATED_STATUS = "deprecated"
 _IRI = re.compile(r"^https://better-answers\.com/c/[0-9A-HJKMNP-TV-Z]{26}$")
 
 
-_SIX = " \t\n\r\f\v"
+_TIER_SHARED_WHITESPACE = " \t\n\r\f\v"
 
-_WS = re.compile(r"\s")
+_UNICODE_SPACE = re.compile(r"\s")
 
 _FOOTNOTE = re.compile(r"^\[\^([^\]]*)\]$")
 
@@ -33,10 +33,6 @@ _FOOTNOTE = re.compile(r"^\[\^([^\]]*)\]$")
 class _Found(NamedTuple):
     at: int
     text: str
-
-
-def _is_six(char: str) -> bool:
-    return char in _SIX
 
 
 def _line_start_from(text: str, from_: int) -> int:
@@ -66,7 +62,7 @@ def _next_stops(text: str, stops: Callable[[str], bool]) -> list[int]:
 
 def _autolink_ends_of(text: str) -> list[int]:
     def stops(char: str) -> bool:
-        return char == ">" or char in _SIX
+        return char == ">" or char in _TIER_SHARED_WHITESPACE
 
     return _next_stops(text, stops)
 
@@ -282,12 +278,12 @@ def _label_key(label: str) -> str:
 
 def _target_after(prose: str, from_: int) -> tuple[int, int] | None:
     start = from_
-    while start < len(prose) and prose[start] in _SIX:
+    while start < len(prose) and prose[start] in _TIER_SHARED_WHITESPACE:
         start += 1
     if start == len(prose):
         return None
     end = start
-    while end < len(prose) and prose[end] not in _SIX:
+    while end < len(prose) and prose[end] not in _TIER_SHARED_WHITESPACE:
         end += 1
     return start, end
 
@@ -455,8 +451,8 @@ def _bare_span(
     return bracket + 1
 
 
-def _angle_bracketed(text: str) -> str:
-    ends = _next_stops(text, _pass_four_stops)
+def _flattened_autolinks(text: str) -> str:
+    ends = _next_stops(text, _autolink_stops_on_unicode_space)
     pieces: list[str] = []
     cursor = 0
     at = 0
@@ -476,15 +472,15 @@ def _angle_bracketed(text: str) -> str:
     return "".join(pieces)
 
 
-def _pass_four_stops(char: str) -> bool:
-    return char == ">" or _WS.fullmatch(char) is not None
+def _autolink_stops_on_unicode_space(char: str) -> bool:
+    return char == ">" or _UNICODE_SPACE.fullmatch(char) is not None
 
 
 def _flattened_links(text: str) -> str:
     flattened = _labels_of(text, _inline_span)
     flattened = _labels_of(flattened, _reference_span)
     flattened = _labels_of(flattened, _bare_span)
-    return _angle_bracketed(flattened)
+    return _flattened_autolinks(flattened)
 
 
 def _sentence_at(body: str, index: int) -> str:
