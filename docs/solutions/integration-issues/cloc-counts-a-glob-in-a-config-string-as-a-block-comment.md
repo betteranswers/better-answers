@@ -7,6 +7,9 @@ module: repository
 problem_type: integration_issue
 component: development-workflow
 severity: low
+applies_when:
+  - "Adding a glob string to a JavaScript tool config such as `jscpd.config.mjs`"
+  - "Seeing `check:gates` fail on `comment-density` for a change that added no comment"
 symptoms:
   - "check:gates fails on comment-density: the-root-tool-configuration source: 0.10 comment lines per code line, over the 0.10 ceiling"
   - "The change that tripped it added one plain string to an array and no comment"

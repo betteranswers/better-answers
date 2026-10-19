@@ -5,6 +5,10 @@ category: integration-issues
 module: repository
 problem_type: integration_issue
 component: development-workflow
+applies_when:
+  - "Changing `cubic.yaml`, or finding a Cubic block in a pull request body or a merge commit"
+  - "Writing a pull request body that becomes a merge commit on `main`"
+  - "Debugging `arm-merge.yml` when Cubic's check completes neutral"
 symptoms:
   - "A 'Summary by cubic' block, a 'Review in cubic' link and a 'Turn on auto-fix' link appear in a pull request body the author wrote"
   - "The same block lands in the merge commit's body on main"

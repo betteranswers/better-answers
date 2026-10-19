@@ -5,6 +5,10 @@ category: logic-errors
 module: apps/web
 problem_type: logic_error
 component: web
+applies_when:
+  - "Building or changing a sheet or panel with `modal={false}`, such as the evidence panel beside Search"
+  - "Changing `SheetContent` in `apps/web/src/shared/ui/sheet.tsx` or the page's single-key keystroke layer"
+  - "Fixing a keyboard trap where Tab or Shift+Tab loops inside an open panel"
 symptoms:
   - "With the evidence panel open beside Search, Tab from its Close button landed on Close again, and Shift+Tab did the same"
   - "Only Escape left the panel, which closed it, so a keyboard reader could not keep a passage open and move on through the list as a mouse reader could"

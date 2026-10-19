@@ -6,6 +6,10 @@ module: apps/web
 problem_type: test_failure
 component: web
 severity: medium
+applies_when:
+  - "Holding a request with `page.route` in a Playwright spec that also checks an optimistic action's refusal"
+  - "Seeing a mutation's mutation-level `onError` run while its per-call `mutate()` `onError` never does"
+  - "Debugging `people-requests.spec.ts` or a spec that passes locally and fails in the merge queue"
 symptoms:
   - "A Playwright scenario that refused an optimistic decline failed with \"the alert says nothing\": the row came back, but no refusal line was drawn"
   - "The mutation-level onError ran (the undo restored the row) while the per-call mutate(vars, { onError }) callback that writes the page's line never ran, so the symptom read as a product bug"
