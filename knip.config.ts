@@ -63,6 +63,7 @@ const config: KnipConfig = {
         "@stryker-mutator/vitest-runner",
         "cloc",
         "jscpd",
+        "oxfmt",
       ],
     },
   },

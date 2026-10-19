@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -18,6 +19,7 @@ import type { Block } from "../lint-rules/shared/comment-blocks.ts";
 import { flagValues } from "./flags.ts";
 import { parsedSource } from "./parsed-source.ts";
 import { filesUnderEach } from "./paths.ts";
+import { executableOf } from "./throwaway-tree.ts";
 
 const KINDS = ["doc", "line", "trailing", "directive"] as const;
 
@@ -380,43 +382,14 @@ const planFor = (root: string, rows: readonly Row[], unit: string): Outcome<read
   return { value: planned.flatMap((one) => ("value" in one ? [one.value] : [])) };
 };
 
-const OPENS = /[{[(]\s*$/;
-
-const CLOSES = /^\s*[}\])]/;
-
-const lastLineOf = (head: string): string =>
-  head.slice(head.lastIndexOf("\n", head.length - 2) + 1, -1);
-
-const firstLineOf = (tail: string): string => tail.split("\n", 1)[0] ?? "";
-
-const isBlank = (line: string | undefined): line is string => line?.trim() === "";
-
-const opensOrEdge = (line: string | undefined): boolean =>
-  line === undefined || isBlank(line) || OPENS.test(line);
-
-const closesOrEdge = (line: string | undefined): boolean => line === undefined || CLOSES.test(line);
-
-const joined = (head: string, tail: string): string => {
-  const previous = head === "" ? undefined : lastLineOf(head);
-  const next = tail === "" ? undefined : firstLineOf(tail);
-  if (isBlank(next) && opensOrEdge(previous)) return head + tail.slice(next.length + 1);
-  if (isBlank(previous) && closesOrEdge(next)) {
-    return head.slice(0, head.length - previous.length - 1) + tail;
-  }
-  return head + tail;
-};
-
 const withoutCut = (source: string, { start, end }: Cut): string => {
   const lineStart = lineStartOf(source, start);
   const newline = source.indexOf("\n", end);
-  const lineEnd = newline === -1 ? source.length : newline;
-  if (source.slice(lineStart, start).trim() !== "") {
-    return source.slice(0, start).replace(/[ \t]+$/, "") + source.slice(end);
-  }
-  if (source.slice(end, lineEnd).trim() !== "") {
-    return source.slice(0, start) + source.slice(end).replace(/^[ \t]+/, "");
-  }
-  return joined(source.slice(0, lineStart), source.slice(lineEnd + 1));
+  const lineEnd = newline === -1 ? source.length : newline + 1;
+  const alone = `${source.slice(lineStart, start)}${source.slice(end, lineEnd)}`.trim() === "";
+  return alone
+    ? source.slice(0, lineStart) + source.slice(lineEnd)
+    : source.slice(0, start) + source.slice(end);
 };
 
 const withCuts = ({ source, cuts }: Planned): string =>
@@ -464,6 +437,16 @@ const requestOf = (root: string, argv: readonly string[]): Outcome<Request> => {
     : { value: { rows: rows.value, unit: flags.get("unit") } };
 };
 
+const FORMATTER = { package: "oxfmt", path: ["bin", "oxfmt"] } as const;
+
+const format = (root: string, files: readonly string[]): void => {
+  if (files.length === 0) return;
+  execFileSync(executableOf(FORMATTER), ["--no-error-on-unmatched-pattern", "--", ...files], {
+    cwd: root,
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+};
+
 const apply = (root: string, argv: readonly string[]): number => {
   const request = requestOf(root, argv);
   if ("refused" in request) return refuse(request.refused, 2);
@@ -476,6 +459,10 @@ const apply = (root: string, argv: readonly string[]): number => {
     writeFileSync(path.resolve(root, one.file), withCuts(one));
     process.stdout.write(`${reportOf("deleted", one)}\n`);
   }
+  format(
+    root,
+    plan.value.map(({ file }) => file),
+  );
   return 0;
 };
 

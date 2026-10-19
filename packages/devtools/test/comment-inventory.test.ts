@@ -48,6 +48,8 @@ const HOLDER = "test/sample.test.ts";
 const HOLDER_SOURCE = `import { it } from "vitest";
 
 it("keeps the answer", () => {});
+
+it("keeps keeps keeps", () => {});
 `;
 
 const trees: string[] = [];
@@ -102,13 +104,12 @@ const located = (tsv: string): readonly string[] =>
 
 describe("comment-inventory inventory", () => {
   it("emits one row per block, naming its kind and declaration", () => {
-    const root = treeOf({ [SAMPLE]: SAMPLE_SOURCE, [VIEW]: VIEW_SOURCE, [LOADER]: LOADER_SOURCE });
+    const root = treeOf({ [SAMPLE]: SAMPLE_SOURCE, [VIEW]: VIEW_SOURCE });
     const tsv = inventoryOf(root);
     expect(tsv.split("\n")[0]).toBe(
       "path\tstart\tend\tkind\tattached\twords\ttext\tclass\tholder\tstructure\tunit",
     );
     expect(located(tsv)).toEqual([
-      `${LOADER} 1 1 directive  1`,
       `${SAMPLE} 1 1 directive  6`,
       `${SAMPLE} 4 5 line answer 10`,
       `${SAMPLE} 6 6 trailing  2`,
@@ -116,6 +117,14 @@ describe("comment-inventory inventory", () => {
       `${SAMPLE} 13 13 line  3`,
       `${VIEW} 3 3 doc  4`,
     ]);
+  });
+
+  it("labels `@vite-ignore` a directive, since a bundler reads it", () => {
+    const root = treeOf({ [LOADER]: LOADER_SOURCE });
+    expect(
+      located(inventoryOf(root)),
+      "the comment gate exempts no `@vite-ignore`, so the inventory names it itself",
+    ).toEqual([`${LOADER} 1 1 directive  1`]);
   });
 
   it("escapes a tab, a newline and a backslash", () => {
@@ -196,6 +205,63 @@ export const shape: Shape = { side: 1 };
     expect(read(root, SAMPLE)).toBe("export const f = () => {\n  return 1;\n};\n");
   });
 
+  it("leaves no blank line at the file's edge", () => {
+    const source = "// top\n\nexport const one = 1;\n\n// bottom\n";
+    const root = treeOf({ [SAMPLE]: source });
+    const tsv = classified(inventoryOf(root), {
+      [`${SAMPLE}:1`]: { class: "narration", unit: "1" },
+      [`${SAMPLE}:5`]: { class: "narration", unit: "1" },
+    });
+    expect(applied(root, tsv, "1").status).toBe(0);
+    expect(read(root, SAMPLE)).toBe("export const one = 1;\n");
+  });
+
+  it("leaves one blank line where a block sat between two", () => {
+    const source = "export const one = 1;\n\n// between\n\nexport const two = 2;\n";
+    const root = treeOf({ [SAMPLE]: source });
+    const tsv = classified(inventoryOf(root), {
+      [`${SAMPLE}:3`]: { class: "narration", unit: "1" },
+    });
+    expect(applied(root, tsv, "1").status).toBe(0);
+    expect(read(root, SAMPLE)).toBe("export const one = 1;\n\nexport const two = 2;\n");
+  });
+
+  it("keeps the braces round a JSX comment the unit leaves", () => {
+    const source =
+      "export const W = () => (\n  <p>\n    {/* keep */\n    /* drop */}\n  </p>\n);\n";
+    const root = treeOf({ [VIEW]: source });
+    const tsv = classified(inventoryOf(root), {
+      [`${VIEW}:4`]: { class: "narration", unit: "1" },
+    });
+    expect(applied(root, tsv, "1").status).toBe(0);
+    expect(read(root, VIEW)).toBe("export const W = () => <p>{/* keep */}</p>;\n");
+  });
+
+  it("leaves each file it deletes from as oxfmt writes it", () => {
+    const source =
+      "export const P = ({ value }: { value: string }) => (\n  <p>\n    {/* a note */}\n    {value}\n  </p>\n);\n";
+    const root = treeOf({ [VIEW]: source });
+    const tsv = classified(inventoryOf(root), {
+      [`${VIEW}:3`]: { class: "narration", unit: "1" },
+    });
+    const ran = applied(root, tsv, "1");
+    expect(ran.stderr).toBe("");
+    expect(ran.status).toBe(0);
+    expect(read(root, VIEW)).toBe(
+      "export const P = ({ value }: { value: string }) => <p>{value}</p>;\n",
+    );
+  });
+
+  it("formats no file when the unit deletes nothing", () => {
+    const source = "// kept\nexport const   spaced = 1;\n";
+    const root = treeOf({ [SAMPLE]: source });
+    const tsv = classified(inventoryOf(root), {
+      [`${SAMPLE}:1`]: { class: "foreign", unit: "1" },
+    });
+    expect(applied(root, tsv, "1").status).toBe(0);
+    expect(read(root, SAMPLE)).toBe(source);
+  });
+
   it("resolves a holder whose line an earlier unit's deletion moved", () => {
     const root = treeOf({ [SAMPLE]: SAMPLE_SOURCE });
     const tsv = classified(inventoryOf(root), {
@@ -253,6 +319,7 @@ describe("comment-inventory apply refuses, changing no file", () => {
   it.each([
     ["text found nowhere", `${HOLDER} › drops the answer`, "holds this text 0 times"],
     ["text found twice", `${SAMPLE} › export const`, "holds this text 2 times"],
+    ["text that overlaps itself", `${HOLDER} › keeps keeps`, "holds this text 2 times"],
     ["text a deletion removes", `${SAMPLE} › second line of a block`, "0 times"],
     ["in a missing file", "test/missing.test.ts › keeps the answer", "names no file"],
     ["a line number", `${HOLDER}:3`, "is not path › text: anchor it on text"],
