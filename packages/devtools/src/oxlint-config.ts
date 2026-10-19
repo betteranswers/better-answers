@@ -30,15 +30,13 @@ type RuleSetting = z.infer<typeof ruleSetting>;
 
 type JsPlugin = OxlintConfig["jsPlugins"][number];
 
+const WHOLE_LINE_COMMENT = /^\s*\/\/.*$/gm;
+
+export const parsedOxlintConfig = (text: string): OxlintConfig =>
+  oxlintConfig.parse(JSON.parse(text.replaceAll(WHOLE_LINE_COMMENT, "")));
+
 export const readOxlintConfig = (): OxlintConfig =>
-  oxlintConfig.parse(
-    JSON.parse(
-      readFileSync(path.join(repositoryRoot, ".oxlintrc.json"), "utf8").replaceAll(
-        /^\s*\/\/.*$/gm,
-        "",
-      ),
-    ),
-  );
+  parsedOxlintConfig(readFileSync(path.join(repositoryRoot, ".oxlintrc.json"), "utf8"));
 
 const requireFromRoot = createRequire(path.join(repositoryRoot, "package.json"));
 
