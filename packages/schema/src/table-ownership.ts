@@ -408,21 +408,20 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "members",
     access: "read and write",
     reason:
-      "Adding a person to a group reads whether they are a member of the workspace first, so the action answers `no-such-member` rather than letting the composite foreign key abort the caller's transaction; the request action reads the same row to answer already-a-member neutrally. An Admin's actions on a member write the row itself — a role change, a removal and the member's revocation instant — and a role change or a removal first holds every Admin row of the workspace, so it never loses its last. The test workspace's fixture reads every workspace its people hold, to refuse one held anywhere else, and sets back a role that drifted under the platform's own actor.",
+      "Adding a person to a group reads whether they are a member of the workspace first, so the action answers `no-such-member` rather than letting the composite foreign key abort the caller's transaction; the request action reads the same row to answer already-a-member neutrally. An Admin's actions on a member write the row itself — a role change, a removal and the member's revocation instant — and a role change or a removal first holds every Admin row of the workspace, so it never loses its last.",
   },
   {
     table: "public.user",
     by: "members",
     access: "read",
     reason:
-      "Approving a request reads the requester's address to mint the invitation to it, and the Admin's queue names each requester so a person can be told apart from a person id; both reads are by the requester id already on a row of this workspace's queue. The test workspace's fixture reads its own people by address, the operator mark among them, so it never takes the operator as a test person.",
+      "Approving a request reads the requester's address to mint the invitation to it, and the Admin's queue names each requester so a person can be told apart from a person id; both reads are by the requester id already on a row of this workspace's queue.",
   },
   {
     table: "public.workspace",
     by: "members",
     access: "read",
-    reason:
-      "An invitation's email names the workspace it joins, and the test workspace's fixture finds its workspace by short name before it provisions one.",
+    reason: "An invitation's email names the workspace it joins.",
   },
   {
     table: "public.user",

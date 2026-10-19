@@ -1,8 +1,6 @@
 import { spawn } from "node:child_process";
 import {
-  existsSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -17,23 +15,11 @@ const web = fileURLToPath(new URL("..", import.meta.url));
 
 export const moduleAt = (file: string): string => JSON.stringify(path.join(web, file));
 
-export const OUTCOME_FILE = "test-results/journeys-outcome";
-
 type Ran = {
   readonly status: number | null;
   readonly stdout: string;
   readonly stderr: string;
   readonly summary: string;
-  readonly left: ReadonlyMap<string, string>;
-};
-
-const leftUnder = (tree: string): ReadonlyMap<string, string> => {
-  const results = path.join(tree, "test-results");
-  if (!existsSync(results)) return new Map();
-  const files = readdirSync(results, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => path.join(entry.parentPath, entry.name));
-  return new Map(files.map((file) => [path.relative(tree, file), readFileSync(file, "utf8")]));
 };
 
 type Exited = Pick<Ran, "status" | "stdout" | "stderr">;
@@ -76,34 +62,8 @@ export const playwrightOver = async (
       GITHUB_WORKSPACE: tree,
       ...env,
     });
-    return { ...exited, summary: readFileSync(summary, "utf8"), left: leftUnder(tree) };
+    return { ...exited, summary: readFileSync(summary, "utf8") };
   } finally {
     rmSync(tree, { recursive: true, force: true });
   }
-};
-
-type Journeys = {
-  readonly spec?: string;
-  /** More specs by file name, which Playwright runs one worker through in name order. */
-  readonly specs?: Readonly<Record<string, string>>;
-  readonly use?: Readonly<Record<string, string | number>>;
-  readonly env?: Readonly<Record<string, string>>;
-  readonly reporter?: string;
-};
-
-export const journeysOver = async (journeys: Journeys) => {
-  const reporter =
-    journeys.reporter ??
-    `[[${moduleAt("journeys/outcome-reporter.ts")}, { outcomeFile: ${JSON.stringify(OUTCOME_FILE)} }]]`;
-  const run = await playwrightOver(
-    {
-      // The journeys are ES modules, and a spec loaded as CommonJS cannot import one.
-      "package.json": '{ "type": "module" }\n',
-      "playwright.config.ts": `export default { testDir: ".", workers: 1, use: ${JSON.stringify(journeys.use ?? {})}, reporter: ${reporter} };\n`,
-      ...(journeys.spec === undefined ? {} : { "a.spec.ts": journeys.spec }),
-      ...journeys.specs,
-    },
-    journeys.env,
-  );
-  return { ...run, outcome: run.left.get(OUTCOME_FILE) };
 };

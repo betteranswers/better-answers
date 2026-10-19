@@ -287,8 +287,6 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Some of the vitest suite's files drive a real browser.
-      - run: pnpm --filter @better-answers/web exec playwright install --with-deps chromium
       - run: pnpm check:web:unit
 
   # Playwright deals tests to the shards, not files, because the suite is fully parallel.

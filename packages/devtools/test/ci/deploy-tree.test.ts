@@ -757,24 +757,18 @@ describe("the deploy tree", () => {
     );
   });
 
-  it("re-reads health briefly after the journeys, within each timeout", () => {
-    const rereads = ["journeys", "record"].map((name) => {
-      const job = releaseJob(name);
-      const polls = Number(
-        job?.steps.find((step) => step.run?.includes("deploy/await-release.sh"))?.env?.[
-          "AWAIT_RELEASE_POLLS"
-        ],
-      );
-      return { name, polls, fits: awaitSeconds(polls) < (job?.["timeout-minutes"] ?? 0) * 60 };
-    });
+  it("re-reads health briefly before the record, within its timeout", () => {
+    const job = releaseJob("record");
+    const polls = Number(
+      job?.steps.find((step) => step.run?.includes("deploy/await-release.sh"))?.env?.[
+        "AWAIT_RELEASE_POLLS"
+      ],
+    );
 
     expect(
-      rereads,
+      { polls, fits: awaitSeconds(polls) < (job?.["timeout-minutes"] ?? 0) * 60 },
       "production answered on this digest at the smoke, so a few polls ride out a blip",
-    ).toEqual([
-      { name: "journeys", polls: 3, fits: true },
-      { name: "record", polls: 3, fits: true },
-    ]);
+    ).toEqual({ polls: 3, fits: true });
   });
 
   it("lets no workflow commit to a branch", () => {

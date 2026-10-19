@@ -136,7 +136,7 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `switched` | Opens the switcher named for where the person is and picks the radio item holding another workspace's name. It waits for nothing after the pick, so the spec asserts where the person landed |
 | `inTwoWorkspaces` | A new person who is the Admin of one new workspace and holds a role in a second, Admin unless Viewer is named. It signs them in through `signIn`, picks the first workspace, waits for the Admin's home and the switcher named for it, and answers the address and both workspaces. A spec about moving between workspaces starts from it |
 | `reconfirmedOn` | Waits for the *Confirm It’s You* dialog, gives the person the harness's authenticator through `withAnAuthenticator`, types its code, and waits for the dialog to go. A spec runs it after `ageTheConfirmation` has made an act ask again |
-| `authenticatorCodeField` | The *Authenticator Code* field, by its exact label. `signIn` fills it on the confirm page, `reconfirmedOn` fills it in the *Confirm It’s You* dialog, and `apps/web/journeys/second-factor.ts` confirms through it |
+| `authenticatorCodeField` | The *Authenticator Code* field, by its exact label. `signIn` fills it on the confirm page, and `reconfirmedOn` fills it in the *Confirm It’s You* dialog |
 | `holdingTheFirstAnswer` | Fetches every answer a matcher picks, holds the first until the spec releases it, and counts every ask. It answers `reached`, `release` and `asked`. A spec presses a second time while the first answer is held and expects `asked` to be 1, as `apps/web/e2e/sessions.spec.ts` does |
 | `askShowsTheServedAddress` | Reads the MCP surface's address from `/.well-known/oauth-protected-resource/mcp` and asserts the page's main region shows it exactly. It answers that address and fails when the document does not answer. A spec compares the page with what the api serves, not with a copied value. `apps/web/e2e/home.spec.ts` is the worked example |
 | `ACTION_SAMPLES` | How many times a spec clocks one action before it judges it, five. A spec seeds `ACTION_SAMPLES - 1` extra rows, so each sample has a row to act on |
@@ -145,8 +145,8 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `tokenPainted` | A design-system token's value for a named CSS property as the browser paints it. It is read off a probe element styled with the token. `tokenColour` is this for `color`. `apps/web/e2e/focus-ring.spec.ts` reads `--focus-ring` as `box-shadow` with it |
 | `drawnMarks` | The visible elements holding `data-marks` whose `::before` draws, each named by its `data-slot` or its tag. `apps/web/e2e/sign-in.spec.ts` asserts the card alone draws them, and that the primary button inside it holds `data-marks` and draws none |
 
-The sign-in code is read from that capture and from nowhere else: the api's logger is forbidden from ever
-holding one. `emailsSentTo` counts the emails the capture holds for an address, and the suite's
+The sign-in code is read from that capture, with `codeSentTo`, and from nowhere else: the api's
+logger is forbidden from ever holding one. `emailsSentTo` counts the emails the capture holds for an address, and the suite's
 api delivers nothing to `@unreachable.example`, so a spec can meet an invitation whose email did
 not go.
 

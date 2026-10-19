@@ -250,7 +250,7 @@ const acceptedRows = {
   recoveryCode: [{ id: "recovery-code-1", userId: USER_ID, codeHash: "a".repeat(64) }],
   secondFactorThrottle: [{ userId: USER_ID, kind: "authenticator", failures: 6, waitUntil: NOW }],
   workspaceLastActive: [{ workspaceId: WS_ID, userId: USER_ID, at: NOW }],
-  testWorkspaceMark: [{ workspaceId: WS_ID, testingDomain: "journeys.testing.invalid" }],
+  testWorkspaceMark: [{ workspaceId: WS_ID, testingDomain: "people.testing.invalid" }],
   mcpCallCounter: [{ workspaceId: WS_ID, tokenId: "jti-1", windowStart: NOW, count: 1 }],
   invitationEmailCounter: [
     { workspaceId: WS_ID, key: "a".repeat(64), windowStart: NOW, count: 1 },
@@ -1087,9 +1087,9 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     mcpCallCounter: [{ ...acceptedRows.mcpCallCounter[0], count: -1 }],
     testWorkspaceMark: [
       { ...acceptedRows.testWorkspaceMark[0], workspaceId: "not-a-ulid" },
-      { ...acceptedRows.testWorkspaceMark[0], testingDomain: "Journeys.Testing.Invalid" },
-      { ...acceptedRows.testWorkspaceMark[0], testingDomain: "journeys" },
-      { ...acceptedRows.testWorkspaceMark[0], testingDomain: "person@journeys.invalid" },
+      { ...acceptedRows.testWorkspaceMark[0], testingDomain: "People.Testing.Invalid" },
+      { ...acceptedRows.testWorkspaceMark[0], testingDomain: "people" },
+      { ...acceptedRows.testWorkspaceMark[0], testingDomain: "person@people.invalid" },
     ],
     invitationEmailCounter: [
       { ...acceptedRows.invitationEmailCounter[0], workspaceId: "not-a-ulid" },

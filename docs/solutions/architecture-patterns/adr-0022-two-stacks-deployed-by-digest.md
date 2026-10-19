@@ -8,14 +8,14 @@ severity: high
 applies_when:
   - "Adding a service, a volume or an image to either compose stack"
   - "Changing how a release is promoted, tagged or rolled back"
-  - "Changing what a release must pass before it is tagged, or when the journeys run"
+  - "Changing what a release must pass before it is tagged"
+  - "Rebuilding a signed-in run against production at go-live"
   - "Changing a backup job, a restore script or the restore drill"
   - "Adding a hostname or a path at the edge"
 tags:
   - adr-0022
   - deploy-unit
   - release-mode
-  - journeys
   - digest
   - backup
   - restore-drill
@@ -31,7 +31,7 @@ Production runs on VPC 1 as a Coolify Postgres resource and two Compose stacks:
 - `stores` (`deploy/stores.compose.yaml`), redeployed only for a store's upgrade.
 - `platform` (`deploy/platform.compose.yaml`: `migrate` → `api` → `worker`), redeployed on every release.
 
-Every stateful service is a bind mount under `/data/<service>`. Garage is the object store, provisioned by `deploy/wizard-41.sh`. Every image deploys by digest, and the backup image is the third. Every release that held is an annotated `release/*` tag, never a commit to `main`. A release holds once its smoke has passed, and, under `JOURNEYS_MODE=gate`, once its journeys have ended `held` too. Every call to the orchestrator must answer 2xx. Migrations are forward-only, and a rollback is the previous digest. That decision lives here alone.
+Every stateful service is a bind mount under `/data/<service>`. Garage is the object store, provisioned by `deploy/wizard-41.sh`. Every image deploys by digest, and the backup image is the third. Every release that held is an annotated `release/*` tag, never a commit to `main`. A release holds once its smoke has passed. Every call to the orchestrator must answer 2xx. Migrations are forward-only, and a rollback is the previous digest. That decision lives here alone.
 
 One variable, `RELEASE_MODE`, phases the releases:
 
@@ -40,16 +40,9 @@ One variable, `RELEASE_MODE`, phases the releases:
 - `drill`: a dispatched release names the drill report it rides on, or a hotfix reason. It runs from go-live.
 - Any other value releases nothing.
 
-The journeys sign in to production as the test people and walk the pages each role reaches. A second variable, `JOURNEYS_MODE`, stages them:
+Until go-live, no run signs in to production. The browser suite proves each page before it merges, and the smoke and the uptime probe watch production. The signed-in production journeys, and the `JOURNEYS_MODE` variable that staged them, are retired until go-live.
 
-- `off`, or unset: they never run, and a release is tagged on its smoke.
-- `report`: they run and report, and the tag still follows the smoke.
-- `gate`: a journeyed release is tagged only when its journeys end `held`. One that ends `fail` stays live and is tagged `rejected/`. The nightly gate treats that tag as the edge of its walk, so it never promotes that commit again or moves production back past it. One that cannot run stays live, untagged, and is promoted again the next night.
-- Any other value releases nothing.
-
-Under `report` and `gate` the journeys run after every nightly or dispatched promotion whose smoke passes, before its tag. A release that `build.yml` calls after a merge runs none, and keeps its smoke-only tag under every value. A scheduled night with nothing newer to promote runs them alone against the live release, in every release mode. So does a journeys-only dispatch. They check out the commit the live api image was built from, which they read from the image's revision label.
-
-Until the first customer uses the platform, a failed release never rolls production back. The owner decides, by the runbook's rollback. From that day, a failure re-promotes the last tagged release. If the failed release added a migration, the failure alerts the owner instead. That rollback is BA-48, still to be built. Its rejected marker landed first, with the gate.
+Until the first customer uses the platform, a failed release never rolls production back. The owner decides, by the runbook's rollback. From that day, a failure re-promotes the last tagged release. If the failed release added a migration, the failure alerts the owner instead. That rollback is BA-48, still to be built.
 
 Every irreplaceable byte is encrypted and copied off-host:
 
@@ -71,13 +64,8 @@ The edge is one tunnel and three hostnames. `app.` is open, and Better Auth is i
 - The backup identity sits on VPC 2 because the drill runs unattended, and a drill that needs a person present stops happening. The cost: a VPC 2 compromise exposes every dump's plaintext.
 - At about sixty merges a day, a release by hand is sixty dispatches nobody makes. A drill report on every release of a platform nobody relies on yet buys nothing.
 - Nothing reaches the stores stack from GitHub but the orchestrator's API, so the nightly release rides the box's own backup rather than a backup CI takes.
-- The first automatic release tagged a deploy that never happened: the edge answered empty credentials with a redirect that `curl -f` counted as success. Hence every call must answer 2xx, and only a release that held gets a tag. So the newest tag is always the last release that held, and the rollback target. Under `gate`, the release production runs may be newer than that tag and untagged, with its migrations applied all the same. So a rollback first lists the migrations it would cross.
-- The smoke reads `/health` and one unauthenticated document, so a release can pass it and refuse every sign-in. Only a run signed in as each role sees that.
-- The journeys skip a release that `build.yml` calls, because `per-merge` lasts only until the first customer's bundle lands. Journeys on every release of a platform nobody relies on yet buy nothing.
-- Every night runs them, with or without a promotion. So the alert hears from each night, and a night with no run reads as a late check. They sit in the release's concurrency group, so they never overlap a release.
-- A refused night pings `could-not-run`, so an unknown mode or an unreadable history reaches the alert that night, not a day and a half later.
-- A failed release is rejected rather than promoted again. Without the marker, `gate` would redeploy the same broken commit every night, restarting the api, until someone acted. Only `fail` rejects, since `could-not-run` says nothing about the release.
-- They check out the image's own commit, not `main`'s head, so a rollback night runs the old commit's journeys against the old images.
+- The first automatic release tagged a deploy that never happened: the edge answered empty credentials with a redirect that `curl -f` counted as success. Hence every call must answer 2xx, and only a release that held gets a tag. So the newest tag is always the last release that held, and the rollback target. A release whose smoke failed may still run, untagged, with its migrations applied all the same. So a rollback first lists the migrations it would cross.
+- The smoke reads `/health` and one unauthenticated document, so a release can pass it and refuse every sign-in. Only a run signed in as each role sees that in production. Until go-live the browser suite sees it before merge, signed in as each role against the served build.
 - An automatic rollback across a migration would run an api older than its schema: a rollback below migration 0053 fails every sign-in.
 - Forward-only and the digest rollback are a decision, not a rule, because neither half is legible in a diff.
 - The api's list is the second fence because Better Auth's handler answers the wildcard on every hostname the process is given.
@@ -93,8 +81,10 @@ The edge is one tunnel and three hostnames. `app.` is open, and Better Auth is i
 - A self-hosted dead-man's switch on VPC 2: it cannot report its own outage.
 - SOPS in the repository: one more tool, and Coolify still needs the values pasted.
 - A switch per release phase: the phases never overlap, and one name read in one place cannot contradict another.
-- A daily schedule of the journeys' own: a second place they run, which could overlap a release.
+- Signed-in production journeys before go-live: 37 of the last 40 releases ran them and every run held, while 69 of the 1,894 commits since 25/09/2026 went to keeping them up. They return at go-live.
 
 ## History
 
 The full record, with its thirteen amendments (among them T-005, T-022, T-030, T-039, T-045, T-119, T-125, T-184 and T-358): `docs/archive/adr/0022-two-stacks-deployed-by-digest.md`.
+
+Amended 19/10/2026 on the owner's ruling of 19/10/2026, by BA-204. The signed-in production journeys, the `JOURNEYS_MODE` variable that staged them, the `rejected/` tag and the test inbox they read are retired until go-live. A release holds on its smoke alone, and the nightly gate walks back to the last `release/*` tag. Git history keeps the journeys for the go-live rebuild.

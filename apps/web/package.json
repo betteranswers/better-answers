@@ -11,8 +11,7 @@
     "typecheck": "tsc --noEmit",
     "check": "node ../../scripts/check.mjs typecheck test e2e",
     "test": "node ./node_modules/vitest/vitest.mjs run",
-    "e2e": "pnpm run build && playwright test",
-    "journeys": "PLAYWRIGHT_NO_COPY_PROMPT=1 node ./node_modules/@playwright/test/cli.js test --config playwright.journeys.config.ts"
+    "e2e": "pnpm run build && playwright test"
   },
   "dependencies": {
     "@better-answers/design-system": "workspace:*",
@@ -49,14 +48,11 @@
     "@tailwindcss/vite": "4.3.3",
     "@testing-library/dom": "10.4.2",
     "@testing-library/react": "16.3.3",
-    "@types/mailparser": "3.9.0",
     "@types/qrcode": "1.5.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
     "jsdom": "30.1.2",
-    "mailauth": "7.2.0",
-    "mailparser": "3.9.37",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.3.4",

@@ -1,6 +1,6 @@
 ---
 name: browser-suite
-description: How this repository drives a browser: the served-build seam, the client-address fixtures, the harness's actions and helpers, locators, waiting, the accessibility gate and the journeys. Use when writing, debugging or running a Playwright spec under apps/web/e2e or a journey under apps/web/journeys, when a spec fails, flakes or hangs, when the gate refuses a page, when a spec needs state no harness action makes, or when a change renames a page's label, heading or accessible name.
+description: How this repository drives a browser: the served-build seam, the client-address fixtures, the harness's actions and helpers, locators, waiting and the accessibility gate. Use when writing, debugging or running a Playwright spec under apps/web/e2e, when a spec fails, flakes or hangs, when the gate refuses a page, when a spec needs state no harness action makes, or when a change renames a page's label, heading or accessible name.
 ---
 
 # The browser suite
@@ -9,7 +9,7 @@ description: How this repository drives a browser: the served-build seam, the cl
 page is read here and a page is never asserted against its source. Everything below is what
 the suite already is; `apps/web/e2e/models-and-spend.spec.ts` is the fullest worked example.
 
-Three reference files hold the detail. Open the one a task needs:
+Two reference files hold the detail. Open the one a task needs:
 
 - **`references/harness.md`**: every harness action and helper, what a refused seed leaves
   behind, the ceilings a spec runs into, and the readers of the api's answers. Open it before
@@ -19,8 +19,6 @@ Three reference files hold the detail. Open the one a task needs:
 - **`references/accessibility-gate.md`**: what the audit checks, and how the gate proves itself.
   Open it when the gate refuses a page, when a spec is about one theme, or when a change touches
   the gate.
-- **`references/journeys.md`**: the production journeys, which are off and being retired
-  (BA-204). Open it only to work on that retirement.
 
 ## The seam
 
@@ -108,8 +106,8 @@ file for one that already does the job.
   still names the control, so the same spec also finds the control by that name, held once, where
   the page shows it. Test ids appear nowhere in this suite; adding one adds a handle the reader
   does not have.
-- **Import none of the web's text.** A spec and a journey import from the SPA only what is not
-  text: a page's address, a wire word, a limit, a count, a key's letter, a type, a function that
+- **Import none of the web's text.** A spec imports from the SPA only what is not text:
+  a page's address, a wire word, a limit, a count, a key's letter, a type, a function that
   formats seeded data. A changed label then fails the tests that name that control, at run time,
   and nothing else. `apps/web/e2e/models-and-spend.spec.ts` reads its page's address off
   `apps/web/src/shared/navigation.ts` and writes each name itself.
@@ -248,12 +246,6 @@ Under CI a failed test gets one retry, and the retry records a trace. A test tha
 its retry is flaky, not green. `apps/web/e2e/flaky-report.ts` names it in a warning annotation
 and in the job's summary, with its first failure; file a ticket with the run id. Nothing is
 retried on a local machine.
-
-## The journeys
-
-The journeys in `apps/web/journeys/` signed in to production as the test workspace's Admin,
-Editor and Viewer. They are off (`JOURNEYS_MODE` is `off`) and are being retired until go-live
-(BA-204). A pull request no longer changes or runs a journey when it changes a page.
 
 ## Not carried
 

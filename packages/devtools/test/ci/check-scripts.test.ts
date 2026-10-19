@@ -155,7 +155,6 @@ const SHIMMED_RUNNERS: readonly string[] = ["vitest", "stryker"];
 const RUNNER_SCRIPTS: Readonly<Record<string, string>> = {
   test: "vitest",
   mutation: "@stryker-mutator/core",
-  journeys: "@playwright/test",
 };
 
 const RUNNER_ENTRY = /\bnode\s+\.\/node_modules\/(?<pkg>(?:@[^/\s]+\/)?[^/\s]+)\/(?<file>\S+)/;
@@ -216,7 +215,7 @@ describe("the runners start through node", () => {
     ).toEqual([]);
   });
 
-  it("starts only the test, mutation and journeys scripts at runners", () => {
+  it("starts only the test and mutation scripts at runners", () => {
     const expected = workspacePackages().flatMap((directory) =>
       Object.entries(RUNNER_SCRIPTS).flatMap(([name, pkg]) =>
         scriptsOf(directory)[name] === undefined ? [] : [`${directory} ${name}: ${pkg}`],
@@ -228,12 +227,8 @@ describe("the runners start through node", () => {
 
     expect(expected).toContain("packages/core mutation: @stryker-mutator/core");
     expect(
-      started,
-      "the journeys start Playwright by path: Knip loads the config a script's --config names, and the journeys' config refuses to load without PUBLIC_URL",
-    ).toContain("apps/web journeys: @playwright/test");
-    expect(
       [...started].sort(),
-      "a workspace's test, mutation or journeys script starts no runner entry, or another script does",
+      "a workspace's test or mutation script starts no runner entry, or another script does",
     ).toEqual([...expected].sort());
   });
 });

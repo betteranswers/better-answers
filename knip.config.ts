@@ -3,7 +3,7 @@ import type { KnipConfig } from "knip";
 /** Not gated: `--production`/`--strict` call helpers unused and their devDependencies unlisted. */
 const config: KnipConfig = {
   // These are installed on the machine and never by npm, so no manifest names them.
-  ignoreBinaries: ["uv", "openssl", "jdocmunch-mcp"],
+  ignoreBinaries: ["uv", "jdocmunch-mcp"],
 
   // Nothing here is published, so an unimported entry export is dead; one kept
   // for a later route block carries `/** @public <block> */`.
@@ -32,16 +32,8 @@ const config: KnipConfig = {
       entry: [
         // Installed ahead of its pages, so an unimported component or export is not dead code.
         "src/shared/ui/**",
-
-        "journeys/*.spec.ts",
-        "journeys/outcome-reporter.ts",
       ],
       includeEntryExports: false,
-    },
-
-    "apps/test-inbox": {
-      // `wrangler.jsonc` names it; wrangler is no dependency, so no knip plugin reads that file.
-      entry: ["src/index.ts"],
     },
 
     "packages/core": {
