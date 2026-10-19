@@ -5,7 +5,7 @@ import type { Role } from "@/shared/navigation.ts";
 
 import { expect, test as suite } from "../e2e/browser.ts";
 import { codeSentTo } from "../e2e/harness.ts";
-import { noteInbox, probeInbox } from "./inbox.ts";
+import { inboxProvesWritable, noteInbox } from "./inbox.ts";
 import { couldNotRun, playsTheRole } from "./outcome.ts";
 import { goOnUnlessStopped } from "./run-stop.ts";
 import {
@@ -56,7 +56,7 @@ const inboxReader = (): Reader => {
   if (!apiUrl.success) return couldNotRun("JOURNEYS_INBOX_URL is not set to a bare https origin");
   return {
     source: (recipient) => noteInbox({ recipient, sender: sender.data, apiUrl: apiUrl.data }),
-    stands: () => probeInbox(apiUrl.data),
+    stands: () => inboxProvesWritable(apiUrl.data),
     factorKey: keyFromTheSetting,
   };
 };

@@ -4,7 +4,7 @@ import { storeOver, type Database, type Received, type Store } from "./store.ts"
 
 type Env = { readonly DB: Database; readonly READ_TOKEN?: string | undefined };
 
-type ReceivedEmail = {
+type ForwardableEmailMessagePart = {
   readonly to: string;
   readonly headers: Headers;
   readonly raw: ReadableStream<Uint8Array>;
@@ -23,7 +23,11 @@ const logged: Logged = (event, detail) => {
 const tokenOf = (token: string | undefined): string | undefined =>
   token !== undefined && token.length >= TOKEN_LEAST_LENGTH ? token : undefined;
 
-const receivedOf = (message: ReceivedEmail, raw: Uint8Array, receivedAtMs: number): Received => ({
+const receivedOf = (
+  message: ForwardableEmailMessagePart,
+  raw: Uint8Array,
+  receivedAtMs: number,
+): Received => ({
   receivedAtMs,
   recipient: message.to.toLowerCase(),
   from: message.headers.get("from") ?? "",
@@ -36,7 +40,7 @@ const receivedOf = (message: ReceivedEmail, raw: Uint8Array, receivedAtMs: numbe
  * test address on the sender's suppression list.
  */
 const receive = async (
-  message: ReceivedEmail,
+  message: ForwardableEmailMessagePart,
   store: Store,
   receivedAtMs: number,
 ): Promise<void> => {
@@ -61,7 +65,7 @@ const receive = async (
 };
 
 export default {
-  email: (message: ReceivedEmail, env: Env): Promise<void> =>
+  email: (message: ForwardableEmailMessagePart, env: Env): Promise<void> =>
     receive(message, storeOver(env.DB), Date.now()),
 
   fetch: (request: Request, env: Env): Promise<Response> =>

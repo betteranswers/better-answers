@@ -312,7 +312,7 @@ export const noteInbox = async (inbox: Inbox): Promise<Noted> => {
   };
 };
 
-export const probeInbox = async (apiUrl: URL): Promise<boolean> => {
+export const inboxProvesWritable = async (apiUrl: URL): Promise<boolean> => {
   const key = inboxKey();
   if (key === undefined) return false;
   return (await fetched(new URL("/probe", apiUrl), key, PROBED, "POST")) !== undefined;

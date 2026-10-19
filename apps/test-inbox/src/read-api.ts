@@ -51,12 +51,18 @@ const unavailable = (api: ReadApi, error: string): Response => {
 const digestOf = async (text: string): Promise<Uint8Array> =>
   new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
 
+const equalInConstantTime = async (given: string, expected: string): Promise<boolean> => {
+  const [givenDigest, expectedDigest] = await Promise.all([digestOf(given), digestOf(expected)]);
+  const difference = givenDigest.reduce(
+    (folded, byte, at) => folded | (byte ^ (expectedDigest[at] ?? 0)),
+    0,
+  );
+  return difference === 0;
+};
+
 const admits = async (authorization: string | null, token: string): Promise<boolean> => {
   const offered = BEARER.exec(authorization ?? "")?.[1];
-  if (offered === undefined) return false;
-  const [given, expected] = await Promise.all([digestOf(offered), digestOf(token)]);
-  const difference = given.reduce((folded, byte, at) => folded | (byte ^ (expected[at] ?? 0)), 0);
-  return difference === 0;
+  return offered !== undefined && (await equalInConstantTime(offered, token));
 };
 
 const limitOf = (given: string | null): number => {
@@ -103,9 +109,9 @@ const retrieved = async (api: ReadApi, id: string): Promise<Response> => {
   return answered(200, body);
 };
 
-const probed = async (api: ReadApi): Promise<Response> => {
-  const probe = await api.store.probe(api.nowMs);
-  return probe.ok ? answered(200, { probed: true }) : unavailable(api, probe.error);
+const provenWritable = async (api: ReadApi): Promise<Response> => {
+  const writable = await api.store.provesWritable(api.nowMs);
+  return writable.ok ? answered(200, { probed: true }) : unavailable(api, writable.error);
 };
 
 type Route = {
@@ -115,7 +121,7 @@ type Route = {
 
 const routeOf = (pathname: string): Route | undefined => {
   if (pathname === RECEIVING) return { allowed: "GET", answer: listed };
-  if (pathname === PROBE_PATH) return { allowed: "POST", answer: probed };
+  if (pathname === PROBE_PATH) return { allowed: "POST", answer: provenWritable };
   const id = ONE_MESSAGE.exec(pathname)?.[1];
   return id === undefined ? undefined : { allowed: "GET", answer: (api) => retrieved(api, id) };
 };

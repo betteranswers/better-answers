@@ -6,7 +6,7 @@ import type { DNSResolver } from "mailauth";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // oxlint-disable-next-line no-restricted-imports -- the journeys sit outside `src`, where no alias reaches
-import { noteInbox, probeInbox, type Inbox } from "../journeys/inbox.ts";
+import { inboxProvesWritable, noteInbox, type Inbox } from "../journeys/inbox.ts";
 import {
   closeEveryStandIn,
   inboxStandIn,
@@ -585,11 +585,11 @@ describe("noteInbox, when the inbox fails", () => {
   });
 });
 
-describe("probeInbox", () => {
+describe("inboxProvesWritable", () => {
   it("holds when the inbox writes its probe row", async () => {
     const inbox = await standIn();
 
-    expect(await probeInbox(new URL(inbox.origin))).toBe(true);
+    expect(await inboxProvesWritable(new URL(inbox.origin))).toBe(true);
     expect(
       inbox.heard.map(({ method, url, authorization }) => [method, url.pathname, authorization]),
     ).toEqual([["POST", "/probe", `Bearer ${KEY}`]]);
@@ -602,14 +602,14 @@ describe("probeInbox", () => {
     const inbox = await standIn();
     inbox.probeAnswers(answer);
 
-    expect(await probeInbox(new URL(inbox.origin))).toBe(false);
+    expect(await inboxProvesWritable(new URL(inbox.origin))).toBe(false);
   });
 
   it("fails without asking when the key is unset", async () => {
     vi.stubEnv("JOURNEYS_INBOX_KEY", undefined);
     const inbox = await standIn();
 
-    expect(await probeInbox(new URL(inbox.origin))).toBe(false);
+    expect(await inboxProvesWritable(new URL(inbox.origin))).toBe(false);
     expect(inbox.heard).toEqual([]);
   });
 });
