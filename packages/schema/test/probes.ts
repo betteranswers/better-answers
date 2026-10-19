@@ -35,7 +35,7 @@ const constraintOf = (error: unknown): string => {
   return typeof named === "string" ? named : `nothing named a constraint: ${String(error)}`;
 };
 
-const TABLE_PRIVILEGES = [
+const EVERY_TABLE_PRIVILEGE_THE_PINNED_IMAGE_HAS = [
   "SELECT",
   "INSERT",
   "UPDATE",
@@ -53,7 +53,7 @@ export const privilegesHeld = async (
 ): Promise<Record<string, boolean>> => {
   const held = await client.query<{ privilege: string; held: boolean }>(
     "SELECT privilege, has_table_privilege($1, $2, privilege) AS held FROM unnest($3::text[]) AS privilege",
-    [role, table, [...TABLE_PRIVILEGES]],
+    [role, table, [...EVERY_TABLE_PRIVILEGE_THE_PINNED_IMAGE_HAS]],
   );
   return Object.fromEntries(held.rows.map((row) => [row.privilege, row.held]));
 };
