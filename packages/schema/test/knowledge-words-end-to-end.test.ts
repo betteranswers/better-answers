@@ -16,7 +16,7 @@ import { journalMigrationFiles } from "../src/journal.ts";
 import { POSTGRES_IMAGE } from "../src/postgres-image.ts";
 import {
   migrationsFolderBefore0072,
-  oldWordsStoredIn,
+  oldWordsAndControlRowsStoredIn,
   type SeededBefore0072,
 } from "./before-the-knowledge-words.ts";
 import { endPool, POSTGRES_COMMAND, withRollback } from "./harness.ts";
@@ -194,8 +194,8 @@ beforeAll(async () => {
   try {
     await client.query("BEGIN");
     seeded = {
-      A: await oldWordsStoredIn(client, here),
-      B: await oldWordsStoredIn(client, there),
+      A: await oldWordsAndControlRowsStoredIn(client, here),
+      B: await oldWordsAndControlRowsStoredIn(client, there),
     };
     await client.query("COMMIT");
     await client.query(

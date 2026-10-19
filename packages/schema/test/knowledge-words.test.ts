@@ -5,7 +5,7 @@ import { ulid } from "../src/index.ts";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
 import { asTheMigrationOwnerOf, migrationStatements } from "./journal-statements.ts";
-import { ADMITTED, postgresForSuite, refusalOf, suggestionWritten } from "./probes.ts";
+import { ADMITTED, postgresForSuite, refusalOf, suggestionWrittenOfAnyKind } from "./probes.ts";
 
 const db = postgresForSuite();
 
@@ -51,7 +51,7 @@ const oldValuesIn = async (client: pg.PoolClient, workspaceId: string): Promise<
   const decided = ulid();
   const waiting = ulid();
   const setId = ulid();
-  await suggestionWritten(client, {
+  await suggestionWrittenOfAnyKind(client, {
     workspaceId,
     id: decided,
     setId,
@@ -59,7 +59,7 @@ const oldValuesIn = async (client: pg.PoolClient, workspaceId: string): Promise<
     proposer: A_RUN,
     decided: { targetIri: identity.iri, decider: A_PERSON },
   });
-  await suggestionWritten(client, {
+  await suggestionWrittenOfAnyKind(client, {
     workspaceId,
     id: waiting,
     setId,
@@ -172,7 +172,13 @@ describe("migration 0072 over the knowledge words stored before it", () => {
       await replayingItsValueRewrites(client);
 
       const raised = (kind: string, proposer: string) => () =>
-        suggestionWritten(client, { workspaceId: here, id: ulid(), setId: ulid(), kind, proposer });
+        suggestionWrittenOfAnyKind(client, {
+          workspaceId: here,
+          id: ulid(),
+          setId: ulid(),
+          kind,
+          proposer,
+        });
       expect(await refusalOf(client, raised("candidate", A_RUN))).toBe("suggestion_kind_check");
       expect(await refusalOf(client, raised("citation-fix", A_PERSON))).toBe(
         "suggestion_citation_fix_proposer_check",

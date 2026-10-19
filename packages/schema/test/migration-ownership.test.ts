@@ -310,7 +310,9 @@ describe("what the audience substrate copies from the schema package", () => {
     const sql = readFileSync(file, "utf8");
 
     for (const table of ["graph_node", "graph_edge"]) {
-      expect(sql).toContain(`"${table}_audience_check" CHECK (${AUDIENCE_CHECK})`);
+      expect(sql, "the substrate predates 0067, so it names graph_node and graph_edge").toContain(
+        `"${table}_audience_check" CHECK (${AUDIENCE_CHECK})`,
+      );
     }
   });
 });

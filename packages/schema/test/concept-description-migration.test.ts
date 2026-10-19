@@ -1,7 +1,3 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
-
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -9,36 +5,16 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { migrationsFolder } from "../src/index.ts";
-import { journalMetaFolder } from "../src/journal.ts";
 import { POSTGRES_IMAGE } from "../src/postgres-image.ts";
 import { testData } from "./factory.ts";
 import { endPool, POSTGRES_COMMAND } from "./harness.ts";
+import { migrationsFolderEndingAt } from "./journal-statements.ts";
 
 const LAST_BEFORE = "0079_the-model-key";
 
 const ROWS = 300;
 
 const ONLY_IN_A_DESCRIPTION = "zebrafinch";
-
-type Journal = { readonly entries: readonly { readonly tag: string }[] };
-
-const folderEndingAt = (tag: string): string => {
-  const journalText = readFileSync(path.join(journalMetaFolder, "_journal.json"), "utf8");
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- src/journal.ts owns the journal's schema; this copy only cuts its entries
-  const journal = JSON.parse(journalText) as Journal & Record<string, unknown>;
-  const entries = journal.entries.slice(0, journal.entries.findIndex((e) => e.tag === tag) + 1);
-  if (entries.at(-1)?.tag !== tag) throw new Error(`${tag} is not in the journal`);
-  const folder = mkdtempSync(path.join(tmpdir(), "until-0080-"));
-  mkdirSync(path.join(folder, "meta"));
-  writeFileSync(
-    path.join(folder, "meta", "_journal.json"),
-    JSON.stringify({ ...journal, entries }),
-  );
-  for (const entry of entries) {
-    cpSync(path.join(migrationsFolder, `${entry.tag}.sql`), path.join(folder, `${entry.tag}.sql`));
-  }
-  return folder;
-};
 
 const standing = async (pool: pg.Pool) => {
   const read = await pool.query<{ rows: number; held: number; valid: boolean; ready: boolean }>(
@@ -61,7 +37,7 @@ describe("0080 over concepts stored before it", () => {
       .withCommand([...POSTGRES_COMMAND])
       .start();
     pool = new pg.Pool({ connectionString: container.getConnectionUri(), max: 2 });
-    await migrate(drizzle(pool), { migrationsFolder: folderEndingAt(LAST_BEFORE) });
+    await migrate(drizzle(pool), { migrationsFolder: migrationsFolderEndingAt(LAST_BEFORE) });
     const client = await pool.connect();
     try {
       const seed = testData(client);

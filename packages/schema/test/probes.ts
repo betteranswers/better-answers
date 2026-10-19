@@ -213,7 +213,7 @@ export type SuggestionRow = {
   readonly decided?: { readonly targetIri: string; readonly decider: string };
 };
 
-export const suggestionWritten = (client: Writer, row: SuggestionRow): Promise<unknown> =>
+export const suggestionWrittenOfAnyKind = (client: Writer, row: SuggestionRow): Promise<unknown> =>
   client.query(
     `INSERT INTO suggestion
        (workspace_id, id, set_id, kind, status, proposer, target_iri, decider, decided_at)

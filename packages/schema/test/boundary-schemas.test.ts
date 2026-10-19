@@ -61,7 +61,7 @@ const DRAFTED_RECORD_ID = "01J6QQQQQQQQQQQQQQQQQQQQQ2";
 
 const A_SEALED_FRAME = new Uint8Array(40).fill(7);
 
-const ASKED_THIS_MONTH = new Date();
+const ASKED_IN_THE_MONTH_THE_MIGRATION_PARTITIONED = new Date();
 
 const DUE = new Date("2026-10-01T00:00:00Z");
 const EXTENDED = new Date("2026-12-01T00:00:00Z");
@@ -583,7 +583,7 @@ const acceptedRows = {
     {
       workspaceId: WS_ID,
       id: QUESTION_RECORD_ID,
-      askedAt: ASKED_THIS_MONTH,
+      askedAt: ASKED_IN_THE_MONTH_THE_MIGRATION_PARTITIONED,
       askedBy: `human:${USER_ID}`,
       transport: "mcp",
       predicateRole: "Viewer",
@@ -591,13 +591,13 @@ const acceptedRows = {
     {
       workspaceId: WS_ID,
       id: DRAFTED_RECORD_ID,
-      askedAt: ASKED_THIS_MONTH,
+      askedAt: ASKED_IN_THE_MONTH_THE_MIGRATION_PARTITIONED,
       askedBy: `human:${USER_ID}`,
       transport: "trpc",
       collections: ["audits"],
       predicateRole: "Editor",
       predicateGroups: [GROUP_ID],
-      completedAt: ASKED_THIS_MONTH,
+      completedAt: ASKED_IN_THE_MONTH_THE_MIGRATION_PARTITIONED,
       verdict: "related",
       judgeState: "judged",
       concepts: [
@@ -620,13 +620,13 @@ const acceptedRows = {
     {
       workspaceId: WS_ID,
       recordId: QUESTION_RECORD_ID,
-      askedAt: ASKED_THIS_MONTH,
+      askedAt: ASKED_IN_THE_MONTH_THE_MIGRATION_PARTITIONED,
       question: "How long are audit logs kept?",
     },
     {
       workspaceId: WS_ID,
       recordId: DRAFTED_RECORD_ID,
-      askedAt: ASKED_THIS_MONTH,
+      askedAt: ASKED_IN_THE_MONTH_THE_MIGRATION_PARTITIONED,
       question: "How long are audit logs kept?",
       drafted: [{ sentence: "Audit logs are kept for a year.", concepts: [CONCEPT_IRI] }],
     },
@@ -1636,15 +1636,15 @@ describe("5 — the inferred type is pinned", () => {
     (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
   type NoneOf<T extends never> = T;
 
-  type Branded<Brand extends string> = string & z.core.$brand<Brand>;
-  type WorkspaceId = Branded<"WorkspaceId">;
-  type UserId = Branded<"UserId">;
-  type GroupId = Branded<"GroupId">;
-  type ConnectedSourceId = Branded<"ConnectedSourceId">;
-  type WriteUpId = Branded<"WriteUpId">;
-  type AuditEventId = Branded<"AuditEventId">;
-  type AccessRequestId = Branded<"AccessRequestId">;
-  type ConceptIri = Branded<"ConceptIri">;
+  type BrandSpelledApartFromIds<Brand extends string> = string & z.core.$brand<Brand>;
+  type WorkspaceId = BrandSpelledApartFromIds<"WorkspaceId">;
+  type UserId = BrandSpelledApartFromIds<"UserId">;
+  type GroupId = BrandSpelledApartFromIds<"GroupId">;
+  type ConnectedSourceId = BrandSpelledApartFromIds<"ConnectedSourceId">;
+  type WriteUpId = BrandSpelledApartFromIds<"WriteUpId">;
+  type AuditEventId = BrandSpelledApartFromIds<"AuditEventId">;
+  type AccessRequestId = BrandSpelledApartFromIds<"AccessRequestId">;
+  type ConceptIri = BrandSpelledApartFromIds<"ConceptIri">;
 
   type PinnedIds = {
     workspaceId: WorkspaceId;

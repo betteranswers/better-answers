@@ -1,37 +1,13 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
-
 import type pg from "pg";
 
-import { migrationsFolder, ulid } from "../src/index.ts";
-import { journalMetaFolder } from "../src/journal.ts";
+import { ulid } from "../src/index.ts";
 import { testData } from "./factory.ts";
-import { suggestionWritten } from "./probes.ts";
+import { migrationsFolderEndingAt } from "./journal-statements.ts";
+import { suggestionWrittenOfAnyKind } from "./probes.ts";
 
 const THE_LAST_BEFORE = "0071_the-short-name";
 
-type Journal = { readonly entries: readonly { readonly idx: number; readonly tag: string }[] };
-
-export const migrationsFolderBefore0072 = (): string => {
-  const journalPath = path.join(journalMetaFolder, "_journal.json");
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- the journal's own schema is in src/journal.ts; this copy only drops entries
-  const journal = JSON.parse(readFileSync(journalPath, "utf8")) as Journal &
-    Record<string, unknown>;
-  const last = journal.entries.findIndex(({ tag }) => tag === THE_LAST_BEFORE);
-  if (last === -1) throw new Error(`${THE_LAST_BEFORE} is not in the journal`);
-  const kept = journal.entries.slice(0, last + 1);
-  const folder = mkdtempSync(path.join(tmpdir(), "before-0072-"));
-  mkdirSync(path.join(folder, "meta"));
-  writeFileSync(
-    path.join(folder, "meta", "_journal.json"),
-    JSON.stringify({ ...journal, entries: kept }),
-  );
-  for (const { tag } of kept) {
-    cpSync(path.join(migrationsFolder, `${tag}.sql`), path.join(folder, `${tag}.sql`));
-  }
-  return folder;
-};
+export const migrationsFolderBefore0072 = (): string => migrationsFolderEndingAt(THE_LAST_BEFORE);
 
 const A_PERSON = "human:01J6CCCCCCCCCCCCCCCCCCCCCC";
 
@@ -43,7 +19,7 @@ export type SeededBefore0072 = {
   readonly decidedSuggestions: readonly string[];
 };
 
-export const oldWordsStoredIn = async (
+export const oldWordsAndControlRowsStoredIn = async (
   client: pg.PoolClient,
   workspaceId: string,
 ): Promise<SeededBefore0072> => {
@@ -62,7 +38,7 @@ export const oldWordsStoredIn = async (
   const decidedSuggestions: string[] = [];
   for (const suggestion of raised) {
     const id = ulid();
-    await suggestionWritten(client, { workspaceId, id, setId: ulid(), ...suggestion });
+    await suggestionWrittenOfAnyKind(client, { workspaceId, id, setId: ulid(), ...suggestion });
     if ("decided" in suggestion) decidedSuggestions.push(id);
   }
 
