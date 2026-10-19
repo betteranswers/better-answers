@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { conceptIriOf } from "@better-answers/schema";
+import { conceptIriOf, WELL_FORMED_ULID } from "@better-answers/schema";
 
 import { ask, askInput, ASK_CAPS, judgeCall, type AskCaps } from "../src/answering/index.ts";
 import type { PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
@@ -171,7 +171,7 @@ describe("the judge's call", () => {
       candidate,
       {
         ...candidate,
-        iri: conceptIriOf("01J6BBBBBBBBBBBBBBBBBBBBBB"),
+        iri: conceptIriOf(WELL_FORMED_ULID.parse("01J6BBBBBBBBBBBBBBBBBBBBBB")),
         title: "Who reads the audit log?",
         collection: null,
         body: "Admins read it.",

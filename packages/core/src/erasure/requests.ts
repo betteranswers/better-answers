@@ -153,7 +153,7 @@ export const recordSubjectRequest = async (
   });
   if (!row.success) return err("malformed");
   const { id: requestId, dueAt } = row.data;
-  const tooBroad = row.data.identifiers === null ? undefined : tooBroadIn(row.data.identifiers);
+  const tooBroad = tooBroadIn(row.data.identifiers);
   if (tooBroad !== undefined) return err(tooBroad);
 
   const written = await attempt(() =>

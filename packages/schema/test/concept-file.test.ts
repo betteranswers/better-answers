@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { conceptIriOf, IRI, ulidOfConceptIri } from "../src/concept-file.ts";
-import { citedSourceOf, citedSourcesOf } from "../src/index.ts";
+import { citedSourceOf, citedSourcesOf, WELL_FORMED_ULID } from "../src/index.ts";
 
-const MINTED = "01J6MMMMMMMMMMMMMMMMMMMMMM";
+const MINTED = WELL_FORMED_ULID.parse("01J6MMMMMMMMMMMMMMMMMMMMMM");
 
 describe("the concept IRI and its ULID", () => {
   it("maps a ULID to its IRI and back", () => {
@@ -14,7 +14,7 @@ describe("the concept IRI and its ULID", () => {
   });
 
   it("refuses a lower-case ULID either way", () => {
-    expect(() => conceptIriOf(MINTED.toLowerCase())).toThrow("invalid_format");
+    expect(WELL_FORMED_ULID.safeParse(MINTED.toLowerCase()).success).toBe(false);
     expect(
       ulidOfConceptIri("https://better-answers.com/c/01j6mmmmmmmmmmmmmmmmmmmmmm"),
     ).toBeUndefined();

@@ -1,9 +1,15 @@
+import { z } from "zod";
+
 const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 export const ULID_CHARACTERS = "[0-9A-HJKMNP-TV-Z]{26}";
 export const ULID_PATTERN = `^${ULID_CHARACTERS}$`;
 
 export const ULID = new RegExp(ULID_PATTERN);
+
+export const WELL_FORMED_ULID = z.string().regex(ULID).brand<"Ulid">();
+
+export type Ulid = z.output<typeof WELL_FORMED_ULID>;
 
 const TIME_CHARS = 10;
 const RANDOM_CHARS = 16;
@@ -48,7 +54,7 @@ const encodeTime = (milliseconds: number): string => {
  * Never a secret. Each sorts after this process's last, even when the clock steps back.
  * @throws once the clock passes the 48-bit time half.
  */
-export const ulid = (): string => {
+export const ulid = (): Ulid => {
   const now = Date.now();
   if (now > lastTimeMs) {
     lastTimeMs = now;
@@ -63,5 +69,5 @@ export const ulid = (): string => {
 
   let encoded = encodeTime(lastTimeMs);
   for (const digit of lastRandom) encoded += ALPHABET[digit] ?? "0";
-  return encoded;
+  return WELL_FORMED_ULID.parse(encoded);
 };

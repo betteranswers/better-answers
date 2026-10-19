@@ -1,6 +1,6 @@
 import { getTableColumns, is } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { jsonb, PgTable, pgTable } from "drizzle-orm/pg-core";
+import { getTableConfig, jsonb, PgDialect, PgTable, pgTable } from "drizzle-orm/pg-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { z } from "zod";
 
@@ -895,13 +895,21 @@ describe("3 — optionality and nullability agree, per key, at runtime", () => {
       it(`${name}.${form} accepts undefined and null exactly where the column does`, () => {
         const refinedShape = boundarySchemas[name][form].shape;
         const unrefinedShape: Readonly<Record<string, z.ZodType>> = unrefinedOf(name)[form].shape;
-        const columns: Readonly<Record<string, { dataType: string }>> = getTableColumns(
-          boundarySchemas[name].table,
+        const { table } = boundarySchemas[name];
+        const columns: Readonly<
+          Record<string, { dataType: string; name: string; notNull: boolean }>
+        > = getTableColumns(table);
+        const checks = getTableConfig(table).checks.map(
+          (constraint) => new PgDialect().sqlToQuery(constraint.value).sql,
         );
         for (const [key, refinedField] of Object.entries<z.ZodType>(refinedShape)) {
-          if (columns[key]?.dataType === "custom") continue;
+          const column = columns[key];
+          if (column?.dataType === "custom") continue;
           const unrefinedField = unrefinedShape[key];
           if (unrefinedField === undefined) throw new Error(`no generated field for ${key}`);
+          const jsonNullRefused =
+            column?.notNull === true &&
+            checks.some((check) => check.includes(`jsonb_typeof(${column.name}) = '`));
           expect({
             key,
             undefined: refinedField.safeParse(undefined).success,
@@ -909,7 +917,7 @@ describe("3 — optionality and nullability agree, per key, at runtime", () => {
           }).toEqual({
             key,
             undefined: unrefinedField.safeParse(undefined).success,
-            null: unrefinedField.safeParse(null).success,
+            null: unrefinedField.safeParse(null).success && !jsonNullRefused,
           });
         }
       });
@@ -1678,7 +1686,7 @@ describe("5 — the inferred type is pinned", () => {
     string,
     string | number | boolean | null | string[] | Record<string, string | number | boolean | null>[]
   > | null;
-  type SubjectIdentifiers = { emails: string[]; names: string[]; other: string[] } | null;
+  type SubjectIdentifiers = { emails: string[]; names: string[]; other: string[] };
   type JobOutcomeScalar = string | number | boolean | null;
   type JobOutcome = Record<
     string,
@@ -2212,7 +2220,7 @@ describe("5 — the inferred type is pinned", () => {
       destination: ("bundle" | "map" | "passage-index")[];
       retentionClass: "keep" | "mirror" | "transient";
       state: "received" | "indexing" | "indexed" | "published";
-      rulesInForce: { default_on: boolean; default_off: boolean } | null;
+      rulesInForce: { default_on: boolean; default_off: boolean };
     };
     sourceDocument: {
       workspaceId: WorkspaceId;
@@ -2274,7 +2282,7 @@ describe("5 — the inferred type is pinned", () => {
       subjectRequestId: string;
       pseudonym: string;
       lockedAt: Date;
-      actions: Record<string, Record<string, string | number | boolean | null>> | null;
+      actions: Record<string, Record<string, string | number | boolean | null>>;
       anchoredAt: Date;
       beyondUseHourlyAt: Date;
       beyondUseDailyAt: Date;
@@ -2316,19 +2324,17 @@ describe("5 — the inferred type is pinned", () => {
       completedAt: Date | null;
       verdict: "ok" | "warn" | "refuse" | "related" | null;
       judgeState: "not-judged" | "judged" | "judging-failed" | null;
-      concepts:
-        | {
-            iri: ConceptIri;
-            contentHash: string;
-            trust: {
-              tier: string;
-              status: string;
-              verifiedAt: string | null;
-              rider: string | null;
-            };
-            judged?: "yes" | "no";
-          }[]
-        | null;
+      concepts: {
+        iri: ConceptIri;
+        contentHash: string;
+        trust: {
+          tier: string;
+          status: string;
+          verifiedAt: string | null;
+          rider: string | null;
+        };
+        judged?: "yes" | "no";
+      }[];
       unmappedPassages: string[];
     };
     questionContent: {

@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-import { conceptIriOf } from "@better-answers/schema";
+import { conceptIriOf, WELL_FORMED_ULID } from "@better-answers/schema";
 
 import type { ReturnedConcept } from "../src/answering/index.ts";
 import { openModelClient, type ModelClient } from "../src/llm/index.ts";
 
 export const A_CANDIDATE: ReturnedConcept = {
-  iri: conceptIriOf("01J6AAAAAAAAAAAAAAAAAAAAAA"),
+  iri: conceptIriOf(WELL_FORMED_ULID.parse("01J6AAAAAAAAAAAAAAAAAAAAAA")),
   url: "/knowledge/search/01J6AAAAAAAAAAAAAAAAAAAAAA",
   kind: "Answer",
   title: "How long are audit logs kept?",

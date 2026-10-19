@@ -186,7 +186,7 @@ type Readable = ReadonlyMap<string, OpenedConcept>;
 
 const irisNamedIn = (rows: readonly PageRow[], feedback: readonly FeedbackRow[]): ConceptIri[] => [
   ...new Set([
-    ...rows.flatMap((row) => (row.concepts ?? []).map((concept) => concept.iri)),
+    ...rows.flatMap((row) => row.concepts.map((concept) => concept.iri)),
     ...rows.flatMap((row) => (row.drafted ?? []).flatMap((sentence) => sentence.concepts)),
     ...feedback.flatMap((given) => (given.disputedConcept === null ? [] : [given.disputedConcept])),
   ]),
@@ -244,7 +244,7 @@ const cutAt = (last: PageRow | undefined): QuestionsAskedCursor | null =>
 const NOTHING_READ: Read = { readable: new Map(), feedback: new Map(), askers: new Map() };
 
 const recordAsRead = (row: PageRow, read: Read): RecordAsRead => {
-  const concepts = (row.concepts ?? []).flatMap((kept) => conceptAsRead(kept, read.readable));
+  const concepts = row.concepts.flatMap((kept) => conceptAsRead(kept, read.readable));
   return {
     id: row.id,
     askedAt: row.askedAt.toISOString(),

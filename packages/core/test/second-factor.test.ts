@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { ulid } from "@better-answers/schema";
+
 import {
+  judgeTheSession,
   readSecondFactor,
   recordAuthenticatorSetUp,
   removeAuthenticator,
+  setOperatorMark,
 } from "../src/workspaces/index.ts";
 import { authenticatorFor, passkeyFor, passkeyUsedAt, recoveryCodeFor } from "./identity-rows.ts";
 import { bootstrap, provisionedWorkspace, seedPerson } from "./platform.ts";
@@ -381,5 +385,34 @@ describe("reading a person's second factor", () => {
     });
 
     expect(read).toEqual({ ok: false, error: "person-gone" });
+  });
+
+  it("promotes on the operator mark, clearing at the next confirmation", async () => {
+    const email = `operator-${ulid().toLowerCase()}@example.test`;
+    const personId = await seedPerson(db().pool, { email });
+    const promotedRead = async () => {
+      const read = await readSecondFactor(bootstrap, door(), { personId });
+      return read.ok && read.value.promoted;
+    };
+    const unmarked = await promotedRead();
+
+    await setOperatorMark(bootstrap, door(), { email, change: "grant" });
+    const marked = await promotedRead();
+    await passkeyFor(db().pool, personId);
+    const sessionId = await aSession(personId);
+    await judgeTheSession(bootstrap, door(), { session: { id: sessionId }, now: AT });
+    const beforeConfirming = await promotedRead();
+    await db().pool.query("UPDATE session SET second_factor_confirmed_at = $2 WHERE id = $1", [
+      sessionId,
+      AT,
+    ]);
+    await judgeTheSession(bootstrap, door(), { session: { id: sessionId }, now: AT });
+
+    expect([unmarked, marked, beforeConfirming, await promotedRead()]).toEqual([
+      false,
+      true,
+      true,
+      false,
+    ]);
   });
 });
