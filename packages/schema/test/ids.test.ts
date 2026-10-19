@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { boundarySchemas, conceptIriOf, ids, ulid } from "../src/index.ts";
+import {
+  boundarySchemas,
+  conceptIriOf,
+  ids,
+  ulid,
+  WELL_FORMED_ULID,
+  type Ulid,
+} from "../src/index.ts";
 
 describe("the branded ids, each its table's own column", () => {
   it("names each id by the column that defines its brand", () => {
@@ -27,8 +34,12 @@ describe("a minted concept IRI", () => {
     expect(ids.conceptIri.safeParse(minted)).toEqual({ success: true, data: minted });
   });
 
-  it("refuses to mint from anything but a ULID", () => {
-    expect(() => conceptIriOf("not-a-ulid")).toThrow("invalid_format");
-    expect(() => conceptIriOf(ulid().toLowerCase())).toThrow("invalid_format");
+  it("mints only from a ULID the type has already checked", () => {
+    expectTypeOf(conceptIriOf).parameter(0).toEqualTypeOf<Ulid>();
+    expectTypeOf<string>().not.toExtend<Ulid>();
+    expectTypeOf(ulid).returns.toEqualTypeOf<Ulid>();
+
+    expect(WELL_FORMED_ULID.safeParse("not-a-ulid").success).toBe(false);
+    expect(WELL_FORMED_ULID.safeParse(ulid().toLowerCase()).success).toBe(false);
   });
 });

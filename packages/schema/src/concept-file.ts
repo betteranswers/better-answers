@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { autolinkClosesAt, nextOf, nextStopsOf } from "./scan.ts";
-import { ULID_CHARACTERS } from "./ulid.ts";
+import { ULID_CHARACTERS, type Ulid } from "./ulid.ts";
 
 export const CONCEPT_IRI_PREFIX = "https://better-answers.com/c/";
 
@@ -11,7 +11,7 @@ export const IRI = new RegExp(
 
 export const CONCEPT_IRI = z.string().regex(IRI).brand<"ConceptIri">();
 
-export const conceptIriOf = (minted: string): z.output<typeof CONCEPT_IRI> =>
+export const conceptIriOf = (minted: Ulid): z.output<typeof CONCEPT_IRI> =>
   CONCEPT_IRI.parse(`${CONCEPT_IRI_PREFIX}${minted}`);
 
 /** The ULID a concept IRI ends in; `undefined` for any other value, a foreign host included. */

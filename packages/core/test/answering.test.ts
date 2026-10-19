@@ -7,6 +7,7 @@ import {
   JUDGE_STATES,
   QUESTION_VERDICTS,
   ulid,
+  WELL_FORMED_ULID,
   type ConceptIri,
 } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
@@ -660,7 +661,7 @@ describe("open's and feedback's renderings", () => {
 
 const A_RECORD = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
 
-const CITED = conceptIriOf("01J6CCCCCCCCCCCCCCCCCCCCCC");
+const CITED = conceptIriOf(WELL_FORMED_ULID.parse("01J6CCCCCCCCCCCCCCCCCCCCCC"));
 
 describe("what the slice's four actions answer", () => {
   const now = new Date("2026-09-08T12:00:00.000Z");

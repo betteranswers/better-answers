@@ -12,7 +12,7 @@ import {
   type ConceptDelta,
   type WalkStep,
 } from "@better-answers/core/store/map";
-import { citedSourcesOf, conceptIriOf, ids, ulid } from "@better-answers/schema";
+import { citedSourcesOf, conceptIriOf, ids, ulid, WELL_FORMED_ULID } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
 
 import { planned } from "./planned.ts";
@@ -336,7 +336,7 @@ describe("a map walk from several entries", () => {
       });
       const behind = await seed.mapNode({
         workspaceId: scenario.workspaceId,
-        uid: conceptIriOf("00000000000000000000000000"),
+        uid: conceptIriOf(WELL_FORMED_ULID.parse("00000000000000000000000000")),
       });
       await seed.mapEdge({
         workspaceId: scenario.workspaceId,
