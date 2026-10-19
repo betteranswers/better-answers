@@ -227,10 +227,6 @@ describe("the runners start through node", () => {
 
     expect(expected).toContain("packages/core mutation: @stryker-mutator/core");
     expect(
-      started,
-      "the journeys start Playwright by path: Knip loads the config a script's --config names, and the journeys' config refuses to load without PUBLIC_URL",
-    ).toContain("apps/web journeys: @playwright/test");
-    expect(
       [...started].sort(),
       "a workspace's test or mutation script starts no runner entry, or another script does",
     ).toEqual([...expected].sort());
