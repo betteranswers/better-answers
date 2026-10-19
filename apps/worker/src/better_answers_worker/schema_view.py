@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0084_the-cloudflare-provider"
+MIGRATION_ID = "0085_the-erased-requester"
 
-MIGRATION_WHEN = 1792042075904
+MIGRATION_WHEN = 1792419763064
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
