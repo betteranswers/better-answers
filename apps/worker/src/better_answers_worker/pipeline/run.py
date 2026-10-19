@@ -107,9 +107,11 @@ def index_connected_source(
                 moved = reconcile_catalogue(cursor, landed.documents)
                 unreadable_catalogue(cursor, landed.unreadable)
 
-            passages = host.land_rows(
-                sync, PASSAGE_TABLE, rows_of(sync, landed.documents)
-            )
+            with queue.scoped(connection, sync.workspace_id) as cursor:
+                queue.hold_the_claim(cursor, job.id, bootstrap.worker_id)
+                passages = host.land_rows(
+                    sync, PASSAGE_TABLE, rows_of(sync, landed.documents)
+                )
 
         outcome = IndexOutcome(
             documents=len(landed.documents),
