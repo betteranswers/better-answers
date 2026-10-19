@@ -1,10 +1,10 @@
 -- Custom migration (hand-written SQL; ADR 0032).
--- The claim protocol (ADR 0031). A claimant whose lease lapsed can still hold its job row
--- under the worker's FOR KEY SHARE fence, writing. The subject check refused a newer job
--- only while a sibling's lease stood; it now also refuses one while a lapsed sibling's row
--- is locked. FOR UPDATE is the one row lock that conflicts with FOR KEY SHARE, and SKIP
--- LOCKED keeps the claim from waiting on it: an unfenced lapsed sibling is held only until
--- the claim commits. The claim protocol's other functions are unchanged.
+-- The claim protocol (ADR 0031). A worker whose lease lapsed can still hold its job row
+-- under queue.hold_the_claim's FOR KEY SHARE and write under it. The subject check refused
+-- a newer job only while a sibling's lease stood; it now also refuses one while a lapsed
+-- sibling's row is locked. FOR UPDATE is the one row lock that conflicts with FOR KEY SHARE,
+-- and SKIP LOCKED keeps the claim from waiting on it: an unheld lapsed sibling stays locked
+-- only until the claim commits. The claim protocol's other functions are unchanged.
 
 CREATE OR REPLACE FUNCTION public.claim_job(p_worker_id text, p_lease interval, p_kinds text[])
 RETURNS SETOF public.job
@@ -23,9 +23,9 @@ AS $$
       FROM spent s
      WHERE j.workspace_id = s.workspace_id AND j.id = s.id
     RETURNING j.id
-  ), unfenced AS MATERIALIZED (
+  ), unheld AS MATERIALIZED (
     SELECT j.workspace_id, j.id FROM public.job j
-     WHERE j.status = 'claimed' AND j.lease_expires_at <= now()
+     WHERE j.status = 'claimed' AND j.lease_expires_at < now()
        AND j.subject_id IS NOT NULL
        AND j.kind = ANY(p_kinds)
      FOR UPDATE SKIP LOCKED
@@ -44,7 +44,7 @@ AS $$
             AND s.status = 'claimed'
             AND (s.lease_expires_at > now()
                  OR NOT EXISTS (
-                   SELECT 1 FROM unfenced u
+                   SELECT 1 FROM unheld u
                     WHERE u.workspace_id = s.workspace_id AND u.id = s.id
                  ))
        )

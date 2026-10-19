@@ -21,7 +21,7 @@ import {
   visibilitySuite,
   type Sourced,
 } from "./sourced-concept.ts";
-import { countWaitingOnLocks, until } from "./suite-postgres.ts";
+import { countWaitingOnLocks, holdingRows, until } from "./suite-postgres.ts";
 import type { Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange, reading } = visibilitySuite();
@@ -290,36 +290,32 @@ describe("a sync that narrows a cited document", () => {
     const scenario = await arrange();
     const { narrowed, onUntouched } = await twoCitedDocuments(scenario);
     const jobId = await syncLapsed(scenario, narrowed.connectedSourceId);
-    const claimant = await db().pool.connect();
-    try {
-      await claimant.query("BEGIN");
-      await claimant.query("SELECT 1 FROM job WHERE workspace_id = $1 AND id = $2 FOR KEY SHARE", [
-        scenario.workspaceId,
-        jobId,
-      ]);
-      const following = pass(scenario);
-      await until(async () => (await countWaitingOnLocks(db().pool)) > 0);
+    let finished = false;
 
-      let finished = false;
-      const overriding = reading(scenario.admin, (admin, tx) =>
-        overrideConceptSensitivity(admin, tx, {
-          iri: onUntouched.iri,
-          sensitivity: "Restricted",
-          audience: "everyone",
-        }),
-      ).finally(() => {
-        finished = true;
-      });
-      await until(async () => finished || (await countWaitingOnLocks(db().pool)) > 1);
-      const finishedBeforeTheFence = finished;
-      await claimant.query("COMMIT");
+    const { following, overriding, finishedWhileThePassWaited } = await holdingRows(
+      db().pool,
+      "SELECT 1 FROM job WHERE workspace_id = $1 AND id = $2 FOR KEY SHARE",
+      [scenario.workspaceId, jobId],
+      async () => {
+        const following = pass(scenario);
+        await until(async () => (await countWaitingOnLocks(db().pool)) > 0);
+        const overriding = reading(scenario.admin, (admin, tx) =>
+          overrideConceptSensitivity(admin, tx, {
+            iri: onUntouched.iri,
+            sensitivity: "Restricted",
+            audience: "everyone",
+          }),
+        ).finally(() => {
+          finished = true;
+        });
+        await until(async () => finished || (await countWaitingOnLocks(db().pool)) > 1);
+        return { following, overriding, finishedWhileThePassWaited: finished };
+      },
+    );
 
-      expect(finishedBeforeTheFence).toBe(true);
-      expect((await overriding).ok).toBe(true);
-      expect((await following).followed).toEqual([{ jobId, concepts: 2 }]);
-    } finally {
-      claimant.release();
-    }
+    expect(finishedWhileThePassWaited).toBe(true);
+    expect((await overriding).ok).toBe(true);
+    expect((await following).followed).toEqual([{ jobId, concepts: 2 }]);
   });
 
   it("records one event for two passes at once", async () => {

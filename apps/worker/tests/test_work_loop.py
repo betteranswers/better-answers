@@ -200,13 +200,13 @@ def test_a_claim_hands_the_handler_what_the_job_is_about(
     assert auditing.subject_id is None
 
 
-def test_a_fenced_lapsed_claim_holds_its_subjects_newer_job_back(
+def test_a_held_lapsed_claim_keeps_its_subjects_newer_job_back(
     database: psycopg.Connection,
 ) -> None:
     workspace = str(seed_workspace(database.cursor())["id"])
     connected_source_id = ulid()
     with database.cursor() as cursor:
-        older = seed_job(
+        spent_older = seed_job(
             cursor,
             workspace_id=workspace,
             kind="index",
@@ -229,24 +229,27 @@ def test_a_fenced_lapsed_claim_holds_its_subjects_newer_job_back(
     database.commit()
 
     dsn = _WHERE[database]
-    with queue.connected(dsn) as fencing, queue.connected(dsn) as claiming:
-        with scoped(fencing, workspace) as fence:
-            queue.hold_the_claim(fence, older["id"], "worker-gone-quiet")
+    with queue.connected(dsn) as holding, queue.connected(dsn) as claiming:
+        with scoped(holding, workspace) as held:
+            queue.hold_the_claim(held, spent_older["id"], "worker-gone-quiet")
             with scoped(database, workspace) as cursor:
                 cursor.execute(
                     "UPDATE job SET lease_expires_at = now() - interval '1 second'"
                     " WHERE id = %s",
-                    (older["id"],),
+                    (spent_older["id"],),
                 )
                 assert cursor.rowcount == 1
             with scoped(claiming, workspace) as cursor:
-                while_fenced = queue.claim(cursor, workspace, WORKER, ["index"])
+                while_held = queue.claim(cursor, workspace, WORKER, ["index"])
         with scoped(claiming, workspace) as cursor:
-            once_committed = queue.claim(cursor, workspace, WORKER, ["index"])
+            once_released = queue.claim(cursor, workspace, WORKER, ["index"])
 
-    assert while_fenced is None
-    assert once_committed is not None
-    assert once_committed.id == newer["id"]
+    assert while_held is None
+    assert once_released is not None
+    assert once_released.id == newer["id"]
+    with scoped(database, workspace) as cursor:
+        cursor.execute("SELECT status FROM job WHERE id = %s", (spent_older["id"],))
+        assert cursor.fetchone() == ("poisoned",)
 
 
 def test_the_loop_runs_a_nightly_audit_it_scheduled_itself(
