@@ -119,6 +119,32 @@ describe("the browser suite's knowledge harness", () => {
     });
   });
 
+  it("lands one file name in two collections", async () => {
+    const workspace = await app().provision();
+
+    const landed = await conceptsSeeded({
+      ...seedingBy(workspace),
+      concepts: [
+        {
+          title: "Quarry speed limits",
+          body: "Synthetic haul roads carry a limit.",
+          collection: "haul-roads",
+        },
+        {
+          title: "Quarry speed-limits",
+          body: "Synthetic site roads carry a limit.",
+          collection: "site-roads",
+        },
+      ],
+    });
+
+    expect(landed.map((concept) => concept.title)).toEqual([
+      "Quarry speed limits",
+      "Quarry speed-limits",
+    ]);
+    expect(await leftIn(workspace)).toMatchObject({ concepts: 2 });
+  });
+
   it("links a concept in a collection to one outside it", async () => {
     const workspace = await app().provision();
     const [basics, trail] = await conceptsSeeded({
@@ -298,6 +324,22 @@ describe("the browser suite's knowledge harness", () => {
         {
           title: "Quarry speed limits",
           body: "A second synthetic file under the first one's title.",
+        },
+      ],
+      "concepts.1.title",
+    ],
+    [
+      "a title two concepts carry in two cases",
+      [
+        {
+          title: "Quarry speed limits",
+          body: "Synthetic haul roads carry a limit.",
+          collection: "haul-roads",
+        },
+        {
+          title: "quarry  Speed Limits",
+          body: "Synthetic site roads carry a limit.",
+          collection: "site-roads",
         },
       ],
       "concepts.1.title",
@@ -526,7 +568,7 @@ describe("a concepts seed the harness refuses before it writes", () => {
     expect(await leftIn(workspace)).toEqual(NOTHING);
   });
 
-  it("refuses a group member named twice, and writes nothing", async () => {
+  it("refuses a group member named twice", async () => {
     const workspace = await app().provision();
 
     const answered = await askedToSeed({
@@ -546,32 +588,6 @@ describe("a concepts seed the harness refuses before it writes", () => {
       refusedNaming(["concepts.0.groupMemberIds.1", "names each member once"]),
     );
     expect(await leftIn(workspace)).toEqual(NOTHING);
-  });
-
-  it("lands one file name in two collections", async () => {
-    const workspace = await app().provision();
-
-    const landed = await conceptsSeeded({
-      ...seedingBy(workspace),
-      concepts: [
-        {
-          title: "Quarry speed limits",
-          body: "Synthetic haul roads carry a limit.",
-          collection: "haul-roads",
-        },
-        {
-          title: "Quarry speed-limits",
-          body: "Synthetic site roads carry a limit.",
-          collection: "site-roads",
-        },
-      ],
-    });
-
-    expect(landed.map((concept) => concept.title)).toEqual([
-      "Quarry speed limits",
-      "Quarry speed-limits",
-    ]);
-    expect(await leftIn(workspace)).toMatchObject({ concepts: 2 });
   });
 
   it("lands an Editor's seed that asks no override", async () => {

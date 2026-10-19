@@ -1391,7 +1391,7 @@ describe("the limits", () => {
     },
   );
 
-  it.each(["sign-in-link-read", "sign-in-link-sign-in", "passkey-sign-in"] as const)(
+  it.each([...new Set(SIGN_IN_PATHS.map(([, group]) => group))])(
     "counts %s from its own page after another site's flood",
     async (group) => {
       const client = app.client();
