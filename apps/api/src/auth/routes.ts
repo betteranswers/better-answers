@@ -223,7 +223,7 @@ const failureOf = async (decided: Result<Response>) =>
 const returnPath = z
   .string()
   .max(512)
-  .regex(/^\/(?![/\\])[^\\]*$/)
+  .regex(/^\/(?![/\\])[^\\\p{Cc}]*$/u)
   .optional()
   .catch(undefined);
 

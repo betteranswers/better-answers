@@ -40,7 +40,8 @@ export const leavingFor = (href: string) => ({
 
 const safeReturnPath = (value: string | null | undefined): string | undefined => {
   if (value === null || value === undefined || value === "") return undefined;
-  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return undefined;
+  if (!value.startsWith("/") || value.startsWith("//")) return undefined;
+  if (value.includes("\\") || /\p{Cc}/u.test(value)) return undefined;
   return value;
 };
 
