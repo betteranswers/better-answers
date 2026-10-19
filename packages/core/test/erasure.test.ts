@@ -183,7 +183,7 @@ describe("recording a subject request", () => {
     expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("refuses a one-word name as too broad, recording nothing", async () => {
+  it("refuses a one-word name, which would withhold an ordinary word", async () => {
     const scenario = await arrange();
 
     const recorded = await recordingAs(
@@ -211,7 +211,7 @@ describe("recording a subject request", () => {
     ["a name", { emails: [], names: ["Al"], other: [] }, "Al"],
     ["another identifier", { emails: [], names: [], other: ["7\n "] }, "7"],
   ])(
-    "refuses %s under three characters, trimmed, recording nothing",
+    "refuses %s under three characters, which withholds ordinary words",
     async (_kind, identifiers, refused) => {
       const scenario = await arrange();
 
