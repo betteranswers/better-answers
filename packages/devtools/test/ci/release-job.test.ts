@@ -420,7 +420,7 @@ describe("the journeys the gate lets run", () => {
 });
 
 describe("the gate's word on a refused or rejected night", () => {
-  it("owes the report a word on a journeys-only refusal", async () => {
+  it("owes the report its refusal and whether journeys were due", async () => {
     expect(
       await gateRan({ EVENT: "workflow_dispatch", JOURNEYS_ONLY: "true", JOURNEYS_MODE: "always" }),
     ).toEqual(
@@ -1079,9 +1079,10 @@ describe("the journeys a release runs", () => {
       (msOf("PREFLIGHT_TIMEOUT_MS") + roles * msOf("ROLE_JOURNEY_TIMEOUT_MS")) / 1000;
 
     expect(roles).toBe(3);
-    expect(journeysSeconds + 10 * 60).toBeLessThanOrEqual(
-      jobOf("journeys")["timeout-minutes"] * 60,
-    );
+    expect(
+      journeysSeconds + 10 * 60,
+      "an install and Chromium took about five minutes in check.yml's web leg; the job leaves twice that",
+    ).toBeLessThanOrEqual(jobOf("journeys")["timeout-minutes"] * 60);
   });
 
   it("is read by nothing in check.yml", () => {

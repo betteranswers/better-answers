@@ -546,10 +546,10 @@ describe("each mutation leg, run as shards and summed once", () => {
       env: { ...process.env, SHARDS: shards, LEG: leg, OF: String(of) },
     });
 
-    expect({ refused: run.status !== 0, said: run.stdout.startsWith("::error::") }).toEqual({
-      refused,
-      said: refused,
-    });
+    expect(
+      { refused: run.status !== 0, said: run.stdout.startsWith("::error::") },
+      "a misnamed shard runs nothing, and the run comes back green having tested nothing",
+    ).toEqual({ refused, said: refused });
     expect(check?.env).toEqual({
       SHARDS: "${{ inputs.shards }}",
       LEG: "${{ matrix.name }}",

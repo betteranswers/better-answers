@@ -47,7 +47,7 @@ const NOT_BUILT_EXIT = 3;
 const SYNTHETIC_WORKSPACE = "01M2SYNTHET1CAAAAAAAAAAAAA";
 const STAGING_COUNTS = '{"live_gen":3,"nodes":{"Concept":2},"edges":{"links_to":1}}';
 
-const ASIDE = ["exec 4>&1", 'aside() { say "$@" >&4; }'];
+const ASIDE_OFF_STDOUT = ["exec 4>&1", 'aside() { say "$@" >&4; }'];
 
 const countsRan = (staging: string, stagingStatus: number): BashRun => {
   const drill = read("deploy/restore-drill.sh");
@@ -62,7 +62,7 @@ const countsRan = (staging: string, stagingStatus: number): BashRun => {
   return bashRan([
     `NOT_BUILT=${String(NOT_BUILT_EXIT)}`,
     `WORK='${work}'; REPORT='${work}/report.md'; DRILL_WORKSPACE=${SYNTHETIC_WORKSPACE}`,
-    ...ASIDE,
+    ...ASIDE_OFF_STDOUT,
     `platform() { [ -z '${staging}' ] || printf '%s\\n' '${staging}'; return ${String(stagingStatus)}; }`,
     commands ?? "",
     counts ?? "",
@@ -140,7 +140,7 @@ const composeServices = (file: string): readonly { name: string; body: string }[
 
 const PINNED_BY_DIGEST = /^[^\s@$]+@(?:sha256:[0-9a-f]{64}|\$\{\w+_DIGEST:\?[^}]*\})$/;
 
-const SET_FROM_THE_POSTGRES_PIN = /^\$\{(?:LOCAL|TEST)_POSTGRES_IMAGE:\?[^}]*\}$/;
+const PIN_THE_POSTGRES_LAUNCHERS_EXPORT = /^\$\{(?:LOCAL|TEST)_POSTGRES_IMAGE:\?[^}]*\}$/;
 
 const digestless = (directory: string): readonly string[] =>
   readdirSync(directory)
@@ -149,7 +149,7 @@ const digestless = (directory: string): readonly string[] =>
       [...readFileSync(path.join(directory, file), "utf8").matchAll(/^[ \t]+(image|build):(.*)$/gm)]
         .map(([, key, raw]) => {
           const value = (raw ?? "").trim().replace(/^(["'])(.*)\1$/, "$2");
-          return { key, value: value.replace(SET_FROM_THE_POSTGRES_PIN, POSTGRES_IMAGE) };
+          return { key, value: value.replace(PIN_THE_POSTGRES_LAUNCHERS_EXPORT, POSTGRES_IMAGE) };
         })
         .filter(({ key, value }) => key === "build" || !PINNED_BY_DIGEST.test(value))
         .map(({ key, value }) => `${file}: ${key ?? ""}: ${value}`),
@@ -591,7 +591,7 @@ describe("the deploy tree", () => {
     const ran = (status: number): BashRun =>
       bashRan([
         `NOT_BUILT=${String(NOT_BUILT_EXIT)}`,
-        ...ASIDE,
+        ...ASIDE_OFF_STDOUT,
         `platform() { printf '%s\\n' "ran: $*"; return ${String(status)}; }`,
         commands ?? "",
         "ops map-sweep --workspace a-workspace",
@@ -684,7 +684,7 @@ describe("the deploy tree", () => {
     const newest = fencedIn(read("deploy/restore-drill.sh"), "the newest dump");
     expect({ markers: newest !== undefined }).toEqual({ markers: true });
 
-    const listed: Readonly<Record<string, readonly string[]>> = {
+    const listedAtTheDrillsHour: Readonly<Record<string, readonly string[]>> = {
       hourly: [
         "globals-20261001T010512Z.sql.age",
         "pg-20261001T010512Z.dump.age",
@@ -695,7 +695,7 @@ describe("the deploy tree", () => {
       monthly: ["globals-20261001T020517Z.sql.age", "pg-20261001T020517Z.dump.age"],
     };
     const picked = (answering: readonly string[]): BashRun => {
-      const listing = Object.entries(listed)
+      const listing = Object.entries(listedAtTheDrillsHour)
         .filter(([tier]) => answering.includes(tier))
         .map(([tier, files]) => `"dumps:dumps/pg/${tier}/") printf '%s\\n' ${files.join(" ")} ;;`)
         .join(" ");
@@ -707,7 +707,7 @@ describe("the deploy tree", () => {
       ]);
     };
 
-    expect(picked(Object.keys(listed))).toEqual({
+    expect(picked(Object.keys(listedAtTheDrillsHour))).toEqual({
       code: 0,
       output:
         "monthly pg-20261001T020517Z.dump.age globals-20261001T020517Z.sql.age 20261001T020517Z\n",
@@ -748,7 +748,10 @@ describe("the deploy tree", () => {
     const polls = Number(/AWAIT_RELEASE_POLLS:-(\d+)/.exec(script)?.[1]);
     const delaySeconds = Number(/AWAIT_RELEASE_DELAY_SECONDS:-(\d+)/.exec(script)?.[1]);
 
-    expect((polls - 1) * delaySeconds).toBeGreaterThanOrEqual(360);
+    expect(
+      (polls - 1) * delaySeconds,
+      "twice the three minutes a fresh image took to pull and start; no sleep follows the last poll",
+    ).toBeGreaterThanOrEqual(360);
     expect(awaitSeconds(polls)).toBeLessThan(
       (releaseJob("promote")?.["timeout-minutes"] ?? 0) * 60,
     );
@@ -765,7 +768,10 @@ describe("the deploy tree", () => {
       return { name, polls, fits: awaitSeconds(polls) < (job?.["timeout-minutes"] ?? 0) * 60 };
     });
 
-    expect(rereads).toEqual([
+    expect(
+      rereads,
+      "production answered on this digest at the smoke, so a few polls ride out a blip",
+    ).toEqual([
       { name: "journeys", polls: 3, fits: true },
       { name: "record", polls: 3, fits: true },
     ]);
@@ -793,7 +799,10 @@ describe("the deploy tree", () => {
     expect(releases).toContain("release/<UTC stamp>-<short commit>");
     expect(releases).toContain("git tag --list 'release/*' --sort=-creatordate");
     expect(releases).toContain("Access debt recorded 04/09/2026");
-    expect(releases).toContain('git push origin "refs/tags/${tag}"');
+    expect(
+      releases,
+      "an on-box promotion records its home as the same tag, pushed by hand",
+    ).toContain('git push origin "refs/tags/${tag}"');
 
     const rows = releases.split("\n").filter((line) => /^\| 20\d\d-/.test(line));
     expect(rows.at(-1)).toContain("2026-09-23T04:26:58Z");

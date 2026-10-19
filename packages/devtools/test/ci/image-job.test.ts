@@ -62,7 +62,7 @@ const deferralsRead = (): readonly DeferralRead[] =>
       return { input: groups?.["input"] ?? value, answer: groups?.["answer"] ?? value };
     });
 
-const workspacesReadingTheDeferral = (): ReadonlySet<string> => {
+const trackedWorkspacesReadingTheDeferral = (): ReadonlySet<string> => {
   const found = spawnSync(
     "git",
     ["grep", "-l", "-F", PROBE_DEFERRAL_VARIABLE, "--", "apps", "packages", `:!${thisSuite}`],
@@ -121,14 +121,15 @@ describe("the job that probes every image it pushes", () => {
   });
 
   it("hands the deferral to exactly the legs reading it", () => {
-    const reading = workspacesReadingTheDeferral();
+    const reading = trackedWorkspacesReadingTheDeferral();
     const wanted = checkLegs().flatMap(([job, steps]) =>
       workspacesUnder(steps).some((workspace) => reading.has(workspace)) ? [job] : [],
     );
 
-    expect(reading.size, "the workspaces that read the deferral are apps/api and apps/worker").toBe(
-      2,
-    );
+    expect(
+      reading.size,
+      "the workspaces that read the deferral are apps/api and apps/worker; this suite spells the variable too, and reads it in no leg",
+    ).toBe(2);
     expect(
       legsCarryingTheDeferral(),
       "a leg runs an image-contents suite it never tells to stand down, or is told and runs none",
