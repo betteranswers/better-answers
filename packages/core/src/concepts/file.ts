@@ -151,13 +151,13 @@ const entryOf = (
   from: number,
   close: number,
 ): Parsed<FrontmatterSource> | undefined => {
-  const entry: Record<string, string | number | boolean | null> = {};
+  const entry = new Map<string, FrontmatterSource[string]>();
   let field = first;
   let at = from;
   for (;;) {
     const value = scalarOf(field.rest);
     if (value === undefined) return undefined;
-    entry[field.key] = value;
+    entry.set(field.key, value);
     const continuation = lines[at] ?? "";
     if (at >= close || !continuation.startsWith("    ")) break;
     const next = pairOf(continuation.slice(4));
@@ -165,7 +165,7 @@ const entryOf = (
     field = next;
     at += 1;
   }
-  return { value: entry, next: at };
+  return { value: Object.fromEntries(entry), next: at };
 };
 
 const itemOf = (
@@ -218,17 +218,17 @@ const valueOf = (
 };
 
 const frontmatterAbove = (lines: readonly string[], close: number): Frontmatter | undefined => {
-  const frontmatter: Record<string, FrontmatterValue> = {};
+  const frontmatter = new Map<string, FrontmatterValue>();
   let at = 1;
   while (at < close) {
     const pair = pairOf(lines[at] ?? "");
-    if (pair === undefined || Object.hasOwn(frontmatter, pair.key)) return undefined;
+    if (pair === undefined || frontmatter.has(pair.key)) return undefined;
     const parsed = valueOf(lines, pair, at + 1, close);
     if (parsed === undefined) return undefined;
-    frontmatter[pair.key] = parsed.value;
+    frontmatter.set(pair.key, parsed.value);
     at = parsed.next;
   }
-  return frontmatter;
+  return Object.fromEntries(frontmatter);
 };
 
 export const parseConceptFile = (

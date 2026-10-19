@@ -34,13 +34,13 @@ const renderBundleManifest = (manifest: BundleManifest): string =>
     .join("\n")}\n`;
 
 export const parseBundleManifest = (content: string): Result<BundleManifest, "malformed"> => {
-  const pairs: Record<string, FrontmatterSource[string]> = {};
+  const pairs = new Map<string, FrontmatterSource[string]>();
   for (const line of content.replace(/\n$/, "").split("\n")) {
     const pair = scalarPairOf(line);
-    if (pair === undefined || Object.hasOwn(pairs, pair.key)) return err("malformed");
-    pairs[pair.key] = pair.value;
+    if (pair === undefined || pairs.has(pair.key)) return err("malformed");
+    pairs.set(pair.key, pair.value);
   }
-  const parsed = bundleManifest.safeParse(pairs);
+  const parsed = bundleManifest.safeParse(Object.fromEntries(pairs));
   return parsed.success ? ok(parsed.data) : err("malformed");
 };
 
