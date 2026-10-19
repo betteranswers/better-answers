@@ -56,6 +56,8 @@ Other skills belong in the `.claude/skills/` folder beside the files they serve,
 
 The backlog lives in **Linear**: team `better-answers` (issue ids `BA-N`), project `better-answers`, reached through the `linear-server` MCP. A pull request is the unit of build work. Work that needs more than one owner, or will outlast one session, gets a plan in `docs/plans/` first. The procedure is in `docs/agents/issue-tracker.md`.
 
+Fix what you find in the session where you find it, and open an issue only when the work cannot land there. Settle a design question with pstack's principle skills, and put it to the owner only when the principles cannot settle it. `docs/agents/issue-tracker.md`, *When to file one*, has the rule.
+
 ### Workflow
 
 Use pstack.
@@ -87,8 +89,6 @@ After a solved, verified problem, document it. Apply this counterfactual: if the
 When writing or reviewing docs, RFCs, readmes, PR descriptions, or commit messages, or when communicating with the user, use the `technical-writing` skill.
 
 ### Triage
-
-Fix what you find in the session that finds it, and open an issue only when the work cannot land there. A design question is settled with pstack's principle skills, and goes to the owner only when they cannot settle it. `docs/agents/issue-tracker.md`, *When to file one*, has the rule.
 
 A new issue lands in Linear's **Triage** state. The owner or an agent moves it to Todo when it is next to build, or to Backlog with what it waits on. An issue that waits on an owner ruling stays in Triage, with the question in a comment. `docs/agents/issue-tracker.md` gives each state's meaning.
 
