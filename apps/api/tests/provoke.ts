@@ -296,7 +296,7 @@ export const whileCommitsAreRefused = async <T>(
 
 export const whileTheApiLacks = async <T>(
   app: TestApp,
-  privilege: "SELECT" | "UPDATE",
+  privilege: "SELECT" | "UPDATE" | "DELETE",
   table: string,
   work: () => Promise<T>,
 ): Promise<T> => {
