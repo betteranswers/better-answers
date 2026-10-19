@@ -37,18 +37,13 @@ export const jscpdArgv = (config: JscpdConfig): readonly string[] => [
 
 type Clone = { readonly left: string; readonly right: string };
 
-const clonesIn = (output: string): readonly Clone[] => {
-  const fragment = /^\s*(?:- )?(?<file>\S+) \[\d+:\d+ - \d+:\d+]/;
-  const files = output
-    .split("\n")
-    .map((line) => fragment.exec(line)?.groups?.["file"])
-    .filter((file): file is string => file !== undefined);
-  const clones: Clone[] = [];
-  for (let index = 0; index + 1 < files.length; index += 2) {
-    clones.push({ left: files[index] ?? "", right: files[index + 1] ?? "" });
-  }
-  return clones;
-};
+const CLONE = /^\s*- (?<left>\S+) \[\d+:\d+ - \d+:\d+].*\n\s*(?<right>\S+) \[\d+:\d+ - \d+:\d+]/gm;
+
+const clonesIn = (output: string): readonly Clone[] =>
+  [...output.matchAll(CLONE)].map(({ groups }) => ({
+    left: groups?.["left"] ?? "",
+    right: groups?.["right"] ?? "",
+  }));
 
 export type JscpdRunner = (tree: Tree) => readonly Clone[];
 
