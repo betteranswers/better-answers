@@ -13,7 +13,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, onTestFinished } from "vitest";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
@@ -52,6 +52,18 @@ it("adds one, slowly", { timeout: 60_000 }, async () => {
 });
 `;
 
+const PID_RECORDING_SUITE = `import { writeFileSync } from "node:fs";
+
+import { it } from "vitest";
+
+import { answer } from "../src/answer.ts";
+
+it("records its worker, then adds one", () => {
+  writeFileSync(new URL("../worker.pid", import.meta.url), String(process.pid));
+  answer(1);
+});
+`;
+
 const workspace = (name: string, suite = SUITE, extraSuite?: string): string => {
   const root = throwawayRepository(path.join(scratch, name));
   writeUnder(
@@ -75,16 +87,18 @@ const workspace = (name: string, suite = SUITE, extraSuite?: string): string => 
   return root;
 };
 
-const TORN_REPORT_VITEST = `import { writeFileSync } from "node:fs";
+const shimVitestReporting = (root: string, report: string): void => {
+  rmSync(path.join(root, "node_modules/vitest"));
+  writeUnder(
+    root,
+    "node_modules/vitest/vitest.mjs",
+    `import { writeFileSync } from "node:fs";
 
 const flag = process.argv.find((arg) => arg.startsWith("--outputFile.json="));
-writeFileSync(flag.slice("--outputFile.json=".length), '{"numTotalTests": 1, "numFail');
+writeFileSync(flag.slice("--outputFile.json=".length), ${JSON.stringify(report)});
 process.exit(1);
-`;
-
-const shimTornReportVitest = (root: string): void => {
-  rmSync(path.join(root, "node_modules/vitest"));
-  writeUnder(root, "node_modules/vitest/vitest.mjs", TORN_REPORT_VITEST);
+`,
+  );
 };
 
 type Run = { readonly status: number | null; readonly stdout: string; readonly stderr: string };
@@ -131,6 +145,25 @@ const exited = (run: Run, status: number): void => {
   }
 };
 
+const isAlive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ESRCH") return false;
+    throw error;
+  }
+};
+
+const goneWithin = async (pid: number, ms: number): Promise<boolean> => {
+  const deadline = Date.now() + ms;
+  while (isAlive(pid)) {
+    if (Date.now() > deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return true;
+};
+
 describe("the mutant probe over a throwaway workspace", () => {
   it("says killed when the suite fails, and restores the file", () => {
     const root = workspace("killed");
@@ -167,6 +200,33 @@ describe("the mutant probe over a throwaway workspace", () => {
     expect(source(root)).toBe(SOURCE);
   });
 
+  it("kills the worker stuck in the mutated loop", async () => {
+    const root = workspace("stuck-worker", PID_RECORDING_SUITE);
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        ...argvFor(root, {
+          line: 1,
+          from: "n + 1",
+          to: "(() => { for (;;) {} })()",
+          timeoutMs: 8_000,
+        }),
+      ],
+      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+    const worker = Number(readFileSync(path.join(root, "worker.pid"), "utf8"));
+    onTestFinished(() => {
+      if (isAlive(worker)) process.kill(worker, "SIGKILL");
+    });
+
+    expect(run.stdout).toContain("verdict: timed out");
+    expect(
+      await goneWithin(worker, 5_000),
+      `worker ${String(worker)} outlived the probe; a stuck worker answers no message from its parent, so only a signal to its process group reaches it`,
+    ).toBe(true);
+  }, 30_000);
+
   it("says src is clean against HEAD after the run", () => {
     const root = workspace("clean");
 
@@ -174,6 +234,18 @@ describe("the mutant probe over a throwaway workspace", () => {
 
     exited(run, 0);
     expect(run.stdout).toContain("src: clean against HEAD");
+  });
+
+  it("exits 1 when git diff over src fails", () => {
+    const root = workspace("unborn-head");
+    gitIn(root, "update-ref", "-d", "HEAD");
+
+    const run = probe(root, { line: 1, from: "n + 1", to: "n - 1" });
+
+    expect(verdictOf(run)).toBe("verdict: killed");
+    expect(run.stderr).toContain("git diff --stat failed");
+    exited(run, 1);
+    expect(source(root)).toBe(SOURCE);
   });
 
   it("restores the file on an interrupt, and exits as interrupted", async () => {
@@ -221,7 +293,7 @@ describe("the mutant probe over a throwaway workspace", () => {
 
     const run = probe(root, { line: 1, from: "n + 1", to: "n - 1" });
 
-    expect(run.status).not.toBe(0);
+    exited(run, 1);
     expect(verdictOf(run)).toBeUndefined();
     expect(run.stderr).toContain("did not run");
     expect(source(root)).toBe(SOURCE);
@@ -229,7 +301,7 @@ describe("the mutant probe over a throwaway workspace", () => {
 
   it("restores the file and removes a torn report", () => {
     const root = workspace("torn-report");
-    shimTornReportVitest(root);
+    shimVitestReporting(root, '{"numTotalTests": 1, "numFail');
     const temporary = mkdtempSync(path.join(scratch, "tmp-"));
 
     const run = probe(root, { line: 1, from: "n + 1", to: "n - 1" }, { TMPDIR: temporary });
@@ -241,12 +313,30 @@ describe("the mutant probe over a throwaway workspace", () => {
     expect(readdirSync(temporary)).toEqual([]);
   });
 
+  it("refuses a verdict on a changed report shape", () => {
+    const root = workspace("changed-report");
+    shimVitestReporting(
+      root,
+      JSON.stringify({ numTotalTests: "1", numFailedTests: "0", success: "true" }),
+    );
+
+    const run = probe(root, { line: 1, from: "n + 1", to: "n - 1" });
+
+    expect(
+      verdictOf(run),
+      "a reporter that changed shape reads as a suite that never ran",
+    ).toBeUndefined();
+    expect(run.stderr).toContain("did not run");
+    exited(run, 1);
+    expect(source(root)).toBe(SOURCE);
+  });
+
   it("refuses a verdict when one test file failed to run", () => {
     const root = workspace("half-ran", SUITE, "this is not a test\n");
 
     const run = probe(root, { line: 2, from: '"answer"', to: '""' });
 
-    expect(run.status).not.toBe(0);
+    exited(run, 1);
     expect(verdictOf(run)).toBeUndefined();
     expect(run.stderr).toContain("1 of 2 test files failed to run");
     expect(source(root)).toBe(SOURCE);
@@ -259,7 +349,7 @@ describe("the mutant probe over a throwaway workspace", () => {
 
     const run = probe(root, { line: 1, from: "n + 1", to: "n - 1" });
 
-    expect(run.status).not.toBe(0);
+    exited(run, 2);
     expect(run.stderr).toContain("unstaged change");
     expect(verdictOf(run)).toBeUndefined();
 
@@ -271,7 +361,7 @@ describe("the mutant probe over a throwaway workspace", () => {
 
     const run = probe(root, { line: 2, from: "n + 1", to: "n - 1" });
 
-    expect(run.status).not.toBe(0);
+    exited(run, 2);
     expect(run.stderr).toContain("line 2");
     expect(verdictOf(run)).toBeUndefined();
     expect(source(root)).toBe(SOURCE);
