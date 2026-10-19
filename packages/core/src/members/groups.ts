@@ -245,7 +245,6 @@ const KEY_SHARED_MEMBERS = `SELECT user_id FROM member
                        WHERE workspace_id = $1 AND user_id = ANY($2::text[])
                        ORDER BY user_id FOR KEY SHARE`;
 
-/** The asked who are members here, held with the group until the transaction ends. */
 export const heldForAdding = async (
   admin: AdminUserPrincipal,
   tx: Tx,

@@ -338,7 +338,6 @@ describe("who is in a group", () => {
   });
 });
 
-/** The delete holds its row uncommitted until the add waits on it, then commits. */
 const addedWhileDeleting = async (
   workspace: Workspace,
   deletion: { readonly text: string; readonly values: readonly string[] },
