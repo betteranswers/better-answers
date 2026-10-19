@@ -37,11 +37,15 @@ const holdOn = (pattern: string): string => {
   const hold = packageRules.find(
     (rule) => rule.allowedVersions !== undefined && rule.matchPackageNames?.includes(pattern),
   )?.allowedVersions;
-  if (hold === undefined) throw new Error(`renovate.json holds no version for ${pattern}`);
+  if (hold === undefined) {
+    throw new Error(
+      `renovate.json holds no version for ${pattern}, and a deleted hold must fail here rather than read as one that matches`,
+    );
+  }
   return hold;
 };
 
-const installed = (name: string): z.infer<typeof manifestSchema> =>
+const installedWithThePasskeyPlugin = (name: string): z.infer<typeof manifestSchema> =>
   manifestOf(path.join("apps/api/node_modules", name, "package.json"));
 
 const ceilingOf = (caretRange: string): string => {
@@ -52,7 +56,8 @@ const ceilingOf = (caretRange: string): string => {
 
 describe("renovate.json's better-auth holds", () => {
   it("holds @better-auth/utils at the peer better-auth core names", () => {
-    const peer = installed("@better-auth/core").peerDependencies["@better-auth/utils"];
+    const peer =
+      installedWithThePasskeyPlugin("@better-auth/core").peerDependencies["@better-auth/utils"];
 
     expect(peer).toMatch(/^\d+\.\d+\.\d+$/);
     expect(holdOn("@better-auth/utils")).toBe(peer);
@@ -60,7 +65,7 @@ describe("renovate.json's better-auth holds", () => {
   });
 
   it("holds @simplewebauthn below the next major passkey takes", () => {
-    const passkey = installed("@better-auth/passkey").dependencies;
+    const passkey = installedWithThePasskeyPlugin("@better-auth/passkey").dependencies;
     const ceilings = ["@simplewebauthn/server", "@simplewebauthn/browser"].map((name) =>
       ceilingOf(passkey[name] ?? ""),
     );
@@ -78,7 +83,7 @@ describe("renovate.json's better-auth holds", () => {
   });
 });
 
-const manifests = (): readonly string[] => [".", ...workspacePackages()];
+const rootAndWorkspaceManifests = (): readonly string[] => [".", ...workspacePackages()];
 
 const pinsOf = (directory: string): readonly (readonly [string, string])[] => {
   const manifest = manifestOf(path.join(directory, "package.json"));
@@ -91,7 +96,7 @@ const pinsOf = (directory: string): readonly (readonly [string, string])[] => {
 describe("the workspaces' manifests", () => {
   it("name each external package at one version", () => {
     const named = new Map<string, { directory: string; version: string }[]>();
-    for (const directory of manifests()) {
+    for (const directory of rootAndWorkspaceManifests()) {
       for (const [name, version] of pinsOf(directory)) {
         named.set(name, [...(named.get(name) ?? []), { directory, version }]);
       }
@@ -103,7 +108,10 @@ describe("the workspaces' manifests", () => {
           `${name}: ${pins.map((pin) => `${pin.directory} ${pin.version}`).join(" | ")}`,
       );
 
-    expect(manifests().length).toBeGreaterThan(4);
+    expect(
+      rootAndWorkspaceManifests().length,
+      "the root manifest counts: it pins the same lint and type tools devtools does",
+    ).toBeGreaterThan(4);
     expect(
       split,
       "two workspaces name one package at two versions, so the lock carries two copies. Move them together.",

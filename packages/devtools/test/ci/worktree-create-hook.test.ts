@@ -37,7 +37,10 @@ describe("creating a worktree", () => {
 
     expect(run.status).toBe(0);
     expect(run.stdout).toBe(`${root}/.claude/worktrees/fresh\n`);
-    expect(tookMs).toBeLessThan((SWEEP_SECONDS * 1000) / 2);
+    expect(
+      tookMs,
+      "the sweep sleeps longer than a creation may take, so a hook that waited on it shows here",
+    ).toBeLessThan((SWEEP_SECONDS * 1000) / 2);
     await vi.waitFor(() => {
       expect(existsSync(swept) && readFileSync(swept, "utf8")).toBe(`${root}\n`);
     });

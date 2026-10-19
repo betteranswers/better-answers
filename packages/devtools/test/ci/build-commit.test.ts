@@ -167,9 +167,10 @@ describe("the commit a release's journeys check out", () => {
   it("follows the blob's redirect without carrying the bearer token", async () => {
     const asked = await askedAbout(shelfFor(mainHead));
 
-    expect(asked.stored.map(request)).toEqual([
-      { method: "GET", url: STORED_PATH, authorization: undefined },
-    ]);
+    expect(
+      asked.stored.map(request),
+      "ghcr answers a blob with a redirect to storage on another origin, where the bearer token must not follow",
+    ).toEqual([{ method: "GET", url: STORED_PATH, authorization: undefined }]);
   });
 });
 

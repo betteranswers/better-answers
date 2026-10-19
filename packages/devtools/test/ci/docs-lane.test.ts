@@ -306,7 +306,7 @@ const probeFilesOf = (leg: ImageLeg): readonly string[] => {
 
 const COPY = /^COPY\s+(?<words>.+)$/gm;
 
-const copiedBy = (leg: ImageLeg): readonly string[] =>
+const copiedFromTheTree = (leg: ImageLeg): readonly string[] =>
   [...read(leg.dockerfile).matchAll(COPY)].flatMap((found) => {
     const words = (found.groups?.["words"] ?? "").trim().split(/\s+/);
     if (words.some((word) => word.startsWith("--from="))) return [];
@@ -354,7 +354,7 @@ describe("which paths are an image's inputs", () => {
   });
 
   it("counts everything a Dockerfile copies except the source", () => {
-    const copied = [...new Set(imageLegs().flatMap(copiedBy))];
+    const copied = [...new Set(imageLegs().flatMap(copiedFromTheTree))];
     const misread = copied.filter(
       (source) => imagesOf([aChangeTo(source)]) !== (COPIED_SOURCE.includes(source) ? "no" : "yes"),
     );
@@ -544,12 +544,16 @@ const TITLE_JOB = "pr-title";
 
 const TYPECHECK_JOB = "dependency-typecheck";
 
+const JOBS_ON_NO_LANE: readonly string[] = [TITLE_JOB, TYPECHECK_JOB];
+
 const LOCKFILE_JOB = "pr-lockfile";
 
 const checkJobs = (): Readonly<Record<string, Job>> => workflow("check.yml").jobs;
 
-const legsOf = (lane: string): readonly string[] =>
-  Object.keys(checkJobs()).filter((job) => job.startsWith(`${lane}-`) && job !== TITLE_JOB);
+const legsTheFanInRequires = (lane: string): readonly string[] =>
+  Object.keys(checkJobs()).filter(
+    (job) => job.startsWith(`${lane}-`) && !JOBS_ON_NO_LANE.includes(job),
+  );
 
 const stepsOfJob = (job: string): readonly Step[] => checkJobs()[job]?.steps ?? [];
 
@@ -942,19 +946,19 @@ describe("the lane inside check.yml", () => {
 describe("the full lane's legs against the one list of gates", () => {
   it("runs exactly the root check's gates across its legs", () => {
     const ran: string[] = [];
-    for (const gate of legsOf(CODE_LANE).flatMap(gatesOf)) {
+    for (const gate of legsTheFanInRequires(CODE_LANE).flatMap(gatesOf)) {
       const whole = wholeGateOf(gate);
       if (!ran.includes(whole)) ran.push(whole);
     }
 
     expect(
       ran,
-      "the legs and the root check have stopped naming the same gates. Add the gate to a leg, or narrow it in NARROWED.",
+      "the legs and the root check have stopped naming the same gates. Add the gate to a leg, or narrow it in NARROWED: a step no one leg can run is split across the legs, and NARROWED folds the parts back.",
     ).toEqual(gatesNamed(rootScripts()["check"] ?? ""));
   });
 
   it("runs each gate on one leg only", () => {
-    const ran = legsOf(CODE_LANE).flatMap(gatesOf);
+    const ran = legsTheFanInRequires(CODE_LANE).flatMap(gatesOf);
 
     expect(ran.filter((gate, at) => ran.indexOf(gate) !== at)).toEqual([]);
     expect(ran.filter((gate) => rootScripts()[gate] === undefined)).toEqual([]);
@@ -963,7 +967,7 @@ describe("the full lane's legs against the one list of gates", () => {
 
 describe("how the legs narrow check:workspaces", () => {
   it("narrows a step only into root scripts the legs run", () => {
-    const ran = legsOf(CODE_LANE).flatMap(gatesOf);
+    const ran = legsTheFanInRequires(CODE_LANE).flatMap(gatesOf);
 
     for (const [whole, parts] of Object.entries(NARROWED)) {
       expect(rootScripts()[whole], `${whole} is not a root script`).toBeDefined();
@@ -1214,7 +1218,7 @@ const verdictOn = ({
   withoutItsLegs,
 }: VerdictCase): SpawnSyncReturns<string> => {
   const legs = Object.keys(checkJobs())
-    .filter((job) => ![FAN_IN, LANE, TITLE_JOB, TYPECHECK_JOB].includes(job))
+    .filter((job) => ![FAN_IN, LANE, ...JOBS_ON_NO_LANE].includes(job))
     .filter((job) => withoutItsLegs !== true || !job.startsWith(`${lane}-`))
     .map((job) => [job, { result: ran.includes(job) ? "success" : "skipped" }] as const);
 
@@ -1244,6 +1248,10 @@ describe("the one verdict check.yml reports", () => {
       FAN_IN,
     );
     expect(fanIn?.needs).toEqual(jobs.filter((job) => job !== FAN_IN));
+    expect(
+      workflow("build.yml").jobs["image"]?.needs,
+      "build.yml's image waits on its call of check.yml, the run this fan-in closes",
+    ).toContain("check");
     expect(
       fanIn?.if,
       "under anything narrower than always() a failed leg leaves the required context skipped, which never reports",

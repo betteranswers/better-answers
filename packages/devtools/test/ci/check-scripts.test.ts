@@ -114,7 +114,7 @@ describe("one run of check names every failure", () => {
 
       expect(
         stepsOf(check),
-        `${directory}'s check names a step that is not one of its gates, or leaves a gate out`,
+        `${directory}'s check names a step that is not one of its gates, or leaves a gate out. oxlint is no workspace gate: it runs once from the root, and a workspace copy would annotate every warning twice, on paths CI cannot place on a diff`,
       ).toEqual(GATE_STEPS.filter((step) => scripts[step] !== undefined));
     }
   });
@@ -227,6 +227,10 @@ describe("the runners start through node", () => {
     );
 
     expect(expected).toContain("packages/core mutation: @stryker-mutator/core");
+    expect(
+      started,
+      "the journeys start Playwright by path: Knip loads the config a script's --config names, and the journeys' config refuses to load without PUBLIC_URL",
+    ).toContain("apps/web journeys: @playwright/test");
     expect(
       [...started].sort(),
       "a workspace's test, mutation or journeys script starts no runner entry, or another script does",
