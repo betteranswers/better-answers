@@ -8,13 +8,12 @@ import {
   CROSS_OWNER_TABLE_ACCESS,
   IDENTITY_PROVIDER,
   IDENTITY_SET,
+  NEVER_AN_OWNER,
   OWNERS_OUTSIDE_CORE,
   TABLE_OWNERS,
 } from "../src/index.ts";
 
 const REPO_ROOT = new URL("../../../", import.meta.url);
-
-const NEVER_AN_OWNER = new Set(["kernel", "store"]);
 
 const coreDirectories = (): Set<string> =>
   new Set(

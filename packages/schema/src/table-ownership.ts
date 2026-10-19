@@ -11,6 +11,8 @@ export const OWNERS_OUTSIDE_CORE = [
   MIGRATE_TS_DIRECTORY,
 ] as const;
 
+export const NEVER_AN_OWNER: ReadonlySet<string> = new Set(["kernel", "store"]);
+
 export const TABLE_OWNERS = {
   "public.user": IDENTITY_PROVIDER,
   "public.session": IDENTITY_PROVIDER,
