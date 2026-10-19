@@ -128,7 +128,7 @@ You need:
 
 Never write helper scripts to shared /tmp paths. Other sessions run in parallel and overwrite them. Use a session-scoped directory such as `$(mktemp -d)` or `.claude/tmp/<session-id>/`.
 
-Stop only the processes you started. Keep each one's pid (`$!`), or find it by a working directory inside your own worktree (`lsof -d cwd`). Never match by name: `pkill -f playwright`, `pkill stryker` or `pgrep -x stryker` also hit other sessions' runs. On 19/10/2026 a name match stopped another session's browser suite, and another stopped a mutation run mid-pass, which left its `src` instrumented.
+Stop only the processes you started, by the pid you recorded when you started them. The Bash tool keeps no shell state between calls, so record the pid in the same call that starts the process, for example `<command> & echo $! > "$dir/run.pid"` in a session-scoped directory. Never stop a process by matching its name or command line, as `pkill -f playwright` or `pkill stryker` do. A name match also stops other sessions' runs. Watching a process by name is fine, as the waiter in `docs/agents/mutation-triage.md` does. On 19/10/2026 one name match stopped other sessions' browser suites, and another stopped a mutation run mid-pass, which left its `src` instrumented.
 
 ### Vitest
 
