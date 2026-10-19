@@ -307,10 +307,15 @@ describe("the steps after a sign-in", () => {
     });
   });
 
-  it("lands a redirect to another origin on home", async () => {
+  it.each([
+    "//evil.example",
+    "https://evil.example",
+    String.raw`/\evil.example`,
+    "evil.example/settings",
+  ])("lands a redirect to %s on home", async (redirect) => {
     adasApi(() => CONFIRMED, new Map(), SHELL_READS);
 
-    const { router } = await openAsAda("/confirm?redirect=%2F%2Fevil.example");
+    const { router } = await openAsAda(`/confirm?redirect=${encodeURIComponent(redirect)}`);
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(HOMES.Admin.path);
