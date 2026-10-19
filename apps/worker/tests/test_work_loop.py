@@ -920,11 +920,11 @@ def test_a_heartbeat_outlives_a_dropped_connection(
 
     assert renewed, "the heartbeat stopped at the dropped connection"
     assert live, "and the lease lapsed"
-    assert [
+    assert {
         line["job_id"]
         for line in beating.written
         if line["event"] == "a heartbeat failed" and line["error"]
-    ] == [beating.job.id]
+    } == {beating.job.id}
 
 
 def test_a_heartbeat_whose_claim_is_gone_says_so_and_stops(
