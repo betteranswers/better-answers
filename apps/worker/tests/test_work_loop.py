@@ -470,6 +470,21 @@ def test_the_audit_counts_unparseable_files_and_rows_without_files(
     assert outcome.missing_file == ["knowledge/gone.md"]
 
 
+def test_an_unparseable_file_with_an_index_row_lands_in_unparsed(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = seed_workspace(database.cursor())["id"]
+    with database.cursor() as cursor:
+        seed_expenses(cursor, workspace)
+    database.commit()
+    write_bundle(tmp_path, workspace, {"knowledge/expenses.md": "not a concept file\n"})
+
+    with scoped(database, workspace) as cursor:
+        outcome = run_audit(cursor, str(tmp_path), workspace)
+
+    assert (outcome.checked, outcome.unparsed) == (0, ["knowledge/expenses.md"])
+
+
 def test_a_rebuild_writes_the_next_generation_aside_then_flips_it(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
