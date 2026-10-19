@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
+import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
@@ -597,7 +598,9 @@ describe("searching the audit log", () => {
   });
 
   it("finds a person named only in an event's detail", async () => {
-    const workspace = await provisionedWorkspace(db(), "SearchedDetailOnly");
+    const minted = ulid();
+    const spellingSam = `${minted.slice(0, 20)}SAM${minted.slice(23)}`;
+    const workspace = await provisionedWorkspace(db(), "SearchedDetailOnly", { id: spellingSam });
     const [crew = ""] = await groupsMadeBy(workspace, workspace.adminUserId, ["Crew"]);
     const leaver = await seedPerson(db().pool, { name: "Sam Okoro" });
     await seedingWith(db().pool, (seed) =>
