@@ -1468,6 +1468,42 @@ describe("a __proto__ key in a concept's frontmatter", () => {
   ])("refuses an object value %s", (_shape, json) => {
     expect(frontmatterOf(json).success).toBe(false);
   });
+
+  it("keeps __proto__, ___proto__ and ____proto__ apart, in an entry too", () => {
+    const parsed = frontmatterOf(
+      '{"__proto__":"a","___proto__":"b","____proto__":"c",' +
+        '"sources":[{"resource":"/s/a.pdf","__proto__":"d","___proto__":"e","____proto__":"f"}]}',
+    );
+
+    expect(parsed.success && parsed.data.frontmatter).toEqual(
+      Object.fromEntries([
+        ["__proto__", "a"],
+        ["___proto__", "b"],
+        ["____proto__", "c"],
+        [
+          "sources",
+          [
+            Object.fromEntries([
+              ["resource", "/s/a.pdf"],
+              ["__proto__", "d"],
+              ["___proto__", "e"],
+              ["____proto__", "f"],
+            ]),
+          ],
+        ],
+      ]),
+    );
+  });
+});
+
+describe("a concept's frontmatter that is not a plain object", () => {
+  it.each([
+    ["an array", ["T"]],
+    ["a Map", new Map([["title", "T"]])],
+    ["a Date", new Date(0)],
+  ])("is refused when it is %s", (_shape, frontmatter) => {
+    expect(conceptFrontmatter.safeParse(frontmatter).success).toBe(false);
+  });
 });
 
 describe("the frontmatter bound's unit", () => {
