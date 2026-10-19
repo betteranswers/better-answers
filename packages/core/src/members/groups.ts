@@ -4,7 +4,16 @@ import { boundarySchemas, CURATED_ORIGIN } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { action, declareActions, record, recordEach } from "../audit/index.ts";
-import { admit, ADMIN_ALONE, attempt, declareAction, err, ok, ulid } from "../kernel/index.ts";
+import {
+  admit,
+  ADMIN_ALONE,
+  attempt,
+  attemptResult,
+  declareAction,
+  err,
+  ok,
+  ulid,
+} from "../kernel/index.ts";
 import type {
   AdminUserPrincipal,
   GroupId,
@@ -291,7 +300,7 @@ export const addToGroup = async (
   if (!target.ok) return err(target.error);
   const { admin, groupId, userId } = target.value;
 
-  const done = await attempt(
+  return attemptResult(
     async (): Promise<
       Result<{ groupId: GroupId; userId: UserId }, Exclude<AddToGroupRefusal, Error>>
     > => {
@@ -302,7 +311,6 @@ export const addToGroup = async (
       return added.length === 0 ? err("already-in-group") : ok({ groupId, userId });
     },
   );
-  return done.ok ? done.value : err(done.error);
 };
 
 export const removeFromGroup = async (
