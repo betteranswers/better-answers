@@ -1628,22 +1628,22 @@ def test_a_verdict_the_document_already_holds_names_nothing(
     assert outcome.as_row()["sensitivity_moved"] == []
 
 
-@pytest.mark.parametrize(
-    "revoking",
-    [
-        pytest.param(
-            "UPDATE job SET lease_expires_at = clock_timestamp() WHERE id = %s",
-            id="its lease lapsed",
-        ),
-        pytest.param(
-            "UPDATE job SET claimed_by = 'another-worker',"
-            " claimed_at = clock_timestamp(), heartbeat_at = clock_timestamp(),"
-            " lease_expires_at = clock_timestamp() + interval '60 seconds'"
-            " WHERE id = %s",
-            id="another worker claimed it since",
-        ),
-    ],
-)
+REVOCATIONS = [
+    pytest.param(
+        "UPDATE job SET lease_expires_at = clock_timestamp() WHERE id = %s",
+        id="its lease lapsed",
+    ),
+    pytest.param(
+        "UPDATE job SET claimed_by = 'another-worker',"
+        " claimed_at = clock_timestamp(), heartbeat_at = clock_timestamp(),"
+        " lease_expires_at = clock_timestamp() + interval '60 seconds'"
+        " WHERE id = %s",
+        id="another worker claimed it since",
+    ),
+]
+
+
+@pytest.mark.parametrize("revoking", REVOCATIONS)
 def test_a_revoked_claimant_writes_no_copy_and_moves_no_sensitivity(
     database: tuple[psycopg.Connection, str], tmp_path: Path, revoking: str
 ) -> None:
@@ -1674,6 +1674,38 @@ def test_a_revoked_claimant_writes_no_copy_and_moves_no_sensitivity(
     assert bucket.writes == []
     assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == "Internal"
     assert finding_rows_of(connection, workspace_id) == []
+
+
+@pytest.mark.parametrize("revoking", REVOCATIONS)
+def test_a_claim_lost_after_the_catalogue_lands_no_passages(
+    database: tuple[psycopg.Connection, str], tmp_path: Path, revoking: str
+) -> None:
+    connection, dsn = database
+    workspace_id = a_connected_source_whose_document_stands_at(
+        connection, A_SICK_NOTE_ID, "Internal"
+    )
+    bootstrap = bootstrap_for(dsn, tmp_path)
+    with connection.cursor() as cursor:
+        job = a_claimed_index_job(cursor, workspace_id, claimed_by=bootstrap.worker_id)
+    connection.commit()
+
+    def revoke_the_claim() -> None:
+        connection.execute(revoking, (job.id,))
+        connection.commit()
+
+    bucket = ABucket(
+        {original_key_of(A_SICK_NOTE_ID): A_SICK_NOTE.encode()},
+        on_write=revoke_the_claim,
+    )
+
+    with pytest.raises(queue.ClaimLostError):
+        index_connected_source(
+            bootstrap, sync_for(workspace_id), job=job, copies=bucket
+        )
+
+    assert bucket.writes == [normalised_key_of(A_SICK_NOTE_ID)]
+    assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == "Restricted"
+    assert passage_rows_of(connection, workspace_id) == []
 
 
 def test_a_heartbeat_renews_while_the_catalogue_write_holds_the_claim(
