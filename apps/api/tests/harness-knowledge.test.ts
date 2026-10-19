@@ -493,6 +493,87 @@ describe("a concepts seed the harness refuses before it writes", () => {
     expect(await leftIn(workspace)).toEqual(NOTHING);
   });
 
+  it("refuses a writer who is no member of the workspace", async () => {
+    const workspace = await app().provision();
+    const outsider = await app().person();
+
+    const answered = await askedToSeed({
+      workspaceId: workspace.workspaceId,
+      userId: outsider.id,
+      concepts: [{ title: "Quarry gate hours", body: "The synthetic gate opens at six." }],
+    });
+
+    expect(answered).toEqual(refusedNaming(["userId", "member of the workspace"]));
+    expect(await leftIn(workspace)).toEqual(NOTHING);
+  });
+
+  it("refuses two titles of one seed that name one file", async () => {
+    const workspace = await app().provision();
+
+    const answered = await askedToSeed({
+      ...seedingBy(workspace),
+      concepts: [
+        {
+          title: "Quarry speed limits",
+          body: "Synthetic haul roads carry a limit.",
+          sources: [A_CITED_SOURCE],
+        },
+        { title: "Quarry speed-limits", body: "Synthetic site roads carry a limit." },
+      ],
+    });
+
+    expect(answered).toEqual(refusedNaming(["concepts.1.title", "each file to one concept"]));
+    expect(await leftIn(workspace)).toEqual(NOTHING);
+  });
+
+  it("refuses a group member named twice, and writes nothing", async () => {
+    const workspace = await app().provision();
+
+    const answered = await askedToSeed({
+      ...seedingBy(workspace),
+      concepts: [
+        {
+          title: "Quarry pay bands",
+          body: "Synthetic pay bands are reviewed yearly.",
+          audience: "groups",
+          groupMemberIds: [workspace.admin.id, workspace.admin.id],
+          sources: [A_CITED_SOURCE],
+        },
+      ],
+    });
+
+    expect(answered).toEqual(
+      refusedNaming(["concepts.0.groupMemberIds.1", "names each member once"]),
+    );
+    expect(await leftIn(workspace)).toEqual(NOTHING);
+  });
+
+  it("lands one file name in two collections", async () => {
+    const workspace = await app().provision();
+
+    const landed = await conceptsSeeded({
+      ...seedingBy(workspace),
+      concepts: [
+        {
+          title: "Quarry speed limits",
+          body: "Synthetic haul roads carry a limit.",
+          collection: "haul-roads",
+        },
+        {
+          title: "Quarry speed-limits",
+          body: "Synthetic site roads carry a limit.",
+          collection: "site-roads",
+        },
+      ],
+    });
+
+    expect(landed.map((concept) => concept.title)).toEqual([
+      "Quarry speed limits",
+      "Quarry speed-limits",
+    ]);
+    expect(await leftIn(workspace)).toMatchObject({ concepts: 2 });
+  });
+
   it("lands an Editor's seed that asks no override", async () => {
     const workspace = await app().provision();
 

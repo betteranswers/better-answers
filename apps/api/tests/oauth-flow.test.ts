@@ -1372,14 +1372,38 @@ describe("the limits", () => {
     return statuses;
   };
 
-  it.each(EMAIL_CODE_PATHS)("spends no count on another site's asks of %s", async (path) => {
-    const client = app.client();
+  const SIGN_IN_PATHS = [
+    ["/sign-in-link/describe", "sign-in-link-read"],
+    ["/sign-in-link/sign-in", "sign-in-link-sign-in"],
+    ["/passkeys/sign-in-options", "passkey-sign-in"],
+    ["/passkeys/sign-in", "passkey-sign-in"],
+  ] as const satisfies readonly (readonly [string, AddressScope])[];
 
-    const statuses = await askedFromAnotherSite(client, path);
+  it.each([...EMAIL_CODE_PATHS, ...SIGN_IN_PATHS.map(([path]) => path)])(
+    "spends no count on another site's asks of %s",
+    async (path) => {
+      const client = app.client();
 
-    expect(statuses).toEqual(Array.from({ length: 11 }, () => [404, 403, 403, 403]).flat());
-    expect(await countedByTheApi(client.ip)).toEqual([]);
-  });
+      const statuses = await askedFromAnotherSite(client, path);
+
+      expect(statuses).toEqual(Array.from({ length: 11 }, () => [404, 403, 403, 403]).flat());
+      expect(await countedByTheApi(client.ip)).toEqual([]);
+    },
+  );
+
+  it.each(["sign-in-link-read", "sign-in-link-sign-in", "passkey-sign-in"] as const)(
+    "counts %s from its own page after another site's flood",
+    async (group) => {
+      const client = app.client();
+      stopTheClock();
+      for (const [path, counted] of SIGN_IN_PATHS) {
+        if (counted === group) await askedFromAnotherSite(client, path);
+      }
+
+      refusedOnlyAtTheLast(await onePast(() => COUNTS[group].ask(client), COUNTS[group].max));
+      expect(await countedByTheApi(client.ip)).toEqual([group]);
+    },
+  );
 
   it("counts its own page's asks after another site's flood", async () => {
     const client = app.client();
