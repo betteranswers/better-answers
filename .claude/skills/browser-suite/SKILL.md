@@ -1,6 +1,6 @@
 ---
 name: browser-suite
-description: How this repository drives a browser — the served-build seam, the two client-address fixtures, the api harness's actions and helpers, locators, waiting, the accessibility gate and the journeys. Use when writing, changing, debugging or running a Playwright spec under apps/web/e2e or a journey under apps/web/journeys, when a spec fails, flakes or hangs, when the accessibility gate refuses a page, when a spec needs state the harness has no action for, or when a page a journey walks changes.
+description: How this repository drives a browser: the served-build seam, the client-address fixtures, the harness's actions and helpers, locators, waiting, the accessibility gate and the journeys. Use when writing, debugging or running a Playwright spec under apps/web/e2e or a journey under apps/web/journeys, when a spec fails, flakes or hangs, when the gate refuses a page, when a spec needs state no harness action makes, or when a change renames a page's label, heading or accessible name.
 ---
 
 # The browser suite
@@ -13,11 +13,15 @@ Three reference files hold the detail. Open the one a task needs:
 
 - **`references/harness.md`**: every harness action and helper, what a refused seed leaves
   behind, the ceilings a spec runs into, and the readers of the api's answers. Open it before
-  writing set-up, and before adding an action or a helper, which may already exist.
+  writing set-up, before reaching for a helper (sign-in, shell locators, keyboard, latency clocks,
+  Claude's part in OAuth, the knowledge pages' module), and before adding an action or a helper,
+  which may already exist.
 - **`references/accessibility-gate.md`**: what the audit checks, and how the gate proves itself.
-  Open it when the gate refuses a page or a change touches the gate.
+  Open it when the gate refuses a page, when a spec is about one theme, or when a change touches
+  the gate.
 - **`references/journeys.md`**: the production journeys, their configuration, code sources,
-  outcome words and the by-hand run. Open it before changing a page a journey walks.
+  outcome words and the by-hand run. Open it before changing a page a journey walks, and before
+  writing or running a journey or reading its outcome word.
 
 ## The seam
 
@@ -69,10 +73,12 @@ A spec asks for the ones it uses and gets the rest anyway: `apps/web/e2e/sign-ou
 The two addresses are **different on purpose**. The browser is one client and the set-up traffic
 is another, so a spec that floods a path through `request` leaves the page's own bucket untouched.
 `apps/web/e2e/sign-in.spec.ts` is the case: it posts six codes for one address through `request`,
-then asks for one more in the browser, and what refuses it is the per-email ceiling. Without an
+then asks for one more in the browser, and what refuses it is the per-email ceiling rather than
+a per-address one the flood would have filled for the page as well. Without an
 address of its own, a caller shares one bucket with every other caller in the run, and a long run
 trips a ceiling partway through. Both addresses come from RFC 2544's benchmarking block, keyed by
-worker index and a per-run count. A spec that means to prove a ceiling names which ceiling it
+worker index and a per-run count. The header's name is written out in `browser.ts` rather than
+imported, because `apps/web` takes nothing from `apps/api` at runtime. A spec that means to prove a ceiling names which ceiling it
 proves and reaches it from the side that counts; `references/harness.md` lists the three.
 
 ## Building state
@@ -83,7 +89,8 @@ action calls `/__harness`, which `apps/api/tests/harness-control.ts` mounts, and
 actions live beside it in `apps/api/tests/harness-*.ts`. The same module re-exports the locators
 and browser helpers in `apps/web/e2e/locators.ts`. Most specs sign in with `signIn` or
 `signedInAtHome`, which pass through the product's own sign-in page and its second-factor gate,
-never around them.
+never around them. Each spec provisions its own workspace with `provision` and mints its own
+address with `anAddress`, so two specs running together never share state.
 
 A seed the harness cannot write answers 400, naming each field and its rule, and the action's
 failure carries that answer, so read the reason there and not in the server's log. A seed that a
@@ -129,6 +136,7 @@ file for one that already does the job.
   proves the page was left. Never a fixed sleep, and never a load state.
 - **Title says what the system does for whom**: `"a member of two workspaces picks
   one, and everything after is scoped to the pick"`, not `"picker test"`.
+- **A set-up repeated across a file becomes a local helper**, with a comment saying why it exists.
 - **Give an assertion a message wherever the failure would not name itself.** The harness's own
   `${path} answered ${status}` is the pattern, and so are the axe assertion and the gate's refusal
   in `apps/web/e2e/browser.ts`.
@@ -144,7 +152,8 @@ file for one that already does the job.
   kind, `- text:` lines included. A name in one is a literal, and a name from seeded data goes in
   through `JSON.stringify`, which quotes it as the snapshot takes it.
 - **Tell which refusal happened from where it was decided.** Where the api answered, read its
-  answer with `refusalAnswering` or `authAnswering`, then check the alert with `saysARefusal`.
+  answer with `refusalAnswering` or `authAnswering` from `./refused-read.ts`
+  (`references/harness.md` says what each answers), then check the alert with `saysARefusal`.
   Ask for the answer before the action that calls and await it afterwards, because an answer can
   land before anything waits for it. Holding words shows a refusal only in an alert that said
   nothing before it. In one that already says a refusal, read what it says first, then check with
@@ -166,7 +175,9 @@ file for one that already does the job.
   timed from a fresh `goto`, so no cache answers it. An action's 100 ms is timed **in the page**,
   with a keydown listener and a `MutationObserver`, because a matcher's polling is coarser than the
   budget. `apps/web/e2e/sources.spec.ts` times both, with `clockTheNextKey` and
-  `theActionLandedWithinItsBudget`.
+  `theActionLandedWithinItsBudget`. Most specs time one sample;
+  `apps/web/e2e/people.spec.ts` and `apps/web/e2e/people-groups.spec.ts` take the median of
+  `ACTION_SAMPLES` through `theActionsLandedWithinTheirBudget`.
 - **A shared part no page draws yet is bundled with Vite, not imported.** Playwright compiles
   every `.tsx` it loads with its own JSX runtime, so React cannot render a component a spec imports.
   `apps/web/e2e/drawn-parts.ts` builds a unit-suite harness through Vite from a virtual entry
@@ -182,9 +193,11 @@ carries that as three things, of which automated rules are only one:
 
 - **An `AxeBuilder` pass** (`@axe-core/playwright`) over `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`
   and `wcag22aa`, asserted to have no violations. The fixture in `apps/web/e2e/browser.ts` runs
-  it on the page the test leaves the browser on, once the body has finished, in light and in dark,
-  so a new spec is held to it by existing. The audit also refuses a control whose edge and fill
+  it on the page the test leaves the browser on, once the body has finished and passed, in light
+  and in dark, so a new spec is held to it by existing and a gate failure appears only once the
+  test's own assertions pass. The audit also refuses a control whose edge and fill
   both sit under 3:1 against what is behind it, and a page with more than three registration marks.
+  `references/accessibility-gate.md` says what the audit sets aside and how it measures.
 - **A keyboard traversal** reaching the page and each of its actions without a pointer:
   `apps/web/e2e/sign-in.spec.ts` for the three pages outside the shell,
   `apps/web/e2e/frame.spec.ts` for the band, the rail and the menu, and
@@ -245,6 +258,8 @@ run after a release, never in `check`, a pull request or the merge queue. A jour
 name itself, as a spec does, so a label changed under one fails nothing until the journey runs.
 A change to a page a journey walks, a label it names included, changes that journey in the same
 pull request and runs it by hand against the browser suite's api with the harness code source.
+Each role's spec in `apps/web/journeys/` names its pages as `test.step` titles, so read those to
+learn whether a change reaches a journey.
 `references/journeys.md` gives the run, the configuration and the outcome words.
 
 ## Not carried

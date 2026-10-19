@@ -22,8 +22,7 @@ The api harness's actions, the helpers in the suite's modules, the ceilings a sp
   `apps/api/src/trpc/knowledge.ts`), which `readsCeilingFilled` in `apps/web/e2e/knowledge.ts`
   fills.
 
-A spec that means to prove a ceiling names which of the three it is proving, and reaches it from
-the side that counts. Read the numbers off those files rather than from here.
+Read the numbers off those files rather than from here.
 
 ## The harness's actions
 
@@ -58,6 +57,8 @@ beside `apps/api/tests/harness-control.ts`: Sources in `apps/api/tests/harness-s
 | `releaseTheModel` | Lets a held call go on: the judge's answer, or the draft after its first sentence. Every later call of that workspace's is answered at once |
 | `modelCallsIn` | The judge's and the drafter's calls the wire has had for a workspace, a held one among them — how a spec shows a second press or a refocus asked nothing |
 
+## What a refused seed leaves
+
 A seed the harness cannot write answers 400. A body or a row that a schema refuses names each
 field and its rule, and a write that trips a constraint names the constraint. The action's failure
 carries that answer, so the reason is read there and not in the server's log. Any other fault of
@@ -84,6 +85,8 @@ Editor. A seed refused there writes nothing and makes no repository. Any other r
 concept leaves the concepts before it whole, in the repository, the index and the map. It may leave
 that concept's own connected sources, documents and passages, and the concept itself, written but
 not yet narrowed to its group, shared past its evidence or verified.
+
+## The browser helpers
 
 More helpers drive the browser rather than the harness. Most are defined in `apps/web/e2e/locators.ts`, which `harness.ts` re-exports, so a spec imports them from either:
 
@@ -147,6 +150,8 @@ holding one. `emailsSentTo` counts the emails the capture holds for an address, 
 api delivers nothing to `@unreachable.example`, so a spec can meet an invitation whose email did
 not go.
 
+## Claude's part in OAuth
+
 Six more play Claude's part in its OAuth flow on the suite's own origin — `apps/web/e2e/consent.spec.ts` for the consent page, `apps/web/e2e/console-people.spec.ts` for a person who has given an assistant access:
 
 | Helper | What it does |
@@ -157,6 +162,8 @@ Six more play Claude's part in its OAuth flow on the suite's own origin — `app
 | `claudeExchanges` | Exchanges the code at the redirect for tokens, which is when the grant's refresh token is minted, and answers that refresh token |
 | `claudeDisconnects` | Revokes that refresh token at `/oauth2/revoke`, as Claude does when the person disconnects it, so the authorization server ends the grant itself |
 | `CLAUDES_REDIRECT_URI` | The redirect address the suite's Claude names in its authorize request and its token exchanges, `https://claude.ai/api/mcp/auth_callback`. A spec compares where *Connect* or *Cancel* landed with it. `catchClaudesRedirect` routes it, and `apps/web/e2e/console-people.spec.ts` unroutes it |
+
+## Reading the api's answers
 
 One helper answers for the api. `refusedFromNowOn` in `apps/web/e2e/refused-read.ts` refuses one
 console procedure inside a tRPC batch, in the api's own words for a person without the operator's

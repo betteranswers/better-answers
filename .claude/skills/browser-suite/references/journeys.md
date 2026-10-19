@@ -2,7 +2,7 @@
 
 The journeys sign in to production. `SKILL.md` gives the rule for a pull request that changes a page a journey walks.
 
-The journeys sign in to production as the test workspace's three test people, an Admin, an
+They sign in as the test workspace's three test people, an Admin, an
 Editor and a Viewer, and walk the pages each role reaches. `.github/workflows/release.yml` runs
 them after a release, and against the live release on a night with nothing to promote;
 `docs/operations/RUNBOOK.md` page 13 is the owner's side of them. They live in
@@ -76,7 +76,4 @@ reporter in the flag beside `list` fails at the run's end, because only the conf
 outcome file.
 
 `check:web` never runs a journey, since the suite's `testDir` is `e2e`, and nor does a pull
-request or the merge queue. Its typecheck covers them, but a journey writes each name itself, as a
-spec does, so a label changed under one fails nothing until the journey runs. A change to a page a
-journey walks, a label it names included, changes that journey in the same pull request and runs it
-by hand as above (`docs/agents/workflow.md`).
+request or the merge queue. Its typecheck covers them; run one by hand as above (`docs/agents/workflow.md`).
