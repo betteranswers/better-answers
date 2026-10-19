@@ -75,20 +75,18 @@ const HEAD = "5c1b9e0f2a7d4c3b8e6f1a0d9c2b7e4f3a8d6c1b";
 const OLDER = "0e7a3c5b9d1f2e4a6c8b0d2f4e6a8c0b2d4f6e8a";
 const OLDEST = "9a8b7c6d5e4f30211203f4e5d6c7b8a9f0e1d2c3";
 const REPOSITORY = "betteranswers/better-answers";
-const tagOf = (commit: string, kind = "release"): string =>
-  `refs/tags/${kind}/20260926T023514Z-${commit.slice(0, 7)}`;
+const tagOf = (commit: string): string =>
+  `refs/tags/release/20260926T023514Z-${commit.slice(0, 7)}`;
 
 const STUB_GH = [
   "#!/usr/bin/env bash",
   '[ -n "${STUB_GH_FAILS:-}" ] && exit 1',
-  '[ -n "${STUB_REJECTED_FAILS:-}" ] && [[ "$*" == *tags/rejected/* ]] && exit 1',
   "lines() { for line in $1; do printf '%s\\n' \"${line}\"; done; }",
   'case "$*" in',
   `  "api repos/${REPOSITORY}/git/ref/heads/main --jq .object.sha") printf '%s\\n' "\${STUB_HEAD}" ;;`,
   `  "api repos/${REPOSITORY}/commits?sha=main&per_page=100 --jq .[].sha") lines "\${STUB_COMMITS:-}" ;;`,
   `  "api repos/${REPOSITORY}/actions/workflows/build.yml/runs?branch=main&status=success&per_page=100 --jq .workflow_runs[].head_sha") lines "\${STUB_GREEN:-}" ;;`,
   `  "api --paginate repos/${REPOSITORY}/git/matching-refs/tags/release/ --jq .[].ref") lines "\${STUB_TAGS:-}" ;;`,
-  `  "api --paginate repos/${REPOSITORY}/git/matching-refs/tags/rejected/ --jq .[].ref") lines "\${STUB_REJECTED:-}" ;;`,
   "  *) exit 2 ;;",
   "esac",
   "",
@@ -123,31 +121,20 @@ const gateRan = async (env: Readonly<Record<string, string>>): Promise<GateRun> 
   };
 };
 
-type Journeys = { readonly only?: boolean; readonly mode?: string };
+const decided = (promote: boolean, commit: string, trigger: string): string =>
+  `promote=${String(promote)}\ncommit=${commit}\ntrigger=${trigger}\n`;
 
-const decided = (
-  promote: boolean,
-  commit: string,
-  trigger: string,
-  { only = false, mode = "off" }: Journeys = {},
-): string =>
-  `promote=${String(promote)}\ncommit=${commit}\ntrigger=${trigger}\njourneys_only=${String(only)}\njourneys_mode=${mode}\n`;
-
-const skipped = (said: string, trigger: string, journeys: Journeys = {}): GateRun => ({
+const skipped = (said: string, trigger: string): GateRun => ({
   code: 0,
   said: `::notice::${said}\n`,
-  output: decided(false, "", trigger, journeys),
+  output: decided(false, "", trigger),
   summary: `### Not released\n\n${said}\n`,
 });
 
-const LIVE = "The journeys run against the live release.";
-
-type Refusal = { readonly mode?: string; readonly due?: boolean };
-
-const refused = (said: string, trigger: string, { mode = "off", due }: Refusal = {}): GateRun => ({
+const refused = (said: string, trigger: string): GateRun => ({
   code: 1,
   said: `::error::${said}\n`,
-  output: `${decided(false, "", trigger, { mode })}refused=${String(due ?? trigger === "nightly")}\nrefusal=${said}\n`,
+  output: decided(false, "", trigger),
   summary: "",
 });
 
@@ -310,163 +297,6 @@ describe("the gate a dispatched release passes", () => {
       );
     },
   );
-});
-
-describe("the journeys the gate lets run", () => {
-  const newestReleased = {
-    EVENT: "schedule",
-    RELEASE_MODE: "nightly",
-    STUB_COMMITS: `${HEAD} ${OLDER}`,
-    STUB_GREEN: `${HEAD} ${OLDER}`,
-    STUB_TAGS: tagOf(HEAD),
-  };
-
-  it("runs them against the live release when nothing is newer", async () => {
-    expect(await gateRan({ ...newestReleased, JOURNEYS_MODE: "report" })).toEqual(
-      skipped(
-        `${HEAD} is the newest release on main, and no commit after it has a green build, so nothing is released tonight. ${LIVE}`,
-        "nightly",
-        { only: true, mode: "report" },
-      ),
-    );
-  });
-
-  it("runs none on a quiet night while off", async () => {
-    expect(await gateRan(newestReleased)).toEqual(
-      skipped(
-        `${HEAD} is the newest release on main, and no commit after it has a green build, so nothing is released tonight.`,
-        "nightly",
-      ),
-    );
-  });
-
-  it("runs them after a nightly promotion, not instead of it", async () => {
-    expect(
-      await gateRan({
-        ...newestReleased,
-        STUB_TAGS: tagOf(OLDER),
-        JOURNEYS_MODE: "gate",
-      }),
-    ).toEqual({
-      code: 0,
-      said: "",
-      output: decided(true, HEAD, "nightly", { mode: "gate" }),
-      summary: "",
-    });
-  });
-
-  it("runs them on a scheduled night in drill mode", async () => {
-    expect(
-      await gateRan({ EVENT: "schedule", RELEASE_MODE: "drill", JOURNEYS_MODE: "report" }),
-    ).toEqual(
-      skipped(
-        `RELEASE_MODE is drill, so the nightly release has nothing to do. Dispatch \`release\` with \`rehearsed_by\` (RUNBOOK.md page 6). ${LIVE}`,
-        "nightly",
-        { only: true, mode: "report" },
-      ),
-    );
-  });
-
-  it("never sets the flag on a merge's skipped release", async () => {
-    expect(await gateRan({ COMMIT: OLDER, EVENT: "push", JOURNEYS_MODE: "report" })).toEqual(
-      skipped(
-        `${OLDER} is no longer main's head; ${HEAD} is. Production never goes back to an older commit, so a newer commit's green build releases in its place.`,
-        "merge",
-        { mode: "report" },
-      ),
-    );
-  });
-
-  it.each(["nightly", "drill"])(
-    "takes a journeys-only dispatch in %s mode, promoting nothing",
-    async (mode) => {
-      expect(
-        await gateRan({
-          EVENT: "workflow_dispatch",
-          RELEASE_MODE: mode,
-          JOURNEYS_ONLY: "true",
-          JOURNEYS_MODE: "report",
-        }),
-      ).toEqual({
-        code: 0,
-        said: `::notice::A journeys-only dispatch: nothing is promoted or tagged. ${LIVE}\n`,
-        output: decided(false, "", "dispatch", { only: true, mode: "report" }),
-        summary: `### Journeys only\n\nA journeys-only dispatch: nothing is promoted or tagged. ${LIVE}\n`,
-      });
-    },
-  );
-
-  it("has nothing to run on a journeys-only dispatch while off", async () => {
-    expect(await gateRan({ EVENT: "workflow_dispatch", JOURNEYS_ONLY: "true" })).toEqual(
-      skipped(
-        "JOURNEYS_MODE is off, so a journeys-only dispatch has nothing to run. Set it to report (RUNBOOK.md page 13)",
-        "dispatch",
-      ),
-    );
-  });
-
-  it.each(EVERY_TRIGGER)(
-    "fails closed on an unknown journeys mode, for a $trigger",
-    async ({ trigger, env }) => {
-      expect(await gateRan({ ...env, JOURNEYS_MODE: "on" })).toEqual(
-        refused(
-          "JOURNEYS_MODE is 'on', which is not off, report or gate, so nothing is released. Set one (gh variable set JOURNEYS_MODE --body report), or delete it for off",
-          trigger,
-          { mode: "on" },
-        ),
-      );
-    },
-  );
-});
-
-describe("the gate's word on a refused or rejected night", () => {
-  it("owes the report its refusal and whether journeys were due", async () => {
-    expect(
-      await gateRan({ EVENT: "workflow_dispatch", JOURNEYS_ONLY: "true", JOURNEYS_MODE: "always" }),
-    ).toEqual(
-      refused(
-        "JOURNEYS_MODE is 'always', which is not off, report or gate, so nothing is released. Set one (gh variable set JOURNEYS_MODE --body report), or delete it for off",
-        "dispatch",
-        { mode: "always", due: true },
-      ),
-    );
-  });
-
-  const rejectedHead = {
-    EVENT: "schedule",
-    RELEASE_MODE: "nightly",
-    JOURNEYS_MODE: "gate",
-    STUB_COMMITS: `${HEAD} ${OLDER} ${OLDEST}`,
-    STUB_GREEN: `${HEAD} ${OLDER} ${OLDEST}`,
-    STUB_TAGS: tagOf(OLDEST),
-  };
-
-  it("stops at a rejected commit, never promoting an older one", async () => {
-    expect(await gateRan({ ...rejectedHead, STUB_REJECTED: tagOf(HEAD, "rejected") })).toEqual(
-      skipped(
-        `${HEAD} has a rejected/ tag, whose message names the journeys that ended fail, and no commit after it has a green build, so nothing is released tonight. Delete its rejected/ tag to promote it again. ${LIVE}`,
-        "nightly",
-        { only: true, mode: "gate" },
-      ),
-    );
-  });
-
-  it("promotes a green commit newer than a rejected one", async () => {
-    expect(await gateRan({ ...rejectedHead, STUB_REJECTED: tagOf(OLDER, "rejected") })).toEqual({
-      code: 0,
-      said: "",
-      output: decided(true, HEAD, "nightly", { mode: "gate" }),
-      summary: "",
-    });
-  });
-
-  it("refuses a night whose rejected tags cannot be read", async () => {
-    expect(await gateRan({ ...rejectedHead, STUB_REJECTED_FAILS: "1" })).toEqual(
-      refused("the rejected tags could not be read, so nothing is released tonight", "nightly", {
-        mode: "gate",
-      }),
-    );
-  });
 });
 
 const READ_KEY = "hcr_read_only_key_for_tests";
@@ -716,11 +546,6 @@ const jobOf = (name: string): ReleaseJob => {
   return job;
 };
 
-const secretsReadBy = (job: ReleaseJob): readonly string[] =>
-  [...new Set([...JSON.stringify(job).matchAll(/secrets\.([A-Z_]+)/g)].map((found) => found[1]))]
-    .filter((name) => name !== undefined)
-    .sort();
-
 describe("how the workflows hand a release its commit", () => {
   it("calls the release after every image leg, on main alone", () => {
     expect(build().jobs.release).toEqual({
@@ -755,6 +580,10 @@ describe("how the workflows hand a release its commit", () => {
     expect(release().concurrency.group).not.toEqual(build().concurrency.group);
   });
 
+  it("runs the gate, promote and record, nothing else", () => {
+    expect(Object.keys(release().jobs)).toEqual(["gate", "promote", "record"]);
+  });
+
   it("promotes only what the gate passes, at the gate's commit", () => {
     const [gate, promote] = [jobOf("gate"), jobOf("promote")];
     const checkout = promote.steps.find((step) => step.uses?.startsWith("actions/checkout@"));
@@ -763,10 +592,6 @@ describe("how the workflows hand a release its commit", () => {
       promote: "${{ steps.ask.outputs.promote }}",
       commit: "${{ steps.ask.outputs.commit }}",
       trigger: "${{ steps.ask.outputs.trigger }}",
-      journeys_only: "${{ steps.ask.outputs.journeys_only }}",
-      journeys_mode: "${{ steps.ask.outputs.journeys_mode }}",
-      refused: "${{ steps.ask.outputs.refused }}",
-      refusal: "${{ steps.ask.outputs.refusal }}",
     });
     expect({ needs: promote.needs, if: promote.if }).toEqual({
       needs: "gate",
@@ -785,21 +610,18 @@ describe("how the workflows hand a release its commit", () => {
     expect([backup >= 0, backup < redeploy, redeploy < smoke]).toEqual([true, true, true]);
   });
 
-  it("reads the switches the runbook tells the owner to set", () => {
+  it("reads the switch the runbook tells the owner to set", () => {
     const ask = jobOf("gate").steps.find((step) => step.id === "ask");
     const runbook = readFileSync(path.join(repositoryRoot, "docs/operations/RUNBOOK.md"), "utf8");
 
-    expect({
-      release: ask?.env?.["RELEASE_MODE"],
-      journeys: ask?.env?.["JOURNEYS_MODE"],
-      only: ask?.env?.["JOURNEYS_ONLY"],
-    }).toEqual({
-      release: "${{ vars.RELEASE_MODE }}",
-      journeys: "${{ vars.JOURNEYS_MODE }}",
-      only: "${{ inputs.journeys_only }}",
-    });
+    expect(ask?.env?.["RELEASE_MODE"]).toEqual("${{ vars.RELEASE_MODE }}");
     expect(runbook).toContain("gh variable set RELEASE_MODE --body nightly");
-    expect(runbook).toContain("gh variable set JOURNEYS_MODE --body report");
+  });
+
+  it("is read by nothing in check.yml", () => {
+    const check = readFileSync(path.join(repositoryRoot, ".github/workflows/check.yml"), "utf8");
+
+    expect(check).not.toMatch(/release\.yml|workflow_run/);
   });
 });
 
@@ -844,16 +666,16 @@ describe("the tag a release records", () => {
     ).toEqual([]);
   });
 
-  it("records on the smoke, or on held or fail", () => {
+  it("records on the smoke", () => {
     const record = jobOf("record");
 
     expect({ needs: record.needs, if: record.if }).toEqual({
-      needs: ["gate", "promote", "journeys"],
-      if: "${{ !cancelled() && needs.promote.result == 'success' && (needs.gate.outputs.trigger == 'merge' || needs.gate.outputs.journeys_mode != 'gate' || needs.journeys.outputs.word == 'held' || needs.journeys.outputs.word == 'fail') }}",
+      needs: "promote",
+      if: "${{ !cancelled() && needs.promote.result == 'success' }}",
     });
   });
 
-  it("forbids tagging by hand a release that did not hold", () => {
+  it("tags by hand only a release production answers healthy on", () => {
     const said = [jobOf("promote"), jobOf("record")]
       .flatMap((job) => job.steps)
       .filter((step) => step.if === "failure()")
@@ -861,7 +683,7 @@ describe("the tag a release records", () => {
 
     expect(said.join("\n")).not.toContain("record it by hand");
     expect(said).toHaveLength(2);
-    for (const one of said) expect(one).toContain("never a release whose journeys did not hold");
+    for (const one of said) expect(one).toMatch(/tag it by hand .* healthy on api/);
   });
 });
 
@@ -873,11 +695,10 @@ const STUB_GIT = [
 ].join("\n");
 
 const RECORDED_HEAD = "7364d68b07ba4287d8d78ba4f79e5501ba3961fa";
-const JOURNEYED = "d0aeb355cba8b2a0c86f4c2b1a3e9f6d7c5b4a31";
 
 type Recorded = { readonly calls: readonly (readonly string[])[]; readonly summary: string };
 
-const recordedAs = async (env: Readonly<Record<string, string>>): Promise<Recorded> => {
+const recorded = async (): Promise<Recorded> => {
   const step = jobOf("record").steps.find(running('git push origin "refs/tags/${tag}"'));
   const run = mkdtempSync(path.join(scratch, "record-"));
   mkdirSync(path.join(run, "bin"));
@@ -892,7 +713,6 @@ const recordedAs = async (env: Readonly<Record<string, string>>): Promise<Record
     TAG: "release/20261003T182337Z-7364d68",
     MESSAGE: "release: api 938568b7b474 · worker 69e6aeebdb1b",
     RELEASE_HEAD: RECORDED_HEAD,
-    ...env,
   });
   expect(done.code).toBe(0);
   const calls = readFileSync(path.join(run, "git.log"), "utf8")
@@ -913,309 +733,24 @@ const taggedBy = ({ calls }: Recorded) => {
 };
 
 describe("the tag the record job makes", () => {
-  it("decides the tag from the gate's and journeys' outputs", () => {
+  it("takes the tag, message and head promote named", () => {
     expect(jobOf("record").steps.find(running('git push origin "refs/tags/${tag}"'))?.env).toEqual({
       TAG: "${{ needs.promote.outputs.tag }}",
       MESSAGE: "${{ needs.promote.outputs.message }}",
       RELEASE_HEAD: "${{ needs.promote.outputs.head }}",
-      MODE: "${{ needs.gate.outputs.journeys_mode }}",
-      TRIGGER: "${{ needs.gate.outputs.trigger }}",
-      WORD: "${{ needs.journeys.outputs.word }}",
-      JOURNEYED: "${{ needs.journeys.outputs.commit }}",
     });
   });
 
-  it("adds the journeys' word and commit to a release", async () => {
-    const recorded = taggedBy(
-      await recordedAs({ MODE: "report", TRIGGER: "nightly", WORD: "held", JOURNEYED }),
-    );
+  it("tags promote's head with promote's message, and pushes that tag", async () => {
+    const record = await recorded();
 
-    expect(recorded).toEqual({
+    expect(taggedBy(record)).toEqual({
       on: RECORDED_HEAD,
       tag: "release/20261003T182337Z-7364d68",
-      message: `release: api 938568b7b474 · worker 69e6aeebdb1b\nJourneys: held, run against ${JOURNEYED}`,
+      message: "release: api 938568b7b474 · worker 69e6aeebdb1b",
       pushed: ["refs/tags/release/20261003T182337Z-7364d68"],
     });
-  });
-
-  it("tags a merge's release with no journeys line", async () => {
-    const recorded = taggedBy(await recordedAs({ MODE: "gate", TRIGGER: "merge" }));
-
-    expect(recorded.message).toEqual("release: api 938568b7b474 · worker 69e6aeebdb1b");
-    expect(recorded.pushed).toEqual(["refs/tags/release/20261003T182337Z-7364d68"]);
-  });
-
-  it("still tags a failed release under report", async () => {
-    const recorded = taggedBy(
-      await recordedAs({ MODE: "report", TRIGGER: "nightly", WORD: "fail", JOURNEYED }),
-    );
-
-    expect(recorded.tag).toEqual("release/20261003T182337Z-7364d68");
-  });
-
-  it("rejects a failed release under gate instead of tagging it", async () => {
-    const recorded = await recordedAs({
-      MODE: "gate",
-      TRIGGER: "nightly",
-      WORD: "fail",
-      JOURNEYED,
-    });
-
-    expect(taggedBy(recorded)).toEqual({
-      on: RECORDED_HEAD,
-      tag: "rejected/20261003T182337Z-7364d68",
-      message: `rejected: its journeys ended fail, so the nightly release will not promote it again\n\nrelease: api 938568b7b474 · worker 69e6aeebdb1b\nJourneys: fail, run against ${JOURNEYED}`,
-      pushed: ["refs/tags/rejected/20261003T182337Z-7364d68"],
-    });
-    expect(recorded.summary).toContain("### Rejected");
-  });
-});
-
-const JOURNEYS_SECRETS = [
-  "JOURNEYS_ADMIN_AUTHENTICATOR_KEY",
-  "JOURNEYS_ADMIN_EMAIL",
-  "JOURNEYS_EDITOR_EMAIL",
-  "JOURNEYS_INBOX_KEY",
-  "JOURNEYS_INBOX_URL",
-  "JOURNEYS_VIEWER_EMAIL",
-];
-
-describe("the journeys a release runs", () => {
-  const journeysStep = (): Step | undefined =>
-    jobOf("journeys").steps.find(running("pnpm --filter @better-answers/web run journeys"));
-
-  it("runs after a promotion or on the flag, never off", () => {
-    const journeys = jobOf("journeys");
-
-    expect({ needs: journeys.needs, if: journeys.if }).toEqual({
-      needs: ["gate", "promote"],
-      if: "${{ !cancelled() && needs.gate.outputs.journeys_mode != 'off' && needs.gate.outputs.trigger != 'merge' && (needs.promote.result == 'success' || needs.gate.outputs.journeys_only == 'true') }}",
-    });
-  });
-
-  it("holds read access and only the journeys' secrets", () => {
-    const journeys = jobOf("journeys");
-
-    expect(journeys.permissions).toEqual({ contents: "read", packages: "read" });
-    expect(secretsReadBy(journeys)).toEqual(JOURNEYS_SECRETS);
-    expect(journeys.env ?? {}).not.toHaveProperty("JOURNEYS_INBOX_KEY");
-    expect(journeys.steps.filter((step) => JSON.stringify(step).includes("secrets."))).toEqual([
-      journeysStep(),
-    ]);
-  });
-
-  it("hands the Admin's authenticator key to the journeys step alone", () => {
-    expect(journeysStep()?.env).toMatchObject({
-      JOURNEYS_ADMIN_AUTHENTICATOR_KEY: "${{ secrets.JOURNEYS_ADMIN_AUTHENTICATOR_KEY }}",
-    });
-    expect(jobOf("journeys").env ?? {}).not.toHaveProperty("JOURNEYS_ADMIN_AUTHENTICATOR_KEY");
-    expect(release().on.workflow_call.secrets["JOURNEYS_ADMIN_AUTHENTICATOR_KEY"]).toEqual({
-      required: false,
-    });
-  });
-
-  it("reads codes from the inbox, from production's sender", () => {
-    expect(journeysStep()?.env).toMatchObject({
-      JOURNEYS_CODE_SOURCE: "inbox",
-      JOURNEYS_SENDER: "${{ vars.JOURNEYS_SENDER }}",
-      JOURNEYS_INBOX_KEY: "${{ secrets.JOURNEYS_INBOX_KEY }}",
-      JOURNEYS_INBOX_URL: "${{ secrets.JOURNEYS_INBOX_URL }}",
-    });
-  });
-
-  it("uploads and caches nothing", () => {
-    const { steps } = jobOf("journeys");
-    const setupNode = steps.find((step) => step.uses?.startsWith("actions/setup-node@"));
-
-    expect(steps.filter((step) => /upload-artifact|actions\/cache@/.test(step.uses ?? ""))).toEqual(
-      [],
-    );
-    expect(setupNode?.with?.["package-manager-cache"]).toBe(false);
-  });
-
-  it("checks out the live image's commit before installing it", () => {
-    const { steps } = jobOf("journeys");
-    const health = steps.findIndex(running("deploy/await-release.sh"));
-    const built = steps.findIndex(running("deploy/build-commit.sh"));
-    const checkout = steps.findIndex(
-      (step) => step.with?.["ref"] === "${{ steps.built.outputs.commit }}",
-    );
-    const install = steps.findIndex(running("pnpm install --frozen-lockfile"));
-    const run = steps.findIndex(running("pnpm --filter @better-answers/web run journeys"));
-
-    expect(steps[built]?.id).toEqual("built");
-    expect([
-      health >= 0,
-      health < built,
-      built < checkout,
-      checkout < install,
-      install < run,
-    ]).toEqual([true, true, true, true, true]);
-  });
-
-  it("hands on the word the journeys wrote", () => {
-    const journeys = jobOf("journeys");
-    const word = journeys.steps.find((step) => step.id === "word");
-
-    expect(journeys.outputs).toEqual({
-      word: "${{ steps.word.outputs.word }}",
-      commit: "${{ steps.built.outputs.commit }}",
-    });
-    expect(word?.if).toEqual("always()");
-    expect(word?.run).toContain("apps/web/test-results/journeys-outcome");
-  });
-
-  it("fits its timeout around the journeys' own", () => {
-    const config = readFileSync(
-      path.join(repositoryRoot, "apps/web/playwright.journeys.config.ts"),
-      "utf8",
-    );
-    const msOf = (name: string): number =>
-      Number(new RegExp(`${name} = ([\\d_]+)`).exec(config)?.[1]?.replaceAll("_", ""));
-    const roles = readdirSync(path.join(repositoryRoot, "apps/web/journeys")).filter(
-      (file) => file.endsWith(".spec.ts") && file !== "preflight.spec.ts",
-    ).length;
-    const journeysSeconds =
-      (msOf("PREFLIGHT_TIMEOUT_MS") + roles * msOf("ROLE_JOURNEY_TIMEOUT_MS")) / 1000;
-
-    expect(roles).toBe(3);
-    expect(
-      journeysSeconds + 10 * 60,
-      "an install and Chromium took about five minutes in check.yml's web leg; the job leaves twice that",
-    ).toBeLessThanOrEqual(jobOf("journeys")["timeout-minutes"] * 60);
-  });
-
-  it("is read by nothing in check.yml", () => {
-    const check = readFileSync(path.join(repositoryRoot, ".github/workflows/check.yml"), "utf8");
-
-    expect(check).not.toMatch(/release\.yml|journeys|workflow_run/);
-  });
-});
-
-describe("the report a journeys run ends in", () => {
-  it("reports whenever journeys were due, never for a merge", () => {
-    const report = jobOf("report");
-
-    expect({ needs: report.needs, if: report.if }).toEqual({
-      needs: ["gate", "promote", "journeys", "record"],
-      if: "${{ always() && needs.gate.outputs.journeys_mode != 'off' && needs.gate.outputs.trigger != 'merge' && (needs.gate.outputs.promote == 'true' || needs.gate.outputs.journeys_only == 'true' || needs.gate.outputs.refused == 'true') }}",
-    });
-  });
-
-  it("holds the ping URL alone, installing nothing", () => {
-    const report = jobOf("report");
-
-    expect(report.permissions).toEqual({ contents: "read" });
-    expect(secretsReadBy(report)).toEqual(["JOURNEYS_PING_URL"]);
-    expect(report.steps.filter((step) => /pnpm|npm/.test(step.run ?? ""))).toEqual([]);
-    expect(report.steps.find(running("deploy/journeys-report.sh"))?.env).toMatchObject({
-      WORD: "${{ needs.journeys.outputs.word }}",
-      JOURNEYS: "${{ needs.journeys.result }}",
-      PROMOTE: "${{ needs.promote.result }}",
-      REFUSED: "${{ needs.gate.outputs.refused }}",
-      REFUSAL: "${{ needs.gate.outputs.refusal }}",
-    });
-  });
-});
-
-type Reported = Ran & { readonly summary: string; readonly heard: readonly Heard[] };
-
-type Upstream = { readonly promote?: string; readonly refused?: string; readonly refusal?: string };
-
-const reported = async (
-  word: string,
-  journeys: string,
-  { promote = "success", refused = "", refusal = "" }: Upstream = {},
-): Promise<Reported> => {
-  const run = mkdtempSync(path.join(scratch, "report-"));
-  const summary = path.join(run, "summary");
-  writeFileSync(summary, "");
-  let result: Reported = { code: null, out: "", err: "", summary: "", heard: [] };
-  await listening(
-    () => ({ status: 200, body: "OK" }),
-    async (origin, heard) => {
-      const done = await ran(deployScript("journeys-report.sh"), [], {
-        ...PATH_ONLY,
-        GITHUB_STEP_SUMMARY: summary,
-        JOURNEYS_PING_URL: `${origin}/check-uuid`,
-        JOURNEYS_PING_DELAY_SECONDS: "0",
-        WORD: word,
-        JOURNEYS: journeys,
-        PROMOTE: promote,
-        REFUSED: refused,
-        REFUSAL: refusal,
-      });
-      result = { ...done, summary: readFileSync(summary, "utf8"), heard: [...heard] };
-    },
-  );
-  return result;
-};
-
-const pingsOf = (heard: readonly Heard[]) => heard.map(({ url, body }) => ({ url, body }));
-
-describe("the word a journeys run reports", () => {
-  it("pings the journeys' own word", async () => {
-    const report = await reported("held", "success");
-
-    expect(report.code).toBe(0);
-    expect(pingsOf(report.heard)).toEqual([{ url: "/check-uuid", body: "held" }]);
-    expect(report.summary).toEqual(
-      "### Journeys: held\n\nEvery journey passed against the release production runs.\n\n",
-    );
-  });
-
-  it("reads journeys skipped after a failed promote as fail", async () => {
-    const report = await reported("", "skipped", { promote: "failure" });
-
-    expect(pingsOf(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "fail" }]);
-    expect(report.summary).toEqual(
-      "### Journeys: fail\n\nThe promote failed, so the journeys did not run (RUNBOOK.md page 6).\n\n",
-    );
-  });
-
-  it.each(["cancelled", "failure"])(
-    "reads a %s job without a word as could-not-run",
-    async (journeys) => {
-      const report = await reported("", journeys);
-
-      expect(pingsOf(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "could-not-run" }]);
-      expect(report.summary).toContain("### Journeys: could-not-run\n");
-    },
-  );
-
-  it("reads a promote cancelled by hand as could-not-run", async () => {
-    const report = await reported("", "skipped", { promote: "cancelled" });
-
-    expect(pingsOf(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "could-not-run" }]);
-    expect(report.summary).toEqual(
-      "### Journeys: could-not-run\n\nThe promote was cancelled, so the journeys did not run (RUNBOOK.md page 6).\n\n",
-    );
-  });
-
-  it("reads a refused gate as could-not-run, naming why", async () => {
-    const report = await reported("", "skipped", {
-      promote: "skipped",
-      refused: "true",
-      refusal: "JOURNEYS_MODE is 'on', which is not off, report or gate, so nothing is released.",
-    });
-
-    expect(pingsOf(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "could-not-run" }]);
-    expect(report.summary).toEqual(
-      "### Journeys: could-not-run\n\nThe gate refused this run, so the journeys did not run: JOURNEYS_MODE is 'on', which is not off, report or gate, so nothing is released. (RUNBOOK.md page 6)\n\n",
-    );
-  });
-
-  it("distrusts a word outside the three", async () => {
-    const report = await reported("passed", "failure");
-
-    expect(pingsOf(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "could-not-run" }]);
-  });
-
-  it("passes a fail word on as fail", async () => {
-    const report = await reported("fail", "failure");
-
-    expect(pingsOf(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "fail" }]);
-    expect(report.summary).toContain("RUNBOOK.md page 13");
+    expect(record.summary).toContain("### Recorded");
   });
 });
 
