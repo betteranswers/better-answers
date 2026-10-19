@@ -187,6 +187,12 @@ export type TestData = {
   modelPrice(overrides?: Partial<InsertInput<"modelPrice">>): Promise<Row<"modelPrice">>;
 };
 
+const numberOf = (id: string): string =>
+  id
+    .split("")
+    .reduce((value, digit) => value * 36n + BigInt(Number.parseInt(digit, 36)), 0n)
+    .toString();
+
 const hexOfLength = (length: number): string =>
   createHash("sha256").update(ulid()).digest("hex").repeat(2).slice(0, length);
 
@@ -274,7 +280,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     return insertRow(client, "user", {
       id,
       name: "Test person",
-      email: `${id.toLowerCase()}@example.invalid`,
+      email: `${numberOf(id)}@example.invalid`,
       ...overrides,
     });
   };
@@ -342,7 +348,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const id = overrides.id ?? ulid();
     return insertRow(client, "group", {
       id,
-      name: `Group ${id}`,
+      name: `Group ${numberOf(id)}`,
       origin: CURATED_ORIGIN,
       ...overrides,
       workspaceId,
