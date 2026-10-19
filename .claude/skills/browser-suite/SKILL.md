@@ -19,9 +19,8 @@ Three reference files hold the detail. Open the one a task needs:
 - **`references/accessibility-gate.md`**: what the audit checks, and how the gate proves itself.
   Open it when the gate refuses a page, when a spec is about one theme, or when a change touches
   the gate.
-- **`references/journeys.md`**: the production journeys, their configuration, code sources,
-  outcome words and the by-hand run. Open it before changing a page a journey walks, and before
-  writing or running a journey or reading its outcome word.
+- **`references/journeys.md`**: the production journeys, which are off and being retired
+  (BA-204). Open it only to work on that retirement.
 
 ## The seam
 
@@ -252,15 +251,9 @@ retried on a local machine.
 
 ## The journeys
 
-The journeys sign in to production as the test workspace's Admin, Editor and Viewer, and walk
-the pages each role reaches. They live in `apps/web/journeys/`, extend the suite's `test`, and
-run after a release, never in `check`, a pull request or the merge queue. A journey writes each
-name itself, as a spec does, so a label changed under one fails nothing until the journey runs.
-A change to a page a journey walks, a label it names included, changes that journey in the same
-pull request and runs it by hand against the browser suite's api with the harness code source.
-Each role's spec in `apps/web/journeys/` names its pages as `test.step` titles, so read those to
-learn whether a change reaches a journey.
-`references/journeys.md` gives the run, the configuration and the outcome words.
+The journeys in `apps/web/journeys/` signed in to production as the test workspace's Admin,
+Editor and Viewer. They are off (`JOURNEYS_MODE` is `off`) and are being retired until go-live
+(BA-204). A pull request no longer changes or runs a journey when it changes a page.
 
 ## Not carried
 
