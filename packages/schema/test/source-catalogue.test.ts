@@ -440,6 +440,10 @@ const THE_DISMISSAL_READ = "0052_the-dismissal-read.sql";
 
 const OTHER_WORKSPACE = "01J6CEEEEEEEEEEEEEEEEEEEEE";
 
+const namedAs0052ReadsThem = async (client: pg.PoolClient): Promise<void> => {
+  for (const statement of NAMES_BEFORE_THE_ACTION) await client.query(statement);
+};
+
 describe("the migration separating an Admin's narrowing from the seam's verdict", () => {
   it("backfills an Admin's last narrowing everywhere, never the seam's", async () => {
     await withWorkspace(async (client) => {
@@ -477,7 +481,7 @@ describe("the migration separating an Admin's narrowing from the seam's verdict"
         subjectId: seamNarrowed.id,
         detail: { sensitivity: "Restricted" },
       });
-      for (const statement of NAMES_BEFORE_THE_ACTION) await client.query(statement);
+      await namedAs0052ReadsThem(client);
 
       await asTheMigrationOwnerOf(
         client,

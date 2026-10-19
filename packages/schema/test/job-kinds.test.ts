@@ -15,9 +15,9 @@ import {
 import { journalMetaFolder } from "../src/journal.ts";
 import {
   type JobProbeRow,
-  seedConnectedSourceIn,
+  seedConnectedSourceInAnyState,
   seedConnectedSourceOfAConnectorAlone,
-  seedConnectedSourceTo,
+  seedConnectedSourceToAnyDestination,
   seedClaimedJob,
   seedFinishedJob,
   seedQueuedJob,
@@ -589,7 +589,7 @@ const SNAPSHOT_CHECKS = z.object({
   ),
 });
 
-const aCheckFrom = (
+const aCheckFromItsCreateTableInTheSnapshot = (
   snapshot: string,
   suffix: string,
   addedAs: string,
@@ -604,7 +604,11 @@ const aCheckFrom = (
 };
 
 const theDestinationCheckBeforeTheMap = (): string =>
-  aCheckFrom("0066_snapshot.json", "destination_check", "connected_source_destination_check");
+  aCheckFromItsCreateTableInTheSnapshot(
+    "0066_snapshot.json",
+    "destination_check",
+    "connected_source_destination_check",
+  );
 
 const withTheOldMapValuesAdmitted = (fn: (client: pg.PoolClient) => Promise<void>): Promise<void> =>
   withTheReasonCheckOf(THE_RENAMING_MIGRATION, fn, async (client) => {
@@ -650,8 +654,13 @@ describe("the migration that named the map", () => {
 
   it("moves every workspace's 'graph' destination to 'map'", async () => {
     await withTheOldMapValuesAdmitted(async (client) => {
-      await seedConnectedSourceTo(client, WS, CONNECTED_SOURCE, THE_OLD_DESTINATION);
-      await seedConnectedSourceTo(client, ANOTHER_WS, CONNECTED_SOURCE, THE_OLD_DESTINATION);
+      await seedConnectedSourceToAnyDestination(client, WS, CONNECTED_SOURCE, THE_OLD_DESTINATION);
+      await seedConnectedSourceToAnyDestination(
+        client,
+        ANOTHER_WS,
+        CONNECTED_SOURCE,
+        THE_OLD_DESTINATION,
+      );
 
       await replayingItsRewrites(client);
 
@@ -659,7 +668,12 @@ describe("the migration that named the map", () => {
       expect(await destinationsStandingIn(client, ANOTHER_WS)).toEqual([["chunk-index", "map"]]);
       expect(
         await refusalOf(client, () =>
-          seedConnectedSourceTo(client, WS, ANOTHER_CONNECTED_SOURCE, THE_OLD_DESTINATION),
+          seedConnectedSourceToAnyDestination(
+            client,
+            WS,
+            ANOTHER_CONNECTED_SOURCE,
+            THE_OLD_DESTINATION,
+          ),
         ),
       ).toBe("connected_source_destination_check");
     });
@@ -688,7 +702,11 @@ const itsValueRewrites = (): readonly string[] =>
   );
 
 const theStateCheckBeforeTheRename = (): string =>
-  aCheckFrom("0067_snapshot.json", "state_check", `${THE_TABLE_THE_MAP_NAMED}_state_check`);
+  aCheckFromItsCreateTableInTheSnapshot(
+    "0067_snapshot.json",
+    "state_check",
+    `${THE_TABLE_THE_MAP_NAMED}_state_check`,
+  );
 
 const withTheOldConnectedSourceValuesAdmitted = (
   fn: (client: pg.PoolClient) => Promise<void>,
@@ -737,8 +755,8 @@ describe("the migration that named the connected source", () => {
 
   it("moves every workspace's landed connected source to received", async () => {
     await withTheOldConnectedSourceValuesAdmitted(async (client) => {
-      await seedConnectedSourceIn(client, WS, CONNECTED_SOURCE, OLD_STATE);
-      await seedConnectedSourceIn(client, ANOTHER_WS, CONNECTED_SOURCE, OLD_STATE);
+      await seedConnectedSourceInAnyState(client, WS, CONNECTED_SOURCE, OLD_STATE);
+      await seedConnectedSourceInAnyState(client, ANOTHER_WS, CONNECTED_SOURCE, OLD_STATE);
 
       await replayingItsValueRewrites(client);
       await seedConnectedSourceOfAConnectorAlone(client, WS, ANOTHER_CONNECTED_SOURCE);
@@ -747,7 +765,7 @@ describe("the migration that named the connected source", () => {
       expect(await statesStandingIn(client, ANOTHER_WS)).toEqual([NEW_STATE]);
       expect(
         await refusalOf(client, () =>
-          seedConnectedSourceIn(client, WS, A_THIRD_CONNECTED_SOURCE, OLD_STATE),
+          seedConnectedSourceInAnyState(client, WS, A_THIRD_CONNECTED_SOURCE, OLD_STATE),
         ),
       ).toBe("connected_source_state_check");
     });
@@ -773,7 +791,7 @@ const withTheDestinationBeforeThePassageAdmitted = (
       'ALTER TABLE "connected_source" DROP CONSTRAINT "connected_source_destination_check"',
     );
     await client.query(
-      aCheckFrom(
+      aCheckFromItsCreateTableInTheSnapshot(
         "0068_snapshot.json",
         "destination_check",
         "connected_source_destination_check",
@@ -785,8 +803,13 @@ const withTheDestinationBeforeThePassageAdmitted = (
 describe("the migration that named the passage", () => {
   it("moves every workspace's chunk-index destination to passage-index", async () => {
     await withTheDestinationBeforeThePassageAdmitted(async (client) => {
-      await seedConnectedSourceTo(client, WS, CONNECTED_SOURCE, DESTINATION_BEFORE_THE_PASSAGE);
-      await seedConnectedSourceTo(
+      await seedConnectedSourceToAnyDestination(
+        client,
+        WS,
+        CONNECTED_SOURCE,
+        DESTINATION_BEFORE_THE_PASSAGE,
+      );
+      await seedConnectedSourceToAnyDestination(
         client,
         ANOTHER_WS,
         CONNECTED_SOURCE,
@@ -801,7 +824,7 @@ describe("the migration that named the passage", () => {
       ]);
       expect(
         await refusalOf(client, () =>
-          seedConnectedSourceTo(
+          seedConnectedSourceToAnyDestination(
             client,
             WS,
             ANOTHER_CONNECTED_SOURCE,

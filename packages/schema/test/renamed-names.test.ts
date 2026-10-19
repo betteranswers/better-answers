@@ -16,7 +16,7 @@ const RENAMED_TABLE_PREFIXES = [
   "concept_class_override",
 ];
 
-const RENAMED_WORDS = [
+const RENAMED_WORDS_ANYWHERE_IN_A_NAME = [
   "binding",
   "candidate",
   "checked",
@@ -75,7 +75,9 @@ describe("the names a renamed table leaves behind", () => {
     await withRollback(db().pool, async (client) => {
       const rows = await namesWithAPartition(client);
 
-      const left = rows.filter(({ name }) => RENAMED_WORDS.some((word) => name.includes(word)));
+      const left = rows.filter(({ name }) =>
+        RENAMED_WORDS_ANYWHERE_IN_A_NAME.some((word) => name.includes(word)),
+      );
 
       expect(left).toEqual([]);
     });

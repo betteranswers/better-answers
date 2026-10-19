@@ -178,7 +178,9 @@ type UnsafeCheck = {
   readonly reads: readonly string[];
 };
 
-const unsafeChecks = async (client: pg.PoolClient): Promise<readonly UnsafeCheck[]> => {
+const checksReadingANullableColumnOrWrittenNull = async (
+  client: pg.PoolClient,
+): Promise<readonly UnsafeCheck[]> => {
   const { rows } = await client.query<{
     check: string;
     on: string;
@@ -230,7 +232,7 @@ const readsOfEach = async (
   for (const statement of statements) {
     await client.query("SAVEPOINT null_probe");
     await client.query(statement);
-    const probed = (await unsafeChecks(client)).filter(
+    const probed = (await checksReadingANullableColumnOrWrittenNull(client)).filter(
       ({ on }) => on === PROBE_TABLE || on === PROBE_DOMAIN,
     );
     answers.push([statement, probed.flatMap(({ reads }) => reads)]);
@@ -241,7 +243,7 @@ const readsOfEach = async (
 
 describe("every CHECK the migrated database holds", () => {
   it("reads a nullable column only in a NULL-safe idiom", async () => {
-    expect(await withRollback(db.pool, unsafeChecks)).toEqual([]);
+    expect(await withRollback(db.pool, checksReadingANullableColumnOrWrittenNull)).toEqual([]);
   });
 });
 
@@ -256,7 +258,7 @@ describe("the NULL-safety gate over the CHECKs", () => {
            CHECK (unreadable_reason IS NULL OR outcome = 'unreadable')`,
       );
 
-      expect(await unsafeChecks(client)).toEqual([
+      expect(await checksReadingANullableColumnOrWrittenNull(client)).toEqual([
         {
           check: "source_document_unreadable_reason_check",
           on: "source_document",

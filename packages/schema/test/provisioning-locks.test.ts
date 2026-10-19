@@ -84,7 +84,7 @@ const aTenantAtWork = async (
   }
 };
 
-const provisionStarted = async (
+const provisionStartedInSignUpOrder = async (
   workspaceId: string,
 ): Promise<{ client: pg.PoolClient; provisioned: Promise<string> }> => {
   const client = await opened();
@@ -123,7 +123,7 @@ describe("provisioning beside a transaction writing documents and passages", () 
       connectedSourceId,
     });
 
-    const signUp = await provisionStarted(WS_SIGNING_UP);
+    const signUp = await provisionStartedInSignUpOrder(WS_SIGNING_UP);
 
     const written = await outcomeOf(
       testData(writer).passage({
@@ -151,7 +151,7 @@ describe("provisioning beside a transaction writing documents and passages", () 
     await scopeTo(writer, WS_READ_BESIDE);
     await testData(writer).sourceDocument({ workspaceId: WS_READ_BESIDE, connectedSourceId });
 
-    const signUp = await provisionStarted(WS_SIGNING_UP_TOO);
+    const signUp = await provisionStartedInSignUpOrder(WS_SIGNING_UP_TOO);
 
     const read = await inAShortWait(
       WS_READ_BESIDE,

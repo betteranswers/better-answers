@@ -32,7 +32,7 @@ export const seedConnectedSourceOfAConnectorAlone = async (
 const CONNECTED_SOURCE_IN = `INSERT INTO connected_source (workspace_id, id, name, connector, state)
   VALUES ($1, $2, 'The handbook', 'upload', $3)`;
 
-export const seedConnectedSourceIn = async (
+export const seedConnectedSourceInAnyState = async (
   client: pg.PoolClient,
   workspaceId: string,
   id: string,
@@ -45,7 +45,7 @@ export const seedConnectedSourceIn = async (
 const CONNECTED_SOURCE_TO = `INSERT INTO connected_source (workspace_id, id, name, connector, destination)
   VALUES ($1, $2, 'The handbook', 'upload', $3::text[])`;
 
-export const seedConnectedSourceTo = async (
+export const seedConnectedSourceToAnyDestination = async (
   client: pg.PoolClient,
   workspaceId: string,
   id: string,

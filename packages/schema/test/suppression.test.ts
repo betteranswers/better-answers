@@ -28,6 +28,8 @@ const THE_MIGRATION_THAT_MADE_IT = "0029_the-suppression.sql";
 
 const THE_RESHAPING_MIGRATION = "the-workspace-suppression.sql";
 
+const THE_SCHEMA_THE_MIGRATE_OWNER_HOLDS = "SCHEMA public";
+
 type Identifiers = Readonly<Record<(typeof SUBJECT_IDENTIFIER_KINDS)[number], readonly string[]>>;
 
 const HER_SET: Identifiers = {
@@ -106,7 +108,7 @@ const reshaped = (client: pg.PoolClient): Promise<void> =>
   asTheMigrationOwnerOf(
     client,
     [
-      "SCHEMA public",
+      THE_SCHEMA_THE_MIGRATE_OWNER_HOLDS,
       "TABLE public.suppression",
       "TABLE public.erasure_request",
       "TABLE public.subject_request",
