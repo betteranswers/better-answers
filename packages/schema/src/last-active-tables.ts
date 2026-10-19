@@ -12,7 +12,6 @@ export const workspaceLastActive = withRLS(
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade" }),
 
-    // No cascade: the platform never deletes a `user` row, so one promises a path that does not exist.
     userId: text("user_id")
       .notNull()
       .references(() => user.id),
