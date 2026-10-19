@@ -15,6 +15,7 @@ import { POSTGRES_IMAGE } from "../src/postgres-image.ts";
 import { testData } from "./factory.ts";
 import { type MigratedPostgres, POSTGRES_COMMAND } from "./harness.ts";
 import {
+  BUILD_LOCK,
   clonedFrom,
   ensureTemplate,
   openMigratedPostgres,
@@ -393,14 +394,18 @@ const tablesIn = async (template: string): Promise<readonly string[]> => {
   }
 };
 
-const until = async (met: () => Promise<boolean>): Promise<void> => {
-  while (!(await met())) await sleep(BUILD_PAUSE_MS / 10);
+const until = async (met: () => Promise<boolean>, signal: AbortSignal): Promise<void> => {
+  while (!(await met())) {
+    signal.throwIfAborted();
+    await sleep(BUILD_PAUSE_MS / 10, undefined, { signal });
+  }
 };
 
 const aBuildWaitsForTheLock = (): Promise<boolean> =>
   asAdmin(async (admin) => {
     const waiting = await admin.query(
-      "SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND NOT granted",
+      `SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND NOT granted AND objsubid = 1
+         AND ((classid::bigint << 32) | objid::bigint) = ${BUILD_LOCK}`,
     );
     return (waiting.rowCount ?? 0) > 0;
   });
@@ -616,7 +621,7 @@ describe("a shared template", () => {
     }).toEqual({ mostAtOnce: 1, built: names.toSorted(), published: [true, true] });
   });
 
-  it("leaves a running build alone while another waits its turn", async () => {
+  it("leaves a running build alone while another waits its turn", async ({ signal }) => {
     const running = `tpl_ts_age_running_${String(process.pid)}`;
     scratchTemplates.push(running, `${running}_building`);
     let release = (): void => undefined;
@@ -627,16 +632,21 @@ describe("a shared template", () => {
       await gate;
       await createTable(databaseUri, "running");
     });
-    await until(() => isOnTheServer(`${running}_building`));
-
-    const queued = ensureTemplate(
-      adminUri(),
-      scratchTemplateOfThisWorker("queued"),
-      buildLog().building("queued"),
-    );
-    await until(aBuildWaitsForTheLock);
-    release();
-    await Promise.all([held, queued]);
+    let queued: Promise<string> | undefined;
+    try {
+      await until(() => isOnTheServer(`${running}_building`), signal);
+      queued = ensureTemplate(
+        adminUri(),
+        scratchTemplateOfThisWorker("queued"),
+        buildLog().building("queued"),
+      );
+      await until(aBuildWaitsForTheLock, signal);
+      release();
+      await Promise.all([held, queued]);
+    } finally {
+      release();
+      await Promise.allSettled([held, queued]);
+    }
 
     expect(await tablesIn(running)).toEqual(["running"]);
   });

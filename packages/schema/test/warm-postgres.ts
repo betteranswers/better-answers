@@ -172,7 +172,7 @@ const buildAndPublish = async (
 };
 
 /** One key for the instance: every build creates the same cluster-wide roles, so builds take turns. */
-const BUILD_LOCK = "hashtextextended('better-answers template build', 0)";
+export const BUILD_LOCK = "hashtextextended('better-answers template build', 0)";
 
 export const ensureTemplate = (
   adminUri: string,
