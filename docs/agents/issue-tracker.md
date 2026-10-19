@@ -22,6 +22,14 @@ An issue is not the unit of build work: a pull request is. Work that needs more 
 | Canceled | Will not be done. A comment gives the reason |
 | Duplicate | Folded into the issue it duplicates |
 
+## When to file one
+
+Fix what you find in the session where you find it. A test that cannot fail, a stale name, a gap a verdict names or a small defect goes into the open pull request, or into a new one in the same session.
+
+File an issue only when the work cannot land in that session: it needs more than one owner, it waits on something outside the repository, or it needs an owner ruling that the owner cannot give before the session ends.
+
+Settle a design question with pstack's principle skills before you put it to the owner. Read the ones that bear on it, such as `principle-laziness-protocol` or `principle-minimize-reader-load`, and decide. Only a question the principles cannot settle goes to the owner, such as a product or preference call. Ask it in the session. File it, in Triage with the question in a comment, only when the owner cannot answer before the session ends.
+
 ## Filing an issue
 
 Create it with `save_issue`: `team: better-answers`, `project: better-answers`, `state: Triage`, a priority, and one of the workspace's `product` labels: `feature`, `bug` or `improvement`.

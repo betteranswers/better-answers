@@ -56,6 +56,8 @@ Other skills belong in the `.claude/skills/` folder beside the files they serve,
 
 The backlog lives in **Linear**: team `better-answers` (issue ids `BA-N`), project `better-answers`, reached through the `linear-server` MCP. A pull request is the unit of build work. Work that needs more than one owner, or will outlast one session, gets a plan in `docs/plans/` first. The procedure is in `docs/agents/issue-tracker.md`.
 
+Fix what you find in the session where you find it, and open an issue only when the work cannot land there. Settle a design question with pstack's principle skills, and put it to the owner only when the principles cannot settle it. `docs/agents/issue-tracker.md`, *When to file one*, has the rule.
+
 ### Workflow
 
 Use pstack.
