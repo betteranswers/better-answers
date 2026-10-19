@@ -93,16 +93,8 @@ const targetOf = (sync: EndedSync) =>
     : { connectedSourceId: sync.connectedSourceId };
 
 const unlessFollowed =
-  (platform: SyncCascadePrincipal, workspaceId: WorkspaceId, sync: EndedSync) =>
+  (platform: SyncCascadePrincipal, sync: EndedSync) =>
   async (tx: Tx): Promise<Result<undefined, typeof ALREADY_FOLLOWED | Error>> => {
-    if (sync.status === "claimed") {
-      const locked = await lockSyncIn(platform, tx, {
-        workspaceId,
-        jobId: sync.jobId,
-        attempts: sync.attempts,
-      });
-      if (!locked.ok) return err(normalizeError(locked.error));
-    }
     const known = await attempt(() => followedAmong(platform, tx, [sync]));
     if (!known.ok) return err(known.error);
     return known.value.has(followedKey(sync)) ? err(ALREADY_FOLLOWED) : ok(undefined);
@@ -120,11 +112,19 @@ const followSync = async (
       door,
       workspaceId,
       async (tx): Promise<Result<number | undefined, Error>> => {
+        if (sync.status === "claimed") {
+          const locked = await lockSyncIn(platform, tx, {
+            workspaceId,
+            jobId: sync.jobId,
+            attempts: sync.attempts,
+          });
+          if (!locked.ok) return err(normalizeError(locked.error));
+        }
         const cascaded = await cascadingVisibility(
           platform,
           tx,
           targetOf(sync),
-          unlessFollowed(platform, workspaceId, sync),
+          unlessFollowed(platform, sync),
         );
         if (!cascaded.ok)
           return cascaded.error === ALREADY_FOLLOWED ? ok(undefined) : err(cascaded.error);

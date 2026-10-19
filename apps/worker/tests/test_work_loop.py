@@ -201,6 +201,58 @@ def test_a_claim_hands_the_handler_what_the_job_is_about(
     assert auditing.subject_id is None
 
 
+def test_a_held_lapsed_claim_keeps_its_subjects_newer_job_back(
+    database: psycopg.Connection,
+) -> None:
+    workspace = str(seed_workspace(database.cursor())["id"])
+    connected_source_id = ulid()
+    with database.cursor() as cursor:
+        spent_older = seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="index",
+            reason="connected",
+            subject_id=connected_source_id,
+            status="claimed",
+            attempts=1,
+            max_attempts=1,
+            enqueued_ago_seconds=60,
+            claimed_by="worker-gone-quiet",
+            lease_expires_in_seconds=600,
+        )
+        newer = seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="index",
+            reason="wiped",
+            subject_id=connected_source_id,
+        )
+    database.commit()
+
+    dsn = _WHERE[database]
+    with queue.connected(dsn) as holding, queue.connected(dsn) as claiming:
+        with scoped(holding, workspace) as held:
+            queue.hold_the_claim(held, spent_older["id"], "worker-gone-quiet")
+            with scoped(database, workspace) as cursor:
+                cursor.execute(
+                    "UPDATE job SET lease_expires_at = now() - interval '1 second'"
+                    " WHERE id = %s",
+                    (spent_older["id"],),
+                )
+                assert cursor.rowcount == 1
+            with scoped(claiming, workspace) as cursor:
+                while_held = queue.claim(cursor, workspace, WORKER, ["index"])
+        with scoped(claiming, workspace) as cursor:
+            once_released = queue.claim(cursor, workspace, WORKER, ["index"])
+
+    assert while_held is None
+    assert once_released is not None
+    assert once_released.id == newer["id"]
+    with scoped(database, workspace) as cursor:
+        cursor.execute("SELECT status FROM job WHERE id = %s", (spent_older["id"],))
+        assert cursor.fetchone() == ("poisoned",)
+
+
 def test_the_loop_runs_a_nightly_audit_it_scheduled_itself(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
