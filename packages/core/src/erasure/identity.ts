@@ -143,6 +143,11 @@ export const eraseFromTheIdentitySet = async (
       personId,
     ]);
     const membersEnded = rowsOf(ended);
+    await tx.query(
+      `UPDATE access_request SET invitation_id = NULL, reason = ''
+        WHERE workspace_id = $1 AND requester_id = $2`,
+      [subject.workspaceId, personId],
+    );
     const named = { workspaceId: subject.workspaceId, pseudonym: subject.pseudonym };
     const questionsSince = await sweepTheQuestions(tx, { ...named, askers: askersOf([personId]) });
     const actorsSince = await sweepTheActors(tx, { ...named, actors: askersOf([personId]) });
