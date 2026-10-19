@@ -48,6 +48,7 @@ import {
   type LinkUse,
   type SeenLink,
   mintNonce,
+  shownOf,
   unseal,
 } from "./link-token.ts";
 import {
@@ -406,7 +407,7 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
     const limited = await ceilingOf("describe", token);
     if (limited !== undefined) return limited;
     const link = await seen(token, getCookie(context, bindingCookieName(publicUrl)));
-    return context.json(link.state);
+    return context.json(shownOf(link));
   });
 
   routes.post(SIGN_IN_LINK_SIGN_IN_PATH, async (context) => {
@@ -415,8 +416,8 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
     const limited = await ceilingOf("sign-in", token);
     if (limited !== undefined) return limited;
     const link = await seen(token, getCookie(context, bindingCookieName(publicUrl)));
-    if (link.state.state === "dead") return context.json(LINK_REFUSALS.dead, 410);
-    if (link.use === undefined) return context.json(LINK_REFUSALS.notThisBrowser, 403);
+    if (link.state === "dead") return context.json(LINK_REFUSALS.dead, 410);
+    if (link.state === "elsewhere") return context.json(LINK_REFUSALS.notThisBrowser, 403);
     return signInBy(context, token, link.use);
   });
 };

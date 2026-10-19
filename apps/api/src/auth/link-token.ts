@@ -103,7 +103,9 @@ export type LinkState =
   | { readonly state: "elsewhere"; readonly code: string; readonly until: string }
   | { readonly state: "dead" };
 
-export const DEAD_LINK: LinkState = { state: "dead" };
+type BoundLink = Extract<LinkState, { readonly state: "bound" }>;
+
+export const DEAD_LINK: Extract<LinkState, { readonly state: "dead" }> = { state: "dead" };
 
 export type LinkUse = {
   readonly email: string;
@@ -112,9 +114,10 @@ export type LinkUse = {
   readonly carried: string;
 };
 
-export type SeenLink = { readonly state: LinkState; readonly use: LinkUse | undefined };
+export type SeenLink = Exclude<LinkState, BoundLink> | (BoundLink & { readonly use: LinkUse });
 
-const NOTHING_TO_SEE: SeenLink = { state: DEAD_LINK, use: undefined };
+export const shownOf = (link: SeenLink): LinkState =>
+  link.state === "bound" ? { state: "bound", address: link.address, carried: link.carried } : link;
 
 export const codeHashOf = (code: string): string =>
   createHash("sha256").update(code).digest("base64url");
@@ -138,17 +141,14 @@ export const linkSeen = (
   contents: Opened | undefined,
   bound: boolean,
 ): SeenLink => {
-  if (read === undefined || !read.linkLive || contents === undefined) return NOTHING_TO_SEE;
-  if (!codeLive(read.code, contents.code)) return NOTHING_TO_SEE;
-  if (!bound) {
-    return {
-      state: { state: "elsewhere", code: contents.code, until: read.code.expiresAt },
-      use: undefined,
-    };
-  }
+  if (read === undefined || !read.linkLive || contents === undefined) return DEAD_LINK;
+  if (!codeLive(read.code, contents.code)) return DEAD_LINK;
+  if (!bound) return { state: "elsewhere", code: contents.code, until: read.code.expiresAt };
   const carried = carriedQueryOf(contents);
   return {
-    state: { state: "bound", address: read.address, carried },
+    state: "bound",
+    address: read.address,
+    carried,
     use: { email: read.address, code: contents.code, oauthQuery: contents.carried, carried },
   };
 };
