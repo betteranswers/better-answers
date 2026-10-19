@@ -888,6 +888,7 @@ def test_a_heartbeat_outlives_a_dropped_connection(
     dsn = _WHERE[database]
 
     with (
+        capture_logs() as written,
         queue.connected(dsn) as onlooker,
         queue.keeping_alive(dsn, claimed, WORKER, every_seconds=0.05),
     ):
@@ -904,6 +905,11 @@ def test_a_heartbeat_outlives_a_dropped_connection(
 
     assert renewed, "the heartbeat stopped at the dropped connection"
     assert live, "and the lease lapsed"
+    assert [
+        line["job_id"]
+        for line in written
+        if line["event"] == "a heartbeat failed" and line["error"]
+    ] == [claimed.id]
 
 
 def test_a_heartbeat_whose_claim_is_gone_says_so_and_stops(

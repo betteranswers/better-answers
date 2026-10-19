@@ -114,9 +114,12 @@ def keeping_alive(
                         )
                     with scoped(connection, job.workspace_id) as cursor:
                         held = heartbeat(cursor, job.id, worker_id)
-                except psycopg.Error:
+                except psycopg.Error as failure:
                     logger.warning(
-                        "a heartbeat failed", job_id=job.id, worker_id=worker_id
+                        "a heartbeat failed",
+                        job_id=job.id,
+                        worker_id=worker_id,
+                        error=type(failure).__name__,
                     )
                     if connection is not None:
                         connection.close()
