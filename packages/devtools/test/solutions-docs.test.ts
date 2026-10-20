@@ -1,11 +1,11 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
-import { repositoryRoot } from "@better-answers/devtools/paths";
+import { markdownUnder, repositoryRoot } from "@better-answers/devtools/paths";
 
 const SOLUTIONS = "docs/solutions";
 
@@ -15,12 +15,6 @@ const frontmatterSchema = z.object({
   applies_when: z.array(z.string().refine((line) => line.trim().length > 0)).min(1),
 });
 
-const solutionDocs = (): readonly string[] =>
-  readdirSync(path.join(repositoryRoot, SOLUTIONS), { recursive: true, encoding: "utf8" })
-    .filter((entry) => entry.endsWith(".md"))
-    .map((entry) => path.posix.join(SOLUTIONS, entry.split(path.sep).join("/")))
-    .sort();
-
 const lacksAppliesWhen = (relative: string): boolean => {
   const text = readFileSync(path.join(repositoryRoot, relative), "utf8");
   const yaml = FRONTMATTER.exec(text)?.groups?.["yaml"];
@@ -29,7 +23,7 @@ const lacksAppliesWhen = (relative: string): boolean => {
 
 describe("docs/solutions", () => {
   it("gives every doc an applies_when list", () => {
-    const docs = solutionDocs();
+    const docs = markdownUnder(repositoryRoot, SOLUTIONS);
 
     expect(docs.length).toBeGreaterThan(0);
     expect(
