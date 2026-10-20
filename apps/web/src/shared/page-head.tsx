@@ -8,7 +8,7 @@ export const PageHeadSlot = createContext<HTMLElement | null | undefined>(undefi
 
 export function PageHead(properties: {
   readonly heading: string;
-  readonly summary?: string | undefined;
+  readonly summary?: ReactNode;
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
 }) {
   const { heading, summary, headingRef } = properties;

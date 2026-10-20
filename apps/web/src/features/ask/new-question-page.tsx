@@ -7,6 +7,7 @@ import { LINK } from "@/shared/knowledge/concept-body.tsx";
 import { SAID_OF_KNOWLEDGE } from "@/shared/knowledge/refusal-words.ts";
 import { ASK, headingOf, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { PageHead } from "@/shared/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
 import { stockWait } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -178,14 +179,18 @@ export function NewQuestionPage() {
 
   return (
     <>
-      <h1>{headingOf(NEW_QUESTION)}</h1>
-      <p className="mt-2 text-muted-foreground">
-        {WORDS.lead.before}
-        <Link to={CONNECT_CLAUDE.path} className={LINK}>
-          {WORDS.lead.link}
-        </Link>
-        {WORDS.lead.after}
-      </p>
+      <PageHead
+        heading={headingOf(NEW_QUESTION)}
+        summary={
+          <>
+            {WORDS.lead.before}
+            <Link to={CONNECT_CLAUDE.path} className={LINK}>
+              {WORDS.lead.link}
+            </Link>
+            {WORDS.lead.after}
+          </>
+        }
+      />
       <section aria-labelledby={headingId} className="mt-6">
         <h2 id={headingId}>{WORDS.heading}</h2>
         <Card marks className="mt-4">
