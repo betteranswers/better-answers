@@ -7,7 +7,10 @@ import {
 } from "@trpc/client";
 import type { Operation, OperationContext } from "@trpc/client";
 
-import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
+import {
+  ANSWERING_WORKSPACE_HEADER,
+  TAB_WORKSPACE_HEADER,
+} from "@better-answers/schema/tab-workspace";
 
 export type UploadDescriptor = {
   readonly connectedSourceId: string;
@@ -52,8 +55,19 @@ const uploadHeadersOf = (context: OperationContext): Headers => {
 
 export type NamedWorkspace = {
   readonly forARead: () => string | undefined;
-  readonly forAWrite: () => Promise<string | undefined>;
+  readonly forAWrite: () => string | undefined;
+  readonly answeredIn: (workspaceId: string) => void;
 };
+
+type LinkFetch = NonNullable<Parameters<typeof httpBatchLink>[0]["fetch"]>;
+
+const fromTheNetwork: LinkFetch = (url, init) =>
+  fetch(url, {
+    method: init?.method ?? "GET",
+    headers: new Headers(init?.headers),
+    body: init?.body ?? null,
+    signal: init?.signal ?? null,
+  });
 
 type ApiLinkOptions = Pick<Parameters<typeof httpBatchLink>[0], "url" | "fetch"> & {
   readonly uploadFetch?: Parameters<typeof httpLink>[0]["fetch"];
@@ -70,13 +84,21 @@ const STREAMED_PATH = "ask.question";
 
 export const apiLink = ({ uploadFetch, namedWorkspace, ...options }: ApiLinkOptions) => {
   const uploading = uploadFetch === undefined ? options : { ...options, fetch: uploadFetch };
-  const namingTheWorkspace = async (sent: Headers, ops: readonly Operation[]): Promise<Headers> => {
+  const namingTheWorkspace = (sent: Headers, ops: readonly Operation[]): Headers => {
     const headers = new Headers(sent);
     const named = ops.some((op) => op.type === "mutation")
-      ? await namedWorkspace.forAWrite()
+      ? namedWorkspace.forAWrite()
       : namedWorkspace.forARead();
     if (named !== undefined) headers.set(TAB_WORKSPACE_HEADER, named);
     return headers;
+  };
+  const sent = options.fetch ?? fromTheNetwork;
+  const hearingTheWorkspace: LinkFetch = async (url, init) => {
+    const answered = await sent(url, init);
+    const answering =
+      answered instanceof Response ? answered.headers.get(ANSWERING_WORKSPACE_HEADER) : null;
+    if (answering !== null) namedWorkspace.answeredIn(answering);
+    return answered;
   };
   return splitLink({
     condition: (op) => isNonJsonSerializable(op.input),
@@ -93,6 +115,7 @@ export const apiLink = ({ uploadFetch, namedWorkspace, ...options }: ApiLinkOpti
       }),
       false: httpBatchLink({
         ...options,
+        fetch: hearingTheWorkspace,
         maxURLLength: BATCH_URL_CEILING,
         headers: ({ opList }) => namingTheWorkspace(new Headers(), opList),
       }),

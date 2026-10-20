@@ -27,29 +27,40 @@ export const roleHeld = (queryClient: QueryClient, api: ApiProxy) =>
 export const workspaceHeld = (queryClient: QueryClient, api: ApiProxy) =>
   queryClient.getQueryData(memberOptions(api).queryKey)?.workspace.id;
 
-const refusedOrNeverAsked = (queryClient: QueryClient, api: ApiProxy): boolean => {
-  const read = queryClient.getQueryState(memberOptions(api).queryKey);
-  if (read === undefined) return true;
-  return read.fetchStatus === "idle" && read.error !== null && refusalOf(read.error) !== undefined;
+type Shown = { readonly id: string; readonly by: "member" | "answer" };
+
+export type WorkspaceShown = NamedWorkspace & {
+  readonly whenLeft: (left: () => void) => void;
 };
 
-/** A write names the workspace the tab last showed, so a page the session left is still refused; one that showed none waits. */
-export const workspaceNamedFor = (queryClient: QueryClient, api: ApiProxy): NamedWorkspace => {
+/** A member read that moves workspace is followed where it is read; only an answer's evidence says this tab was left. */
+const leftBetween = (was: Shown | undefined, now: Shown): boolean =>
+  was !== undefined && was.id !== now.id && (was.by === "answer" || now.by === "answer");
+
+export const workspaceShownBy = (queryClient: QueryClient, api: ApiProxy): WorkspaceShown => {
   const memberHash = hashKey(memberOptions(api).queryKey);
-  let shown = workspaceHeld(queryClient, api);
+  const lefts: (() => void)[] = [];
+  const held = workspaceHeld(queryClient, api);
+  let shown: Shown | undefined = held === undefined ? undefined : { id: held, by: "member" };
+  const learnt = (now: Shown) => {
+    const was = shown;
+    shown = now;
+    if (leftBetween(was, now)) for (const left of lefts) left();
+  };
   queryClient.getQueryCache().subscribe(({ type, query }) => {
     if (query.queryHash !== memberHash) return;
-    shown = type === "removed" ? undefined : (workspaceHeld(queryClient, api) ?? shown);
+    if (type === "removed") shown = undefined;
+    const now = workspaceHeld(queryClient, api);
+    if (now !== undefined) learnt({ id: now, by: "member" });
   });
   return {
     forARead: () => workspaceHeld(queryClient, api),
-    forAWrite: async () => {
-      if (shown !== undefined || refusedOrNeverAsked(queryClient, api)) return shown;
-      // A read that fails leaves the api to judge the write: one naming no workspace is refused.
-      return queryClient.ensureQueryData(memberOptions(api)).then(
-        (member) => member.workspace.id,
-        () => undefined,
-      );
+    forAWrite: () => workspaceHeld(queryClient, api) ?? shown?.id,
+    answeredIn: (id) => {
+      if (workspaceHeld(queryClient, api) === undefined) learnt({ id, by: "answer" });
+    },
+    whenLeft: (left) => {
+      lefts.push(left);
     },
   };
 };

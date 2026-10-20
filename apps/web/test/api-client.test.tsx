@@ -6,7 +6,10 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
+import {
+  ANSWERING_WORKSPACE_HEADER,
+  TAB_WORKSPACE_HEADER,
+} from "@better-answers/schema/tab-workspace";
 
 import { createAppClients, Providers, type AppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
@@ -14,7 +17,7 @@ import { createApiProxy, TRPC_ENDPOINT, useTRPC } from "@/shared/api/trpc.ts";
 import { memberOptions, NEEDS_A_PICK } from "@/shared/member.ts";
 
 import { addressOf, answered } from "./stubbed-api.ts";
-import { aRefusalAnswer } from "./two-workspaces.ts";
+import { aRefusalAnswer, read } from "./two-workspaces.ts";
 
 afterEach(() => {
   cleanup();
@@ -69,38 +72,32 @@ describe("the query provider above the router", () => {
   });
 });
 
-type Session = {
-  in: string | undefined;
-  memberReads: number;
-  failing: boolean;
-  answered: Promise<void>;
-};
+type Session = { in: string | undefined; memberReads: number };
+
+const answeredFrom = (body: unknown, workspaceId: string): Promise<Response> =>
+  Promise.resolve(Response.json(body, { headers: { [ANSWERING_WORKSPACE_HEADER]: workspaceId } }));
 
 const anApiHearingActions = () => {
   const named: (string | null)[] = [];
-  const session: Session = {
-    in: "w",
-    memberReads: 0,
-    failing: false,
-    answered: Promise.resolve(),
-  };
+  const session: Session = { in: "w", memberReads: 0 };
   vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
     const { pathname } = addressOf(input);
     if (pathname.endsWith("/members.createGroup")) {
       named.push(new Headers(init?.headers).get(TAB_WORKSPACE_HEADER));
     }
-    if (!pathname.endsWith("/session.member")) return answered([{ result: { data: null } }]);
-    session.memberReads += 1;
-    if (session.failing) return Promise.resolve(new Response("", { status: 503 }));
+    const reading = ["/members.groups", "/session.member"].find((path) => pathname.endsWith(path));
+    if (reading === undefined) return answered([read(null)]);
+    if (reading === "/session.member") session.memberReads += 1;
     if (session.in === undefined) {
       return answered([aRefusalAnswer(NEEDS_A_PICK, "unauthenticated", 401)]);
     }
+    if (reading === "/members.groups") return answeredFrom([read([])], session.in);
     const member = {
       workspace: { id: session.in, name: "Northern Tooling" },
       person: { id: "p", name: "Ada", email: "ada@example.test" },
       role: "Admin",
     };
-    return session.answered.then(() => answered([{ result: { data: member } }]));
+    return answeredFrom([read(member)], session.in);
   });
   return { named, session };
 };
@@ -113,13 +110,18 @@ const memberRead = (clients: AppClients) =>
 const memberKeyOf = (clients: AppClients) =>
   memberOptions(createApiProxy(clients.apiClient, clients.queryClient)).queryKey;
 
-/** tRPC sends a batch on a later task, so two tasks on, an action not held back has been sent. */
-const batchesSent = async () => {
-  for (const _ of [1, 2]) await new Promise((resolve) => setTimeout(resolve, 0));
-};
+const groupsRead = (clients: AppClients) => clients.apiClient.members.groups.query();
 
 const groupMade = (clients: AppClients) =>
   clients.apiClient.members.createGroup.mutate({ name: "Bid writers" });
+
+const leavesCounted = (clients: AppClients) => {
+  const left = { times: 0 };
+  clients.shown.whenLeft(() => {
+    left.times += 1;
+  });
+  return left;
+};
 
 describe("the workspace an action names", () => {
   it("is the held member read's, as each action is sent", async () => {
@@ -147,6 +149,18 @@ describe("the workspace an action names", () => {
     expect(named).toEqual(["w"]);
   });
 
+  it("is the one a read was answered from, member unread", async () => {
+    const { named, session } = anApiHearingActions();
+    const clients = createAppClients();
+
+    await groupsRead(clients);
+    session.in = "v";
+    await groupMade(clients);
+
+    expect(named).toEqual(["w"]);
+    expect(session.memberReads, "the action read the member").toBe(0);
+  });
+
   it("is none, reading nothing, once the member read is refused", async () => {
     const { named, session } = anApiHearingActions();
     session.in = undefined;
@@ -157,34 +171,6 @@ describe("the workspace an action names", () => {
 
     expect(named).toEqual([null]);
     expect(session.memberReads, "the action read the member again").toBe(1);
-  });
-
-  it("waits for a member read the tab has asked", async () => {
-    const { named, session } = anApiHearingActions();
-    const read = Promise.withResolvers<void>();
-    session.answered = read.promise;
-    const clients = createAppClients();
-
-    const asked = memberRead(clients);
-    const made = groupMade(clients);
-    await batchesSent();
-    read.resolve();
-    await Promise.all([asked, made]);
-
-    expect(named).toEqual(["w"]);
-  });
-
-  it("is none once a failed member read fails again", async () => {
-    const { named, session } = anApiHearingActions();
-    session.failing = true;
-    const clients = createAppClients();
-    clients.queryClient.setQueryDefaults(memberKeyOf(clients), { retryDelay: 0 });
-    await expect(memberRead(clients)).rejects.toBeInstanceOf(Error);
-
-    await groupMade(clients);
-
-    expect(named).toEqual([null]);
-    expect(session.memberReads, "the action read no member").toBeGreaterThan(1);
   });
 
   it("is none once the tab's cache is cleared on sign-out", async () => {
@@ -205,6 +191,56 @@ describe("the workspace an action names", () => {
     await groupMade(clients);
 
     expect(named).toEqual([null]);
+  });
+});
+
+describe("a tab whose reads were answered before its member read", () => {
+  it("is left when a later answer comes from another workspace", async () => {
+    const { session } = anApiHearingActions();
+    const clients = createAppClients();
+    const left = leavesCounted(clients);
+
+    await groupsRead(clients);
+    session.in = "v";
+    await groupsRead(clients);
+    await groupsRead(clients);
+
+    expect(left.times).toBe(1);
+  });
+
+  it("is left when its member read lands in another workspace", async () => {
+    const { session } = anApiHearingActions();
+    const clients = createAppClients();
+    const left = leavesCounted(clients);
+
+    await groupsRead(clients);
+    session.in = "v";
+    await memberRead(clients);
+
+    expect(left.times).toBe(1);
+  });
+
+  it("stays when its member read lands where reads were answered", async () => {
+    anApiHearingActions();
+    const clients = createAppClients();
+    const left = leavesCounted(clients);
+
+    await groupsRead(clients);
+    await memberRead(clients);
+
+    expect(left.times).toBe(0);
+  });
+
+  it("is not left by a member read moving between workspaces", async () => {
+    const { session } = anApiHearingActions();
+    const clients = createAppClients();
+    const left = leavesCounted(clients);
+
+    await memberRead(clients);
+    session.in = "v";
+    await memberRead(clients);
+
+    expect(left.times).toBe(0);
   });
 });
 

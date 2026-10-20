@@ -43,7 +43,11 @@ export const webClientOf = (client: TestClient, held?: string) => {
     links: [
       apiLink({
         url: `${client.origin}${TRPC_ENDPOINT}`,
-        namedWorkspace: { forARead: () => held, forAWrite: async () => held },
+        namedWorkspace: {
+          forARead: () => held,
+          forAWrite: () => held,
+          answeredIn: () => undefined,
+        },
         fetch: async (url, init) => {
           const asked = new URL(url);
           sent.push({
