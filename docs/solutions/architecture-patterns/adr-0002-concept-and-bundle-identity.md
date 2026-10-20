@@ -45,7 +45,7 @@ A bundle's identity lives in its manifest, a platform-reserved file at the bundl
 - The IRI is the one key that cannot be re-keyed, so its form was fixed before anything was built on it. Opaque, because a derived IRI would carry names into every place it is copied.
 - The apex, because the IRI must outlive every product hostname. The apex is kept for identity and redirection. A persistent redirector can front it later without changing any identity.
 - `iri` says what the value is and drops straight into RDF as a subject.
-- In a file, an absolute HTTPS IRI is spec-legal in links and in `sources[].resource` today, and a link checker can follow it. On the wire, `okf://` is what an MCP resource URI is for: a resource-capable host resolves it through the MCP surface that minted it (ADR 0018).
+- In a file, an absolute HTTPS IRI is spec-legal in links and in `sources[].resource` today, and a link checker can follow it. On the wire, `okf://` identifies a concept (ADR 0030), which is what an MCP resource URI is for. No concept is served as an MCP resource in v0.1.
 
 ## Rejected
 

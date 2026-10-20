@@ -29,7 +29,7 @@ A guide definition and every write-up are platform records in Postgres, with app
 - A write-up has two homes: a guide section and a response.
 - The platform writes each guide's skeleton projection into the workspace repository: kind, subject, roles, and the ordered sections with their prompts and included concepts' IRIs. It holds no prose, is regenerated when the guide definition changes, and is never hand-edited.
 - A Q&A pair is a concept, `type: Answer` (ADR 0011): the question as `title`, the answer as the body, and `sources[]` naming the entry it came from and the concepts it rests on. Its usage and submissions are records attached by IRI.
-- A context wording lives on its concept as a named section of the body, chosen by an include (ADR 0014). There is no `variants:` key and no guide-shaped tag on a concept. A wording that states a different claim is a separate concept.
+- Where a context wording lives is ADR 0014's rule, and an include chooses it. There is no `variants:` key and no guide-shaped tag on a concept. A wording that states a different claim is a separate concept.
 - A guide's readers are roles, and roles are levels: Admin, Editor, Viewer. Per role, the guide definition sets the default layer and the action threshold.
 - A guide has no publish state. It is visible to its readers from the moment it exists, every section wearing its trust badge. Hiding a section is a setting in the guide definition. Admins see a hidden section marked, and coverage still counts it.
 - A write-up's shown trust is the weaker of its own and its cited concepts'. When a cited concept changes, the write-up is marked *needs review* synchronously in Postgres.

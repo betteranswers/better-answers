@@ -32,6 +32,7 @@ The api is a plain long-running Node process on Hono, Node 24. One process carri
 - Two things sit beside tRPC: identity and bytes. The Better Auth client carries identity with its own typed client: the session, sign-in, sign-out, the workspace, OAuth. Bytes have no shape a compiler checks.
 - Bytes in: the upload is a tRPC mutation over `application/octet-stream`, with the connected source's descriptor beside the bytes (ADR 0043). It needs no exception here.
 - Bytes out: tRPC answers JSON and cannot stream a file. So a download is a route beside tRPC on the same origin. It resolves the principal the same way and uses the same crossing table. The ADR of the block that lands a download opens that route.
+- The audit-log export is the one exception. Its CSV is a string in the JSON answer of a tRPC mutation, `exportAuditLog`, and the SPA saves it as a file. The export is capped, so the whole file fits in one answer.
 - A route beside tRPC for a shape tRPC carries is refused.
 - Public pages, when they arrive, are a separate site in their own package, never a mode of the api.
 - Node's LTS calendar sets the runtime upgrade cadence.
