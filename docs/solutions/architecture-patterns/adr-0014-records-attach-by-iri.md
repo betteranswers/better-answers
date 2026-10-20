@@ -27,6 +27,7 @@ tags:
 Records attach to a concept by IRI and never restate it. A record keys to the concept's `concept_identity` row by `(workspace_id, iri)`, a composite foreign key. Records keep versions only where a person edits text. Every action is audited in one audit log per workspace.
 
 - A write-up's includes, a guide definition's sections and a question set's questions are rows, never saved lists.
+- A question set's input object is Restricted by default, passes the redaction seam before extraction or any model call, is retained by rule and is in the erasure map.
 - A context wording is a named section of its concept's body, never a record.
 
 The audit log, `audit_event`:
@@ -80,3 +81,5 @@ Decided for the S3 block and not yet in the tree:
 ## History
 
 The full record, with its amendments (tickets 23, 24, 39 and 50, T-073, T-059, T-113, and the T-027 and T-028 grill): `docs/archive/adr/0014-records-attach-by-iri.md`.
+
+The question set's input object, in the archived record, was missing from this doc until 20/10/2026, when a sample of the map tickets found S6 resting on it.

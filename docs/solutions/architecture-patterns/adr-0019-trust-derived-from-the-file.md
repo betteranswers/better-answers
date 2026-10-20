@@ -26,6 +26,7 @@ tags:
 Everything a reader is told about a concept's trust is derived from its OKF file, by the spec's own rules, and never stored in it. It is told in a fixed set of words and moved only by a check.
 
 - Verifier ≠ generator, enforced on the producer part of the actor string.
+- A verification needs view on every source the concept cites. Otherwise the page says *cannot check, source restricted*.
 - The words are *Verified by*, *Verified automatically*, *Unverified*, *Changed since verified*, *Out of date*, *Draft*, *Left* and *Deprecated*, plus two riders, *· imported* and *· source moved on*. A rider never changes the tier. *Restricted* is a sensitivity value only.
 - *Out of date* comes from `stale_after` alone. Its absence means no shelf life.
 - *Changed since verified* comes from `content_hash`: RFC 8785 canonical JSON of the frontmatter without `generated`, `verified`, `stale_after`, `status` and `iri`, with `sources[]` reduced to ordered `(resource, locator)` pairs, plus the normalised body.
@@ -68,3 +69,5 @@ The full record, with its two amendments (ticket 24 on the erasure line, T-073 o
 Amended 03/10/2026 by the glossary plan (`docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`, R4 and R5). The trust words became the reader's words listed above, and *Restricted* left the set to stay a sensitivity value. The tiers, the derivation and every rule above stand.
 
 Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-160 (`docs/plans/2026-10-14-1811-fix-erasure-late-commit-and-actors-plan.md`). The rule that "no routine rewrites" a person id now holds for the audit log alone. An erasure rewrites `bundle_commit.actor`, `concept_verification.actor` and the commit trailers to the pseudonym, as ADR 0020 says, so a verification by a person erased while they hold another workspace reads *Verified by a former member*.
+
+The view-on-every-source condition, in the archived record, was missing from this doc until 20/10/2026, when a sample of the map tickets found V1 resting on it.

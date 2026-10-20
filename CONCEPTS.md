@@ -338,8 +338,9 @@ fact, a new concept raised from unmapped passages; kind *promotion*: an answer p
 `Answer`, decided singly at the gate) — which the target's owner or an Admin accepts or declines
 before it is applied.
 
-Nothing platform-prepared enters a knowledge base without acceptance; every kind but *edit* is an
-Admin's to decide, in Control Centre. A suggestion the platform refused mid-acceptance is
+Nothing platform-prepared enters a knowledge base without acceptance; every kind but *edit* and *promotion*
+is an Admin's to decide, in Control Centre. An *edit* is the target's owner's or an Admin's to decide, and a
+*promotion* the `Answer` collection's owner's or an Admin's. A suggestion the platform refused mid-acceptance is
 **returned**: handed back to its proposer with the reason, recording who was deciding it, because
 what it was written against moved.
 

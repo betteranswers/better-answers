@@ -60,7 +60,7 @@ A **suppression** belongs to the workspace. There is one per erasure request, an
 The platform emits a **DPIA input** per connected source: its data types, scope, sensitivity class, the redaction rules in force, each model choice with its processor, country and retention tail, the retention class and the audience. The publish action's audit row carries its totals and its hash.
 
 - A workspace's embedding model choice is fixed once any vector exists. Its hosted provider is listed in the DPIA input and in the platform's sub-processor list only from the day that model choice is first called, never ahead of the processing. The local model choice names no sub-processor.
-- Four questions are owed to a lawyer, recorded as owed and answered by no build. The fourth is whether a forward edit satisfies Article 17 for a capability statement that names an employee, which is knowledge the company asserts about itself.
+- Four questions are owed to a lawyer, recorded as owed and answered by no build: a six-month governance-locked tier under Article 17, with re-apply-on-restore as beyond use; RPO, RTO and the beyond-use period as contract terms; healthchecks.io and GitHub as sub-processors that hold no personal data; and whether a forward edit satisfies Article 17 for a capability statement that names an employee, which is knowledge the company asserts about itself.
 
 ## Why
 
