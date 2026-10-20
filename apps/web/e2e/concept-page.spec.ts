@@ -563,6 +563,7 @@ test.describe("the concept page", () => {
     await page.unroute(isAnOpen);
     await page.getByRole("main").getByRole("button", { name: "Retry" }).click();
     await expect(conceptOf(page, RETENTION)).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Browse" })).toBeFocused();
     await expect(failed).toHaveCount(0);
   });
 
