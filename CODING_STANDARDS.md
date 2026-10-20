@@ -18,7 +18,7 @@ These bind every workspace. A gate enforces the rest, and its message names the 
 ## Data and secrets
 
 - Log through pino or structlog. Prompt and completion content never reach a logger, an exporter or a row.
-- A secret belongs to one of the seven credential classes in `docs/operations/SECRETS.md`. A config module reads the bootstrap class; the other six are rows under the envelope, reached through a credentials provider. Never mix classes in one scope, and never log a secret.
+- A secret belongs to one of the seven credential classes in `docs/operations/SECRETS.md`. A config module reads the bootstrap class. Never mix classes in one scope, and never log a secret.
 - No LLM-authored SQL runs against a shared store.
 
 ## Domain

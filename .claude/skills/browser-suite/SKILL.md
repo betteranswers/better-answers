@@ -158,7 +158,11 @@ file for one that already does the job.
   answer with `refusalAnswering` or `authAnswering` from `./refused-read.ts`
   (`references/harness.md` says what each answers), then check the alert with `saysARefusal`.
   Ask for the answer before the action that calls and await it afterwards, because an answer can
-  land before anything waits for it. Holding words shows a refusal only in an alert that said
+  land before anything waits for it. A streamed answer is the exception, `ask.question`'s today
+  (`STREAMED_PATH` in `apps/web/src/shared/api/link.ts`). Chromium keeps no body for it, so read
+  it through `page.route` and `route.fetch()`, as
+  `docs/solutions/integration-issues/chromium-keeps-no-body-for-a-streamed-trpc-answer.md` shows.
+  Holding words shows a refusal only in an alert that said
   nothing before it. In one that already says a refusal, read what it says first, then check with
   `saysSomethingNew` that it says something else. A ceiling's answer carries no word, so the spec
   hands the wait it names to `saysTheWait`. The api's word is for the logs and the wire, and
