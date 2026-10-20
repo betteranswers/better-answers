@@ -1,10 +1,8 @@
-import { ACTOR_ID, boundarySchemas } from "@better-answers/schema";
+import { ACTOR_ID, boundarySchemas, type PROCESS_PREFIX } from "@better-answers/schema";
 
 import type { OperatorPrincipal, Principal, UserId } from "./principal.ts";
 
 export const PERSON_PREFIX = "human:";
-
-export const PROCESS_PREFIX = "process:better-answers-";
 
 export type ProcessActorId = `${typeof PROCESS_PREFIX}${string}`;
 

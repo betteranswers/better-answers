@@ -1,8 +1,7 @@
 import type { z } from "zod";
 
-import { ROLES } from "@better-answers/schema";
+import { PROCESS_PREFIX, ROLES } from "@better-answers/schema";
 
-import { PROCESS_PREFIX } from "./actor.ts";
 import type {
   OperatorPrincipal,
   PlatformPrincipal,
