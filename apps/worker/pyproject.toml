@@ -80,7 +80,7 @@ dependencies = [
     # source, because the bytes are addressed by keys the document's catalogue row
     # already holds and nothing here walks a bucket. Read from PyPI on 10/10/2026;
     # Apache-2.0.
-    "boto3==1.43.111",
+    "boto3==1.43.115",
     # The two converters, one per media type (ADR 0013, amended 20/09/2026). `anydoc`
     # answers a `.docx` as GitHub-flavoured Markdown; `pdf-inspector` answers a PDF as
     # Markdown and classifies its pages first. Both are Rust extensions with no model in
@@ -141,7 +141,7 @@ dev = [
     # each and Renovate's pep621 manager moves them.
     "actionlint-py==1.7.12.25",
     "shellcheck-py==0.11.0.1",
-    "zizmor==1.30.1",
+    "zizmor==1.31.1",
 ]
 
 # THE LINE THE BUILDERS ARE ACTUALLY ON. uv ships this backend inside itself and takes the
