@@ -154,6 +154,9 @@ const expectNoCall = async (workspaceId: string, wire: Wire) => {
   expect(await spendOf(workspaceId)).toEqual({ open: 0, calls: [] });
 };
 
+const candidateCountOf = (wire: Wire): number =>
+  [...promptOf(wire.sent[0]?.body ?? "").matchAll(/<candidate number="/g)].length;
+
 const titlesOf = (concepts: readonly { readonly title: string }[]) =>
   concepts.map(({ title }) => title).toSorted();
 
@@ -419,6 +422,29 @@ describe("ask with a judge", () => {
     expect(sentFor).toHaveLength(1);
     expect(titlesOf(answer.answers)).toEqual(sentFor.map(([title]) => title));
     expect(answer.related.map(({ kind }) => kind)).toEqual(["Answer"]);
+  });
+
+  const askedBesideACopy = async (status: NonNullable<SeededConcept["status"]>) => {
+    const { asker, iris, wire } = await arranged([USERS, { ...USERS, status }], [USERS.title]);
+    const [current, copy] = iris;
+    const answer = await askedWith(asker, { question: QUESTION }, wire);
+    expect(candidateCountOf(wire)).toBe(1);
+    expect(answer.answers.map(({ iri }) => iri)).toEqual([current]);
+    return { answer, copy };
+  };
+
+  it("never offers a Deprecated Answer to the judge", async () => {
+    const { answer, copy } = await askedBesideACopy("deprecated");
+
+    expect(answer.related.map(({ iri, trustWords }) => ({ iri, trustWords }))).toEqual([
+      { iri: copy, trustWords: "Deprecated" },
+    ]);
+  });
+
+  it("never reads an unpublished Draft Answer for the judge", async () => {
+    const { answer } = await askedBesideACopy("draft");
+
+    expect(answer.related).toEqual([]);
   });
 
   it("records the judge's verdict for each candidate sent", async () => {

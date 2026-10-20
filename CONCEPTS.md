@@ -1124,10 +1124,11 @@ concept comes back as a preview, its line as `find` gives it, for `open` to read
 The one typed judgement that decides, for each candidate `Answer`, whether it answers the question
 as asked: yes or no, never a ranking of one candidate against another.
 
-It runs on the judging model choice. Every answer says how its judge stood, in one of three words:
-*Not judged*, where the workspace has no judging model choice or no spending limit, or no `Answer`
-was a candidate; *Judged*; and *Judging failed*, where the call failed and its candidates are
-returned as related knowledge. Their keys on the wire are `not-judged`, `judged` and
+It runs on the judging model choice. A *Deprecated* or *Draft* `Answer` is never a candidate; a
+*Deprecated* one stays in related knowledge with its word. Every answer says how its judge stood, in
+one of three words: *Not judged*, where the workspace has no judging model choice or no spending
+limit, or no `Answer` was a candidate; *Judged*; and *Judging failed*, where the call failed and its
+candidates are returned as related knowledge. Their keys on the wire are `not-judged`, `judged` and
 `judging-failed`.
 
 ### decision model

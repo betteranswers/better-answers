@@ -1,7 +1,12 @@
 import type pg from "pg";
 import type { z } from "zod";
 
-import { ids, type ConceptIri } from "@better-answers/schema";
+import {
+  CONCEPT_DRAFT_STATUS,
+  ids,
+  type CONCEPT_STATUSES,
+  type ConceptIri,
+} from "@better-answers/schema";
 import type { MigratedPostgres } from "@better-answers/schema/testing";
 
 import {
@@ -187,9 +192,16 @@ export type SeededConcept = {
   readonly sensitivity?: string;
   readonly iri?: ConceptIri;
   readonly linksTo?: readonly ConceptIri[];
+  readonly status?: (typeof CONCEPT_STATUSES)[number];
 };
 
 let seededConcepts = 0;
+
+const publishedAs = (status: SeededConcept["status"]) =>
+  status === CONCEPT_DRAFT_STATUS ? { publishedAt: null } : {};
+
+const statusAs = (status: SeededConcept["status"]) =>
+  status === undefined ? {} : { status, ...publishedAs(status) };
 
 export const conceptSeeded = (
   db: MigratedPostgres,
@@ -198,7 +210,7 @@ export const conceptSeeded = (
 ): Promise<ConceptIri> =>
   seedingWith(db.pool, async (seed) => {
     seededConcepts += 1;
-    const { kind = "Policy", title, body, sensitivity = "Internal", contentHash } = shape;
+    const { kind = "Policy", title, body, sensitivity = "Internal", contentHash, status } = shape;
     const folder = shape.collection === null ? "" : `${shape.collection}/`;
     const { iri } = await seed.conceptIdentity({
       workspaceId,
@@ -214,8 +226,15 @@ export const conceptSeeded = (
       frontmatter: { title, type: kind },
       sensitivity,
       ...(contentHash === undefined ? {} : { contentHash }),
+      ...statusAs(status),
     });
-    await seed.mapNode({ workspaceId, uid: indexed.iri, kind, sensitivity });
+    await seed.mapNode({
+      workspaceId,
+      uid: indexed.iri,
+      kind,
+      sensitivity,
+      ...publishedAs(status),
+    });
     for (const toUid of shape.linksTo ?? []) {
       await seed.mapEdge({ workspaceId, fromUid: indexed.iri, toUid, sensitivity });
     }
