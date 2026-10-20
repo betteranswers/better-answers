@@ -16,7 +16,7 @@ const WITHOUT_THE_MARK = {
 };
 
 /** A batch's address names its procedures in the order of its answers; a call sent alone names one. */
-const askedAt = (url: string): readonly string[] =>
+export const askedAt = (url: string): readonly string[] =>
   new URL(url).pathname.replace("/trpc/", "").split(",");
 
 export const refusedFromNowOn = (page: Page, procedure: string) =>
