@@ -1,10 +1,26 @@
-import { ACTOR_ID, boundarySchemas, type PROCESS_PREFIX } from "@better-answers/schema";
+import { ACTOR_ID, boundarySchemas, PROCESS_PREFIX } from "@better-answers/schema";
 
 import type { OperatorPrincipal, Principal, UserId } from "./principal.ts";
 
 export const PERSON_PREFIX = "human:";
 
+export type ProcessPurpose =
+  | "bootstrap"
+  | "erasure"
+  | "graph"
+  | "identity"
+  | "measures"
+  | "reconciler"
+  | "reindex"
+  | "sweeps"
+  | "sync-cascade"
+  | "uploads";
+
 export type ProcessActorId = `${typeof PROCESS_PREFIX}${string}`;
+
+export const processActorId = <P extends ProcessPurpose>(
+  purpose: P,
+): `${typeof PROCESS_PREFIX}${P}` => `${PROCESS_PREFIX}${purpose}`;
 
 export type ActorId = `human:${string}` | ProcessActorId | `better-answers-${string}/${string}`;
 

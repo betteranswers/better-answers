@@ -1,7 +1,14 @@
 import { boundarySchemas, ULID } from "@better-answers/schema";
 
 import { action, declareActions, recordEach, STORED_DETAIL_KEYS } from "../audit/index.ts";
-import { attempt, err, ok, type PlatformPrincipal, type Result } from "../kernel/index.ts";
+import {
+  attempt,
+  err,
+  ok,
+  processActorId,
+  type PlatformPrincipal,
+  type Result,
+} from "../kernel/index.ts";
 import {
   listWorkspaceObjects,
   removeWorkspaceObject,
@@ -11,7 +18,7 @@ import {
 import { withScope, type PostgresDoor } from "../store/postgres/index.ts";
 import { UPLOAD_ORIGINALS_PREFIX } from "./connected-source.ts";
 
-const UPLOAD_SWEEP_ACTOR = "process:better-answers-uploads";
+const UPLOAD_SWEEP_ACTOR = processActorId("uploads");
 
 export type UploadSweepPrincipal = PlatformPrincipal & {
   readonly actorId: typeof UPLOAD_SWEEP_ACTOR;

@@ -11,6 +11,7 @@ import {
   err,
   ok,
   PENDING_SESSION_LIFETIME_MS,
+  processActorId,
   ulid,
   type Clock,
   type PlatformPrincipal,
@@ -35,7 +36,7 @@ import {
 } from "../store/postgres/index.ts";
 import { workspaceIds } from "../workspaces/index.ts";
 
-const SWEEPS_ACTOR = "process:better-answers-sweeps";
+const SWEEPS_ACTOR = processActorId("sweeps");
 
 export type SweepsPrincipal = PlatformPrincipal & {
   readonly actorId: typeof SWEEPS_ACTOR;

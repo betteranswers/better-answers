@@ -2,6 +2,7 @@ import type { z } from "zod";
 
 import { PROCESS_PREFIX, ROLES } from "@better-answers/schema";
 
+import type { ProcessPurpose } from "./actor.ts";
 import type {
   OperatorPrincipal,
   PlatformPrincipal,
@@ -17,7 +18,7 @@ export const EVERY_PURPOSE = "every";
 type RoleOrPurpose = {
   readonly role: Role;
 
-  readonly purposes: readonly string[] | typeof EVERY_PURPOSE;
+  readonly purposes: readonly ProcessPurpose[] | typeof EVERY_PURPOSE;
 };
 
 export const ADMIN_ALONE = { role: "Admin", purposes: [] } as const;
@@ -101,7 +102,7 @@ export const declareAction = <
 
 const admitsPurpose = (admits: RoleOrPurpose, principal: PlatformPrincipal): boolean =>
   admits.purposes === EVERY_PURPOSE ||
-  admits.purposes.includes(principal.actorId.slice(PROCESS_PREFIX.length));
+  admits.purposes.some((purpose) => purpose === principal.actorId.slice(PROCESS_PREFIX.length));
 
 const opens = (wanted: Admits, principal: Principal | OperatorPrincipal): boolean => {
   if ("operator" in wanted) return principal.kind === "operator";

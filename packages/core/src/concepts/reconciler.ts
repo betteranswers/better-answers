@@ -13,6 +13,7 @@ import {
   err,
   isActorId,
   ok,
+  processActorId,
   refusalFor,
   type ActorId,
   type Clock,
@@ -46,7 +47,7 @@ import { parseBundleManifest } from "./manifest.ts";
 import { RECONCILER_ACTIONS, restsAlsoOnWhenReplayed } from "./reconciler-hit.ts";
 import { payloadFor, targetOfMergeKey } from "./suggestions.ts";
 
-const RECONCILER_ACTOR = "process:better-answers-reconciler";
+const RECONCILER_ACTOR = processActorId("reconciler");
 
 export type ReconcilerPrincipal = PlatformPrincipal & {
   readonly actorId: typeof RECONCILER_ACTOR;

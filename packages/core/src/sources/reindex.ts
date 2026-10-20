@@ -1,6 +1,13 @@
 import { boundarySchemas } from "@better-answers/schema";
 
-import { attempt, err, ok, type PlatformPrincipal, type Result } from "../kernel/index.ts";
+import {
+  attempt,
+  err,
+  ok,
+  processActorId,
+  type PlatformPrincipal,
+  type Result,
+} from "../kernel/index.ts";
 import { WIPE_REASON } from "../runs/index.ts";
 import { withScope, type PostgresDoor } from "../store/postgres/index.ts";
 import { CONNECTED_SOURCE_ID } from "./admin-connected-source.ts";
@@ -10,7 +17,7 @@ import {
   type ReprocessConnectedSourceRefusal,
 } from "./connected-source.ts";
 
-const REINDEX_ACTOR = "process:better-answers-reindex";
+const REINDEX_ACTOR = processActorId("reindex");
 
 type ReindexPrincipal = PlatformPrincipal & {
   readonly actorId: typeof REINDEX_ACTOR;

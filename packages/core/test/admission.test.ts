@@ -15,6 +15,7 @@ import {
   type InputOf,
   type OperatorPrincipal,
   type PlatformPrincipal,
+  type ProcessPurpose,
   type RefusalOf,
   type Result,
   type Role,
@@ -237,6 +238,20 @@ describe("what a declaration will not let an action say", () => {
         refuses: ["role-forbids", "role-forbids"],
       }),
     ).toThrow("listed twice");
+  });
+
+  it("refuses a purpose no platform process has", () => {
+    expectTypeOf<"erasure">().toExtend<ProcessPurpose>();
+    expectTypeOf<"erasrue">().not.toExtend<ProcessPurpose>();
+
+    const misspelt = declareAction({
+      // @ts-expect-error — a misspelt purpose would admit no process and refuse none by name.
+      admits: { role: "Admin", purposes: ["erasrue"] },
+      input: nothing,
+      refuses: ["role-forbids"],
+    });
+
+    expect(admit(misspelt, processActor("erasure"), {}).ok).toBe(false);
   });
 });
 
