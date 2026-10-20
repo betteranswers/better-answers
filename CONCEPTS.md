@@ -134,6 +134,22 @@ tRPC, the MCP surface, the authorization server and the SPA's build on one origi
 The word for that tier in prose, in code and on a job's *claimant*. The Postgres runtime role the
 api connects as is an identifier rather than a second word for the tier.
 
+### agreement
+
+_Internal._ one thing the api and the worker must do alike, named by a key of
+`contracts/manifest.json`'s `agreements` and settled by the fixtures, SQL functions or generated
+rows its form declares.
+
+Both tiers' suites read it, so a change to an agreement moves both tiers in one change.
+
+### port
+
+_Internal._ a worker module that carries TypeScript logic into Python, naming the TypeScript modules
+it ports in `PORT_OF` and the agreement that holds the two alike in `AGREEMENT`.
+
+The port scan refuses a port whose agreement the manifest does not hold. A module that declares
+neither constant is not a port to the scan, however closely it follows a TypeScript module.
+
 ### estate
 
 _Internal._ the running deployment: the boxes, the stores, the stacks and the copies kept off them.
