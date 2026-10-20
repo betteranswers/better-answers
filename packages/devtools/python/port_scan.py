@@ -4,6 +4,7 @@ from __future__ import annotations
 import ast
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 from typing import NamedTuple
 
@@ -80,7 +81,7 @@ def _literal(value: ast.expr) -> object:
 
 
 def _declared_in(statement: ast.stmt) -> list[Declared]:
-    targets: list[ast.expr]
+    targets: Sequence[ast.expr]
     if isinstance(statement, ast.Assign):
         targets, value = statement.targets, statement.value
     elif isinstance(statement, ast.AnnAssign) and statement.value is not None:
