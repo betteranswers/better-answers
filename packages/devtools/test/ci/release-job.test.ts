@@ -474,6 +474,7 @@ const redeployedThrough = async (
 const PULL_STEP = "docker compose pull --policy missing";
 const DEPLOYMENT = "dep-1";
 const DEPLOYMENT_READ = `/api/v1/deployments/${DEPLOYMENT}`;
+const DEPLOYMENTS_LIST = "/api/v1/deployments/applications/uuid-1";
 
 const deploymentIs = (status: string): Answer => ({
   status: 200,
@@ -482,12 +483,14 @@ const deploymentIs = (status: string): Answer => ({
 
 type Orchestrator = {
   readonly pullStep?: string | null;
+  readonly listed?: readonly string[];
   readonly reads?: readonly Answer[];
   readonly deploy?: Answer;
 };
 
 const orchestrator = ({
   pullStep = null,
+  listed = ["finished", "failed"],
   reads = [deploymentIs("finished")],
   deploy = {
     status: 200,
@@ -508,6 +511,13 @@ const orchestrator = ({
       const next = reads[Math.min(read, reads.length - 1)];
       read += 1;
       return next ?? { status: 404, body: "{}" };
+    }
+    if (heard.url === DEPLOYMENTS_LIST) {
+      const deployments = listed.map((status, index) => ({
+        deployment_uuid: `dep-0${index}`,
+        status,
+      }));
+      return { status: 200, body: JSON.stringify({ count: deployments.length, deployments }) };
     }
     if (heard.method === "GET") {
       return {
@@ -539,6 +549,7 @@ describe("the redeploy a release makes", () => {
 
     expect(redeployed.heard.map(sent)).toEqual([
       { method: "GET", url: "/api/v1/applications/uuid-1", body: "", ...credentialed },
+      { method: "GET", url: DEPLOYMENTS_LIST, body: "", ...credentialed },
       {
         method: "PATCH",
         url: "/api/v1/applications/uuid-1",
@@ -574,6 +585,7 @@ describe("the redeploy a release makes", () => {
       code: 0,
       calls: [
         "GET /api/v1/applications/uuid-1",
+        `GET ${DEPLOYMENTS_LIST}`,
         "PATCH /api/v1/applications/uuid-1/envs",
         "PATCH /api/v1/applications/uuid-1/envs",
         "POST /api/v1/deploy?uuid=uuid-1&force=false",
@@ -611,19 +623,50 @@ describe("the redeploy a release makes", () => {
     const started = Date.now();
     const redeployed = await redeployedThrough(
       orchestrator({ reads: [deploymentIs("in_progress")] }),
-      { RELEASE_DEPLOY_WAIT_SECONDS: "1", RELEASE_DEPLOY_DELAY_SECONDS: "0.2" },
+      { RELEASE_DEPLOY_WAIT_SECONDS: "2", RELEASE_DEPLOY_DELAY_SECONDS: "0.2" },
     );
 
     expect({
       code: redeployed.code,
       read: redeployed.heard.some((heard) => heard.url === DEPLOYMENT_READ),
-      inTime: Date.now() - started < 5000,
+      inTime: Date.now() - started >= 2000 && Date.now() - started < 6000,
       err: redeployed.err,
     }).toEqual({
       code: 1,
       read: true,
       inTime: true,
-      err: `::error::deployment ${DEPLOYMENT} had not finished 1 s after it was queued, and its last status read was in_progress. It may still swap production later, so read /health before acting\n`,
+      err: `::error::deployment ${DEPLOYMENT} had not finished 2 s after it was queued, and its last status read was in_progress. It may still swap production later, so read /health before acting\n`,
+    });
+  });
+
+  it("writes nothing while a deployment is queued or running", async () => {
+    for (const status of ["queued", "in_progress"]) {
+      const redeployed = await redeployedThrough(orchestrator({ listed: [status, "finished"] }));
+
+      expect({
+        code: redeployed.code,
+        calls: redeployed.heard.map(called),
+        err: redeployed.err,
+      }).toEqual({
+        code: 1,
+        calls: ["GET /api/v1/applications/uuid-1", `GET ${DEPLOYMENTS_LIST}`],
+        err: `::error::production's deployment dep-00 is ${status}, so the release sets nothing: a deployment not yet started reads the digests set before it starts. Let it end, or cancel it in the orchestrator, then run the release again\n`,
+      });
+    }
+  });
+
+  it("writes nothing when the deployment list is unreadable", async () => {
+    const valid = orchestrator();
+    const redeployed = await redeployedThrough((heard) =>
+      heard.url === DEPLOYMENTS_LIST
+        ? { status: 200, body: JSON.stringify({ count: 0 }) }
+        : valid(heard),
+    );
+
+    expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
+      code: 1,
+      heard: 2,
+      err: `::error::GET ${DEPLOYMENTS_LIST} answered no list of deployments, so the release cannot tell whether one is queued or running, and sets nothing\n`,
     });
   });
 
@@ -647,8 +690,8 @@ describe("the redeploy a release makes", () => {
 
     expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
       code: 1,
-      heard: 5,
-      err: `::error::the orchestrator queued no deployment, because one of production was already queued or running, and the id it answered, ${DEPLOYMENT}, names nothing. Both digests are set, which a deployment not yet started reads. Let that deployment end, or cancel it in the orchestrator, then run the release again\n`,
+      heard: 6,
+      err: `::error::the orchestrator queued no deployment, because one of production was queued after this release checked for one, and the id it answered, ${DEPLOYMENT}, names nothing. Both digests are set, and that deployment reads them if it has not started, with no smoke and no tag after it. Read /health once it ends, then run the release again\n`,
     });
   });
 
@@ -708,7 +751,7 @@ describe("the redeploy a release makes", () => {
     );
 
     expect(redeployed.code).toBe(1);
-    expect(redeployed.heard).toHaveLength(5);
+    expect(redeployed.heard).toHaveLength(6);
     expect(redeployed.err).toEqual(
       "::error::POST /api/v1/deploy?uuid=uuid-1&force=false was answered 500, so the release stops before anything else is sent\n",
     );
@@ -721,7 +764,7 @@ describe("the redeploy a release makes", () => {
 
     expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
       code: 1,
-      heard: 5,
+      heard: 6,
       err: "::error::POST /api/v1/deploy named no deployment_uuid, so the release cannot wait for the deployment\n",
     });
   });

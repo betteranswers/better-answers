@@ -55,7 +55,16 @@ patch() {
 }
 
 coolify read GET "/api/v1/applications/${PROD_UUID}"
-if [ "$(jq -r '.docker_compose_custom_build_command // empty' "${answer}")" != "${PULL_STEP}" ]; then
+build_command="$(jq -r '.docker_compose_custom_build_command // empty' "${answer}")"
+
+coolify read GET "/api/v1/deployments/applications/${PROD_UUID}"
+jq -e '.deployments | arrays' "${answer}" >/dev/null 2>&1 ||
+  refuse "GET /api/v1/deployments/applications/${PROD_UUID} answered no list of deployments, so the release cannot tell whether one is queued or running, and sets nothing"
+active="$(jq -r '[.deployments[] | select(.status == "queued" or .status == "in_progress") | "\(.deployment_uuid) is \(.status)"][0] // empty' "${answer}")"
+[ -z "${active}" ] ||
+  refuse "production's deployment ${active}, so the release sets nothing: a deployment not yet started reads the digests set before it starts. Let it end, or cancel it in the orchestrator, then run the release again"
+
+if [ "${build_command}" != "${PULL_STEP}" ]; then
   jq -cn --arg command "${PULL_STEP}" '{docker_compose_custom_build_command: $command}' |
     coolify write PATCH "/api/v1/applications/${PROD_UUID}" -H "Content-Type: application/json" --data-binary @-
   echo "the compose build command is now \`${PULL_STEP}\`"
@@ -69,13 +78,13 @@ deployment="$(jq -r '.deployments[0].deployment_uuid // empty' "${answer}" 2>/de
 [ -n "${deployment}" ] || refuse "POST /api/v1/deploy named no deployment_uuid, so the release cannot wait for the deployment"
 # Coolify 4.3.13 answers a skipped deploy with a fresh id it never queued.
 if [ "$(jq -r '.deployments[0].message // empty' "${answer}")" = "Deployment already queued for this commit." ]; then
-  refuse "the orchestrator queued no deployment, because one of production was already queued or running, and the id it answered, ${deployment}, names nothing. Both digests are set, which a deployment not yet started reads. Let that deployment end, or cancel it in the orchestrator, then run the release again"
+  refuse "the orchestrator queued no deployment, because one of production was queued after this release checked for one, and the id it answered, ${deployment}, names nothing. Both digests are set, and that deployment reads them if it has not started, with no smoke and no tag after it. Read /health once it ends, then run the release again"
 fi
 echo "deploying production as deployment ${deployment}"
 
 status="unread"
 deadline=$((SECONDS + wait_seconds))
-while ((SECONDS < deadline)); do
+while ((SECONDS <= deadline)); do
   code="$(ask GET "/api/v1/deployments/${deployment}")"
   if [[ "${code}" == 2?? ]]; then
     status="$(jq -r '.status // "none"' "${answer}" 2>/dev/null)" || status="unreadable"
