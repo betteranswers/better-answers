@@ -502,7 +502,7 @@ describe("spending a recovery code", () => {
   it("leaves the old factors and codes when setup is abandoned", async () => {
     const { personId } = await anAdminRecovering();
 
-    const read = await readSecondFactor(bootstrap, door(), { personId });
+    const read = await readSecondFactor(bootstrap, door(), { personId, now: AT });
 
     expect(read).toMatchObject({
       ok: true,

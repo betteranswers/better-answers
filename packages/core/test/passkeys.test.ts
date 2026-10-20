@@ -340,7 +340,7 @@ describe("dismissing the passkey offer", () => {
         )
       ).rows[0]?.at,
     ).toEqual(AT);
-    expect(await readSecondFactor(bootstrap, door(), { personId })).toMatchObject({
+    expect(await readSecondFactor(bootstrap, door(), { personId, now: AT })).toMatchObject({
       ok: true,
       value: { passkeyOfferDismissed: true },
     });
