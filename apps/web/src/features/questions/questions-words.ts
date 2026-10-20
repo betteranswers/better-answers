@@ -74,7 +74,6 @@ export const QUESTIONS_WORDS = {
   others: "Other Questions",
   notAnswered: "Not Answered",
   noCollection: CONCEPT_WORDS.noCollection,
-  noCollectionHeading: "No Collection",
   more: "More Questions",
   removed: "Question removed by an erasure",
   verdict: (verdict: AskedRecord["verdict"]): string =>

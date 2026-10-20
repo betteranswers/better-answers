@@ -6,7 +6,6 @@ import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { expect, test } from "./browser.ts";
 import {
   A_ROLE,
-  addMember,
   aMemberSignedInAt,
   anAddress,
   clockTheNextKey,
@@ -14,7 +13,6 @@ import {
   keystrokesDismissed,
   keystrokesListed,
   notFoundOfferingHome,
-  person,
   provision,
   saysARefusal,
   seedConcepts,
@@ -29,8 +27,6 @@ const LIST_BUDGET_MS = 1000;
 const QUESTIONS_ASKED = pageNamed(menuGroupIn(CONTROL_CENTRE, "questions"), "Questions Asked").path;
 
 const AUDIT_CONCEPT = "Audit Logs Retention";
-
-const SECRET_CONCEPT = "Acquisition Plans";
 
 const FLAGGED_QUESTION = "How long do you keep audit logs for buyers?";
 
@@ -61,8 +57,6 @@ const aWorkspaceWithConcepts = async (
   const adminEmail = anAddress("admin");
   const workspace = await provision(api, { name, adminEmail });
   const { workspaceId } = workspace;
-  const insider = await person(api, anAddress("insider"), { displayName: "Ines Insider" });
-  await addMember(api, { workspaceId, userId: insider.id, role: "Viewer" });
   const seeded = await seedConcepts(api, {
     workspaceId,
     userId: workspace.admin.id,
@@ -71,13 +65,6 @@ const aWorkspaceWithConcepts = async (
         title: AUDIT_CONCEPT,
         collection: "audits",
         body: "We keep audit logs for seven years, then delete them.",
-      },
-      {
-        title: SECRET_CONCEPT,
-        collection: "secret-plans",
-        body: "We plan to buy a competitor next year.",
-        audience: "groups",
-        groupMemberIds: [insider.id],
       },
     ],
   });
@@ -164,35 +151,22 @@ test.describe("Questions asked", () => {
     await expect(page.getByRole("main")).not.toContainText(/\b[0-9]+ (question|record)s?\b/i);
   });
 
-  test("groups refusals under collections the Admin can read", async ({ page, request }) => {
+  test("shows every refusal in one group", async ({ page, request }) => {
     const at = await aWorkspaceWithConcepts(request, "Swale Refusals");
-    const refused = (question: string, concepts: readonly string[]): SeedRecord => ({
-      question,
-      verdict: "refuse",
-      concepts: concepts.map((title) => ({ iri: iriOf(at, title) })),
-    });
+    const refused = (question: string): SeedRecord => ({ question, verdict: "refuse" });
     await seedQuestions(request, {
       workspaceId: at.workspaceId,
-      records: [
-        refused("Matched nothing at all", []),
-        refused("Matched the secret plans", [SECRET_CONCEPT]),
-        refused("Matched the audit logs", [AUDIT_CONCEPT]),
-      ],
+      records: [refused("Where do we park on site?"), refused("What is on the canteen menu?")],
     });
 
     await signedInAtTheQuestions(page, request, at);
 
     const notAnswered = groupNamed(page, "Not Answered");
-    await expect(notAnswered.getByRole("heading", { level: 4 })).toHaveText([
-      "audits",
-      "No Collection",
+    await expect(notAnswered.getByRole("heading")).toHaveText(["Not Answered"]);
+    await expect(rowsOf(notAnswered)).toHaveText([
+      "What is on the canteen menu?",
+      "Where do we park on site?",
     ]);
-    await expect(rowsOf(groupNamed(page, "audits"))).toHaveText(["Matched the audit logs"]);
-    await expect(rowsOf(groupNamed(page, "No Collection"))).toHaveText([
-      "Matched the secret plans",
-      "Matched nothing at all",
-    ]);
-    await expect(page.getByText("secret-plans")).toHaveCount(0);
   });
 
   test("shows an erased record's verdict, concepts and flag", async ({ page, request }) => {

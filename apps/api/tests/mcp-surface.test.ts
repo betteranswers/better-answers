@@ -647,6 +647,20 @@ describe("ask, on the own-transaction road", () => {
     );
   });
 
+  it("describes each judge state without promising a retry", async () => {
+    const { client, token } = await connect();
+
+    const ask = (await listTools(client, token)).find((listed) => listed.name === "ask");
+
+    expect(ask?.description).toContain(
+      "`judging-failed` when it could not judge (its candidates are then under `related`)",
+    );
+    expect(ask?.description).toContain(
+      "`not-judged` when the workspace has no judge or no `Answer` was a candidate",
+    );
+    expect(ask?.description).not.toContain("asking again later");
+  });
+
   describe("refused where the call enters", () => {
     let connected: Awaited<ReturnType<typeof connect>>;
 

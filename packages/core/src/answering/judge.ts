@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { CANDIDATE_VERDICTS, type CandidateVerdict, type ConceptIri } from "@better-answers/schema";
 
+import type { TrustStatus } from "../concepts/index.ts";
 import { err, ok, type KernelRefusal, type Result, type UserPrincipal } from "../kernel/index.ts";
 import {
   checkTypedText,
@@ -102,11 +103,23 @@ export const reserveDrafting = async (
     most: (shape) => (shape === "messages" ? reserving.most : undefined),
   });
 
+const OFFERED_TO_THE_JUDGE = {
+  current: true,
+  "changed-since-checked": true,
+  "out-of-date": true,
+  draft: false,
+  deprecated: false,
+} satisfies Record<TrustStatus, boolean>;
+
 const candidatesOf = (
   related: readonly RelatedConcept[],
   cap: number,
 ): readonly ReturnedConcept[] =>
-  related.flatMap((concept) => ("body" in concept ? [concept] : [])).slice(0, cap);
+  related
+    .flatMap((concept) =>
+      "body" in concept && OFFERED_TO_THE_JUDGE[concept.trust.status] ? [concept] : [],
+    )
+    .slice(0, cap);
 
 const JUDGE_SYSTEM = `You judge whether each candidate answers a question as it was asked.
 Each candidate is an approved answer from a company's knowledge, shown with the question it was written for and the collection it is filed under.

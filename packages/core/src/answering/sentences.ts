@@ -27,28 +27,67 @@ const pastClosing = (line: string, end: number): number => {
   return at;
 };
 
+const TERMINAL = /[.!?]/;
+
+const CLOSING_QUOTE = new Set(['"', "'", "”", "’", ")"]);
+
+type Mark = { readonly at: number; readonly end: number };
+
+type MarksOfLine = {
+  readonly starts: ReadonlySet<number>;
+  readonly startOfEnd: ReadonlyMap<number, number>;
+};
+
+const runStart = (line: string, mark: Mark, marks: MarksOfLine): number => {
+  let start = mark.at;
+  for (;;) {
+    let before = start;
+    while (SPACE.has(line[before - 1] ?? "")) before -= 1;
+    const earlier = marks.startOfEnd.get(before);
+    if (earlier === undefined) return start;
+    start = earlier;
+  }
+};
+
+const terminalBefore = (line: string, at: number): boolean => {
+  let before = at;
+  while (CLOSING_QUOTE.has(line[before - 1] ?? "") || SPACE.has(line[before - 1] ?? "")) {
+    before -= 1;
+  }
+  return TERMINAL.test(line[before - 1] ?? "");
+};
+
+const endsASentence = (line: string, mark: Mark, at: number, marks: MarksOfLine): boolean =>
+  TERMINAL.test(line.slice(mark.end, at)) || terminalBefore(line, runStart(line, mark, marks));
+
 const stopAfter = (
   line: string,
-  end: number,
-  markStarts: ReadonlySet<number>,
+  mark: Mark,
+  marks: MarksOfLine,
   lineDone: boolean,
 ): number | undefined => {
-  const at = pastClosing(line, end);
+  const at = pastClosing(line, mark.end);
   const next = pastSpace(line, at);
   if (next === line.length) return lineDone ? at : undefined;
-  if (next === at) return undefined;
-  return markStarts.has(next) ? undefined : at;
+  if (next === at || marks.starts.has(next)) return undefined;
+  return endsASentence(line, mark, at, marks) ? at : undefined;
 };
 
 type Split = { readonly sentences: readonly string[]; readonly rest: string };
 
 const splitLine = (line: string, citable: readonly Citable[], lineDone: boolean): Split => {
-  const marks = marksIn(line, citable);
-  const markStarts = new Set(marks.map((mark) => mark.at));
+  const marks = marksIn(line, citable).map((mark) => ({
+    at: mark.at,
+    end: mark.at + mark.mark.length,
+  }));
+  const ofLine: MarksOfLine = {
+    starts: new Set(marks.map((mark) => mark.at)),
+    startOfEnd: new Map(marks.map((mark) => [mark.end, mark.at])),
+  };
   const sentences: string[] = [];
   let from = 0;
   for (const mark of marks) {
-    const stop = stopAfter(line, mark.at + mark.mark.length, markStarts, lineDone);
+    const stop = stopAfter(line, mark, ofLine, lineDone);
     if (stop === undefined || stop <= from) continue;
     sentences.push(line.slice(from, stop));
     from = stop;

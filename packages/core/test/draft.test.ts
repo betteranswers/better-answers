@@ -493,6 +493,29 @@ describe("where a drafted sentence ends", () => {
     ]);
   });
 
+  it("keeps a sentence whole across a mark in its middle", async () => {
+    const { sent, retention, exported } = await sentOf(({ a, b }) => [
+      `Logs are kept[^${a}] for a year.[^${b}]\n`,
+      `Kept[^${b}], then deleted.[^${a}]\n`,
+    ]);
+
+    expect(sent).toEqual([
+      { sentence: "Logs are kept for a year.", concepts: [retention, exported] },
+      { sentence: "Kept, then deleted.", concepts: [exported, retention] },
+    ]);
+  });
+
+  it("ends a sentence at a mark spaced after its stop", async () => {
+    const { sent, retention, exported } = await sentOf(({ a, b }) => [
+      `Claims close. [^${a}] Receipts are kept. [^${b}]\n`,
+    ]);
+
+    expect(sent).toEqual([
+      { sentence: "Claims close.", concepts: [retention] },
+      { sentence: "Receipts are kept.", concepts: [exported] },
+    ]);
+  });
+
   it("waits across pieces for the marks a sentence ends with", async () => {
     const { sent, retention, exported } = await sentOf(({ a, b }) => [
       `Claims close.[^${a}] `,
