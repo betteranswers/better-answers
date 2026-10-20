@@ -32,6 +32,8 @@ const followedOnce = (reading: Reading): Promise<typeof HOME> => {
   return followed;
 };
 
+export const homeOnceLeft = (reading: Reading): Promise<typeof HOME> => followedOnce(reading);
+
 export const homeAfterASwitchElsewhere = (
   failure: Error,
   reading: Reading,

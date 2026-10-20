@@ -53,13 +53,14 @@ export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
     trpcServer({
       router: appRouter,
       endpoint: TRPC_ENDPOINT,
-      createContext: (_options, context) => ({
+      createContext: (options, context) => ({
         doors: deps.doors,
         modelDoors: deps.modelDoors,
         askKeepAliveMs: deps.askKeepAliveMs ?? ASK_KEEP_ALIVE_MS,
         clock: deps.doors.clock,
         readSession: readOncePerRequest(),
         headers: context.req.raw.headers,
+        resHeaders: options.resHeaders,
         log,
         mail: deps.mail,
       }),

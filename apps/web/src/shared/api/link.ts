@@ -5,9 +5,12 @@ import {
   isNonJsonSerializable,
   splitLink,
 } from "@trpc/client";
-import type { OperationContext } from "@trpc/client";
+import type { Operation, OperationContext } from "@trpc/client";
 
-import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
+import {
+  ANSWERING_WORKSPACE_HEADER,
+  TAB_WORKSPACE_HEADER,
+} from "@better-answers/schema/tab-workspace";
 
 export type UploadDescriptor = {
   readonly connectedSourceId: string;
@@ -50,9 +53,25 @@ const uploadHeadersOf = (context: OperationContext): Headers => {
   return held instanceof Headers ? held : new Headers();
 };
 
+export type NamedWorkspace = {
+  readonly forARead: () => string | undefined;
+  readonly forAWrite: () => string | undefined;
+  readonly answeredIn: (workspaceId: string) => void;
+};
+
+type LinkFetch = NonNullable<Parameters<typeof httpBatchLink>[0]["fetch"]>;
+
+const fromTheNetwork: LinkFetch = (url, init) =>
+  fetch(url, {
+    method: init?.method ?? "GET",
+    headers: new Headers(init?.headers),
+    body: init?.body ?? null,
+    signal: init?.signal ?? null,
+  });
+
 type ApiLinkOptions = Pick<Parameters<typeof httpBatchLink>[0], "url" | "fetch"> & {
   readonly uploadFetch?: Parameters<typeof httpLink>[0]["fetch"];
-  readonly heldWorkspace: () => string | undefined;
+  readonly namedWorkspace: NamedWorkspace;
 };
 
 /**
@@ -63,31 +82,42 @@ const BATCH_URL_CEILING = 2083;
 
 const STREAMED_PATH = "ask.question";
 
-export const apiLink = ({ uploadFetch, heldWorkspace, ...options }: ApiLinkOptions) => {
+export const apiLink = ({ uploadFetch, namedWorkspace, ...options }: ApiLinkOptions) => {
   const uploading = uploadFetch === undefined ? options : { ...options, fetch: uploadFetch };
-  const namingTheWorkspace = (sent: Headers): Headers => {
+  const namingTheWorkspace = (sent: Headers, ops: readonly Operation[]): Headers => {
     const headers = new Headers(sent);
-    const held = heldWorkspace();
-    if (held !== undefined) headers.set(TAB_WORKSPACE_HEADER, held);
+    const named = ops.some((op) => op.type === "mutation")
+      ? namedWorkspace.forAWrite()
+      : namedWorkspace.forARead();
+    if (named !== undefined) headers.set(TAB_WORKSPACE_HEADER, named);
     return headers;
+  };
+  const sent = options.fetch ?? fromTheNetwork;
+  const hearingTheWorkspace: LinkFetch = async (url, init) => {
+    const answered = await sent(url, init);
+    const answering =
+      answered instanceof Response ? answered.headers.get(ANSWERING_WORKSPACE_HEADER) : null;
+    if (answering !== null) namedWorkspace.answeredIn(answering);
+    return answered;
   };
   return splitLink({
     condition: (op) => isNonJsonSerializable(op.input),
     true: httpLink({
       ...uploading,
-      headers: ({ op }) => namingTheWorkspace(uploadHeadersOf(op.context)),
+      headers: ({ op }) => namingTheWorkspace(uploadHeadersOf(op.context), [op]),
     }),
     false: splitLink({
       condition: (op) => op.path === STREAMED_PATH,
       true: httpBatchStreamLink({
         ...options,
         maxItems: 1,
-        headers: () => namingTheWorkspace(new Headers()),
+        headers: ({ opList }) => namingTheWorkspace(new Headers(), opList),
       }),
       false: httpBatchLink({
         ...options,
+        fetch: hearingTheWorkspace,
         maxURLLength: BATCH_URL_CEILING,
-        headers: () => namingTheWorkspace(new Headers()),
+        headers: ({ opList }) => namingTheWorkspace(new Headers(), opList),
       }),
     }),
   });

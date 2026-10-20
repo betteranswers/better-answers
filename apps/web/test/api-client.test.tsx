@@ -6,14 +6,18 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
+import {
+  ANSWERING_WORKSPACE_HEADER,
+  TAB_WORKSPACE_HEADER,
+} from "@better-answers/schema/tab-workspace";
 
 import { createAppClients, Providers, type AppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 import { createApiProxy, TRPC_ENDPOINT, useTRPC } from "@/shared/api/trpc.ts";
-import { memberOptions } from "@/shared/member.ts";
+import { memberOptions, NEEDS_A_PICK } from "@/shared/member.ts";
 
 import { addressOf, answered } from "./stubbed-api.ts";
+import { aRefusalAnswer, read } from "./two-workspaces.ts";
 
 afterEach(() => {
   cleanup();
@@ -68,20 +72,32 @@ describe("the query provider above the router", () => {
   });
 });
 
+type Session = { in: string | undefined; memberReads: number };
+
+const answeredFrom = (body: unknown, workspaceId: string): Promise<Response> =>
+  Promise.resolve(Response.json(body, { headers: { [ANSWERING_WORKSPACE_HEADER]: workspaceId } }));
+
 const anApiHearingActions = () => {
   const named: (string | null)[] = [];
-  const session = { in: "w" };
+  const session: Session = { in: "w", memberReads: 0 };
   vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
     const { pathname } = addressOf(input);
     if (pathname.endsWith("/members.createGroup")) {
       named.push(new Headers(init?.headers).get(TAB_WORKSPACE_HEADER));
     }
+    const reading = ["/members.groups", "/session.member"].find((path) => pathname.endsWith(path));
+    if (reading === undefined) return answered([read(null)]);
+    if (reading === "/session.member") session.memberReads += 1;
+    if (session.in === undefined) {
+      return answered([aRefusalAnswer(NEEDS_A_PICK, "unauthenticated", 401)]);
+    }
+    if (reading === "/members.groups") return answeredFrom([read([])], session.in);
     const member = {
       workspace: { id: session.in, name: "Northern Tooling" },
       person: { id: "p", name: "Ada", email: "ada@example.test" },
       role: "Admin",
     };
-    return answered([{ result: { data: pathname.endsWith("/session.member") ? member : null } }]);
+    return answeredFrom([read(member)], session.in);
   });
   return { named, session };
 };
@@ -91,8 +107,21 @@ const memberRead = (clients: AppClients) =>
     memberOptions(createApiProxy(clients.apiClient, clients.queryClient)),
   );
 
+const memberKeyOf = (clients: AppClients) =>
+  memberOptions(createApiProxy(clients.apiClient, clients.queryClient)).queryKey;
+
+const groupsRead = (clients: AppClients) => clients.apiClient.members.groups.query();
+
 const groupMade = (clients: AppClients) =>
   clients.apiClient.members.createGroup.mutate({ name: "Bid writers" });
+
+const leavesCounted = (clients: AppClients) => {
+  const left = { times: 0 };
+  clients.shown.whenLeft(() => {
+    left.times += 1;
+  });
+  return left;
+};
 
 describe("the workspace an action names", () => {
   it("is the held member read's, as each action is sent", async () => {
@@ -108,6 +137,53 @@ describe("the workspace an action names", () => {
     expect(named).toEqual(["w", "v"]);
   });
 
+  it("is the last shown while the member is read again", async () => {
+    const { named, session } = anApiHearingActions();
+    const clients = createAppClients();
+
+    await memberRead(clients);
+    await clients.queryClient.resetQueries({ queryKey: memberKeyOf(clients) });
+    session.in = "v";
+    await groupMade(clients);
+
+    expect(named).toEqual(["w"]);
+  });
+
+  it("is the one a read was answered from, member unread", async () => {
+    const { named, session } = anApiHearingActions();
+    const clients = createAppClients();
+
+    await groupsRead(clients);
+    session.in = "v";
+    await groupMade(clients);
+
+    expect(named).toEqual(["w"]);
+    expect(session.memberReads, "the action read the member").toBe(0);
+  });
+
+  it("is none, reading nothing, once the member read is refused", async () => {
+    const { named, session } = anApiHearingActions();
+    session.in = undefined;
+    const clients = createAppClients();
+
+    await expect(memberRead(clients)).rejects.toThrow("no-active-workspace");
+    await groupMade(clients);
+
+    expect(named).toEqual([null]);
+    expect(session.memberReads, "the action read the member again").toBe(1);
+  });
+
+  it("is none once the tab's cache is cleared on sign-out", async () => {
+    const { named } = anApiHearingActions();
+    const clients = createAppClients();
+    await memberRead(clients);
+
+    clients.queryClient.clear();
+    await groupMade(clients);
+
+    expect(named).toEqual([null]);
+  });
+
   it("is none while the tab holds no member read", async () => {
     const { named } = anApiHearingActions();
     const clients = createAppClients();
@@ -115,6 +191,56 @@ describe("the workspace an action names", () => {
     await groupMade(clients);
 
     expect(named).toEqual([null]);
+  });
+});
+
+describe("a tab whose reads were answered before its member read", () => {
+  it("is left when a later answer comes from another workspace", async () => {
+    const { session } = anApiHearingActions();
+    const clients = createAppClients();
+    const left = leavesCounted(clients);
+
+    await groupsRead(clients);
+    session.in = "v";
+    await groupsRead(clients);
+    await groupsRead(clients);
+
+    expect(left.times).toBe(1);
+  });
+
+  it("is left when its member read lands in another workspace", async () => {
+    const { session } = anApiHearingActions();
+    const clients = createAppClients();
+    const left = leavesCounted(clients);
+
+    await groupsRead(clients);
+    session.in = "v";
+    await memberRead(clients);
+
+    expect(left.times).toBe(1);
+  });
+
+  it("stays when its member read lands where reads were answered", async () => {
+    anApiHearingActions();
+    const clients = createAppClients();
+    const left = leavesCounted(clients);
+
+    await groupsRead(clients);
+    await memberRead(clients);
+
+    expect(left.times).toBe(0);
+  });
+
+  it("is not left by a member read moving between workspaces", async () => {
+    const { session } = anApiHearingActions();
+    const clients = createAppClients();
+    const left = leavesCounted(clients);
+
+    await memberRead(clients);
+    session.in = "v";
+    await memberRead(clients);
+
+    expect(left.times).toBe(0);
   });
 });
 

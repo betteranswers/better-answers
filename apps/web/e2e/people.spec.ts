@@ -27,6 +27,7 @@ import {
   keystrokesListed,
   landedAtHome,
   makeGroups,
+  memberUnreadUntil,
   notFoundOfferingHome,
   person,
   personMenuOpened,
@@ -1735,37 +1736,6 @@ const changeRoleOpened = async (page: Page, titled: string): Promise<Locator> =>
   return dialog;
 };
 
-const A_FAILED_READ = {
-  error: {
-    message: "INTERNAL_SERVER_ERROR",
-    code: -32_603,
-    data: { code: "INTERNAL_SERVER_ERROR", httpStatus: 500 },
-  },
-};
-
-const membershipUnreadUntil = async (page: Page, read: Promise<void>): Promise<void> => {
-  let shellRead = true;
-  await page.route(MEMBER_READ, async (route) => {
-    const asked = new URL(route.request().url()).pathname.replace("/trpc/", "").split(",");
-    if (shellRead) {
-      shellRead = false;
-      await route.abort();
-      return;
-    }
-    if (asked.length === 1) {
-      await read;
-      await route.continue();
-      return;
-    }
-    const answered = await route.fetch();
-    const answers: readonly unknown[] = await answered.json();
-    await route.fulfill({
-      response: answered,
-      json: answers.map((answer, at) => (asked[at] === "session.member" ? A_FAILED_READ : answer)),
-    });
-  });
-};
-
 const removedThroughTheBar = async (page: Page, titled: string): Promise<void> => {
   await selectionAction(page, "Remove").click();
   await page
@@ -1974,7 +1944,7 @@ test.describe("bulk actions on the members ticked", () => {
       });
     }
     const read = Promise.withResolvers<void>();
-    await membershipUnreadUntil(page, read.promise);
+    await memberUnreadUntil(page, read.promise);
     await page.reload();
     await expect(memberRows(page)).toHaveCount(2);
 

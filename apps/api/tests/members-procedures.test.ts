@@ -733,6 +733,10 @@ const WORKSPACE_SWITCHED = {
   data: { httpStatus: 409, refusal: { word: "workspace-switched", class: "conflict" } },
 } as const;
 
+const WORKSPACE_UNNAMED = {
+  data: { httpStatus: 409, refusal: { word: "workspace-unnamed", class: "conflict" } },
+} as const;
+
 const aTabLeftInAcme = async (roleInBeta: "Admin" | "Editor" = "Admin") => {
   const acme = await app.provision({ name: "Acme" });
   const beta = await app.provision({ name: "Beta" });
@@ -821,7 +825,7 @@ describe("an action from a tab left in another workspace", () => {
       webClientOf(client).api.members.remove.mutate({ personId: viewer.id }),
     );
 
-    expect(refused).toMatchObject(WORKSPACE_SWITCHED);
+    expect(refused).toMatchObject(WORKSPACE_UNNAMED);
     expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Viewer");
   });
 

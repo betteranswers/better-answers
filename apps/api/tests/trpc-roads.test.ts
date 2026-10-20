@@ -13,7 +13,10 @@ import {
   type UserPrincipal,
 } from "@better-answers/core/kernel";
 import type { Tx } from "@better-answers/core/store/postgres";
-import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
+import {
+  ANSWERING_WORKSPACE_HEADER,
+  TAB_WORKSPACE_HEADER,
+} from "@better-answers/schema/tab-workspace";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
 
 import type { ModelDoors } from "../src/ask-steps.ts";
@@ -117,6 +120,7 @@ const contextOf = (
   clock: systemClock(),
   readSession,
   headers,
+  resHeaders: new Headers(),
   log,
   mail: { send: async () => {}, publicUrl: "https://app.example.test" },
 });
@@ -459,6 +463,38 @@ describe("every query the router serves on a workspace road", () => {
 
     expect([unnamed.status, named.status]).toEqual([200, 200]);
   });
+
+  it("says which workspace answered a read naming none", async () => {
+    const { client, here } = await switchedAway();
+
+    const unnamed = await queriedFromATab(client, "members.list");
+
+    expect(unnamed.headers.get(ANSWERING_WORKSPACE_HEADER)).toBe(here.workspaceId);
+  });
+
+  it("says no workspace answered a read it refused", async () => {
+    const { client, left } = await switchedAway();
+
+    const refused = await queriedFromATab(client, "members.list", left.workspaceId);
+
+    expect(await wordOf(refused)).toBe("workspace-switched");
+    expect(refused.headers.get(ANSWERING_WORKSPACE_HEADER)).toBeNull();
+  });
+
+  it("says no workspace answered a read on the person's road", async () => {
+    const { client } = await switchedAway();
+    const paths = QUERIES.filter(([, procedure]) => namesNoWorkspace(procedure)).map(
+      ([path]) => path,
+    );
+
+    const answering: (string | null)[] = [];
+    for (const path of paths) {
+      answering.push((await queriedFromATab(client, path)).headers.get(ANSWERING_WORKSPACE_HEADER));
+    }
+
+    expect(paths).toEqual(expect.arrayContaining(["person.workspaces"]));
+    expect(answering).toEqual(paths.map(() => null));
+  });
 });
 
 describe("every mutation on an own-transaction road", () => {
@@ -486,28 +522,42 @@ describe("every mutation on an own-transaction road", () => {
   });
 });
 
+const WORKSPACE_MUTATIONS = MUTATIONS.filter(([, procedure]) => !namesNoWorkspace(procedure)).map(
+  ([path]) => path,
+);
+
+const wordsOfEach = async (
+  paths: readonly string[],
+  posted: (path: string) => Promise<Response>,
+): Promise<(readonly [string, string | undefined])[]> => {
+  const words: (readonly [string, string | undefined])[] = [];
+  for (const path of paths) {
+    const answered = await posted(`${TRPC_ENDPOINT}/${path}`);
+    words.push([path, answeredWord.parse(await answered.json()).error?.data.refusal?.word]);
+  }
+  return words;
+};
+
 describe("every mutation the router serves", () => {
   it("is refused on a workspace road, its tab naming another", async () => {
     const { client, left } = await switchedAway();
-    const paths = MUTATIONS.filter(([, procedure]) => !namesNoWorkspace(procedure)).map(
-      ([path]) => path,
+
+    const words = await wordsOfEach(WORKSPACE_MUTATIONS, (path) =>
+      postedFromATab(client, path, {}, left.workspaceId),
     );
 
-    const words: (readonly [string, string | undefined])[] = [];
-    for (const path of paths) {
-      const answered = await postedFromATab(
-        client,
-        `${TRPC_ENDPOINT}/${path}`,
-        {},
-        left.workspaceId,
-      );
-      words.push([path, answeredWord.parse(await answered.json()).error?.data.refusal?.word]);
-    }
-
-    expect(paths).toEqual(
+    expect(WORKSPACE_MUTATIONS).toEqual(
       expect.arrayContaining(["members.remove", "members.invite", "sources.connect"]),
     );
-    expect(words).toEqual(paths.map((path) => [path, "workspace-switched"]));
+    expect(words).toEqual(WORKSPACE_MUTATIONS.map((path) => [path, "workspace-switched"]));
+  });
+
+  it("is refused on a workspace road, its tab naming none", async () => {
+    const { client } = await switchedAway();
+
+    const words = await wordsOfEach(WORKSPACE_MUTATIONS, (path) => client.json(path, {}));
+
+    expect(words).toEqual(WORKSPACE_MUTATIONS.map((path) => [path, "workspace-unnamed"]));
   });
 
   it("never asks the person's or operator's road for a workspace", async () => {

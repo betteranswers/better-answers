@@ -1,5 +1,6 @@
-import { useQuery, type QueryClient } from "@tanstack/react-query";
+import { hashKey, useQuery, type QueryClient } from "@tanstack/react-query";
 
+import type { NamedWorkspace } from "@/shared/api/link.ts";
 import { refusalOf, useTRPC, type ApiProxy, type RefusalWord } from "@/shared/api/trpc.ts";
 
 export const memberOptions = (api: ApiProxy) =>
@@ -25,6 +26,43 @@ export const roleHeld = (queryClient: QueryClient, api: ApiProxy) =>
 
 export const workspaceHeld = (queryClient: QueryClient, api: ApiProxy) =>
   queryClient.getQueryData(memberOptions(api).queryKey)?.workspace.id;
+
+type Shown = { readonly id: string; readonly by: "member" | "answer" };
+
+export type WorkspaceShown = NamedWorkspace & {
+  readonly whenLeft: (left: () => void) => void;
+};
+
+const leftAsAnAnswerSaw = (was: Shown | undefined, now: Shown): boolean =>
+  was !== undefined && was.id !== now.id && (was.by === "answer" || now.by === "answer");
+
+export const workspaceShownBy = (queryClient: QueryClient, api: ApiProxy): WorkspaceShown => {
+  const memberHash = hashKey(memberOptions(api).queryKey);
+  const lefts: (() => void)[] = [];
+  const held = workspaceHeld(queryClient, api);
+  let shown: Shown | undefined = held === undefined ? undefined : { id: held, by: "member" };
+  const learnt = (now: Shown) => {
+    const was = shown;
+    shown = now;
+    if (leftAsAnAnswerSaw(was, now)) for (const left of lefts) left();
+  };
+  queryClient.getQueryCache().subscribe(({ type, query }) => {
+    if (query.queryHash !== memberHash) return;
+    if (type === "removed") shown = undefined;
+    const now = workspaceHeld(queryClient, api);
+    if (now !== undefined) learnt({ id: now, by: "member" });
+  });
+  return {
+    forARead: () => workspaceHeld(queryClient, api),
+    forAWrite: () => workspaceHeld(queryClient, api) ?? shown?.id,
+    answeredIn: (id) => {
+      if (workspaceHeld(queryClient, api) === undefined) learnt({ id, by: "answer" });
+    },
+    whenLeft: (left) => {
+      lefts.push(left);
+    },
+  };
+};
 
 export const leftFor = (held: string | undefined, now: string | undefined): boolean =>
   held !== undefined && now !== undefined && now !== held;

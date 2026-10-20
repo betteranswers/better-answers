@@ -50,6 +50,7 @@ describe("the refusal the api sends the web", () => {
     expectTypeOf<"no-session">().toExtend<RefusalWord>();
     expectTypeOf<"no-active-workspace">().toExtend<RefusalWord>();
     expectTypeOf<"workspace-switched">().toExtend<RefusalWord>();
+    expectTypeOf<"workspace-unnamed">().toExtend<RefusalWord>();
     expectTypeOf<"no-such-workspace">().toExtend<RefusalWord>();
     expectTypeOf<"credentials-revoked">().toExtend<RefusalWord>();
     expectTypeOf<"role-forbids">().toExtend<RefusalWord>();

@@ -13,6 +13,7 @@ const REFUSALS = classesIn({
     "no-session": "unauthenticated",
     "no-active-workspace": "unauthenticated",
     "workspace-switched": "conflict",
+    "workspace-unnamed": "conflict",
   },
 });
 

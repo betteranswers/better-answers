@@ -43,7 +43,7 @@ import {
 import { rememberTheSession } from "@/features/auth/session-memory.ts";
 import { CodesPage, SetupPage } from "@/features/auth/setup-page.tsx";
 import { SignInPage } from "@/features/auth/sign-in-page.tsx";
-import { homeAfterASwitchElsewhere } from "@/features/auth/switched-elsewhere.ts";
+import { homeAfterASwitchElsewhere, homeOnceLeft } from "@/features/auth/switched-elsewhere.ts";
 import { EveryonePage } from "@/features/console/everyone-page.tsx";
 import { NamesWaitingPage } from "@/features/console/names-waiting-page.tsx";
 import { isTheOperator, mustSignInForTheConsole } from "@/features/console/operator.ts";
@@ -531,6 +531,9 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
     const home = homeAfterASwitchElsewhere(failure, context);
     if (home === undefined) detour(failure, during);
     else void home.then((to) => router.navigate(to));
+  });
+  clients.shown.whenLeft(() => {
+    void homeOnceLeft(context).then((to) => router.navigate(to));
   });
   return router;
 };

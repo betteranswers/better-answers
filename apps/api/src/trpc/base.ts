@@ -28,7 +28,10 @@ import {
   type Folded,
   type Tx,
 } from "@better-answers/core/store/postgres";
-import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
+import {
+  ANSWERING_WORKSPACE_HEADER,
+  TAB_WORKSPACE_HEADER,
+} from "@better-answers/schema/tab-workspace";
 
 import type { ModelDoors } from "../ask-steps.ts";
 import { sessionClaims } from "../auth/verify.ts";
@@ -44,6 +47,7 @@ type TrpcContext = {
   readonly clock: Clock;
   readonly readSession: GatedSessionReader;
   readonly headers: Headers;
+  readonly resHeaders: Headers;
   readonly log: Logger;
   readonly mail: Mail;
 };
@@ -195,9 +199,10 @@ const leftBehind = (
   claims: Claims,
   path: string,
   type: TRPCProcedureType,
-): boolean => {
-  if (type === "mutation") return held !== claims.workspaceId;
-  return path !== MEMBER_READ && held !== null && held !== claims.workspaceId;
+): "workspace-switched" | "workspace-unnamed" | undefined => {
+  if (type === "mutation" && held === null) return "workspace-unnamed";
+  if (type !== "mutation" && (path === MEMBER_READ || held === null)) return undefined;
+  return held === claims.workspaceId ? undefined : "workspace-switched";
 };
 
 const claimsInTheTabsWorkspace = async (
@@ -207,9 +212,9 @@ const claimsInTheTabsWorkspace = async (
 ): Promise<Claims> => {
   const claims = await claimsOf(ctx, path);
 
-  if (leftBehind(ctx.headers.get(TAB_WORKSPACE_HEADER), claims, path, type)) {
-    throw refused(ctx.log, path, "workspace-switched");
-  }
+  const left = leftBehind(ctx.headers.get(TAB_WORKSPACE_HEADER), claims, path, type);
+  if (left !== undefined) throw refused(ctx.log, path, left);
+  ctx.resHeaders.set(ANSWERING_WORKSPACE_HEADER, claims.workspaceId);
   return claims;
 };
 
