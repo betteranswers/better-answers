@@ -202,9 +202,9 @@ def test_a_claim_hands_the_handler_what_the_job_is_about(
     assert auditing.subject_id is None
 
 
-def test_a_held_lapsed_claim_keeps_its_subjects_newer_job_back(
+def a_spent_claim_before_a_newer_job(
     database: psycopg.Connection,
-) -> None:
+) -> tuple[str, Mapping[str, Any], Mapping[str, Any]]:
     workspace = str(seed_workspace(database.cursor())["id"])
     connected_source_id = ulid()
     with database.cursor() as cursor:
@@ -229,18 +229,29 @@ def test_a_held_lapsed_claim_keeps_its_subjects_newer_job_back(
             subject_id=connected_source_id,
         )
     database.commit()
+    return workspace, spent_older, newer
+
+
+def lapse(database: psycopg.Connection, workspace: str, job_id: str) -> None:
+    with scoped(database, workspace) as cursor:
+        cursor.execute(
+            "UPDATE job SET lease_expires_at = now() - interval '1 second'"
+            " WHERE id = %s",
+            (job_id,),
+        )
+        assert cursor.rowcount == 1
+
+
+def test_a_held_lapsed_claim_keeps_its_subjects_newer_job_back(
+    database: psycopg.Connection,
+) -> None:
+    workspace, spent_older, newer = a_spent_claim_before_a_newer_job(database)
 
     dsn = _WHERE[database]
     with queue.connected(dsn) as holding, queue.connected(dsn) as claiming:
         with scoped(holding, workspace) as held:
             queue.hold_the_claim(held, spent_older["id"], "worker-gone-quiet")
-            with scoped(database, workspace) as cursor:
-                cursor.execute(
-                    "UPDATE job SET lease_expires_at = now() - interval '1 second'"
-                    " WHERE id = %s",
-                    (spent_older["id"],),
-                )
-                assert cursor.rowcount == 1
+            lapse(database, workspace, spent_older["id"])
             with scoped(claiming, workspace) as cursor:
                 while_held = queue.claim(cursor, workspace, WORKER, ["index"])
         with scoped(claiming, workspace) as cursor:
@@ -252,6 +263,40 @@ def test_a_held_lapsed_claim_keeps_its_subjects_newer_job_back(
     with scoped(database, workspace) as cursor:
         cursor.execute("SELECT status FROM job WHERE id = %s", (spent_older["id"],))
         assert cursor.fetchone() == ("poisoned",)
+
+
+def test_an_idle_fence_lets_its_subjects_newer_job_go(
+    database: psycopg.Connection,
+) -> None:
+    workspace, spent_older, newer = a_spent_claim_before_a_newer_job(database)
+
+    dsn = _WHERE[database]
+    freed = None
+    with (
+        queue.connected(dsn, idle_in_transaction_seconds=1) as hung,
+        queue.connected(dsn) as claiming,
+        pytest.raises(psycopg.errors.IdleInTransactionSessionTimeout),
+        scoped(hung, workspace) as held,
+    ):
+        queue.hold_the_claim(held, spent_older["id"], "worker-gone-quiet")
+        lapse(database, workspace, spent_older["id"])
+        deadline = time.monotonic() + 10
+        while freed is None and time.monotonic() < deadline:
+            with scoped(claiming, workspace) as cursor:
+                freed = queue.claim(cursor, workspace, WORKER, ["index"])
+            time.sleep(0.05)
+
+    assert freed is not None, "the idle fence held the newer job back"
+    assert freed.id == newer["id"]
+
+
+def test_a_worker_session_ends_a_fence_idle_for_an_hour(
+    database: psycopg.Connection,
+) -> None:
+    with queue.connected(_WHERE[database]) as worker:
+        shown = worker.execute("SHOW idle_in_transaction_session_timeout").fetchone()
+
+    assert shown == ("1h",)
 
 
 def test_the_loop_runs_a_nightly_audit_it_scheduled_itself(
