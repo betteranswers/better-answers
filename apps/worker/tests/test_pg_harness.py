@@ -603,11 +603,25 @@ def test_sweeps_a_dead_runs_database_and_keeps_a_live_ones(
             _discard(maintenance, database)
 
 
+def _gone_or_going(maintenance: str, database: str) -> bool:
+    # Postgres marks a database it is dropping with a connection limit of -2.
+    with _admin(maintenance) as admin:
+        row = admin.execute(
+            "SELECT datconnlimit FROM pg_database WHERE datname = %s", (database,)
+        ).fetchone()
+    return row is None or row[0] == -2
+
+
 def _held(maintenance: str, database: str, server: str) -> psycopg.Connection | None:
     try:
         return psycopg.connect(on_database(server, database))
     except psycopg.OperationalError:
-        return None
+        # A failed connect carries no SQLSTATE, so the catalog tells a sweep's drop
+        # apart from a server that refused.
+        if _gone_or_going(maintenance, database):
+            return None
+        _discard(maintenance, database)
+        raise
 
 
 @contextmanager
