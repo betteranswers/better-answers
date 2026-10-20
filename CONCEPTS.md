@@ -2274,30 +2274,29 @@ How the work from the foundation to a finished v0.1 is cut and ordered.
 
 ### route spec
 
-_Internal._ the one document that holds the way to a finished v0.1: a head over the vision's v0.1
-row, then the *blocks* in order, each with its edges and the obligations it carries, and a status
-table that is the product frontier every product session reads first.
+_Internal._ the way to a finished v0.1, written as `docs/specs/v01-route.md` and one brief per
+live *block* under `docs/specs/route/`.
 
-Each block is planned from it. A Wayfinder map is charted only for a destination the route spec does
-not already hold. A plan is one piece of work's, never the route spec.
+`v01-route.md` holds the status table and the session rules. The status table is the one home of
+each block's strand, status, next marker, waits and plan. A plan serves one block, and is never the
+route spec.
 
 ### block
 
-_Internal._ one section of the route spec: a destination a product session can pick, about a page —
-the ADRs and words it rests on, what in the tree it builds on, what it must carry, its blocking
-edges, a seam sketch.
+_Internal._ one destination on the route spec that a product session can pick, described by a brief
+of at most 600 words.
 
-Taken to `/poteto-mode`, and planned first when it needs more than one owner or will outlast
-one session; the block itself is never one of its plans. Each block lands its own page. A slice is
-a core package capability, never a block.
+A session takes it to `/poteto-mode`, and plans it first when it needs more than one owner or will
+outlast one session. A block is never one of its plans, and never a Linear issue. Each block builds
+its own pages. A slice is a core package capability, never a block.
 
 ### strand
 
-_Internal._ one chain of blocks the route spec orders by their edges, worked in parallel with the
-other: the *knowledge strand* (a document to a passage, an answer, the producer) and the *records
-strand* (guides, suggestions).
+_Internal._ one chain of blocks the route spec orders by what each waits on, worked in parallel with
+the others: knowledge, records, people, ops and customer.
 
-A block belongs to one strand; a cross-strand edge is stated on the block.
+A block belongs to one strand, and a strand carries one next marker at most. A wait across strands
+is a Blocked by entry like any other.
 
 ### land (the verb)
 

@@ -40,7 +40,7 @@ Every model call the api tier makes goes through the model client, one fetch-sha
 - **The streamed form tries again only before its reply begins.** Once a reply has begun, it may have been billed. A reply cut off or ended early before it gave its count is settled at the size reserved for it.
 - **The client names the model a model choice names and no other.** It never substitutes a model at run time.
 - **Every call sits behind the redaction seam and the typed-text check** (ADR 0020). The client answers what each attempt spent, and the caller settles them as `llm_call` rows, one per attempt (ADR 0025). No prompt and no completion is logged, stored or returned beyond the caller.
-- **In `check` the client is faked.** A test asserts the shape of a call and of a result, never a model's judgement. A reading with a real model is a run the owner starts, over synthetic content, and its figures are recorded on the route.
+- **In `check` the client is faked.** A test asserts the shape of a call and of a result, never a model's judgement. A reading with a real model is a run the owner starts, over synthetic content, and its figures are recorded in `docs/operations/readings.md`.
 
 A decision model is measured before any workspace is set to run it. The generative judge ships first, and the decision-model backend ships unselected.
 
@@ -66,7 +66,7 @@ What is given up: two wire shapes are kept in step with their vendors by hand, w
 
 ## History
 
-Written 13/10/2026 on the owner's decisions of 11/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R29 and KTD10). The route named the wire shape as S2b's decision, leaning towards the Messages API alone (`docs/specs/v01-route.md`, the S2b block). ADR 0041 holds how a provider's key is kept, and ADR 0025 what an `llm_call` row holds.
+Written 13/10/2026 on the owner's decisions of 11/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R29 and KTD10). The route named the wire shape as S2b's decision, leaning towards the Messages API alone (`docs/archive/specs/v01-route-to-2026-10-20.md`, the S2b block as it then read). ADR 0041 holds how a provider's key is kept, and ADR 0025 what an `llm_call` row holds.
 
 Amended 15/10/2026 by the plan's U15, which built the decision shape on Workers AI. It added Cloudflare as a model provider and the window, key and threshold rules above, read from Cloudflare's Clef and Clef-flash model pages that day: windows of 65,536 and 24,576 tokens, a state that is truncated to fit, and no charge for output.
 

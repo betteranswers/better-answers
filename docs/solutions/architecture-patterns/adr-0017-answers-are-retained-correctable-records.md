@@ -39,7 +39,9 @@ An `Answer` concept is minted or updated only at a gate a person runs, the promo
 
 - An Editor's *Save as an Answer* waits as a suggestion of kind *promotion*.
 - The `Answer` collection's owner or an Admin decides it one at a time, never in bulk: update the existing, add as new, or decline.
+- The decider sees the proposed `Answer` beside the closest existing one, which one judging call labels same, variant or different, with any customer-specific wording to strip.
 - Accepting is one governed write with the decider as author. A trim makes the decider the generator.
+- An uncited answer may be promoted. It lands as `status: draft` with no sources, and stays out of new answers until its owner attaches evidence and moves it to stable.
 
 Control Centre is one area of eight groups: Overview, Suggestions, Sources, Models, Questions, People, Personal data and System. ADR 0047 lists each group's pages.
 
@@ -79,3 +81,5 @@ Edited 30/09/2026 with ADR 0047, after the archived record was frozen: Control C
 Amended 13/10/2026 on the owner's decisions of 11/10 and 12/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R29, with R19 to R21 and R37). The record holds what `ask` gave and no prose an assistant wrote. Feedback is stored on the record it names, a flag on an assistant's prose carries its sentence and concept, and a flag can be closed either way. A flag reaches nobody's queue until S5 builds the routing.
 
 Amended 13/10/2026 by the same plan's U4, which built the record's three tables (KTD8, with R19, R38 and R39). Who asked moved from the content to the skeleton, where the erasure routine rewrites it. The content is the question and drafted prose alone, and it leaves by dropping a month's partition, never by thinning rows. The trust a record keeps for a concept names no verifier.
+
+The judge's three labels and the uncited draft rule, both in the archived record, were missing from this doc until 20/10/2026, when the route's rewrite found S5 resting on them.

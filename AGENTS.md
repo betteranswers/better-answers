@@ -6,7 +6,7 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 
 ## Key Project Documentation
 
-- `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block. A block one owner can build in one session goes to `/poteto-mode`, as one pull request or a short stack. A block that needs more than one owner, or will outlast one session, is planned first (*Workflow*, below).
+- `docs/specs/v01-route.md` — the route: the status table of the blocks to v0.1 and the rules for picking and updating one. Each live block's brief is `docs/specs/route/<id>.md`. A product session opens the table first and takes the row marked next on its strand. A block one owner can build in one session goes to `/poteto-mode`, as one pull request or a short stack. A block that needs more than one owner, or will outlast one session, is planned first (*Workflow*, below).
 - `CONCEPTS.md` — the glossary. Name things in code, tests, docs and commits with its words. `docs/agents/domain.md` says more.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open, and where each lands here. Read it before adding a key, convention or feature that relates to the knowledge layer.
 - `CODING_STANDARDS.md` — the rules that bind every workspace and that no gate yet enforces. A directory's own rules live in its `AGENTS.md` (`apps/api/`, `apps/web/`, `apps/worker/`, `deploy/`, `packages/core/`, `packages/schema/`), which loads when work reaches it.
@@ -16,7 +16,7 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 
 - **plans**  live in `docs/plans/` — unified plan artifacts.
 - **Solutions** live in `docs/solutions/` — documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`). Relevant when implementing or debugging in documented areas.
-- **Specs** live in `docs/specs/` — target platform format specifications. `v01-route.md` is the route spec.
+- **Specs** live in `docs/specs/` — target platform format specifications. `v01-route.md` with `route/` is the route spec, and `v01-stories.md` holds the user stories a finished v0.1 satisfies.
 - **C4 architecture diagrams** live in `docs/architecture/` - context, containers, three component views, deployment and flows. They are a reading of the tree, which `/c4-architecture` redraws after any review that moves the shape. The README maps each route block to the containers and components it touches.
 
 ## Directory Layout

@@ -28,6 +28,7 @@ A write-up's prose (a guide section's Brief, a response) is stored as markdown. 
 - Footnote definitions are never stored. They are rendered from the include rows every time the prose is shown, exported or copied.
 - Rows own what is included and markers own placement. A save reconciles the two. A marker whose label has no include row is refused before a version is written. An include with no marker is allowed and shown "not placed". Deleting a marker never deletes its row.
 - Two footnote kinds share one syntax, and the page always says which. An OKF source footnote in a concept body is a citation mark. Its label is the `id` of an entry in the file's `sources`, matched ignoring case and surrounding whitespace. It resolves to the first such entry, whether or not the file defines it. A citation mark is never a link and never a map edge. A concept-body footnote whose label is no source id is a link when the file defines it, as OKF allows. An include marker in a write-up has no definition.
+- At the promotion gate, the include markers of a response become `sources[]` entries with body footnotes labelled by those ids when it mints an `Answer` concept. An include id never enters the bundle.
 
 There is one stored form, markdown, for write-ups and concept bodies alike. There is one renderer: a pure function in `packages/` from prose, include rows and trust state to markdown. It has two profiles, one with trust words as text tags for the labelled export and one with none for the clipboard.
 
@@ -58,3 +59,5 @@ The gate that treats uncited text as below threshold is the Editor's.
 ## History
 
 The full record, with its one amendment (ticket 79, applied by T-001, making roles levels): `docs/archive/adr/0015-compositions-cite-concepts-by-footnote.md`. S2a's plan made a concept body's source footnote a citation mark (`docs/plans/2026-10-09-1344-feat-s2a-search-and-concept-page-plan.md`, KTD5).
+
+The promotion-gate line, the archived amendment of ticket 37, was missing from this doc until 20/10/2026, when the route's rewrite found S5 resting on it.

@@ -302,7 +302,7 @@ The first customer is landed by this page on staging first and then on productio
 7. **Smoke and open:** `pnpm ops smoke --url <origin> --workspace <id> --find`; then, through the MCP surface as a member, one `find` for a question the bundle answers and one `open` of the concept it names, reading *Verified by <the verifier's name> · imported* under the answer.
 8. **Record the numbers** from the closing line — landed, skipped, checks, links, seconds — in the estate-size record, staging's beside production's.
 9. **Wipe staging** by the drill's own wipe (the procedure above); the `staging-wiped` ping is the proof, and the exception above ends with it.
-10. **Production:** steps 2 to 8 again on VPC 1 — the same two people, the same short name, the manifest's id unchanged. The numbers into the estate-size record are the first measurement of a real customer, and the route's C1 row says so.
+10. **Production:** steps 2 to 8 again on VPC 1 — the same two people, the same short name, the manifest's id unchanged. The numbers into the estate-size record are the first measurement of a real customer, and C1's brief says so.
 
 **Staging has no mail and no public hostname.** A rehearsal therefore runs steps 2 and 7 from inside the staging `api` container, against its loopback. The codes go to a mail catcher on the platform network. The display name is set by hand in staging's database, because the page that asks for it is not reachable. The MCP read runs the claude.ai assistant's OAuth flow to a bearer, then calls `/mcp`. Of the stores stack, only `objectstore` is started: `backup` would ship staging's rows to the off-host dumps, and the tunnel has nowhere to go. Production has both mail and a hostname, so its run follows the steps as written. On production the running Admin may be the operator's own address rather than one at the customer, and the verifier may be added by `add-person` rather than signed in. That is how the first customer landed.
 
@@ -423,7 +423,7 @@ A run whose judge answered nothing, as with a key the provider refuses, fails. T
 
 **The key.** It is sealed into the container's database as production seals a workspace's key, and is gone when the run ends and the container is removed. The reading never prints or logs it.
 
-**Recording the figures.** Copy each run's figures into S2b's entry on the route (`docs/specs/v01-route.md`), with the day, the rate and the commit the reading ran at.
+**Recording the figures.** Add each run's figures as a row under *The reuse reading* in `docs/operations/readings.md`, with the day, the rate and the commit the reading ran at.
 
 ## Read the decision models
 
@@ -451,7 +451,7 @@ A run that judged or scored nothing, as with a key the provider refuses, fails. 
 
 **What it costs.** Clef-flash costs $0.038 and Clef $0.24 per million tokens in, and neither charges for output. All the runs together send a few million tokens, well under £1. The reuse runs' workspaces each have a spending limit of £20. The entry step's calls are made outside any workspace, and the window of each call bounds them to about £3 in all.
 
-**Recording the figures.** Copy each run's figures into S2b's entry on the route, with the day, the rate and the commit. The owner then decides which threshold, if any, a decision model's judging would run at, and the route records which backend the first customer's workspace runs, and why.
+**Recording the figures.** Add each run's figures as a row under *The decision reading* in `docs/operations/readings.md`, with the day, the rate and the commit. The owner then decides which threshold, if any, a decision model's judging would run at, and S2b's brief records which backend the first customer's workspace runs, and why.
 
 ## Read a workspace's unmapped-passage rate
 

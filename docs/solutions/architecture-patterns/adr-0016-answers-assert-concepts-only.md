@@ -38,6 +38,8 @@ An answer asserts only what a concept states. It is found by traversal before an
 - A caller may name collections. The entry step, the walk and the judge then stay inside them. Unmapped passages are not narrowed, because a passage no concept rests on belongs to no collection.
 - Nothing withheld is counted, hinted at or explained anywhere.
 
+A question set is extracted as a suggestion and confirmed in a table before any answer is drafted. It is answered as a background job on the web, streamed per question, with unanswered questions first, and goes out as a response-set document through the one renderer, recorded as one `usage` row per response and never as an export. The MCP `ask` entry links to it and does not run it. A `.docx` with real footnotes is beyond v0.1.
+
 An answer is served as one answer contract for the UI, MCP and the response record. The contract is an event stream, verdict first, that one pure function folds into one object. The verdict is ok, related, warn or refuse for the caller's role. It is ok when at least one `Answer` is a judged fit, and related when concepts bear on the question and none is. Nothing in v0.1 produces warn. The object says how its judge stood: *not judged*, *judged* or *judging failed*. MCP returns the object alone. On the web the stream opens with its phase, the object follows before any prose, and drafted sentences follow it. A refusal ends the stream with no prose.
 
 A concept's collection, `ask`'s `collections` argument, the narrowing of the walk, the *related knowledge* verdict and the judge are in the tree. Where a workspace has no judging model choice or no spending limit, no model is called: every answer says *not judged*, and every `Answer` among its concepts is related knowledge.
@@ -86,3 +88,5 @@ Amended 13/10/2026 on the owner's decisions of 11/10 and 12/10/2026, by the S2b 
 Amended 13/10/2026 by the same plan (KTD4). A walk that passed its timeout had no stated outcome. It now counts as the map unavailable: the answer stands on its entry points and says so.
 
 Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-168 (`docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md`). The concept index searches each concept's `description` at weight B, and an entry point ranks by a rarity weight over the rows the reader may read, not by how many of the question's words it holds.
+
+The question-set paragraph, the archived consequence and its amendment of 27/08/2026, was missing from this doc until 20/10/2026, when the route's rewrite found S6 resting on it.
