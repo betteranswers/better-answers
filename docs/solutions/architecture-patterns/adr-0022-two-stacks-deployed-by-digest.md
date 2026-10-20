@@ -31,7 +31,11 @@ Production runs on VPC 1 as a Coolify Postgres resource and two Compose stacks:
 - `stores` (`deploy/stores.compose.yaml`), redeployed only for a store's upgrade.
 - `platform` (`deploy/platform.compose.yaml`: `migrate` → `api` → `worker`), redeployed on every release.
 
-Every stateful service is a bind mount under `/data/<service>`. Garage is the object store, provisioned by `deploy/wizard-41.sh`. Every image deploys by digest, and the backup image is the third. Every release that held is an annotated `release/*` tag, never a commit to `main`. A release holds once its smoke has passed. Every call to the orchestrator must answer 2xx. Migrations are forward-only, and a rollback is the previous digest. That decision lives here alone.
+Every stateful service is a bind mount under `/data/<service>`. Garage is the object store, provisioned by `deploy/wizard-41.sh`. It runs as one node with no versioning and no lock, and its region is fixed as `garage`. Immutability lives in the off-host buckets. Every image deploys by digest, and the backup image is the third. A compose file refuses to start a service without its image digest. Renovate pins images and actions by digest, ignores `lifts/**`, and never merges on its own.
+
+`depends_on` inside a stack is a convenience. The safety is the worker's own check, which claims nothing while a deploy stamp differs from its own.
+
+Every release that held is an annotated `release/*` tag, never a commit to `main`. A release holds once its smoke has passed. Every call to the orchestrator must answer 2xx. Migrations are forward-only, and a rollback is the previous digest. That decision lives here alone.
 
 One variable, `RELEASE_MODE`, phases the releases:
 
@@ -51,8 +55,14 @@ Every irreplaceable byte is encrypted and copied off-host:
 - Each workspace's git store is bundled and mirrored to VPC 2.
 - Every job pings a hosted dead-man's switch only once its upload is verified.
 - The backup identity is resident on VPC 2 as well as escrowed with two holders.
+- Escrow holds the orchestrator's `APP_KEY` and SSH keys, the envelope key, the backup `age` identity, the bucket admin credential, the tunnel token, the registry pull token, the mirror deploy key and every account's recovery codes.
+- The buckets, the escrow with its second holder, the dead-man checks and one restore drill all come before the first customer's data reaches the box.
 
-Every restore replays the erasures completed after its dump, once all three stores are back and before `api` starts. The replay runs on `api`, the one service carrying both stores' settings. `deploy/restore-production.sh` has no exit trap. It empties and refills the database in one transaction once the dump has been read whole, and wipes no other store. The monthly drill on VPC 2 (`deploy/restore-drill.sh`) reads production over SSH and ends by wiping staging.
+Every restore replays the erasures completed after its dump, once all three stores are back and before `api` starts. The replay runs on `api`, the one service carrying both stores' settings. `deploy/restore-production.sh` has no exit trap. It empties and refills the database in one transaction once the dump has been read whole, and wipes no other store. It refuses to restore the git store over live repositories.
+
+The monthly drill on VPC 2 (`deploy/restore-drill.sh`) wipes staging at its start and at its end. Its smoke runs `find`, a guide read and `ask` against restored staging. The drill writes its one `backup` row to production over SSH, not to staging, because staging is wiped minutes later. Production has no `backup` table yet, so the drill reports the row as not written.
+
+A release that held is recorded as a `release` audit event as well as its tag. No such action exists yet, so the tag is the only record today.
 
 The edge is one tunnel and three hostnames. `app.` is open, and Better Auth is its sign-in. The tunnel's ingress rules are the first fence, and the api's own hostname list (`apps/api/src/ingress/hostnames.ts`) is the second. The `pnpm ops` commands answer done · refused · not built. The ops documents live in `docs/operations/`.
 
@@ -74,9 +84,11 @@ The edge is one tunnel and three hostnames. `app.` is open, and Better Auth is i
 
 - One compose stack for everything: an outage per release.
 - Every store its own Coolify resource: more resources to keep in step.
-- A compliance-mode lock for twelve months: "we cannot" reads as failure to design for erasure, and a scripting mistake is unfixable.
+- A compliance-mode lock for twelve months: "we cannot" reads as failure to design for erasure, and a scripting mistake is unfixable. It returns only on a lawyer's say-so.
 - WAL archiving from day one: a second process with its own failure modes, until the database passes 5 GB or a contract asks for an RPO under an hour.
 - SeaweedFS as the object store: several daemons even in one process.
+- MinIO pinned to its last image: an unpatched CVE.
+- Forgejo Actions, or a self-hosted runner, from day one: a second CI on the restore target.
 - Access service tokens at the edge: a second credential class, kept as the day-two kill switch.
 - A self-hosted dead-man's switch on VPC 2: it cannot report its own outage.
 - SOPS in the repository: one more tool, and Coolify still needs the values pasted.
@@ -88,3 +100,7 @@ The edge is one tunnel and three hostnames. `app.` is open, and Better Auth is i
 The full record, with its thirteen amendments (among them T-005, T-022, T-030, T-039, T-045, T-119, T-125, T-184 and T-358): `docs/archive/adr/0022-two-stacks-deployed-by-digest.md`.
 
 Amended 19/10/2026 on the owner's ruling of 19/10/2026, by BA-204. The signed-in production journeys, the `JOURNEYS_MODE` variable that staged them, the `rejected/` tag and the test inbox they read are retired until go-live. A release holds on its smoke alone, and the nightly gate walks back to the last `release/*` tag. Git history keeps the journeys for the go-live rebuild.
+
+Later decisions overturned two rules of the archived record. The code lived in a private repository until ADR 0027 made it public. The Postgres resource ran the platform's own AGE and pgvector image until ADR 0032 moved the map to plain tables on the official pgvector image.
+
+These rules of the record were missing from this doc until 20/10/2026 (BA-215): Garage's one node, the compose file's refusal without a digest, Renovate's three rules, `depends_on` and the worker's stamp check, the escrow list, what precedes the first customer's data, the git store's refusal, the drill's two wipes, its smoke and its production row, and the `release` audit event. The same reading found that the drill reads nothing from production. It writes its row there, so this doc no longer says the drill reads production over SSH.
