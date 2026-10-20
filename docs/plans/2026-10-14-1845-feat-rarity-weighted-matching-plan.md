@@ -105,7 +105,7 @@ The gain is modest, as the owner expected: the buyer-worded set at ten rises 5.2
 
 - `docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, the *Scope Boundaries* line that rules BM25 out: it now says the owner lifted it on 14/10/2026 and names this plan.
 - `docs/specs/v01-route.md`: S2a's line *A search matches on any of its words*, and S2b's owner's lines naming *S2a's matching rule*, each say the ranking is BA-168's; a new paragraph in S2b records the rule and the figures above.
-- `docs/solutions/architecture-patterns/adr-0018-one-mcp-surface-five-entries.md`, the bullet *The two arms share no score*: each arm now ranks first by the rarity weight, then by full-text rank. Its strong-before-passages rule is unchanged.
+- `docs/solutions/architecture-patterns/adr-0018-one-mcp-surface-grown-by-scope.md`, the bullet *The two arms share no score*: each arm now ranks first by the rarity weight, then by full-text rank. Its strong-before-passages rule is unchanged.
 
 ### Risks
 
@@ -147,7 +147,7 @@ The gain is modest, as the owner expected: the buyer-worded set at ten rises 5.2
 
 - **Goal:** R6, and the docs this overrides.
 - **Requirements:** R6.
-- **Files:** `packages/core/src/answering/cursor.ts`, `packages/core/src/answering/index.ts`, `packages/core/test/find-matching.test.ts`, `packages/core/test/answering.test.ts`, `packages/core/test/concept-plans.test.ts`, `packages/core/test/passage-plans.test.ts`, `docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, `docs/specs/v01-route.md`, `docs/solutions/architecture-patterns/adr-0018-one-mcp-surface-five-entries.md`.
+- **Files:** `packages/core/src/answering/cursor.ts`, `packages/core/src/answering/index.ts`, `packages/core/test/find-matching.test.ts`, `packages/core/test/answering.test.ts`, `packages/core/test/concept-plans.test.ts`, `packages/core/test/passage-plans.test.ts`, `docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, `docs/specs/v01-route.md`, `docs/solutions/architecture-patterns/adr-0018-one-mcp-surface-grown-by-scope.md`.
 - **Approach:** KTD3. Re-encode the base64 cursors the tests hold.
 - **Test scenarios:**
   - A page's cursor names the run, the row's weight (`ln 2.4` for the case built), its density and its key.

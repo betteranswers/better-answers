@@ -16,7 +16,7 @@ execution: code
 - **Objective:** Whoever writes S3's concept actions cannot ship a face that admits nobody, and cannot be handed an Admin by the type checker where the action admitted a lower role.
 - **Means:** The kernel types an admitted person by the lowest role its declaration can name (KTD1). Every face that takes a person declares what it admits, and a check over each face names one that does not (KTD3, KTD5).
 - **Issues:** BA-141 and BA-142, landed as one pull request. Both follow BA-84 (#691).
-- **Authority:** The two issues' acceptance criteria, then `docs/solutions/architecture-patterns/adr-0043-what-an-act-is.md`, then the root `CODING_STANDARDS.md`. This plan decides how.
+- **Authority:** The two issues' acceptance criteria, then `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`, then the root `CODING_STANDARDS.md`. This plan decides how.
 - **Execution profile:** One branch, `liam/ba-141-admission-typing-and-lint`, in its own worktree. The units land in order, and each leaves the tree compiling.
 - **Stop conditions:** Stop and report if a face test has to change a run-time expectation, if a `refuses` list needs a word the catalogue lacks, or if declaring `ask` needs any change beyond its declaration, its admission and its refusal type.
 - **Who ships:** The implementing agent opens the pull request. The lead queues the merge.
@@ -58,7 +58,7 @@ The lint `action-admits-before-await` holds the order of admission, and holds th
 
 **Records**
 
-- R11. `adr-0043-what-an-act-is.md` says which faces declare and what holds it, in the commit that adds the check, with a History entry. The root `CODING_STANDARDS.md` says the same in its admission rule.
+- R11. `adr-0043-what-an-action-is.md` says which faces declare and what holds it, in the commit that adds the check, with a History entry. The root `CODING_STANDARDS.md` says the same in its admission rule.
 
 ### Acceptance Examples
 
@@ -234,7 +234,7 @@ No other test changes an expectation. A type annotation in a test that spells a 
 - **Goal:** R11.
 - **Requirements:** R11.
 - **Dependencies:** U4.
-- **Files:** `docs/solutions/architecture-patterns/adr-0043-what-an-act-is.md`, `CODING_STANDARDS.md`.
+- **Files:** `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`, `CODING_STANDARDS.md`.
 - **Approach:** This unit's edits are committed with U4's, the commit that completes the check (R11). The decision doc's action bullets gain the rule and the test that holds it, and its History gains an entry for this plan. The standards' admission rule gains one sentence.
 - **Test expectation:** none -- prose only. `pnpm check:docs` holds the words.
 - **Verification:** `pnpm check:docs` passes.

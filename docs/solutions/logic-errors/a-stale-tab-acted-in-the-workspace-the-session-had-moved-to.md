@@ -93,5 +93,5 @@ A tab loaded before the release sends no header. The api refuses its actions, an
 
 - `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md` covers the switch made in the same tab: which cache verb reaches a mounted observer, and why an awaited refetch is no proof of a fresh answer. Its file addresses predate this work. The member read and its re-read now live in `apps/web/src/shared/member.ts`, and `memberChanged` replaces `rereadMember`.
 - `docs/solutions/logic-errors/a-second-mutate-drops-the-first-actions-callbacks.md` is why the refused tab's step is wired at the listener and in each mutation's own options, never in a per-call callback.
-- `docs/solutions/architecture-patterns/adr-0043-what-an-act-is.md` records the transport word and the roads' comparison.
+- `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md` records the transport word and the roads' comparison.
 - On BA-149: the header is read when the request is sent, not when the person pressed, which leaves a gap of milliseconds. The consent page, a Hono route this check does not reach, now carries the workspace it was drawn for and refuses a grant naming another (#731). A refusal that lands while a follow is under way joins it (`followedOnce` in `apps/web/src/features/auth/switched-elsewhere.ts`).

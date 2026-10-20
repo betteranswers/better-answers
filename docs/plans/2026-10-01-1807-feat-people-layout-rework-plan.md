@@ -236,7 +236,7 @@ This plan covers P1's People layout rework. The breakdown below is the current u
 - `docs/archive/specs/T-027.md`: which Arena blocks were ported and which were not.
 - ADR 0038, in `docs/solutions/architecture-patterns/`: the one-role model, the concepts not adopted, and the append-only audit log.
 - `docs/solutions/architecture-patterns/adr-0033-ui-kit-is-tailwind-v4.md`: the three registries, and why Kibo's table was rejected.
-- `docs/solutions/architecture-patterns/adr-0043-what-an-act-is.md`: admission before the first await, and classed refusal words.
+- `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`: admission before the first await, and classed refusal words.
 - `docs/solutions/architecture-patterns/adr-0035-one-id-per-person.md`: the `human:<person id>` actor, and acts named by family.
 - `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`: People's screens, the Audit log under System, and the one navigation list.
 - `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-membership-after-failed-reread.md`: query keys that must drop on a workspace switch.
@@ -480,7 +480,7 @@ flowchart TB
 - `apps/api/src/mcp/crossing.ts`
 - `apps/web/src/shared/api/trpc.ts`
 - `apps/web/src/shared/refusal-outcome.tsx`
-- `docs/solutions/architecture-patterns/adr-0043-what-an-act-is.md`
+- `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`
 - Tests: `apps/api/tests/trpc-roads.test.ts`, `apps/api/tests/procedure-output.test.ts`, `apps/web/test/refusal-outcome.test.tsx`, `packages/core/test/refusal-words.test.ts`
 
 **Approach:**

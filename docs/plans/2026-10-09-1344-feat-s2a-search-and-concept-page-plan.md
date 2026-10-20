@@ -352,7 +352,7 @@ flowchart LR
 - **Goal:** the route spec, the glossary and the decision docs say what this plan changed.
 - **Requirements:** R8; KTD1, KTD3, KTD6.
 - **Dependencies:** none.
-- **Files:** `docs/specs/v01-route.md`, `CONCEPTS.md`, `docs/solutions/architecture-patterns/adr-0016-answers-assert-concepts-only.md`, `docs/solutions/architecture-patterns/adr-0018-one-mcp-surface-five-entries.md`.
+- **Files:** `docs/specs/v01-route.md`, `CONCEPTS.md`, `docs/solutions/architecture-patterns/adr-0016-answers-assert-concepts-only.md`, `docs/solutions/architecture-patterns/adr-0018-one-mcp-surface-grown-by-scope.md`.
 - **Approach:**
   1. In the route spec, S2a and S2b each get a dated *Owner's lines (09/10/2026)* paragraph, the same shape as *BA-35's lines*. S2a's names the recall measure's move (R3 to R6), the owner-only production reading (R2), the design-system package edge (R7) and any-word matching (R9). S2b's says its recall must-carry is now S2a's measure, reused (R6). Both status rows name this plan.
   2. `CONCEPTS.md`'s *Also known as* entry gains the line form (KTD1). Its *evidence pane* entry is made to agree with the route: an unreadable source is listed in the file's words with no link (KTD6).
@@ -368,7 +368,7 @@ flowchart LR
 - **Dependencies:** WP2 (BA-77), whose `ConceptIri` brand this module carries.
 - **Files:**
   - Create: `packages/schema/src/concept-file.ts`, `packages/schema/test/concept-file.test.ts`, `contracts/links/cases.json`, `packages/core/test/links.contract.test.ts`, `apps/worker/tests/test_links_contract.py`.
-  - Modify: `packages/schema/package.json` (the `./concept-file` subpath), `packages/schema/src/concept-tables.ts` (`IRI`, `conceptIriOf` and `CitedSource` move out and are re-exported), `packages/core/src/store/map/index.ts`, `apps/worker/src/better_answers_worker/links.py`, `contracts/manifest.json`, `packages/core/test/tier-contract.test.ts`, `apps/worker/tests/test_tier_contract.py`, both contract stamps, `docs/solutions/architecture-patterns/adr-0015-compositions-cite-concepts-by-footnote.md`, `docs/solutions/architecture-patterns/adr-0031-tier-contract-is-six-agreements.md`.
+  - Modify: `packages/schema/package.json` (the `./concept-file` subpath), `packages/schema/src/concept-tables.ts` (`IRI`, `conceptIriOf` and `CitedSource` move out and are re-exported), `packages/core/src/store/map/index.ts`, `apps/worker/src/better_answers_worker/links.py`, `contracts/manifest.json`, `packages/core/test/tier-contract.test.ts`, `apps/worker/tests/test_tier_contract.py`, both contract stamps, `docs/solutions/architecture-patterns/adr-0015-compositions-cite-concepts-by-footnote.md`, `docs/solutions/architecture-patterns/adr-0031-tier-contract-is-a-list-of-agreements.md`.
 - **Approach:**
   1. Write the module pure, with no drizzle import. The web will import it.
   2. Teach `resolveOutgoing` and `outgoing_edges` the KTD5 rules through the shared fixture, not through each other.

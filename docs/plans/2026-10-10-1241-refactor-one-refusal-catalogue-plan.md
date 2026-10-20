@@ -145,7 +145,7 @@ The first two and `no-such-repository` are asserted. `ce-work` confirms that no 
   - Modify: `packages/core/package.json` (the `./refusals` export), `packages/core/src/kernel/refusal.ts`, `packages/core/src/kernel/index.ts`, `packages/core/src/kernel/vocabulary.ts`, and the `vocabulary.ts` of `concepts`, `erasure`, `members`, `runs`, `sources` and `workspaces`
   - Modify: `packages/devtools/lint-rules/rules/import-direction.ts`
   - Modify: `apps/api/src/refusal.ts`, `apps/api/tests/kept-names.ts`
-  - Modify: `docs/solutions/architecture-patterns/adr-0043-what-an-act-is.md`, `docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md`, `docs/architecture/c4-components-core.md`
+  - Modify: `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`, `docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md`, `docs/architecture/c4-components-core.md`
   - Test: `packages/core/test/refusal-words.test.ts`, `packages/core/test/admission.test.ts`, `packages/core/test/import-direction.test.ts`
 - **Approach:** write the catalogue and the kernel function first and run core's check, to confirm `import-direction` is the only gate the new module trips before changing the rule. The test's hand-kept table stays word for word, as the proof that no class or owner moved. Its type `EveryRegisteredWord` is read from the catalogue's type, so a union word the catalogue lacks fails typecheck as well as the walk.
 - **Patterns to follow:** `EXIT_OF_CLASS` in `apps/api/src/ops/index.ts` for `as const satisfies`; `ZONES` in the rule for a zone's `reaches` and clause.
@@ -182,7 +182,7 @@ The first two and `no-such-repository` are asserted. `ce-work` confirms that no 
 - **Dependencies:** U1.
 - **Files:**
   - Modify: `apps/api/src/ops/index.ts`
-  - Modify: `docs/solutions/architecture-patterns/adr-0043-what-an-act-is.md` (the `pnpm ops` bullet)
+  - Modify: `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md` (the `pnpm ops` bullet)
   - Test: `apps/api/tests/ops.test.ts`
 - **Approach:** read `docs/agents/mutation-triage.md` first, since a mutation report names `ops/index.ts`. The sentence each word prints does not change.
 - **Test scenarios:**

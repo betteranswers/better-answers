@@ -93,7 +93,7 @@ The timing is the cost. `route.fetch()` waits for the whole body, so the page se
 ## Related Issues
 
 - `docs/solutions/architecture-patterns/adr-0037-reader-screen-latency-budget.md`: answers stream, with the first sentence first, which is why `ask.question` takes the streaming link.
-- `docs/solutions/architecture-patterns/adr-0043-what-an-act-is.md`: a streamed answer sends its status before any call settles, so a ceiling met inside it arrives in a body that answered 200. The spending limit's refusal follows the stream's first event, so it arrives the same way. That is a second reason `refusalAnswering` does not fit it.
+- `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`: a streamed answer sends its status before any call settles, so a ceiling met inside it arrives in a body that answered 200. The spending limit's refusal follows the stream's first event, so it arrives the same way. That is a second reason `refusalAnswering` does not fit it.
 - `docs/solutions/architecture-patterns/adr-0016-answers-assert-concepts-only.md`: a refusal ends the stream with no prose, which is why the buffered read ends promptly.
 - `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md`: the same `route.fetch()` and `route.fulfill` pair, used there to let a call land and then take the page offline, not to read its body.
 - `.claude/skills/browser-suite/SKILL.md`: a spec reads the api's answer before `saysARefusal`.
