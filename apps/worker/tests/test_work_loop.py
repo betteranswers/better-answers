@@ -1,6 +1,5 @@
 import contextlib
 import json
-import os
 import subprocess
 import sys
 import threading
@@ -1031,12 +1030,13 @@ import sys
 from better_answers_worker import loop, queue
 from better_answers_worker.config import read_bootstrap
 
-with queue.connected(sys.argv[1]) as connection:
+bootstrap = read_bootstrap()
+with queue.connected(bootstrap.database_url) as connection:
     loop.tick(
         connection,
-        read_bootstrap(),
+        bootstrap,
         heartbeat_every_seconds=0.05,
-        deadline_seconds=float(sys.argv[2]),
+        deadline_seconds=float(sys.argv[1]),
     )
 """
 
@@ -1047,11 +1047,10 @@ def a_worker_hung_on_its_audit(
     *,
     deadline_seconds: float = 0.3,
     while_hung: Callable[[], object] = lambda: None,
-) -> tuple[str, str]:
+) -> tuple[list[dict[str, Any]], str]:
     bootstrap = bootstrap_for(database, tmp_path)
     store = bootstrap.object_store
     environment = {
-        **os.environ,
         "DATABASE_URL": bootstrap.database_url,
         "GIT_STORE_DIR": bootstrap.git_store_dir,
         "LMDB_DIR": bootstrap.engine.lmdb_dir,
@@ -1065,13 +1064,7 @@ def a_worker_hung_on_its_audit(
     with queue.connected(bootstrap.database_url) as locking, locking.transaction():
         locking.execute("LOCK TABLE concept_index IN ACCESS EXCLUSIVE MODE")
         with subprocess.Popen(
-            [
-                sys.executable,
-                "-c",
-                A_WORKER_RUN,
-                bootstrap.database_url,
-                str(deadline_seconds),
-            ],
+            [sys.executable, "-c", A_WORKER_RUN, str(deadline_seconds)],
             env=environment,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -1083,11 +1076,7 @@ def a_worker_hung_on_its_audit(
             finally:
                 worker.kill()
     assert worker.returncode == queue.OUTLIVED_ITS_DEADLINE, stderr
-    return stdout, stderr
-
-
-def events_of(stdout: str) -> list[dict[str, Any]]:
-    return [json.loads(line) for line in stdout.splitlines()]
+    return [json.loads(line) for line in stdout.splitlines()], stderr
 
 
 def test_a_job_past_its_deadline_ends_the_worker_process(
@@ -1095,13 +1084,12 @@ def test_a_job_past_its_deadline_ends_the_worker_process(
 ) -> None:
     workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
 
-    stdout, stderr = a_worker_hung_on_its_audit(database, tmp_path)
+    written, stderr = a_worker_hung_on_its_audit(database, tmp_path)
 
     with scoped(database, workspace) as cursor:
         reclaimed = queue.claim(cursor, workspace, WORKER, ["nightly-audit"])
     assert reclaimed is not None, "the lease outlived the worker process"
     assert reclaimed.attempts == 2
-    written = events_of(stdout)
     events = [line["event"] for line in written]
     assert not {"job finished", "job failed", "the claim was lost"} & set(events)
     assert (events[-1], written[-1]["job_id"]) == (
@@ -1149,9 +1137,9 @@ def test_a_lost_claim_still_ends_the_worker_at_its_deadline(
 
             assert _within(10, taken), "the worker never claimed its job"
 
-    stdout, _ = a_worker_hung_on_its_audit(
+    written, _ = a_worker_hung_on_its_audit(
         database, tmp_path, deadline_seconds=2.0, while_hung=take_the_claim
     )
 
-    events = [line["event"] for line in events_of(stdout)]
+    events = [line["event"] for line in written]
     assert events[-2:] == ["the claim was lost", "the job outlived its deadline"]
