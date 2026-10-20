@@ -1306,6 +1306,21 @@ def test_the_runtime_stage_copies_the_source_last() -> None:
     }
 
 
+def test_the_build_stage_makes_the_venv_before_copying_a_module() -> None:
+    build = DOCKERFILE.read_text("utf-8").partition("\nFROM interpreter AS build\n")[2]
+    steps = build.partition("\nFROM ")[0].splitlines()
+    install = steps.index("RUN uv sync --frozen --no-dev")
+    modules = [
+        index
+        for index, step in enumerate(steps)
+        if step.startswith("COPY src/")
+        and not step.startswith("COPY src/better_answers_worker/__init__.py ")
+    ]
+
+    assert modules != []
+    assert install < min(modules)
+
+
 def test_the_image_redacts_the_fixture_offline_and_fetches_nothing(
     image: str,
 ) -> None:
