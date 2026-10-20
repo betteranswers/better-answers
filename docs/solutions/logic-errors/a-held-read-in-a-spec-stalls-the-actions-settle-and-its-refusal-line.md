@@ -1,5 +1,5 @@
 ---
-title: "A read held for good in a spec stalled the act's settle, and its refusal line never came"
+title: "A read held for good in a spec stalled the action's settle, and its refusal line never came"
 date: 2026-10-15
 category: logic-errors
 module: apps/web
@@ -28,11 +28,11 @@ tags:
 retire_when: "a released @tanstack/query-core dispatches a mutation's error state to its observers before awaiting the options-level onSettled; check Mutation.execute in the query-core source"
 ---
 
-# A read held for good in a spec stalled the act's settle, and its refusal line never came
+# A read held for good in a spec stalled the action's settle, and its refusal line never came
 
 ## Problem
 
-A browser scenario wanted to prove that an optimistic removal is undone by the act's own rollback, not by the read that follows a refusal. It held the list's read with a `page.route` that never answered. The row came back as expected, but the refusal line the page writes from the act's per-call `onError` never appeared, and the scenario failed twice in the merge queue on PR #760 with "the alert says nothing". Library lines below are from the installed package `@tanstack/query-core` 5.104.1, its Mutation class (a dependency, not a tracked file), and hold for that version only.
+A browser scenario wanted to prove that an optimistic removal is undone by the action's own rollback, not by the read that follows a refusal. It held the list's read with a `page.route` that never answered. The row came back as expected, but the refusal line the page writes from the action's per-call `onError` never appeared, and the scenario failed twice in the merge queue on PR #760 with "the alert says nothing". Library lines below are from the installed package `@tanstack/query-core` 5.104.1, its Mutation class (a dependency, not a tracked file), and hold for that version only.
 
 ## Symptoms
 
@@ -75,11 +75,11 @@ Both holders are one helper, `heldUntilReleased(page, procedure, answer)`, which
 
 ## Why This Works
 
-Asserting the row's return before the read is released proves the undo alone restored it, because the only other path that could, the refetch, has not answered yet. Releasing the read then lets `invalidateQueries` resolve, the settle finish, the error state reach the observer, and the per-call `onError` write the line. The product was never wrong: a read that answers eventually, as every real one does, settles the act.
+Asserting the row's return before the read is released proves the undo alone restored it, because the only other path that could, the refetch, has not answered yet. Releasing the read then lets `invalidateQueries` resolve, the settle finish, the error state reach the observer, and the per-call `onError` write the line. The product was never wrong: a read that answers eventually, as every real one does, settles the action.
 
 ## Prevention
 
-- In a spec, never hold a read for good when an act's `onSettled` invalidates it. Hold it until a returned call, assert the optimistic effect, release, then assert what the settle produces.
+- In a spec, never hold a read for good when an action's `onSettled` invalidates it. Hold it until a returned call, assert the optimistic effect, release, then assert what the settle produces.
 - When a per-call `mutate()` callback seems not to run while the mutation-level one did, check first whether the mutation has settled; the per-call callbacks wait on the mutation's own `onSettled`.
 
 ## Related Issues
