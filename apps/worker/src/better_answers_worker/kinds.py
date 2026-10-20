@@ -5,7 +5,7 @@ from . import queue
 from .audit import run_audit
 from .config import Bootstrap
 from .pipeline import Sync, index_connected_source
-from .rebuild import run_rebuild
+from .rebuild import analyse_map, run_rebuild
 
 type Handler = Callable[[Bootstrap, queue.ClaimedJob], dict[str, Any]]
 
@@ -19,11 +19,11 @@ def nightly_audit(bootstrap: Bootstrap, job: queue.ClaimedJob) -> dict[str, Any]
 
 
 def full_rebuild(bootstrap: Bootstrap, job: queue.ClaimedJob) -> dict[str, Any]:
-    with (
-        queue.connected(bootstrap.database_url) as connection,
-        queue.scoped(connection, job.workspace_id) as cursor,
-    ):
-        return run_rebuild(cursor, bootstrap.git_store_dir, job.workspace_id).as_row()
+    with queue.connected(bootstrap.database_url) as connection:
+        with queue.scoped(connection, job.workspace_id) as cursor:
+            outcome = run_rebuild(cursor, bootstrap.git_store_dir, job.workspace_id)
+        analyse_map(connection, job.workspace_id)
+        return outcome.as_row()
 
 
 def sync(bootstrap: Bootstrap, job: queue.ClaimedJob) -> dict[str, Any]:

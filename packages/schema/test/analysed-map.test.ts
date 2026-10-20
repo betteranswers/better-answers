@@ -78,7 +78,17 @@ describe("analysing the map for the planner", () => {
     });
   });
 
-  it("asks autovacuum to count the tables at one percent", async () => {
+  it("pins its search path and lock wait, with no arguments", async () => {
+    const read = await db().pool.query<{ args: number; settings: readonly string[] }>(
+      `SELECT pronargs AS args, proconfig AS settings FROM pg_proc
+        WHERE pronamespace = 'public'::regnamespace AND proname = 'analyse_map'`,
+    );
+    expect(read.rows).toEqual([
+      { args: 0, settings: ["search_path=pg_catalog, pg_temp", "lock_timeout=5s"] },
+    ]);
+  });
+
+  it("asks autovacuum to analyse the tables at one percent", async () => {
     const read = await db().pool.query<{ table: string; options: readonly string[] }>(
       `SELECT relname AS "table", reloptions AS options FROM pg_class
         WHERE relnamespace = 'public'::regnamespace AND relname = ANY($1::text[])

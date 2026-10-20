@@ -778,6 +778,18 @@ export type BundleImported = ImportProgress & {
   readonly dryRun: boolean;
 };
 
+export type MapNotAnalysedLine = {
+  readonly workspace_id: string;
+  readonly bundle_id: string;
+  readonly error: string;
+};
+
+export type ImportLog = {
+  readonly warn: (line: MapNotAnalysedLine, message: string) => void;
+};
+
+type ImportDoors = WriteDoors & { readonly log: ImportLog };
+
 const importBundleAction = declareAction({
   admits: BUNDLE_WRITERS,
   input: z.custom<ImportBundleInput>(),
@@ -1091,7 +1103,7 @@ const rewriteEach = async (
 
 const runImport = async (
   principal: UserPrincipal,
-  doors: WriteDoors,
+  doors: ImportDoors,
   opened: OpenedImport,
   sensitivity: Sensitivity,
 ): Promise<Result<BundleImported, ImportBundleRefusal | Error>> => {
@@ -1108,7 +1120,16 @@ const runImport = async (
     ? await rewriteEach(principal, doors, run, landing.value)
     : err(landing.error);
   const analysed = await attempt(() => analyseMap(doors.postgres.pool));
-  if (!analysed.ok) return err(analysed.error);
+  if (!analysed.ok) {
+    doors.log.warn(
+      {
+        workspace_id: principal.workspaceId,
+        bundle_id: opened.manifest.id,
+        error: analysed.error.message,
+      },
+      "import-bundle: the map was left unanalysed, so the planner waits for autovacuum",
+    );
+  }
   if (!landing.ok) return err(landing.error);
   if (!rewritten.ok) return err(rewritten.error);
   return ok({
@@ -1123,7 +1144,7 @@ const runImport = async (
 
 export const importBundle = async (
   principal: UserPrincipal,
-  doors: WriteDoors,
+  doors: ImportDoors,
   input: ImportBundleInput,
 ): Promise<Result<BundleImported, ImportBundleRefusal | Error>> => {
   const admitted = admit(importBundleAction, principal, input);

@@ -1,7 +1,4 @@
 -- Custom migration (hand-written SQL; ADR 0032).
--- Each bulk writer of the map (the worker's rebuild, the api's import) counts the rows it wrote for
--- the planner through this function (BA-151); packages/schema/src/definer-reach.ts says why it is a
--- definer. The autovacuum floor below is for the rows no bulk writer counts.
 CREATE FUNCTION public.analyse_map() RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp

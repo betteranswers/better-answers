@@ -356,7 +356,6 @@ type IndexedPolicy = {
   readonly contentHash: string;
 };
 
-/** Lands every concept in two statements, for a map too wide to seed one row at a time. */
 export const policiesIndexedInBulk = async (
   client: Writer,
   landing: {

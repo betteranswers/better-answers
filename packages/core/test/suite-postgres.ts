@@ -183,11 +183,12 @@ export const holdingTable = async <T>(
   pool: pg.Pool,
   table: string,
   work: () => Promise<T>,
+  mode: "ACCESS EXCLUSIVE" | "SHARE UPDATE EXCLUSIVE" = "ACCESS EXCLUSIVE",
 ): Promise<T> => {
   const holder = await pool.connect();
   try {
     await holder.query("BEGIN");
-    await holder.query(`LOCK TABLE "${table}" IN ACCESS EXCLUSIVE MODE`);
+    await holder.query(`LOCK TABLE "${table}" IN ${mode} MODE`);
     return await work();
   } finally {
     await holder.query("COMMIT");
