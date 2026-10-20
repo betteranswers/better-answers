@@ -5,6 +5,7 @@ import {
   attempt,
   err,
   ok,
+  processActorId,
   type PlatformPrincipal,
   type PrincipalRefusal,
   type Result,
@@ -18,7 +19,7 @@ import {
 } from "../store/map/index.ts";
 import { withScope, type PostgresDoor } from "../store/postgres/index.ts";
 
-const MAP_ACTOR = "process:better-answers-graph";
+const MAP_ACTOR = processActorId("graph");
 
 export type MapMaintenancePrincipal = PlatformPrincipal & {
   readonly actorId: typeof MAP_ACTOR;

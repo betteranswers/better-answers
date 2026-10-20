@@ -16,6 +16,7 @@ import {
   declareAction,
   err,
   ok,
+  processActorId,
   refusalFor,
   requireFreshConfirmation,
   type RefusalOf,
@@ -140,7 +141,7 @@ export type { SignInMethod } from "../audit/index.ts";
 export const TOOLS_LIST_TTL_MS_DEFAULT = 300_000;
 export const TOOLS_LIST_TTL_CONFIG_KEY = "mcp.tools_list_ttl_ms";
 
-const BOOTSTRAP_ACTOR = "process:better-answers-bootstrap";
+const BOOTSTRAP_ACTOR = processActorId("bootstrap");
 
 export type BootstrapPrincipal = PlatformPrincipal & {
   readonly actorId: typeof BOOTSTRAP_ACTOR;

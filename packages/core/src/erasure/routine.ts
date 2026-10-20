@@ -10,6 +10,7 @@ import {
   attempt,
   err,
   ok,
+  processActorId,
   ulid,
   type Clock,
   type PlatformPrincipal,
@@ -38,7 +39,7 @@ import {
 import { monthsOn, type SubjectRequest } from "./requests.ts";
 import { addressesSuppressedFor, suppressInTheWorkspace, type Suppressed } from "./suppressions.ts";
 
-const ERASURE_ACTOR = "process:better-answers-erasure";
+const ERASURE_ACTOR = processActorId("erasure");
 
 const isTombstone = (address: string): boolean => address.endsWith(`@${ERASED_DOMAIN}`);
 

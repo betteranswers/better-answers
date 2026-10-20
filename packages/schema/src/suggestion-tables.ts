@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { check, foreignKey, index, jsonb, primaryKey, text } from "drizzle-orm/pg-core";
 
-import { ACTOR_ID_PATTERN, PLATFORM_ACTOR_PREFIX } from "./actor-id.ts";
+import { ACTOR_ID_PATTERN, PROCESS_PREFIX } from "./actor-id.ts";
 import { listed, stamp } from "./column-helpers.ts";
 import { conceptIdentity } from "./concept-tables.ts";
 import { withRLS } from "./with-rls.ts";
@@ -84,9 +84,7 @@ export const suggestion = withRLS(
 
     check(
       "suggestion_citation_fix_proposer_check",
-      sql.raw(
-        `kind <> '${SUGGESTION_CITATION_FIX_KIND}' OR proposer LIKE '${PLATFORM_ACTOR_PREFIX}%'`,
-      ),
+      sql.raw(`kind <> '${SUGGESTION_CITATION_FIX_KIND}' OR proposer LIKE '${PROCESS_PREFIX}%'`),
     ),
     check(
       "suggestion_reason_length_check",

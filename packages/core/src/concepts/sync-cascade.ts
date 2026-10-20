@@ -5,6 +5,7 @@ import {
   err,
   normalizeError,
   ok,
+  processActorId,
   ulid,
   type PlatformPrincipal,
   type Result,
@@ -21,7 +22,7 @@ import {
 import { workspaceIds } from "../workspaces/index.ts";
 import { cascadingVisibility } from "./visibility.ts";
 
-const SYNC_CASCADE_ACTOR = "process:better-answers-sync-cascade";
+const SYNC_CASCADE_ACTOR = processActorId("sync-cascade");
 
 export type SyncCascadePrincipal = PlatformPrincipal & {
   readonly actorId: typeof SYNC_CASCADE_ACTOR;

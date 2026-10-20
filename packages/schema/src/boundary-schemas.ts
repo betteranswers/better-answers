@@ -416,7 +416,7 @@ const sweepPassSelect = createSelectSchema(sweepPass, sweepPassRefinements);
 const sweepPassInsert = createInsertSchema(sweepPass, sweepPassRefinements);
 const sweepPassUpdate = createUpdateSchema(sweepPass, sweepPassRefinements);
 
-export { ACTOR_ID } from "./actor-id.ts";
+export { ACTOR_ID, PROCESS_PREFIX } from "./actor-id.ts";
 
 const detailEntry = z.record(z.string(), z.union([z.string(), z.null()]));
 
