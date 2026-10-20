@@ -97,13 +97,25 @@ const addressAtRest = (
     ? personSaid(by.displayName, by.address).address
     : undefined;
 
+type Detailing = {
+  readonly detailed: ReadonlySet<string>;
+  readonly onDetailed: (eventId: string, open: boolean) => void;
+};
+
 function EventLine(properties: {
   readonly event: ReadAuditEvent;
   readonly address: string | undefined;
+  readonly detailing: Detailing;
 }) {
-  const { event, address } = properties;
+  const { event, address, detailing } = properties;
   return (
-    <Collapsible className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3">
+    <Collapsible
+      open={detailing.detailed.has(event.id)}
+      onOpenChange={(open) => {
+        detailing.onDetailed(event.id, open);
+      }}
+      className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3"
+    >
       <span className="min-w-0 flex-1 wrap-anywhere">
         {sentenceOf(event)}
         {address === undefined ? null : (
@@ -164,6 +176,7 @@ function Events(properties: {
   readonly asked: Asked;
   readonly onClear: () => void;
   readonly searchRef: RefObject<HTMLInputElement | null>;
+  readonly detailing: Detailing;
 }) {
   const { auditLog, events } = properties;
   const landing = useLanding();
@@ -189,7 +202,13 @@ function Events(properties: {
       <EventDays
         events={events}
         landing={landing}
-        line={(event) => <EventLine event={event} address={addressAtRest(event.by, shared)} />}
+        line={(event) => (
+          <EventLine
+            event={event}
+            address={addressAtRest(event.by, shared)}
+            detailing={properties.detailing}
+          />
+        )}
       />
       <ListPages
         pages={{
@@ -269,6 +288,18 @@ function AuditLogRegion() {
     AUDIT_LOG_LIST,
     AUDIT_LOG_FIELDS,
   );
+  const [detailed, setDetailed] = useState<ReadonlySet<string>>(new Set());
+  const detailing: Detailing = {
+    detailed,
+    onDetailed: (eventId, open) => {
+      setDetailed((held) => {
+        const next = new Set(held);
+        if (open) next.add(eventId);
+        else next.delete(eventId);
+        return next;
+      });
+    },
+  };
   const asked: Asked = { family: state.family, search: state.search };
   const auditLog = useAuditLog(asked);
   const [outcome, setOutcome] = useState<Outcome>();
@@ -334,6 +365,7 @@ function AuditLogRegion() {
             asked={asked}
             onClear={clear}
             searchRef={searchRef}
+            detailing={detailing}
           />
         </ListRead>
       </Card>

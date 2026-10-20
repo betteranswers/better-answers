@@ -495,6 +495,23 @@ test.describe("the Knowledge Search page", () => {
     });
   }
 
+  test("opens the focused match by key, else says none is", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Nidd Annals", [conceptsSeeded]);
+    await searched(page, "forklift");
+    const listed = await saidNow(page);
+
+    await searchRegion(page).getByRole("heading", { name: "Search" }).focus();
+    await page.keyboard.press(KEY.open.key);
+    await expect(said(page), "the page says nothing of a key that opened nothing").not.toHaveText(
+      listed,
+    );
+    await expect(page).toHaveURL((url) => url.pathname === SEARCH.path);
+
+    await matchesOf(page).getByRole("link", { name: "Forklift Licences" }).focus();
+    await page.keyboard.press(KEY.open.key);
+    await expect(page.getByRole("heading", { level: 2, name: "Forklift Licences" })).toBeVisible();
+  });
+
   test("keeps the typed search for a concept opened before settling", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Nidd Records", [conceptsSeeded]);
     await searched(page, "audit");
@@ -810,6 +827,8 @@ test.describe("the Knowledge Search page", () => {
     await listsItsKeystrokes(page, "Search", KEY, [
       "Search This Workspace’s Knowledge",
       "Show More Matches",
+      "Open the Match in Focus",
+      "Close the Open Passage",
     ]);
 
     await page.keyboard.press(KEY.search.key);
@@ -825,6 +844,11 @@ test.describe("the Knowledge Search page", () => {
     const panel = passagePanel(page, HANDBOOK);
     await expect(panel.getByRole("heading", { name: HANDBOOK })).toBeFocused();
     await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+    await expect(opener).toBeFocused();
+    await page.keyboard.press(KEY.open.key);
+    await expect(panel.getByRole("heading", { name: HANDBOOK })).toBeFocused();
+    await page.keyboard.press(KEY.close.key);
     await expect(panel).toHaveCount(0);
     await expect(opener).toBeFocused();
 

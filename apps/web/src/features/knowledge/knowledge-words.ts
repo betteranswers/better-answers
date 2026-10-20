@@ -12,6 +12,7 @@ export const SEARCH_WORDS = {
       : `Showing matches for ${quoted(query)}.`,
   matches: "Matches",
   passageLeft: "The passage you had open is no longer listed.",
+  selectFirst: "Please select a match first.",
   more: "More Matches",
   document: "Document",
 } as const;
