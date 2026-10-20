@@ -102,6 +102,14 @@ const useSwitchedInAnotherTabSaid = (here: Here | undefined): Outcome | undefine
     : undefined;
 };
 
+const useSwitchesSeen = (now: string | undefined): number => {
+  const [seen, setSeen] = useState({ in: now, switches: 0 });
+  if (now !== undefined && now !== seen.in) {
+    setSeen({ in: now, switches: seen.switches + (leftFor(seen.in, now) ? 1 : 0) });
+  }
+  return seen.switches;
+};
+
 type SaidOn = { readonly failure: Error | null; readonly pathname: string | undefined };
 
 const useSignOutRefusedSaid = (failure: Error | null, pathname: string): Outcome | undefined => {
@@ -154,6 +162,7 @@ export function Frame(properties: {
   const open = placeAt(visible.areas, pathname);
   const region = useRegion(visible, pathname);
   const outcome = useBandOutcome(switching, leaving, here, pathname);
+  const switches = useSwitchesSeen(here?.workspaceId);
   useArrivalTakenOnceRead(visible);
 
   return (
@@ -211,7 +220,7 @@ export function Frame(properties: {
             <div className="flex min-w-0 flex-1 flex-col">
               <BreadcrumbLastPartSlot value={nameLastPart}>
                 <ToolbarAndPage
-                  key={here?.workspaceId}
+                  key={switches}
                   region={region}
                   picked={[pickedTab, pickTab]}
                   handed={properties.page}

@@ -11,9 +11,10 @@ import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 import { createAppClients, Providers, type AppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 import { createApiProxy, TRPC_ENDPOINT, useTRPC } from "@/shared/api/trpc.ts";
-import { memberOptions } from "@/shared/member.ts";
+import { memberOptions, NEEDS_A_PICK } from "@/shared/member.ts";
 
 import { addressOf, answered } from "./stubbed-api.ts";
+import { aRefusalAnswer } from "./two-workspaces.ts";
 
 afterEach(() => {
   cleanup();
@@ -68,20 +69,38 @@ describe("the query provider above the router", () => {
   });
 });
 
+type Session = {
+  in: string | undefined;
+  memberReads: number;
+  failing: boolean;
+  answered: Promise<void>;
+};
+
 const anApiHearingActions = () => {
   const named: (string | null)[] = [];
-  const session = { in: "w" };
+  const session: Session = {
+    in: "w",
+    memberReads: 0,
+    failing: false,
+    answered: Promise.resolve(),
+  };
   vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
     const { pathname } = addressOf(input);
     if (pathname.endsWith("/members.createGroup")) {
       named.push(new Headers(init?.headers).get(TAB_WORKSPACE_HEADER));
+    }
+    if (!pathname.endsWith("/session.member")) return answered([{ result: { data: null } }]);
+    session.memberReads += 1;
+    if (session.failing) return Promise.resolve(new Response("", { status: 503 }));
+    if (session.in === undefined) {
+      return answered([aRefusalAnswer(NEEDS_A_PICK, "unauthenticated", 401)]);
     }
     const member = {
       workspace: { id: session.in, name: "Northern Tooling" },
       person: { id: "p", name: "Ada", email: "ada@example.test" },
       role: "Admin",
     };
-    return answered([{ result: { data: pathname.endsWith("/session.member") ? member : null } }]);
+    return session.answered.then(() => answered([{ result: { data: member } }]));
   });
   return { named, session };
 };
@@ -90,6 +109,14 @@ const memberRead = (clients: AppClients) =>
   clients.queryClient.fetchQuery(
     memberOptions(createApiProxy(clients.apiClient, clients.queryClient)),
   );
+
+const memberKeyOf = (clients: AppClients) =>
+  memberOptions(createApiProxy(clients.apiClient, clients.queryClient)).queryKey;
+
+/** tRPC sends a batch on a later task, so two tasks on, an action not held back has been sent. */
+const batchesSent = async () => {
+  for (const _ of [1, 2]) await new Promise((resolve) => setTimeout(resolve, 0));
+};
 
 const groupMade = (clients: AppClients) =>
   clients.apiClient.members.createGroup.mutate({ name: "Bid writers" });
@@ -106,6 +133,69 @@ describe("the workspace an action names", () => {
     await groupMade(clients);
 
     expect(named).toEqual(["w", "v"]);
+  });
+
+  it("is the last shown while the member is read again", async () => {
+    const { named, session } = anApiHearingActions();
+    const clients = createAppClients();
+
+    await memberRead(clients);
+    await clients.queryClient.resetQueries({ queryKey: memberKeyOf(clients) });
+    session.in = "v";
+    await groupMade(clients);
+
+    expect(named).toEqual(["w"]);
+  });
+
+  it("is none, reading nothing, once the member read is refused", async () => {
+    const { named, session } = anApiHearingActions();
+    session.in = undefined;
+    const clients = createAppClients();
+
+    await expect(memberRead(clients)).rejects.toThrow("no-active-workspace");
+    await groupMade(clients);
+
+    expect(named).toEqual([null]);
+    expect(session.memberReads, "the action read the member again").toBe(1);
+  });
+
+  it("waits for a member read the tab has asked", async () => {
+    const { named, session } = anApiHearingActions();
+    const read = Promise.withResolvers<void>();
+    session.answered = read.promise;
+    const clients = createAppClients();
+
+    const asked = memberRead(clients);
+    const made = groupMade(clients);
+    await batchesSent();
+    read.resolve();
+    await Promise.all([asked, made]);
+
+    expect(named).toEqual(["w"]);
+  });
+
+  it("is none once a failed member read fails again", async () => {
+    const { named, session } = anApiHearingActions();
+    session.failing = true;
+    const clients = createAppClients();
+    clients.queryClient.setQueryDefaults(memberKeyOf(clients), { retryDelay: 0 });
+    await expect(memberRead(clients)).rejects.toBeInstanceOf(Error);
+
+    await groupMade(clients);
+
+    expect(named).toEqual([null]);
+    expect(session.memberReads, "the action read no member").toBeGreaterThan(1);
+  });
+
+  it("is none once the tab's cache is cleared on sign-out", async () => {
+    const { named } = anApiHearingActions();
+    const clients = createAppClients();
+    await memberRead(clients);
+
+    clients.queryClient.clear();
+    await groupMade(clients);
+
+    expect(named).toEqual([null]);
   });
 
   it("is none while the tab holds no member read", async () => {

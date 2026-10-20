@@ -1,5 +1,6 @@
-import { useQuery, type QueryClient } from "@tanstack/react-query";
+import { hashKey, useQuery, type QueryClient } from "@tanstack/react-query";
 
+import type { NamedWorkspace } from "@/shared/api/link.ts";
 import { refusalOf, useTRPC, type ApiProxy, type RefusalWord } from "@/shared/api/trpc.ts";
 
 export const memberOptions = (api: ApiProxy) =>
@@ -25,6 +26,33 @@ export const roleHeld = (queryClient: QueryClient, api: ApiProxy) =>
 
 export const workspaceHeld = (queryClient: QueryClient, api: ApiProxy) =>
   queryClient.getQueryData(memberOptions(api).queryKey)?.workspace.id;
+
+const refusedOrNeverAsked = (queryClient: QueryClient, api: ApiProxy): boolean => {
+  const read = queryClient.getQueryState(memberOptions(api).queryKey);
+  if (read === undefined) return true;
+  return read.fetchStatus === "idle" && read.error !== null && refusalOf(read.error) !== undefined;
+};
+
+/** A write names the workspace the tab last showed, so a page the session left is still refused; one that showed none waits. */
+export const workspaceNamedFor = (queryClient: QueryClient, api: ApiProxy): NamedWorkspace => {
+  const memberHash = hashKey(memberOptions(api).queryKey);
+  let shown = workspaceHeld(queryClient, api);
+  queryClient.getQueryCache().subscribe(({ type, query }) => {
+    if (query.queryHash !== memberHash) return;
+    shown = type === "removed" ? undefined : (workspaceHeld(queryClient, api) ?? shown);
+  });
+  return {
+    forARead: () => workspaceHeld(queryClient, api),
+    forAWrite: async () => {
+      if (shown !== undefined || refusedOrNeverAsked(queryClient, api)) return shown;
+      // A read that fails leaves the api to judge the write: one naming no workspace is refused.
+      return queryClient.ensureQueryData(memberOptions(api)).then(
+        (member) => member.workspace.id,
+        () => undefined,
+      );
+    },
+  };
+};
 
 export const leftFor = (held: string | undefined, now: string | undefined): boolean =>
   held !== undefined && now !== undefined && now !== held;

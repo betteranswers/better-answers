@@ -10,7 +10,7 @@ import {
   type ApiClient,
   type ApiProxy,
 } from "@/shared/api/trpc.ts";
-import { workspaceHeld } from "@/shared/member.ts";
+import { workspaceNamedFor } from "@/shared/member.ts";
 import { useThemeFollowed } from "@/shared/theme.ts";
 
 type FailureListener = {
@@ -39,8 +39,12 @@ export type AppClients = {
 export const createAppClients = (): AppClients => {
   const failures = aFailureListener();
   const queryClient = createQueryClient(failures.heard);
-  const apiClient: ApiClient = createApiClient(() => workspaceHeld(queryClient, api));
+  const apiClient: ApiClient = createApiClient({
+    forARead: () => named.forARead(),
+    forAWrite: () => named.forAWrite(),
+  });
   const api: ApiProxy = createApiProxy(apiClient, queryClient);
+  const named = workspaceNamedFor(queryClient, api);
   forgetAWorkspaceLeftElsewhere(queryClient, api);
   return { queryClient, apiClient, failures };
 };

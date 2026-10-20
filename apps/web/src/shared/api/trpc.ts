@@ -5,7 +5,7 @@ import { createTRPCContext, createTRPCOptionsProxy } from "@trpc/tanstack-react-
 
 import type { AppRouter } from "@better-answers/api/trpc";
 
-import { apiLink } from "./link.ts";
+import { apiLink, type NamedWorkspace } from "./link.ts";
 import { sentWithProgress } from "./upload-progress.ts";
 
 export const TRPC_ENDPOINT = "/trpc";
@@ -32,9 +32,9 @@ export const ceilingLiftsIn = (error: Error | ApiError): number | undefined => {
 
 export const { TRPCProvider, useTRPC, useTRPCClient } = createTRPCContext<AppRouter>();
 
-export const createApiClient = (heldWorkspace: () => string | undefined) =>
+export const createApiClient = (namedWorkspace: NamedWorkspace) =>
   createTRPCClient<AppRouter>({
-    links: [apiLink({ url: TRPC_ENDPOINT, uploadFetch: sentWithProgress, heldWorkspace })],
+    links: [apiLink({ url: TRPC_ENDPOINT, uploadFetch: sentWithProgress, namedWorkspace })],
   });
 
 export type ApiClient = ReturnType<typeof createApiClient>;
