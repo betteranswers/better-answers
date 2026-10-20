@@ -12,6 +12,7 @@ import {
   aMemberSignedInAt,
   anAddress,
   askToJoin,
+  avatarOf,
   clockTheNextKey,
   confirmedWhenAsked,
   countOf,
@@ -1672,6 +1673,8 @@ const BULK_ROLE_CHANGE_ASKED = "members.bulkChangeRole";
 /** Matched by name anywhere in the path, because the tRPC client batches its calls. */
 const BULK_ROLE_CHANGE = (url: URL): boolean => url.pathname.includes(BULK_ROLE_CHANGE_ASKED);
 
+const BULK_REMOVAL = (url: URL): boolean => url.pathname.includes("members.bulkRemove");
+
 const aWorkspaceOfThirtyEditors = async (
   page: Page,
   api: APIRequestContext,
@@ -1721,6 +1724,38 @@ const changeRoleOpened = async (page: Page, titled: string): Promise<Locator> =>
   const dialog = page.getByRole("dialog", { name: titled });
   await expect(dialog.getByRole("combobox", { name: "Role" })).toBeFocused();
   return dialog;
+};
+
+const A_FAILED_READ = {
+  error: {
+    message: "INTERNAL_SERVER_ERROR",
+    code: -32_603,
+    data: { code: "INTERNAL_SERVER_ERROR", httpStatus: 500 },
+  },
+};
+
+/** The shell's read fails, the batch's member answer fails, and the lone retry waits on `read`. */
+const membershipUnreadUntil = async (page: Page, read: Promise<void>): Promise<void> => {
+  let shellRead = true;
+  await page.route(MEMBER_READ, async (route) => {
+    const asked = new URL(route.request().url()).pathname.replace("/trpc/", "").split(",");
+    if (shellRead) {
+      shellRead = false;
+      await route.abort();
+      return;
+    }
+    if (asked.length === 1) {
+      await read;
+      await route.continue();
+      return;
+    }
+    const answered = await route.fetch();
+    const answers: readonly unknown[] = await answered.json();
+    await route.fulfill({
+      response: answered,
+      json: answers.map((answer, at) => (asked[at] === "session.member" ? A_FAILED_READ : answer)),
+    });
+  });
 };
 
 const removedThroughTheBar = async (page: Page, titled: string): Promise<void> => {
@@ -1915,6 +1950,37 @@ test.describe("bulk actions on the members ticked", () => {
       await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
     }
     await expect(page.getByRole("button", { name: "Esk Ropeworks", exact: true })).toHaveCount(0);
+  });
+
+  test("removing yourself before your membership reads lands on the chooser", async ({
+    page,
+    request,
+  }) => {
+    const workspace = await anAdminBesideAnotherAtPeople(page, request, "Esk Cordage");
+    for (const name of ["Ure Cordage", "Nidd Cordage"]) {
+      const other = await provision(request, { name });
+      await addMember(request, {
+        workspaceId: other.workspaceId,
+        userId: workspace.admin.id,
+        role: "Viewer",
+      });
+    }
+    const read = Promise.withResolvers<void>();
+    await membershipUnreadUntil(page, read.promise);
+    await page.reload();
+    await expect(memberRows(page)).toHaveCount(2);
+
+    await tickOf(page, "Test person").check();
+    await expect(outcomeOf(page)).toHaveText("");
+    await selectionAction(page, "Remove").click();
+    await expect(outcomeOf(page), "Remove says to wait for your role").toHaveText(/\S/);
+    await expect(page.getByRole("dialog"), "no confirmation opens unread").toHaveCount(0);
+    read.resolve();
+    await expect(avatarOf(page, "Test person")).toBeVisible();
+
+    await removedThemselfThroughTheBar(page);
+
+    await expect(page).toHaveURL(/\/choose-workspace$/);
   });
 
   test("removing yourself, in one other workspace, opens that one", async ({ page, request }) => {

@@ -99,5 +99,6 @@ export const BULK_WORDS = {
   },
   refused: (count: number) => `No changes were made. There was a problem with ${members(count)}:`,
   stillGoing: "The previous action is still in progress. Please try again when it has finished.",
+  roleLoading: "Your role in this workspace is still loading. Please try again in a moment.",
   tooMany: (most: number) => `You can select up to ${members(most)} at a time.`,
 } as const;

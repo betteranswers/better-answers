@@ -58,6 +58,8 @@ const NOTHING_TICKED = selectFirst(PEOPLE_SELECT_FIRST.member);
 
 const STILL_GOING: Outcome = { tone: "said", words: BULK_WORDS.stillGoing };
 
+const ROLE_LOADING: Outcome = { tone: "said", words: BULK_WORDS.roleLoading };
+
 const MOST_TICKED = 200;
 
 const TOO_MANY: Outcome = { tone: "said", words: BULK_WORDS.tooMany(MOST_TICKED) };
@@ -98,6 +100,10 @@ export const useMemberBulkActions = (list: BulkList) => {
       list.say(TOO_MANY);
       return;
     }
+    if (readerId === undefined) {
+      list.say(ROLE_LOADING);
+      return;
+    }
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     sent.current = false;
     setAsked([...list.ticked]);
@@ -118,9 +124,9 @@ export const useMemberBulkActions = (list: BulkList) => {
     readonly ownChange: "demoted" | "removed" | undefined;
     readonly run: (personIds: string[], settled: Settled) => void;
   }) => {
-    if (acting) return;
+    if (acting || readerId === undefined) return;
     const names = new Map(asked.map((personId) => [personId, list.nameOf(personId)]));
-    const yourOwn = readerId !== undefined && asked.includes(readerId) ? said.ownChange : undefined;
+    const yourOwn = asked.includes(readerId) ? said.ownChange : undefined;
     sent.current = true;
     setActing(true);
     setOpen(undefined);
