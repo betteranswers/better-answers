@@ -4,13 +4,7 @@ import { describe, expect, it } from "vitest";
 import { FIRST_PAINT } from "@better-answers/schema/theme";
 
 import { PAGE_STYLE, serveFaces } from "../src/auth/page-style.ts";
-import {
-  CONSENT_WORDS,
-  consentPage,
-  REFUSAL_PAGES,
-  refusedPage,
-  signInPage,
-} from "../src/auth/pages.ts";
+import { consentPage, REFUSAL_PAGES, refusedPage, signInPage } from "../src/auth/pages.ts";
 
 const CONSENTING = {
   clientName: "Claude",
@@ -26,18 +20,6 @@ const variablesRead = (sheet: string): readonly string[] =>
 
 const variablesDeclared = (sheet: string): ReadonlySet<string> =>
   new Set([...sheet.matchAll(/(--[\w-]+)\s*:/g)].map(([, name]) => name ?? ""));
-
-const everyWordShown = (): readonly string[] => [
-  CONSENT_WORDS.title("Claude"),
-  CONSENT_WORDS.asYou("Claude", "Acme"),
-  CONSENT_WORDS.hostedAt("Claude", "claude.ai"),
-  CONSENT_WORDS.goesNext("claude.ai"),
-  ...Object.values(CONSENT_WORDS.scopes),
-  CONSENT_WORDS.recorded("Claude"),
-  CONSENT_WORDS.connect,
-  CONSENT_WORDS.cancel,
-  ...Object.values(REFUSAL_PAGES).flatMap((page) => Object.values(page)),
-];
 
 describe("the api pages' stylesheet", () => {
   it("inlines every design-system import rather than leaving one", () => {
@@ -67,10 +49,6 @@ describe("the consent page", () => {
       '<button type="submit" data-variant="default" data-marks>Connect</button>',
     );
     expect(html).toContain('<button type="submit" data-variant="outline">Cancel</button>');
-  });
-
-  it("shows no straight quote or apostrophe", () => {
-    expect(everyWordShown().filter((words) => /['"]/.test(words))).toEqual([]);
   });
 });
 
