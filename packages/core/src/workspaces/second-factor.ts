@@ -18,7 +18,6 @@ import {
   type Role,
   type SecondFactorStanding,
   standingOf,
-  systemClock,
   type UserId,
   ulid,
 } from "../kernel/index.ts";
@@ -387,7 +386,7 @@ const thisSessionOf = async (
 type ReadSecondFactorInput = {
   readonly personId: string;
   readonly sessionId?: string;
-  readonly now?: Date;
+  readonly now: Date;
 };
 
 const reading = async (
@@ -399,7 +398,7 @@ const reading = async (
   if (facts === undefined) return undefined;
   return heldOf(facts, {
     passkeys: await passkeysOf(tx, personId),
-    waits: await waitsOf(tx, personId, input.now ?? systemClock().now()),
+    waits: await waitsOf(tx, personId, input.now),
     thisSession: await thisSessionOf(tx, { ...facts, personId }, input.sessionId),
   });
 };

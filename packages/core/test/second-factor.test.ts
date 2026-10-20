@@ -251,7 +251,7 @@ describe("reading a person's second factor", () => {
   it("answers nothing held for a new person", async () => {
     const personId = await seedPerson(db().pool);
 
-    const read = await readSecondFactor(bootstrap, door(), { personId });
+    const read = await readSecondFactor(bootstrap, door(), { personId, now: AT });
 
     expect(read).toEqual({
       ok: true,
@@ -278,7 +278,7 @@ describe("reading a person's second factor", () => {
     await recoveryCodeFor(db().pool, adminUserId, AT);
     await recoveryCodeFor(db().pool, adminUserId, AT);
 
-    const read = await readSecondFactor(bootstrap, door(), { personId: adminUserId });
+    const read = await readSecondFactor(bootstrap, door(), { personId: adminUserId, now: AT });
 
     expect(read).toMatchObject({
       ok: true,
@@ -305,7 +305,7 @@ describe("reading a person's second factor", () => {
     ]);
     await passkeyUsedAt(db().pool, used, new Date("2026-10-02T09:41:00.000Z"));
 
-    const read = await readSecondFactor(bootstrap, door(), { personId });
+    const read = await readSecondFactor(bootstrap, door(), { personId, now: AT });
 
     expect(read).toMatchObject({
       ok: true,
@@ -327,7 +327,7 @@ describe("reading a person's second factor", () => {
     const personId = await seedPerson(db().pool);
     await passkeyFor(db().pool, personId);
 
-    const read = await readSecondFactor(bootstrap, door(), { personId });
+    const read = await readSecondFactor(bootstrap, door(), { personId, now: AT });
 
     expect(read.ok && read.value.passkeys[0]?.createdAt).toMatch(/^\d{4}-\d\d-\d\dT/);
   });
@@ -336,7 +336,7 @@ describe("reading a person's second factor", () => {
     const personId = await seedPerson(db().pool);
     await authenticatorFor(db().pool, personId, { verified: false });
 
-    const read = await readSecondFactor(bootstrap, door(), { personId });
+    const read = await readSecondFactor(bootstrap, door(), { personId, now: AT });
 
     expect(read).toMatchObject({ ok: true, value: { authenticator: "awaiting-code" } });
   });
@@ -350,7 +350,11 @@ describe("reading a person's second factor", () => {
       workspaceId,
     ]);
 
-    const read = await readSecondFactor(bootstrap, door(), { personId: adminUserId, sessionId });
+    const read = await readSecondFactor(bootstrap, door(), {
+      personId: adminUserId,
+      sessionId,
+      now: AT,
+    });
 
     expect(read).toMatchObject({
       ok: true,
@@ -371,7 +375,7 @@ describe("reading a person's second factor", () => {
     const personId = await seedPerson(db().pool, { operator: true });
     const sessionId = await aSession(personId);
 
-    const read = await readSecondFactor(bootstrap, door(), { personId, sessionId });
+    const read = await readSecondFactor(bootstrap, door(), { personId, sessionId, now: AT });
 
     expect(read).toMatchObject({
       ok: true,
@@ -382,6 +386,7 @@ describe("reading a person's second factor", () => {
   it("refuses a person nobody holds", async () => {
     const read = await readSecondFactor(bootstrap, door(), {
       personId: "01J00000000000000000000000",
+      now: AT,
     });
 
     expect(read).toEqual({ ok: false, error: "person-gone" });
@@ -391,7 +396,7 @@ describe("reading a person's second factor", () => {
     const email = `operator-${ulid().toLowerCase()}@example.test`;
     const personId = await seedPerson(db().pool, { email });
     const promotedRead = async () => {
-      const read = await readSecondFactor(bootstrap, door(), { personId });
+      const read = await readSecondFactor(bootstrap, door(), { personId, now: AT });
       return read.ok && read.value.promoted;
     };
     const unmarked = await promotedRead();

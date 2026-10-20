@@ -12,19 +12,16 @@ import {
 import { connectUploadFields, type ConnectUploadFields } from "@better-answers/core/sources";
 import type { ObjectDoor } from "@better-answers/core/store/objects";
 import type { PostgresDoor } from "@better-answers/core/store/postgres";
+import {
+  type HeaderOfEachField,
+  UPLOAD_HEADER_OF_FIELD,
+} from "@better-answers/schema/upload-headers";
 
 import { doorTold, type Doors } from "../doors.ts";
 
-export const UPLOAD_DESCRIPTOR_HEADERS = {
-  connectedSourceId: "x-upload-connected-source-id",
-  name: "x-upload-name",
-  fileName: "x-upload-file-name",
-  mediaType: "x-upload-media-type",
-  byteSize: "x-upload-byte-size",
-  sensitivity: "x-upload-sensitivity",
-  audience: "x-upload-audience",
-  audienceGroups: "x-upload-audience-groups",
-} as const satisfies Record<keyof z.input<typeof connectUploadFields>, string>;
+const HEADER_OF_FIELD = Object.entries(
+  UPLOAD_HEADER_OF_FIELD satisfies HeaderOfEachField<z.input<typeof connectUploadFields>>,
+);
 
 /** A header carries bytes and a name may not be one, so each value is its JSON, percent-encoded. */
 const decoded = (sent: string): Result<z.JSONType, IssueWord> => {
@@ -39,7 +36,7 @@ const decoded = (sent: string): Result<z.JSONType, IssueWord> => {
 export const descriptorOf = (headers: Headers): Result<ConnectUploadFields, Malformed> => {
   const gathered: Record<string, z.JSONType> = {};
   const unreadable: Record<string, IssueWord> = {};
-  for (const [field, header] of Object.entries(UPLOAD_DESCRIPTOR_HEADERS)) {
+  for (const [field, header] of HEADER_OF_FIELD) {
     const sent = headers.get(header);
     if (sent === null) continue;
     const read = decoded(sent);
