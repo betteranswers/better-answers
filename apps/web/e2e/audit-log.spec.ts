@@ -11,6 +11,7 @@ import {
   addMember,
   aMemberSignedInAt,
   anAddress,
+  holdingTheFirstAnswer,
   keyListed,
   keystrokesListed,
   makeGroups,
@@ -189,6 +190,31 @@ test.describe("the System group's Audit log page", () => {
     for (const raw of ["platform.workspace.provisioned", "process:", "human:", "Actor id"]) {
       await expect(auditLog(page), `the audit log shows ${raw}`).not.toContainText(raw);
     }
+  });
+
+  test("keeps open the detail opened before a typed search settles", async ({ page, request }) => {
+    const { priya } = await anAdminAtTheAuditLog(page, request, "Nidd Tooling");
+    const priyas = linesOf(page).filter({ hasText: BY_PRIYA });
+    await expect(priyas).toHaveCount(1);
+    await expect(linesOf(page)).not.toHaveCount(1);
+    const typed = await holdingTheFirstAnswer(
+      page,
+      (url) =>
+        url.pathname.includes("members.auditLog") &&
+        (url.searchParams.get("input") ?? "").includes('"search":"Priya"'),
+    );
+
+    await searchBox(page).fill("Priya");
+    await detailsOf(priyas).click();
+    await expect(detailsOf(priyas)).toHaveAttribute("aria-expanded", "true");
+    typed.release();
+
+    await expect(linesOf(page)).toHaveText([BY_PRIYA]);
+    await expect(
+      detailsOf(priyas),
+      "the detail opened closed as the typed search settled",
+    ).toHaveAttribute("aria-expanded", "true");
+    await expect(priyas.getByRole("definition").first()).toHaveText(`Priya Shah${priya.email}`);
   });
 
   test("tells apart two members of one name by their addresses", async ({ page, request }) => {

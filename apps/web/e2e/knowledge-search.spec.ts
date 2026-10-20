@@ -141,6 +141,31 @@ const payReviewSeeded = async (api: APIRequestContext, workspace: Seeded): Promi
   });
 };
 
+const FORKLIFT_GUIDE = "Forklift guide";
+
+const forkliftGuideSeeded = async (api: APIRequestContext, workspace: Seeded): Promise<void> => {
+  await seedConnectedSources(api, {
+    workspaceId: workspace.workspaceId,
+    connectedSources: [
+      {
+        name: "Yard drive",
+        sensitivity: "Internal",
+        published: true,
+        sync: "done",
+        documents: [
+          { title: FORKLIFT_GUIDE, passages: ["A forklift lifts each pallet off the racking."] },
+          { title: "Racking plan", passages: ["Each pallet bay is racked by row."] },
+        ],
+      },
+    ],
+  });
+};
+
+const isAFindFor =
+  (query: string) =>
+  (url: URL): boolean =>
+    isAFind(url) && (url.searchParams.get("input") ?? "").includes(`"query":"${query}"`);
+
 type Seeding = (api: APIRequestContext, workspace: Seeded) => Promise<void>;
 
 const anAdminAtSearch = async (
@@ -445,6 +470,44 @@ test.describe("the Knowledge Search page", () => {
     await page.keyboard.press("Escape");
     await expect(panel).toHaveCount(0);
     await expect(opener).toBeFocused();
+  });
+
+  for (const width of [320, 1280]) {
+    test(`keeps open a passage clicked before settling, at ${String(width)} px`, async ({
+      page,
+      request,
+    }) => {
+      await anAdminAtSearch(page, request, `Nidd Stores ${String(width)}`, [forkliftGuideSeeded]);
+      await page.setViewportSize({ width, height: 720 });
+      await searched(page, "pallet");
+      await expect(matchesOf(page)).toHaveCount(2);
+      const typed = await heldBack(page, isAFindFor("forklift"));
+
+      await searchBox(page).fill("forklift");
+      await matchesOf(page).getByRole("button", { name: FORKLIFT_GUIDE }).click();
+      typed.release();
+
+      await expect(matchesOf(page)).toHaveText([new RegExp(FORKLIFT_GUIDE)]);
+      await expect(
+        page.getByRole("heading", { name: FORKLIFT_GUIDE }),
+        "the passage clicked closed as the typed search settled",
+      ).toBeFocused();
+    });
+  }
+
+  test("keeps the typed search for a concept opened before settling", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Nidd Records", [conceptsSeeded]);
+    await searched(page, "audit");
+
+    await searchBox(page).fill("forklift");
+    await matchesOf(page).getByRole("link", { name: "Audit Committee" }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Audit Committee" })).toBeVisible();
+    await page.getByRole("main").getByRole("link", { name: "Back to Search" }).click();
+
+    await expect(searchBox(page), "the typed search was lost on the way back").toHaveValue(
+      "forklift",
+    );
+    await expect(matchesOf(page)).toHaveText([/Forklift Licences/]);
   });
 
   test("hands Tab from the open panel back to its opener", async ({
