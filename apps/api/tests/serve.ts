@@ -3,17 +3,35 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 
-import { openObjectStore } from "@better-answers/core/testing/warm-objects";
-
 import { logger } from "../src/logger.ts";
-import { scriptedModels } from "./harness-asking.ts";
-import { harnessControl } from "./harness-control.ts";
-import { startApp } from "./harness.ts";
 
 const port = Number(process.argv[2]);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("the browser suite's api needs a port as its one argument");
 }
+
+/** Bound before the harness loads, so a taken port fails this server before another's `/health` can pass for its own. Playwright waits on 503. */
+let served: Hono | undefined;
+const listening = serve({
+  fetch: (request) => served?.fetch(request) ?? new Response(null, { status: 503 }),
+  port,
+  hostname: "127.0.0.1",
+});
+
+listening.on("error", (cause: Error) => {
+  logger.error({ port, reason: cause.message }, "the browser suite's api could not listen");
+  process.exit(1);
+});
+
+await new Promise((bound) => listening.once("listening", bound));
+
+const [{ openObjectStore }, { scriptedModels }, { harnessControl }, { startApp }] =
+  await Promise.all([
+    import("@better-answers/core/testing/warm-objects"),
+    import("./harness-asking.ts"),
+    import("./harness-control.ts"),
+    import("./harness.ts"),
+  ]);
 
 const objects = await openObjectStore("browser-suite");
 
@@ -37,12 +55,8 @@ const app = await startApp({
   },
 });
 
-const listening = serve(
-  { fetch: withHarnessControl().fetch, port, hostname: "127.0.0.1" },
-  (address) => {
-    logger.info({ port: address.port }, "the browser suite's api is listening");
-  },
-);
+served = withHarnessControl();
+logger.info({ port }, "the browser suite's api is listening");
 
 function withHarnessControl(): Hono {
   const outer = new Hono();
@@ -50,11 +64,6 @@ function withHarnessControl(): Hono {
   outer.all("/*", (context) => app.server.fetch(context.req.raw));
   return outer;
 }
-
-listening.on("error", (cause: Error) => {
-  logger.error({ port, reason: cause.message }, "the browser suite's api could not listen");
-  process.exit(1);
-});
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {

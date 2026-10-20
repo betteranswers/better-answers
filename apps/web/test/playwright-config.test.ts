@@ -3,19 +3,33 @@
 import type { PlaywrightTestConfig } from "@playwright/test";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const configUnder = async (ci: string | undefined): Promise<PlaywrightTestConfig> => {
-  if (ci === undefined) delete process.env["CI"];
-  else process.env["CI"] = ci;
+const SETTINGS = ["CI", "E2E_PORT"] as const;
+type Settings = Partial<Record<(typeof SETTINGS)[number], string>>;
 
+const before: Settings = Object.fromEntries(SETTINGS.map((name) => [name, process.env[name]]));
+
+const setAll = (settings: Settings): void => {
+  for (const name of SETTINGS) {
+    const value = settings[name];
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+};
+
+const configWith = async (settings: Settings): Promise<PlaywrightTestConfig> => {
+  setAll(settings);
   vi.resetModules();
   return (await import("../playwright.config.ts")).default;
 };
 
-const ciBefore = process.env["CI"];
+const configUnder = (ci: string | undefined): Promise<PlaywrightTestConfig> =>
+  configWith(ci === undefined ? {} : { CI: ci });
+
+const portOf = (config: PlaywrightTestConfig): number =>
+  Number(new URL(config.use?.baseURL ?? "").port);
 
 afterEach(() => {
-  if (ciBefore === undefined) delete process.env["CI"];
-  else process.env["CI"] = ciBefore;
+  setAll(before);
 });
 
 describe("the browser suite's configuration", () => {
@@ -45,5 +59,44 @@ describe("the browser suite's configuration", () => {
 
   it("hands every run to the flaky report", async () => {
     expect((await configUnder("true")).reporter).toContainEqual(["./e2e/flaky-report.ts"]);
+  });
+});
+
+describe("the browser suite's port", () => {
+  it("is 3100 when it runs in CI", async () => {
+    expect(portOf(await configUnder("true"))).toBe(3100);
+  });
+
+  it("leaves 3100 free on a developer's machine", async () => {
+    expect(portOf(await configUnder(undefined))).not.toBe(3100);
+  });
+
+  it("hands its port to the workers through E2E_PORT", async () => {
+    const port = portOf(await configUnder(undefined));
+
+    expect(process.env["E2E_PORT"]).toBe(String(port));
+  });
+
+  it("gives a worker the port its runner took", async () => {
+    const port = portOf(await configUnder(undefined));
+
+    expect(portOf(await configWith({ E2E_PORT: String(port) }))).toBe(port);
+  });
+
+  it("is the one E2E_PORT names, even in CI", async () => {
+    expect(portOf(await configWith({ CI: "true", E2E_PORT: "4321" }))).toBe(4321);
+  });
+
+  it("refuses an E2E_PORT that is not a port", async () => {
+    await expect(configWith({ E2E_PORT: "43a1" })).rejects.toThrow(/E2E_PORT/);
+  });
+
+  it("is the port the server starts on and answers", async () => {
+    const config = await configUnder(undefined);
+    const server = Array.isArray(config.webServer) ? config.webServer[0] : config.webServer;
+    const port = portOf(config);
+
+    expect(server?.command).toMatch(new RegExp(` ${port}$`));
+    expect(server?.url).toBe(`http://localhost:${port}/health`);
   });
 });
