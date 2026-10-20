@@ -34,6 +34,12 @@ const filesUnder = (root: string, directory: string): readonly string[] =>
 export const filesUnderEach = (root: string, roots: readonly string[]): readonly string[] =>
   [...new Set(roots.flatMap((directory) => filesUnder(root, directory)))].sort(byCodeUnit);
 
+export const markdownUnder = (root: string, folder: string): readonly string[] =>
+  readdirSync(path.join(root, folder), { recursive: true, encoding: "utf8" })
+    .filter((entry) => entry.endsWith(".md"))
+    .map((entry) => path.posix.join(folder, entry.split(path.sep).join("/")))
+    .sort(byCodeUnit);
+
 export const isTestPath = (file: string): boolean => {
   const segments = file.split("/");
   const name = segments.at(-1) ?? "";
