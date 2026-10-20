@@ -4,6 +4,7 @@ import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
+import { COUNTED, NOT_COUNTED, commented } from "./caller-counts.ts";
 import { wordsOf } from "./fixture-text.ts";
 import { fixedByOxlint } from "./oxlint-fix.ts";
 
@@ -20,6 +21,8 @@ const holding = (comment: string, code = "export const keep = 1;\n"): Tree => ({
 const ENVIRONMENT_DOCBLOCK = `/** @vitest-${"environment"} happy-dom */\n`;
 
 const TOO_LONG = `// ${wordsOf(29)}\n`;
+
+const COUNTING = "// Two specs open a member and remove one.\n";
 
 const lint = oxlintOver(CONFIG, { tree: holding(TOO_LONG), flagged: [FILE] });
 
@@ -129,6 +132,46 @@ describe("the comment rule fires on a long or citing comment", () => {
   });
 });
 
+describe("the comment rule refuses a comment that counts its callers", () => {
+  it("refuses a comment counting its specs, naming the fix", () => {
+    const output = lint.output(holding(COUNTING));
+
+    expect(output).toContain("This comment counts the code that uses it (`Two specs`).");
+    expect(output).toContain(
+      "Delete it: hold a reason the callers share in a name or a test title.",
+    );
+  });
+
+  it.each(COUNTED)("quotes the count of %s on one line", (_what, prose, counted) => {
+    expect(lint.output(holding(commented("//", prose)))).toContain(`uses it (\`${counted}\`).`);
+  });
+
+  it.each(NOT_COUNTED)("walks past %s", (_what, prose) => {
+    expect(lint.flagged(holding(commented("//", prose)))).toEqual([]);
+  });
+
+  it("refuses a doc block counting its callers", () => {
+    expect(lint.flagged(holding("/** Both callers hand the trimmed name. */\n"))).toEqual([FILE]);
+  });
+
+  it("walks past a doc block naming the one caller", () => {
+    expect(lint.flagged(holding("/** The one caller hands the trimmed name. */\n"))).toEqual([]);
+  });
+
+  it("refuses a directive's reason that counts its callers", () => {
+    const directive = "// @ts-expect-error both callers hand the wrong shape\n";
+
+    expect(lint.output(holding(directive))).toContain("counts the code that uses it");
+  });
+
+  it("reports a long count once, for the count", () => {
+    const output = lint.output(holding(`// ${wordsOf(26)} for both callers\n`));
+
+    expect(output).toContain("counts the code that uses it (`both callers`)");
+    expect(output.match(/better-answers\(comment-only-the-why\)/g)).toHaveLength(1);
+  });
+});
+
 describe("the comment rule's exemptions", () => {
   it.each([
     ["a why inside the ceiling", "// Deleting this changes what knip answers.\n"],
@@ -233,6 +276,13 @@ describe("the rule's fix", () => {
     const after = fixed(holding(TOO_LONG));
 
     expect(after).not.toContain(wordsOf(29));
+    expect(after).toContain("export const keep = 1;");
+  });
+
+  it("removes a comment that counts its callers", () => {
+    const after = fixed(holding(COUNTING));
+
+    expect(after).not.toContain("Two specs");
     expect(after).toContain("export const keep = 1;");
   });
 

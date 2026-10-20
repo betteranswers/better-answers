@@ -7,6 +7,9 @@ import type { Block, Opened } from "../shared/comment-blocks.ts";
 
 const WORD_LIMIT = 25;
 
+const A_COUNT_OF_CALLERS =
+  /\b(?:two|three|four|five|six|seven|eight|nine|ten|both)\s+(?:other\s+)?(?:specs|callers|call\s+sites)\b/i;
+
 const wordsIn = (prose: string): number => prose.match(/\S+/g)?.length ?? 0;
 
 const reasonOf = (prose: string, opened: Opened): string | undefined => {
@@ -18,13 +21,16 @@ const reasonOf = (prose: string, opened: Opened): string | undefined => {
 };
 
 type Finding = {
-  readonly messageId: "cites" | "tooLong" | "reasonTooLong";
+  readonly messageId: "cites" | "countsCallers" | "tooLong" | "reasonTooLong";
   readonly data: Readonly<Record<string, string | number>>;
 };
 
 const findingIn = (prose: string, overLimit: "tooLong" | "reasonTooLong"): Finding | undefined => {
   const cited = citationIn(prose);
   if (cited !== undefined) return { messageId: "cites", data: { ...cited } };
+  const counted = A_COUNT_OF_CALLERS.exec(prose);
+  if (counted !== null)
+    return { messageId: "countsCallers", data: { counted: counted[0].replace(/\s+/g, " ") } };
   const words = wordsIn(prose);
   return words > WORD_LIMIT
     ? { messageId: overLimit, data: { words, limit: WORD_LIMIT } }
@@ -37,13 +43,15 @@ export const commentOnlyTheWhyRule = defineRule({
     fixable: "code",
     docs: {
       description:
-        "A comment is 25 words at most and cites nothing. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. A disable gives its reason on the same line, and a directive's reason counts against the cap.",
+        "A comment is 25 words at most, cites nothing, and never counts the code that uses it. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. A disable gives its reason on the same line, and a directive's reason counts against the cap.",
     },
     messages: {
       tooLong:
         "This comment runs to {{words}} words, over the cap of {{limit}}. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. Any other comment is deleted: hold its reason in a name, a type, a test, a grant or a lint, or report it open in the tracker.",
       cites:
         "This comment cites {{what}} (`{{cited}}`); a comment never says which ticket, decision or rule asked for the code. git, a spec and an ADR are where that is read.",
+      countsCallers:
+        "This comment counts the code that uses it (`{{counted}}`). Who calls the code is this repository's own code, which a search reads, and the count is wrong once the next caller lands. Delete it: hold a reason the callers share in a name or a test title.",
       unexplained:
         "This disable gives no reason; name what it suppresses and say why on the same line, after ` -- ` (`: ` for Stryker).",
       reasonTooLong:

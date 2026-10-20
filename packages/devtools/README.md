@@ -201,8 +201,12 @@ No config key reports a disable that suppresses nothing, so the `lint` script pa
 `--report-unused-disable-directives-severity=error`. The pre-commit hook and each workspace's
 `lint` pass it too.
 
-Three rules are this plugin's own. `comment-only-the-why` holds the 25-word cap and the citation
-ban, and a doc block has no longer cap than any other comment. A disable gives its reason on the same line, and a directive's reason counts against
+Three rules are this plugin's own. `comment-only-the-why` holds the 25-word cap, the citation
+ban and the count of callers, and a doc block has no longer cap than any other comment. A count of
+callers is a spelled-out two to ten, or `both`, then an optional `other`, before `specs`,
+`callers` or `call sites`, in any case. `tests`, `suites` and `consumers` are left out, because a
+test runner, a cipher and a queue all have them. A protocol's specs are written `specifications`.
+A disable gives its reason on the same line, and a directive's reason counts against
 the cap. A notice is exempt by its opening text. A directive is dropped before blocks are
 grouped, so it cannot lend a paragraph its exemption.
 
@@ -221,7 +225,8 @@ usage text is long by design. A test file is exempt in both tiers. Every other f
 gate's own source included.
 
 The Python check reads `.py` files and nothing else: its comments, grouped into blocks of
-touching lines, and its docstrings, each held to 25 words. A directive or a notice is
+touching lines, and its docstrings, each held to 25 words, the citation ban and the count of
+callers. Both suites read their count cases from `test/caller-counts.ts`. A directive or a notice is
 dropped by its opening text before blocks are grouped, so it cannot lend a paragraph its
 exemption. A suppression's reason is a block of its own. It is prose and counts, whether it
 follows a second `#` or the codes of a `noqa` or a `type: ignore` directly, and a suppression
