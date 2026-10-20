@@ -101,7 +101,7 @@ Nothing writes `concept_evidence` in production yet, so nobody is exposed today 
 ### Sources / Research
 
 - The staff review and the survey, attached to BA-35: card 1 (the gap), card 22 (the hand-sequenced cascade), section 2's premise checks.
-- `docs/solutions/architecture-patterns/adr-0023-graph-is-apache-age.md`, `adr-0039-audience-word-and-group-ids.md`, `adr-0044-chunk-visibility-is-read-not-copied.md`, `adr-0031-tier-contract-is-six-agreements.md`, `adr-0012-the-concept-write-path.md`, `adr-0043-what-an-act-is.md`, `adr-0029-apps-over-packages-capability-slices.md`.
+- `docs/solutions/architecture-patterns/adr-0023-one-read-predicate-guards-the-map.md`, `adr-0039-audience-word-and-group-ids.md`, `adr-0044-chunk-visibility-is-read-not-copied.md`, `adr-0031-tier-contract-is-a-list-of-agreements.md`, `adr-0012-the-concept-write-path.md`, `adr-0043-what-an-action-is.md`, `adr-0029-apps-over-packages-capability-slices.md`.
 - `docs/solutions/best-practices/a-race-test-held-late-or-released-in-turn-cannot-prove-a-lock-order.md` for U2's and U6's race tests.
 
 ---
@@ -225,7 +225,7 @@ U2 is a behaviour-preserving refactor and lands first, in its own reversible pul
   - Modify: `packages/core/test/tier-contract.test.ts`, `apps/worker/tests/test_tier_contract.py` (`SPOKEN_AGREEMENTS`)
   - Create: `packages/core/test/sync-sensitivity-moves.contract.test.ts`, `apps/worker/tests/test_sync_sensitivity_moves_contract.py`
   - Modify: `packages/schema/src/contract-stamp.ts`, `apps/worker/src/better_answers_worker/contract_stamp.py` (regenerated)
-  - Modify: `docs/solutions/architecture-patterns/adr-0031-tier-contract-is-six-agreements.md`
+  - Modify: `docs/solutions/architecture-patterns/adr-0031-tier-contract-is-a-list-of-agreements.md`
 - **Approach:**
   1. Write the fixture first: the key `sensitivity_moved` (a list of document ids), the move cases (Internal and a Restricted verdict, named; already Restricted and a Restricted verdict, not named; lifted to a NULL `narrowed_to`, named; lifted to an equal `narrowed_to`, not named), and the reading cases (absent: whole source; empty: nothing; ids: those documents).
   2. Add the two `SPOKEN_AGREEMENTS` entries and one contract test per tier. Each tier holds its own code to the fixture: the worker's `reconcile_catalogue` and `as_row`, and the api's outcome reading from U5.
@@ -342,7 +342,7 @@ U2 is a behaviour-preserving refactor and lands first, in its own reversible pul
 - **Requirements:** R7.
 - **Dependencies:** U6.
 - **Files:**
-  - Modify: `docs/solutions/architecture-patterns/adr-0023-graph-is-apache-age.md`
+  - Modify: `docs/solutions/architecture-patterns/adr-0023-one-read-predicate-guards-the-map.md`
   - Modify: `docs/solutions/architecture-patterns/adr-0039-audience-word-and-group-ids.md`
   - Modify: `CONCEPTS.md` (*cascade*)
 - **Approach:**

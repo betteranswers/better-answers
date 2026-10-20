@@ -313,7 +313,7 @@ A first-principles review on 02/10 tested every reader of a rule: agents, gates,
 - **Files:**
   - ADR docs in `docs/solutions/architecture-patterns/`:
     - `adr-0005-own-app-in-two-tiers.md`
-    - `adr-0008-trpc-inside-openapi-and-mcp-outside.md`
+    - `adr-0008-a-contract-for-each-class-of-caller.md`
     - `adr-0025-signals-are-queries-over-rows.md`
     - `adr-0027-open-core-under-apache-2-0.md`
     - `adr-0037-reader-screen-latency-budget.md`

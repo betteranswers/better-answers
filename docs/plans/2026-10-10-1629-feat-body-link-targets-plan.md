@@ -120,7 +120,7 @@ The projected rows are KTD1's statement. A row exists only for a target the read
 - `apps/api/tests/harness-knowledge.ts`: `linksTo` already writes `[Title](file.md)` through `writeConcept`, so the browser suite needs no new seed.
 - `docs/solutions/logic-errors/two-tiers-regex-engines-split-lines-and-whitespace-differently.md`: the ordinal is not "the nth Markdown link", and a third reader must not count for itself.
 - `docs/solutions/architecture-patterns/adr-0016-answers-assert-concepts-only.md`: nothing withheld is counted, hinted at or explained.
-- `docs/solutions/architecture-patterns/adr-0018-one-mcp-surface-five-entries.md`: an outside client cannot open a relative path, so MCP names a target by its IRI.
+- `docs/solutions/architecture-patterns/adr-0018-one-mcp-surface-grown-by-scope.md`: an outside client cannot open a relative path, so MCP names a target by its IRI.
 
 ---
 
