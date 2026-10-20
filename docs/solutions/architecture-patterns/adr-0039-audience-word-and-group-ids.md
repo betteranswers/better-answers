@@ -26,9 +26,9 @@ tags:
 
 **The representation.** Every readable unit and the connected source carry a pair. The tables that carry it are `concept_index`, `write_up`, `connected_source`, `concept_sensitivity_override`, `map_node` and `map_edge`.
 
-- `audience` is *everyone* or *groups*, narrowed at the boundary.
+- `audience` is *everyone* or *groups*, narrowed at the boundary. It is `NOT NULL` on every unit, because a CHECK passes on NULL and only the column constraint refuses a missing word.
 - `audience_groups text[]` holds ADR 0038's group ids.
-- One CHECK ties them, `AUDIENCE_CHECK` in `packages/schema/src/readable-columns.ts`. *Everyone* holds no array. *Groups* holds a non-empty array with no NULL element.
+- One CHECK ties them, `AUDIENCE_CHECK` in `packages/schema/src/readable-columns.ts`. *Everyone* holds no array. *Groups* holds a non-empty array with no NULL element. It is written once, in the schema package. A test reads every hand-written copy back against the constant, and the row-level security suite refuses a bad pair at the row on every table that carries one.
 
 A passage carries no pair of its own. It reads its connected source's through `index.readable_passage` (ADR 0044).
 
@@ -41,13 +41,13 @@ A passage carries no pair of its own. It reads its connected source's through `i
 
 - A recorded Admin override outranks everything. The combination comes next. A unit resting on nothing takes its fallback. The per-kind floor narrows the sensitivity and never widens it.
 - It runs at write time: the governed write derives the row it lands.
-- A narrowing re-derives synchronously two levels down, in the narrowing action's own transaction. It re-derives every concept citing the connected source's documents, then every write-up including them.
-- The map's copies of the columns are rewritten in that same transaction.
+- A narrowing re-derives synchronously two levels down, in the narrowing action's own transaction. It re-derives every concept citing the connected source's documents, in the concepts slice, then every write-up including them, in the guides slice. Narrowing a connected source refuses a widening (`widening-refused`) and a group the workspace does not hold (`no-such-group`), and its audit event is `sources.binding.narrowed`.
+- The map's copies of the columns are rewritten in that same transaction. The edges a concept derives carry its published stamp, sensitivity and audience, and are rewritten with its node.
 - The worker's sync is the exception. It narrows or lifts a document outside any action of the api's. So the api's tick re-derives what the sync moved, two levels down and the map's copies with them, in one transaction per sync (ADR 0023).
 
 **An empty intersection forces the unit Restricted, and is never stored.** It becomes *Restricted* for *everyone*, which the predicate reads as Admins alone. It is never stored as *groups* over an empty list.
 
-**A Restricted connected source's named people are a `group` row** of ADR 0038's audience-minted origin, and `audience_groups` names its id. Nothing here mints one. Connected source management mints it.
+**A Restricted connected source's named people are a `group` row** of ADR 0038's audience-minted origin, and `audience_groups` names its id. Nothing here mints one. Connected source management is to mint it, and nothing does yet.
 
 ## Why
 
@@ -71,3 +71,5 @@ A passage carries no pair of its own. It reads its connected source's through `i
 The full record, with no amendments: `docs/archive/adr/0039-audience-word-and-group-ids.md`.
 
 Amended 09/10/2026 by the plan for BA-85 (`docs/plans/2026-10-09-1517-fix-sync-narrows-citing-concepts-plan.md`): a narrowing by the worker's sync re-derives on the api's tick, not in a transaction of its own.
+
+Later decisions overturned three rules of the record. The passage carried the audience pair, and the worker wrote it on passage rows, until ADR 0044 read a passage's visibility from its connected source and document. A citation of a document the catalogue did not hold contributed no connected source, until the archived ADR 0023's amendment of 11/09/2026 refused it at the write. The `NOT NULL` word, the CHECK's read-back and refusal tests, the derived edges, the two slices of the cascade and the narrowing's refusals were missing from this doc until 20/10/2026 (BA-215).

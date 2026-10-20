@@ -27,9 +27,14 @@ A concept's `type`, its kind, is the short string its producer chose, folded at 
 
 - The Kinds list is the set of kinds in use, derived from the concept index with counts per kind and per collection. It is never a file in the bundle, never a table an Admin curates, and never checked closed-world.
 - A new kind arrives with the concepts that carry it. The suggestion set's summary names it, and accepting the concepts accepts the kind.
-- An Admin renames or merges a kind from the Kinds list on Knowledge. That is one bulk commit that rewrites every affected `type`. The same transaction re-keys `concept_identity`, because `type` is inside the merge key.
-- A kind's definition is a `Term` concept in a glossary collection. Tags stay free strings.
-- An alias is knowledge: a confirmed alias lands as an *Also known as* line in the concept body. `concept_identity` derives its merge-key names from that line and the `title`.
+- The starter kinds a new workspace is offered live in the platform bundle's extraction guidance, which says to prefer them and that a better short kind is fine. They are never a registry.
+- A source-entity type that shares a name with a concept kind uses the same word.
+- An Admin renames or merges a kind from the Kinds list on Knowledge. That is one bulk commit that rewrites every affected `type`. The same transaction re-keys `concept_identity`, because `type` is inside the merge key. Nothing is renamed without a sentence and a count first. The rename shows how many concepts it rewrites before it commits.
+- Kind drift has one signal, *kinds with two or fewer concepts* per workspace. There is no count of links that carry no relation.
+- A kind's definition is a `Term` concept in a glossary collection. Tags stay free strings, and the api writes nothing into a concept's `tags`. A tag names a context or a tier, never a guide or an audience, and the extraction guidance says so rather than a check. The tag chips and a guide's tier axis derive from links to concepts of kind *Tier*, *Framework* and *Sector*, and from the distinct tags in use.
+- An alias is knowledge: a confirmed alias lands as an *Also known as* line in the concept body. `concept_identity` derives its merge-key names from that line and the `title`. When an Admin answers *No* to "Are these the same thing?", the platform keeps a row keyed by the pair and writes an audit event, so it never asks about that pair again.
+
+Not yet in the tree: the Kinds page and its rename (ADR 0047), the starter kinds, a new kind named in the suggestion set's summary, the alias matcher and its remembered *No*, the tag chips, and the drift signal.
 
 A relation between concepts is the link, and it is never named. Every markdown link between concepts is a `LINKS_TO` edge carrying the two endpoint kinds, the section and the sentence around it. There is no relations list, no predicate matcher and no `RELATES_TO` matrix. An agent that wants the predicate reads the sentence.
 
@@ -55,9 +60,13 @@ A kind is an indexed property on the one `Concept` label, never a label of its o
 - Closed-world tags with a platform-written tier tag: a rule with no action.
 - A concept alias as a `concept_identity` row only: the alias leaves with nothing on export.
 - The two bookkeeping edges as properties: a supersession or lineage walk becomes a property scan.
+- A *provisional* state on every unknown kind, or a plan diff of the vocabulary: a registry by another name.
+- The ontology tools open-ontologies, semantica and Hyper-Extract as dependencies of any tier.
 
 ## History
 
 The full record, with its one amendment (ticket 79, applied by T-001): `docs/archive/adr/0026-kinds-emerge-from-the-concepts.md`.
 
 It superseded ADR 0001, which made a per-tenant SKOS-shaped vocabulary file in the bundle authoritative and checked every `type` against it closed-world. It went because OKF registers no kind centrally, and without a second file a rename is already one commit.
+
+Later decisions overturned two rules of the record. The map derived `SUPERSEDES` from a successor's *Supersedes* line as well as its citation, which ADR 0019 rejects. "No seventh screen" fell to ADR 0047's surfaces, groups and pages. The starter kinds, the source-entity word, the rename's count, the drift signal, the rules on tags and the remembered *No* were missing from this doc until 20/10/2026 (BA-215).

@@ -30,16 +30,19 @@ tags:
 - The face function admits before its first `await`. The lint rule `action-admits-before-await` holds it (`packages/devtools/lint-rules/rules/action-admits-before-await.ts`).
 - A face function that takes a person declares what it admits, even where every role may ask: it declares the kernel's `ANY_ROLE`. `packages/core/test/face-admission.test.ts` names one that passes no declaration to `admit`. It also lists each step a face exports, with the action that admits for it.
 - There is no action constructor: a constructed action left GitNexus answering a lower bound.
+- Admission is a pure function of the person and the parsed input, and reads no row. A function that reads a row for an action takes the admitted person first, as its proof of admission.
+- A declaration names neither who opens the transaction nor the audit actions the action writes. The signature and the procedure's context type say the first. The second waits for a sweep that reads an action's audit event, which is not built.
 - The name an audit event is recorded under is its *audit action*.
 
-**A step**, such as `record` or `enqueueJobIn`, runs only inside another action's transaction. It is never declared and has no refusal of its own. After an action's first write, anything it calls rejects.
+**A step**, such as `record` or `enqueueJobIn`, runs only inside another action's transaction. It is never declared and has no refusal of its own. After an action's first write, anything it calls rejects. A step that refuses after the action's rows have landed is a defect, so the action throws, and a step's word such as `role-forbids` never reaches an Admin whose fault was the input.
 
 **A refusal word** means one thing wherever it appears.
 
 - Its owning slice declares it once, in a vocabulary that is plain data. Importing a module registers nothing. The shared words (`malformed`, `role-forbids`, `not-found`) are the kernel's (`packages/core/src/kernel/vocabulary.ts`).
-- One module composes the catalogue: each owner's vocabulary under the owner's name (`packages/core/src/refusals/index.ts`). Every reader takes the words from it. A transport adds only its own, as the api adds its three (`apps/api/src/refusal.ts`).
+- One module composes the catalogue: each owner's vocabulary under the owner's name (`packages/core/src/refusals/index.ts`). Every reader takes the words from it. A transport adds only its own, as the api adds its four (`apps/api/src/refusal.ts`).
+- An action's refusal union is built from catalogued words, so a word no slice declared does not compile. Only a word that can cross an action's face is classed. A store door's own word becomes a defect before it crosses.
 - The classes are in `packages/core/src/kernel/refusal.ts`, beside the function that reads a catalogue and throws on a word two owners declare.
-- It is classed by remedy: *unauthenticated*, *forbidden*, *absent*, *malformed*, *inapplicable*, *conflict* or *precondition*.
+- It is classed by remedy: *unauthenticated*, *forbidden*, *absent*, *malformed*, *inapplicable*, *conflict* or *precondition*. A word that seems to fit two classes takes the one whose transport status says what its caller can do.
 - The catalogue is append-only. A shipped word is never removed and never changes class.
 - `packages/core/test/refusal-words.test.ts` holds that every word is declared once, used and classed.
 
@@ -57,7 +60,8 @@ Each transport:
 - Over tRPC it is a thrown error, typed through `AppRouter` (`apps/api/src/trpc/base.ts`). The error carries the items, and the web reads them as plain words.
 - MCP has its own (`apps/api/src/mcp/crossing.ts`). It answers the set's word alone and drops the items, since no action that names items is an entry.
 - `pnpm ops` maps each class to an exit code (`apps/api/src/ops/index.ts`). A command's refusal is a word, or a word beside the one thing the operator must change. It exits with its word's class. A run that names the file or commit it stopped at is no word. It exits as refused, whatever word it names. Such runs are an import's unsound tree or stopped file, and a reconcile's stopped replay. An import's manifest commit that the git door refuses as malformed is a defect in the import, so it stays an error and exits as refused too. The usage text says both. No command's action names items, so items never reach it.
-- A refusal's log line holds its word and class, never an item's id.
+- A refusal's log line holds its word and class, never an item's id, at info. At the crossing an `Error` becomes the protocol's internal failure and is logged there once, at error.
+- A type test holds that no procedure's output is a `Result`. That a word crosses as itself is proved once per class and by the walk of the catalogue, never by driving each word through the api harness.
 - A ceiling is no refusal, since time is its only remedy. An action counting one in its own transaction fails with the kernel's `CeilingMet` (`packages/core/src/kernel/ceiling.ts`), which rolls the count back. tRPC's crossing answers it 429 with `retryAfterSeconds`, as it answers a ceiling met before the action.
 - Procedures are written by hand, so the call graph stays whole.
 
@@ -65,15 +69,18 @@ Each transport:
 
 - A query resolves the member unlocked, in a read-only transaction, so a write anywhere inside it fails at its statement. tRPC sends a query over GET, a method that promises no change, and Postgres holds the promise. A held row needs a read-write transaction, which is why a query's member is read and never held.
 - A mutation reads the member `FOR SHARE`.
-- An own-transaction procedure resolves the Principal in a short transaction, releases the connection, and hands the action the Principal and its doors.
+- An own-transaction procedure resolves the Principal in a short transaction, releases the connection, and hands the action the Principal and its doors. A Principal may outlive the transaction that resolved it, never the request, and an own-transaction action judges it again under the shared lock.
+- A procedure that holds a transaction cannot reach a Postgres door, because its context's type gives it none.
 
 An MCP entry's transaction opens as the entry's `readOnlyHint` declares: read-only where the entry tells the host it only reads, read-write otherwise (ADR 0030). A read-write entry reads the member `FOR SHARE`, as a mutation does, so a revocation waits on its commit.
 
 An MCP entry may take the own-transaction road instead. The surface resolves the member in a short transaction, releases the connection, and hands the entry fixed steps, never a door. For such an entry, read-only excludes the platform's own account of the call: the record of the question and the spend rows (ADR 0030). `ask` is the first. The road is in the tree, and so is the held member of a read-write entry. On the web, `ask` is a tRPC procedure on the own-transaction road, handed the same fixed steps. Its work runs apart from the stream that reads it. So a reader who leaves ends the model call in flight, and the work still leaves a completed record and settled spend. The stream sends its phase at once, and a keep-alive whenever it has been quiet for 25 seconds, because Cloudflare ends a response that has been quiet for 125.
 
-Every Postgres door rolls back when its work answers a refusal or throws. A principal-scoped door answers its own refusal apart from its work's. An action that wants one union of the two calls `folded` on it. One composition root, `openDoors` in `apps/api/src/doors.ts`, opens the four doors and the Clock (ADR 0040) and states the pool's size.
+Every Postgres door rolls back when its work answers a refusal or throws. A principal-scoped door answers its own refusal apart from its work's. An action that wants one union of the two calls `folded` on it, and `folded` refuses, in the type, a work whose answer is only partly a `Result`. One composition root, `openDoors` in `apps/api/src/doors.ts`, opens the four doors and the Clock (ADR 0040) and states the pool's size.
 
-**Input is parsed once, at the entry**, by the kernel's `parse` (`packages/core/src/kernel/parse.ts`) over a schema the slice owns. Instants cross every wire as ISO-8601 text, with no transformer. The upload is a tRPC mutation over `application/octet-stream`, with its descriptor travelling beside the bytes. It needs no exception to ADR 0006.
+**Input is parsed once, at the entry**, by the kernel's `parse` (`packages/core/src/kernel/parse.ts`) over a schema the slice owns. Instants cross every wire as ISO-8601 text, with no transformer. Shape is refused before role, because a shape says nothing of a workspace's state. MCP's flat wire shape maps into the action's schema and is not forced to be that schema.
+
+The upload is a tRPC mutation over `application/octet-stream`, with its descriptor travelling beside the bytes. It needs no exception to ADR 0006. The descriptor travels as request headers the web's link sets. The procedure gathers them once and parses them with the kernel's `parse`, and a test fails when a field's header differs between the web and the api. The upload action counts the bytes it streams and refuses past the cap as `too-large`, and the cap is one exported constant. A second octet-stream mutation, when one comes, carries its descriptor inside the typed input through a custom link.
 
 ## Why
 
@@ -91,7 +98,8 @@ Every Postgres door rolls back when its work answers a refusal or throws. A prin
 - A constructed action: the code index answers a lower bound for it.
 - A constructor that also parses or owns the transaction: ownership differs by action.
 - Own-transaction actions each resolving their own Principal: `putObject` and `withRepositoryLock` take one outside any Postgres transaction.
-- A refusal as a value on the wire: every read page would branch on it, and a cached web app could do nothing with a word it had never met.
+- A refusal as a value on the wire: every read page would branch on it, and a cached web app could do nothing with a word it had never met. If a page needs per-procedure exhaustiveness, it gets a type-only map beside `AppRouter`.
+- A door that commits a refused work, with the throw moved to the crossing function alone: the rows landed before the refusal stay.
 - A check read before a set's write, to name the items it would refuse: another Admin's action can land between the read and the write.
 - No classes and a table per transport, or one flat list of words.
 - Capability-typed doors with no declared admission, a per-slice manifest a router is generated from, or schemas generated from types.
@@ -99,7 +107,7 @@ Every Postgres door rolls back when its work answers a refusal or throws. A prin
 
 ## History
 
-The full record, with its four amendments (T-232, T-230, T-338, the T-027 and T-028 grill): `docs/archive/adr/0043-what-an-act-is.md`.
+The full record, with its four amendments (T-232, T-230, T-338, the T-027 and T-028 grill): `docs/archive/adr/0043-what-an-act-is.md`. Admission's purity, the admitted person first, what a declaration leaves out, the step that refuses late, the compiled refusal union, the store door's word, the tie-breaker between classes, the error's log line, the output type test, the crossing's proof, the Principal's lifetime, the procedure with no door, `folded`'s type, the shape before role, MCP's flat shape, the upload's headers, cap and second mutation, and the per-procedure map were missing from this doc until 20/10/2026 (BA-215).
 
 A refusal naming items came with the people layout rework (`docs/plans/2026-10-01-1807-feat-people-layout-rework-plan.md`, KTD1), and a ceiling counted inside an action with its invitations (KTD11).
 

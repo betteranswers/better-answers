@@ -28,13 +28,13 @@ A concept's identity is an IRI the platform mints when the concept is created: `
 
 - It sits on the bare apex, `better-answers.com`, never on a product hostname such as `app.`.
 - It is opaque. It is never derived from the path, the bundle or the workspace, so it leaks no name wherever it appears: in the bundle, in MCP output, in an exported skeleton.
-- It is a code-owned `iri` key in the concept file. No caller sets it, and the governed write preserves it as it preserves `generated`.
+- It is a code-owned `iri` key in the concept file. No caller sets it, and the governed write preserves it. A caller may name an existing concept by its IRI, but cannot mint or change one.
 - It is the stable key across renames and regeneration. Verification history hangs on it, and a concept in one bundle uses it to refer to a concept in another.
-- The file path stays OKF's own identity for a concept within its bundle.
+- The file path stays OKF's own identity for a concept within its bundle. Across a bundle estate, a concept's key is `<bundle-id>:<path>`, its bundle's manifest id joined to its path. With one bundle per workspace (ADR 0003), the tree keys a concept on its workspace and path.
 - Until a resolver is designed, an unauthenticated request for an IRI answers the same 404 whether the IRI exists or not.
 - v0.1 ships no cross-bundle links. The reference form is fixed now so nothing is rewritten when they arrive.
 
-A bundle's identity lives in its manifest, a platform-reserved file at the bundle's root: `knowledge/manifest.yaml` inside the workspace repository. It carries the bundle's id, origin, ref or commit, owner and content version. The platform derives its record of the bundle from it. The manifest sits at the bundle's root, not the repository's, so an imported bundle carries its own under `imports/<vendor>/`.
+A bundle's identity lives in its manifest, a platform-reserved file at the bundle's root: `knowledge/manifest.yaml` inside the workspace repository. It carries the bundle's id, origin, ref or commit, owner and content version. The platform derives its record of the bundle from it. The manifest sits at the bundle's root, not the repository's. A workspace repository holds each bundle under its own root: the company's under `knowledge/`, the platform bundle under `platform/`, and each imported bundle under `imports/<vendor>/` with its own manifest. Only `knowledge/` exists in the tree today.
 
 `okf://` is an MCP wire URI and never a file reference. A concept file refers to another concept by its absolute HTTPS IRI. On the wire yes, in a file never.
 
@@ -57,3 +57,5 @@ A bundle's identity lives in its manifest, a platform-reserved file at the bundl
 ## History
 
 The full record, with its three amendments (tickets 38, 22 and 79, the last applied by T-001): `docs/archive/adr/0002-concept-and-bundle-identity.md`.
+
+The estate key and the three bundle roots were missing from this doc until 20/10/2026 (BA-215). The same reading found that the governed write does not preserve `generated`, which this doc had claimed, so the `iri` bullet no longer leans on it.

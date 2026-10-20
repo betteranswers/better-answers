@@ -27,11 +27,13 @@ The repository is public under the Apache License 2.0, one licence over the whol
 
 - Copyleft is run-only. Third-party code is lifted or depended on only under MIT, BSD, ISC, Apache-2.0 or the PostgreSQL licence.
 - GPL and AGPL software, such as Garage, runs unmodified as a separate process over a network protocol, never linked, vendored or copied. Nothing under an enterprise-licensed directory is read, not even for its shape.
+- Before a line of a lift is copied, its source's licence is checked against the list, and the result is recorded in the lift's `THIRD_PARTY_NOTICES.md`. A refresh reads the licence again. A lift from a copyleft or enterprise-licensed source is refused, and its design is reimplemented clean-room.
 - The estate's own configuration is not published. The ops documents in `docs/operations/` are public halves naming credential classes, contracts and the deployment shape. The gitignored `.planning/estate/` holds the addresses and the edge-policy placement.
+- Customer material and the local planning map never enter the repository. `.planning` and `.lavish/` are gitignored.
 - No public file names a hostname's Access posture, a rate-limit placement, a firewall rule, a bucket name or an escrow holder. The rule binds operational files, not the ADRs. The compose files, Dockerfiles, wizard, workflows and backup and restore scripts stay public in full.
-- The licence posture binds as this decision's own text. `CODING_STANDARDS.md` carries no licence family. The per-lift file is the lifts rule in `apps/api/AGENTS.md`. Every directory under `lifts/` has a `THIRD_PARTY_NOTICES.md` that names the contract test a refresh must pass, and that test sits in the tier's own `tests/`. For example, `apps/api/lifts/better-auth-cimd-node/` names `apps/api/tests/cimd-fetch.test.ts`.
+- The licence posture binds as this decision's own text. `CODING_STANDARDS.md` carries no licence family. The per-lift file is the lifts rule in `apps/api/AGENTS.md`. Every directory under `lifts/` has a `THIRD_PARTY_NOTICES.md` that names the contract test a refresh must pass. For example, `apps/api/lifts/better-auth-cimd-node/` names `apps/api/tests/cimd-fetch.test.ts`. Source taken from a component registry into `apps/web/src/shared/ui/` carries a `THIRD_PARTY_NOTICES.md` as a lift does, under the same licence list.
 - There is no root `THIRD_PARTY_NOTICES.md` aggregate and no `check` licence step.
-- The public face is read-only. Issues are open, outside pull requests are closed with a fixed note, and `SECURITY.md` names one address for vulnerability reports.
+- The public face is read-only. Issues are open, outside pull requests are closed with a fixed note, and `SECURITY.md` names one address for vulnerability reports. No outside person commits.
 
 ## Why
 
@@ -56,3 +58,5 @@ The repository is public under the Apache License 2.0, one licence over the whol
 ## History
 
 The full record, with its two amendments (ticket 79's Q10, applied by T-001, and T-078): `docs/archive/adr/0027-open-core-under-apache-2-0.md`.
+
+The licence check before a lift, the clean-room path, the registry notice, the gitignored planning material and the no-outside-committer rule were missing from this doc until 20/10/2026 (BA-215). The same reading found that a lift's contract test does not always sit in its own tier's tests, so this doc no longer says it does.

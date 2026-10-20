@@ -27,8 +27,8 @@ tags:
 A passage's visibility is read, not carried. `index.readable_passage` is a `security_invoker` view that joins the passage to its connected source and its document (`packages/schema/migrations/0044_the-readable-chunk.sql`, as `readable_chunk` and `narrower_class`, renamed by `0069_the-passage.sql` and `0072_the-knowledge-words.sql`).
 
 - `published_at`, `audience` and `audience_groups` are the connected source's.
-- `sensitivity` is the narrower of the connected source's sensitivity and the document's, by `narrower_sensitivity`. That is the document's *effective class*.
-- `narrower_sensitivity` is the one SQL statement of the sensitivity ranking.
+- `sensitivity` is the narrower of the connected source's sensitivity and the document's, by `narrower_sensitivity`. That is the document's *effective class*. The view joins the connected source inner and the document left, so a passage with no document row reads at its connected source's sensitivity, because `narrower_sensitivity(a, NULL)` returns `a`.
+- `narrower_sensitivity` is the one SQL statement of the sensitivity ranking. The worker folds its special-category verdict into `source_document.sensitivity` with the same function. The api keeps its own ranking for the widening refusals an action makes before it writes, and the core suite holds it equal to `narrower_sensitivity` for every ordered pair.
 - `passageAt`, `findPassages` and `previewPassages` (`packages/core/src/sources/passages.ts`) read the view.
 - A passage whose connected source row is gone is unreadable.
 
@@ -65,4 +65,4 @@ Only S8 measuring a need for the filter columns on the indexed table reopens thi
 
 ## History
 
-The full record, with its one amendment (T-324): `docs/archive/adr/0044-chunk-visibility-is-read-not-copied.md`.
+The full record, with its one amendment (T-324): `docs/archive/adr/0044-chunk-visibility-is-read-not-copied.md`. The view's two joins, the worker's use of the same function and the api's tested twin ranking were missing from this doc until 20/10/2026 (BA-215).

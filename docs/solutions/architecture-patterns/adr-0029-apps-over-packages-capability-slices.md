@@ -25,24 +25,30 @@ tags:
 
 ## The decision
 
-The tree is `apps/` over `packages/`: `apps/` is what deploys and `packages/` is what is imported. `apps/api` is the product's one TypeScript deployable and holds transports only. Business logic is `packages/core`, a library the api depends on, organised as capability slices over four store doors.
+The tree is `apps/` over `packages/`: `apps/` is what deploys and `packages/` is what is imported. `apps/api` is the product's one TypeScript deployable and holds transports only. `apps/web` groups its code as features, one per area of the product. Business logic is `packages/core`, a library the api depends on, organised as capability slices over four store doors. It exports named entry points only, and its `exports` map has no wildcard entry.
 
 - `kernel/` holds the Principal, branded ids, the error vocabulary and `Result`: types and pure functions.
 - `access/` holds the read predicate, defined once with one SQL renderer.
-- `store/` holds the four doors, one per shared store, and is the only place a connection is made: `store/postgres`, `store/git`, `store/map` and `store/objects`. Each door is exported under its own name, such as `@better-answers/core/store/postgres`. There is no `store` barrel and no `./store` entry.
+- `store/` holds the four doors, one per shared store: `store/postgres`, `store/git`, `store/map` and `store/objects`. Each door is exported under its own name, such as `@better-answers/core/store/postgres`. There is no `store` barrel and no `./store` entry. `store/postgres` holds the handle, the transaction helpers and the one place that sets `app.workspace_id` from the Principal. Only `store/objects` builds the per-workspace key prefix in the object store.
 - `llm/` and `audit/` are layers every slice may use.
 - A slice is the capability that owns a set of tables and the invariants over them. The slices today are `sources`, `concepts`, `answering`, `guides`, `erasure`, `runs`, `workspaces`, `members` and `sweeps`. `erasure` sits on top, and no slice imports it.
 - `refusals/` holds the refusal catalogue, each slice's vocabulary under its owner's name (ADR 0043). It is no slice, because it owns no table. It imports `kernel` and every slice's face, `erasure` included. Nothing in core but a test imports it.
 
 The import direction has five rules:
 
-1. `kernel` imports nothing else in core.
+1. `kernel` imports nothing else in core, and every zone may import `kernel`.
 2. `access` imports only `kernel`. `store` imports only `kernel`, except that `store/map` also imports `access`, so a traversal template cannot exist without the predicate.
 3. `llm` and `audit` import `kernel`, `access` and `store`, never a slice and never each other.
-4. A slice reaches another slice only through its face, never its internals. The slice graph is acyclic. The refusal catalogue reaches each slice the same way, and sits above the graph.
-5. Nothing in core imports a transport or a transport's dependency, such as `hono`, `@trpc`, `@modelcontextprotocol` or `better-auth`.
+4. A slice imports `kernel`, `access`, the store doors, `llm`, `audit` and other slices' faces. It reaches another slice only through its face, never its internals. The slice graph is acyclic. The refusal catalogue reaches each slice the same way, and sits above the graph.
+5. Nothing in core imports a transport or a transport's dependency, such as `hono`, `@trpc`, `@modelcontextprotocol` or `better-auth`. A transport reaches core only through an entry the `exports` map names.
 
-All five are one rule in the repository's own lint plugin, `better-answers/import-direction`, in `packages/devtools/lint-rules/rules/import-direction.ts`. For each import, it places both ends in a zone by their position under the package whose `package.json` names `@better-answers/core`. A face is a directory's `index.ts` that the `exports` map in `packages/core/package.json` names. The rule refuses a face the map does not name. Inside a slice, the slice is the unit, so its own subdirectories reach each other freely. `import/no-cycle` holds rule 4's acyclic clause. `packages/core/test/import-direction.test.ts` holds each refusal where it fires and where it stays silent.
+All five are one rule in the repository's own lint plugin, `better-answers/import-direction`, in `packages/devtools/lint-rules/rules/import-direction.ts`. For each import, it places both ends in a zone by their position under the package whose `package.json` names `@better-answers/core`. A face is a directory's `index.ts` that the `exports` map in `packages/core/package.json` names. The rule refuses a face the map does not name. Inside a slice, the slice is the unit, so its own subdirectories reach each other freely. `import/no-cycle` holds rule 4's acyclic clause. `packages/core/test/import-direction.test.ts` holds each refusal where it fires and where it stays silent. It also proves the zone table against the real tree both ways, and that the committed tree lints clean.
+
+- The rule judges a relative import and an `@better-answers/core/<entry>` import alike. Its refusal names the clause it holds, and for a face the map does not name it names the entry to add.
+- A new slice or door needs no line anywhere. A new layer is one line in the rule, added after an amendment here names it.
+- No `no-restricted-imports` override covers `packages/core`, so the base bans on `drizzle-zod` and `better-auth` reach core without being restated.
+
+Decided and not yet in the tree: CI holding `packages/core`'s dependencies to an allowlist; `unicorn/filename-case` over `packages/core`; a line ceiling on a store file as a lint warning, with its split recipe written before the first breach; the SPA's zone overrides moved to a web zone table beside core's; and a check that a directory move moves every path that names it in the same commit.
 
 Every query reaches its store through a store door in `packages/core/src/store/`. Row-level security is the tenancy guarantee (ADR 0032), and the door is ergonomics over it. A transaction that spans slices lives in the slice that owns the action.
 
@@ -61,7 +67,8 @@ Every one of the four doors is real in a test, and none may be faked. `CODING_ST
 
 - A directory plus a lint rule: no export list, so an interface by convention only.
 - Folders named for the knowledge layers plus `records/`: every capability cuts across them, and `records/` becomes a wastebasket.
-- A `principal/` folder or a Control Centre folder: a Principal is a kernel type, and Control Centre composes slice reads in the api's routers.
+- A `principal/` folder or a Control Centre folder: a Principal is a kernel type, and Control Centre composes slice reads in the api's routers. A slice function has no Admin-only branch either.
+- Drizzle tables split per slice inside core, so a cross-slice table read becomes an import: the table-ownership scan does that job over one schema package.
 - Two TypeScript deployables for the product, splitting `/agent/v1` off: nothing varies across that seam yet.
 - Vertical slices with no cross-slice imports at all: slices share one database, so it forces duplicated queries or a `shared/` wastebasket.
 - `resources/` for the persistence modules: *resource* is MCP's word.
@@ -76,3 +83,5 @@ Amended 10/10/2026 by the refusal catalogue plan (`docs/plans/2026-10-10-1241-re
 Amended 19/10/2026 on the owner's ruling of 19/10/2026, by BA-204. `apps/test-inbox`, a second TypeScript deployable outside the product, is retired with the signed-in production journeys until go-live, so `apps/api` is again the one TypeScript deployable.
 
 The full record, which retired the constitution's tenancy rule to ADR 0032 and whose tier-contract consequences ADR 0031 enacted and corrected, with its amendments (T-078, T-048, T-053, T-114, T-117, T-118, T-253): `docs/archive/adr/0029-apps-over-packages-capability-slices.md`.
+
+The record gave `apps/api` the worker control plane's HTTP face, which ADR 0005's amendment of 25/08/2026 replaced with rows. The SPA's features, core's named entries, the zones' reach, what `store/postgres` and `store/objects` alone do, the lint rule's own rules, the Admin-only branch and what is not yet built were missing from this doc until 20/10/2026 (BA-215). The same reading found that `apps/api/src/doors.ts` makes the Postgres pool the door wraps, so this doc no longer says `store/` is the only place a connection is made.

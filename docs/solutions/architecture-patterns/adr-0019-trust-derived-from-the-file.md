@@ -25,18 +25,36 @@ tags:
 
 Everything a reader is told about a concept's trust is derived from its OKF file, by the spec's own rules, and never stored in it. It is told in a fixed set of words and moved only by a check.
 
-- Verifier ≠ generator, enforced on the producer part of the actor string.
+- Verifier ≠ generator, enforced on the producer part of the actor string. Nobody may verify a version they made. That rules out both the person whose edit made the current version of a concept or write-up, nor the person who accepted the rewrite that made it. The owner stays answerable.
 - A verification needs view on every source the concept cites. Otherwise the page says *cannot check, source restricted*.
+- Every verification row carries its origin: `platform`, `imported`, `citation-fix` or `erasure-rewrite`. An imported verification has no content hash, so it never reads *Changed since verified*, and its verification interval counts from its `at`.
 - The words are *Verified by*, *Verified automatically*, *Unverified*, *Changed since verified*, *Out of date*, *Draft*, *Left* and *Deprecated*, plus two riders, *· imported* and *· source moved on*. A rider never changes the tier. *Restricted* is a sensitivity value only.
-- *Out of date* comes from `stale_after` alone. Its absence means no shelf life.
-- *Changed since verified* comes from `content_hash`: RFC 8785 canonical JSON of the frontmatter without `generated`, `verified`, `stale_after`, `status` and `iri`, with `sources[]` reduced to ordered `(resource, locator)` pairs, plus the normalised body.
-- Supersession is derived, never keyed: only a citation of a deprecated concept of the same `type` is a succession.
+- *Out of date* comes from `stale_after` alone. Its absence means no shelf life. `stale_after` is read as a date or as a datetime with an offset, and written as the UTC date.
+- *Changed since verified* comes from `content_hash`: canonical JSON of the frontmatter, keys sorted and each value as its JSON text, without `generated`, `verified`, `stale_after`, `status` and `iri`, with `sources[]` reduced to ordered `(resource, locator)` pairs, plus the normalised body.
+  - Each `sources[].resource` path is resolved to its `/abs.md` form first. The parser reads a path written as `/abs.md`, `./rel.md` or bare `dir/x.md`.
+  - The body has `\r\n` turned into `\n`, trailing whitespace stripped from each line, and exactly one trailing newline.
+  - So renaming a heading or swapping a source changes the hash. Fixing a source's title, writing a source path in another form, or editing `stale_after` does not.
+- Supersession is derived, never keyed: only a citation of a deprecated concept of the same `type` is a succession. Every commit that deprecates a concept revisits its inbound lineage, so each citing concept's edge is relabelled `SUPERSEDES` or `DERIVED_FROM`.
+- A draft `Answer` with no evidence cannot be verified. Its owner or an Admin moves it to `stable` once evidence is attached.
+
+The code owns four keys of a concept file: `iri`, `generated`, which moves only when the content hash moves, the `verified` events the platform writes, and `status` on deprecation. Every normaliser is a pure function in `packages/`, and the worker has its twin.
+
+Decided and not yet in the tree:
+
+- The verify action, with its refusal of a version's maker and the verification interval.
+- A supersession chain walked with a visited set to its newest concept that is not deprecated, where `find` and `ask` land.
+- One *cited concept deprecated* verification request for each write-up that cites a deprecated concept, with *use the successor* inline.
+- A filter on Knowledge that includes deprecated concepts, for Admins only.
+- `generated` moved when the hash moves, and `stale_after` written by the platform.
+- The import rewriting each file once in Google's key order, and round-trip tests in CI on Google's four sample bundles and openwiki's wiki.
+- The actor alias as a record attached by IRI, and `sources[].author` stripped for documents of company origin.
 
 A person in a file is `human:<email>`.
 
 - Only an erasure, on a valid request, rewrites it, across history, to `human:<erasure pseudonym>`. A reader then sees *Verified by a former member*.
 - The erasure pseudonym is a per-workspace id minted at erasure. It is never the person id (ADR 0035).
-- On a record the platform keeps, a person is `human:<person id>`. An erasure rewrites it to `human:<erasure pseudonym>` on every such record but the audit log, which no routine rewrites.
+- On a record the platform keeps, a person is `human:<person id>`. An erasure rewrites it to `human:<erasure pseudonym>` on the records ADR 0020 lists: `bundle_commit`, `concept_verification`, the commit trailers and *Questions asked*. The audit log is never rewritten. A suggestion's proposer and decider are not rewritten yet.
+- When the erasure routine rewrites a file, it moves each standing verification's hash with it and marks it `erasure-rewrite`, so an erasure never makes a concept read *Changed since verified*.
 
 ## Why
 
@@ -71,3 +89,7 @@ Amended 03/10/2026 by the glossary plan (`docs/plans/2026-10-02-2325-docs-glossa
 Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-160 (`docs/plans/2026-10-14-1811-fix-erasure-late-commit-and-actors-plan.md`). The rule that "no routine rewrites" a person id now holds for the audit log alone. An erasure rewrites `bundle_commit.actor`, `concept_verification.actor` and the commit trailers to the pseudonym, as ADR 0020 says, so a verification by a person erased while they hold another workspace reads *Verified by a former member*.
 
 The view-on-every-source condition, in the archived record, was missing from this doc until 20/10/2026, when a sample of the map tickets found V1 resting on it.
+
+Later decisions overturned two rules of the record. The emitter wrote links as `/abs.md` paths, until ADR 0002's amendment of 30/08/2026 made a file refer to another concept by its HTTPS IRI. A discarded concept's citers read *no longer exists*, until ADR 0012 gave a cited concept no ending but deprecation.
+
+The rule against verifying one's own version, the origins, `stale_after`'s forms, the hash's normalisation and examples, the lineage relabel, the draft `Answer`'s road to stable, the code-owned keys, the erasure's moved hashes and what is not yet built were missing from this doc until 20/10/2026 (BA-215). The same reading found that the erasure does not reach every record that names a person yet, and that the hash's canonical JSON is not RFC 8785's for numbers, so this doc no longer claims either.

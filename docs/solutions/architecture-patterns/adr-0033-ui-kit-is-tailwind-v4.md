@@ -26,17 +26,20 @@ tags:
 
 The interface is Tailwind v4. Its theme is the design system's tokens, read through one bridge stylesheet, `packages/design-system/tokens/tailwind-bridge.css`. There is no `tailwind.config.js`.
 
-- In a page, a colour, a size or a radius that is not a theme value from the tokens is a defect. The bridge is the one place a literal may stand, and only where a token cannot reach. A page reads a type step as `var(--text-lg)`, because the design system owns the `--text-*` names.
-- Components come from three shadcn registries: shadcn for the primitives, Kibo UI for the composed pieces, and Vercel AI Elements for answers. They arrive as source in this repository, and each is reviewed before it lands.
+- In a page, a colour, a size or a radius that is not a theme value from the tokens is a defect. The bridge is the one place a literal may stand, and only where a token cannot reach, with a comment saying why. A page reads a type step as `var(--text-lg)`, because the design system owns the `--text-*` names.
+- `packages/design-system/styles.css` imports each token file by an explicitly relative path in the plain-string form, never `url()`, or a bundler reads the path as a package name and every utility class loses its token. The SPA's stylesheet imports it before Tailwind, because a nested `@import` may follow only another `@import`.
+- The product makes no third-party font request. Geist and Geist Mono are self-hosted through `@fontsource-variable`.
+- Components come from three shadcn registries: shadcn for the primitives, Kibo UI for the composed pieces, and Vercel AI Elements for answers. They arrive as source in this repository, and each is reviewed before it lands. A registry item has no version of its own, so its pin is the CLI version, the registry URL and the date, recorded in `apps/web/src/shared/ui/THIRD_PARTY_NOTICES.md`. On arrival every relative import is rewritten to name its `.ts` or `.tsx` file, and the `"use client"` directives are removed. If AI Elements' streaming components fight the register, this decision is amended, not quietly worked around.
 - The registries own behaviour: keyboard handling, focus, ARIA wiring, virtualisation and streaming. The platform owns meaning: the trust words, the citation unit, the register and the glossary's vocabulary. Where the two meet, we take their component, skin it, and keep the meaning in ours.
 - The web's wording follows Kibo UI's patterns: their strings where one fits the product, their casing for each kind of text, and sentences written in the same manner where Kibo has none. In that wording the trust words and the glossary's words stay the platform's own. `packages/design-system/readme.md` holds the rule and its examples.
+- A page says what happened inline, in a live region beside the control that caused it. The product has no toasts.
 - The design system's own components are deleted. Its tokens, stylesheet and bridge stay.
-- The components live in `apps/web/src/shared/ui/`, with `kibo-ui/` and `ai-elements/` beside the shadcn primitives. `apps/web/components.json` records the registries and aliases.
-- `.oxlintrc.json` turns off four rules that judge how a component is written, over `apps/web/src/shared/ui/**` alone. Every import rule, the accessibility rule at the page and the anti-slop rules stay on.
+- The components live in `apps/web/src/shared/ui/`, with `kibo-ui/` and `ai-elements/` beside the shadcn primitives. `apps/web/components.json` records the registries and aliases. The `cn` helper the registries expect is `apps/web/src/shared/lib/utils.ts`.
+- `.oxlintrc.json` turns off four rules that judge how a component is written, over `apps/web/src/shared/ui/**` alone. Every import rule, the accessibility rule at the page, the anti-slop rules and `no-console` stay on.
 - Kibo UI's `table` is rejected, because it is written against `@tanstack/react-table` v8. The shadcn `table` primitive stands in.
-- better-auth-ui is not used. The auth module's own TanStack Query factories replace better-auth-ui's provider, its `localization` and its hooks. They sit over the `better-auth` client, in `apps/web/src/features/auth/auth-hooks.ts`. The module's words files, `sign-in-words.ts` and `workspace-words.ts` among them, hold the words its pages show. The package and its two `declare module` augmentations are gone.
+- better-auth-ui is not used. The auth module's own TanStack Query factories replace better-auth-ui's provider, its `localization` and its hooks. They sit over the `better-auth` client, tRPC and the api's own sign-in routes, in `apps/web/src/features/auth/auth-hooks.ts`, under a query-key space the module owns. The module has no provider: its hooks use the SPA's one query cache, and the router root renders its outlet directly. The module's words files, `sign-in-words.ts` and `workspace-words.ts` among them, hold the words its pages show. The package and its two `declare module` augmentations are gone.
 - better-auth-ui's 28 rendered sign-in files stay refused. They are sign-up, password and social pages for a product this platform does not have.
-- `apps/web` stays on `moduleResolution: "bundler"` on the SPA's own grounds: Vite builds it and nothing in it is emitted.
+- `apps/web` stays on `module: "preserve"` with `moduleResolution: "bundler"` on the SPA's own grounds: Vite builds it and nothing in it is emitted. `apps/api` and all other code Node runs stays on `nodenext`.
 
 ## Why
 
@@ -55,9 +58,12 @@ The interface is Tailwind v4. Its theme is the design system's tokens, read thro
 - MUI, Mantine or Chakra: each owns meaning as well as behaviour.
 - Headless primitives alone, Radix or Base UI: the registries add composed pieces at no coupling cost.
 - better-auth-ui's provider, `localization` and headless hooks: taken on 03/09/2026 and reversed two days later.
+- Toasts for outcomes, through better-auth-ui's `error-toaster`: a toast announces the same sentence a second time and brings two dependencies.
 
 ## History
 
 The full record, with its three amendments (T-036, T-037, T-046): `docs/archive/adr/0033-ui-kit-is-tailwind-v4.md`.
 
 Amended 13/10/2026 by the web wording plan (`docs/plans/2026-10-13-1101-fix-web-wording-and-stock-refusals-plan.md`, R5 and R7). The platform's meaning took in the wording of each page, written to its own rules. The web's wording now follows Kibo UI's patterns, and the platform keeps the trust words and the glossary's words. The registries still own behaviour, and no component's source changes by this.
+
+The registry pin, the rewrite on arrival, `no-console`, the self-hosted fonts, the stylesheet imports, the inline outcomes, `cn`, the module settings, the auth module's query keys and missing provider, and the bridge's comment were missing from this doc until 20/10/2026 (BA-215). The same reading found that the answer page draws its own components, not AI Elements' (`docs/plans/2026-10-09-1344-feat-s2a-search-and-concept-page-plan.md`, line 208), with no amendment here, and that the auth factories also call tRPC and the api's routes.

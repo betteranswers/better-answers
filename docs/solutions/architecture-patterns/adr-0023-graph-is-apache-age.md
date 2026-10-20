@@ -28,10 +28,12 @@ The engine is ADR 0032's: plain Postgres tables under RLS. This record holds the
 
 - Every node and edge carries `workspace_id` and the three visibility terms. `workspace_id` is a term of the `WHERE` on every element of every path, beside the read predicate.
 - The bundle-and-record delta lands in the api's commit transaction, beside the concept index row, the `bundle_commit` and the audit event. The map is never behind for an edit.
-- Generations survive only for full rebuilds. A rebuild writes the next generation beside the live one and swaps with one row update.
+- Generations survive only for full rebuilds. A rebuild writes the next generation beside the live one and swaps with one row update. It checks its parse against the concept index, and flips the new generation live even on a mismatch.
+- The worker's nightly audit parses every concept file again and compares its content hash with the concept index row. It also lists a file with no row and a row with no file. Any finding sets bundle health to *mismatched*. Rebuild-equivalence is a named running test, which proves that a rebuild from the bundle and the records reproduces the live map exactly.
+- The worker writes the full rebuild. It is also to write source entities, document by document, in the sync that lands their rows, with each document's connected source and sensitivity. cocoindex has no map target.
 - Keys are never text: concepts by IRI, sections by `(IRI, slug)`, source entities by `(document, type, normalised-text hash)`, actors by `(workspace, actor id)`, write-ups by `(record id, version)`.
-- A confirmed alias merge makes a canonical entity. Each contribution hangs off it by `SAME_AS`, under its own connected source, sensitivity and audience.
-- The label set is closed and owned by the migrations. A concept's kind is a property, never a label.
+- A confirmed alias merge makes a canonical entity. Each contribution hangs off it by `SAME_AS`, under its own connected source, sensitivity and audience. A `Person` concept links to a canonical entity by `IS_CONCEPT` and is never merged into it.
+- The label set is closed and owned by the migrations: `Concept`, `Section`, `Source`, `Actor`, `WriteUp`, `Evidence` and `CanonicalEntity`. Source entities use their own set, prefixed `source-entity:` and carrying no generation. A concept's kind is an indexed property, never a label.
 - A `Person` concept starts Restricted whatever its evidence says. Only a recorded Admin override widens it.
 
 The read predicate (published · sensitivity · audience) lives once, as `readableClause` in `packages/core/src/access/index.ts`. It is tested against columns: `published_at`, `sensitivity`, `audience` and `audience_groups` on `concept_index`, `write_up`, `map_node` and `map_edge`. For a passage it is tested against `index.readable_passage`'s columns, because a passage's visibility is read from its connected source and document and not carried (ADR 0044). The map door, `packages/core/src/store/map/index.ts`, applies it to every node and edge of a walk, and the template caps depth at 4.
@@ -44,7 +46,15 @@ A sensitivity is derived:
 - Audiences combine by intersection, with *everyone* the identity. An empty intersection forces Restricted (ADR 0039).
 - A unit resting on nothing takes its fallback: on a creation, the writer's word; on anything else, what the row holds.
 
-The walk's timeout is set per statement, never on a role. A walk enters by key, never by a map-side index, and its entry admits a set of keys. The governed write refuses a citation of a document the workspace's catalogue does not hold (`no-such-document`), so only a concept citing nothing takes the fallback.
+The walk's timeout is set per statement, never on a role. A walk enters by key, never by a map-side index, and its entry admits a set of keys. The governed write refuses a citation of a document the workspace's catalogue does not hold (`no-such-document`), so only a concept citing nothing takes the fallback. `evidence` keys to `source_document` by a composite foreign key that restricts, so no row can cite a document the catalogue does not hold.
+
+Decided and not yet in the tree:
+
+- An erasure's map sweep is part of the erasure, and the sweep's last commit is the timestamp on the erasure report.
+- Source entities on the map, canonical entities and `IS_CONCEPT` edges.
+- Two functional tests of the map door. A `Person` canonical entity merged from a published and an unpublished connected source shows a non-Admin only the published contributions. A Viewer outside a Restricted `Person` concept's audience, reaching it through `IS_CONCEPT`, gets nothing back and no hint of it.
+- *Questions asked* recording the set a walk reached and the depth its cap cut at.
+- The size of each workspace's map tables as a signal (ADR 0025).
 
 ## Why
 
@@ -64,6 +74,8 @@ The walk's timeout is set per statement, never on a role. A walk enters by key, 
 - Deltas only, with no generations: a model choice change, an erasure re-derive and the reconciler need a safe "rewrite everything".
 - The canonical entity as the target contribution's node: it wears one connected source's predicate and gates the whole person.
 - Rewriting merged entities into one node: it loses the per-contribution predicate and cannot be undone.
+- LadybugDB embedded in the worker: it is single-writer, so the api could not walk the map, and answering would move into the worker behind HTTP.
+- Memgraph or FalkorDB: their licences cannot be signed for a multi-tenant service without counsel, for no gain in simplicity.
 
 ## History
 
@@ -72,3 +84,5 @@ The full record, with its seven amendments (among them T-055, T-078, T-113 and T
 Amended 09/10/2026 by the plan for BA-85 (`docs/plans/2026-10-09-1517-fix-sync-narrows-citing-concepts-plan.md`): the worker's sync is the one writer of a sensitivity whose cascade runs on the api's next tick rather than inside its own transaction.
 
 It superseded ADR 0021, which put the map on one shared Neo4j Community instance, rebuilt rather than backed up. That went because it cost more than the port: a JVM reserving about 3 GB for a map of tens of megabytes, a second stateful service that could not be backed up without stopping it.
+
+ADR 0032 also overturned the record's per-workspace worker roles, its regex-allowlisted map names with their lint, and its throw on a query that names no workspace, which row-level security answers with zero rows. ADR 0019 overturned the record's one-hop fallback to a successor IRI on the concept index row. The nightly audit, the rebuild's cross-check, rebuild-equivalence, the worker's map writes, the label set, `IS_CONCEPT`, the evidence key and what is not yet built were missing from this doc until 20/10/2026 (BA-215).

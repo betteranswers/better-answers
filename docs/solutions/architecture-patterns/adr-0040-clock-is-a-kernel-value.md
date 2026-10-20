@@ -22,16 +22,17 @@ tags:
 
 ## The decision
 
-A `Clock`, `{ now(): Date }`, lives in the kernel (`packages/core/src/kernel/clock.ts`). It is a value, not a fifth door. The api builds one `systemClock()` per process and hands it down explicitly. It builds the clock in `openDoors` (`apps/api/src/doors.ts`), which `apps/api/src/main.ts` and `apps/api/src/ops.ts` each call once.
+A `Clock`, `{ readonly now: () => Date }`, lives in the kernel (`packages/core/src/kernel/clock.ts`). It is a value, not a fifth door. The api builds one `systemClock()` per process and hands it down explicitly. It builds the clock in `openDoors` (`apps/api/src/doors.ts`), which `apps/api/src/main.ts` and `apps/api/src/ops.ts` each call once.
 
-- An action that reads one instant and spends it once takes a plain `now: Date` from its caller (`open`, `find`, `approveRequest`, the git door's `CommitRequest.at`).
-- An action that hands the reading on to more than one call takes the `Clock` and reads it itself (`writeConcept`, the reconciler).
+- An action that reads one instant and spends it once takes a plain `now: Date` from its caller (`open`, `find`, `approveRequest`, the git door's `CommitRequest.at`). `find` judges the trust of every hit in a batch against that one instant. The MCP surface reads the clock once per call and hands that `now` to the entry's `run`.
+- An action that hands the reading on to more than one call takes the `Clock` and reads it itself (`writeConcept`, the reconciler). `writeConcept` reads it once and gives the same instant to the index row's `published_at` and to the commit's `at`. The reconciler reads it once per replayed commit, inside that commit's transaction, so each commit is stamped at its own landing.
+- A rate-limit middleware takes the `Clock` and reads it inside the handler it returns, never when it is mounted.
 - No parameter defaults to `new Date()`.
 - A row's own timestamp stays the database's `now()`: the audit log, `bundle_commit` and the worker's job queue.
-- The worker is handed no Clock. Its one clock-shaped read is the ULID minter's, which orders an id and decides nothing.
-- The identity set's `updated_at` columns are stamped by Better Auth inside the library (ADR 0009). Where one of the platform's raw-SQL writes to those tables stamps `updated_at`, that write sets `updated_at = now()`.
+- The worker is handed no Clock. Its one wall-clock read is its ULID minter's (`apps/worker/src/better_answers_worker/ids.py`), which orders an id and decides nothing. The job lease's keep-alive reads a monotonic clock to stop at the job's deadline.
+- The identity set's `updated_at` columns are stamped by Better Auth inside the library (ADR 0009). The identity tables declare no Drizzle `$onUpdate` hook, because Better Auth sets `updatedAt` before Drizzle sees the write, and no database trigger stamps them. `account.updated_at` carries `DEFAULT now()` in the database, as `user` and `verification` do, and `session.updated_at` carries a default in neither place. The default is inert, because Better Auth always supplies `updatedAt`. Where one of the platform's raw-SQL writes to those tables stamps `updated_at`, that write sets `updated_at = now()`.
 
-The gate is a tree scan, `apps/api/tests/no-ambient-clock.test.ts`, over `packages/core/src`, `apps/api/src` and `packages/schema/src`. It has two exemptions: `kernel/clock.ts` and the ULID minter. The lint can now express the same selectors, but the scan stays. In the lint, each exemption would be an override restating every other selector.
+The gate is a tree scan, `apps/api/tests/no-ambient-clock.test.ts`, over `packages/core/src`, `apps/api/src` and `packages/schema/src`. It refuses a `new Date()` with no argument and any `Date.now()`, and passes a `Date` built from an argument. The scan is proved on its own positive and negative cases before it is trusted over the tree. It has two exemptions, `kernel/clock.ts` and the ULID minter (`packages/schema/src/ulid.ts`), and each is proved to still read the clock, so an edit that removed its read fails the gate. The lint can now express the same selectors, but the scan stays. In the lint, each exemption would be an override restating every other selector.
 
 ## Why
 
@@ -41,7 +42,7 @@ The gate is a tree scan, `apps/api/tests/no-ambient-clock.test.ts`, over `packag
 - The smallest interface differs by site. Forcing a `Clock` on sites that read one instant once makes their interface bigger for nothing.
 - A row's timestamp is a fact about when the store committed it. Moving it onto the api's clock would let the transaction time and the process's wall clock disagree about the same row.
 
-A test pins a `now: Date` site with a literal `Date`, and a `clock: Clock` site with an inline `{ now: () => new Date("...") }`. A fixed clock is a fixture, not a kernel export.
+A test pins a `now: Date` site with a literal `Date`, and a `clock: Clock` site with an inline `{ now: () => new Date("...") }`. A fixed clock is a fixture, not a kernel export. The api's test harness takes an optional `clock`, which defaults to `systemClock()`, so a test that must hold the api's time still through HTTP passes its own.
 
 ## Rejected
 
@@ -53,4 +54,4 @@ A test pins a `now: Date` site with a literal `Date`, and a `clock: Clock` site 
 
 ## History
 
-The full record, with its three amendments (T-109, T-138, T-429): `docs/archive/adr/0040-clock-is-a-kernel-value.md`.
+The full record, with its three amendments (T-109, T-138, T-429): `docs/archive/adr/0040-clock-is-a-kernel-value.md`. The one-instant rules of `writeConcept`, the reconciler, `find` and the MCP surface, the middleware's read, the scan's patterns and self-tests, the exemptions' proof, the harness's clock, and the identity tables' hooks, triggers and defaults were missing from this doc until 20/10/2026 (BA-215). The same reading found that the worker's lease keep-alive reads a monotonic clock, added on 20/10/2026, so this doc no longer says the worker's only clock read is the minter's.

@@ -35,12 +35,15 @@ The MCP surface is built on MCP SDK v2, `@modelcontextprotocol/server`, in `apps
 - No MCP library type crosses into `packages/core`. The import-direction lint refuses `@modelcontextprotocol` there.
 - The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`.
 - `open` returns structured content: frontmatter, body, relations, the concept each link in the body leads to, trust state and evidence as fields. The human rendering is derived from it.
-- An MCP App, when built, adds views over three of the entries and no further entry. It uses `@modelcontextprotocol/ext-apps` directly, with `apps/web`'s Vite React toolchain. `okf://` identifies a concept and `ui://` a view; both live on the wire and never in a file.
+- In v0.1 a person proposes a concept on the web, never through an MCP entry or an App form. The governed write's first version is the one where an Admin sees the whole queue.
+- An MCP App, when built, adds views over three of the entries and no further entry. It uses `@modelcontextprotocol/ext-apps` directly, with `apps/web`'s Vite React toolchain. Once it is built, `give_feedback` is a button the App presses in a view, and its description stops assuming the model picks it up in conversation. `okf://` identifies a concept and `ui://` a view; both live on the wire and never in a file.
 - No concept is served as an MCP resource in v0.1. A `ui://` view resource is not a concept.
 
 The **acting** credential class is for actions on our own estate and for the ingestion side. It is never a credential for writing into a customer's other systems. ADR 0041 holds the list of classes it belongs to. `docs/operations/SECRETS.md` glosses *acting* incompatibly, as writing back into a connected system as the user. ADR 0041 records that conflict as unsettled.
 
 The platform builds no outbound connectors to third-party SaaS, no outbound OAuth client, no field mapping or sync engine, no outbound scheduler or webhook fan-out, no per-destination rendering and no connector directory of its own. A person who wants our knowledge in Notion or Asana reaches those systems through their own MCP servers, under their own consent. A nightly sync with no person in the loop would be a new ADR and a new deployable.
+
+SEP-990 is built when a customer asks for it. The `jwt-bearer` grant at Better Auth's token endpoint then checks the assertion's signature, issuer, audience, `typ` and `sub`, and refuses a replayed `jti`. Until then it is watched beside ADR 0009's three triggers. If the self-hosted OAuth path never gains it while hosted alternatives do, that is evidence on the second trigger, not a separate decision.
 
 ## Why
 
@@ -68,7 +71,7 @@ The platform builds no outbound connectors to third-party SaaS, no outbound OAut
 
 ## History
 
-The full record, with its two amendments (the same-day correction to four entries, and T-184): `docs/archive/adr/0030-mcp-surface-stays-mcp-sdk-v2.md`.
+The full record, with its two amendments (the same-day correction to four entries, and T-184): `docs/archive/adr/0030-mcp-surface-stays-mcp-sdk-v2.md`. It kept the SDK's official Hono adapter, which T-004 left untaken for the SDK's own `createMcpHandler` behind the seam above. The web-only proposal, `give_feedback` as an App's button, and SEP-990's checks and watch were missing from this doc until 20/10/2026 (BA-215).
 
 Amended 10/10/2026 on the owner's ruling, by the MCP entry door plan (`docs/plans/2026-10-10-1334-feat-mcp-entry-read-only-door-plan.md`, R1 and R5). An entry's transaction opens as its `readOnlyHint` declares. The read-only query road's plan left this surface unchanged and named the change as a follow-up (`docs/plans/2026-10-10-0123-feat-read-only-query-road-plan.md`). The follow-up waited for a decision of its own under the architecture review's decision 14 (`docs/plans/2026-10-08-2311-docs-architecture-review-before-s2-plan.md`), and the ruling is that decision.
 

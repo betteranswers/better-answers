@@ -42,7 +42,11 @@ What follows from the rule:
 
 - The ticket that introduces a new kind of unit classifies it by the rule, and `CONCEPTS.md` names the layer it lives in. Nothing is registered anywhere else.
 - Q&A pairs are `Answer` concepts. A write-up has two homes, a guide section and a response.
+- A guide's FAQ section or Bid Reference section is a view over the `Answer` concepts linked to its subject. It holds no prose of its own.
+- A bid outcome or a proposal outcome can start a producer run over the `Answer` concepts it used. That is the knowledge side of the outcome loop, fixed in v0.1, though the opportunity records come after v0.1.
 - The kinds in use are derived from the concept index, never a file in the bundle.
+
+Guide sections and the outcome loop are not in the tree yet.
 
 ## Why
 
@@ -59,3 +63,5 @@ What follows from the rule:
 ## History
 
 The full record, with its two amendments (ticket 53 on source entities; ticket 79, applied by T-001, on relations as links): `docs/archive/adr/0011-knowledge-layers-and-the-minting-rule.md`.
+
+The FAQ and Bid Reference sections as views, and the outcome loop's knowledge side, were missing from this doc until 20/10/2026 (BA-215).

@@ -34,17 +34,20 @@ An answer asserts only what a concept states. It is found by traversal before an
 - At the workspace's spending limit `ask` refuses with `spending-limit-met` before any model is called, and the question stays on record.
 - Where no `Answer` is a judged fit and concepts bear on the question, the answer holds those concepts under a verdict of its own, *related knowledge*. A concept bears on a question when it is an entry point or the walk reaches it from one. An `Answer` with no judge's yes is among them and is never shown as a fit.
 - Prose is written over the returned concepts alone, with a footnote per claim (ADR 0015). Over MCP the platform writes none: the assistant writes it, told to quote an `Answer` unchanged and to assert only what the returned concepts state. On the Ask page the platform drafts it over a *related knowledge* result, one part per collection.
-- No prose is ever generated from a document. Where nothing the reader can read matches, the answer is the one sentence "Not answered from the company's knowledge", with unmapped passages. The sentence is kept for that case alone.
+- No prose is ever generated from a document. Where nothing the reader can read matches, the answer is the one sentence "Not answered from the company's knowledge", with unmapped passages. The sentence is kept for that case alone. The reader may then write their own answer, which the promotion gate treats as uncited (ADR 0017).
+- A conflict in an answer carries both values, each with its evidence.
 - A caller may name collections. The entry step, the walk and the judge then stay inside them. Unmapped passages are not narrowed, because a passage no concept rests on belongs to no collection.
-- Nothing withheld is counted, hinted at or explained anywhere.
+- Nothing withheld is counted, hinted at or explained anywhere. A concept or a guide looked up by IRI answers one *not found* for absent and withheld alike. No search or answer surface shows a total, and more results are reached by cursor alone.
 
-A question set is extracted as a suggestion and confirmed in a table before any answer is drafted. It is answered as a background job on the web, streamed per question, with unanswered questions first, and goes out as a response-set document through the one renderer, recorded as one `usage` row per response and never as an export. The MCP `ask` entry links to it and does not run it. A `.docx` with real footnotes is beyond v0.1.
+A question set is extracted as a suggestion and confirmed in a table before any answer is drafted. Each question keeps its order and its span in the source document (`question.ordinal`, `source_span`). It is answered as a background job on the web, streamed per question, with unanswered questions first, and goes out as a response-set document through the one renderer, recorded as one `usage` row per response and never as an export. The MCP `ask` entry links to it and does not run it. A `.docx` with real footnotes is beyond v0.1.
 
-An answer is served as one answer contract for the UI, MCP and the response record. The contract is an event stream, verdict first, that one pure function folds into one object. The verdict is ok, related, warn or refuse for the caller's role. It is ok when at least one `Answer` is a judged fit, and related when concepts bear on the question and none is. Nothing in v0.1 produces warn. The object says how its judge stood: *not judged*, *judged* or *judging failed*. MCP returns the object alone. On the web the stream opens with its phase, the object follows before any prose, and drafted sentences follow it. A refusal ends the stream with no prose.
+An answer is served as one answer contract for the UI, MCP and the response record. The contract is an event stream, verdict first, that one pure function folds into one object. The verdict is ok, related, warn or refuse for the caller's role. It is ok when at least one `Answer` is a judged fit, and related when concepts bear on the question and none is. Nothing in v0.1 produces warn. The object says how its judge stood: *not judged*, *judged* or *judging failed*. MCP returns the object alone, with progress notifications while it builds it (ADR 0018). An answer's context is one header line in fixed words. It never shows the model's reasoning or the model choice's name. On the web the stream opens with its phase, the object follows before any prose, and drafted sentences follow it. A refusal ends the stream with no prose.
 
 A concept's collection, `ask`'s `collections` argument, the narrowing of the walk, the *related knowledge* verdict and the judge are in the tree. Where a workspace has no judging model choice or no spending limit, no model is called: every answer says *not judged*, and every `Answer` among its concepts is related knowledge.
 
-When the map is unavailable, the answer runs at depth 0. Entry points, the judge and reuse still run, and the context header line says the map is unavailable. A walk that passes its timeout counts as the map unavailable for that answer.
+When the map is unavailable, the answer runs at depth 0. Entry points, the judge and reuse still run, and over MCP the context header line says the map is unavailable. The object's `map` field holds the map's state: live, as of a time, or unavailable since a time, never a count. A walk that passes its timeout counts as the map unavailable for that answer. The Ask page does not show the map's state yet.
+
+Decided and not yet in the tree: the conflict's two values, an answer's coverage rendered by a template over the question's own parts, the reader's own answer, the question's order and span, MCP's progress notifications, and the write-up unit of the index. A write-up's sections and responses are indexed for search by a catch-up job the api queues after a save, and the screen says *searchable within a minute*, never *at commit*.
 
 In v0.1 the entry step is full-text over the concept index alone.
 
@@ -53,7 +56,7 @@ In v0.1 the entry step is full-text over the concept index alone.
 - A concept that shares any of the question's words is an entry point (owner, 09/10/2026). Entry points are ranked first by the rarity weight of the question's words each holds, computed over the rows the reader may read (owner, 14/10/2026). A question asked in plain words rarely repeats a concept's every word.
 - No model call on the entry step.
 
-The concept unit of the one index, with its vectors and its catch-up run, is the reserve block S8. It lands only when the answer tests' recall on the first customer's context wordings falls below the threshold S2b sets. When it lands, the governed write inserts a job row, and the worker writes the vector on that job, never inline and never at read.
+The concept unit of the one index, with its vectors and its catch-up run, is the reserve block S8. It lands only when the answer tests' recall on the first customer's context wordings falls below the threshold S2b sets, or when the owner judges the unmapped-passage rate's two counts too high. When it lands, the governed write inserts a job row, and the worker writes the vector on that job, never inline and never at read.
 
 ## Why
 
@@ -72,7 +75,7 @@ The concept unit of the one index, with its vectors and its catch-up run, is the
 - A suggested concept prepared automatically from the passages: extraction spend per unanswered question.
 - Every matching unit as its own match, ranked flat: the same fact three times.
 - Reuse judged by similarity plus keyword agreement: "uptime SLA" and "support SLA" sit 0.02 apart.
-- A cross-encoder reranker in v0.1: seconds per query on a CPU for a marginal gain.
+- A cross-encoder reranker in v0.1: seconds per query on a CPU for a marginal gain. A *reranking* purpose stays reserved among the model choices for the day one is taken up.
 - Two contracts, one per transport: the drift one renderer exists to prevent. The contract stays one now that only the Ask page drafts, because drafting is a second step over the same result. What is given up is one prose: what a person reads through an assistant and on the Ask page will differ.
 - The platform drafting on every transport, or no drafting in v0.1: a model call an assistant then rewrites, or an Ask page with no prose.
 - Asking which collection a question concerns, or picking the likeliest `Answer`: the first blocks a plain question, and the second is wrong without notice.
@@ -90,3 +93,7 @@ Amended 13/10/2026 by the same plan (KTD4). A walk that passed its timeout had n
 Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-168 (`docs/plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md`). The concept index searches each concept's `description` at weight B, and an entry point ranks by a rarity weight over the rows the reader may read, not by how many of the question's words it holds.
 
 The question-set paragraph, the archived consequence and its amendment of 27/08/2026, was missing from this doc until 20/10/2026, when the route's rewrite found S6 resting on it.
+
+Later decisions overturned three rules of the record. Search was one index of three unit kinds fused by RRF, and a match was a concept with its guide sections and documents nested under it, until ADR 0018's amendment of 21/09/2026 made `find`'s match a union by knowledge layer, ranked per arm. The degraded phrase *map as of <time> · updating* fell to the archived ADR 0023's amendment of 29/08/2026, which put the map in the commit transaction.
+
+The reader's own answer, the conflict's values, the not-found rule, the cursor rule, the question's order and span, the progress notifications, the header line, the `map` field, the write-up unit, the reranking purpose and S8's second trigger were missing from this doc until 20/10/2026 (BA-215).

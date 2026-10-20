@@ -28,7 +28,7 @@ A reader-facing page has a latency budget in three parts:
 - An action applies under 100 milliseconds. The web app applies it optimistically and reconciles the server's answer after.
 - Answers stream. The first sentence is the first thing on the page, never a spinner until the last.
 
-The browser suite asserts the budget per page, against the served build (`apps/web/e2e/`). A missed budget is a bug.
+The browser suite asserts the budget per page, against the served build on a loopback port (`apps/web/e2e/`), so a measured number never includes network distance. A missed budget is a bug.
 
 - The list budget is a timed assertion in the suite.
 - The action budget is the query client's optimistic update, reconciled when the mutation settles. A refusal is never retried, because the budget protects the page, and that page has to say the action was refused.
@@ -55,4 +55,4 @@ Two things reopen the budget: a page added without its budget asserted, and a me
 
 ## History
 
-The full record, with no amendments: `docs/archive/adr/0037-reader-screen-latency-budget.md`.
+The full record, with no amendments: `docs/archive/adr/0037-reader-screen-latency-budget.md`. The loopback port was missing from this doc until 20/10/2026 (BA-215).

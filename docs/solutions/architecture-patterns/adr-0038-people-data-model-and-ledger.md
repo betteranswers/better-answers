@@ -28,22 +28,23 @@ tags:
 
 - A person may sit in several groups. Belonging to a group changes what a person may see, through audiences, never what they may do. `group_member` carries no role and no permission column.
 - A member removed from the workspace cascades out of every group.
-- A group carries an origin, Admin-curated or audience-minted, so a Restricted connected source's named people will be a row of this same table (ADR 0039).
+- A group carries an origin, Admin-curated or audience-minted, so a Restricted connected source's named people will be a row of this same table (ADR 0039). The origin is a text column, narrowed at the boundary to the closed pair `admin-curated` and `audience-minted`, as sensitivity is.
 - Deleting a group is allowed and fail-closed. An audience holds group ids with no foreign key. A dangling id matches no caller, so content narrows.
 - Teams, plural roles, dynamic roles and temporal access are not adopted. Nor are request expiry or a Suspended member state. A person holds one role in a workspace: Admin, Editor or Viewer.
 
 **An access request is a signed-in non-member's ask, answered neutrally and approved by a direct invitation.**
 
-- It names one workspace and carries a required reason. Its status is waiting, approved or declined. There is one open request per workspace and requester.
-- The action answers one neutral acknowledgement whether the short name resolves, does not resolve, names a workspace the person belongs to, or one they are already waiting on. Only the first case writes a row.
-- It runs under the platform principal with the person as the actor.
-- Approve mints the invitation row directly, in the same transaction, and never through Better Auth's endpoint. Decline records who said no.
+- It names one workspace and carries a required reason. Its status is waiting, approved or declined. There is one open request per workspace and requester. It asks for one thing only, a place in the workspace, so `access_request` has no column saying what is asked for.
+- The action answers one neutral acknowledgement whether the short name resolves, does not resolve, names a workspace the person belongs to, or one they are already waiting on. Only the first case writes a row. A functional test proves the neutral answer for an unknown, a joined and an already-waiting short name alike.
+- It runs under the platform principal with the person as the actor. The transport checks the live session and takes the requester from it, never from a field the caller fills.
+- Approve checks the chosen role against Admin, Editor and Viewer, mints the invitation row directly, in the same transaction, and never through Better Auth's endpoint, and records the invitation's id on the request. Decline records who said no.
 
 **The audit log**, `audit_event`, is an unpartitioned tenant table the database keeps append-only. The migration revokes `UPDATE` and `DELETE` from `app_rt` and every privilege from the worker's role.
 
-- Two doors write it, inside the caller's transaction (`packages/core/src/audit/index.ts`). `record` derives the actor from the caller's Principal. `recordFor` takes the platform principal and an explicit actor. Both reject on any failure, so an action and its row land or fail together.
+- Two doors write it, inside the caller's transaction (`packages/core/src/audit/index.ts`). `record` derives the actor from the caller's Principal. `recordFor` takes the platform principal and an explicit actor. Both reject on any failure, so an action and its row land or fail together. Both doors also write the identity-set audit log, and the action's declaration picks the table. In the table-ownership map the audit slice owns both tables.
+- A sign-in, a consent and a person's own display-name action run under the platform principal through `recordFor`, naming the person as actor, because no user principal exists there. A sign-in also names the person as its subject.
 - Provisioning's row lands in the workspace it creates.
-- A consent lands in its workspace's audit log.
+- A consent lands in its workspace's audit log, and its subject is the assistant it was given to.
 
 **The identity-set audit log**, `identity_audit_event`, sits beside it, outside RLS and append-only the same way. It holds:
 
@@ -79,7 +80,10 @@ The sign-in and the consent are written after Better Auth's own write. A failed 
 - Month partitioning, as ADR 0014 said: see above.
 - Doors that return a `Result`: a value the action might not read would let its rows commit without their event.
 - Plural roles, dynamic roles, temporal access, request expiry and a Suspended state: none has a v0.1 story.
+- One audit log over the identity set for every action, a sign-in and a workspace action in one table with no workspace column and no policy: the one table a workspace's rows could leak through.
 
 ## History
 
 The full record, with its four amendments (T-355, the T-027 and T-028 grill, T-411, T-460), is `docs/archive/adr/0038-people-data-model-and-ledger.md`.
+
+Later decisions overturned two rules of the record. A sign-in's identity-set row had an empty detail, until the people sign-in and security plan (`docs/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md`) gave it the method. T-004's two invitation fences stood until T-027 brought the accept page, until ADR 0009's grill amendment of 24/09/2026 moved every People action to tRPC. The origin column, the request's one ask, the session's requester, the neutral answer's test, the role check and invitation id on approval, the doors' two tables, the actor of a sign-in and a consent, and the consent's subject were missing from this doc until 20/10/2026 (BA-215).

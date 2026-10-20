@@ -24,7 +24,7 @@ tags:
 
 - **Ask** is an area in the one rail, beside Knowledge, Inbox and Control Centre (ADR 0047). It was first drawn apart from Control Centre, as a reader area in regions of its own. It is now one entry in the same rail.
 - Ask has three pages under `/ask/`: *New question* (the default), *Your questions* and *Connect Claude*.
-- An Editor's and a Viewer's home is Ask › New question. They land there after signing in, and the not-found page offers it back.
+- An Editor's and a Viewer's home is Ask › New question. They land there after signing in, and the not-found page and a failed page offer it back.
 - An Admin lands on People › Members until Control Centre › Overview is built.
 - Control Centre stays the one Admin area, shown to Admins alone. Questions keeps *Questions asked* and the answer tests. Their names and addresses stayed until BA-29 renamed the first in the reader's words, on 07/10/2026.
 - This record first set aside a filtered Control Centre. That idea is now the decision, one level up: one rail, filtered page by page by role or by ownership of a collection (ADR 0047). Control Centre itself stays Admin-only, so a reader's home is never in it.

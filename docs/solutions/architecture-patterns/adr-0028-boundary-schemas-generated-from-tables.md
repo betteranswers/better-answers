@@ -23,7 +23,9 @@ tags:
 
 ## The decision
 
-Every zod schema over a table is generated from that table by `drizzle-zod`, in `packages/schema` and nowhere else. The package exports a boundary schema for every table it owns, in three shapes: select, insert and update. They sit in one registry, `boundarySchemas`, in `packages/schema/src/boundary-schemas.ts`.
+Every zod schema over a table is generated from that table by `drizzle-zod`, in `packages/schema` and nowhere else. The package exports a boundary schema for every table it owns, in three shapes: select, insert and update. They sit in one registry, `boundarySchemas`, in `packages/schema/src/boundary-schemas.ts`. Each entry holds the table with its three schemas.
+
+`packages/schema` pins `drizzle-zod@0.8.3`. Its fit with drizzle-orm 0.45.x is our tests' promise, not the library's. The `1.0.0-beta` line is not taken while drizzle-orm is 0.x, and the pin is revisited at the drizzle-orm v1 upgrade, when the import moves to `drizzle-orm/zod`.
 
 - A refinement narrows one column. It is written in the second argument of the generating call, one entry per column, as a callback: `{ workspaceId: (schema) => schema.regex(ULID).brand<"WorkspaceId">() }`. It is never a plain schema.
 - A refinement only narrows, and a parity test proves it.
@@ -33,12 +35,16 @@ Every zod schema over a table is generated from that table by `drizzle-zod`, in 
 
 A `customType` column, such as `index.passage`'s vector, is the one exception. It takes a plain schema, because a callback there compiles and then throws at module evaluation. That plain schema is built and tested per shape: select and insert take it as it is, and update takes it wrapped in `.optional()`. Each shape has its own test in `packages/schema/test/boundary-schemas.test.ts`.
 
+A `jsonb().$type<T>()` column is generated as any JSON value at runtime, though its inferred type is `T`, because `$type` never validates. A boundary that needs the shape refines the column with a callback that pipes into a schema for `T`.
+
+A generated schema cannot tell `$defaultFn` from a database `.default()`, because both mark the column `hasDefault`. Where the source of a default matters, a comment at the column says so, and no second schema is written.
+
 The parity test makes five assertions over the registry, against a real Postgres. Each compares an entry with the unrefined generation of the same table.
 
-1. Every exported table has a boundary.
+1. Every exported table has a boundary, and the registry's keys are exactly the tables the public entry point exports.
 2. The key sets agree, for each of the three shapes.
 3. Optionality and nullability agree per key at runtime. The `customType` column is exempt; its per-shape tests cover it.
-4. The fixture rows the refined insert schema accepts are inserted inside a rolled-back transaction, and the table must accept every one.
+4. The fixture rows the refined insert schema accepts are inserted inside a rolled-back transaction, and the table must accept every one. The passage fixture creates its workspace's partition first, because `index.passage` is list-partitioned in hand-written SQL that Drizzle cannot model, and Postgres refuses a row that matches no partition.
 5. Each boundary schema's inferred type is pinned with `Expect<Equal<…>>`.
 
 ## Why
@@ -57,8 +63,10 @@ The parity test makes five assertions over the registry, against a real Postgres
 - A type-level drift check alone: blind to widening.
 - A runtime parity check alone: blind to a retyped column.
 - `drizzle-kit`'s snapshot diff: it watches the migration, not the boundary, and cannot model `index.passage`'s partitioning.
-- `createSchemaFactory({ coerce })`: a boundary parses and never coerces.
+- `createSchemaFactory({ coerce })`: a boundary parses and never coerces. The factory stays in reserve for a `zodInstance` override.
 
 ## History
 
 The full record, with its one amendment (T-025): `docs/archive/adr/0028-boundary-schemas-generated-from-tables.md`.
+
+The record's vector column carried no dimension, until ADR 0032 fixed it as `vector(N)`. The pin, the registry's exact keys, the jsonb rule, the default rule and the passage fixture's partition were missing from this doc until 20/10/2026 (BA-215).

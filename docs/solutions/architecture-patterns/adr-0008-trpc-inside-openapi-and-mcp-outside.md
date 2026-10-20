@@ -26,17 +26,17 @@ tags:
 
 Each class of caller gets its own contract, all from the api's one process.
 
-- The SPA calls the api over tRPC (`@hono/trpc-server`), so a field changed in the api fails the SPA's type-check until fixed.
-- A customer integration, a script or a partner gets an OpenAPI document generated from the same router, never hand-edited. Breaking a route in it is a versioned change. The tree does not mount it yet.
+- The SPA calls the api over tRPC 11 (`@hono/trpc-server`), so a field changed in the api fails the SPA's type-check until fixed.
+- A customer integration, a script or a partner gets an OpenAPI document generated from the same router, never hand-edited. Breaking a route in it is a versioned change. `trpc-to-openapi` generates it, until `@trpc/openapi` leaves alpha. The tree does not mount it yet.
 - Agents get the tools-only MCP surface: MCP SDK v2 over Streamable HTTP, at `app.<domain>/mcp`. Every MCP entry is a named, described, zod-typed function, and none reaches the database directly.
-- The share agent gets `/agent/v1`: hand-written Hono routes over `packages/core`, on the `agent.` hostname. They run under a connected-source-scoped share agent token. They have a 100 MB per-file cap and a per-agent rate limit, stream to the object store, and accept agent versions N and N-1. The host router already reserves `/agent/v1/*` on `agent.`, but the routes themselves are not in the tree yet.
+- The share agent gets `/agent/v1`: hand-written Hono routes over `packages/core`, on the `agent.` hostname. They run under a share agent token scoped to one connected source and to a path prefix within it. They have a 100 MB per-file cap and a per-agent rate limit, stream to the object store, and accept agent versions N and N-1. The host router already reserves `/agent/v1/*` on `agent.`, but the routes themselves are not in the tree yet.
 - The worker uses none of these. It shares the stores (ADR 0005).
 - zod v4 is the one validation library at every boundary.
 
 The authorization server's pages are `/oauth2/*`, the path `@better-auth/oauth-provider` mounts, never `/oauth/*`.
 
 - The MCP surface and `/oauth2/*` answer on the product's origin, `app.<domain>`, beside `/.well-known/*` and `/jwks`, never on `mcp.` (ADR 0034).
-- The host router, `apps/api/src/ingress/hostnames.ts`, holds paths per hostname across three hostnames: `app.`, `agent.` and the apex. It is mounted ahead of every other route. On `agent.` it refuses anything but `/agent/v1/*`, before a body is read.
+- The host router, `apps/api/src/ingress/hostnames.ts`, holds paths per hostname across three public hostnames: `app.`, `agent.` and the apex. A fourth role, loopback, carries `/health` for the container's own health check. The router is mounted ahead of every other route. It answers 404 to a host it does not list, and on `agent.` to anything but `/agent/v1/*`, before a body is read.
 
 Business logic lives in `packages/core`. The same function serves every transport because it takes a `Principal` first, as `CODING_STANDARDS.md` requires, and nothing transport-shaped.
 
@@ -61,3 +61,5 @@ Business logic lives in `packages/core`. The same function serves every transpor
 ## History
 
 The full record, with its six amendments (tickets 47, 53 and 41, then T-030, T-045 and T-078): `docs/archive/adr/0008-trpc-inside-openapi-and-mcp-outside.md`.
+
+Later decisions overturned three rules of the record. Dynamic client registration was a v0.1 requirement until ADR 0009 chose CIMD and left registration off. The MCP surface was to run on the SDK's official Hono adapter until T-004 left that package untaken, and the api mounts the SDK's own request handler (ADR 0030). `agent.` was open on the tunnel with no Access policy, which ADR 0034's removal of Access made moot. The unknown-host refusal, the token's path prefix, the OpenAPI generator and the tRPC version were missing from this doc until 20/10/2026 (BA-215).

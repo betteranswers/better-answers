@@ -38,7 +38,7 @@ The table in `docs/operations/SECRETS.md`, under *The classes*, says what each c
 1. What *acting* means. `SECRETS.md` glosses it as writing back into a connected system as the user, approval-gated. ADR 0030 says it is never a credential for writing into a customer's other systems.
 2. Whether all six below bootstrap are rows under the envelope. `SECRETS.md`'s *where it is read* column disagrees for three: the object store's write-and-list pair comes from the environment and its admin credential from escrow; the repository's keys are mounted read-only from the host; and the share agent token is checked in the api.
 
-Settling either is a new decision. It amends this record and the record that loses.
+Settling either is a new decision. It amends this record and the record that loses. So is adding, renaming or removing a credential class, and every record that cites a class follows it.
 
 The decision predates this record. It was moved out of the credential-class rule in the root `CODING_STANDARDS.md`. That file keeps the sentence that classes are never mixed in one scope, and its config-module rule keeps the seam.
 
@@ -48,7 +48,7 @@ A workspace's key for a model provider is a **model key**, and it is the first c
 
 1. **Sealed, never hashed.** A model key is sealed under the envelope. It is not hashed, because the platform sends it to the model provider with every call, and a hash cannot be sent. Hashing behind a lookup prefix stays the shape for a token the platform is shown and checks.
 2. **The api tier reads it.** The api tier alone holds the envelope key, and it alone opens a model key, at the moment of a model call. The worker tier holds no grant on the table.
-3. **Setting is an audit event, and a read is not.** Setting or replacing a model key writes one audit event, which names the model provider and never the key. A read writes none. The read is accounted for by the `llm_call` row of the call it served (ADR 0025).
+3. **Setting is an audit event, and a read is not.** Setting or replacing a model key writes one audit event, which names the model provider and never the key. A read writes none, an exception to "every access audited" for this class. The read is accounted for by the `llm_call` row of the call it served (ADR 0025).
 
 How a model key is kept:
 
@@ -78,3 +78,5 @@ The full record, with no amendments; T-184 moved it out of the constitution: `do
 Amended 14/10/2026 by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, U9 and KTD11): the credentials provider is built for the LLM-provider class, and *The LLM-provider class* answers the three questions the provider's shape left open for it. The two conflicts recorded unsettled are untouched.
 
 Amended 15/10/2026 by the same plan's U15: Cloudflare joins the model providers for Workers AI, and its key carries the account id before the token.
+
+The rule that a change to the class list amends this record was missing from this doc until 20/10/2026 (BA-215).

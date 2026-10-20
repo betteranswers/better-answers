@@ -34,7 +34,7 @@ These are all open, as they were when the sentence lived in the constitution:
 
 The statement is not written yet. The work that writes it records the date it shipped and the claim it made.
 
-The reason stays in the accessibility rule in `apps/web/AGENTS.md`. The buyers are UK public bodies for whom this is law, and the first customer states it of its own products. That reason justifies the whole rule, so it is quoted here and not moved. The rule also keeps the WCAG 2.2 AA bar and the component semantics. The axe check runs in the browser suite.
+The accessibility rule in `apps/web/AGENTS.md` keeps the first half of the reason, that the buyers are UK public bodies, for whom this is law. This doc alone keeps the second half, that the first customer states it of its own products. The rule also keeps the WCAG 2.2 AA bar and the component semantics. The axe check runs in the browser suite.
 
 The decision predates this record and was moved out of the accessibility rule unchanged.
 
@@ -52,3 +52,5 @@ The decision predates this record and was moved out of the accessibility rule un
 ## History
 
 The full record, with no amendments; T-184 moved it out of the constitution: `docs/archive/adr/0042-product-ships-accessibility-statement.md`.
+
+The record had every UI change carry the acceptance line "WCAG 2.2 AA, tested with a keyboard and a screen reader". ADR 0045's amendment of 16/10/2026 cut the rules files to what no gate holds, and the line went with it, as did the second half of the reason in the rule. The rule's pointer to this doc went in the one-form rewrite of 22/09/2026, and no decision restored it.

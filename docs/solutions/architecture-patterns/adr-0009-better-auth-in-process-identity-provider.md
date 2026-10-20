@@ -27,25 +27,30 @@ tags:
 
 Better Auth runs in-process as a library. The api is its own OAuth 2.1 authorization server for the MCP surface and the email-code sign-in for the SPA.
 
-- Its tables are the identity set, keyed not scoped, with the platform's own rows about a person's sign-in: recovery codes and a passkey's last use. They are read by key before any workspace is known, so they carry no RLS policy. A table carries a `workspace_id` only where its exemption says why. A person's last activity in a workspace is that workspace's own row, under RLS. The set is named in `packages/schema/src/identity-tables.ts`, and `packages/schema/test/rls.test.ts` holds the exemption both ways.
+- Its tables are the identity set, keyed not scoped, with the platform's own rows about a person's sign-in: recovery codes and a passkey's last use. They are read by key before any workspace is known, so they carry no RLS policy. A table carries a `workspace_id` only where its exemption says why. A person's last activity in a workspace is that workspace's own row, under RLS. The set is named in `packages/schema/src/identity-tables.ts`, and `packages/schema/test/rls.test.ts` holds the exemption both ways. The pre-authentication counters, `ingress_counter` among them, are global tables beside it, named in the same exemption list (`GLOBAL_TABLE_NAMES_BEYOND_IDENTITY`).
 - It shares one origin, `app.<apex>`, with the SPA's sign-in and the workspace picker.
 - CIMD only, allow-listed to `claude.ai`. Dynamic client registration stays off.
+- The client-metadata fetch is HTTPS with GET or HEAD only. Every address a host resolves to must be public-routable, and the fetch pins it with the original Host and SNI. It never follows a redirect. It has a 5-second deadline and a 5 KiB body cap, and refuses any status but 200. Concurrent fetches are bounded, and a document is cached per `client_id` under its `Cache-Control`. A client's `jwks_uri` goes through the same transport with a 64 KiB cap.
+- An MCP call without a usable bearer is answered 401, and the challenge names the protected-resource document and the scopes the surface needs.
+- An access token lives one hour and is renewed by a rotating refresh token. Its only claims are `workspace` and `user`, and its audience is the MCP surface.
 - Its rate limiter is off. The api counts every endpoint it mounts, the email-code ones among them. Nothing counts discovery or a page of the application (ADR 0034). The library's count is a run of requests, not a window: it resets only once a whole window passes with none. A password, sign-up, social or email-verification path turned on later needs a ceiling of its own, because the library's rules for those paths are off with the rest.
-- A person has one platform-minted id (ADR 0035). Revocation has two scopes: a workspace Admin's, in that workspace, and the operator's, everywhere.
-- A token's workspace is fixed at consent, as Better Auth's `referenceId`. A person who wants another workspace consents again.
+- A person has one platform-minted id (ADR 0035). Revocation has two scopes: a workspace Admin's, in that workspace, and the operator's, everywhere. The resolver refuses any credential issued before either revocation instant, the person's or the membership's, with one word, `credentials-revoked`. It reads both instants in the member query that admits the call.
+- A token's workspace is fixed at consent, as Better Auth's `referenceId`. A person who wants another workspace consents again. A person who belongs to one workspace has it set as the session's workspace at sign-in, and consent refuses a session with no chosen workspace. The picker reads a person's workspaces by person id through the workspaces slice.
 - A session runs for thirty days and renews once a day has passed while the person keeps using it. Its confirmation stamp is the one freshness rule. Each of these acts asks for a confirmation within the hour, and refuses as `confirmation-too-old`: the operator's console writes; an Admin's high-impact acts (removing a member, changing a role, revoking access, an audit export, inviting an Admin, and the bulk acts); and a person's own factor changes, where they already hold a factor. A first factor is trusted on first use. A caller whose claims name no session — a personal token, an MCP bearer — holds no stamp, so no such act is reachable by token.
 
 The seam, which `packages/core` never crosses:
 
 - No Better Auth type crosses into `packages/core`. A transport verifies a bearer and builds a `Principal`.
 - `better-auth` and `@better-auth/*` are imported only in `apps/api/src/auth/`, `apps/web/src/features/auth/` and the CIMD lift, `apps/api/lifts/better-auth-cimd-node/`. `.oxlintrc.json` enforces it, with rule tests in `apps/api/tests/lint-rules.test.ts` and `apps/web/test/lint-rules.test.ts`.
-- The CIMD lift runs on upstream 1.7.7's transport and carries two guards (better-auth/better-auth#11422, #11423). It goes when a release fixes both.
+- The CIMD lift runs on upstream 1.7.7's transport and carries two guards (better-auth/better-auth#11422, #11423). It goes when a release fixes both. A reply status that a `Response` cannot carry is refused as a transport error, never a crash. The address lookup races the caller's abort signal, and abandoned lookups count against a bound of 32 in flight until they settle.
 
 The `organization` plugin:
 
 - It keeps its tables, its reads and the picker's `/organization/set-active`.
 - Its other writes and `/organization/check-slug` are in `disabledPaths`, each proven refused for every role.
-- Every People action, accepting an invitation included, belongs to the members slice and runs over tRPC. Each is keyed by workspace and person id, with its audit event in its own transaction.
+- Every People action, accepting an invitation included, belongs to the members slice and runs over tRPC. Each is keyed by workspace and person id, with its audit event in its own transaction. Each action's refusal for every role is proven through its tRPC procedure, never through the plugin's endpoints.
+- A workspace's name and short name change only by an ops command, `pnpm ops rename-workspace`, as provisioning set them.
+- Better Auth's delete-user endpoint is refused, and a test proves it. A person's row is pseudonymised, never deleted.
 
 The passkey and authenticator plugins:
 
@@ -66,7 +71,7 @@ The operator:
 - `admin()` is refused for good.
 - The operator is a third principal kind, beside a user and the platform. It is a mark on the person's `user` row. Only an ops command sets or clears it, and erasure clears it too.
 - It is built only from a signed-in session, never from an OAuth or personal token. Revoke everywhere and a display-name correction follow the shared freshness rule above: a session that confirmed within the hour, however long ago it was signed in.
-- It has one cross-workspace read: people, with the workspaces and role each holds, and workspaces with their member counts, over the identity set alone.
+- It has one cross-workspace read: people, with the workspaces and role each holds, and workspaces with their member counts, over the identity set alone. Inspecting a person reads the identity-set audit log alone and never scopes its transaction to a workspace, so no workspace's audit log is read.
 - A person who has lost every factor and every recovery code is restored by `pnpm ops restore-sign-in`, never from a page. The operator first checks who they are by a route other than their email. Under the person's lock it ends their factors, codes and sessions, keeps a one-time restore code's hash for 24 hours, records the action and sends the notice. It prints the code, which the operator hands over by that same route.
 
 A person exists from their first email-code sign-in, or earlier when `pnpm ops add-person` adds them by name. That action writes the `user` row itself, past the library's create hook, which would blank the name.
@@ -76,11 +81,13 @@ The identity-set audit log holds:
 - a person's own display-name action, an Admin's flag on a display name, and the platform's adding of a person or restoring their sign-in;
 - a person's own second-factor actions: a passkey added, renamed or removed, an authenticator added or removed, recovery codes issued or used, each confirm, a restore code accepted, and their factors replaced after a recovery or restore code;
 - a person's ending of their own sessions, naming each session it ended;
-- with the console, each sign-in, every operator write and an Admin's action that ends a person's grants.
+- each sign-in, every operator write and an Admin's action that ends a person's grants.
+
+It uses the same `family.subject.verb` action names as `audit_event`, and on both tables CHECK constraints hold the name's pattern and its four families. A person's display-name action writes `people.person.named` in the transaction that changes the name. The person is actor and subject, and the detail is empty, so the name's one copy stays on the `user` row. An Admin's flag on a display name answers the same for every person, whether or not a flag already waits. It writes `people.person.name_flagged` to the workspace's audit log and `people.name_flag.raised`, naming the workspace, to the identity-set audit log, and the operator is emailed.
 
 A token's issue, refusal and refresh, and the workspace pick, stay log lines.
 
-Better Auth is a stay. Any one of three triggers starts a migration: a licence or distribution change on core or the OAuth provider; the self-hosted OAuth path deprecated, or twelve months without a release while core ships; a security defect we report left unfixed for one release cycle.
+Better Auth is a stay. Any one of three triggers starts a migration: a licence or distribution change on core or the OAuth provider; the self-hosted OAuth path deprecated, or twelve months without a release while core ships; a security defect we report left unfixed for one release cycle. The stay is reviewed at the first customer's renewal, or as soon as a trigger fires.
 
 ## Why
 
@@ -99,7 +106,13 @@ Better Auth is a stay. Any one of three triggers starts a migration: a licence o
 - Hosted Auth0 in the UK: every sign-in on a third party's uptime and terms.
 - Zitadel, Authentik, Ory, WorkOS, Clerk and Stytch: missing RFC 8414, closed DCR, container count or US-only data.
 - The MCP SDK's own OAuth helpers: Express-only and frozen.
+- `admin()` reduced, with its unsafe paths in `disabledPaths`: it still writes no audit event.
+- Better Auth's `banUser` as revocation: it is checked only when a session is created, never by the resolver or on a live token.
+- A second table repeating each workspace's id and name for the picker, so `workspace` could stay under RLS: an invariant no foreign key enforces.
+- Self-serve workspace creation through Better Auth's own endpoint: workspaces are platform-provisioned, in one transaction with their partition, first Admin and config row.
 
 ## History
 
 The full record, with its fourteen amendments (tickets 21 and 79, then T-004, T-022, T-045, T-044, T-073, T-078, T-328 and T-329, T-355, the T-027 and T-028 grill, T-420, T-460 and T-474): `docs/archive/adr/0009-better-auth-in-process-identity-provider.md`.
+
+The record's freshness rule read a session's `created_at`, a sign-in within the hour. The people sign-in and security plan (`docs/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md`) replaced it with the confirmation stamp above, and added the passkey and authenticator blocks. The counters' exemption, the client-metadata fetch policy, the 401 challenge, the token's lifetime and claims, the sole-workspace session, the resolver's revocation refusal, the lift's guards, the per-role proofs, the rename command, the delete-user refusal, the operator's inspect read, the audit log's action names, the display-name actions and the review at renewal were missing from this doc until 20/10/2026 (BA-215).

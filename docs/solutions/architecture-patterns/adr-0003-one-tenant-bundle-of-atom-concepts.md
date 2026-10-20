@@ -30,6 +30,7 @@ A workspace's knowledge is one OKF bundle in v0.1. Its concepts are trust-bearin
 - A collection directory is a future bundle boundary, so a bundle per collection stays a promotion rather than a rewrite.
 - Guides and their sections are assembled over atoms and are never the unit of trust.
 - Merge by identity is keyed `(workspace, bundle, type, normalised label)` in `concept_identity`. In the tree the key is one `merge_key` column: the folded kind, a colon, then the title trimmed, its whitespace collapsed and lower-cased (`mergeKeyOf`, `packages/core/src/concepts/landing.ts`). It is unique per workspace, and the bundle is implicit because a workspace holds one.
+  - The api resolves identity against `concept_identity` when it writes. A governed write with an `iri` edits a concept that must already exist, and is refused `no-such-concept` when none does. A write without an `iri` mints one. A write whose merge key another concept holds is refused `merge-key-taken`.
 - A connected source names the collection its knowledge lands in, and extraction proposes only within it.
 - Contradictory values found at extraction are recorded as `conflict` records. The pipeline never resolves them; a person does.
 
@@ -55,3 +56,5 @@ The atom-boundary rule:
 ## History
 
 The full record, with its one amendment (ticket 38): `docs/archive/adr/0003-one-tenant-bundle-of-atom-concepts.md`.
+
+The amendment also had the worker's write request carry a resolved `iri` for an update. T-006 overturned that. A suggestion's payload carries the merge key and never an IRI, and the acceptance resolves identity inside the commit transaction (`CONCEPTS.md`, *concept write request*). The governed write's own rule, resolution against `concept_identity`, was missing from this doc until 20/10/2026 (BA-215).
