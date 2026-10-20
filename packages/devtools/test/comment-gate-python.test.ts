@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tool, Tree } from "@better-answers/devtools/throwaway-tree";
 
+import { COUNTED, NOT_COUNTED, commented } from "./caller-counts.ts";
 import { wordsOf } from "./fixture-text.ts";
 
 const FILE = "probe.py";
@@ -21,6 +22,8 @@ const A_WHY_OF_TWENTY =
 const A_WHY_AT_THE_CEILING = `${A_WHY_OF_TWENTY} until the next release lands`;
 
 const TOO_LONG = `# ${OVER_THE_CEILING}\n`;
+
+const COUNTING = "# Two specs open a member and remove one.\n";
 
 const WORKER_MODULE = "apps/worker/src/better_answers_worker/probe.py";
 
@@ -114,6 +117,52 @@ describe("the Python check fires on a long or citing comment", () => {
 
     expect(output.trim().split("\n")).toHaveLength(1);
     expect(output).toContain("cites a ticket id");
+  });
+});
+
+describe("the Python check refuses a comment that counts its callers", () => {
+  it("refuses a comment counting its specs, naming the fix", () => {
+    const output = run(holding(COUNTING));
+
+    expect(output).toContain("this comment counts the code that uses it (`Two specs`).");
+    expect(output).toContain(
+      "Delete it: hold a reason the callers share in a name or a test title.",
+    );
+  });
+
+  it.each(COUNTED)("quotes the count of %s on one line", (_what, prose, counted) => {
+    expect(findings(holding(commented("#", prose)))).toEqual([
+      expect.stringContaining(`uses it (\`${counted}\`).`),
+    ]);
+  });
+
+  it.each(NOT_COUNTED)("walks past %s", (_what, prose) => {
+    expect(findings(holding(commented("#", prose)))).toEqual([]);
+  });
+
+  it("refuses a docstring counting its callers", () => {
+    const module = { [FILE]: '"""Both callers hand the trimmed name."""\n\nKEEP = 1\n' };
+
+    expect(findings(module)).toHaveLength(1);
+  });
+
+  it("walks past a docstring naming the one caller", () => {
+    const module = { [FILE]: '"""The one caller hands the trimmed name."""\n\nKEEP = 1\n' };
+
+    expect(findings(module)).toEqual([]);
+  });
+
+  it("refuses a directive's reason that counts its callers", () => {
+    const reason = "import os  # noqa: F401  # both callers hand the wrong shape\n";
+
+    expect(run({ [FILE]: reason })).toContain("counts the code that uses it");
+  });
+
+  it("reports a long count once, for the count", () => {
+    const output = run(holding(`# ${wordsOf(26)} for both callers\n`));
+
+    expect(output.trim().split("\n")).toHaveLength(1);
+    expect(output).toContain("counts the code that uses it (`both callers`)");
   });
 });
 

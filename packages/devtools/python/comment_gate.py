@@ -50,6 +50,13 @@ CITES = (
     "that is read."
 )
 
+COUNTS_CALLERS = (
+    "{path}:{line}: this comment counts the code that uses it (`{counted}`). Who calls "
+    "the code is this repository's own code, which a search reads, and the count is "
+    "wrong once the next caller lands. Delete it: hold a reason the callers share in a "
+    "name or a test title."
+)
+
 STRING_CITES = (
     "{path}:{line}: this string cites {what} (`{cited}`); a string that reaches a "
     "person names what they can act on, never a document they cannot open from where "
@@ -68,6 +75,12 @@ class Block(NamedTuple):
 A_TEST_PATH = re.compile(r"(?:^|/)(?:tests?|e2e)/|(?:^|/)(?:test_[^/]*|conftest)\.py$")
 
 A_SPACE = re.compile(r"\s")
+
+A_COUNT_OF_CALLERS = re.compile(
+    r"\b(?:two|three|four|five|six|seven|eight|nine|ten|both)\s+(?:other\s+)?"
+    r"(?:specs|callers|call\s+sites)\b",
+    re.IGNORECASE,
+)
 
 
 NEVER_WALKED = frozenset(
@@ -155,6 +168,14 @@ def _findings(path: Path, source: str) -> list[str]:
         if cited is not None:
             what, citation = cited
             said.append(CITES.format(path=path, line=line, what=what, cited=citation))
+            continue
+        counted = A_COUNT_OF_CALLERS.search(prose)
+        if counted is not None:
+            said.append(
+                COUNTS_CALLERS.format(
+                    path=path, line=line, counted=" ".join(counted.group(0).split())
+                )
+            )
             continue
         words = len(prose.split())
         if words > limit:
