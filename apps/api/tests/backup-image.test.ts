@@ -439,9 +439,11 @@ git init --quiet --bare "/data/git/${UNREADABLE_WORKSPACE}.git"
 rm "/data/git/${UNREADABLE_WORKSPACE}.git/HEAD"
 `;
 
+const AN_UPLOAD = "uploads/one";
+
 const nightlyRun = (script: string, alsoInTheStore = ""): string => String.raw`
 set -eu
-mkdir -p /data/git /data/mirror /staging /objectstore/uploads /buckets
+mkdir -p /data/git /data/mirror /staging /buckets
 git init --quiet --initial-branch=main /tmp/workspace
 git -C /tmp/workspace -c user.name=probe -c user.email=probe@example.invalid \
   commit --quiet --allow-empty --message "a workspace's first commit"
@@ -454,7 +456,8 @@ chown -R ${API_UID}:${API_UID} /data/git
 printf '%s' "$MIRROR_SHELL" > /usr/local/bin/mirror-shell
 printf '%s' "$SSH_STAND_IN" > /usr/local/bin/ssh
 chmod 0755 /usr/local/bin/mirror-shell /usr/local/bin/ssh
-printf 'an upload\n' > /objectstore/uploads/one
+printf 'an upload\n' > /tmp/upload
+rclone copyto --s3-no-check-bucket /tmp/upload "src:$OBJECTS_BUCKET/${AN_UPLOAD}"
 touch -d '2 days ago' "${LEFT_BY_A_FAILED_RUN}"
 age-keygen -o /tmp/identity 2>/dev/null
 BACKUP_AGE_RECIPIENT=$(age-keygen -y /tmp/identity) "${script}" nightly > /tmp/nightly.log 2>&1 || true
@@ -465,20 +468,36 @@ find /data/mirror -mindepth 1 -maxdepth 1 -name '*.git' | sort | while IFS= read
 done
 `;
 
-const NIGHTLY_ENVIRONMENT = {
+const seenFromTheImage = (address: string): string => {
+  const uri = new URL(address);
+  uri.hostname = THE_HOST;
+  return uri.toString();
+};
+
+const s3RemoteOver = (remote: string, store: ObjectStore): Record<string, string> => ({
+  [`RCLONE_CONFIG_${remote}_TYPE`]: "s3",
+  [`RCLONE_CONFIG_${remote}_PROVIDER`]: "Other",
+  [`RCLONE_CONFIG_${remote}_ENDPOINT`]: seenFromTheImage(store.endpoint),
+  [`RCLONE_CONFIG_${remote}_REGION`]: store.region,
+  [`RCLONE_CONFIG_${remote}_FORCE_PATH_STYLE`]: "true",
+  [`RCLONE_CONFIG_${remote}_ACCESS_KEY_ID`]: store.accessKeyId,
+  [`RCLONE_CONFIG_${remote}_SECRET_ACCESS_KEY`]: store.secretAccessKey,
+});
+
+const nightlyEnvironment = (objects: ObjectStore): Record<string, string> => ({
   DATABASE_URL: "postgresql://backup@127.0.0.1:9/betteranswers",
   BACKUP_DUMPS_BUCKET: "dumps",
   BACKUP_MIRROR_BUCKET: "mirror",
   RCLONE_CONFIG_DUMPS_TYPE: "alias",
   RCLONE_CONFIG_DUMPS_REMOTE: "/buckets",
-  RCLONE_CONFIG_SRC_TYPE: "alias",
-  RCLONE_CONFIG_SRC_REMOTE: "/objectstore",
+  ...s3RemoteOver("SRC", objects),
+  OBJECTS_BUCKET: objects.bucket,
   GIT_MIRROR_SSH_TARGET: "mirror@127.0.0.1:/data/mirror",
   HEALTHCHECKS_PING_URL_PG_HOURLY: "http://127.0.0.1:9/pg-hourly",
   HEALTHCHECKS_PING_URL_NIGHTLY: "http://127.0.0.1:9/nightly",
   MIRROR_SHELL: read("deploy/mirror-shell.sh"),
   SSH_STAND_IN,
-};
+});
 
 const taggedIn = (lines: readonly string[], tag: string): readonly string[] =>
   lines.filter((line) => line.startsWith(`${tag}\t`)).map((line) => line.slice(tag.length + 1));
@@ -489,6 +508,7 @@ const bundleOf = (workspace: string): unknown =>
   );
 
 describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
+  const objects = objectStoreForSuite();
   let log: readonly string[] = [];
   let files: readonly string[] = [];
   let mirrored: readonly string[] = [];
@@ -497,13 +517,22 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
     const lines = (
       await readTheImage(backupImage(), {
         command: ["bash", "-c", nightlyRun(scriptPath())],
-        environment: NIGHTLY_ENVIRONMENT,
+        environment: nightlyEnvironment(objects()),
+        reachesTheHost: true,
       })
     ).split("\n");
     log = taggedIn(lines, "log");
     files = taggedIn(lines, "file");
     mirrored = taggedIn(lines, "mirrored");
   }, IMAGE_PROBE_ALLOWANCE);
+
+  it("mirrors every object the platform's store holds", () => {
+    const mirror = files.filter((file) => file.startsWith("/buckets/mirror/"));
+
+    expect({ mirror, log }).toMatchObject({
+      mirror: [`/buckets/mirror/objectstore/${objects().bucket}/${AN_UPLOAD}`],
+    });
+  });
 
   it("bundles each api-owned repository with a ref, skipping one without", () => {
     const bundles = files.filter((file) => file.startsWith("/buckets/dumps/git/")).sort();
@@ -539,13 +568,15 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
 describe.skipIf(nothingToProbeHere)(
   "the backup image's nightly job, given a broken repository",
   () => {
+    const objects = objectStoreForSuite();
     let log: readonly string[] = [];
 
     beforeAll(async () => {
       const lines = (
         await readTheImage(backupImage(), {
           command: ["bash", "-c", nightlyRun(scriptPath(), AN_UNREADABLE_REPOSITORY)],
-          environment: NIGHTLY_ENVIRONMENT,
+          environment: nightlyEnvironment(objects()),
+          reachesTheHost: true,
         })
       ).split("\n");
       log = taggedIn(lines, "log");
@@ -614,12 +645,6 @@ interface Seeded {
   readonly neverWritten: string;
 }
 
-const seenFromTheImage = (address: string): string => {
-  const uri = new URL(address);
-  uri.hostname = THE_HOST;
-  return uri.toString();
-};
-
 const theApisUid = (script: string): string => {
   const line = /^API_UID=\S+$/m.exec(read(script))?.[0];
   if (line === undefined) throw new Error(`${script} no longer names the api's uid as API_UID`);
@@ -636,13 +661,7 @@ const restoreEnvironment = (
   database: string,
   dumps: ObjectStore,
 ): Record<string, string> => ({
-  RCLONE_CONFIG_DUMPS_TYPE: "s3",
-  RCLONE_CONFIG_DUMPS_PROVIDER: "Other",
-  RCLONE_CONFIG_DUMPS_ENDPOINT: seenFromTheImage(dumps.endpoint),
-  RCLONE_CONFIG_DUMPS_REGION: dumps.region,
-  RCLONE_CONFIG_DUMPS_FORCE_PATH_STYLE: "true",
-  RCLONE_CONFIG_DUMPS_ACCESS_KEY_ID: dumps.accessKeyId,
-  RCLONE_CONFIG_DUMPS_SECRET_ACCESS_KEY: dumps.secretAccessKey,
+  ...s3RemoteOver("DUMPS", dumps),
   BACKUP_DUMPS_BUCKET: dumps.bucket,
   DATABASE_URL: database,
   STAGING_DATABASE_URL: database,
