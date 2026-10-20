@@ -1,4 +1,8 @@
 import contextlib
+import json
+import os
+import subprocess
+import sys
 import threading
 import time
 from collections.abc import Callable, Iterator, Mapping, MutableMapping, Sequence
@@ -1086,3 +1090,82 @@ def test_a_job_past_its_deadline_frees_its_source(
     with scoped(database, workspace) as cursor:
         cursor.execute("SELECT status FROM job WHERE id = %s", (older["id"],))
         assert cursor.fetchone() == ("poisoned",)
+
+
+A_WORKER_RUN = """
+import sys
+from better_answers_worker import loop, queue
+from better_answers_worker.config import read_bootstrap
+
+with queue.connected(sys.argv[1]) as connection:
+    loop.tick(
+        connection, read_bootstrap(), heartbeat_every_seconds=0.05, deadline_seconds=0.3
+    )
+"""
+
+
+def a_worker_hung_on_its_audit(
+    database: psycopg.Connection, tmp_path: Path
+) -> list[dict[str, Any]]:
+    bootstrap = bootstrap_for(database, tmp_path)
+    store = bootstrap.object_store
+    environment = {
+        **os.environ,
+        "DATABASE_URL": bootstrap.database_url,
+        "GIT_STORE_DIR": bootstrap.git_store_dir,
+        "LMDB_DIR": bootstrap.engine.lmdb_dir,
+        "WORKER_ID": bootstrap.worker_id,
+        "S3_ENDPOINT": store.endpoint,
+        "S3_ACCESS_KEY": store.access_key,
+        "S3_SECRET_KEY": store.secret_key,
+        "S3_BUCKET": store.bucket,
+        "S3_REGION": store.region,
+    }
+    with queue.connected(bootstrap.database_url) as locking, locking.transaction():
+        locking.execute("LOCK TABLE concept_index IN ACCESS EXCLUSIVE MODE")
+        worker = subprocess.run(
+            [sys.executable, "-c", A_WORKER_RUN, bootstrap.database_url],
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    assert worker.returncode == queue.OUTLIVED_ITS_DEADLINE, worker.stderr
+    return [json.loads(line) for line in worker.stdout.splitlines()]
+
+
+def test_a_job_past_its_deadline_ends_the_worker_process(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
+
+    written = a_worker_hung_on_its_audit(database, tmp_path)
+
+    with scoped(database, workspace) as cursor:
+        reclaimed = queue.claim(cursor, workspace, WORKER, ["nightly-audit"])
+    assert reclaimed is not None, "the lease outlived the worker process"
+    assert reclaimed.attempts == 2
+    assert (written[-1]["event"], written[-1]["job_id"]) == (
+        "the job outlived its deadline",
+        reclaimed.id,
+    )
+
+
+def test_a_job_outliving_every_attempt_ends_poisoned(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = str(seed_workspace(database.cursor())["id"])
+    database.commit()
+    with scoped(database, workspace) as cursor:
+        job = seed_job(
+            cursor, workspace_id=workspace, kind="nightly-audit", max_attempts=2
+        )
+
+    for _ in range(2):
+        a_worker_hung_on_its_audit(database, tmp_path)
+
+    with scoped(database, workspace) as cursor:
+        assert queue.claim(cursor, workspace, WORKER, ["nightly-audit"]) is None
+        cursor.execute("SELECT status, attempts FROM job WHERE id = %s", (job["id"],))
+        assert cursor.fetchone() == ("poisoned", 2)
