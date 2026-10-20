@@ -382,8 +382,8 @@ carries it with the file.
 
 `pnpm port-scan`, a root `check` step, walks every `.py` file under `apps/worker/src` and parses
 each one with `ast`, reading the module's top-level statements. It never imports a module and
-never matches text. A module that assigns either name is a port. The scan refuses these, each
-with the fix in its message:
+never matches text. A module that assigns or extends either name is a port. The scan refuses
+these, each with the fix in its message:
 
 - a port that declares one of the two names and not the other;
 - an `AGREEMENT` that names a key the manifest does not hold;
@@ -393,7 +393,9 @@ with the fix in its message:
   string literals, and `AGREEMENT` a string literal;
 - a name assigned with another target, by a chained assignment (`PORT_OF = A = …`) or an
   unpacking (`PORT_OF, A = …`), which the scan refuses as not a literal;
-- a name declared twice in one module, which would leave the value that holds to the order.
+- a name declared twice in one module, which would leave the value that holds to the order;
+- a name extended by an augmented assignment (`PORT_OF += …`), even in a module that declares
+  nothing else, since what it adds would pass unchecked.
 
 The manifest is read from the tree the script runs in, so a throwaway tree carries its own. The
 scan exits 2 when it is given no directory, when a named directory is absent, when the manifest
