@@ -34,13 +34,8 @@ import {
   INVITATIONS_LIST,
   isActable,
 } from "./invitations-address.ts";
-import {
-  useInvitationCounts,
-  useInvitations,
-  type ListedInvitation,
-  type SentInvitation,
-} from "./invitations-api.ts";
-import { InviteAction } from "./invite-action.tsx";
+import { useInvitationCounts, useInvitations, type ListedInvitation } from "./invitations-api.ts";
+import { useInviteAction } from "./invite-action.tsx";
 import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
 import { UnsentEmails } from "./unsent-emails.tsx";
@@ -52,8 +47,6 @@ const INVITATIONS_HEADING = "Invitations";
 const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.invitation);
 
 const NO_ONE: readonly ListedInvitation[] = [];
-
-const NOTHING_UNSENT: readonly SentInvitation[] = [];
 
 const matching = (search: string) => {
   const sought = search.toLowerCase();
@@ -214,7 +207,7 @@ function InvitationList(properties: {
   const [ticked, setTicked] = useState<Ticked>(NONE);
   const [inFocusId, setInFocusId] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
-  const [unsent, setUnsent] = useState(NOTHING_UNSENT);
+  const invite = useInviteAction(setOutcome);
   const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -235,7 +228,7 @@ function InvitationList(properties: {
     tick: setTicked,
     heading,
     say: setOutcome,
-    unsent: setUnsent,
+    unsent: invite.setUnsent,
   });
 
   useInFocusKeystrokes({
@@ -259,10 +252,10 @@ function InvitationList(properties: {
         headingId={properties.headingId}
         headingRef={heading}
         count={read.data === undefined ? "" : countSaid(narrowed)}
-        action={<InviteAction />}
+        action={invite.action}
       />
       <OutcomeLine outcome={outcome} className="mt-2" />
-      <UnsentEmails unsent={unsent} />
+      <UnsentEmails unsent={invite.unsent} />
 
       <Card className="mt-4">
         <InvitationFilters

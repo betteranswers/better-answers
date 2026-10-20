@@ -18,7 +18,7 @@ import { useHiddenColumns } from "@/shared/wide-layout.ts";
 import { CLEAR_WORDS, counted } from "@/shared/words.ts";
 
 import { useGroups } from "./groups-api.ts";
-import { InviteAction } from "./invite-action.tsx";
+import { useInviteAction } from "./invite-action.tsx";
 import {
   MEMBER_PAGE_WORDS,
   MEMBERS_LOADING,
@@ -53,6 +53,7 @@ import { useMembers, useRemovalOf, type ListedMember, type Role } from "./people
 import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
 import { ROLES } from "./role-meanings.ts";
+import { UnsentEmails } from "./unsent-emails.tsx";
 import { nameOf } from "./words.tsx";
 
 const PAGE_SIZE = 25;
@@ -320,6 +321,7 @@ function MemberList(properties: {
   const searchRef = useRef<HTMLInputElement>(null);
   const openMember = useOpenMember(narrowed.flush);
   const { outcome, refused, say } = useLastSaid(heading);
+  const invite = useInviteAction(say);
 
   const columns = useMemo(() => memberColumns(refused), [refused]);
 
@@ -367,9 +369,10 @@ function MemberList(properties: {
             ? ""
             : saidOfCount(narrowed.data.length, read.data.length, narrowed.narrowing)
         }
-        action={<InviteAction />}
+        action={invite.action}
       />
       <OutcomeLine outcome={outcome} className="mt-2" />
+      <UnsentEmails unsent={invite.unsent} />
 
       <Card className="mt-4">
         <MemberFilters

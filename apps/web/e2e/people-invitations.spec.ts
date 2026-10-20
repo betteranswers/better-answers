@@ -121,6 +121,22 @@ const answeredOnceHeld = (page: Page, procedure: string, held: Promise<void>) =>
     },
   );
 
+/** Two specs send to an address that joined after the dialog opened, which the api refuses. */
+const sentToOneWhoJoinedMeanwhile = async (
+  page: Page,
+  api: APIRequestContext,
+  at: AtInvitations,
+  addresses: { readonly other: string; readonly joined: string },
+) => {
+  await dialogOpened(page);
+  const made = await person(api, addresses.joined, { displayName: "Ola Joined" });
+  await addMember(api, { workspaceId: at.workspaceId, userId: made.id, role: "Viewer" });
+  await addressField(page).fill(`${addresses.other}, ${addresses.joined}`);
+  const refused = refusalAnswering(page, "members.invite");
+  await sendButton(page).click();
+  return { refused };
+};
+
 const resentAsIfItWent = (page: Page) =>
   page.route(
     (url) => url.pathname.includes("members.resendInvitation"),
@@ -358,12 +374,7 @@ test.describe("the People page's Invitations tab", () => {
     const joined = anAddress("joined");
     const other = anAddress("other");
 
-    await dialogOpened(page);
-    const made = await person(request, joined, { displayName: "Ola Joined" });
-    await addMember(request, { workspaceId: at.workspaceId, userId: made.id, role: "Viewer" });
-    await addressField(page).fill(`${other}, ${joined}`);
-    const refused = refusalAnswering(page, "members.invite");
-    await sendButton(page).click();
+    const { refused } = await sentToOneWhoJoinedMeanwhile(page, request, at, { other, joined });
 
     expect((await refused).items).toEqual({ 1: "already-a-member" });
     await saysARefusal(inviteDialog(page).getByRole("alert"));
@@ -566,6 +577,54 @@ test.describe("the People page's Invitations tab", () => {
       rowOf(page, offline),
       "the invitation stands though its email did not go",
     ).toHaveCount(1);
+  });
+
+  for (const tab of ["Members", "Invitations", "Requests"] as const) {
+    test(`closed mid-send, the dialog's unsent emails land on ${tab}`, async ({
+      page,
+      request,
+    }) => {
+      await anAdminAtInvitations(page, request, `Calder ${tab} Lacemakers`);
+      await page.getByRole("tab", { name: tab }).click();
+      const region = page.getByRole("region", { name: tab });
+      await expect(region.getByRole("heading", { name: tab })).toBeVisible();
+      const offline = anUnreachableAddress("offline");
+      const answered = Promise.withResolvers<void>();
+      await answeredOnceHeld(page, "members.invite", answered.promise);
+
+      await dialogOpened(page);
+      await addressField(page).fill(offline);
+      await sendButton(page).click();
+      await page.keyboard.press("Escape");
+      await expect(inviteDialog(page)).toHaveCount(0);
+      answered.resolve();
+
+      await expect(
+        unsentIn(region).getByRole("button", { name: `Resend Invitation to ${offline}` }),
+      ).toBeVisible();
+      await expect(region.getByRole("alert").first()).toContainText(offline);
+    });
+  }
+
+  test("a refusal after the dialog closed names its addresses", async ({ page, request }) => {
+    const at = await anAdminAtInvitations(page, request, "Calder Refused Lacemakers");
+    await openInvitations(page);
+    const [other, joined] = [anAddress("other"), anAddress("joined")];
+    const answered = Promise.withResolvers<void>();
+    await answeredOnceHeld(page, "members.invite", answered.promise);
+
+    const { refused } = await sentToOneWhoJoinedMeanwhile(page, request, at, { other, joined });
+    await page.keyboard.press("Escape");
+    await expect(inviteDialog(page)).toHaveCount(0);
+    answered.resolve();
+
+    expect((await refused).items).toEqual({ 1: "already-a-member" });
+    const said = invitationsRegion(page).getByRole("alert").first();
+    await expect(said.getByRole("listitem")).toHaveText([new RegExp(joined)]);
+    await inviteAction(page).click();
+    await expect(addressField(page), "the dialog holds what was not sent").toHaveValue(
+      `${other}, ${joined}`,
+    );
   });
 
   test("the dialog's unsent list drops an address whose Resend went", async ({ page, request }) => {

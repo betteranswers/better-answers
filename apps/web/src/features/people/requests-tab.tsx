@@ -14,7 +14,7 @@ import { counted, nothingMatches } from "@/shared/words.ts";
 import { ApproveRequest } from "./approve-request.tsx";
 import { EMPTY_LINES } from "./empty-lines.ts";
 import { approvedOutcome } from "./invitation-words.ts";
-import { InviteAction } from "./invite-action.tsx";
+import { useInviteAction } from "./invite-action.tsx";
 import type { Role } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfRequestFailure } from "./refusal.tsx";
@@ -28,6 +28,7 @@ import {
 } from "./requests-api.ts";
 import { REQUESTS_COLUMNS, RequestsActionsContext, requestsFeatures } from "./requests-columns.tsx";
 import { aRole } from "./role-meanings.ts";
+import { UnsentEmails } from "./unsent-emails.tsx";
 
 const REQUESTS_HEADING = "Requests";
 
@@ -86,6 +87,7 @@ function RequestsList(properties: {
   const { read, listed, search, data } = narrowed;
   const [inFocusId, setInFocusId] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
+  const invite = useInviteAction(setOutcome);
   const [approving, setApproving] = useState<WaitingRequest>();
   const searchRef = useRef<HTMLInputElement>(null);
   const openedFrom = useRef<HTMLElement | null>(null);
@@ -163,9 +165,10 @@ function RequestsList(properties: {
         headingId={properties.headingId}
         headingRef={heading}
         count={read.data === undefined ? "" : saidOfCount(data.length, listed.length, search)}
-        action={<InviteAction />}
+        action={invite.action}
       />
       <OutcomeLine outcome={outcome} className="mt-2" />
+      <UnsentEmails unsent={invite.unsent} />
 
       <Card className="mt-4">
         <FilterRow
