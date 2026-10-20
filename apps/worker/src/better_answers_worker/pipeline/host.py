@@ -1,11 +1,9 @@
 import asyncio
 import contextlib
-import gc
 import shutil
 import threading
-import time
 from collections import OrderedDict
-from collections.abc import Callable, Coroutine, Iterator, Mapping, Sequence
+from collections.abc import Coroutine, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType, TracebackType
@@ -19,18 +17,6 @@ from ..log import logger
 from .tables import POOL, Table, declare_nothing, declare_rows
 
 ENVIRONMENTS_HELD = 8
-
-
-# heed's message for an environment this process still holds open.
-STILL_OPEN = (
-    "environment already open in this program;"
-    " close it to be able to open it again with different options"
-)
-
-
-STARVED_RUNNER_RELEASE_WAIT_SECONDS = 5.0
-FIRST_PAUSE_SECONDS = 0.05
-LONGEST_PAUSE_SECONDS = 0.5
 
 
 POOL_MIN_SIZE = 0
@@ -86,53 +72,6 @@ async def open_pool(
     return pool
 
 
-def _pauses_within(cap_seconds: float) -> Iterator[float]:
-    pause = FIRST_PAUSE_SECONDS
-    left = cap_seconds
-    while pause < left:
-        yield pause
-        left -= pause
-        pause = min(pause * 2, LONGEST_PAUSE_SECONDS)
-    if left > 0:
-        yield left
-
-
-def _open_unless_held(
-    open_store: Callable[[], coco.Environment],
-) -> coco.Environment | None:
-    try:
-        return open_store()
-    except RuntimeError as error:
-        if str(error) != STILL_OPEN:
-            raise
-        return None
-
-
-def _opened_once_let_go(
-    sync: Sync,
-    store: str,
-    open_store: Callable[[], coco.Environment],
-    wait_seconds: float,
-) -> coco.Environment:
-    opened = _open_unless_held(open_store)
-    if opened is not None:
-        return opened
-    logger.info(
-        "the engine still holds the store, so its open waits for it to let go",
-        connected_source_id=sync.connected_source_id,
-        store=store,
-        wait_seconds=wait_seconds,
-    )
-    # A handle caught in a reference cycle drops only when the collector runs.
-    gc.collect()
-    for pause in _pauses_within(wait_seconds):
-        opened = _open_unless_held(open_store)
-        if opened is not None:
-            return opened
-        time.sleep(pause)
-    return open_store()
-
-
 class _Loop:
     def __init__(self) -> None:
         self._loop = asyncio.new_event_loop()
@@ -164,7 +103,6 @@ class Host:
         bootstrap: Bootstrap,
         *,
         environments_held: int = ENVIRONMENTS_HELD,
-        release_wait_seconds: float = STARVED_RUNNER_RELEASE_WAIT_SECONDS,
     ) -> None:
         if environments_held < len(STORES_A_CONNECTED_SOURCE_HOLDS):
             message = (
@@ -176,7 +114,6 @@ class Host:
         self._bootstrap = bootstrap
         self._engine = bootstrap.engine
         self._held = environments_held
-        self._release_wait = release_wait_seconds
         self._loop = _Loop()
         self._pools: dict[str, asyncpg.Pool] = {}
         self._environments: OrderedDict[str, dict[str, coco.Environment]] = (
@@ -236,7 +173,9 @@ class Host:
 
     def _evict(self, sync: Sync, store: str) -> None:
         stores = self._environments.get(sync.connected_source_id, {})
-        stores.pop(store, None)
+        evicted = stores.pop(store, None)
+        if evicted is not None:
+            evicted.close()
         if not stores:
             self._environments.pop(sync.connected_source_id, None)
 
@@ -258,21 +197,18 @@ class Host:
             db_path=directory,
             db_settings=coco.LmdbSettings(map_size=self.store_map_bytes()),
         )
-        opened = _opened_once_let_go(
-            sync,
-            store,
-            lambda: coco.Environment(
-                settings,
-                name=f"connected_source:{sync.connected_source_id}:{store}",
-                context_provider=provider,
-                event_loop=self._loop.loop,
-            ),
-            self._release_wait,
+        opened = coco.Environment(
+            settings,
+            name=f"connected_source:{sync.connected_source_id}:{store}",
+            context_provider=provider,
+            event_loop=self._loop.loop,
         )
         self._environments.setdefault(sync.connected_source_id, {})[store] = opened
         self._environments.move_to_end(sync.connected_source_id)
         while self._handles() > self._held:
             oldest, closed = self._environments.popitem(last=False)
+            for environment in closed.values():
+                environment.close()
             logger.info(
                 "the connected source's stores were closed to stay within the cache",
                 connected_source_id=oldest,
@@ -304,6 +240,9 @@ class Host:
         coco.App(self.app_config(sync, PASSAGES_APP), declare_nothing).drop_blocking()
 
     def close(self) -> None:
+        for stores in self._environments.values():
+            for environment in stores.values():
+                environment.close()
         self._environments.clear()
         pools = list(self._pools.values())
         self._pools.clear()

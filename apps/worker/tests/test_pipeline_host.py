@@ -1,16 +1,12 @@
 import asyncio
-import gc
 import os
-import threading
-import time
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import asyncpg
 import psycopg
 import pytest
-from structlog.testing import capture_logs
 
 from better_answers_worker import queue
 from better_answers_worker.config import Bootstrap, Engine, ObjectStore
@@ -436,123 +432,54 @@ def test_a_connected_sources_lmdb_size_is_readable_after_its_run(
     assert Path(host.connected_source_directory(sync)).is_dir()
 
 
-STILL_OPEN = (
-    "environment already open in this program;"
-    " close it to be able to open it again with different options"
-)
-
-WAITS = "the engine still holds the store, so its open waits for it to let go"
-
-HOLDS_AT_MOST_SECONDS = 10
-
-
-def waits_in(written: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
-    return [entry for entry in written if entry["event"] == WAITS]
-
-
-def hold_until_waited_on(store: object, written: Sequence[Mapping[str, Any]]) -> None:
-    """Keeps `store`'s handle open until a wait is logged, as a cocoindex engine
-    task holds it after its update."""
-    deadline = time.monotonic() + HOLDS_AT_MOST_SECONDS
-    while not waits_in(written) and time.monotonic() < deadline:
-        time.sleep(0.05)
-
-
-def test_a_held_store_opens_once_the_engine_lets_go(tmp_path: Path) -> None:
+def test_a_closed_hosts_store_reopens_while_its_config_is_held(
+    tmp_path: Path,
+) -> None:
     bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
     sync = a_sync_on("connected-source-one")
 
-    with capture_logs() as written:
-        with Host(bootstrap) as first:
-            holder = threading.Thread(
-                target=hold_until_waited_on,
-                args=(first.app_config(sync, PASSAGES_APP), written),
-            )
-        holder.start()
-        try:
-            with Host(bootstrap) as second:
-                second.app_config(sync, PASSAGES_APP)
-                opened = second.held_connected_sources()
-        finally:
-            holder.join()
+    with Host(bootstrap) as first:
+        _held = first.app_config(sync, PASSAGES_APP)
+    with Host(bootstrap) as second:
+        second.app_config(sync, PASSAGES_APP)
+        opened = second.held_connected_sources()
 
     assert opened == ("connected-source-one",)
-    assert waits_in(written) == [
-        {
-            "event": WAITS,
-            "log_level": "info",
-            "connected_source_id": "connected-source-one",
-            "store": "connected_source",
-            "wait_seconds": 5.0,
-        }
-    ]
 
 
-def test_a_store_held_in_a_cycle_opens_after_a_collection(tmp_path: Path) -> None:
-    bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
-    sync = a_sync_on("connected-source-one")
+def test_a_store_closed_for_the_cache_bound_reopens_while_held(
+    tmp_path: Path,
+) -> None:
+    one = a_sync_on("connected-source-one")
 
-    gc.disable()
-    try:
-        with Host(bootstrap) as first:
-            cycle: list[object] = [first.app_config(sync, PASSAGES_APP)]
-            cycle.append(cycle)
-        del cycle
-        with (
-            capture_logs() as written,
-            Host(bootstrap, release_wait_seconds=0.2) as second,
-        ):
-            second.app_config(sync, PASSAGES_APP)
-            opened = second.held_connected_sources()
-    finally:
-        gc.enable()
+    with Host(
+        bootstrap_for("postgresql://unreached/unreached", tmp_path),
+        environments_held=2,
+    ) as host:
+        _held = host.app_config(one, PASSAGES_APP)
+        host.open_connected_source(a_sync_on("connected-source-two"))
+        host.app_config(one, PASSAGES_APP)
+        opened = host.held_connected_sources()
 
     assert opened == ("connected-source-one",)
-    assert waits_in(written) == [
-        {
-            "event": WAITS,
-            "log_level": "info",
-            "connected_source_id": "connected-source-one",
-            "store": "connected_source",
-            "wait_seconds": 0.2,
-        }
-    ]
 
 
-def test_a_store_never_let_go_raises_after_the_wait(tmp_path: Path) -> None:
-    bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
+def test_a_removed_store_reopens_while_its_config_is_held(tmp_path: Path) -> None:
     sync = a_sync_on("connected-source-one")
 
-    with Host(bootstrap) as first, capture_logs() as written:
-        first.app_config(sync, PASSAGES_APP)
-        started = time.monotonic()
-        with (
-            pytest.raises(RuntimeError) as raised,
-            Host(bootstrap, release_wait_seconds=0.2) as second,
-        ):
-            second.app_config(sync, PASSAGES_APP)
-        waited = time.monotonic() - started
+    with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
+        _held = host.app_config(sync, PASSAGES_APP)
+        host.remove_connected_source_store(sync)
+        host.app_config(sync, PASSAGES_APP)
+        opened = host.held_connected_sources()
 
-    assert str(raised.value) == STILL_OPEN
-    assert waited >= 0.2
-    assert waits_in(written) == [
-        {
-            "event": WAITS,
-            "log_level": "info",
-            "connected_source_id": "connected-source-one",
-            "store": "connected_source",
-            "wait_seconds": 0.2,
-        }
-    ]
+    assert opened == ("connected-source-one",)
 
 
-def test_an_unreadable_store_raises_without_waiting(tmp_path: Path) -> None:
+def test_an_unreadable_store_raises_the_engines_error(tmp_path: Path) -> None:
     sync = a_sync_on("connected-source-one")
 
-    with (
-        Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host,
-        capture_logs() as written,
-    ):
+    with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
         directory = host.store_directory(sync, CONNECTED_SOURCE_STORE)
         directory.mkdir(parents=True)
         (directory / "data.mdb").write_bytes(b"not an lmdb file" * 1000)
@@ -560,4 +487,3 @@ def test_an_unreadable_store_raises_without_waiting(tmp_path: Path) -> None:
             host.app_config(sync, PASSAGES_APP)
 
     assert str(raised.value) == "MDB_INVALID: File is not an LMDB file"
-    assert waits_in(written) == []
