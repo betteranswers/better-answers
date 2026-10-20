@@ -11,6 +11,10 @@ _TIME_CHARACTERS = 10
 _RANDOM_CHARACTERS = 16
 
 
+PORT_OF = ("packages/schema/src/ulid.ts",)
+AGREEMENT = "id-shape"
+
+
 def ulid() -> str:
     milliseconds = time.time_ns() // 1_000_000
     stamp = "".join(

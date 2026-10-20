@@ -13,6 +13,10 @@ ENVELOPE_VERSION_BYTES = 1
 _SHORTEST_FRAME = ENVELOPE_VERSION_BYTES + ENVELOPE_NONCE_BYTES + ENVELOPE_TAG_BYTES
 
 
+PORT_OF = ("packages/core/src/kernel/envelope.ts",)
+AGREEMENT = "credential-envelope"
+
+
 class UnopenableError(Exception):
     def __init__(self, name: str, message: str) -> None:
         super().__init__(message)
