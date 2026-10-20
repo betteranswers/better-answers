@@ -111,7 +111,6 @@ const capitalised = (address: string): string =>
 const anUnreachableAddress = (who: string): string =>
   anAddress(who).replace("@example.test", "@unreachable.example");
 
-/** Holds a call until `held` settles, so a spec can act while it is still in flight. */
 const answeredOnceHeld = (page: Page, procedure: string, held: Promise<void>) =>
   page.route(
     (url) => url.pathname.replace("/trpc/", "").split(",").includes(procedure),
@@ -121,7 +120,6 @@ const answeredOnceHeld = (page: Page, procedure: string, held: Promise<void>) =>
     },
   );
 
-/** Two specs send to an address that joined after the dialog opened, which the api refuses. */
 const sentToOneWhoJoinedMeanwhile = async (
   page: Page,
   api: APIRequestContext,

@@ -69,7 +69,6 @@ const ticking = async (count: number, readable = true) => {
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false } });
   vi.stubGlobal("fetch", answeringAs("Admin"));
-  // As the shell does before it draws a page: a bulk act waits on the reader's membership.
   await clients.queryClient.fetchQuery(
     memberOptions(createApiProxy(clients.apiClient, clients.queryClient)),
   );

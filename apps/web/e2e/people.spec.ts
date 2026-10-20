@@ -88,7 +88,6 @@ const answeredChangedMeanwhile = (
 
 const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
 
-/** Two specs hold Priya's removal from her page, so a bulk act can answer before it. */
 const priyasRemovalHeld = async (page: Page, api: APIRequestContext, workspaceName: string) => {
   const { joined } = await anAdminAtPeople(page, api, workspaceName);
   const removalAnswered = Promise.withResolvers<void>();
@@ -1744,7 +1743,6 @@ const A_FAILED_READ = {
   },
 };
 
-/** The shell's read fails, the batch's member answer fails, and the lone retry waits on `read`. */
 const membershipUnreadUntil = async (page: Page, read: Promise<void>): Promise<void> => {
   let shellRead = true;
   await page.route(MEMBER_READ, async (route) => {

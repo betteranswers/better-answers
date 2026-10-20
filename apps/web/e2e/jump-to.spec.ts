@@ -219,7 +219,6 @@ test("lands an Admin on the member they chose", async ({ page, request }) => {
   await expect(memberPageNaming(page, TOM)).toHaveCount(0);
 });
 
-/** Two specs open a member through jump-to and remove one from their page. */
 const jumpedToMember = async (page: Page, words: string, name: string): Promise<void> => {
   await opened(page, "Meta+k");
   await typed(page, words);
@@ -249,7 +248,6 @@ test("removing a member opened from jump-to keeps Members' search", async ({ pag
   await expect(memberRows(page)).toContainText(TOM);
 });
 
-/** jump-to hands focus to the page after the page has drawn, so a stop on the way is recorded. */
 const focusStopsRecorded = (page: Page) =>
   page.evaluate(() => {
     const stops: string[] = [];
