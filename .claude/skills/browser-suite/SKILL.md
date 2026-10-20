@@ -47,7 +47,9 @@ and `apps/web/e2e/confirm-recovery.spec.ts` signs in by email while the device h
 
 `apps/web/playwright.config.ts` holds the port, the `webServer` command (`node tests/serve.ts`
 run in `apps/api`, handed that port) and `/health` as the readiness URL. `/health` answers only
-once the database is migrated and the authorization server has initialised. The api's `serve:e2e`
+once the database is migrated and the authorization server has initialised. `serve.ts` binds its
+port before it starts the harness and answers 503 until then, so a port another server holds
+fails the run at once. The api's `serve:e2e`
 script is the same command for a person to run by hand. Playwright never goes through it: pnpm
 11.27 and later start a script in a process group of its own, which Playwright's kill never
 reaches, so the server outlives the suite and the run hangs on its open output.
