@@ -33,8 +33,7 @@ export type WorkspaceShown = NamedWorkspace & {
   readonly whenLeft: (left: () => void) => void;
 };
 
-/** A member read that moves workspace is followed where it is read; only an answer's evidence says this tab was left. */
-const leftBetween = (was: Shown | undefined, now: Shown): boolean =>
+const leftAsAnAnswerSaw = (was: Shown | undefined, now: Shown): boolean =>
   was !== undefined && was.id !== now.id && (was.by === "answer" || now.by === "answer");
 
 export const workspaceShownBy = (queryClient: QueryClient, api: ApiProxy): WorkspaceShown => {
@@ -45,7 +44,7 @@ export const workspaceShownBy = (queryClient: QueryClient, api: ApiProxy): Works
   const learnt = (now: Shown) => {
     const was = shown;
     shown = now;
-    if (leftBetween(was, now)) for (const left of lefts) left();
+    if (leftAsAnAnswerSaw(was, now)) for (const left of lefts) left();
   };
   queryClient.getQueryCache().subscribe(({ type, query }) => {
     if (query.queryHash !== memberHash) return;

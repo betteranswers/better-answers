@@ -34,19 +34,19 @@ const A_FAILED_READ = {
   },
 };
 
-/** The shell's read is dropped and the frame's batched one fails, so the page draws unread; the lone retry waits on `landed`. */
 const memberUnreadUntil = async (page: Page, landed: Promise<void>): Promise<void> => {
-  let shellRead = true;
+  let theShellsReadToDrop = true;
   await page.route(
     (url) => askedAt(url.href).includes(MEMBER_READ),
     async (route) => {
       const asked = askedAt(route.request().url());
-      if (shellRead) {
-        shellRead = false;
+      if (theShellsReadToDrop) {
+        theShellsReadToDrop = false;
         await route.abort();
         return;
       }
-      if (asked.length === 1) {
+      const theLoneRetryToHold = asked.length === 1;
+      if (theLoneRetryToHold) {
         await landed;
         await route.continue();
         return;
