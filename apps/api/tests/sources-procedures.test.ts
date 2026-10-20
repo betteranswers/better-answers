@@ -9,7 +9,6 @@ import { ulid } from "@better-answers/schema";
 
 import { POSTGRES_POOL_MAX } from "../src/doors.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
-import { UPLOAD_DESCRIPTOR_HEADERS } from "../src/trpc/upload.ts";
 import { actingIn, startApp, type TestApp } from "./harness.ts";
 import {
   revocationHeldOpen,
@@ -20,7 +19,6 @@ import {
 import {
   anAdminOnTheWeb,
   refusalOfCall,
-  UPLOAD_HEADER_OF_FIELD,
   uploadHeaders,
   uploadOptions,
   type UploadDescriptor,
@@ -220,12 +218,6 @@ const pastTheCap = () => {
 };
 
 describe("the upload, one mutation over the split link", () => {
-  it("names each descriptor field by one header on both sides", () => {
-    expect(Object.entries(UPLOAD_HEADER_OF_FIELD).sort()).toEqual(
-      Object.entries(UPLOAD_DESCRIPTOR_HEADERS).sort(),
-    );
-  });
-
   it("lands a connected source with its document and index job", async () => {
     const { workspace, api, sent } = await anAdmin();
     const finance = await seededIn(app, (seed) =>

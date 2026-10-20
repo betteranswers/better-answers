@@ -11,6 +11,10 @@ import {
   ANSWERING_WORKSPACE_HEADER,
   TAB_WORKSPACE_HEADER,
 } from "@better-answers/schema/tab-workspace";
+import {
+  type HeaderOfEachField,
+  UPLOAD_HEADER_OF_FIELD,
+} from "@better-answers/schema/upload-headers";
 
 export type UploadDescriptor = {
   readonly connectedSourceId: string;
@@ -23,18 +27,9 @@ export type UploadDescriptor = {
   readonly audienceGroups?: readonly string[] | null;
 };
 
-export const UPLOAD_HEADER_OF_FIELD = {
-  connectedSourceId: "x-upload-connected-source-id",
-  name: "x-upload-name",
-  fileName: "x-upload-file-name",
-  mediaType: "x-upload-media-type",
-  byteSize: "x-upload-byte-size",
-  sensitivity: "x-upload-sensitivity",
-  audience: "x-upload-audience",
-  audienceGroups: "x-upload-audience-groups",
-} as const satisfies Record<keyof UploadDescriptor, string>;
-
-const HEADER_OF_FIELD = new Map<string, string>(Object.entries(UPLOAD_HEADER_OF_FIELD));
+const HEADER_OF_FIELD = new Map<string, string>(
+  Object.entries(UPLOAD_HEADER_OF_FIELD satisfies HeaderOfEachField<UploadDescriptor>),
+);
 
 const UPLOAD_CONTEXT = "upload";
 

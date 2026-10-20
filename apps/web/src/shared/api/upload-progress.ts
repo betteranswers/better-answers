@@ -1,6 +1,6 @@
 import type { httpLink } from "@trpc/client";
 
-import { UPLOAD_HEADER_OF_FIELD } from "./link.ts";
+import { UPLOAD_HEADER_OF_FIELD } from "@better-answers/schema/upload-headers";
 
 type Fetch = NonNullable<Parameters<typeof httpLink>[0]["fetch"]>;
 

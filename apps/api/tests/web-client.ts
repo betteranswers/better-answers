@@ -3,19 +3,14 @@ import { z } from "zod";
 
 import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 
-import {
-  apiLink,
-  UPLOAD_HEADER_OF_FIELD,
-  uploadOptions,
-  type UploadDescriptor,
-} from "../../web/src/shared/api/link.ts";
+import { apiLink, uploadOptions, type UploadDescriptor } from "../../web/src/shared/api/link.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import type { AppRouter } from "../src/trpc/router.ts";
 import { setActiveWorkspace } from "./flow.ts";
 import type { TestApp, TestClient } from "./harness.ts";
 import { signedInClient } from "./provoke.ts";
 
-export { UPLOAD_HEADER_OF_FIELD, uploadOptions, type UploadDescriptor };
+export { uploadOptions, type UploadDescriptor };
 
 type Sent = {
   readonly path: string;
