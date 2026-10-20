@@ -463,11 +463,70 @@ const redeployedThrough = async (
       CF_ACCESS_CLIENT_ID: "access-id",
       CF_ACCESS_CLIENT_SECRET: "access-secret",
       PROD_UUID: "uuid-1",
+      RELEASE_DEPLOY_DELAY_SECONDS: "0",
       ...credentials,
     });
     result = { ...done, heard: [...heard] };
   });
   return result;
+};
+
+const PULL_STEP = "docker compose pull --policy missing";
+const DEPLOYMENT = "dep-1";
+const DEPLOYMENT_READ = `/api/v1/deployments/${DEPLOYMENT}`;
+const DEPLOYMENTS_LIST = "/api/v1/deployments/applications/uuid-1";
+
+const deploymentIs = (status: string): Answer => ({
+  status: 200,
+  body: JSON.stringify({ deployment_uuid: DEPLOYMENT, status, logs: "a deployment's whole log" }),
+});
+
+type Orchestrator = {
+  readonly pullStep?: string | null;
+  readonly listed?: readonly string[];
+  readonly reads?: readonly Answer[];
+  readonly deploy?: Answer;
+};
+
+const orchestrator = ({
+  pullStep = null,
+  listed = ["finished", "failed"],
+  reads = [deploymentIs("finished")],
+  deploy = {
+    status: 200,
+    body: JSON.stringify({
+      deployments: [
+        {
+          message: "Application better-answers deployment queued.",
+          resource_uuid: "uuid-1",
+          deployment_uuid: DEPLOYMENT,
+        },
+      ],
+    }),
+  },
+}: Orchestrator = {}): ((heard: Heard) => Answer) => {
+  let read = 0;
+  return (heard) => {
+    if (heard.url === DEPLOYMENT_READ) {
+      const next = reads[Math.min(read, reads.length - 1)];
+      read += 1;
+      return next ?? { status: 404, body: "{}" };
+    }
+    if (heard.url === DEPLOYMENTS_LIST) {
+      const deployments = listed.map((status, index) => ({
+        deployment_uuid: `dep-0${index}`,
+        status,
+      }));
+      return { status: 200, body: JSON.stringify({ count: deployments.length, deployments }) };
+    }
+    if (heard.method === "GET") {
+      return {
+        status: 200,
+        body: JSON.stringify({ uuid: "uuid-1", docker_compose_custom_build_command: pullStep }),
+      };
+    }
+    return heard.method === "POST" ? deploy : { status: 200, body: "{}" };
+  };
 };
 
 const sent = (heard: Heard) => ({
@@ -478,53 +537,240 @@ const sent = (heard: Heard) => ({
   access: [heard.headers["cf-access-client-id"], heard.headers["cf-access-client-secret"]],
 });
 
+const called = (heard: Heard): string => `${heard.method} ${heard.url}`;
+
+const digestSet = (key: string, value: string): string =>
+  `${JSON.stringify({ key, value, is_preview: false, is_buildtime: true, is_runtime: true })}\n`;
+
 describe("the redeploy a release makes", () => {
-  it("sets both digests, then deploys, with every credential", async () => {
-    const redeployed = await redeployedThrough(() => ({ status: 200, body: "{}" }));
+  it("sets the pull step and digests, deploys, then waits", async () => {
+    const redeployed = await redeployedThrough(orchestrator());
     const credentialed = { token: "Bearer deploy-token", access: ["access-id", "access-secret"] };
 
-    expect(redeployed.code).toBe(0);
     expect(redeployed.heard.map(sent)).toEqual([
+      { method: "GET", url: "/api/v1/applications/uuid-1", body: "", ...credentialed },
+      { method: "GET", url: DEPLOYMENTS_LIST, body: "", ...credentialed },
       {
         method: "PATCH",
-        url: "/api/v1/applications/uuid-1/envs",
-        body: `{"key":"API_IMAGE_DIGEST","value":"${API_DIGEST}","is_preview":false}\n`,
+        url: "/api/v1/applications/uuid-1",
+        body: `{"docker_compose_custom_build_command":"${PULL_STEP}"}\n`,
         ...credentialed,
       },
       {
         method: "PATCH",
         url: "/api/v1/applications/uuid-1/envs",
-        body: `{"key":"WORKER_IMAGE_DIGEST","value":"${WORKER_DIGEST}","is_preview":false}\n`,
+        body: digestSet("API_IMAGE_DIGEST", API_DIGEST),
+        ...credentialed,
+      },
+      {
+        method: "PATCH",
+        url: "/api/v1/applications/uuid-1/envs",
+        body: digestSet("WORKER_IMAGE_DIGEST", WORKER_DIGEST),
         ...credentialed,
       },
       { method: "POST", url: "/api/v1/deploy?uuid=uuid-1&force=false", body: "", ...credentialed },
+      { method: "GET", url: DEPLOYMENT_READ, body: "", ...credentialed },
     ]);
+    expect({ code: redeployed.code, out: redeployed.out, err: redeployed.err }).toEqual({
+      code: 0,
+      out: `the compose build command is now \`${PULL_STEP}\`\ndeploying production as deployment ${DEPLOYMENT}\ndeployment ${DEPLOYMENT} finished\n`,
+      err: "",
+    });
+  });
+
+  it("leaves the pull step alone when already set", async () => {
+    const redeployed = await redeployedThrough(orchestrator({ pullStep: PULL_STEP }));
+
+    expect({ code: redeployed.code, calls: redeployed.heard.map(called) }).toEqual({
+      code: 0,
+      calls: [
+        "GET /api/v1/applications/uuid-1",
+        `GET ${DEPLOYMENTS_LIST}`,
+        "PATCH /api/v1/applications/uuid-1/envs",
+        "PATCH /api/v1/applications/uuid-1/envs",
+        "POST /api/v1/deploy?uuid=uuid-1&force=false",
+        `GET ${DEPLOYMENT_READ}`,
+      ],
+    });
+  });
+
+  it("waits through queued and in-progress until finished", async () => {
+    const redeployed = await redeployedThrough(
+      orchestrator({
+        reads: [deploymentIs("queued"), deploymentIs("in_progress"), deploymentIs("finished")],
+      }),
+    );
+
+    expect({
+      code: redeployed.code,
+      reads: redeployed.heard.filter((heard) => heard.url === DEPLOYMENT_READ).length,
+      last: redeployed.out.trimEnd().split("\n").at(-1),
+    }).toEqual({ code: 0, reads: 3, last: `deployment ${DEPLOYMENT} finished` });
+  });
+
+  it("fails the release when the deployment fails, naming it", async () => {
+    const redeployed = await redeployedThrough(
+      orchestrator({ reads: [deploymentIs("in_progress"), deploymentIs("failed")] }),
+    );
+
+    expect({ code: redeployed.code, err: redeployed.err }).toEqual({
+      code: 1,
+      err: `::error::deployment ${DEPLOYMENT} ended failed. Read its log in the orchestrator. A failure before \`Removing old containers.\` left production running the release before this one\n`,
+    });
+  });
+
+  it("gives up when its wait runs out, naming the deployment", async () => {
+    const started = Date.now();
+    const redeployed = await redeployedThrough(
+      orchestrator({ reads: [deploymentIs("in_progress")] }),
+      { RELEASE_DEPLOY_WAIT_SECONDS: "2", RELEASE_DEPLOY_DELAY_SECONDS: "0.2" },
+    );
+
+    expect({
+      code: redeployed.code,
+      read: redeployed.heard.some((heard) => heard.url === DEPLOYMENT_READ),
+      inTime: Date.now() - started >= 2000 && Date.now() - started < 6000,
+      err: redeployed.err,
+    }).toEqual({
+      code: 1,
+      read: true,
+      inTime: true,
+      err: `::error::deployment ${DEPLOYMENT} had not finished 2 s after it was queued, and its last status read was in_progress. It may still swap production later, so read /health before acting\n`,
+    });
+  });
+
+  it("writes nothing while a deployment is queued or running", async () => {
+    for (const status of ["queued", "in_progress"]) {
+      const redeployed = await redeployedThrough(orchestrator({ listed: [status, "finished"] }));
+
+      expect({
+        code: redeployed.code,
+        calls: redeployed.heard.map(called),
+        err: redeployed.err,
+      }).toEqual({
+        code: 1,
+        calls: ["GET /api/v1/applications/uuid-1", `GET ${DEPLOYMENTS_LIST}`],
+        err: `::error::production's deployment dep-00 is ${status}, so the release sets nothing: a deployment not yet started reads the digests set before it starts. Let it end, or cancel it in the orchestrator, then run the release again\n`,
+      });
+    }
+  });
+
+  it("writes nothing when the deployment list is unreadable", async () => {
+    const valid = orchestrator();
+    const redeployed = await redeployedThrough((heard) =>
+      heard.url === DEPLOYMENTS_LIST
+        ? { status: 200, body: JSON.stringify({ count: 0 }) }
+        : valid(heard),
+    );
+
+    expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
+      code: 1,
+      heard: 2,
+      err: `::error::GET ${DEPLOYMENTS_LIST} answered no list of deployments, so the release cannot tell whether one is queued or running, and sets nothing\n`,
+    });
+  });
+
+  it("stops at a deploy the orchestrator skipped", async () => {
+    const redeployed = await redeployedThrough(
+      orchestrator({
+        deploy: {
+          status: 200,
+          body: JSON.stringify({
+            deployments: [
+              {
+                message: "Deployment already queued for this commit.",
+                resource_uuid: "uuid-1",
+                deployment_uuid: DEPLOYMENT,
+              },
+            ],
+          }),
+        },
+      }),
+    );
+
+    expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
+      code: 1,
+      heard: 6,
+      err: `::error::the orchestrator queued no deployment, because one of production was queued after this release checked for one, and the id it answered, ${DEPLOYMENT}, names nothing. Both digests are set, and that deployment reads them if it has not started, with no smoke and no tag after it. Read /health once it ends, then run the release again\n`,
+    });
+  });
+
+  it("names the read ability when the first read is refused", async () => {
+    const valid = orchestrator();
+    const redeployed = await redeployedThrough((heard) =>
+      heard.url === "/api/v1/applications/uuid-1" && heard.method === "GET"
+        ? { status: 403, body: JSON.stringify({ message: "Missing required permissions: read" }) }
+        : valid(heard),
+    );
+
+    expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
+      code: 1,
+      heard: 1,
+      err: "::error::GET /api/v1/applications/uuid-1 was answered 403: the token is not live, or lacks Coolify's `read` ability, or the edge refused its service token, as the answer above says. The release's token needs `read`, `write` and `deploy`\n",
+    });
+  });
+
+  it("keeps polling past a failed status read", async () => {
+    const redeployed = await redeployedThrough(
+      orchestrator({ reads: [{ status: 502, body: "" }, deploymentIs("finished")] }),
+    );
+
+    expect({
+      code: redeployed.code,
+      reads: redeployed.heard.filter((heard) => heard.url === DEPLOYMENT_READ).length,
+    }).toEqual({ code: 0, reads: 2 });
   });
 
   it("stops at the edge's redirect to sign-in", async () => {
-    const redeployed = await redeployedThrough(() => ({ status: 302, body: "" }));
+    const valid = orchestrator();
+    const redeployed = await redeployedThrough((heard) =>
+      heard.url === "/api/v1/applications/uuid-1" ? { status: 302, body: "" } : valid(heard),
+    );
 
     expect(redeployed.code).toBe(1);
     expect(redeployed.heard).toHaveLength(1);
     expect(redeployed.err).toEqual(
-      "::error::PATCH /api/v1/applications/uuid-1/envs was answered 302, a redirect to sign-in: the edge's Access credential is missing or expired, so nothing reached the orchestrator\n",
+      "::error::GET /api/v1/applications/uuid-1 was answered 302, a redirect to sign-in: the edge's Access credential is missing or expired, so the call never reached the orchestrator\n",
     );
   });
 
+  it("stops waiting at the edge's redirect to sign-in", async () => {
+    const redeployed = await redeployedThrough(
+      orchestrator({ reads: [{ status: 302, body: "" }, deploymentIs("finished")] }),
+    );
+
+    expect({ code: redeployed.code, err: redeployed.err }).toEqual({
+      code: 1,
+      err: `::error::GET ${DEPLOYMENT_READ} was answered 302, a redirect to sign-in: the edge's Access credential is missing or expired, so the call never reached the orchestrator\n`,
+    });
+  });
+
   it("stops at an orchestrator that refuses the deploy", async () => {
-    const redeployed = await redeployedThrough((heard) =>
-      heard.method === "POST" ? { status: 500, body: "{}" } : { status: 200, body: "{}" },
+    const redeployed = await redeployedThrough(
+      orchestrator({ deploy: { status: 500, body: "{}" } }),
     );
 
     expect(redeployed.code).toBe(1);
-    expect(redeployed.heard).toHaveLength(3);
+    expect(redeployed.heard).toHaveLength(6);
     expect(redeployed.err).toEqual(
       "::error::POST /api/v1/deploy?uuid=uuid-1&force=false was answered 500, so the release stops before anything else is sent\n",
     );
   });
 
+  it("stops at a deploy answer naming no deployment", async () => {
+    const redeployed = await redeployedThrough(
+      orchestrator({ deploy: { status: 200, body: JSON.stringify({ deployments: [] }) } }),
+    );
+
+    expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
+      code: 1,
+      heard: 6,
+      err: "::error::POST /api/v1/deploy named no deployment_uuid, so the release cannot wait for the deployment\n",
+    });
+  });
+
   it("calls nothing without its edge credential", async () => {
-    const redeployed = await redeployedThrough(() => ({ status: 200, body: "{}" }), {
+    const redeployed = await redeployedThrough(orchestrator(), {
       CF_ACCESS_CLIENT_ID: "",
     });
 
@@ -608,6 +854,22 @@ describe("how the workflows hand a release its commit", () => {
 
     expect(steps[backup]?.if).toEqual("needs.gate.outputs.trigger == 'nightly'");
     expect([backup >= 0, backup < redeploy, redeploy < smoke]).toEqual([true, true, true]);
+  });
+
+  it("outlasts the redeploy's wait and the smoke's by ten minutes", () => {
+    const defaultOf = (script: string, name: string): number => {
+      const text = readFileSync(path.join(repositoryRoot, "deploy", script), "utf8");
+      const found = new RegExp(`\\$\\{${name}:-(\\d+)\\}`).exec(text)?.[1];
+      if (found === undefined) throw new Error(`${script} gives ${name} no default`);
+      return Number(found);
+    };
+    const smokeReadSeconds = 5;
+    const smoke =
+      defaultOf("await-release.sh", "AWAIT_RELEASE_POLLS") *
+      (smokeReadSeconds + defaultOf("await-release.sh", "AWAIT_RELEASE_DELAY_SECONDS"));
+    const wait = defaultOf("release-redeploy.sh", "RELEASE_DEPLOY_WAIT_SECONDS");
+
+    expect(jobOf("promote")["timeout-minutes"] * 60).toBeGreaterThanOrEqual(wait + smoke + 600);
   });
 
   it("reads the switch the runbook tells the owner to set", () => {
