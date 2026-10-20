@@ -6,6 +6,7 @@ import { expect, test } from "./browser.ts";
 import {
   anAddress,
   inTwoWorkspaces,
+  memberUnreadUntil,
   keepsItsWordOffThePage,
   landedAtHome,
   provision,
@@ -23,43 +24,6 @@ const PEOPLE = menuGroupIn(CONTROL_CENTRE, "people");
 const GROUPS = pageNamed(PEOPLE, "Groups").path;
 
 const MEMBERS = pageNamed(PEOPLE, "Members").path;
-
-const MEMBER_READ = "session.member";
-
-const A_FAILED_READ = {
-  error: {
-    message: "INTERNAL_SERVER_ERROR",
-    code: -32_603,
-    data: { code: "INTERNAL_SERVER_ERROR", httpStatus: 500 },
-  },
-};
-
-const memberUnreadUntil = async (page: Page, landed: Promise<void>): Promise<void> => {
-  let theShellsReadToDrop = true;
-  await page.route(
-    (url) => askedAt(url.href).includes(MEMBER_READ),
-    async (route) => {
-      const asked = askedAt(route.request().url());
-      if (theShellsReadToDrop) {
-        theShellsReadToDrop = false;
-        await route.abort();
-        return;
-      }
-      const theLoneRetryToHold = asked.length === 1;
-      if (theLoneRetryToHold) {
-        await landed;
-        await route.continue();
-        return;
-      }
-      const answered = await route.fetch();
-      const answers: readonly unknown[] = await answered.json();
-      await route.fulfill({
-        response: answered,
-        json: answers.map((answer, at) => (asked[at] === MEMBER_READ ? A_FAILED_READ : answer)),
-      });
-    },
-  );
-};
 
 const PUBLISHED: SeedConnectedSource = {
   name: "Supplier payments",
