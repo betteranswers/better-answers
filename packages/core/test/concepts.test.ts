@@ -1247,6 +1247,24 @@ const isBlockedOnALock = async (pid: number): Promise<boolean> => {
   return (found.rowCount ?? 0) > 0;
 };
 
+/**
+ * Postgres can hand the row to a new FOR SHARE read before a woken UPDATE, so no connection opens
+ * until the revocation settles.
+ */
+const lendingOnceSettled = (pool: pg.Pool, settled: () => Promise<unknown>): pg.Pool =>
+  new Proxy(pool, {
+    get: (target, key) => {
+      if (key === "connect") {
+        return async () => {
+          await settled();
+          return target.connect();
+        };
+      }
+      const value: unknown = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+
 const expectCommitsWithoutRows = async (scenario: Scenario, commits: number): Promise<void> => {
   expect(await rowsFor(scenario.workspaceId)).toMatchObject({ concepts: "0", commits: "0" });
   expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(commits);
@@ -1343,9 +1361,10 @@ describe("authority that moved while the action was in flight", () => {
     const revoker = await db().pool.connect();
     let acting: Promise<Result<unknown, unknown>> | undefined;
     let revoking: Promise<unknown> = Promise.resolve();
+    const postgres = { pool: lendingOnceSettled(scenario.postgres.pool, () => revoking) };
     try {
       await holdingTable(db().pool, "concept_index", async () => {
-        acting = write(scenario, scenario.editor, writeFor());
+        acting = writeConcept(scenario.editor, { ...doorsOf(scenario), postgres }, writeFor());
         await until(() => isBlockedOnTable(db().pool, "concept_index"));
 
         const pid = await backendPidOf(revoker);
