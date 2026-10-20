@@ -33,7 +33,7 @@ control paths (`apps/api/tests/harness-control.ts`) mounted in front of the api 
 nowhere in `apps/api/src`.
 
 One origin carries the SPA, sign-in, consent and `/oauth2/*`, which is why the consent
-flow is provable in a browser at all. It is `http://localhost:3100`, never `127.0.0.1`: a
+flow is provable in a browser at all. It is `http://localhost:<port>`, never `127.0.0.1`: a
 passkey's relying party must be a domain, and WebAuthn refuses an IP address.
 
 A spec that makes or uses a passkey attaches a virtual authenticator to its page first, through
@@ -51,6 +51,10 @@ once the database is migrated and the authorization server has initialised. The 
 script is the same command for a person to run by hand. Playwright never goes through it: pnpm
 11.27 and later start a script in a process group of its own, which Playwright's kill never
 reaches, so the server outlives the suite and the run hangs on its open output.
+
+The port is 3100 in CI. On a developer's machine the runner takes a free port and hands it to its
+workers in `E2E_PORT`, so two worktrees can run the suite at once. Set `E2E_PORT` to choose the
+port yourself.
 
 ## The fixture module
 

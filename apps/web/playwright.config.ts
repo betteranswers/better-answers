@@ -1,12 +1,29 @@
+import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 3100;
+const inCi = Boolean(process.env["CI"]);
+
+const aFreePort = (): Promise<number> =>
+  new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      const port = typeof address === "object" && address !== null ? address.port : 0;
+      probe.close(() => resolve(port));
+    });
+  });
+
+/** Playwright evaluates this file in the runner and again in each worker, which inherits the runner's environment and so its port. */
+process.env["E2E_PORT"] ??= inCi ? "3100" : String(await aFreePort());
+const PORT = Number(process.env["E2E_PORT"]);
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
+  throw new Error(`E2E_PORT must be a port number, not "${process.env["E2E_PORT"]}"`);
+}
 /** The api's own public address: a passkey's relying party must be a domain, never an IP. */
 const baseURL = `http://localhost:${PORT}`;
-
-const inCi = Boolean(process.env["CI"]);
 
 export default defineConfig({
   testDir: "e2e",
