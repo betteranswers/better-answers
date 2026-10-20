@@ -1,4 +1,5 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
+import { z } from "zod";
 
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 import { CONSOLE, CONTROL_CENTRE, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
@@ -216,6 +217,67 @@ test("lands an Admin on the member they chose", async ({ page, request }) => {
   await page.keyboard.press("Enter");
   await expect(memberPageNaming(page, PRIYA)).toBeVisible();
   await expect(memberPageNaming(page, TOM)).toHaveCount(0);
+});
+
+/** Two specs open a member through jump-to and remove one from their page. */
+const jumpedToMember = async (page: Page, words: string, name: string): Promise<void> => {
+  await opened(page, "Meta+k");
+  await typed(page, words);
+  await optionOf(page, new RegExp(name)).click();
+  await expect(memberPageNaming(page, name)).toBeVisible();
+};
+
+const removedOnTheirPage = async (page: Page): Promise<void> => {
+  const removal = page.getByRole("region", { name: "Removal", exact: true });
+  await removal.getByRole("button", { name: "Remove Member" }).click();
+  await removal.getByRole("button", { name: "Remove", exact: true }).click();
+};
+
+test("removing a member opened from jump-to keeps Members' search", async ({ page, request }) => {
+  await anAdminWithATeam(page, request, "Swaledale Lead Mines");
+  await page.goto(MEMBERS.path);
+  await searchBox(page).fill("Okafor");
+  await expect(page).toHaveURL(/members\.search=Okafor$/);
+  await expect(memberRows(page)).toHaveCount(1);
+
+  await jumpedToMember(page, "priya", PRIYA);
+  await removedOnTheirPage(page);
+
+  await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}\\?members\\.search=Okafor$`));
+  await expect(searchBox(page)).toHaveValue("Okafor");
+  await expect(memberRows(page)).toHaveCount(1);
+  await expect(memberRows(page)).toContainText(TOM);
+});
+
+/** jump-to hands focus to the page after the page has drawn, so a stop on the way is recorded. */
+const focusStopsRecorded = (page: Page) =>
+  page.evaluate(() => {
+    const stops: string[] = [];
+    Reflect.set(window, "focusStops", stops);
+    document.addEventListener("focusin", (event) => {
+      if (event.target instanceof HTMLElement) stops.push(event.target.innerText);
+    });
+  });
+
+const focusStops = async (page: Page): Promise<readonly string[]> =>
+  z.array(z.string()).parse(await page.evaluate(() => Reflect.get(window, "focusStops")));
+
+test("jumping after a removal focuses the page, not Remove", async ({ page, request }) => {
+  await anAdminWithATeam(page, request, "Swaledale Smelters");
+  await page.goto(MEMBERS.path);
+  await membersRegion(page)
+    .getByRole("button", { name: `Actions for ${PRIYA}` })
+    .click();
+  await page.getByRole("menuitem", { name: "Remove" }).click();
+  await removedOnTheirPage(page);
+  await expect(memberRows(page)).toHaveCount(2);
+
+  await focusStopsRecorded(page);
+  await jumpedToMember(page, "tom", TOM);
+  await expect(page.getByRole("main")).toBeFocused();
+  expect(await focusStops(page), "focus never stops on Remove Member").not.toContain(
+    "Remove Member",
+  );
 });
 
 test("lands on Search with the typed query and its matches", async ({ page, request }) => {

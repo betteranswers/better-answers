@@ -1,7 +1,9 @@
+import type { HistoryState } from "@tanstack/react-router";
 import { z } from "zod";
 
 import { ULID } from "@better-answers/schema/ulid";
 
+import type { Here } from "@/shared/address-ask.ts";
 import { PAGE_NUMBER } from "@/shared/list-address.ts";
 import { CONTROL_CENTRE, detailAt, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
@@ -47,6 +49,11 @@ const OPENED_AT = ["member", "role", "groups", "credentials", "flag", "removal"]
 export type OpenedAt = (typeof OPENED_AT)[number];
 
 export type Opening = { readonly openedAt: OpenedAt; readonly membersQuery: string };
+
+export const openingFrom = (
+  here: Here,
+): (HistoryState & Pick<Opening, "membersQuery">) | undefined =>
+  here.pathname === MEMBERS_PAGE.path ? { membersQuery: here.searchStr } : undefined;
 
 export const OPENING = z.object({
   openedAt: z.enum(OPENED_AT).optional().catch(undefined),
