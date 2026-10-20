@@ -18,7 +18,7 @@ import { useHiddenColumns } from "@/shared/wide-layout.ts";
 import { CLEAR_WORDS, counted } from "@/shared/words.ts";
 
 import { useGroups } from "./groups-api.ts";
-import { InviteAction } from "./invite-action.tsx";
+import { useInviteAction } from "./invite-action.tsx";
 import {
   MEMBER_PAGE_WORDS,
   MEMBERS_LOADING,
@@ -53,6 +53,7 @@ import { useMembers, useRemovalOf, type ListedMember, type Role } from "./people
 import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
 import { ROLES } from "./role-meanings.ts";
+import { UnsentEmails } from "./unsent-emails.tsx";
 import { nameOf } from "./words.tsx";
 
 const PAGE_SIZE = 25;
@@ -146,7 +147,7 @@ const removalSaid = (
   };
 };
 
-const useReturnedFromARemoval = (heading: RefObject<HTMLElement | null>): Outcome | undefined => {
+const useReturnedFromARemoval = (heading: RefObject<HTMLElement | null>) => {
   const personId = useRouterState({
     select: (state) =>
       RETURNED_FROM_A_REMOVAL.safeParse(state.location.state).data?.removed.personId,
@@ -160,7 +161,10 @@ const useReturnedFromARemoval = (heading: RefObject<HTMLElement | null>): Outcom
     if (personId !== undefined) heading.current?.focus();
   }, [personId, heading]);
 
-  return removalSaid(name, removal);
+  return {
+    outcome: removalSaid(name, removal),
+    heard: `${personId ?? ""} ${removal?.status ?? ""}`,
+  };
 };
 
 const ROW_ACTIONS: readonly { readonly label: string; readonly at: OpenedAt }[] = [
@@ -288,6 +292,21 @@ type Shown = { readonly outcome: Outcome | undefined; readonly refused: RefusedR
 
 const NOTHING_SHOWN: Shown = { outcome: undefined, refused: NO_MARKS };
 
+const useLastSaid = (heading: RefObject<HTMLElement | null>) => {
+  const returned = useReturnedFromARemoval(heading);
+  const removalSaidOnly: Shown = { ...NOTHING_SHOWN, outcome: returned.outcome };
+  const [shown, setShown] = useState<Shown>(removalSaidOnly);
+  const [heard, setHeard] = useState(returned.heard);
+  if (returned.heard !== heard) {
+    setHeard(returned.heard);
+    if (returned.outcome !== undefined) setShown(removalSaidOnly);
+  }
+  const say = (outcome: Outcome | undefined, refused: RefusedRows = NO_MARKS) => {
+    setShown({ outcome, refused });
+  };
+  return { ...shown, say };
+};
+
 function MemberList(properties: {
   readonly read: ReturnType<typeof useMembers>;
   readonly headingId: string;
@@ -298,16 +317,13 @@ function MemberList(properties: {
   const narrowed = useNarrowedMembers(listed);
   const [ticked, setTicked] = useState<ReadonlySet<string>>(NONE);
   const [inFocus, setInFocus] = useState<string>();
-  const [shown, setShown] = useState<Shown>(NOTHING_SHOWN);
   const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
   const searchRef = useRef<HTMLInputElement>(null);
   const openMember = useOpenMember(narrowed.flush);
-  const returned = useReturnedFromARemoval(heading);
-  const say = (outcome: Outcome | undefined, refused: RefusedRows = NO_MARKS) => {
-    setShown({ outcome, refused });
-  };
+  const { outcome, refused, say } = useLastSaid(heading);
+  const invite = useInviteAction(say);
 
-  const columns = useMemo(() => memberColumns(shown.refused), [shown.refused]);
+  const columns = useMemo(() => memberColumns(refused), [refused]);
 
   const sorted = sortedOf(narrowed.state.sort);
   const table = useTable({
@@ -353,9 +369,10 @@ function MemberList(properties: {
             ? ""
             : saidOfCount(narrowed.data.length, read.data.length, narrowed.narrowing)
         }
-        action={<InviteAction />}
+        action={invite.action}
       />
-      <OutcomeLine outcome={shown.outcome ?? returned} className="mt-2" />
+      <OutcomeLine outcome={outcome} className="mt-2" />
+      <UnsentEmails unsent={invite.unsent} />
 
       <Card className="mt-4">
         <MemberFilters

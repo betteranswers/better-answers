@@ -2,7 +2,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
 import { QUERY_MAX } from "@/features/knowledge/knowledge-state.ts";
-import { MEMBERS_PAGE } from "@/features/people/members-address.ts";
+import { MEMBERS_PAGE, openingFrom } from "@/features/people/members-address.ts";
 import { useMembers } from "@/features/people/people-api.ts";
 import { askingHere, type Here } from "@/shared/address-ask.ts";
 import { Icon, type IconName } from "@/shared/icon.tsx";
@@ -42,6 +42,7 @@ type Jump = {
   readonly to: string;
   readonly kind: Kind;
   readonly words: string;
+  readonly opening?: ReturnType<typeof openingFrom>;
 };
 
 export type JumpGroup = { readonly heading: string; readonly jumps: readonly Jump[] };
@@ -99,8 +100,8 @@ const actionJumps = (page: Page, here: Here): readonly Jump[] =>
     }),
   );
 
-const memberJump = (member: Member): Jump =>
-  jumpOf({
+const memberJump = (member: Member, here: Here): Jump => {
+  const jump = jumpOf({
     value: `member ${member.personId}`,
     name: nameOrAddress(member.displayName, member.address),
     said: member.displayName === "" ? undefined : member.address,
@@ -108,6 +109,9 @@ const memberJump = (member: Member): Jump =>
     to: detailAt(MEMBERS_PAGE, member.personId),
     kind: "member",
   });
+  const opening = openingFrom(here);
+  return opening === undefined ? jump : { ...jump, opening };
+};
 
 export const jumpsIn = (
   tree: VisibleTree,
@@ -123,7 +127,7 @@ export const jumpsIn = (
     },
     {
       heading: JUMP_TO.groups.members,
-      jumps: (members ?? []).map(memberJump),
+      jumps: (members ?? []).map((member) => memberJump(member, here)),
     },
   ];
   return groups.filter((group) => group.jumps.length > 0);
@@ -381,7 +385,9 @@ export function JumpTo(properties: {
   const choose = (jump: Jump) => {
     chosen.current = jump.kind;
     jumping.setOpen(false);
-    void navigate({ href: jump.to });
+    const { opening } = jump;
+    if (opening === undefined) void navigate({ href: jump.to });
+    else void navigate({ href: jump.to, state: () => opening });
   };
 
   const landFocus = (event: Event) => {

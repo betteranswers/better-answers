@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useId,
   useMemo,
   useRef,
@@ -16,7 +17,8 @@ import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { INVITE_A_PERSON } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
-import { refusedWith } from "@/shared/refusal-outcome.tsx";
+import { refusedWith, setRefusalOutcome } from "@/shared/refusal-outcome.tsx";
+import type { OwnSentences } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import {
   Dialog,
@@ -33,7 +35,7 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
 import { INVITE_REFUSED, INVITE_WORDS, invitedOutcome } from "./invitation-words.ts";
-import { useInvite, type InvitedOne } from "./invitations-api.ts";
+import { useInvite, type InvitedOne, type SentInvitation } from "./invitations-api.ts";
 import {
   addressesCounted,
   allInto,
@@ -54,6 +56,40 @@ import { ROLE_OFFERED_FIRST, RoleChoice } from "./role-choice.tsx";
 import { UnsentEmails } from "./unsent-emails.tsx";
 
 const ACTION_NAME = PEOPLE_KEYSTROKES.invite.action;
+
+type AnsweredAway = {
+  readonly outcome: Outcome;
+  readonly unsent: readonly SentInvitation[];
+  readonly left: string;
+};
+
+type OnAnsweredAway = (answered: AnsweredAway) => void;
+
+const NOTHING_UNSENT: readonly SentInvitation[] = [];
+
+const FLAGGED_BY_THE_API = {
+  malformed: INVITE_WORDS.flag.malformed,
+  "already-a-member": INVITE_WORDS.flag["already-a-member"],
+} satisfies OwnSentences;
+
+const heldBackOutcome = (failure: Error, held: readonly Held[]): Outcome =>
+  flagsFrom(held, refusalOf(failure)?.items ?? {}).size === 0
+    ? outcomeOfSendingFailure(failure)
+    : setRefusalOutcome({
+        featureWords: FLAGGED_BY_THE_API,
+        failure,
+        nameOf: (place) => held[Number(place)]?.address ?? "",
+        lead: INVITE_REFUSED.heldBack,
+      });
+
+export const useInviteAction = (say: (outcome: Outcome) => void) => {
+  const [unsent, setUnsent] = useState(NOTHING_UNSENT);
+  const onAnsweredAway: OnAnsweredAway = (answered) => {
+    say(answered.outcome);
+    setUnsent(answered.unsent);
+  };
+  return { action: <InviteAction onAnsweredAway={onAnsweredAway} />, unsent, setUnsent };
+};
 
 const NO_FLAGS: ReadonlyMap<string, Flag> = new Map();
 
@@ -306,9 +342,17 @@ function InviteForm(properties: {
   readonly fieldRef: FieldRef;
   readonly left: string;
   readonly onAgain: (left: string) => void;
+  readonly onAnsweredAway: OnAnsweredAway;
 }) {
   const { fieldRef, members } = properties;
   const invite = useInvite();
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const list = useRef<HTMLUListElement>(null);
   const known = useMemo(
     () => membersOf((members ?? []).map((member) => member.address)),
@@ -317,7 +361,6 @@ function InviteForm(properties: {
   const addresses = useHeldAddresses(known, list, properties.left);
   const [role, setRole] = useState<Role>(ROLE_OFFERED_FIRST);
   const [outcome, setOutcome] = useState<Outcome>();
-  // One send at a time: a second call on the mutation takes over the first's callbacks.
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState<readonly InvitedOne[]>();
   const formId = useId();
@@ -337,24 +380,39 @@ function InviteForm(properties: {
   const send = (held: readonly Held[]) => {
     setSending(true);
     setOutcome(undefined);
-    invite.mutate(
-      { addresses: held.map((one) => one.address), role },
-      {
-        onSuccess: ({ invitations }) => {
-          setSending(false);
-          setSent(invitations);
-          setOutcome(invitedOutcome(invitations, role));
-        },
-        onError: (failure) => {
-          setSending(false);
-          const flagged = flagsFrom(held, refusalOf(failure)?.items ?? {});
-          if (flagged.size === 0) {
-            setOutcome(outcomeOfSendingFailure(failure));
-            return;
-          }
-          addresses.flagNow(flagged);
-          setOutcome(refusedWith(INVITE_REFUSED.flagged));
-        },
+    // Not `mutate`: its callbacks die with this form, which a closed dialog unmounts.
+    invite.mutateAsync({ addresses: held.map((one) => one.address), role }).then(
+      ({ invitations }) => {
+        const invited = invitedOutcome(invitations, role);
+        if (!mounted.current) {
+          properties.onAnsweredAway({
+            outcome: invited,
+            unsent: invitations.filter((one) => !one.emailSent),
+            left: "",
+          });
+          return;
+        }
+        setSending(false);
+        setSent(invitations);
+        setOutcome(invited);
+      },
+      (failure: Error) => {
+        if (!mounted.current) {
+          properties.onAnsweredAway({
+            outcome: heldBackOutcome(failure, held),
+            unsent: NOTHING_UNSENT,
+            left: held.map((one) => one.address).join(", "),
+          });
+          return;
+        }
+        setSending(false);
+        const flagged = flagsFrom(held, refusalOf(failure)?.items ?? {});
+        if (flagged.size === 0) {
+          setOutcome(outcomeOfSendingFailure(failure));
+          return;
+        }
+        addresses.flagNow(flagged);
+        setOutcome(refusedWith(INVITE_REFUSED.flagged));
       },
     );
   };
@@ -419,7 +477,7 @@ function InviteForm(properties: {
   );
 }
 
-export function InviteAction() {
+function InviteAction(properties: { readonly onAnsweredAway: OnAnsweredAway }) {
   const [open, setOpen] = useState(false);
   const [invites, setInvites] = useState(0);
   const [left, setLeft] = useState("");
@@ -461,6 +519,10 @@ export function InviteAction() {
           fieldRef={fieldRef}
           left={left}
           onAgain={again}
+          onAnsweredAway={(answered) => {
+            setLeft(answered.left);
+            properties.onAnsweredAway(answered);
+          }}
         />
       </DialogContent>
     </Dialog>

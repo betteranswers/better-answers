@@ -1,5 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { useId, useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type RefObject,
+  type SetStateAction,
+} from "react";
 
 import { ActionDialog } from "@/shared/action-dialog.tsx";
 import type { ApiError } from "@/shared/api/trpc.ts";
@@ -47,7 +55,7 @@ type Settled = {
 export type BulkList = {
   readonly readable: boolean;
   readonly ticked: ReadonlySet<string>;
-  readonly tick: (ticked: ReadonlySet<string>) => void;
+  readonly tick: Dispatch<SetStateAction<ReadonlySet<string>>>;
   readonly nameOf: (personId: string) => string;
   readonly heading: RefObject<HTMLElement | null>;
 
@@ -57,6 +65,8 @@ export type BulkList = {
 const NOTHING_TICKED = selectFirst(PEOPLE_SELECT_FIRST.member);
 
 const STILL_GOING: Outcome = { tone: "said", words: BULK_WORDS.stillGoing };
+
+const ROLE_LOADING: Outcome = { tone: "said", words: BULK_WORDS.roleLoading };
 
 const MOST_TICKED = 200;
 
@@ -98,6 +108,10 @@ export const useMemberBulkActions = (list: BulkList) => {
       list.say(TOO_MANY);
       return;
     }
+    if (readerId === undefined) {
+      list.say(ROLE_LOADING);
+      return;
+    }
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     sent.current = false;
     setAsked([...list.ticked]);
@@ -118,9 +132,9 @@ export const useMemberBulkActions = (list: BulkList) => {
     readonly ownChange: "demoted" | "removed" | undefined;
     readonly run: (personIds: string[], settled: Settled) => void;
   }) => {
-    if (acting) return;
+    if (acting || readerId === undefined) return;
     const names = new Map(asked.map((personId) => [personId, list.nameOf(personId)]));
-    const yourOwn = readerId !== undefined && asked.includes(readerId) ? said.ownChange : undefined;
+    const yourOwn = asked.includes(readerId) ? said.ownChange : undefined;
     sent.current = true;
     setActing(true);
     setOpen(undefined);
@@ -137,7 +151,7 @@ export const useMemberBulkActions = (list: BulkList) => {
       },
       onError: (failure) => {
         setActing(false);
-        list.tick(new Set(asked));
+        list.tick((now) => new Set([...now, ...asked]));
         list.say(refusalOf(failure, names), refusedRowsOf(failure));
       },
     });

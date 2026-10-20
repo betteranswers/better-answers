@@ -12,6 +12,7 @@ import {
   aMemberSignedInAt,
   anAddress,
   askToJoin,
+  avatarOf,
   clockTheNextKey,
   confirmedWhenAsked,
   countOf,
@@ -63,6 +64,7 @@ const answeredChangedMeanwhile = (
   page: Page,
   action: (url: URL) => boolean,
   held: Promise<void> = Promise.resolve(),
+  items?: Readonly<Record<string, string>>,
 ) =>
   page.route(action, async (route) => {
     await held;
@@ -76,7 +78,7 @@ const answeredChangedMeanwhile = (
             data: {
               code: "CONFLICT",
               httpStatus: 409,
-              refusal: { word: "changed-meanwhile", class: "conflict" },
+              refusal: { word: "changed-meanwhile", class: "conflict", items },
             },
           },
         },
@@ -85,6 +87,15 @@ const answeredChangedMeanwhile = (
   });
 
 const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
+
+/** Two specs hold Priya's removal from her page, so a bulk act can answer before it. */
+const priyasRemovalHeld = async (page: Page, api: APIRequestContext, workspaceName: string) => {
+  const { joined } = await anAdminAtPeople(page, api, workspaceName);
+  const removalAnswered = Promise.withResolvers<void>();
+  await answeredChangedMeanwhile(page, REMOVAL, removalAnswered.promise);
+  await removedThroughTheirPage(page, "Priya Shah");
+  return { joined, release: removalAnswered.resolve };
+};
 
 const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
 
@@ -1672,6 +1683,8 @@ const BULK_ROLE_CHANGE_ASKED = "members.bulkChangeRole";
 /** Matched by name anywhere in the path, because the tRPC client batches its calls. */
 const BULK_ROLE_CHANGE = (url: URL): boolean => url.pathname.includes(BULK_ROLE_CHANGE_ASKED);
 
+const BULK_REMOVAL = (url: URL): boolean => url.pathname.includes("members.bulkRemove");
+
 const aWorkspaceOfThirtyEditors = async (
   page: Page,
   api: APIRequestContext,
@@ -1721,6 +1734,38 @@ const changeRoleOpened = async (page: Page, titled: string): Promise<Locator> =>
   const dialog = page.getByRole("dialog", { name: titled });
   await expect(dialog.getByRole("combobox", { name: "Role" })).toBeFocused();
   return dialog;
+};
+
+const A_FAILED_READ = {
+  error: {
+    message: "INTERNAL_SERVER_ERROR",
+    code: -32_603,
+    data: { code: "INTERNAL_SERVER_ERROR", httpStatus: 500 },
+  },
+};
+
+/** The shell's read fails, the batch's member answer fails, and the lone retry waits on `read`. */
+const membershipUnreadUntil = async (page: Page, read: Promise<void>): Promise<void> => {
+  let shellRead = true;
+  await page.route(MEMBER_READ, async (route) => {
+    const asked = new URL(route.request().url()).pathname.replace("/trpc/", "").split(",");
+    if (shellRead) {
+      shellRead = false;
+      await route.abort();
+      return;
+    }
+    if (asked.length === 1) {
+      await read;
+      await route.continue();
+      return;
+    }
+    const answered = await route.fetch();
+    const answers: readonly unknown[] = await answered.json();
+    await route.fulfill({
+      response: answered,
+      json: answers.map((answer, at) => (asked[at] === "session.member" ? A_FAILED_READ : answer)),
+    });
+  });
 };
 
 const removedThroughTheBar = async (page: Page, titled: string): Promise<void> => {
@@ -1915,6 +1960,37 @@ test.describe("bulk actions on the members ticked", () => {
       await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
     }
     await expect(page.getByRole("button", { name: "Esk Ropeworks", exact: true })).toHaveCount(0);
+  });
+
+  test("removing yourself before your membership reads lands on the chooser", async ({
+    page,
+    request,
+  }) => {
+    const workspace = await anAdminBesideAnotherAtPeople(page, request, "Esk Cordage");
+    for (const name of ["Ure Cordage", "Nidd Cordage"]) {
+      const other = await provision(request, { name });
+      await addMember(request, {
+        workspaceId: other.workspaceId,
+        userId: workspace.admin.id,
+        role: "Viewer",
+      });
+    }
+    const read = Promise.withResolvers<void>();
+    await membershipUnreadUntil(page, read.promise);
+    await page.reload();
+    await expect(memberRows(page)).toHaveCount(2);
+
+    await tickOf(page, "Test person").check();
+    await expect(outcomeOf(page)).toHaveText("");
+    await selectionAction(page, "Remove").click();
+    await expect(outcomeOf(page), "Remove says to wait for your role").toHaveText(/\S/);
+    await expect(page.getByRole("dialog"), "no confirmation opens unread").toHaveCount(0);
+    read.resolve();
+    await expect(avatarOf(page, "Test person")).toBeVisible();
+
+    await removedThemselfThroughTheBar(page);
+
+    await expect(page).toHaveURL(/\/choose-workspace$/);
   });
 
   test("removing yourself, in one other workspace, opens that one", async ({ page, request }) => {
@@ -2182,6 +2258,59 @@ test.describe("bulk actions on the members ticked", () => {
     await keepsItsWordOffThePage(page, "changed-meanwhile");
     await expect(tickOf(page, "Priya Shah")).toBeChecked();
     await expect(action).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  test("a tick made mid-act survives the bulk refusal", async ({ page, request }) => {
+    await anAdminAtPeople(page, request, "Wharfe Carding");
+    const answered = Promise.withResolvers<void>();
+    await answeredChangedMeanwhile(page, BULK_REMOVAL, answered.promise);
+    await tickOf(page, "Priya Shah").check();
+    await removedThroughTheBar(page, "Remove 1 Member");
+    await expect(selectionBar(page)).toBeHidden();
+    await tickOf(page, "Sam Okoro").check();
+
+    const refused = refusalAnswering(page, "members.bulkRemove");
+    answered.resolve();
+    expect(await refused).toMatchObject({ word: "changed-meanwhile" });
+    await saysARefusal(membersRegion(page).getByRole("alert"));
+    await expect(tickOf(page, "Priya Shah"), "the pressed tick comes back").toBeChecked();
+    await expect(tickOf(page, "Sam Okoro"), "the tick made meanwhile stays").toBeChecked();
+  });
+
+  test("a removal refused after a bulk answer still says why", async ({ page, request }) => {
+    const { release } = await priyasRemovalHeld(page, request, "Wharfe Dyeing");
+    await expect(outcomeOf(page)).toContainText("Priya Shah");
+
+    await tickOf(page, "Sam Okoro").check();
+    const dialog = await changeRoleOpened(page, "Change Role for 1 Member");
+    await editorPickedByKeyboard(page, dialog.getByRole("combobox", { name: "Role" }));
+    const bulkAnswered = page.waitForResponse((answer) => BULK_ROLE_CHANGE(new URL(answer.url())));
+    await dialog.getByRole("button", { name: "Change Role", exact: true }).click();
+    expect((await bulkAnswered).ok(), "the bulk act answers first").toBe(true);
+
+    const refused = refusalAnswering(page, "members.remove");
+    release();
+    expect(await refused).toMatchObject({ word: "changed-meanwhile" });
+    await saysARefusal(membersRegion(page).getByRole("alert"));
+    await expect(rowOf(page, "Priya Shah")).toBeVisible();
+  });
+
+  test("a removal's late refusal clears a bulk refusal's row marks", async ({ page, request }) => {
+    const { joined, release } = await priyasRemovalHeld(page, request, "Wharfe Marks");
+    const samId = joined.find((one) => one.displayName === "Sam Okoro")?.id ?? "";
+    await answeredChangedMeanwhile(page, BULK_ROLE_CHANGE, undefined, {
+      [samId]: "no-such-member",
+    });
+    await tickOf(page, "Sam Okoro").check();
+    const dialog = await changeRoleOpened(page, "Change Role for 1 Member");
+    await dialog.getByRole("button", { name: "Change Role", exact: true }).click();
+    const marked = rowOf(page, "Sam Okoro").getByText("Refused", { exact: true });
+    await expect(marked).toBeVisible();
+
+    const refused = refusalAnswering(page, "members.remove");
+    release();
+    expect(await refused).toMatchObject({ word: "changed-meanwhile" });
+    await expect(marked, "the removal's words leave no row marked").toHaveCount(0);
   });
 
   test("the row menu's Change Role changes its one member alone", async ({ page, request }) => {
