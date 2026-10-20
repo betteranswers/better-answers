@@ -39,6 +39,7 @@ import { SAID_OF_KNOWLEDGE } from "@/shared/knowledge/refusal-words.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { ListState } from "@/shared/list-pages.tsx";
+import { PageHead } from "@/shared/page-head.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
@@ -392,9 +393,7 @@ export function ConceptPage(properties: { readonly iri: string | undefined }) {
 
   return (
     <>
-      <h1 ref={heading} tabIndex={-1}>
-        {BROWSE.name}
-      </h1>
+      <PageHead heading={BROWSE.name} headingRef={heading} />
       {iri === undefined ? (
         <NoSuchConcept />
       ) : (

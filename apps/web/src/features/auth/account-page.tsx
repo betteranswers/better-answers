@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 
 import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
 import { KeystrokesAction, usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
+import { PageHead } from "@/shared/page-head.tsx";
 import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
@@ -254,7 +255,7 @@ function InTheShell(properties: {
 
   return (
     <>
-      <h1>{ACCOUNT_HEADING}</h1>
+      <PageHead heading={ACCOUNT_HEADING} />
       {properties.children}
     </>
   );

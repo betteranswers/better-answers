@@ -23,6 +23,7 @@ import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { useLanding, useLandingLine, type Landing } from "@/shared/landing.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { ListPages, ListState } from "@/shared/list-pages.tsx";
+import { PageHead } from "@/shared/page-head.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
@@ -375,8 +376,7 @@ export function SearchPage() {
 
   return (
     <>
-      <h1>{BROWSE.name}</h1>
-      <p className="mt-2 text-muted-foreground">{BROWSE.summary}</p>
+      <PageHead heading={BROWSE.name} summary={BROWSE.summary} />
       <SearchRegion />
     </>
   );
