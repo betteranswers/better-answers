@@ -707,8 +707,8 @@ event*. A *sync* or a *map rebuild* is one job being done.
 ### lease
 
 _Internal._ the scheduler's grip on a claimed job: held only while its claimant keeps confirming it
-is alive, expiring otherwise, so a job whose claimant died is handed back for another claim rather
-than lost.
+is alive and the job is inside its deadline (36 hours from the claim), expiring otherwise, so a job
+whose claimant died or hangs is handed back for another claim rather than lost.
 
 Nothing waits on it.
 

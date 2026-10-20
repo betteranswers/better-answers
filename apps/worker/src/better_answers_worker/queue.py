@@ -1,5 +1,6 @@
 import json
 import threading
+import time
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -16,6 +17,8 @@ HEARTBEAT_SECONDS = 20
 
 
 HEARTBEAT_CONNECT_SECONDS = 5
+HEARTBEAT_STATEMENT_SECONDS = 5
+JOB_DEADLINE_SECONDS = 36 * 60 * 60
 IDLE_IN_TRANSACTION_SECONDS = 60 * 60
 
 
@@ -95,13 +98,33 @@ def hold_the_claim(cursor: ScopedCursor, job_id: str, worker_id: str) -> None:
         raise ClaimLostError(job_id)
 
 
-def heartbeat(cursor: ScopedCursor, job_id: str, worker_id: str) -> bool:
+def heartbeat(
+    cursor: ScopedCursor,
+    job_id: str,
+    worker_id: str,
+    *,
+    lease_seconds: float = LEASE_SECONDS,
+) -> bool:
     cursor.execute(
         "SELECT heartbeat_job(%s, %s, %s::interval)",
-        (job_id, worker_id, f"{LEASE_SECONDS} seconds"),
+        (job_id, worker_id, f"{round(lease_seconds * 1000)} milliseconds"),
     )
     row = cursor.fetchone()
     return bool(row and row[0])
+
+
+def _the_claim_ended(
+    job: ClaimedJob, worker_id: str, ends_at: float, deadline_seconds: float
+) -> None:
+    if time.monotonic() < ends_at:
+        logger.warning("the claim was lost", job_id=job.id, worker_id=worker_id)
+        return
+    logger.error(
+        "the job outlived its deadline",
+        job_id=job.id,
+        worker_id=worker_id,
+        deadline_seconds=deadline_seconds,
+    )
 
 
 @contextmanager
@@ -110,20 +133,37 @@ def keeping_alive(
     job: ClaimedJob,
     worker_id: str,
     every_seconds: float = HEARTBEAT_SECONDS,
+    *,
+    deadline_seconds: float = JOB_DEADLINE_SECONDS,
+    statement_seconds: float = HEARTBEAT_STATEMENT_SECONDS,
 ) -> Iterator[None]:
     stop = threading.Event()
+    ends_at = time.monotonic() + deadline_seconds
+    statement_timeout = f"-c statement_timeout={round(statement_seconds * 1000)}ms"
 
     def beat() -> None:
         connection: psycopg.Connection | None = None
         try:
-            while not stop.wait(every_seconds):
+            while not stop.wait(
+                min(every_seconds, max(ends_at - time.monotonic(), 0.0))
+            ):
+                remaining = ends_at - time.monotonic()
+                if remaining <= 0:
+                    _the_claim_ended(job, worker_id, ends_at, deadline_seconds)
+                    return
                 try:
-                    if connection is None:
-                        connection = psycopg.connect(
-                            database_url, connect_timeout=HEARTBEAT_CONNECT_SECONDS
-                        )
+                    connection = connection or psycopg.connect(
+                        database_url,
+                        connect_timeout=HEARTBEAT_CONNECT_SECONDS,
+                        options=statement_timeout,
+                    )
                     with scoped(connection, job.workspace_id) as cursor:
-                        held = heartbeat(cursor, job.id, worker_id)
+                        held = heartbeat(
+                            cursor,
+                            job.id,
+                            worker_id,
+                            lease_seconds=min(LEASE_SECONDS, remaining),
+                        )
                 except psycopg.Error as failure:
                     logger.warning(
                         "a heartbeat failed",
@@ -136,9 +176,7 @@ def keeping_alive(
                     connection = None
                     continue
                 if not held:
-                    logger.warning(
-                        "the claim was lost", job_id=job.id, worker_id=worker_id
-                    )
+                    _the_claim_ended(job, worker_id, ends_at, deadline_seconds)
                     return
         finally:
             if connection is not None:
@@ -150,7 +188,7 @@ def keeping_alive(
         yield
     finally:
         stop.set()
-        thread.join(timeout=every_seconds)
+        thread.join(timeout=HEARTBEAT_CONNECT_SECONDS + 2 * statement_seconds)
 
 
 def finish(
