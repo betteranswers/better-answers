@@ -19,6 +19,10 @@ WORD_CATEGORIES = frozenset("LMN")
 ADDRESS_JOINERS = frozenset("._+-")
 
 
+PORT_OF = ("packages/core/src/erasure/identifiers.ts",)
+AGREEMENT = "erasure-match"
+
+
 @dataclass(frozen=True, slots=True)
 class ErasureMatch:
     start: int

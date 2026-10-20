@@ -4,7 +4,7 @@ The repository's own gate tooling. **It is imported and never deployed** — `pa
 is imported, `apps/` is what deploys (ADR 0029) — so nothing under `apps/` copies this
 directory into an image, and every dependency here is a development dependency.
 
-Twelve things live here.
+Thirteen things live here.
 
 ## `src/throwaway-tree.ts` — the runner
 
@@ -358,6 +358,60 @@ The map is read from the tree the script runs in, so a throwaway tree carries it
 that read no file, or a map with no table, exits 2. `test/table-ownership-scan.test.ts` runs
 the script through the runner over a failing and a passing tree for each direction, a CTE
 named like a table, a file under no owner, and an owner nested in another's directory.
+
+## `python/port_scan.py` — the port scan
+
+A port is a worker module that carries TypeScript logic into Python, so the two tiers must
+behave as one. What holds them together is an agreement under `contracts/`: one set of fixtures
+that both tiers' suites read. The scan makes a port name its agreement. A port says what it is
+in two literal constants at module level, beside its other constants:
+
+```python
+PORT_OF = (
+    "packages/schema/src/concept-file.ts",
+    "packages/core/src/store/map/index.ts",
+)
+AGREEMENT = "links"
+```
+
+`PORT_OF` names each TypeScript module the Python module ports, by its relative path from the
+repository root to a `.ts` or `.tsx` file the tree holds. `AGREEMENT` names a key of the
+`agreements` object in `contracts/manifest.json`. The declaration lives in the module, not in a
+table here, so the author of the next port sees it in the module they copy from, and a rename
+carries it with the file.
+
+`pnpm port-scan`, a root `check` step, walks every `.py` file under `apps/worker/src` and parses
+each one with `ast`, reading the module's top-level statements. It never imports a module and
+never matches text. A module that assigns either name is a port. The scan refuses these, each
+with the fix in its message:
+
+- a port that declares one of the two names and not the other;
+- an `AGREEMENT` that names a key the manifest does not hold;
+- a `PORT_OF` path that is absolute, holds a `..` segment, does not end `.ts` or `.tsx`, or names
+  a file the tree does not hold;
+- a value that is not a literal of the declared shape: `PORT_OF` must be a non-empty tuple of
+  string literals, and `AGREEMENT` a string literal;
+- a name assigned with another target, by a chained assignment (`PORT_OF = A = …`) or an
+  unpacking (`PORT_OF, A = …`), which the scan refuses as not a literal;
+- a name declared twice in one module, which would leave the value that holds to the order.
+
+The manifest is read from the tree the script runs in, so a throwaway tree carries its own. The
+scan exits 2 when it is given no directory, when a named directory is absent, when the manifest
+is missing, unreadable or holds no agreement, when a file does not read or parse, when the walk
+reads no `.py` file, and when the modules it reads declare no port. A walk that found no port
+proved nothing.
+
+Like the Python comment check, the scan runs under bare `python3` and imports only the standard
+library. ruff reads it under `python/ruff.toml` and mypy under `--strict`, through the same
+`lint:python` and `typecheck:python`.
+
+**What it cannot see.** A module that declares nothing is not a port to the scan, so a port
+that does not declare itself passes. The scan reads only top-level statements, so a declaration
+inside a function, a class or an `if` block is not read, and that module passes as one that
+declares nothing. The scan does not hold that the two tiers agree, only that a port names an
+agreement. The agreement's own tests in both tiers hold that. `test/port-scan.test.ts` runs the
+script through the runner over a passing tree and a tree for each refusal, and once over the
+worker's own tree with the argv of the root `port-scan` script.
 
 ## `src/face-admission.ts` — the face reader
 

@@ -20,6 +20,13 @@ DERIVED_FROM_LABEL = "DERIVED_FROM"
 CONCEPT_DEPRECATED_STATUS = "deprecated"
 
 
+PORT_OF = (
+    "packages/schema/src/concept-file.ts",
+    "packages/core/src/store/map/index.ts",
+)
+AGREEMENT = "links"
+
+
 _IRI = re.compile(r"^https://better-answers\.com/c/[0-9A-HJKMNP-TV-Z]{26}$")
 
 

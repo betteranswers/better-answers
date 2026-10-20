@@ -21,6 +21,10 @@ _FRONTMATTER_LINE = re.compile(r'^("(?:[^"\\]|\\.)*"):(?: (.*))?$')
 UNHASHED_KEYS = frozenset({"generated", "verified", "stale_after", "status", "iri"})
 
 
+PORT_OF = ("packages/core/src/concepts/file.ts",)
+AGREEMENT = "concept-file"
+
+
 def _not_a_number(constant: str) -> NoReturn:
     raise MalformedConceptFileError(f"not a JSON value: {constant!r}")
 

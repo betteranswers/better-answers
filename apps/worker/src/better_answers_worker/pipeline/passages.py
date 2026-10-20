@@ -14,6 +14,10 @@ LOCATOR_SEPARATOR = "/"
 SPAN_PREFIX = "chars:"
 
 
+PORT_OF = ("packages/core/src/sources/passage-address.ts",)
+AGREEMENT = "document-passage"
+
+
 @dataclass(frozen=True, slots=True)
 class Passage:
     ordinal: int

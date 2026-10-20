@@ -7,5 +7,5 @@ select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20", 
 max-complexity = 8
 
 [lint.per-file-ignores]
-# The gate is a script, and what it prints is the finding a reader acts on.
 "comment_gate.py" = ["T20"]
+"port_scan.py" = ["T20"]
