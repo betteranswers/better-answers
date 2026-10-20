@@ -28,7 +28,7 @@ function ModelChoiceFields(properties: { readonly modelChoice: WorkspaceModelCho
   return (
     <dl className="mt-1 flex flex-col gap-1 sm:flex-row sm:gap-8">
       <div className="flex gap-2">
-        <dt className="text-muted-foreground">Provider</dt>
+        <dt className="text-muted-foreground">Model provider</dt>
         <dd>{providerWordOf(provider)}</dd>
       </div>
       <div className="flex gap-2">

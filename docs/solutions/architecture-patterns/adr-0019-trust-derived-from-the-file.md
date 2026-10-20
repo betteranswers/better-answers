@@ -27,7 +27,7 @@ Everything a reader is told about a concept's trust is derived from its OKF file
 
 - Verifier ≠ generator, enforced on the producer part of the actor string.
 - A verification needs view on every source the concept cites. Otherwise the page says *cannot check, source restricted*.
-- The words are *Verified by*, *Verified automatically*, *Unverified*, *Changed since verified*, *Out of date*, *Draft*, *Left* and *Deprecated*, plus two riders, *· imported* and *· source moved on*. A rider never changes the tier. *Restricted* is a sensitivity value only.
+- The words are *Verified by*, *Verified automatically*, *Unverified*, *Changed since verified*, *Out of date*, *Draft* and *Deprecated*, plus two riders, *· imported* and *· source moved on*. A rider never changes the tier. *Restricted* is a sensitivity value only, and *Left* is a person's word, not a trust word.
 - *Out of date* comes from `stale_after` alone. Its absence means no shelf life.
 - *Changed since verified* comes from `content_hash`: RFC 8785 canonical JSON of the frontmatter without `generated`, `verified`, `stale_after`, `status` and `iri`, with `sources[]` reduced to ordered `(resource, locator)` pairs, plus the normalised body.
 - Supersession is derived, never keyed: only a citation of a deprecated concept of the same `type` is a succession.

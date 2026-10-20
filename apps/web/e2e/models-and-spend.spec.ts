@@ -296,7 +296,7 @@ test.describe("the Models and spend page's model choices card", () => {
             - paragraph
           - listitem:
             - heading "Answering" [level=3]
-            - term: Provider
+            - term: Model provider
             - definition: "Anthropic"
             - term: Model
             - definition: ${ANSWERING.model}
@@ -305,7 +305,7 @@ test.describe("the Models and spend page's model choices card", () => {
             - paragraph
           - listitem:
             - heading "Embedding" [level=3]
-            - term: Provider
+            - term: Model provider
             - definition: "Mistral AI"
             - term: Model
             - definition: ${EMBEDDING.model}
