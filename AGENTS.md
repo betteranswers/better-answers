@@ -6,7 +6,7 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 
 ## Key Project Documentation
 
-- `docs/specs/v01-route.md` — the route: the status table of the blocks to v0.1 and the rules for picking and updating one. Each live block's brief is `docs/specs/route/<id>.md`. A product session opens the table first and takes the row marked next on its strand. A block one owner can build in one session goes to `/poteto-mode`, as one pull request or a short stack. A block that needs more than one owner, or will outlast one session, is planned first (*Workflow*, below).
+- `docs/specs/v01-route.md` — the route: the status table of the blocks to v0.1 and the rules for picking and updating one. Each live block's brief is `docs/specs/route/<id>.md`. A product session opens the table first, continues a building row on its strand, else takes the row marked next. A block one owner can build in one session goes to `/poteto-mode`, as one pull request or a short stack. A block that needs more than one owner, or will outlast one session, is planned first (*Workflow*, below).
 - `CONCEPTS.md` — the glossary. Name things in code, tests, docs and commits with its words. `docs/agents/domain.md` says more.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open, and where each lands here. Read it before adding a key, convention or feature that relates to the knowledge layer.
 - `CODING_STANDARDS.md` — the rules that bind every workspace and that no gate yet enforces. A directory's own rules live in its `AGENTS.md` (`apps/api/`, `apps/web/`, `apps/worker/`, `deploy/`, `packages/core/`, `packages/schema/`), which loads when work reaches it.

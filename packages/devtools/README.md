@@ -4,7 +4,7 @@ The repository's own gate tooling. **It is imported and never deployed** — `pa
 is imported, `apps/` is what deploys (ADR 0029) — so nothing under `apps/` copies this
 directory into an image, and every dependency here is a development dependency.
 
-Thirteen things live here.
+Fourteen things live here.
 
 ## `src/throwaway-tree.ts` — the runner
 
@@ -487,6 +487,12 @@ holder in the tree yet: its holder is the tracker issue the reason went to, such
 tool deletes it without resolving anything, and refuses one whose holder is not an issue id. A
 refused unit exits 1, and a malformed TSV exits 2 and names its line.
 `test/comment-inventory.test.ts` runs each command over a throwaway tree.
+
+## `src/route-spec.ts` — the route lint
+
+It refuses a file under `docs/specs/` that names what a clone cannot open, uses a word of the
+retired workflow or breaks the status table's rules, and the merge group runs it through
+`check:docs:devtools` in the docs lane and this package's `check` in the full lane.
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
 

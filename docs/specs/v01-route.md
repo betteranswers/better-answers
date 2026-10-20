@@ -80,7 +80,7 @@ Before a row turns done, file what the block still owes as Linear issues under i
 | A user story | `docs/specs/v01-stories.md` |
 | What happened, and when | git, and `docs/archive/` |
 
-`pnpm check:docs` runs `packages/devtools/test/route-spec.test.ts` over these files on every pull request. Each refusal names its rule.
+The merge group runs `packages/devtools/test/route-spec.test.ts` through `pnpm check:docs` in the docs lane and devtools' `check` in the full lane. Each violation names its rule.
 
 ## Not in v0.1
 
