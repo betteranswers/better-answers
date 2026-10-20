@@ -463,11 +463,54 @@ const redeployedThrough = async (
       CF_ACCESS_CLIENT_ID: "access-id",
       CF_ACCESS_CLIENT_SECRET: "access-secret",
       PROD_UUID: "uuid-1",
+      RELEASE_DEPLOY_DELAY_SECONDS: "0",
       ...credentials,
     });
     result = { ...done, heard: [...heard] };
   });
   return result;
+};
+
+const PULL_STEP = "docker compose pull --policy missing";
+const DEPLOYMENT = "dep-1";
+const DEPLOYMENT_READ = `/api/v1/deployments/${DEPLOYMENT}`;
+
+const deploymentIs = (status: string): Answer => ({
+  status: 200,
+  body: JSON.stringify({ deployment_uuid: DEPLOYMENT, status, logs: "a deployment's whole log" }),
+});
+
+type Orchestrator = {
+  readonly pullStep?: string | null;
+  readonly reads?: readonly Answer[];
+  readonly deploy?: Answer;
+};
+
+const orchestrator = ({
+  pullStep = null,
+  reads = [deploymentIs("finished")],
+  deploy = {
+    status: 200,
+    body: JSON.stringify({
+      deployments: [{ message: "queued", resource_uuid: "uuid-1", deployment_uuid: DEPLOYMENT }],
+    }),
+  },
+}: Orchestrator = {}): ((heard: Heard) => Answer) => {
+  let read = 0;
+  return (heard) => {
+    if (heard.url === DEPLOYMENT_READ) {
+      const next = reads[Math.min(read, reads.length - 1)];
+      read += 1;
+      return next ?? { status: 404, body: "{}" };
+    }
+    if (heard.method === "GET") {
+      return {
+        status: 200,
+        body: JSON.stringify({ uuid: "uuid-1", docker_compose_custom_build_command: pullStep }),
+      };
+    }
+    return heard.method === "POST" ? deploy : { status: 200, body: "{}" };
+  };
 };
 
 const sent = (heard: Heard) => ({
@@ -478,53 +521,164 @@ const sent = (heard: Heard) => ({
   access: [heard.headers["cf-access-client-id"], heard.headers["cf-access-client-secret"]],
 });
 
+const called = (heard: Heard): string => `${heard.method} ${heard.url}`;
+
+const digestSet = (key: string, value: string): string =>
+  `${JSON.stringify({ key, value, is_preview: false, is_buildtime: true, is_runtime: true })}\n`;
+
 describe("the redeploy a release makes", () => {
-  it("sets both digests, then deploys, with every credential", async () => {
-    const redeployed = await redeployedThrough(() => ({ status: 200, body: "{}" }));
+  it("sets the pull step and digests, deploys, then waits", async () => {
+    const redeployed = await redeployedThrough(orchestrator());
     const credentialed = { token: "Bearer deploy-token", access: ["access-id", "access-secret"] };
 
-    expect(redeployed.code).toBe(0);
     expect(redeployed.heard.map(sent)).toEqual([
+      { method: "GET", url: "/api/v1/applications/uuid-1", body: "", ...credentialed },
       {
         method: "PATCH",
-        url: "/api/v1/applications/uuid-1/envs",
-        body: `{"key":"API_IMAGE_DIGEST","value":"${API_DIGEST}","is_preview":false}\n`,
+        url: "/api/v1/applications/uuid-1",
+        body: `{"docker_compose_custom_build_command":"${PULL_STEP}"}\n`,
         ...credentialed,
       },
       {
         method: "PATCH",
         url: "/api/v1/applications/uuid-1/envs",
-        body: `{"key":"WORKER_IMAGE_DIGEST","value":"${WORKER_DIGEST}","is_preview":false}\n`,
+        body: digestSet("API_IMAGE_DIGEST", API_DIGEST),
+        ...credentialed,
+      },
+      {
+        method: "PATCH",
+        url: "/api/v1/applications/uuid-1/envs",
+        body: digestSet("WORKER_IMAGE_DIGEST", WORKER_DIGEST),
         ...credentialed,
       },
       { method: "POST", url: "/api/v1/deploy?uuid=uuid-1&force=false", body: "", ...credentialed },
+      { method: "GET", url: DEPLOYMENT_READ, body: "", ...credentialed },
     ]);
+    expect({ code: redeployed.code, out: redeployed.out, err: redeployed.err }).toEqual({
+      code: 0,
+      out: `the compose build command is now \`${PULL_STEP}\`\ndeploying production as deployment ${DEPLOYMENT}\ndeployment ${DEPLOYMENT} finished\n`,
+      err: "",
+    });
+  });
+
+  it("leaves the pull step alone when already set", async () => {
+    const redeployed = await redeployedThrough(orchestrator({ pullStep: PULL_STEP }));
+
+    expect({ code: redeployed.code, calls: redeployed.heard.map(called) }).toEqual({
+      code: 0,
+      calls: [
+        "GET /api/v1/applications/uuid-1",
+        "PATCH /api/v1/applications/uuid-1/envs",
+        "PATCH /api/v1/applications/uuid-1/envs",
+        "POST /api/v1/deploy?uuid=uuid-1&force=false",
+        `GET ${DEPLOYMENT_READ}`,
+      ],
+    });
+  });
+
+  it("waits through queued and in-progress until finished", async () => {
+    const redeployed = await redeployedThrough(
+      orchestrator({
+        reads: [deploymentIs("queued"), deploymentIs("in_progress"), deploymentIs("finished")],
+      }),
+    );
+
+    expect({
+      code: redeployed.code,
+      reads: redeployed.heard.filter((heard) => heard.url === DEPLOYMENT_READ).length,
+      last: redeployed.out.trimEnd().split("\n").at(-1),
+    }).toEqual({ code: 0, reads: 3, last: `deployment ${DEPLOYMENT} finished` });
+  });
+
+  it("fails the release when the deployment fails, naming it", async () => {
+    const redeployed = await redeployedThrough(
+      orchestrator({ reads: [deploymentIs("in_progress"), deploymentIs("failed")] }),
+    );
+
+    expect({ code: redeployed.code, err: redeployed.err }).toEqual({
+      code: 1,
+      err: `::error::deployment ${DEPLOYMENT} ended failed. Read its log in the orchestrator. A failure before \`Removing old containers.\` left production running the release before this one\n`,
+    });
+  });
+
+  it("gives up naming a deployment that never finishes", async () => {
+    const redeployed = await redeployedThrough(
+      orchestrator({ reads: [deploymentIs("in_progress")] }),
+      { RELEASE_DEPLOY_POLLS: "3" },
+    );
+
+    expect({
+      code: redeployed.code,
+      reads: redeployed.heard.filter((heard) => heard.url === DEPLOYMENT_READ).length,
+      err: redeployed.err,
+    }).toEqual({
+      code: 1,
+      reads: 3,
+      err: `::error::deployment ${DEPLOYMENT} had not finished after 3 reads, and its last status read was in_progress. It may still swap production later, so read /health before acting\n`,
+    });
+  });
+
+  it("keeps polling past a failed status read", async () => {
+    const redeployed = await redeployedThrough(
+      orchestrator({ reads: [{ status: 502, body: "" }, deploymentIs("finished")] }),
+    );
+
+    expect({
+      code: redeployed.code,
+      reads: redeployed.heard.filter((heard) => heard.url === DEPLOYMENT_READ).length,
+    }).toEqual({ code: 0, reads: 2 });
   });
 
   it("stops at the edge's redirect to sign-in", async () => {
-    const redeployed = await redeployedThrough(() => ({ status: 302, body: "" }));
+    const valid = orchestrator();
+    const redeployed = await redeployedThrough((heard) =>
+      heard.url === "/api/v1/applications/uuid-1" ? { status: 302, body: "" } : valid(heard),
+    );
 
     expect(redeployed.code).toBe(1);
     expect(redeployed.heard).toHaveLength(1);
     expect(redeployed.err).toEqual(
-      "::error::PATCH /api/v1/applications/uuid-1/envs was answered 302, a redirect to sign-in: the edge's Access credential is missing or expired, so nothing reached the orchestrator\n",
+      "::error::GET /api/v1/applications/uuid-1 was answered 302, a redirect to sign-in: the edge's Access credential is missing or expired, so the call never reached the orchestrator\n",
     );
   });
 
+  it("stops waiting at the edge's redirect to sign-in", async () => {
+    const redeployed = await redeployedThrough(
+      orchestrator({ reads: [{ status: 302, body: "" }, deploymentIs("finished")] }),
+    );
+
+    expect({ code: redeployed.code, err: redeployed.err }).toEqual({
+      code: 1,
+      err: `::error::GET ${DEPLOYMENT_READ} was answered 302, a redirect to sign-in: the edge's Access credential is missing or expired, so the call never reached the orchestrator\n`,
+    });
+  });
+
   it("stops at an orchestrator that refuses the deploy", async () => {
-    const redeployed = await redeployedThrough((heard) =>
-      heard.method === "POST" ? { status: 500, body: "{}" } : { status: 200, body: "{}" },
+    const redeployed = await redeployedThrough(
+      orchestrator({ deploy: { status: 500, body: "{}" } }),
     );
 
     expect(redeployed.code).toBe(1);
-    expect(redeployed.heard).toHaveLength(3);
+    expect(redeployed.heard).toHaveLength(5);
     expect(redeployed.err).toEqual(
       "::error::POST /api/v1/deploy?uuid=uuid-1&force=false was answered 500, so the release stops before anything else is sent\n",
     );
   });
 
+  it("stops at a deploy answer naming no deployment", async () => {
+    const redeployed = await redeployedThrough(
+      orchestrator({ deploy: { status: 200, body: JSON.stringify({ deployments: [] }) } }),
+    );
+
+    expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
+      code: 1,
+      heard: 5,
+      err: "::error::POST /api/v1/deploy named no deployment_uuid, so the release cannot wait for the deployment\n",
+    });
+  });
+
   it("calls nothing without its edge credential", async () => {
-    const redeployed = await redeployedThrough(() => ({ status: 200, body: "{}" }), {
+    const redeployed = await redeployedThrough(orchestrator(), {
       CF_ACCESS_CLIENT_ID: "",
     });
 
