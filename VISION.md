@@ -1,6 +1,6 @@
 # The platform destination
 
-The way to v0.1 is the route spec, `docs/specs/v01-route.md`; the map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
+The way to v0.1 is the route spec, `docs/specs/v01-route.md`.
 
 ## In one line
 

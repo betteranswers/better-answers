@@ -19,6 +19,7 @@
     "./paths": "./src/paths.ts",
     "./refusal-unions": "./src/refusal-unions.ts",
     "./root-commands": "./src/root-commands.ts",
+    "./route-spec": "./src/route-spec.ts",
     "./table-ownership-scan": "./src/table-ownership-scan.ts",
     "./throwaway-tree": "./src/throwaway-tree.ts",
     "./workflows": "./src/workflows.ts",

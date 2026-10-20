@@ -57,6 +57,11 @@ The erasure routine rewrites what the platform wrote; a person edits what the co
 
 A **suppression** belongs to the workspace. There is one per erasure request, and it holds the request's identifier set and the addresses the person signs in with. The seam withholds every exact occurrence of those identifiers each time a document of the workspace, held now or bound later, is indexed. Recording a subject request refuses an identifier too broad to withhold (`identifier-too-broad`). An access answer is locations and categories, never a passage.
 
+The platform emits a **DPIA input** per connected source: its data types, scope, sensitivity class, the redaction rules in force, each model choice with its processor, country and retention tail, the retention class and the audience. The publish action's audit row carries its totals and its hash.
+
+- A workspace's embedding model choice is fixed once any vector exists. Its hosted provider is listed in the DPIA input and in the platform's sub-processor list only from the day that model choice is first called, never ahead of the processing. The local model choice names no sub-processor.
+- Four questions are owed to a lawyer, recorded as owed and answered by no build. The fourth is whether a forward edit satisfies Article 17 for a capability statement that names an employee, which is knowledge the company asserts about itself.
+
 ## Why
 
 - The first corpus's most useful file is also the flagged one. Setting it aside is the manual work the product exists to remove. Role-gating in place puts a sort code in four stores and at a processor.
@@ -92,3 +97,5 @@ Amended 13/10/2026 by the same plan's U4 (R39 and KTD8). The erasure routine gai
 Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-153. A naming word between a sort code and its account number, whole or as its plural, now names the pair, in a document and in typed text. A National Insurance number no longer takes the space before it, and a refused prefix after a space is no longer read as one. The rule version moved from 6 to 7. A National Insurance finding that took the space before it now starts one character later, so a restore made on it before the change no longer matches, and the number is withheld again at the next sync until an Admin restores it afresh.
 
 Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-166 and BA-160 (`docs/plans/2026-10-14-1811-fix-erasure-late-commit-and-actors-plan.md`). The routine now rewrites `bundle_commit.actor` and `concept_verification.actor`, which it had found but never rewritten, and the person id in commit trailers. A commit made as the person while the routine runs is rewritten: the commit holds the member row, and history is rewritten again once the member has ended. The identity step reads which arm applies inside its own transaction.
+
+The DPIA input, the fixed embedding model choice with its late-listed provider, and the four questions owed to a lawyer, all in the archived record, were missing from this doc until 20/10/2026, when the route's rewrite found S0, S8 and C1 resting on them.

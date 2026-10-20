@@ -32,6 +32,7 @@ The bundle is a bare git repository per workspace (ADR 0024). Only the api write
 - The action's rows are written in one transaction the slice owns. So `bundle_commit` history is always a prefix of git history.
 - Writing the manifest, `knowledge/manifest.yaml` inside the bundle, is such a commit too (`writeManifest`). It lands no concept row.
 - Platform-prepared changes wait as suggestions. Nothing platform-prepared reaches the bundle without acceptance.
+- A person who may not commit a change prepares a suggestion of the kind *edit*: an edit to a concept's text from a guide page by anyone but the concept's owner or an Admin, an edit to a Brief by a reader who may not edit compositions, or a missing fact offered as a new concept. The suggestion records the proposer and the content hash it was written against, so an acceptance over a body that moved fails and returns to the proposer. The target's owner or an Admin decides it, in the guide page or the owner's Inbox, and the acceptance is the same governed write: one commit, the proposer as git author, the platform bot as committer, the accepter on the audit event. Every other suggestion kind is decided by an Admin. The owner's or an Admin's own edit from the page commits directly, after the page has stated the consequence and, where the concept is used in more than one place, asked once.
 - A concept has two endings: deprecate, for anything that has been stable or is cited or linked, and discard, for the rest.
 - The erasure routine rewrites git author lines, commit trailers and file text to the erasure pseudonym, never to a key of the member row. It rewrites history a second time once the member has ended (ADR 0020, ADR 0035).
 
@@ -70,4 +71,4 @@ Moving a ref back to its watermark is the operator's plumbing, written down on a
 
 ## History
 
-The full record, with its amendments (ticket 19, ticket 24, ticket 74, ticket 79 applied by T-001, T-020, T-073, T-052, T-056, T-108, T-308, T-370, and a wording fix of 27/09/2026): `docs/archive/adr/0012-the-concept-write-path.md`.
+The full record, with its amendments (ticket 19, ticket 24, ticket 74, ticket 79 applied by T-001, T-020, T-073, T-052, T-056, T-108, T-308, T-370, and a wording fix of 27/09/2026): `docs/archive/adr/0012-the-concept-write-path.md`. The *edit* kind and the owner's arm, the archived amendment of 27/08/2026, were missing from this doc until 20/10/2026, when the route's rewrite found S3 resting on them.

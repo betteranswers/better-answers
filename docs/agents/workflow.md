@@ -12,7 +12,7 @@ The project playbooks in `.agents/playbooks/` add this repository's steps to pst
 - A design question that a run can answer is settled by the Prototype playbook or `/architect`, not by asking the owner.
 - Work one owner can build in one session runs under Feature, Refactoring or Bug fix with no plan, even when it lands as a short stack of pull requests. Work that needs more than one owner, or will outlast one session, gets a plan first. `/poteto-mode plan <the work> in docs/plans/` runs the Multi-phase plan playbook, which writes the plan and stops. Its `check-plan.mjs` holds the plan's shape. A plan has no status field: git says what shipped.
 
-A route block (`docs/specs/v01-route.md`) that one owner can build in one session goes straight to `/poteto-mode`. A block that needs more than one owner, or will outlast one session, is planned first, then built under the plan's execution playbook. The personas in `docs/personas/` ground a design: read the ones a screen serves before shaping it.
+A route block, a row of `docs/specs/v01-route.md` with its brief under `docs/specs/route/`, that one owner can build in one session goes straight to `/poteto-mode`. A block that needs more than one owner, or will outlast one session, is planned first, then built under the plan's execution playbook. The personas in `docs/personas/` ground a design: read the ones a screen serves before shaping it.
 
 ## What pstack does not know about this repository
 
