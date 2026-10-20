@@ -68,13 +68,19 @@ describe("the browser suite's port", () => {
   });
 
   it("leaves 3100 free on a developer's machine", async () => {
-    expect(portOf(await configUnder(undefined))).toBeGreaterThan(3100);
+    expect(portOf(await configUnder(undefined))).not.toBe(3100);
   });
 
   it("hands its port to the workers through E2E_PORT", async () => {
     const port = portOf(await configUnder(undefined));
 
     expect(process.env["E2E_PORT"]).toBe(String(port));
+  });
+
+  it("gives a worker the port its runner took", async () => {
+    const port = portOf(await configUnder(undefined));
+
+    expect(portOf(await configWith({ E2E_PORT: String(port) }))).toBe(port);
   });
 
   it("is the one E2E_PORT names, even in CI", async () => {
