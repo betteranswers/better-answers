@@ -988,3 +988,35 @@ def test_a_heartbeat_whose_claim_is_gone_says_so_and_stops(
         for line in beating.written
         if line["event"] == "the claim was lost"
     ] == [beating.job.id]
+
+
+def test_a_blocked_heartbeat_statement_ends_within_its_bound(
+    database: psycopg.Connection,
+) -> None:
+    workspace, claimed = a_claimed_audit(database)
+
+    dsn = _WHERE[database]
+    with (
+        capture_logs() as written,
+        queue.connected(dsn) as locking,
+        queue.connected(dsn) as onlooker,
+        queue.keeping_alive(
+            dsn, claimed, WORKER, every_seconds=0.05, statement_seconds=0.5
+        ),
+    ):
+        with scoped(locking, workspace) as cursor:
+            cursor.execute("SELECT 1 FROM job WHERE id = %s FOR UPDATE", (claimed.id,))
+            cancelled = _within(
+                10,
+                lambda: [
+                    line
+                    for line in written
+                    if line["event"] == "a heartbeat failed"
+                    and line["error"] == "QueryCanceled"
+                ],
+            )
+        cancelled_at, _ = _lease_of(onlooker, workspace)
+        renewed = _within(10, lambda: _lease_of(onlooker, workspace)[0] > cancelled_at)
+
+    assert cancelled, "the blocked heartbeat statement was never cancelled"
+    assert renewed, "the heartbeat stopped after its statement was cancelled"

@@ -16,6 +16,7 @@ HEARTBEAT_SECONDS = 20
 
 
 HEARTBEAT_CONNECT_SECONDS = 5
+HEARTBEAT_STATEMENT_SECONDS = 5
 IDLE_IN_TRANSACTION_SECONDS = 60 * 60
 
 
@@ -110,8 +111,11 @@ def keeping_alive(
     job: ClaimedJob,
     worker_id: str,
     every_seconds: float = HEARTBEAT_SECONDS,
+    *,
+    statement_seconds: float = HEARTBEAT_STATEMENT_SECONDS,
 ) -> Iterator[None]:
     stop = threading.Event()
+    statement_timeout = f"-c statement_timeout={round(statement_seconds * 1000)}ms"
 
     def beat() -> None:
         connection: psycopg.Connection | None = None
@@ -120,7 +124,9 @@ def keeping_alive(
                 try:
                     if connection is None:
                         connection = psycopg.connect(
-                            database_url, connect_timeout=HEARTBEAT_CONNECT_SECONDS
+                            database_url,
+                            connect_timeout=HEARTBEAT_CONNECT_SECONDS,
+                            options=statement_timeout,
                         )
                     with scoped(connection, job.workspace_id) as cursor:
                         held = heartbeat(cursor, job.id, worker_id)
@@ -150,7 +156,7 @@ def keeping_alive(
         yield
     finally:
         stop.set()
-        thread.join(timeout=every_seconds)
+        thread.join(timeout=HEARTBEAT_CONNECT_SECONDS + 2 * statement_seconds)
 
 
 def finish(
