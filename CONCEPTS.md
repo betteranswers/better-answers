@@ -1933,8 +1933,8 @@ row, in the *page head*.
 
 ### page head
 
-_Internal._ how every *page* opens: its first heading, which names its group, and the group's
-summary; then its *toolbar* where it has tabs; then one row for each list, holding the list's
+_Internal._ how every *page* opens: its first heading, which names its group, and its summary;
+then its *toolbar* where it has tabs; then one row for each list, holding the list's
 count and the page's primary action.
 
 So a page reads where the person is, how many, then what they can do. A list under an open *tab*
