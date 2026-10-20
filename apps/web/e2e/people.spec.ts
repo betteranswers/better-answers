@@ -64,6 +64,7 @@ const answeredChangedMeanwhile = (
   page: Page,
   action: (url: URL) => boolean,
   held: Promise<void> = Promise.resolve(),
+  items?: Readonly<Record<string, string>>,
 ) =>
   page.route(action, async (route) => {
     await held;
@@ -77,7 +78,7 @@ const answeredChangedMeanwhile = (
             data: {
               code: "CONFLICT",
               httpStatus: 409,
-              refusal: { word: "changed-meanwhile", class: "conflict" },
+              refusal: { word: "changed-meanwhile", class: "conflict", items },
             },
           },
         },
@@ -86,6 +87,15 @@ const answeredChangedMeanwhile = (
   });
 
 const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
+
+/** Two specs hold Priya's removal from her page, so a bulk act can answer before it. */
+const priyasRemovalHeld = async (page: Page, api: APIRequestContext, workspaceName: string) => {
+  const { joined } = await anAdminAtPeople(page, api, workspaceName);
+  const removalAnswered = Promise.withResolvers<void>();
+  await answeredChangedMeanwhile(page, REMOVAL, removalAnswered.promise);
+  await removedThroughTheirPage(page, "Priya Shah");
+  return { joined, release: removalAnswered.resolve };
+};
 
 const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
 
@@ -2248,6 +2258,42 @@ test.describe("bulk actions on the members ticked", () => {
     await keepsItsWordOffThePage(page, "changed-meanwhile");
     await expect(tickOf(page, "Priya Shah")).toBeChecked();
     await expect(action).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  test("a removal refused after a bulk answer still says why", async ({ page, request }) => {
+    const { release } = await priyasRemovalHeld(page, request, "Wharfe Dyeing");
+    await expect(outcomeOf(page)).toContainText("Priya Shah");
+
+    await tickOf(page, "Sam Okoro").check();
+    const dialog = await changeRoleOpened(page, "Change Role for 1 Member");
+    await editorPickedByKeyboard(page, dialog.getByRole("combobox", { name: "Role" }));
+    const bulkAnswered = page.waitForResponse((answer) => BULK_ROLE_CHANGE(new URL(answer.url())));
+    await dialog.getByRole("button", { name: "Change Role", exact: true }).click();
+    expect((await bulkAnswered).ok(), "the bulk act answers first").toBe(true);
+
+    const refused = refusalAnswering(page, "members.remove");
+    release();
+    expect(await refused).toMatchObject({ word: "changed-meanwhile" });
+    await saysARefusal(membersRegion(page).getByRole("alert"));
+    await expect(rowOf(page, "Priya Shah")).toBeVisible();
+  });
+
+  test("a removal's late refusal clears a bulk refusal's row marks", async ({ page, request }) => {
+    const { joined, release } = await priyasRemovalHeld(page, request, "Wharfe Marks");
+    const samId = joined.find((one) => one.displayName === "Sam Okoro")?.id ?? "";
+    await answeredChangedMeanwhile(page, BULK_ROLE_CHANGE, undefined, {
+      [samId]: "no-such-member",
+    });
+    await tickOf(page, "Sam Okoro").check();
+    const dialog = await changeRoleOpened(page, "Change Role for 1 Member");
+    await dialog.getByRole("button", { name: "Change Role", exact: true }).click();
+    const marked = rowOf(page, "Sam Okoro").getByText("Refused", { exact: true });
+    await expect(marked).toBeVisible();
+
+    const refused = refusalAnswering(page, "members.remove");
+    release();
+    expect(await refused).toMatchObject({ word: "changed-meanwhile" });
+    await expect(marked, "the removal's words leave no row marked").toHaveCount(0);
   });
 
   test("the row menu's Change Role changes its one member alone", async ({ page, request }) => {
