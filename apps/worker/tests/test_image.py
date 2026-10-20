@@ -1,8 +1,11 @@
+import ast
 import base64
+import itertools
 import json
 import logging
 import math
 import os
+import posixpath
 import re
 import subprocess
 import tempfile
@@ -31,7 +34,8 @@ WORKSPACE = REPO_ROOT / "apps" / "worker"
 BUILD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build.yml"
 CHECK_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "check.yml"
 STORES_COMPOSE = REPO_ROOT / "deploy" / "stores.compose.yaml"
-PINS = WORKSPACE / "src" / "better_answers_worker" / "redaction" / "pins.py"
+REDACTION = WORKSPACE / "src" / "better_answers_worker" / "redaction"
+PINS = REDACTION / "pins.py"
 PIPELINE = WORKSPACE / "src" / "better_answers_worker" / "pipeline"
 DOCKERFILE = WORKSPACE / "Dockerfile"
 
@@ -1304,6 +1308,74 @@ def test_the_runtime_stage_copies_the_source_last() -> None:
         "/app/.venv",
         worker_environment("HF_HOME"),
     }
+
+
+def build_stage() -> list[str]:
+    instructions = _instructions(DOCKERFILE.read_text("utf-8"))
+    rest = instructions[instructions.index("FROM interpreter AS build") + 1 :]
+    return list(itertools.takewhile(lambda step: not step.startswith("FROM "), rest))
+
+
+def copied_from_the_context(step: str) -> list[str]:
+    keyword, *words = step.split()
+    if keyword not in {"COPY", "ADD"} or any(w.startswith("--from=") for w in words):
+        return []
+    paths = [word for word in words if not word.startswith("--")]
+    return (_json_list(" ".join(paths)) or paths)[:-1]
+
+
+def reaches_a_module(path: str) -> bool:
+    written = posixpath.normpath("/" + path).lstrip("/") or "."
+    return written != "src/better_answers_worker/__init__.py" and (
+        written in {".", "src"}
+        or written.startswith("src/")
+        or any(glob in written for glob in "*?[")
+    )
+
+
+def test_no_module_reaches_the_build_stage_before_the_project_install() -> None:
+    steps = build_stage()
+    install = steps.index("RUN uv sync --frozen --no-dev")
+    copies = [
+        index
+        for index, step in enumerate(steps)
+        for path in copied_from_the_context(step)
+        if reaches_a_module(path)
+    ]
+
+    assert copies != []
+    assert install < min(copies)
+
+
+def imported_by(path: Path) -> list[str]:
+    package = [
+        "better_answers_worker",
+        "redaction",
+        *path.relative_to(REDACTION).parent.parts,
+    ]
+    names: list[str] = []
+    for node in ast.walk(ast.parse(path.read_text("utf-8"), filename=str(path))):
+        if isinstance(node, ast.Import):
+            names.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            base = package[: len(package) - node.level + 1] if node.level else []
+            module = [*base, *node.module.split(".")] if node.module else base
+            names.extend(".".join([*module, alias.name]) for alias in node.names)
+    return names
+
+
+def test_the_redaction_seam_imports_nothing_else_from_the_worker() -> None:
+    worker = [
+        name
+        for path in sorted(REDACTION.rglob("*.py"))
+        for name in imported_by(path)
+        if name.startswith("better_answers_worker.")
+    ]
+
+    seam = "better_answers_worker.redaction."
+
+    assert worker != []
+    assert [name for name in worker if not name.startswith(seam)] == []
 
 
 def test_the_image_redacts_the_fixture_offline_and_fetches_nothing(
