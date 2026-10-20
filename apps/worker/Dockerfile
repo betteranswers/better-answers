@@ -61,9 +61,6 @@ WORKDIR /app
 #
 # Then the project, installed editable from its `__init__.py` alone, which is all the install
 # reads.
-#
-# Then the redaction seam, and only it. The weights step below fetches by loading the
-# seam's own analyzer, so those modules have to be present before it runs.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY src/better_answers_worker/__init__.py src/better_answers_worker/__init__.py
@@ -103,9 +100,7 @@ RUN --mount=type=cache,target=/tldextract-cache,uid=0 \
     /data/worker/tldextract-cache
 
 # What the runtime adds to its base, staged under /runtime because the runtime cannot run a
-# command to do it. A stage of its own off the Python image rather than the tail of the
-# build stage, so it carries the standard library as that image ships it and no bytecode a
-# build step wrote.
+# command to do it.
 #
 # The interpreter sits at the path the venv's `python` already names, so the venv the
 # build stage made runs unchanged. pip and the wheel `ensurepip` would install it from stay
@@ -187,10 +182,7 @@ ENV HF_HOME=/data/worker/hf-cache \
 #
 # Last of this stage's copies, and on purpose (`T-223`). BuildKit re-runs every instruction
 # below the first one whose input moved, and a `COPY` it re-runs is a new layer even when
-# every byte it copies is the same. This line is the one a source edit moves, and it stood
-# above the weights: each edit re-made a layer of about 950 MB, which a pull request's ref
-# and then `main` each wrote to a 10 GB cache. `apps/worker/tests/test_image.py` holds the
-# order, since no container started from the image can tell the two apart.
+# every byte it copies is the same.
 COPY src src
 
 USER worker
