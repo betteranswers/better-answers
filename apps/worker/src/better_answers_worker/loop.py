@@ -70,12 +70,14 @@ def _run_claimed(
     bootstrap: Bootstrap,
     job: queue.ClaimedJob,
     heartbeat_every_seconds: float,
+    deadline_seconds: float,
 ) -> dict[str, Any]:
     with queue.keeping_alive(
         bootstrap.database_url,
         job,
         bootstrap.worker_id,
         every_seconds=heartbeat_every_seconds,
+        deadline_seconds=deadline_seconds,
     ):
         return KINDS[job.kind](bootstrap, job)
 
@@ -85,6 +87,7 @@ def _serve_workspace(
     bootstrap: Bootstrap,
     workspace_id: str,
     heartbeat_every_seconds: float,
+    deadline_seconds: float,
 ) -> bool:
     with queue.scoped(connection, workspace_id) as cursor:
         claimed = queue.claim(cursor, workspace_id, bootstrap.worker_id, list(KINDS))
@@ -108,7 +111,9 @@ def _serve_workspace(
     )
 
     try:
-        outcome = _run_claimed(bootstrap, claimed, heartbeat_every_seconds)
+        outcome = _run_claimed(
+            bootstrap, claimed, heartbeat_every_seconds, deadline_seconds
+        )
     except Exception as failure:
         document_id = (
             failure.source_document_id
@@ -163,11 +168,16 @@ def tick(
     bootstrap: Bootstrap,
     *,
     heartbeat_every_seconds: float = queue.HEARTBEAT_SECONDS,
+    deadline_seconds: float = queue.JOB_DEADLINE_SECONDS,
 ) -> bool:
     worked = False
     for workspace_id in queue.workspace_ids(connection):
         served = _serve_workspace(
-            connection, bootstrap, workspace_id, heartbeat_every_seconds
+            connection,
+            bootstrap,
+            workspace_id,
+            heartbeat_every_seconds,
+            deadline_seconds,
         )
         worked = served or worked
     return worked

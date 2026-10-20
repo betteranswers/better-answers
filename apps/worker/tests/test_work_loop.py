@@ -1,4 +1,7 @@
 import contextlib
+import json
+import subprocess
+import sys
 import threading
 import time
 from collections.abc import Callable, Iterator, Mapping, MutableMapping, Sequence
@@ -1022,67 +1025,121 @@ def test_a_blocked_heartbeat_statement_ends_within_its_bound(
     assert renewed, "the heartbeat stopped after its statement was cancelled"
 
 
-def test_a_job_past_its_deadline_frees_its_source(
+A_WORKER_RUN = """
+import sys
+from better_answers_worker import loop, queue
+from better_answers_worker.config import read_bootstrap
+
+bootstrap = read_bootstrap()
+with queue.connected(bootstrap.database_url) as connection:
+    loop.tick(
+        connection,
+        bootstrap,
+        heartbeat_every_seconds=0.05,
+        deadline_seconds=float(sys.argv[1]),
+    )
+"""
+
+
+def a_worker_hung_on_its_audit(
     database: psycopg.Connection,
+    tmp_path: Path,
+    *,
+    deadline_seconds: float = 0.3,
+    while_hung: Callable[[], object] = lambda: None,
+) -> tuple[list[dict[str, Any]], str]:
+    bootstrap = bootstrap_for(database, tmp_path)
+    store = bootstrap.object_store
+    environment = {
+        "DATABASE_URL": bootstrap.database_url,
+        "GIT_STORE_DIR": bootstrap.git_store_dir,
+        "LMDB_DIR": bootstrap.engine.lmdb_dir,
+        "WORKER_ID": bootstrap.worker_id,
+        "S3_ENDPOINT": store.endpoint,
+        "S3_ACCESS_KEY": store.access_key,
+        "S3_SECRET_KEY": store.secret_key,
+        "S3_BUCKET": store.bucket,
+        "S3_REGION": store.region,
+    }
+    with queue.connected(bootstrap.database_url) as locking, locking.transaction():
+        locking.execute("LOCK TABLE concept_index IN ACCESS EXCLUSIVE MODE")
+        with subprocess.Popen(
+            [sys.executable, "-c", A_WORKER_RUN, str(deadline_seconds)],
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        ) as worker:
+            try:
+                while_hung()
+                stdout, stderr = worker.communicate(timeout=30)
+            finally:
+                worker.kill()
+    assert worker.returncode == queue.OUTLIVED_ITS_DEADLINE, stderr
+    return [json.loads(line) for line in stdout.splitlines()], stderr
+
+
+def test_a_job_past_its_deadline_ends_the_worker_process(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
+
+    written, stderr = a_worker_hung_on_its_audit(database, tmp_path)
+
+    with scoped(database, workspace) as cursor:
+        reclaimed = queue.claim(cursor, workspace, WORKER, ["nightly-audit"])
+    assert reclaimed is not None, "the lease outlived the worker process"
+    assert reclaimed.attempts == 2
+    events = [line["event"] for line in written]
+    assert not {"job finished", "job failed", "the claim was lost"} & set(events)
+    assert (events[-1], written[-1]["job_id"]) == (
+        "the job outlived its deadline",
+        reclaimed.id,
+    )
+    assert "in nightly_audit" in stderr, "the hung frame went unrecorded"
+
+
+def test_a_job_outliving_every_attempt_ends_poisoned(
+    database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = str(seed_workspace(database.cursor())["id"])
-    connected_source_id = ulid()
-    with database.cursor() as cursor:
-        older = seed_job(
-            cursor,
-            workspace_id=workspace,
-            kind="index",
-            reason="connected",
-            subject_id=connected_source_id,
-            max_attempts=1,
-            enqueued_ago_seconds=60,
-        )
     database.commit()
-
-    dsn = _WHERE[database]
-    with (
-        capture_logs() as written,
-        queue.connected(dsn) as hanging,
-        queue.connected(dsn) as claiming,
-    ):
-
-        def claimed_by_another_worker() -> queue.ClaimedJob | None:
-            with scoped(claiming, workspace) as cursor:
-                return queue.claim(cursor, workspace, "another-worker", ["index"])
-
-        def outlived() -> list[str]:
-            return [
-                line["job_id"]
-                for line in written
-                if line["event"] == "the job outlived its deadline"
-            ]
-
-        with scoped(hanging, workspace) as cursor:
-            hung = queue.claim(cursor, workspace, WORKER, ["index"])
-        assert hung is not None
-        assert hung.id == older["id"]
-        with database.cursor() as cursor:
-            newer = seed_job(
-                cursor,
-                workspace_id=workspace,
-                kind="index",
-                reason="wiped",
-                subject_id=connected_source_id,
-            )
-        database.commit()
-        while_leased = claimed_by_another_worker()
-        with queue.keeping_alive(
-            dsn, hung, WORKER, every_seconds=0.05, deadline_seconds=0.3
-        ):
-            freed = _within(10, claimed_by_another_worker)
-            _within(10, outlived)
-
-    assert while_leased is None
-    assert freed is not None, "the hung job kept its source past its deadline"
-    assert freed.id == newer["id"]
-    assert outlived() == [hung.id]
-    with pytest.raises(queue.ClaimLostError), scoped(database, workspace) as cursor:
-        queue.hold_the_claim(cursor, hung.id, WORKER)
     with scoped(database, workspace) as cursor:
-        cursor.execute("SELECT status FROM job WHERE id = %s", (older["id"],))
-        assert cursor.fetchone() == ("poisoned",)
+        job = seed_job(
+            cursor, workspace_id=workspace, kind="nightly-audit", max_attempts=2
+        )
+
+    for _ in range(2):
+        a_worker_hung_on_its_audit(database, tmp_path)
+
+    with scoped(database, workspace) as cursor:
+        assert queue.claim(cursor, workspace, WORKER, ["nightly-audit"]) is None
+        cursor.execute("SELECT status, attempts FROM job WHERE id = %s", (job["id"],))
+        assert cursor.fetchone() == ("poisoned", 2)
+
+
+def test_a_lost_claim_still_ends_the_worker_at_its_deadline(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
+
+    def take_the_claim() -> None:
+        with queue.connected(_WHERE[database]) as taking:
+
+            def taken() -> int:
+                with scoped(taking, workspace) as cursor:
+                    cursor.execute(
+                        "UPDATE job SET claimed_by = 'another-worker'"
+                        " WHERE claimed_by = %s",
+                        (WORKER,),
+                    )
+                    return cursor.rowcount
+
+            assert _within(10, taken), "the worker never claimed its job"
+
+    written, _ = a_worker_hung_on_its_audit(
+        database, tmp_path, deadline_seconds=2.0, while_hung=take_the_claim
+    )
+
+    events = [line["event"] for line in written]
+    assert events[-2:] == ["the claim was lost", "the job outlived its deadline"]
