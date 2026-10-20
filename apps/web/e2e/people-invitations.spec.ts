@@ -111,6 +111,16 @@ const capitalised = (address: string): string =>
 const anUnreachableAddress = (who: string): string =>
   anAddress(who).replace("@example.test", "@unreachable.example");
 
+/** Holds a call until `held` settles, so a spec can act while it is still in flight. */
+const answeredOnceHeld = (page: Page, procedure: string, held: Promise<void>) =>
+  page.route(
+    (url) => url.pathname.replace("/trpc/", "").split(",").includes(procedure),
+    async (route) => {
+      await held;
+      await route.continue();
+    },
+  );
+
 const resentAsIfItWent = (page: Page) =>
   page.route(
     (url) => url.pathname.includes("members.resendInvitation"),
@@ -805,6 +815,30 @@ test.describe("the People page's Invitations tab", () => {
     await expect(rowOf(page, ana)).toHaveCount(0);
     await expect(tickOf(page, ben)).toBeChecked();
     await expect(action).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  test("a tick made mid-act survives the bulk refusal", async ({ page, request }) => {
+    const [ana, ben] = [anAddress("ana"), anAddress("ben")];
+    let ids: string[] = [];
+    const here = await anAdminAtInvitations(page, request, "Wharfe Tannery", async (at) => {
+      ids = await invitedEach(request, at, [ana, ben]);
+    });
+    await openInvitations(page);
+    const answered = Promise.withResolvers<void>();
+    await answeredOnceHeld(page, "members.bulkResendInvitations", answered.promise);
+
+    await tickOf(page, ana).check();
+    expect(await actedAside(page, here, "cancelInvitation", { invitationId: ids[0] })).toBe(200);
+    await selectionAction(page, "Resend").click();
+    await expect(tickOf(page, ana)).not.toBeChecked();
+    await tickOf(page, ben).check();
+    const refused = refusalAnswering(page, "members.bulkResendInvitations");
+    answered.resolve();
+
+    expect((await refused).items).toEqual({ [ids[0] ?? ""]: "no-such-invitation" });
+    await saysARefusal(invitationsRegion(page).getByRole("alert"));
+    await expect(tickOf(page, ben), "the tick made meanwhile stays").toBeChecked();
+    await expect(selectionSaid(page), "the pressed tick comes back too").toHaveText(/\b2\b/);
   });
 
   test("accepted and cancelled invitations offer no tick and no actions", async ({

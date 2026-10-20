@@ -2260,6 +2260,23 @@ test.describe("bulk actions on the members ticked", () => {
     await expect(action).not.toHaveAttribute("aria-disabled", "true");
   });
 
+  test("a tick made mid-act survives the bulk refusal", async ({ page, request }) => {
+    await anAdminAtPeople(page, request, "Wharfe Carding");
+    const answered = Promise.withResolvers<void>();
+    await answeredChangedMeanwhile(page, BULK_REMOVAL, answered.promise);
+    await tickOf(page, "Priya Shah").check();
+    await removedThroughTheBar(page, "Remove 1 Member");
+    await expect(selectionBar(page)).toBeHidden();
+    await tickOf(page, "Sam Okoro").check();
+
+    const refused = refusalAnswering(page, "members.bulkRemove");
+    answered.resolve();
+    expect(await refused).toMatchObject({ word: "changed-meanwhile" });
+    await saysARefusal(membersRegion(page).getByRole("alert"));
+    await expect(tickOf(page, "Priya Shah"), "the pressed tick comes back").toBeChecked();
+    await expect(tickOf(page, "Sam Okoro"), "the tick made meanwhile stays").toBeChecked();
+  });
+
   test("a removal refused after a bulk answer still says why", async ({ page, request }) => {
     const { release } = await priyasRemovalHeld(page, request, "Wharfe Dyeing");
     await expect(outcomeOf(page)).toContainText("Priya Shah");

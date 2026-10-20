@@ -1,5 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { useId, useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type RefObject,
+  type SetStateAction,
+} from "react";
 
 import { ActionDialog } from "@/shared/action-dialog.tsx";
 import type { ApiError } from "@/shared/api/trpc.ts";
@@ -47,7 +55,7 @@ type Settled = {
 export type BulkList = {
   readonly readable: boolean;
   readonly ticked: ReadonlySet<string>;
-  readonly tick: (ticked: ReadonlySet<string>) => void;
+  readonly tick: Dispatch<SetStateAction<ReadonlySet<string>>>;
   readonly nameOf: (personId: string) => string;
   readonly heading: RefObject<HTMLElement | null>;
 
@@ -143,7 +151,7 @@ export const useMemberBulkActions = (list: BulkList) => {
       },
       onError: (failure) => {
         setActing(false);
-        list.tick(new Set(asked));
+        list.tick((now) => new Set([...now, ...asked]));
         list.say(refusalOf(failure, names), refusedRowsOf(failure));
       },
     });

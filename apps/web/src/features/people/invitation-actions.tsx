@@ -1,4 +1,4 @@
-import { useState, type RefObject } from "react";
+import { useState, type Dispatch, type RefObject, type SetStateAction } from "react";
 
 import { ceilingLiftsIn, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
@@ -30,7 +30,7 @@ export const NONE: Ticked = new Map();
 type ActedList = {
   readonly readable: boolean;
   readonly ticked: Ticked;
-  readonly tick: (ticked: Ticked) => void;
+  readonly tick: Dispatch<SetStateAction<Ticked>>;
   readonly heading: RefObject<HTMLElement | null>;
   readonly say: (outcome: Outcome | undefined) => void;
   readonly unsent: (unsent: readonly SentInvitation[]) => void;
@@ -162,20 +162,19 @@ export const useInvitationActions = (list: ActedList) => {
     run(names);
   };
 
+  const refusedPuttingBack = (names: Ticked) => (failure: Failure) => {
+    list.tick((now) => new Map([...now, ...names]));
+    list.say(refusalOf(failure, names));
+  };
+
   const resendTicked = () => {
     onTheTicked(INVITATIONS_WORDS.bulk.resending, (names) => {
       bulkResend.mutate(
         { invitationIds: [...names.keys()] },
-        settled<BulkResent>(
-          ({ invitations }) => {
-            list.say(bulkResentOutcome(invitations));
-            list.unsent(invitations.filter((invitation) => !invitation.emailSent));
-          },
-          (failure) => {
-            list.tick(names);
-            list.say(refusalOf(failure, names));
-          },
-        ),
+        settled<BulkResent>(({ invitations }) => {
+          list.say(bulkResentOutcome(invitations));
+          list.unsent(invitations.filter((invitation) => !invitation.emailSent));
+        }, refusedPuttingBack(names)),
       );
     });
   };
@@ -184,18 +183,12 @@ export const useInvitationActions = (list: ActedList) => {
     onTheTicked(INVITATIONS_WORDS.bulk.cancelling, (names) => {
       bulkCancel.mutate(
         { invitationIds: [...names.keys()] },
-        settled<BulkCancelled>(
-          ({ changed, skipped }) => {
-            list.say({
-              tone: "said",
-              words: INVITATIONS_WORDS.bulk.cancelled(changed.length, skipped),
-            });
-          },
-          (failure) => {
-            list.tick(names);
-            list.say(refusalOf(failure, names));
-          },
-        ),
+        settled<BulkCancelled>(({ changed, skipped }) => {
+          list.say({
+            tone: "said",
+            words: INVITATIONS_WORDS.bulk.cancelled(changed.length, skipped),
+          });
+        }, refusedPuttingBack(names)),
       );
     });
   };
