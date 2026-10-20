@@ -198,6 +198,13 @@ read-live fetch. Its IRI is opaque, it **starts Restricted whatever its evidence
 per-kind floor), and a leaver's reads *Left*, never *Deprecated*. Not a *Person* source entity,
 which is derived from one document and is never a concept.
 
+### Left
+
+A `Person` concept whose person has left the company; kept for history; never offered to new work.
+
+Never *Deprecated*: a person has no successor. It tells what became of a person, not how far a
+concept is trusted, so it is none of the trust words.
+
 ### platform bundle
 
 The bundle of concepts describing how to use the platform and how it fits together, seeded into
@@ -322,12 +329,13 @@ is searchable at its commit.
 
 ### merge key
 
-_Internal._ what a concept is recognised by when its IRI is not yet known: the words a suggestion's
-payload carries about the concept it means, which an acceptance resolves the target from at the
+_Internal._ what a concept is recognised by when its IRI is not yet known: its folded kind and its
+normalised title as one key (`mergeKeyOf`), which an acceptance resolves the target from at the
 moment it commits, never before.
 
 One concept per merge key in a workspace, so a concept whose identity moved between proposal and
-decision refuses the acceptance rather than landing on the wrong concept.
+decision refuses the acceptance rather than landing on the wrong concept. The kind is inside the
+key, so renaming or merging a kind re-keys every concept of that kind.
 
 ### suggestion
 
@@ -778,8 +786,10 @@ sensitivity widens.
 
 ### audience
 
-Who a connected source's content is for: everyone in the workspace, or named groups (plus, if
-needed, named individuals).
+Who a connected source's content is for: everyone in the workspace, or named groups.
+
+The named people of a Restricted connected source are a group too, minted for that source, never a
+list of people beside the groups.
 
 Set on the connected source, carried with sensitivity onto every source entity and read from the
 connected source for a passage, and applied with *published* on every read and traversal hop.
@@ -883,8 +893,10 @@ Kept per *model provider*; a provider no wire shape speaks has no model to call.
 
 ### model provider
 
-_Internal._ who hosts the model a *model choice* names (Anthropic, Mistral, Cloudflare): the
-*model client* calls its API. One of a closed set, and never the *provider* of a connected source.
+The company that hosts the model a *model choice* names (Anthropic, Mistral, Cloudflare), whose
+API the *model client* calls.
+
+One of a closed set, and never the *provider* of a connected source.
 
 ### model key
 
@@ -944,12 +956,6 @@ Past its shelf life (`stale_after`); needs verifying again.
 ### Draft
 
 Proposed, not yet part of what the company states.
-
-### Left
-
-A `Person` concept whose person has left the company; kept for history; never offered to new work.
-
-Never *Deprecated*: a person has no successor.
 
 ### Deprecated
 
@@ -2331,3 +2337,13 @@ here lands one.
   concept, and related knowledge is the concepts an answer returns when no `Answer` is a judged fit.
 - *Tenant* and *workspace* name one boundary: a page says *workspace*, and *tenant* is the same
   boundary said from the platform's side, never a second concept.
+- A *provider* and a *model provider* are distinct: a provider is the system a connected source's
+  documents came from, and a model provider is the company that hosts a model.
+- A *promotion*, a promotion to a role and a *release* are distinct: a promotion is an Editor's
+  proposal that an answer or a response become an `Answer`, a promotion to a role makes a person
+  an Admin or the operator and so asks a *second factor* of them, and a release promotes a built
+  image digest.
+- A *tab* and a browser tab are distinct: a tab divides one page, and a browser tab holds the whole
+  app. The `x-tab-workspace` header names the workspace a browser tab shows.
+- A *window* and a ceiling's window are distinct: a window is a run of a document's text put to
+  the detector's model, and a ceiling's window is the fixed span of time it counts within.

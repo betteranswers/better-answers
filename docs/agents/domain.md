@@ -44,6 +44,8 @@ If your output contradicts a decision in `docs/solutions/architecture-patterns/`
 
 > _Contradicts the decision that the database is plain Postgres and the api owns every migration (`adr-0007-plain-postgres-and-app-owned-migrations.md`) — but worth reopening because…_
 
+The one exception is a hand-written migration's first line, `-- Custom migration (hand-written SQL; ADR 0032).`, which is a tag that `packages/schema/test/migration-ownership.test.ts` matches exactly, not a citation.
+
 ## Where a changed decision lands
 
 A decision's doc states **what is true now**. The step that edits it in place, in the same commit as the code, is in `.agents/playbooks/knowledge.md`; git keeps the history. The ADRs these docs came from, amendments and struck text included, are frozen in `docs/archive/adr/`: read one there when you need how a decision got to where it is.

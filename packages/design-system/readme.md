@@ -30,7 +30,7 @@ The areas the rail lists, each holding groups of pages:
 
 **Trust words are a closed set**, written verbatim and always as text:
 Verified by <person> · Verified automatically · Unverified · Changed since verified ·
-Out of date · Draft · Left · Deprecated.
+Out of date · Draft · Deprecated.
 
 **British spelling and UK conventions throughout.**
 
