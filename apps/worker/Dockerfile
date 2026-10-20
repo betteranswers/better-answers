@@ -59,19 +59,16 @@ WORKDIR /app
 # The lockfile's dependencies first, so a source edit does not re-resolve them. `--frozen`
 # fails rather than updating `uv.lock`: the committed lockfile is the pin.
 #
+# Then the project, installed editable from its `__init__.py` alone, which is all the install
+# reads.
+#
 # Then the redaction seam, and only it. The weights step below fetches by loading the
-# seam's own analyzer, so those modules have to be present before it runs — and nothing
-# else does: no module under `redaction/` imports anything outside it. Copying the subtree
-# here rather than the whole of `src` is what puts the weights above the source: an edit to
-# a file outside the seam reuses roughly three gigabytes of weight layers, and an edit
-# inside it rebuilds them, which is right, because a moved pin has to re-fetch. This stage
-# reads nothing else from `src` after this point, and the runtime stage copies the tree
-# from the build context rather than from here, so the rest of it never enters this stage.
+# seam's own analyzer, so those modules have to be present before it runs.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY src/better_answers_worker/__init__.py src/better_answers_worker/__init__.py
-COPY src/better_answers_worker/redaction src/better_answers_worker/redaction
 RUN uv sync --frozen --no-dev
+COPY src/better_answers_worker/redaction src/better_answers_worker/redaction
 
 # The weights, fetched by loading each pinned model through the seam's own analyzer —
 # `redaction/weights.py` says why a load and not a snapshot, and holds the model ids, so no
@@ -108,7 +105,7 @@ RUN --mount=type=cache,target=/tldextract-cache,uid=0 \
 # What the runtime adds to its base, staged under /runtime because the runtime cannot run a
 # command to do it. A stage of its own off the Python image rather than the tail of the
 # build stage, so it carries the standard library as that image ships it and no bytecode a
-# build step wrote, and an edit inside `redaction/` does not re-make it.
+# build step wrote.
 #
 # The interpreter sits at the path the venv's `python` already names, so the venv the
 # build stage made runs unchanged. pip and the wheel `ensurepip` would install it from stay
@@ -192,10 +189,8 @@ ENV HF_HOME=/data/worker/hf-cache \
 # below the first one whose input moved, and a `COPY` it re-runs is a new layer even when
 # every byte it copies is the same. This line is the one a source edit moves, and it stood
 # above the weights: each edit re-made a layer of about 950 MB, which a pull request's ref
-# and then `main` each wrote to a 10 GB cache. Below the venv, the weights and the suffix
-# list, an edit outside `redaction/` re-makes this layer and nothing else — the build
-# stage says what an edit inside it costs, and why. `apps/worker/tests/test_image.py`
-# holds the order, since no container started from the image can tell the two apart.
+# and then `main` each wrote to a 10 GB cache. `apps/worker/tests/test_image.py` holds the
+# order, since no container started from the image can tell the two apart.
 COPY src src
 
 USER worker
