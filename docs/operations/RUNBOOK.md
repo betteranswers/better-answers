@@ -62,6 +62,8 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
   - *answering no image named*, `no health answer`: nothing answers, so production is down, with the old container gone and the new one not up; *the last image named* is the build that answered last.
 
   Also: the uptime check goes red within minutes of a promotion; the orchestrator's *failed deployment* or *unhealthy container* mail.
+
+  Or the step before the smoke, `set digests, redeploy production and wait for the deployment`, is red (BA-219). It waits up to 30 minutes for the orchestrator's deployment, and its error names that deployment. Read the deployment's log in the orchestrator. A deployment that failed before its log reached `Removing old containers.`, a pull that failed say, left production running the release before it, so nothing needs rolling back. A failure after that line left production down, and this page's **Do** applies. A deployment that never finished may still swap production later, so read `/health` before acting. Neither pushed a tag.
 - **Do:** **list the release tags newest first** and take the newest — a release is tagged only once its smoke passed, so the newest tag is the last release that held (promotions are `release/*` tags since 23/09/2026, T-342; `deploy/RELEASES.md` is frozen and holds the promotions before that date, its last row read the same way):
 
   ```sh

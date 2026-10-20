@@ -73,7 +73,7 @@ jobs:
     needs: gate
     if: needs.gate.outputs.promote == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     environment: production
     permissions:
       contents: read
@@ -146,7 +146,7 @@ jobs:
               exit 1
             fi
           done
-      - name: set digests and redeploy production
+      - name: set digests, redeploy production and wait for the deployment
         env:
           API_DIGEST: ${{ steps.d.outputs.api }}
           WORKER_DIGEST: ${{ steps.d.outputs.worker }}
