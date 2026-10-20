@@ -603,14 +603,34 @@ def test_sweeps_a_dead_runs_database_and_keeps_a_live_ones(
             _discard(maintenance, database)
 
 
+def _gone_or_going(maintenance: str, database: str) -> bool:
+    # Postgres marks a database it is dropping with a connection limit of -2.
+    with _admin(maintenance) as admin:
+        row = admin.execute(
+            "SELECT datconnlimit FROM pg_database WHERE datname = %s", (database,)
+        ).fetchone()
+    return row is None or row[0] == -2
+
+
+def _held(maintenance: str, database: str, server: str) -> psycopg.Connection | None:
+    try:
+        return psycopg.connect(on_database(server, database))
+    except psycopg.OperationalError:
+        # A failed connect carries no SQLSTATE, so the catalog tells a sweep's drop
+        # apart from a server that refused.
+        if _gone_or_going(maintenance, database):
+            return None
+        _discard(maintenance, database)
+        raise
+
+
 @contextmanager
 def _a_dead_runs_database_held(maintenance: str) -> Iterator[str]:
     for _attempt in range(5):
         dead = f"case_{_a_dead_pid()}_{uuid.uuid4().int % 10**9}"
         _create(maintenance, dead)
-        try:
-            session = psycopg.connect(on_database(maintenance, dead))
-        except psycopg.OperationalError:
+        session = _held(maintenance, dead, maintenance)
+        if session is None:
             continue
         try:
             with session:
@@ -626,6 +646,34 @@ def test_sweep_skips_a_dead_runs_database_still_in_use(maintenance: str) -> None
         sweep_dead_cases(maintenance)
 
         assert dead in _case_names(maintenance)
+
+
+def test_a_refused_connection_fails_as_itself_and_leaves_no_database(
+    maintenance: str, unique: Callable[[str], str]
+) -> None:
+    made = unique("probe_refused")
+    _create(maintenance, made)
+
+    with pytest.raises(psycopg.OperationalError, match="Connection refused"):
+        _held(maintenance, made, _uri_at(1))
+
+    assert _row_of(maintenance, made) is None
+
+
+@pytest.mark.parametrize("drop", ["finished", "interrupted"])
+def test_a_database_a_sweep_dropped_is_not_held(
+    maintenance: str, unique: Callable[[str], str], drop: str
+) -> None:
+    dropped = unique("probe_dropped")
+    if drop == "interrupted":
+        _create(maintenance, dropped)
+        with _admin(maintenance) as admin:
+            admin.execute(
+                "UPDATE pg_database SET datconnlimit = -2 WHERE datname = %s",
+                (dropped,),
+            )
+
+    assert _held(maintenance, dropped, maintenance) is None
 
 
 def test_discards_a_database_an_interrupted_drop_left_invalid(
