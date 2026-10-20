@@ -4,7 +4,31 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ListHead, PageHead } from "@/shared/page-head.tsx";
 import { OpenTabProvider } from "@/shared/page-toolbar.tsx";
 
+import { sourceFiles } from "./source-files.ts";
+
 afterEach(cleanup);
+
+const ALLOWED_ELSEWHERE: Readonly<Record<string, string>> = {
+  "app/failed-page.tsx": "the failed page names no menu group, and its alert holds the heading",
+  "app/unknown-page.tsx": "the not-found page names no menu group: no page has its address",
+  "features/auth/account-page.tsx": "Account names no menu group: it sits outside every area",
+  "features/auth/auth-page.tsx": "a sign-in page's heading is its card's title",
+  "features/auth/recovery-codes.tsx":
+    "the codes' heading is h1 on a sign-in page and h3 on Account",
+  "shared/knowledge/concept-body.tsx": "names a concept's own h1 only to draw it lower",
+};
+
+describe("a page's h1", () => {
+  it("is drawn by PageHead alone, apart from the files named", () => {
+    const naming = sourceFiles(/\.tsx?$/)
+      .filter(({ text }) => /<h1\b|["']h1["']/.test(text))
+      .map(({ file }) => file);
+
+    expect(naming.toSorted()).toEqual(
+      ["shared/page-head.tsx", ...Object.keys(ALLOWED_ELSEWHERE)].toSorted(),
+    );
+  });
+});
 
 describe("a page's head with no frame around it", () => {
   it("draws its heading and summary where it stands", () => {
