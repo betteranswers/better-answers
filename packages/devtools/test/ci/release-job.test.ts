@@ -492,7 +492,13 @@ const orchestrator = ({
   deploy = {
     status: 200,
     body: JSON.stringify({
-      deployments: [{ message: "queued", resource_uuid: "uuid-1", deployment_uuid: DEPLOYMENT }],
+      deployments: [
+        {
+          message: "Application better-answers deployment queued.",
+          resource_uuid: "uuid-1",
+          deployment_uuid: DEPLOYMENT,
+        },
+      ],
     }),
   },
 }: Orchestrator = {}): ((heard: Heard) => Answer) => {
@@ -601,20 +607,63 @@ describe("the redeploy a release makes", () => {
     });
   });
 
-  it("gives up naming a deployment that never finishes", async () => {
+  it("gives up when its wait runs out, naming the deployment", async () => {
+    const started = Date.now();
     const redeployed = await redeployedThrough(
       orchestrator({ reads: [deploymentIs("in_progress")] }),
-      { RELEASE_DEPLOY_POLLS: "3" },
+      { RELEASE_DEPLOY_WAIT_SECONDS: "1", RELEASE_DEPLOY_DELAY_SECONDS: "0.2" },
     );
 
     expect({
       code: redeployed.code,
-      reads: redeployed.heard.filter((heard) => heard.url === DEPLOYMENT_READ).length,
+      read: redeployed.heard.some((heard) => heard.url === DEPLOYMENT_READ),
+      inTime: Date.now() - started < 5000,
       err: redeployed.err,
     }).toEqual({
       code: 1,
-      reads: 3,
-      err: `::error::deployment ${DEPLOYMENT} had not finished after 3 reads, and its last status read was in_progress. It may still swap production later, so read /health before acting\n`,
+      read: true,
+      inTime: true,
+      err: `::error::deployment ${DEPLOYMENT} had not finished 1 s after it was queued, and its last status read was in_progress. It may still swap production later, so read /health before acting\n`,
+    });
+  });
+
+  it("stops at a deploy the orchestrator skipped", async () => {
+    const redeployed = await redeployedThrough(
+      orchestrator({
+        deploy: {
+          status: 200,
+          body: JSON.stringify({
+            deployments: [
+              {
+                message: "Deployment already queued for this commit.",
+                resource_uuid: "uuid-1",
+                deployment_uuid: DEPLOYMENT,
+              },
+            ],
+          }),
+        },
+      }),
+    );
+
+    expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
+      code: 1,
+      heard: 5,
+      err: `::error::the orchestrator queued no deployment, because one of production was already queued or running, and the id it answered, ${DEPLOYMENT}, names nothing. Both digests are set, which a deployment not yet started reads. Let that deployment end, or cancel it in the orchestrator, then run the release again\n`,
+    });
+  });
+
+  it("names the read ability when the first read is refused", async () => {
+    const valid = orchestrator();
+    const redeployed = await redeployedThrough((heard) =>
+      heard.url === "/api/v1/applications/uuid-1" && heard.method === "GET"
+        ? { status: 403, body: JSON.stringify({ message: "Missing required permissions: read" }) }
+        : valid(heard),
+    );
+
+    expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
+      code: 1,
+      heard: 1,
+      err: "::error::GET /api/v1/applications/uuid-1 was answered 403: the token is not live, or lacks Coolify's `read` ability, or the edge refused its service token, as the answer above says. The release's token needs `read`, `write` and `deploy`\n",
     });
   });
 
@@ -762,6 +811,22 @@ describe("how the workflows hand a release its commit", () => {
 
     expect(steps[backup]?.if).toEqual("needs.gate.outputs.trigger == 'nightly'");
     expect([backup >= 0, backup < redeploy, redeploy < smoke]).toEqual([true, true, true]);
+  });
+
+  it("outlasts the redeploy's wait and the smoke's by ten minutes", () => {
+    const defaultOf = (script: string, name: string): number => {
+      const text = readFileSync(path.join(repositoryRoot, "deploy", script), "utf8");
+      const found = new RegExp(`\\$\\{${name}:-(\\d+)\\}`).exec(text)?.[1];
+      if (found === undefined) throw new Error(`${script} gives ${name} no default`);
+      return Number(found);
+    };
+    const smokeReadSeconds = 5;
+    const smoke =
+      defaultOf("await-release.sh", "AWAIT_RELEASE_POLLS") *
+      (smokeReadSeconds + defaultOf("await-release.sh", "AWAIT_RELEASE_DELAY_SECONDS"));
+    const wait = defaultOf("release-redeploy.sh", "RELEASE_DEPLOY_WAIT_SECONDS");
+
+    expect(jobOf("promote")["timeout-minutes"] * 60).toBeGreaterThanOrEqual(wait + smoke + 600);
   });
 
   it("reads the switch the runbook tells the owner to set", () => {
