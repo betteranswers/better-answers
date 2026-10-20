@@ -81,6 +81,12 @@ export const runtimePoolFor = (db: () => MigratedPostgres, reads: number): (() =
   };
 };
 
+export const mapAutovacuumOff = async (pool: pg.Pool): Promise<void> => {
+  for (const table of ["map_node", "map_edge"]) {
+    await pool.query(`ALTER TABLE ${table} SET (autovacuum_enabled = false)`);
+  }
+};
+
 export const addressOf = (person: string): string =>
   `${person}-${ulid().toLowerCase()}@example.invalid`;
 

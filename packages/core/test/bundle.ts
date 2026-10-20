@@ -65,22 +65,55 @@ export const objectRemovedFrom = async (
 
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
+const NOBODY = {
+  GIT_AUTHOR_NAME: "Nobody",
+  GIT_AUTHOR_EMAIL: "nobody@acme.invalid",
+  GIT_COMMITTER_NAME: "Nobody",
+  GIT_COMMITTER_EMAIL: "nobody@acme.invalid",
+};
+
 export const emptyRootCommit = async (
   door: GitDoor,
   workspaceId: string,
   message: string,
 ): Promise<string> => {
-  const nobody = {
-    GIT_AUTHOR_NAME: "Nobody",
-    GIT_AUTHOR_EMAIL: "nobody@acme.invalid",
-    GIT_COMMITTER_NAME: "Nobody",
-    GIT_COMMITTER_EMAIL: "nobody@acme.invalid",
-  };
   const root = (
-    await git(door, workspaceId, ["commit-tree", EMPTY_TREE, "-m", message], nobody)
+    await git(door, workspaceId, ["commit-tree", EMPTY_TREE, "-m", message], NOBODY)
   ).trim();
   await git(door, workspaceId, ["update-ref", "refs/heads/main", root]);
   return root;
+};
+
+export const treeCommitted = async (
+  door: GitDoor,
+  workspaceId: string,
+  files: ReadonlyMap<string, string>,
+  message: string,
+): Promise<string> => {
+  const workTree = await mkdtemp(path.join(tmpdir(), "better-answers-tree-"));
+  const index = { GIT_INDEX_FILE: `${workTree}.index` };
+  try {
+    for (const [file, content] of files) {
+      await mkdir(path.dirname(path.join(workTree, file)), { recursive: true });
+      await writeFile(path.join(workTree, file), content);
+    }
+    await git(door, workspaceId, ["--work-tree", workTree, "add", "--all"], index);
+    const tree = (await git(door, workspaceId, ["write-tree"], index)).trim();
+    const parent = (await bundleHistory(door, workspaceId)).at(-1);
+    const sha = (
+      await git(
+        door,
+        workspaceId,
+        ["commit-tree", tree, ...(parent === undefined ? [] : ["-p", parent]), "-m", message],
+        NOBODY,
+      )
+    ).trim();
+    await git(door, workspaceId, ["update-ref", "refs/heads/main", sha]);
+    return sha;
+  } finally {
+    await rm(workTree, { recursive: true, force: true });
+    await rm(index.GIT_INDEX_FILE, { force: true });
+  }
 };
 
 export const divergeHistory = (door: GitDoor, workspaceId: string): Promise<string> =>

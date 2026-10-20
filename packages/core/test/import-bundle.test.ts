@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { head } from "@better-answers/core/store/git";
 import { ids, type ConceptIri } from "@better-answers/schema";
@@ -17,7 +17,14 @@ import {
 } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit, holdMainRef } from "./bundle.ts";
-import { addressOf, holdingTable, isBlockedOnTable, readingAs, until } from "./suite-postgres.ts";
+import {
+  addressOf,
+  holdingTable,
+  isBlockedOnTable,
+  mapAutovacuumOff,
+  readingAs,
+  until,
+} from "./suite-postgres.ts";
 import { doorsOf, memberOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange } = suiteWithBundles();
@@ -353,7 +360,36 @@ const stoppedAt = (file: string, reason: string, progress: ImportProgress) => ({
   error: { kind: "stopped", file, reason, progress },
 });
 
+const MAP_TABLES = ["map_edge", "map_node"] as const;
+
+const mapRowsHeld = async (): Promise<Record<string, number>> => {
+  const counted = await db().pool.query<Record<string, number>>(
+    `SELECT (SELECT count(*)::int FROM map_edge) AS map_edge,
+            (SELECT count(*)::int FROM map_node) AS map_node`,
+  );
+  return counted.rows[0] ?? {};
+};
+
+const mapRowsCountedForThePlanner = async (): Promise<Record<string, number>> => {
+  const read = await db().pool.query<{ table: string; counted: number }>(
+    `SELECT relname AS "table", reltuples::int AS counted FROM pg_class
+      WHERE relnamespace = 'public'::regnamespace AND relname = ANY($1::text[])`,
+    [[...MAP_TABLES]],
+  );
+  return Object.fromEntries(read.rows.map((row) => [row.table, row.counted]));
+};
+
 describe("importing the bundle", () => {
+  beforeAll(() => mapAutovacuumOff(db().pool));
+
+  it("analyses the map for the planner once landed", async () => {
+    const { scenario, verifiers } = await arranged();
+
+    await imported(scenario, soundBundle(verifiers));
+
+    expect(await mapRowsCountedForThePlanner()).toEqual(await mapRowsHeld());
+  });
+
   it("commits the manifest, then each concept in path order", async () => {
     const { scenario, verifiers } = await arranged();
 

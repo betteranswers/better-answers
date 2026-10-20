@@ -348,6 +348,50 @@ export const conceptIriTakenAgain = (
     iri,
   ]);
 
+type IndexedPolicy = {
+  readonly iri: string;
+  readonly path: string;
+  readonly title: string;
+  readonly body: string;
+  readonly contentHash: string;
+};
+
+/** Lands every concept in two statements, for a map too wide to seed one row at a time. */
+export const policiesIndexedInBulk = async (
+  client: Writer,
+  landing: {
+    readonly workspaceId: string;
+    readonly commitSha: string;
+    readonly concepts: readonly IndexedPolicy[];
+  },
+): Promise<void> => {
+  const { workspaceId, commitSha, concepts } = landing;
+  const column = (field: keyof IndexedPolicy): readonly string[] =>
+    concepts.map((concept) => concept[field]);
+  await client.query(
+    `INSERT INTO concept_identity (workspace_id, iri, merge_key)
+       SELECT $1, iri, 'policy:' || path FROM unnest($2::text[], $3::text[]) AS t(iri, path)`,
+    [workspaceId, column("iri"), column("path")],
+  );
+  await client.query(
+    `INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter, body, content_hash,
+                                commit_sha, status, published_at, sensitivity, audience)
+       SELECT $1, iri, path, 'Policy', title, jsonb_build_object('title', title, 'type', 'Policy'),
+              body, content_hash, $2, 'stable', now(), 'Internal', 'everyone'
+         FROM unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::text[])
+           AS t(iri, path, title, body, content_hash)`,
+    [
+      workspaceId,
+      commitSha,
+      column("iri"),
+      column("path"),
+      column("title"),
+      column("body"),
+      column("contentHash"),
+    ],
+  );
+};
+
 /** Answers `ADMITTED` or the refusal's SQLSTATE, not its constraint; the row never stays. */
 export const enqueueAttempted = async (
   client: Writer,

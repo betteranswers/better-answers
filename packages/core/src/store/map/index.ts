@@ -475,6 +475,10 @@ const WALK_TIMED_OUT = "57014";
 export const walkTimedOut = (error: Error): boolean =>
   "code" in error && error.code === WALK_TIMED_OUT;
 
+export const analyseMap = async (pool: pg.Pool): Promise<void> => {
+  await pool.query("SELECT analyse_map()");
+};
+
 export const walkToEntries = (
   principal: UserPrincipal,
   tx: Tx,

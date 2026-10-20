@@ -170,4 +170,5 @@ def run_rebuild(
         "UPDATE map_generation SET live_gen = %s WHERE workspace_id = %s",
         (outcome.generation, workspace_id),
     )
+    cursor.execute("SELECT analyse_map()")
     return outcome

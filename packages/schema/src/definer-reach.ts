@@ -50,4 +50,11 @@ export const SECURITY_DEFINER_REACH = [
     reason:
       "Past the caller's grants. `app_rt`'s ALL is revoked on the table, so the read the acceptance path makes of a proposed concept's body exists only here, scoped to the transaction's own workspace.",
   },
+  {
+    fn: "public.analyse_map",
+    args: "",
+    reaches: ["public.map_node", "public.map_edge"],
+    reason:
+      "Past both callers' grants, and two callers because the worker's rebuild runs as `worker_rt` and the api's import as `app_rt`. ANALYZE takes the table's owner or MAINTAIN, which neither runtime role holds, so counting the map's rows for the planner after a bulk write runs through this function and in no other way. The statistics it refreshes are the tables', so they cover every tenant's rows at once and no scope guards them. Row writes never block it; it waits, for five seconds at most, on another count held to that count's commit, on an autovacuum of either table, or on an exclusive lock a migration has queued.",
+  },
 ] as const satisfies readonly DefinerReach[];

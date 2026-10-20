@@ -52,6 +52,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { ANY_HEAD, type CommitAuthor, type Committed, type GitDoor } from "../store/git/index.ts";
+import { analyseMap } from "../store/map/index.ts";
 import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { withBundleWrite } from "./fence.ts";
 import {
@@ -1103,8 +1104,12 @@ const runImport = async (
 
   const run: ImportRun = { author: opened.author, sensitivity, batchId: ulid() };
   const landing = await landEach(principal, doors, run, opened);
+  const rewritten = landing.ok
+    ? await rewriteEach(principal, doors, run, landing.value)
+    : err(landing.error);
+  const analysed = await attempt(() => analyseMap(doors.postgres.pool));
+  if (!analysed.ok) return err(analysed.error);
   if (!landing.ok) return err(landing.error);
-  const rewritten = await rewriteEach(principal, doors, run, landing.value);
   if (!rewritten.ok) return err(rewritten.error);
   return ok({
     bundleId: opened.manifest.id,

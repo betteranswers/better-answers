@@ -663,6 +663,33 @@ def test_a_rebuild_leaves_the_prior_generation_for_the_apis_prune(
         assert cursor.fetchall() == [(1,), (2,)]
 
 
+def rows_counted_for_the_planner(database: psycopg.Connection) -> dict[str, int]:
+    with database.cursor() as cursor:
+        cursor.execute(
+            "SELECT relname, reltuples::int FROM pg_class"
+            " WHERE relnamespace = 'public'::regnamespace"
+            " AND relname IN ('map_node', 'map_edge')"
+        )
+        return {str(row[0]): int(row[1]) for row in cursor.fetchall()}
+
+
+def test_a_rebuild_analyses_the_map_for_the_planner(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace, expenses = a_workspace_live_at_generation_one(database)
+    with database.cursor() as cursor:
+        cursor.execute("ALTER TABLE map_node SET (autovacuum_enabled = false)")
+        cursor.execute("ALTER TABLE map_edge SET (autovacuum_enabled = false)")
+    database.commit()
+    write_bundle(tmp_path, workspace, {"knowledge/expenses.md": expenses})
+    assert rows_counted_for_the_planner(database) == {"map_node": -1, "map_edge": -1}
+
+    with scoped(database, workspace) as cursor:
+        run_rebuild(cursor, str(tmp_path), workspace)
+
+    assert rows_counted_for_the_planner(database) == {"map_node": 1, "map_edge": 0}
+
+
 def a_workspace_with_a_queued_audit(
     database: psycopg.Connection, tmp_path: Path
 ) -> str:
