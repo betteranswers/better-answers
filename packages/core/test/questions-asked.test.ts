@@ -620,33 +620,6 @@ describe("reading the questions asked", () => {
       },
     ]);
   });
-
-  it("puts a refusal matching nothing in the group for none", async () => {
-    const admin = await anAsker();
-    await aRecord(admin, { verdict: "refuse" });
-
-    const [record] = answered(await asked(admin)).records;
-
-    expect(record).toEqual(expect.objectContaining({ verdict: "refuse", refusedUnder: null }));
-  });
-
-  it("groups a refusal under the first collection the Admin reads", async () => {
-    const admin = await anAsker();
-    const narrowed = await aConceptNarrowedIn(admin, "board");
-    const readable = await aConceptIn(admin, "audits");
-    const related = await aRecord(admin, {
-      askedAt: new Date(Date.now() - 60_000),
-      cited: [readable],
-    });
-    const refused = await aRecord(admin, { verdict: "refuse", cited: [narrowed, readable] });
-
-    const { records } = answered(await asked(admin));
-
-    expect(records.map((record) => [record.id, record.refusedUnder])).toEqual([
-      [refused.id, "audits"],
-      [related.id, undefined],
-    ]);
-  });
 });
 
 describe("closing a flag", () => {

@@ -102,7 +102,6 @@ type RecordAsRead = {
   readonly concepts: readonly ConceptAsRead[];
   readonly drafted: readonly DraftedSentence[] | null;
   readonly feedback: readonly FeedbackAsRead[];
-  readonly refusedUnder?: string | null;
 };
 
 export type QuestionsAskedPage = {
@@ -229,9 +228,6 @@ const feedbackAsRead = (given: FeedbackRow, readable: Readable): FeedbackAsRead 
   closedAt: given.closedAt?.toISOString() ?? null,
 });
 
-const refusalGroup = (row: PageRow, concepts: readonly ConceptAsRead[]) =>
-  row.verdict === "refuse" ? { refusedUnder: concepts[0]?.collection ?? null } : {};
-
 type Read = {
   readonly readable: Readable;
   readonly feedback: ReadonlyMap<string, readonly FeedbackRow[]>;
@@ -243,26 +239,20 @@ const cutAt = (last: PageRow | undefined): QuestionsAskedCursor | null =>
 
 const NOTHING_READ: Read = { readable: new Map(), feedback: new Map(), askers: new Map() };
 
-const recordAsRead = (row: PageRow, read: Read): RecordAsRead => {
-  const concepts = row.concepts.flatMap((kept) => conceptAsRead(kept, read.readable));
-  return {
-    id: row.id,
-    askedAt: row.askedAt.toISOString(),
-    askedBy: actorOf(row.askedBy, read.askers),
-    transport: row.transport,
-    collectionsNamed: row.collections,
-    question: row.question,
-    verdict: row.verdict,
-    judgeState: row.judgeState,
-    flagged: row.flagged,
-    concepts,
-    drafted: draftedAsRead(row.drafted, read.readable),
-    feedback: (read.feedback.get(row.id) ?? []).map((given) =>
-      feedbackAsRead(given, read.readable),
-    ),
-    ...refusalGroup(row, concepts),
-  };
-};
+const recordAsRead = (row: PageRow, read: Read): RecordAsRead => ({
+  id: row.id,
+  askedAt: row.askedAt.toISOString(),
+  askedBy: actorOf(row.askedBy, read.askers),
+  transport: row.transport,
+  collectionsNamed: row.collections,
+  question: row.question,
+  verdict: row.verdict,
+  judgeState: row.judgeState,
+  flagged: row.flagged,
+  concepts: row.concepts.flatMap((kept) => conceptAsRead(kept, read.readable)),
+  drafted: draftedAsRead(row.drafted, read.readable),
+  feedback: (read.feedback.get(row.id) ?? []).map((given) => feedbackAsRead(given, read.readable)),
+});
 
 const byRecord = (feedback: readonly FeedbackRow[]): ReadonlyMap<string, readonly FeedbackRow[]> =>
   Map.groupBy(feedback, (given) => given.recordId);

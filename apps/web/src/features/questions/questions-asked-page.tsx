@@ -87,52 +87,25 @@ function RecordItem(properties: { readonly record: AskedRecord; readonly actions
 
 function RecordGroup(properties: {
   readonly title: string;
-  readonly level: "h3" | "h4";
   readonly records: readonly AskedRecord[];
   readonly actions: RowActions;
 }) {
   const headingId = useId();
   const { records, actions } = properties;
-  const Heading = properties.level;
   if (records.length === 0) return null;
   return (
     <section aria-labelledby={headingId} className="border-t border-border first:border-t-0">
-      <Heading
+      <h3
         id={headingId}
         className="max-w-none border-b border-border bg-muted px-3 py-2 font-medium"
       >
         {properties.title}
-      </Heading>
+      </h3>
       <ul>
         {records.map((record) => (
           <RecordItem key={record.id} record={record} actions={actions} />
         ))}
       </ul>
-    </section>
-  );
-}
-
-function NotAnswered(properties: {
-  readonly groups: ReturnType<typeof groupedForReading>["notAnswered"];
-  readonly actions: RowActions;
-}) {
-  const headingId = useId();
-  const { groups, actions } = properties;
-  if (groups.length === 0) return null;
-  return (
-    <section aria-labelledby={headingId} className="border-t border-border first:border-t-0">
-      <h3 id={headingId} className="max-w-none px-3 pt-3 pb-2 font-semibold">
-        {WORDS.notAnswered}
-      </h3>
-      {groups.map((group) => (
-        <RecordGroup
-          key={group.collection ?? ""}
-          title={group.collection ?? WORDS.noCollectionHeading}
-          level="h4"
-          records={group.records}
-          actions={actions}
-        />
-      ))}
     </section>
   );
 }
@@ -172,9 +145,9 @@ function Records(properties: { readonly asked: QuestionsAsked }) {
   return (
     <>
       <OutcomeLine outcome={outcome} className="px-3 empty:hidden" />
-      <RecordGroup title={WORDS.flagged} level="h3" records={grouped.flagged} actions={actions} />
-      <RecordGroup title={WORDS.others} level="h3" records={grouped.others} actions={actions} />
-      <NotAnswered groups={grouped.notAnswered} actions={actions} />
+      <RecordGroup title={WORDS.flagged} records={grouped.flagged} actions={actions} />
+      <RecordGroup title={WORDS.others} records={grouped.others} actions={actions} />
+      <RecordGroup title={WORDS.notAnswered} records={grouped.notAnswered} actions={actions} />
       <ListPages
         pages={{
           kind: "more",
