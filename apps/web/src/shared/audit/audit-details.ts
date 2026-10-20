@@ -76,7 +76,7 @@ const VALUE_LABELS = new Map(
     capped: "Stopped at the limit",
     searchTooBroad: "Search named too many",
     purpose: "Used For",
-    provider: "AI Provider",
+    provider: "Model Provider",
     model: "AI Model",
     effectiveFrom: "Priced From",
     gbpPerMillionIn: "£ per Million Tokens In",

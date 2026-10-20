@@ -305,6 +305,20 @@ describe("an audit event in today's words", () => {
 
     expect(shared, "actions that read as the same sentence").toEqual([]);
   });
+
+  it("calls the company that runs a model its model provider", () => {
+    const keySet: SaidEvent = {
+      action: "platform.workspace.model_key_set",
+      by: BY_THE_PLATFORM,
+      subject: null,
+      detail: { provider: "anthropic" },
+      named: {},
+    };
+
+    expect(headlineOf(keySet.action)).toBe("Model provider key set");
+    expect(sentenceOf(keySet)).toContain("set a model provider’s API key");
+    expect(detailLinesOf(keySet).map((line) => line.label)).toEqual(["Model Provider"]);
+  });
 });
 
 describe("an audit event's detail in today's words", () => {
