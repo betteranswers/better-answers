@@ -10,8 +10,6 @@ afterEach(cleanup);
 
 const ALLOWED_ELSEWHERE: Readonly<Record<string, string>> = {
   "app/failed-page.tsx": "the failed page names no menu group, and its alert holds the heading",
-  "app/unknown-page.tsx": "the not-found page names no menu group: no page has its address",
-  "features/auth/account-page.tsx": "Account names no menu group: it sits outside every area",
   "features/auth/auth-page.tsx": "a sign-in page's heading is its card's title",
   "features/auth/recovery-codes.tsx":
     "the codes' heading is h1 on a sign-in page and h3 on Account",

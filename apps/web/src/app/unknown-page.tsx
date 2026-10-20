@@ -5,6 +5,7 @@ import { refusalOf } from "@/shared/api/trpc.ts";
 import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
 import { NO_SESSION, useMemberAskedOnce } from "@/shared/member.ts";
 import type { Page } from "@/shared/navigation.ts";
+import { PageHead } from "@/shared/page-head.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
 import { WorkspaceFrame } from "./frame.tsx";
@@ -16,7 +17,7 @@ export function UnknownPage(properties: { readonly home?: Page | undefined }) {
 
   return (
     <>
-      <h1>{UNKNOWN_PAGE.heading}</h1>
+      <PageHead heading={UNKNOWN_PAGE.heading} />
       <GoHome home={properties.home} className="mt-6" />
     </>
   );
@@ -25,7 +26,7 @@ export function UnknownPage(properties: { readonly home?: Page | undefined }) {
 function UnknownSignedOut() {
   return (
     <>
-      <h1>{UNKNOWN_PAGE.heading}</h1>
+      <PageHead heading={UNKNOWN_PAGE.heading} />
       <p className="mt-6">
         <Button asChild variant="link" className="px-0">
           <Link to="/sign-in">{UNKNOWN_PAGE.signIn}</Link>
