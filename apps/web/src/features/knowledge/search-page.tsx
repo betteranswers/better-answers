@@ -75,12 +75,12 @@ type OpenedFor = Opened & { readonly query: string };
 const stillListed = (
   opened: OpenedFor,
   query: string,
-  listed: readonly Match[] | undefined,
+  shown: readonly Match[],
+  loading: boolean,
 ): boolean =>
-  opened.query === query &&
-  (listed === undefined || listed.some((match) => keyOf(match) === opened.key));
+  opened.query === query && (loading || shown.some((match) => keyOf(match) === opened.key));
 
-const openerIdOf = (key: string): string => `opener-${key}`;
+const openerIdOf = (key: string): string => `opener-${encodeURIComponent(key)}`;
 
 const chosenOf = (match: PassageMatch): Omit<Opened, "pressed"> => {
   const key = keyOf(match);
@@ -103,10 +103,10 @@ type Reading = {
 
 function ConceptLine(properties: {
   readonly match: ConceptMatch;
+  readonly opening: Opening;
   readonly reading: Reading;
-  readonly onFocus: () => void;
 }) {
-  const { match, reading } = properties;
+  const { match, opening, reading } = properties;
   const page = conceptPageOf(match.iri);
   const land = useLandingLine(keyOf(match) === reading.returning.key, reading.returning.landed);
   return (
@@ -119,9 +119,11 @@ function ConceptLine(properties: {
           ref={land}
           href={page}
           className={TITLE}
-          onFocus={properties.onFocus}
+          onFocus={() => {
+            opening.focusedOn(keyOf(match));
+          }}
           onOpen={() => {
-            reading.onRead(match, page);
+            opening.open(match);
           }}
         >
           {match.title}
@@ -136,7 +138,7 @@ function ConceptLine(properties: {
 type Opening = {
   readonly opened: Opened | undefined;
   readonly beside: boolean;
-  readonly onOpen: (chosen: Omit<Opened, "pressed">) => void;
+  readonly open: (match: Match) => void;
   readonly onClose: () => void;
   readonly focusedOn: (key: string) => void;
 };
@@ -158,7 +160,7 @@ function PassageLine(properties: { readonly match: PassageMatch; readonly openin
             opening.focusedOn(key);
           }}
           onClick={() => {
-            opening.onOpen(chosenOf(match));
+            opening.open(match);
           }}
         >
           {match.title}
@@ -180,17 +182,14 @@ function MatchLine(properties: {
   readonly reading: Reading;
 }) {
   const { match } = properties;
-  const land = useLandingLine(properties.landsHere, properties.onLanded);
+  const land = useLandingLine(properties.landsHere, () => {
+    properties.onLanded();
+    properties.opening.focusedOn(keyOf(match));
+  });
   return (
     <li ref={land} tabIndex={-1} className="px-4 py-3">
       {match.layer === "bundles" ? (
-        <ConceptLine
-          match={match}
-          reading={properties.reading}
-          onFocus={() => {
-            properties.opening.focusedOn(keyOf(match));
-          }}
-        />
+        <ConceptLine match={match} opening={properties.opening} reading={properties.reading} />
       ) : (
         <PassageLine match={match} opening={properties.opening} />
       )}
@@ -276,16 +275,7 @@ function Results(properties: {
   );
 }
 
-const openMatch = (match: Match, opening: Opening, reading: Reading): void => {
-  if (match.layer !== "bundles") {
-    opening.onOpen(chosenOf(match));
-    return;
-  }
-  const page = conceptPageOf(match.iri);
-  if (page !== undefined) reading.onRead(match, page);
-};
-
-const useReading = (query: string, flush: () => void): Reading => {
+const useReading = (query: string): Reading => {
   const router = useRouter();
   const navigate = useNavigate();
   const returned = useRouterState({
@@ -304,7 +294,6 @@ const useReading = (query: string, flush: () => void): Reading => {
       },
     },
     onRead: (match, page) => {
-      flush();
       const searchQuery = router.latestLocation.searchStr;
       void navigate({
         to: ".",
@@ -324,12 +313,13 @@ const useReading = (query: string, flush: () => void): Reading => {
 
 const useOpening = (
   query: string,
-  listed: readonly Match[] | undefined,
+  shown: readonly Match[],
+  loading: boolean,
   heading: RefObject<HTMLElement | null>,
 ) => {
   const [opened, setOpened] = useState<OpenedFor>();
   const [leftIn, setLeftIn] = useState<string>();
-  if (opened !== undefined && !stillListed(opened, query, listed)) {
+  if (opened !== undefined && !stillListed(opened, query, shown, loading)) {
     setOpened(undefined);
     if (opened.query === query) setLeftIn(query);
   }
@@ -343,16 +333,50 @@ const useOpening = (
   return {
     opened,
     left,
-    onOpen: (chosen: Omit<Opened, "pressed">, committed: string) => {
+    onOpen: (chosen: Omit<Opened, "pressed">, typed: string) => {
       setLeftIn(undefined);
       setOpened((current) => ({
         ...chosen,
-        query: committed,
+        query: typed,
         pressed: (current?.pressed ?? 0) + 1,
       }));
     },
     onClose: () => {
       setOpened(undefined);
+    },
+  };
+};
+
+const useReturnedUnlisted = (
+  returningKey: string | undefined,
+  shown: readonly Match[],
+  loading: boolean,
+  heading: RefObject<HTMLElement | null>,
+) => {
+  const unlisted =
+    returningKey !== undefined && !loading && !shown.some((match) => keyOf(match) === returningKey);
+
+  useEffect(() => {
+    if (unlisted && document.activeElement === document.body) heading.current?.focus();
+  }, [unlisted, heading]);
+};
+
+const useOpenKey = (query: string, shown: readonly Match[], open: (match: Match) => void) => {
+  const [inFocus, setInFocus] = useState<string>();
+  const [unopenedIn, setUnopenedIn] = useState<string>();
+  if (unopenedIn !== undefined && unopenedIn !== query) setUnopenedIn(undefined);
+
+  useKeystroke(KEY.open, () => {
+    const match = shown.find((listed) => keyOf(listed) === inFocus);
+    if (match === undefined) setUnopenedIn(query);
+    else open(match);
+  });
+
+  return {
+    unopened: unopenedIn === query,
+    focusedOn: (key: string) => {
+      setInFocus(key);
+      setUnopenedIn(undefined);
     },
   };
 };
@@ -369,29 +393,26 @@ function SearchRegion() {
   const matches = useMatches(query);
   const shown = useMemo(() => matchesOf(matches.data), [matches.data]);
   const beside = useRoomBeside();
-  const reading = useReading(query, flush);
-  const panel = useOpening(query, matches.isLoading ? undefined : shown, heading);
-  const [inFocus, setInFocus] = useState<string>();
-  const [unopenedIn, setUnopenedIn] = useState<string>();
+  const reading = useReading(query);
+  const panel = useOpening(query, shown, matches.isLoading, heading);
+  useReturnedUnlisted(reading.returning.key, shown, matches.isLoading, heading);
+  const open = (match: Match) => {
+    flush();
+    if (match.layer !== "bundles") {
+      panel.onOpen(chosenOf(match), search);
+      return;
+    }
+    const page = conceptPageOf(match.iri);
+    if (page !== undefined) reading.onRead(match, page);
+  };
+  const openKey = useOpenKey(query, shown, open);
   const opening: Opening = {
     opened: panel.opened,
     beside,
-    onOpen: (chosen) => {
-      flush();
-      panel.onOpen(chosen, search);
-    },
+    open,
     onClose: panel.onClose,
-    focusedOn: (key) => {
-      setInFocus(key);
-      setUnopenedIn(undefined);
-    },
+    focusedOn: openKey.focusedOn,
   };
-
-  useKeystroke(KEY.open, () => {
-    const match = shown.find((listed) => keyOf(listed) === inFocus);
-    if (match === undefined) setUnopenedIn(query);
-    else openMatch(match, opening, reading);
-  });
 
   return (
     <section
@@ -415,7 +436,7 @@ function SearchRegion() {
         <output className="block px-4 py-3 text-muted-foreground empty:hidden">
           {saidOf(query, matches, shown.length)}
           {panel.left ? ` ${WORDS.passageLeft}` : null}
-          {unopenedIn === query ? ` ${WORDS.selectFirst}` : null}
+          {openKey.unopened ? ` ${WORDS.selectFirst}` : null}
         </output>
         <Results
           key={query}

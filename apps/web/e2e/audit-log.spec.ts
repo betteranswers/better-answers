@@ -205,9 +205,10 @@ test.describe("the System group's Audit log page", () => {
     );
 
     await searchBox(page).fill("Priya");
-    await detailsOf(priyas).click();
-    await expect(detailsOf(priyas)).toHaveAttribute("aria-expanded", "true");
+    const clicked = detailsOf(priyas).click();
+    await typed.reached;
     typed.release();
+    await clicked;
 
     await expect(linesOf(page)).toHaveText([BY_PRIYA]);
     await expect(

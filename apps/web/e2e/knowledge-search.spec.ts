@@ -484,8 +484,10 @@ test.describe("the Knowledge Search page", () => {
       const typed = await heldBack(page, isAFindFor("forklift"));
 
       await searchBox(page).fill("forklift");
-      await matchesOf(page).getByRole("button", { name: FORKLIFT_GUIDE }).click();
+      const clicked = matchesOf(page).getByRole("button", { name: FORKLIFT_GUIDE }).click();
+      await typed.reached;
       typed.release();
+      await clicked;
 
       await expect(matchesOf(page)).toHaveText([new RegExp(FORKLIFT_GUIDE)]);
       await expect(
@@ -506,10 +508,29 @@ test.describe("the Knowledge Search page", () => {
       listed,
     );
     await expect(page).toHaveURL((url) => url.pathname === SEARCH.path);
+    await searched(page, "audit");
+    await searched(page, "forklift");
+    await expect(said(page), "the page still says no match was in focus").toHaveText(listed);
 
     await matchesOf(page).getByRole("link", { name: "Forklift Licences" }).focus();
     await page.keyboard.press(KEY.open.key);
     await expect(page.getByRole("heading", { level: 2, name: "Forklift Licences" })).toBeVisible();
+  });
+
+  test("opens the match focus landed on after More", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Nidd Shelves", [handbookSeeded]);
+    await searched(page, "pallet");
+    await searchRegion(page).getByRole("heading", { name: "Search" }).focus();
+
+    await page.keyboard.press(KEY.more.key);
+    const landed = matchesOf(page).nth(A_PAGE);
+    await expect(landed).toBeFocused();
+    await page.keyboard.press(KEY.open.key);
+
+    await expect(landed.getByRole("button", { name: HANDBOOK })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 
   test("keeps the typed search for a concept opened before settling", async ({ page, request }) => {
@@ -525,6 +546,10 @@ test.describe("the Knowledge Search page", () => {
       "forklift",
     );
     await expect(matchesOf(page)).toHaveText([/Forklift Licences/]);
+    await expect(
+      searchRegion(page).getByRole("heading", { name: "Search" }),
+      "focus fell to the page on the way back",
+    ).toBeFocused();
   });
 
   test("hands Tab from the open panel back to its opener", async ({
