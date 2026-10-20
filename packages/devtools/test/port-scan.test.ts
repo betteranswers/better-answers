@@ -94,6 +94,9 @@ const halfDeclared = (
 const declaredTwice = (line: number, name: keyof typeof SHAPES): string =>
   `${MODULE}:${String(line)}: \`${name}\` is declared twice in this module, so which value holds depends on the order. Declare it once.`;
 
+const augmented = (line: number, name: keyof typeof SHAPES, module = MODULE): string =>
+  `${module}:${String(line)}: \`${name}\` is extended by an augmented assignment, which the gate does not read, so what it adds would pass unchecked. Declare the whole value once, as ${SHAPES[name]}.`;
+
 describe("the port scan over a throwaway tree", () => {
   it("passes a port naming an agreement the manifest has", () => {
     expect(findings(declaring())).toEqual([passed(1)]);
@@ -162,6 +165,20 @@ describe("the port scan over a throwaway tree", () => {
     expect(findings(declaring({ after: 'AGREEMENT = "links"' }))).toEqual([
       declaredTwice(3, "AGREEMENT"),
     ]);
+  });
+
+  it.each([
+    ["PORT_OF", `PORT_OF += ("${ABSENT}",)`],
+    ["AGREEMENT", 'AGREEMENT += "s"'],
+  ] as const)("refuses %s extended after its declaration", (name, after) => {
+    expect(findings(declaring({ after }))).toEqual([augmented(3, name)]);
+  });
+
+  it("refuses an extension in a module declaring nothing", () => {
+    const extending = "apps/worker/src/extending.py";
+    const tree = { ...declaring(), [extending]: `PORT_OF += ("${ABSENT}",)\nKEEP = 1\n` };
+
+    expect(findings(tree)).toEqual([augmented(1, "PORT_OF", extending)]);
   });
 
   it("reports every finding on one module, in line order", () => {

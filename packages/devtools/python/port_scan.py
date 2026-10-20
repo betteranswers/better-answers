@@ -44,6 +44,11 @@ TWICE = (
     "order. Declare it once."
 )
 
+AUGMENTED = (
+    "`{name}` is extended by an augmented assignment, which the gate does not read, so "
+    "what it adds would pass unchecked. Declare the whole value once, as {shape}."
+)
+
 SHAPES = {
     "PORT_OF": '`PORT_OF = ("packages/<package>/src/<module>.ts",)`, a non-empty '
     "tuple of string literals",
@@ -62,9 +67,15 @@ class Declared(NamedTuple):
     value: object
 
 
+class Augmented(NamedTuple):
+    name: str
+    line: int
+
+
 class Port(NamedTuple):
     path: Path
     declared: list[Declared]
+    augmented: list[Augmented]
 
 
 class Scanned(NamedTuple):
@@ -100,6 +111,15 @@ def _declared_in(statement: ast.stmt) -> list[Declared]:
     alone = len(targets) == 1 and isinstance(targets[0], ast.Name)
     literal = _literal(value) if alone else None
     return [Declared(name, statement.lineno, literal) for name in declared]
+
+
+def _augmented_in(statement: ast.stmt) -> list[Augmented]:
+    if not isinstance(statement, ast.AugAssign):
+        return []
+    target = statement.target
+    if not isinstance(target, ast.Name) or target.id not in DECLARED:
+        return []
+    return [Augmented(target.id, statement.lineno)]
 
 
 def _names_a_module(ported: str) -> bool:
@@ -164,6 +184,10 @@ def _findings_for(port: Port, agreements: frozenset[str]) -> list[str]:
         for found in port.declared
         for message in _value_findings(found, agreements)
     ]
+    said += [
+        (found.line, AUGMENTED.format(name=found.name, shape=SHAPES[found.name]))
+        for found in port.augmented
+    ]
     said += _declared_twice(port) + _half_declared(port)
     return [f"{port.path}:{line}: {message}" for line, message in sorted(said)]
 
@@ -199,8 +223,11 @@ def _ports(modules: list[Path]) -> list[Port] | Refused:
         declared = [
             found for statement in tree.body for found in _declared_in(statement)
         ]
-        if declared:
-            ports.append(Port(module, declared))
+        augmented = [
+            found for statement in tree.body for found in _augmented_in(statement)
+        ]
+        if declared or augmented:
+            ports.append(Port(module, declared, augmented))
     return ports
 
 
