@@ -1,15 +1,15 @@
 # AGENTS.md
 
-`AGENTS.md` is the canonical repo instruction file, and Claude Code reads it directly. The repository has no root `CLAUDE.md`.
+`AGENTS.md` is the canonical repo instruction file.
 
 A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge layers: **sources** (evidence) → **bundles** (OKF concepts, curated) → the **map** (derived). Over them the platform keeps **records** (guides, write-ups, usage, connected sources, audit), which cite concepts. The destination this repo builds towards is `VISION.md`. Two runtime tiers share four stores: Postgres, an object store, a git repository per workspace, and the map as Postgres tables under RLS. The way to v0.1 is the **route spec**, `docs/specs/v01-route.md`.
 
-## Read first
+## Key Project Documentation
 
 - `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block. A block one owner can build in one session goes to `/poteto-mode`, as one pull request or a short stack. A block that needs more than one owner, or will outlast one session, is planned first (*Workflow*, below).
 - `CONCEPTS.md` — the glossary. Name things in code, tests, docs and commits with its words. `docs/agents/domain.md` says more.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open, and where each lands here. Read it before adding a key, convention or feature that relates to the knowledge layer.
-- `CODING_STANDARDS.md` — the rules that bind every workspace and that no gate enforces. A directory's own rules live in its `AGENTS.md` (`apps/api/`, `apps/web/`, `apps/worker/`, `deploy/`, `packages/core/`, `packages/schema/`), which its `CLAUDE.md` loads when work reaches it.
+- `CODING_STANDARDS.md` — the rules that bind every workspace and that no gate yet enforces. A directory's own rules live in its `AGENTS.md` (`apps/api/`, `apps/web/`, `apps/worker/`, `deploy/`, `packages/core/`, `packages/schema/`), which loads when work reaches it.
 - `docs/solutions/architecture-patterns/` — why the architecture is the way it is: one doc per live decision. The doc is `docs/solutions/architecture-patterns/adr-NNNN-<slug>.md`.
 
 ## Repository Docs Convention
@@ -62,19 +62,7 @@ Fix what you find in the session where you find it, and open an issue only when 
 
 Use pstack.
 
-A pull request's body becomes its squash commit's body on `main`, so every body an agent writes has one form. A body repeats no check counts and no release steps a plan or the RUNBOOK holds; it links to them. The body closes with these lines, after every section and before any attribution a tool appends:
-
-- `Merge risk:` is required on every body. It says whether reverting that commit undoes the change, `reversible` or `not reversible`, then what a failure would reach.
-- The issue line follows it whenever the pull request has an issue: `Fixes BA-N` when the pull request completes the issue, or `Related to BA-N` when it does not.
-
-```text
-Merge risk: reversible, docs only
-Fixes BA-58
-```
-
 Every commit reaches `main` through the merge queue. A commit's subject and a PR's title take the Conventional Commits form.
-
-A plan's test scenario opens with the behaviour it checks.
 
 `docs/agents/workflow.md` has the loop, the commit's form, the merge, what `check` runs where, and what a worker prompt carries.
 
@@ -86,11 +74,11 @@ After a solved, verified problem, document it. Apply this counterfactual: if the
 
 ### Documentation and communication
 
-When writing or reviewing docs, RFCs, readmes, PR descriptions, or commit messages, or when communicating with the user, use the `technical-writing` skill.
+Invoke the `technical-writing` skill when writing or reviewing docs, RFCs, readmes, PR descriptions, or commit messages, or when summarising for the user.
 
 ### Triage
 
-A new issue lands in Linear's **Triage** state. The owner or an agent moves it to Todo when it is next to build, or to Backlog with what it waits on. An issue that waits on an owner ruling stays in Triage, with the question in a comment. `docs/agents/issue-tracker.md` gives each state's meaning.
+A new issue lands in Linear's **Triage** state. The owner or an agent moves it to Todo when it is next to build, or to Backlog with what it waits on. `docs/agents/issue-tracker.md` gives each state's meaning.
 
 ### Domain docs
 
@@ -102,7 +90,7 @@ A mutation survivor is a hypothesis until a probe answers it. Triage uses contro
 
 ### Code review
 
-Size a review to its change. `/thermos` runs before the pull request. Cubic is paused, so review happens before the pull request, unless CodeRabbit flags an issue. `babysit` fixes or answers a review bot's threads, three rounds at most, and the ruleset holds the merge until every thread is resolved. The loop is in `docs/agents/code-review.md`.
+Size a review to its change. `/thermos` runs before the pull request. Cubic is paused, so review happens before the pull request, unless CodeRabbit flags an issue. `babysit` fixes or answers a review bot's threads, three rounds at most. The loop is in `docs/agents/code-review.md`.
 
 ## Code and doc exploration
 
@@ -128,7 +116,7 @@ So from a worktree:
 - Find a passage with `search_sections`, and read it with `get_section` or `get_sections`.
 - Open a long file's structure with `get_document_outline` before reading any of it.
 
-No hook holds this rule, so it applies whether you would read with `Read` or through Bash. Read a doc directly when you will work through all of it (a plan you are carrying out), when you are about to edit it, or when a command needs it raw, such as a grep that also covers code. Files outside the repository, such as the references of an installed plugin's skills and run output under `/tmp`, are always read directly.
+Read a doc directly when you will work through all of it (a plan you are carrying out), when you are about to edit it, or when a command needs it raw, such as a grep that also covers code. Files outside the repository, such as the references of an installed plugin's skills and run output under `/tmp`, are always read directly.
 
 <!-- gitnexus:start -->
 <!-- gitnexus:keep -->

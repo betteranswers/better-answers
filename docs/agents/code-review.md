@@ -5,7 +5,7 @@ Review is sized to what the change risks, not its line count. The steps below ar
 | Tool | Job |
 | --- | --- |
 | **`/no-comments`** (pstack) | Strips comments that narrate or that hold a reason about our own code, before review |
-| **`/thermos`** (pstack) | Reviews the branch's diff before the pull request: bugs, security and breaking changes, then maintainability. Hand it `CODING_STANDARDS.md` and the `AGENTS.md` of each directory the change touches |
+| **`/thermos`** (pstack) | Reviews the branch's diff before the pull request: bugs, security and breaking changes, then maintainability |
 | **The verdict** (pstack's *Shipping*) | An agent that did not write the change runs it and posts `PASS`, `PASS+NOTES` or `FAIL` with the head SHA. It is what lets the session queue the merge (`docs/agents/workflow.md`, *Merging*) |
 | **Cubic** (`cubic.yaml`, the `cubic` MCP) | Reviews each head on the pull request when it is switched on. It is paused today |
 | **GitNexus** (the `gitnexus` MCP) | Blast radius before a risky edit, changed scope before a large commit. A tool, not a gate |
@@ -19,6 +19,5 @@ pstack's playbooks run `/no-comments` before review and `/thermos` on the branch
 
 1. **The verifier posts its verdict** on the head. A `FAIL` goes back to the session that wrote the change, and a new head gets a new verdict.
 2. **A review bot's threads are triaged**, not obeyed: a fix for each finding worth fixing, and a reply saying why for each one that is not (pstack's bugbot triage). One commit per round of fixes.
-3. **The ruleset holds the merge** until every thread is resolved. Cubic resolves a thread it sees addressed (`resolve_threads_when_addressed`); a thread answered as a false positive is resolved by whoever answered it.
 
 `get_pr_issues` on the `cubic` MCP lists a pull request's findings when the threads are hard to read. *Fix with cubic* hands a finding to Cubic's coding-agent provider; use it only when no session is pushing to the branch, because two fixers pushing to one branch undo each other.

@@ -19,8 +19,6 @@ An issue is not the unit of build work: a pull request is. Work that needs more 
 | Todo | Ready to build. Unassigned means an agent may take it; assigned to the owner means it is theirs |
 | In Progress, In Review | Being built; In Review once its pull request is open |
 | Done | Its pull request merged |
-| Canceled | Will not be done. A comment gives the reason |
-| Duplicate | Folded into the issue it duplicates |
 
 ## When to file one
 
@@ -32,7 +30,7 @@ Settle a design question with pstack's principle skills before you put it to the
 
 ## Filing an issue
 
-Create it with `save_issue`: `team: better-answers`, `project: better-answers`, `state: Triage`, a priority, and one of the workspace's `product` labels: `feature`, `bug` or `improvement`.
+Create it with `save_issue`: `team: better-answers`, `project: better-answers`, `state: Triage`, a priority, and one of the workspace's `product` labels: `feature`, `bug` or `improvement`. Where a task relates to a route block at the label e.g., `S1`, `S2`, `S3` etc.
 
 **The title** takes the commit's form (`docs/agents/workflow.md`, *The commit's form*): `type(scope): summary`, 90 characters at most, the summary imperative and lower-case with no full stop. The title names no issue id, and the detail goes in the description. Check one before it is written: `printf '%s\n' "<title>" | pnpm exec commitlint`.
 
@@ -50,7 +48,7 @@ What this issue accomplishes.
 Anything that doesn't fit elsewhere.
 ```
 
-Progress goes in comments, one per landing. A dependency is a Linear relation (`blockedBy`), not a line in the description. The route block an issue belongs to (`S2`, `S4` …) is named in its Goal or Notes, and added as a label.
+Progress goes in comments, one per landing. A dependency is a Linear relation (`blockedBy`), not a line in the description.
 
 ## The tasks before Linear
 

@@ -40,7 +40,7 @@ gh run list --workflow check.yml --event merge_group --json databaseId,headBranc
 gh run view <id> --log-failed
 ```
 
-The `main` ruleset holds the merge until every review thread is resolved. A review bot's thread is triaged under pstack's bugbot triage: fix it, or answer why not and resolve it.
+A review bot's thread is triaged under pstack's bugbot triage: fix it, or answer why not and resolve it.
 
 GitHub deletes the merged branch. Then run `node .gitnexus/run.cjs analyze` in the main checkout, so GitNexus reads the new `main`.
 
