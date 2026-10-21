@@ -15,6 +15,7 @@ import {
   emailsSentTo,
   invite,
   keyListed,
+  keystrokesButton,
   keystrokesDismissed,
   keystrokesListed,
   notFoundOfferingHome,
@@ -917,6 +918,24 @@ test.describe("the People page's Invitations tab", () => {
     await expect(rowOf(page, dropped)).toHaveCount(1);
     await expect(tickOf(page, dropped)).toHaveCount(0);
     await expect(menuOf(page, dropped)).toHaveCount(0);
+  });
+
+  test("drops the select-first line once a key acts", async ({ page, request }) => {
+    const held = anAddress("held");
+    await anAdminAtInvitations(page, request, "Calder Keys", (at) =>
+      invitedEach(request, at, [held]).then(() => undefined),
+    );
+    await page.getByRole("tab", { name: "Invitations" }).click();
+    await expect(invitationRows(page)).toHaveCount(1);
+    await keystrokesButton(page).focus();
+
+    await page.keyboard.press(PEOPLE_KEYSTROKES.tickInvitation.key);
+    await expect(outcomeIn(page), "x with no invitation in focus said nothing").toHaveText(/\S/);
+
+    await tickOf(page, held).focus();
+    await page.keyboard.press(PEOPLE_KEYSTROKES.tickInvitation.key);
+    await expect(tickOf(page, held)).toBeChecked();
+    await expect(outcomeIn(page), "the select-first line outlived the tick").toHaveText("");
   });
 
   test("an Admin resends and cancels an invitation by keyboard alone", async ({

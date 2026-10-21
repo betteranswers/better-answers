@@ -9,6 +9,7 @@ import {
   anAddress,
   clockTheNextKey,
   keepsItsWordOffThePage,
+  keystrokesButton,
   keystrokesDismissed,
   moveTheSync,
   notFoundOfferingHome,
@@ -689,6 +690,27 @@ test.describe("reviewing a connected source's findings", () => {
     await expect(reviewOf(page, "Supplier forms")).toBeVisible();
     await expect(reviewHeading(page, "Supplier forms")).toBeFocused();
     await expect(opener).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("selects no group of findings once focus leaves the table", async ({ page, request }) => {
+    await anAdminAtSources(page, request, {
+      workspace: "Midgley Keys",
+      connectedSources: [SUPPLIER_FORMS],
+    });
+    await rowAction(page, "Supplier forms", "review").click();
+    const box = page.getByRole("checkbox", { name: BANK_ACCOUNT_BOX });
+    await box.focus();
+    await reviewHeading(page, "Supplier forms").focus();
+
+    await page.keyboard.press("x");
+    await twoFramesDrawn(page);
+
+    await expect(box, "x selected a group not in focus").not.toBeChecked();
+    const keep = reviewOf(page, "Supplier forms").getByRole("button", { name: "Keep in Text" });
+    await expect(keep).toBeDisabled();
+    await expect(keep, "the review stopped saying to select first").toHaveAccessibleDescription(
+      /\S/,
+    );
   });
 
   test("closes a review when its button is pressed again", async ({ page, request }) => {
@@ -1484,6 +1506,33 @@ test.describe("publishing, narrowing and widening a connected source", () => {
 });
 
 test.describe("the Sources page's keystrokes", () => {
+  test("acts on no source by key once focus leaves", async ({ page, request }) => {
+    await anAdminAtSources(page, request, {
+      workspace: "Sowerby Keys",
+      connectedSources: [SUPPLIER_FORMS],
+    });
+    const saying = connectedSourcesRegion(page).getByRole("status").filter({ hasText: /\S/ });
+    await expect(rowAction(page, "Supplier forms", "review")).toBeVisible();
+    const atRest = await saying.count();
+    await rowAction(page, "Supplier forms", "review").focus();
+    await keystrokesButton(page).focus();
+
+    for (const key of ["r", "p", "n", "w"]) await page.keyboard.press(key);
+    await twoFramesDrawn(page);
+
+    await expect(page.getByRole("dialog"), "a key published a source not in focus").toHaveCount(0);
+    await expect(reviewNamed(page, "Supplier forms")).toHaveCount(0);
+    await expect(saying, "a key with no connected source in focus said nothing").toHaveCount(
+      atRest + 1,
+    );
+    for (const action of ["narrow", "widen"] as const) {
+      await expect(rowAction(page, "Supplier forms", action)).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+    }
+  });
+
   test("lists keystrokes on ?, and one switch turns them off", async ({ page, request }) => {
     await anAdminAtSources(page, request, { workspace: "Luddenden Weaving" });
 
