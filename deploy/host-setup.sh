@@ -4,9 +4,10 @@ set -euo pipefail
 box=${1:-}; shift || true
 usage() {
   cat >&2 <<'USAGE'
-host-setup.sh vpc1 --mirror-host <VPC2 address> [--drill-pubkey <file>]
-    the production box: /data, the 4 GB swap file, git, the git-mirror deploy keypair,
-    known_hosts for VPC 2, the nightly image prune, and the host hardening. Prints the
+host-setup.sh vpc1 --mirror-host <VPC2 address> --repo <git URL> [--drill-pubkey <file>]
+    the production box: /data, the 4 GB swap file, git, the checkout restore-production.sh
+    runs from, the git-mirror deploy keypair, known_hosts for VPC 2, the nightly image
+    prune, and the host hardening. Prints the
     deploy key's public half, which vpc2 takes. Run it again with --drill-pubkey once vpc2
     has printed root's key.
 
@@ -47,12 +48,14 @@ CRON
 }
 
 vpc1() {
-  local mirror_host="" drill_pubkey=""
-  while [ $# -gt 0 ]; do case "$1" in --mirror-host) mirror_host=$2; shift 2 ;; --drill-pubkey) drill_pubkey=$2; shift 2 ;; *) usage ;; esac; done
-  [ -n "${mirror_host}" ] || usage
+  local mirror_host="" repo="" drill_pubkey=""
+  while [ $# -gt 0 ]; do case "$1" in
+    --mirror-host) mirror_host=$2; shift 2 ;; --repo) repo=$2; shift 2 ;; --drill-pubkey) drill_pubkey=$2; shift 2 ;; *) usage ;; esac; done
+  [ -n "${mirror_host}" ] && [ -n "${repo}" ] || usage
   need_root
   # restore-production.sh clones bundles on the host; its other tools are in the image.
   apt-get install -y --no-install-recommends git >/dev/null
+  [ -d /opt/better-answers/.git ] || git clone --quiet "${repo}" /opt/better-answers
   mkdir -p /data && chmod 755 /data
   if ! swapon --show | grep -q '^/swapfile'; then
     fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
