@@ -33,7 +33,7 @@ import {
   questionsSeeding,
   recordsIn as recordsOf,
   seedQuestions,
-  staleToday,
+  staleTomorrow,
   wordsTwoDaysApart,
 } from "./harness-questions.ts";
 import { servedOnLoopback } from "./loopback-port.ts";
@@ -501,7 +501,7 @@ const aQuestionEach = async () => {
     conceptsSeeding.parse({
       workspaceId: workspace.workspaceId,
       userId: workspace.admin.id,
-      concepts: [{ ...ACCESS_POLICY, frontmatter: { stale_after: staleToday() } }],
+      concepts: [{ ...ACCESS_POLICY, frontmatter: { stale_after: staleTomorrow() } }],
     }),
   );
   const cited = [{ iri: concepts[0]?.iri ?? "" }];

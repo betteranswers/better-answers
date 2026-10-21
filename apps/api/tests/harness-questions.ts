@@ -153,9 +153,12 @@ export const feedbackKeptOn = async (app: TestApp, recordId: string) => {
   return kept.rows;
 };
 
-const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-export const staleToday = (): string => new Date().toISOString().slice(0, 10);
+const TWO_DAYS_MS = 2 * ONE_DAY_MS;
+
+export const staleTomorrow = (): string =>
+  new Date(Date.now() + ONE_DAY_MS).toISOString().slice(0, 10);
 
 type MovedClock = Pick<ReturnType<typeof aStoppableClock>, "stopTheClock" | "moveTheClock">;
 

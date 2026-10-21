@@ -6,7 +6,7 @@ import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
 import {
   questionsSeeding,
   seedQuestions,
-  staleToday,
+  staleTomorrow,
   wordsTwoDaysApart,
 } from "./harness-questions.ts";
 import { calledTool, structured, toolAnswered } from "./mcp-call.ts";
@@ -144,7 +144,7 @@ describe("Questions asked over tRPC", () => {
           {
             title: RETENTION_QUESTION,
             body: "Audit logs are kept for thirteen months.",
-            frontmatter: { stale_after: staleToday() },
+            frontmatter: { stale_after: staleTomorrow() },
           },
         ],
       }),

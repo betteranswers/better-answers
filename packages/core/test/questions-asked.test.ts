@@ -820,7 +820,7 @@ describe("reading your questions", () => {
     expect(await staleWordsOf(read)).toEqual(["Unverified", "Out of date"]);
   });
 
-  it("carries the words of a concept the judge passed alone", async () => {
+  it("carries the body only of concepts the judge passed", async () => {
     const admin = await anAsker();
     const [answer, rejected, related] = [
       await aConceptIn(admin, "audits"),

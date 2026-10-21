@@ -50,7 +50,6 @@ const trust = z.discriminatedUnion("tier", [
 
 type WireTrust = z.infer<typeof trust>;
 
-/** The two branches read alike, but each narrows `tier`, so the verifier's type follows it. */
 const wireTrust = ({ tier, status, verifiedBy, verifiedAt, rider }: Trust): WireTrust =>
   tier === "human-reviewed"
     ? { tier, status, checkedBy: verifiedBy, checkedAt: verifiedAt, rider }
