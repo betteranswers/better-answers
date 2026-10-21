@@ -629,6 +629,21 @@
       ],
       "marks": [],
       "why": "A line ends at a line feed alone, so in a CRLF body the line between two paragraphs holds a carriage return. A line holding only the other five whitespace characters is blank, and a blank line ends a paragraph, so a link's sentence never runs into the heading or the paragraph above it."
+    },
+    {
+      "case": "a line holding only a code span is no blank line",
+      "body": "The rate is\n`45p`\nper mile, see [the policy](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).",
+      "sources": [],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "The rate is per mile, see the policy."
+        }
+      ],
+      "marks": [],
+      "why": "A line is blank when the body's own line holds only whitespace. A code span is blanked to spaces in the prose, but its line in the body is not blank, so the paragraph runs on through it."
     }
   ]
 }
