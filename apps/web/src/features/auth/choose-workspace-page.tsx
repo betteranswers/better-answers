@@ -16,7 +16,7 @@ import {
   useSetActiveOrganization,
   useWorkspacesHeld,
   type ResumeAnswer,
-  type SessionStanding,
+  type SessionRead,
   type SwitchRefused,
 } from "./auth-hooks.ts";
 import { AuthPage } from "./auth-page.tsx";
@@ -39,17 +39,21 @@ const addressIn = (answer: ResumeAnswer): string | undefined => {
   return typeof next === "string" && next !== "" ? next : undefined;
 };
 
-const whatTheSessionSays = (read: SessionStanding) => {
-  const session = read.standing === "signed-in" ? read.session : undefined;
-  return {
-    signedOut: read.standing === "signed-out" || read.standing === "unread",
-    unnamed: session !== undefined && session.displayName === undefined,
-    active: session?.workspaceId,
-  };
-};
+const GOES_TO_SIGN_IN = {
+  reading: false,
+  unread: true,
+  "signed-out": true,
+  "signed-in": false,
+} as const satisfies Record<SessionRead["state"], boolean>;
+
+const whatTheSessionSays = (read: SessionRead) => ({
+  toSignIn: GOES_TO_SIGN_IN[read.state],
+  unnamed: read.state === "signed-in" && read.person.displayName === undefined,
+  active: read.state === "signed-in" ? read.session.workspaceId : undefined,
+});
 
 const whereThePersonStands = (
-  session: SessionStanding,
+  session: SessionRead,
   workspaces: Workspaces,
   noLongerHeld: Workspace | undefined,
 ) => {
@@ -58,7 +62,7 @@ const whereThePersonStands = (
     ...whatTheSessionSays(session),
     held,
     sole: held.length === 1 ? held[0] : undefined,
-    settled: session.standing !== "reading" && !workspaces.isPending,
+    settled: session.state !== "reading" && !workspaces.isPending,
   };
 };
 
@@ -100,7 +104,7 @@ export function ChooseWorkspacePage() {
   const [wentNowhere, setWentNowhere] = useState(false);
   const [noLongerHeld, setNoLongerHeld] = useState<Workspace | undefined>(undefined);
 
-  const { signedOut, unnamed, held, sole, active, settled } = whereThePersonStands(
+  const { toSignIn, unnamed, held, sole, active, settled } = whereThePersonStands(
     session,
     workspaces,
     noLongerHeld,
@@ -162,7 +166,7 @@ export function ChooseWorkspacePage() {
   const decided = settled && !pick.isPending && resume.isIdle && !wentNowhere;
   useEffect(() => {
     if (!decided) return;
-    if (signedOut) {
+    if (toSignIn) {
       void navigate(leavingFor(`/sign-in${carried}`));
       return;
     }
@@ -180,7 +184,7 @@ export function ChooseWorkspacePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- adding `openSoleWorkspace` re-runs this on every render and resumes a flow that is already resuming
   }, [
     decided,
-    signedOut,
+    toSignIn,
     unnamed,
     held.length,
     workspaces.isError,

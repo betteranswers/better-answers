@@ -16,7 +16,7 @@ import {
   useSendVerificationOtp,
   useSessionReread,
   useSignInEmailOtp,
-  type SessionStanding,
+  type SessionReread,
   type SignedIn,
 } from "./auth-hooks.ts";
 import { AuthPage, focusOn, Outcome } from "./auth-page.tsx";
@@ -119,35 +119,26 @@ const saidOnTheEmailStep = (
   saidWhileSigningInWithAPasskey(passkey.pending, passkey.failure) ??
   saidOnArriving(arriving, arrival);
 
-const sessionIdOf = (read: SessionStanding): string | null | undefined => {
-  if (read.standing === "unread") return undefined;
-  return read.standing === "signed-in" ? read.session.id : null;
-};
-
-const isANewSignInOf = (
-  read: SessionStanding,
-  standing: string | null | undefined,
-  sentTo: string,
-): boolean =>
-  standing !== undefined &&
-  read.standing === "signed-in" &&
-  read.session.id !== standing &&
-  read.session.address.toLowerCase() === sentTo.toLowerCase();
+const isANewSignInOf = (read: SessionReread, before: SessionReread, sentTo: string): boolean =>
+  before.state !== "unread" &&
+  read.state === "signed-in" &&
+  (before.state === "signed-out" || read.session.id !== before.session.id) &&
+  read.person.email.toLowerCase() === sentTo.toLowerCase();
 
 function useFollowsASignInElsewhere(waiting: boolean, sentTo: string, follow: () => void) {
   const reread = useSessionReread();
-  const standing = useRef<string | null | undefined>(undefined);
+  const before = useRef<SessionReread>({ state: "unread" });
   const readWhatStands = useEffectEvent(() => {
     void reread().then((read) => {
-      standing.current = sessionIdOf(read);
+      before.current = read;
     });
   });
-  const followIfNew = useEffectEvent((read: SessionStanding) => {
-    if (waiting && isANewSignInOf(read, standing.current, sentTo)) follow();
+  const followIfNew = useEffectEvent((read: SessionReread) => {
+    if (waiting && isANewSignInOf(read, before.current, sentTo)) follow();
   });
   const recheck = useEffectEvent(() => {
     if (!waiting) return;
-    if (standing.current === undefined) readWhatStands();
+    if (before.current.state === "unread") readWhatStands();
     else void reread().then(followIfNew);
   });
 

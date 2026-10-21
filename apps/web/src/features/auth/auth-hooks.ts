@@ -145,18 +145,18 @@ const askedAgainUnlessRefused = (failures: number, failure: Error): boolean =>
 
 const hasADisplayName = (name: string): boolean => name.trim() !== "";
 
-type Session = {
-  readonly id: string;
-  readonly address: string;
-  readonly displayName: string | undefined;
-  readonly workspaceId: string | undefined;
+type SignedInAs = {
+  readonly session: { readonly id: string; readonly workspaceId: string | undefined };
+  readonly person: { readonly email: string; readonly displayName: string | undefined };
 };
 
-export type SessionStanding =
-  | { readonly standing: "reading" }
-  | { readonly standing: "unread" }
-  | { readonly standing: "signed-out" }
-  | { readonly standing: "signed-in"; readonly session: Session };
+export type SessionRead =
+  | { readonly state: "reading" }
+  | { readonly state: "unread" }
+  | { readonly state: "signed-out" }
+  | ({ readonly state: "signed-in" } & SignedInAs);
+
+export type SessionReread = Exclude<SessionRead, { readonly state: "reading" }>;
 
 type SessionAnswer = {
   readonly session: {
@@ -166,45 +166,47 @@ type SessionAnswer = {
   readonly user: { readonly email: string; readonly name: string };
 } | null;
 
-const sessionOf = (answer: SessionAnswer): Session | null =>
+const signedInAsOf = (answer: SessionAnswer): SignedInAs | null =>
   answer === null
     ? null
     : {
-        id: answer.session.id,
-        address: answer.user.email,
-        displayName: hasADisplayName(answer.user.name) ? answer.user.name : undefined,
-        workspaceId: answer.session.activeOrganizationId ?? undefined,
+        session: {
+          id: answer.session.id,
+          workspaceId: answer.session.activeOrganizationId ?? undefined,
+        },
+        person: {
+          email: answer.user.email,
+          displayName: hasADisplayName(answer.user.name) ? answer.user.name : undefined,
+        },
       };
 
 const sessionOptions = () =>
   queryOptions({
     queryKey: AUTH_KEYS.session,
-    queryFn: () => unwrapWithTheWait((reading) => authClient.getSession({ fetchOptions: reading })),
+    queryFn: () =>
+      unwrapWithTheWait((reading) => authClient.getSession({ fetchOptions: reading })).then(
+        signedInAsOf,
+      ),
     retry: askedAgainUnlessRefused,
   });
 
-const standingOf = (read: {
-  readonly isPending: boolean;
-  readonly data: Session | null | undefined;
-}): SessionStanding => {
-  if (read.isPending) return { standing: "reading" };
-  if (read.data === undefined) return { standing: "unread" };
-  return read.data === null
-    ? { standing: "signed-out" }
-    : { standing: "signed-in", session: read.data };
+const answeredAs = (answer: SignedInAs | null | undefined): SessionReread => {
+  if (answer === undefined) return { state: "unread" };
+  return answer === null ? { state: "signed-out" } : { state: "signed-in", ...answer };
 };
 
-export const addressOf = (read: SessionStanding): string =>
-  read.standing === "signed-in" ? read.session.address : "";
+export const emailOf = (read: SessionRead): string =>
+  read.state === "signed-in" ? read.person.email : "";
 
-const theSession = () => ({ ...sessionOptions(), select: sessionOf });
+export const useSession = (): SessionRead => {
+  const read = useQuery(sessionOptions());
+  return read.isPending ? { state: "reading" } : answeredAs(read.data);
+};
 
-export const useSession = (): SessionStanding => standingOf(useQuery(theSession()));
-
-/** A failed reread says nothing of the session now, even while the cache keeps an older answer. */
-export const useSessionReread = (): (() => Promise<SessionStanding>) => {
-  const { refetch } = useQuery(theSession());
-  return () => refetch().then((read) => (read.isError ? { standing: "unread" } : standingOf(read)));
+export const useSessionReread = (): (() => Promise<SessionReread>) => {
+  const { refetch } = useQuery(sessionOptions());
+  return () =>
+    refetch().then((read) => (read.isError ? { state: "unread" } : answeredAs(read.data)));
 };
 
 const returnPathOf = (query: string): { readonly redirect?: string } => {
@@ -350,7 +352,7 @@ export const displayNameDetour = async (
   if (session === undefined) return undefined;
   if (session === null) return `/sign-in${query}`;
   const next = nextAfterSignIn(query);
-  return hasADisplayName(session.user.name) || isAnInvitation(next) ? next : undefined;
+  return session.person.displayName !== undefined || isAnInvitation(next) ? next : undefined;
 };
 
 export const signedOutDetour = async (

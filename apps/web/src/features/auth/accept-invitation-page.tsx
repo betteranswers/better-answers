@@ -208,7 +208,7 @@ function InvitationToJoin(properties: {
   const { invitation, invitationId, here } = properties;
   const read = useSession();
   const [asksAName, setAsksAName] = useState(
-    () => read.standing === "signed-in" && read.session.displayName === undefined,
+    () => read.state === "signed-in" && read.person.displayName === undefined,
   );
   const [name, setName] = useState("");
   const naming = useSetDisplayName();
