@@ -17,7 +17,7 @@ SELECT count(*) FILTER (
          WHERE attempts < max_attempts
            AND (status = 'queued'
                 OR (status = 'claimed' AND lease_expires_at < now()))
-           AND enqueued_at < now() - %s::interval
+           AND coalesce(backoff_ends_at, enqueued_at) < now() - %s::interval
        )
   FROM job
 """

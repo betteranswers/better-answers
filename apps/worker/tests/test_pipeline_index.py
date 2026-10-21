@@ -512,6 +512,11 @@ def test_runs_a_failed_index_job_again_and_names_it(
         assert the_job_row(job["id"]) == ("queued", attempt, None), (
             "a failing run goes back to the queue"
         )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE job SET backoff_ends_at = now() WHERE id = %s", (job["id"],)
+            )
+        connection.commit()
 
     with queue.connected(bootstrap.database_url) as worker:
         assert loop.tick(worker, bootstrap) is True

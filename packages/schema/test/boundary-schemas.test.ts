@@ -2161,6 +2161,7 @@ describe("5 — the inferred type is pinned", () => {
       claimedAt: Date | null;
       leaseExpiresAt: Date | null;
       heartbeatAt: Date | null;
+      backoffEndsAt: Date | null;
       finishedAt: Date | null;
       outcome: JobOutcome;
     };

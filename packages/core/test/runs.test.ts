@@ -294,6 +294,23 @@ describe("an action landing its rows and job in one transaction", () => {
     },
   );
 
+  it("queues afresh beside a job waiting out its backoff", async () => {
+    const scenario = await arrange();
+    const retrying = await queuedBound(scenario);
+    await db().pool.query(
+      "UPDATE job SET attempts = 1, backoff_ends_at = now() + interval '1 minute' WHERE id = $1",
+      [retrying],
+    );
+
+    const fresh = await actionOf(scenario, (tx) =>
+      enqueueJobIn(mapMaintenance, tx, { ...boundJob(scenario.workspaceId), reason: "wiped" }),
+    );
+
+    expect(fresh.ok && fresh.value.jobId).not.toBe(retrying);
+    expect(fresh.ok).toBe(true);
+    expect(await reasonsIn(scenario.workspaceId)).toEqual(["connected", "wiped"]);
+  });
+
   it("rejects an enqueue that another action's commit overtook", async () => {
     const scenario = await arrange();
     const firstLanded = Promise.withResolvers<undefined>();

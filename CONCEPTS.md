@@ -727,6 +727,13 @@ claimant once the lease has lapsed, whether or not the job has been claimed agai
 
 A job has no owner.
 
+### backoff
+
+_Internal._ the wait before a failed job may be claimed again: 60 seconds after its first attempt,
+doubled for each attempt since and capped at an hour, timed by the database's clock.
+
+A job waiting out its backoff holds no place in the run key.
+
 ### outcome
 
 _Internal._ what a job found, written once at its end by its claimant: counts, and the ids or paths
@@ -865,6 +872,9 @@ documents out to the platform; a caller of the public API, never the worker.
 
 _Internal._ the key that makes two requests to sync the same connected source for the same period
 one sync.
+
+It holds one place per subject for a job not yet tried, so a failed job waiting out its backoff
+leaves room for a fresh request, which waits behind it.
 
 ### model choice
 

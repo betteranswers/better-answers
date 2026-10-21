@@ -551,26 +551,27 @@ def _seed_queue_fixture(cursor: Cursor[Any], fixture: dict[str, Any]) -> None:
             enqueued_ago_seconds=seeded["enqueued_ago_seconds"],
             claimed_by=seeded["claimed_by"],
             lease_expires_in_seconds=seeded["lease_expires_in_seconds"],
+            backoff_ends_in_seconds=seeded["backoff_ends_in_seconds"],
         )
 
 
-def _refused_enqueue(cursor: Cursor[Any], refused: dict[str, Any]) -> str:
+def _enqueue_answer(cursor: Cursor[Any], enqueue: dict[str, Any]) -> str:
     from factories import enqueue_job
 
-    cursor.execute("SAVEPOINT refused_enqueue")
+    cursor.execute("SAVEPOINT enqueue")
     try:
         enqueue_job(
             cursor,
-            workspace_id=refused["workspace_id"],
-            job_id=refused["id"],
-            kind=refused["kind"],
-            reason=refused["reason"],
-            subject_id=refused["subject_id"],
+            workspace_id=enqueue["workspace_id"],
+            job_id=enqueue["id"],
+            kind=enqueue["kind"],
+            reason=enqueue["reason"],
+            subject_id=enqueue["subject_id"],
         )
     except psycopg.Error as error:
-        cursor.execute("ROLLBACK TO SAVEPOINT refused_enqueue")
+        cursor.execute("ROLLBACK TO SAVEPOINT enqueue")
         return str(error.sqlstate)
-    cursor.execute("ROLLBACK TO SAVEPOINT refused_enqueue")
+    cursor.execute("ROLLBACK TO SAVEPOINT enqueue")
     return "admitted"
 
 
@@ -601,12 +602,12 @@ def test_the_queue_hands_out_and_answers_as_the_fixture_says() -> None:
         _seed_queue_fixture(cursor, fixture)
 
         enqueues = [
-            {"why": refused["why"], "sqlstate": _refused_enqueue(cursor, refused)}
-            for refused in fixture["refused_enqueues"]
+            {"why": enqueue["why"], "answer": _enqueue_answer(cursor, enqueue)}
+            for enqueue in fixture["enqueues"]
         ]
         assert enqueues == [
-            {"why": refused["why"], "sqlstate": refused["sqlstate"]}
-            for refused in fixture["refused_enqueues"]
+            {"why": enqueue["why"], "answer": enqueue["answer"]}
+            for enqueue in fixture["enqueues"]
         ]
 
         claimed: list[dict[str, Any]] = []
@@ -654,7 +655,8 @@ def test_the_queue_hands_out_and_answers_as_the_fixture_says() -> None:
         ]
 
         cursor.execute(
-            "SELECT workspace_id, id, status, attempts, max_attempts, claimed_by"
+            "SELECT workspace_id, id, status, attempts, max_attempts, claimed_by,"
+            " round(extract(epoch FROM backoff_ends_at - now()))::int"
             " FROM job ORDER BY workspace_id, id"
         )
         assert cursor.fetchall() == [
@@ -665,6 +667,7 @@ def test_the_queue_hands_out_and_answers_as_the_fixture_says() -> None:
                 expected["attempts"],
                 expected["max_attempts"],
                 expected["claimed_by"],
+                expected["backoff_ends_in_seconds"],
             )
             for expected in sorted(
                 fixture["expect_final"],

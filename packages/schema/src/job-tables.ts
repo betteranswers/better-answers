@@ -106,6 +106,8 @@ export const JOB_FINISHED_STATUSES = ["done", "failed"] as const;
 
 export const JOB_MAX_ATTEMPTS = 3;
 
+export const JOB_RUN_KEY_WHERE = `status = '${JOB_QUEUED_STATUS}' AND attempts = 0`;
+
 export const job = withRLS(
   "job",
   {
@@ -130,6 +132,7 @@ export const job = withRLS(
     leaseExpiresAt: stamp("lease_expires_at"),
 
     heartbeatAt: stamp("heartbeat_at"),
+    backoffEndsAt: stamp("backoff_ends_at"),
     finishedAt: stamp("finished_at"),
     outcome: jsonb("outcome"),
   },
@@ -145,7 +148,7 @@ export const job = withRLS(
 
     uniqueIndex("job_queued_subject_key")
       .on(table.workspaceId, table.kind, table.subjectId)
-      .where(sql.raw(`status = '${JOB_QUEUED_STATUS}'`)),
+      .where(sql.raw(JOB_RUN_KEY_WHERE)),
     check("job_kind_check", sql.raw(`kind IN (${listed(JOB_KINDS)})`)),
     check("job_status_check", sql.raw(`status IN (${listed(JOB_STATUSES)})`)),
 

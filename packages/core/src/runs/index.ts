@@ -5,10 +5,10 @@ import {
   FULL_REBUILD_KIND,
   INDEX_KIND,
   INDEX_REASONS,
+  JOB_RUN_KEY_WHERE,
   JOB_CLAIMED_STATUS,
   JOB_DONE_STATUS,
   JOB_KIND_DESCRIPTORS,
-  JOB_QUEUED_STATUS,
   NIGHTLY_AUDIT_KIND,
   REASONS_EMPTYING_THE_CONNECTED_SOURCE,
   REBUILD_REASONS,
@@ -147,12 +147,12 @@ export type EnqueueJobRefusal = KernelRefusal<RefusalOf<typeof enqueueJobAction>
 const ENQUEUE = `WITH inserted AS (
     INSERT INTO job (workspace_id, id, kind, subject_id, reason)
     VALUES ($1, $2, $3, $4::text, $5::text)
-    ON CONFLICT (workspace_id, kind, subject_id) WHERE status = '${JOB_QUEUED_STATUS}' DO NOTHING
+    ON CONFLICT (workspace_id, kind, subject_id) WHERE ${JOB_RUN_KEY_WHERE} DO NOTHING
     RETURNING id
   ), taken AS (
     UPDATE job SET reason = $5::text
      WHERE workspace_id = $1 AND kind = $3 AND subject_id = $4::text
-       AND status = '${JOB_QUEUED_STATUS}'
+       AND ${JOB_RUN_KEY_WHERE}
        AND $5::text = ANY($6::text[]) AND reason <> ALL($6::text[])
        AND NOT EXISTS (SELECT 1 FROM inserted)
     RETURNING id
@@ -161,7 +161,7 @@ const ENQUEUE = `WITH inserted AS (
   UNION ALL
   SELECT id FROM job
    WHERE workspace_id = $1 AND kind = $3 AND subject_id = $4::text
-     AND status = '${JOB_QUEUED_STATUS}' AND NOT EXISTS (SELECT 1 FROM inserted)`;
+     AND ${JOB_RUN_KEY_WHERE} AND NOT EXISTS (SELECT 1 FROM inserted)`;
 
 export const syncRefused = (refusal: EnqueueJobRefusal): Error =>
   new Error(`runs: the sync was refused (${refusal})`);
