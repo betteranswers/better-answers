@@ -2126,7 +2126,7 @@ describe("the audience pair on every readable unit", () => {
     JOIN pg_class c ON c.oid = a.attrelid
     JOIN pg_namespace n ON n.oid = c.relnamespace
     LEFT JOIN pg_constraint k
-      ON k.conrelid = c.oid AND k.contype = 'c' AND pg_get_constraintdef(k.oid) LIKE '%audience_groups%'
+      ON k.conrelid = c.oid AND k.contype = 'c' AND k.conname = c.relname || '_audience_check'
     WHERE a.attname = 'audience_groups' AND NOT a.attisdropped
       AND c.relkind IN ('r', 'p') AND NOT c.relispartition
     ORDER BY n.nspname, c.relname`;
