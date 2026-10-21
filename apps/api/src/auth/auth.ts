@@ -490,6 +490,7 @@ export const createAuth = (deps: AuthDependencies) => {
       "/token",
       "/update-user",
       "/oauth2/consent",
+      "/oauth2/client/rotate-keys",
       ...CLOSED_ORGANISATION_PATHS,
       ...CLOSED_FACTOR_PATHS,
       ...CLOSED_SESSION_PATHS,
