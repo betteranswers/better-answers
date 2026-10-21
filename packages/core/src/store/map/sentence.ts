@@ -72,11 +72,27 @@ export const sectionAt = (body: string, index: number): string | null => {
   return null;
 };
 
+const BLANK = /^[ \t\r\f\v]*$/;
+
+const paragraphAround = (body: string, index: number): readonly [number, number] => {
+  let above = body.lastIndexOf("\n", index);
+  while (above !== -1) {
+    const line = body.lastIndexOf("\n", above - 1);
+    if (BLANK.test(body.slice(line + 1, above))) break;
+    above = line;
+  }
+  let below = body.indexOf("\n", index);
+  while (below !== -1) {
+    const line = body.indexOf("\n", below + 1);
+    if (BLANK.test(body.slice(below + 1, line === -1 ? body.length : line))) break;
+    below = line;
+  }
+  return [above + 1, below === -1 ? body.length : below];
+};
+
 export const sentenceAt = (body: string, index: number): string => {
-  const before = body.lastIndexOf("\n\n", index);
-  const paragraphStart = before === -1 ? 0 : before + 2;
-  const after = body.indexOf("\n\n", index);
-  const paragraph = body.slice(paragraphStart, after === -1 ? body.length : after);
+  const [paragraphStart, paragraphEnd] = paragraphAround(body, index);
+  const paragraph = body.slice(paragraphStart, paragraphEnd);
   const at = index - paragraphStart;
 
   let start = 0;

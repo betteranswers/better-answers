@@ -219,6 +219,7 @@ def _fenced_blocks(body: str) -> list[tuple[int, int]]:
 
 _BACKTICK_RUN = re.compile(r"`+")
 _HEADING = re.compile(r"^\#{1,6}[ \t\n\r\f\v]+([^\n]*)")
+_BLANK = re.compile(r"[ \t\r\f\v]*")
 _SENTENCE_BOUNDARY = re.compile(r"[.!?](?=[ \t\n\r\f\v]|$)")
 _WHITESPACE_RUN = re.compile(r"[ \t\n\r\f\v]+")
 
@@ -487,11 +488,25 @@ def _flattened_links(text: str) -> str:
     return _flattened_autolinks(flattened)
 
 
+def _paragraph_around(body: str, index: int) -> tuple[int, int]:
+    above = body.rfind("\n", 0, index)
+    while above != -1:
+        line = body.rfind("\n", 0, above)
+        if _BLANK.fullmatch(body, line + 1, above):
+            break
+        above = line
+    below = body.find("\n", index)
+    while below != -1:
+        line = body.find("\n", below + 1)
+        if _BLANK.fullmatch(body, below + 1, len(body) if line == -1 else line):
+            break
+        below = line
+    return above + 1, len(body) if below == -1 else below
+
+
 def _sentence_at(body: str, index: int) -> str:
-    before = body.rfind("\n\n", 0, index + 2)
-    paragraph_start = 0 if before == -1 else before + 2
-    after = body.find("\n\n", index)
-    paragraph = body[paragraph_start : len(body) if after == -1 else after]
+    paragraph_start, paragraph_end = _paragraph_around(body, index)
+    paragraph = body[paragraph_start:paragraph_end]
     at = index - paragraph_start
 
     start = 0
