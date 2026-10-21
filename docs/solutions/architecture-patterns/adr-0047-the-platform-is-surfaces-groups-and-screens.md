@@ -64,7 +64,7 @@ The utilities sit at the rail's foot: Keyboard shortcuts today, and help and set
 
 | Area | Menu group | Pages (built today in bold) | Seen by |
 |---|---|---|---|
-| Ask | (none) | **New question** · Your questions · **Connect Claude** | every role (New question is the home of Editor and Viewer) |
+| Ask | (none) | **New question** · **Your questions** · **Connect Claude** | every role (New question is the home of Editor and Viewer) |
 | Knowledge | Browse · Curation | **Search** · Guides · All knowledge · Due for verification · Conflicts · Kinds · Collections and owners · Exports | Browse: every role. Curation: Admins and owners |
 | Inbox | (none) | Waiting on you | Admins and owners |
 | Control Centre | Overview | Overview | Admin |
@@ -119,7 +119,7 @@ Control Centre's menu groups keep root addresses, `/<group>/<page>`, so today's 
 
 | Area | Built | v0.1 | Next, Then and Later |
 |---|---|---|---|
-| Ask | New question, Connect Claude | Your questions (S2b) | none yet |
+| Ask | New question, Your questions, Connect Claude | none | none yet |
 | Knowledge | Search, and the concept page, its detail | Guides, All knowledge, Kinds, Collections and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
