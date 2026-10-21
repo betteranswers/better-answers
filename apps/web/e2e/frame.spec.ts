@@ -1167,23 +1167,37 @@ test("closes the sheet on widening, focusing the navigation control", async ({ p
   await expect(closerOf(page)).toBeFocused();
 });
 
-test("leads each built page with its group's line, auditing each", async ({
-  page,
-  request,
-  passesTheAccessibilityGate,
-}) => {
+const leadingLineOf = async (page: Page, heading: string, name: string, path: string) => {
+  await page.goto(path);
+  await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+  const lead = page.getByRole("main").locator("h1 + p");
+  await expect(lead, `${name}'s heading leads no line`).toHaveText(/\S/);
+  return lead.innerText();
+};
+
+for (const group of new Set(AN_ADMINS_PAGES.map(([heading]) => heading))) {
+  test(`leads the ${group} group's pages with one line, auditing each`, async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await signedIn(page, request, "Swaledale Foundry");
+
+    const lines = new Set<string>();
+    for (const [heading, name, path] of AN_ADMINS_PAGES.filter(([of]) => of === group)) {
+      lines.add(await leadingLineOf(page, heading, name, path));
+      expect(lines.size, `${name} leads with a line of its own`).toBe(1);
+      await passesTheAccessibilityGate();
+    }
+  });
+}
+
+test("leads each group's pages with a line of its own", async ({ page, request }) => {
   await signedIn(page, request, "Swaledale Foundry");
 
   const lineOf = new Map<string, string>();
   for (const [heading, name, path] of AN_ADMINS_PAGES) {
-    await page.goto(path);
-    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
-    const lead = page.getByRole("main").locator("h1 + p");
-    await expect(lead, `${name}'s heading leads no line`).toHaveText(/\S/);
-    const line = await lead.innerText();
-    expect(lineOf.get(heading) ?? line, `${name} leads with a line of its own`).toBe(line);
-    lineOf.set(heading, line);
-    await passesTheAccessibilityGate();
+    lineOf.set(heading, await leadingLineOf(page, heading, name, path));
   }
   expect(new Set(lineOf.values()).size, "two groups lead their pages with one line").toBe(
     lineOf.size,
