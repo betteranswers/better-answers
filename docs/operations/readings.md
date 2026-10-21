@@ -77,6 +77,18 @@ How Clef-flash and Clef do as the judge's decision backend on the reuse set at t
 
 | Date | Release or commit | Set or rule | Figure | Source |
 | --- | --- | --- | --- | --- |
+| 2026-10-21 | `76513a867` | Clef-flash on reuse at threshold 0.3, at £0.747 to the dollar | Fits 29 of 32, hard negatives wrongly taken 16 of 36, other `Answer`s taken 257; £0.0020; latency median 715 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef-flash on reuse at threshold 0.5 | Fits 26 of 32, hard negatives wrongly taken 12 of 36, other `Answer`s taken 234; £0.0020; latency median 759 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef-flash on reuse at threshold 0.7 | Fits 25 of 32, hard negatives wrongly taken 7 of 36, other `Answer`s taken 210; £0.0020; latency median 875 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef-flash on reuse at threshold 0.9 | Fits 14 of 32, hard negatives wrongly taken 2 of 36, other `Answer`s taken 113; £0.0020; latency median 755 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef on reuse at threshold 0.3 | Fits 30 of 32, hard negatives wrongly taken 1 of 36, other `Answer`s taken 160; £0.0126; latency median 380 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef on reuse at threshold 0.5 | Fits 29 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 103; £0.0126; latency median 357 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef on reuse at threshold 0.7 | Fits 27 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 53; £0.0126; latency median 362 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef on reuse at threshold 0.9 | Fits 20 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 11; £0.0126; latency median 382 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef-flash at the entry step, recall in the first ten | Paraphrases 77.9 % reordered against 72.6 % for `find` and the entry step, 8 unscored; buyer-worded 53.9 % against 55.8 %, 1 unscored; 835,709 tokens in | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef at the entry step, recall in the first ten | Paraphrases 77.9 % reordered against 72.6 %, 8 unscored; buyer-worded 55.8 % against 55.8 %, 1 unscored; 835,709 tokens in | `pnpm reading:decision` |
+
+The first twelve other `Answer`s Clef took at threshold 0.7, read by hand, each answer a different question from the one asked, such as an uptime question taking whether contractors are background checked. Claude Sonnet 5.5 and Claude Haiku 5.5 take none (§ The reuse reading). So no threshold makes either model a judge on this set: one that keeps out the hard negatives still takes unrelated `Answer`s, and at 0.9 Clef finds 20 of 32 fits. At the entry step, reordering by either model lifts paraphrase recall by 5.3 points and leaves buyer-worded recall level or lower.
 
 ## The governed write at 3,000 concepts
 
