@@ -8,7 +8,7 @@ const asJsonWritesIt = (value: string): Json => {
   return read;
 };
 
-export const typedText = (held: unknown): string | undefined =>
+export const asWritten = (held: unknown): string | undefined =>
   typeof held === "string" ? held : JSON.stringify(held);
 
 export const ADDRESS_QUERY = {

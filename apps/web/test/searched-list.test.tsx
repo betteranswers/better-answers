@@ -1,9 +1,9 @@
 import { useNavigate } from "@tanstack/react-router";
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
-import { PAGE_NUMBER, searchText } from "@/shared/list-address.ts";
+import { PAGE_NUMBER, searchText, type SearchText } from "@/shared/list-address.ts";
 import { useSearchedList } from "@/shared/searched-list.ts";
 
 import { openPages } from "./address-router.tsx";
@@ -119,6 +119,13 @@ describe("a searched list, its search settled into the address", () => {
       expect(box().value).toBe(typed);
     },
   );
+
+  it("takes a search field only as the text written", () => {
+    type Fields = Parameters<typeof useSearchedList>[1];
+    expectTypeOf<{ search: SearchText }>().toExtend<Fields>();
+    // @ts-expect-error — a bare string field empties a search the router read as JSON.
+    expectTypeOf<{ search: z.ZodCatch<z.ZodString> }>().toExtend<Fields>();
+  });
 
   it("takes a search the address gained from outside the box", async () => {
     const { router, at } = await openList("/list?list.search=priya");

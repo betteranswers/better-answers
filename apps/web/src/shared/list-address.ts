@@ -2,7 +2,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { z } from "zod";
 
-import { typedText } from "@/shared/address-query.ts";
+import { asWritten } from "@/shared/address-query.ts";
 
 type Held = string | number | undefined;
 
@@ -14,7 +14,9 @@ type AddressState<Fields extends ListFields> = z.output<z.ZodObject<Fields>>;
 export const PAGE_NUMBER = z.number().int().min(1).catch(1);
 
 export const searchText = (max = Number.POSITIVE_INFINITY) =>
-  z.preprocess(typedText, z.string().max(max)).catch("");
+  z.preprocess(asWritten, z.string().max(max)).catch("");
+
+export type SearchText = ReturnType<typeof searchText>;
 
 const QUERY = z.record(z.string(), z.unknown());
 
