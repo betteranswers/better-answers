@@ -46,7 +46,7 @@ Text a person types, such as a question or a note on a flag, never passes the wo
 The erasure routine rewrites what the platform wrote; a person edits what the company wrote.
 
 - Every actor id the platform wrote (files, history and its commit trailers, `bundle_commit` rows, verification rows, git author lines by mailmap) becomes `human:<erasure pseudonym>`, one pseudonym per workspace. The audit log is never rewritten: it names a person by person id.
-- A member's commit to the bundle holds their member row until the commit has landed in Postgres, or until its one-minute budget runs out and it fails. So ending the member waits for a commit under way, and refuses a later one. The routine rewrites history a second time once the member has ended.
+- A member's commit to the bundle holds their member row until the commit has landed in Postgres. A git step that overruns its one-minute budget fails, and frees the row. So ending the member waits for a commit under way, and refuses a later one. The routine rewrites history a second time once the member has ended.
 - When this is the person's last workspace, it pseudonymises the user row (email to a tombstone, name cleared, id kept) and deletes their sessions, verification rows, invitations and linked accounts. It ends the person as a member here on every arm.
 - It reaches *Questions asked* on every arm, in the erasing workspace alone. Who asked and who gave feedback become `human:<erasure pseudonym>`, the question is deleted and each note and each disputed sentence is cleared. The record's skeleton stays (ADR 0017).
 - Erasure alone may leave a workspace with no Admin. The operator repairs it with `pnpm ops add-member`.

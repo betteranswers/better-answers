@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -11,6 +11,47 @@ import { openGit, type GitDoor } from "@better-answers/core/store/git";
 import { removeBundleRoot } from "./bundle-root.ts";
 
 const run = promisify(execFile);
+
+/** Git's one seam inside a commit: a hook that parks a ref update, or refuses it, on a file. */
+export const gatingRefUpdates = async (door: GitDoor, workspaceId: string) => {
+  const repository = path.join(door.root, `${workspaceId}.git`);
+  const gate = path.join(repository, "gate");
+  const at = (name: string): string => path.join(gate, name);
+  const hooks = path.join(repository, "hooks");
+  await mkdir(gate, { recursive: true });
+  await mkdir(hooks, { recursive: true });
+  await writeFile(
+    path.join(hooks, "reference-transaction"),
+    [
+      "#!/bin/sh",
+      "cat >/dev/null",
+      '[ "$1" = prepared ] || exit 0',
+      `[ -e "${at("refuse")}" ] && exit 1`,
+      `[ -e "${at("park")}" ] || exit 0`,
+      `touch "${at("parked")}"`,
+      "turns=0",
+      `while [ -e "${at("park")}" ] && [ "$turns" -lt 1200 ]; do`,
+      "  sleep 0.05",
+      "  turns=$((turns + 1))",
+      "done",
+      "exit 0",
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  const exists = (name: string): Promise<boolean> =>
+    access(at(name)).then(
+      () => true,
+      () => false,
+    );
+  return {
+    park: () => writeFile(at("park"), ""),
+    parked: () => exists("parked"),
+    unpark: () => rm(at("park")),
+    refuse: () => writeFile(at("refuse"), ""),
+    allow: () => rm(at("refuse")),
+  };
+};
 
 export const bundlesForSuite = (): (() => GitDoor) => {
   let root: string | undefined;

@@ -1,6 +1,4 @@
 import { randomBytes } from "node:crypto";
-import { access, mkdir, rm, writeFile } from "node:fs/promises";
-import path from "node:path";
 
 import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -58,7 +56,13 @@ import {
 } from "../src/members/index.ts";
 import { setDisplayName, setOperatorMark } from "../src/workspaces/index.ts";
 import { asAnotherProcess } from "./bundle-fence.ts";
-import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
+import {
+  authorLinesOf,
+  bundleHistory,
+  everyObjectOf,
+  gatingRefUpdates,
+  objectPresent,
+} from "./bundle.ts";
 import { erasureDoorsFor } from "./erasure-doors.ts";
 import {
   identityRowsFor,
@@ -90,7 +94,6 @@ import {
   countWaitingOnLocks,
   holdingTable,
   isBlockedOnTable,
-  lendingOnceSettled,
   readingAs,
   seedingWith,
   statementsWaitingOnALock,
@@ -3129,47 +3132,6 @@ const writingAsThePerson = async (
   });
 };
 
-/** Git's one seam inside a commit: a hook that parks a ref update, or refuses it, on a file. */
-const gatingRefUpdates = async (scenario: Scenario) => {
-  const repository = path.join(scenario.git.root, `${scenario.workspaceId}.git`);
-  const gate = path.join(repository, "gate");
-  const at = (name: string): string => path.join(gate, name);
-  const hooks = path.join(repository, "hooks");
-  await mkdir(gate, { recursive: true });
-  await mkdir(hooks, { recursive: true });
-  await writeFile(
-    path.join(hooks, "reference-transaction"),
-    [
-      "#!/bin/sh",
-      "cat >/dev/null",
-      '[ "$1" = prepared ] || exit 0',
-      `[ -e "${at("refuse")}" ] && exit 1`,
-      `[ -e "${at("park")}" ] || exit 0`,
-      `touch "${at("parked")}"`,
-      "turns=0",
-      `while [ -e "${at("park")}" ] && [ "$turns" -lt 1200 ]; do`,
-      "  sleep 0.05",
-      "  turns=$((turns + 1))",
-      "done",
-      "exit 0",
-      "",
-    ].join("\n"),
-    { mode: 0o755 },
-  );
-  const exists = (name: string): Promise<boolean> =>
-    access(at(name)).then(
-      () => true,
-      () => false,
-    );
-  return {
-    park: () => writeFile(at("park"), ""),
-    parked: () => exists("parked"),
-    unpark: () => rm(at("park")),
-    refuse: () => writeFile(at("refuse"), ""),
-    allow: () => rm(at("refuse")),
-  };
-};
-
 const thePersonIn = async (scenario: Scenario, person: { readonly id: string }, email: string) => {
   const objects = await everyObjectOf(scenario.git, scenario.workspaceId);
   return {
@@ -3182,14 +3144,6 @@ const thePersonIn = async (scenario: Scenario, person: { readonly id: string }, 
 };
 
 const NOWHERE = { address: false, personId: false, authors: [] };
-
-const theMemberHasEnded = async (member: Member): Promise<boolean> =>
-  (
-    await db().pool.query("SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2", [
-      member.workspaceId,
-      member.userId,
-    ])
-  ).rowCount === 0;
 
 const theMemberRowIsFree = async (scenario: Scenario, person: { readonly id: string }) => {
   const probe = await db().pool.connect();
@@ -3226,9 +3180,7 @@ describe("a commit made as the person while the routine runs", () => {
   it("ends the member once a commit underway lands, then rewrites", async () => {
     const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
     const member = { workspaceId: scenario.workspaceId, userId: person.id };
-    const gate = await gatingRefUpdates(scenario);
-    let ended: Promise<unknown> = Promise.resolve();
-    const postgres = { pool: lendingOnceSettled(scenario.postgres.pool, () => ended) };
+    const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
 
     const { done, met } = await heldAheadOfTheMembersEnd(
       scenario,
@@ -3236,11 +3188,10 @@ describe("a commit made as the person while the routine runs", () => {
       member,
       async (resume) => {
         await gate.park();
-        const writing = writingAsThePerson({ ...scenario, postgres }, person, email);
+        const writing = writingAsThePerson(scenario, person, email);
         await until(gate.parked);
         const ending = resume();
         await until(async () => (await countWaitingOnLocks(db().pool)) === 1);
-        ended = until(() => theMemberHasEnded(member));
         await gate.unpark();
         await ending;
         return writing;
@@ -3262,7 +3213,7 @@ describe("a commit made as the person while the routine runs", () => {
 
   it("stops a hung commit and frees the member row", async () => {
     const { scenario, email, person } = await bundleNamingThePerson();
-    const gate = await gatingRefUpdates(scenario);
+    const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
     const writer = await principalFor(db(), scenario.workspaceId, person.id);
     const impatient = { ...doorsOf(scenario), git: { ...scenario.git, commitBudgetMs: 500 } };
@@ -3288,7 +3239,7 @@ describe("a commit made as the person while the routine runs", () => {
 
   it("holds the rewrite until another process's write lands", async () => {
     const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
-    const gate = await gatingRefUpdates(scenario);
+    const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
     const elsewhere = await asAnotherProcess(scenario.git);
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
 
@@ -3332,7 +3283,7 @@ describe("a commit made as the person while the routine runs", () => {
       byId ? person.id : null,
       byId ? null : email,
     );
-    const gate = await gatingRefUpdates(scenario);
+    const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
 
     const { done: died } = await heldAheadOfTheMembersEnd(
       scenario,
@@ -3364,7 +3315,7 @@ describe("a commit made as the person while the routine runs", () => {
       person,
       member: { workspaceId: scenario.workspaceId, userId: person.id },
       byAddress: await erasureRequestAbout(scenario.workspaceId, null, email),
-      gate: await gatingRefUpdates(scenario),
+      gate: await gatingRefUpdates(scenario.git, scenario.workspaceId),
     };
   };
 
