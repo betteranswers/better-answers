@@ -336,6 +336,7 @@
     {"role":"app_rt","object":"public.current_workspace_id","args":"","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"app_rt","object":"public.fail_job","args":"p_id text, p_worker_id text, p_outcome jsonb","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"app_rt","object":"public.finish_job","args":"p_id text, p_worker_id text, p_outcome jsonb","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
+    {"role":"app_rt","object":"public.hand_back_job","args":"p_id text, p_worker_id text","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"app_rt","object":"public.heartbeat_job","args":"p_id text, p_worker_id text, p_lease interval","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"app_rt","object":"public.model_choice_for","args":"p_purpose llm_purpose","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"app_rt","object":"public.narrower_sensitivity","args":"a text, b text","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
@@ -346,6 +347,7 @@
     {"role":"worker_rt","object":"public.current_workspace_id","args":"","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"worker_rt","object":"public.fail_job","args":"p_id text, p_worker_id text, p_outcome jsonb","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"worker_rt","object":"public.finish_job","args":"p_id text, p_worker_id text, p_outcome jsonb","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
+    {"role":"worker_rt","object":"public.hand_back_job","args":"p_id text, p_worker_id text","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"worker_rt","object":"public.heartbeat_job","args":"p_id text, p_worker_id text, p_lease interval","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"worker_rt","object":"public.narrower_sensitivity","args":"a text, b text","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"worker_rt","object":"public.submit_suggestion_set","args":"p_set_id text, p_kind text, p_proposer text, p_requests jsonb","security_definer":true,"acl_is_default":false,"privilege":"EXECUTE","grantable":false}

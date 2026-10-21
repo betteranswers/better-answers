@@ -74,6 +74,8 @@ services:
   # `depends_on` is a convenience; the safety is the worker's own schema-stamp check.
   worker:
     image: ghcr.io/betteranswers/worker@${WORKER_IMAGE_DIGEST:?set by the release workflow}
+    init: true
+    stop_grace_period: 30s
     <<: [*restart, *logging]
     environment:
       <<: *bootstrap

@@ -3409,6 +3409,7 @@ describe("the queue under both runtime roles", () => {
         ["SELECT heartbeat_job($1, $2, $3::interval)", ["01J6J1AAAAAAAAAAAAAAAAAAAA", "w", "60 s"]],
         ["SELECT finish_job($1, $2, NULL)", ["01J6J1AAAAAAAAAAAAAAAAAAAA", "w"]],
         ["SELECT fail_job($1, $2, NULL)", ["01J6J1AAAAAAAAAAAAAAAAAAAA", "w"]],
+        ["SELECT hand_back_job($1, $2)", ["01J6J1AAAAAAAAAAAAAAAAAAAA", "w"]],
       ];
       for (const [statement, parameters] of refused) {
         await client.query("SAVEPOINT queue_probe");

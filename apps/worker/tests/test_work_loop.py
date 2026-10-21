@@ -1,5 +1,6 @@
 import contextlib
 import json
+import signal
 import subprocess
 import sys
 import threading
@@ -1117,16 +1118,9 @@ with queue.connected(bootstrap.database_url) as connection:
 """
 
 
-def a_worker_hung_on_its_audit(
-    database: psycopg.Connection,
-    tmp_path: Path,
-    *,
-    deadline_seconds: float = 0.3,
-    while_hung: Callable[[], object] = lambda: None,
-) -> tuple[list[dict[str, Any]], str]:
-    bootstrap = bootstrap_for(database, tmp_path)
+def worker_environment(bootstrap: Bootstrap) -> dict[str, str]:
     store = bootstrap.object_store
-    environment = {
+    return {
         "DATABASE_URL": bootstrap.database_url,
         "GIT_STORE_DIR": bootstrap.git_store_dir,
         "LMDB_DIR": bootstrap.engine.lmdb_dir,
@@ -1137,11 +1131,21 @@ def a_worker_hung_on_its_audit(
         "S3_BUCKET": store.bucket,
         "S3_REGION": store.region,
     }
+
+
+def a_worker_hung_on_its_audit(
+    database: psycopg.Connection,
+    tmp_path: Path,
+    *,
+    deadline_seconds: float = 0.3,
+    while_hung: Callable[[], object] = lambda: None,
+) -> tuple[list[dict[str, Any]], str]:
+    bootstrap = bootstrap_for(database, tmp_path)
     with queue.connected(bootstrap.database_url) as locking, locking.transaction():
         locking.execute("LOCK TABLE concept_index IN ACCESS EXCLUSIVE MODE")
         with subprocess.Popen(
             [sys.executable, "-c", A_WORKER_RUN, str(deadline_seconds)],
-            env=environment,
+            env=worker_environment(bootstrap),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -1234,3 +1238,120 @@ def test_a_lost_claim_still_ends_the_worker_at_its_deadline(
 
     events = [line["event"] for line in written]
     assert events[-2:] == ["the claim was lost", "the job outlived its deadline"]
+
+
+A_WORKER_PROCESS = """
+import sys
+from better_answers_worker import loop
+
+sys.exit(loop.serve(finish_within_seconds=float(sys.argv[1])))
+"""
+
+WARM_UP_SECONDS = loop.IDLE_SLEEP_SECONDS * IDLE_SLEEPS_THE_DETECTORS_IMPORT_MAY_TAKE
+
+EXIT_AFTER_STOP_SECONDS = 5
+
+
+@contextlib.contextmanager
+def a_worker_process(
+    database: psycopg.Connection, tmp_path: Path, *, finish_within_seconds: float
+) -> Iterator[subprocess.Popen[str]]:
+    with database.cursor() as cursor:
+        stamp_contract_as_migrate_does(cursor, digest=CONTRACT_DIGEST)
+    database.commit()
+    with subprocess.Popen(
+        [sys.executable, "-c", A_WORKER_PROCESS, str(finish_within_seconds)],
+        env=worker_environment(bootstrap_for(database, tmp_path)),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    ) as worker:
+        try:
+            yield worker
+        finally:
+            worker.kill()
+
+
+def exit_within(
+    worker: subprocess.Popen[str], seconds: float
+) -> tuple[int | None, str]:
+    try:
+        _, stderr = worker.communicate(timeout=seconds)
+    except subprocess.TimeoutExpired:
+        return None, "the worker was still running"
+    return worker.returncode, stderr
+
+
+@contextlib.contextmanager
+def concept_index_locked(database: psycopg.Connection) -> Iterator[psycopg.Connection]:
+    with queue.connected(_WHERE[database]) as locking:
+        locking.execute("BEGIN")
+        locking.execute("LOCK TABLE concept_index IN ACCESS EXCLUSIVE MODE")
+        yield locking
+
+
+def claimed_by_the_worker(database: psycopg.Connection, workspace: str) -> bool:
+    return bool(
+        _within(WARM_UP_SECONDS, lambda: audit_job(database, workspace)[0] == "claimed")
+    )
+
+
+def test_an_idle_worker_exits_cleanly_on_sigterm(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    with (
+        a_worker_process(database, tmp_path, finish_within_seconds=10) as worker,
+        queue.connected(_WHERE[database]) as onlooker,
+    ):
+        connected = _within(
+            WARM_UP_SECONDS, lambda: _heartbeat_sessions(onlooker, database)
+        )
+        assert connected, "the worker never reached its loop"
+
+        worker.send_signal(signal.SIGTERM)
+        exit_code, stderr = exit_within(worker, EXIT_AFTER_STOP_SECONDS)
+
+    assert exit_code == 0, stderr
+
+
+def test_a_stop_mid_job_hands_it_back_with_its_attempt(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
+
+    with (
+        concept_index_locked(database),
+        a_worker_process(database, tmp_path, finish_within_seconds=0.5) as worker,
+    ):
+        assert claimed_by_the_worker(database, workspace)
+        worker.send_signal(signal.SIGTERM)
+        exit_code, stderr = exit_within(worker, EXIT_AFTER_STOP_SECONDS)
+
+    assert exit_code == 0, stderr
+    database.commit()
+    with scoped(database, workspace) as cursor:
+        reclaimed = queue.claim(cursor, workspace, WORKER, ["nightly-audit"])
+    assert reclaimed is not None, "the handed-back job was not claimable at once"
+    with database.cursor() as cursor:
+        cursor.execute("SELECT max_attempts FROM job WHERE id = %s", (reclaimed.id,))
+        bound = cursor.fetchone()
+    assert bound is not None
+    assert (reclaimed.attempts, bound[0]) == (2, 4), "the stop spent an attempt"
+
+
+def test_a_stop_lets_a_job_that_ends_within_grace_finish(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = a_workspace_with_a_queued_audit(database, tmp_path)
+
+    with (
+        concept_index_locked(database) as locking,
+        a_worker_process(database, tmp_path, finish_within_seconds=10) as worker,
+    ):
+        assert claimed_by_the_worker(database, workspace)
+        worker.send_signal(signal.SIGTERM)
+        locking.execute("COMMIT")
+        exit_code, stderr = exit_within(worker, EXIT_AFTER_STOP_SECONDS)
+
+    assert exit_code == 0, stderr
+    assert audit_job(database, workspace) == ("done", WORKER)

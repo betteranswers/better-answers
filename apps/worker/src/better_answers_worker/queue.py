@@ -234,6 +234,12 @@ def fail(
     return bool(row and row[0])
 
 
+def hand_back(cursor: ScopedCursor, job_id: str, worker_id: str) -> bool:
+    cursor.execute("SELECT hand_back_job(%s, %s)", (job_id, worker_id))
+    row = cursor.fetchone()
+    return bool(row and row[0])
+
+
 def enqueue(
     cursor: ScopedCursor, job_id: str, kind: str, reason: str | None = None
 ) -> None:

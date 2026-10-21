@@ -722,8 +722,8 @@ Nothing waits on it.
 ### claimant
 
 _Internal._ the process holding a job's claim — the worker, or the api for a kind only it can do:
-the only one that may keep its lease alive, finish it or fail it — and no longer the claimant once
-the lease has lapsed, whether or not the job has been claimed again since.
+the only one that may keep its lease alive, finish it, fail it or hand it back — and no longer the
+claimant once the lease has lapsed, whether or not the job has been claimed again since.
 
 A job has no owner.
 
