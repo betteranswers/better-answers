@@ -43,7 +43,7 @@ const write = (scenario: Scenario, principal: UserPrincipal, input: WriteManifes
   writeManifest(principal, doorsOf(scenario), input);
 
 const written = async (scenario: Scenario, input: WriteManifestInput = manifestFor()) => {
-  const result = await write(scenario, scenario.editor, input);
+  const result = await write(scenario, scenario.admin, input);
   if (!result.ok) throw new Error(`the manifest was refused: ${String(result.error)}`);
   return result.value;
 };
@@ -78,7 +78,7 @@ const onlyTheStandingManifest = async (scenario: Scenario, landed: ManifestWritt
 };
 
 const nothingWritten = async (scenario: Scenario) => {
-  expect(await head(scenario.editor, scenario.git)).toBeNull();
+  expect(await head(scenario.admin, scenario.git)).toBeNull();
   expect(await rowsFor(scenario.workspaceId)).toEqual({ concepts: "0", commits: "0", events: "0" });
 };
 
@@ -109,7 +109,7 @@ describe("the manifest, the bundle's first commit", () => {
       committer: `${PLATFORM_BOT.name} <${PLATFORM_BOT.email}>`,
       parents: [],
       files: ["knowledge/manifest.yaml"],
-      trailers: { Actor: `human:${scenario.editor.userId}`, Audit: landed.auditEventId },
+      trailers: { Actor: `human:${scenario.admin.userId}`, Audit: landed.auditEventId },
     });
     expect(
       await fileAtCommit(scenario.git, scenario.workspaceId, landed.sha, "knowledge/manifest.yaml"),
@@ -126,13 +126,13 @@ describe("the manifest, the bundle's first commit", () => {
     expect(await knowledgeEventsOf(scenario.workspaceId)).toEqual([
       {
         action: "knowledge.manifest.written",
-        actor: `human:${scenario.editor.userId}`,
+        actor: `human:${scenario.admin.userId}`,
         subject_kind: "manifest",
         subject_id: BUNDLE_ID,
         detail: { bundleId: BUNDLE_ID, commitSha: landed.sha },
         sha: landed.sha,
         parent_sha: null,
-        committer: `human:${scenario.editor.userId}`,
+        committer: `human:${scenario.admin.userId}`,
       },
     ]);
     expect(await rowsFor(scenario.workspaceId)).toEqual({
@@ -144,7 +144,7 @@ describe("the manifest, the bundle's first commit", () => {
 
   it("lands on the head it found when concepts already stand", async () => {
     const scenario = await arrange();
-    const first = await writeConcept(scenario.editor, doorsOf(scenario), {
+    const first = await writeConcept(scenario.admin, doorsOf(scenario), {
       mergeKey: "policy:expenses",
       path: "knowledge/expenses.md",
       kind: "Policy",
@@ -188,7 +188,7 @@ describe("the manifest, the bundle's first commit", () => {
     const scenario = await arrange();
     const landed = await written(scenario);
 
-    const other = await write(scenario, scenario.editor, manifestFor({ id: ulid() }));
+    const other = await write(scenario, scenario.admin, manifestFor({ id: ulid() }));
 
     expect(other).toEqual({ ok: false, error: "path-taken" });
     await onlyTheStandingManifest(scenario, landed);
@@ -201,16 +201,16 @@ describe("the manifest, the bundle's first commit", () => {
   ])("refuses %s, writing nothing", async (_why, input) => {
     const scenario = await arrange();
 
-    const refused = await write(scenario, scenario.editor, input);
+    const refused = await write(scenario, scenario.admin, input);
 
     expect(refused).toEqual({ ok: false, error: "malformed" });
     await nothingWritten(scenario);
   });
 
-  it("refuses a Viewer before anything is written", async () => {
+  it("refuses an Editor the manifest write, by role", async () => {
     const scenario = await arrange();
 
-    const refused = await write(scenario, scenario.viewer, manifestFor());
+    const refused = await write(scenario, scenario.editor, manifestFor());
 
     expect(refused).toEqual({ ok: false, error: "role-forbids" });
     await nothingWritten(scenario);
@@ -220,7 +220,7 @@ describe("the manifest, the bundle's first commit", () => {
     const scenario = await arrange();
     await removeRepository(scenario.git, scenario.workspaceId);
 
-    const refused = await write(scenario, scenario.editor, manifestFor());
+    const refused = await write(scenario, scenario.admin, manifestFor());
 
     expect(refused).toEqual({ ok: false, error: "no-such-repository" });
     await nothingWritten(scenario);
@@ -228,13 +228,13 @@ describe("the manifest, the bundle's first commit", () => {
 
   it("refuses a member removed since they signed in, committing nothing", async () => {
     const scenario = await arrange();
-    const { workspaceId, editor } = scenario;
+    const { workspaceId, admin } = scenario;
     await db().pool.query("DELETE FROM member WHERE user_id = $1 AND workspace_id = $2", [
-      editor.userId,
+      admin.userId,
       workspaceId,
     ]);
 
-    expect(await write(scenario, editor, manifestFor())).toEqual({
+    expect(await write(scenario, admin, manifestFor())).toEqual({
       ok: false,
       error: "not-a-member",
     });
@@ -251,11 +251,11 @@ describe("the manifest, the bundle's first commit", () => {
       scenario.postgres,
       {
         write: (postgres) =>
-          writeManifest(scenario.editor, { ...doorsOf(scenario), postgres }, manifestFor()),
+          writeManifest(scenario.admin, { ...doorsOf(scenario), postgres }, manifestFor()),
         revoke: (client) =>
           client.query(
             "UPDATE member SET credentials_revoked_at = now() WHERE workspace_id = $1 AND user_id = $2",
-            [scenario.workspaceId, scenario.editor.userId],
+            [scenario.workspaceId, scenario.admin.userId],
           ),
       },
       async (writeThenRevoke) => {

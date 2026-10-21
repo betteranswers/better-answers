@@ -1,7 +1,7 @@
 import type pg from "pg";
 
 import type { PostgresDoor } from "../src/store/postgres/index.ts";
-import { lendingOnceSettled, until } from "./suite-postgres.ts";
+import { holdingTable, isBlockedOnTable, lendingOnceSettled, until } from "./suite-postgres.ts";
 
 export const backendPidOf = async (client: pg.PoolClient): Promise<number> => {
   const found = await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
@@ -18,6 +18,11 @@ export const isBlockedOnALock = async (pool: pg.Pool, pid: number): Promise<bool
 type Parking = (
   writeThenRevoke: (parked: () => Promise<boolean>) => Promise<void>,
 ) => Promise<void>;
+
+export const parkedOnTable =
+  (pool: pg.Pool, table: string): Parking =>
+  (writeThenRevoke) =>
+    holdingTable(pool, table, () => writeThenRevoke(() => isBlockedOnTable(pool, table)));
 
 /** A write, parked by `parking`, with a revocation queued behind it before it resumes. */
 export const writeRevokedWhileParked = async <T>(

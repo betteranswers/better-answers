@@ -6,6 +6,7 @@ export const ACTION_HEADLINES = {
   "knowledge.concept.committed": "Concept saved",
   "knowledge.feedback.closed": "Flag on an answer closed",
   "knowledge.manifest.written": "Knowledge base description updated",
+  "knowledge.owner.named": "Owner named",
   "knowledge.suggestion.accepted": "Suggestion accepted",
   "knowledge.suggestion.declined": "Suggestion declined",
   "knowledge.suggestion.returned": "Suggestion sent back",

@@ -47,12 +47,12 @@ People on records:
 - A member ends by an Admin's removal or by an erasure. Its row is deleted, and its audit event is the record of it.
 - The identity set keeps no team record. A group may carry a team's name (ADR 0038).
 
-The erasure union is `ERASURE_FAMILIES` in `packages/core/src/erasure/map.ts`. Each family has a finder in the erasure map and a step in the erasure routine, and the access answer lists what each finder found. The union holds nineteen families:
+The erasure union is `ERASURE_FAMILIES` in `packages/core/src/erasure/map.ts`. Each family has a finder in the erasure map and a step in the erasure routine, and the access answer lists what each finder found. The union holds twenty families:
 
 - The bundle: `concept-file` (file text and git author lines), `bundle-commit` and `concept-verification`.
 - The identity set: `identity-user`, `identity-session`, `identity-verification`, `identity-invitation`, `identity-account`, `identity-passkey`, `identity-authenticator`, `identity-recovery-code`, `identity-confirm-failures` and `identity-last-active`.
 - The evidence: `source-document`.
-- The platform's records: `question-asked`, `concept-sensitivity-override` (who set the override), `finding` (who reviewed or restored it, and the reason they gave), `suggestion` (who proposed and who decided it, and the decider's reason) and `concept-write-request` (the person's actor id or `human:<address>` in a request's title, frontmatter or body).
+- The platform's records: `question-asked`, `concept-sensitivity-override` (who set the override), `finding` (who reviewed or restored it, and the reason they gave), `suggestion` (who proposed and who decided it, and the decider's reason) `concept-write-request` (the person's actor id or `human:<address>` in a request's title, frontmatter or body) and `concept-owner` (a collection or a concept the person owns). An owner row names the person and nothing else, so the member's ending deletes it, and the concept falls back to its collection's owner or to Admins.
 
 These tables name a person outside the union. The list is a scan of the schema on 21/10/2026, and no gate holds it, so a new column that names a person goes here or into the union:
 
@@ -63,11 +63,17 @@ These tables name a person outside the union. The list is a scan of the schema o
 - `oauth_client`, `oauth_access_token`, `oauth_refresh_token` and `oauth_consent`, by `user_id`. Each keys the user row, which keeps its id. The erasure deletes none of them.
 - `group_member.user_id`. Its foreign key to `member` cascades, so ending the member deletes it.
 
+A concept's owner:
+
+- `concept_owner`, on the `concepts` slice, holds a collection's default owner or one concept's override, and a CHECK holds each row to one of the two. A partial unique index gives each collection and each concept one owner. An override keys to `concept_identity` by `attachedByIri()`.
+- The owner of a concept is its override, else its collection's default, else nobody, and then Admins decide. No row is written when a concept is minted, so a default and a copy of it can never disagree.
+- A person who has left the workspace owns nothing: an owner row keys to `member`, and ending the member deletes it by the foreign key's cascade, as `group_member` does.
+- `attachedByIri()` is the one by-IRI key, exported from `packages/schema/src/concept-tables.ts`. Every table that attaches to a concept by IRI uses it, `write_up_include` included.
+
 Decided for the S3 block and not yet in the tree:
 
-- `concept_owner` is a table on the `concepts` slice, keyed against `concept_identity`, with a per-collection default beside it.
 - A write-up declares its two homes, `section` and `response`, together, so the second home adds a writer and never a migration.
-- The by-IRI key and the version column set are one helper each, `attachedByIri()` and `versionColumns()`.
+- The version column set is one helper, `versionColumns()`.
 
 ## Why
 
@@ -99,3 +105,5 @@ Decided for the S3 block and not yet in the tree:
 The full record, with its amendments (tickets 23, 24, 39 and 50, T-073, T-059, T-113, and the T-027 and T-028 grill): `docs/archive/adr/0014-records-attach-by-iri.md`.
 
 The question set's input object, in the archived record, was missing from this doc until 20/10/2026, when a sample of the map tickets found S6 resting on it.
+
+On 22/10/2026 `concept_owner` and `attachedByIri()` reached the tree (BA-231, migration `0096_the-concept-owner`), and the erasure union gained `concept-owner`. `suggestion` and `concept_write_request` joined the union on 21/10/2026 (BA-220).

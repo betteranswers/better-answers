@@ -169,7 +169,7 @@ export const landRecallSet = async (
   const landed = new Map<string, ConceptIri>();
   let head: string | null = null;
   for (const { key, group, title, body } of answersOf(set)) {
-    const written = await writeConcept(scenario.editor, doorsOf(scenario), {
+    const written = await writeConcept(scenario.admin, doorsOf(scenario), {
       mergeKey: `answer:${key}`,
       path: `knowledge/${group}/${key}.md`,
       kind: "Answer",

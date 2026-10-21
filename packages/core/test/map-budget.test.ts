@@ -65,7 +65,7 @@ const writeOf = (at: number, head: string | null): WriteConceptInput => ({
 const landDenseMap = async (scenario: Scenario): Promise<Scenario> => {
   let head: string | null = null;
   for (let at = 0; at < CONCEPTS; at += 1) {
-    const written = await writeConcept(scenario.editor, doorsOf(scenario), writeOf(at, head));
+    const written = await writeConcept(scenario.admin, doorsOf(scenario), writeOf(at, head));
     if (!written.ok) throw new Error(`the map did not land: ${String(written.error)}`);
     head = written.value.sha;
   }

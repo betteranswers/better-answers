@@ -751,13 +751,11 @@ const linksOf = (rewritten: readonly ConceptRewritten[]): number =>
 const importWordSaid = (word: Extract<ImportBundleRefusal, string>, email: string): string => {
   switch (word) {
     case "role-forbids":
-      return `${email} is a Viewer of this workspace; the import runs as an Admin or an Editor`;
+      return `${email} is not an Admin of this workspace; the import runs as an Admin`;
     case "manifest-taken":
       return "a manifest with another bundle id already stands in this workspace's bundle";
     case "no-such-repository":
       return "this workspace has no bundle repository; provision it first";
-    case "class-unreadable":
-      return `${email} is not an Admin of this workspace, and a bundle landed Restricted is one only an Admin can read back for its second pass; run the import as an Admin`;
     case "stale-precondition":
       return "this workspace's bundle could not be moved while the import was writing its manifest, because another writer moved it or holds its lock; nothing was written, so run the import again, and if it is refused the same way a lock was left on refs/heads/main";
     default:
@@ -935,8 +933,8 @@ const BODY_WORDS: Partial<
     (asked: BodyAsked, workspaceId: string) => string
   >
 > = {
-  "role-forbids": (asked) =>
-    `${asked.email} is a Viewer of this workspace; the update runs as an Admin or an Editor`,
+  "owner-forbids": (asked) =>
+    `${asked.email} neither owns ${asked.iri} nor is an Admin of this workspace; nothing was written`,
   malformed: (asked) =>
     `--iri ${asked.iri} is not a concept iri, or the body is longer than a concept holds; nothing was written`,
   "no-such-concept": (asked, workspaceId) =>

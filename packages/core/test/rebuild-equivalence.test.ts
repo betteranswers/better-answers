@@ -127,11 +127,11 @@ const buildTheMap = async (scenario: Scenario) => {
   const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
   const group = await groupNamed(db(), scenario, "HR", [scenario.editor]);
 
-  const superseded = await wrote(scenario, scenario.editor, {
+  const superseded = await wrote(scenario, scenario.admin, {
     body: "The old rule stood until it did not.",
   });
 
-  const derivedFrom = await wrote(scenario, scenario.editor, {
+  const derivedFrom = await wrote(scenario, scenario.admin, {
     body: "The evidence this rests on.",
   });
 
@@ -139,7 +139,7 @@ const buildTheMap = async (scenario: Scenario) => {
 
   const unlanded = conceptIriOf(ulid());
 
-  const linker = await wrote(scenario, scenario.editor, {
+  const linker = await wrote(scenario, scenario.admin, {
     body: [
       "# The map",
       "",
@@ -178,7 +178,7 @@ const buildTheMap = async (scenario: Scenario) => {
     ],
   });
 
-  await wrote(scenario, scenario.editor, {
+  await wrote(scenario, scenario.admin, {
     path: laterPath,
     body: "The concept the link was waiting for.",
   });
@@ -187,7 +187,7 @@ const buildTheMap = async (scenario: Scenario) => {
     body: `Accepted, and it cites [the linker](/${linker.path}) once.`,
   });
 
-  await wrote(scenario, scenario.editor, {
+  await wrote(scenario, scenario.admin, {
     iri: superseded.iri,
     path: superseded.path,
     mergeKey: superseded.mergeKey,

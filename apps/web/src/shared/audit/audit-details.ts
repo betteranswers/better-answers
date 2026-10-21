@@ -42,6 +42,7 @@ const NAMED_LABELS = new Map(
 const VALUE_LABELS = new Map(
   Object.entries({
     role: "Role",
+    collection: "Collection",
     previousRole: "Role before",
     sensitivity: "Sensitivity",
     fromSensitivity: "Sensitivity before",

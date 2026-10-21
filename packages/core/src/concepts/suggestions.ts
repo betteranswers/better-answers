@@ -15,7 +15,6 @@ import { action, declareActions, record, type AuditAction } from "../audit/index
 import {
   actorIdOf,
   admit,
-  ADMIN_ALONE,
   ANY_ROLE,
   attempt,
   declareAction,
@@ -24,7 +23,6 @@ import {
   ok,
   ulid,
   type ActorId,
-  type AdminUserPrincipal,
   type Principal,
   type PrincipalRefusal,
   type RefusalOf,
@@ -41,6 +39,7 @@ import {
   type Tx,
 } from "../store/postgres/index.ts";
 import type { Frontmatter } from "./index.ts";
+import { deciderAdmits, type DeciderRefusal, type OwnedConcept } from "./owners.ts";
 
 const SUGGESTION_ACTIONS = declareActions("knowledge", {
   declined: action("knowledge.suggestion.declined", { setId: "id" }),
@@ -256,9 +255,9 @@ export type DecideSuggestionInput = {
 };
 
 const declineSuggestionAction = declareAction({
-  admits: ADMIN_ALONE,
+  admits: ANY_ROLE,
   input: z.custom<DecideSuggestionInput>(),
-  refuses: ["role-forbids", "malformed", "no-such-suggestion", "already-decided"],
+  refuses: ["role-forbids", "owner-forbids", "malformed", "no-such-suggestion", "already-decided"],
 });
 
 export type DecideSuggestionRefusal = RefusalOf<typeof declineSuggestionAction> | PrincipalRefusal;
@@ -269,8 +268,32 @@ export type SuggestionDecided = {
   readonly status: SuggestionStatus;
 };
 
+export const conceptOfSuggestion = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  payload: SuggestionPayload,
+): Promise<OwnedConcept> => {
+  const target = await targetOfMergeKey(principal, tx, payload.mergeKey);
+  if (target === undefined) return { iri: null, path: payload.path };
+  const standing = await tx.query<{ path: string }>(
+    "SELECT path FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+    [principal.workspaceId, target],
+  );
+  return { iri: target, path: standing.rows[0]?.path ?? payload.path };
+};
+
+const decidersRefusal = async (
+  decider: UserPrincipal,
+  tx: Tx,
+  suggestionId: string,
+): Promise<DeciderRefusal | undefined> => {
+  const payload = await payloadFor(decider, tx, suggestionId);
+  if (payload === undefined) throw new Error("a suggestion has no write request to decide");
+  return deciderAdmits(decider, tx, await conceptOfSuggestion(decider, tx, payload), payload.kind);
+};
+
 const decide = async (
-  admin: AdminUserPrincipal,
+  decider: UserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
   input: DecideSuggestionInput,
   decision: { readonly status: SuggestionStatus; readonly action: AuditAction },
@@ -278,9 +301,9 @@ const decide = async (
   const reason = boundarySchemas.suggestion.insert.shape.reason.safeParse(input.reason);
   if (!reason.success || reason.data === null) return err("malformed");
 
-  const decided = await withRepositoryLock(admin, doors.git, () =>
+  const decided = await withRepositoryLock(decider, doors.git, () =>
     attempt(() =>
-      withMember(admin, doors.postgres, async (fresh, tx) => {
+      withMember(decider, doors.postgres, async (fresh, tx) => {
         const waiting = await tx.query<{ set_id: string; status: string }>(
           "SELECT set_id, status FROM suggestion WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
           [fresh.workspaceId, input.suggestionId],
@@ -288,6 +311,8 @@ const decide = async (
         const row = waiting.rows[0];
         if (row === undefined) return err("no-such-suggestion" as const);
         if (row.status !== SUGGESTION_WAITING_STATUS) return err("already-decided" as const);
+        const refusal = await decidersRefusal(fresh, tx, input.suggestionId);
+        if (refusal !== undefined) return err(refusal);
 
         await record(fresh, tx, {
           id: ulid(),
@@ -336,11 +361,11 @@ export const declineSuggestion = async (
 };
 
 export const returnToProposer = (
-  admin: AdminUserPrincipal,
+  decider: UserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
   input: DecideSuggestionInput,
 ): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> =>
-  decide(admin, doors, input, {
+  decide(decider, doors, input, {
     status: SUGGESTION_RETURNED_STATUS,
     action: SUGGESTION_ACTIONS.returned,
   });

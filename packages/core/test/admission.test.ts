@@ -184,16 +184,16 @@ describe("what an action admits of the operator", () => {
   });
 });
 
-describe("an action whose level is read from its input", () => {
-  it("types a concept's writer as an Editor or above", () => {
+describe("the concept write, which ownership decides", () => {
+  it("types a concept's writer as a person of any role", () => {
     type Writer = AdmittedOf<typeof writeConceptAction>;
 
-    expectTypeOf<UserPrincipal & { readonly role: "Editor" }>().toExtend<Writer>();
-    expectTypeOf<Writer>().not.toExtend<UserPrincipal & { readonly role: "Admin" }>();
-    expectTypeOf<UserPrincipal & { readonly role: "Viewer" }>().not.toExtend<Writer>();
+    expectTypeOf<Writer["role"]>().toEqualTypeOf<Role>();
     expectTypeOf<PlatformPrincipal>().not.toExtend<Writer>();
   });
+});
 
+describe("an action whose level is read from its input", () => {
   it("types the enqueue's person at any role", () => {
     type Enqueuer = AdmittedOf<typeof enqueueJobAction>;
 

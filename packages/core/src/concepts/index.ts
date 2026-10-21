@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+
 import { z } from "zod";
 
 import {
@@ -21,7 +23,6 @@ import {
 import {
   readableClause,
   readableParameters,
-  readsSensitivity,
   widens,
   type Sensitivity,
   type Visibility,
@@ -42,7 +43,6 @@ import {
   personOfActor,
   refusalFor,
   ulid,
-  type AdminUserPrincipal,
   type AdmittedOf,
   type Clock,
   type PrincipalRefusal,
@@ -101,12 +101,8 @@ import {
   type StandingConcept,
   type Unsound,
 } from "./loader.ts";
-import {
-  BUNDLE_WRITERS,
-  manifestAtHead,
-  writeManifest,
-  type WriteManifestRefusal,
-} from "./manifest.ts";
+import { manifestAtHead, writeManifest, type WriteManifestRefusal } from "./manifest.ts";
+import { deciderAdmits, ownerAdmits, type OwnedConcept, type OwnerRefusal } from "./owners.ts";
 import {
   bodyLinksOf,
   paneOf,
@@ -120,6 +116,7 @@ import {
   type Relation,
 } from "./read.ts";
 import {
+  conceptOfSuggestion,
   payloadFor,
   returnToProposer,
   suggestionIsWaiting,
@@ -153,6 +150,9 @@ export {
   type UnsoundReason,
 } from "./loader.ts";
 export { writeManifest, type ManifestWritten, type WriteManifestInput } from "./manifest.ts";
+export { nameOwner, ownerOf, type NameOwnerInput } from "./owners.ts";
+/** @public S3 */
+export type { OwnedConcept, OwnerNamed } from "./owners.ts";
 export {
   RECONCILER,
   reconcile,
@@ -285,11 +285,11 @@ export type ConceptWritten = {
 };
 
 export const writeConceptAction = declareAction({
-  admits: (input: WriteConceptInput) =>
-    input.acceptance === undefined ? BUNDLE_WRITERS : ADMIN_ALONE,
+  admits: ANY_ROLE,
   input: z.custom<WriteConceptInput>(),
   refuses: [
     "role-forbids",
+    "owner-forbids",
     "malformed",
     "no-such-concept",
     "no-such-document",
@@ -320,10 +320,7 @@ const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
 
 type WriteDoors = { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock };
 
-/**
- * An `iri` edits a concept that must already stand; an `acceptance` asks for an Admin and a
- * `base` precondition.
- */
+/** An `iri` edits a concept that must already stand; an `acceptance` needs a `base` precondition. */
 export const writeConcept = async (
   principal: UserPrincipal,
   doors: WriteDoors,
@@ -395,6 +392,7 @@ type Existing = {
   readonly resolved: string | undefined;
   readonly holder: string | undefined;
   readonly waiting: boolean;
+  readonly admission: WriteConceptRefusal | undefined;
 };
 
 const writeUnderLock = async (
@@ -405,7 +403,7 @@ const writeUnderLock = async (
   const existing = await existingOf(principal, doors.postgres, write);
   if (!existing.ok) return err(existing.error);
   if (!existing.value.ok) return err(existing.value.error);
-  const refusal = writeRefusalOf(write, existing.value.value);
+  const refusal = existing.value.value.admission ?? writeRefusalOf(write, existing.value.value);
   if (refusal !== undefined) return err(refusal);
 
   const now = doors.clock.now();
@@ -450,8 +448,10 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
   attempt(() =>
     withMember(principal, postgres, async (fresh, tx): Promise<Existing> => {
       const { input, iri } = write;
+      const admission = await writersRefusal(fresh, tx, write, { iri, path: input.path });
       const held = await heldByIri(fresh, tx, iri);
       return {
+        admission,
         held,
 
         derived:
@@ -516,6 +516,29 @@ const WRITE_REFUSALS: readonly (readonly [
 const writeRefusalOf = (write: ParsedWrite, existing: Existing): WriteConceptRefusal | undefined =>
   WRITE_REFUSALS.find(([, refuses]) => refuses(write, existing))?.[0];
 
+const writersRefusal = async (
+  fresh: UserPrincipal,
+  tx: Tx,
+  write: ParsedWrite,
+  concept: OwnedConcept,
+): Promise<WriteConceptRefusal | undefined> => {
+  const { input } = write;
+  if (input.acceptance === undefined) return ownerAdmits(fresh, tx, concept);
+  const payload = await payloadFor(fresh, tx, input.acceptance.suggestionId);
+  if (payload === undefined) return "already-decided";
+  if (!writesItsSuggestion(write, payload)) return "malformed";
+  return deciderAdmits(fresh, tx, await conceptOfSuggestion(fresh, tx, payload), payload.kind);
+};
+
+const writesItsSuggestion = ({ input, mergeKey }: ParsedWrite, payload: SuggestionPayload) =>
+  payload.kind === input.acceptance?.kind &&
+  payload.mergeKey === mergeKey &&
+  payload.path === input.path &&
+  payload.conceptKind === input.kind &&
+  payload.title === input.title &&
+  payload.body === input.body &&
+  isDeepStrictEqual(payload.frontmatter, input.frontmatter);
+
 const commitAndLandWrite = async (
   principal: UserPrincipal,
   doors: WriteDoors,
@@ -542,6 +565,7 @@ const commitAndLandWrite = async (
       at,
     },
     (fresh, tx, committed) => landWrite(fresh, tx, write, row, committed, fromContentHash),
+    (fresh, tx) => writersRefusal(fresh, tx, write, row),
   );
   if (!landed.ok && landed.error instanceof Error) {
     const named = refusalFor(landed.error, WRITE_CONSTRAINTS);
@@ -663,7 +687,7 @@ const acceptanceMessage = (title: string): string =>
 type AcceptSuggestionsInput = { readonly decisions: readonly AcceptanceDecision[] };
 
 const acceptSuggestionsAction = declareAction({
-  admits: ADMIN_ALONE,
+  admits: ANY_ROLE,
   input: z.custom<AcceptSuggestionsInput>(),
   refuses: ["role-forbids", "malformed"],
 });
@@ -678,8 +702,8 @@ export const acceptSuggestions = async (
     RefusalOf<typeof acceptSuggestionsAction> | PrincipalRefusal | Error
   >
 > => {
-  const admin = admit(acceptSuggestionsAction, principal, input);
-  if (!admin.ok) return err(admin.error);
+  const admitted = admit(acceptSuggestionsAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
 
   const decisions = ACCEPTANCE_DECISIONS.safeParse(input.decisions);
   if (!decisions.success) return err("malformed");
@@ -687,7 +711,7 @@ export const acceptSuggestions = async (
   const batchId = batchIdFor(decisions.data.length);
   const outcomes: AcceptanceOutcome[] = [];
   for (const decision of decisions.data) {
-    outcomes.push(await acceptOne(admin.value, doors, decision, batchId));
+    outcomes.push(await acceptOne(admitted.value, doors, decision, batchId));
   }
   return ok(outcomes);
 };
@@ -757,7 +781,7 @@ const returnedToProposerOn = (
 };
 
 const acceptOne = async (
-  principal: AdminUserPrincipal,
+  principal: UserPrincipal,
   doors: WriteDoors,
   decision: AcceptanceDecision,
   batchId: string | undefined,
@@ -772,7 +796,9 @@ const acceptOne = async (
 
   const [word, reason] = returning;
   const returned = await returnToProposer(principal, doors, { suggestionId, reason });
-  return { suggestionId, outcome: err(returned.ok ? word : returned.error) };
+  const keptWaiting =
+    returned.ok || returned.error === "owner-forbids" || returned.error === "role-forbids";
+  return { suggestionId, outcome: err(keptWaiting ? word : returned.error) };
 };
 
 export type ImportBundleInput = {
@@ -815,15 +841,9 @@ export type ImportLog = {
 type ImportDoors = WriteDoors & { readonly log: ImportLog };
 
 const importBundleAction = declareAction({
-  admits: BUNDLE_WRITERS,
+  admits: ADMIN_ALONE,
   input: z.custom<ImportBundleInput>(),
-  refuses: [
-    "role-forbids",
-    "no-such-repository",
-    "manifest-taken",
-    "class-unreadable",
-    "stale-precondition",
-  ],
+  refuses: ["role-forbids", "no-such-repository", "manifest-taken", "stale-precondition"],
 });
 
 export type ImportBundleRefusal =
@@ -1175,7 +1195,6 @@ export const importBundle = async (
   if (!admitted.ok) return err(admitted.error);
   const sensitivity = input.sensitivity ?? IMPORT_SENSITIVITY_DEFAULT;
 
-  if (!readsSensitivity(principal, sensitivity)) return err("class-unreadable");
   const opened = await openImport(principal, doors.postgres, input);
   if (!opened.ok) return err(opened.error);
   return input.dryRun === true
@@ -1204,9 +1223,16 @@ export type ConceptBodyUpdate = {
 };
 
 const updateConceptBodyAction = declareAction({
-  admits: BUNDLE_WRITERS,
+  admits: ANY_ROLE,
   input: z.custom<UpdateConceptBodyInput>(),
-  refuses: ["role-forbids", "malformed", "no-such-concept", "unchanged", "stale-precondition"],
+  refuses: [
+    "role-forbids",
+    "owner-forbids",
+    "malformed",
+    "no-such-concept",
+    "unchanged",
+    "stale-precondition",
+  ],
 });
 
 export type UpdateConceptBodyRefusal =
@@ -1217,12 +1243,17 @@ type StandingBody = { readonly held: Held; readonly author: CommitAuthor };
 
 const standingBodyOf = (principal: UserPrincipal, postgres: PostgresDoor, iri: ConceptIri) =>
   attempt(() =>
-    withMember(principal, postgres, async (fresh, tx): Promise<StandingBody | undefined> => {
-      const held = await heldByIri(fresh, tx, iri);
-      return held === undefined
-        ? undefined
-        : { held, author: await authorOf(fresh, tx, fresh.userId) };
-    }),
+    withMember(
+      principal,
+      postgres,
+      async (fresh, tx): Promise<Result<StandingBody, "no-such-concept" | OwnerRefusal>> => {
+        const held = await heldByIri(fresh, tx, iri);
+        if (held === undefined) return err("no-such-concept");
+        const refusal = await ownerAdmits(fresh, tx, { iri, path: held.path });
+        if (refusal !== undefined) return err(refusal);
+        return ok({ held, author: await authorOf(fresh, tx, fresh.userId) });
+      },
+    ),
   );
 
 const disagreement = (path: string, why: string): Error =>
@@ -1257,9 +1288,10 @@ const heldBodyOf = async (
   const standing = await standingBodyOf(principal, doors.postgres, iri);
   if (!standing.ok) return err(standing.error);
   if (!standing.value.ok) return err(standing.value.error);
-  if (standing.value.value === undefined) return err("no-such-concept");
-  const file = await fileHeldAt(principal, doors.git, standing.value.value.held);
-  return file.ok ? ok({ ...standing.value.value, file: file.value }) : err(file.error);
+  if (!standing.value.value.ok) return err(standing.value.value.error);
+  const found = standing.value.value.value;
+  const file = await fileHeldAt(principal, doors.git, found.held);
+  return file.ok ? ok({ ...found, file: file.value }) : err(file.error);
 };
 
 const wellFormedOf = (asked: string, body: string): ConceptIri | undefined => {

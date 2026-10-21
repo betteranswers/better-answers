@@ -354,7 +354,7 @@ describe("what a governed write derives from its cited connected sources", () =>
   it("refuses citing an uncatalogued document by name, landing nothing", async () => {
     const scenario = await arrange();
     const uncatalogued = ulid();
-    const path = "knowledge/cites-an-uncatalogued-document.md";
+    const path = "knowledge/policy/cites-an-uncatalogued-document.md";
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
 
     const refused = await writeConcept(scenario.editor, doorsOf(scenario), {
@@ -547,7 +547,7 @@ describe("what a re-write may not do to a concept's sensitivity", () => {
 
     const ontoKey = await writeConcept(scenario.editor, doorsOf(scenario), {
       mergeKey: withheld.mergeKey,
-      path: "knowledge/jane-doe-again.md",
+      path: "knowledge/policy/jane-doe-again.md",
       kind: "Person",
       title: "Jane Doe",
       frontmatter: { title: "Jane Doe", type: "Person" },
@@ -1885,7 +1885,7 @@ describe("find", () => {
               rider: null,
             },
             trustWords: "Unverified",
-            collection: null,
+            collection: "policy",
             tags: ["finance"],
           },
         ],
@@ -1981,7 +1981,7 @@ describe("the collections a reader meets", () => {
   it("offers only collections holding a concept the reader may read", async () => {
     const scenario = await arrange();
     await auditsReadableAndLmsWithheld(scenario);
-    await conceptCiting(scenario, scenario.editor, [], {
+    await conceptCiting(scenario, scenario.admin, [], {
       path: "knowledge/retention.md",
       title: RETENTION,
       sensitivity: "Internal",

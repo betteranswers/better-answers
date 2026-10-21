@@ -3958,21 +3958,19 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.forbidden);
       expect(run.lines).toEqual([
-        `import-bundle: REFUSED — ${viewer.email} is a Viewer of this workspace; the import runs as an Admin or an Editor`,
+        `import-bundle: REFUSED — ${viewer.email} is not an Admin of this workspace; the import runs as an Admin`,
       ]);
       expect(await commitsOf(app(), workspaceId)).toEqual([]);
     });
 
-    it("refuses an Editor landing Restricted, which only Admins read back", async () => {
+    it("refuses to run as an Editor, and writes nothing", async () => {
       const { workspaceId } = await bundleWorkspace(app());
 
-      const run = await importing(app(), workspaceId, MONA, {
-        flags: ["--sensitivity", "Restricted"],
-      });
+      const run = await importing(app(), workspaceId, MONA);
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.forbidden);
       expect(run.lines).toEqual([
-        `import-bundle: REFUSED — ${MONA} is not an Admin of this workspace, and a bundle landed Restricted is one only an Admin can read back for its second pass; run the import as an Admin`,
+        `import-bundle: REFUSED — ${MONA} is not an Admin of this workspace; the import runs as an Admin`,
       ]);
       expect(await commitsOf(app(), workspaceId)).toEqual([]);
     });

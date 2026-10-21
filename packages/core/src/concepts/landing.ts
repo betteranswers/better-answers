@@ -52,14 +52,17 @@ import type { Acceptance } from "./index.ts";
 import { markDeciding } from "./suggestions.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
 
-export const commitAndLandAsMember = async (
+export const commitAndLandAsMember = async <Refused extends string = never>(
   principal: UserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
   request: CommitRequest,
   land: (fresh: UserPrincipal, tx: Tx, committed: Committed) => Promise<void>,
-): Promise<Result<Committed, CommitRefusal | PrincipalRefusal | Error>> => {
+  admits: (fresh: UserPrincipal, tx: Tx) => Promise<Refused | undefined>,
+): Promise<Result<Committed, CommitRefusal | Refused | PrincipalRefusal | Error>> => {
   const held = await attempt(() =>
     withMember(principal, doors.postgres, async (fresh, tx) => {
+      const refusal = await admits(fresh, tx);
+      if (refusal !== undefined) return err(refusal);
       const committed = await commit(fresh, doors.git, request);
       if (committed.ok) await land(fresh, tx, committed.value);
       return committed;

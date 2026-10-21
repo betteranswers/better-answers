@@ -182,7 +182,7 @@ describe("the seed", () => {
 
   it("refuses where another concept holds the drill's path, head unmoved", async () => {
     const scenario = await arrange();
-    const other = await writeConcept(scenario.editor, doorsOf(scenario), {
+    const other = await writeConcept(scenario.admin, doorsOf(scenario), {
       mergeKey: "Note:not the drill",
       path: CONCEPT_PATH,
       kind: "Note",

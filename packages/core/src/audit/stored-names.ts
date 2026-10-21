@@ -70,6 +70,7 @@ export const STORED_ACT_NAMES = [
   "knowledge.feedback.closed",
   "platform.workspace.model_choice_set",
   "people.person.sessions_ended",
+  "knowledge.owner.named",
 ] as const;
 
 export const STORED_DETAIL_KEYS = {
@@ -148,4 +149,5 @@ export const STORED_DETAIL_KEYS = {
   recordId: "recordId",
   closedAs: "closedAs",
   fromContentHash: "fromContentHash",
+  collection: "collection",
 } as const;

@@ -520,37 +520,17 @@ const strangersToTheWorkspace = (
     ),
   );
 
-const overridesAsked = (asked: Asked): readonly Refusal[] =>
-  asked.concepts.flatMap((concept, at) => {
-    if (concept.audience === "groups") {
-      return [
-        {
-          path: ["concepts", at, "audience"],
-          message:
-            "narrowing a concept to a group is an Admin's override, and the writer is no Admin",
-        },
-      ];
-    }
-    return concept.sources.flatMap((source, nth) =>
-      heldCloser(concept, source)
-        ? [
-            {
-              path: ["concepts", at, "sources", nth, "sensitivity"],
-              message:
-                "sharing a concept that cites a document held at another sensitivity is an Admin's override, and the writer is no Admin",
-            },
-          ]
-        : [],
-    );
-  });
-
-const writerRefused = (asked: Asked, role: Role | undefined): readonly Refusal[] => {
+const writerRefused = (role: Role | undefined): readonly Refusal[] => {
   if (role === undefined) {
     return [{ path: ["userId"], message: "a seed's writer is a member of the workspace" }];
   }
   if (role === "Admin") return [];
-  if (role === "Editor") return overridesAsked(asked);
-  return [{ path: ["userId"], message: "a concept is written by an Editor or an Admin" }];
+  return [
+    {
+      path: ["userId"],
+      message: "a concept is seeded by an Admin, since the seed names nobody its owner",
+    },
+  ];
 };
 
 const refuse = (refusals: readonly Refusal[]): void => {
@@ -568,7 +548,7 @@ export const seedConcepts = async (
   const git = openTestGit(app);
   const held = await heldAhead(app, asked);
   refuse([
-    ...writerRefused(asked, held.members.get(userId)),
+    ...writerRefused(held.members.get(userId)),
     ...titlesHeld(asked, held.files),
     ...strangersToTheWorkspace(asked, held.members),
   ]);
