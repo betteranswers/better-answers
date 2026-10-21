@@ -315,6 +315,47 @@ describe("the per-address ceiling over tRPC", () => {
     expect(await api.members.invitations.query()).toEqual(before);
   });
 
+  it("lets a resend go after four resends that failed", async () => {
+    const { api } = await anAdmin();
+    const ana = anAddress("ana");
+    stopTheClock();
+    const invited = await invitedOne(api, ana);
+    unreachable.add(ana);
+    const failed: unknown[] = [];
+    for (let resend = 1; resend < PER_ADDRESS_CEILING; resend += 1) {
+      failed.push(
+        await api.members.resendInvitation.mutate({ invitationId: invited.invitationId }),
+      );
+    }
+    unreachable.delete(ana);
+
+    const resent = await statusOf(
+      api.members.resendInvitation.mutate({ invitationId: invited.invitationId }),
+    );
+
+    expect(failed).toEqual(
+      Array.from({ length: PER_ADDRESS_CEILING - 1 }, () =>
+        expect.objectContaining({ emailSent: false }),
+      ),
+    );
+    expect(resent).toBe(200);
+  });
+
+  it("counts a partial send's delivered emails, not its failed ones", async () => {
+    const { api } = await anAdmin();
+    const online = anAddress("online");
+    const offline = anAddress("offline");
+    unreachable.add(offline);
+    stopTheClock();
+    for (let attempt = 0; attempt < PER_ADDRESS_CEILING; attempt += 1) {
+      await inviting(api, [online, offline]);
+    }
+    unreachable.delete(offline);
+
+    expect(await statusOf(inviting(api, [online]))).toBe(429);
+    expect(await statusOf(inviting(api, [offline]))).toBe(200);
+  });
+
   it("answers a stale tab the refusal, never the ceiling", async () => {
     const acme = await app().provision({ name: "Acme" });
     const beta = await app().provision({ name: "Beta" });

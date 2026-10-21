@@ -15,13 +15,16 @@ import {
   type Api,
 } from "./people-suite.ts";
 import { whileCommitsAreRefused } from "./provoke.ts";
-import { refusalOfCall, webSignedIn } from "./web-client.ts";
+import { aStoppableClock } from "./suite-app.ts";
+import { refusalOfCall, statusOf, webSignedIn } from "./web-client.ts";
 
 const REASON = "I have joined the bids team and need the answer library.";
 
 const unreachable = new Set<string>();
 
-const app = appForSuite(unreachable);
+const { clock, stopTheClock } = aStoppableClock();
+
+const app = appForSuite(unreachable, clock);
 
 const anAdminWithOneRequest = async () => {
   const workspace = await app().provision({ name: "Calder Joinery" });
@@ -207,6 +210,24 @@ describe("an approval's invitation email", () => {
     expect(emailsTo(app(), requester.email).at(-1)?.text).toContain(
       `/invitations/${approved.invitationId}`,
     );
+  });
+
+  it("gives back no count when it did not go", async () => {
+    const { api, requester, requestId } = await anAdminWithOneRequest();
+    stopTheClock();
+    for (let invite = 0; invite < 5; invite += 1) {
+      await api.members.invite.mutate({ addresses: [requester.email], role: "Viewer" });
+    }
+    unreachable.add(requester.email);
+    const approved = await api.members.approveRequest.mutate({ requestId, role: "Viewer" });
+    unreachable.delete(requester.email);
+
+    const resent = await statusOf(
+      api.members.resendInvitation.mutate({ invitationId: approved.invitationId }),
+    );
+
+    expect(approved).toMatchObject({ emailSent: false });
+    expect(resent).toBe(429);
   });
 });
 
