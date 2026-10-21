@@ -18,13 +18,7 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
-import {
-  hasADisplayName,
-  useAcceptInvitation,
-  useSession,
-  useSetDisplayName,
-  useSignOut,
-} from "./auth-hooks.ts";
+import { useAcceptInvitation, useSession, useSetDisplayName, useSignOut } from "./auth-hooks.ts";
 import { AuthPage, Outcome, ReadAgain, Refused } from "./auth-page.tsx";
 import { carriedFlow, invitationAt, leavingFor, pageQuery } from "./carried-flow.ts";
 import { INVITATION_ACTIONS, INVITATION_WORDS } from "./invitation-words.ts";
@@ -212,11 +206,10 @@ function InvitationToJoin(properties: {
   readonly here: string;
 }) {
   const { invitation, invitationId, here } = properties;
-  const session = useSession().data;
-  const [asksAName, setAsksAName] = useState(() => {
-    const given = session?.user.name;
-    return given !== undefined && !hasADisplayName(given);
-  });
+  const read = useSession();
+  const [asksAName, setAsksAName] = useState(
+    () => read.standing === "signed-in" && read.session.displayName === undefined,
+  );
   const [name, setName] = useState("");
   const naming = useSetDisplayName();
   const accept = useAcceptInvitation();

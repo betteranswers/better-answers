@@ -139,6 +139,39 @@ const ASKED_AGAIN_AT_MOST = 2;
 const askedAgainUnlessRefused = (failures: number, failure: Error): boolean =>
   !(failure instanceof CodeRefused) && failures < ASKED_AGAIN_AT_MOST;
 
+const hasADisplayName = (name: string): boolean => name.trim() !== "";
+
+export type Session = {
+  readonly id: string;
+  readonly address: string;
+  readonly displayName: string | undefined;
+  readonly workspaceId: string | undefined;
+};
+
+export type SessionStanding =
+  | { readonly standing: "reading" }
+  | { readonly standing: "unread" }
+  | { readonly standing: "signed-out" }
+  | { readonly standing: "signed-in"; readonly session: Session };
+
+type SessionAnswer = {
+  readonly session: {
+    readonly id: string;
+    readonly activeOrganizationId?: string | null | undefined;
+  };
+  readonly user: { readonly email: string; readonly name: string };
+} | null;
+
+const sessionOf = (answer: SessionAnswer): Session | null =>
+  answer === null
+    ? null
+    : {
+        id: answer.session.id,
+        address: answer.user.email,
+        displayName: hasADisplayName(answer.user.name) ? answer.user.name : undefined,
+        workspaceId: answer.session.activeOrganizationId ?? undefined,
+      };
+
 const sessionOptions = () =>
   queryOptions({
     queryKey: AUTH_KEYS.session,
@@ -146,7 +179,29 @@ const sessionOptions = () =>
     retry: askedAgainUnlessRefused,
   });
 
-export const useSession = () => useQuery(sessionOptions());
+const standingOf = (read: {
+  readonly isPending: boolean;
+  readonly data: Session | null | undefined;
+}): SessionStanding => {
+  if (read.isPending) return { standing: "reading" };
+  if (read.data === undefined) return { standing: "unread" };
+  return read.data === null
+    ? { standing: "signed-out" }
+    : { standing: "signed-in", session: read.data };
+};
+
+export const addressOf = (read: SessionStanding): string =>
+  read.standing === "signed-in" ? read.session.address : "";
+
+const theSession = () => ({ ...sessionOptions(), select: sessionOf });
+
+export const useSession = (): SessionStanding => standingOf(useQuery(theSession()));
+
+/** A failed reread says nothing of the session now, even while the cache keeps an older answer. */
+export const useSessionReread = (): (() => Promise<SessionStanding>) => {
+  const { refetch } = useQuery(theSession());
+  return () => refetch().then((read) => (read.isError ? { standing: "unread" } : standingOf(read)));
+};
 
 const returnPathOf = (query: string): { readonly redirect?: string } => {
   const redirect = new URLSearchParams(query).get("redirect");
@@ -165,8 +220,6 @@ const sendVerificationOtpOptions = () =>
   });
 
 export const useSendVerificationOtp = () => useMutation(sendVerificationOtpOptions());
-
-export const hasADisplayName = (name: string): boolean => name.trim() !== "";
 
 export type SignedIn = { readonly displayNameGiven: boolean };
 

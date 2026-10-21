@@ -22,7 +22,7 @@ import {
   PASSKEY_WORDS,
   passkeyNameFor,
 } from "./account-words.ts";
-import { useSession } from "./auth-hooks.ts";
+import { addressOf, useSession } from "./auth-hooks.ts";
 import { AuthPage, focusOn, Outcome } from "./auth-page.tsx";
 import { COPY_KEY } from "./authenticator-part.tsx";
 import { passkeysHere, useRemovePasskey, type PasskeyAdded } from "./passkey-hooks.ts";
@@ -263,7 +263,7 @@ function InTheShell(properties: {
 
 export function AccountPage(properties: { readonly framed?: boolean }) {
   const read = useSecondFactor();
-  const address = useSession().data?.user.email ?? "";
+  const address = addressOf(useSession());
   const hash = useLocation({ select: (location) => location.hash });
   const routes =
     read.data?.thisSession?.setupGranted === true ? NEW_AUTHENTICATOR : FIRST_AUTHENTICATOR;

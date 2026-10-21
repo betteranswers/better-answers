@@ -11,12 +11,12 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { AccountLink } from "./account-link.tsx";
 import {
-  hasADisplayName,
   useOAuthContinue,
   useSession,
   useSetActiveOrganization,
   useWorkspacesHeld,
   type ResumeAnswer,
+  type SessionStanding,
   type SwitchRefused,
 } from "./auth-hooks.ts";
 import { AuthPage } from "./auth-page.tsx";
@@ -25,7 +25,6 @@ import { CONNECTION_UNFINISHED, noLongerAMember, SOLE_PICK_REFUSED } from "./ref
 import { SignOutButton } from "./sign-out-button.tsx";
 import { NOT_CONNECTED, PICKER_ACTIONS, PICKER_WORDS } from "./workspace-words.ts";
 
-type Session = ReturnType<typeof useSession>;
 type Workspaces = ReturnType<typeof useWorkspacesHeld>;
 type Workspace = NonNullable<Workspaces["data"]>[number];
 
@@ -40,15 +39,17 @@ const addressIn = (answer: ResumeAnswer): string | undefined => {
   return typeof next === "string" && next !== "" ? next : undefined;
 };
 
-const whatTheSessionSays = (session: Session) => ({
-  signedOut: !session.isPending && (session.data === null || session.data === undefined),
-  unnamed:
-    session.data !== null && session.data !== undefined && !hasADisplayName(session.data.user.name),
-  active: session.data?.session.activeOrganizationId ?? undefined,
-});
+const whatTheSessionSays = (read: SessionStanding) => {
+  const session = read.standing === "signed-in" ? read.session : undefined;
+  return {
+    signedOut: read.standing === "signed-out" || read.standing === "unread",
+    unnamed: session !== undefined && session.displayName === undefined,
+    active: session?.workspaceId,
+  };
+};
 
 const whereThePersonStands = (
-  session: Session,
+  session: SessionStanding,
   workspaces: Workspaces,
   noLongerHeld: Workspace | undefined,
 ) => {
@@ -57,7 +58,7 @@ const whereThePersonStands = (
     ...whatTheSessionSays(session),
     held,
     sole: held.length === 1 ? held[0] : undefined,
-    settled: !session.isPending && !workspaces.isPending,
+    settled: session.standing !== "reading" && !workspaces.isPending,
   };
 };
 
