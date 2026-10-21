@@ -156,7 +156,8 @@ const stop = async (signal: NodeJS.Signals): Promise<never> => {
       "the stop reached its deadline, so what was still open is cut",
     );
   }
-  process.exit(0);
+  // A non-zero exit leaves a cut stop in `docker inspect`, not only in the log.
+  process.exit(drained ? 0 : 1);
 };
 
 const stopOn = (signal: NodeJS.Signals): void => {

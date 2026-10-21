@@ -85,8 +85,8 @@ const stopped = (api: Running, signal: NodeJS.Signals): Promise<Stopped> => {
   return api.exited.then((exit) => ({ ...exit, said: api.said(), afterMs: Date.now() - from }));
 };
 
-const exitedClean = (stop: Stopped): Stopped => ({
-  code: 0,
+const exitedWith = (code: number, stop: Stopped): Stopped => ({
+  code,
   signal: null,
   said: stop.said,
   afterMs: stop.afterMs,
@@ -112,7 +112,7 @@ it.each(["SIGTERM", "SIGINT"] as const)("exits 0 at once on %s", async (signal) 
 
   const stop = await stopped(api, signal);
 
-  expect(stop).toEqual(exitedClean(stop));
+  expect(stop).toEqual(exitedWith(0, stop));
   expect(stop.afterMs).toBeLessThan(STOP_DEADLINE_MS / 2);
 });
 
@@ -129,18 +129,18 @@ it("answers a request in flight at the stop", async () => {
     /^HTTP\/1\.1 200 [\s\S]*\r\nconnection: close\r\n[\s\S]*"status":"healthy"/i,
   );
   const stop = await stopping;
-  expect(stop).toEqual(exitedClean(stop));
+  expect(stop).toEqual(exitedWith(0, stop));
   expect(stop.afterMs).toBeLessThan(STOP_DEADLINE_MS / 2);
 });
 
-it("cuts a request still open at the stop deadline", async () => {
+it("exits 1 at the deadline, cutting a request still open", async () => {
   const api = await startApi();
   const socket = await heldRequest(api.port);
   const reply = received(socket);
 
   const stop = await stopped(api, "SIGTERM");
 
-  expect(stop).toEqual(exitedClean(stop));
+  expect(stop).toEqual(exitedWith(1, stop));
   expect(stop.afterMs).toBeGreaterThanOrEqual(STOP_DEADLINE_MS - 500);
   expect(stop.afterMs).toBeLessThan(STOP_DEADLINE_MS + 5_000);
   expect(await reply).toBe("");
