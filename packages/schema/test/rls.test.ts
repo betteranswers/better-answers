@@ -1,3 +1,4 @@
+import { getTableConfig } from "drizzle-orm/pg-core";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -2120,64 +2121,85 @@ describe("the passage index under worker_rt", () => {
 });
 
 describe("the audience pair on every readable unit", () => {
-  const AUDIENCE_TABLES: readonly [string, string, (seed: TestData) => Promise<unknown>][] = [
-    [
-      "concept_index",
-      "concept_index_audience_check",
-      (seed) => seed.conceptIndex({ workspaceId: WS_A }),
-    ],
-    ["map_node", "map_node_audience_check", (seed) => seed.mapNode({ workspaceId: WS_A })],
-    ["map_edge", "map_edge_audience_check", (seed) => seed.mapEdge({ workspaceId: WS_A })],
-    [
-      "connected_source",
-      "connected_source_audience_check",
-      (seed) => seed.connectedSource({ workspaceId: WS_A }),
-    ],
-    ["write_up", "write_up_audience_check", (seed) => seed.writeUp({ workspaceId: WS_A })],
-    [
-      "concept_sensitivity_override",
-      "concept_sensitivity_override_audience_check",
-      (seed) => seed.conceptSensitivityOverride({ workspaceId: WS_A }),
-    ],
+  const AUDIENCE_TABLES = `SELECT n.nspname AS schema, c.relname AS table, k.conname AS constraint
+    FROM pg_attribute a
+    JOIN pg_class c ON c.oid = a.attrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    LEFT JOIN pg_constraint k
+      ON k.conrelid = c.oid AND k.contype = 'c' AND pg_get_constraintdef(k.oid) LIKE '%audience_groups%'
+    WHERE a.attname = 'audience_groups' AND NOT a.attisdropped
+      AND c.relkind IN ('r', 'p') AND NOT c.relispartition
+    ORDER BY n.nspname, c.relname`;
+
+  const HALF_SHAPES = [
+    "audience = 'groups', audience_groups = NULL",
+    "audience = 'groups', audience_groups = '{}'",
+    "audience = 'groups', audience_groups = ARRAY[NULL]::text[]",
+    "audience = 'everyone', audience_groups = ARRAY['01J6JJJJJJJJJJJJJJJJJJJJJJ']",
+    "audience = 'members', audience_groups = NULL",
   ];
 
-  it.each(AUDIENCE_TABLES)(
-    "refuses every half-shape on %s and lands both whole ones",
-    async (table, constraint, seedOne) => {
-      await withRollback(db.pool, async (client) => {
-        const seed = await seedTwoWorkspaces(client);
-        await seedOne(seed);
+  const seedOneRow = async (seed: TestData, schema: string, table: string) => {
+    const key = Object.entries(boundarySchemas).find(([, { table: declared }]) => {
+      const config = getTableConfig(declared);
+      return (config.schema ?? "public") === schema && config.name === table;
+    })?.[0];
+    const seeders: Readonly<Record<string, unknown>> = seed;
+    const seeder = key === undefined ? undefined : seeders[key];
+    if (typeof seeder !== "function") {
+      throw new Error(
+        `the factory has no seeder for ${schema}.${table}, so its audience goes unprobed`,
+      );
+    }
+    await seeder({ workspaceId: WS_A });
+  };
+
+  it("refuses each half-shape wherever the pair lives, landing whole ones", async () => {
+    const tables = (
+      await db.pool.query<{ schema: string; table: string; constraint: string | null }>(
+        AUDIENCE_TABLES,
+      )
+    ).rows;
+    expect(tables).not.toEqual([]);
+
+    for (const { schema, table, constraint } of tables) {
+      const qualified = `"${schema}"."${table}"`;
+      const probed = await withRollback(db.pool, async (client) => {
+        await seedOneRow(await seedTwoWorkspaces(client), schema, table);
         await client.query("SET LOCAL ROLE app_rt");
         await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-        const halfShapes = [
-          "audience = 'groups', audience_groups = NULL",
-          "audience = 'groups', audience_groups = '{}'",
-          "audience = 'groups', audience_groups = ARRAY[NULL]::text[]",
-          "audience = 'everyone', audience_groups = ARRAY['01J6JJJJJJJJJJJJJJJJJJJJJJ']",
-          "audience = 'members', audience_groups = NULL",
-        ];
-        for (const half of halfShapes) {
-          await client.query("SAVEPOINT half_shape");
-          await expect(
-            client.query(`UPDATE ${table} SET ${half} WHERE workspace_id = $1`, [WS_A]),
-          ).rejects.toThrow(new RegExp(constraint));
-          await client.query("ROLLBACK TO SAVEPOINT half_shape");
+        const refusals = [];
+        for (const half of HALF_SHAPES) {
+          refusals.push(
+            await refusalOf(client, () =>
+              client.query(`UPDATE ${qualified} SET ${half} WHERE workspace_id = $1`, [WS_A]),
+            ),
+          );
         }
-
         const narrowed = await client.query(
-          `UPDATE ${table} SET audience = 'groups', audience_groups = ARRAY['01J6JJJJJJJJJJJJJJJJJJJJJJ'] WHERE workspace_id = $1`,
+          `UPDATE ${qualified} SET audience = 'groups', audience_groups = ARRAY['01J6JJJJJJJJJJJJJJJJJJJJJJ'] WHERE workspace_id = $1`,
           [WS_A],
         );
-        expect(narrowed.rowCount).toBeGreaterThan(0);
         const widened = await client.query(
-          `UPDATE ${table} SET audience = 'everyone', audience_groups = NULL WHERE workspace_id = $1`,
+          `UPDATE ${qualified} SET audience = 'everyone', audience_groups = NULL WHERE workspace_id = $1`,
           [WS_A],
         );
-        expect(widened.rowCount).toBe(narrowed.rowCount);
+        return {
+          refusals,
+          narrowed: (narrowed.rowCount ?? 0) > 0,
+          widenedAsMany: widened.rowCount === narrowed.rowCount,
+        };
       });
-    },
-  );
+
+      expect({ table: qualified, ...probed }).toEqual({
+        table: qualified,
+        refusals: HALF_SHAPES.map(() => constraint),
+        narrowed: true,
+        widenedAsMany: true,
+      });
+    }
+  });
 });
 
 describe("the rules in force on a connected source", () => {
