@@ -188,24 +188,36 @@ const anAdminAtSearch = async (
 
 const saidNow = async (page: Page): Promise<string> => (await said(page).textContent()) ?? "";
 
-const aPassageOpenedWhileTheListLoads = async (
-  page: Page,
-  api: APIRequestContext,
-  name: string,
-): Promise<{ readonly panel: Locator; readonly release: () => void }> => {
-  await anAdminAtSearch(page, api, name, [forkliftGuideSeeded]);
+const aPassageClickedWhileTheListLoads = async (page: Page): Promise<() => void> => {
   await searched(page, "pallet");
   await expect(matchesOf(page)).toHaveCount(2);
   const typed = await heldBack(page, isAFindFor("forklift"));
   await searchBox(page).fill("forklift");
   await matchesOf(page).getByRole("button", { name: FORKLIFT_GUIDE }).click();
   await typed.reached;
+  return typed.release;
+};
+
+const aPassageOpenedWhileTheListLoads = async (
+  page: Page,
+  api: APIRequestContext,
+  name: string,
+): Promise<{ readonly panel: Locator; readonly release: () => void }> => {
+  await anAdminAtSearch(page, api, name, [forkliftGuideSeeded]);
+  const release = await aPassageClickedWhileTheListLoads(page);
   const panel = passagePanel(page, FORKLIFT_GUIDE);
   await expect(panel.getByRole("heading", { name: FORKLIFT_GUIDE })).toBeFocused();
   await expect(matchesOf(page), "the opener is still on the page while the list loads").toHaveCount(
     0,
   );
-  return { panel, release: typed.release };
+  return { panel, release };
+};
+
+const saysNoMatchWasInFocus = async (page: Page, listed: string): Promise<void> => {
+  await page.keyboard.press(KEY.open.key);
+  await expect(said(page), "the page says nothing of a key that opened nothing").not.toHaveText(
+    listed,
+  );
 };
 
 const searched = async (page: Page, query: string): Promise<void> => {
@@ -499,14 +511,9 @@ test.describe("the Knowledge Search page", () => {
     }) => {
       await anAdminAtSearch(page, request, `Nidd Stores ${String(width)}`, [forkliftGuideSeeded]);
       await page.setViewportSize({ width, height: 720 });
-      await searched(page, "pallet");
-      await expect(matchesOf(page)).toHaveCount(2);
-      const typed = await heldBack(page, isAFindFor("forklift"));
 
-      await searchBox(page).fill("forklift");
-      await matchesOf(page).getByRole("button", { name: FORKLIFT_GUIDE }).click();
-      await typed.reached;
-      typed.release();
+      const release = await aPassageClickedWhileTheListLoads(page);
+      release();
 
       await expect(matchesOf(page)).toHaveText([new RegExp(FORKLIFT_GUIDE)]);
       await expect(
@@ -522,10 +529,7 @@ test.describe("the Knowledge Search page", () => {
     const listed = await saidNow(page);
 
     await searchRegion(page).getByRole("heading", { name: "Search" }).focus();
-    await page.keyboard.press(KEY.open.key);
-    await expect(said(page), "the page says nothing of a key that opened nothing").not.toHaveText(
-      listed,
-    );
+    await saysNoMatchWasInFocus(page, listed);
     await expect(page).toHaveURL((url) => url.pathname === SEARCH.path);
     await searched(page, "audit");
     await searched(page, "forklift");
@@ -543,11 +547,8 @@ test.describe("the Knowledge Search page", () => {
 
     await matchesOf(page).getByRole("button", { name: FORKLIFT_GUIDE }).focus();
     await searchRegion(page).getByRole("heading", { name: "Search" }).focus();
-    await page.keyboard.press(KEY.open.key);
 
-    await expect(said(page), "the page says nothing of a key that opened nothing").not.toHaveText(
-      listed,
-    );
+    await saysNoMatchWasInFocus(page, listed);
     await expect(passagePanel(page, FORKLIFT_GUIDE)).toHaveCount(0);
   });
 
