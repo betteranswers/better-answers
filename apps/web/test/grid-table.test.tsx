@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable, RowLink } from "@/shared/grid-table.tsx";
 import { ListPages } from "@/shared/list-pages.tsx";
+import { rowInFocus } from "@/shared/row-focus.ts";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
 import { BareList, LIST_SAYS, MEMBERS, MembersList } from "./members-list.tsx";
@@ -529,11 +530,11 @@ const FOCUS_COLUMNS = focusColumn.columns([
   focusColumn.accessor("name", { id: "person", header: "Person" }),
 ]);
 
-function FocusedList(properties: { readonly onRowFocus: (id: string | undefined) => void }) {
+function FocusedList(properties: { readonly members: typeof MEMBERS }) {
   const table = useTable({
     features: FOCUS_FEATURES,
     columns: FOCUS_COLUMNS,
-    data: [...MEMBERS],
+    data: [...properties.members],
     getRowId: (member) => member.id,
   });
   return (
@@ -547,23 +548,25 @@ function FocusedList(properties: { readonly onRowFocus: (id: string | undefined)
           <button type="button">Cancel for {member.name}</button>
         </>
       )}
-      onRowFocus={(member) => {
-        properties.onRowFocus(member?.id);
-      }}
     />
   );
 }
 
 describe("the row in focus", () => {
-  it("holds a row only while focus stays inside it", () => {
-    const seen: (string | undefined)[] = [];
-    render(<FocusedList onRowFocus={(id) => seen.push(id)} />);
+  it("answers the row holding focus, none once it is gone", () => {
+    const { rerender } = render(<FocusedList members={MEMBERS} />);
+    const inFocus = () => rowInFocus(MEMBERS, (member) => member.id)?.id;
+
+    expect(inFocus()).toBeUndefined();
+    screen.getByRole("button", { name: "Resend to Cy Twombly" }).focus();
+    expect(inFocus()).toBe("cy");
+    screen.getByRole("button", { name: "Cancel for Ada Lovelace" }).focus();
+    expect(inFocus()).toBe("ada");
+    screen.getByRole("button", { name: "Cancel for Ada Lovelace" }).blur();
+    expect(inFocus()).toBeUndefined();
 
     screen.getByRole("button", { name: "Resend to Cy Twombly" }).focus();
-    screen.getByRole("button", { name: "Resend to Ada Lovelace" }).focus();
-    screen.getByRole("button", { name: "Cancel for Ada Lovelace" }).focus();
-    screen.getByRole("button", { name: "Cancel for Ada Lovelace" }).blur();
-
-    expect(seen).toEqual(["cy", undefined, "ada", "ada", undefined]);
+    rerender(<FocusedList members={MEMBERS.filter((member) => member.id !== "cy")} />);
+    expect(inFocus(), "a row taken off the page stayed in focus").toBeUndefined();
   });
 });

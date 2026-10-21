@@ -1,21 +1,9 @@
-import type { FocusEventHandler } from "react";
+export const keyedRow = (key: string) => ({ "data-row": key });
 
-type RowFocus = {
-  readonly onFocus?: FocusEventHandler;
-  readonly onBlur?: FocusEventHandler;
+export const rowInFocus = <Row>(
+  rows: readonly Row[],
+  keyOf: (row: Row) => string,
+): Row | undefined => {
+  const key = document.activeElement?.closest("[data-row]")?.getAttribute("data-row");
+  return rows.find((row) => keyOf(row) === key);
 };
-
-export const rowFocusOf = <Row>(
-  onRowFocus: ((row: Row | undefined) => void) | undefined,
-  row: Row,
-): RowFocus =>
-  onRowFocus === undefined
-    ? {}
-    : {
-        onFocus: () => {
-          onRowFocus(row);
-        },
-        onBlur: (event) => {
-          if (!event.currentTarget.contains(event.relatedTarget)) onRowFocus(undefined);
-        },
-      };

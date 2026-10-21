@@ -9,7 +9,7 @@ import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
-import { rowFocusOf } from "@/shared/row-focus.ts";
+import { keyedRow, rowInFocus } from "@/shared/row-focus.ts";
 import { RowSheetButton } from "@/shared/row-sheet.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
@@ -45,7 +45,6 @@ const recordsOf = (data: QuestionsAsked["data"]): readonly AskedRecord[] =>
 
 type RowActions = {
   readonly open: (recordId: string) => void;
-  readonly onRowFocus: (recordId: string | undefined) => void;
   readonly servedAt: ReadonlyMap<string, number>;
   readonly landing: Landing;
 };
@@ -60,7 +59,7 @@ function RecordItem(properties: { readonly record: AskedRecord; readonly actions
   return (
     <li
       className="grid justify-items-start gap-1 border-t border-border px-3 py-3 first:border-t-0"
-      {...rowFocusOf(actions.onRowFocus, record.id)}
+      {...keyedRow(record.id)}
     >
       <RowSheetButton
         ref={land}
@@ -117,16 +116,15 @@ function Records(properties: { readonly asked: QuestionsAsked }) {
   const grouped = useMemo(() => groupedForReading(records), [records]);
   const servedAt = useMemo(() => new Map(records.map((record, at) => [record.id, at])), [records]);
   const landing = useLanding();
-  const [inFocus, setInFocus] = useState<string>();
   const [openedId, setOpenedId] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
   const opened = useLastRead(records, openedId);
   const closing = useFlagClosing();
 
   useKeystroke(KEY.open, () => {
-    const held = records.some((record) => record.id === inFocus);
-    setOutcome(held ? undefined : NOTHING_IN_FOCUS);
-    if (held) setOpenedId(inFocus);
+    const record = rowInFocus(records, (each) => each.id);
+    setOutcome(record === undefined ? NOTHING_IN_FOCUS : undefined);
+    if (record !== undefined) setOpenedId(record.id);
   });
 
   if (records.length === 0) {
@@ -138,7 +136,6 @@ function Records(properties: { readonly asked: QuestionsAsked }) {
       setOutcome(undefined);
       setOpenedId(recordId);
     },
-    onRowFocus: setInFocus,
     servedAt,
     landing,
   };

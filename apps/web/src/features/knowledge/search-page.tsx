@@ -24,7 +24,7 @@ import { useLanding, useLandingLine, type Landing } from "@/shared/landing.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { ListPages, ListState } from "@/shared/list-pages.tsx";
 import { PageHead } from "@/shared/page-head.tsx";
-import { rowFocusOf } from "@/shared/row-focus.ts";
+import { keyedRow, rowInFocus } from "@/shared/row-focus.ts";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
@@ -138,7 +138,6 @@ type Opening = {
   readonly beside: boolean;
   readonly open: (match: Match) => void;
   readonly onClose: () => void;
-  readonly onRowFocus: (key: string | undefined) => void;
 };
 
 function PassageLine(properties: { readonly match: PassageMatch; readonly opening: Opening }) {
@@ -179,12 +178,7 @@ function MatchLine(properties: {
   const { match } = properties;
   const land = useLandingLine(properties.landsHere, properties.onLanded);
   return (
-    <li
-      ref={land}
-      tabIndex={-1}
-      className="px-4 py-3"
-      {...rowFocusOf(properties.opening.onRowFocus, keyOf(match))}
-    >
+    <li ref={land} tabIndex={-1} className="px-4 py-3" {...keyedRow(keyOf(match))}>
       {match.layer === "bundles" ? (
         <ConceptLine match={match} opening={properties.opening} reading={properties.reading} />
       ) : (
@@ -359,23 +353,16 @@ const useReturnedUnlisted = (
 };
 
 const useOpenKey = (query: string, shown: readonly Match[], open: (match: Match) => void) => {
-  const [inFocus, setInFocus] = useState<string>();
   const [unopenedIn, setUnopenedIn] = useState<string>();
   if (unopenedIn !== undefined && unopenedIn !== query) setUnopenedIn(undefined);
 
   useKeystroke(KEY.open, () => {
-    const match = shown.find((listed) => keyOf(listed) === inFocus);
-    if (match === undefined) setUnopenedIn(query);
-    else open(match);
+    const match = rowInFocus(shown, keyOf);
+    setUnopenedIn(match === undefined ? query : undefined);
+    if (match !== undefined) open(match);
   });
 
-  return {
-    unopened: unopenedIn === query,
-    onRowFocus: (key: string | undefined) => {
-      setInFocus(key);
-      setUnopenedIn(undefined);
-    },
-  };
+  return unopenedIn === query;
 };
 
 function SearchRegion() {
@@ -403,14 +390,8 @@ function SearchRegion() {
     const page = conceptPageOf(match.iri);
     if (page !== undefined) reading.onRead(match, page);
   };
-  const openKey = useOpenKey(query, shown, open);
-  const opening: Opening = {
-    opened: panel.opened,
-    beside,
-    open,
-    onClose: panel.onClose,
-    onRowFocus: openKey.onRowFocus,
-  };
+  const unopened = useOpenKey(query, shown, open);
+  const opening: Opening = { opened: panel.opened, beside, open, onClose: panel.onClose };
 
   return (
     <section
@@ -434,7 +415,7 @@ function SearchRegion() {
         <output className="block px-4 py-3 text-muted-foreground empty:hidden">
           {saidOf(query, matches, shown.length)}
           {panel.left ? ` ${WORDS.passageLeft}` : null}
-          {openKey.unopened ? ` ${WORDS.selectFirst}` : null}
+          {unopened ? ` ${WORDS.selectFirst}` : null}
         </output>
         <Results
           key={query}

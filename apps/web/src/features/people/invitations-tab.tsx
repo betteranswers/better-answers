@@ -7,6 +7,7 @@ import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
+import { rowInFocus } from "@/shared/row-focus.ts";
 import { RowMenu } from "@/shared/row-menu.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
@@ -152,14 +153,15 @@ const tickedFrom =
     );
 
 const useInFocusKeystrokes = (properties: {
-  readonly inFocus: ListedInvitation | undefined;
+  readonly inFocus: () => ListedInvitation | undefined;
   readonly resend: (invitation: ListedInvitation) => void;
   readonly cancel: (invitation: ListedInvitation) => void;
   readonly tick: (invitation: ListedInvitation) => void;
   readonly nothingInFocus: () => void;
 }) => {
-  const { inFocus, nothingInFocus } = properties;
+  const { nothingInFocus } = properties;
   const onTheRowInFocus = (action: (invitation: ListedInvitation) => void) => () => {
+    const inFocus = properties.inFocus();
     if (inFocus === undefined) nothingInFocus();
     else action(inFocus);
   };
@@ -205,7 +207,6 @@ function InvitationList(properties: {
   const { read, listed, state } = narrowed;
   const actable = isActable(state.status);
   const [ticked, setTicked] = useState<Ticked>(NONE);
-  const [inFocusId, setInFocusId] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
   const invite = useInviteAction(setOutcome);
   const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
@@ -232,7 +233,7 @@ function InvitationList(properties: {
   });
 
   useInFocusKeystrokes({
-    inFocus: listed.find((invitation) => invitation.invitationId === inFocusId),
+    inFocus: () => rowInFocus(listed, (invitation) => invitation.invitationId),
     resend: actions.resendOne,
     cancel: actions.cancelOne,
     tick: (invitation) => {
@@ -300,9 +301,6 @@ function InvitationList(properties: {
             }
             hidden={columnsUnder(state.status, hidden).hidden}
             rowMenu={actable ? rowMenuOf(actions, heading) : undefined}
-            onRowFocus={(invitation) => {
-              setInFocusId(invitation?.invitationId);
-            }}
             empty={<NoneShown narrowed={narrowed} focusAfterClear={searchRef} />}
           />
           <ListPages

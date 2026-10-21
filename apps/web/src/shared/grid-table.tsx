@@ -10,7 +10,7 @@ import type { ComponentProps, MouseEvent, ReactNode } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
 import { cn } from "@/shared/lib/utils.ts";
-import { rowFocusOf } from "@/shared/row-focus.ts";
+import { keyedRow } from "@/shared/row-focus.ts";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import {
   Table,
@@ -43,7 +43,6 @@ type Opted<Data> = {
   readonly sorting?: SortHeads | undefined;
   readonly hidden?: ReadonlySet<string> | undefined;
   readonly rowMenu?: ((row: Data) => ReactNode) | undefined;
-  readonly onRowFocus?: ((row: Data | undefined) => void) | undefined;
 };
 
 const HEAD =
@@ -190,7 +189,7 @@ function GridRow<Features extends TableFeatures, Data extends RowData>(
     <TableRow
       data-state={ticked ? "selected" : undefined}
       className="data-[state=selected]:bg-[var(--surface-selected)]"
-      {...rowFocusOf(properties.onRowFocus, row.original)}
+      {...keyedRow(row.id)}
     >
       {ticking === undefined ? null : (
         <TableCell className={cn(CELL, "w-10")}>
@@ -234,7 +233,7 @@ export function GridTable<Features extends TableFeatures, Data extends RowData>(
     readonly empty: ReactNode;
   },
 ) {
-  const { table, ticking, sorting, hidden, rowMenu, onRowFocus } = properties;
+  const { table, ticking, sorting, hidden, rowMenu } = properties;
   const rows = table.getRowModel().rows;
 
   return (
@@ -270,14 +269,7 @@ export function GridTable<Features extends TableFeatures, Data extends RowData>(
           </TableRow>
         ) : (
           rows.map((row) => (
-            <GridRow
-              key={row.id}
-              row={row}
-              ticking={ticking}
-              hidden={hidden}
-              rowMenu={rowMenu}
-              onRowFocus={onRowFocus}
-            />
+            <GridRow key={row.id} row={row} ticking={ticking} hidden={hidden} rowMenu={rowMenu} />
           ))
         )}
       </TableBody>
