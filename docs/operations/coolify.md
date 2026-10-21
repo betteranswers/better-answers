@@ -12,7 +12,7 @@ Coolify is the orchestrator: a pinned version with auto-update off, so its own u
 
 | Box | Role |
 | --- | --- |
-| **VPC 1** | production: the Postgres resource (`shared_buffers` 512 MB, a 1 GB memory limit set in the orchestrator), the `stores` stack and the `platform` stack, the git store under `/data/git`, and a 4 GB swap file on the NVMe (`RUNBOOK.md` § Swap; created by `deploy/host-setup.sh vpc1`) |
+| **VPC 1** | production: the Postgres resource (`shared_buffers` 512 MB, a 1 GB memory limit set in the orchestrator), the `stores` stack and the `platform` stack, the git store under `/data/git`, a 4 GB swap file on the NVMe (`RUNBOOK.md` § Swap), and the checkout at `/opt/better-answers` that `restore-production.sh` runs from, both created by `deploy/host-setup.sh vpc1` |
 | **VPC 2** | the orchestrator, the git mirror, and a restore target that exists only during a drill or rehearsal — staging is **on demand** and never stands |
 
 No private network joins them: the orchestrator manages VPC 1 over SSH, the mirror is `git push` over SSH, and every customer byte arrives through the tunnel. Growth steps, in order: **A** — split production over a WireGuard pair (object store, git store and backup to VPC 2) if the swap-in probe says so, at no cost; then **E** — a third contract. Neither needs a data-model change.
