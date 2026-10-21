@@ -24,6 +24,14 @@ export const conceptIriOf = (minted: Ulid): z.output<typeof CONCEPT_IRI> =>
 export const ulidOfConceptIri = (iri: string): string | undefined =>
   IRI.test(iri) ? iri.slice(CONCEPT_IRI_PREFIX.length) : undefined;
 
+export const uriDecoded = (address: string): string => {
+  try {
+    return decodeURI(address);
+  } catch {
+    return address;
+  }
+};
+
 /** `id` is what a citation mark names; only a record-form `sources` entry can carry one. */
 export type CitedSource = {
   readonly resource: string;
@@ -72,12 +80,20 @@ const bracketFormAt = (
   );
 };
 
-const linkMatchesOf = (prose: string): readonly Found[] => {
+const linkMatchesOf = (
+  prose: string,
+  bracketedTargetSpans: ReadonlyMap<number, number>,
+): readonly Found[] => {
   const close = nextOf(prose, "]");
   const ending = nextOf(prose, ")");
   const ends = autolinkEndsOf(prose);
   const found: Found[] = [];
   for (let at = 0; at < prose.length;) {
+    const target = bracketedTargetSpans.get(at);
+    if (target !== undefined) {
+      at = target;
+      continue;
+    }
     const ch = prose[at] ?? "";
     if (ch === "[") {
       const end = bracketFormAt(prose, at, close, ending);
@@ -237,7 +253,7 @@ const targetAfter = (
   return { start, end };
 };
 
-type Definition = { readonly key: string; readonly target: string; readonly end: number };
+type Definition = { readonly key: string; readonly start: number; readonly end: number };
 
 const definitionAt = (prose: string, at: number, close: Int32Array): Definition | undefined => {
   const spaces = leadingSpacesOf(prose, at);
@@ -247,25 +263,29 @@ const definitionAt = (prose: string, at: number, close: Int32Array): Definition 
   if (bracket === -1 || bracket === opened + 1 || prose[bracket + 1] !== ":") return undefined;
   const target = targetAfter(prose, bracket + 2);
   if (target === undefined) return undefined;
-  return {
-    key: labelKey(prose.slice(opened + 1, bracket)),
-    target: prose.slice(target.start, target.end),
-    end: target.end,
-  };
+  return { key: labelKey(prose.slice(opened + 1, bracket)), ...target };
 };
 
-const definitionsOf = (prose: string): ReadonlyMap<string, string> => {
+type Definitions = {
+  readonly definitions: ReadonlyMap<string, string>;
+  readonly bracketedTargetSpans: ReadonlyMap<number, number>;
+};
+
+const definitionsOf = (prose: string): Definitions => {
   const definitions = new Map<string, string>();
+  const bracketedTargetSpans = new Map<number, number>();
   const close = nextOf(prose, "]");
   for (let at = 0; at < prose.length; at = lineStartFrom(prose, at + 1)) {
     const found = definitionAt(prose, at, close);
     if (found === undefined) continue;
+    const target = prose.slice(found.start, found.end);
+    if (target.startsWith("<")) bracketedTargetSpans.set(found.start, found.end);
     if (!definitions.has(found.key)) {
-      definitions.set(found.key, found.target.replace(/^</, "").replace(/>$/, ""));
+      definitions.set(found.key, target.replace(/^</, "").replace(/>$/, ""));
     }
     at = found.end - 1;
   }
-  return definitions;
+  return { definitions, bracketedTargetSpans };
 };
 
 const sourcesById = (sources: readonly CitedSource[]): ReadonlyMap<string, number> => {
@@ -353,11 +373,12 @@ export type BodyReading = {
  */
 export const linksAndMarksOf = (body: string, sources: readonly CitedSource[]): BodyReading => {
   const prose = proseOf(body);
-  const refs = { definitions: definitionsOf(prose), sourcesById: sourcesById(sources) };
+  const { definitions, bracketedTargetSpans } = definitionsOf(prose);
+  const refs = { definitions, sourcesById: sourcesById(sources) };
   const links: BodyLink[] = [];
   const marks: CitationMark[] = [];
   let ordinal = 0;
-  for (const found of linkMatchesOf(prose)) {
+  for (const found of linkMatchesOf(prose, bracketedTargetSpans)) {
     const reading = readingOf(found, prose, refs);
     if (reading.as === "mark")
       marks.push({ at: found.at, mark: found.text, source: reading.source });

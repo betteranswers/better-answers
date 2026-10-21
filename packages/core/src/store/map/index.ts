@@ -14,7 +14,7 @@ import {
   resolvedResource,
   SUPERSEDES_LABEL,
 } from "@better-answers/schema";
-import { linksAndMarksOf, proseOf } from "@better-answers/schema/concept-file";
+import { linksAndMarksOf, proseOf, uriDecoded } from "@better-answers/schema/concept-file";
 import { SCHEMED } from "@better-answers/schema/scan";
 
 import { readableClause, readableParameters } from "../../access/index.ts";
@@ -85,7 +85,9 @@ export const targetOf = (raw: string, from: string): OutgoingRef["target"] | und
   if (IRI.test(bare)) return { iri: bare };
 
   if (SCHEMED.test(bare) || bare.startsWith("//")) return undefined;
-  return { path: resolvedResource(bare, from).slice(1) };
+  const decoded = uriDecoded(bare);
+  if (decoded.includes("\u0000")) return undefined;
+  return { path: resolvedResource(decoded, from).slice(1) };
 };
 
 const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
@@ -233,8 +235,19 @@ const replaceOutgoingEdges = async (gen: number, tx: Tx, concept: EdgeSource): P
   }
 };
 
-const namePattern = (filename: string): string =>
-  `(^|[\\s"'(<:/[])${filename.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}`;
+const literally = (text: string): string => text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+
+const encodedSpelling = (filename: string): string =>
+  literally(encodeURI(filename.toWellFormed())).replaceAll(
+    /%([0-9A-F])([0-9A-F])/g,
+    (_, high: string, low: string) => `%[${high}${high.toLowerCase()}][${low}${low.toLowerCase()}]`,
+  );
+
+/** A link that names the file by its percent-encoded spelling names it too (`targetOf`). */
+const namePattern = (filename: string): string => {
+  const spellings = new Set([literally(filename), encodedSpelling(filename)]);
+  return `(^|[\\s"'(<:/[])(${[...spellings].join("|")})`;
+};
 
 const liveGeneration = async (workspaceId: string, tx: Tx): Promise<number> => {
   const row = await tx.query<{ live_gen: number }>(

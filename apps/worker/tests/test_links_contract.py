@@ -4,6 +4,7 @@ from typing import Any, cast
 
 from better_answers_worker.links import (
     LINKS_TO_LABEL,
+    ResolvedTarget,
     links_and_marks_of,
     outgoing_edges,
 )
@@ -36,7 +37,10 @@ def test_makes_exactly_the_links_each_case_names_by_ordinal() -> None:
                     path=citing["path"],
                     body=case["body"],
                     frontmatter={"sources": case["sources"]},
-                    by_path={},
+                    by_path={
+                        held["path"]: ResolvedTarget(held["iri"], "Policy", "stable")
+                        for held in case.get("held", [])
+                    },
                     by_iri={},
                 )
                 if edge.label == LINKS_TO_LABEL

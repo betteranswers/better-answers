@@ -14,6 +14,7 @@ const linksCase = z.object({
   case: z.string().min(1),
   body: z.string().min(1),
   sources: z.union([z.array(z.string()), z.array(sourceEntry)]),
+  held: z.array(z.object({ iri: z.string(), path: z.string() })).default([]),
   links: z.array(
     z.object({
       ordinal: z.int().nonnegative(),
@@ -43,6 +44,10 @@ const edgesMadeBy = async (each: z.output<typeof linksCase>) => {
   const reader = await seedingWith(db().pool, async (seed) => {
     const workspace = await seed.workspace();
     const admin = await seed.member({ workspaceId: workspace.id, role: "Admin" });
+    for (const { iri, path } of each.held) {
+      await seed.conceptIdentity({ workspaceId: workspace.id, iri });
+      await seed.conceptIndex({ workspaceId: workspace.id, iri, path });
+    }
     return { workspaceId: workspace.id, userId: admin.userId };
   });
   answered(

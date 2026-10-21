@@ -911,6 +911,19 @@ describe("a body's links", () => {
     ]);
   });
 
+  it("answers an encoded link whose concept was written after it", async () => {
+    const scenario = await arrange();
+    const expenses = await noteAt(scenario, EXPENSES, {
+      body: "See [the team](../roles/%c3%a9quipe.md).",
+    });
+
+    const team = await noteAt(scenario, "knowledge/roles/équipe.md");
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([
+      { ordinal: 0, address: "../roles/%c3%a9quipe.md", target: team.iri },
+    ]);
+  });
+
   it("answers every link past twenty-five", async () => {
     const scenario = await arrange();
     const files = Array.from(
@@ -951,6 +964,31 @@ describe("a body's links", () => {
 
     expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([
       { ordinal: 4, address: "../roles/audit-committee.md", target: committee.iri },
+    ]);
+  });
+
+  it("answers a footnote defined as a relative path", async () => {
+    const scenario = await arrange();
+    const committee = await noteAt(scenario, AUDIT_COMMITTEE);
+    const expenses = await noteAt(scenario, EXPENSES, {
+      body: "Claims close in thirty days.[^b]\n\n[^b]: ../roles/audit-committee.md",
+    });
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([
+      { ordinal: 0, address: "../roles/audit-committee.md", target: committee.iri },
+    ]);
+  });
+
+  it("answers a percent-encoded spelling as the file it decodes to", async () => {
+    const scenario = await arrange();
+    const team = await noteAt(scenario, "knowledge/roles/équipe.md");
+    const expenses = await noteAt(scenario, EXPENSES, {
+      body: "See [the team](../roles/%C3%A9quipe.md) and [again](../roles/équipe.md).",
+    });
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([
+      { ordinal: 0, address: "../roles/%C3%A9quipe.md", target: team.iri },
+      { ordinal: 1, address: "../roles/équipe.md", target: team.iri },
     ]);
   });
 

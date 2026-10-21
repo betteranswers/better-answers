@@ -121,13 +121,16 @@ def _bracket_form_at(
     return bracket + 1 if found is None else found
 
 
-def _link_matches(prose: str) -> list[_Found]:
+def _link_matches(prose: str, bracketed_target_spans: dict[int, int]) -> list[_Found]:
     close = _next_of(prose, "]")
     ending = _next_of(prose, ")")
     ends = _autolink_ends_of(prose)
     found: list[_Found] = []
     at = 0
     while at < len(prose):
+        if at in bracketed_target_spans:
+            at = bracketed_target_spans[at]
+            continue
         if prose[at] == "[":
             end = _bracket_form_at(prose, at, close, ending)
             if end is not None:
@@ -220,7 +223,7 @@ def _fenced_blocks(body: str) -> list[tuple[int, int]]:
 _BACKTICK_RUN = re.compile(r"`+")
 _HEADING = re.compile(r"^\#{1,6}[ \t\n\r\f\v]+([^\n]*)")
 _BLANK = re.compile(r"[ \t\r\f\v]*")
-_SENTENCE_BOUNDARY = re.compile(r"[.!?](?=[ \t\n\r\f\v]|$)")
+_SENTENCE_BOUNDARY = re.compile(r"[.!?](?:\[\^[^\[\]]*\])*(?=[ \t\n\r\f\v]|$)")
 _WHITESPACE_RUN = re.compile(r"[ \t\n\r\f\v]+")
 
 
@@ -297,9 +300,13 @@ def _target_after(prose: str, from_: int) -> tuple[int, int] | None:
     return start, end
 
 
-def _definition_at(
-    prose: str, at: int, close: list[int]
-) -> tuple[str, str, int] | None:
+class _Definition(NamedTuple):
+    key: str
+    start: int
+    end: int
+
+
+def _definition_at(prose: str, at: int, close: list[int]) -> _Definition | None:
     spaces = _leading_spaces(prose, at)
     opened = at + spaces
     if spaces > 3 or prose[opened : opened + 1] != "[":
@@ -314,12 +321,12 @@ def _definition_at(
     target = _target_after(prose, bracket + 2)
     if target is None:
         return None
-    start, end = target
-    return _label_key(prose[opened + 1 : bracket]), prose[start:end], end
+    return _Definition(_label_key(prose[opened + 1 : bracket]), *target)
 
 
-def _definitions_of(prose: str) -> dict[str, str]:
+def _definitions_of(prose: str) -> tuple[dict[str, str], dict[int, int]]:
     definitions: dict[str, str] = {}
+    bracketed_target_spans: dict[int, int] = {}
     close = _next_of(prose, "]")
     at = 0
     while at < len(prose):
@@ -327,11 +334,14 @@ def _definitions_of(prose: str) -> dict[str, str]:
         if found is None:
             at = _line_start_from(prose, at + 1)
             continue
-        key, target, end = found
+        key, start, end = found
+        target = prose[start:end]
+        if target.startswith("<"):
+            bracketed_target_spans[start] = end
         if key not in definitions:
-            definitions[key] = target.lstrip("<").rstrip(">")
+            definitions[key] = target.removeprefix("<").removesuffix(">")
         at = _line_start_from(prose, end)
-    return definitions
+    return definitions, bracketed_target_spans
 
 
 def _cited_entries(frontmatter: Frontmatter) -> list[SourceEntry | str]:
@@ -384,6 +394,60 @@ def _link_target_of(
     return definitions.get(_label_key(text[1:-1]))
 
 
+_URI_RESERVED = frozenset(";/?:@&=+$,#")
+_HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
+
+
+def _escaped_byte(address: str, at: int) -> int | None:
+    digits = address[at + 1 : at + 3]
+    if (
+        address[at : at + 1] != "%"
+        or len(digits) != 2
+        or not set(digits) <= _HEX_DIGITS
+    ):
+        return None
+    return int(digits, 16)
+
+
+def _utf8_width(lead: int) -> int | None:
+    if lead < 0x80:
+        return 1
+    if 0xC0 <= lead < 0xE0:
+        return 2
+    if 0xE0 <= lead < 0xF0:
+        return 3
+    if 0xF0 <= lead < 0xF8:
+        return 4
+    return None
+
+
+def _uri_decoded(address: str) -> str:
+    pieces: list[str] = []
+    at = 0
+    while at < len(address):
+        if address[at] != "%":
+            pieces.append(address[at])
+            at += 1
+            continue
+        lead = _escaped_byte(address, at)
+        width = None if lead is None else _utf8_width(lead)
+        if lead is None or width is None:
+            return address
+        escaped = bytearray([lead])
+        for step in range(1, width):
+            byte = _escaped_byte(address, at + 3 * step)
+            if byte is None:
+                return address
+            escaped.append(byte)
+        try:
+            decoded = escaped.decode("utf-8")
+        except UnicodeDecodeError:
+            return address
+        pieces.append(address[at : at + 3] if decoded in _URI_RESERVED else decoded)
+        at += 3 * width
+    return "".join(pieces)
+
+
 type _TargetShape = Literal["iri", "path"]
 
 
@@ -396,7 +460,10 @@ def _target_of(raw: str, from_path: str) -> tuple[_TargetShape, str] | None:
 
     if SCHEMED.match(bare) or bare.startswith("//"):
         return None
-    return "path", resolved_resource(bare, from_path)[1:]
+    decoded = _uri_decoded(bare)
+    if "\0" in decoded:
+        return None
+    return "path", resolved_resource(decoded, from_path)[1:]
 
 
 def _section_at(body: str, index: int) -> str | None:
@@ -512,10 +579,10 @@ def _sentence_at(body: str, prose: str, index: int) -> str:
     start = 0
     end = len(paragraph)
     for boundary in _SENTENCE_BOUNDARY.finditer(paragraph):
-        if boundary.start() < at:
-            start = boundary.start() + 1
+        if boundary.end() <= at:
+            start = boundary.end()
         else:
-            end = boundary.start() + 1
+            end = boundary.end()
             break
     return _collapsed_whitespace(_flattened_links(paragraph[start:end]))
 
@@ -577,12 +644,12 @@ def links_and_marks_of(
     body: str, frontmatter: Frontmatter
 ) -> tuple[list[BodyLink], list[CitationMark]]:
     prose = prose_of(body)
-    definitions = _definitions_of(prose)
+    definitions, bracketed_target_spans = _definitions_of(prose)
     sources_by_id = _sources_by_id(_cited_entries(frontmatter))
     links: list[BodyLink] = []
     marks: list[CitationMark] = []
     ordinal = 0
-    for found in _link_matches(prose):
+    for found in _link_matches(prose, bracketed_target_spans):
         reading, value = _reading_of(found, prose, definitions, sources_by_id)
         if reading == "mark" and isinstance(value, int):
             marks.append(CitationMark(found.at, found.text, value))
