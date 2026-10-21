@@ -1,5 +1,9 @@
 import argparse
-import time
+import signal
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
+from types import FrameType
 from typing import Any
 
 import psycopg
@@ -15,11 +19,50 @@ from .schema_view import MIGRATION_ID, MIGRATION_WHEN
 
 IDLE_SLEEP_SECONDS = 5
 
+FINISH_WITHIN_SECONDS = 10
+
 
 AUDIT_EVERY_SECONDS = 24 * 60 * 60
 
 MATCHES = "matches"
 DIFFERS = "differs"
+
+
+# psycopg cancels an interrupted query only on SystemExit or KeyboardInterrupt.
+class StopRequested(SystemExit): ...
+
+
+class _Stop:
+    def __init__(self) -> None:
+        self.requested = threading.Event()
+        self._job_running = False
+        self._finish_within_seconds: float = FINISH_WITHIN_SECONDS
+
+    def install(self, finish_within_seconds: float) -> None:
+        self._finish_within_seconds = finish_within_seconds
+        for stop_signal in (signal.SIGTERM, signal.SIGINT):
+            signal.signal(stop_signal, self._request)
+        signal.signal(signal.SIGALRM, self._interrupt)
+
+    def _request(self, _signal: int, _frame: FrameType | None) -> None:
+        if not self.requested.is_set():
+            self.requested.set()
+            signal.setitimer(signal.ITIMER_REAL, self._finish_within_seconds)
+
+    def _interrupt(self, _signal: int, _frame: FrameType | None) -> None:
+        if self._job_running:
+            raise StopRequested
+
+    @contextmanager
+    def interruptible(self) -> Iterator[None]:
+        self._job_running = True
+        try:
+            yield
+        finally:
+            self._job_running = False
+
+
+STOP = _Stop()
 
 
 def schema_stamp_matches(connection: psycopg.Connection) -> bool:
@@ -72,12 +115,15 @@ def _run_claimed(
     heartbeat_every_seconds: float,
     deadline_seconds: float,
 ) -> dict[str, Any]:
-    with queue.keeping_alive(
-        bootstrap.database_url,
-        job,
-        bootstrap.worker_id,
-        every_seconds=heartbeat_every_seconds,
-        deadline_seconds=deadline_seconds,
+    with (
+        queue.keeping_alive(
+            bootstrap.database_url,
+            job,
+            bootstrap.worker_id,
+            every_seconds=heartbeat_every_seconds,
+            deadline_seconds=deadline_seconds,
+        ),
+        STOP.interruptible(),
     ):
         return KINDS[job.kind](bootstrap, job)
 
@@ -114,6 +160,18 @@ def _serve_workspace(
         outcome = _run_claimed(
             bootstrap, claimed, heartbeat_every_seconds, deadline_seconds
         )
+    except StopRequested:
+        with queue.scoped(connection, claimed.workspace_id) as cursor:
+            handed_back = queue.hand_back(cursor, claimed.id, bootstrap.worker_id)
+        logger.info(
+            "job handed back",
+            workspace_id=claimed.workspace_id,
+            job_id=claimed.id,
+            kind=claimed.kind,
+            handed_back=handed_back,
+            worker_id=bootstrap.worker_id,
+        )
+        return True
     except Exception as failure:
         document_id = (
             failure.source_document_id
@@ -172,6 +230,8 @@ def tick(
 ) -> bool:
     worked = False
     for workspace_id in queue.workspace_ids(connection):
+        if STOP.requested.is_set():
+            break
         served = _serve_workspace(
             connection,
             bootstrap,
@@ -200,7 +260,7 @@ def run(bootstrap: Bootstrap, *, once: bool) -> int:
         warm_the_detectors_stack(bootstrap.worker_id)
     with queue.connected(bootstrap.database_url) as connection:
         said: dict[str, str] | None = None
-        while True:
+        while not STOP.requested.is_set():
             stamps = deploy_stamps(connection)
             if DIFFERS in stamps.values():
                 if stamps != said:
@@ -214,14 +274,16 @@ def run(bootstrap: Bootstrap, *, once: bool) -> int:
                     said = stamps
                 if once:
                     return 1
-                time.sleep(IDLE_SLEEP_SECONDS)
+                STOP.requested.wait(IDLE_SLEEP_SECONDS)
                 continue
             said = None
             worked = tick(connection, bootstrap)
             if once:
                 return 0
             if not worked:
-                time.sleep(IDLE_SLEEP_SECONDS)
+                STOP.requested.wait(IDLE_SLEEP_SECONDS)
+    logger.info("the worker stopped", worker_id=bootstrap.worker_id)
+    return 0
 
 
 def main() -> int:
@@ -232,4 +294,11 @@ def main() -> int:
         help="one pass over every workspace, then exit — what a test drives",
     )
 
-    return run(read_bootstrap(), once=parser.parse_args().once)
+    return serve(once=parser.parse_args().once)
+
+
+def serve(
+    *, once: bool = False, finish_within_seconds: float = FINISH_WITHIN_SECONDS
+) -> int:
+    STOP.install(finish_within_seconds)
+    return run(read_bootstrap(), once=once)

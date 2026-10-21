@@ -14,7 +14,7 @@ C4Component
 
   Container_Boundary(worker, "apps/worker") {
     Component(loop, "loop.py", "the image's command", "One pass over every workspace per tick: claim and run one job, or enqueue the nightly audit when due; claims nothing while the schema stamp or the contract digest differs")
-    Component(queue, "queue.py", "the queue agreement", "claim_job with the kinds, heartbeat, finish, fail; the lease kept alive beside the job")
+    Component(queue, "queue.py", "the queue agreement", "claim_job with the kinds, heartbeat, finish, fail, hand back on a stop signal; the lease kept alive beside the job")
     Component(kinds, "kinds.py — KINDS", "the registry", "nightly-audit, full-rebuild, index: each a handler taking the bootstrap and the claimed job, answering an outcome row")
     Component(rebuild, "rebuild.py", "full-rebuild", "One workspace's map made again as a new generation, flipped live by one row update")
     Component(audit, "audit.py", "nightly-audit", "The parser audit over every concept file")

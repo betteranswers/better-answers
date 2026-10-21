@@ -629,15 +629,23 @@ def test_the_queue_hands_out_and_answers_as_the_fixture_says() -> None:
         answered: list[dict[str, Any]] = []
         for call in fixture["calls"]:
             _as_role_in_scope(cursor, call)
-            if call["function"] == "heartbeat_job":
-                statement = "SELECT heartbeat_job(%s, %s, %s::interval)"
-                third: str | None = lease
-            else:
-                statement = f"SELECT {call['function']}(%s, %s, %s::jsonb)"
-                third = (
-                    None if call.get("outcome") is None else json.dumps(call["outcome"])
-                )
-            cursor.execute(statement, (call["job_id"], call["worker_id"], third))
+            claim = (call["job_id"], call["worker_id"])
+            match call["function"]:
+                case "heartbeat_job":
+                    cursor.execute(
+                        "SELECT heartbeat_job(%s, %s, %s::interval)", (*claim, lease)
+                    )
+                case "hand_back_job":
+                    cursor.execute("SELECT hand_back_job(%s, %s)", claim)
+                case "finish_job" | "fail_job":
+                    outcome = call.get("outcome")
+                    cursor.execute(
+                        f"SELECT {call['function']}(%s, %s, %s::jsonb)",
+                        (*claim, None if outcome is None else json.dumps(outcome)),
+                    )
+                case unknown:
+                    message = f"the queue fixture calls an unknown function {unknown}"
+                    raise AssertionError(message)
             row = cursor.fetchone()
             answered.append({"why": call["why"], "answer": bool(row and row[0])})
             cursor.execute("RESET ROLE")
@@ -646,8 +654,8 @@ def test_the_queue_hands_out_and_answers_as_the_fixture_says() -> None:
         ]
 
         cursor.execute(
-            "SELECT workspace_id, id, status, attempts, claimed_by FROM job"
-            " ORDER BY workspace_id, id"
+            "SELECT workspace_id, id, status, attempts, max_attempts, claimed_by"
+            " FROM job ORDER BY workspace_id, id"
         )
         assert cursor.fetchall() == [
             (
@@ -655,6 +663,7 @@ def test_the_queue_hands_out_and_answers_as_the_fixture_says() -> None:
                 expected["id"],
                 expected["status"],
                 expected["attempts"],
+                expected["max_attempts"],
                 expected["claimed_by"],
             )
             for expected in sorted(

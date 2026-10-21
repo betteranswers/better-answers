@@ -18,7 +18,25 @@ const jobCaseSchema = z.object({
   subject_id: z.string().nullable(),
 });
 
-const WORKER_CALLS = ["heartbeat_job", "finish_job", "fail_job"] as const;
+const CALLS_WITH_AN_OUTCOME = ["finish_job", "fail_job"] as const;
+
+const callWhere = z.object({
+  why: z.string(),
+  role: z.string(),
+  workspace_id: z.string(),
+  job_id: z.string(),
+  worker_id: z.string(),
+  expect: z.boolean(),
+});
+
+const callSchema = z.discriminatedUnion("function", [
+  callWhere.extend({ function: z.literal("heartbeat_job") }),
+  callWhere.extend({ function: z.literal("hand_back_job") }),
+  callWhere.extend({
+    function: z.enum(CALLS_WITH_AN_OUTCOME),
+    outcome: z.record(z.string(), z.unknown()).optional(),
+  }),
+]);
 
 const fixtureSchema = z.object({
   description: z.string(),
@@ -46,18 +64,7 @@ const fixtureSchema = z.object({
       expect_ids: z.array(z.string()),
     }),
   ),
-  calls: z.array(
-    z.object({
-      why: z.string(),
-      function: z.enum(WORKER_CALLS),
-      role: z.string(),
-      workspace_id: z.string(),
-      job_id: z.string(),
-      worker_id: z.string(),
-      outcome: z.record(z.string(), z.unknown()).optional(),
-      expect: z.boolean(),
-    }),
-  ),
+  calls: z.array(callSchema),
   expect_final: z.array(
     z.object({
       why: z.string(),
@@ -65,6 +72,7 @@ const fixtureSchema = z.object({
       id: z.string(),
       status: z.string(),
       attempts: z.number().int(),
+      max_attempts: z.number().int(),
       claimed_by: z.string().nullable(),
     }),
   ),
@@ -154,28 +162,32 @@ const claimsAnswered = async (client: pg.PoolClient) => {
 };
 
 const callStatement = (
-  call: (typeof fixture.calls)[number],
-): { readonly statement: string; readonly leaseOrOutcome: string | null } =>
-  call.function === "heartbeat_job"
-    ? {
+  call: z.output<typeof callSchema>,
+): { readonly statement: string; readonly values: (string | null)[] } => {
+  const claim = [call.job_id, call.worker_id];
+  switch (call.function) {
+    case "heartbeat_job":
+      return {
         statement: "SELECT heartbeat_job($1, $2, $3::interval) AS answer",
-        leaseOrOutcome: seconds(fixture.lease_seconds),
-      }
-    : {
-        statement: `SELECT ${call.function}($1, $2, $3::jsonb) AS answer`,
-        leaseOrOutcome: call.outcome === undefined ? null : JSON.stringify(call.outcome),
+        values: [...claim, seconds(fixture.lease_seconds)],
       };
+    case "hand_back_job":
+      return { statement: "SELECT hand_back_job($1, $2) AS answer", values: claim };
+    case "finish_job":
+    case "fail_job":
+      return {
+        statement: `SELECT ${call.function}($1, $2, $3::jsonb) AS answer`,
+        values: [...claim, call.outcome === undefined ? null : JSON.stringify(call.outcome)],
+      };
+  }
+};
 
 const callsAnswered = async (client: pg.PoolClient) => {
   const answered: { readonly why: string; readonly answer: boolean }[] = [];
   for (const call of fixture.calls) {
     await asRoleInScope(client, call);
-    const { statement, leaseOrOutcome } = callStatement(call);
-    const result = await client.query<{ answer: boolean }>(statement, [
-      call.job_id,
-      call.worker_id,
-      leaseOrOutcome,
-    ]);
+    const { statement, values } = callStatement(call);
+    const result = await client.query<{ answer: boolean }>(statement, values);
     answered.push({ why: call.why, answer: result.rows[0]?.answer ?? false });
     await client.query("RESET ROLE");
   }
@@ -188,8 +200,11 @@ const finalRows = async (client: pg.PoolClient) => {
     id: string;
     status: string;
     attempts: number;
+    max_attempts: number;
     claimed_by: string | null;
-  }>("SELECT workspace_id, id, status, attempts, claimed_by FROM job ORDER BY workspace_id, id");
+  }>(
+    "SELECT workspace_id, id, status, attempts, max_attempts, claimed_by FROM job ORDER BY workspace_id, id",
+  );
   return rows.rows;
 };
 
@@ -221,6 +236,7 @@ describe("the queue agreement", () => {
             id: expected.id,
             status: expected.status,
             attempts: expected.attempts,
+            max_attempts: expected.max_attempts,
             claimed_by: expected.claimed_by,
           })),
       );

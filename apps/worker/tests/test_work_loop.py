@@ -1244,9 +1244,7 @@ A_WORKER_PROCESS = """
 import sys
 from better_answers_worker import loop
 
-loop.FINISH_WITHIN_SECONDS = float(sys.argv[1])
-sys.argv = sys.argv[:1]
-sys.exit(loop.main())
+sys.exit(loop.serve(finish_within_seconds=float(sys.argv[1])))
 """
 
 WARM_UP_SECONDS = loop.IDLE_SLEEP_SECONDS * IDLE_SLEEPS_THE_DETECTORS_IMPORT_MAY_TAKE
@@ -1274,12 +1272,14 @@ def a_worker_process(
             worker.kill()
 
 
-def exit_code_within(worker: subprocess.Popen[str], seconds: float) -> int | None:
+def exit_within(
+    worker: subprocess.Popen[str], seconds: float
+) -> tuple[int | None, str]:
     try:
-        worker.communicate(timeout=seconds)
+        _, stderr = worker.communicate(timeout=seconds)
     except subprocess.TimeoutExpired:
-        return None
-    return worker.returncode
+        return None, "the worker was still running"
+    return worker.returncode, stderr
 
 
 @contextlib.contextmanager
@@ -1309,9 +1309,9 @@ def test_an_idle_worker_exits_cleanly_on_sigterm(
         assert connected, "the worker never reached its loop"
 
         worker.send_signal(signal.SIGTERM)
-        exit_code = exit_code_within(worker, EXIT_AFTER_STOP_SECONDS)
+        exit_code, stderr = exit_within(worker, EXIT_AFTER_STOP_SECONDS)
 
-    assert exit_code == 0
+    assert exit_code == 0, stderr
 
 
 def test_a_stop_mid_job_hands_it_back_with_its_attempt(
@@ -1325,14 +1325,18 @@ def test_a_stop_mid_job_hands_it_back_with_its_attempt(
     ):
         assert claimed_by_the_worker(database, workspace)
         worker.send_signal(signal.SIGTERM)
-        exit_code = exit_code_within(worker, EXIT_AFTER_STOP_SECONDS)
+        exit_code, stderr = exit_within(worker, EXIT_AFTER_STOP_SECONDS)
 
-    assert exit_code == 0
+    assert exit_code == 0, stderr
     database.commit()
     with scoped(database, workspace) as cursor:
         reclaimed = queue.claim(cursor, workspace, WORKER, ["nightly-audit"])
     assert reclaimed is not None, "the handed-back job was not claimable at once"
-    assert reclaimed.attempts == 1, "the stop spent an attempt"
+    with database.cursor() as cursor:
+        cursor.execute("SELECT max_attempts FROM job WHERE id = %s", (reclaimed.id,))
+        bound = cursor.fetchone()
+    assert bound is not None
+    assert (reclaimed.attempts, bound[0]) == (2, 4), "the stop spent an attempt"
 
 
 def test_a_stop_lets_a_job_that_ends_within_grace_finish(
@@ -1347,7 +1351,7 @@ def test_a_stop_lets_a_job_that_ends_within_grace_finish(
         assert claimed_by_the_worker(database, workspace)
         worker.send_signal(signal.SIGTERM)
         locking.execute("COMMIT")
-        exit_code = exit_code_within(worker, EXIT_AFTER_STOP_SECONDS)
+        exit_code, stderr = exit_within(worker, EXIT_AFTER_STOP_SECONDS)
 
-    assert exit_code == 0
+    assert exit_code == 0, stderr
     assert audit_job(database, workspace) == ("done", WORKER)
