@@ -32,7 +32,7 @@ const rewritten = (anchor: string): string =>
   "the index, the evidence and the map, and in the backup copies listed below. Names this " +
   "person wrote or that were written about them inside concept bodies are listed for the " +
   "owner to edit; an edit is a new commit and does not remove the name from earlier commits, " +
-  `from copies already exported, or from backup copies taken before ${anchor}.`;
+  `from copies already exported, or from any backup copy taken before ${anchor}.`;
 
 const beyondUse = (anchor: string, erasure: ErasureRecord): string =>
   `Backup copies taken before ${anchor} are beyond use: restored only in a disaster, ` +
@@ -44,7 +44,7 @@ const beyondUse = (anchor: string, erasure: ErasureRecord): string =>
 
 const ANCHOR_NAMED =
   "The anchor above is the instant this routine took the erasure lock, not the stamp of the " +
-  "last dump before it: no backup is recorded, so the last dump precedes the anchor and " +
+  "last dump before it: this routine reads no backup record, so the last dump precedes the anchor and " +
   "every date above is the latest a copy can expire.";
 
 const SIGN_IN_IDENTITY_REMOVED =

@@ -484,8 +484,8 @@ const s3RemoteOver = (remote: string, store: ObjectStore): Record<string, string
   [`RCLONE_CONFIG_${remote}_SECRET_ACCESS_KEY`]: store.secretAccessKey,
 });
 
-const nightlyEnvironment = (objects: ObjectStore): Record<string, string> => ({
-  DATABASE_URL: "postgresql://backup@127.0.0.1:9/betteranswers",
+const jobEnvironment = (objects: ObjectStore, database: string): Record<string, string> => ({
+  DATABASE_URL: seenFromTheImage(database),
   BACKUP_DUMPS_BUCKET: "dumps",
   BACKUP_MIRROR_BUCKET: "mirror",
   RCLONE_CONFIG_DUMPS_TYPE: "alias",
@@ -498,6 +498,32 @@ const nightlyEnvironment = (objects: ObjectStore): Record<string, string> => ({
   MIRROR_SHELL: read("deploy/mirror-shell.sh"),
   SSH_STAND_IN,
 });
+
+const recordedCopies = async (database: MigratedPostgres) =>
+  (
+    await database.pool.query(
+      `SELECT store, outcome, bytes, location, expires_at > finished_at AS expires_after_finish
+         FROM backup WHERE kind = 'backup' ORDER BY store`,
+    )
+  ).rows;
+
+type JobRun = { readonly lines: readonly string[]; readonly copies: readonly unknown[] };
+
+const runTheJob = async (command: string, objects: ObjectStore): Promise<JobRun> => {
+  const database = await openMigratedPostgres();
+  try {
+    const lines = (
+      await readTheImage(backupImage(), {
+        command: ["bash", "-c", command],
+        environment: jobEnvironment(objects, database.connectionUri),
+        reachesTheHost: true,
+      })
+    ).split("\n");
+    return { lines, copies: await recordedCopies(database) };
+  } finally {
+    await database.stop();
+  }
+};
 
 const taggedIn = (lines: readonly string[], tag: string): readonly string[] =>
   lines.filter((line) => line.startsWith(`${tag}\t`)).map((line) => line.slice(tag.length + 1));
@@ -512,18 +538,14 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
   let log: readonly string[] = [];
   let files: readonly string[] = [];
   let mirrored: readonly string[] = [];
+  let copies: readonly unknown[] = [];
 
   beforeAll(async () => {
-    const lines = (
-      await readTheImage(backupImage(), {
-        command: ["bash", "-c", nightlyRun(scriptPath())],
-        environment: nightlyEnvironment(objects()),
-        reachesTheHost: true,
-      })
-    ).split("\n");
-    log = taggedIn(lines, "log");
-    files = taggedIn(lines, "file");
-    mirrored = taggedIn(lines, "mirrored");
+    const ran = await runTheJob(nightlyRun(scriptPath()), objects());
+    log = taggedIn(ran.lines, "log");
+    files = taggedIn(ran.lines, "file");
+    mirrored = taggedIn(ran.lines, "mirrored");
+    copies = ran.copies;
   }, IMAGE_PROBE_ALLOWANCE);
 
   it("mirrors every object the platform's store holds", () => {
@@ -563,6 +585,28 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
   it("ends its log with the ok its ping carries", () => {
     expect(log.at(-1)).toMatch(/^backup\.sh nightly: ok bytes=0 took=\d+$/);
   });
+
+  it("writes an ok row for each store it copied", () => {
+    expect({ copies, log }).toMatchObject({
+      copies: [
+        { store: "git", outcome: "ok", bytes: null, location: "git/", expires_after_finish: true },
+        {
+          store: "git-mirror",
+          outcome: "ok",
+          bytes: null,
+          location: "mirror/",
+          expires_after_finish: null,
+        },
+        {
+          store: "objectstore",
+          outcome: "ok",
+          bytes: null,
+          location: "objectstore/",
+          expires_after_finish: true,
+        },
+      ],
+    });
+  });
 });
 
 describe.skipIf(nothingToProbeHere)(
@@ -570,23 +614,70 @@ describe.skipIf(nothingToProbeHere)(
   () => {
     const objects = objectStoreForSuite();
     let log: readonly string[] = [];
+    let copies: readonly unknown[] = [];
 
     beforeAll(async () => {
-      const lines = (
-        await readTheImage(backupImage(), {
-          command: ["bash", "-c", nightlyRun(scriptPath(), AN_UNREADABLE_REPOSITORY)],
-          environment: nightlyEnvironment(objects()),
-          reachesTheHost: true,
-        })
-      ).split("\n");
-      log = taggedIn(lines, "log");
+      const ran = await runTheJob(nightlyRun(scriptPath(), AN_UNREADABLE_REPOSITORY), objects());
+      log = taggedIn(ran.lines, "log");
+      copies = ran.copies;
     }, IMAGE_PROBE_ALLOWANCE);
 
     it("ends its log with the fail its ping carries", () => {
       expect(log.at(-1)).toBe("backup.sh nightly: fail bytes=0 took=0");
     });
+
+    it("writes a failed row for the git store", () => {
+      expect({ copies, log }).toMatchObject({
+        copies: [
+          { store: "git", outcome: "failed", bytes: null, location: null },
+          { store: "objectstore", outcome: "ok", location: "objectstore/" },
+        ],
+      });
+    });
   },
 );
+
+const hourlyRun = (script: string): string => String.raw`
+set -eu
+mkdir -p /staging /buckets
+age-keygen -o /tmp/identity 2>/dev/null
+BACKUP_AGE_RECIPIENT=$(age-keygen -y /tmp/identity) "${script}" hourly > /tmp/hourly.log 2>&1 || true
+while IFS= read -r line; do printf 'log\t%s\n' "$line"; done < /tmp/hourly.log
+find /buckets -type f -name 'pg-*' | while IFS= read -r file; do
+  printf 'dump\t%s %s\n' "$(printf '%s' "$file" | sed 's|^/buckets/dumps/||')" "$(stat -c %s "$file")"
+done
+`;
+
+describe.skipIf(nothingToProbeHere)("the backup image's hourly job", () => {
+  const objects = objectStoreForSuite();
+  let log: readonly string[] = [];
+  let dumps: readonly string[] = [];
+  let copies: readonly unknown[] = [];
+
+  beforeAll(async () => {
+    const ran = await runTheJob(hourlyRun(scriptPath()), objects());
+    log = taggedIn(ran.lines, "log");
+    dumps = taggedIn(ran.lines, "dump");
+    copies = ran.copies;
+  }, IMAGE_PROBE_ALLOWANCE);
+
+  it("records its dump's size, location and expiry", () => {
+    const [location = "", size = ""] = dumps[0]?.split(" ") ?? [];
+
+    expect({ dumps, log }).toMatchObject({
+      dumps: [
+        expect.stringMatching(
+          /^pg\/(hourly|daily|weekly|monthly)\/pg-\d{8}T\d{6}Z\.dump\.age \d+$/,
+        ),
+      ],
+    });
+    expect({ copies, log }).toMatchObject({
+      copies: [
+        { store: "postgres", outcome: "ok", bytes: size, location, expires_after_finish: true },
+      ],
+    });
+  });
+});
 
 const fenced = (script: string, step: string): string => {
   const body = read(script).split(`# >>> ${step}\n`)[1]?.split(`# <<< ${step}`)[0];

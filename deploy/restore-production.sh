@@ -20,7 +20,7 @@ done
 
 # The uid the api writes /data/git as: the stores stack's init hands the store to it.
 API_UID=1000
-WORK=$(mktemp -d); chmod 700 "${WORK}"; BUNDLES=$(mktemp -d); T0=$(date +%s); LOG="/var/log/better-answers-restore-$(date -u +%Y%m%dT%H%M%SZ).log"
+WORK=$(mktemp -d); chmod 700 "${WORK}"; BUNDLES=$(mktemp -d); started=$(date -u +%FT%TZ); T0=$(date +%s); LOG="/var/log/better-answers-restore-$(date -u +%Y%m%dT%H%M%SZ).log"
 say() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${LOG}"; }
 compose() { docker compose --project-directory "${REPO_DIR}/deploy" "$@"; }
 stores()   { compose --env-file "${STORES_ENV_FILE}" -f stores.compose.yaml -p better-answers-stores "$@"; }
@@ -117,4 +117,15 @@ say "## 8 start the backup service — its next hourly run dumps the restored da
 stores start backup
 
 rto=$(( ( $(date +%s) - T0 ) / 60 ))
-say "## done — RTO ${rto} min. Record it: RUNBOOK.md page 1 names the row (a *restore* audit_event and a backup row land with the signals task; until then this log is the record). Delete the age identity from this box now."
+# >>> record the restore
+finished=$(date -u +%FT%TZ)
+restored="('restore', 'postgres', '${started}', '${finished}', 'ok', 'pg/${tier}/${dump}', false, ${rto})"
+[ "${objectstore}" != yes ] || restored+=", ('restore', 'objectstore', '${started}', '${finished}', 'ok', 'objectstore/', false, ${rto})"
+[ "${git}" != yes ] || restored+=", ('restore', 'git', '${started}', '${finished}', 'ok', 'git/', false, ${rto})"
+row="insert into backup (kind, store, started_at, finished_at, outcome, location, contains_personal_data, rto_minutes) values ${restored} on conflict do nothing"
+# shellcheck disable=SC2016 # the tool container's shell expands it, where DATABASE_URL is set
+if ! stores run --rm --no-deps backup sh -c 'psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 -c "$1"' sh "${row}"; then
+  say "backup row not written; once the database answers, run: ${row}"
+fi
+# <<< record the restore
+say "## done — RTO ${rto} min. The *restore* audit_event lands with the signals task; until then this log is its record. Delete the age identity from this box now."
