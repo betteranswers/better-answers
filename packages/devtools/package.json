@@ -39,22 +39,22 @@
   "devDependencies": {
     "@better-answers/devtools": "workspace:*",
     "@better-answers/schema": "workspace:*",
-    "@oxlint/plugins": "1.87.0",
+    "@oxlint/plugins": "1.89.0",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/instrumenter": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@types/node": "24.19.2",
     "cloc": "2.6.0-cloc",
     "jscpd": "5.4.1",
-    "knip": "6.41.0",
-    "oxc-parser": "0.153.0",
-    "oxfmt": "0.72.0",
-    "oxlint": "1.87.0",
-    "oxlint-tsgolint": "7.0.2003",
-    "testcontainers": "12.2.0",
+    "knip": "6.42.1",
+    "oxc-parser": "0.155.0",
+    "oxfmt": "0.74.0",
+    "oxlint": "1.89.0",
+    "oxlint-tsgolint": "7.0.2004",
+    "testcontainers": "12.2.1",
     "typescript": "7.0.2",
-    "vitest": "5.0.3",
+    "vitest": "5.0.5",
     "yaml": "2.9.1",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   }
 }
