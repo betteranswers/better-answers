@@ -20,7 +20,8 @@ The api harness's actions, the helpers in the suite's modules, the ceilings a sp
   the session's person, so a flood through the page's own `page.request` reaches it. The knowledge
   reads, `find` and `open`, share one count a person (`knowledgeReadProcedure` in
   `apps/api/src/trpc/knowledge.ts`), which `readsCeilingFilled` in `apps/web/e2e/knowledge.ts`
-  fills.
+  fills. The count resets at each minute of the clock, so the helper waits for a fresh minute
+  when too few seconds of the current one are left for the fill and the refusal after it.
 
 Read the numbers off those files rather than from here.
 

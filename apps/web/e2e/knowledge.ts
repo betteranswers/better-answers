@@ -90,7 +90,21 @@ export const windowRefocused = (page: Page): Promise<void> =>
 
 const PAST_THE_READS_CEILING = 121;
 
+const READS_WINDOW_MS = 60_000;
+
+const FILL_AND_REFUSAL_MS = 10_000;
+
+/** The api counts the reads in windows fixed to the clock's minute, on this machine's clock. */
+const aFreshReadsWindow = async (): Promise<void> => {
+  const left = READS_WINDOW_MS - (Date.now() % READS_WINDOW_MS);
+  if (left > FILL_AND_REFUSAL_MS) return;
+  await new Promise((later) => {
+    setTimeout(later, left);
+  });
+};
+
 export const readsCeilingFilled = async (page: Page, read: string): Promise<void> => {
+  await aFreshReadsWindow();
   const asked = new URL(read);
   const call = Object.values(
     z.record(z.string(), z.unknown()).parse(JSON.parse(asked.searchParams.get("input") ?? "{}")),
