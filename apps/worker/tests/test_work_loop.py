@@ -429,6 +429,50 @@ def test_a_failed_audit_counts_so_idle_ticks_queue_no_other(
         )
 
 
+def test_a_failed_job_is_not_claimable_until_its_backoff_passes(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
+    (tmp_path / f"{workspace}.git").mkdir()
+    bootstrap = bootstrap_for(database, tmp_path)
+
+    assert loop.tick(database, bootstrap) is True
+    assert loop.tick(database, bootstrap) is False, "the failed job was claimed at once"
+
+
+def test_a_failure_requeues_beside_a_fresh_job_for_its_subject(
+    database: psycopg.Connection,
+) -> None:
+    workspace = str(seed_workspace(database.cursor())["id"])
+    database.commit()
+    subject = ulid()
+    with scoped(database, workspace) as cursor:
+        failing = seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="index",
+            reason="connected",
+            subject_id=subject,
+            status="claimed",
+            attempts=1,
+            claimed_by=WORKER,
+            lease_expires_in_seconds=60,
+            enqueued_ago_seconds=10,
+        )
+        seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="index",
+            reason="connected",
+            subject_id=subject,
+        )
+
+    with scoped(database, workspace) as cursor:
+        assert queue.fail(cursor, failing["id"], WORKER, {"error": "TimeoutError"})
+        cursor.execute("SELECT status, attempts FROM job ORDER BY enqueued_at")
+        assert cursor.fetchall() == [("queued", 1), ("queued", 0)]
+
+
 def test_refuses_a_malformed_workspace_id_before_touching_the_store(
     tmp_path: Path,
 ) -> None:
