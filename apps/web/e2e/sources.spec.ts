@@ -713,6 +713,22 @@ test.describe("reviewing a connected source's findings", () => {
     );
   });
 
+  test("narrows the source whose review holds focus, by key", async ({ page, request }) => {
+    await anAdminAtSources(page, request, {
+      workspace: "Midgley Panels",
+      connectedSources: [SUPPLIER_FORMS],
+    });
+    await rowAction(page, "Supplier forms", "review").click();
+    await page.getByRole("checkbox", { name: BANK_ACCOUNT_BOX }).focus();
+
+    await page.keyboard.press("n");
+
+    await expect(rowAction(page, "Supplier forms", "narrow")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
+
   test("closes a review when its button is pressed again", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Southowram Stone",

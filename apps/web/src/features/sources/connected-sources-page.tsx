@@ -8,6 +8,7 @@ import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page-head.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
+import { rowInFocus } from "@/shared/row-focus.ts";
 import { counted } from "@/shared/words.ts";
 
 import { ConnectAction } from "./connect-action.tsx";
@@ -204,7 +205,6 @@ export function ConnectedSourcesPage() {
   usePageKeystrokes(LISTED);
   const connectedSources = useConnectedSources();
   const listId = useId();
-  const [inFocus, setInFocus] = useState<string>();
   const [reviewing, setReviewing] = useState<string>();
   const [publishing, setPublishing] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
@@ -250,7 +250,7 @@ export function ConnectedSourcesPage() {
   };
 
   const connectedSourceInFocusOrTell = (): ListedConnectedSource | undefined => {
-    const connectedSource = connectedSourceOf(inFocus);
+    const connectedSource = rowInFocus(listed, (each) => each.connectedSourceId);
     if (connectedSource === undefined) setOutcome(NOTHING_IN_FOCUS);
     return connectedSource;
   };
@@ -297,7 +297,6 @@ export function ConnectedSourcesPage() {
           <ConnectedSourceList
             connectedSources={listed}
             actions={{
-              onFocusConnectedSource: setInFocus,
               onReview: reviewOrClose,
               onPublish: publish,
               onNarrow: (connectedSource) => {

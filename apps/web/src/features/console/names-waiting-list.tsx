@@ -8,6 +8,7 @@ import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { NothingListed } from "@/shared/list-pages.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
+import { rowInFocus } from "@/shared/row-focus.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 
@@ -35,7 +36,6 @@ const focusOnArrival = (node: HTMLElement | null) => {
 
 type NameActions = {
   readonly correct: (personId: string) => void;
-  readonly focusedOn: (personId: string) => void;
   readonly personToFocus: string | undefined;
 };
 
@@ -75,9 +75,6 @@ function CorrectAction(properties: {
       aria-haspopup="dialog"
       aria-label={correctWords(waiting.displayName)}
       aria-keyshortcuts={NAMES_WAITING_KEYSTROKES.correct.key}
-      onFocus={() => {
-        actions.focusedOn(personId);
-      }}
       onClick={() => {
         actions.correct(personId);
       }}
@@ -158,7 +155,6 @@ export function NamesWaitingList() {
   const correcting = useCorrecting();
   const navigate = useNavigate();
   const [arrivedFor] = useState(() => arrival().personId);
-  const [inFocus, setInFocus] = useState<string>();
   const [openFor, setOpenFor] = useState<string>();
   const [said, setSaid] = useState<Outcome>();
   const waiting = listed.error === null ? listed.data : undefined;
@@ -167,7 +163,7 @@ export function NamesWaitingList() {
   const personToFocus = correcting.otherwiseRefusedFor ?? arrivedFor;
 
   const columns = useMemo(
-    () => columnsFor({ correct: setOpenFor, focusedOn: setInFocus, personToFocus }),
+    () => columnsFor({ correct: setOpenFor, personToFocus }),
     [personToFocus],
   );
   const table = useTable({
@@ -178,7 +174,7 @@ export function NamesWaitingList() {
   });
 
   useKeystroke(NAMES_WAITING_KEYSTROKES.correct, () => {
-    const held = narrowed.shown.find((each) => each.personId === inFocus);
+    const held = rowInFocus(narrowed.shown, (each) => each.personId);
     setSaid(held === undefined ? NO_NAME_IN_FOCUS : undefined);
     if (held !== undefined) setOpenFor(held.personId);
   });

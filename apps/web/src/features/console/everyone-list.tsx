@@ -10,6 +10,7 @@ import { useLastRead } from "@/shared/last-read.ts";
 import { NothingListed } from "@/shared/list-pages.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
+import { rowInFocus } from "@/shared/row-focus.ts";
 import { RowSheetButton } from "@/shared/row-sheet.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 
@@ -34,7 +35,6 @@ const ON_THE_LAST_PAGE: Outcome = { tone: "said", words: WORDS.onTheLastPage };
 
 type PersonActions = {
   readonly open: (personId: string) => void;
-  readonly focusedOn: (personId: string) => void;
 };
 
 function PersonCell(properties: {
@@ -47,9 +47,6 @@ function PersonCell(properties: {
     <div className="grid justify-items-start gap-0.5">
       <RowSheetButton
         id={personButtonId(person.id)}
-        onFocus={() => {
-          actions.focusedOn(person.id);
-        }}
         onClick={() => {
           actions.open(person.id);
         }}
@@ -154,7 +151,6 @@ export function EveryoneList() {
   const headingId = useId();
   const [arrived] = useState(arrival);
   const { typed, asked, type, clear, turnTo } = useAsking(arrived.search);
-  const [inFocus, setInFocus] = useState<string>();
   const [opened, setOpened] = useState(() => reopened(arrived));
   const [outcome, setOutcome] = useState<Outcome>();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -169,14 +165,13 @@ export function EveryoneList() {
         open: (personId) => {
           setOpened({ personId, at: "person" });
         },
-        focusedOn: setInFocus,
       }),
     [],
   );
   const table = useTable({ features, columns, data: people, getRowId: (person) => person.id });
 
   const openInFocus = (at: OpenedAt) => {
-    const person = people.find((listedPerson) => listedPerson.id === inFocus);
+    const person = rowInFocus(people, (listedPerson) => listedPerson.id);
     setOutcome(person === undefined ? NO_PERSON_IN_FOCUS : undefined);
     if (person !== undefined) setOpened({ personId: person.id, at });
   };

@@ -4,6 +4,12 @@ export const rowInFocus = <Row>(
   rows: readonly Row[],
   keyOf: (row: Row) => string,
 ): Row | undefined => {
-  const key = document.activeElement?.closest("[data-row]")?.getAttribute("data-row");
-  return rows.find((row) => keyOf(row) === key);
+  let keyed = document.activeElement?.closest("[data-row]");
+  while (keyed) {
+    const key = keyed.getAttribute("data-row");
+    const row = rows.find((each) => keyOf(each) === key);
+    if (row !== undefined) return row;
+    keyed = keyed.parentElement?.closest("[data-row]");
+  }
+  return undefined;
 };

@@ -68,13 +68,12 @@ const useInFocusKeystrokes = (properties: {
   readonly inFocus: () => WaitingRequest | undefined;
   readonly approve: (request: WaitingRequest) => void;
   readonly decline: (request: WaitingRequest) => void;
-  readonly nothingInFocus: () => void;
+  readonly say: (outcome: Outcome | undefined) => void;
 }) => {
-  const { nothingInFocus } = properties;
   const onTheRowInFocus = (act: (request: WaitingRequest) => void) => () => {
     const inFocus = properties.inFocus();
-    if (inFocus === undefined) nothingInFocus();
-    else act(inFocus);
+    properties.say(inFocus === undefined ? NOTHING_IN_FOCUS : undefined);
+    if (inFocus !== undefined) act(inFocus);
   };
   useKeystroke(KEY.approve, onTheRowInFocus(properties.approve));
   useKeystroke(KEY.decline, onTheRowInFocus(properties.decline));
@@ -153,9 +152,7 @@ function RequestsList(properties: {
     inFocus: () => rowInFocus(data, (request) => request.id),
     approve: toApprove,
     decline: declined,
-    nothingInFocus: () => {
-      setOutcome(NOTHING_IN_FOCUS);
-    },
+    say: setOutcome,
   });
 
   return (

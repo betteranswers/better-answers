@@ -345,7 +345,7 @@ describe("the console's lists", () => {
     const pressCorrect = () => {
       fireEvent.keyDown(document.body, { key: NAMES_WAITING_KEYSTROKES.correct.key });
     };
-    fireEvent.focus(within(list).getByRole("button", { name: toCorrectPriya }));
+    within(list).getByRole("button", { name: toCorrectPriya }).focus();
 
     searchFor(list, NAMES_WAITING_LIST.search, "sam");
     pressCorrect();
@@ -353,6 +353,10 @@ describe("the console's lists", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
 
     searchFor(list, NAMES_WAITING_LIST.search, "");
+    pressCorrect();
+    expect(screen.queryByRole("dialog"), "a name shown again kept focus it lost").toBeNull();
+
+    within(list).getByRole("button", { name: toCorrectPriya }).focus();
     pressCorrect();
     expect(await screen.findByRole("dialog", { name: toCorrectPriya })).toBeDefined();
   });

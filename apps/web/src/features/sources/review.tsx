@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
+import { keyedRow, rowInFocus } from "@/shared/row-focus.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
@@ -25,7 +26,6 @@ import {
   useFindings,
   usePreview,
   type GroupOfFindings,
-  type GroupOfFindingsKey,
   type ListedConnectedSource,
 } from "./sources-api.ts";
 import {
@@ -127,7 +127,6 @@ function FindingsTable(properties: {
 }) {
   const { connectedSource, groups } = properties;
   const [ticked, tick] = useTickedGroups();
-  const [inFocus, setInFocus] = useState<GroupOfFindingsKey>();
   const selected = groupsTickedIn(ticked, connectedSource.connectedSourceId);
 
   const toggle = (group: GroupOfFindings) => {
@@ -139,8 +138,7 @@ function FindingsTable(properties: {
     });
   };
   useKeystroke(SOURCES_KEYSTROKES.select, () => {
-    const group =
-      inFocus === undefined ? undefined : groups.find((each) => groupIsIn([inFocus], each));
+    const group = rowInFocus(groups, groupKeyText);
     if (group !== undefined) toggle(group);
   });
 
@@ -170,12 +168,9 @@ function FindingsTable(properties: {
       </TableHeader>
       <TableBody>
         {groups.map((group) => (
-          <TableRow key={groupKeyText(group)}>
+          <TableRow key={groupKeyText(group)} {...keyedRow(groupKeyText(group))}>
             <TableCell>
               <Checkbox
-                onFocus={() => {
-                  setInFocus(keyOf(group));
-                }}
                 checked={groupIsIn(selected, group)}
                 onCheckedChange={() => {
                   toggle(group);

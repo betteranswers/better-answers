@@ -157,13 +157,12 @@ const useInFocusKeystrokes = (properties: {
   readonly resend: (invitation: ListedInvitation) => void;
   readonly cancel: (invitation: ListedInvitation) => void;
   readonly tick: (invitation: ListedInvitation) => void;
-  readonly nothingInFocus: () => void;
+  readonly say: (outcome: Outcome | undefined) => void;
 }) => {
-  const { nothingInFocus } = properties;
   const onTheRowInFocus = (action: (invitation: ListedInvitation) => void) => () => {
     const inFocus = properties.inFocus();
-    if (inFocus === undefined) nothingInFocus();
-    else action(inFocus);
+    properties.say(inFocus === undefined ? NOTHING_IN_FOCUS : undefined);
+    if (inFocus !== undefined) action(inFocus);
   };
   useKeystroke(KEY.resend, onTheRowInFocus(properties.resend));
   useKeystroke(KEY.cancel, onTheRowInFocus(properties.cancel));
@@ -241,9 +240,7 @@ function InvitationList(properties: {
       if (!next.delete(invitation.invitationId)) next.add(invitation.invitationId);
       setTicked(tick(next));
     },
-    nothingInFocus: () => {
-      setOutcome(NOTHING_IN_FOCUS);
-    },
+    say: setOutcome,
   });
 
   return (
