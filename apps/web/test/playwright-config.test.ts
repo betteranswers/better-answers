@@ -57,7 +57,7 @@ describe("the browser suite's configuration", () => {
     expect((await configUnder(undefined)).workers).toBeUndefined();
   });
 
-  it("hands every run to the flaky report", async () => {
+  it("hands every run to the run summary", async () => {
     expect((await configUnder("true")).reporter).toContainEqual(["./e2e/run-summary.ts"]);
   });
 });
