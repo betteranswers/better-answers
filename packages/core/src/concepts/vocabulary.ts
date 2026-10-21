@@ -16,6 +16,7 @@ export const CONCEPT_REFUSALS = {
   "rename-refused": "inapplicable",
   "reclassification-refused": "inapplicable",
   "unreadable-commit": "inapplicable",
+  unchanged: "inapplicable",
 
   "no-such-repository": "precondition",
   "history-diverged": "precondition",

@@ -51,12 +51,21 @@ import {
   type UserId,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { ANY_HEAD, type CommitAuthor, type Committed, type GitDoor } from "../store/git/index.ts";
+import {
+  ANY_HEAD,
+  fileAtHead,
+  type CommitAuthor,
+  type Committed,
+  type GitDoor,
+} from "../store/git/index.ts";
 import { analyseMap } from "../store/map/index.ts";
 import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { withBundleWrite } from "./fence.ts";
 import {
+  contentHashOf,
   hashedFileOf,
+  normalisedBody,
+  parseConceptFile,
   renderConceptFile,
   type Frontmatter,
   type FrontmatterSource,
@@ -1172,6 +1181,147 @@ export const importBundle = async (
   return input.dryRun === true
     ? dryRunImport(principal, doors.git, opened.value)
     : runImport(principal, doors, opened.value, sensitivity);
+};
+
+export type ConceptBodyRun =
+  | { readonly dryRun: true; readonly base?: string | undefined }
+  | { readonly dryRun: false; readonly base: string };
+
+export type UpdateConceptBodyInput = {
+  readonly iri: string;
+  readonly body: string;
+} & ConceptBodyRun;
+
+type BodyAt = { readonly contentHash: string; readonly body: string };
+
+export type ConceptBodyUpdate = {
+  readonly iri: ConceptIri;
+  readonly path: string;
+  readonly from: BodyAt;
+  readonly to: BodyAt;
+
+  readonly written: ConceptWritten | undefined;
+};
+
+const updateConceptBodyAction = declareAction({
+  admits: BUNDLE_WRITERS,
+  input: z.custom<UpdateConceptBodyInput>(),
+  refuses: ["role-forbids", "malformed", "no-such-concept", "unchanged", "stale-precondition"],
+});
+
+export type UpdateConceptBodyRefusal =
+  | RefusalOf<typeof updateConceptBodyAction>
+  | WriteConceptRefusal;
+
+type StandingBody = { readonly held: Held; readonly author: CommitAuthor };
+
+const standingBodyOf = (principal: UserPrincipal, postgres: PostgresDoor, iri: ConceptIri) =>
+  attempt(() =>
+    withMember(principal, postgres, async (fresh, tx): Promise<StandingBody | undefined> => {
+      const held = await heldByIri(fresh, tx, iri);
+      return held === undefined
+        ? undefined
+        : { held, author: await authorOf(fresh, tx, fresh.userId) };
+    }),
+  );
+
+const disagreement = (path: string, why: string): Error =>
+  new Error(`the bundle and the index disagree: ${path} ${why}`);
+
+type ConceptFile = { readonly frontmatter: Frontmatter; readonly body: string };
+
+const fileHeldAt = async (
+  principal: UserPrincipal,
+  git: GitDoor,
+  held: Held,
+): Promise<Result<ConceptFile, "stale-precondition" | Error>> => {
+  const content = await attempt(() => fileAtHead(principal, git, held.path));
+  if (!content.ok) return err(content.error);
+  if (content.value === null) return err(disagreement(held.path, "is not in the bundle's head"));
+  const parsed = parseConceptFile(content.value);
+  if (!parsed.ok) return err(disagreement(held.path, "does not parse at the bundle's head"));
+  const { frontmatter, body } = parsed.value;
+  // A write commits to git before its rows land, so a head ahead of the row is a write in flight.
+  return contentHashOf(frontmatter, body, held.path) === held.contentHash
+    ? ok(parsed.value)
+    : err("stale-precondition");
+};
+
+type HeldBody = StandingBody & { readonly file: ConceptFile };
+
+const heldBodyOf = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  iri: ConceptIri,
+): Promise<Result<HeldBody, UpdateConceptBodyRefusal | Error>> => {
+  const standing = await standingBodyOf(principal, doors.postgres, iri);
+  if (!standing.ok) return err(standing.error);
+  if (!standing.value.ok) return err(standing.value.error);
+  if (standing.value.value === undefined) return err("no-such-concept");
+  const file = await fileHeldAt(principal, doors.git, standing.value.value.held);
+  return file.ok ? ok({ ...standing.value.value, file: file.value }) : err(file.error);
+};
+
+const wellFormedOf = (asked: string, body: string): ConceptIri | undefined => {
+  const iri = ids.conceptIri.safeParse(asked);
+  const fits = boundarySchemas.conceptIndex.insert.shape.body.safeParse(body);
+  return iri.success && fits.success && body.trim() !== "" ? iri.data : undefined;
+};
+
+const bodyRefusalOf = (
+  held: string,
+  to: string,
+  base: string | undefined,
+): UpdateConceptBodyRefusal | undefined => {
+  if (to === held) return "unchanged";
+  return base !== undefined && base !== held ? "stale-precondition" : undefined;
+};
+
+/**
+ * Replaces a standing concept's body and keeps everything else: its frontmatter as the file
+ * holds it, its status, its verifications and its citations.
+ */
+export const updateConceptBody = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  input: UpdateConceptBodyInput,
+): Promise<Result<ConceptBodyUpdate, UpdateConceptBodyRefusal | Error>> => {
+  const admitted = admit(updateConceptBodyAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const body = normalisedBody(input.body);
+  const iri = wellFormedOf(input.iri, body);
+  if (iri === undefined) return err("malformed");
+
+  const standing = await heldBodyOf(admitted.value, doors, iri);
+  if (!standing.ok) return err(standing.error);
+  const { held, author, file } = standing.value;
+  const to = contentHashOf(file.frontmatter, body, held.path);
+  const refusal = bodyRefusalOf(held.contentHash, to, input.base);
+  if (refusal !== undefined) return err(refusal);
+
+  const update = {
+    iri,
+    path: held.path,
+    from: { contentHash: held.contentHash, body: file.body },
+    to: { contentHash: to, body },
+  };
+  if (input.dryRun) return ok({ ...update, written: undefined });
+
+  const written = await writeConcept(admitted.value, doors, {
+    iri,
+    mergeKey: held.mergeKey,
+    path: held.path,
+    kind: held.kind,
+    title: held.title,
+    frontmatter: file.frontmatter,
+    body,
+    message: `Update the body of ${held.path} in place`,
+    author,
+    expects: { base: input.base },
+    status: held.status,
+  });
+  if (!written.ok) return err(written.error);
+  return ok({ ...update, written: written.value });
 };
 
 export type OpenedConcept = {
