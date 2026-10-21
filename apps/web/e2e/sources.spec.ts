@@ -1,6 +1,10 @@
 import type { APIRequestContext, Locator, Page, Response } from "@playwright/test";
 
-import { NEEDS_OCR } from "@/features/sources/words.ts";
+import {
+  NEEDS_OCR,
+  SELECT_A_CONNECTED_SOURCE_FIRST,
+  THE_ACTION_BEFORE_IS_STILL_GOING,
+} from "@/features/sources/words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -1522,6 +1526,53 @@ test.describe("publishing, narrowing and widening a connected source", () => {
 });
 
 test.describe("the Sources page's keystrokes", () => {
+  test("drops the select-first line once a key acts", async ({ page, request }) => {
+    await anAdminAtSources(page, request, {
+      workspace: "Sowerby Clearing",
+      connectedSources: [SUPPLIER_FORMS],
+    });
+    const said = connectedSourcesRegion(page).getByText(SELECT_A_CONNECTED_SOURCE_FIRST);
+    await expect(rowAction(page, "Supplier forms", "narrow")).toBeVisible();
+    await keystrokesButton(page).focus();
+
+    await page.keyboard.press("n");
+    await expect(said, "n with no connected source in focus said nothing").toHaveCount(1);
+
+    await rowAction(page, "Supplier forms", "narrow").focus();
+    await page.keyboard.press("n");
+    await expect(rowAction(page, "Supplier forms", "narrow")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    await expect(said, "the select-first line outlived the narrow").toHaveCount(0);
+  });
+
+  test("opens no review by key while a bulk action runs", async ({ page, request }) => {
+    await anAdminAtSources(page, request, {
+      workspace: "Sowerby Holding",
+      connectedSources: [SUPPLIER_FORMS, SERVICE_RECORDS],
+    });
+    await rowAction(page, "Supplier forms", "review").click();
+    await page.getByRole("checkbox", { name: BANK_ACCOUNT_BOX }).check();
+    await reviewOf(page, "Supplier forms").getByRole("button", { name: "Keep in Text" }).click();
+    const keeping = page.getByRole("dialog", { name: "Keep 1 Group of Findings in Text" });
+    await keeping.getByLabel("Reason").fill("The company's own bank details");
+    const kept = await heldBack(page, (url) => url.pathname.includes("sources.keepInText"));
+    await keeping.getByLabel("Reason").press("Enter");
+    await kept.reached;
+
+    await rowAction(page, "Service records", "review").focus();
+    await page.keyboard.press("r");
+
+    await expect(
+      connectedSourcesRegion(page).getByText(THE_ACTION_BEFORE_IS_STILL_GOING),
+    ).toHaveCount(1);
+    await expect(reviewNamed(page, "Service records"), "r opened a review mid-action").toHaveCount(
+      0,
+    );
+    kept.release();
+  });
+
   test("acts on no source by key once focus leaves", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Sowerby Keys",

@@ -101,6 +101,9 @@ const membersRegion = (page: Page) => page.getByRole("region", { name: "Members"
 
 const outcomeOf = (page: Page): Locator => membersRegion(page).getByRole("status").nth(1);
 
+const saidLineOf = (page: Page): Locator =>
+  membersRegion(page).locator("output:has(+ [role='alert'])");
+
 const selectionBar = (page: Page): Locator =>
   page.getByRole("toolbar", { name: "Selected Members" });
 
@@ -921,6 +924,16 @@ test.describe("a member's own page", () => {
     await listHeading(page).focus();
 
     await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.open.key);
+  });
+
+  test("drops the select-first line once a key ticks a member", async ({ page, request }) => {
+    await skippedToMembers(page, request, "Calder Ticking");
+    await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.tick.key);
+
+    await tickOf(page, "Priya Shah").focus();
+    await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
+    await expect(tickOf(page, "Priya Shah")).toBeChecked();
+    await expect(saidLineOf(page), "the select-first line outlived the tick").toHaveText("");
   });
 
   test("opens a member and changes their role by keyboard alone", async ({ page, request }) => {
@@ -1787,6 +1800,16 @@ test.describe("bulk actions on the members ticked", () => {
       await expect(rowOf(page, name).getByText("Refused", { exact: true })).toBeVisible();
       await expect(cellOf(page, name, "Role")).toHaveText("Admin");
     }
+    await tickOf(page, "Test person").focus();
+    await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
+    await expect(tickOf(page, "Test person")).not.toBeChecked();
+    await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
+    await expect(tickOf(page, "Test person")).toBeChecked();
+    await expect(refusal.getByRole("listitem"), "a tick by key wiped the refusal").toHaveCount(2);
+    await expect(
+      rowOf(page, "Test person").getByText("Refused", { exact: true }),
+      "a tick by key wiped the row's mark",
+    ).toBeVisible();
     await expect(selectionBar(page).getByRole("status")).toHaveText(TWO_TICKED);
     await passesTheAccessibilityGate();
   });

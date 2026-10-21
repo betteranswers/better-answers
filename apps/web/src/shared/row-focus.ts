@@ -1,8 +1,6 @@
-import type { Dispatch, SetStateAction } from "react";
-
 import type { Outcome } from "@/shared/outcome.tsx";
 
-export type Saying = Dispatch<SetStateAction<Outcome | undefined>>;
+export type Saying = (next: (said: Outcome | undefined) => Outcome | undefined) => void;
 
 export const keyedRow = (key: string) => ({ "data-row": key });
 
@@ -26,7 +24,7 @@ export const onTheRowInFocus =
   () => {
     const row = inFocus();
     if (row === undefined) {
-      say(selectFirst);
+      say(() => selectFirst);
       return;
     }
     say((said) => (said === selectFirst ? undefined : said));

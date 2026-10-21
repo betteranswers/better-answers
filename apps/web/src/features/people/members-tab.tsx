@@ -9,7 +9,7 @@ import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { ListPages, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
-import { rowInFocus } from "@/shared/row-focus.ts";
+import { onTheRowInFocus, rowInFocus, type Saying } from "@/shared/row-focus.ts";
 import { RowMenu } from "@/shared/row-menu.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
@@ -305,7 +305,13 @@ const useLastSaid = (heading: RefObject<HTMLElement | null>) => {
   const say = (outcome: Outcome | undefined, refused: RefusedRows = NO_MARKS) => {
     setShown({ outcome, refused });
   };
-  return { ...shown, say };
+  const sayOver: Saying = (next) => {
+    setShown((was) => {
+      const outcome = next(was.outcome);
+      return outcome === was.outcome ? was : { outcome, refused: NO_MARKS };
+    });
+  };
+  return { ...shown, say, sayOver };
 };
 
 function MemberList(properties: {
@@ -320,7 +326,7 @@ function MemberList(properties: {
   const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
   const searchRef = useRef<HTMLInputElement>(null);
   const openMember = useOpenMember(narrowed.flush);
-  const { outcome, refused, say } = useLastSaid(heading);
+  const { outcome, refused, say, sayOver } = useLastSaid(heading);
   const invite = useInviteAction(say);
 
   const columns = useMemo(() => memberColumns(refused), [refused]);
@@ -353,9 +359,7 @@ function MemberList(properties: {
     tick: (personId) => {
       setTicked(toggled(ticked, personId));
     },
-    nothingInFocus: () => {
-      say(NOTHING_IN_FOCUS);
-    },
+    say: sayOver,
   });
 
   return (
@@ -448,17 +452,12 @@ function useInFocusKeystrokes(properties: {
   readonly inFocus: () => ListedMember | undefined;
   readonly open: (personId: string, at: OpenedAt) => void;
   readonly tick: (personId: string) => void;
-  readonly nothingInFocus: () => void;
+  readonly say: Saying;
 }) {
-  const { nothingInFocus } = properties;
-  const onTheMemberInFocus = (action: (personId: string) => void) => () => {
-    const inFocus = properties.inFocus();
-    if (inFocus === undefined) nothingInFocus();
-    else action(inFocus.personId);
-  };
+  const acting = onTheRowInFocus(properties.inFocus, properties.say, NOTHING_IN_FOCUS);
   const opening = (at: OpenedAt) =>
-    onTheMemberInFocus((personId) => {
-      properties.open(personId, at);
+    acting((member) => {
+      properties.open(member.personId, at);
     });
 
   useKeystroke(KEY.open, opening("member"));
@@ -467,7 +466,12 @@ function useInFocusKeystrokes(properties: {
   useKeystroke(KEY.changeGroups, opening("groups"));
   useKeystroke(KEY.remove, opening("removal"));
   useKeystroke(KEY.flagName, opening("flag"));
-  useKeystroke(KEY.tick, onTheMemberInFocus(properties.tick));
+  useKeystroke(
+    KEY.tick,
+    acting((member) => {
+      properties.tick(member.personId);
+    }),
+  );
 }
 
 export function MembersTab() {
