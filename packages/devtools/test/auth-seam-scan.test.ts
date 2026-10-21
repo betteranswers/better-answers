@@ -62,6 +62,18 @@ describe("the auth seam's declarations", () => {
     expect(scan(MAPPED)).toBe(`${SEAM}: its declarations name no Better Auth type\n`);
   });
 
+  it("refuses the auth client re-exported through the seam", () => {
+    const tree = {
+      ...MAPPED,
+      "src/auth-client.ts": 'export { client as authClient } from "better-auth";\n',
+      [SEAM]: `${MAPPED[SEAM] ?? ""}\nexport { authClient } from "./auth-client.ts";\n`,
+    };
+
+    expect(scan(tree)).toContain(
+      `${SEAM}: the declaration of \`authClient\` names \`./auth-client.ts\`.`,
+    );
+  });
+
   it("refuses an export whose inferred type TypeScript cannot name", () => {
     const tree = seamed(
       'import { made } from "hidden-types";\n\nexport const madeHere = () => made();\n',

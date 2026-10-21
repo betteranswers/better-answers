@@ -1,8 +1,9 @@
 import path from "node:path";
 
-const LIBRARY_NAMED = /@?better-(?:auth|fetch)\b[\w./-]*/;
+const LIBRARY_NAMED = /@?better-(?:auth|fetch)\b[\w./-]*|[\w./-]*\bauth-client(?:\.ts)?\b/;
 
-const EXPORTED = /^export (?:declare )?(?:const|function|class|type|interface) (\w+)/;
+const EXPORTED =
+  /^export (?:declare )?(?:(?:const|function|class|type|interface) (\w+)|(?:type )?\{ (\w+))/;
 
 const DIAGNOSTIC = /^(?<file>.+?)\((?<line>\d+),\d+\): error (?<code>TS\d+): (?<said>.*)$/;
 
@@ -50,11 +51,16 @@ export const refusalsOf = (root: string, seam: Seam, tscOutput: string): readonl
     ];
   });
 
+const exportOn = (text: string): string | undefined => {
+  const declared = EXPORTED.exec(text);
+  return declared?.[1] ?? declared?.[2];
+};
+
 export const libraryNamed = (seam: Seam, declaration: string): readonly string[] => {
   const leaks = new Map<string, string>();
   let exported = "an export";
   for (const text of declaration.split("\n")) {
-    exported = EXPORTED.exec(text)?.[1] ?? exported;
+    exported = exportOn(text) ?? exported;
     const named = LIBRARY_NAMED.exec(text)?.[0];
     if (named !== undefined && !leaks.has(exported)) leaks.set(exported, named);
   }
