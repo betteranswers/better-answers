@@ -233,7 +233,7 @@ function InvitationList(properties: {
   });
 
   useInFocusKeystrokes({
-    inFocus: () => rowInFocus(listed, (invitation) => invitation.invitationId),
+    inFocus: () => rowInFocus(narrowed.data, (invitation) => invitation.invitationId),
     resend: actions.resendOne,
     cancel: actions.cancelOne,
     tick: (invitation) => {

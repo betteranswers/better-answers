@@ -150,7 +150,7 @@ function RequestsList(properties: {
   };
 
   useInFocusKeystrokes({
-    inFocus: () => rowInFocus(listed, (request) => request.id),
+    inFocus: () => rowInFocus(data, (request) => request.id),
     approve: toApprove,
     decline: declined,
     nothingInFocus: () => {
