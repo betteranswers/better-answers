@@ -118,7 +118,7 @@ describe("an ask as the address holds it", () => {
 });
 
 describe("a search written into the address by hand", () => {
-  it.each(["audit", "1.5"])("is taken as written: %s", async (written) => {
+  it.each(["audit", "1.5", "1.50", "1e3"])("is taken as written: %s", async (written) => {
     const { at } = await openAt("/elsewhere", `/members?search=${written}`);
 
     await at("/members");
