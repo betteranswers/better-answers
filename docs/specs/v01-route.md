@@ -9,7 +9,7 @@ The route is the way from the foundation to a finished v0.1, cut into blocks. Th
 | S0 | knowledge | Personal data withheld before any store, and an erasure that says what it did | none | done | | [S0's spec](../archive/specs/s0-redaction-seam-and-erasure.md) |
 | S1 | knowledge | One uploaded document to a cited passage, with no embedding | S0 | done | | [S1's spec](../archive/specs/s1-one-uploaded-document-to-a-cited-passage.md) |
 | S2a | knowledge | Search and the concept page, with no model call | S1 (`open` by locator) | done | | [S2a's plan](../plans/2026-10-09-1344-feat-s2a-search-and-concept-page-plan.md) |
-| [S2b](route/s2b.md) | knowledge | Ask answers from concepts with citations or refuses, and the Questions pages | S2a, S1 (unmapped passages) | building | | [S2b's plan](../plans/2026-10-11-2309-feat-s2b-ask-plan.md), [rarity-weighted matching](../plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md) |
+| S2b | knowledge | Ask answers from concepts with citations or refuses, and the Questions pages | S2a, S1 (unmapped passages) | done | | [S2b's plan](../plans/2026-10-11-2309-feat-s2b-ask-plan.md), [rarity-weighted matching](../plans/2026-10-14-1845-feat-rarity-weighted-matching-plan.md) |
 | [S4](route/s4.md) | knowledge | The website and a SharePoint library as connected sources, priced before they sync | S1 | unplanned | | |
 | [S6](route/s6.md) | knowledge | A bid's question set answered and exported as a response-set document | S2b, S3 | unplanned | | |
 | [S7](route/s7.md) | knowledge | Suggested concepts extracted from synced sources within the spending limit | S4, S3 (the Kinds rename) | unplanned | | |

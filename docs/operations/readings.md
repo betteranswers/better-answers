@@ -57,6 +57,9 @@ How often a G-Cloud row of the buyer-worded set, asked word for word with no col
 | 2026-10-14 | `release/20261014T184033Z-8d0a501` | Reading 2 through `ask`, counted against a list fixed blind beforehand, at least one in the first 20, the 55 rows | 47 of 55 | Old route, archived |
 | 2026-10-14 | `release/20261014T184033Z-8d0a501` | Reading 2 through `ask`, counted against a list fixed blind beforehand, every answering `Answer` in the first ten, the 54 rows | 20 of 54 | Old route, archived |
 | 2026-10-14 | `release/20261014T184033Z-8d0a501` | Reading 2 through `ask`, counted against a list fixed blind beforehand, every answering `Answer` in the first 20, the 54 rows | 27 of 54 | Old route, archived |
+| 2026-10-21 | `release/20261021T141344Z-5ed685a` | AE1: checklist row 45 through `ask` from claude.ai, `audits` named, judged by Claude Sonnet 5.5 | Pass, read by the owner. Both `audits` `Answer`s fit, word for word with who verified them, and none from `lms` or `website`. Record `01M5FN3X9NRPK3A0R47H6GWV8J` | S2b's plan, *Acceptance Examples* |
+| 2026-10-21 | `release/20261021T141344Z-5ed685a` | AE2: the same row, no collection named | Pass, read by the owner. AE1's two `Answer`s under `audits` and two under `website`, *Audit Logs & Buyer Audit Access* among them, with no one retention period stated for every product. No `lms` `Answer` reached the result, though AE14's judge takes one (BA-177). Record `01M5FP1EZS5C1ABP3HDBBVVF3K` | S2b's plan, *Acceptance Examples* |
+| 2026-10-21 | `release/20261021T141344Z-5ed685a` | AE14: the same row, `lms` named | Pass, read by the owner. *Buyer audit of user actions* and *Supplier audit trail* fit under `lms`. Record `01M5FP9EY1RDKP9G6DGQ9Y8Q3T` | S2b's plan, *Acceptance Examples* |
 
 ## The reuse reading
 
@@ -64,6 +67,12 @@ How many of the reuse set's 32 fits the judge takes, and how many of its 36 hard
 
 | Date | Release or commit | Set or rule | Figure | Source |
 | --- | --- | --- | --- | --- |
+| 2026-10-21 | `76513a867` | Claude Sonnet 5.5 at effort high, its default, at £0.747 to the dollar | Fits 28 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 0, 34 of 34 answered, none never sent; £0.123; latency median 2,195 ms, worst 5,849 ms | `pnpm reading:reuse` |
+| 2026-10-21 | `76513a867` | Claude Sonnet 5.5 at effort low, at £0.747 to the dollar | Fits 28 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 0, 34 of 34 answered, none never sent; £0.123; latency median 1,674 ms, worst 8,834 ms | `pnpm reading:reuse` |
+| 2026-10-21 | `76513a867` | Claude Haiku 5.5 at effort medium, its default, at £0.747 to the dollar | Fits 28 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 0, 34 of 34 answered, none never sent; £0.0079; latency median 2,385 ms, worst 8,212 ms | `pnpm reading:reuse` |
+| 2026-10-21 | `76513a867` | Claude Haiku 5.5 at effort low, at £0.747 to the dollar | Fits 26 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 0, 34 of 34 answered, none never sent; £0.0065; latency median 1,469 ms, worst 5,212 ms | `pnpm reading:reuse` |
+
+The three runs at 28 of 32 miss the same four fits. Each is a question in two parts, and the `Answer` answers one of them. Two ask about encryption at rest and in transit, and two about each module's audit log. Effort low on Haiku 5.5 misses the two audit-log fits and four fits whose question has one part.
 
 ## The decision reading
 
@@ -71,6 +80,20 @@ How Clef-flash and Clef do as the judge's decision backend on the reuse set at t
 
 | Date | Release or commit | Set or rule | Figure | Source |
 | --- | --- | --- | --- | --- |
+| 2026-10-21 | `76513a867` | Clef-flash on reuse at threshold 0.3, at £0.747 to the dollar | Fits 29 of 32, hard negatives wrongly taken 16 of 36, other `Answer`s taken 257; £0.0020; latency median 715 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef-flash on reuse at threshold 0.5 | Fits 26 of 32, hard negatives wrongly taken 12 of 36, other `Answer`s taken 234; £0.0020; latency median 759 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef-flash on reuse at threshold 0.7 | Fits 25 of 32, hard negatives wrongly taken 7 of 36, other `Answer`s taken 210; £0.0020; latency median 875 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef-flash on reuse at threshold 0.9 | Fits 14 of 32, hard negatives wrongly taken 2 of 36, other `Answer`s taken 113; £0.0020; latency median 755 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef on reuse at threshold 0.3 | Fits 30 of 32, hard negatives wrongly taken 1 of 36, other `Answer`s taken 160; £0.0126; latency median 380 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef on reuse at threshold 0.5 | Fits 29 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 103; £0.0126; latency median 357 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef on reuse at threshold 0.7 | Fits 27 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 53; £0.0126; latency median 362 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef on reuse at threshold 0.9 | Fits 20 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 11; £0.0126; latency median 382 ms | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef-flash at the entry step, recall in the first ten | Paraphrases 77.9 % reordered against 72.6 % for `find` and the entry step, 8 unscored; buyer-worded 53.9 % against 55.8 %, 1 unscored; 835,709 tokens in | `pnpm reading:decision` |
+| 2026-10-21 | `76513a867` | Clef at the entry step, recall in the first ten | Paraphrases 77.9 % reordered against 72.6 %, 8 unscored; buyer-worded 55.8 % against 55.8 %, 1 unscored; 835,709 tokens in | `pnpm reading:decision` |
+
+The first twelve other `Answer`s Clef took at threshold 0.7, read by hand, each answer a different question from the one asked, such as an uptime question taking whether contractors are background checked. Claude Sonnet 5.5 and Claude Haiku 5.5 take none (§ The reuse reading). So no threshold makes either model a judge on this set: one that keeps out the hard negatives still takes unrelated `Answer`s, and at 0.9 Clef finds 20 of 32 fits. At the entry step, reordering by either model lifts paraphrase recall by 5.3 points and leaves buyer-worded recall level or lower.
+
+**The owner's choice from the two readings (21/10/2026).** Phew's workspace judges with Claude Sonnet 5.5 at its default effort, and no decision model has a threshold. Sonnet 5.5 took 28 of 32 fits on the reuse set, with no hard negative and no unrelated `Answer`. Clef and Clef-flash took unrelated `Answer`s at every threshold read. Claude Haiku 5.5 at its default effort matched Sonnet 5.5 at about a fifteenth of the cost, but 34 questions cannot tell the two apart, so Haiku waits for a larger set.
 
 ## The governed write at 3,000 concepts
 
