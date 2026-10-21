@@ -8,6 +8,9 @@ const asJsonWritesIt = (value: string): Json => {
   return read;
 };
 
+export const typedText = (held: unknown): string | undefined =>
+  typeof held === "string" ? held : JSON.stringify(held);
+
 export const ADDRESS_QUERY = {
   parseSearch: parseSearchWith(asJsonWritesIt),
   stringifySearch: stringifySearchWith(JSON.stringify, asJsonWritesIt),
