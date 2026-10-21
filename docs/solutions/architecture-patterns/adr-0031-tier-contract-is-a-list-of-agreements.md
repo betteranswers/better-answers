@@ -32,7 +32,7 @@ Every answer the api and the worker must hold alike is an agreement in the tier 
 
 The agreements live in top-level `contracts/`, listed in `contracts/manifest.json`. Nothing imports the directory and nothing deploys it. The manifest names these:
 
-- `queue` (SQL functions): claim, lease, heartbeat, hand-back, reaper, attempt count and poison threshold; the kinds a claimant runs, a job's subject and the run key.
+- `queue` (SQL functions): claim, lease, heartbeat, hand-back, reaper, attempt count, backoff and poison threshold; the kinds a claimant runs, a job's subject and the run key.
 - `suggestions` (SQL function): submitting a suggestion set; what acceptance promises is fixtured.
 - `model-choice` (SQL function): one model choice per workspace per purpose, resolved by the database.
 - `cost-ledger` (generated): the `llm_call` row. Its golden rows are held to the migrated table's columns and outcomes, and to the purpose vocabulary both tiers speak.

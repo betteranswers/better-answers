@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0089_the-handed-back-claim"
+MIGRATION_ID = "0091_the-claim-after-backoff"
 
-MIGRATION_WHEN = 1792586224913
+MIGRATION_WHEN = 1792589722576
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -260,6 +260,7 @@ TABLES: dict[str, dict[str, str]] = {
         "finished_at": "timestamp with time zone",
         "outcome": "jsonb",
         "subject_id": "text",
+        "backoff_ends_at": "timestamp with time zone",
     },
     "public.jwks": {
         "id": "text NOT NULL",

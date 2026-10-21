@@ -50,9 +50,10 @@ const fixtureSchema = z.object({
       enqueued_ago_seconds: z.number().int(),
       claimed_by: z.string().nullable(),
       lease_expires_in_seconds: z.number().int().nullable(),
+      backoff_ends_in_seconds: z.number().int().nullable(),
     }),
   ),
-  refused_enqueues: z.array(jobCaseSchema.extend({ sqlstate: z.string() })),
+  enqueues: z.array(jobCaseSchema.extend({ answer: z.string() })),
   claims: z.array(
     z.object({
       why: z.string(),
@@ -74,6 +75,7 @@ const fixtureSchema = z.object({
       attempts: z.number().int(),
       max_attempts: z.number().int(),
       claimed_by: z.string().nullable(),
+      backoff_ends_in_seconds: z.number().int().nullable(),
     }),
   ),
 });
@@ -107,19 +109,25 @@ const seedFixture = async (client: pg.PoolClient) => {
           : new Date(now + seeded.lease_expires_in_seconds * 1000),
       heartbeatAt: seeded.claimed_by === null ? null : new Date(now - 1000),
     });
+    if (seeded.backoff_ends_in_seconds !== null) {
+      await client.query(
+        "UPDATE job SET backoff_ends_at = now() + make_interval(secs => $1) WHERE id = $2",
+        [seeded.backoff_ends_in_seconds, seeded.id],
+      );
+    }
   }
 };
 
-const refusedEnqueue = (
+const enqueueAnswer = (
   client: pg.PoolClient,
-  refused: (typeof fixture.refused_enqueues)[number],
+  enqueue: (typeof fixture.enqueues)[number],
 ): Promise<string> =>
   enqueueAttempted(client, {
-    workspaceId: refused.workspace_id,
-    id: refused.id,
-    kind: refused.kind,
-    reason: refused.reason,
-    subjectId: refused.subject_id,
+    workspaceId: enqueue.workspace_id,
+    id: enqueue.id,
+    kind: enqueue.kind,
+    reason: enqueue.reason,
+    subjectId: enqueue.subject_id,
   });
 
 const lapseLeases = async (client: pg.PoolClient, jobIds: readonly string[]) => {
@@ -139,9 +147,9 @@ const asRoleInScope = async (
 };
 
 const enqueuesAnswered = async (client: pg.PoolClient) => {
-  const enqueues: { readonly why: string; readonly sqlstate: string }[] = [];
-  for (const refused of fixture.refused_enqueues) {
-    enqueues.push({ why: refused.why, sqlstate: await refusedEnqueue(client, refused) });
+  const enqueues: { readonly why: string; readonly answer: string }[] = [];
+  for (const enqueue of fixture.enqueues) {
+    enqueues.push({ why: enqueue.why, answer: await enqueueAnswer(client, enqueue) });
   }
   return enqueues;
 };
@@ -202,8 +210,11 @@ const finalRows = async (client: pg.PoolClient) => {
     attempts: number;
     max_attempts: number;
     claimed_by: string | null;
+    backoff_ends_in_seconds: number | null;
   }>(
-    "SELECT workspace_id, id, status, attempts, max_attempts, claimed_by FROM job ORDER BY workspace_id, id",
+    `SELECT workspace_id, id, status, attempts, max_attempts, claimed_by,
+            round(extract(epoch FROM backoff_ends_at - now()))::int AS backoff_ends_in_seconds
+       FROM job ORDER BY workspace_id, id`,
   );
   return rows.rows;
 };
@@ -214,9 +225,9 @@ describe("the queue agreement", () => {
       await seedFixture(client);
 
       expect(await enqueuesAnswered(client)).toEqual(
-        fixture.refused_enqueues.map((refused) => ({
-          why: refused.why,
-          sqlstate: refused.sqlstate,
+        fixture.enqueues.map((enqueue) => ({
+          why: enqueue.why,
+          answer: enqueue.answer,
         })),
       );
 
@@ -238,6 +249,7 @@ describe("the queue agreement", () => {
             attempts: expected.attempts,
             max_attempts: expected.max_attempts,
             claimed_by: expected.claimed_by,
+            backoff_ends_in_seconds: expected.backoff_ends_in_seconds,
           })),
       );
     });
@@ -248,7 +260,7 @@ describe("the kinds the queue agreement exercises", () => {
   it("are the kinds the descriptors declare, neither more nor fewer", () => {
     const exercised = new Set<string>([
       ...fixture.jobs.map((seeded) => seeded.kind),
-      ...fixture.refused_enqueues.map((refused) => refused.kind),
+      ...fixture.enqueues.map((enqueue) => enqueue.kind),
       ...fixture.claims.flatMap((claim) => claim.kinds),
     ]);
     const declared = new Set<string>(JOB_KINDS);

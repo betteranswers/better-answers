@@ -509,20 +509,21 @@ def seed_job(
     enqueued_ago_seconds: int = 0,
     claimed_by: str | None = None,
     lease_expires_in_seconds: int | None = None,
+    backoff_ends_in_seconds: int | None = None,
 ) -> dict[str, Any]:
     held = None if claimed_by is None else "now() - interval '1 second'"
-    lease = (
-        "NULL"
-        if lease_expires_in_seconds is None
-        else f"now() + interval '{lease_expires_in_seconds} seconds'"
-    )
+
+    def from_now(seconds: int | None) -> str:
+        return "NULL" if seconds is None else f"now() + interval '{seconds} seconds'"
+
     cursor.execute(
         "INSERT INTO job (workspace_id, id, kind, reason, subject_id, status, attempts,"
         " max_attempts, enqueued_at, claimed_by, claimed_at, lease_expires_at,"
-        " heartbeat_at)"
+        " heartbeat_at, backoff_ends_at)"
         f" VALUES (%s, %s, %s, %s, %s, %s, %s, %s,"
         f" now() - interval '{enqueued_ago_seconds} seconds', %s,"
-        f" {held or 'NULL'}, {lease}, {held or 'NULL'}) RETURNING *",
+        f" {held or 'NULL'}, {from_now(lease_expires_in_seconds)}, {held or 'NULL'},"
+        f" {from_now(backoff_ends_in_seconds)}) RETURNING *",
         (
             workspace_id,
             job_id or ulid(),

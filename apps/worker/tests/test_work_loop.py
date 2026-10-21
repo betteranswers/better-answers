@@ -90,6 +90,17 @@ def bootstrap_for(database: psycopg.Connection, git_store: Path) -> Bootstrap:
     )
 
 
+def an_empty_store_fails_the_audit(git_store: Path, workspace: str) -> None:
+    (git_store / f"{workspace}.git").mkdir()
+
+
+def end_backoffs(database: psycopg.Connection, workspace: str) -> None:
+    with scoped(database, workspace) as cursor:
+        cursor.execute(
+            "UPDATE job SET backoff_ends_at = now() WHERE backoff_ends_at IS NOT NULL"
+        )
+
+
 def a_workspace_holding_one_job(
     database: psycopg.Connection, *, kind: str, reason: str | None = None
 ) -> str:
@@ -407,14 +418,15 @@ def test_a_failed_audit_counts_so_idle_ticks_queue_no_other(
     workspace = seed_workspace(database.cursor())["id"]
     database.commit()
 
-    (tmp_path / f"{workspace}.git").mkdir()
+    an_empty_store_fails_the_audit(tmp_path, workspace)
     bootstrap = bootstrap_for(database, tmp_path)
 
     assert loop.tick(database, bootstrap) is False
     assert loop.tick(database, bootstrap) is True
 
-    assert loop.tick(database, bootstrap) is True
-    assert loop.tick(database, bootstrap) is True
+    for _ in range(2):
+        end_backoffs(database, workspace)
+        assert loop.tick(database, bootstrap) is True
 
     assert loop.tick(database, bootstrap) is False
 
@@ -427,6 +439,117 @@ def test_a_failed_audit_counts_so_idle_ticks_queue_no_other(
         assert cursor.fetchall() == [("failed", 3)], (
             "a failed audit runs to its bound of three"
         )
+
+
+def test_a_failed_job_is_not_claimable_until_its_backoff_passes(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
+    an_empty_store_fails_the_audit(tmp_path, workspace)
+    bootstrap = bootstrap_for(database, tmp_path)
+
+    assert loop.tick(database, bootstrap) is True
+    assert loop.tick(database, bootstrap) is False, "the failed job was claimed at once"
+
+    end_backoffs(database, workspace)
+    assert loop.tick(database, bootstrap) is True, "the backoff never let the job go"
+
+
+def test_a_job_failing_twice_then_succeeding_is_not_poisoned(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = seed_workspace(database.cursor())["id"]
+    with database.cursor() as cursor:
+        content = seed_expenses(cursor, workspace)
+    database.commit()
+    with scoped(database, workspace) as cursor:
+        seed_job(cursor, workspace_id=workspace, kind="nightly-audit")
+    an_empty_store_fails_the_audit(tmp_path, workspace)
+    bootstrap = bootstrap_for(database, tmp_path)
+
+    for _ in range(2):
+        assert loop.tick(database, bootstrap) is True
+        end_backoffs(database, workspace)
+    (tmp_path / f"{workspace}.git").rmdir()
+    write_bundle(tmp_path, workspace, {"knowledge/expenses.md": content})
+    assert loop.tick(database, bootstrap) is True
+
+    with database.cursor() as cursor:
+        cursor.execute(
+            "SELECT status, attempts FROM job WHERE workspace_id = %s", (workspace,)
+        )
+        assert cursor.fetchall() == [("done", 3)]
+
+
+def test_two_claimants_never_run_one_subjects_two_queued_jobs(
+    database: psycopg.Connection,
+) -> None:
+    workspace = str(seed_workspace(database.cursor())["id"])
+    database.commit()
+    subject = ulid()
+    with scoped(database, workspace) as cursor:
+        retry = seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="index",
+            reason="wiped",
+            subject_id=subject,
+            attempts=1,
+            enqueued_ago_seconds=10,
+            backoff_ends_in_seconds=-1,
+        )
+        seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="index",
+            reason="connected",
+            subject_id=subject,
+        )
+
+    with (
+        queue.connected(_WHERE[database]) as first,
+        queue.connected(_WHERE[database]) as second,
+        scoped(first, workspace) as claiming,
+    ):
+        taken = queue.claim(claiming, workspace, "first", ["index"])
+        with scoped(second, workspace) as racing:
+            raced = queue.claim(racing, workspace, "second", ["index"])
+
+    assert taken is not None
+    assert (taken.id, raced) == (retry["id"], None)
+
+
+def test_a_failure_requeues_beside_a_fresh_job_for_its_subject(
+    database: psycopg.Connection,
+) -> None:
+    workspace = str(seed_workspace(database.cursor())["id"])
+    database.commit()
+    subject = ulid()
+    with scoped(database, workspace) as cursor:
+        failing = seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="index",
+            reason="connected",
+            subject_id=subject,
+            status="claimed",
+            attempts=1,
+            claimed_by=WORKER,
+            lease_expires_in_seconds=60,
+            enqueued_ago_seconds=10,
+        )
+        seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="index",
+            reason="connected",
+            subject_id=subject,
+        )
+
+    with scoped(database, workspace) as cursor:
+        assert queue.fail(cursor, failing["id"], WORKER, {"error": "TimeoutError"})
+        cursor.execute("SELECT status, attempts FROM job ORDER BY enqueued_at")
+        assert cursor.fetchall() == [("queued", 1), ("queued", 0)]
 
 
 def test_refuses_a_malformed_workspace_id_before_touching_the_store(
@@ -914,6 +1037,28 @@ def test_healthy_with_a_fresh_lease_unhealthy_with_a_waiting_queue(
 
     with scoped(database, workspace) as cursor:
         cursor.execute("UPDATE job SET lease_expires_at = now() - interval '1 minute'")
+
+    assert health.is_healthy(database, WORKER) is False
+
+
+def test_a_job_in_its_backoff_is_not_a_waiting_queue(
+    database: psycopg.Connection,
+) -> None:
+    workspace = seed_workspace(database.cursor())["id"]
+    database.commit()
+    with scoped(database, workspace) as cursor:
+        seed_job(
+            cursor,
+            workspace_id=workspace,
+            attempts=1,
+            enqueued_ago_seconds=300,
+            backoff_ends_in_seconds=60,
+        )
+
+    assert health.is_healthy(database, WORKER) is True
+
+    with scoped(database, workspace) as cursor:
+        cursor.execute("UPDATE job SET backoff_ends_at = now() - interval '5 minutes'")
 
     assert health.is_healthy(database, WORKER) is False
 
