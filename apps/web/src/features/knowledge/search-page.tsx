@@ -302,24 +302,33 @@ const useReading = (query: string): Reading => {
   };
 };
 
+type Read = "pending" | "failed" | "read";
+
+const readOf = (query: string, matches: Matches): Read => {
+  if (matches.data !== undefined || asksNothing(query)) return "read";
+  return matches.isPending ? "pending" : "failed";
+};
+
 const useOpening = (
   query: string,
   shown: readonly Match[],
-  unread: boolean,
+  matches: Matches,
   heading: RefObject<HTMLElement | null>,
 ) => {
+  const read = readOf(query, matches);
   const [opened, setOpened] = useState<OpenedFor>();
   const [leftIn, setLeftIn] = useState<string>();
-  if (opened !== undefined && !stillListed(opened, query, shown, unread)) {
+  if (opened !== undefined && !stillListed(opened, query, shown, read !== "read")) {
     setOpened(undefined);
     if (opened.query === query) setLeftIn(query);
   }
   const left = leftIn === query;
   if (leftIn !== undefined && !left) setLeftIn(undefined);
+  const listFailed = opened !== undefined && read === "failed";
 
   useEffect(() => {
-    if (left && document.activeElement === document.body) heading.current?.focus();
-  }, [left, heading]);
+    if ((left || listFailed) && document.activeElement === document.body) heading.current?.focus();
+  }, [left, listFailed, heading]);
 
   return {
     opened,
@@ -378,8 +387,7 @@ function SearchRegion() {
   const shown = useMemo(() => matchesOf(matches.data), [matches.data]);
   const beside = useRoomBeside();
   const reading = useReading(query);
-  const unread = matches.data === undefined && !asksNothing(query);
-  const panel = useOpening(query, shown, unread, heading);
+  const panel = useOpening(query, shown, matches, heading);
   useReturnedUnlisted(reading.returning.key, shown, matches.isLoading, heading);
   const open = (match: Match) => {
     flush();
