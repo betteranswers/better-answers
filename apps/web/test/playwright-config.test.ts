@@ -41,7 +41,7 @@ describe("the browser suite's configuration", () => {
     expect((await configUnder(undefined)).forbidOnly).toBe(false);
   });
 
-  it("retries a failed spec once when it runs in CI", async () => {
+  it("retries once in CI so flakes keep their queue entry", async () => {
     expect((await configUnder("true")).retries).toBe(1);
   });
 
@@ -57,7 +57,7 @@ describe("the browser suite's configuration", () => {
     expect((await configUnder(undefined)).workers).toBeUndefined();
   });
 
-  it("hands every run to the flaky report", async () => {
+  it("hands every run to the run summary", async () => {
     expect((await configUnder("true")).reporter).toContainEqual(["./e2e/run-summary.ts"]);
   });
 });

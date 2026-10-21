@@ -545,7 +545,7 @@ const conceptLine = (
 const findLine = (match: FindMatch<string>): string =>
   match.layer === "bundles"
     ? conceptLine(match)
-    : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator} · "${match.openingLine}"`;
+    : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator} · ${JSON.stringify(match.openingLine)}`;
 
 export const renderFind = (result: FindResult<string>): string => {
   if (result.matches.length === 0) return "Nothing in the company's knowledge matches that.";
