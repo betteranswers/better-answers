@@ -198,7 +198,7 @@ describe("what the api puts on the worker's queue", () => {
     expect(rows.rowCount).toBe(0);
   });
 
-  it("a person whose membership moved cannot queue a job", async () => {
+  it("refuses a person whose credentials were revoked, queuing nothing", async () => {
     const kept = await arrange();
     const revoked = await arrange();
     await db().pool.query(
