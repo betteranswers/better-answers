@@ -523,6 +523,18 @@ test.describe("the Knowledge Search page", () => {
     });
   }
 
+  test("leaves the reader's focus alone when the pending list lands", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Nidd Gates", [forkliftGuideSeeded]);
+    await page.setViewportSize({ width: 320, height: 720 });
+
+    const release = await aPassageClickedWhileTheListLoads(page);
+    await searchBox(page).focus();
+    release();
+
+    await expect(matchesOf(page).getByRole("region", { name: FORKLIFT_GUIDE })).toBeVisible();
+    await expect(searchBox(page), "the landed passage took focus from the reader").toBeFocused();
+  });
+
   test("opens the focused match by key, else says none is", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Nidd Annals", [conceptsSeeded]);
     await searched(page, "forklift");
@@ -816,6 +828,24 @@ test.describe("the Knowledge Search page", () => {
       );
     });
   }
+
+  test("focuses Search when a re-read drops the focused match", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Holme Bays", [handbookSeeded]);
+    await searched(page, "pallet");
+    await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).focus();
+
+    await page.route(
+      isAFind,
+      matchesBecome((matches) => matches.slice(1)),
+    );
+    await windowRefocused(page);
+
+    await expect(matchesOf(page)).toHaveCount(A_PAGE - 1);
+    await expect(
+      searchRegion(page).getByRole("heading", { name: "Search" }),
+      "focus fell to the page with its match",
+    ).toBeFocused();
+  });
 
   for (const width of [320, 1024]) {
     test(`opens a passage inline beneath its match at ${String(width)} px`, async ({
