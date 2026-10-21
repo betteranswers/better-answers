@@ -72,6 +72,8 @@ export type { SetModelChoiceRefusal } from "./model-choice.ts";
 export { setModelKey } from "./model-key.ts";
 export type { SetModelKeyRefusal } from "./model-key.ts";
 export { setModelPrice } from "./model-price.ts";
+export { setDecisionThreshold } from "./decision-threshold.ts";
+export type { SetDecisionThresholdRefusal } from "./decision-threshold.ts";
 export { setSpendingLimit } from "./spending-limit.ts";
 export type { SetSpendingLimitRefusal } from "./spending-limit.ts";
 export {

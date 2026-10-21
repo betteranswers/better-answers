@@ -15,9 +15,11 @@ import {
 } from "../kernel/index.ts";
 import {
   CHOOSABLE_PROVIDERS,
+  decisionThresholdOf,
   FIXED_PURPOSE,
   LLM_PURPOSES,
   pricedProviderOn,
+  speaksDecision,
   storeModelChoice,
   type ModelChoiceStored,
 } from "../llm/index.ts";
@@ -50,10 +52,13 @@ type SetModelChoiceInput = {
 export type SetModelChoiceRefusal =
   | KernelRefusal<"malformed">
   | WorkspaceRefusal<
-      "no-such-workspace" | "fixed-model-choice" | "no-sub-processor" | "no-model-price"
+      | "no-such-workspace"
+      | "fixed-model-choice"
+      | "no-decision-threshold"
+      | "no-sub-processor"
+      | "no-model-price"
     >;
 
-/** Only a provider the DPIA names as a sub-processor, and a model priced today, is taken. */
 export const setModelChoice = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -63,7 +68,6 @@ export const setModelChoice = async (
   if (!asked.success) return err(MALFORMED);
   const { workspaceId, purpose, provider, model } = asked.data;
   if (purpose === FIXED_PURPOSE) return err("fixed-model-choice");
-  if (!CHOOSABLE_PROVIDERS.has(provider)) return err("no-sub-processor");
 
   const set = await attempt(() =>
     withScope(
@@ -71,6 +75,13 @@ export const setModelChoice = async (
       door,
       workspaceId,
       async (tx): Promise<Result<ModelChoiceStored, SetModelChoiceRefusal>> => {
+        if (
+          speaksDecision(provider) &&
+          (await decisionThresholdOf(tx, { provider, model })) === undefined
+        ) {
+          return err("no-decision-threshold");
+        }
+        if (!CHOOSABLE_PROVIDERS.has(provider)) return err("no-sub-processor");
         const held = await tx.query("SELECT 1 FROM workspace WHERE id = $1", [workspaceId]);
         if (held.rows.length === 0) return err("no-such-workspace");
         const priced = await pricedProviderOn(tx, { provider, model }, input.now);

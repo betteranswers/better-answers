@@ -2,13 +2,17 @@ import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
 
-import { CANDIDATE_VERDICTS, type CandidateVerdict } from "@better-answers/schema";
+import {
+  CANDIDATE_VERDICTS,
+  DECISION_THRESHOLD,
+  type CandidateVerdict,
+} from "@better-answers/schema";
 import type { MigratedPostgres } from "@better-answers/schema/testing";
 
-import { ASK_CAPS } from "../../src/answering/index.ts";
 import type { PlatformPrincipal, Result, UserPrincipal } from "../../src/kernel/index.ts";
 import {
   openModelKeySetting,
+  storeDecisionThreshold,
   type ModelCall,
   type ModelClient,
   type ModelOutcome,
@@ -98,7 +102,7 @@ export type ReuseJudge =
     })
   | (PricedModel & {
       readonly provider: "cloudflare";
-      readonly decide: ModelClient["decide"];
+      readonly decideYesNo: ModelClient["decideYesNo"];
       readonly threshold: number;
     });
 
@@ -143,6 +147,11 @@ const judgeChosen = async (
         dimensions: null,
       }),
     );
+    await storeDecisionThreshold(db.pool, {
+      provider: judge.provider,
+      model,
+      threshold: DECISION_THRESHOLD.parse(judge.threshold),
+    });
     return;
   }
   answered(
@@ -274,12 +283,9 @@ const timedBy = (judge: ReuseJudge) => {
     return outcome;
   };
   if (judge.provider === "cloudflare") {
-    const thresholds = new Map([[judge.provider, new Map([[judge.model, judge.threshold]])]]);
-    const decide: ModelClient["decide"] = (to, call) => timing(() => judge.decide(to, call));
-    return {
-      told: { judging: { decide }, caps: { ...ASK_CAPS, decisionThresholds: thresholds } },
-      times,
-    };
+    const decideYesNo: ModelClient["decideYesNo"] = (to, call) =>
+      timing(() => judge.decideYesNo(to, call));
+    return { told: { judging: { decideYesNo } }, times };
   }
   const callModel = <T>(to: ModelToCall, call: ModelCall<T>): Promise<ModelOutcome<T>> =>
     timing(() => judge.callModel(to, call));

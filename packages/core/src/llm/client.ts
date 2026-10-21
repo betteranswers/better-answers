@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import type { ModelProvider } from "@better-answers/schema";
+import {
+  DECISION_THRESHOLD,
+  type DecisionThreshold,
+  type ModelProvider,
+} from "@better-answers/schema";
 
 import {
   attempt,
@@ -60,11 +64,26 @@ export type ModelToCall = {
   readonly provider: SpokenProvider;
   readonly model: string;
   readonly key: ModelKey;
+  readonly threshold: DecisionThreshold | undefined;
 };
 
 export const wireShapeOf = (to: ModelToCall): WireShapeName => SPEAKS[to.provider];
 
-const spokenChoice = z.object({ id: z.string(), provider: spoken, model: z.string() });
+export const speaksDecision = (provider: string): boolean => {
+  const read = spoken.safeParse(provider);
+  return read.success && SPEAKS[read.data] === "decision";
+};
+
+export const DECISION_PROVIDERS: readonly ModelProvider[] = SPOKEN.filter(
+  (provider) => SPEAKS[provider] === "decision",
+);
+
+const spokenChoice = z.object({
+  id: z.string(),
+  provider: spoken,
+  model: z.string(),
+  threshold: DECISION_THRESHOLD.nullable(),
+});
 
 export const resolveModel = async (
   asker: UserPrincipal,
@@ -74,15 +93,24 @@ export const resolveModel = async (
 ): Promise<Result<ModelToCall | undefined, OpenEnvelopeRefusal | Error>> =>
   attemptResult(async (): Promise<Result<ModelToCall | undefined, OpenEnvelopeRefusal>> => {
     const found = await tx.query(
-      "SELECT id, provider, model FROM model_choice WHERE workspace_id = $1 AND purpose = $2",
+      `SELECT id, provider, model, threshold
+         FROM model_choice LEFT JOIN decision_threshold USING (provider, model)
+        WHERE workspace_id = $1 AND purpose = $2`,
       [asker.workspaceId, purpose],
     );
     const choice = spokenChoice.safeParse(found.rows[0]);
     if (!choice.success) return ok(undefined);
-    const { id, provider, model } = choice.data;
+    const { id, provider, model, threshold } = choice.data;
     const key = await credentials.readModelKey(tx, provider);
     if (!key.ok || key.value === undefined) return key.ok ? ok(undefined) : key;
-    return ok({ purpose, modelChoiceId: id, provider, model, key: key.value });
+    return ok({
+      purpose,
+      modelChoiceId: id,
+      provider,
+      model,
+      key: key.value,
+      threshold: threshold ?? undefined,
+    });
   });
 
 export type ModelCall<T> = {
@@ -112,7 +140,7 @@ export type AttemptRead<Said = unknown> =
   | { readonly read: "timed-out" }
   | { readonly read: "abandoned" };
 
-type Unsent = "another-shape" | "over-window";
+type Unsent = "another-shape" | "over-window" | "no-threshold";
 
 export type ModelAttemptLine = {
   readonly purpose: LlmPurpose;
@@ -140,6 +168,11 @@ export type ModelClient = {
     to: ModelToCall,
     call: DecisionModelCall,
   ) => Promise<ModelOutcome<Probabilities>>;
+  /** Takes a probability at or above the model's stored threshold as yes, and sends nothing without one. */
+  readonly decideYesNo: (
+    to: ModelToCall,
+    call: DecisionModelCall,
+  ) => Promise<ModelOutcome<Readonly<Record<string, boolean>>>>;
 };
 
 type Attempted<Said = unknown> = {
@@ -375,5 +408,20 @@ export const openModelClient = (doors: ModelClientDoors): ModelClient => {
     });
   };
 
-  return { callModel, decide };
+  const decideYesNo = async (
+    to: ModelToCall,
+    call: DecisionModelCall,
+  ): Promise<ModelOutcome<Readonly<Record<string, boolean>>>> => {
+    if (SPEAKS[to.provider] !== "decision") return unsent(to, "another-shape");
+    const { threshold } = to;
+    if (threshold === undefined) return unsent(to, "no-threshold");
+    const decided = await decide(to, call);
+    if (decided.outcome !== "answered") return decided;
+    const answer = Object.fromEntries(
+      Object.entries(decided.answer).map(([question, yes]) => [question, yes >= threshold]),
+    );
+    return { ...decided, answer };
+  };
+
+  return { callModel, decide, decideYesNo };
 };

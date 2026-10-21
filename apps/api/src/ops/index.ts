@@ -1320,6 +1320,8 @@ const modelChoiceReason = (
       return noSuchWorkspace(asked.workspaceId);
     case "fixed-model-choice":
       return "fixed-model-choice: the embedding model is fixed, since the index's vectors are its own; nothing changed";
+    case "no-decision-threshold":
+      return `no-decision-threshold: ${asked.provider} ${asked.model} is a decision model with no threshold; set one with set-decision-threshold first; nothing changed`;
     case "no-sub-processor":
       return `no-sub-processor: ${asked.provider} is no model provider the DPIA names as a sub-processor (${[...CHOOSABLE_PROVIDERS].join(" · ")}); nothing changed`;
     case "no-model-price":

@@ -102,6 +102,7 @@ const NO_MODEL = {
   models: {
     callModel: () => Promise.reject(new Error("no procedure here calls a model")),
     decide: () => Promise.reject(new Error("no procedure here calls a model")),
+    decideYesNo: () => Promise.reject(new Error("no procedure here calls a model")),
     streamModel: () => {
       throw new Error("no procedure here calls a model");
     },

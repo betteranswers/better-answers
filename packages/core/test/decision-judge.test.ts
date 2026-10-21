@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  ASK_CAPS,
-  decisionJudgeCall,
-  type AskCaps,
-  type DecisionThresholds,
-} from "../src/answering/index.ts";
+import { ASK_CAPS, decisionJudgeCall } from "../src/answering/index.ts";
 import type { PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
 import { openModelKeySetting } from "../src/llm/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
-import { setModelKey, setModelPrice, setSpendingLimit } from "../src/workspaces/index.ts";
+import {
+  setDecisionThreshold,
+  setModelKey,
+  setModelPrice,
+  setSpendingLimit,
+} from "../src/workspaces/index.ts";
 import {
   asked,
   conceptSeeded,
@@ -35,32 +35,41 @@ const CLEF_FLASH = "clef-flash";
 
 const A_WORKERS_AI_KEY = "0123456789abcdef0123456789abcdef:invented_Token-u15";
 
-const AT_SEVEN_TENTHS: DecisionThresholds = new Map([["cloudflare", new Map([[CLEF_FLASH, 0.7]])]]);
-
-const CAPS: AskCaps = { ...ASK_CAPS, decisionThresholds: AT_SEVEN_TENTHS };
-
 const PLACEHOLDER_LONGEST_ANSWER_CHARACTERS = 3_000;
 
-const aDecidingWorkspace = async () => {
+const thresholdStored = async (threshold: string, model = CLEF_FLASH) =>
+  answered(
+    await setDecisionThreshold(PLATFORM, openPostgres(db().pool), {
+      provider: "cloudflare",
+      model,
+      threshold,
+    }),
+  );
+
+const aDecidingWorkspace = async ({
+  model = CLEF_FLASH,
+  threshold = "0.7",
+}: { readonly model?: string; readonly threshold?: string | null } = {}) => {
   const workspace = await provisionedWorkspace(db(), "Acme");
   const { workspaceId } = workspace;
   const door = openPostgres(db().pool);
   answered(
     await setModelPrice(PLATFORM, door, {
       provider: "cloudflare",
-      model: CLEF_FLASH,
+      model,
       effectiveFrom: "2026-01-01",
       gbpPerMillionIn: "0.03",
       gbpPerMillionOut: "0",
     }),
   );
+  if (threshold !== null) await thresholdStored(threshold, model);
   await seedingWith(db().pool, (seed) =>
     seed.modelChoice({
       id: `judge-${workspaceId}`,
       workspaceId,
       purpose: "judging",
       provider: "cloudflare",
-      model: CLEF_FLASH,
+      model,
       dimensions: null,
     }),
   );
@@ -104,8 +113,8 @@ const decidingWire = (
 
 type Wire = ReturnType<typeof decidingWire>;
 
-const askedWith = (asker: UserPrincipal, wire: Wire, caps: AskCaps = CAPS) =>
-  asked(db(), asker, { question: QUESTION }, { judging: { decide: wire.client.decide }, caps });
+const askedWith = (asker: UserPrincipal, wire: Wire) =>
+  asked(db(), asker, { question: QUESTION }, { judging: { decideYesNo: wire.client.decideYesNo } });
 
 const seededIn = async (workspaceId: string, shapes: readonly SeededConcept[]) => {
   for (const shape of shapes) await conceptSeeded(db(), workspaceId, shape);
@@ -236,25 +245,45 @@ describe("ask with a decision model", () => {
     expect(titlesOf(answer.related)).toEqual([SUPPLIER.title]);
   });
 
-  it("fails judging, sending nothing, with no stored threshold", async () => {
+  it("judges at the threshold stored last, not the first", async () => {
     const { workspaceId, asker } = await aDecidingWorkspace();
-    await seededIn(workspaceId, [USERS]);
-    const wire = decidingWire(new Map([[USERS.title, 1]]));
-    const elsewhere: DecisionThresholds = new Map([["cloudflare", new Map([["clef", 0.7]])]]);
+    await seededIn(workspaceId, [USERS, SUPPLIER]);
+    await thresholdStored("0.6");
+    const wire = decidingWire(
+      new Map([
+        [USERS.title, 0.7],
+        [SUPPLIER.title, 0.6],
+      ]),
+    );
 
-    const answer = await askedWith(asker, wire, { ...ASK_CAPS, decisionThresholds: elsewhere });
+    const answer = await askedWith(asker, wire);
 
-    expect(await outcomeOf(answer, wire, workspaceId)).toEqual(FAILED_UNSENT);
+    expect(titlesOf(answer.answers)).toEqual(titlesOf([USERS, SUPPLIER]));
   });
 
-  it("fails judging, sending nothing, with the thresholds as shipped", async () => {
-    const { workspaceId, asker } = await aDecidingWorkspace();
+  it("fails judging, sending nothing, with no stored threshold", async () => {
+    const { workspaceId, asker } = await aDecidingWorkspace({ model: "clef", threshold: null });
     await seededIn(workspaceId, [USERS]);
     const wire = decidingWire(new Map([[USERS.title, 1]]));
 
-    const answer = await askedWith(asker, wire, ASK_CAPS);
+    const answer = await askedWith(asker, wire);
 
     expect(await outcomeOf(answer, wire, workspaceId)).toEqual(FAILED_UNSENT);
+    expect(wire.logged).toEqual([
+      {
+        line: {
+          purpose: "judging",
+          provider: "cloudflare",
+          model: "clef",
+          attempt: 0,
+          status: null,
+          read: "no-threshold",
+          seconds: 0,
+          request_id: null,
+        },
+        message: "llm: a model call never sent",
+      },
+    ]);
   });
 
   it("fails judging, sending nothing, over the model's window", async () => {

@@ -2,7 +2,6 @@ import {
   ids,
   type ConceptIri,
   type JudgeState,
-  type ModelProvider,
   type QuestionVerdict,
   type RecordMapState,
 } from "@better-answers/schema";
@@ -95,17 +94,13 @@ export type AskCaps = {
   readonly related: number;
   readonly unmappedPassages: number;
   readonly candidates: number;
-  readonly decisionThresholds: DecisionThresholds;
 };
-
-export type DecisionThresholds = ReadonlyMap<ModelProvider, ReadonlyMap<string, number>>;
 
 export const ASK_CAPS: AskCaps = {
   entryPoints: 20,
   related: 28,
   unmappedPassages: 3,
   candidates: 20,
-  decisionThresholds: new Map(),
 };
 
 export type ReadStep<Refused = never> = <Read, Failure>(

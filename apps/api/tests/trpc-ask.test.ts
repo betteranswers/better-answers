@@ -79,9 +79,13 @@ const ACCESS_POLICY = {
   body: "Buyers access audit information through the console's audit page.",
 };
 
-type Arranged = { readonly limitGbp?: string; readonly drafting?: boolean };
+type Arranged = {
+  readonly limitGbp?: string;
+  readonly drafting?: boolean;
+  readonly chosen?: boolean;
+};
 
-const anAdminAsking = async ({ limitGbp, drafting = false }: Arranged = {}) => {
+const anAdminAsking = async ({ limitGbp, drafting = false, chosen = true }: Arranged = {}) => {
   const workspace = await app().provision();
   await seedConcepts(
     app(),
@@ -95,6 +99,7 @@ const anAdminAsking = async ({ limitGbp, drafting = false }: Arranged = {}) => {
   await app().database.superuser.query("ANALYZE map_node, map_edge");
   await judgingSetUp(app(), workspace.workspaceId, {
     drafting,
+    chosen,
     ...(limitGbp === undefined ? {} : { limitGbp }),
   });
   return {
@@ -148,6 +153,17 @@ const ANSWERED_IN_FULL = {
 };
 
 describe("ask over tRPC", () => {
+  it("says no judging phase with no judging model chosen", async () => {
+    const { web } = await anAdminAsking({ chosen: false });
+
+    const events = await streamed(web, { question: QUESTION });
+
+    expect(events.flatMap((event) => (event.kind === "phase" ? [event.phase] : []))).toEqual([
+      "reading",
+    ]);
+    expect(resultIn(events).judgeState).toBe("not-judged");
+  });
+
   it("opens with its phase, then the whole result", async () => {
     const { workspace, web } = await anAdminAsking();
     wire.answerWith(judgeSaying([USERS.title]));

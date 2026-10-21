@@ -175,6 +175,7 @@ const SENTENCES = {
   "platform.workspace.model_key_set": ({ by }) => `${by} set a model provider’s API key`,
   "platform.workspace.model_choice_set": ({ by }) => `${by} chose the AI model for a task`,
   "platform.model.priced": ({ by }) => `${by} set an AI model’s price`,
+  "platform.model.threshold_set": ({ by }) => `${by} set an AI model’s decision threshold`,
   "platform.workspace.spending_limit_set": ({ by }) =>
     `${by} set the workspace’s monthly AI spending limit`,
   "platform.workspace.provisioned": ({ by }) => `${by} provisioned the workspace`,

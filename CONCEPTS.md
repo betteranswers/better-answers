@@ -1158,8 +1158,16 @@ _Internal._ a model that answers a typed question with a probability for each al
 writes no text. The *judge* may run on one, asking it of each candidate whether it answers the
 question.
 
-A probability at or above the model's **threshold** is a yes. A decision model with no threshold
-set cannot judge, and its judging fails.
+A probability at or above the model's *decision threshold* is a yes. A decision model with none
+cannot judge, and its judging fails.
+
+### decision threshold
+
+The probability at or above which a *decision model*'s answer counts as a yes, one for each *model
+provider* and model.
+
+It is strictly between 0 and 1. The platform's tooling sets and replaces it, never a page, and the
+audit log keeps each setting. `set-model-choice` refuses a decision model that has none.
 
 ### match
 

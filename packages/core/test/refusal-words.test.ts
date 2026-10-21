@@ -114,6 +114,8 @@ const CATALOGUED = {
   "no-display-name": "precondition by workspaces",
   "no-sub-processor": "precondition by workspaces",
   "no-model-price": "precondition by workspaces",
+  "no-decision-threshold": "precondition by workspaces",
+  "not-a-decision-model": "inapplicable by workspaces",
   "fixed-model-choice": "inapplicable by workspaces",
   "display-name-empty": "malformed by workspaces",
   "display-name-not-one-line": "malformed by workspaces",

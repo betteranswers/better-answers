@@ -61,6 +61,7 @@ export const ACTION_HEADLINES = {
   "platform.workspace.model_choice_set": "AI model chosen",
   "platform.workspace.spending_limit_set": "AI spending limit set",
   "platform.model.priced": "AI model price set",
+  "platform.model.threshold_set": "AI model decision threshold set",
   "platform.workspace.provisioned": "Workspace provisioned",
   "platform.workspace.renamed": "Workspace renamed",
   "sources.binding.bound": "Connected source added",

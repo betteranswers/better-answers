@@ -78,7 +78,6 @@ export { findCursor, type FindPosition } from "./cursor.ts";
 export {
   ASK_CAPS,
   type AskCaps,
-  type DecisionThresholds,
   type MapState,
   type PlannedAnswer,
   type PreviewedConcept,

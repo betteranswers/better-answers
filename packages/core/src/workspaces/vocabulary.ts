@@ -38,6 +38,8 @@ export const WORKSPACE_REFUSALS = {
 
   "no-sub-processor": "precondition",
   "no-model-price": "precondition",
+  "no-decision-threshold": "precondition",
+  "not-a-decision-model": "inapplicable",
   "fixed-model-choice": "inapplicable",
 
   "last-second-factor": "precondition",

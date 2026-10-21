@@ -19,7 +19,6 @@ import {
   type ModelOutcome,
   type ModelToCall,
   type NoulInstructions,
-  type Probabilities,
   type WireShapeName,
 } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
@@ -27,7 +26,6 @@ import {
   previewed,
   type AnswerPlan,
   type AskCaps,
-  type DecisionThresholds,
   type RelatedConcept,
   type ReturnedConcept,
 } from "./plan.ts";
@@ -45,7 +43,7 @@ export type CallReserving = {
 
 export type JudgeRefusal = KernelRefusal<"spending-limit-met"> | Error;
 
-export type JudgeSteps<Refused = never> = ModelClient & {
+export type JudgeSteps<Refused = never> = Pick<ModelClient, "callModel" | "decideYesNo"> & {
   readonly reserve: (
     reserving: CallReserving,
   ) => Promise<Result<CallReserved | undefined, Refused | JudgeRefusal>>;
@@ -225,10 +223,8 @@ export const decisionJudgeCall = (
   };
 };
 
-const verdictsAt = (probabilities: Probabilities, threshold: number): Verdicts =>
-  Object.fromEntries(
-    Object.entries(probabilities).map(([place, yes]) => [place, yes >= threshold ? "yes" : "no"]),
-  );
+const verdictsOf = (decided: Readonly<Record<string, boolean>>): Verdicts =>
+  Object.fromEntries(Object.entries(decided).map(([place, yes]) => [place, yes ? "yes" : "no"]));
 
 type JudgeCalls = { readonly messages: ModelCall<Verdicts>; readonly decision: DecisionJudgeCall };
 
@@ -243,15 +239,10 @@ const heardFrom = async <Refused>(
   steps: JudgeSteps<Refused>,
   to: ModelToCall,
   calls: JudgeCalls,
-  thresholds: DecisionThresholds,
-): Promise<Heard> => {
-  if (wireShapeOf(to) === "messages") {
-    return heardOf(await steps.callModel(to, calls.messages), (verdicts) => verdicts);
-  }
-  const threshold = thresholds.get(to.provider)?.get(to.model);
-  if (threshold === undefined) return { verdicts: undefined, spent: [] };
-  return heardOf(await steps.decide(to, calls.decision), (said) => verdictsAt(said, threshold));
-};
+): Promise<Heard> =>
+  wireShapeOf(to) === "messages"
+    ? heardOf(await steps.callModel(to, calls.messages), (verdicts) => verdicts)
+    : heardOf(await steps.decideYesNo(to, calls.decision), verdictsOf);
 
 const byIri = (
   candidates: readonly ReturnedConcept[],
@@ -296,7 +287,7 @@ export const judgedBy = async <Refused>(
   steps: JudgeSteps<Refused>,
   plan: AnswerPlan,
   asked: { readonly question: string; readonly answerId: string; readonly now: Date },
-  caps: Pick<AskCaps, "candidates" | "decisionThresholds">,
+  caps: Pick<AskCaps, "candidates">,
 ): Promise<Result<Judged, Refused | JudgeRefusal>> => {
   const candidates = candidatesOf(plan.answer.related, caps.candidates);
   if (candidates.length === 0) return ok(plan);
@@ -312,7 +303,7 @@ export const judgedBy = async <Refused>(
   if (!reserved.ok) return reserved;
   if (reserved.value === undefined) return ok(plan);
   const { to, reservationId } = reserved.value;
-  const heard = await heardFrom(steps, to, calls, caps.decisionThresholds);
+  const heard = await heardFrom(steps, to, calls);
   return ok({
     ...judgedPlan(plan, candidates, heard.verdicts),
     settled: { reservationId, calls: heard.spent },
