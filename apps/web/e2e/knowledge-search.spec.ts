@@ -632,6 +632,11 @@ test.describe("the Knowledge Search page", () => {
       await matchesOf(page).getByRole("button", { name: FORKLIFT_GUIDE }).click();
       await typed.promise;
       await saysARefusal(alerted(page));
+      const landing =
+        width === 320
+          ? searchRegion(page).getByRole("heading", { name: "Search" })
+          : passagePanel(page, FORKLIFT_GUIDE).getByRole("heading", { name: FORKLIFT_GUIDE });
+      await expect(landing, "a failed list left focus on the page").toBeFocused();
       await page.unroute(isTheTypedFind);
       await searchRegion(page).getByRole("button", { name: "Retry" }).click();
 
@@ -645,6 +650,8 @@ test.describe("the Knowledge Search page", () => {
 
   test("closes a passage opened as the search empties", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Nidd Bins", [forkliftGuideSeeded]);
+    await expect(said(page)).toHaveText(/\S/);
+    const nothingAsked = await saidNow(page);
     await searched(page, "forklift");
 
     await searchBox(page).fill("");
@@ -654,6 +661,9 @@ test.describe("the Knowledge Search page", () => {
       passagePanel(page, FORKLIFT_GUIDE),
       "a passage stayed open beside an empty search",
     ).toHaveCount(0);
+    await expect(said(page), "emptying the search said more than nothing asked").toHaveText(
+      nothingAsked,
+    );
   });
 
   test("hands Tab from the open panel back to its opener", async ({

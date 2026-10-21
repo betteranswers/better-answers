@@ -2389,4 +2389,42 @@ test.describe("bulk actions on the members ticked", () => {
       expect(line, "a line of the address ends inside a word").toMatch(/[@.-]$/);
     }
   });
+
+  test("acts on no member paged out of view by key", async ({ page, request }) => {
+    await aWorkspaceOfThirtyEditors(page, request, "Calder Paging");
+    const pagedAwayFromPersonOne = async (): Promise<void> => {
+      await page.goto(MEMBERS_PAGE);
+      await memberLink(page, "Person 01").focus();
+      await page.keyboard.press(PEOPLE_KEYSTROKES.nextPage.key);
+      await expect(memberLink(page, "Person 01")).toHaveCount(0);
+    };
+    const saysToPickAMember = async (key: string): Promise<void> => {
+      await expect(outcomeOf(page), `${key} said nothing of a member out of view`).toHaveText(/\S/);
+      await expect(page, `${key} opened a member out of view`).toHaveURL(
+        (url) => url.pathname === MEMBERS_PAGE,
+      );
+      await expect(selectionBar(page), `${key} selected a member out of view`).toHaveCount(0);
+    };
+
+    for (const { key } of [
+      PEOPLE_KEYSTROKES.open,
+      PEOPLE_KEYSTROKES.changeRole,
+      PEOPLE_KEYSTROKES.remove,
+      PEOPLE_KEYSTROKES.tick,
+    ]) {
+      await pagedAwayFromPersonOne();
+      await page.keyboard.press(key);
+      await saysToPickAMember(key);
+    }
+
+    await pagedAwayFromPersonOne();
+    await page.keyboard.press(PEOPLE_KEYSTROKES.previousPage.key);
+    await expect(memberLink(page, "Person 01")).toBeVisible();
+    await page.keyboard.press(PEOPLE_KEYSTROKES.open.key);
+    await saysToPickAMember(`${PEOPLE_KEYSTROKES.previousPage.key} ${PEOPLE_KEYSTROKES.open.key}`);
+
+    await memberLink(page, "Person 01").focus();
+    await page.keyboard.press(PEOPLE_KEYSTROKES.open.key);
+    await expect(personHeading(page, "Person 01")).toBeVisible();
+  });
 });
