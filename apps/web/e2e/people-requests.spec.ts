@@ -361,6 +361,9 @@ test.describe("the People page's Requests tab", () => {
     await expect(approving.getByRole("combobox", { name: "Role" })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(approving).toHaveCount(0);
+    await expect(saidIn(page), "an approve key wiped the decline's outcome").toContainText(
+      "Dropped Ray",
+    );
     await expect(
       page.getByRole("button", { name: "Decline Request from Approved Kay" }),
     ).toBeFocused();

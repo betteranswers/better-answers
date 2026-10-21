@@ -958,6 +958,7 @@ test.describe("the People page's Invitations tab", () => {
 
     await page.keyboard.press(PEOPLE_KEYSTROKES.tickInvitation.key);
     await expect(tickOf(page, dropped)).toBeChecked();
+    await expect(outcomeIn(page), "a tick wiped the resend's outcome").toHaveText(saidOfTheResend);
     await page.keyboard.press(PEOPLE_KEYSTROKES.tickInvitation.key);
     await expect(tickOf(page, dropped)).not.toBeChecked();
 
