@@ -33,8 +33,9 @@ export type Opened = {
   readonly pressed: number;
 };
 
-const focusOnMount = (heading: HTMLHeadingElement | null): void => {
-  heading?.focus();
+const focusOnMount = (heading: HTMLHeadingElement | null, onlyFrom: Heading | undefined): void => {
+  const at = document.activeElement;
+  if (onlyFrom === undefined || at === document.body || at === onlyFrom.current) heading?.focus();
 };
 
 const returnFocus = (opened: Opened, fallback?: Heading): void => {
@@ -158,14 +159,18 @@ const HEADING = "pr-8 font-semibold wrap-anywhere";
 function PanelBody(properties: {
   readonly opened: Opened;
   readonly at: { readonly kind: "sheet" } | { readonly kind: "inline"; readonly headingId: string };
+  readonly focusFromBodyOr?: Heading | undefined;
 }) {
-  const { opened, at } = properties;
+  const { opened, at, focusFromBodyOr } = properties;
   const { source } = opened;
   const heading = useRef<HTMLHeadingElement>(null);
-  const held = useCallback((node: HTMLHeadingElement | null) => {
-    heading.current = node;
-    focusOnMount(node);
-  }, []);
+  const held = useCallback(
+    (node: HTMLHeadingElement | null) => {
+      heading.current = node;
+      focusOnMount(node, focusFromBodyOr);
+    },
+    [focusFromBodyOr],
+  );
   const title =
     source.kind === "passage" && source.unmapped !== undefined ? (
       <TitleRead locator={source.locator} until={opened.title} />
@@ -251,6 +256,7 @@ export function EvidenceSheet(properties: {
 export function EvidenceInline(properties: {
   readonly opened: Opened;
   readonly onClose: () => void;
+  readonly focusFromBodyOr?: Heading | undefined;
 }) {
   const { opened } = properties;
   const headingId = useId();
@@ -279,6 +285,7 @@ export function EvidenceInline(properties: {
         key={`${opened.key}:${String(opened.pressed)}`}
         opened={opened}
         at={{ kind: "inline", headingId }}
+        focusFromBodyOr={properties.focusFromBodyOr}
       />
       <Button variant="outline" size="sm" className="mt-3" onClick={close}>
         {EVIDENCE_WORDS.close}
