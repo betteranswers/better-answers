@@ -1371,6 +1371,29 @@ describe("authority that moved while the action was in flight", () => {
       identities: "0",
     });
   });
+
+  it("answers a write landed when a revocation follows its commit", async () => {
+    const scenario = await arrange();
+    let revoking: Promise<unknown> | undefined;
+    const revokedOnceCommitted = async (): Promise<unknown> => {
+      const history = await bundleHistory(scenario.git, scenario.workspaceId);
+      if (revoking === undefined && history.length > 0) revoking = revokeEditor(scenario, "here");
+      return revoking;
+    };
+    const postgres = { pool: lendingOnceSettled(scenario.postgres.pool, revokedOnceCommitted) };
+
+    const landed = await writeConcept(
+      scenario.editor,
+      { ...doorsOf(scenario), postgres },
+      writeFor(),
+    );
+
+    expect(landed).toMatchObject({ ok: true });
+    const history = await bundleHistory(scenario.git, scenario.workspaceId);
+    expect(history).toHaveLength(1);
+    expect(await recordedCommits(scenario.workspaceId)).toEqual(history);
+    expect(await rowsFor(scenario.workspaceId)).toMatchObject({ concepts: "1", commits: "1" });
+  });
 });
 
 describe("the read a concept's trust is derived from", () => {
