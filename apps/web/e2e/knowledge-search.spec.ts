@@ -484,10 +484,9 @@ test.describe("the Knowledge Search page", () => {
       const typed = await heldBack(page, isAFindFor("forklift"));
 
       await searchBox(page).fill("forklift");
-      const clicked = matchesOf(page).getByRole("button", { name: FORKLIFT_GUIDE }).click();
+      await matchesOf(page).getByRole("button", { name: FORKLIFT_GUIDE }).click();
       await typed.reached;
       typed.release();
-      await clicked;
 
       await expect(matchesOf(page)).toHaveText([new RegExp(FORKLIFT_GUIDE)]);
       await expect(

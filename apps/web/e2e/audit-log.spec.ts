@@ -205,10 +205,9 @@ test.describe("the System group's Audit log page", () => {
     );
 
     await searchBox(page).fill("Priya");
-    const clicked = detailsOf(priyas).click();
+    await detailsOf(priyas).click();
     await typed.reached;
     typed.release();
-    await clicked;
 
     await expect(linesOf(page)).toHaveText([BY_PRIYA]);
     await expect(
