@@ -550,6 +550,13 @@ test.describe("the Knowledge Search page", () => {
 
     await saysNoMatchWasInFocus(page, listed);
     await expect(passagePanel(page, FORKLIFT_GUIDE)).toHaveCount(0);
+
+    await matchesOf(page).getByRole("button", { name: FORKLIFT_GUIDE }).click();
+    await expect(passagePanel(page, FORKLIFT_GUIDE)).toBeVisible();
+    await expect(
+      said(page),
+      "the page still says to select a match beside the one opened",
+    ).toHaveText(listed);
   });
 
   test("opens the match focus landed on after More", async ({ page, request }) => {
@@ -666,6 +673,10 @@ test.describe("the Knowledge Search page", () => {
     await expect(said(page), "emptying the search said more than nothing asked").toHaveText(
       nothingAsked,
     );
+    await expect(
+      searchRegion(page).getByRole("heading", { name: "Search" }),
+      "the passage closed under an emptied search left focus on the page",
+    ).toBeFocused();
   });
 
   test("hands Tab from the open panel back to its opener", async ({
