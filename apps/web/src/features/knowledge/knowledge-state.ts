@@ -1,6 +1,5 @@
-import { z } from "zod";
-
 import type { Keystroke } from "@/shared/keystrokes.tsx";
+import { searchText } from "@/shared/list-address.ts";
 
 export const SEARCH_KEYSTROKES = {
   search: { key: "/", action: "Search This Workspace’s Knowledge" },
@@ -22,5 +21,5 @@ export const QUERY_MAX = 500;
 export const MATCHES_A_PAGE = 20;
 
 export const SEARCH_FIELDS = {
-  search: z.string().max(QUERY_MAX).catch(""),
+  search: searchText(QUERY_MAX),
 };

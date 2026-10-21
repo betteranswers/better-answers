@@ -337,8 +337,14 @@ test("takes a search written into the address by hand", async ({ page, request }
 
   await page.goto(`${SEARCH.path}?search=audit`);
   await expect(searchBoxOf(page)).toHaveValue("audit");
-  await page.goto(`${SEARCH.path}?search=1.5`);
-  await expect(searchBoxOf(page)).toHaveValue("1.5");
+  for (const written of ["1.5", "1.50", "1e3"]) {
+    await page.goto(`${SEARCH.path}?search=${written}`);
+    await expect(searchBoxOf(page)).toHaveValue(written);
+  }
+  for (const written of ["1.5", "1.50", "1e3", "null"]) {
+    await page.goto(`${SEARCH.path}?knowledge.search=${written}`);
+    await expect(searchBoxOf(page), "Search's own key re-typed the search").toHaveValue(written);
+  }
 });
 
 test("reaches the search row by the arrow keys", async ({ page, request }) => {

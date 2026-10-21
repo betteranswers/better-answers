@@ -1,12 +1,12 @@
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import { z } from "zod";
 
-import { useListAddress, type ListFields } from "@/shared/list-address.ts";
+import { useListAddress, type ListFields, type SearchText } from "@/shared/list-address.ts";
 import { pageWithin } from "@/shared/list-pages.tsx";
 
 const SETTLE_MS = 300;
 
-type SearchedFields = ListFields & { readonly search: z.ZodCatch<z.ZodType<string>> };
+type SearchedFields = ListFields & { readonly search: SearchText };
 
 const HELD = z.object({ search: z.string().catch(""), page: z.number().catch(1) });
 

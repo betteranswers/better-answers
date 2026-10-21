@@ -1,5 +1,14 @@
 import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
-import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 
 import { useAsked } from "@/shared/address-ask.ts";
 import { FilterRow } from "@/shared/filter-row.tsx";
@@ -17,6 +26,7 @@ import {
   EvidenceInline,
   EvidenceSheet,
   SensitivityTag,
+  type Heading,
   type Opened,
 } from "@/shared/knowledge/evidence-panel.tsx";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
@@ -79,7 +89,10 @@ const saidOf = (searched: Searched, query: string, more: boolean, shown: number)
   return shown === 0 ? WORDS.noMatches(query) : WORDS.matched(query, more);
 };
 
-type OpenedFor = Opened & { readonly query: string };
+type OpenedFor = Opened & { readonly query: string; readonly waited: boolean };
+
+const unlistedYet = (searched: Searched): boolean =>
+  searched === "searching" || searched === "failed";
 
 const stillListed = (
   opened: OpenedFor,
@@ -88,9 +101,22 @@ const stillListed = (
   searched: Searched,
 ): boolean =>
   opened.query === query &&
-  (searched === "searching" ||
-    searched === "failed" ||
-    shown.some((match) => keyOf(match) === opened.key));
+  (unlistedYet(searched) || shown.some((match) => keyOf(match) === opened.key));
+
+type OpenedChange = { readonly opened: OpenedFor | undefined; readonly left: boolean };
+
+const changeOf = (
+  opened: OpenedFor,
+  query: string,
+  shown: readonly Match[],
+  searched: Searched,
+): OpenedChange | undefined => {
+  if (!stillListed(opened, query, shown, searched)) {
+    return { opened: undefined, left: opened.query === query };
+  }
+  if (opened.waited || !unlistedYet(searched)) return undefined;
+  return { opened: { ...opened, waited: true }, left: false };
+};
 
 const openerIdOf = (key: string): string => `opener-${encodeURIComponent(key)}`;
 
@@ -147,6 +173,7 @@ function ConceptLine(properties: {
 type Opening = {
   readonly opened: Opened | undefined;
   readonly beside: boolean;
+  readonly focusFromBodyOr: Heading | undefined;
   readonly open: (match: Match) => void;
   readonly onClose: () => void;
 };
@@ -173,7 +200,11 @@ function PassageLine(properties: { readonly match: PassageMatch; readonly openin
         <SensitivityTag sensitivity={match.sensitivity} />
       </div>
       {opened === undefined || opening.beside ? null : (
-        <EvidenceInline opened={opened} onClose={opening.onClose} />
+        <EvidenceInline
+          opened={opened}
+          onClose={opening.onClose}
+          focusFromBodyOr={opening.focusFromBodyOr}
+        />
       )}
     </>
   );
@@ -183,13 +214,21 @@ function MatchLine(properties: {
   readonly match: Match;
   readonly landsHere: boolean;
   readonly onLanded: () => void;
+  readonly onDroppedInFocus: () => void;
   readonly opening: Opening;
   readonly reading: Reading;
 }) {
-  const { match } = properties;
+  const { match, onDroppedInFocus } = properties;
   const land = useLandingLine(properties.landsHere, properties.onLanded);
+  const key = keyOf(match);
+  useLayoutEffect(
+    () => () => {
+      if (rowInFocus([key], (held) => held) !== undefined) onDroppedInFocus();
+    },
+    [key, onDroppedInFocus],
+  );
   return (
-    <li ref={land} tabIndex={-1} className="px-4 py-3" {...keyedRow(keyOf(match))}>
+    <li ref={land} tabIndex={-1} className="px-4 py-3" {...keyedRow(key)}>
       {match.layer === "bundles" ? (
         <ConceptLine match={match} opening={properties.opening} reading={properties.reading} />
       ) : (
@@ -202,6 +241,7 @@ function MatchLine(properties: {
 function MatchList(properties: {
   readonly shown: readonly Match[];
   readonly landing: Landing;
+  readonly onDroppedInFocus: () => void;
   readonly opening: Opening;
   readonly reading: Reading;
 }) {
@@ -214,6 +254,7 @@ function MatchList(properties: {
           match={match}
           landsHere={index === landing.landAt}
           onLanded={landing.landed}
+          onDroppedInFocus={properties.onDroppedInFocus}
           opening={properties.opening}
           reading={properties.reading}
         />
@@ -229,6 +270,7 @@ function Results(properties: {
   readonly opening: Opening;
   readonly reading: Reading;
   readonly searchRef: RefObject<HTMLInputElement | null>;
+  readonly onDroppedInFocus: () => void;
 }) {
   const { query, matches, shown } = properties;
   const landing = useLanding();
@@ -259,6 +301,7 @@ function Results(properties: {
       <MatchList
         shown={shown}
         landing={landing}
+        onDroppedInFocus={properties.onDroppedInFocus}
         opening={properties.opening}
         reading={properties.reading}
       />
@@ -313,34 +356,44 @@ const useReading = (query: string): Reading => {
   };
 };
 
+const focusIfLost = (heading: RefObject<HTMLElement | null>): void => {
+  if (document.activeElement === document.body) heading.current?.focus();
+};
+
+const focusFromBodyOr = (opened: OpenedFor | undefined, heading: Heading): Heading | undefined =>
+  opened?.waited === true ? heading : undefined;
+
 const useOpening = (
   query: string,
   shown: readonly Match[],
   searched: Searched,
-  heading: RefObject<HTMLElement | null>,
+  heading: Heading,
 ) => {
   const [opened, setOpened] = useState<OpenedFor>();
   const [leftIn, setLeftIn] = useState<string>();
-  if (opened !== undefined && !stillListed(opened, query, shown, searched)) {
-    setOpened(undefined);
-    if (opened.query === query) setLeftIn(query);
+  const change = opened === undefined ? undefined : changeOf(opened, query, shown, searched);
+  if (change !== undefined) {
+    setOpened(change.opened);
+    if (change.left) setLeftIn(query);
   }
   const left = leftIn === query;
   if (leftIn !== undefined && !left) setLeftIn(undefined);
   const listFailed = opened !== undefined && searched === "failed";
 
   useEffect(() => {
-    if ((left || listFailed) && document.activeElement === document.body) heading.current?.focus();
+    if (left || listFailed) focusIfLost(heading);
   }, [left, listFailed, heading]);
 
   return {
     opened,
+    focusFromBodyOr: focusFromBodyOr(opened, heading),
     unlisted: left && searched !== "nothing-asked",
     onOpen: (chosen: Omit<Opened, "pressed">, typed: string) => {
       setLeftIn(undefined);
       setOpened((current) => ({
         ...chosen,
         query: typed,
+        waited: false,
         pressed: (current?.pressed ?? 0) + 1,
       }));
     },
@@ -360,8 +413,22 @@ const useReturnedUnlisted = (
     returningKey !== undefined && !loading && !shown.some((match) => keyOf(match) === returningKey);
 
   useEffect(() => {
-    if (unlisted && document.activeElement === document.body) heading.current?.focus();
+    if (unlisted) focusIfLost(heading);
   }, [unlisted, heading]);
+};
+
+const useDroppedInFocus = (heading: RefObject<HTMLElement | null>) => {
+  const dropped = useRef(false);
+
+  useEffect(() => {
+    if (!dropped.current) return;
+    dropped.current = false;
+    focusIfLost(heading);
+  });
+
+  return useCallback(() => {
+    dropped.current = true;
+  }, []);
 };
 
 const useOpenKey = (query: string, shown: readonly Match[], open: (match: Match) => void) => {
@@ -397,6 +464,7 @@ function SearchRegion() {
   const searched = searchedOf(query, matches);
   const panel = useOpening(query, shown, searched, heading);
   useReturnedUnlisted(reading.returning.key, shown, matches.isLoading, heading);
+  const onDroppedInFocus = useDroppedInFocus(heading);
   const open = (match: Match) => {
     flush();
     if (match.layer !== "bundles") {
@@ -410,6 +478,7 @@ function SearchRegion() {
   const opening: Opening = {
     opened: panel.opened,
     beside,
+    focusFromBodyOr: panel.focusFromBodyOr,
     open: openKey.open,
     onClose: panel.onClose,
   };
@@ -446,6 +515,7 @@ function SearchRegion() {
           opening={opening}
           reading={reading}
           searchRef={searchRef}
+          onDroppedInFocus={onDroppedInFocus}
         />
       </Card>
       {panel.opened === undefined || !beside ? null : (

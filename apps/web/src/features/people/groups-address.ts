@@ -1,7 +1,7 @@
-import { z } from "zod";
+import { searchText } from "@/shared/list-address.ts";
 
 export const GROUPS_LIST = "groups";
 
 export const GROUPS_FIELDS = {
-  search: z.string().catch(""),
+  search: searchText(),
 };

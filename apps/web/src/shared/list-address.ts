@@ -2,6 +2,8 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { z } from "zod";
 
+import { asWritten } from "@/shared/address-query.ts";
+
 type Held = string | number | undefined;
 
 export type ListFields = Readonly<Record<string, z.ZodCatch<z.ZodType<Held>>>>;
@@ -10,6 +12,11 @@ type AddressState<Fields extends ListFields> = z.output<z.ZodObject<Fields>>;
 
 /** The router reads a whole number as one, so a page held as a quoted word is malformed too. */
 export const PAGE_NUMBER = z.number().int().min(1).catch(1);
+
+export const searchText = (max = Number.POSITIVE_INFINITY) =>
+  z.preprocess(asWritten, z.string().max(max)).catch("");
+
+export type SearchText = ReturnType<typeof searchText>;
 
 const QUERY = z.record(z.string(), z.unknown());
 

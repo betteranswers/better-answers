@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { DETAIL_KEYS } from "@/shared/audit/audit-actions.ts";
-import { KEPT_OFF_DETAIL_KEYS, LABELLED_DETAIL_KEYS } from "@/shared/audit/audit-details.ts";
+import {
+  detailLinesOf,
+  KEPT_OFF_DETAIL_KEYS,
+  LABELLED_DETAIL_KEYS,
+} from "@/shared/audit/audit-details.ts";
 
 const said = (action: string, key: string): string => `${action} ${key}`;
 
@@ -17,6 +21,18 @@ describe("the audit log's detail labels", () => {
     expect(
       unlabelled,
       "a detail key core writes with no label in audit-details.ts. Label it, or keep it off the page for its action.",
+    ).toEqual([]);
+  });
+
+  it("are each written in sentence case", () => {
+    const labels = detailLinesOf({
+      detail: Object.fromEntries(LABELLED_DETAIL_KEYS.map((key) => [key, "held"])),
+      named: {},
+    }).map((line) => line.label);
+
+    expect(
+      labels.filter((label) => /\s[A-Z][a-z]/.test(label)),
+      "a detail label with a capital past its first word",
     ).toEqual([]);
   });
 

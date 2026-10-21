@@ -57,7 +57,10 @@ function OfferOnThisPage(properties: OfferProperties & { readonly address: strin
   if (!offering) return null;
 
   return (
-    <section aria-label={PASSKEY_WORDS.heading} className="px-4 pt-4 md:px-8">
+    <section
+      aria-label={PASSKEY_WORDS.heading}
+      className="px-4 pt-4 md:px-8 [body:has([data-beside-page])_&]:pr-[calc(var(--container-md)+--spacing(8))]"
+    >
       <Banner className="max-w-page flex-wrap py-2">
         <BannerTitle>{PASSKEY_WORDS.offer}</BannerTitle>
         <BannerAction asChild>

@@ -37,6 +37,7 @@ import {
   windowRefocused,
 } from "./knowledge.ts";
 import { refusalAnswering } from "./refused-read.ts";
+import { aVirtualAuthenticator } from "./virtual-authenticator.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -523,6 +524,18 @@ test.describe("the Knowledge Search page", () => {
     });
   }
 
+  test("leaves the reader's focus alone when the pending list lands", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Nidd Gates", [forkliftGuideSeeded]);
+    await page.setViewportSize({ width: 320, height: 720 });
+
+    const release = await aPassageClickedWhileTheListLoads(page);
+    await searchBox(page).focus();
+    release();
+
+    await expect(matchesOf(page).getByRole("region", { name: FORKLIFT_GUIDE })).toBeVisible();
+    await expect(searchBox(page), "the landed passage took focus from the reader").toBeFocused();
+  });
+
   test("opens the focused match by key, else says none is", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Nidd Annals", [conceptsSeeded]);
     await searched(page, "forklift");
@@ -814,6 +827,57 @@ test.describe("the Knowledge Search page", () => {
       await expect(said(page), "a search come back to still says a passage left").toHaveText(
         whileListed,
       );
+    });
+  }
+
+  test("focuses Search when a re-read drops the focused match", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Holme Bays", [handbookSeeded]);
+    await searched(page, "pallet");
+    await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).focus();
+
+    await page.route(
+      isAFind,
+      matchesBecome((matches) => matches.slice(1)),
+    );
+    await windowRefocused(page);
+
+    await expect(matchesOf(page)).toHaveCount(A_PAGE - 1);
+    await expect(
+      searchRegion(page).getByRole("heading", { name: "Search" }),
+      "focus fell to the page with its match",
+    ).toBeFocused();
+  });
+
+  for (const width of [1280, 1536]) {
+    test(`keeps the panel off the passkey offer, at ${String(width)} px`, async ({
+      page,
+      request,
+    }) => {
+      await aVirtualAuthenticator(page);
+      const email = anAddress("admin");
+      const workspace = await provision(request, {
+        name: `Holme Keys ${String(width)}`,
+        adminEmail: email,
+      });
+      await handbookSeeded(request, {
+        workspaceId: workspace.workspaceId,
+        adminId: workspace.admin.id,
+      });
+      await page.setViewportSize({ width, height: 720 });
+      await page.goto(asked("pallet"));
+      await signIn(page, request, email);
+      const dismiss = page.getByRole("button", { name: "Dismiss Passkey Offer" });
+      await expect(dismiss).toBeVisible();
+
+      await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();
+      const panel = await passagePanel(page, HANDBOOK).boundingBox();
+      const offer = await dismiss.boundingBox();
+
+      if (panel === null || offer === null) throw new Error("the panel or the offer drew no box");
+      expect(
+        offer.x + offer.width,
+        "the panel covers the passkey offer's Dismiss",
+      ).toBeLessThanOrEqual(panel.x);
     });
   }
 
