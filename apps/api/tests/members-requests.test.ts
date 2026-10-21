@@ -10,6 +10,7 @@ import {
   emailsTo,
   eventsOn,
   ISO_INSTANT,
+  PER_ADDRESS_CEILING,
   SEVEN_DAYS_MS,
   ULID,
   type Api,
@@ -212,10 +213,10 @@ describe("an approval's invitation email", () => {
     );
   });
 
-  it("gives back no count when it did not go", async () => {
+  it("an approval counts nothing, so its failure returns nothing", async () => {
     const { api, requester, requestId } = await anAdminWithOneRequest();
     stopTheClock();
-    for (let invite = 0; invite < 5; invite += 1) {
+    for (let invite = 0; invite < PER_ADDRESS_CEILING; invite += 1) {
       await api.members.invite.mutate({ addresses: [requester.email], role: "Viewer" });
     }
     unreachable.add(requester.email);

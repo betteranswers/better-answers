@@ -29,7 +29,7 @@ import {
 } from "../kernel/index.ts";
 import { refusalOfDeadlock, type Tx } from "../store/postgres/index.ts";
 import type { WORKSPACE_REFUSALS } from "../workspaces/index.ts";
-import { emailsCounted, waitingCounted } from "./invitation-ceilings.ts";
+import { emailsCounted, waitingCounted, type Counted } from "./invitation-ceilings.ts";
 import { distinct, namedEach, refusedItemsOf } from "./sets.ts";
 import {
   invitationsOffDomain,
@@ -324,7 +324,7 @@ const sentUnderLocks = async (
   admin: AdminUserPrincipal,
   tx: Tx,
   sending: Sending,
-): Promise<Result<readonly InvitationMinted[], SendRefusal>> => {
+): Promise<Result<readonly Counted<InvitationMinted>[], SendRefusal>> => {
   const offDomain = await offDomainRefused(admin, tx, sending.addresses);
   if (offDomain !== undefined) return err(offDomain);
   const addresses = distinct(sending.addresses);
@@ -349,7 +349,12 @@ const sentUnderLocks = async (
     invitations: addresses.map((address) => ({ invitationId: ulid(), address })),
   };
   const { replaced, workspaceName } = await mintedEach(admin, tx, minting);
-  const sent = { role: sending.role, ...windowOf(sending.now), workspaceName };
+  const sent = {
+    role: sending.role,
+    ...windowOf(sending.now),
+    workspaceName,
+    countedAt: sending.now,
+  };
   return ok(
     minting.invitations.map(({ invitationId, address }) => ({
       ...sent,
@@ -370,7 +375,7 @@ export const inviteMembers = async (
   principal: UserPrincipal,
   tx: Tx,
   input: InviteMembersInput,
-): Promise<Result<readonly InvitationMinted[], InviteMembersRefusal>> => {
+): Promise<Result<readonly Counted<InvitationMinted>[], InviteMembersRefusal>> => {
   const admitted = admit(inviteMembersAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const role = ROLE.safeParse(input.role);
@@ -407,7 +412,10 @@ const renewedOne = async (
   tx: Tx,
   input: ResendInvitationInput,
 ): Promise<
-  Result<InvitationToSend, MemberRefusal<"no-such-invitation" | "off-testing-domain"> | CeilingMet>
+  Result<
+    Counted<InvitationToSend>,
+    MemberRefusal<"no-such-invitation" | "off-testing-domain"> | CeilingMet
+  >
 > => {
   const offDomain = await invitationsOffDomain(admin, tx, [input.invitationId]);
   if (offDomain.length > 0) return err(OFF_TESTING_DOMAIN);
@@ -431,7 +439,7 @@ const renewedOne = async (
     subjectId: renewed.invitationId,
     detail: {},
   });
-  return ok({ ...renewed, workspaceName: await workspaceNameOf(admin, tx) });
+  return ok({ ...renewed, workspaceName: await workspaceNameOf(admin, tx), countedAt: input.now });
 };
 
 /**
@@ -442,7 +450,7 @@ export const resendInvitation = async (
   principal: UserPrincipal,
   tx: Tx,
   input: ResendInvitationInput,
-): Promise<Result<InvitationToSend, ResendInvitationRefusal>> => {
+): Promise<Result<Counted<InvitationToSend>, ResendInvitationRefusal>> => {
   const admitted = admit(resendInvitationAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const invitationId = INVITATION_ID.safeParse(input.invitationId);

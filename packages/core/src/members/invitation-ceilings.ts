@@ -3,7 +3,14 @@ import { createHash } from "node:crypto";
 import { INVITATION_WAITING_STATUS } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
-import { CeilingMet, err, ok, type AdminUserPrincipal, type Result } from "../kernel/index.ts";
+import {
+  CeilingMet,
+  err,
+  ok,
+  type AdminUserPrincipal,
+  type Result,
+  type UserPrincipal,
+} from "../kernel/index.ts";
 import {
   consumeInvitationEmails,
   returnInvitationEmails,
@@ -16,14 +23,14 @@ const INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 5 };
 /** Every workspace mails through one shared account, which a flood could get suspended; a few hundred people still fit in two hours. */
 const WORKSPACE_INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 200 };
 
-const counterKeyOf = (admin: AdminUserPrincipal, address: string): string =>
+const counterKeyOf = (admin: UserPrincipal, address: string): string =>
   createHash("sha256").update(`${admin.workspaceId}:${address}`).digest("hex");
 
 const WORKSPACE_KEY = "workspace";
 
 type Counter = { readonly key: string; readonly rule: CounterRule; readonly amount: number };
 
-const countersOf = (admin: AdminUserPrincipal, addresses: readonly string[]): readonly Counter[] =>
+const countersOf = (admin: UserPrincipal, addresses: readonly string[]): readonly Counter[] =>
   [
     ...addresses.map((address) => ({
       key: counterKeyOf(admin, address),
@@ -32,6 +39,8 @@ const countersOf = (admin: AdminUserPrincipal, addresses: readonly string[]): re
     })),
     { key: WORKSPACE_KEY, rule: WORKSPACE_INVITATION_CEILING, amount: addresses.length },
   ].toSorted((one, other) => byCodeUnit(one.key, other.key));
+
+export type Counted<Invitation> = Invitation & { readonly countedAt: Date };
 
 export const emailsCounted = async (
   admin: AdminUserPrincipal,
@@ -71,18 +80,24 @@ export const waitingCounted = async (
 const ADDRESSES_OF = `SELECT lower(email) AS address FROM invitation
                        WHERE workspace_id = $1 AND id = ANY($2::text[])`;
 
-export const unsentReturned = async (
-  admin: AdminUserPrincipal,
+/** Gives each unsent email's count back to the window it was counted in, never below zero. */
+export const returnUnsentEmails = async (
+  principal: UserPrincipal,
   tx: Tx,
-  invitationIds: readonly string[],
-  countedAt: Date,
+  unsent: readonly Counted<{ readonly invitationId: string }>[],
 ): Promise<void> => {
-  const unsent = await tx.query<{ address: string }>(ADDRESSES_OF, [
-    admin.workspaceId,
-    invitationIds,
-  ]);
-  const addresses = unsent.rows.map((row) => row.address);
-  for (const { key, rule, amount } of countersOf(admin, addresses)) {
-    await returnInvitationEmails(admin, tx, key, rule, countedAt, amount);
+  const windows = Map.groupBy(unsent, (invitation) => invitation.countedAt.getTime());
+  for (const [countedAtMs, invitations] of windows) {
+    const addresses = await tx.query<{ address: string }>(ADDRESSES_OF, [
+      principal.workspaceId,
+      invitations.map((invitation) => invitation.invitationId),
+    ]);
+    const counters = countersOf(
+      principal,
+      addresses.rows.map((row) => row.address),
+    );
+    for (const { key, rule, amount } of counters) {
+      await returnInvitationEmails(principal, tx, key, rule, new Date(countedAtMs), amount);
+    }
   }
 };

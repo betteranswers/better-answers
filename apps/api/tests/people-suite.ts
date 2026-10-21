@@ -13,6 +13,8 @@ export const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 export const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
+export const PER_ADDRESS_CEILING = 5;
+
 export type Api = Awaited<ReturnType<typeof webSignedIn>>["api"];
 
 export const anAddress = (who: string): string =>

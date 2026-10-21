@@ -12,6 +12,7 @@ import {
   emailsTo,
   eventsOn,
   ISO_INSTANT,
+  PER_ADDRESS_CEILING,
   SEVEN_DAYS_MS,
   ULID,
   type Api,
@@ -57,8 +58,6 @@ const anAdmin = async () => {
   const workspace = await app().provision({ name: "Calder Joinery" });
   return { workspace, ...(await webSignedIn(app(), workspace.admin.email)) };
 };
-
-const PER_ADDRESS_CEILING = 5;
 
 const TO_THE_CEILING = [...Array.from({ length: PER_ADDRESS_CEILING }, () => 200), 429];
 
