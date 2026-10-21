@@ -90,6 +90,7 @@ import {
   countWaitingOnLocks,
   holdingTable,
   isBlockedOnTable,
+  lendingOnceSettled,
   readingAs,
   seedingWith,
   statementsWaitingOnALock,
@@ -3182,6 +3183,14 @@ const thePersonIn = async (scenario: Scenario, person: { readonly id: string }, 
 
 const NOWHERE = { address: false, personId: false, authors: [] };
 
+const theMemberHasEnded = async (member: Member): Promise<boolean> =>
+  (
+    await db().pool.query("SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2", [
+      member.workspaceId,
+      member.userId,
+    ])
+  ).rowCount === 0;
+
 const theMemberRowIsFree = async (scenario: Scenario, person: { readonly id: string }) => {
   const probe = await db().pool.connect();
   try {
@@ -3218,6 +3227,8 @@ describe("a commit made as the person while the routine runs", () => {
     const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
     const member = { workspaceId: scenario.workspaceId, userId: person.id };
     const gate = await gatingRefUpdates(scenario);
+    let ended: Promise<unknown> = Promise.resolve();
+    const postgres = { pool: lendingOnceSettled(scenario.postgres.pool, () => ended) };
 
     const { done, met } = await heldAheadOfTheMembersEnd(
       scenario,
@@ -3225,10 +3236,11 @@ describe("a commit made as the person while the routine runs", () => {
       member,
       async (resume) => {
         await gate.park();
-        const writing = writingAsThePerson(scenario, person, email);
+        const writing = writingAsThePerson({ ...scenario, postgres }, person, email);
         await until(gate.parked);
         const ending = resume();
         await until(async () => (await countWaitingOnLocks(db().pool)) === 1);
+        ended = until(() => theMemberHasEnded(member));
         await gate.unpark();
         await ending;
         return writing;

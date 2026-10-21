@@ -138,6 +138,24 @@ export const until = async (condition: () => Promise<boolean>): Promise<void> =>
   throw new Error("the condition never held");
 };
 
+/**
+ * Postgres can hand a row to a new FOR SHARE read before a woken UPDATE or DELETE, so connect
+ * waits for that change.
+ */
+export const lendingOnceSettled = (pool: pg.Pool, settled: () => Promise<unknown>): pg.Pool =>
+  new Proxy(pool, {
+    get: (target, key) => {
+      if (key === "connect") {
+        return async () => {
+          await settled();
+          return target.connect();
+        };
+      }
+      const value: unknown = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+
 export const leaseLetLapse = async (
   pool: pg.Pool,
   job: { readonly workspaceId: string; readonly jobId: string },

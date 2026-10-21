@@ -46,6 +46,7 @@ import {
   answered,
   holdingTable,
   isBlockedOnTable,
+  lendingOnceSettled,
   postgresForSuite,
   readingAs,
   until,
@@ -1246,24 +1247,6 @@ const isBlockedOnALock = async (pid: number): Promise<boolean> => {
   ]);
   return (found.rowCount ?? 0) > 0;
 };
-
-/**
- * Postgres can hand the row to a new FOR SHARE read before a woken UPDATE, so no connection opens
- * until the revocation settles.
- */
-const lendingOnceSettled = (pool: pg.Pool, settled: () => Promise<unknown>): pg.Pool =>
-  new Proxy(pool, {
-    get: (target, key) => {
-      if (key === "connect") {
-        return async () => {
-          await settled();
-          return target.connect();
-        };
-      }
-      const value: unknown = Reflect.get(target, key);
-      return typeof value === "function" ? value.bind(target) : value;
-    },
-  });
 
 const expectCommitsWithoutRows = async (scenario: Scenario, commits: number): Promise<void> => {
   expect(await rowsFor(scenario.workspaceId)).toMatchObject({ concepts: "0", commits: "0" });
