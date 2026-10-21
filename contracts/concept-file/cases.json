@@ -1,5 +1,5 @@
 {
-  "description": "concept-file (ADR 0014, ADR 0019, ADR 0031): the content hash a check confirms is one number whichever tier computed it — the api's `contentHashOf` at every write and replay, the worker's `content_hash_of` on every nightly audit — so the canonical text it hashes is an agreement, not either tier's reading of RFC 8785. Each entry of `cases` is a frontmatter as a file carries it, the concept's own `path` the `sources[]` reduction resolves against, the `body` as written, and what both tiers must produce: `canonical`, the frontmatter as the hash reads it (keys sorted by UTF-16 code unit — so an integer-like key sorts as the text it is, never first — the trust and identity keys dropped, `sources[]` reduced to `[resource, locator]` pairs, every number written as ECMAScript's `Number::toString` writes it, no insignificant whitespace), and `sha256`, the hex digest over that text, a newline and the normalised body. Each entry of `numbers` is a number as a file may carry it and the one text both tiers write for it under the key `n`.",
+  "description": "concept-file (ADR 0014, ADR 0019, ADR 0031): the content hash a check confirms is one number whichever tier computed it — the api's `contentHashOf` at every write and replay, the worker's `content_hash_of` on every nightly audit — so the canonical text it hashes is an agreement, not either tier's reading of RFC 8785. Each entry of `cases` is a frontmatter as a file carries it, the concept's own `path` the `sources[]` reduction resolves against, the `body` as written, and what both tiers must produce: `canonical`, the frontmatter as the hash reads it (keys sorted by UTF-16 code unit — so an integer-like key sorts as the text it is, never first — the trust and identity keys dropped, `sources[]` reduced to `[resource, locator]` pairs, each resource resolved against `path` unless it starts `//` or with a scheme (an ASCII letter, then ASCII letters, digits, plus, full stop and hyphen, then a colon), every number written as ECMAScript's `Number::toString` writes it, no insignificant whitespace), and `sha256`, the hex digest over that text, a newline and the normalised body. Each entry of `numbers` is a number as a file may carry it and the one text both tiers write for it under the key `n`.",
   "cases": [
     {
       "why": "the trust and identity keys are left out, a relative and a dotted resource resolve against the concept's path, a numeric locator is kept as the text it meant and an absent one as null, and the body is normalised — CRLF to LF, trailing whitespace off, one final newline",
@@ -95,6 +95,20 @@
       "body": "Expenses are claimed within thirty days.",
       "canonical": "{\"__proto__\":\"x\",\"reviewers\":[{\"__proto__\":\"finance\",\"name\":\"Ada\"}],\"sources\":[[\"/knowledge/policies/handbook.md\",\"p.2\"]],\"title\":\"Expenses\"}",
       "sha256": "2987fc03a41d0dc8237435e9c2de265ba2b5ba8009144514ac70dc68ec809126"
+    },
+    {
+      "why": "a scheme is ASCII letters, digits, plus, full stop and hyphen after an ASCII letter, so a resource whose scheme holds the Kelvin sign or a long s, which Python's case-insensitive matching folds to k and s, is a path and resolves against the concept's path",
+      "path": "knowledge/policies/expenses.md",
+      "frontmatter": {
+        "sources": [
+          { "resource": "Ka:b" },
+          { "resource": "\u212aa:b" },
+          { "resource": "a\u017f:b" }
+        ]
+      },
+      "body": "Expenses are claimed within thirty days.",
+      "canonical": "{\"sources\":[[\"Ka:b\",null],[\"/knowledge/policies/\u212aa:b\",null],[\"/knowledge/policies/a\u017f:b\",null]]}",
+      "sha256": "9bf3951c7f07d57972125a80a84c8905a12dc86a98e5aa98aa3427a9f220af70"
     }
   ],
   "numbers": [

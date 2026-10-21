@@ -118,6 +118,20 @@ def test_a_scheme_or_protocol_relative_target_is_never_a_concept() -> None:
     assert edges(body) == []
 
 
+def test_a_scheme_holds_ascii_letters_alone() -> None:
+    kelvin = "\N{KELVIN SIGN}a:b.md"
+    long_s = "a\N{LATIN SMALL LETTER LONG S}:b.md"
+    body = f"See [the kelvin]({kelvin}) and [the long s]({long_s})."
+    landed = {
+        f"knowledge/{kelvin}": ResolvedTarget(OTHER_IRI, "Policy", "stable"),
+        f"knowledge/{long_s}": ResolvedTarget(UNLANDED_IRI, "Policy", "stable"),
+    }
+
+    derived = edges(body, by_path=landed)
+
+    assert [edge.to_uid for edge in derived] == [OTHER_IRI, UNLANDED_IRI]
+
+
 def test_lineage_supersedes_a_deprecated_same_kind_and_derives_otherwise() -> None:
     frontmatter: Frontmatter = {
         "sources": [
