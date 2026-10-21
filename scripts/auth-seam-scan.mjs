@@ -13,8 +13,7 @@ import {
 } from "../packages/devtools/src/auth-seam-scan.ts";
 import { executableOf } from "../packages/devtools/src/throwaway-tree.ts";
 
-/** The tree it is run in, not the tree it lives in, so a suite can spawn it over a throwaway. */
-const root = process.cwd();
+const ranIn = process.cwd();
 const named = process.argv.slice(2);
 
 if (named.length !== 2) {
@@ -28,10 +27,10 @@ const seam = { config, file };
 const scanIn = (scratch) => {
   const emitted = path.join(scratch, "emitted");
   const scanConfig = path.join(scratch, "tsconfig.json");
-  writeFileSync(scanConfig, JSON.stringify(declarationConfig(root, seam, emitted)));
+  writeFileSync(scanConfig, JSON.stringify(declarationConfig(ranIn, seam, emitted)));
 
   const tsc = spawnSync(executableOf(TSC), ["-p", scanConfig, "--pretty", "false"], {
-    cwd: root,
+    cwd: ranIn,
     encoding: "utf8",
   });
   if (tsc.error !== undefined) {
@@ -39,15 +38,14 @@ const scanIn = (scratch) => {
     return 2;
   }
 
-  const written = declarationPath(root, seam, emitted);
+  const written = declarationPath(ranIn, seam, emitted);
   const found = [
-    ...refusalsOf(root, seam, tsc.stdout),
+    ...refusalsOf(ranIn, seam, tsc.stdout),
     ...(existsSync(written) ? libraryNamed(seam, readFileSync(written, "utf8")) : []),
   ];
   for (const one of found) process.stdout.write(`${one}\n`);
   if (found.length > 0) return 1;
 
-  // No declaration and no reason is a gate that read nothing, never a seam that leaks nothing.
   if (!existsSync(written)) {
     process.stderr.write(`auth-seam-scan: tsc wrote no declaration for ${file}\n${tsc.stdout}`);
     return 2;
