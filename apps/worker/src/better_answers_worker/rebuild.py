@@ -7,6 +7,7 @@ from .audit import ParseFindings
 from .bundle import NoSuchBundleError, concepts_at_head
 from .concept_file import MalformedConceptFileError, content_hash_of, parse_concept_file
 from .links import CONCEPT_NODE_LABEL, LINKS_TO_LABEL, ResolvedTarget, outgoing_edges
+from .log import logger
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,3 +172,15 @@ def run_rebuild(
         (outcome.generation, workspace_id),
     )
     return outcome
+
+
+def analyse_map(connection: psycopg.Connection, workspace_id: str) -> None:
+    try:
+        connection.execute("SELECT analyse_map()")
+    except psycopg.Error as failure:
+        logger.warning(
+            "the map was left unanalysed",
+            workspace_id=workspace_id,
+            error=type(failure).__name__,
+            sqlstate=failure.sqlstate,
+        )

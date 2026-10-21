@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { head } from "@better-answers/core/store/git";
 import { ids, type ConceptIri } from "@better-answers/schema";
@@ -12,12 +12,21 @@ import {
   type BundleImported,
   type BundleTree,
   type ImportBundleInput,
+  type ImportLog,
   type ImportProgress,
+  type MapNotAnalysedLine,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit, holdMainRef } from "./bundle.ts";
-import { addressOf, holdingTable, isBlockedOnTable, readingAs, until } from "./suite-postgres.ts";
+import {
+  addressOf,
+  holdingTable,
+  isBlockedOnTable,
+  mapAutovacuumOff,
+  readingAs,
+  until,
+} from "./suite-postgres.ts";
 import { doorsOf, memberOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange } = suiteWithBundles();
@@ -159,11 +168,14 @@ const arranged = async (): Promise<Arranged> => {
   return { scenario, verifiers, people: { mona: mona.id, theo: theo.id } };
 };
 
+const SILENT: ImportLog = { warn: () => undefined };
+
 const importing = (
   scenario: Scenario,
   principal: UserPrincipal,
   input: ImportBundleInput,
-): ReturnType<typeof importBundle> => importBundle(principal, doorsOf(scenario), input);
+  log: ImportLog = SILENT,
+): ReturnType<typeof importBundle> => importBundle(principal, { ...doorsOf(scenario), log }, input);
 
 const imported = async (
   scenario: Scenario,
@@ -353,7 +365,92 @@ const stoppedAt = (file: string, reason: string, progress: ImportProgress) => ({
   error: { kind: "stopped", file, reason, progress },
 });
 
+const STOPPED_WHERE_THE_CONCEPT_MOVED = stoppedAt(
+  "company/answers/support-hours.md",
+  "stale-precondition",
+  {
+    landed: PATHS_IN_ORDER,
+    skipped: [],
+    verifications: { recorded: 7, present: 0 },
+    rewritten: [],
+  },
+);
+
+const MAP_TABLES = ["map_edge", "map_node"] as const;
+
+const mapRowsHeld = async (): Promise<Record<string, number>> => {
+  const counted = await db().pool.query<Record<string, number>>(
+    `SELECT (SELECT count(*)::int FROM map_edge) AS map_edge,
+            (SELECT count(*)::int FROM map_node) AS map_node`,
+  );
+  return counted.rows[0] ?? {};
+};
+
+const plannersRowEstimates = async (): Promise<Record<string, number>> => {
+  const read = await db().pool.query<{ table: string; estimate: number }>(
+    `SELECT relname AS "table", reltuples::int AS estimate FROM pg_class
+      WHERE relnamespace = 'public'::regnamespace AND relname = ANY($1::text[])`,
+    [[...MAP_TABLES]],
+  );
+  return Object.fromEntries(read.rows.map((row) => [row.table, row.estimate]));
+};
+
+const warningsKept = (): { readonly log: ImportLog; readonly warnings: MapNotAnalysedLine[] } => {
+  const warnings: MapNotAnalysedLine[] = [];
+  const warn = (line: MapNotAnalysedLine): void => {
+    warnings.push(line);
+  };
+  return { log: { warn }, warnings };
+};
+
+const analyseHeldOff = <T>(work: () => Promise<T>): Promise<T> =>
+  holdingTable(db().pool, "map_node", work, "SHARE UPDATE EXCLUSIVE");
+
 describe("importing the bundle", () => {
+  beforeAll(() => mapAutovacuumOff(db().pool));
+
+  it("analyses the map for the planner once landed", async () => {
+    const { scenario, verifiers } = await arranged();
+    const { log, warnings } = warningsKept();
+
+    await importing(scenario, scenario.editor, { tree: soundBundle(verifiers) }, log);
+
+    expect(await plannersRowEstimates()).toEqual(await mapRowsHeld());
+    expect(warnings).toEqual([]);
+  });
+
+  it("reports a landed import when the analyse fails", async () => {
+    const { scenario, verifiers } = await arranged();
+    const { log, warnings } = warningsKept();
+
+    const run = await analyseHeldOff(() =>
+      importing(scenario, scenario.editor, { tree: soundBundle(verifiers) }, log),
+    );
+
+    expect(run).toMatchObject({ ok: true, value: { landed: PATHS_IN_ORDER, dryRun: false } });
+    expect(warnings).toEqual([
+      {
+        workspace_id: scenario.workspaceId,
+        bundle_id: BUNDLE_ID,
+        error: "canceling statement due to lock timeout",
+      },
+    ]);
+  });
+
+  it("keeps the stopped refusal when the analyse fails too", async () => {
+    const { scenario, verifiers } = await arranged();
+    const { log, warnings } = warningsKept();
+
+    const stopped = await analyseHeldOff(() =>
+      movedBetweenThePasses(LINKED.supportHours, () =>
+        importing(scenario, scenario.editor, { tree: soundBundle(verifiers) }, log),
+      ),
+    );
+
+    expect(stopped).toEqual(STOPPED_WHERE_THE_CONCEPT_MOVED);
+    expect(warnings).toHaveLength(1);
+  });
+
   it("commits the manifest, then each concept in path order", async () => {
     const { scenario, verifiers } = await arranged();
 
@@ -810,14 +907,7 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
       importing(scenario, scenario.editor, { tree: soundBundle(verifiers) }),
     );
 
-    expect(stopped).toEqual(
-      stoppedAt("company/answers/support-hours.md", "stale-precondition", {
-        landed: PATHS_IN_ORDER,
-        skipped: [],
-        verifications: { recorded: 7, present: 0 },
-        rewritten: [],
-      }),
-    );
+    expect(stopped).toEqual(STOPPED_WHERE_THE_CONCEPT_MOVED);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(7);
     const files = await filesAtHead(scenario);
     for (const { path } of REWRITTEN_IN_ORDER) expect(files.get(path)).toMatch(/\]\([^)]*\.md\)/);

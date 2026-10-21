@@ -52,6 +52,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { ANY_HEAD, type CommitAuthor, type Committed, type GitDoor } from "../store/git/index.ts";
+import { analyseMap } from "../store/map/index.ts";
 import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { withBundleWrite } from "./fence.ts";
 import {
@@ -777,6 +778,18 @@ export type BundleImported = ImportProgress & {
   readonly dryRun: boolean;
 };
 
+export type MapNotAnalysedLine = {
+  readonly workspace_id: string;
+  readonly bundle_id: string;
+  readonly error: string;
+};
+
+export type ImportLog = {
+  readonly warn: (line: MapNotAnalysedLine, message: string) => void;
+};
+
+type ImportDoors = WriteDoors & { readonly log: ImportLog };
+
 const importBundleAction = declareAction({
   admits: BUNDLE_WRITERS,
   input: z.custom<ImportBundleInput>(),
@@ -1090,7 +1103,7 @@ const rewriteEach = async (
 
 const runImport = async (
   principal: UserPrincipal,
-  doors: WriteDoors,
+  doors: ImportDoors,
   opened: OpenedImport,
   sensitivity: Sensitivity,
 ): Promise<Result<BundleImported, ImportBundleRefusal | Error>> => {
@@ -1103,8 +1116,21 @@ const runImport = async (
 
   const run: ImportRun = { author: opened.author, sensitivity, batchId: ulid() };
   const landing = await landEach(principal, doors, run, opened);
+  const rewritten = landing.ok
+    ? await rewriteEach(principal, doors, run, landing.value)
+    : err(landing.error);
+  const analysed = await attempt(() => analyseMap(doors.postgres.pool));
+  if (!analysed.ok) {
+    doors.log.warn(
+      {
+        workspace_id: principal.workspaceId,
+        bundle_id: opened.manifest.id,
+        error: analysed.error.message,
+      },
+      "import-bundle: the map was left unanalysed, so the planner waits for autovacuum",
+    );
+  }
   if (!landing.ok) return err(landing.error);
-  const rewritten = await rewriteEach(principal, doors, run, landing.value);
   if (!rewritten.ok) return err(rewritten.error);
   return ok({
     bundleId: opened.manifest.id,
@@ -1118,7 +1144,7 @@ const runImport = async (
 
 export const importBundle = async (
   principal: UserPrincipal,
-  doors: WriteDoors,
+  doors: ImportDoors,
   input: ImportBundleInput,
 ): Promise<Result<BundleImported, ImportBundleRefusal | Error>> => {
   const admitted = admit(importBundleAction, principal, input);

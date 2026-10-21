@@ -867,7 +867,7 @@ const importBundleCommand = async (
   const started = doors.clock.now();
   const run = await importBundle(
     principal.value,
-    { git: git.value, postgres, clock: doors.clock },
+    { git: git.value, postgres, clock: doors.clock, log: io.logger },
     { tree: tree.value, sensitivity, dryRun },
   );
   const seconds = ((doors.clock.now().getTime() - started.getTime()) / 1_000).toFixed(1);
