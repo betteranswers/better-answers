@@ -370,18 +370,6 @@
       }
     },
     {
-      "files": ["apps/web/**"],
-      "rules": {
-        "better-answers/auth-types-stay-in-the-seam": "error"
-      }
-    },
-    {
-      "files": ["apps/web/src/features/auth/auth-client.ts"],
-      "rules": {
-        "better-answers/auth-types-stay-in-the-seam": "off"
-      }
-    },
-    {
       "files": ["apps/web/src/shared/ui/**"],
       "rules": {
         "react/set-state-in-effect": "off",

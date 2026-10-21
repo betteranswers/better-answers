@@ -11,14 +11,15 @@ import {
   type Query,
   type QueryClient,
   type UseMutationResult,
+  type UseQueryResult,
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import type { inferOutput } from "@trpc/tanstack-react-query";
+import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 import type { BetterFetchError } from "better-auth/client";
 import { useState } from "react";
 import { z } from "zod";
 
-import { useTRPC, type ApiProxy } from "@/shared/api/trpc.ts";
+import { useTRPC, type ApiError, type ApiProxy } from "@/shared/api/trpc.ts";
 import {
   forgetMember,
   leftFor,
@@ -66,7 +67,9 @@ type WorkspacesHeld = inferOutput<ApiProxy["person"]["workspaces"]>;
 const withTheRole = (held: WorkspacesHeld) =>
   held.map(({ workspace, role }) => ({ ...workspace, role }));
 
-export const useWorkspacesHeld = (asked = true) => {
+export const useWorkspacesHeld = (
+  asked = true,
+): UseQueryResult<ReturnType<typeof withTheRole>, ApiError> => {
   const api = useTRPC();
   return useQuery(
     api.person.workspaces.queryOptions(undefined, { enabled: asked, select: withTheRole }),
@@ -209,10 +212,8 @@ const returnPathOf = (query: string): { readonly redirect?: string } => {
   return redirect === null ? {} : { redirect };
 };
 
-type CodeAsked = { email: string; type: "sign-in" };
-
 const sendVerificationOtpOptions = () =>
-  mutationOptions<unknown, Error, CodeAsked>({
+  mutationOptions<unknown, Error, { email: string; type: "sign-in" }>({
     mutationFn: (input) =>
       unwrapWithTheWait((reading) =>
         authClient.emailOtp.sendVerificationOtp(
@@ -222,15 +223,12 @@ const sendVerificationOtpOptions = () =>
       ),
   });
 
-export const useSendVerificationOtp = (): UseMutationResult<unknown, Error, CodeAsked> =>
-  useMutation(sendVerificationOtpOptions());
+export const useSendVerificationOtp = () => useMutation(sendVerificationOtpOptions());
 
 export type SignedIn = { readonly displayNameGiven: boolean };
 
-type CodeGiven = { email: string; otp: string };
-
 const signInEmailOtpOptions = () =>
-  mutationOptions<SignedIn, Error, CodeGiven>({
+  mutationOptions<SignedIn, Error, { email: string; otp: string }>({
     mutationFn: async (input) => {
       const answer = await unwrapWithTheWait((reading) =>
         authClient.signIn.emailOtp(input, reading),
@@ -240,8 +238,7 @@ const signInEmailOtpOptions = () =>
     onSuccess: signedInHere,
   });
 
-export const useSignInEmailOtp = (): UseMutationResult<SignedIn, Error, CodeGiven> =>
-  useMutation(signInEmailOtpOptions());
+export const useSignInEmailOtp = () => useMutation(signInEmailOtpOptions());
 
 const LINK_TOKEN = /^#([A-Za-z0-9]{1,128})$/;
 
@@ -375,7 +372,13 @@ export const signedOutOfAStep = async (
 export const rereadTheSession = (queryClient: QueryClient): Promise<void> =>
   queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
 
-export const useSetDisplayName = () => {
+type PersonMutation<Name extends "setDisplayName" | "acceptInvitation"> = UseMutationResult<
+  inferOutput<ApiProxy["person"][Name]>,
+  ApiError,
+  inferInput<ApiProxy["person"][Name]>
+>;
+
+export const useSetDisplayName = (): PersonMutation<"setDisplayName"> => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   return useMutation(
@@ -387,7 +390,7 @@ export const useSetDisplayName = () => {
   );
 };
 
-export const useAcceptInvitation = () => {
+export const useAcceptInvitation = (): PersonMutation<"acceptInvitation"> => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -409,13 +412,7 @@ const signOutOptions = () =>
     mutationFn: () => unwrapWithTheWait((reading) => authClient.signOut({ fetchOptions: reading })),
   });
 
-type SigningOut = {
-  readonly signingOut: boolean;
-  readonly failure: Error | null;
-  readonly signOut: () => void;
-};
-
-export const useSignOut = (returnTo?: string): SigningOut => {
+export const useSignOut = (returnTo?: string) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const signOut = useMutation(signOutOptions());
@@ -465,10 +462,8 @@ const setActiveWorkspace = (organizationId: string) =>
     },
   );
 
-type WorkspacePicked = { organizationId: string };
-
 const setActiveOrganizationOptions = () =>
-  mutationOptions<unknown, SwitchRefused, WorkspacePicked>({
+  mutationOptions<unknown, SwitchRefused, { organizationId: string }>({
     mutationFn: (input) => setActiveWorkspace(input.organizationId),
   });
 
@@ -497,11 +492,7 @@ export const forgetAWorkspaceLeftElsewhere = (queryClient: QueryClient, api: Api
   });
 };
 
-export const useSetActiveOrganization = (): UseMutationResult<
-  unknown,
-  SwitchRefused,
-  WorkspacePicked
-> => {
+export const useSetActiveOrganization = () => {
   const queryClient = useQueryClient();
   const api = useTRPC();
   return useMutation({
@@ -525,7 +516,7 @@ export const followTheSession = async (queryClient: QueryClient, api: ApiProxy):
   void queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
 };
 
-export const useSwitchWorkspace = (): UseMutationResult<unknown, SwitchRefused, SwitchedTo> => {
+export const useSwitchWorkspace = () => {
   const queryClient = useQueryClient();
   const api = useTRPC();
   const navigate = useNavigate();
@@ -542,10 +533,8 @@ export const useSwitchWorkspace = (): UseMutationResult<unknown, SwitchRefused, 
 const resumeAnswer = z.object({ redirect: z.boolean().optional(), url: z.string().optional() });
 export type ResumeAnswer = z.infer<typeof resumeAnswer>;
 
-type ResumeAsked = { postLogin: true };
-
 const oauthContinueOptions = () =>
-  mutationOptions<ResumeAnswer, Error, ResumeAsked>({
+  mutationOptions<ResumeAnswer, Error, { postLogin: true }>({
     mutationFn: async (input) => {
       const { data, error } = await authClient.oauth2.continue(input);
       if (error !== null) {
@@ -555,5 +544,4 @@ const oauthContinueOptions = () =>
     },
   });
 
-export const useOAuthContinue = (): UseMutationResult<ResumeAnswer, Error, ResumeAsked> =>
-  useMutation(oauthContinueOptions());
+export const useOAuthContinue = () => useMutation(oauthContinueOptions());

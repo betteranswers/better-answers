@@ -4,7 +4,7 @@ The repository's own gate tooling. **It is imported and never deployed** — `pa
 is imported, `apps/` is what deploys (ADR 0029) — so nothing under `apps/` copies this
 directory into an image, and every dependency here is a development dependency.
 
-Fourteen things live here.
+Fifteen things live here.
 
 ## `src/throwaway-tree.ts` — the runner
 
@@ -182,16 +182,6 @@ override, both ways.
 `parameter-never-mutated` refuses an in-place array method, or `Object.assign`, on a function's
 parameter. It resolves the receiver through scope, so a local that shadows a parameter goes
 past, and `test/parameter-never-mutated.test.ts` runs it both ways.
-
-`auth-types-stay-in-the-seam` keeps Better Auth's inferred types inside the web's auth seam. The
-import lint already lets only `features/auth/auth-hooks.ts` import `authClient`, so the one path
-left out is an export of that file. A binding is tainted when it is imported from better-auth or
-the client, or when its declaration names a tainted binding. The rule refuses an export whose
-written type names a tainted binding, an export with an inferred type whose code names one, and
-a re-export of the library or the client. It reads names, not types, so an export that reads the
-library writes its type out. `.oxlintrc.json` turns it on for `apps/web` and off for
-`auth-client.ts`, the one file that exports the library's object. `test/auth-types-stay-in-the-seam.test.ts`
-runs it both ways.
 
 ## The comment gate — three parts, all in root `check`
 
@@ -373,6 +363,25 @@ The map is read from the tree the script runs in, so a throwaway tree carries it
 that read no file, or a map with no table, exits 2. `test/table-ownership-scan.test.ts` runs
 the script through the runner over a failing and a passing tree for each direction, a CTE
 named like a table, a file under no owner, and an owner nested in another's directory.
+
+## `src/auth-seam-scan.ts` — the auth seam scan
+
+Better Auth's types stay inside the web's auth seam. The import lint lets only
+`features/auth/auth-hooks.ts` import `authClient`, so the one way left for the library's shape to
+reach a page is the type of an export of that file. `scripts/auth-seam-scan.mjs` — `pnpm
+auth-seam-scan`, a root `check` step — asks TypeScript for that file's declarations
+(`--emitDeclarationOnly`, over a config extending the workspace's own) and reads what it wrote.
+It refuses a declaration that names `better-auth`, `@better-auth/*` or `better-fetch`, naming the
+export, and any error TypeScript reports in the seam itself. TypeScript writes no declaration for
+a file whose inferred export type it cannot name (TS2883), so such an export has to be written out
+before the declarations can be read. Errors in the files the seam imports are not read. A run in
+which TypeScript wrote no declaration and named no reason exits 2.
+
+Reading the declarations TypeScript writes, rather than the source, catches an inferred type
+however the export reaches it: a destructured or default export, a re-export, a wrapper.
+`test/auth-seam-scan.test.ts` runs the script through the runner over a throwaway workspace with
+a stub `better-auth`, both ways, over an export TypeScript cannot name, and over an error in a file
+beside the seam.
 
 ## `python/port_scan.py` — the port scan
 

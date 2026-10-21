@@ -1,7 +1,6 @@
 import { eslintCompatPlugin } from "@oxlint/plugins";
 
 import { actionAdmitsBeforeAwaitRule } from "./rules/action-admits-before-await.ts";
-import { authTypesStayInTheSeamRule } from "./rules/auth-types-stay-in-the-seam.ts";
 import { commentOnlyTheWhyRule } from "./rules/comment-only-the-why.ts";
 import { declarationDocBlockRule } from "./rules/declaration-doc-block.ts";
 import { importDirectionRule } from "./rules/import-direction.ts";
@@ -15,7 +14,6 @@ const betterAnswersPlugin = eslintCompatPlugin({
   meta: { name: "better-answers" },
   rules: {
     "action-admits-before-await": actionAdmitsBeforeAwaitRule,
-    "auth-types-stay-in-the-seam": authTypesStayInTheSeamRule,
     "comment-only-the-why": commentOnlyTheWhyRule,
     "declaration-doc-block": declarationDocBlockRule,
     "import-direction": importDirectionRule,
