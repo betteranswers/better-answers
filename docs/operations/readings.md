@@ -97,12 +97,16 @@ The first twelve other `Answer`s Clef took at threshold 0.7, read by hand, each 
 
 ## The governed write at 3,000 concepts
 
-How long one governed concept write takes as the workspace grows to 3,000 concepts, and how much of it the creation-time backfill scan takes, read through the core interface by a probe that is not in the tree, with the write's own time as the figure S3's plan keeps or beats.
+How long one governed concept write takes as the workspace grows to 3,000 concepts, and how much of it the creation-time backfill takes, read through the core interface. The rows of 2026-09-10 came from a probe that was never merged. Since 2026-10-21 the probe is `packages/core/test/write-budget.test.ts`, and the write's own time is the figure S3's plan keeps or beats.
 
 | Date | Release or commit | Set or rule | Figure | Source |
 | --- | --- | --- | --- | --- |
 | 2026-09-10 | A probe branch, never merged | One governed write, from 250 to 3,000 concepts | About 0.9 s, flat | Old route, archived |
 | 2026-09-10 | A probe branch, never merged | The backfill scan inside one write, at 3,000 concepts | 31 to 42 ms of about 960 ms | Old route, archived |
+| 2026-10-21 | `468890172` with the probe commit | One governed write landing a concept three seeded bodies link, at 3,000 concepts, median of three runs' medians of 115, 124 and 71 ms on an Apple M4 Pro, alternated with the head runs | 115 ms, p95 144 ms | `packages/core/test/write-budget.test.ts` |
+| 2026-10-21 | `468890172` with the probe commit | The backfill scan inside one delta at 3,000 concepts, median of three runs' medians of 37.0, 37.4 and 23.1 ms | 37.0 ms | `packages/core/test/write-budget.test.ts` |
+| 2026-10-21 | BA-233's branch, the keyed lookup | One governed write as above, median of three runs' medians of 96, 105 and 85 ms | 96 ms, p95 118 ms | `packages/core/test/write-budget.test.ts` |
+| 2026-10-21 | BA-233's branch, the keyed lookup | The keyed lookup and re-derivation inside one delta, as above, median of three runs' medians of 13.8, 15.5 and 21.1 ms | 15.5 ms | `packages/core/test/write-budget.test.ts` |
 
 ## The cascade ceiling
 
