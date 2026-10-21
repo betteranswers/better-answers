@@ -180,4 +180,19 @@ describe("the nightly image prune", () => {
     });
     expect(calls(on)).toBe("");
   });
+
+  it("is installed with its cron on both boxes", () => {
+    const setup = readFileSync(deployScript("host-setup.sh"), "utf8");
+    const body = (name: string): string =>
+      setup.split(`\n${name}() {\n`)[1]?.split("\n}\n")[0] ?? "";
+
+    expect(body("vpc1")).toMatch(/^ {2}prune_images$/m);
+    expect(body("vpc2")).toMatch(/^ {2}prune_images$/m);
+    expect(body("prune_images")).toContain(
+      'install -m 755 "$(dirname "$0")/prune-images.sh" /usr/local/bin/better-answers-prune-images',
+    );
+    expect(body("prune_images")).toContain(
+      "root /usr/local/bin/better-answers-prune-images >> /var/log/better-answers-prune-images.log 2>&1",
+    );
+  });
 });
