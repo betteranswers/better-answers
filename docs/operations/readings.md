@@ -93,6 +93,8 @@ How Clef-flash and Clef do as the judge's decision backend on the reuse set at t
 
 The first twelve other `Answer`s Clef took at threshold 0.7, read by hand, each answer a different question from the one asked, such as an uptime question taking whether contractors are background checked. Claude Sonnet 5.5 and Claude Haiku 5.5 take none (§ The reuse reading). So no threshold makes either model a judge on this set: one that keeps out the hard negatives still takes unrelated `Answer`s, and at 0.9 Clef finds 20 of 32 fits. At the entry step, reordering by either model lifts paraphrase recall by 5.3 points and leaves buyer-worded recall level or lower.
 
+**The owner's choice from the two readings (21/10/2026).** Phew's workspace judges with Claude Sonnet 5.5 at its default effort, and no decision model has a threshold. Sonnet 5.5 took 28 of 32 fits on the reuse set, with no hard negative and no unrelated `Answer`. Clef and Clef-flash took unrelated `Answer`s at every threshold read. Claude Haiku 5.5 at its default effort matched Sonnet 5.5 at about a fifteenth of the cost, but 34 questions cannot tell the two apart, so Haiku waits for a larger set.
+
 ## The governed write at 3,000 concepts
 
 How long one governed concept write takes as the workspace grows to 3,000 concepts, and how much of it the creation-time backfill scan takes, read through the core interface by a probe that is not in the tree, with the write's own time as the figure S3's plan keeps or beats.
