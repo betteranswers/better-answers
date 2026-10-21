@@ -12,8 +12,11 @@
     },
     "gitnexus": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "gitnexus@latest", "mcp"]
+      "command": "sh",
+      "args": [
+        "-c",
+        "command -v gitnexus >/dev/null && exec gitnexus mcp || exec npx -y gitnexus@latest mcp"
+      ]
     },
     "kibo-ui": {
       "command": "npx",
