@@ -142,7 +142,7 @@ const askedAgainUnlessRefused = (failures: number, failure: Error): boolean =>
 
 const hasADisplayName = (name: string): boolean => name.trim() !== "";
 
-export type Session = {
+type Session = {
   readonly id: string;
   readonly address: string;
   readonly displayName: string | undefined;

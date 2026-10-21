@@ -40,7 +40,6 @@ const importedFromTheLibrary = (program: ESTree.Program): Set<string> =>
     ),
   );
 
-/** A declaration that names a tainted binding is tainted too, until no more are reached. */
 const taintedIn = (
   program: ESTree.Program,
   declared: readonly Declared[],
