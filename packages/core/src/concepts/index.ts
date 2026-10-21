@@ -63,7 +63,7 @@ import {
   type HashedSource,
 } from "./file.ts";
 import {
-  commitAsMember,
+  commitAndLandAsMember,
   foldKind,
   heldByIri,
   heldVisibilityOf,
@@ -414,11 +414,8 @@ const writeUnderLock = async (
   if (!parsed.success) return err("malformed");
   const row = parsed.data;
 
-  const committed = await commitWrite(principal, doors, write, row.path, now);
+  const committed = await commitAndLandWrite(principal, doors, write, row, now);
   if (!committed.ok) return err(committed.error);
-
-  const landed = await landWrite(principal, doors.postgres, write, row, committed.value);
-  if (!landed.ok) return err(landed.error);
 
   return ok({
     iri: row.iri,
@@ -498,83 +495,84 @@ const WRITE_REFUSALS: readonly (readonly [
 const writeRefusalOf = (write: ParsedWrite, existing: Existing): WriteConceptRefusal | undefined =>
   WRITE_REFUSALS.find(([, refuses]) => refuses(write, existing))?.[0];
 
-const commitWrite = async (
+const commitAndLandWrite = async (
   principal: UserPrincipal,
   doors: WriteDoors,
   write: ParsedWrite,
-  path: string,
+  row: IndexRow,
   at: Date,
-) => {
+): Promise<Result<Committed, WriteConceptRefusal | Error>> => {
   const { input } = write;
-  return commitAsMember(principal, doors, {
-    path,
-    content: renderConceptFile(write.frontmatter, input.body),
-    message: input.message,
-    author: input.author,
-    trailers: {
-      actor: actorIdOf(principal),
-      audit: write.auditEventId,
+  const committed = await commitAndLandAsMember(
+    principal,
+    doors,
+    {
+      path: row.path,
+      content: renderConceptFile(write.frontmatter, input.body),
+      message: input.message,
+      author: input.author,
+      trailers: {
+        actor: actorIdOf(principal),
+        audit: write.auditEventId,
 
-      suggestion: input.acceptance?.suggestionId,
+        suggestion: input.acceptance?.suggestionId,
+      },
+
+      expectedHead: "head" in input.expects ? input.expects.head : ANY_HEAD,
+      at,
     },
-
-    expectedHead: "head" in input.expects ? input.expects.head : ANY_HEAD,
-    at,
-  });
+    (fresh, tx, landing) => landWrite(fresh, tx, write, row, landing),
+  );
+  if (committed.ok || !(committed.error instanceof Error)) return committed;
+  const named = refusalFor(committed.error, WRITE_CONSTRAINTS);
+  return err(typeof named === "string" ? named : committed.error);
 };
 
 const landWrite = async (
-  principal: UserPrincipal,
-  postgres: PostgresDoor,
+  fresh: UserPrincipal,
+  tx: Tx,
   write: ParsedWrite,
   row: IndexRow,
   committed: Committed,
-): Promise<Result<void, WriteConceptRefusal | Error>> => {
-  const landed = await attempt(() =>
-    withMember(principal, postgres, async (fresh, tx) => {
-      const acceptance = write.input.acceptance;
-      if (acceptance === undefined) {
-        await record(fresh, tx, {
-          id: write.auditEventId,
-          action: CONCEPT_ACTIONS.committed,
-          subjectId: row.iri,
-          detail: {
-            iri: row.iri,
-            commitSha: committed.sha,
-            contentHash: write.contentHash,
-            evidenceCount: write.evidence.length,
-          },
-        });
-      } else {
-        await record(fresh, tx, {
-          id: write.auditEventId,
-          action: CONCEPT_ACTIONS.accepted,
-          subjectId: acceptance.suggestionId,
-          batchId: acceptance.batchId,
-          detail: {
-            iri: row.iri,
-            commitSha: committed.sha,
-            contentHash: write.contentHash,
-            setId: acceptance.setId,
-          },
-        });
-      }
-      await landRows(fresh, tx, {
-        ...row,
-        mergeKey: write.mergeKey,
-        commit: committed,
-        actor: actorIdOf(fresh),
-        auditEventId: write.auditEventId,
-        sources: write.sources,
-        evidence: write.evidence,
-        restsAlsoOn: [],
-        acceptance,
-      });
-    }),
-  );
-  if (landed.ok) return landed.value;
-  const named = refusalFor(landed.error, WRITE_CONSTRAINTS);
-  return err(typeof named === "string" ? named : landed.error);
+): Promise<void> => {
+  const acceptance = write.input.acceptance;
+  if (acceptance === undefined) {
+    await record(fresh, tx, {
+      id: write.auditEventId,
+      action: CONCEPT_ACTIONS.committed,
+      subjectId: row.iri,
+      detail: {
+        iri: row.iri,
+        commitSha: committed.sha,
+        contentHash: write.contentHash,
+        evidenceCount: write.evidence.length,
+      },
+    });
+  } else {
+    await record(fresh, tx, {
+      id: write.auditEventId,
+      action: CONCEPT_ACTIONS.accepted,
+      subjectId: acceptance.suggestionId,
+      batchId: acceptance.batchId,
+      detail: {
+        iri: row.iri,
+        commitSha: committed.sha,
+        contentHash: write.contentHash,
+        setId: acceptance.setId,
+      },
+    });
+  }
+  await landRows(fresh, tx, {
+    ...row,
+    mergeKey: write.mergeKey,
+    commit: committed,
+    actor: actorIdOf(fresh),
+    auditEventId: write.auditEventId,
+    sources: write.sources,
+    evidence: write.evidence,
+    restsAlsoOn: [],
+    acceptance,
+  });
 };
 
 export type AcceptanceDecision = {

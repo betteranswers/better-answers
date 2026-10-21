@@ -29,7 +29,7 @@ The bundle is a bare git repository per workspace (ADR 0024). Only the api write
 - Each action makes one commit, under the per-repository lock. The lock is held from the hash precondition through the Postgres COMMIT.
 - The lock has two parts, taken in turn: a queue inside the process, then a Postgres advisory lock on the workspace (`hashtext('bundle')`, `hashtext(<workspace id>)`). The advisory lock makes it hold across processes. Every write and the reconciler hold it shared. A history rewrite holds it alone. The reconciler never waits for it: it skips a workspace whose lock is taken. A pool holds at most three at once, so the lock never takes the whole pool.
 - The `audit_event` id is minted first and carried in the commit's `Audit:` trailer.
-- The action's rows are written in one transaction the slice owns. So `bundle_commit` history is always a prefix of git history.
+- The action's rows are written in one transaction the slice owns: the one whose member read admitted the commit, after git has the commit. So `bundle_commit` history is always a prefix of git history.
 - Writing the manifest, `knowledge/manifest.yaml` inside the bundle, is such a commit too (`writeManifest`). It lands no concept row.
 - Platform-prepared changes wait as suggestions. Nothing platform-prepared reaches the bundle without acceptance.
 - A person who may not commit a change prepares a suggestion of the kind *edit*: an edit to a concept's text from a guide page by anyone but the concept's owner or an Admin, an edit to a Brief by a reader who may not edit compositions, or a missing fact offered as a new concept. The suggestion records the proposer and the content hash it was written against, so an acceptance over a body that moved fails and returns to the proposer. The target's owner or an Admin decides it, in the guide page or the owner's Inbox, and the acceptance is the same governed write: one commit, the proposer as git author, the platform bot as committer, the accepter on the audit event. A *promotion* is decided by the `Answer` collection's owner or an Admin (ADR 0017). Every other kind is decided by an Admin. The owner's or an Admin's own edit from the page commits directly, after the page has stated the consequence and, where the concept is used in more than one place, asked once.
@@ -44,7 +44,7 @@ The reconciler replays the missed commits, oldest first, under `process:better-a
 - A commit the index refuses stops the replay there. It is reported, never skipped.
 - A live write on an unrecorded head fails on the parent key (`bundle_commit_parent_fk`), and the next tick heals it.
 
-A revocation inside the action's window does not stop the replay: the role is judged at time-of-action. Unwanted content is undone by a forward revert, never by a history rewrite.
+The role is judged at time-of-action, once, by the member read that admits the commit. That transaction holds the member row from the read through the landing. A revocation or a member's end that arrives after the read waits for the landing, and the action is answered as landed. An action is answered as refused only when nothing reached git or the landing failed. A commit whose landing failed is still replayed, even when a revocation came after the read. Unwanted content is undone by a forward revert, never by a history rewrite.
 
 Moving a ref back to its watermark is the operator's plumbing, written down on a runbook page: `docs/operations/RUNBOOK.md`, page 10, *A workspace is stuck behind a commit*. It is not a history rewrite, since it drops only commits no row recorded. It is not an ops command either. It is rehearsed on staging, against a made-up stuck bundle, before the first customer's data is on the box.
 
@@ -55,7 +55,8 @@ Moving a ref back to its watermark is the operator's plumbing, written down on a
 - The row written at commit time is what makes a changed atom flag its write-ups now, not after a worker job.
 - The id is minted first for the reconciler alone. An id minted after the commit would leave the trailer empty exactly when the row was never written. That is the one case the reconciler exists for.
 - The lock spanning both stores gives the prefix invariant, so the replay reads from a watermark and never hunts for holes.
-- The transport's own transaction is not used: a transaction held open across a git commit waits on a subprocess. The one exception is the member's row, held `FOR SHARE` across that member's commit. So an erasure's member delete waits until the commit is in git, or until the commit's one-minute budget runs out and it fails (ADR 0020).
+- The transport's own transaction is not used: a transaction held open across a git commit waits on a subprocess. The one exception is the member's row, held `FOR SHARE` across that member's commit and the landing after it. So an erasure's member delete waits until the commit has landed, or until the commit's one-minute budget runs out and it fails (ADR 0020).
+- The landing shares the commit's transaction so the answer agrees with the outcome. When the landing had a transaction of its own, a revocation could land between the two. The person was answered `credentials-revoked`, and the reconciler landed the commit later.
 - A widening is an Admin's recorded action, so a recovery never guesses a wider sensitivity.
 - The commits after the watermark were never recorded, so no reader was ever served them. One ref moves and no object is rewritten. It stays a procedure because the question is whether to make the move at all, and no flag holds that judgement.
 
@@ -74,3 +75,5 @@ Moving a ref back to its watermark is the operator's plumbing, written down on a
 The full record, with its amendments (ticket 19, ticket 24, ticket 74, ticket 79 applied by T-001, T-020, T-073, T-052, T-056, T-108, T-308, T-370, and a wording fix of 27/09/2026): `docs/archive/adr/0012-the-concept-write-path.md`. The *edit* kind and the owner's arm, the archived amendment of 27/08/2026, were missing from this doc until 20/10/2026, when the route's rewrite found S3 resting on them.
 
 The promotion sentence was corrected on 20/10/2026, after a sample of the map tickets found it contradicting ADR 0017, which gives a *promotion* to the `Answer` collection's owner or an Admin.
+
+On 21/10/2026 the landing moved into the commit's member transaction (BA-221). Until then, a revocation inside the action's window answered the action as refused, and the replay landed it.

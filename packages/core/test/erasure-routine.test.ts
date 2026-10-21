@@ -3223,7 +3223,7 @@ describe("a commit made as the person while the routine runs", () => {
     expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
   });
 
-  it("ends the member after a commit underway, then rewrites it", async () => {
+  it("ends the member once a commit underway lands, then rewrites", async () => {
     const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
     const member = { workspaceId: scenario.workspaceId, userId: person.id };
     const gate = await gatingRefUpdates(scenario);
@@ -3248,14 +3248,14 @@ describe("a commit made as the person while the routine runs", () => {
     );
 
     expect(done.ok).toBe(true);
-    expect(met).toEqual({ ok: false, error: "not-a-member" });
+    expect(met).toMatchObject({ ok: true });
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(3);
     expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
 
     const swept = await reconcile(RECONCILER, doorsOf(scenario), {
       workspaceId: scenario.workspaceId,
     });
-    expect(swept.ok && swept.value.replayed).toHaveLength(1);
+    expect(swept.ok && swept.value.replayed).toHaveLength(0);
     const erased = `human:${await pseudonymIn(scenario.workspaceId)}`;
     expect(await actorsIn("bundle_commit", scenario.workspaceId)).toEqual([erased, erased, erased]);
   });
