@@ -8,6 +8,7 @@ import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page-head.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
+import { onTheRowInFocus, rowInFocus } from "@/shared/row-focus.ts";
 import { counted } from "@/shared/words.ts";
 
 import { ConnectAction } from "./connect-action.tsx";
@@ -204,7 +205,6 @@ export function ConnectedSourcesPage() {
   usePageKeystrokes(LISTED);
   const connectedSources = useConnectedSources();
   const listId = useId();
-  const [inFocus, setInFocus] = useState<string>();
   const [reviewing, setReviewing] = useState<string>();
   const [publishing, setPublishing] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
@@ -249,28 +249,20 @@ export function ConnectedSourcesPage() {
     else opening({ change: "widen", connectedSourceId: connectedSource.connectedSourceId });
   };
 
-  const connectedSourceInFocusOrTell = (): ListedConnectedSource | undefined => {
-    const connectedSource = connectedSourceOf(inFocus);
-    if (connectedSource === undefined) setOutcome(NOTHING_IN_FOCUS);
-    return connectedSource;
-  };
-  useKeystroke(SOURCES_KEYSTROKES.review, () => {
-    const connectedSource = connectedSourceInFocusOrTell();
-    if (connectedSource === undefined || heldAndSaid()) return;
-    review(connectedSource.connectedSourceId);
-  });
-  useKeystroke(SOURCES_KEYSTROKES.publish, () => {
-    const connectedSource = connectedSourceInFocusOrTell();
-    if (connectedSource !== undefined) publish(connectedSource);
-  });
-  useKeystroke(SOURCES_KEYSTROKES.narrow, () => {
-    const connectedSource = connectedSourceInFocusOrTell();
-    if (connectedSource !== undefined) narrow(connectedSource);
-  });
-  useKeystroke(SOURCES_KEYSTROKES.widen, () => {
-    const connectedSource = connectedSourceInFocusOrTell();
-    if (connectedSource !== undefined) widen(connectedSource);
-  });
+  const acting = onTheRowInFocus(
+    () => rowInFocus(listed, (each) => each.connectedSourceId),
+    setOutcome,
+    NOTHING_IN_FOCUS,
+  );
+  useKeystroke(
+    SOURCES_KEYSTROKES.review,
+    acting((connectedSource) => {
+      if (!heldAndSaid()) review(connectedSource.connectedSourceId);
+    }),
+  );
+  useKeystroke(SOURCES_KEYSTROKES.publish, acting(publish));
+  useKeystroke(SOURCES_KEYSTROKES.narrow, acting(narrow));
+  useKeystroke(SOURCES_KEYSTROKES.widen, acting(widen));
 
   const toPublish = connectedSourceOf(publishing);
 
@@ -297,7 +289,6 @@ export function ConnectedSourcesPage() {
           <ConnectedSourceList
             connectedSources={listed}
             actions={{
-              onFocusConnectedSource: setInFocus,
               onReview: reviewOrClose,
               onPublish: publish,
               onNarrow: (connectedSource) => {

@@ -23,6 +23,7 @@ import {
   countOf,
   flagTheName,
   keystrokesDismissed,
+  keystrokesButton,
   keystrokesListed,
   markTheOperator,
   navOf,
@@ -399,6 +400,21 @@ test.describe("the console's Everyone page", () => {
     await expect(everyone(page)).not.toContainText(NOT_THE_OPERATOR);
     await expect(everyone(page).getByRole("table")).toHaveCount(0);
     await saysOfItsRead(everyone(page));
+  });
+
+  test("opens no person by key after focus leaves the list", async ({ page, request }) => {
+    await priyaListed(page, request, aTag());
+    await expect(personRows(page)).toHaveCount(2);
+    const said = outcomeOf(everyone(page));
+    await expect(said, "the list says nothing at rest").toHaveText("");
+    await personButton(page, "Priya Shah").focus();
+    await keystrokesButton(page).focus();
+
+    for (const key of ["o", "r", "c"]) {
+      await page.keyboard.press(key);
+      await expect(said, `${key} with no person in focus said nothing`).toHaveText(/\S/);
+      await expect(page.getByRole("dialog"), `${key} opened a person not in focus`).toHaveCount(0);
+    }
   });
 
   test("is keyboard-operable, sounds like a table and passes axe", async ({
@@ -999,6 +1015,20 @@ test.describe("the console's Names Waiting page", () => {
     await expect(waitingRowOf(page, name)).toHaveCount(0);
     await expect(outcomeOf(namesWaiting(page))).toHaveText(/\S/);
     await expect(page).toHaveURL(NAMES_WAITING_PAGE);
+  });
+
+  test("corrects no name by key after focus leaves the list", async ({ page, request }) => {
+    const { name } = await priyaFlagged(page, request, aTag());
+    await page.goto(NAMES_WAITING_PAGE);
+    const said = outcomeOf(namesWaiting(page));
+    await expect(correctButtonOf(page, name)).toBeVisible();
+    await expect(said, "the list says nothing at rest").toHaveText("");
+    await correctButtonOf(page, name).focus();
+    await keystrokesButton(page).focus();
+
+    await page.keyboard.press("c");
+    await expect(said, "c with no name in focus said nothing").toHaveText(/\S/);
+    await expect(page.getByRole("dialog"), "c corrected a name not in focus").toHaveCount(0);
   });
 
   test("is keyboard-operable and lists its keystrokes", async ({ page, request }) => {

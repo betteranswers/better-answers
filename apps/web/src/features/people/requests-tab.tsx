@@ -7,7 +7,7 @@ import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { ListRead, ListState, NothingListed } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
-import { rowInFocus } from "@/shared/row-focus.ts";
+import { onTheRowInFocus, rowInFocus, type Saying } from "@/shared/row-focus.ts";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { Card } from "@/shared/ui/card.tsx";
 import { counted, nothingMatches } from "@/shared/words.ts";
@@ -68,16 +68,11 @@ const useInFocusKeystrokes = (properties: {
   readonly inFocus: () => WaitingRequest | undefined;
   readonly approve: (request: WaitingRequest) => void;
   readonly decline: (request: WaitingRequest) => void;
-  readonly nothingInFocus: () => void;
+  readonly say: Saying;
 }) => {
-  const { nothingInFocus } = properties;
-  const onTheRowInFocus = (act: (request: WaitingRequest) => void) => () => {
-    const inFocus = properties.inFocus();
-    if (inFocus === undefined) nothingInFocus();
-    else act(inFocus);
-  };
-  useKeystroke(KEY.approve, onTheRowInFocus(properties.approve));
-  useKeystroke(KEY.decline, onTheRowInFocus(properties.decline));
+  const acting = onTheRowInFocus(properties.inFocus, properties.say, NOTHING_IN_FOCUS);
+  useKeystroke(KEY.approve, acting(properties.approve));
+  useKeystroke(KEY.decline, acting(properties.decline));
 };
 
 function RequestsList(properties: {
@@ -153,9 +148,7 @@ function RequestsList(properties: {
     inFocus: () => rowInFocus(data, (request) => request.id),
     approve: toApprove,
     decline: declined,
-    nothingInFocus: () => {
-      setOutcome(NOTHING_IN_FOCUS);
-    },
+    say: setOutcome,
   });
 
   return (

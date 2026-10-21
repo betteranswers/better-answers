@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { keyedRow } from "@/shared/row-focus.ts";
 import { SummaryRow as Row } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
@@ -27,7 +28,6 @@ import {
 } from "./words.ts";
 
 type ConnectedSourceActions = {
-  readonly onFocusConnectedSource: (connectedSourceId: string) => void;
   readonly onReview: (connectedSourceId: string) => void;
   readonly onPublish: (connectedSource: ListedConnectedSource) => void;
   readonly onNarrow: (connectedSource: ListedConnectedSource) => void;
@@ -51,22 +51,14 @@ const audienceWords = (connectedSource: ListedConnectedSource): string => {
   return named === 0 ? words : `${words} (${counted(named, "group", "groups")})`;
 };
 
-function MoreAbout(properties: {
-  readonly connectedSource: ListedConnectedSource;
-  readonly onFocus: () => void;
-}) {
+function MoreAbout(properties: { readonly connectedSource: ListedConnectedSource }) {
   const { connectedSource } = properties;
   const needingOcr = connectedSource.unreadableByReason[NEEDS_OCR] ?? 0;
 
   return (
     <Collapsible className="mt-2">
       <CollapsibleTrigger asChild>
-        <Button
-          variant="link"
-          size="sm"
-          className="h-auto px-0 text-left whitespace-normal"
-          onFocus={properties.onFocus}
-        >
+        <Button variant="link" size="sm" className="h-auto px-0 text-left whitespace-normal">
           More Details
           <span className="sr-only"> {connectedSource.name}</span>
         </Button>
@@ -114,7 +106,6 @@ function RowAction(properties: {
   readonly name: string;
   readonly expanded?: boolean;
   readonly held?: boolean;
-  readonly onFocus: () => void;
   readonly onPress: () => void;
 }) {
   return (
@@ -126,7 +117,6 @@ function RowAction(properties: {
       aria-disabled={properties.held ? true : undefined}
       className="aria-disabled:opacity-50"
       aria-keyshortcuts={SOURCES_KEYSTROKES[properties.action].key}
-      onFocus={properties.onFocus}
       onClick={properties.onPress}
     >
       {ROW_ACTIONS[properties.action]}
@@ -141,9 +131,8 @@ function RowActions(properties: {
   readonly reviewing: boolean;
   readonly reviewHeld: boolean;
   readonly changing: SensitivityChange | undefined;
-  readonly onFocus: () => void;
 }) {
-  const { connectedSource, actions, onFocus } = properties;
+  const { connectedSource, actions } = properties;
   const { name } = connectedSource;
 
   return (
@@ -153,7 +142,6 @@ function RowActions(properties: {
         name={name}
         expanded={properties.reviewing}
         held={properties.reviewHeld}
-        onFocus={onFocus}
         onPress={() => {
           actions.onReview(connectedSource.connectedSourceId);
         }}
@@ -162,7 +150,6 @@ function RowActions(properties: {
         <RowAction
           action="publish"
           name={name}
-          onFocus={onFocus}
           onPress={() => {
             actions.onPublish(connectedSource);
           }}
@@ -173,7 +160,6 @@ function RowActions(properties: {
           action="narrow"
           name={name}
           expanded={properties.changing === "narrow"}
-          onFocus={onFocus}
           onPress={() => {
             actions.onNarrow(connectedSource);
           }}
@@ -184,7 +170,6 @@ function RowActions(properties: {
           action="widen"
           name={name}
           expanded={properties.changing === "widen"}
-          onFocus={onFocus}
           onPress={() => {
             actions.onWiden(connectedSource);
           }}
@@ -203,13 +188,11 @@ function ConnectedSourceItem(properties: {
 }) {
   const { connectedSource, actions } = properties;
   const headingId = connectedSourceHeadingId(connectedSource.connectedSourceId);
-  const focused = () => {
-    actions.onFocusConnectedSource(connectedSource.connectedSourceId);
-  };
 
   return (
     <li
       aria-labelledby={headingId}
+      {...keyedRow(connectedSource.connectedSourceId)}
       className="border-t border-border py-4 first:border-t-0 first:pt-0"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -222,7 +205,6 @@ function ConnectedSourceItem(properties: {
           reviewing={properties.reviewing}
           reviewHeld={properties.reviewHeld}
           changing={properties.panel?.change}
-          onFocus={focused}
         />
       </div>
 
@@ -238,7 +220,7 @@ function ConnectedSourceItem(properties: {
         <Row term="Last Synced">{lastSyncedWords(connectedSource.lastSync)}</Row>
       </dl>
 
-      <MoreAbout connectedSource={connectedSource} onFocus={focused} />
+      <MoreAbout connectedSource={connectedSource} />
       {properties.panel?.part}
       {properties.reviewing ? <Review connectedSource={connectedSource} /> : null}
     </li>

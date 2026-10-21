@@ -1,6 +1,10 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { MEMBER_PAGE_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
+import {
+  MEMBER_PAGE_KEYSTROKES,
+  PEOPLE_KEYSTROKES,
+  PEOPLE_SELECT_FIRST,
+} from "@/features/people/people-state.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -923,6 +927,24 @@ test.describe("a member's own page", () => {
     await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.open.key);
   });
 
+  test("drops the select-first line once a key ticks a member", async ({ page, request }) => {
+    await skippedToMembers(page, request, "Calder Ticking");
+    const said = membersRegion(page).getByText(PEOPLE_SELECT_FIRST.member);
+
+    for (const { key } of [PEOPLE_KEYSTROKES.tick, PEOPLE_KEYSTROKES.changeSelectedRoles]) {
+      await listHeading(page).focus();
+      await page.keyboard.press(key);
+      await expect(said, `${key} with no member in focus or ticked said nothing`).toHaveCount(1);
+
+      await tickOf(page, "Priya Shah").focus();
+      await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
+      await expect(tickOf(page, "Priya Shah")).toBeChecked();
+      await expect(said, `the select-first line of ${key} outlived the tick`).toHaveCount(0);
+      await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
+      await expect(tickOf(page, "Priya Shah")).not.toBeChecked();
+    }
+  });
+
   test("opens a member and changes their role by keyboard alone", async ({ page, request }) => {
     await skippedToMembers(page, request, "Calder Rolling");
 
@@ -1787,6 +1809,16 @@ test.describe("bulk actions on the members ticked", () => {
       await expect(rowOf(page, name).getByText("Refused", { exact: true })).toBeVisible();
       await expect(cellOf(page, name, "Role")).toHaveText("Admin");
     }
+    await tickOf(page, "Test person").focus();
+    await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
+    await expect(tickOf(page, "Test person")).not.toBeChecked();
+    await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
+    await expect(tickOf(page, "Test person")).toBeChecked();
+    await expect(refusal.getByRole("listitem"), "a tick by key wiped the refusal").toHaveCount(2);
+    await expect(
+      rowOf(page, "Test person").getByText("Refused", { exact: true }),
+      "a tick by key wiped the row's mark",
+    ).toBeVisible();
     await expect(selectionBar(page).getByRole("status")).toHaveText(TWO_TICKED);
     await passesTheAccessibilityGate();
   });

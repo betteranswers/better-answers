@@ -1,9 +1,32 @@
+import type { Outcome } from "@/shared/outcome.tsx";
+
+export type Saying = (next: (said: Outcome | undefined) => Outcome | undefined) => void;
+
 export const keyedRow = (key: string) => ({ "data-row": key });
 
 export const rowInFocus = <Row>(
   rows: readonly Row[],
   keyOf: (row: Row) => string,
 ): Row | undefined => {
-  const key = document.activeElement?.closest("[data-row]")?.getAttribute("data-row");
-  return rows.find((row) => keyOf(row) === key);
+  let keyed = document.activeElement?.closest("[data-row]");
+  while (keyed) {
+    const key = keyed.getAttribute("data-row");
+    const row = rows.find((each) => keyOf(each) === key);
+    if (row !== undefined) return row;
+    keyed = keyed.parentElement?.closest("[data-row]");
+  }
+  return undefined;
 };
+
+export const onTheRowInFocus =
+  <Row>(inFocus: () => Row | undefined, say: Saying, selectFirst: Outcome) =>
+  (act: (row: Row) => void) =>
+  () => {
+    const row = inFocus();
+    if (row === undefined) {
+      say(() => selectFirst);
+      return;
+    }
+    say((said) => (said?.words === selectFirst.words ? undefined : said));
+    act(row);
+  };

@@ -13,6 +13,7 @@ import {
   countOf,
   editorPickedByKeyboard,
   keyListed,
+  keystrokesButton,
   keystrokesListed,
   notFoundOfferingHome,
   person,
@@ -291,6 +292,24 @@ test.describe("the People page's Requests tab", () => {
     await expect(rowOf(page, "Priya Shah")).toHaveCount(1);
   });
 
+  test("drops the select-first line once a key approves", async ({ page, request }) => {
+    await anAdminAtRequests(page, request, "Calder Asks", [{ displayName: "Kept Lee" }]);
+    await openRequests(page);
+    await expect(requestRows(page)).toHaveCount(1);
+    const said = page
+      .getByRole("region", { name: "Requests", includeHidden: true })
+      .locator("output:has(+ [role='alert'])");
+    await keystrokesButton(page).focus();
+
+    await page.keyboard.press(PEOPLE_KEYSTROKES.approve.key);
+    await expect(said, "a with no request in focus said nothing").toHaveText(/\S/);
+
+    await page.getByRole("button", { name: "Approve Request from Kept Lee" }).focus();
+    await page.keyboard.press(PEOPLE_KEYSTROKES.approve.key);
+    await expect(approveDialog(page, "Kept Lee")).toBeVisible();
+    await expect(said, "the select-first line outlived the approve").toHaveText("");
+  });
+
   test("an Admin decides requests by keyboard alone", async ({
     page,
     request,
@@ -342,6 +361,9 @@ test.describe("the People page's Requests tab", () => {
     await expect(approving.getByRole("combobox", { name: "Role" })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(approving).toHaveCount(0);
+    await expect(saidIn(page), "an approve key wiped the decline's outcome").toContainText(
+      "Dropped Ray",
+    );
     await expect(
       page.getByRole("button", { name: "Decline Request from Approved Kay" }),
     ).toBeFocused();

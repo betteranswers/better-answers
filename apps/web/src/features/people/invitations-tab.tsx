@@ -7,7 +7,7 @@ import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
-import { rowInFocus } from "@/shared/row-focus.ts";
+import { onTheRowInFocus, rowInFocus, type Saying } from "@/shared/row-focus.ts";
 import { RowMenu } from "@/shared/row-menu.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
@@ -157,17 +157,12 @@ const useInFocusKeystrokes = (properties: {
   readonly resend: (invitation: ListedInvitation) => void;
   readonly cancel: (invitation: ListedInvitation) => void;
   readonly tick: (invitation: ListedInvitation) => void;
-  readonly nothingInFocus: () => void;
+  readonly say: Saying;
 }) => {
-  const { nothingInFocus } = properties;
-  const onTheRowInFocus = (action: (invitation: ListedInvitation) => void) => () => {
-    const inFocus = properties.inFocus();
-    if (inFocus === undefined) nothingInFocus();
-    else action(inFocus);
-  };
-  useKeystroke(KEY.resend, onTheRowInFocus(properties.resend));
-  useKeystroke(KEY.cancel, onTheRowInFocus(properties.cancel));
-  useKeystroke(KEY.tickInvitation, onTheRowInFocus(properties.tick));
+  const acting = onTheRowInFocus(properties.inFocus, properties.say, NOTHING_IN_FOCUS);
+  useKeystroke(KEY.resend, acting(properties.resend));
+  useKeystroke(KEY.cancel, acting(properties.cancel));
+  useKeystroke(KEY.tickInvitation, acting(properties.tick));
 };
 
 const rowMenuOf =
@@ -241,9 +236,7 @@ function InvitationList(properties: {
       if (!next.delete(invitation.invitationId)) next.add(invitation.invitationId);
       setTicked(tick(next));
     },
-    nothingInFocus: () => {
-      setOutcome(NOTHING_IN_FOCUS);
-    },
+    say: setOutcome,
   });
 
   return (
