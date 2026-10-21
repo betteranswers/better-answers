@@ -642,6 +642,19 @@ test.describe("the Knowledge Search page", () => {
     });
   }
 
+  test("closes a passage opened as the search empties", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Nidd Bins", [forkliftGuideSeeded]);
+    await searched(page, "forklift");
+
+    await searchBox(page).fill("");
+    await matchesOf(page).getByRole("button", { name: FORKLIFT_GUIDE }).click();
+
+    await expect(
+      passagePanel(page, FORKLIFT_GUIDE),
+      "a passage stayed open beside an empty search",
+    ).toHaveCount(0);
+  });
+
   test("hands Tab from the open panel back to its opener", async ({
     page,
     request,
