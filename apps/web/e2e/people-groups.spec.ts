@@ -320,6 +320,16 @@ test.describe("a group's actions", () => {
     await expect(countOf(groupsRegion(page))).toHaveText(/\b2\b/);
   });
 
+  test("takes a search written into the address by hand", async ({ page, request }) => {
+    await anAdminAtGroups(page, request, "Ure Weir", ["Team 42"]);
+
+    await page.goto(`${GROUPS_PAGE}?groups.search=42`);
+
+    await expect(searchBox(page)).toHaveValue("42");
+    await expect(rowOf(page, "Team 42")).toHaveCount(1);
+    await expect(countOf(groupsRegion(page))).toHaveText(/1 of 3 groups match/);
+  });
+
   test("keeps search focus as a created row leaves and returns", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Esk Weir");
     await groupsRegion(page).getByRole("button", { name: "Create a Group" }).click();

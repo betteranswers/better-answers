@@ -111,6 +111,15 @@ describe("a searched list, its search settled into the address", () => {
     expect(box().value).toBe("pri");
   });
 
+  it.each(["1.5", "true", "null", "42"])(
+    "takes %s written into the address by hand",
+    async (typed) => {
+      await openList(`/list?list.search=${typed}`);
+
+      expect(box().value).toBe(typed);
+    },
+  );
+
   it("takes a search the address gained from outside the box", async () => {
     const { router, at } = await openList("/list?list.search=priya");
     expect(box().value).toBe("priya");
