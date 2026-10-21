@@ -11,12 +11,12 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { AccountLink } from "./account-link.tsx";
 import {
-  hasADisplayName,
   useOAuthContinue,
   useSession,
   useSetActiveOrganization,
   useWorkspacesHeld,
   type ResumeAnswer,
+  type SessionRead,
   type SwitchRefused,
 } from "./auth-hooks.ts";
 import { AuthPage } from "./auth-page.tsx";
@@ -25,7 +25,6 @@ import { CONNECTION_UNFINISHED, noLongerAMember, SOLE_PICK_REFUSED } from "./ref
 import { SignOutButton } from "./sign-out-button.tsx";
 import { NOT_CONNECTED, PICKER_ACTIONS, PICKER_WORDS } from "./workspace-words.ts";
 
-type Session = ReturnType<typeof useSession>;
 type Workspaces = ReturnType<typeof useWorkspacesHeld>;
 type Workspace = NonNullable<Workspaces["data"]>[number];
 
@@ -40,15 +39,21 @@ const addressIn = (answer: ResumeAnswer): string | undefined => {
   return typeof next === "string" && next !== "" ? next : undefined;
 };
 
-const whatTheSessionSays = (session: Session) => ({
-  signedOut: !session.isPending && (session.data === null || session.data === undefined),
-  unnamed:
-    session.data !== null && session.data !== undefined && !hasADisplayName(session.data.user.name),
-  active: session.data?.session.activeOrganizationId ?? undefined,
+const GOES_TO_SIGN_IN = {
+  reading: false,
+  unread: true,
+  "signed-out": true,
+  "signed-in": false,
+} as const satisfies Record<SessionRead["state"], boolean>;
+
+const whatTheSessionSays = (read: SessionRead) => ({
+  toSignIn: GOES_TO_SIGN_IN[read.state],
+  unnamed: read.state === "signed-in" && read.person.displayName === undefined,
+  active: read.state === "signed-in" ? read.session.workspaceId : undefined,
 });
 
 const whereThePersonStands = (
-  session: Session,
+  session: SessionRead,
   workspaces: Workspaces,
   noLongerHeld: Workspace | undefined,
 ) => {
@@ -57,7 +62,7 @@ const whereThePersonStands = (
     ...whatTheSessionSays(session),
     held,
     sole: held.length === 1 ? held[0] : undefined,
-    settled: !session.isPending && !workspaces.isPending,
+    settled: session.state !== "reading" && !workspaces.isPending,
   };
 };
 
@@ -99,7 +104,7 @@ export function ChooseWorkspacePage() {
   const [wentNowhere, setWentNowhere] = useState(false);
   const [noLongerHeld, setNoLongerHeld] = useState<Workspace | undefined>(undefined);
 
-  const { signedOut, unnamed, held, sole, active, settled } = whereThePersonStands(
+  const { toSignIn, unnamed, held, sole, active, settled } = whereThePersonStands(
     session,
     workspaces,
     noLongerHeld,
@@ -161,7 +166,7 @@ export function ChooseWorkspacePage() {
   const decided = settled && !pick.isPending && resume.isIdle && !wentNowhere;
   useEffect(() => {
     if (!decided) return;
-    if (signedOut) {
+    if (toSignIn) {
       void navigate(leavingFor(`/sign-in${carried}`));
       return;
     }
@@ -179,7 +184,7 @@ export function ChooseWorkspacePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- adding `openSoleWorkspace` re-runs this on every render and resumes a flow that is already resuming
   }, [
     decided,
-    signedOut,
+    toSignIn,
     unnamed,
     held.length,
     workspaces.isError,

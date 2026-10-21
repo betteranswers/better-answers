@@ -4,7 +4,7 @@ The repository's own gate tooling. **It is imported and never deployed** — `pa
 is imported, `apps/` is what deploys (ADR 0029) — so nothing under `apps/` copies this
 directory into an image, and every dependency here is a development dependency.
 
-Fourteen things live here.
+Fifteen things live here.
 
 ## `src/throwaway-tree.ts` — the runner
 
@@ -363,6 +363,25 @@ The map is read from the tree the script runs in, so a throwaway tree carries it
 that read no file, or a map with no table, exits 2. `test/table-ownership-scan.test.ts` runs
 the script through the runner over a failing and a passing tree for each direction, a CTE
 named like a table, a file under no owner, and an owner nested in another's directory.
+
+## `src/auth-seam-scan.ts` — the auth seam scan
+
+Better Auth's types stay inside the web's auth seam. The import lint lets only
+`features/auth/auth-hooks.ts` import `authClient`, so the one way left for the library's shape to
+reach a page is the type of an export of that file. `scripts/auth-seam-scan.mjs` — `pnpm
+auth-seam-scan`, a root `check` step — asks TypeScript for that file's declarations
+(`--emitDeclarationOnly`, over a config extending the workspace's own) and reads what it wrote.
+It refuses a declaration that names `better-auth`, `@better-auth/*` or `better-fetch`, naming the
+export, and any error TypeScript reports in the seam itself. TypeScript writes no declaration for
+a file whose inferred export type it cannot name (TS2883), so such an export has to be written out
+before the declarations can be read. Errors in the files the seam imports are not read. A run in
+which TypeScript wrote no declaration and named no reason exits 2.
+
+Reading the declarations TypeScript writes, rather than the source, catches an inferred type
+however the export reaches it: a destructured or default export, a re-export, a wrapper.
+`test/auth-seam-scan.test.ts` runs the script through the runner over a throwaway workspace with
+a stub `better-auth`, both ways, over an export TypeScript cannot name, and over an error in a file
+beside the seam.
 
 ## `python/port_scan.py` — the port scan
 

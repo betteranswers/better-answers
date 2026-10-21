@@ -12,7 +12,7 @@ import {
   passkeyNameFor,
   RECOVERY_CODE_WORDS,
 } from "./account-words.ts";
-import { CodeRefused, useSession } from "./auth-hooks.ts";
+import { CodeRefused, emailOf, useSession } from "./auth-hooks.ts";
 import { AuthPage, Outcome, Refused } from "./auth-page.tsx";
 import { AuthenticatorSetup, COPY_KEY } from "./authenticator-part.tsx";
 import { leavingFor, pageQuery } from "./carried-flow.ts";
@@ -98,7 +98,7 @@ const headingRefOnMount = (node: HTMLHeadingElement | null): void => {
 function CodesToFinish(properties: { readonly inHand: CodesInHand; readonly query: string }) {
   const navigate = useNavigate();
   const acknowledge = useAcknowledgeRecoveryCodes();
-  const address = useSession().data?.user.email ?? "";
+  const address = emailOf(useSession());
 
   return (
     <AuthPage>

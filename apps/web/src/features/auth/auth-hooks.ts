@@ -10,14 +10,16 @@ import {
   useQueryClient,
   type Query,
   type QueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import type { inferOutput } from "@trpc/tanstack-react-query";
+import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 import type { BetterFetchError } from "better-auth/client";
 import { useState } from "react";
 import { z } from "zod";
 
-import { useTRPC, type ApiProxy } from "@/shared/api/trpc.ts";
+import { useTRPC, type ApiError, type ApiProxy } from "@/shared/api/trpc.ts";
 import {
   forgetMember,
   leftFor,
@@ -65,7 +67,9 @@ type WorkspacesHeld = inferOutput<ApiProxy["person"]["workspaces"]>;
 const withTheRole = (held: WorkspacesHeld) =>
   held.map(({ workspace, role }) => ({ ...workspace, role }));
 
-export const useWorkspacesHeld = (asked = true) => {
+export const useWorkspacesHeld = (
+  asked = true,
+): UseQueryResult<ReturnType<typeof withTheRole>, ApiError> => {
   const api = useTRPC();
   return useQuery(
     api.person.workspaces.queryOptions(undefined, { enabled: asked, select: withTheRole }),
@@ -139,14 +143,71 @@ const ASKED_AGAIN_AT_MOST = 2;
 const askedAgainUnlessRefused = (failures: number, failure: Error): boolean =>
   !(failure instanceof CodeRefused) && failures < ASKED_AGAIN_AT_MOST;
 
+const hasADisplayName = (name: string): boolean => name.trim() !== "";
+
+type SignedInAs = {
+  readonly session: { readonly id: string; readonly workspaceId: string | undefined };
+  readonly person: { readonly email: string; readonly displayName: string | undefined };
+};
+
+export type SessionRead =
+  | { readonly state: "reading" }
+  | { readonly state: "unread" }
+  | { readonly state: "signed-out" }
+  | ({ readonly state: "signed-in" } & SignedInAs);
+
+export type SessionReread = Exclude<SessionRead, { readonly state: "reading" }>;
+
+type SessionAnswer = {
+  readonly session: {
+    readonly id: string;
+    readonly activeOrganizationId?: string | null | undefined;
+  };
+  readonly user: { readonly email: string; readonly name: string };
+} | null;
+
+const signedInAsOf = (answer: SessionAnswer): SignedInAs | null =>
+  answer === null
+    ? null
+    : {
+        session: {
+          id: answer.session.id,
+          workspaceId: answer.session.activeOrganizationId ?? undefined,
+        },
+        person: {
+          email: answer.user.email,
+          displayName: hasADisplayName(answer.user.name) ? answer.user.name : undefined,
+        },
+      };
+
 const sessionOptions = () =>
   queryOptions({
     queryKey: AUTH_KEYS.session,
-    queryFn: () => unwrapWithTheWait((reading) => authClient.getSession({ fetchOptions: reading })),
+    queryFn: () =>
+      unwrapWithTheWait((reading) => authClient.getSession({ fetchOptions: reading })).then(
+        signedInAsOf,
+      ),
     retry: askedAgainUnlessRefused,
   });
 
-export const useSession = () => useQuery(sessionOptions());
+const answeredAs = (answer: SignedInAs | null | undefined): SessionReread => {
+  if (answer === undefined) return { state: "unread" };
+  return answer === null ? { state: "signed-out" } : { state: "signed-in", ...answer };
+};
+
+export const emailOf = (read: SessionRead): string =>
+  read.state === "signed-in" ? read.person.email : "";
+
+export const useSession = (): SessionRead => {
+  const read = useQuery(sessionOptions());
+  return read.isPending ? { state: "reading" } : answeredAs(read.data);
+};
+
+export const useSessionReread = (): (() => Promise<SessionReread>) => {
+  const { refetch } = useQuery(sessionOptions());
+  return () =>
+    refetch().then((read) => (read.isError ? { state: "unread" } : answeredAs(read.data)));
+};
 
 const returnPathOf = (query: string): { readonly redirect?: string } => {
   const redirect = new URLSearchParams(query).get("redirect");
@@ -165,8 +226,6 @@ const sendVerificationOtpOptions = () =>
   });
 
 export const useSendVerificationOtp = () => useMutation(sendVerificationOtpOptions());
-
-export const hasADisplayName = (name: string): boolean => name.trim() !== "";
 
 export type SignedIn = { readonly displayNameGiven: boolean };
 
@@ -293,7 +352,7 @@ export const displayNameDetour = async (
   if (session === undefined) return undefined;
   if (session === null) return `/sign-in${query}`;
   const next = nextAfterSignIn(query);
-  return hasADisplayName(session.user.name) || isAnInvitation(next) ? next : undefined;
+  return session.person.displayName !== undefined || isAnInvitation(next) ? next : undefined;
 };
 
 export const signedOutDetour = async (
@@ -315,7 +374,13 @@ export const signedOutOfAStep = async (
 export const rereadTheSession = (queryClient: QueryClient): Promise<void> =>
   queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
 
-export const useSetDisplayName = () => {
+type PersonMutation<Name extends "setDisplayName" | "acceptInvitation"> = UseMutationResult<
+  inferOutput<ApiProxy["person"][Name]>,
+  ApiError,
+  inferInput<ApiProxy["person"][Name]>
+>;
+
+export const useSetDisplayName = (): PersonMutation<"setDisplayName"> => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   return useMutation(
@@ -327,7 +392,7 @@ export const useSetDisplayName = () => {
   );
 };
 
-export const useAcceptInvitation = () => {
+export const useAcceptInvitation = (): PersonMutation<"acceptInvitation"> => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   const navigate = useNavigate();

@@ -109,6 +109,10 @@ pre-push-gates:
       run: "{without-git-env} pnpm run table-ownership-scan"
       fail_text: "run it alone with pnpm run table-ownership-scan"
 
+    auth-seam-scan:
+      run: "{without-git-env} pnpm run auth-seam-scan"
+      fail_text: "run it alone with pnpm run auth-seam-scan"
+
     port-scan:
       run: "{without-git-env} pnpm run port-scan"
       fail_text: "run it alone with pnpm run port-scan"

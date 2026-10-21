@@ -14,8 +14,9 @@ import {
   CodeRefused,
   useArrival,
   useSendVerificationOtp,
-  useSession,
+  useSessionReread,
   useSignInEmailOtp,
+  type SessionReread,
   type SignedIn,
 } from "./auth-hooks.ts";
 import { AuthPage, focusOn, Outcome } from "./auth-page.tsx";
@@ -118,46 +119,27 @@ const saidOnTheEmailStep = (
   saidWhileSigningInWithAPasskey(passkey.pending, passkey.failure) ??
   saidOnArriving(arriving, arrival);
 
-type SessionRead = {
-  readonly isError: boolean;
-  readonly data:
-    | { readonly session: { readonly id: string }; readonly user: { readonly email: string } }
-    | null
-    | undefined;
-};
-
-const sessionIdOf = (read: SessionRead): string | null | undefined =>
-  read.isError ? undefined : (read.data?.session.id ?? null);
-
-const isANewSignInOf = (
-  read: SessionRead,
-  standing: string | null | undefined,
-  sentTo: string,
-): boolean => {
-  const id = sessionIdOf(read);
-  return (
-    standing !== undefined &&
-    typeof id === "string" &&
-    id !== standing &&
-    read.data?.user.email.toLowerCase() === sentTo.toLowerCase()
-  );
-};
+const isANewSignInOf = (read: SessionReread, before: SessionReread, sentTo: string): boolean =>
+  before.state !== "unread" &&
+  read.state === "signed-in" &&
+  (before.state === "signed-out" || read.session.id !== before.session.id) &&
+  read.person.email.toLowerCase() === sentTo.toLowerCase();
 
 function useFollowsASignInElsewhere(waiting: boolean, sentTo: string, follow: () => void) {
-  const session = useSession();
-  const standing = useRef<string | null | undefined>(undefined);
+  const reread = useSessionReread();
+  const before = useRef<SessionReread>({ state: "unread" });
   const readWhatStands = useEffectEvent(() => {
-    void session.refetch().then((read) => {
-      standing.current = sessionIdOf(read);
+    void reread().then((read) => {
+      before.current = read;
     });
   });
-  const followIfNew = useEffectEvent((read: SessionRead) => {
-    if (waiting && isANewSignInOf(read, standing.current, sentTo)) follow();
+  const followIfNew = useEffectEvent((read: SessionReread) => {
+    if (waiting && isANewSignInOf(read, before.current, sentTo)) follow();
   });
   const recheck = useEffectEvent(() => {
     if (!waiting) return;
-    if (standing.current === undefined) readWhatStands();
-    else void session.refetch().then(followIfNew);
+    if (before.current.state === "unread") readWhatStands();
+    else void reread().then(followIfNew);
   });
 
   useEffect(() => {

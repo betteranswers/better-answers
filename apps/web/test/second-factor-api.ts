@@ -54,6 +54,11 @@ const ADAS_SESSION = {
   user: { id: "p", name: "Ada", email: "ada@example.test" },
 };
 
+const SIGNED_IN_AS_ADA = {
+  session: { id: "s", workspaceId: undefined },
+  person: { email: "ada@example.test", displayName: "Ada" },
+};
+
 export const sessionStanding = (
   standing: "not-required" | "confirmed" | "confirm" | "setup",
   facts: { confirmed?: boolean; setupGranted?: boolean; adminOf?: string | null } = {},
@@ -180,7 +185,7 @@ const clientsAt = (path: string) => {
   globalThis.history.replaceState(null, "", path);
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false, retryDelay: 0 } });
-  clients.queryClient.setQueryData(["auth", "session"], ADAS_SESSION);
+  clients.queryClient.setQueryData(["auth", "session"], SIGNED_IN_AS_ADA);
   return clients;
 };
 

@@ -32,6 +32,11 @@ afterEach(() => {
 
 const SESSION = { session: { id: "s" }, user: { id: "p", name: "Ada", email: "ada@example.test" } };
 
+const SIGNED_IN_AS_ADA = {
+  session: { id: "s", workspaceId: undefined },
+  person: { email: "ada@example.test", displayName: "Ada" },
+};
+
 const NO_SET = {
   mustHoldOne: false,
   passkeys: [],
@@ -96,7 +101,7 @@ const adasApi =
 /** The session is held before the page opens: the auth library's own read never settles here. */
 const makeCodesPressed = async () => {
   const clients = createAppClients();
-  clients.queryClient.setQueryData(["auth", "session"], SESSION);
+  clients.queryClient.setQueryData(["auth", "session"], SIGNED_IN_AS_ADA);
   await openApp("/account", clients);
   fireEvent.click(await screen.findByRole("button", { name: "Make Recovery Codes" }));
 };
@@ -125,7 +130,7 @@ const accountOpened = async (held: unknown) => {
     ),
   );
   const clients = createAppClients();
-  clients.queryClient.setQueryData(["auth", "session"], SESSION);
+  clients.queryClient.setQueryData(["auth", "session"], SIGNED_IN_AS_ADA);
   await openApp("/account", clients);
 };
 

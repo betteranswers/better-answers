@@ -91,11 +91,15 @@ describe("imports run app \u2192 features \u2192 shared, never back", () => {
   });
 });
 
-describe("better-auth is named in the identity feature and nowhere else", () => {
-  it("allows the client in the identity feature, refuses it outside", () => {
+const HOOKS = "apps/web/src/features/auth/auth-hooks.ts";
+const CLIENT = "apps/web/src/features/auth/auth-client.ts";
+
+describe("better-auth is named in the auth seam and nowhere else", () => {
+  it("allows the library in the client and hooks alone", () => {
     const refused = flagged({
-      "apps/web/src/features/auth/auth-client.ts": probe("better-auth/client"),
-      "apps/web/src/features/auth/deep.ts": probe("better-auth/client/plugins"),
+      [CLIENT]: probe("better-auth/client"),
+      [HOOKS]: probe("better-auth/client/plugins"),
+      "apps/web/src/features/auth/sign-in-page.tsx": probe("better-auth/client"),
       "apps/web/src/features/auth/scoped.ts": probe("@better-auth/oauth-provider/client"),
       "apps/web/src/shared/ui/reaches-the-library.tsx": probe("better-auth/react"),
       "apps/web/src/features/model-choices/reaches-the-library.ts": probe("better-auth/client"),
@@ -105,25 +109,54 @@ describe("better-auth is named in the identity feature and nowhere else", () => 
 
     expect(refused).toEqual([
       "apps/web/src/app/reaches-the-library.ts",
+      "apps/web/src/features/auth/scoped.ts",
+      "apps/web/src/features/auth/sign-in-page.tsx",
       "apps/web/src/features/model-choices/reaches-the-library.ts",
       "apps/web/src/shared/api/reaches-the-library.ts",
       "apps/web/src/shared/ui/reaches-the-library.tsx",
     ]);
   });
 
-  it("holds the identity feature to every other import rule", () => {
+  it("allows the client in the hooks alone", () => {
     const refused = flagged({
-      "apps/web/src/features/auth/reaches-sideways.ts": probe("@/features/model-choices/api.ts"),
-      "apps/web/src/features/auth/reaches-up.ts": probe("@/app/router.tsx"),
-      "apps/web/src/features/auth/reaches-the-api.ts": typeProbe("@better-answers/api/trpc"),
-      "apps/web/src/features/auth/reaches-down.ts": probe("@/shared/ui/button.tsx"),
+      [HOOKS]: probe("./auth-client.ts"),
+      "apps/web/src/features/auth/sign-in-page.tsx": probe("./auth-client.ts"),
+      "apps/web/src/app/reaches-the-client.ts": probe("@/features/auth/auth-client.ts"),
+      "apps/web/test/reaches-the-client.ts": probe("@/features/auth/auth-client.ts"),
     });
 
     expect(refused).toEqual([
-      "apps/web/src/features/auth/reaches-sideways.ts",
-      "apps/web/src/features/auth/reaches-the-api.ts",
-      "apps/web/src/features/auth/reaches-up.ts",
+      "apps/web/src/app/reaches-the-client.ts",
+      "apps/web/src/features/auth/sign-in-page.tsx",
+      "apps/web/test/reaches-the-client.ts",
     ]);
+  });
+
+  it("refuses the client named without its extension", () => {
+    const refused = flagged({
+      [HOOKS]: probe("./auth-client"),
+      "apps/web/src/features/auth/sign-in-page.tsx": probe("./auth-client"),
+      "apps/web/src/app/reaches-the-client.ts": probe("@/features/auth/auth-client"),
+      "apps/web/src/shared/api/trpc.ts": probe("@/features/auth/auth-client"),
+    });
+
+    expect(refused).toEqual([
+      "apps/web/src/app/reaches-the-client.ts",
+      "apps/web/src/features/auth/sign-in-page.tsx",
+      "apps/web/src/shared/api/trpc.ts",
+    ]);
+  });
+
+  it.each([
+    ["a sibling feature", probe("@/features/model-choices/api.ts")],
+    ["the app layer", probe("@/app/router.tsx")],
+    ["the api", typeProbe("@better-answers/api/trpc")],
+  ])("refuses the hooks reaching %s", (_reached, source) => {
+    expect(flagged({ [HOOKS]: source })).toEqual([HOOKS]);
+  });
+
+  it("lets the hooks reach shared", () => {
+    expect(flagged({ [HOOKS]: probe("@/shared/ui/button.tsx") })).toEqual([]);
   });
 });
 

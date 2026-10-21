@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./package.json": "./package.json",
+    "./auth-seam-scan": "./src/auth-seam-scan.ts",
     "./comment-density": "./src/comment-density.ts",
     "./comment-inventory": "./src/comment-inventory.ts",
     "./face-admission": "./src/face-admission.ts",

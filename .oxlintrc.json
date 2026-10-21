@@ -200,7 +200,11 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/."
+                "message": "In apps/web, better-auth is imported only by features/auth/auth-client.ts and features/auth/auth-hooks.ts; every other file reads the platform's types those hooks return."
+              },
+              {
+                "group": ["**/auth-client", "**/auth-client.ts"],
+                "message": "authClient is imported only by features/auth/auth-hooks.ts, which maps what it answers to the platform's own types."
               }
             ]
           }
@@ -242,7 +246,11 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/."
+                "message": "In apps/web, better-auth is imported only by features/auth/auth-client.ts and features/auth/auth-hooks.ts; every other file reads the platform's types those hooks return."
+              },
+              {
+                "group": ["**/auth-client", "**/auth-client.ts"],
+                "message": "authClient is imported only by features/auth/auth-hooks.ts, which maps what it answers to the platform's own types."
               }
             ]
           }
@@ -280,7 +288,11 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/."
+                "message": "In apps/web, better-auth is imported only by features/auth/auth-client.ts and features/auth/auth-hooks.ts; every other file reads the platform's types those hooks return."
+              },
+              {
+                "group": ["**/auth-client", "**/auth-client.ts"],
+                "message": "authClient is imported only by features/auth/auth-hooks.ts, which maps what it answers to the platform's own types."
               }
             ]
           }
@@ -319,7 +331,11 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/."
+                "message": "In apps/web, better-auth is imported only by features/auth/auth-client.ts and features/auth/auth-hooks.ts; every other file reads the platform's types those hooks return."
+              },
+              {
+                "group": ["**/auth-client", "**/auth-client.ts"],
+                "message": "authClient is imported only by features/auth/auth-hooks.ts, which maps what it answers to the platform's own types."
               }
             ]
           }
@@ -327,7 +343,10 @@
       }
     },
     {
-      "files": ["apps/web/src/features/auth/**"],
+      "files": [
+        "apps/web/src/features/auth/auth-client.ts",
+        "apps/web/src/features/auth/auth-hooks.ts"
+      ],
       "rules": {
         "no-restricted-imports": [
           "error",
