@@ -77,9 +77,9 @@ const stillListed = (
   opened: OpenedFor,
   query: string,
   shown: readonly Match[],
-  loading: boolean,
+  unread: boolean,
 ): boolean =>
-  opened.query === query && (loading || shown.some((match) => keyOf(match) === opened.key));
+  opened.query === query && (unread || shown.some((match) => keyOf(match) === opened.key));
 
 const openerIdOf = (key: string): string => `opener-${encodeURIComponent(key)}`;
 
@@ -311,12 +311,12 @@ const useReading = (query: string): Reading => {
 const useOpening = (
   query: string,
   shown: readonly Match[],
-  loading: boolean,
+  unread: boolean,
   heading: RefObject<HTMLElement | null>,
 ) => {
   const [opened, setOpened] = useState<OpenedFor>();
   const [leftIn, setLeftIn] = useState<string>();
-  if (opened !== undefined && !stillListed(opened, query, shown, loading)) {
+  if (opened !== undefined && !stillListed(opened, query, shown, unread)) {
     setOpened(undefined);
     if (opened.query === query) setLeftIn(query);
   }
@@ -391,7 +391,7 @@ function SearchRegion() {
   const shown = useMemo(() => matchesOf(matches.data), [matches.data]);
   const beside = useRoomBeside();
   const reading = useReading(query);
-  const panel = useOpening(query, shown, matches.isLoading, heading);
+  const panel = useOpening(query, shown, matches.data === undefined, heading);
   useReturnedUnlisted(reading.returning.key, shown, matches.isLoading, heading);
   const open = (match: Match) => {
     flush();
