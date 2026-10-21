@@ -12,6 +12,7 @@ import {
   type SENSITIVITIES,
 } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
+import { uriDecoded } from "@better-answers/schema/concept-file";
 import { SCHEMED } from "@better-answers/schema/scan";
 
 import { action, declareActions, record } from "../audit/index.ts";
@@ -182,21 +183,20 @@ const INLINE_LINK = /\]\(\s*<?([^)\s>]+)/g;
 type RelativeLink = {
   readonly at: number;
   readonly target: string;
-  readonly file: string;
+  readonly written: string;
+  readonly resolved: string;
 };
 
-const relativeLinksOf = (body: string): readonly RelativeLink[] =>
+const relativeLinksOf = (body: string, path: string): readonly RelativeLink[] =>
   [...body.matchAll(INLINE_LINK)].flatMap((match) => {
     const target = match[1] ?? "";
-    const file = target.split("#")[0] ?? "";
-    if (file === "" || file.startsWith("//") || SCHEMED.test(file)) return [];
-    return file.endsWith(".md")
-      ? [{ at: match.index + match[0].length - target.length, target, file }]
-      : [];
+    const written = target.split("#")[0] ?? "";
+    if (written.startsWith("//") || SCHEMED.test(written)) return [];
+    const decoded = uriDecoded(written);
+    if (!decoded.endsWith(".md")) return [];
+    const at = match.index + match[0].length - target.length;
+    return [{ at, target, written, resolved: resolvedResource(decoded, path).slice(1) }];
   });
-
-const relativeConceptLinksOf = (body: string): readonly string[] =>
-  relativeLinksOf(body).map((link) => link.file);
 
 export type RewrittenBody = {
   readonly body: string;
@@ -211,10 +211,10 @@ export const rewriteLinks = (
   const pieces: string[] = [];
   let cursor = 0;
   let links = 0;
-  for (const link of relativeLinksOf(body)) {
-    const iri = iriOf(resolvedResource(link.file, path).slice(1));
+  for (const link of relativeLinksOf(body, path)) {
+    const iri = iriOf(link.resolved);
     if (iri === undefined) continue;
-    pieces.push(body.slice(cursor, link.at), iri, link.target.slice(link.file.length));
+    pieces.push(body.slice(cursor, link.at), iri, link.target.slice(link.written.length));
     cursor = link.at + link.target.length;
     links += 1;
   }
@@ -261,7 +261,7 @@ const linkOutsideTree = (
   path: string,
   paths: ReadonlySet<string>,
 ): string | undefined =>
-  relativeConceptLinksOf(body).find((link) => !paths.has(resolvedResource(link, path).slice(1)));
+  relativeLinksOf(body, path).find((link) => !paths.has(link.resolved))?.written;
 
 const readConcept = (
   file: string,

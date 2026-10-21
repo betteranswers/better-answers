@@ -920,6 +920,52 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
       expect(file).not.toMatch(/\]\([^)]*\.md/);
     }
   });
+
+  it.each(["roles/%C3%A9quipe.md", "roles/%c3%a9quipe.md", "roles/%C3%A9quipe%2Emd"])(
+    "resolves the encoded link %s to the concept it names",
+    async (link) => {
+      const { scenario, verifiers } = await arranged();
+      const byMona = { by: humanOf(verifiers.mona), at: VERIFIED_AT };
+
+      await imported(
+        scenario,
+        treeOf({
+          "manifest.yaml": MANIFEST,
+          "company/roles/équipe.md": conceptFile({
+            type: "Role",
+            title: "Équipe",
+            entry: "ROLE-001",
+            verified: [byMona],
+            body: "The team that answers expenses.",
+          }),
+          "company/expenses.md": conceptFile({
+            title: "Expenses",
+            entry: "ENTRY-003",
+            verified: [byMona],
+            body: `Ask [the team](${link}).`,
+          }),
+        }),
+      );
+
+      const iri = await irisByPath(scenario.workspaceId);
+      const expenses = iri.get("knowledge/company/expenses.md");
+      const team = iri.get("knowledge/company/roles/équipe.md");
+      const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1) ?? "";
+      expect(
+        await fileAtCommit(
+          scenario.git,
+          scenario.workspaceId,
+          sha,
+          "knowledge/company/expenses.md",
+        ),
+      ).toContain(`Ask [the team](${team}).`);
+      const edges = await db().pool.query<{ from_uid: string; to_uid: string }>(
+        "SELECT from_uid, to_uid FROM map_edge WHERE workspace_id = $1 AND label = 'LINKS_TO'",
+        [scenario.workspaceId],
+      );
+      expect(edges.rows).toEqual([{ from_uid: expenses, to_uid: team }]);
+    },
+  );
 });
 
 describe("an imported concept, opened", () => {
@@ -1085,6 +1131,15 @@ describe("what the import refuses before it writes anything", () => {
         reason: "link-outside-tree",
         about: "../../product/tiers/premium-plan.md",
       },
+    ],
+    [
+      "a link whose path decodes to a NUL",
+      (verifiers: Verifiers) =>
+        oneConcept(verifiers, "company/answers/nul.md", {
+          title: "Nul",
+          body: "See the [plan](%00.md).",
+        }),
+      { file: "company/answers/nul.md", reason: "link-outside-tree", about: "%00.md" },
     ],
     [
       "a verifier who is not a workspace member",
