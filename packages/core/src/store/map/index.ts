@@ -15,6 +15,7 @@ import {
   SUPERSEDES_LABEL,
 } from "@better-answers/schema";
 import { linksAndMarksOf, proseOf } from "@better-answers/schema/concept-file";
+import { SCHEMED } from "@better-answers/schema/scan";
 
 import { readableClause, readableParameters } from "../../access/index.ts";
 import type { PlatformPrincipal, Principal, UserPrincipal } from "../../kernel/index.ts";
@@ -83,7 +84,7 @@ export const targetOf = (raw: string, from: string): OutgoingRef["target"] | und
   if (bare === "") return undefined;
   if (IRI.test(bare)) return { iri: bare };
 
-  if (/^[a-z][a-z0-9+.-]*:/i.test(bare) || bare.startsWith("//")) return undefined;
+  if (SCHEMED.test(bare) || bare.startsWith("//")) return undefined;
   return { path: resolvedResource(bare, from).slice(1) };
 };
 
@@ -99,7 +100,7 @@ const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
         target,
         section: sectionAt(prose, link.at),
 
-        sentence: sentenceAt(prose, link.at),
+        sentence: sentenceAt(concept.body, prose, link.at),
       },
     ];
   });

@@ -26,10 +26,12 @@ export const collapsedWhitespace = (text: string): string =>
 export const autolinkEndsOf = (text: string): Int32Array =>
   nextStopsOf(text, (ch) => ch === ">" || isAsciiWhitespace(ch));
 
-const SCHEME = /[a-z0-9+.-]/i;
+const SCHEME = /[A-Za-z0-9+.-]/;
+
+export const SCHEMED = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 
 const colonAfter = (text: string, at: number): number | undefined => {
-  if (!/[a-z]/i.test(text[at + 1] ?? "")) return undefined;
+  if (!/[A-Za-z]/.test(text[at + 1] ?? "")) return undefined;
   let scheme = at + 2;
   while (scheme < text.length && SCHEME.test(text[scheme] ?? "")) scheme += 1;
   return text[scheme] === ":" ? scheme : undefined;

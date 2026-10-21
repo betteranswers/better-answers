@@ -1,5 +1,5 @@
 {
-  "description": "links (ADR 0031, ADR 0015): what a concept body's footnotes make of the map, said once for both tiers. The api derives a concept's LINKS_TO edges at every governed write (`packages/core/src/store/map/index.ts`) and the worker derives them again in the full rebuild (`apps/worker/src/better_answers_worker/links.py`); an edge's id carries its link's ordinal, so the two must count links alike or the rebuilt map and the live one name different edges. A footnote reference `[^label]` is a **citation mark** when its label, trimmed, with inner whitespace collapsed and compared without case, is the `id` of an entry in the concept's `sources` list. A mark resolves to the first entry carrying that id, whether or not the body holds a definition for it, and it is never a link: it makes no edge and takes no ordinal. A footnote reference whose label is no source id is a link when the body defines it, and it then takes an ordinal and makes an edge when its definition names a concept, as OKF allows. One with neither a source nor a definition is plain text: no edge, no ordinal, no error. A footnote definition line `[^label]: ...` is never a link and takes no ordinal. Everything else in the prose that today takes an ordinal still does. Only a record-form `sources` entry carries an `id`; a string-form entry carries none, so no mark resolves to it. Every case is read as the concept `citing` below, every target is a concept IRI no concept holds yet (so both tiers make the edge with no kind and no lookup), and no source's resource is a concept, so no case makes a lineage edge. `links` is every LINKS_TO edge the case makes, in ordinal order, by ordinal, target, `section` and `sentence`. `section` is the text of the nearest heading above the link, or null, and `sentence` is the sentence the link sits in, with each link reduced to its text. Both are trimmed, with each run of whitespace made one space. `marks` is every citation mark, as written, with the index of the `sources` entry it resolves to, in body order. Throughout, a line ends at a line feed alone, and whitespace is the six characters space, tab, line feed, carriage return, form feed and vertical tab. The TypeScript half drives the api's map write (`packages/core/test/links.contract.test.ts`) and the Python half the worker's edge derivation (`apps/worker/tests/test_links_contract.py`).",
+  "description": "links (ADR 0031, ADR 0015): what a concept body's footnotes make of the map, said once for both tiers. The api derives a concept's LINKS_TO edges at every governed write (`packages/core/src/store/map/index.ts`) and the worker derives them again in the full rebuild (`apps/worker/src/better_answers_worker/links.py`); an edge's id carries its link's ordinal, so the two must count links alike or the rebuilt map and the live one name different edges. A footnote reference `[^label]` is a **citation mark** when its label, trimmed, with inner whitespace collapsed and compared without case, is the `id` of an entry in the concept's `sources` list. A mark resolves to the first entry carrying that id, whether or not the body holds a definition for it, and it is never a link: it makes no edge and takes no ordinal. A footnote reference whose label is no source id is a link when the body defines it, and it then takes an ordinal and makes an edge when its definition names a concept, as OKF allows. One with neither a source nor a definition is plain text: no edge, no ordinal, no error. A footnote definition line `[^label]: ...` is never a link and takes no ordinal. Everything else in the prose that today takes an ordinal still does. Only a record-form `sources` entry carries an `id`; a string-form entry carries none, so no mark resolves to it. Every case is read as the concept `citing` below, every target is a concept IRI no concept holds yet (so both tiers make the edge with no kind and no lookup), and no source's resource is a concept, so no case makes a lineage edge. `links` is every LINKS_TO edge the case makes, in ordinal order, by ordinal, target, `section` and `sentence`. `section` is the text of the nearest heading above the link, or null, and `sentence` is the sentence the link sits in, with each link reduced to its text. Both are trimmed, with each run of whitespace made one space. `marks` is every citation mark, as written, with the index of the `sources` entry it resolves to, in body order. Throughout, a line ends at a line feed alone, whitespace is the six characters space, tab, line feed, carriage return, form feed and vertical tab, a line of the body holding only whitespace is blank and ends a paragraph, and a scheme is an ASCII letter followed by ASCII letters, digits, plus, full stop and hyphen. The TypeScript half drives the api's map write (`packages/core/test/links.contract.test.ts`) and the Python half the worker's edge derivation (`apps/worker/tests/test_links_contract.py`).",
   "citing": {
     "iri": "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM",
     "path": "knowledge/expenses.md",
@@ -593,6 +593,57 @@
       ],
       "marks": [],
       "why": "A heading is read from the prose, where a code span is blanked to spaces, and its whitespace runs become one space. So the heading reads the same however each tier counts the characters of an emoji it blanked."
+    },
+    {
+      "case": "an autolink's scheme is ASCII alone",
+      "body": "<\u212aa:b> <a\u017f:b> See [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).",
+      "sources": [],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "<\u212aa:b> <a\u017f:b> See the product."
+        }
+      ],
+      "marks": [],
+      "why": "A scheme is an ASCII letter, then ASCII letters, digits, plus, full stop and hyphen. The Kelvin sign and the long s fold to k and s under Python's case-insensitive matching, but neither is in the scheme, so neither bracketed run is an autolink, takes an ordinal or loses its angle brackets."
+    },
+    {
+      "case": "a line of whitespace is a blank line",
+      "body": "# Mileage rates\r\n\r\nSee [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN)\n \t\f\u000b\nSee [the rates](https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP).",
+      "sources": [],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": "Mileage rates",
+          "sentence": "See the product"
+        },
+        {
+          "ordinal": 1,
+          "to": "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP",
+          "section": "Mileage rates",
+          "sentence": "See the rates."
+        }
+      ],
+      "marks": [],
+      "why": "A line ends at a line feed alone, so in a CRLF body the line between two paragraphs holds a carriage return. A line holding only the other five whitespace characters is blank, and a blank line ends a paragraph, so a link's sentence never runs into the heading or the paragraph above it."
+    },
+    {
+      "case": "a line holding only a code span is no blank line",
+      "body": "The rate is\n`45p`\nper mile, see [the policy](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).",
+      "sources": [],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "The rate is per mile, see the policy."
+        }
+      ],
+      "marks": [],
+      "why": "A line is blank when the body's own line holds only whitespace. A code span is blanked to spaces in the prose, but its line in the body is not blank, so the paragraph runs on through it."
     }
   ]
 }

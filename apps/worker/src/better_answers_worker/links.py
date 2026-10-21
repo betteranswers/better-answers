@@ -3,6 +3,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Literal, NamedTuple
 
 from .concept_file import (
+    SCHEMED,
     Frontmatter,
     Scalar,
     SourceEntry,
@@ -72,11 +73,11 @@ def _autolink_ends_of(text: str) -> list[int]:
     return _next_stops(text, stops)
 
 
-_SCHEME = re.compile(r"[a-z0-9+.-]", re.I)
+_SCHEME = re.compile(r"[A-Za-z0-9+.-]")
 
 
 def _colon_after(text: str, at: int) -> int | None:
-    if at + 1 >= len(text) or not re.match(r"[a-z]", text[at + 1], re.I):
+    if at + 1 >= len(text) or not re.match(r"[A-Za-z]", text[at + 1]):
         return None
     scheme = at + 2
     while scheme < len(text) and _SCHEME.match(text[scheme]):
@@ -218,8 +219,8 @@ def _fenced_blocks(body: str) -> list[tuple[int, int]]:
 
 _BACKTICK_RUN = re.compile(r"`+")
 _HEADING = re.compile(r"^\#{1,6}[ \t\n\r\f\v]+([^\n]*)")
+_BLANK = re.compile(r"[ \t\r\f\v]*")
 _SENTENCE_BOUNDARY = re.compile(r"[.!?](?=[ \t\n\r\f\v]|$)")
-_SCHEMED = re.compile(r"^[a-z][a-z0-9+.-]*:", re.I)
 _WHITESPACE_RUN = re.compile(r"[ \t\n\r\f\v]+")
 
 
@@ -393,7 +394,7 @@ def _target_of(raw: str, from_path: str) -> tuple[_TargetShape, str] | None:
     if _IRI.match(bare):
         return "iri", bare
 
-    if _SCHEMED.match(bare) or bare.startswith("//"):
+    if SCHEMED.match(bare) or bare.startswith("//"):
         return None
     return "path", resolved_resource(bare, from_path)[1:]
 
@@ -487,11 +488,25 @@ def _flattened_links(text: str) -> str:
     return _flattened_autolinks(flattened)
 
 
-def _sentence_at(body: str, index: int) -> str:
-    before = body.rfind("\n\n", 0, index + 2)
-    paragraph_start = 0 if before == -1 else before + 2
-    after = body.find("\n\n", index)
-    paragraph = body[paragraph_start : len(body) if after == -1 else after]
+def _paragraph_around(body: str, index: int) -> tuple[int, int]:
+    above = body.rfind("\n", 0, index + 1)
+    while above != -1:
+        line = body.rfind("\n", 0, above)
+        if _BLANK.fullmatch(body, line + 1, above):
+            break
+        above = line
+    below = body.find("\n", index)
+    while below != -1:
+        line = body.find("\n", below + 1)
+        if _BLANK.fullmatch(body, below + 1, len(body) if line == -1 else line):
+            break
+        below = line
+    return above + 1, len(body) if below == -1 else below
+
+
+def _sentence_at(body: str, prose: str, index: int) -> str:
+    paragraph_start, paragraph_end = _paragraph_around(body, index)
+    paragraph = prose[paragraph_start:paragraph_end]
     at = index - paragraph_start
 
     start = 0
@@ -613,7 +628,7 @@ def references_of(
                 link.ordinal,
                 target,
                 _section_at(prose, link.at),
-                _sentence_at(prose, link.at),
+                _sentence_at(body, prose, link.at),
             )
         )
 

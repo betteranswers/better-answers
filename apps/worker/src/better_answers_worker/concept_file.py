@@ -136,8 +136,11 @@ def normalised_body(body: str) -> str:
     return trimmed.rstrip("\n") + "\n"
 
 
+SCHEMED = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+
+
 def resolved_resource(resource: str, from_path: str) -> str:
-    if resource.startswith("//") or re.match(r"^[a-z][a-z0-9+.-]*:", resource, re.I):
+    if resource.startswith("//") or SCHEMED.match(resource):
         return resource
     directory = "" if resource.startswith("/") else from_path[: from_path.rfind("/")]
     segments: list[str] = []
