@@ -320,7 +320,7 @@ const useOpening = (
   const [leftIn, setLeftIn] = useState<string>();
   if (opened !== undefined && !stillListed(opened, query, shown, read !== "read")) {
     setOpened(undefined);
-    if (opened.query === query) setLeftIn(query);
+    if (opened.query === query && !asksNothing(query)) setLeftIn(query);
   }
   const left = leftIn === query;
   if (leftIn !== undefined && !left) setLeftIn(undefined);
