@@ -147,4 +147,5 @@ export const STORED_DETAIL_KEYS = {
   threshold: "threshold",
   recordId: "recordId",
   closedAs: "closedAs",
+  fromContentHash: "fromContentHash",
 } as const;

@@ -475,11 +475,15 @@ describe("what an edit keeps of a concept's citations", () => {
     const written = await conceptCiting(scenario, scenario.editor, [source.documentId]);
 
     const edited = await rewriteCiting(scenario, scenario.editor, written, evidence);
-
-    expect(edited.ok).toBe(true);
-    expect(await documentsCitedBy(scenario.workspaceId, written.iri)).toEqual(
-      outcome === "keeps" ? [source.documentId] : [],
+    if (!edited.ok) throw new Error(`the edit answered ${String(edited.error)}`);
+    const event = await db().pool.query<{ detail: { evidenceCount: number } }>(
+      "SELECT detail FROM audit_event WHERE id = $1",
+      [edited.value.auditEventId],
     );
+
+    const cited = outcome === "keeps" ? [source.documentId] : [];
+    expect(await documentsCitedBy(scenario.workspaceId, written.iri)).toEqual(cited);
+    expect(event.rows[0]?.detail.evidenceCount).toBe(cited.length);
   });
 });
 

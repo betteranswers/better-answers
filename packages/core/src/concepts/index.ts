@@ -119,7 +119,7 @@ import {
   type SuggestionPayload,
 } from "./suggestions.ts";
 import { trustOf, trustWords, type ConceptVerification, type Trust } from "./trust.ts";
-import { conceptVisibilityFrom } from "./visibility.ts";
+import { citationCountOf, conceptVisibilityFrom } from "./visibility.ts";
 import type { PassedOnCommitRefusal } from "./vocabulary.ts";
 
 export {
@@ -213,6 +213,7 @@ const CONCEPT_ACTIONS = declareActions("knowledge", {
     iri: "iri",
     commitSha: "gitSha",
     contentHash: "contentHash",
+    fromContentHash: "contentHash?",
     evidenceCount: "count",
   }),
   accepted: action("knowledge.suggestion.accepted", {
@@ -418,7 +419,14 @@ const writeUnderLock = async (
   if (!parsed.success) return err("malformed");
   const row = parsed.data;
 
-  const landed = await commitAndLandWrite(principal, doors, write, row, now);
+  const landed = await commitAndLandWrite(
+    principal,
+    doors,
+    write,
+    row,
+    now,
+    existing.value.value.held?.contentHash,
+  );
   if (!landed.ok) return err(landed.error);
 
   return ok({
@@ -505,6 +513,7 @@ const commitAndLandWrite = async (
   write: ParsedWrite,
   row: IndexRow,
   at: Date,
+  fromContentHash: string | undefined,
 ): Promise<Result<Committed, WriteConceptRefusal | Error>> => {
   const { input } = write;
   const landed = await commitAndLandAsMember(
@@ -523,7 +532,7 @@ const commitAndLandWrite = async (
       expectedHead: "head" in input.expects ? input.expects.head : ANY_HEAD,
       at,
     },
-    (fresh, tx, committed) => landWrite(fresh, tx, write, row, committed),
+    (fresh, tx, committed) => landWrite(fresh, tx, write, row, committed, fromContentHash),
   );
   if (!landed.ok && landed.error instanceof Error) {
     const named = refusalFor(landed.error, WRITE_CONSTRAINTS);
@@ -538,19 +547,23 @@ const landWrite = async (
   write: ParsedWrite,
   row: IndexRow,
   committed: Committed,
+  fromContentHash: string | undefined,
 ): Promise<void> => {
   const acceptance = write.input.acceptance;
   if (acceptance === undefined) {
+    const detail = {
+      iri: row.iri,
+      commitSha: committed.sha,
+      contentHash: write.contentHash,
+      evidenceCount:
+        write.evidence?.length ??
+        (fromContentHash === undefined ? 0 : await citationCountOf(fresh, tx, row.iri)),
+    };
     await record(fresh, tx, {
       id: write.auditEventId,
       action: CONCEPT_ACTIONS.committed,
       subjectId: row.iri,
-      detail: {
-        iri: row.iri,
-        commitSha: committed.sha,
-        contentHash: write.contentHash,
-        evidenceCount: write.evidence?.length ?? 0,
-      },
+      detail: fromContentHash === undefined ? detail : { ...detail, fromContentHash },
     });
   } else {
     await record(fresh, tx, {

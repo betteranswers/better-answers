@@ -95,7 +95,7 @@ export const LABELLED_DETAIL_KEYS: readonly string[] = [
 
 export const KEPT_OFF_DETAIL_KEYS: Readonly<Partial<Record<DeclaredAction, readonly string[]>>> = {
   "knowledge.check.imported": ["verificationId"],
-  "knowledge.concept.committed": ["commitSha", "contentHash"],
+  "knowledge.concept.committed": ["commitSha", "contentHash", "fromContentHash"],
   "knowledge.feedback.closed": ["recordId"],
   "knowledge.manifest.written": ["bundleId", "commitSha"],
   "knowledge.suggestion.accepted": ["commitSha", "contentHash", "setId"],
