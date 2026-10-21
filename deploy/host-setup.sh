@@ -7,9 +7,8 @@ usage() {
 host-setup.sh vpc1 --mirror-host <VPC2 address> --repo <git URL> [--drill-pubkey <file>]
     the production box: /data, the 4 GB swap file, git, the checkout restore-production.sh
     runs from, the git-mirror deploy keypair, known_hosts for VPC 2, the nightly image
-    prune, and the host hardening. Prints the
-    deploy key's public half, which vpc2 takes. Run it again with --drill-pubkey once vpc2
-    has printed root's key.
+    prune, and the host hardening. Prints the deploy key's public half, which vpc2 takes.
+    Run it again with the same arguments and --drill-pubkey once vpc2 has printed root's key.
 
 host-setup.sh vpc2 --mirror-pubkey <file> --repo <git URL> [--prod-host <VPC1 address>]
     the orchestrator box: the mirror user and /data/mirror, the deploy key restricted to
@@ -143,7 +142,7 @@ CRON
   prune_images
   harden
   echo; echo "fill, as root, mode 0600: /etc/better-answers/drill.env · staging.env (every key the two compose files require, staging values) · backup-age.key (the identity, from escrow — resident here; SECRETS.md says what that means)"
-  echo; echo "root's PUBLIC key for the drill — give it to: host-setup.sh vpc1 --mirror-host <this box> --drill-pubkey <file>"; cat /root/.ssh/id_ed25519.pub
+  echo; echo "root's PUBLIC key for the drill — give it to: host-setup.sh vpc1 --mirror-host <this box> --repo <the repository's HTTPS URL> --drill-pubkey <file>"; cat /root/.ssh/id_ed25519.pub
   echo "still yours: Coolify itself (the wizard's stage 7), and the provider firewall (SSH from your IP and from VPC 1 only)"
 }
 
