@@ -29,7 +29,7 @@ A concept's `type`, its kind, is the short string its producer chose, folded at 
 - A new kind arrives with the concepts that carry it. The suggestion set's summary names it, and accepting the concepts accepts the kind.
 - An Admin renames or merges a kind from the Kinds list on Knowledge. That is one bulk commit that rewrites every affected `type`. The same transaction re-keys `concept_identity`, because `type` is inside the merge key.
 - A kind's definition is a `Term` concept in a glossary collection. Tags stay free strings.
-- An alias is knowledge: a confirmed alias lands as an *Also known as* line in the concept body. `concept_identity` derives its merge-key names from that line and the `title`.
+- An alias is knowledge: a confirmed alias lands as an *Also known as* line in the concept body. The line feeds the concept's search column, beside its tags. `concept_identity` keys a concept by its folded kind and normalised `title` alone (`mergeKeyOf`), so an alias never enters the merge key.
 
 A relation between concepts is the link, and it is never named. Every markdown link between concepts is a `LINKS_TO` edge carrying the two endpoint kinds, the section and the sentence around it. There is no relations list, no predicate matcher and no `RELATES_TO` matrix. An agent that wants the predicate reads the sentence.
 
