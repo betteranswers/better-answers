@@ -39,7 +39,7 @@ export const ASK_WORDS = {
     failed: "Nothing was drafted. Please try again.",
     paused: "Drafting is paused because this workspace has reached its monthly AI spending limit.",
   } satisfies Readonly<Record<Unwritten, string>>,
-  cites: (title: string): string => `Cites ${title}`,
+  cites: (place: number, title: string): string => `[${String(place)}] Cites ${title}`,
   helpful: "Mark as Helpful",
   markedHelpful: "Marked Helpful",
   helpfulSaid: "Your feedback has been sent successfully.",

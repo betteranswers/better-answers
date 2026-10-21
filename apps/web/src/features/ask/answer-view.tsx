@@ -200,7 +200,7 @@ function Footnote(properties: { readonly cited: Cited }) {
       <Button
         id={openerId}
         variant="link"
-        aria-label={WORDS.cites(concept.title)}
+        aria-label={WORDS.cites(place, concept.title)}
         aria-expanded={opened?.openerId === openerId}
         className={MARK}
         onClick={() => {
