@@ -909,6 +909,14 @@ test.describe("a member's own page", () => {
     await expect(inTheRail).toBeFocused();
   });
 
+  test("opens no member by key after focus leaves the list", async ({ page, request }) => {
+    await skippedToMembers(page, request, "Calder Drifting");
+    await memberLink(page, "Priya Shah").focus();
+    await listHeading(page).focus();
+
+    await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.open.key);
+  });
+
   test("opens a member and changes their role by keyboard alone", async ({ page, request }) => {
     await skippedToMembers(page, request, "Calder Rolling");
 

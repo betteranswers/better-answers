@@ -553,6 +553,18 @@ test.describe("a group's actions", () => {
     await expect(rowOf(page, "Bid writers").getByRole("cell").nth(1)).toHaveText(/^0\b/);
   });
 
+  test("opens no group by key after focus leaves the list", async ({ page, request }) => {
+    await anAdminAtGroups(page, request, "Calder Moulds");
+    const saying = groupsRegion(page).getByRole("status").filter({ hasText: /\S/ });
+    await expect(saying, "only the count says anything at rest").toHaveCount(1);
+    await groupButton(page, "HR team").focus();
+    await groupsRegion(page).getByRole("heading", { level: 2, name: "Groups" }).focus();
+
+    await page.keyboard.press(GROUPS_KEYSTROKES.open.key);
+    await expect(saying, "a keystroke with no group in focus says nothing").toHaveCount(2);
+    await expect(sheetOf(page, "HR team")).toHaveCount(0);
+  });
+
   test("lets an Admin reach every group action by keyboard alone", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Calder Castings");
     await page.goto(GROUPS_PAGE);
