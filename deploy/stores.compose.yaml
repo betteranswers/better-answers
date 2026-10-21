@@ -57,6 +57,8 @@ services:
   backup:
     image: ghcr.io/betteranswers/backup@${BACKUP_IMAGE_DIGEST:?set from build.yml's run summary}
     <<: [*restart, *logging, *mem384]
+    # As PID 1, cron ignores the stop signal and is killed 30 s later. Under tini it ends at once, and cuts a running job.
+    init: true
     environment:
       DATABASE_URL: ${DATABASE_URL:?}
       BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?}
