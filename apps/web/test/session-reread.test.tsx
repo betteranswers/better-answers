@@ -2,7 +2,7 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createAppClients, Providers } from "@/app/providers.tsx";
+import { createAppClients, Providers, type AppClients } from "@/app/providers.tsx";
 import { useSession, useSessionReread, type SessionReread } from "@/features/auth/auth-hooks.ts";
 
 const TOO_MANY_REQUESTS = 429;
@@ -29,14 +29,16 @@ const wire = vi.hoisted(() => {
 
 afterEach(cleanup);
 
+const inTheApp =
+  (clients: AppClients) =>
+  ({ children }: { readonly children: ReactNode }) => (
+    <Providers clients={clients}>{children}</Providers>
+  );
+
 describe("rereading the session", () => {
   it("reads a refused reread unread, the session still signed in", async () => {
-    const clients = createAppClients();
-    const wrapper = (properties: { readonly children: ReactNode }) => (
-      <Providers clients={clients}>{properties.children}</Providers>
-    );
     const { result } = renderHook(() => ({ read: useSession(), reread: useSessionReread() }), {
-      wrapper,
+      wrapper: inTheApp(createAppClients()),
     });
     await vi.waitFor(() => expect(result.current.read.state).toBe("signed-in"));
 
