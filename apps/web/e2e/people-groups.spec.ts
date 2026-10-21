@@ -108,9 +108,14 @@ const deletedAtAKey = async (page: Page, name: string, left: number): Promise<nu
   await groupButton(page, name).click();
   await sheetOf(page, name).getByRole("button", { name: "Delete Group" }).click();
   const confirming = page.getByRole("alertdialog", { name: `Delete ${name}` });
+  const answered = page.waitForResponse((response) =>
+    new URL(response.url()).pathname.includes("members.deleteGroup"),
+  );
   await confirmedAtAKey(page, confirming, left);
   await expect(groupRows(page)).toHaveCount(left);
-  return actionClocked(page);
+  const clocked = await actionClocked(page);
+  expect((await answered).ok(), `the deletion of ${name} was refused`).toBe(true);
+  return clocked;
 };
 
 const tickedGroup = (name: string): string =>

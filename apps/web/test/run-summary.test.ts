@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import { moduleAt, playwrightOver } from "./playwright-tree.ts";
 
-const flakyReportOver = async (spec: string) => {
-  const reporter = moduleAt("e2e/flaky-report.ts");
+const runSummaryOver = async (spec: string) => {
+  const reporter = moduleAt("e2e/run-summary.ts");
   const run = await playwrightOver(
     {
       "playwright.config.ts": `export default { testDir: ".", retries: 1, reporter: [[${reporter}]], use: { trace: "on-first-retry" } };\n`,
@@ -19,9 +19,9 @@ const flakyReportOver = async (spec: string) => {
   return run;
 };
 
-describe("the flaky report", () => {
+describe("the run summary", () => {
   it("names a test that passed only on its retry", async () => {
-    const run = await flakyReportOver(
+    const run = await runSummaryOver(
       [
         'import { test } from "@playwright/test";',
         'test.describe("the checkout", () => {',
@@ -43,8 +43,25 @@ describe("the flaky report", () => {
     );
   }, 60_000);
 
+  it("writes every action timing to the summary", async () => {
+    const run = await runSummaryOver(
+      [
+        'import { test } from "@playwright/test";',
+        'test("approves a request", () => {',
+        '  test.info().annotations.push({ type: "approve action", description: "12 ms; median 12 ms" });',
+        '  test.info().annotations.push({ type: "jump-to list", description: "40 ms" });',
+        "});",
+        "",
+      ].join("\n"),
+    );
+
+    expect(run.stdout).not.toContain("::warning");
+    expect(run.summary).toContain("| approves a request | 1 | approve | 12 ms; median 12 ms |\n");
+    expect(run.summary).not.toContain("jump-to");
+  }, 60_000);
+
   it("names nothing when every test passes at first", async () => {
-    const run = await flakyReportOver(
+    const run = await runSummaryOver(
       ['import { test } from "@playwright/test";', 'test("takes a payment", () => {});', ""].join(
         "\n",
       ),

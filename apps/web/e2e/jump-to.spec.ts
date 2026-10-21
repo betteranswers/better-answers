@@ -6,10 +6,11 @@ import { CONSOLE, CONTROL_CENTRE, HOMES, menuGroupIn, pageNamed } from "@/shared
 
 import { expect, test } from "./browser.ts";
 import {
+  actionClocked,
   addMember,
   aMemberSignedInAt,
   anAddress,
-  clockTheNextKey,
+  clockTheNextDraw,
   markTheOperator,
   person,
   provision,
@@ -438,9 +439,9 @@ test("draws the list within its second, timed in the page", async ({ page, reque
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Models" })).toBeVisible();
 
-  await clockTheNextKey(page, { at: "//*[@role='dialog']", reads: TOM });
+  await clockTheNextDraw(page, { at: "//*[@role='dialog']", reads: TOM });
   await page.keyboard.press("Meta+k");
-  const elapsed = await page.evaluate(() => Reflect.get(window, "actionClocked"));
+  const elapsed = await actionClocked(page);
   test.info().annotations.push({ type: "jump-to list", description: `${elapsed} ms` });
   expect(elapsed, "the jump-to list did not draw within its second").toBeLessThan(LIST_BUDGET_MS);
 
