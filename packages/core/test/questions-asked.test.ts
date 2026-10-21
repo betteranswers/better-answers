@@ -15,14 +15,21 @@ import {
   openRecord,
   questionsAskedInput,
   readQuestionsAsked,
+  readYourQuestions,
+  readYourRecord,
+  yourQuestionsInput,
   type QuestionsAskedInput,
+  type YourQuestionsInput,
 } from "../src/answering/index.ts";
 import type { Trust } from "../src/concepts/index.ts";
 import { actorIdOfPerson, type Result, type UserPrincipal } from "../src/kernel/index.ts";
+import { changeRole, changeRoleInput } from "../src/members/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
 import { makeQuestionMonths } from "../src/sweeps/index.ts";
+import { heldAs } from "./members-suite.ts";
 import { provisionedWorkspace } from "./platform.ts";
 import { askedAMicrosecondFiner } from "./question-rows.ts";
+import { inputOf } from "./suite-input.ts";
 import { answered, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
 
@@ -363,6 +370,20 @@ const asked = (
     readQuestionsAsked(principal, tx, questionsAskedInput.parse(input), now),
   );
 
+const yours = (
+  reader: UserPrincipal,
+  input: Partial<YourQuestionsInput> = {},
+  now: Date = new Date(),
+) =>
+  readingAs(db().runtimePool, reader, (principal, tx) =>
+    readYourQuestions(principal, tx, yourQuestionsInput.parse(input), now),
+  );
+
+const yourRecord = (reader: UserPrincipal, id: string) =>
+  readingAs(db().runtimePool, reader, (principal, tx) =>
+    readYourRecord(principal, tx, { id }, new Date()),
+  );
+
 const closing = (closer: UserPrincipal, feedbackId: string, closedAs: FlagClosing) =>
   readingAs(db().runtimePool, closer, (principal, tx) =>
     closeFlag(principal, tx, { feedbackId, closedAs }, new Date()),
@@ -375,9 +396,17 @@ type RecordShape = {
   readonly askedAt?: Date;
   readonly verdict?: "related" | "refuse";
   readonly answers?: readonly Seeded[];
+  readonly rejected?: readonly Seeded[];
   readonly cited?: readonly Seeded[];
   readonly drafted?: readonly { sentence: string; concepts: readonly Seeded[] }[];
 };
+
+const keptAs =
+  (judged?: "yes" | "no") =>
+  ({ iri, contentHash }: Seeded) => {
+    const kept = { iri, contentHash, trust: KEPT_TRUST };
+    return judged === undefined ? kept : { ...kept, judged };
+  };
 
 const draftedOf = (drafted: RecordShape["drafted"]) =>
   drafted?.map(({ sentence, concepts }) => ({
@@ -385,28 +414,20 @@ const draftedOf = (drafted: RecordShape["drafted"]) =>
     concepts: concepts.map(({ iri }) => iri),
   }));
 
-const aRecord = (admin: UserPrincipal, shape: RecordShape = {}) =>
+const aRecord = (admin: UserPrincipal, { by: asker = admin, ...shape }: RecordShape = {}) =>
   seedingWith(db().pool, async (seed) => {
     const record = await seed.questionAsked({
       workspaceId: admin.workspaceId,
       askedAt: shape.askedAt ?? new Date(),
-      askedBy: actorIdOfPerson((shape.by ?? admin).userId),
-      predicateRole: (shape.by ?? admin).role,
+      askedBy: actorIdOfPerson(asker.userId),
+      predicateRole: asker.role,
       completedAt: new Date(),
       verdict: shape.verdict ?? "related",
       judgeState: "not-judged",
       concepts: [
-        ...(shape.answers ?? []).map(({ iri, contentHash }) => ({
-          iri,
-          contentHash,
-          trust: KEPT_TRUST,
-          judged: "yes" as const,
-        })),
-        ...(shape.cited ?? []).map(({ iri, contentHash }) => ({
-          iri,
-          contentHash,
-          trust: KEPT_TRUST,
-        })),
+        ...(shape.answers ?? []).map(keptAs("yes")),
+        ...(shape.rejected ?? []).map(keptAs("no")),
+        ...(shape.cited ?? []).map(keptAs()),
       ],
     });
     await seed.questionContent({
@@ -468,6 +489,18 @@ const aConceptStaleAfter = (admin: UserPrincipal, day: string) =>
       frontmatter: { title: "Expenses", type: "Policy", stale_after: day },
     }),
   );
+
+type RecordsRead = (
+  reader: UserPrincipal,
+  now: Date,
+) => Promise<readonly { readonly concepts: readonly { readonly trustWords: string }[] }[]>;
+
+const staleWordsOf = async (read: RecordsRead) => {
+  const admin = await anAsker();
+  await aRecord(admin, { cited: [await aConceptStaleAfter(admin, STALE_AFTER)] });
+  const wordsAt = async (now: Date) => (await read(admin, now))[0]?.concepts[0]?.trustWords;
+  return [await wordsAt(BEFORE_STALE), await wordsAt(AFTER_STALE)];
+};
 
 const aMemberOf = async (admin: UserPrincipal, role: "Editor" | "Viewer") => {
   const member = await seedingWith(db().pool, (seed) =>
@@ -628,16 +661,10 @@ describe("reading the questions asked", () => {
   });
 
   it("words trust at the moment the Admin's read is given", async () => {
-    const admin = await anAsker();
-    await aRecord(admin, { cited: [await aConceptStaleAfter(admin, STALE_AFTER)] });
+    const read = async (reader: UserPrincipal, now: Date) =>
+      answered(await asked(reader, {}, now)).records;
 
-    const wordsAt = async (now: Date) =>
-      answered(await asked(admin, {}, now)).records[0]?.concepts[0]?.trustWords;
-
-    expect([await wordsAt(BEFORE_STALE), await wordsAt(AFTER_STALE)]).toEqual([
-      "Unverified",
-      "Out of date",
-    ]);
+    expect(await staleWordsOf(read)).toEqual(["Unverified", "Out of date"]);
   });
 
   it("leaves out an unreadable concept, with no hint", async () => {
@@ -684,6 +711,136 @@ describe("reading the questions asked", () => {
         closedAt: null,
       },
     ]);
+  });
+});
+
+const idsOf = async (reader: UserPrincipal, input: Partial<YourQuestionsInput> = {}) =>
+  answered(await yours(reader, input)).records.map(({ id }) => id);
+
+describe("reading your questions", () => {
+  it("shows each member only the questions they asked", async () => {
+    const admin = await anAsker();
+    const [editor, viewer] = [await aMemberOf(admin, "Editor"), await aMemberOf(admin, "Viewer")];
+    const editors = await aRecord(admin, { by: editor });
+    const viewers = await aRecord(admin, { by: viewer });
+
+    expect([await idsOf(editor), await idsOf(viewer)]).toEqual([[editors.id], [viewers.id]]);
+  });
+
+  it("lists newest first, with a cursor only when more follow", async () => {
+    const admin = await anAsker();
+    const older = await aRecord(admin, { askedAt: new Date(Date.now() - 60_000) });
+    const newer = await aRecord(admin);
+
+    const first = answered(await yours(admin, { limit: 1 }));
+    const next = answered(await yours(admin, { limit: 1, cursor: first.nextCursor ?? undefined }));
+
+    expect(
+      [first, next].map((page) => [page.records.map(({ id }) => id), page.nextCursor]),
+    ).toEqual([
+      [[newer.id], newer.id],
+      [[older.id], null],
+    ]);
+  });
+
+  it("pages nothing from a cursor at another person's record", async () => {
+    const admin = await anAsker();
+    const editor = await aMemberOf(admin, "Editor");
+    await aRecord(admin, { by: editor, askedAt: new Date(Date.now() - 60_000) });
+    const theirs = await aRecord(admin);
+
+    expect(await idsOf(editor, { cursor: theirs.id })).toEqual([]);
+  });
+
+  it("reads another person's record as not found", async () => {
+    const admin = await anAsker();
+    const editor = await aMemberOf(admin, "Editor");
+    const record = await aRecord(admin, { by: editor });
+
+    const [own, other] = [await yourRecord(editor, record.id), await yourRecord(admin, record.id)];
+
+    expect(own).toMatchObject({ ok: true, value: { id: record.id } });
+    expect(other).toEqual({ ok: false, error: "not-found" });
+  });
+
+  it("leaves out an Answer the reader can no longer read", async () => {
+    const admin = await anAsker();
+    const narrowed = await aConceptNarrowedIn(admin, "board");
+    const readable = await aConceptIn(admin, "audits");
+    const record = await aRecord(admin, { answers: [narrowed], cited: [readable] });
+
+    const read = answered(await yourRecord(admin, record.id));
+
+    expect(read.concepts.map(({ iri }) => iri)).toEqual([readable.iri]);
+    expect(JSON.stringify(read)).not.toContain(narrowed.iri);
+  });
+
+  it("drops a sentence citing an unreadable concept, keeping its neighbours", async () => {
+    const admin = await anAsker();
+    const readable = await aConceptIn(admin, "audits");
+    const narrowed = await aConceptNarrowedIn(admin, "board");
+    const record = await aRecord(admin, {
+      cited: [readable, narrowed],
+      drafted: [
+        { sentence: "Audit logs are kept for a year.", concepts: [readable] },
+        { sentence: "The board meets monthly.", concepts: [narrowed] },
+        { sentence: "Each audit is filed.", concepts: [readable] },
+      ],
+    });
+
+    const read = answered(await yourRecord(admin, record.id));
+
+    expect(read.drafted?.map(({ sentence }) => sentence)).toEqual([
+      "Audit logs are kept for a year.",
+      "Each audit is filed.",
+    ]);
+  });
+
+  it("still lists a member's questions after their role changes", async () => {
+    const workspace = await provisionedWorkspace(db(), "Acme");
+    const admin = await principalFor(db(), workspace.workspaceId, workspace.adminUserId);
+    const editor = await aMemberOf(admin, "Editor");
+    const record = await aRecord(admin, { by: editor });
+    answered(
+      await heldAs(workspace, workspace.adminUserId, (principal, tx) =>
+        changeRole(principal, tx, {
+          ...inputOf(changeRoleInput, { personId: editor.userId, role: "Viewer" }),
+          at: new Date(),
+        }),
+      ),
+    );
+
+    expect(await idsOf(editor)).toEqual([record.id]);
+  });
+
+  it("words trust at the moment the reader's read is given", async () => {
+    const read = async (reader: UserPrincipal, now: Date) =>
+      answered(await yours(reader, {}, now)).records;
+
+    expect(await staleWordsOf(read)).toEqual(["Unverified", "Out of date"]);
+  });
+
+  it("carries the words of a concept the judge passed alone", async () => {
+    const admin = await anAsker();
+    const [answer, rejected, related] = [
+      await aConceptIn(admin, "audits"),
+      await aConceptIn(admin, "audits"),
+      await aConceptIn(admin, "audits"),
+    ];
+    const record = await aRecord(admin, {
+      answers: [answer],
+      rejected: [rejected],
+      cited: [related],
+    });
+
+    const { concepts } = answered(await yourRecord(admin, record.id));
+
+    expect(concepts.map((concept) => [concept.iri, "body" in concept])).toEqual([
+      [answer.iri, true],
+      [rejected.iri, false],
+      [related.iri, false],
+    ]);
+    expect(concepts[0]?.body).toBe("Expenses are claimed within thirty days.");
   });
 });
 

@@ -100,7 +100,12 @@ export {
   closeFlagInput,
   questionsAskedInput,
   readQuestionsAsked,
+  readYourQuestions,
+  readYourRecord,
+  yourQuestionsInput,
+  yourRecordInput,
   type QuestionsAskedInput,
+  type YourQuestionsInput,
 } from "./records.ts";
 export {
   ANSWER_MEASURES,

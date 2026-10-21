@@ -3,7 +3,12 @@ import { z } from "zod";
 
 import { connectAsHost } from "./flow.ts";
 import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
-import { questionsSeeding, seedQuestions } from "./harness-questions.ts";
+import {
+  questionsSeeding,
+  seedQuestions,
+  staleToday,
+  wordsTwoDaysApart,
+} from "./harness-questions.ts";
 import { calledTool, structured, toolAnswered } from "./mcp-call.ts";
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
 import { statusOf, webSignedIn } from "./web-client.ts";
@@ -11,8 +16,6 @@ import { statusOf, webSignedIn } from "./web-client.ts";
 const { clock, stopTheClock, moveTheClock } = aStoppableClock();
 
 const app = appForSuite({ clock });
-
-const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
 
 const FULL_SCOPE = "knowledge:read feedback:write offline_access";
 
@@ -141,7 +144,7 @@ describe("Questions asked over tRPC", () => {
           {
             title: RETENTION_QUESTION,
             body: "Audit logs are kept for thirteen months.",
-            frontmatter: { stale_after: new Date().toISOString().slice(0, 10) },
+            frontmatter: { stale_after: staleToday() },
           },
         ],
       }),
@@ -160,13 +163,11 @@ describe("Questions asked over tRPC", () => {
       }),
     );
     const { api } = await webSignedIn(app(), workspace.admin.email);
-    const trustWordsNow = async () =>
-      (await api.questions.asked.query({})).records[0]?.concepts[0]?.trustWords;
+    const read = async () => (await api.questions.asked.query({})).records;
 
-    stopTheClock();
-    const before = await trustWordsNow();
-    moveTheClock(TWO_DAYS_MS);
-
-    expect([before, await trustWordsNow()]).toEqual(["Unverified", "Out of date"]);
+    expect(await wordsTwoDaysApart({ stopTheClock, moveTheClock }, read)).toEqual([
+      "Unverified",
+      "Out of date",
+    ]);
   });
 });

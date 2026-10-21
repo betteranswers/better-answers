@@ -15,8 +15,10 @@ import {
 import { action, declareActions, record } from "../audit/index.ts";
 import { conceptsByIris, trustOf, trustWords, type OpenedConcept } from "../concepts/index.ts";
 import {
+  actorIdOf,
   admit,
   ADMIN_ALONE,
+  ANY_ROLE,
   attempt,
   declareAction,
   err,
@@ -64,6 +66,29 @@ const readQuestionsAskedAction = declareAction({
   admits: ADMIN_ALONE,
   input: questionsAskedInput,
   refuses: ["role-forbids"],
+});
+
+export const yourQuestionsInput = z.object({
+  cursor: recordId.optional(),
+  limit: z.number().int().min(1).max(QUESTIONS_ASKED_PAGE_MAX).default(QUESTIONS_ASKED_PAGE),
+});
+
+export type YourQuestionsInput = z.output<typeof yourQuestionsInput>;
+
+const readYourQuestionsAction = declareAction({
+  admits: ANY_ROLE,
+  input: yourQuestionsInput,
+  refuses: ["role-forbids"],
+});
+
+export const yourRecordInput = z.object({ id: recordId });
+
+export type YourRecordInput = z.output<typeof yourRecordInput>;
+
+const readYourRecordAction = declareAction({
+  admits: ANY_ROLE,
+  input: yourRecordInput,
+  refuses: ["role-forbids", "not-found"],
 });
 
 const skeleton = boundarySchemas.questionAsked.select;
@@ -116,6 +141,15 @@ export type QuestionsAskedPage = {
 
 export type QuestionsAskedRefusal = RefusalOf<typeof readQuestionsAskedAction> | Error;
 
+export type YourQuestionsPage = {
+  readonly records: readonly RecordAsRead[];
+  readonly nextCursor: string | null;
+};
+
+export type YourQuestionsRefusal = RefusalOf<typeof readYourQuestionsAction> | Error;
+
+export type YourRecordRefusal = RefusalOf<typeof readYourRecordAction> | Error;
+
 const OF_THE_PAGE = `SELECT r.id, r.asked_at AS "askedAt", r.asked_by AS "askedBy", r.transport, r.collections,
          r.verdict, r.judge_state AS "judgeState", r.map_state AS "mapState", r.concepts,
          c.question, c.drafted, r.flagged
@@ -147,6 +181,31 @@ const A_PAGE_OF_RECORDS = `WITH open_flags AS (
   ${OF_THE_PAGE}
    ORDER BY r.flagged DESC, r.asked_at DESC, r.id DESC
    LIMIT $3 + 1`;
+
+const OPEN_FLAG_ON_Q = `EXISTS (SELECT 1 FROM question_feedback f
+     WHERE f.workspace_id = q.workspace_id AND f.record_id = q.id
+       AND f.verdict = '${FEEDBACK_FLAG_VERDICT}' AND f.closed_at IS NULL)`;
+
+const YOUR_PAGE_OF_RECORDS = `WITH cut AS (
+    SELECT asked_at, id FROM question_asked WHERE workspace_id = $1 AND asked_by = $2 AND id = $3
+  ), page AS (
+    SELECT q.*, ${OPEN_FLAG_ON_Q} AS flagged
+      FROM question_asked q
+     WHERE q.workspace_id = $1
+       AND q.asked_by = $2
+       AND ($3::text IS NULL OR (q.asked_at, q.id) < (SELECT asked_at, id FROM cut))
+     ORDER BY q.asked_at DESC, q.id DESC
+     LIMIT $4 + 1
+  )
+  ${OF_THE_PAGE}
+   ORDER BY r.asked_at DESC, r.id DESC`;
+
+const YOUR_RECORD = `WITH page AS (
+    SELECT q.*, ${OPEN_FLAG_ON_Q} AS flagged
+      FROM question_asked q
+     WHERE q.workspace_id = $1 AND q.asked_by = $2 AND q.id = $3
+  )
+  ${OF_THE_PAGE}`;
 
 const THEIR_FEEDBACK = `SELECT id, record_id AS "recordId", given_at AS "givenAt", verdict, reason,
          note, disputed_sentence AS "disputedSentence", disputed_concept AS "disputedConcept",
@@ -347,6 +406,50 @@ export const readQuestionsAsked = async (
     records: records.value,
     nextCursor: page.value.length > input.limit ? cutAt(rows.at(-1)) : null,
   });
+};
+
+export const readYourQuestions = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: YourQuestionsInput,
+  now: Date,
+): Promise<Result<YourQuestionsPage, YourQuestionsRefusal>> => {
+  const admitted = admit(readYourQuestionsAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const reader = admitted.value;
+
+  const page = await rowsOf(tx, YOUR_PAGE_OF_RECORDS, [
+    reader.workspaceId,
+    actorIdOf(reader),
+    input.cursor ?? null,
+    input.limit,
+  ]);
+  if (!page.ok) return err(page.error);
+  const rows = page.value.slice(0, input.limit);
+  const records = await recordsAsRead(reader, tx, rows, now);
+  if (!records.ok) return err(records.error);
+  return ok({
+    records: records.value,
+    nextCursor: page.value.length > input.limit ? (rows.at(-1)?.id ?? null) : null,
+  });
+};
+
+export const readYourRecord = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: YourRecordInput,
+  now: Date,
+): Promise<Result<RecordAsRead, YourRecordRefusal>> => {
+  const admitted = admit(readYourRecordAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const reader = admitted.value;
+
+  const rows = await rowsOf(tx, YOUR_RECORD, [reader.workspaceId, actorIdOf(reader), input.id]);
+  if (!rows.ok) return err(rows.error);
+  const records = await recordsAsRead(reader, tx, rows.value, now);
+  if (!records.ok) return err(records.error);
+  const [record] = records.value;
+  return record === undefined ? err(NOT_FOUND) : ok(record);
 };
 
 export const closeFlagInput = z.object({

@@ -46,6 +46,8 @@ describe("what a procedure may answer the wire", () => {
     expect(Object.keys(appRouter._def.procedures).sort()).toEqual([
       "ask.giveFeedback",
       "ask.question",
+      "ask.yourQuestions",
+      "ask.yourRecord",
       "console.people.correctDisplayName",
       "console.people.endEverySignInAndToken",
       "console.people.inspect",
@@ -170,6 +172,8 @@ describe("what a procedure may answer the wire", () => {
       | "knowledge.open"
       | "ask.question"
       | "ask.giveFeedback"
+      | "ask.yourQuestions"
+      | "ask.yourRecord"
       | "questions.asked"
       | "questions.closeFlag"
       | "modelChoices.list"

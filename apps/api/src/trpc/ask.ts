@@ -4,6 +4,10 @@ import {
   draftAnswer,
   feedbackInput,
   giveFeedback,
+  readYourQuestions,
+  readYourRecord,
+  yourQuestionsInput,
+  yourRecordInput,
   type AnswerResult,
   type AskInput,
   type DraftEvent,
@@ -18,6 +22,7 @@ import {
   mutationProcedure,
   ownTransactionCounted,
   parsedBy,
+  queryProcedure,
   router,
   type AskingContext,
 } from "./base.ts";
@@ -112,6 +117,20 @@ export const askRouter = router({
       ctx,
       giveFeedback.name,
       given(input, (asked) => giveFeedback(ctx.principal, ctx.tx, asked, ctx.clock.now())),
+    ),
+  ),
+  yourQuestions: queryProcedure.input(parsedBy(yourQuestionsInput)).query(({ ctx, input }) =>
+    crossing(
+      ctx,
+      readYourQuestions.name,
+      given(input, (asked) => readYourQuestions(ctx.principal, ctx.tx, asked, ctx.clock.now())),
+    ),
+  ),
+  yourRecord: queryProcedure.input(parsedBy(yourRecordInput)).query(({ ctx, input }) =>
+    crossing(
+      ctx,
+      readYourRecord.name,
+      given(input, (asked) => readYourRecord(ctx.principal, ctx.tx, asked, ctx.clock.now())),
     ),
   ),
 });
