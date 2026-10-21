@@ -56,6 +56,7 @@ export const TABLE_OWNERS = {
   "public.llm_call": "llm",
   "public.spend_reservation": "llm",
   "public.model_price": "llm",
+  "public.decision_threshold": "llm",
   "public.audit_event": "audit",
   "public.identity_audit_event": "audit",
   "public.access_request": "members",

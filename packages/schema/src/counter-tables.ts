@@ -48,4 +48,5 @@ export const GLOBAL_TABLE_NAMES_BEYOND_IDENTITY = [
   "public.backup",
   "public.identity_audit_event",
   "public.model_price",
+  "public.decision_threshold",
 ] as const;

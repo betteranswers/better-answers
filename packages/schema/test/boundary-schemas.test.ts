@@ -99,6 +99,7 @@ const acceptedRows = {
       gbpPerMillionOut: "15.00",
     },
   ],
+  decisionThreshold: [{ provider: "cloudflare", model: "clef-flash", threshold: 0.7 }],
   llmCall: [
     {
       workspaceId: WS_ID,
@@ -1027,6 +1028,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "questionContent",
         "questionFeedback",
         "modelPrice",
+        "decisionThreshold",
         "llmCall",
         "spendReservation",
         "passage",
@@ -1075,6 +1077,12 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     modelPrice: [
       { ...acceptedRows.modelPrice[0], provider: "openai" },
       { ...acceptedRows.modelPrice[0], effectiveFrom: "1 October 2026" },
+    ],
+    decisionThreshold: [
+      { ...acceptedRows.decisionThreshold[0], threshold: 0 },
+      { ...acceptedRows.decisionThreshold[0], threshold: 1 },
+      { ...acceptedRows.decisionThreshold[0], threshold: 1.5 },
+      { ...acceptedRows.decisionThreshold[0], provider: "openai" },
     ],
 
     user: [{ ...acceptedRows.user[0], id: "kEyIkQBmQ1EnBJnUvKMR6nSFXlQKUcuJ" }],
@@ -1776,6 +1784,11 @@ describe("5 — the inferred type is pinned", () => {
       effectiveFrom: string;
       gbpPerMillionIn: string;
       gbpPerMillionOut: string;
+    };
+    decisionThreshold: {
+      provider: "anthropic" | "mistral" | "cloudflare";
+      model: string;
+      threshold: number & z.core.$brand<"DecisionThreshold">;
     };
     workspaceConfig: { workspaceId: WorkspaceId; key: string; value: string; updatedAt: Date };
     passage: {

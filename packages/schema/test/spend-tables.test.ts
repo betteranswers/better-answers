@@ -3,8 +3,13 @@ import { describe, expect, it } from "vitest";
 
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
-import { postgresForSuite, privilegesHeld, refusalOf } from "./probes.ts";
-import { A_CALL_SERVING, A_PRICE_FROM_OCTOBER, A_RESERVATION_SERVING } from "./rls-probes.ts";
+import { postgresForSuite, privilegesHeld, refusalOf, refusesEach } from "./probes.ts";
+import {
+  A_CALL_SERVING,
+  A_PRICE_FROM_OCTOBER,
+  A_RESERVATION_SERVING,
+  A_THRESHOLD_OF,
+} from "./rls-probes.ts";
 
 const db = postgresForSuite();
 
@@ -68,7 +73,7 @@ describe("spend", () => {
   it("gives the worker no privilege on any table", async () => {
     await withRollback(db().pool, async (client) => {
       const held = await Promise.all(
-        ["llm_call", "spend_reservation", "model_price"].map(async (table) =>
+        ["llm_call", "spend_reservation", "model_price", "decision_threshold"].map(async (table) =>
           Object.values(await privilegesHeld(client, "worker_rt", table)),
         ),
       );
@@ -165,6 +170,40 @@ describe("spend", () => {
         again: "model_price_provider_model_effective_from_pk",
         elsewhere: "model_price_provider_check",
       });
+    });
+  });
+
+  it("holds a threshold strictly between nought and one", async () => {
+    await withRollback(db().pool, async (client) => {
+      const threshold = (provider: string, value: number) =>
+        refusalOf(client, () => client.query(A_THRESHOLD_OF, [provider, value]));
+
+      expect({
+        nought: await threshold("cloudflare", 0),
+        one: await threshold("cloudflare", 1),
+        elsewhere: await threshold("openai", 0.7),
+        within: await threshold("cloudflare", 0.7),
+      }).toEqual({
+        nought: "decision_threshold_probability_check",
+        one: "decision_threshold_probability_check",
+        elsewhere: "decision_threshold_provider_check",
+        within: "admitted",
+      });
+    });
+  });
+
+  it("lets the api replace a threshold, never remove it", async () => {
+    await withRollback(db().pool, async (client) => {
+      await client.query(A_THRESHOLD_OF, ["cloudflare", 0.7]);
+
+      await asTheApiIn(client, "");
+
+      await client.query("UPDATE decision_threshold SET threshold = 0.6");
+      await refusesEach(client, [
+        ["DELETE FROM decision_threshold", "the api never removes a threshold"],
+      ]);
+      const read = await client.query("SELECT threshold FROM decision_threshold");
+      expect(read.rows).toEqual([{ threshold: 0.6 }]);
     });
   });
 });

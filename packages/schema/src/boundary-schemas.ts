@@ -79,6 +79,8 @@ import { workspaceLastActive } from "./last-active-tables.ts";
 import {
   CALENDAR_DAY,
   DECIMAL_STRING,
+  DECISION_THRESHOLD,
+  decisionThreshold,
   LLM_CALL_OUTCOMES,
   llmCall,
   MODEL_NAME,
@@ -257,6 +259,16 @@ const modelPriceRefinements = {
 const modelPriceSelect = createSelectSchema(modelPrice, modelPriceRefinements);
 const modelPriceInsert = createInsertSchema(modelPrice, modelPriceRefinements);
 const modelPriceUpdate = createUpdateSchema(modelPrice, modelPriceRefinements);
+
+const decisionThresholdRefinements = {
+  provider: (schema: z.ZodString) => schema.pipe(z.enum(MODEL_PROVIDERS)),
+  model: (schema: z.ZodString) => schema.regex(MODEL_NAME),
+  threshold: (schema: z.ZodNumber) => schema.pipe(DECISION_THRESHOLD),
+};
+
+const decisionThresholdSelect = createSelectSchema(decisionThreshold, decisionThresholdRefinements);
+const decisionThresholdInsert = createInsertSchema(decisionThreshold, decisionThresholdRefinements);
+const decisionThresholdUpdate = createUpdateSchema(decisionThreshold, decisionThresholdRefinements);
 
 const workspaceConfigRefinements = {
   workspaceId,
@@ -1074,6 +1086,12 @@ export const boundarySchemas = {
     select: modelPriceSelect,
     insert: modelPriceInsert,
     update: modelPriceUpdate,
+  },
+  decisionThreshold: {
+    table: decisionThreshold,
+    select: decisionThresholdSelect,
+    insert: decisionThresholdInsert,
+    update: decisionThresholdUpdate,
   },
   workspaceConfig: {
     table: workspaceConfig,

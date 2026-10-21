@@ -224,3 +224,6 @@ export const A_RESERVATION_SERVING = `INSERT INTO spend_reservation
 export const A_PRICE_FROM_OCTOBER = `INSERT INTO model_price
     (provider, model, effective_from, gbp_per_million_in, gbp_per_million_out)
   VALUES ($1, 'claude-sonnet-5-5', '2026-10-01', '3', '15')`;
+
+export const A_THRESHOLD_OF = `INSERT INTO decision_threshold (provider, model, threshold)
+  VALUES ($1, 'clef-flash', $2)`;

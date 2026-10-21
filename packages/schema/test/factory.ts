@@ -185,6 +185,10 @@ export type TestData = {
   ): Promise<Row<"spendReservation">>;
 
   modelPrice(overrides?: Partial<InsertInput<"modelPrice">>): Promise<Row<"modelPrice">>;
+
+  decisionThreshold(
+    overrides?: Partial<InsertInput<"decisionThreshold">>,
+  ): Promise<Row<"decisionThreshold">>;
 };
 
 const numberOf = (id: string): string =>
@@ -1093,10 +1097,19 @@ export const testData = (client: pg.PoolClient): TestData => {
       ...overrides,
     });
 
+  const decisionThreshold: TestData["decisionThreshold"] = async (overrides = {}) =>
+    insertRow(client, "decisionThreshold", {
+      provider: "cloudflare",
+      model: "clef-flash",
+      threshold: 0.7,
+      ...overrides,
+    });
+
   return {
     llmCall,
     spendReservation,
     modelPrice,
+    decisionThreshold,
     workspace,
     user,
     session,

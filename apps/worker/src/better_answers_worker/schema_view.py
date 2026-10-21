@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0094_the-backup"
+MIGRATION_ID = "0095_the-decision-threshold"
 
-MIGRATION_WHEN = 1792609491070
+MIGRATION_WHEN = 1792612872459
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -167,6 +167,11 @@ TABLES: dict[str, dict[str, str]] = {
         "only_row": "boolean NOT NULL",
         "digest": "text NOT NULL",
         "stamped_at": "timestamp with time zone NOT NULL",
+    },
+    "public.decision_threshold": {
+        "provider": "text NOT NULL",
+        "model": "text NOT NULL",
+        "threshold": "double precision NOT NULL",
     },
     "public.erasure_request": {
         "workspace_id": "text NOT NULL",
