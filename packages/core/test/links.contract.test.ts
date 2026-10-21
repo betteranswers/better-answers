@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { writeConceptDelta } from "@better-answers/core/store/map";
-import { citedSourcesOf } from "@better-answers/schema";
+import { citedSourcesOf, UNRESOLVED_RELATIONS } from "@better-answers/schema";
 import { linksAndMarksOf } from "@better-answers/schema/concept-file";
 
 import { contractFixture } from "./contract-fixture.ts";
@@ -23,6 +23,13 @@ const linksCase = z.object({
       sentence: z.string(),
     }),
   ),
+  unresolved: z.array(
+    z.object({
+      relation: z.enum(UNRESOLVED_RELATIONS),
+      ordinal: z.int().nonnegative(),
+      path: z.string().min(1),
+    }),
+  ),
   marks: z.array(z.object({ mark: z.string().min(1), source: z.int().nonnegative() })),
   why: z.string().min(1),
 });
@@ -40,7 +47,7 @@ const db = postgresForSuite();
 
 const LINK_UID = /^links_to:(?<from>.+):(?<ordinal>\d+)$/;
 
-const edgesMadeBy = async (each: z.output<typeof linksCase>) => {
+const mapMadeBy = async (each: z.output<typeof linksCase>) => {
   const reader = await seedingWith(db().pool, async (seed) => {
     const workspace = await seed.workspace();
     const admin = await seed.member({ workspaceId: workspace.id, role: "Admin" });
@@ -77,7 +84,16 @@ const edgesMadeBy = async (each: z.output<typeof linksCase>) => {
       WHERE workspace_id = $1 AND from_uid = $2 AND label = 'LINKS_TO'`,
     [reader.workspaceId, fixture.citing.iri],
   );
-  return rows.rows
+  const waiting = await db().pool.query<{
+    relation: (typeof UNRESOLVED_RELATIONS)[number];
+    ordinal: number;
+    path: string;
+  }>(
+    `SELECT relation, ordinal, target_path AS path FROM map_unresolved_reference
+      WHERE workspace_id = $1 AND from_uid = $2`,
+    [reader.workspaceId, fixture.citing.iri],
+  );
+  const links = rows.rows
     .map((row) => {
       const named = LINK_UID.exec(row.uid)?.groups;
       return {
@@ -89,18 +105,24 @@ const edgesMadeBy = async (each: z.output<typeof linksCase>) => {
       };
     })
     .toSorted((one, other) => one.ordinal - other.ordinal);
+  const unresolved = waiting.rows.toSorted(
+    (one, other) =>
+      UNRESOLVED_RELATIONS.indexOf(one.relation) - UNRESOLVED_RELATIONS.indexOf(other.relation) ||
+      one.ordinal - other.ordinal,
+  );
+  return { links, unresolved };
 };
 
 describe("the edges a concept body's footnotes make", () => {
-  it("makes exactly the links each case names, by ordinal", async () => {
+  it("makes exactly the links and unresolved paths each case names", async () => {
     const made = [];
-    for (const each of fixture.cases)
-      made.push({ case: each.case, links: await edgesMadeBy(each) });
+    for (const each of fixture.cases) made.push({ case: each.case, ...(await mapMadeBy(each)) });
 
     expect(made).toEqual(
       fixture.cases.map((each) => ({
         case: each.case,
         links: each.links.map((link) => ({ from: fixture.citing.iri, ...link })),
+        unresolved: each.unresolved,
       })),
     );
   });
