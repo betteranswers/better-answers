@@ -10,6 +10,7 @@ import type { ComponentProps, MouseEvent, ReactNode } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
 import { cn } from "@/shared/lib/utils.ts";
+import { rowFocusOf } from "@/shared/row-focus.ts";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import {
   Table,
@@ -180,21 +181,6 @@ function ColumnHead<Features extends TableFeatures, Data extends RowData>(proper
 const isShown = (hidden: ReadonlySet<string> | undefined, columnId: string): boolean =>
   hidden?.has(columnId) !== true;
 
-const focusHandlersOf = <Data,>(
-  onRowFocus: ((row: Data | undefined) => void) | undefined,
-  row: Data,
-): Pick<ComponentProps<"tr">, "onFocus" | "onBlur"> =>
-  onRowFocus === undefined
-    ? {}
-    : {
-        onFocus: () => {
-          onRowFocus(row);
-        },
-        onBlur: (event) => {
-          if (!event.currentTarget.contains(event.relatedTarget)) onRowFocus(undefined);
-        },
-      };
-
 function GridRow<Features extends TableFeatures, Data extends RowData>(
   properties: Opted<Data> & { readonly row: Row<Features, Data> },
 ) {
@@ -204,7 +190,7 @@ function GridRow<Features extends TableFeatures, Data extends RowData>(
     <TableRow
       data-state={ticked ? "selected" : undefined}
       className="data-[state=selected]:bg-[var(--surface-selected)]"
-      {...focusHandlersOf(properties.onRowFocus, row.original)}
+      {...rowFocusOf(properties.onRowFocus, row.original)}
     >
       {ticking === undefined ? null : (
         <TableCell className={cn(CELL, "w-10")}>

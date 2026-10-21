@@ -400,7 +400,6 @@ function MemberList(properties: {
               open: (personId) => {
                 openMember(personId, "member");
               },
-              focusedOn: setInFocus,
             }}
           >
             <GridTable
@@ -421,6 +420,9 @@ function MemberList(properties: {
               }}
               hidden={hidden}
               rowMenu={rowMenuOf(openMember)}
+              onRowFocus={(member) => {
+                setInFocus(member?.personId);
+              }}
               empty={<NoOneMatches narrowed={narrowed} focusAfterClear={searchRef} />}
             />
           </MemberActionsContext>

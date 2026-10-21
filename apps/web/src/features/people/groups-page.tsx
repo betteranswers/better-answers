@@ -67,7 +67,6 @@ const column = createColumnHelper<typeof features, GroupRow>();
 
 type GroupActions = {
   readonly open: (groupId: string) => void;
-  readonly focusedOn: (groupId: string) => void;
   readonly landOn: string | undefined;
   readonly landed: (button: HTMLButtonElement | null) => void;
 };
@@ -85,9 +84,6 @@ function GroupCell(properties: { readonly row: GroupRow }) {
     <RowSheetButton
       ref={groupId === actions.landOn ? actions.landed : undefined}
       id={groupButtonId(groupId)}
-      onFocus={() => {
-        actions.focusedOn(groupId);
-      }}
       onClick={() => {
         actions.open(groupId);
       }}
@@ -153,7 +149,6 @@ function GroupsList(properties: { readonly headingId: string }) {
     open: (groupId) => {
       setOpened({ groupId, at: "group" });
     },
-    focusedOn: setInFocus,
     landOn,
     landed: (button) => {
       if (button === null) return;

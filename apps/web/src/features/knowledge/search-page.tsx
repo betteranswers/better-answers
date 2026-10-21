@@ -24,6 +24,7 @@ import { useLanding, useLandingLine, type Landing } from "@/shared/landing.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { ListPages, ListState } from "@/shared/list-pages.tsx";
 import { PageHead } from "@/shared/page-head.tsx";
+import { rowFocusOf } from "@/shared/row-focus.ts";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
@@ -119,9 +120,6 @@ function ConceptLine(properties: {
           ref={land}
           href={page}
           className={TITLE}
-          onFocus={() => {
-            opening.focusedOn(keyOf(match));
-          }}
           onOpen={() => {
             opening.open(match);
           }}
@@ -140,7 +138,7 @@ type Opening = {
   readonly beside: boolean;
   readonly open: (match: Match) => void;
   readonly onClose: () => void;
-  readonly focusedOn: (key: string) => void;
+  readonly focusedOn: (key: string | undefined) => void;
 };
 
 function PassageLine(properties: { readonly match: PassageMatch; readonly opening: Opening }) {
@@ -156,9 +154,6 @@ function PassageLine(properties: { readonly match: PassageMatch; readonly openin
           variant="link"
           aria-expanded={opened !== undefined}
           className={`h-auto justify-start px-0 text-left whitespace-normal ${TITLE}`}
-          onFocus={() => {
-            opening.focusedOn(key);
-          }}
           onClick={() => {
             opening.open(match);
           }}
@@ -182,12 +177,14 @@ function MatchLine(properties: {
   readonly reading: Reading;
 }) {
   const { match } = properties;
-  const land = useLandingLine(properties.landsHere, () => {
-    properties.onLanded();
-    properties.opening.focusedOn(keyOf(match));
-  });
+  const land = useLandingLine(properties.landsHere, properties.onLanded);
   return (
-    <li ref={land} tabIndex={-1} className="px-4 py-3">
+    <li
+      ref={land}
+      tabIndex={-1}
+      className="px-4 py-3"
+      {...rowFocusOf(properties.opening.focusedOn, keyOf(match))}
+    >
       {match.layer === "bundles" ? (
         <ConceptLine match={match} opening={properties.opening} reading={properties.reading} />
       ) : (
@@ -374,7 +371,7 @@ const useOpenKey = (query: string, shown: readonly Match[], open: (match: Match)
 
   return {
     unopened: unopenedIn === query,
-    focusedOn: (key: string) => {
+    focusedOn: (key: string | undefined) => {
       setInFocus(key);
       setUnopenedIn(undefined);
     },

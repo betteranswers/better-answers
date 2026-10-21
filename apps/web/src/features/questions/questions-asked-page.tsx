@@ -9,6 +9,7 @@ import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
+import { rowFocusOf } from "@/shared/row-focus.ts";
 import { RowSheetButton } from "@/shared/row-sheet.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
@@ -44,7 +45,7 @@ const recordsOf = (data: QuestionsAsked["data"]): readonly AskedRecord[] =>
 
 type RowActions = {
   readonly open: (recordId: string) => void;
-  readonly focusedOn: (recordId: string) => void;
+  readonly focusedOn: (recordId: string | undefined) => void;
   readonly servedAt: ReadonlyMap<string, number>;
   readonly landing: Landing;
 };
@@ -57,14 +58,14 @@ function RecordItem(properties: { readonly record: AskedRecord; readonly actions
   );
   const openFlags = record.feedback.filter(isOpen);
   return (
-    <li className="grid justify-items-start gap-1 border-t border-border px-3 py-3 first:border-t-0">
+    <li
+      className="grid justify-items-start gap-1 border-t border-border px-3 py-3 first:border-t-0"
+      {...rowFocusOf(actions.focusedOn, record.id)}
+    >
       <RowSheetButton
         ref={land}
         id={recordButtonId(record.id)}
         className={cn("has-[>svg]:px-0", record.question === null && "text-muted-foreground")}
-        onFocus={() => {
-          actions.focusedOn(record.id);
-        }}
         onClick={() => {
           actions.open(record.id);
         }}
