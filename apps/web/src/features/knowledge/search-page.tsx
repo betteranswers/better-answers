@@ -446,7 +446,7 @@ function SearchRegion() {
         />
       </Card>
       {panel.opened === undefined || !beside ? null : (
-        <EvidenceSheet opened={panel.opened} onClose={panel.onClose} />
+        <EvidenceSheet opened={panel.opened} onClose={panel.onClose} focusFallback={heading} />
       )}
     </section>
   );

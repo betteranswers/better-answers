@@ -37,8 +37,8 @@ const focusOnMount = (heading: HTMLHeadingElement | null): void => {
   heading?.focus();
 };
 
-const returnFocus = (opened: Opened): void => {
-  document.getElementById(opened.openerId)?.focus();
+const returnFocus = (opened: Opened, fallback?: Heading): void => {
+  (document.getElementById(opened.openerId) ?? fallback?.current)?.focus();
 };
 
 const TABBABLE =
@@ -202,8 +202,9 @@ function PanelBody(properties: {
 export function EvidenceSheet(properties: {
   readonly opened: Opened;
   readonly onClose: () => void;
+  readonly focusFallback?: Heading;
 }) {
-  const { opened, onClose } = properties;
+  const { opened, onClose, focusFallback } = properties;
   const content = useRef<HTMLDivElement>(null);
   return (
     <Sheet
@@ -223,7 +224,7 @@ export function EvidenceSheet(properties: {
         }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
-          if (document.activeElement === document.body) returnFocus(opened);
+          if (document.activeElement === document.body) returnFocus(opened, focusFallback);
         }}
         onInteractOutside={(event) => {
           event.preventDefault();
@@ -231,7 +232,7 @@ export function EvidenceSheet(properties: {
         onKeyDown={(event) => {
           if (!tabsOff(event)) return;
           event.preventDefault();
-          returnFocus(opened);
+          returnFocus(opened, focusFallback);
         }}
         onEscapeKeyDown={(event) => {
           if (!content.current?.contains(document.activeElement)) event.preventDefault();
