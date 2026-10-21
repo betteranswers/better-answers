@@ -49,6 +49,8 @@ const CONNECTED_SOURCE_ID = "01J6VVVVVVVVVVVVVVVVVVVVVV";
 const DOCUMENT_ID = "01J6NNNNNNNNNNNNNNNNNNNNNN";
 const WRITE_UP_ID = "01J6WWWWWWWWWWWWWWWWWWWWWW";
 
+const OWNER_ID = "01J6TTTTTTTTTTTTTTTTTTTTTT";
+const OVERRIDE_ID = "01J6TTTTTTTTTTTTTTTTTTTTT2";
 const FINDING_ID = "01J6XXXXXXXXXXXXXXXXXXXXXX";
 
 const SUBJECT_REQUEST_ID = "01J6YYYYYYYYYYYYYYYYYYYYYY";
@@ -582,6 +584,11 @@ const acceptedRows = {
       auditEventId: AUDIT_EVENT_ID,
     },
   ],
+
+  conceptOwner: [
+    { workspaceId: WS_ID, id: OWNER_ID, collection: "policy", iri: null, personId: USER_ID },
+    { workspaceId: WS_ID, id: OVERRIDE_ID, collection: null, iri: CONCEPT_IRI, personId: USER_ID },
+  ],
   writeUp: [
     {
       workspaceId: WS_ID,
@@ -1022,6 +1029,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "suppression",
         "conceptEvidence",
         "conceptSensitivityOverride",
+        "conceptOwner",
         "writeUp",
         "writeUpInclude",
         "questionAsked",
@@ -2255,6 +2263,14 @@ describe("5 — the inferred type is pinned", () => {
       actor: string;
       auditEventId: string;
       recordedAt: Date;
+    };
+    conceptOwner: {
+      workspaceId: WorkspaceId;
+      id: string;
+      collection: string | null;
+      iri: ConceptIri | null;
+      personId: string;
+      createdAt: Date;
     };
     connectedSource: {
       publishedAt: Date | null;

@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { check, foreignKey, index, integer, primaryKey, text } from "drizzle-orm/pg-core";
 
-import { conceptIdentity } from "./concept-tables.ts";
+import { attachedByIri } from "./concept-tables.ts";
 import { readableRecordColumns, readableUnitChecks } from "./readable-columns.ts";
 import { withRLS } from "./with-rls.ts";
 
@@ -35,11 +35,7 @@ export const writeUpInclude = withRLS(
       name: "write_up_include_write_up_fk",
     }).onDelete("cascade"),
 
-    foreignKey({
-      columns: [table.workspaceId, table.iri],
-      foreignColumns: [conceptIdentity.workspaceId, conceptIdentity.iri],
-      name: "write_up_include_identity_fk",
-    }).onDelete("cascade"),
+    attachedByIri(table, "write_up_include_identity_fk"),
 
     index("write_up_include_workspace_id_iri_idx").on(table.workspaceId, table.iri),
     check("write_up_include_ordinal_check", sql.raw("ordinal >= 0")),
