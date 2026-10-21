@@ -41,7 +41,7 @@ describe("the browser suite's configuration", () => {
     expect((await configUnder(undefined)).forbidOnly).toBe(false);
   });
 
-  it("retries a failed spec once when it runs in CI", async () => {
+  it("retries once in CI so a flake stays queued", async () => {
     expect((await configUnder("true")).retries).toBe(1);
   });
 

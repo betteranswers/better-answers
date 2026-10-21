@@ -179,7 +179,9 @@ const OPENING_READ_WITH_ROOM_TO_TRIM = OPENING_POINTS * 2;
 
 const SPACE_WITHIN_A_LINE = String.raw`[\t \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]`;
 
-const BLANK_AND_HEADING_ONLY_LINES_AHEAD = String.raw`^(?:${SPACE_WITHIN_A_LINE}*(?:#{1,6})?${SPACE_WITHIN_A_LINE}*(?:\r\n|[\n\r\v\f]))+`;
+const LINE_END = String.raw`\r\n|[\n\r\v\f\u0085\u2028\u2029]`;
+
+const BLANK_AND_HEADING_ONLY_LINES_AHEAD = String.raw`^(?:${SPACE_WITHIN_A_LINE}*(?:#{1,6})?${SPACE_WITHIN_A_LINE}*(?:${LINE_END}))+`;
 
 /** Over the page alone: in the matching query, Postgres would cut every matched row's text before its sort. */
 const withOpenings = (
@@ -248,7 +250,7 @@ const passageMatchOf = (row: MatchRow): PassageMatch => ({
   sensitivity: PASSAGE_SENSITIVITY.parse(row.sensitivity),
 });
 
-const LINE_BREAK = /\r\n|[\n\r\v\f\u0085\u2028\u2029]/u;
+const LINE_BREAK = new RegExp(LINE_END, "u");
 
 const openingLineOf = (head: string | null): string => {
   const line =

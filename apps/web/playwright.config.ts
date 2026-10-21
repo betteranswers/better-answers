@@ -31,7 +31,6 @@ export default defineConfig({
 
   forbidOnly: inCi,
 
-  // One retry in CI keeps a single flake from ejecting a merge-queue entry, and the run summary names it; locally a failure stays a failure.
   retries: inCi ? 1 : 0,
 
   // Three of the runner's four cores: the api, Postgres and the browser's own processes take the fourth.

@@ -1859,6 +1859,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     const reader = await arrange();
     const brief = `𝔸 The kingfisher brief ${"a".repeat(137)}`;
     const ledger = `The kingfisher ledger ${"runs on ".repeat(30)}to the end.`;
+    const roll = `The kingfisher roll ${"x".repeat(300)}`;
     const documents = [
       [
         "The kingfisher minutes",
@@ -1886,11 +1887,21 @@ describe("the two knowledge layers a search and a fetch reach", () => {
         "The kingfisher spacer opens late.",
       ],
       ["The kingfisher grid", `Name${"　  ".repeat(150)}Role kingfisher`, "Name Role kingfisher"],
+      [
+        "The kingfisher annex",
+        `${"\n".repeat(5)}#\u2028${"\n".repeat(330)}The kingfisher annex opens late.`,
+        "The kingfisher annex opens late.",
+      ],
+      [
+        "The kingfisher roll",
+        `${"#\u2028".repeat(100)}${roll}`,
+        `${Array.from(roll).slice(0, 159).join("").trimEnd()}…`,
+      ],
     ] as const;
     for (const [title, text] of documents)
       await documentHolding(reader.workspaceId, { title, text });
 
-    const found = await searching(reader);
+    const found = await searching(reader, documents.length);
 
     const openings = new Map(
       (found.ok ? found.value.matches : []).flatMap((match) =>
