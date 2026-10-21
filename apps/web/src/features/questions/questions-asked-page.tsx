@@ -45,7 +45,7 @@ const recordsOf = (data: QuestionsAsked["data"]): readonly AskedRecord[] =>
 
 type RowActions = {
   readonly open: (recordId: string) => void;
-  readonly focusedOn: (recordId: string | undefined) => void;
+  readonly onRowFocus: (recordId: string | undefined) => void;
   readonly servedAt: ReadonlyMap<string, number>;
   readonly landing: Landing;
 };
@@ -60,7 +60,7 @@ function RecordItem(properties: { readonly record: AskedRecord; readonly actions
   return (
     <li
       className="grid justify-items-start gap-1 border-t border-border px-3 py-3 first:border-t-0"
-      {...rowFocusOf(actions.focusedOn, record.id)}
+      {...rowFocusOf(actions.onRowFocus, record.id)}
     >
       <RowSheetButton
         ref={land}
@@ -138,7 +138,7 @@ function Records(properties: { readonly asked: QuestionsAsked }) {
       setOutcome(undefined);
       setOpenedId(recordId);
     },
-    focusedOn: setInFocus,
+    onRowFocus: setInFocus,
     servedAt,
     landing,
   };

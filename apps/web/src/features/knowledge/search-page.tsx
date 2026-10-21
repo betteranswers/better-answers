@@ -138,7 +138,7 @@ type Opening = {
   readonly beside: boolean;
   readonly open: (match: Match) => void;
   readonly onClose: () => void;
-  readonly focusedOn: (key: string | undefined) => void;
+  readonly onRowFocus: (key: string | undefined) => void;
 };
 
 function PassageLine(properties: { readonly match: PassageMatch; readonly opening: Opening }) {
@@ -183,7 +183,7 @@ function MatchLine(properties: {
       ref={land}
       tabIndex={-1}
       className="px-4 py-3"
-      {...rowFocusOf(properties.opening.focusedOn, keyOf(match))}
+      {...rowFocusOf(properties.opening.onRowFocus, keyOf(match))}
     >
       {match.layer === "bundles" ? (
         <ConceptLine match={match} opening={properties.opening} reading={properties.reading} />
@@ -371,7 +371,7 @@ const useOpenKey = (query: string, shown: readonly Match[], open: (match: Match)
 
   return {
     unopened: unopenedIn === query,
-    focusedOn: (key: string | undefined) => {
+    onRowFocus: (key: string | undefined) => {
       setInFocus(key);
       setUnopenedIn(undefined);
     },
@@ -409,7 +409,7 @@ function SearchRegion() {
     beside,
     open,
     onClose: panel.onClose,
-    focusedOn: openKey.focusedOn,
+    onRowFocus: openKey.onRowFocus,
   };
 
   return (
