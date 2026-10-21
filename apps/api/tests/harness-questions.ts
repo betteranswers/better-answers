@@ -16,6 +16,7 @@ import { testData, type TestData } from "@better-answers/schema/testing";
 
 import { inOneTransaction } from "./harness-sources.ts";
 import type { TestApp } from "./harness.ts";
+import type { aStoppableClock } from "./suite-app.ts";
 
 const A_CONTENT_HASH = "a".repeat(64);
 
@@ -150,4 +151,28 @@ export const feedbackKeptOn = async (app: TestApp, recordId: string) => {
     [recordId],
   );
   return kept.rows;
+};
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+const TWO_DAYS_MS = 2 * ONE_DAY_MS;
+
+export const staleTomorrow = (): string =>
+  new Date(Date.now() + ONE_DAY_MS).toISOString().slice(0, 10);
+
+type MovedClock = Pick<ReturnType<typeof aStoppableClock>, "stopTheClock" | "moveTheClock">;
+
+type RecordsRead = () => Promise<
+  readonly { readonly concepts: readonly { readonly trustWords: string }[] }[]
+>;
+
+export const wordsTwoDaysApart = async (
+  clock: MovedClock,
+  read: RecordsRead,
+): Promise<readonly (string | undefined)[]> => {
+  const wordsNow = async () => (await read())[0]?.concepts[0]?.trustWords;
+  clock.stopTheClock();
+  const before = await wordsNow();
+  clock.moveTheClock(TWO_DAYS_MS);
+  return [before, await wordsNow()];
 };

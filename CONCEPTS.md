@@ -1293,6 +1293,9 @@ the answer carried; with the feedback and corrections it received.
 
 A record kept before the platform kept the map's state reads as unknown, never as live.
 
+A reader reads their own records on Ask › Your questions. Both pages show each cited concept as the
+reader can read it now, with its trust as it is now; the record itself keeps the trust at the time.
+
 Not part of the audit log. Content is kept twelve months by default, then thinned to the skeleton —
 citations, trust then, verdicts, feedback and corrections — kept for good.
 

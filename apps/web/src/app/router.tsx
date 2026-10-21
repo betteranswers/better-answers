@@ -13,7 +13,9 @@ import {
 import type { ReactElement, ReactNode } from "react";
 import { z } from "zod";
 
+import { RECORD_ID } from "@/features/ask/ask-state.ts";
 import { NewQuestionPage } from "@/features/ask/new-question-page.tsx";
+import { YourQuestionsPage, YourRecordPage } from "@/features/ask/your-questions-page.tsx";
 import { AcceptInvitationPage } from "@/features/auth/accept-invitation-page.tsx";
 import { AccountPage } from "@/features/auth/account-page.tsx";
 import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
@@ -103,6 +105,7 @@ type BuiltPage = { readonly draw: () => ReactElement; readonly toolbar?: PageToo
 
 const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>([
   ["/ask/new-question", { draw: NewQuestionPage }],
+  ["/ask/your-questions", { draw: YourQuestionsPage }],
   ["/ask/connect-claude", { draw: ConnectClaudePage }],
   ["/knowledge/search", { draw: SearchPage }],
   ["/sources/connected-sources", { draw: ConnectedSourcesPage }],
@@ -123,6 +126,13 @@ type BuiltDetail = {
 };
 
 const BUILT_DETAILS: ReadonlyMap<string, BuiltDetail> = new Map<PagePath, BuiltDetail>([
+  [
+    "/ask/your-questions",
+    {
+      value: RECORD_ID,
+      draw: (recordId) => <YourRecordPage recordId={recordId} notFound={<UnknownPage />} />,
+    },
+  ],
   ["/knowledge/search", { value: CONCEPT_IRI, draw: (iri) => <ConceptPage iri={iri} /> }],
   ["/people/members", { value: PERSON_ID, draw: (personId) => <MemberPage personId={personId} /> }],
 ]);

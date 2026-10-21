@@ -20,11 +20,11 @@ Words: *answer*, *related knowledge*, *judge*, *decision model*, *model client*,
 - `apps/api/src/trpc/ask.ts` and the MCP entries carry `ask` (#717, #756).
 - `apps/web/src/features/ask/` holds New question (#759), and `apps/web/src/features/questions/` holds Questions asked and Answer tests (#751, #752).
 - `packages/core/test/recall.ts` reports [recall at ten on the synthetic sets](../../operations/readings.md#recall-at-ten-on-the-synthetic-sets). `packages/core/test/readings/` holds the owner's readings (#755, #757).
+- `packages/core/src/answering/records.ts` reads a reader's own records (`ask.yourQuestions`, `ask.yourRecord`), and `apps/web/src/features/ask/your-questions-page.tsx` holds Ask › Your questions, its list budget in `apps/web/e2e/ask-your-questions.spec.ts` (U19 of the [plan](../../plans/2026-10-11-2309-feat-s2b-ask-plan.md)).
+- Both record pages word each concept's trust now, and the record keeps trust at the time (BA-181).
 
 **Must carry.**
 
-- **Your questions.** U19 of the [plan](../../plans/2026-10-11-2309-feat-s2b-ask-plan.md) builds it. A reader sees their own records, newest first, with no count, and another person's record answers not-found (ADR 0046).
-- **Trust now.** Both record pages read each concept's trust now, in the closed trust words, and the record keeps trust at the time (BA-181).
 - **The judge's follow-up.** An expired reservation is settled, with the root fix in BA-186. A Deprecated or Draft `Answer` is never a judge candidate (BA-182).
 - **Refusals in one group.** A refusal carries no concepts, so the grouping by collection and its seeded tests go (BA-180).
 - **The map's state on the record.** A record says whether the map was live, and an older record reads as unknown (BA-158).

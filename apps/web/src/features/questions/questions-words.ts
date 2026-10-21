@@ -1,8 +1,7 @@
-import { JUDGE_WORDS, REASON_WORDS, VERDICT_WORDS } from "@/shared/answer-words.ts";
+import { flaggedWords, JUDGE_WORDS, RECORD_WORDS, verdictWords } from "@/shared/answer-words.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
-import { dayWords } from "@/shared/words.ts";
 
-import type { AskedRecord, ConceptRead, Feedback, FlagClosing } from "./questions-api.ts";
+import type { AskedRecord, ConceptRead, FlagClosing } from "./questions-api.ts";
 
 const JUDGED_WORDS = {
   yes: "Yes, it answers the question",
@@ -29,37 +28,6 @@ export const CLOSINGS = [
   "no-fault-in-the-knowledge",
 ] as const satisfies readonly FlagClosing[];
 
-const STATUS_WORDS: ReadonlyMap<string, string> = new Map([
-  ["changed-since-checked", "Changed since verified"],
-  ["out-of-date", "Out of date"],
-  ["draft", "Draft"],
-  ["deprecated", "Deprecated"],
-]);
-
-const RIDER_WORDS: ReadonlyMap<string, string> = new Map([
-  ["imported", " · imported"],
-  ["source-moved-on", " · source moved on"],
-]);
-
-type TrustThen = ConceptRead["trustThen"];
-
-const verifiedWords = (trust: TrustThen): string => {
-  const rider = trust.rider === null ? "" : (RIDER_WORDS.get(trust.rider) ?? "");
-  switch (trust.tier) {
-    case "human-reviewed": {
-      const day = trust.verifiedAt === null ? "" : ` · ${dayWords(trust.verifiedAt)}`;
-      return `Verified by a person${day}${rider}`;
-    }
-    case "machine-confirmed":
-      return `Verified automatically${rider}`;
-    default:
-      return "Unverified";
-  }
-};
-
-export const trustThenWords = (trust: TrustThen): string =>
-  STATUS_WORDS.get(trust.status) ?? verifiedWords(trust);
-
 const ASKER_WORDS = {
   "former-member": "A former member",
   platform: "The platform",
@@ -75,17 +43,14 @@ export const QUESTIONS_WORDS = {
   notAnswered: "Not Answered",
   noCollection: CONCEPT_WORDS.noCollection,
   more: "More Questions",
-  removed: "Question removed by an erasure",
-  verdict: (verdict: AskedRecord["verdict"]): string =>
-    verdict === null ? "Not finished" : VERDICT_WORDS[verdict],
+  verdict: verdictWords,
   judge: (state: AskedRecord["judgeState"]): string =>
     state === null ? "Not finished" : JUDGE_WORDS[state],
   judged: JUDGED_WORDS,
   where: WHERE_WORDS,
   asker: ASKER_WORDS,
   closing: CLOSING_WORDS,
-  flaggedAs: (reason: Feedback["reason"]): string =>
-    reason === null ? "Flagged" : `Flagged · ${REASON_WORDS[reason]}`,
+  flaggedAs: flaggedWords,
   terms: {
     askedBy: "Asked By",
     asked: "Asked",
@@ -95,12 +60,10 @@ export const QUESTIONS_WORDS = {
     judge: "Judge",
     kind: "Kind",
     collection: "Collection",
-    trustThen: "Trust When Asked",
+    trust: "Trust",
     judged: "Judge’s Verdict",
-    note: "Note",
-    disputed: "Sentence Disputed",
+    ...RECORD_WORDS.terms,
     restedOn: "Rested On",
-    given: "Given",
     closed: "Closed",
   },
   noneNamed: "None",
@@ -111,7 +74,7 @@ export const QUESTIONS_WORDS = {
     feedback: "Feedback",
   },
   noConcepts: "No concepts you can read",
-  helpful: "Marked helpful",
+  helpful: RECORD_WORDS.markedHelpful,
   closeTheFlag: "Close This Flag",
   closedSaid: {
     "fixed-in-the-knowledge": "The flag has been closed as fixed in the knowledge successfully.",

@@ -51,6 +51,20 @@ const tool = z.object({
 });
 type Tool = z.infer<typeof tool>;
 
+const tierOffer = z.object({ const: z.string().optional(), enum: z.array(z.string()).optional() });
+
+const tiersOffered = (schema: unknown): readonly string[] => {
+  const tiers = new Set<string>();
+  JSON.stringify(schema, (key, value: unknown) => {
+    const offer = key === "tier" ? tierOffer.safeParse(value) : undefined;
+    if (offer?.success === true) {
+      for (const tier of [offer.data.const ?? [], offer.data.enum ?? []].flat()) tiers.add(tier);
+    }
+    return value;
+  });
+  return [...tiers];
+};
+
 const toolsListed = z.object({
   tools: z.array(tool),
   resultType: z.string().optional(),
@@ -344,13 +358,10 @@ describe("era-independent", () => {
   });
 
   it.each([
-    ["find", "trust tier", TRUST_TIERS],
     ["find", "trust status", TRUST_STATUSES],
     ["find", "trust rider", TRUST_RIDERS],
     ["ask", "verdict", QUESTION_VERDICTS],
     ["ask", "judge state", JUDGE_STATES],
-    ["ask", "trust tier", TRUST_TIERS],
-    ["open", "trust tier", TRUST_TIERS],
     ["open", "trust status", TRUST_STATUSES],
     ["open", "trust rider", TRUST_RIDERS],
     ["give_feedback", "verdict", FEEDBACK_VERDICTS],
@@ -363,6 +374,14 @@ describe("era-independent", () => {
     expect(JSON.stringify([entry?.inputSchema, entry?.outputSchema])).toContain(
       `"enum":${JSON.stringify(values)}`,
     );
+  });
+
+  it.each(["find", "ask", "open"])("offers %s every trust tier core declares", async (name) => {
+    const { client, token } = await connect();
+
+    const entry = (await listTools(client, token)).find((listed) => listed.name === name);
+
+    expect(tiersOffered(entry?.outputSchema).toSorted()).toEqual(TRUST_TIERS.toSorted());
   });
 
   it("offers open's body links in its output schema", async () => {

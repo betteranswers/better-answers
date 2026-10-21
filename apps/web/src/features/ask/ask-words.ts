@@ -55,3 +55,11 @@ export const ASK_WORDS = {
   noteHelp: "Optional. Say what was wrong.",
   sendFlag: "Send Flag",
 } as const;
+
+export const YOUR_QUESTIONS_WORDS = {
+  loading: "Your questions are still loading.",
+  none: "No questions yet",
+  more: "More Questions",
+  recordLoading: "The question is still loading.",
+  feedback: "Your Feedback",
+} as const;

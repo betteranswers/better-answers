@@ -199,6 +199,7 @@ export {
   TRUST_RIDERS,
   TRUST_STATUSES,
   TRUST_TIERS,
+  UNREVIEWED_TIERS,
   trustOf,
   trustWords,
   ukLongDate,

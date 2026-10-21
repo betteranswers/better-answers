@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 
 import { ulidOfConceptIri } from "@better-answers/schema/concept-file";
 
+import { questionWords } from "@/shared/answer-words.ts";
 import { detailAt, KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
@@ -22,7 +23,7 @@ import {
   type Feedback,
   type FlagClosing,
 } from "./questions-api.ts";
-import { CLOSE_AS, CLOSINGS, QUESTIONS_WORDS as WORDS, trustThenWords } from "./questions-words.ts";
+import { CLOSE_AS, CLOSINGS, QUESTIONS_WORDS as WORDS } from "./questions-words.ts";
 
 const SEARCH_PAGE = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Search");
 
@@ -36,8 +37,6 @@ export const askerWords = (askedBy: AskedRecord["askedBy"]): string =>
   askedBy.kind === "person"
     ? nameOrAddress(askedBy.displayName, askedBy.address)
     : WORDS.asker[askedBy.kind];
-
-export const questionWords = (record: AskedRecord): string => record.question ?? WORDS.removed;
 
 const conceptPageOf = (iri: string): string | undefined => {
   const ulid = ulidOfConceptIri(iri);
@@ -63,8 +62,8 @@ function ConceptItem(properties: { readonly concept: ConceptRead }) {
       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
         <Row term={WORDS.terms.kind}>{concept.kind}</Row>
         <Row term={WORDS.terms.collection}>{concept.collection ?? WORDS.noCollection}</Row>
-        <Row term={WORDS.terms.trustThen}>
-          <Pill>{trustThenWords(concept.trustThen)}</Pill>
+        <Row term={WORDS.terms.trust}>
+          <Pill>{concept.trustWords}</Pill>
         </Row>
         {concept.judged === undefined ? null : (
           <Row term={WORDS.terms.judged}>{WORDS.judged[concept.judged]}</Row>

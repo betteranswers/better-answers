@@ -75,8 +75,9 @@ export const ASK = {
           name: "Your Questions",
           path: "/ask/your-questions",
           icon: "history",
-          built: false,
+          built: true,
           seenBy: EVERY_ROLE,
+          detail: { param: "record" },
         },
         {
           name: "Connect Claude",

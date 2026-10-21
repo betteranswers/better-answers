@@ -28,15 +28,22 @@ import {
   promptSent,
   type SentToModel,
 } from "./harness-model.ts";
-import { feedbackKeptOn as feedbackOf, recordsIn as recordsOf } from "./harness-questions.ts";
+import {
+  feedbackKeptOn as feedbackOf,
+  questionsSeeding,
+  recordsIn as recordsOf,
+  seedQuestions,
+  staleTomorrow,
+  wordsTwoDaysApart,
+} from "./harness-questions.ts";
 import { servedOnLoopback } from "./loopback-port.ts";
 import { structured, toolAnswered, type Rpc } from "./mcp-call.ts";
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
-import { refusalOfCall, webClientOf } from "./web-client.ts";
+import { refusalOfCall, webClientOf, webSignedIn } from "./web-client.ts";
 
 const wire = aModelWire();
 
-const { clock, stopTheClock } = aStoppableClock();
+const { clock, stopTheClock, moveTheClock } = aStoppableClock();
 
 const QUIET_MS = 200;
 
@@ -482,6 +489,69 @@ describe("feedback over tRPC", () => {
     };
     expect(await feedbackKeptOn(overMcp)).toEqual([kept]);
     expect(await feedbackKeptOn(onTheWeb)).toEqual([kept]);
+  });
+});
+
+const aQuestionEach = async () => {
+  const workspace = await app().provision();
+  const member = await app().person();
+  await app().addMember(workspace.workspaceId, member.id, "Viewer");
+  const { concepts } = await seedConcepts(
+    app(),
+    conceptsSeeding.parse({
+      workspaceId: workspace.workspaceId,
+      userId: workspace.admin.id,
+      concepts: [{ ...ACCESS_POLICY, frontmatter: { stale_after: staleTomorrow() } }],
+    }),
+  );
+  const cited = [{ iri: concepts[0]?.iri ?? "" }];
+  const [admins, members] = await seedQuestions(
+    app(),
+    questionsSeeding.parse({
+      workspaceId: workspace.workspaceId,
+      records: [
+        { askedBy: workspace.admin.id, question: QUESTION, verdict: "related", concepts: cited },
+        { askedBy: member.id, question: QUESTION, verdict: "related", concepts: cited },
+      ],
+    }),
+  );
+  return {
+    member,
+    admins: admins?.recordId ?? "",
+    members: members?.recordId ?? "",
+  };
+};
+
+describe("your questions over tRPC", () => {
+  it("answers a reader only the records they asked", async () => {
+    const { member, members } = await aQuestionEach();
+    const { api } = await webSignedIn(app(), member.email);
+
+    const { records } = await api.ask.yourQuestions.query({});
+
+    expect(records.map(({ id }) => id)).toEqual([members]);
+  });
+
+  it("answers another member's record as not found", async () => {
+    const { member, admins, members } = await aQuestionEach();
+    const { api } = await webSignedIn(app(), member.email);
+
+    const own = await api.ask.yourRecord.query({ id: members });
+    const other = await refusalOfCall(api.ask.yourRecord.query({ id: admins }));
+
+    expect(own.id).toBe(members);
+    expect(other).toMatchObject({ data: { httpStatus: 404, refusal: { word: "not-found" } } });
+  });
+
+  it("words a record's trust by the app's clock", async () => {
+    const { member } = await aQuestionEach();
+    const { api } = await webSignedIn(app(), member.email);
+    const read = async () => (await api.ask.yourQuestions.query({})).records;
+
+    expect(await wordsTwoDaysApart({ stopTheClock, moveTheClock }, read)).toEqual([
+      "Unverified",
+      "Out of date",
+    ]);
   });
 });
 

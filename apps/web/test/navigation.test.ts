@@ -121,13 +121,14 @@ describe("the one navigation list", () => {
     ]);
   });
 
-  it("calls only today's thirteen pages built", () => {
+  it("calls only today's fourteen pages built", () => {
     expect(
       pagesOf([...AREAS, CONSOLE])
         .filter((each) => each.built)
         .map((each) => each.path),
     ).toEqual([
       "/ask/new-question",
+      "/ask/your-questions",
       "/ask/connect-claude",
       "/knowledge/search",
       "/sources/connected-sources",
@@ -175,7 +176,7 @@ describe("what each person is shown", () => {
       const shown = visibleTo(readerOf(role), AREAS);
 
       expect(outline(shown.areas)).toEqual([
-        ["Ask", [[null, ["New Question", "Connect Claude"]]]],
+        ["Ask", [[null, ["New Question", "Your Questions", "Connect Claude"]]]],
         ["Knowledge", [["Browse", ["Search"]]]],
       ]);
       expect(shown.home).toBe(HOMES[role]);
@@ -187,7 +188,7 @@ describe("what each person is shown", () => {
     const shown = visibleTo(readerOf("Admin"), AREAS);
 
     expect(outline(shown.areas)).toEqual([
-      ["Ask", [[null, ["New Question", "Connect Claude"]]]],
+      ["Ask", [[null, ["New Question", "Your Questions", "Connect Claude"]]]],
       ["Knowledge", [["Browse", ["Search"]]]],
       [
         "Control Centre",

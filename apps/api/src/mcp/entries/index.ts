@@ -19,7 +19,7 @@ import {
   renderOpen,
   TRUST_RIDERS,
   TRUST_STATUSES,
-  TRUST_TIERS,
+  UNREVIEWED_TIERS,
   type AnswerResult,
   type FindMatch,
   type FindResult,
@@ -33,31 +33,32 @@ import { ok, parse, type Result } from "@better-answers/core/kernel";
 
 import { defineEntry, type Entry } from "./define.ts";
 
-const trust = z.object({
-  tier: z.enum(TRUST_TIERS),
+const trustState = {
   status: z.enum(TRUST_STATUSES),
-  checkedBy: z.string().nullable(),
   checkedAt: z.string().nullable(),
   rider: z.enum(TRUST_RIDERS).nullable(),
-});
+};
+
+const trust = z.discriminatedUnion("tier", [
+  z.object({ tier: z.literal("human-reviewed"), checkedBy: z.string(), ...trustState }),
+  z.object({
+    tier: z.enum(UNREVIEWED_TIERS),
+    checkedBy: z.string().nullable(),
+    ...trustState,
+  }),
+]);
 
 type WireTrust = z.infer<typeof trust>;
 
-const wireTrust = ({ tier, status, verifiedBy, verifiedAt, rider }: Trust): WireTrust => ({
-  tier,
-  status,
-  checkedBy: verifiedBy,
-  checkedAt: verifiedAt,
-  rider,
-});
+const wireTrust = ({ tier, status, verifiedBy, verifiedAt, rider }: Trust): WireTrust =>
+  tier === "human-reviewed"
+    ? { tier, status, checkedBy: verifiedBy, checkedAt: verifiedAt, rider }
+    : { tier, status, checkedBy: verifiedBy, checkedAt: verifiedAt, rider };
 
-const coreTrust = ({ tier, status, checkedBy, checkedAt, rider }: WireTrust): Trust => ({
-  tier,
-  status,
-  verifiedBy: checkedBy,
-  verifiedAt: checkedAt,
-  rider,
-});
+const coreTrust = ({ tier, status, checkedBy, checkedAt, rider }: WireTrust): Trust =>
+  tier === "human-reviewed"
+    ? { tier, status, verifiedBy: checkedBy, verifiedAt: checkedAt, rider }
+    : { tier, status, verifiedBy: checkedBy, verifiedAt: checkedAt, rider };
 
 type WireMatch<Match> = Match extends { readonly trust: Trust }
   ? Omit<Match, "trust"> & { readonly trust: WireTrust }
