@@ -196,9 +196,10 @@ def keeping_alive(
                     if remaining <= 0:
                         break
                     if not lease.renew(min(LEASE_SECONDS, remaining)):
-                        logger.warning(
-                            "the claim was lost", job_id=job.id, worker_id=worker_id
-                        )
+                        if left() > 0:
+                            logger.warning(
+                                "the claim was lost", job_id=job.id, worker_id=worker_id
+                            )
                         break
         finally:
             if not stop.wait(left()):

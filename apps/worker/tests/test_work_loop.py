@@ -1079,6 +1079,17 @@ def a_worker_hung_on_its_audit(
     return [json.loads(line) for line in stdout.splitlines()], stderr
 
 
+A_BEATS_SKEW_SECONDS = (
+    queue.HEARTBEAT_CONNECT_SECONDS + 2 * queue.HEARTBEAT_STATEMENT_SECONDS
+)
+
+
+def the_lease_lapses(database: psycopg.Connection, workspace: str) -> bool:
+    return bool(
+        _within(A_BEATS_SKEW_SECONDS, lambda: not _lease_of(database, workspace)[1])
+    )
+
+
 def test_a_job_past_its_deadline_ends_the_worker_process(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
@@ -1086,9 +1097,12 @@ def test_a_job_past_its_deadline_ends_the_worker_process(
 
     written, stderr = a_worker_hung_on_its_audit(database, tmp_path)
 
+    assert the_lease_lapses(database, workspace), (
+        "the lease outlived the worker process"
+    )
     with scoped(database, workspace) as cursor:
         reclaimed = queue.claim(cursor, workspace, WORKER, ["nightly-audit"])
-    assert reclaimed is not None, "the lease outlived the worker process"
+    assert reclaimed is not None
     assert reclaimed.attempts == 2
     events = [line["event"] for line in written]
     assert not {"job finished", "job failed", "the claim was lost"} & set(events)
@@ -1111,6 +1125,7 @@ def test_a_job_outliving_every_attempt_ends_poisoned(
 
     for _ in range(2):
         a_worker_hung_on_its_audit(database, tmp_path)
+        assert the_lease_lapses(database, workspace), "the lease outlived the worker"
 
     with scoped(database, workspace) as cursor:
         assert queue.claim(cursor, workspace, WORKER, ["nightly-audit"]) is None
