@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useId, useMemo, useRef, type ReactElement, type RefObject } from "react";
 
-import { flaggedWords, verdictWords } from "@/shared/answer-words.ts";
+import { flaggedWords, questionWords, RECORD_WORDS, verdictWords } from "@/shared/answer-words.ts";
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
 import { RowLink } from "@/shared/grid-table.tsx";
@@ -34,8 +34,6 @@ const LISTED = Object.values(KEY);
 
 const { outcomeOfFailure } = refusalsOf({});
 
-const questionOf = (record: YourRecord): string => record.question ?? WORDS.removed;
-
 const namesNoRecord = (failure: Error | ApiError): boolean =>
   refusalOf(failure)?.word === "not-found";
 
@@ -58,7 +56,7 @@ function QuestionRow(properties: {
           void navigate({ href });
         }}
       >
-        {questionOf(record)}
+        {questionWords(record)}
       </RowLink>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
         <Pill>{verdictWords(record.verdict)}</Pill>
@@ -167,13 +165,13 @@ function FeedbackGiven(properties: { readonly feedback: YourRecord["feedback"] }
         {feedback.map((given) => (
           <li key={given.id} className="grid gap-2 border-t border-border pt-3 first:border-t-0">
             <p className="font-medium">
-              {given.verdict === "flag" ? flaggedWords(given.reason) : WORDS.markedHelpful}
+              {given.verdict === "flag" ? flaggedWords(given.reason) : RECORD_WORDS.markedHelpful}
             </p>
             <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-              <Row term={WORDS.terms.given}>{instantWords(given.givenAt)}</Row>
-              {given.note === null ? null : <Row term={WORDS.terms.note}>{given.note}</Row>}
+              <Row term={RECORD_WORDS.terms.given}>{instantWords(given.givenAt)}</Row>
+              {given.note === null ? null : <Row term={RECORD_WORDS.terms.note}>{given.note}</Row>}
               {given.disputed?.sentence == null ? null : (
-                <Row term={WORDS.terms.disputed}>
+                <Row term={RECORD_WORDS.terms.disputed}>
                   <blockquote className="border-l border-border bg-muted px-3 py-2">
                     {given.disputed.sentence}
                   </blockquote>
@@ -189,7 +187,7 @@ function FeedbackGiven(properties: { readonly feedback: YourRecord["feedback"] }
 
 function RecordShown(properties: { readonly record: YourRecord }) {
   const { record } = properties;
-  const question = questionOf(record);
+  const question = questionWords(record);
   useBreadcrumbLastPart(question);
   const shown = shownAnswerOf(record);
   return (

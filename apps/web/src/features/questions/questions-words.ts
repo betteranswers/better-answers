@@ -1,4 +1,4 @@
-import { flaggedWords, JUDGE_WORDS, verdictWords } from "@/shared/answer-words.ts";
+import { flaggedWords, JUDGE_WORDS, RECORD_WORDS, verdictWords } from "@/shared/answer-words.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 
 import type { AskedRecord, ConceptRead, FlagClosing } from "./questions-api.ts";
@@ -43,7 +43,6 @@ export const QUESTIONS_WORDS = {
   notAnswered: "Not Answered",
   noCollection: CONCEPT_WORDS.noCollection,
   more: "More Questions",
-  removed: "Question removed by an erasure",
   verdict: verdictWords,
   judge: (state: AskedRecord["judgeState"]): string =>
     state === null ? "Not finished" : JUDGE_WORDS[state],
@@ -63,10 +62,8 @@ export const QUESTIONS_WORDS = {
     collection: "Collection",
     trust: "Trust",
     judged: "Judge’s Verdict",
-    note: "Note",
-    disputed: "Sentence Disputed",
+    ...RECORD_WORDS.terms,
     restedOn: "Rested On",
-    given: "Given",
     closed: "Closed",
   },
   noneNamed: "None",
@@ -77,7 +74,7 @@ export const QUESTIONS_WORDS = {
     feedback: "Feedback",
   },
   noConcepts: "No concepts you can read",
-  helpful: "Marked helpful",
+  helpful: RECORD_WORDS.markedHelpful,
   closeTheFlag: "Close This Flag",
   closedSaid: {
     "fixed-in-the-knowledge": "The flag has been closed as fixed in the knowledge successfully.",

@@ -1,5 +1,6 @@
 import { useId, useMemo, useRef, useState } from "react";
 
+import { questionWords } from "@/shared/answer-words.ts";
 import { usePageKeystrokes, useKeystroke } from "@/shared/keystrokes.tsx";
 import { useLanding, useLandingLine, type Landing } from "@/shared/landing.ts";
 import { useLastRead } from "@/shared/last-read.ts";
@@ -15,13 +16,7 @@ import { Card } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { instantWords } from "@/shared/words.ts";
 
-import {
-  QuestionSheet,
-  askerWords,
-  questionWords,
-  recordButtonId,
-  useFlagClosing,
-} from "./question-sheet.tsx";
+import { QuestionSheet, askerWords, recordButtonId, useFlagClosing } from "./question-sheet.tsx";
 import {
   isOpen,
   useQuestionsAsked,

@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 
 import { ulidOfConceptIri } from "@better-answers/schema/concept-file";
 
+import { questionWords } from "@/shared/answer-words.ts";
 import { detailAt, KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
@@ -36,8 +37,6 @@ export const askerWords = (askedBy: AskedRecord["askedBy"]): string =>
   askedBy.kind === "person"
     ? nameOrAddress(askedBy.displayName, askedBy.address)
     : WORDS.asker[askedBy.kind];
-
-export const questionWords = (record: AskedRecord): string => record.question ?? WORDS.removed;
 
 const conceptPageOf = (iri: string): string | undefined => {
   const ulid = ulidOfConceptIri(iri);

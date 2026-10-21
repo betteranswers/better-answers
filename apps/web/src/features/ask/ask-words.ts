@@ -60,9 +60,6 @@ export const YOUR_QUESTIONS_WORDS = {
   loading: "Your questions are still loading.",
   none: "No questions yet",
   more: "More Questions",
-  removed: "Question no longer kept",
   recordLoading: "The question is still loading.",
   feedback: "Your Feedback",
-  markedHelpful: "Marked helpful",
-  terms: { given: "Given", note: "Note", disputed: "Sentence Disputed" },
 } as const;

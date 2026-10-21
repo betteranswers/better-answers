@@ -28,6 +28,15 @@ export const REASON_WORDS = {
 export const flaggedWords = (reason: FlagReason | null): string =>
   reason === null ? "Flagged" : `Flagged · ${REASON_WORDS[reason]}`;
 
+export const RECORD_WORDS = {
+  questionGone: "Question no longer kept",
+  markedHelpful: "Marked helpful",
+  terms: { given: "Given", note: "Note", disputed: "Sentence Disputed" },
+} as const;
+
+export const questionWords = (record: { readonly question: string | null }): string =>
+  record.question ?? RECORD_WORDS.questionGone;
+
 export const FLAG_REASONS = [
   "wrong",
   "out-of-date",
