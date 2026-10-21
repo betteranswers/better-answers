@@ -873,11 +873,11 @@ test.describe("the Knowledge Search page", () => {
       const panel = await passagePanel(page, HANDBOOK).boundingBox();
       const offer = await dismiss.boundingBox();
 
-      expect(panel, "no panel opened beside the page").not.toBeNull();
+      if (panel === null || offer === null) throw new Error("the panel or the offer drew no box");
       expect(
-        (offer?.x ?? 0) + (offer?.width ?? 0),
+        offer.x + offer.width,
         "the panel covers the passkey offer's Dismiss",
-      ).toBeLessThanOrEqual(panel?.x ?? 0);
+      ).toBeLessThanOrEqual(panel.x);
     });
   }
 

@@ -356,6 +356,10 @@ const useReading = (query: string): Reading => {
   };
 };
 
+const focusIfLost = (heading: RefObject<HTMLElement | null>): void => {
+  if (document.activeElement === document.body) heading.current?.focus();
+};
+
 const focusFromBodyOr = (opened: OpenedFor | undefined, heading: Heading): Heading | undefined =>
   opened?.waited === true ? heading : undefined;
 
@@ -377,7 +381,7 @@ const useOpening = (
   const listFailed = opened !== undefined && searched === "failed";
 
   useEffect(() => {
-    if ((left || listFailed) && document.activeElement === document.body) heading.current?.focus();
+    if (left || listFailed) focusIfLost(heading);
   }, [left, listFailed, heading]);
 
   return {
@@ -409,7 +413,7 @@ const useReturnedUnlisted = (
     returningKey !== undefined && !loading && !shown.some((match) => keyOf(match) === returningKey);
 
   useEffect(() => {
-    if (unlisted && document.activeElement === document.body) heading.current?.focus();
+    if (unlisted) focusIfLost(heading);
   }, [unlisted, heading]);
 };
 
@@ -419,7 +423,7 @@ const useDroppedInFocus = (heading: RefObject<HTMLElement | null>) => {
   useEffect(() => {
     if (!dropped.current) return;
     dropped.current = false;
-    if (document.activeElement === document.body) heading.current?.focus();
+    focusIfLost(heading);
   });
 
   return useCallback(() => {
