@@ -489,7 +489,7 @@ def _flattened_links(text: str) -> str:
 
 
 def _paragraph_around(body: str, index: int) -> tuple[int, int]:
-    above = body.rfind("\n", 0, index)
+    above = body.rfind("\n", 0, index + 1)
     while above != -1:
         line = body.rfind("\n", 0, above)
         if _BLANK.fullmatch(body, line + 1, above):
