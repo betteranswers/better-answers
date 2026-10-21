@@ -14,7 +14,14 @@ const linksCase = z.object({
   case: z.string().min(1),
   body: z.string().min(1),
   sources: z.union([z.array(z.string()), z.array(sourceEntry)]),
-  links: z.array(z.object({ ordinal: z.int().nonnegative(), to: z.string().min(1) })),
+  links: z.array(
+    z.object({
+      ordinal: z.int().nonnegative(),
+      to: z.string().min(1),
+      section: z.string().nullable(),
+      sentence: z.string(),
+    }),
+  ),
   marks: z.array(z.object({ mark: z.string().min(1), source: z.int().nonnegative() })),
   why: z.string().min(1),
 });
@@ -55,8 +62,13 @@ const edgesMadeBy = async (each: z.output<typeof linksCase>) => {
       }),
     ),
   );
-  const rows = await db().pool.query<{ uid: string; to_uid: string }>(
-    `SELECT uid, to_uid FROM map_edge
+  const rows = await db().pool.query<{
+    uid: string;
+    to_uid: string;
+    section: string | null;
+    sentence: string | null;
+  }>(
+    `SELECT uid, to_uid, section, sentence FROM map_edge
       WHERE workspace_id = $1 AND from_uid = $2 AND label = 'LINKS_TO'`,
     [reader.workspaceId, fixture.citing.iri],
   );
@@ -67,6 +79,8 @@ const edgesMadeBy = async (each: z.output<typeof linksCase>) => {
         from: named?.["from"],
         ordinal: Number(named?.["ordinal"]),
         to: row.to_uid,
+        section: row.section,
+        sentence: row.sentence,
       };
     })
     .toSorted((one, other) => one.ordinal - other.ordinal);

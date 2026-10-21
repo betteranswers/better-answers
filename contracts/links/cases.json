@@ -1,5 +1,5 @@
 {
-  "description": "links (ADR 0031, ADR 0015): what a concept body's footnotes make of the map, said once for both tiers. The api derives a concept's LINKS_TO edges at every governed write (`packages/core/src/store/map/index.ts`) and the worker derives them again in the full rebuild (`apps/worker/src/better_answers_worker/links.py`); an edge's id carries its link's ordinal, so the two must count links alike or the rebuilt map and the live one name different edges. A footnote reference `[^label]` is a **citation mark** when its label, trimmed, with inner whitespace collapsed and compared without case, is the `id` of an entry in the concept's `sources` list. A mark resolves to the first entry carrying that id, whether or not the body holds a definition for it, and it is never a link: it makes no edge and takes no ordinal. A footnote reference whose label is no source id is a link when the body defines it, and it then takes an ordinal and makes an edge when its definition names a concept, as OKF allows. One with neither a source nor a definition is plain text: no edge, no ordinal, no error. A footnote definition line `[^label]: ...` is never a link and takes no ordinal. Everything else in the prose that today takes an ordinal still does. Only a record-form `sources` entry carries an `id`; a string-form entry carries none, so no mark resolves to it. Every case is read as the concept `citing` below, every target is a concept IRI no concept holds yet (so both tiers make the edge with no kind and no lookup), and no source's resource is a concept, so no case makes a lineage edge. `links` is every LINKS_TO edge the case makes, by ordinal and target, in ordinal order; `marks` is every citation mark, as written, with the index of the `sources` entry it resolves to, in body order. The TypeScript half drives the api's map write (`packages/core/test/links.contract.test.ts`) and the Python half the worker's edge derivation (`apps/worker/tests/test_links_contract.py`).",
+  "description": "links (ADR 0031, ADR 0015): what a concept body's footnotes make of the map, said once for both tiers. The api derives a concept's LINKS_TO edges at every governed write (`packages/core/src/store/map/index.ts`) and the worker derives them again in the full rebuild (`apps/worker/src/better_answers_worker/links.py`); an edge's id carries its link's ordinal, so the two must count links alike or the rebuilt map and the live one name different edges. A footnote reference `[^label]` is a **citation mark** when its label, trimmed, with inner whitespace collapsed and compared without case, is the `id` of an entry in the concept's `sources` list. A mark resolves to the first entry carrying that id, whether or not the body holds a definition for it, and it is never a link: it makes no edge and takes no ordinal. A footnote reference whose label is no source id is a link when the body defines it, and it then takes an ordinal and makes an edge when its definition names a concept, as OKF allows. One with neither a source nor a definition is plain text: no edge, no ordinal, no error. A footnote definition line `[^label]: ...` is never a link and takes no ordinal. Everything else in the prose that today takes an ordinal still does. Only a record-form `sources` entry carries an `id`; a string-form entry carries none, so no mark resolves to it. Every case is read as the concept `citing` below, every target is a concept IRI no concept holds yet (so both tiers make the edge with no kind and no lookup), and no source's resource is a concept, so no case makes a lineage edge. `links` is every LINKS_TO edge the case makes, in ordinal order, by ordinal, target, `section` and `sentence`. `section` is the text of the nearest heading above the link, or null, and `sentence` is the sentence the link sits in, with each link reduced to its text. Both are trimmed, with each run of whitespace made one space. `marks` is every citation mark, as written, with the index of the `sources` entry it resolves to, in body order. Throughout, a line ends at a line feed alone, and whitespace is the six characters space, tab, line feed, carriage return, form feed and vertical tab. The TypeScript half drives the api's map write (`packages/core/test/links.contract.test.ts`) and the Python half the worker's edge derivation (`apps/worker/tests/test_links_contract.py`).",
   "citing": {
     "iri": "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM",
     "path": "knowledge/expenses.md",
@@ -18,7 +18,9 @@
       "links": [
         {
           "ordinal": 0,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "Claims close within 30 days.^a See the product for tiers."
         }
       ],
       "marks": [
@@ -41,7 +43,9 @@
       "links": [
         {
           "ordinal": 0,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "Mileage follows the rates policy.^b"
         }
       ],
       "marks": [],
@@ -59,7 +63,9 @@
       "links": [
         {
           "ordinal": 0,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "Receipts are kept for six years.^c See the product."
         }
       ],
       "marks": [],
@@ -104,7 +110,9 @@
       "links": [
         {
           "ordinal": 0,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "Audit logs are kept for a year.^aud-047 Reviews run yearly.^ AUD-047 See the product."
         }
       ],
       "marks": [
@@ -144,7 +152,9 @@
       "links": [
         {
           "ordinal": 0,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "Mileage is paid at the published rate.^AUD-047 See the product."
         }
       ],
       "marks": [],
@@ -162,7 +172,9 @@
       "links": [
         {
           "ordinal": 0,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "See the product for tiers."
         }
       ],
       "marks": [
@@ -185,23 +197,33 @@
       "links": [
         {
           "ordinal": 3,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "!a diagram and the regulator back the rule.^a So do nowhere, inline, full, collapsed and https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP, and so does a footnote link.^rates"
         },
         {
           "ordinal": 4,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "!a diagram and the regulator back the rule.^a So do nowhere, inline, full, collapsed and https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP, and so does a footnote link.^rates"
         },
         {
           "ordinal": 5,
-          "to": "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP"
+          "to": "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP",
+          "section": null,
+          "sentence": "!a diagram and the regulator back the rule.^a So do nowhere, inline, full, collapsed and https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP, and so does a footnote link.^rates"
         },
         {
           "ordinal": 6,
-          "to": "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP"
+          "to": "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP",
+          "section": null,
+          "sentence": "!a diagram and the regulator back the rule.^a So do nowhere, inline, full, collapsed and https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP, and so does a footnote link.^rates"
         },
         {
           "ordinal": 7,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "!a diagram and the regulator back the rule.^a So do nowhere, inline, full, collapsed and https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP, and so does a footnote link.^rates"
         }
       ],
       "marks": [
@@ -224,7 +246,9 @@
       "links": [
         {
           "ordinal": 0,
-          "to": "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP"
+          "to": "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP",
+          "section": null,
+          "sentence": "Only this one maps.^a"
         }
       ],
       "marks": [
@@ -247,11 +271,15 @@
       "links": [
         {
           "ordinal": 0,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "See ^a and the rates."
         },
         {
           "ordinal": 1,
-          "to": "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP"
+          "to": "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP",
+          "section": null,
+          "sentence": "See ^a and the rates."
         }
       ],
       "marks": [],
@@ -269,7 +297,9 @@
       "links": [
         {
           "ordinal": 0,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "Claims close within 30 days.^ See the product."
         }
       ],
       "marks": [],
@@ -282,7 +312,9 @@
       "links": [
         {
           "ordinal": 0,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "Mileage is paid ~~~ at cost, see the rates."
         }
       ],
       "marks": [],
@@ -304,7 +336,9 @@
       "links": [
         {
           "ordinal": 0,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "Approvals need two signatures.^a See the product."
         }
       ],
       "marks": [
@@ -331,7 +365,9 @@
       "links": [
         {
           "ordinal": 0,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "Claims close within 30 days.^12 See the product."
         }
       ],
       "marks": [
@@ -354,7 +390,9 @@
       "links": [
         {
           "ordinal": 0,
-          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "Claims close within 30 days.^\ufeffa Mileage is paid at cost.^\u0085a See the product."
         }
       ],
       "marks": [],
@@ -371,8 +409,20 @@
     {
       "case": "a bracket run is one link naming nothing",
       "body": "[[[[[[]] Claims close [the product](https://better-answers.com/c/01J6RRRRRRRRRRRRRRRRRRRRRR).",
-      "sources": [{ "resource": "https://example.test/handbook", "id": "a" }],
-      "links": [{ "ordinal": 1, "to": "https://better-answers.com/c/01J6RRRRRRRRRRRRRRRRRRRRRR" }],
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 1,
+          "to": "https://better-answers.com/c/01J6RRRRRRRRRRRRRRRRRRRRRR",
+          "section": null,
+          "sentence": "[[[[[] Claims close the product."
+        }
+      ],
       "marks": [],
       "why": "A run of brackets before the first `]` is one bare link of the whole span: it names nothing and takes the first ordinal, and the readable link after it takes the next. However many brackets a body holds, the reader walks it once."
     },
@@ -387,16 +437,40 @@
     {
       "case": "a definition's target may sit on a later line",
       "body": "[the handbook]:\n\nhttps://better-answers.com/c/01J6TTTTTTTTTTTTTTTTTTTTTT\n\nRead [the handbook].[^a]",
-      "sources": [{ "resource": "https://example.test/handbook", "id": "a" }],
-      "links": [{ "ordinal": 1, "to": "https://better-answers.com/c/01J6TTTTTTTTTTTTTTTTTTTTTT" }],
-      "marks": [{ "mark": "[^a]", "source": 0 }],
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 1,
+          "to": "https://better-answers.com/c/01J6TTTTTTTTTTTTTTTTTTTTTT",
+          "section": null,
+          "sentence": "Read the handbook.^a"
+        }
+      ],
+      "marks": [
+        {
+          "mark": "[^a]",
+          "source": 0
+        }
+      ],
       "why": "The definition's target is the first run after the colon that is more than the six, and the six include line feeds, so the target may sit on a later line. The definition line itself is a link naming nothing and takes the first ordinal; the reference resolves to the target and takes the next."
     },
     {
       "case": "a space is whitespace in a label and around a definition's target",
       "body": "Read [the rates].\n\n[the rates]: https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV \"Rates policy\"",
       "sources": [],
-      "links": [{ "ordinal": 0, "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV" }],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV",
+          "section": null,
+          "sentence": "Read the rates."
+        }
+      ],
       "marks": [],
       "why": "A space is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the space after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
     },
@@ -404,7 +478,14 @@
       "case": "a tab is whitespace in a label and around a definition's target",
       "body": "Read [the\trates].\n\n[the rates]:\thttps://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV\t\"Rates policy\"",
       "sources": [],
-      "links": [{ "ordinal": 0, "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV" }],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV",
+          "section": null,
+          "sentence": "Read the rates."
+        }
+      ],
       "marks": [],
       "why": "A tab is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the tab after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
     },
@@ -412,7 +493,14 @@
       "case": "a line feed is whitespace in a label and around a definition's target",
       "body": "Read [the\nrates].\n\n[the rates]:\nhttps://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV\n\"Rates policy\"",
       "sources": [],
-      "links": [{ "ordinal": 0, "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV" }],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV",
+          "section": null,
+          "sentence": "Read the rates."
+        }
+      ],
       "marks": [],
       "why": "A line feed is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the line feed after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
     },
@@ -420,7 +508,14 @@
       "case": "a carriage return is whitespace in a label and around a definition's target",
       "body": "Read [the\rrates].\n\n[the rates]:\rhttps://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV\r\"Rates policy\"",
       "sources": [],
-      "links": [{ "ordinal": 0, "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV" }],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV",
+          "section": null,
+          "sentence": "Read the rates."
+        }
+      ],
       "marks": [],
       "why": "A carriage return is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the carriage return after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
     },
@@ -428,7 +523,14 @@
       "case": "a form feed is whitespace in a label and around a definition's target",
       "body": "Read [the\frates].\n\n[the rates]:\fhttps://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV\f\"Rates policy\"",
       "sources": [],
-      "links": [{ "ordinal": 0, "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV" }],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV",
+          "section": null,
+          "sentence": "Read the rates."
+        }
+      ],
       "marks": [],
       "why": "A form feed is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the form feed after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
     },
@@ -436,9 +538,61 @@
       "case": "a vertical tab is whitespace in a label and around a definition's target",
       "body": "Read [the\u000brates].\n\n[the rates]:\u000bhttps://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV\u000b\"Rates policy\"",
       "sources": [],
-      "links": [{ "ordinal": 0, "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV" }],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV",
+          "section": null,
+          "sentence": "Read the rates."
+        }
+      ],
       "marks": [],
       "why": "A vertical tab is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the vertical tab after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
+    },
+    {
+      "case": "a heading line ends only at a line feed",
+      "body": "# Claims\u2028and\rexpenses\u2028\r\n\nSee [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN)\u2028for tiers.\r\nAll of them.",
+      "sources": [],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": "Claims\u2028and expenses\u2028",
+          "sentence": "See the product\u2028for tiers."
+        }
+      ],
+      "marks": [],
+      "why": "An edge carries the heading above its link and the sentence the link sits in. A line ends at a line feed alone, so a carriage return or a line separator inside a heading is part of its line. Only the six whitespace characters are trimmed and made one space, in a heading and in a sentence, so the carriage return becomes a space and the line separator stays where it is written."
+    },
+    {
+      "case": "only plain whitespace marks a heading or ends a sentence",
+      "body": "# \u0085Expenses\u0085\n#\ufeffDraft\n\nClaims close.\ufeffSee [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN)\u0085or <https://example.test/a\ufeffb> and <https://example.test/c\u0085d>.\u0085 Next one.",
+      "sources": [],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": "\u0085Expenses\u0085",
+          "sentence": "Claims close.\ufeffSee the product\u0085or https://example.test/a\ufeffb and https://example.test/c\u0085d.\u0085 Next one."
+        }
+      ],
+      "marks": [],
+      "why": "A heading's marks need one of the six whitespace characters after them, so the line after a byte-order mark is no heading and the one above it stands, with its next-line characters kept. A sentence ends at a full stop that one of the six or the paragraph's end follows, so a full stop before a byte-order mark or a next-line character ends nothing. Neither character stops an autolink, so both autolinks lose their angle brackets."
+    },
+    {
+      "case": "a heading's code span leaves one space",
+      "body": "## Mileage `\ud83d\ude97` rates\n\nSee [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).",
+      "sources": [],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": "Mileage rates",
+          "sentence": "See the product."
+        }
+      ],
+      "marks": [],
+      "why": "A heading is read from the prose, where a code span is blanked to spaces, and its whitespace runs become one space. So the heading reads the same however each tier counts the characters of an emoji it blanked."
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { sentenceAt } from "@better-answers/core/store/map";
+import { sectionAt, sentenceAt } from "@better-answers/core/store/map";
 import { linksAndMarksOf, proseOf } from "@better-answers/schema/concept-file";
 
 const takenBy = (work: () => void): number => {
@@ -23,5 +23,11 @@ describe("the reader stays linear on a tenant's worst shapes", () => {
     const prose = proseOf(linked);
 
     expect(takenBy(() => sentenceAt(prose, prose.length - 1))).toBeLessThan(1000);
+  });
+
+  it("reads a heading of eighty thousand spaces inside a second", () => {
+    const spaced = `# Mileage${" ".repeat(80_000)}rates\n\nSee [the rates](rates.md).`;
+
+    expect(takenBy(() => sectionAt(spaced, spaced.length - 1))).toBeLessThan(1000);
   });
 });

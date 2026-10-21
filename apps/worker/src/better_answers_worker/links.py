@@ -32,8 +32,6 @@ _IRI = re.compile(r"^https://better-answers\.com/c/[0-9A-HJKMNP-TV-Z]{26}$")
 
 _TIER_SHARED_WHITESPACE = " \t\n\r\f\v"
 
-_UNICODE_SPACE = re.compile(r"\s")
-
 _FOOTNOTE = re.compile(r"^\[\^([^\]]*)\]$")
 
 
@@ -219,11 +217,10 @@ def _fenced_blocks(body: str) -> list[tuple[int, int]]:
 
 
 _BACKTICK_RUN = re.compile(r"`+")
-_HEADING = re.compile(r"^\#{1,6}\s+(.*)$")
-_SENTENCE_BOUNDARY = re.compile(r"[.!?](?=\s|$)")
+_HEADING = re.compile(r"^\#{1,6}[ \t\n\r\f\v]+([^\n]*)")
+_SENTENCE_BOUNDARY = re.compile(r"[.!?](?=[ \t\n\r\f\v]|$)")
 _SCHEMED = re.compile(r"^[a-z][a-z0-9+.-]*:", re.I)
-_WHITESPACE = re.compile(r"\s+")
-_LABEL_SPACE = re.compile(r"[ \t\n\r\f\v]+")
+_WHITESPACE_RUN = re.compile(r"[ \t\n\r\f\v]+")
 
 
 def _blank(text: str) -> str:
@@ -273,8 +270,12 @@ def prose_of(body: str) -> str:
     return _blanked_spans("".join(pieces))
 
 
+def _collapsed_whitespace(text: str) -> str:
+    return " ".join(word for word in _WHITESPACE_RUN.split(text) if word)
+
+
 def _normalised_label(label: str) -> str:
-    return " ".join(word for word in _LABEL_SPACE.split(label) if word).lower()
+    return _collapsed_whitespace(label).lower()
 
 
 def _label_key(label: str) -> str:
@@ -401,7 +402,7 @@ def _section_at(body: str, index: int) -> str | None:
     for line in reversed(body[:index].split("\n")):
         heading = _HEADING.match(line)
         if heading is not None:
-            return (heading.group(1) or "").strip()
+            return _collapsed_whitespace(heading.group(1))
     return None
 
 
@@ -459,7 +460,7 @@ def _bare_span(
 
 
 def _flattened_autolinks(text: str) -> str:
-    ends = _next_stops(text, _autolink_stops_on_unicode_space)
+    ends = _autolink_ends_of(text)
     pieces: list[str] = []
     cursor = 0
     at = 0
@@ -477,10 +478,6 @@ def _flattened_autolinks(text: str) -> str:
         at = end + 1
     pieces.append(text[cursor:])
     return "".join(pieces)
-
-
-def _autolink_stops_on_unicode_space(char: str) -> bool:
-    return char == ">" or _UNICODE_SPACE.fullmatch(char) is not None
 
 
 def _flattened_links(text: str) -> str:
@@ -505,7 +502,7 @@ def _sentence_at(body: str, index: int) -> str:
         else:
             end = boundary.start() + 1
             break
-    return _WHITESPACE.sub(" ", _flattened_links(paragraph[start:end])).strip()
+    return _collapsed_whitespace(_flattened_links(paragraph[start:end]))
 
 
 class BodyLink:
