@@ -4,6 +4,8 @@ import { stripVTControlCharacters } from "node:util";
 
 import type { FullConfig, Reporter, Suite, TestCase } from "@playwright/test/reporter";
 
+import { actionAnnotatedBy } from "./action-timing.ts";
+
 type Flake = {
   readonly title: string;
   readonly file: string;
@@ -33,8 +35,10 @@ const traceOf = (test: TestCase): string | undefined => {
   return `${root}/${path.relative(outputDir, trace)}`;
 };
 
+const titleOf = (test: TestCase): string => [...describesOf(test.parent), test.title].join(" › ");
+
 const flakeOf = (test: TestCase): Flake => ({
-  title: [...describesOf(test.parent), test.title].join(" › "),
+  title: titleOf(test),
   file: path.relative(workspace(), test.location.file),
   line: test.location.line,
   firstFailure: firstLineOf(
@@ -72,7 +76,47 @@ const summaryOf = (flakes: readonly Flake[]): string =>
     "",
   ].join("\n");
 
-export default class FlakyReport implements Reporter {
+type ActionTiming = {
+  readonly title: string;
+  readonly attempt: number;
+  readonly action: string;
+  readonly clocked: string;
+};
+
+const actionTimingsOf = (test: TestCase): readonly ActionTiming[] =>
+  test.results.flatMap((result) =>
+    result.annotations.flatMap((annotation) => {
+      const action = actionAnnotatedBy(annotation.type);
+      return action === undefined
+        ? []
+        : [
+            {
+              title: titleOf(test),
+              attempt: result.retry + 1,
+              action,
+              clocked: annotation.description ?? "",
+            },
+          ];
+    }),
+  );
+
+const timingsSummaryOf = (timings: readonly ActionTiming[]): string =>
+  [
+    "",
+    "### Action timings",
+    "",
+    "Every clocked action, from its key to the page reading as landed, passing or not.",
+    "",
+    "| Test | Attempt | Action | Clocked |",
+    "| --- | --- | --- | --- |",
+    ...timings.map(
+      (timing) =>
+        `| ${cell(timing.title)} | ${String(timing.attempt)} | ${cell(timing.action)} | ${cell(timing.clocked)} |`,
+    ),
+    "",
+  ].join("\n");
+
+export default class RunSummary implements Reporter {
   #root: Suite | undefined;
 
   onBegin(_config: FullConfig, suite: Suite): void {
@@ -80,13 +124,14 @@ export default class FlakyReport implements Reporter {
   }
 
   onEnd(): void {
-    const flakes = (this.#root?.allTests() ?? [])
-      .filter((test) => test.outcome() === "flaky")
-      .map(flakeOf);
-    if (flakes.length === 0) return;
+    const tests = this.#root?.allTests() ?? [];
+    const flakes = tests.filter((test) => test.outcome() === "flaky").map(flakeOf);
+    const timings = tests.flatMap(actionTimingsOf);
     process.stdout.write(flakes.map(annotationOf).join(""));
     const summary = process.env["GITHUB_STEP_SUMMARY"];
-    if (summary !== undefined) appendFileSync(summary, summaryOf(flakes));
+    if (summary === undefined) return;
+    if (flakes.length > 0) appendFileSync(summary, summaryOf(flakes));
+    if (timings.length > 0) appendFileSync(summary, timingsSummaryOf(timings));
   }
 
   printsToStdio(): boolean {

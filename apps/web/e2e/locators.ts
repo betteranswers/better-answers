@@ -5,6 +5,8 @@ import type { CarriedOn } from "@/features/auth/sign-in-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
 import { HOMES, type Role } from "@/shared/navigation.ts";
 
+import { actionAnnotationOf } from "./action-timing.ts";
+
 export const avatarOf = (page: Page, who: string): Locator =>
   page.getByRole("banner").getByRole("button", { name: new RegExp(who) });
 
@@ -173,40 +175,84 @@ export const notFoundOfferingHome = async (page: Page, role: Role): Promise<void
 
 const ACTION_BUDGET_MS = 100;
 
-/** On CI the shared runner's processor sets the number, not the page (BA-228), so there it is only recorded. */
-const HELD_TO_THE_BUDGET = !process.env["CI"];
+/** On CI the shared runner's processor sets the number, not the page, so there it is only recorded. */
+const BUDGET_ASSERTED = !process.env["CI"];
 
-export const clockTheNextKey = (
-  page: Page,
-  landed: { readonly at: string; readonly reads: string },
-) =>
-  page.evaluate((asked) => {
-    const reads = () =>
-      document
-        .evaluate(asked.at, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE)
-        .singleNodeValue?.textContent?.includes(asked.reads) === true;
-    const clocked = new Promise<number>((resolve) => {
-      document.addEventListener(
-        "keydown",
-        () => {
-          const pressedAt = performance.now();
-          const observer = new MutationObserver(() => {
-            if (!reads()) return;
-            observer.disconnect();
-            resolve(performance.now() - pressedAt);
-          });
-          observer.observe(document.body, { subtree: true, childList: true, characterData: true });
-        },
-        { capture: true, once: true },
-      );
-    });
-    Reflect.set(window, "actionClocked", clocked);
-  }, landed);
+const ANSWER_HELD_AT_MOST_MS = 2_000;
+
+type Landed = { readonly at: string; readonly reads: string };
+
+type TheServersAnswer = "held" | "sent";
+
+const startTheClock = (page: Page, landed: Landed, answer: TheServersAnswer) =>
+  page.evaluate(
+    (asked) => {
+      const reads = () =>
+        document
+          .evaluate(asked.at, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE)
+          .singleNodeValue?.textContent?.includes(asked.reads) === true;
+      const sent = window.fetch;
+      const held: (() => void)[] = [];
+      const released = () => {
+        window.fetch = sent;
+        for (const send of held.splice(0)) send();
+      };
+      const holdTheFetches = () => {
+        window.fetch = (...request) =>
+          new Promise<void>((send) => held.push(send)).then(() => sent(...request));
+      };
+      const clocked = new Promise((resolve) => {
+        document.addEventListener(
+          "keydown",
+          () => {
+            const pressedAt = performance.now();
+            if (asked.answer === "held") holdTheFetches();
+            const giveUp = setTimeout(() => {
+              const waited = held.length > 0;
+              released();
+              if (!waited) return;
+              observer.disconnect();
+              resolve({ kind: "waited", heldMs: asked.heldAtMostMs, reads: asked.reads });
+            }, asked.heldAtMostMs);
+            const observer = new MutationObserver(() => {
+              if (!reads()) return;
+              observer.disconnect();
+              clearTimeout(giveUp);
+              released();
+              resolve({ kind: "landed", ms: performance.now() - pressedAt });
+            });
+            observer.observe(document.body, {
+              subtree: true,
+              childList: true,
+              characterData: true,
+            });
+          },
+          { capture: true, once: true },
+        );
+      });
+      Reflect.set(window, "actionClocked", clocked);
+    },
+    { ...landed, answer, heldAtMostMs: ANSWER_HELD_AT_MOST_MS },
+  );
+
+export const clockTheNextKey = (page: Page, landed: Landed) => startTheClock(page, landed, "held");
+
+export const clockTheNextDraw = (page: Page, landed: Landed) => startTheClock(page, landed, "sent");
 
 export const ACTION_SAMPLES = 5;
 
-export const actionClocked = async (page: Page): Promise<number> =>
-  z.number().parse(await page.evaluate(() => Reflect.get(window, "actionClocked")));
+const CLOCKED = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("landed"), ms: z.number() }),
+  z.object({ kind: z.literal("waited"), heldMs: z.number(), reads: z.string() }),
+]);
+
+export const actionClocked = async (page: Page): Promise<number> => {
+  const clocked = CLOCKED.parse(await page.evaluate(() => Reflect.get(window, "actionClocked")));
+  if (clocked.kind === "landed") return clocked.ms;
+  throw new Error(
+    `the page did not read ${JSON.stringify(clocked.reads)} while the server's answer was held for ${String(clocked.heldMs)} ms: the action waits on a round trip, or the page never reads it`,
+  );
+};
 
 const medianOf = (samples: readonly number[]): number => {
   const sorted = samples.toSorted((a, b) => a - b);
@@ -222,10 +268,10 @@ export const theActionsLandedWithinTheirBudget = (
   expect(samples.length, `the ${action} was never clocked`).toBeGreaterThan(0);
   const median = medianOf(samples);
   test.info().annotations.push({
-    type: `${action} action`,
+    type: actionAnnotationOf(action),
     description: `${samples.map((elapsed) => `${String(elapsed)} ms`).join(", ")}; median ${String(median)} ms`,
   });
-  if (!HELD_TO_THE_BUDGET) return;
+  if (!BUDGET_ASSERTED) return;
   expect(median, `the ${action} did not read as landed within its budget`).toBeLessThan(
     ACTION_BUDGET_MS,
   );

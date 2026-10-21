@@ -58,7 +58,7 @@ describe("the browser suite's configuration", () => {
   });
 
   it("hands every run to the flaky report", async () => {
-    expect((await configUnder("true")).reporter).toContainEqual(["./e2e/flaky-report.ts"]);
+    expect((await configUnder("true")).reporter).toContainEqual(["./e2e/run-summary.ts"]);
   });
 });
 

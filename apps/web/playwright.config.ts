@@ -37,7 +37,7 @@ export default defineConfig({
 
   // Three of the runner's four cores: the api, Postgres and the browser's own processes take the fourth.
   ...(inCi ? { workers: 3 } : {}),
-  reporter: [["list"], ["./e2e/flaky-report.ts"]],
+  reporter: [["list"], ["./e2e/run-summary.ts"]],
   use: { baseURL, trace: "on-first-retry" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {

@@ -182,7 +182,15 @@ file for one that already does the job.
   beside the comparison, so a run that passes still says how close it came. A list's second is
   timed from a fresh `goto`, so no cache answers it. An action's 100 ms is timed **in the page**,
   with a keydown listener and a `MutationObserver`, because a matcher's polling is coarser than the
-  budget. `apps/web/e2e/sources.spec.ts` times both, with `clockTheNextKey` and
+  budget. `clockTheNextKey` also holds every `fetch` the page sends after the key until the page
+  reads as landed. When the node has not read its text 2 s after the key while a request is held,
+  `actionClocked` fails by name: an action never waits on a round trip (ADR 0037). That check
+  passes or fails the same way on any runner that draws within 2 s. A request already in flight
+  at the key is not held, and nor is an upload, which goes by `XMLHttpRequest`, so a spec that
+  samples one action several times waits for each sample's answer before the next key. On CI the
+  100 ms is only recorded, because there the shared runner's processor sets the number. A timed
+  draw that does wait on the server, such as jump-to's list, uses `clockTheNextDraw`, which holds
+  nothing. `apps/web/e2e/sources.spec.ts` times both, with `clockTheNextKey` and
   `theActionLandedWithinItsBudget`. Most specs time one sample;
   `apps/web/e2e/people.spec.ts` and `apps/web/e2e/people-groups.spec.ts` take the median of
   `ACTION_SAMPLES` through `theActionsLandedWithinTheirBudget`.
@@ -254,8 +262,9 @@ fence: a focused spec left behind would run alone and report the suite green.
 committing.
 
 Under CI a failed test gets one retry, and the retry records a trace. A test that passes only on
-its retry is flaky, not green. `apps/web/e2e/flaky-report.ts` names it in a warning annotation
-and in the job's summary, with its first failure; file a ticket with the run id. Nothing is
+its retry is flaky, not green. `apps/web/e2e/run-summary.ts` names it in a warning annotation
+and in the job's summary, with its first failure; file a ticket with the run id. The same
+summary lists every action's clocked timing, from passing runs too. Nothing is
 retried on a local machine.
 
 ## Not carried

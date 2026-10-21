@@ -1251,18 +1251,20 @@ const removedAtAKey = async (
     const made = await person(api, anAddress("extra"), { displayName });
     await addMember(api, { workspaceId, userId: made.id, role: "Viewer" });
   }
-  await page.reload();
   const samples: number[] = [];
   for (const [at, name] of names.entries()) {
     const left = 1 + names.length - at;
+    await page.reload();
     await memberLink(page, name).click();
     await expect(personHeading(page, name)).toBeVisible();
     await removalOf(page).getByRole("button", { name: "Remove Member" }).click();
     await removalOf(page).getByRole("button", { name: "Remove", exact: true }).focus();
     await clockTheNextKey(page, { at: THE_COUNT, reads: String(left) });
+    const answered = page.waitForResponse((response) => REMOVAL(new URL(response.url())));
     await page.keyboard.press("Enter");
     await expect(memberRows(page)).toHaveCount(left);
     samples.push(await actionClocked(page));
+    expect((await answered).ok(), `the removal of ${name} was refused`).toBe(true);
   }
   return samples;
 };

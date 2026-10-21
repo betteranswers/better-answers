@@ -127,8 +127,9 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `keyListed` | A keystroke's key among the terms of the open list of keystrokes, which sets each action beside its key |
 | `keystrokesButton` | The one *Keyboard Shortcuts* button, in the page or in a region it is given: at the rail's foot where the layout is wide, in the band where it is narrow, and a page's own outside the shell |
 | `keystrokesDismissed` | Presses Escape and waits for the list to go and for focus to come back to its button, which lands a task later. A key pressed sooner keeps the focus it moved |
-| `clockTheNextKey` | Starts the action's clock in the page: from the next key to the node an XPath names reading a given text |
-| `theActionLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the action's 100 ms |
+| `clockTheNextKey` | Starts the action's clock in the page: from the next key to the node an XPath names reading a given text. Every `fetch` the page sends after the key is held until then, because an action never waits on a round trip. A request in flight at the key is not held |
+| `clockTheNextDraw` | The same clock with nothing held, for a timed draw that waits on the server, such as jump-to's list |
+| `theActionLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the action's 100 ms. On CI it only annotates |
 | `saysARefusal` | Asserts an alert holds words. A refusal's region can stand empty from the first draw, so being in the tree shows no refusal |
 | `saysSomethingNew` | Asserts a status or an alert says something other than what it said before, which the spec read from it and hands over. Holding words would pass on what it already said |
 | `countOf` | A list's count: the first status its region holds, which its head says |
@@ -148,8 +149,8 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `memberUnreadUntil` | Drops the shell's member read, fails the member read in the frame's batch, and holds the lone retry until the promise it is given settles. The page then draws with the member unread. A spec sets it up, reloads, and acts before it lets the read land, as `apps/web/e2e/member-unread.spec.ts` and `apps/web/e2e/people.spec.ts` do |
 | `askShowsTheServedAddress` | Reads the MCP surface's address from `/.well-known/oauth-protected-resource/mcp` and asserts the page's main region shows it exactly. It answers that address and fails when the document does not answer. A spec compares the page with what the api serves, not with a copied value. `apps/web/e2e/home.spec.ts` is the worked example |
 | `ACTION_SAMPLES` | How many times a spec clocks one action before it judges it, five. A spec seeds `ACTION_SAMPLES - 1` extra rows, so each sample has a row to act on |
-| `actionClocked` | Waits for the clock `clockTheNextKey` started and answers it in milliseconds. It fails when no clock was started. A spec collects one per sample for `theActionsLandedWithinTheirBudget` |
-| `theActionsLandedWithinTheirBudget` | Annotates the test with every sample of an action and their median, and asserts the median under the action's 100 ms. It fails by name when the action was never clocked. `theActionLandedWithinItsBudget` is the same check over one sample |
+| `actionClocked` | Waits for the clock `clockTheNextKey` started and answers it in milliseconds. It fails when no clock was started, and fails by name when the node had not read its text 2 s after the key while a request was held. A spec collects one per sample for `theActionsLandedWithinTheirBudget` |
+| `theActionsLandedWithinTheirBudget` | Annotates the test with every sample of an action and their median, and asserts the median under the action's 100 ms, which on CI it only annotates. It fails by name when the action was never clocked. `theActionLandedWithinItsBudget` is the same check over one sample |
 | `tokenPainted` | A design-system token's value for a named CSS property as the browser paints it. It is read off a probe element styled with the token. `tokenColour` is this for `color`. `apps/web/e2e/focus-ring.spec.ts` reads `--focus-ring` as `box-shadow` with it |
 | `drawnMarks` | The visible elements holding `data-marks` whose `::before` draws, each named by its `data-slot` or its tag. `apps/web/e2e/sign-in.spec.ts` asserts the card alone draws them, and that the primary button inside it holds `data-marks` and draws none |
 
