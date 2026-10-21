@@ -9,6 +9,7 @@ import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { ListPages, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
+import { rowInFocus } from "@/shared/row-focus.ts";
 import { RowMenu } from "@/shared/row-menu.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
@@ -316,7 +317,6 @@ function MemberList(properties: {
   const listed = read.data ?? NO_ONE;
   const narrowed = useNarrowedMembers(listed);
   const [ticked, setTicked] = useState<ReadonlySet<string>>(NONE);
-  const [inFocus, setInFocus] = useState<string>();
   const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
   const searchRef = useRef<HTMLInputElement>(null);
   const openMember = useOpenMember(narrowed.flush);
@@ -348,7 +348,7 @@ function MemberList(properties: {
   });
 
   useInFocusKeystrokes({
-    inFocus: listed.find((member) => member.personId === inFocus),
+    inFocus: () => rowInFocus(narrowed.data, (member) => member.personId),
     open: openMember,
     tick: (personId) => {
       setTicked(toggled(ticked, personId));
@@ -400,7 +400,6 @@ function MemberList(properties: {
               open: (personId) => {
                 openMember(personId, "member");
               },
-              focusedOn: setInFocus,
             }}
           >
             <GridTable
@@ -446,13 +445,14 @@ function MemberList(properties: {
 }
 
 function useInFocusKeystrokes(properties: {
-  readonly inFocus: ListedMember | undefined;
+  readonly inFocus: () => ListedMember | undefined;
   readonly open: (personId: string, at: OpenedAt) => void;
   readonly tick: (personId: string) => void;
   readonly nothingInFocus: () => void;
 }) {
-  const { inFocus, nothingInFocus } = properties;
+  const { nothingInFocus } = properties;
   const onTheMemberInFocus = (action: (personId: string) => void) => () => {
+    const inFocus = properties.inFocus();
     if (inFocus === undefined) nothingInFocus();
     else action(inFocus.personId);
   };

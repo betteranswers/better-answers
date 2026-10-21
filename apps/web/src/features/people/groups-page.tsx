@@ -8,6 +8,7 @@ import { ListRead, ListState, NothingListed } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page-head.tsx";
+import { rowInFocus } from "@/shared/row-focus.ts";
 import { RowMenu } from "@/shared/row-menu.tsx";
 import { RowSheetButton } from "@/shared/row-sheet.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
@@ -67,7 +68,6 @@ const column = createColumnHelper<typeof features, GroupRow>();
 
 type GroupActions = {
   readonly open: (groupId: string) => void;
-  readonly focusedOn: (groupId: string) => void;
   readonly landOn: string | undefined;
   readonly landed: (button: HTMLButtonElement | null) => void;
 };
@@ -85,9 +85,6 @@ function GroupCell(properties: { readonly row: GroupRow }) {
     <RowSheetButton
       ref={groupId === actions.landOn ? actions.landed : undefined}
       id={groupButtonId(groupId)}
-      onFocus={() => {
-        actions.focusedOn(groupId);
-      }}
       onClick={() => {
         actions.open(groupId);
       }}
@@ -136,7 +133,6 @@ function GroupsList(properties: { readonly headingId: string }) {
   const pending = usePendingGroupNames();
   const heading = useRef<HTMLHeadingElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const [inFocus, setInFocus] = useState<string>();
   const [opened, setOpened] = useState<Opened>();
   const [renaming, setRenaming] = useState<ListedGroup>();
   const [deleting, setDeleting] = useState<ListedGroup>();
@@ -153,7 +149,6 @@ function GroupsList(properties: { readonly headingId: string }) {
     open: (groupId) => {
       setOpened({ groupId, at: "group" });
     },
-    focusedOn: setInFocus,
     landOn,
     landed: (button) => {
       if (button === null) return;
@@ -178,7 +173,7 @@ function GroupsList(properties: { readonly headingId: string }) {
   };
 
   const openInFocus = (at: GroupOpenedAt) => {
-    const group = groupOf(inFocus);
+    const group = rowInFocus(read.data ?? [], (each) => each.id);
     setOutcome(group === undefined ? NOTHING_IN_FOCUS : undefined);
     if (group !== undefined) setOpened({ groupId: group.id, at });
   };
@@ -275,9 +270,6 @@ function GroupsList(properties: { readonly headingId: string }) {
               table={table}
               caption="Groups in this workspace."
               rowMenu={rowMenuOf}
-              onRowFocus={(row) => {
-                setInFocus(row?.group?.id);
-              }}
               empty={
                 <NothingListed
                   search={search}

@@ -40,7 +40,6 @@ export const HIDEABLE = [
 
 type MemberActions = {
   readonly open: (personId: string) => void;
-  readonly focusedOn: (personId: string) => void;
 };
 
 export const MemberActionsContext = createContext<MemberActions | undefined>(undefined);
@@ -61,9 +60,6 @@ function PersonCell(properties: { readonly member: ListedMember; readonly refuse
       <span className="flex min-w-0 flex-col items-start leading-tight">
         <RowLink
           href={memberPageOf(personId)}
-          onFocus={() => {
-            actions?.focusedOn(personId);
-          }}
           onOpen={() => {
             actions?.open(personId);
           }}

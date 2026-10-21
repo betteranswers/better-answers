@@ -7,6 +7,7 @@ import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { ListRead, ListState, NothingListed } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
+import { rowInFocus } from "@/shared/row-focus.ts";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { Card } from "@/shared/ui/card.tsx";
 import { counted, nothingMatches } from "@/shared/words.ts";
@@ -64,13 +65,14 @@ const useNarrowedRequests = () => {
 };
 
 const useInFocusKeystrokes = (properties: {
-  readonly inFocus: WaitingRequest | undefined;
+  readonly inFocus: () => WaitingRequest | undefined;
   readonly approve: (request: WaitingRequest) => void;
   readonly decline: (request: WaitingRequest) => void;
   readonly nothingInFocus: () => void;
 }) => {
-  const { inFocus, nothingInFocus } = properties;
+  const { nothingInFocus } = properties;
   const onTheRowInFocus = (act: (request: WaitingRequest) => void) => () => {
+    const inFocus = properties.inFocus();
     if (inFocus === undefined) nothingInFocus();
     else act(inFocus);
   };
@@ -85,7 +87,6 @@ function RequestsList(properties: {
   const { heading } = properties;
   const narrowed = useNarrowedRequests();
   const { read, listed, search, data } = narrowed;
-  const [inFocusId, setInFocusId] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
   const invite = useInviteAction(setOutcome);
   const [approving, setApproving] = useState<WaitingRequest>();
@@ -94,7 +95,6 @@ function RequestsList(properties: {
   const consequenceId = useId();
   const approve = useApproveRequest();
   const decline = useDeclineRequest();
-  const inFocus = listed.find((request) => request.id === inFocusId);
 
   const table = useTable({
     features: requestsFeatures,
@@ -150,7 +150,7 @@ function RequestsList(properties: {
   };
 
   useInFocusKeystrokes({
-    inFocus,
+    inFocus: () => rowInFocus(data, (request) => request.id),
     approve: toApprove,
     decline: declined,
     nothingInFocus: () => {
@@ -195,9 +195,6 @@ function RequestsList(properties: {
             <GridTable
               table={table}
               caption="Requests to join this workspace."
-              onRowFocus={(request) => {
-                setInFocusId(request?.id);
-              }}
               empty={
                 <NothingListed
                   search={search}

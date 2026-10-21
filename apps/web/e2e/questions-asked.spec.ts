@@ -267,6 +267,24 @@ test.describe("Questions asked", () => {
     expect(elapsed, "a page of 50 questions rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
   });
 
+  test("opens no question by key after focus leaves the list", async ({ page, request }) => {
+    const at = await aWorkspaceWithConcepts(request, "Holme Keys");
+    await seedQuestions(request, {
+      workspaceId: at.workspaceId,
+      records: aFlagAndANewerQuestion(at),
+    });
+    await signedInAtTheQuestions(page, request, at);
+    const region = questionsAsked(page);
+    const saying = region.getByRole("status").filter({ hasText: /\S/ });
+    await expect(saying, "the list says nothing at rest").toHaveCount(0);
+    await rowsOf(region).first().focus();
+    await region.getByRole("heading", { level: 2 }).focus();
+
+    await page.keyboard.press(KEY.open.key);
+    await expect(saying, "a keystroke with no question in focus says nothing").toHaveCount(1);
+    await expect(recordOf(page, FLAGGED_QUESTION)).toHaveCount(0);
+  });
+
   test("lists, opens and pages the questions by keyboard", async ({ page, request }) => {
     await aPageAndOneMoreOpened(page, request, "Aire Keys");
     await expect(rowsOf(questionsAsked(page))).toHaveCount(50);

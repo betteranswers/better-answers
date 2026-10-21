@@ -101,6 +101,9 @@ const membersRegion = (page: Page) => page.getByRole("region", { name: "Members"
 
 const outcomeOf = (page: Page): Locator => membersRegion(page).getByRole("status").nth(1);
 
+const selectionBar = (page: Page): Locator =>
+  page.getByRole("toolbar", { name: "Selected Members" });
+
 const describing = async (control: Locator): Promise<string> =>
   control
     .page()
@@ -291,7 +294,10 @@ const saysToPickAMemberAfter = async (page: Page, key: string): Promise<void> =>
   await expect(outcomeOf(page)).toHaveText("");
   await page.keyboard.press(key);
   await expect(outcomeOf(page)).toHaveText(/\S/);
-  await expect(page, "the keystroke left Members").toHaveURL(new RegExp(`${MEMBERS_PAGE}(#.*)?$`));
+  await expect(page, "the keystroke left Members").toHaveURL(
+    (url) => url.pathname === MEMBERS_PAGE,
+  );
+  await expect(selectionBar(page), "the keystroke selected a member").toHaveCount(0);
 };
 
 const skippedToMembers = async (page: Page, api: APIRequestContext, workspaceName: string) => {
@@ -907,6 +913,14 @@ test.describe("a member's own page", () => {
     );
     await keystrokesDismissed(page, pressed);
     await expect(inTheRail).toBeFocused();
+  });
+
+  test("opens no member by key after focus leaves the list", async ({ page, request }) => {
+    await skippedToMembers(page, request, "Calder Drifting");
+    await memberLink(page, "Priya Shah").focus();
+    await listHeading(page).focus();
+
+    await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.open.key);
   });
 
   test("opens a member and changes their role by keyboard alone", async ({ page, request }) => {
@@ -1663,13 +1677,10 @@ const PAGE_OF_ROWS = 25;
 const tickOf = (page: Page, name: string): Locator =>
   membersRegion(page).getByRole("checkbox", { name: `Select ${name}`, exact: true });
 
-const selectionBar = (page: Page): Locator =>
-  page.getByRole("toolbar", { name: "Selected Members" });
+const pagesOf = (page: Page): Locator => page.getByRole("navigation", { name: "Pages of Members" });
 
 const selectionAction = (page: Page, action: string): Locator =>
   selectionBar(page).getByRole("button", { name: action, exact: true });
-
-const pagesOf = (page: Page): Locator => page.getByRole("navigation", { name: "Pages of Members" });
 
 const refusedLineOf = (page: Page, name: string): Locator =>
   membersRegion(page).getByRole("alert").getByRole("listitem").filter({ hasText: name });
@@ -2380,5 +2391,36 @@ test.describe("bulk actions on the members ticked", () => {
     for (const line of lines.slice(0, -1)) {
       expect(line, "a line of the address ends inside a word").toMatch(/[@.-]$/);
     }
+  });
+});
+
+test.describe("keys on a member paged out of view", () => {
+  test("acts on no member paged out of view by key", async ({ page, request }) => {
+    await aWorkspaceOfThirtyEditors(page, request, "Calder Paging");
+    const pagedAwayFromPersonOne = async (): Promise<void> => {
+      await page.goto(MEMBERS_PAGE);
+      await memberLink(page, "Person 01").focus();
+      await page.keyboard.press(PEOPLE_KEYSTROKES.nextPage.key);
+      await expect(memberLink(page, "Person 01")).toHaveCount(0);
+    };
+
+    for (const { key } of [
+      PEOPLE_KEYSTROKES.open,
+      PEOPLE_KEYSTROKES.changeRole,
+      PEOPLE_KEYSTROKES.remove,
+      PEOPLE_KEYSTROKES.tick,
+    ]) {
+      await pagedAwayFromPersonOne();
+      await saysToPickAMemberAfter(page, key);
+    }
+
+    await pagedAwayFromPersonOne();
+    await page.keyboard.press(PEOPLE_KEYSTROKES.previousPage.key);
+    await expect(memberLink(page, "Person 01")).toBeVisible();
+    await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.open.key);
+
+    await memberLink(page, "Person 01").focus();
+    await page.keyboard.press(PEOPLE_KEYSTROKES.open.key);
+    await expect(personHeading(page, "Person 01")).toBeVisible();
   });
 });

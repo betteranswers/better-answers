@@ -4,6 +4,8 @@ import type { Keystroke } from "@/shared/keystrokes.tsx";
 
 export const SEARCH_KEYSTROKES = {
   search: { key: "/", action: "Search This Workspace’s Knowledge" },
+  open: { key: "o", action: "Open the Match in Focus" },
+  close: { key: "Escape", action: "Close the Open Passage" },
   more: { key: "m", action: "Show More Matches" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
