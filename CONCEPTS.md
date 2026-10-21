@@ -1474,8 +1474,9 @@ The current state is the latest version. Concepts have git instead.
 
 ### backup
 
-One scheduled copy of one store, or one restore drill, as a row: what, when, outcome, size, where it
-went, whether it holds personal data, when it expires, and — for a drill — how long the restore took.
+One scheduled copy of one store, one restore drill, or one store restored to production, as a row:
+what, when, outcome, size, where it went, whether it holds personal data, when it expires, and, for a
+drill or a restore, how long the restore took.
 
 ### tier (of a backup)
 

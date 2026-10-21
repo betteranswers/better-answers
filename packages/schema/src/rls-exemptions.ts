@@ -39,6 +39,8 @@ export const RLS_EXEMPTIONS = {
     "One row saying which tier contract this deploy's api carries: a fact about the deploy, not about a tenant, and the worker reads it before any workspace is in hand.",
   "public.sweep_pass":
     "One row per sweep pass, and a pass covers every workspace at once: a fact about the deploy's schedule that names no tenant and holds counts alone.",
+  "public.backup":
+    "One row per run of a backup, drill or restore over the deploy's copies: a fact about the deploy's stores that names no tenant.",
   "public.identity_audit_event":
     "The identity-set audit log: an action on a person's own identity belongs to no workspace, so no scope could hold its row; it names people by person id and actions by their word, never a name or an address.",
   "public.model_price":

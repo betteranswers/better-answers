@@ -95,7 +95,15 @@ import {
   mapNode,
   SOURCE_ENTITY_LABEL_PREFIX,
 } from "./map-tables.ts";
-import { contractStamp, sweepPass, UPLOAD_SWEEP_MODES } from "./platform-tables.ts";
+import {
+  backup,
+  BACKUP_KINDS,
+  BACKUP_OUTCOMES,
+  BACKUP_STORES,
+  contractStamp,
+  sweepPass,
+  UPLOAD_SWEEP_MODES,
+} from "./platform-tables.ts";
 import {
   CANDIDATE_VERDICTS,
   FEEDBACK_REASONS,
@@ -417,6 +425,18 @@ const sweepPassRefinements = {
 const sweepPassSelect = createSelectSchema(sweepPass, sweepPassRefinements);
 const sweepPassInsert = createInsertSchema(sweepPass, sweepPassRefinements);
 const sweepPassUpdate = createUpdateSchema(sweepPass, sweepPassRefinements);
+
+const backupRefinements = {
+  kind: (schema: z.ZodString) => schema.pipe(z.enum(BACKUP_KINDS)),
+  store: (schema: z.ZodString) => schema.pipe(z.enum(BACKUP_STORES)),
+  outcome: (schema: z.ZodString) => schema.pipe(z.enum(BACKUP_OUTCOMES)),
+  bytes: aCount,
+  rtoMinutes: aCount,
+};
+
+const backupSelect = createSelectSchema(backup, backupRefinements);
+const backupInsert = createInsertSchema(backup, backupRefinements);
+const backupUpdate = createUpdateSchema(backup, backupRefinements);
 
 export { ACTOR_ID, PROCESS_PREFIX } from "./actor-id.ts";
 
@@ -1112,6 +1132,12 @@ export const boundarySchemas = {
     select: sweepPassSelect,
     insert: sweepPassInsert,
     update: sweepPassUpdate,
+  },
+  backup: {
+    table: backup,
+    select: backupSelect,
+    insert: backupInsert,
+    update: backupUpdate,
   },
   session: {
     table: session,

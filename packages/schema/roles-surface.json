@@ -360,7 +360,7 @@
     {"owner":"<migrator>","kind":"<partition-of public.question_content>","relations":1},
     {"owner":"<migrator>","kind":"partitioned table","relations":2},
     {"owner":"<migrator>","kind":"sequence","relations":1},
-    {"owner":"<migrator>","kind":"table","relations":62},
+    {"owner":"<migrator>","kind":"table","relations":63},
     {"owner":"<migrator>","kind":"view","relations":1}
   ]
 }

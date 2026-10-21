@@ -180,6 +180,10 @@ export const A_SWEEP_PASS = `INSERT INTO sweep_pass (id, upload_sweep, workspace
 export const A_SWEEP_PASS_COUNTING = `INSERT INTO sweep_pass (id, upload_sweep, workspaces, refused, found, removed, generations)
                                       VALUES ($1, $2, $3, $4, $5, $6, 0)`;
 
+export const A_BACKUP_ROW = `INSERT INTO backup (kind, store, started_at, finished_at, outcome, bytes, location,
+                                                report_url, contains_personal_data, expires_at, rto_minutes)
+                             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`;
+
 export const A_QUESTION_RECORD = `INSERT INTO question_asked (workspace_id, id, asked_at, asked_by, transport, predicate_role)
        VALUES ($1, $2, $3, $4, 'mcp', 'Viewer')`;
 

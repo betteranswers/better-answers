@@ -229,6 +229,8 @@ fi
 rto=$(( ( $(date +%s) - T0 ) / 60 ))
 say "## done — RTO ${rto} min"
 rclone copyto "${REPORT}" "drillsink:${BACKUP_DUMPS_BUCKET}/drills/$(basename "${REPORT}")"
-printf '%s' "insert into backup (kind, store, started_at, finished_at, outcome, bytes, location, report_url, contains_personal_data, rto_minutes) values ('drill', 'all', '${started}', now(), 'ok', 0, 'drills/', 'drills/$(basename "${REPORT}")', false, ${rto})" \
-  | ${PROD_PSQL} -q -v ON_ERROR_STOP=1 || say "backup row not written to production (no backup table yet — it lands with the signals task)"
+# >>> record the drill
+printf '%s' "insert into backup (kind, store, started_at, finished_at, outcome, bytes, location, report_url, contains_personal_data, rto_minutes) values ('drill', 'all', '${started}', now(), 'ok', NULL, 'drills/', 'drills/$(basename "${REPORT}")', false, ${rto})" \
+  | ${PROD_PSQL} -q -v ON_ERROR_STOP=1 || say "backup row not written to production"
+# <<< record the drill
 curl -fsS -m 10 -o /dev/null --data-raw "ok took=${rto}m" "${HEALTHCHECKS_PING_URL_DRILL}"

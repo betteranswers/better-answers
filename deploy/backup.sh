@@ -7,11 +7,13 @@ STAGING=/staging
 NOW=$(date -u +%Y%m%dT%H%M%SZ)
 JOB=${1:-}
 
+# >>> record the copy
 record() {
   psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -qc \
-    "insert into backup (kind, store, started_at, finished_at, outcome, bytes, location, contains_personal_data, expires_at) values ('$1', '$2', '$3', now(), '$4', $5, '$6', $7, $8)" \
-    || echo "backup row not written (schema not migrated yet?)" >&2
+    "insert into backup (kind, store, started_at, finished_at, outcome, bytes, location, contains_personal_data, expires_at) values ('backup', '$1', '$2', now(), '$3', ${4:-NULL}, nullif('${5:-}', ''), true, now() + nullif('${6:-}', '')::interval)" \
+    || echo "backup row not written" >&2
 }
+# <<< record the copy
 ping() {
   local url=$1 outcome=$2 body="$2 bytes=${3:-0} took=${4:-0}" suffix=""
   [ "${outcome}" = ok ] || suffix=/fail
@@ -58,10 +60,10 @@ job_pg() {
      && rclone copyto --s3-no-check-bucket "${STAGING}/globals-${NOW}.sql.age" "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/globals-${NOW}.sql.age" \
      && verify "${file}" "${remote}"; then
     local bytes; bytes=$(stat -c %s "${file}"); rm -f "${file}" "${STAGING}/globals-${NOW}.sql.age"
-    record backup postgres "${started}" ok "${bytes}" "pg/${tier}/pg-${NOW}.dump.age" true "now() + interval '${life}'"
+    record postgres "${started}" ok "${bytes}" "pg/${tier}/pg-${NOW}.dump.age" "${life}"
     ping "${HEALTHCHECKS_PING_URL_PG_HOURLY:?}" ok "${bytes}" $(( $(date +%s) - t0 ))
   else
-    record backup postgres "${started}" failed 0 "" true NULL
+    record postgres "${started}" failed
     ping "${HEALTHCHECKS_PING_URL_PG_HOURLY:?}" fail; exit 1
   fi
 }
@@ -70,8 +72,8 @@ job_mirror() {
   local started; started=$(date -u +%FT%TZ)
   if rclone sync --s3-no-check-bucket --fast-list src: "dumps:${BACKUP_MIRROR_BUCKET}/objectstore/" \
      && rclone check --one-way --size-only src: "dumps:${BACKUP_MIRROR_BUCKET}/objectstore/" >/dev/null 2>&1; then
-    record backup objectstore "${started}" ok 0 "objectstore/" true "now() + interval '30 days'"
-  else record backup objectstore "${started}" failed 0 "" true NULL; return 1; fi
+    record objectstore "${started}" ok "" objectstore/ "30 days"
+  else record objectstore "${started}" failed; return 1; fi
 }
 
 job_bundles() {
@@ -85,7 +87,7 @@ job_bundles() {
       && verify "${out}" "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${ws}-${NOW}.bundle.age" || rc=1
     rm -f "${STAGING}/${ws}.bundle" "${out}"
   done < <(repositories)
-  if [ "${rc}" -eq 0 ]; then record backup git "${started}" ok 0 "git/" true "now() + interval '30 days'"; else record backup git "${started}" failed 0 "" true NULL; fi
+  if [ "${rc}" -eq 0 ]; then record git "${started}" ok "" git/ "30 days"; else record git "${started}" failed; fi
   return "${rc}"
 }
 
@@ -101,7 +103,7 @@ job_git_mirror() {
       ssh -n -o BatchMode=yes "${GIT_MIRROR_SSH_TARGET%%:*}" prune-repo "${ws}" >/dev/null || rc=1
     fi
   done < <(repositories)
-  if [ "${rc}" -eq 0 ]; then record backup git-mirror "${started}" ok 0 "mirror/" true NULL; else record backup git-mirror "${started}" failed 0 "" true NULL; fi
+  if [ "${rc}" -eq 0 ]; then record git-mirror "${started}" ok "" mirror/; else record git-mirror "${started}" failed; fi
   return "${rc}"
 }
 

@@ -9,7 +9,7 @@ The matrix ADR 0007 asked for, decided by ticket 41 (ADR 0022) and resized by ti
 - **dumps** — versioned, **object lock in governance mode**, lifecycle tiers below. The production host's credential can write and list, never delete, never bypass retention; the escrowed admin credential can. A compromised host cannot erase its history; a human can correct a mistake.
 - **mirror** — versioned, **no lock**, 30-day expiry of non-current versions: deletions must propagate, because the object store holds personal data that erasure removes (ADR 0020).
 
-Everything in `dumps/` is **client-side encrypted with `age`** before upload; the private half lives in escrow and, for the unattended drill, in a root-only file on VPC 2 — with the consequence `SECRETS.md` § The backup identity states. Every job: verify the upload against the bucket, write a `backup` row (the System page reads it — ticket 42), then ping the dead-man check with the outcome word and sizes only.
+Everything in `dumps/` is **client-side encrypted with `age`** before upload; the private half lives in escrow and, for the unattended drill, in a root-only file on VPC 2 — with the consequence `SECRETS.md` § The backup identity states. Every job: verify the upload against the bucket, write a `backup` row (§ The `backup` rows; ticket 42's System page reads it once built), then ping the dead-man check with the outcome word and sizes only.
 
 ## Copied
 
@@ -96,11 +96,23 @@ Two boxes of 4 vCPU · 4 GB · 120 GB NVMe. VPC 1 runs all of production — the
 
 **The nightly bundle is verified inside the repository it came from**, because `git bundle verify` refuses to run anywhere else. The api's uid owns the bare repositories and the job runs as root, so the image's git config trusts `/data/git/*`. The mount is read-only, so root cannot write into the repositories.
 
-**Every run ends with one line in the `backup` service's log**, carrying the same words as its ping: `backup.sh hourly: ok bytes=<n> took=<seconds>`, or `fail` in place of `ok`. The dead-man check's ping history shows the same body. If a run has no closing line, it stopped before it could ping, and the lines above it say where. The one exception is an hourly run skipped while the erasure lock is held: it logs that, and pings nothing. Two kinds of line appear in most runs and are expected. One is rclone's `Config file … not found` notice, once per call, because the remotes come from the environment. The other is psql's refusal followed by `backup row not written`, until ticket 42's table lands.
+**Every run ends with one line in the `backup` service's log**, carrying the same words as its ping: `backup.sh hourly: ok bytes=<n> took=<seconds>`, or `fail` in place of `ok`. The dead-man check's ping history shows the same body. If a run has no closing line, it stopped before it could ping, and the lines above it say where. The one exception is an hourly run skipped while the erasure lock is held: it logs that, and pings nothing. One kind of line appears in most runs and is expected: rclone's `Config file … not found` notice, once per call, because the remotes come from the environment. A `backup row not written` line after psql's error is not expected: the copy and its ping went ahead, and only the record of it is missing (§ The `backup` rows).
 
 **A file left in `/staging` clears itself.** Each run first deletes anything there older than 24 hours. The first scheduled run of an image that gets its variables therefore removes a leftover like 04/09's `globals-…sql.age`, and the health check (cron alive, nothing stale in `/staging`) turns healthy at its next interval.
 
 **The pings hold the nightly release too.** When `RELEASE_MODE` is `nightly`, the release at 02:35 UTC reads the `pg-hourly` and `nightly` checks before it deploys anything, and refuses unless both are up with a recent ping (`CI.md` § `release.yml`, *The nightly backup*). So a red check here also stops that night's release, and production stays on the last release that rode a verified backup.
+
+## The `backup` rows
+
+Every script writes a `backup` row as the database resource's owner, the role each already connects as. The stores stack's `DATABASE_URL` is the owner DSN because a dump reads every table, the drill reaches production as `postgres`, and `restore-production.sh` takes the owner DSN. The table grants no role anything more. The api and the worker hold no privilege on it. One row is one run of one kind on one store, and its key is the kind, the store and the instant the run started.
+
+| Kind | Written by | Store | When |
+| --- | --- | --- | --- |
+| `backup` | `backup.sh` | `postgres` each hour; `objectstore`, `git` and `git-mirror` each night | after the copy is verified against the bucket and before the ping, `ok` with where it went and when it expires, or `failed` with neither |
+| `drill` | `restore-drill.sh` | `all` | at the end of a drill that passed, to production and never to staging, with the report and the RTO |
+| `restore` | `restore-production.sh` | `postgres`, and `objectstore` and `git` when the run restored them | once the `backup` service is started again at the end, into the restored and migrated database, with the dump it restored and the RTO |
+
+A row that cannot be written never stops its run and never changes the run's ping or exit status: the script logs `backup row not written` and goes on. A drill that fails writes no row, and its failed ping is the record. A restore that stops before its end writes no row, because the database might not yet be the restored and migrated one. `restore-production.sh` also logs the statement it tried. Run it by hand once the database answers. It inserts nothing if the row is already there, so running it twice is safe.
 
 ## Putting a new backup image on production
 
@@ -114,4 +126,4 @@ To check, the `backup` container runs the new digest, and its first `:05` run lo
 
 ## Signals (for ticket 42)
 
-`backup(id, kind ∈ backup · drill, store, started_at, finished_at, outcome, bytes, location, report_url, contains_personal_data, expires_at, rto_minutes)` — the table lands with ticket 42's signals task; until then `backup.sh` and the drill say "row not written" and carry on, and the pings are the record. Alerts: a missed or failed ping per job (scheduler, pg-hourly, nightly, drill, Coolify instance backup, staging-wiped) — `pg-hourly`, `nightly` and `drill` on the **second channel**, with a weekly all-green digest so silence is distinguishable from health; the uptime check's two paths (`coolify.md` § Ingress); disk under `/data` above 80 %; last backup per store older than its period; last drill older than 35 days; worker `image_digest` ≠ the released one. **Growth step A has two triggers** (ADR 0024): the swap-in rate (`pswpin` above 4 MB/s for five minutes) and the **page-cache floor** — `MemAvailable` on VPC 1 below 512 MB for five minutes, with every service's limit summed in `coolify.md` § Memory.
+`backup(kind ∈ backup · drill · restore, store, started_at, finished_at, outcome, bytes, location, report_url, contains_personal_data, expires_at, rto_minutes)`, the rows § The `backup` rows describes. The signal lines that read them land with ticket 42's signals task. Alerts: a missed or failed ping per job (scheduler, pg-hourly, nightly, drill, Coolify instance backup, staging-wiped) — `pg-hourly`, `nightly` and `drill` on the **second channel**, with a weekly all-green digest so silence is distinguishable from health; the uptime check's two paths (`coolify.md` § Ingress); disk under `/data` above 80 %; last backup per store older than its period; last drill older than 35 days; worker `image_digest` ≠ the released one. **Growth step A has two triggers** (ADR 0024): the swap-in rate (`pswpin` above 4 MB/s for five minutes) and the **page-cache floor** — `MemAvailable` on VPC 1 below 512 MB for five minutes, with every service's limit summed in `coolify.md` § Memory.

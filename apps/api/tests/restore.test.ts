@@ -227,6 +227,7 @@ let production: pg.Pool;
 let fresh: pg.Pool;
 let untouched: pg.Pool;
 let staging: pg.Pool;
+let recorded: pg.Pool;
 let atTheDump: Readonly<Record<string, number>>;
 
 beforeAll(async () => {
@@ -253,7 +254,7 @@ beforeAll(async () => {
 
   const admin = new pg.Pool({ connectionString: uriFor("postgres"), max: 1 });
   try {
-    for (const database of ["production", "fresh", "untouched", "staging"]) {
+    for (const database of ["production", "fresh", "untouched", "staging", "recorded"]) {
       await admin.query(`CREATE DATABASE ${database}`);
       mustSucceed(migrating(database));
     }
@@ -264,6 +265,7 @@ beforeAll(async () => {
   fresh = new pg.Pool({ connectionString: uriFor("fresh"), max: 2 });
   untouched = new pg.Pool({ connectionString: uriFor("untouched"), max: 2 });
   staging = new pg.Pool({ connectionString: uriFor("staging"), max: 2 });
+  recorded = new pg.Pool({ connectionString: uriFor("recorded"), max: 2 });
   for (const pool of [production, fresh, untouched, staging]) await seedAWorkspace(pool);
 
   // Piped, as the backup pipes it into age: an archive written to a pipe records no offsets, so
@@ -279,7 +281,7 @@ beforeAll(async () => {
 }, 240_000);
 
 afterAll(async () => {
-  await Promise.all([production, fresh, untouched, staging].map(endPool));
+  await Promise.all([production, fresh, untouched, staging, recorded].map(endPool));
   if (container !== "") docker(["rm", "--force", container]);
 });
 
@@ -404,5 +406,180 @@ describe("the drill's restore, over staging left migrated and seeded", () => {
     expect(restored).toContain(
       "schema public, owned by pg_database_owner: USAGE to PUBLIC, granted by pg_database_owner",
     );
+  });
+});
+
+const NOTHING_LISTENS = `postgresql://postgres:${PASSWORD}@localhost:9/recorded`;
+
+const UNWRITTEN = "backup row not written";
+
+const rowsStartedAt = async (startedAt: string) =>
+  (
+    await recorded.query(
+      `SELECT kind, store, outcome, bytes, location, report_url, contains_personal_data,
+              extract(epoch FROM expires_at - finished_at)::int / 3600 AS kept_hours, rto_minutes
+         FROM backup WHERE started_at = $1 ORDER BY store`,
+      [startedAt],
+    )
+  ).rows;
+
+const recordingACopy = (calls: string, database: string): Ran =>
+  inTheContainer(
+    ["set -euo pipefail", fenced("deploy/backup.sh", "record the copy"), calls].join("\n"),
+    { DATABASE_URL: database },
+  );
+
+describe("backup.sh's record of a copy", () => {
+  it("writes the hourly dump's size, location and expiry after finish", async () => {
+    const started = "2026-10-21T10:00:00Z";
+    mustSucceed(
+      recordingACopy(
+        `record postgres ${started} ok 52428800 pg/hourly/pg-20261021T100000Z.dump.age "48 hours"`,
+        insideUriFor("recorded"),
+      ),
+    );
+
+    expect(await rowsStartedAt(started)).toEqual([
+      {
+        kind: "backup",
+        store: "postgres",
+        outcome: "ok",
+        bytes: "52428800",
+        location: "pg/hourly/pg-20261021T100000Z.dump.age",
+        report_url: null,
+        contains_personal_data: true,
+        kept_hours: 48,
+        rto_minutes: null,
+      },
+    ]);
+  });
+
+  it("writes a failed copy with no location, size or expiry", async () => {
+    const started = "2026-10-21T11:00:00Z";
+    mustSucceed(recordingACopy(`record postgres ${started} failed`, insideUriFor("recorded")));
+
+    expect(await rowsStartedAt(started)).toMatchObject([
+      { outcome: "failed", bytes: null, location: null, kept_hours: null },
+    ]);
+  });
+
+  it("logs an unwritten row and returns success", () => {
+    const ran = recordingACopy(
+      'record postgres 2026-10-21T09:00:00Z failed; echo "returned $?"',
+      NOTHING_LISTENS,
+    );
+
+    expect(ran.code).toBe(0);
+    expect(ran.said).toContain(UNWRITTEN);
+    expect(ran.said).toMatch(/^returned 0$/m);
+  });
+});
+
+const recordingADrill = (started: string, prodPsql: string): Ran =>
+  inTheContainer(
+    [
+      "set -euo pipefail",
+      `started=${started} rto=70 REPORT=/work/drill-20261001T030000Z.md`,
+      'say() { printf "%s\\n" "$*"; }',
+      fenced("deploy/restore-drill.sh", "record the drill"),
+      "echo carried on",
+    ].join("\n"),
+    { PROD_PSQL: prodPsql },
+  );
+
+describe("the drill's record", () => {
+  it("writes one drill row to production through PROD_PSQL", async () => {
+    const started = "2026-10-01T03:00:00Z";
+    mustSucceed(recordingADrill(started, `psql ${insideUriFor("recorded")}`));
+
+    expect(await rowsStartedAt(started)).toEqual([
+      {
+        kind: "drill",
+        store: "all",
+        outcome: "ok",
+        bytes: null,
+        location: "drills/",
+        report_url: "drills/drill-20261001T030000Z.md",
+        contains_personal_data: false,
+        kept_hours: null,
+        rto_minutes: 70,
+      },
+    ]);
+  });
+
+  it("logs an unwritten row and carries on", () => {
+    const ran = recordingADrill("2026-10-01T04:00:00Z", `psql ${NOTHING_LISTENS}`);
+
+    expect(ran.code).toBe(0);
+    expect(ran.said).toContain(`${UNWRITTEN} to production`);
+    expect(ran.said).toMatch(/^carried on$/m);
+  });
+});
+
+type Restored = { readonly objectstore: "yes" | "no"; readonly git: "yes" | "no" };
+
+const recordingARestore = (started: string, restored: Restored, database: string): Ran =>
+  inTheContainer(
+    [
+      "set -euo pipefail",
+      `started=${started} rto=40 tier=daily dump=pg-20261021T020000Z.dump.age`,
+      `objectstore=${restored.objectstore} git=${restored.git}`,
+      'say() { printf "%s\\n" "$*"; }',
+      'stores() { [ "$1 $2 $3 $4" = "run --rm --no-deps backup" ] || return 2; shift 4; "$@"; }',
+      fenced("deploy/restore-production.sh", "record the restore"),
+    ].join("\n"),
+    { DATABASE_URL: database },
+  );
+
+const A_RESTORED_STORE = {
+  kind: "restore",
+  outcome: "ok",
+  bytes: null,
+  report_url: null,
+  contains_personal_data: false,
+  kept_hours: null,
+  rto_minutes: 40,
+};
+
+describe("the production restore's record", () => {
+  it("writes one row per store it restored", async () => {
+    const everyStore = "2026-10-21T12:00:00Z";
+    const theDatabaseAlone = "2026-10-21T13:00:00Z";
+    mustSucceed(
+      recordingARestore(everyStore, { objectstore: "yes", git: "yes" }, insideUriFor("recorded")),
+    );
+    mustSucceed(
+      recordingARestore(
+        theDatabaseAlone,
+        { objectstore: "no", git: "no" },
+        insideUriFor("recorded"),
+      ),
+    );
+
+    expect(await rowsStartedAt(everyStore)).toEqual([
+      { ...A_RESTORED_STORE, store: "git", location: "git/" },
+      { ...A_RESTORED_STORE, store: "objectstore", location: "objectstore/" },
+      { ...A_RESTORED_STORE, store: "postgres", location: "pg/daily/pg-20261021T020000Z.dump.age" },
+    ]);
+    expect(await rowsStartedAt(theDatabaseAlone)).toEqual([
+      { ...A_RESTORED_STORE, store: "postgres", location: "pg/daily/pg-20261021T020000Z.dump.age" },
+    ]);
+  });
+
+  it("logs a statement that, rerun, records the restore once", async () => {
+    const started = "2026-10-21T14:00:00Z";
+    const ran = recordingARestore(started, { objectstore: "yes", git: "yes" }, NOTHING_LISTENS);
+    const logged = new RegExp(`^${UNWRITTEN}; once the database answers, run: (.+)$`, "m").exec(
+      ran.said,
+    )?.[1];
+
+    expect({ code: ran.code, logged }).toEqual({ code: 0, logged: expect.any(String) });
+    await recorded.query(logged ?? "");
+    await recorded.query(logged ?? "");
+    expect((await rowsStartedAt(started)).map((row) => row.store)).toEqual([
+      "git",
+      "objectstore",
+      "postgres",
+    ]);
   });
 });
