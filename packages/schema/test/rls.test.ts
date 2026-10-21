@@ -1800,6 +1800,310 @@ const submittingOneRequest = async (client: pg.PoolClient, kind: string): Promis
   }
 };
 
+const PSEUDONYM = "01J6EEEEEEEEEEEEEEEEEEEEEE";
+
+const ERASED_AS = `human:${PSEUDONYM}`;
+
+const PERSON = "01J6PPPPPPPPPPPPPPPPPPPPPP";
+
+const PROPOSER = `human:${PERSON}`;
+
+const ADDRESS = "priya@example.com";
+
+const TOO_LONG =
+  "Removed: erasing a person's personal data from this request made it longer than a request may be.";
+
+type Erasing = {
+  readonly workspaceId?: string;
+  readonly people?: readonly string[];
+  readonly addresses?: readonly string[];
+  readonly pseudonym?: string;
+};
+
+const eraseTheSuggestions = (client: pg.PoolClient, erasing: Erasing = {}) =>
+  client.query<{ erase_from_the_suggestions: number }>(
+    "SELECT erase_from_the_suggestions($1, $2, $3)",
+    [erasing.workspaceId ?? WS_A, erasing.people ?? [PERSON], erasing.pseudonym ?? PSEUDONYM],
+  );
+
+const eraseTheRequests = (client: pg.PoolClient, erasing: Erasing = {}) =>
+  client.query<{ rewritten: number; bodies_replaced: number }>(
+    "SELECT * FROM erase_from_the_write_requests($1, $2, $3, $4)",
+    [
+      erasing.workspaceId ?? WS_A,
+      erasing.people ?? [PERSON],
+      erasing.addresses ?? [ADDRESS],
+      erasing.pseudonym ?? PSEUDONYM,
+    ],
+  );
+
+const requestsNaming = (client: pg.PoolClient, erasing: Erasing = {}) =>
+  client.query<{ concept_write_requests_naming: string }>(
+    "SELECT * FROM concept_write_requests_naming($1, $2)",
+    [erasing.people ?? [PERSON], erasing.addresses ?? [ADDRESS]],
+  );
+
+const asTheApiIn = async (client: pg.PoolClient, workspaceId: string) => {
+  await client.query("SET LOCAL ROLE app_rt");
+  await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
+};
+
+const refusedAt = async (
+  client: pg.PoolClient,
+  call: () => Promise<unknown>,
+  refusal: RegExp,
+): Promise<void> => {
+  await client.query("SAVEPOINT refused");
+  await expect(call()).rejects.toThrow(refusal);
+  await client.query("ROLLBACK TO SAVEPOINT refused");
+};
+
+describe("the erasure of the suggestions", () => {
+  const twoProposals = async (client: pg.PoolClient) => {
+    const seed = await seedTwoWorkspaces(client);
+    await seed.erasureRequest({ workspaceId: WS_A, pseudonym: PSEUDONYM });
+    const here = await seed.suggestion({ workspaceId: WS_A, proposer: PROPOSER });
+    await seed.conceptWriteRequest({
+      workspaceId: WS_A,
+      suggestionId: here.id,
+      body: `Ask ${PROPOSER} about expenses, within sixty days.`,
+    });
+    const there = await seed.suggestion({ workspaceId: WS_B, proposer: PROPOSER });
+    await seed.conceptWriteRequest({
+      workspaceId: WS_B,
+      suggestionId: there.id,
+      body: `Ask ${PROPOSER} about expenses.`,
+    });
+    return { seed, here, there };
+  };
+
+  const requestOf = async (client: pg.PoolClient, suggestionId: string) =>
+    (
+      await client.query(
+        `SELECT s.status, s.proposer, s.decider, s.reason, r.body
+           FROM suggestion s JOIN concept_write_request r
+             ON r.workspace_id = s.workspace_id AND r.suggestion_id = s.id
+          WHERE s.id = $1`,
+        [suggestionId],
+      )
+    ).rows;
+
+  const UNTOUCHED = [
+    expect.objectContaining({
+      proposer: PROPOSER,
+      body: `Ask ${PROPOSER} about expenses, within sixty days.`,
+    }),
+  ];
+
+  const asLeft = async (client: pg.PoolClient, suggestionId: string) => {
+    await client.query("RESET ROLE");
+    return requestOf(client, suggestionId);
+  };
+
+  const declinedByTheProposer = async (client: pg.PoolClient) => {
+    const { here } = await twoProposals(client);
+    await deciding(client, here.id);
+    await client.query(
+      `UPDATE suggestion SET status = 'declined', decider = $3, decided_at = now(),
+              reason = 'not the company''s word on this'
+        WHERE workspace_id = $1 AND id = $2`,
+      [WS_A, here.id, PROPOSER],
+    );
+    return here;
+  };
+
+  it("serves the api only, and only in its own workspace", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { here, there } = await twoProposals(client);
+      await asTheApiIn(client, WS_A);
+
+      expect((await requestsNaming(client)).rows).toEqual([
+        { concept_write_requests_naming: here.id },
+      ]);
+      for (const erase of [eraseTheSuggestions, eraseTheRequests]) {
+        await refusedAt(
+          client,
+          () => erase(client, { workspaceId: WS_B }),
+          /scoped to another workspace/,
+        );
+      }
+      expect((await eraseTheSuggestions(client)).rows).toEqual([{ erase_from_the_suggestions: 1 }]);
+      expect((await eraseTheRequests(client)).rows).toEqual([{ rewritten: 1, bodies_replaced: 0 }]);
+
+      await client.query("SELECT set_config('app.workspace_id', '', true)");
+      await refusedAt(
+        client,
+        () => eraseTheSuggestions(client, { workspaceId: WS_B }),
+        /scoped to another workspace/,
+      );
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      for (const call of [requestsNaming, eraseTheSuggestions, eraseTheRequests]) {
+        await refusedAt(client, () => call(client), /permission denied/);
+      }
+
+      await client.query("RESET ROLE");
+      expect(await requestOf(client, there.id)).toEqual([
+        {
+          status: "waiting",
+          proposer: PROPOSER,
+          decider: null,
+          reason: null,
+          body: `Ask ${PROPOSER} about expenses.`,
+        },
+      ]);
+    });
+  });
+
+  it("refuses a person named by anything but a person id", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { here } = await twoProposals(client);
+      await asTheApiIn(client, WS_A);
+
+      for (const call of [requestsNaming, eraseTheSuggestions, eraseTheRequests]) {
+        await refusedAt(
+          client,
+          () => call(client, { people: ["sixty"] }),
+          /a person is named by their person id/,
+        );
+      }
+      expect(await asLeft(client, here.id)).toEqual(UNTOUCHED);
+    });
+  });
+
+  it("refuses an address that is not an email address", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { here } = await twoProposals(client);
+      await asTheApiIn(client, WS_A);
+
+      for (const call of [requestsNaming, eraseTheRequests]) {
+        await refusedAt(
+          client,
+          () => call(client, { addresses: ["sixty"] }),
+          /an address is a lower-case email address/,
+        );
+      }
+      expect(await asLeft(client, here.id)).toEqual(UNTOUCHED);
+    });
+  });
+
+  it("refuses a pseudonym no erasure in the workspace minted", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { here } = await twoProposals(client);
+      await asTheApiIn(client, WS_A);
+
+      for (const erase of [eraseTheSuggestions, eraseTheRequests]) {
+        await refusedAt(
+          client,
+          () => erase(client, { pseudonym: "01J6QQQQQQQQQQQQQQQQQQQQQQ" }),
+          /no erasure in this workspace minted that pseudonym/,
+        );
+      }
+      expect(await asLeft(client, here.id)).toEqual(UNTOUCHED);
+    });
+  });
+
+  it("leaves a longer address that begins with the needle", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { seed } = await twoProposals(client);
+      const longer = await seed.suggestion({ workspaceId: WS_A, proposer: PROPOSER });
+      await seed.conceptWriteRequest({
+        workspaceId: WS_A,
+        suggestionId: longer.id,
+        body: "Ask human:a@b.com, human:a@b.co.uk or human:a@b.co.",
+      });
+      await asTheApiIn(client, WS_A);
+
+      await eraseTheRequests(client, { addresses: ["a@b.co"] });
+
+      await client.query("RESET ROLE");
+      expect(await requestOf(client, longer.id)).toEqual([
+        expect.objectContaining({ body: `Ask human:a@b.com, human:a@b.co.uk or ${ERASED_AS}.` }),
+      ]);
+    });
+  });
+
+  it("replaces a body the pseudonym would push past its limit", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { seed } = await twoProposals(client);
+      const needle = "human:a@b.co";
+      const atTheLimit = await seed.suggestion({ workspaceId: WS_A, proposer: PROPOSER });
+      await seed.conceptWriteRequest({
+        workspaceId: WS_A,
+        suggestionId: atTheLimit.id,
+        body: `${"x".repeat(100_000 - needle.length)}${needle}`,
+      });
+      await asTheApiIn(client, WS_A);
+
+      expect((await eraseTheRequests(client, { addresses: ["a@b.co"] })).rows).toEqual([
+        { rewritten: 2, bodies_replaced: 1 },
+      ]);
+      expect((await eraseTheRequests(client, { addresses: ["a@b.co"] })).rows).toEqual([
+        { rewritten: 0, bodies_replaced: 0 },
+      ]);
+
+      await client.query("RESET ROLE");
+      expect(await requestOf(client, atTheLimit.id)).toEqual([
+        {
+          status: "returned",
+          proposer: PROPOSER,
+          decider: "process:better-answers-erasure",
+          reason: TOO_LONG,
+          body: TOO_LONG,
+        },
+      ]);
+    });
+  });
+
+  it("refuses the api the erasure's rewrite of a decided suggestion", async () => {
+    await withRollback(db.pool, async (client) => {
+      const here = await declinedByTheProposer(client);
+      await asTheApiIn(client, WS_A);
+      await client.query("SELECT set_config('app.erasing_suggestions_as', $1, true)", [ERASED_AS]);
+
+      await expect(
+        client.query("UPDATE suggestion SET proposer = $3 WHERE workspace_id = $1 AND id = $2", [
+          WS_A,
+          here.id,
+          ERASED_AS,
+        ]),
+      ).rejects.toThrow(/decided as declined already/);
+    });
+  });
+
+  it("lets the erasure rewrite only the names and the reason", async () => {
+    await withRollback(db.pool, async (client) => {
+      const here = await declinedByTheProposer(client);
+      await client.query("SELECT set_config('app.erasing_suggestions_as', $1, true)", [ERASED_AS]);
+
+      for (const [change, value] of [
+        ["status", "returned"],
+        ["set_id", ulid()],
+        ["proposer", "human:01J6CCCCCCCCCCCCCCCCCCCCCC"],
+        ["decider", "human:01J6CCCCCCCCCCCCCCCCCCCCCC"],
+        ["reason", "Priya says the policy changed in May."],
+      ] as const) {
+        await refusedAt(
+          client,
+          () =>
+            client.query(
+              `UPDATE suggestion SET ${change} = $3 WHERE workspace_id = $1 AND id = $2`,
+              [WS_A, here.id, value],
+            ),
+          /an erasure rewrites who proposed and decided to its pseudonym, and the reason to its sentence, and nothing else/,
+        );
+      }
+      const rewritten = await client.query(
+        `UPDATE suggestion SET proposer = $3, decider = $3,
+                reason = 'Removed when its author''s personal data was erased.'
+          WHERE workspace_id = $1 AND id = $2`,
+        [WS_A, here.id, ERASED_AS],
+      );
+      expect(rewritten.rowCount).toBe(1);
+    });
+  });
+});
+
 describe("the kinds a caller may raise, asked of the function", () => {
   it("lands a set only of kinds its caller's tier names", async () => {
     await withRollback(db.pool, async (client) => {

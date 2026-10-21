@@ -7,6 +7,7 @@ export {
 } from "./identifiers.ts";
 export { accessAnswerOf, ERASURE_FAMILIES, erasureMapOf } from "./map.ts";
 export type { AccessAnswer, ErasureFamily, ErasureFamilyDescriptor, ErasureMap } from "./map.ts";
+export { subjectNamedBy } from "./needles.ts";
 export { rederiveAfterErasure } from "./rederive.ts";
 export { rehearseErasure, seedSyntheticSubject } from "./rehearsal.ts";
 export type { ErasureRehearsed, RehearsalRefusal } from "./rehearsal.ts";

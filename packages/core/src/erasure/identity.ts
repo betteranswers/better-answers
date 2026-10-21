@@ -1,5 +1,5 @@
 import type { PlatformPrincipal } from "../kernel/index.ts";
-import { ERASED_DOMAIN } from "../store/git/index.ts";
+import { ERASED_DOMAIN, type Needles } from "../store/git/index.ts";
 import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { SESSION_VERIFICATION_PREFIXES, verificationIdentifiersOf } from "../workspaces/index.ts";
 import { NO_ACTORS_SWEPT, sweepTheActors, type ActorsSwept } from "./actors.ts";
@@ -58,6 +58,8 @@ export type ErasureSubject = {
   readonly personId: string | null;
 
   readonly emails: readonly string[];
+
+  readonly needles: Needles;
 
   readonly pseudonym: string;
 };
@@ -150,7 +152,7 @@ export const eraseFromTheIdentitySet = async (
     );
     const named = { workspaceId: subject.workspaceId, pseudonym: subject.pseudonym };
     const questionsSince = await sweepTheQuestions(tx, { ...named, askers: askersOf([personId]) });
-    const actorsSince = await sweepTheActors(tx, { ...named, actors: askersOf([personId]) });
+    const actorsSince = await sweepTheActors(tx, { ...named, needles: subject.needles });
     const done = { membersEnded, lastActive, questionsSince, actorsSince };
 
     const elsewhere = await tx.query(HELD_ELSEWHERE, [personId, subject.workspaceId]);

@@ -16,17 +16,13 @@ import {
   type PlatformPrincipal,
   type Result,
 } from "../kernel/index.ts";
-import {
-  ERASED_DOMAIN,
-  rewriteHistory,
-  type GitDoor,
-  type Pseudonymisation,
-} from "../store/git/index.ts";
+import { rewriteHistory, type GitDoor, type Pseudonymisation } from "../store/git/index.ts";
 import type { ObjectDoor } from "../store/objects/index.ts";
 import { withScope, withSessionLock, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { eraseFromTheActors, inEverySweep, type ActorsSwept } from "./actors.ts";
 import { eraseFromTheIdentitySet, type IdentityArm, type IdentitySwept } from "./identity.ts";
 import { erasureMapOf, type ErasureFamily, type ErasureMap } from "./map.ts";
+import { subjectNamedBy, type SubjectNamed } from "./needles.ts";
 import { eraseFromTheQuestions, type QuestionsSwept } from "./questions.ts";
 import { rederiveAfterErasure, type Rederived } from "./rederive.ts";
 import { writeReplayCopy } from "./replay.ts";
@@ -37,11 +33,9 @@ import {
   type ErasureRecord,
 } from "./report.ts";
 import { monthsOn, type SubjectRequest } from "./requests.ts";
-import { addressesSuppressedFor, suppressInTheWorkspace, type Suppressed } from "./suppressions.ts";
+import { suppressInTheWorkspace, type Suppressed } from "./suppressions.ts";
 
 const ERASURE_ACTOR = processActorId("erasure");
-
-const isTombstone = (address: string): boolean => address.endsWith(`@${ERASED_DOMAIN}`);
 
 export type ErasurePrincipal = PlatformPrincipal & {
   readonly actorId: typeof ERASURE_ACTOR;
@@ -285,14 +279,11 @@ const withTheVerificationsMoved = (
   [CONCEPT_VERIFICATION]: { ...actions[CONCEPT_VERIFICATION], rehashed: carried.verifications },
 });
 
-const withTheActorsStep = (actions: ErasureActions, swept: ActorsSwept): ErasureActions => ({
-  ...actions,
-  [BUNDLE_COMMIT]: { ...actions[BUNDLE_COMMIT], actorsRewritten: swept.commits },
-  [CONCEPT_VERIFICATION]: {
-    ...actions[CONCEPT_VERIFICATION],
-    actorsRewritten: swept.verifications,
-  },
-});
+const withTheActorsStep = (actions: ErasureActions, swept: ActorsSwept): ErasureActions =>
+  [...swept].reduce<ErasureActions>(
+    (taken, [family, counts]) => ({ ...taken, [family]: { ...taken[family], ...counts } }),
+    actions,
+  );
 
 const rewritingTheBundle = (
   platform: ErasurePrincipal,
@@ -319,22 +310,19 @@ const afterTheMembersEnd = async (
   doors: ErasureDoors,
   subject: Pseudonymisation & {
     readonly workspaceId: string;
-    readonly erasureRequestId: string;
-    readonly personIds: readonly (string | null)[];
     readonly paths: readonly string[];
   },
 ): Promise<Result<{ readonly git: GitStep; readonly actors: ActorsSwept }, Error>> => {
-  const { workspaceId } = subject;
-  const suppressed = await attempt(() =>
-    withScope(platform, doors.postgres, workspaceId, (tx) => addressesSuppressedFor(tx, subject)),
-  );
-  if (!suppressed.ok) return err(suppressed.error);
-  const addresses = [...new Set([...subject.addresses, ...suppressed.value])].filter(
-    (address) => !isTombstone(address),
-  );
-  const git = await rewritingTheBundle(platform, doors, workspaceId, { ...subject, addresses });
+  const { workspaceId, addresses, people, pseudonym } = subject;
+  const git = await rewritingTheBundle(platform, doors, workspaceId, subject);
   if (!git.ok) return err(git.error);
-  const actors = await attempt(() => eraseFromTheActors(platform, doors.postgres, subject));
+  const actors = await attempt(() =>
+    eraseFromTheActors(platform, doors.postgres, {
+      workspaceId,
+      needles: { addresses, people },
+      pseudonym,
+    }),
+  );
   return actors.ok ? ok({ git: git.value, actors: actors.value }) : err(actors.error);
 };
 
@@ -412,37 +400,6 @@ const IDENTITY_USER: ErasureFamily = "identity-user";
 const personTheMapFound = (map: ErasureMap): string | null =>
   map.find((entry) => entry.family === IDENTITY_USER)?.locations[0] ?? null;
 
-type SubjectAddresses = {
-  readonly inTheBundle: readonly string[];
-  readonly ofTheSubject: readonly string[];
-};
-
-const ADDRESSES_OF = `SELECT lower(email) AS email FROM "user" WHERE id = ANY($1::text[])`;
-
-const lowered = (addresses: readonly string[]): readonly string[] =>
-  addresses.map((address) => address.trim().toLowerCase()).filter((address) => address !== "");
-
-const addressesOfTheSubject = async (
-  tx: Tx,
-  subject: {
-    readonly personIds: readonly (string | null)[];
-    readonly requested: readonly string[];
-  },
-): Promise<SubjectAddresses> => {
-  const people = [...new Set(subject.personIds.filter((id) => id !== null))];
-  const found =
-    people.length === 0 ? { rows: [] } : await tx.query<{ email: string }>(ADDRESSES_OF, [people]);
-  const ofTheSubject = [...new Set(lowered(found.rows.map((row) => row.email)))].filter(
-    (address) => !isTombstone(address),
-  );
-  return {
-    ofTheSubject,
-    inTheBundle: [...new Set([...ofTheSubject, ...lowered(subject.requested)])].filter(
-      (address) => !isTombstone(address),
-    ),
-  };
-};
-
 const detailOf = (request: SubjectRequest, map: ErasureMap): CompletedDetail => {
   const locations = map.reduce((total, entry) => total + entry.locations.length, 0);
   const personId = personTheMapFound(map);
@@ -468,31 +425,7 @@ type ErasureOpened = {
   readonly standingCompletion: Date | null;
   readonly map: ErasureMap;
   readonly concepts: readonly string[];
-  readonly addresses: SubjectAddresses;
-
-  readonly namedPeople: readonly string[];
-};
-
-const NAMED_PEOPLE = `SELECT id FROM "user" WHERE email = $1 OR lower(email) = ANY($2::text[])`;
-
-const peopleNamedBy = async (
-  tx: Tx,
-  request: {
-    readonly workspaceId: string;
-    readonly erasureRequestId: string;
-    readonly pseudonym: string;
-    readonly addresses: readonly string[];
-  },
-): Promise<readonly string[]> => {
-  const suppressed = await addressesSuppressedFor(tx, request);
-  const addresses = [...new Set([...request.addresses, ...suppressed])].filter(
-    (address) => !isTombstone(address),
-  );
-  const found = await tx.query<{ id: string }>(NAMED_PEOPLE, [
-    `${request.pseudonym}@${ERASED_DOMAIN}`,
-    addresses,
-  ]);
-  return found.rows.map((row) => row.id);
+  readonly named: SubjectNamed;
 };
 
 const openTheRequest = async (
@@ -513,38 +446,16 @@ const openTheRequest = async (
 
   const searched = await attempt(() =>
     withScope(platform, doors.postgres, workspaceId, async (tx) => {
-      const map = await erasureMapOf(platform, tx, doors.git, request);
-      const addresses = await addressesOfTheSubject(tx, {
-        personIds: [personTheMapFound(map), request.personId],
-        requested: request.identifiers.emails,
-      });
-      return {
-        map,
-        concepts: await conceptsNaming(tx, workspaceId, map),
-        addresses,
-        namedPeople: await peopleNamedBy(tx, {
-          workspaceId,
-          erasureRequestId: erasure.id,
-          pseudonym,
-          addresses: addresses.inTheBundle,
-        }),
-      };
+      const named = await subjectNamedBy(tx, request, { erasureRequestId: erasure.id, pseudonym });
+      const map = await erasureMapOf(platform, tx, doors.git, request, named);
+      return { map, named, concepts: await conceptsNaming(tx, workspaceId, map) };
     }),
   );
   if (!searched.ok) return err(searched.error);
-  const { map, concepts, addresses, namedPeople } = searched.value;
+  const { map, concepts, named } = searched.value;
 
-  if (namedInTheBundle(map) && addresses.inTheBundle.length === 0) return err("no-address");
-  return ok({
-    request,
-    erasure,
-    pseudonym,
-    standingCompletion,
-    map,
-    concepts,
-    addresses,
-    namedPeople,
-  });
+  if (namedInTheBundle(map) && named.needles.addresses.length === 0) return err("no-address");
+  return ok({ request, erasure, pseudonym, standingCompletion, map, concepts, named });
 };
 
 const completeTheRequest = async (
@@ -632,16 +543,14 @@ export const runErasure = async (
 
     const opened = await openTheRequest(platform, doors, workspaceId, requestId.data, lockedAt);
     if (!opened.ok) return err(opened.error);
-    const { request, erasure, pseudonym, standingCompletion, map, addresses, namedPeople } =
-      opened.value;
-    const personIds = [personTheMapFound(map), request.personId, ...namedPeople];
-    const people = [...new Set(personIds.filter((person) => person !== null))];
+    const { request, erasure, pseudonym, standingCompletion, map, named } = opened.value;
+    const { needles } = named;
+    const paths = pathsNaming(map);
 
     const rewritten = await rewritingTheBundle(platform, doors, workspaceId, {
-      addresses: addresses.inTheBundle,
-      people,
+      ...needles,
       pseudonym,
-      paths: pathsNaming(map),
+      paths,
     });
     if (!rewritten.ok) return err(rewritten.error);
 
@@ -651,30 +560,33 @@ export const runErasure = async (
           workspaceId,
           erasureRequestId: erasure.id,
           identifiers: request.identifiers,
-          signInAddresses: addresses.ofTheSubject,
+          signInAddresses: named.signInAddresses,
         }),
       ),
     );
     if (!suppressed.ok) return err(suppressed.error);
 
-    const named = { workspaceId, personIds, pseudonym };
+    const sweeping = { workspaceId, needles, pseudonym };
     const swept = await attempt(async () => {
-      const questions = await eraseFromTheQuestions(platform, doors.postgres, named);
+      const questions = await eraseFromTheQuestions(platform, doors.postgres, {
+        workspaceId,
+        personIds: needles.people,
+        pseudonym,
+      });
       logTheSweep(
         doors.log,
         questionsStepLineOf(platform, erasure.id, questions),
         QUESTIONS_STEP_LOGGED,
       );
-      return { questions, actors: await eraseFromTheActors(platform, doors.postgres, named) };
+      return { questions, actors: await eraseFromTheActors(platform, doors.postgres, sweeping) };
     });
     if (!swept.ok) return err(swept.error);
 
     const identity = await attempt(() =>
       eraseFromTheIdentitySet(platform, doors.postgres, {
-        workspaceId,
-        personId: personTheMapFound(map),
-        emails: addresses.ofTheSubject,
-        pseudonym,
+        ...sweeping,
+        personId: named.member,
+        emails: named.signInAddresses,
       }),
     );
     if (!identity.ok) return err(identity.error);
@@ -686,11 +598,10 @@ export const runErasure = async (
     );
 
     const after = await afterTheMembersEnd(platform, doors, {
-      ...named,
-      erasureRequestId: erasure.id,
-      addresses: addresses.inTheBundle,
-      people,
-      paths: pathsNaming(map),
+      ...needles,
+      workspaceId,
+      pseudonym,
+      paths,
     });
     if (!after.ok) return err(after.error);
 

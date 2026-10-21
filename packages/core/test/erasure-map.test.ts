@@ -9,6 +9,7 @@ import {
   accessAnswerOf,
   ERASURE_FAMILIES,
   erasureMapOf,
+  subjectNamedBy,
   subjectRequestFor,
   type AccessAnswer,
   type ErasureFamily,
@@ -72,8 +73,8 @@ const requestFor = async (
 };
 
 const mapOf = (scenario: Scenario, request: SubjectRequest): Promise<ErasureMap> =>
-  withScope(bootstrap, scenario.postgres, scenario.workspaceId, (tx, platform) =>
-    erasureMapOf(platform, tx, scenario.git, request),
+  withScope(bootstrap, scenario.postgres, scenario.workspaceId, async (tx, platform) =>
+    erasureMapOf(platform, tx, scenario.git, request, await subjectNamedBy(tx, request, null)),
   );
 
 const conceptFileBy = async (
@@ -169,6 +170,10 @@ describe("the erasure map's union", () => {
       "identity-last-active",
       "source-document",
       "question-asked",
+      "concept-sensitivity-override",
+      "finding",
+      "suggestion",
+      "concept-write-request",
     ]);
   });
 
@@ -194,10 +199,15 @@ describe("the erasure map's union", () => {
       "identity-confirm-failures": findsNothing,
       "identity-last-active": findsNothing,
       "question-asked": findsNothing,
+      "concept-sensitivity-override": findsNothing,
+      finding: findsNothing,
+      suggestion: findsNothing,
+      "concept-write-request": findsNothing,
     };
 
-    expect(Object.keys(withoutADocumentFinder)).toHaveLength(14);
-    expect(ERASURE_FAMILIES).toHaveLength(15);
+    expect(ERASURE_FAMILIES.filter((family) => !(family in withoutADocumentFinder))).toEqual([
+      "source-document",
+    ]);
   });
 });
 
@@ -247,6 +257,10 @@ describe("the erasure map for a member", () => {
       },
       { family: "source-document", categories: ["document-text"], locations: [] },
       NO_QUESTION_ASKED,
+      { family: "concept-sensitivity-override", categories: ["actor-id"], locations: [] },
+      { family: "finding", categories: ["actor-id", "typed-text"], locations: [] },
+      { family: "suggestion", categories: ["actor-id", "typed-text"], locations: [] },
+      { family: "concept-write-request", categories: ["actor-id", "email-address"], locations: [] },
     ]);
   });
 
@@ -367,6 +381,10 @@ describe("the erasure map for a subject with no user row", () => {
       ["identity-last-active", []],
       ["source-document", []],
       ["question-asked", []],
+      ["concept-sensitivity-override", []],
+      ["finding", []],
+      ["suggestion", []],
+      ["concept-write-request", []],
     ]);
   });
 });
@@ -390,6 +408,18 @@ describe("the erasure map in one workspace's scope", () => {
         email,
         inviterId: here.admin.userId,
       }),
+      override: await seed.conceptSensitivityOverride({ workspaceId: here.workspaceId, actor }),
+      finding: await seed.finding({
+        workspaceId: here.workspaceId,
+        restoredBy: actor,
+        restoredAt: new Date(),
+        restoreReason: "Needed on the payroll page.",
+      }),
+      suggestion: await seed.suggestion({ workspaceId: here.workspaceId, proposer: actor }),
+      request: await seed.conceptWriteRequest({
+        workspaceId: here.workspaceId,
+        frontmatter: { title: "Expenses", verified: [{ by: `human:${email}` }] },
+      }),
     }));
     const theirs = await seedingWith(db().pool, async (seed) => ({
       commit: await seed.bundleCommit({ workspaceId: elsewhere.workspaceId, actor }),
@@ -398,6 +428,21 @@ describe("the erasure map in one workspace's scope", () => {
         workspaceId: elsewhere.workspaceId,
         email,
         inviterId: elsewhere.admin.userId,
+      }),
+      override: await seed.conceptSensitivityOverride({
+        workspaceId: elsewhere.workspaceId,
+        actor,
+      }),
+      finding: await seed.finding({
+        workspaceId: elsewhere.workspaceId,
+        reviewState: "dismissed",
+        reviewedBy: actor,
+        reviewedAt: new Date(),
+      }),
+      suggestion: await seed.suggestion({ workspaceId: elsewhere.workspaceId, proposer: actor }),
+      request: await seed.conceptWriteRequest({
+        workspaceId: elsewhere.workspaceId,
+        body: `Ask ${actor} about expenses.`,
       }),
     }));
 
@@ -430,12 +475,20 @@ describe("the erasure map in one workspace's scope", () => {
       ["identity-last-active", [here.workspaceId]],
       ["source-document", []],
       ["question-asked", []],
+      ["concept-sensitivity-override", [mine.override.iri]],
+      ["finding", [mine.finding.id]],
+      ["suggestion", [mine.suggestion.id]],
+      ["concept-write-request", [mine.request.suggestionId]],
     ]);
     const named = map.flatMap((entry) => entry.locations);
     for (const theirsOwn of [
       theirs.commit.sha,
       theirs.verification.id,
       theirs.invite.id,
+      theirs.override.iri,
+      theirs.finding.id,
+      theirs.suggestion.id,
+      theirs.request.suggestionId,
       shaElsewhere,
       elsewhere.workspaceId,
     ]) {
@@ -724,7 +777,7 @@ describe("the access answer", () => {
     });
     const map = await mapOf(scenario, request);
 
-    expect(map).toHaveLength(15);
+    expect(map).toHaveLength(ERASURE_FAMILIES.length);
     expect(accessAnswerOf(map)).toEqual({ categories: [], locations: [] });
   });
 });

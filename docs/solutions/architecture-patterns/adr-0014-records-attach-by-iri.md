@@ -47,6 +47,22 @@ People on records:
 - A member ends by an Admin's removal or by an erasure. Its row is deleted, and its audit event is the record of it.
 - The identity set keeps no team record. A group may carry a team's name (ADR 0038).
 
+The erasure union is `ERASURE_FAMILIES` in `packages/core/src/erasure/map.ts`. Each family has a finder in the erasure map and a step in the erasure routine, and the access answer lists what each finder found. The union holds nineteen families:
+
+- The bundle: `concept-file` (file text and git author lines), `bundle-commit` and `concept-verification`.
+- The identity set: `identity-user`, `identity-session`, `identity-verification`, `identity-invitation`, `identity-account`, `identity-passkey`, `identity-authenticator`, `identity-recovery-code`, `identity-confirm-failures` and `identity-last-active`.
+- The evidence: `source-document`.
+- The platform's records: `question-asked`, `concept-sensitivity-override` (who set the override), `finding` (who reviewed or restored it, and the reason they gave), `suggestion` (who proposed and who decided it, and the decider's reason) and `concept-write-request` (the person's actor id or `human:<address>` in a request's title, frontmatter or body).
+
+These tables name a person outside the union. The list is a scan of the schema on 21/10/2026, and no gate holds it, so a new column that names a person goes here or into the union:
+
+- `access_request`. The identity step clears the reason and the invitation on every arm, by the owner's ruling in #792. `requester_id` and `decided_by` keep the person id, because they key the user row, which keeps its id.
+- `invitation.inviter_id`. It keys the user row, which keeps its id. An invitation sent to the person is `identity-invitation`.
+- `subject_request.person_id`. It is the request's own subject, and the request is the record the erasure answers.
+- `audit_event.actor` and `identity_audit_event.actor`. The audit logs are never rewritten, and name a person by person id alone.
+- `oauth_client`, `oauth_access_token`, `oauth_refresh_token` and `oauth_consent`, by `user_id`. Each keys the user row, which keeps its id. The erasure deletes none of them.
+- `group_member.user_id`. Its foreign key to `member` cascades, so ending the member deletes it.
+
 Decided for the S3 block and not yet in the tree:
 
 - `concept_owner` is a table on the `concepts` slice, keyed against `concept_identity`, with a per-collection default beside it.

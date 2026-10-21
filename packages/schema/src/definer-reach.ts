@@ -51,6 +51,27 @@ export const SECURITY_DEFINER_REACH = [
       "Past the caller's grants. `app_rt`'s ALL is revoked on the table, so the read the acceptance path makes of a proposed concept's body exists only here, scoped to the transaction's own workspace.",
   },
   {
+    fn: "public.concept_write_requests_naming",
+    args: "p_people text[], p_addresses text[]",
+    reaches: ["public.concept_write_request"],
+    reason:
+      "Past the caller's grants. `app_rt`'s ALL is revoked on the table, so the erasure map's read of which requests name a person exists only here. It answers suggestion ids alone, never a request's text, and only in the transaction's own workspace. It refuses a person that is not a person id and an address that is not an email address, so a caller cannot use it to test a request's text for a word of its choosing.",
+  },
+  {
+    fn: "public.erase_from_the_suggestions",
+    args: "p_workspace_id text, p_people text[], p_pseudonym text",
+    reaches: ["public.suggestion"],
+    reason:
+      "Past the caller's grants. `suggestion_decides_once` refuses any update to a decided suggestion and any change of proposer, except from the table's owner, which this function runs as. It refuses a workspace other than the transaction's, a person that is not a person id, and a pseudonym that no `erasure_request` in the workspace carries. Within those, it rewrites who proposed and decided to `human:<pseudonym>` and the decider's reason to a fixed sentence, and the trigger refuses any other change. `app_rt` can write `erasure_request` and chooses the person ids, so the guards bound the rewrite's shape and tie its pseudonym to a recorded erasure. They do not prove the people are that erasure's subject.",
+  },
+  {
+    fn: "public.erase_from_the_write_requests",
+    args: "p_workspace_id text, p_people text[], p_addresses text[], p_pseudonym text",
+    reaches: ["public.concept_write_request", "public.suggestion"],
+    reason:
+      "Past the caller's grants. `app_rt` holds no privilege on `concept_write_request`. The function has the guards of `erase_from_the_suggestions`, and also refuses an address that is not an email address, so it rewrites only `human:<person id>` and `human:<address>`, each ending at an address boundary, to `human:<pseudonym>`. A body the rewrite would push past its CHECK becomes a fixed sentence, and a waiting suggestion it belongs to is returned through the decision path. The same limit holds: the guards do not prove the people and addresses are the erasure's subject.",
+  },
+  {
     fn: "public.analyse_map",
     args: "",
     reaches: ["public.map_node", "public.map_edge"],
