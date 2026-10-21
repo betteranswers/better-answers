@@ -188,7 +188,6 @@ const anAdminAtSearch = async (
 
 const saidNow = async (page: Page): Promise<string> => (await said(page).textContent()) ?? "";
 
-/** The passage's opener is off the page until the held list answers, so focus has nowhere to go back to. */
 const aPassageOpenedWhileTheListLoads = async (
   page: Page,
   api: APIRequestContext,
@@ -203,7 +202,9 @@ const aPassageOpenedWhileTheListLoads = async (
   await typed.reached;
   const panel = passagePanel(page, FORKLIFT_GUIDE);
   await expect(panel.getByRole("heading", { name: FORKLIFT_GUIDE })).toBeFocused();
-  await expect(matchesOf(page)).toHaveCount(0);
+  await expect(matchesOf(page), "the opener is still on the page while the list loads").toHaveCount(
+    0,
+  );
   return { panel, release: typed.release };
 };
 
