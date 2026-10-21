@@ -221,6 +221,7 @@ export function EvidenceSheet(properties: {
     >
       <SheetContent
         ref={content}
+        data-beside-page
         overlay={false}
         aria-describedby={undefined}
         className="top-[var(--band-drawn-h)] h-auto overflow-y-auto p-4 shadow-none sm:max-w-md"
