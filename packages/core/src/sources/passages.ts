@@ -154,8 +154,9 @@ export const passageCountsOf = (
   );
 
 const matchingRows = (
+  carried: string,
   after: string,
-): string => `SELECT c.source_document_id, c.char_start, c.char_end, c.sensitivity, d.title,
+): string => `SELECT c.source_document_id, c.char_start, c.char_end, c.sensitivity, d.title, ${carried}
           ${MATCH.columns}
      FROM "index".readable_passage c
      JOIN source_document d ON d.workspace_id = c.workspace_id AND d.id = c.source_document_id
@@ -170,11 +171,20 @@ const matchingRows = (
     ORDER BY ${MATCH.order}
     LIMIT $7`;
 
-const MATCHING_ROWS = matchingRows("");
+const AFTER = `AND ${MATCH.after({ weight: "$10", rank: "$11", key: ["$12", "$13"] })}`;
 
-const MATCHING_ROWS_AFTER = matchingRows(
-  `AND ${MATCH.after({ weight: "$10", rank: "$11", key: ["$12", "$13"] })}`,
-);
+const OPENING_POINTS = 160;
+
+const OPENING_READ = OPENING_POINTS * 2;
+
+/** Over the page alone: in the matching query, Postgres would cut every matched row's text before its sort. */
+const withOpenings = (
+  rows: string,
+): string => `SELECT found.source_document_id, found.char_start, found.char_end, found.sensitivity,
+          found.title, found.weight, found.rank,
+          left(substring(found.content from '\\S.*'), ${String(OPENING_READ)}) AS head
+     FROM (${rows}) AS found
+    ORDER BY found.weight DESC, found.rank DESC, found.source_document_id, found.char_start`;
 
 type MatchRow = {
   readonly source_document_id: string;
@@ -186,12 +196,17 @@ type MatchRow = {
   readonly rank: number;
 };
 
+type OpeningRow = MatchRow & { readonly head: string | null };
+
 export type PassageBound = MatchBound<{
   readonly sourceDocumentId: string;
   readonly charStart: number;
 }>;
 
-export type PassageFound = { readonly passage: PassageMatch; readonly bound: PassageBound };
+export type PassageFound<Match = PassageMatch> = {
+  readonly passage: Match;
+  readonly bound: PassageBound;
+};
 
 const boundParameters = (after: PassageBound | undefined): readonly unknown[] =>
   after === undefined
@@ -202,49 +217,109 @@ type PassageSearch = {
   readonly query: string;
   readonly limit: number;
   readonly after?: PassageBound | undefined;
+  readonly counts?: CorpusCounts | undefined;
 };
 
-export const findPassages = async (
+type Reading<Row extends MatchRow, Match> = {
+  readonly first: string;
+  readonly after: string;
+  readonly matchOf: (row: Row) => Match;
+};
+
+const readingOf = <Row extends MatchRow, Match>(
+  query: (after: string) => string,
+  matchOf: (row: Row) => Match,
+): Reading<Row, Match> => ({ first: query(""), after: query(AFTER), matchOf });
+
+const passageMatchOf = (row: MatchRow): PassageMatch => ({
+  sourceDocumentId: row.source_document_id,
+  title: row.title,
+  locator: wireLocatorOf(row),
+  sensitivity: PASSAGE_SENSITIVITY.parse(row.sensitivity),
+});
+
+const LINE_BREAK = /\r\n|[\n\r\v\f\u0085\u2028\u2029]/u;
+
+const openingLineOf = (head: string | null): string => {
+  const line =
+    (head ?? "")
+      .split(LINE_BREAK)
+      .map((each) =>
+        each
+          .replace(/^\s*#{1,6}(?:\s|$)/u, "")
+          .replace(/\s+/gu, " ")
+          .trim(),
+      )
+      .find((each) => each !== "") ?? "";
+  const points = Array.from(line);
+  return points.length > OPENING_POINTS
+    ? `${points
+        .slice(0, OPENING_POINTS - 1)
+        .join("")
+        .trimEnd()}…`
+    : line;
+};
+
+export type PassageMatchWithOpening = PassageMatch & { readonly openingLine: string };
+
+const LOCATED = readingOf((after) => matchingRows("", after), passageMatchOf);
+
+const WITH_OPENING = readingOf(
+  (after) => withOpenings(matchingRows("c.content,", after)),
+  (row: OpeningRow): PassageMatchWithOpening => ({
+    ...passageMatchOf(row),
+    openingLine: openingLineOf(row.head),
+  }),
+);
+
+export const findPassages = (
   principal: UserPrincipal,
   tx: Tx,
-  input: PassageSearch & { readonly counts?: CorpusCounts | undefined },
-): Promise<Result<readonly PassageFound[], Error>> => {
+  input: PassageSearch,
+): Promise<Result<readonly PassageFound[], Error>> => passagesFound(principal, tx, input, LOCATED);
+
+export const findPassagesWithOpening = (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: PassageSearch,
+): Promise<Result<readonly PassageFound<PassageMatchWithOpening>[], Error>> =>
+  passagesFound(principal, tx, input, WITH_OPENING);
+
+const passagesFound = async <Row extends MatchRow, Match>(
+  principal: UserPrincipal,
+  tx: Tx,
+  input: PassageSearch,
+  reading: Reading<Row, Match>,
+): Promise<Result<readonly PassageFound<Match>[], Error>> => {
   const counts =
     input.counts === undefined
       ? await passageCountsOf(principal, tx, input.query)
       : ok(input.counts);
-  return counts.ok ? passagesWeighed(principal, tx, input, counts.value) : counts;
+  return counts.ok ? passagesWeighed(principal, tx, input, counts.value, reading) : counts;
 };
 
-const passagesWeighed = (
+const passagesWeighed = <Row extends MatchRow, Match>(
   principal: UserPrincipal,
   tx: Tx,
   input: PassageSearch,
   counts: CorpusCounts,
-): Promise<Result<readonly PassageFound[], Error>> => {
+  reading: Reading<Row, Match>,
+): Promise<Result<readonly PassageFound<Match>[], Error>> => {
   const parameters = readableParameters(principal);
   return attempt(async () => {
-    const read = await tx.query<MatchRow>(
-      input.after === undefined ? MATCHING_ROWS : MATCHING_ROWS_AFTER,
-      [
-        principal.workspaceId,
-        input.query,
-        ...parameters,
-        ...parameters,
-        input.limit,
-        counts.size,
-        counts.frequencies,
-        ...boundParameters(input.after),
-      ],
-    );
+    const read = await tx.query<Row>(input.after === undefined ? reading.first : reading.after, [
+      principal.workspaceId,
+      input.query,
+      ...parameters,
+      ...parameters,
+      input.limit,
+      counts.size,
+      counts.frequencies,
+      ...boundParameters(input.after),
+    ]);
 
     return read.rows.map((row) => ({
-      passage: {
-        sourceDocumentId: row.source_document_id,
-        title: row.title,
-        locator: wireLocatorOf(row),
-        sensitivity: PASSAGE_SENSITIVITY.parse(row.sensitivity),
-      },
+      passage: reading.matchOf(row),
       bound: {
         weight: row.weight,
         rank: row.rank,

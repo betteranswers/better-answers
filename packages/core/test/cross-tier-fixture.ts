@@ -14,6 +14,8 @@ export const THE_PASSAGE =
   "Overtime is paid at time and a quarter after the fortieth hour.\n\n" +
   "The sort code is [withheld].\n";
 
+export const THE_OPENING = "The depot handbook";
+
 export const THE_PASSAGE_QUOTED =
   "> # The depot handbook\n> \n" +
   "> Overtime is paid at time and a quarter after the fortieth hour.\n> \n" +

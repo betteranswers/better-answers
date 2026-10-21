@@ -273,13 +273,14 @@ describe("the document layer through the MCP entries", () => {
         title: INVOICE_TITLE,
         locator: standalone.locator,
         sensitivity: "Internal",
+        openingLine: INVOICE_TEXT,
       },
     ]);
 
     expect(rendered(found)).toBe(
       [
         `Note · ${COVERING_TITLE} · policies · Unverified · ${iri}`,
-        `document · ${INVOICE_TITLE} · Not company knowledge · Internal · ${standalone.locator}`,
+        `document · ${INVOICE_TITLE} · Not company knowledge · Internal · ${standalone.locator} · "${INVOICE_TEXT}"`,
       ].join("\n"),
     );
     expect(JSON.stringify(found)).not.toContain(COVERED_TITLE);
@@ -317,6 +318,7 @@ describe("the document layer through the MCP entries", () => {
           title: INVOICE_TITLE,
           locator: standalone.locator,
           sensitivity: "Internal",
+          openingLine: INVOICE_TEXT,
         },
       ],
     });

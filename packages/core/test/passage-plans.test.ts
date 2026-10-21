@@ -4,7 +4,12 @@ import { MARK_THE_MATCH_LEAKPROOF } from "@better-answers/schema";
 import { UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
 
 import { ok, type UserPrincipal } from "../src/kernel/index.ts";
-import { findPassages, previewPassages, previewPassagesInput } from "../src/sources/index.ts";
+import {
+  findPassages,
+  findPassagesWithOpening,
+  previewPassages,
+  previewPassagesInput,
+} from "../src/sources/index.ts";
 import { planned } from "./planned.ts";
 import { seededBy, visibilitySuite } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
@@ -89,12 +94,6 @@ const arrangedWithInvoices = async (): Promise<Arranged> => {
   return { admin: scenario.admin, workspaceId, ...seeded };
 };
 
-const searching = (person: UserPrincipal) =>
-  planned(db(), person, async (reader, tx) => {
-    const found = await findPassages(reader, tx, { query: QUERY, limit: 10 });
-    return found.ok ? ok(found.value.map(({ passage }) => passage)) : found;
-  });
-
 const theHandbookFound = (arranged: Arranged) => [
   {
     sourceDocumentId: arranged.handbook,
@@ -103,6 +102,15 @@ const theHandbookFound = (arranged: Arranged) => [
     sensitivity: "Internal",
   },
 ];
+
+const ARMS = {
+  "ask's": { read: findPassages, found: theHandbookFound },
+  "find's": {
+    read: findPassagesWithOpening,
+    found: (arranged: Arranged) =>
+      theHandbookFound(arranged).map((match) => ({ ...match, openingLine: HANDBOOK.text })),
+  },
+} as const;
 
 const partitionCopyOf = async (parentIndex: string, workspaceId: string): Promise<string> => {
   const read = await db().pool.query<{ name: string }>(
@@ -119,44 +127,53 @@ const partitionCopyOf = async (parentIndex: string, workspaceId: string): Promis
   return copy;
 };
 
-describe("find's plan, as the api and under the passage's policy", () => {
-  it("matches through the partition's GIN index on the full-text column", async () => {
-    const arranged = await arrangedWithInvoices();
-
-    const found = await searching(arranged.admin);
-
-    expect(found.answer).toEqual(theHandbookFound(arranged));
-    expect(found.indexes).toContain(`passage_${arranged.workspaceId}_search_gin`);
-  });
-
-  it("keeps the partition's GIN index past a cursor", async () => {
-    const arranged = await arrangedWithInvoices();
-
-    const found = await planned(db(), arranged.admin, async (reader, tx) => {
-      const read = await findPassages(reader, tx, {
-        query: QUERY,
-        limit: 10,
-        after: { weight: 3, rank: 3, key: { sourceDocumentId: arranged.handbook, charStart: 0 } },
+describe.each(Object.entries(ARMS))(
+  "%s passage plan, as the api, under the passage's policy",
+  (_arm, { read, found: handbookFound }) => {
+    const searching = (person: UserPrincipal) =>
+      planned(db(), person, async (reader, tx) => {
+        const found = await read(reader, tx, { query: QUERY, limit: 10 });
+        return found.ok ? ok(found.value.map(({ passage }) => passage)) : found;
       });
-      return read.ok ? ok(read.value.map(({ passage }) => passage)) : read;
+
+    it("matches through the partition's GIN index on the full-text column", async () => {
+      const arranged = await arrangedWithInvoices();
+
+      const found = await searching(arranged.admin);
+
+      expect(found.answer).toEqual(handbookFound(arranged));
+      expect(found.indexes).toContain(`passage_${arranged.workspaceId}_search_gin`);
     });
 
-    expect(found.answer).toEqual(theHandbookFound(arranged));
-    expect(found.indexes).toContain(`passage_${arranged.workspaceId}_search_gin`);
-  });
+    it("keeps the partition's GIN index past a cursor", async () => {
+      const arranged = await arrangedWithInvoices();
 
-  it("cannot use the GIN index unless the match is leakproof", async () => {
-    const arranged = await arrangedWithInvoices();
+      const found = await planned(db(), arranged.admin, async (reader, tx) => {
+        const page = await read(reader, tx, {
+          query: QUERY,
+          limit: 10,
+          after: { weight: 3, rank: 3, key: { sourceDocumentId: arranged.handbook, charStart: 0 } },
+        });
+        return page.ok ? ok(page.value.map(({ passage }) => passage)) : page;
+      });
 
-    await db().pool.query(UNMARK_THE_MATCH);
-    const found = await searching(arranged.admin).finally(() =>
-      db().pool.query(MARK_THE_MATCH_LEAKPROOF),
-    );
+      expect(found.answer).toEqual(handbookFound(arranged));
+      expect(found.indexes).toContain(`passage_${arranged.workspaceId}_search_gin`);
+    });
 
-    expect(found.answer).toEqual(theHandbookFound(arranged));
-    expect(found.indexes).not.toContain(`passage_${arranged.workspaceId}_search_gin`);
-  });
-});
+    it("cannot use the GIN index unless the match is leakproof", async () => {
+      const arranged = await arrangedWithInvoices();
+
+      await db().pool.query(UNMARK_THE_MATCH);
+      const found = await searching(arranged.admin).finally(() =>
+        db().pool.query(MARK_THE_MATCH_LEAKPROOF),
+      );
+
+      expect(found.answer).toEqual(handbookFound(arranged));
+      expect(found.indexes).not.toContain(`passage_${arranged.workspaceId}_search_gin`);
+    });
+  },
+);
 
 describe("previewPassages' plan, as the api and under the passage's policy", () => {
   it("lists a connected source's passages through the connected-source-first index", async () => {

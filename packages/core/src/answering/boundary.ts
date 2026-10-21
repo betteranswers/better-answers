@@ -115,6 +115,11 @@ const documentMatch = z.object({
   title: z.string(),
   locator: z.string(),
   sensitivity: z.string(),
+  openingLine: z
+    .string()
+    .describe(
+      "The matched passage's first line with words, less any heading marks, cut short past 160 characters.",
+    ),
 });
 
 export const findOutputWith = <Trust extends z.ZodType>(trust: Trust) =>

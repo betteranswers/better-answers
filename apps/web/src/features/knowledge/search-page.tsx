@@ -199,6 +199,7 @@ function PassageLine(properties: { readonly match: PassageMatch; readonly openin
         </Button>
         <SensitivityTag sensitivity={match.sensitivity} />
       </div>
+      <p className="mt-1 break-words text-muted-foreground">{match.openingLine}</p>
       {opened === undefined || opening.beside ? null : (
         <EvidenceInline
           opened={opened}
