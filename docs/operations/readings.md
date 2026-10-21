@@ -64,6 +64,12 @@ How many of the reuse set's 32 fits the judge takes, and how many of its 36 hard
 
 | Date | Release or commit | Set or rule | Figure | Source |
 | --- | --- | --- | --- | --- |
+| 2026-10-21 | `76513a867` | Claude Sonnet 5.5 at effort high, its default, at £0.747 to the dollar | Fits 28 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 0, 34 of 34 answered, none never sent; £0.123; latency median 2,195 ms, worst 5,849 ms | `pnpm reading:reuse` |
+| 2026-10-21 | `76513a867` | Claude Sonnet 5.5 at effort low, at £0.747 to the dollar | Fits 28 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 0, 34 of 34 answered, none never sent; £0.123; latency median 1,674 ms, worst 8,834 ms | `pnpm reading:reuse` |
+| 2026-10-21 | `76513a867` | Claude Haiku 5.5 at effort medium, its default, at £0.747 to the dollar | Fits 28 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 0, 34 of 34 answered, none never sent; £0.0079; latency median 2,385 ms, worst 8,212 ms | `pnpm reading:reuse` |
+| 2026-10-21 | `76513a867` | Claude Haiku 5.5 at effort low, at £0.747 to the dollar | Fits 26 of 32, hard negatives wrongly taken 0 of 36, other `Answer`s taken 0, 34 of 34 answered, none never sent; £0.0065; latency median 1,469 ms, worst 5,212 ms | `pnpm reading:reuse` |
+
+The three runs at 28 of 32 miss the same four fits, Each is a question in two parts, and the `Answer` answers one of them. Two ask about encryption at rest and in transit, and two about each module's audit log. Effort low on Haiku 5.5 misses the two audit-log fits and four fits whose question has one part.
 
 ## The decision reading
 
