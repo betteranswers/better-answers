@@ -132,6 +132,21 @@ describe("better-auth is named in the auth seam and nowhere else", () => {
     ]);
   });
 
+  it("refuses the client named without its extension", () => {
+    const refused = flagged({
+      [HOOKS]: probe("./auth-client"),
+      "apps/web/src/features/auth/sign-in-page.tsx": probe("./auth-client"),
+      "apps/web/src/app/reaches-the-client.ts": probe("@/features/auth/auth-client"),
+      "apps/web/src/shared/api/trpc.ts": probe("@/features/auth/auth-client"),
+    });
+
+    expect(refused).toEqual([
+      "apps/web/src/app/reaches-the-client.ts",
+      "apps/web/src/features/auth/sign-in-page.tsx",
+      "apps/web/src/shared/api/trpc.ts",
+    ]);
+  });
+
   it.each([
     ["a sibling feature", probe("@/features/model-choices/api.ts")],
     ["the app layer", probe("@/app/router.tsx")],
