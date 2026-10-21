@@ -140,16 +140,24 @@ type WireAnswered = Omit<AnswerResult<string>, "answers" | "related"> & {
   readonly related: readonly WireMatch<RelatedConcept<string>>[];
 };
 
+/** A host may hand its model the structured copy alone, so it opens as the text does. */
 const answeredOnTheWire = (
   origin: string,
-  { answers, related, ...answer }: AnswerResult,
+  { verdict, recordId, answers, judgeState, related, ...answer }: AnswerResult,
 ): WireAnswered => {
   const wire = <Concept extends RelatedConcept>(concept: Concept) => ({
     ...concept,
     url: `${origin}${concept.url}`,
     trust: wireTrust(concept.trust),
   });
-  return { ...answer, answers: answers.map(wire), related: related.map(wire) };
+  return {
+    verdict,
+    recordId,
+    answers: answers.map(wire),
+    judgeState,
+    related: related.map(wire),
+    ...answer,
+  };
 };
 
 const answeredInCore = ({ answers, related, ...answer }: WireAnswered): AnswerResult<string> => {
@@ -160,17 +168,13 @@ const answeredInCore = ({ answers, related, ...answer }: WireAnswered): AnswerRe
   return { ...answer, answers: answers.map(core), related: related.map(core) };
 };
 
-/** A host may hand its assistant the text alone, so the record's id is written there too. */
-const renderAsked = (answer: WireAnswered): string =>
-  `${renderAnswer(answeredInCore(answer))}\n\nRecord of this question: ${answer.recordId}`;
-
 const askEntryAt = (origin: string) =>
   defineEntry({
     road: "own-transaction",
     name: "ask",
     title: "Ask the company's knowledge a question",
     description:
-      "Ask a question and get, verdict first, each `Answer` in the company's knowledge that a judge found answers it as asked, under `answers`, and the other concepts that bear on it, under `related`. Quote an `Answer` under `answers` unchanged, with who verified it. What is under `related` is related knowledge, not a judged answer: write only what those concepts state, name each one you use, and quote an `Answer` among them unchanged. `judgeState` is `judged` when the judge ran, `judging-failed` when it could not judge (its candidates are then under `related`), and `not-judged` when the workspace has no judge or no `Answer` was a candidate; an `Answer` no judge passed is never under `answers`. A refusal of `spending-limit-met` means the workspace's model spend for the month is used up: do not ask again, and tell the person their Admin can ask better-answers to raise it. An `Answer` comes back in full; any other concept comes back as one line, so read it with `open` and its `iri` before you write from it. Each concept is labelled with its collection, and `Answer`s under different collections are never merged: give each under its own. An empty `conflicts` list means no conflict was looked for, not that none exists. A verdict of `refuse` means nothing you can read bears on the question. A passage marked 'Not company knowledge' is to be quoted with its source named, never summarised. Each question is kept as a record, and the answer carries its `recordId`. The person who asked and the workspace's Admins may read it. The question's words are kept for twelve months; the verdict and which concepts were returned are kept for good, and who asked until that person is erased.",
+      "Ask a question and get, verdict first, each `Answer` in the company's knowledge that a judge found answers it as asked, under `answers`, and the other concepts that bear on it, under `related`. Quote an `Answer` under `answers` unchanged, with who verified it. What is under `related` is related knowledge, not a judged answer: write only what those concepts state, name each one you use, and quote unchanged an `Answer` among them that comes in full. `judgeState` is `judged` when the judge ran, `judging-failed` when it could not judge (its candidates are then under `related`), and `not-judged` when the workspace has no judge or no `Answer` was a candidate; an `Answer` no judge passed is never under `answers`. A refusal of `spending-limit-met` means the workspace's model spend for the month is used up: do not ask again, and tell the person their Admin can ask better-answers to raise it. An `Answer` under `answers` comes back in full. An `Answer` under `related` comes back in full unless `judgeState` is `judged`; once it is, every `Answer` under `related`, whether the judge said no to it or did not see it, comes back as one line, as any other concept does. Read a concept given as one line with `open` and its `iri` before you write from it. Each concept is labelled with its collection, and `Answer`s under different collections are never merged: give each under its own. An empty `conflicts` list means no conflict was looked for, not that none exists. A verdict of `refuse` means nothing you can read bears on the question. A passage marked 'Not company knowledge' is to be quoted with its source named, never summarised. Each question is kept as a record, and the answer carries its `recordId`. The person who asked and the workspace's Admins may read it. The question's words are kept for twelve months; the verdict and which concepts were returned are kept for good, and who asked until that person is erased.",
     scopes: ["knowledge:read"],
     input: z.object({
       question: askInput.shape.question,
@@ -185,7 +189,7 @@ const askEntryAt = (origin: string) =>
     },
     run: async (principal, steps, args, now) =>
       wired(await ask(principal, steps, args, now), (answer) => answeredOnTheWire(origin, answer)),
-    render: renderAsked,
+    render: (answer) => renderAnswer(answeredInCore(answer)),
   });
 
 const openEntry = defineEntry({

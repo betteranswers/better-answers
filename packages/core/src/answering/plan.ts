@@ -57,6 +57,24 @@ export type RelatedConcept<Iri extends string = ConceptIri> =
   | ReturnedConcept<Iri>
   | PreviewedConcept<Iri>;
 
+export const previewed = <Iri extends string>({
+  iri,
+  url,
+  kind,
+  title,
+  collection,
+  trust,
+  trustWords,
+}: RelatedConcept<Iri>): PreviewedConcept<Iri> => ({
+  iri,
+  url,
+  kind,
+  title,
+  collection,
+  trust,
+  trustWords,
+});
+
 export type PlannedAnswer<Iri extends string = ConceptIri> = {
   readonly verdict: QuestionVerdict;
   readonly judgeState: JudgeState;

@@ -537,9 +537,14 @@ export const ask = async <Refused = never>(
   return ok({ ...answer, recordId });
 };
 
+const conceptLine = (
+  concept: Pick<PreviewedConcept<string>, "kind" | "title" | "collection" | "trustWords" | "iri">,
+): string =>
+  `${concept.kind} · ${concept.title} · ${concept.collection ?? NO_COLLECTION} · ${concept.trustWords} · ${concept.iri}`;
+
 const findLine = (match: FindMatch<string>): string =>
   match.layer === "bundles"
-    ? `${match.kind} · ${match.title} · ${match.collection ?? NO_COLLECTION} · ${match.trustWords} · ${match.iri}`
+    ? conceptLine(match)
     : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator} · "${match.openingLine}"`;
 
 export const renderFind = (result: FindResult<string>): string => {
@@ -616,7 +621,7 @@ const VERDICT_LINES = {
   warn: "**Answered with a warning for your role.**",
   refuse: `**${NOT_ANSWERED}**`,
   related:
-    "**Related knowledge, not an answer.** Write only what these concepts state, naming each one you use, and quote an `Answer` word for word.",
+    "**Related knowledge, not an answer.** Write only what these concepts state, naming each one you use, and quote an `Answer` word for word, opening one given as a line first.",
 } satisfies Record<QuestionVerdict, string>;
 
 const JUDGE_WORDS = {
@@ -628,31 +633,37 @@ const JUDGE_WORDS = {
 const namedOrNone = (collections: readonly string[]): string =>
   collections.length === 0 ? "none" : collections.join(", ");
 
-const returnedText = (concept: ReturnedConcept<string>): readonly string[] => [
+const returnedText = (heading: string, concept: ReturnedConcept<string>): readonly string[] => [
   "",
-  `## ${concept.kind} · ${concept.collection ?? NO_COLLECTION}`,
+  `## ${heading}${concept.kind} · ${concept.collection ?? NO_COLLECTION}`,
   concept.kind === ANSWER_KIND ? `Question: ${concept.title}` : concept.title,
   `_${concept.trustWords}_`,
   "",
   concept.body.trimEnd(),
   ...listed("Evidence:", evidenceLines(concept.evidence)),
   "",
-  `${concept.iri} — ${concept.url}`,
+  concept.iri,
 ];
+
+const RELATED_HEADING = "Related knowledge · ";
 
 const PREVIEWS_HEADING =
   "Also bearing on the question, one line each: read one with `open` and its iri before writing from it.";
 
-const previewLine = (concept: PreviewedConcept<string>): string =>
-  `- ${concept.kind} · ${concept.title} · ${concept.collection ?? NO_COLLECTION} · ${concept.trustWords} · ${concept.iri} — ${concept.url}`;
-
 const relatedText = (related: readonly RelatedConcept<string>[]): readonly string[] => [
-  ...related.flatMap((concept) => ("body" in concept ? returnedText(concept) : [])),
+  ...related.flatMap((concept) =>
+    "body" in concept ? returnedText(RELATED_HEADING, concept) : [],
+  ),
   ...listed(
     PREVIEWS_HEADING,
-    related.flatMap((concept) => ("body" in concept ? [] : [previewLine(concept)])),
+    related.flatMap((concept) => ("body" in concept ? [] : [`- ${conceptLine(concept)}`])),
   ),
 ];
+
+const FITS_HEADING = "Answers that fit, each word for word below:";
+
+const fitLine = (fit: ReturnedConcept<string>): string =>
+  `- ${fit.collection ?? NO_COLLECTION} · ${fit.title} · ${fit.iri}`;
 
 const unmappedText = (passage: PassageView): readonly string[] => [
   "",
@@ -662,20 +673,22 @@ const unmappedText = (passage: PassageView): readonly string[] => [
 ];
 
 const FITS_THEN_RELATED =
-  "**Related knowledge, which the judge did not find answers the question as asked.**";
+  "**Related knowledge, which the judge did not pass as answering the question as asked.**";
 
 const answeredText = (answer: PlannedAnswer<string>): readonly string[] =>
   answer.answers.length === 0
     ? relatedText(answer.related)
     : [
-        ...answer.answers.flatMap(returnedText),
+        ...answer.answers.flatMap((fit) => returnedText("", fit)),
         ...(answer.related.length === 0 ? [] : ["", FITS_THEN_RELATED]),
         ...relatedText(answer.related),
       ];
 
-export const renderAnswer = (answer: PlannedAnswer<string>): string =>
+export const renderAnswer = (answer: AnswerResult<string>): string =>
   [
     VERDICT_LINES[answer.verdict],
+    `Record of this question: ${answer.recordId}`,
+    ...(answer.answers.length === 0 ? [] : [FITS_HEADING, ...answer.answers.map(fitLine)]),
     `_${JUDGE_WORDS[answer.judgeState]} · ${mapWords(answer.map)}_`,
     `Collections considered: ${namedOrNone(answer.collections)}`,
     `Collections you may name: ${namedOrNone(answer.readableCollections)}`,

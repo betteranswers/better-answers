@@ -38,7 +38,6 @@ import {
   type FeedbackReceipt,
   type FindResult,
   type OpenResult,
-  type PlannedAnswer,
   type PreviewedConcept,
   type ReturnedConcept,
   type Trust,
@@ -109,6 +108,8 @@ const unverified: Trust = {
   rider: null,
 };
 
+const A_RECORD = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
+
 const trust = z.custom<Trust>();
 
 const messagesOf = (parsed: { readonly error?: z.ZodError }): readonly string[] | undefined =>
@@ -120,7 +121,7 @@ const described = (shape: Readonly<Record<string, z.ZodType>>): Readonly<Record<
   );
 
 const RELATED_LINE =
-  "**Related knowledge, not an answer.** Write only what these concepts state, naming each one you use, and quote an `Answer` word for word.";
+  "**Related knowledge, not an answer.** Write only what these concepts state, naming each one you use, and quote an `Answer` word for word, opening one given as a line first.";
 
 const returned = (overrides: Partial<ReturnedConcept<string>> = {}): ReturnedConcept<string> => ({
   iri: "https://better-answers.com/c/01A",
@@ -135,8 +136,9 @@ const returned = (overrides: Partial<ReturnedConcept<string>> = {}): ReturnedCon
   ...overrides,
 });
 
-const answer = (overrides: Partial<PlannedAnswer<string>> = {}): PlannedAnswer<string> => ({
+const answer = (overrides: Partial<AnswerResult<string>> = {}): AnswerResult<string> => ({
   verdict: "related",
+  recordId: A_RECORD,
   judgeState: "not-judged",
   answers: [],
   related: [returned()],
@@ -156,7 +158,8 @@ describe("the answer's rendering", () => {
 
     expect(first).toBe(RELATED_LINE);
     expect(first).not.toMatch(/answered/i);
-    expect(rest.slice(0, 3)).toEqual([
+    expect(rest.slice(0, 4)).toEqual([
+      `Record of this question: ${A_RECORD}`,
       "_Not judged · map as of now_",
       "Collections considered: audits",
       "Collections you may name: audits, lms",
@@ -181,7 +184,7 @@ describe("the answer's rendering", () => {
     ["judged", "_Judged · map as of now_"],
     ["judging-failed", "_Judging failed · map as of now_"],
   ] as const)("says a %s judge in words beside the map", (judgeState, line) => {
-    expect(linesOf(renderAnswer(answer({ judgeState })))[1]).toBe(line);
+    expect(linesOf(renderAnswer(answer({ judgeState })))[2]).toBe(line);
     expect(JUDGE_STATES).toContain(judgeState);
   });
 
@@ -193,7 +196,7 @@ describe("the answer's rendering", () => {
     expect(
       linesOf(
         renderAnswer(answer({ map: { state: "unavailable_since", since: "2026-09-01" } })),
-      )[1],
+      )[2],
     ).toBe("_Not judged · map unavailable since 1 September 2026_");
   });
 
@@ -206,9 +209,9 @@ describe("the answer's rendering", () => {
       ],
     });
 
-    expect(linesOf(renderAnswer(answer({ related: [verified] }))).slice(4)).toEqual([
+    expect(linesOf(renderAnswer(answer({ related: [verified] }))).slice(5)).toEqual([
       "",
-      "## Answer · audits",
+      "## Related knowledge · Answer · audits",
       "Question: How long are audit logs kept?",
       "_Verified by Priya Anand · 2 May 2026_",
       "",
@@ -218,53 +221,78 @@ describe("the answer's rendering", () => {
       "- SOC 2 report, p.4",
       "- Hosting contract (01DOC/chars:0-44)",
       "",
-      "https://better-answers.com/c/01A — https://app.example/knowledge/search/01A",
+      "https://better-answers.com/c/01A",
     ]);
   });
 
-  it("renders each fit before the related knowledge, under its line", () => {
-    const fit = returned({ title: "Who reads the audit log?", body: "Admins read it.\n" });
+  it("renders each fit word for word with its verifier", () => {
+    const fit = returned({
+      title: "Who reads the audit log?",
+      body: "Admins read it.\n",
+      trustWords: "Verified by Priya Anand · 2 May 2026",
+    });
     const rendered = renderAnswer(
-      answer({ verdict: "ok", judgeState: "judged", answers: [fit], related: [returned()] }),
+      answer({ verdict: "ok", judgeState: "judged", answers: [fit], related: [] }),
     );
 
-    expect(linesOf(rendered).slice(4)).toEqual([
+    expect(linesOf(rendered).slice(7)).toEqual([
       "",
       "## Answer · audits",
       "Question: Who reads the audit log?",
-      "_Unverified_",
+      "_Verified by Priya Anand · 2 May 2026_",
       "",
       "Admins read it.",
       "",
-      "https://better-answers.com/c/01A — https://app.example/knowledge/search/01A",
-      "",
-      "**Related knowledge, which the judge did not find answers the question as asked.**",
-      "",
-      "## Answer · audits",
-      "Question: How long are audit logs kept?",
-      "_Unverified_",
-      "",
-      "Audit logs are kept for thirteen months.",
-      "",
-      "https://better-answers.com/c/01A — https://app.example/knowledge/search/01A",
+      "https://better-answers.com/c/01A",
     ]);
   });
 
-  it("renders fits with no related line when nothing else bears", () => {
+  it("follows the verdict with the record id and the fits", () => {
+    const users = returned({ iri: "https://better-answers.com/c/01U", title: "Who exports it?" });
+    const unfiled = returned({ title: "Who reads it?", collection: null });
     const rendered = renderAnswer(
-      answer({ verdict: "ok", judgeState: "judged", answers: [returned()], related: [] }),
+      answer({ verdict: "ok", judgeState: "judged", answers: [users, unfiled] }),
     );
 
-    expect(linesOf(rendered).slice(4)).toEqual([
-      "",
-      "## Answer · audits",
-      "Question: How long are audit logs kept?",
-      "_Unverified_",
-      "",
-      "Audit logs are kept for thirteen months.",
-      "",
-      "https://better-answers.com/c/01A — https://app.example/knowledge/search/01A",
+    expect(linesOf(rendered).slice(0, 5)).toEqual([
+      "**Answered from the company's knowledge.**",
+      `Record of this question: ${A_RECORD}`,
+      "Answers that fit, each word for word below:",
+      "- audits · Who exports it? · https://better-answers.com/c/01U",
+      "- No collection · Who reads it? · https://better-answers.com/c/01A",
     ]);
+  });
+
+  it("never heads a related `Answer` as a fit", () => {
+    const headings = (rendered: string) =>
+      linesOf(rendered).filter((line) => line.startsWith("## "));
+    const fitted = answer({
+      verdict: "ok",
+      judgeState: "judged",
+      answers: [returned()],
+      related: [],
+    });
+
+    expect(headings(renderAnswer(fitted))).toEqual(["## Answer · audits"]);
+    expect(headings(renderAnswer(answer()))).toEqual(["## Related knowledge · Answer · audits"]);
+  });
+
+  it("names each concept in the text by its iri alone", () => {
+    const policy: PreviewedConcept<string> = {
+      iri: "https://better-answers.com/c/01B",
+      url: "https://app.example/knowledge/search/01B",
+      kind: "Policy",
+      title: "Retention policy",
+      collection: null,
+      trust: unverified,
+      trustWords: "Unverified",
+    };
+    const rendered = renderAnswer(
+      answer({ verdict: "ok", judgeState: "judged", answers: [returned()], related: [policy] }),
+    );
+
+    expect(rendered).not.toContain("https://app.example/");
+    expect(rendered.split("https://better-answers.com/c/01B")).toHaveLength(2);
   });
 
   it("lists any other concept after the `Answer`s, to open", () => {
@@ -280,11 +308,11 @@ describe("the answer's rendering", () => {
 
     const rendered = linesOf(renderAnswer(answer({ related: [policy, returned()] })));
 
-    expect(rendered[5]).toBe("## Answer · audits");
+    expect(rendered[6]).toBe("## Related knowledge · Answer · audits");
     expect(rendered.slice(-3)).toEqual([
       "",
       "Also bearing on the question, one line each: read one with `open` and its iri before writing from it.",
-      "- Policy · Retention policy · No collection · Unverified · https://better-answers.com/c/01B — https://app.example/knowledge/search/01B",
+      "- Policy · Retention policy · No collection · Unverified · https://better-answers.com/c/01B",
     ]);
   });
 
@@ -304,7 +332,7 @@ describe("the answer's rendering", () => {
       }),
     );
 
-    expect(linesOf(rendered).slice(4)).toEqual([
+    expect(linesOf(rendered).slice(5)).toEqual([
       "",
       "Not company knowledge · Internal",
       "> Retained for six years.",
@@ -341,6 +369,7 @@ describe("the answer's rendering", () => {
     ).toBe(
       [
         "**Not answered from the company's knowledge.**",
+        `Record of this question: ${A_RECORD}`,
         "_Not judged · map as of now_",
         "Collections considered: none",
         "Collections you may name: none",
@@ -657,8 +686,6 @@ describe("open's and feedback's renderings", () => {
     );
   });
 });
-
-const A_RECORD = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
 
 const CITED = conceptIriOf(WELL_FORMED_ULID.parse("01J6CCCCCCCCCCCCCCCCCCCCCC"));
 

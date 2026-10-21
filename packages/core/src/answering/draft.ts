@@ -48,11 +48,11 @@ export type DraftSteps<Refused = never> = {
 
 type Part = { readonly collection: string | null; readonly citable: readonly Citable[] };
 
-const isPreview = (concept: RelatedConcept): boolean => concept.kind !== ANSWER_KIND;
+const isNotAnAnswer = (concept: RelatedConcept): boolean => concept.kind !== ANSWER_KIND;
 
 const partsOf = (answer: PlannedAnswer): readonly Part[] => {
   const parts = new Map<string | null, Citable[]>();
-  for (const [place, concept] of answer.related.filter(isPreview).entries()) {
+  for (const [place, concept] of answer.related.filter(isNotAnAnswer).entries()) {
     const citable = parts.get(concept.collection) ?? [];
     citable.push({ label: String(place + 1), iri: concept.iri });
     parts.set(concept.collection, citable);

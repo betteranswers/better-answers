@@ -547,7 +547,7 @@ describe("an `Answer` withheld from the asker", () => {
 
     expect(withoutRecord(before)).toEqual(REFUSED);
     expect(withoutRecord(after)).toEqual(REFUSED);
-    expect(renderAnswer(after)).toBe(renderAnswer(before));
+    expect(renderAnswer({ ...after, recordId: before.recordId })).toBe(renderAnswer(before));
     expect(after.recordId).not.toBe(before.recordId);
     expect(irisOf(admins)).toEqual([withheld.iri]);
   });
@@ -560,7 +560,7 @@ describe("an `Answer` withheld from the asker", () => {
 
     expect(irisOf(before)).toEqual([visible.iri]);
     expect(withoutRecord(after)).toEqual(withoutRecord(before));
-    expect(renderAnswer(after)).toBe(renderAnswer(before));
+    expect(renderAnswer({ ...after, recordId: before.recordId })).toBe(renderAnswer(before));
     expect(irisOf(admins).toSorted()).toEqual([visible.iri, withheld.iri].toSorted());
   });
 

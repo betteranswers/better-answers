@@ -186,7 +186,8 @@ test.describe("Ask › New question", () => {
     await disclosure.click();
 
     await expect(disclosure).toHaveAttribute("aria-expanded", "true");
-    await expect(result.getByText(SUPPLIER.body)).toBeVisible();
+    await expect(result.getByRole("button", { name: SUPPLIER.title, exact: true })).toBeVisible();
+    await expect(result.getByText(SUPPLIER.body)).toHaveCount(0);
     await expect(result.getByRole("button", { name: POLICY.title, exact: true })).toBeVisible();
   });
 
@@ -212,12 +213,26 @@ test.describe("Ask › New question", () => {
     await expect(said(page), "the verdict was never said").not.toHaveText(whileJudging);
   });
 
+  test("says Judged, listing each judged-no Answer to open", async ({ page, request }) => {
+    await aViewerAsking(page, request, { judging: { fits: [] } });
+
+    await asked(page);
+
+    const result = answered(page, "Related Knowledge");
+    await expect(result.getByText("Judged", { exact: true })).toBeVisible();
+    const audits = collectionIn(result, "audits");
+    for (const { title, body } of [USERS, SUPPLIER]) {
+      await expect(audits.getByRole("button", { name: title, exact: true })).toBeVisible();
+      await expect(audits.getByText(body)).toHaveCount(0);
+    }
+    await expect(answered(page, "Answered")).toHaveCount(0);
+  });
+
   for (const [judging, word] of [
     [undefined, "Not judged"],
-    [{ fits: [] }, "Judged"],
     ["fails", "Judging failed"],
   ] as const) {
-    test(`says ${word}, showing each Answer as related knowledge`, async ({ page, request }) => {
+    test(`says ${word}, showing each Answer in full`, async ({ page, request }) => {
       await aViewerAsking(page, request, judging === undefined ? {} : { judging });
 
       await asked(page);
