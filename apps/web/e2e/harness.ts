@@ -329,7 +329,7 @@ type SeedCitedPlace = { readonly title: string; readonly at: string };
 
 type SeedFrontmatterEntry = Readonly<Record<string, string | number | boolean | null>>;
 
-type SeedConcept = {
+export type SeedConcept = {
   readonly title: string;
   readonly collection?: string;
   readonly body: string;
@@ -385,6 +385,7 @@ export type SeedRecord = {
     readonly tier?: SeedConcept["trust"];
     readonly judged?: (typeof CANDIDATE_VERDICTS)[number];
   }[];
+  readonly drafted?: readonly { readonly sentence: string; readonly concepts: readonly string[] }[];
   readonly flags?: readonly SeedFlag[];
 };
 

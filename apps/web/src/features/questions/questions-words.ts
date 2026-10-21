@@ -1,7 +1,7 @@
-import { JUDGE_WORDS, REASON_WORDS, VERDICT_WORDS } from "@/shared/answer-words.ts";
+import { flaggedWords, JUDGE_WORDS, verdictWords } from "@/shared/answer-words.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 
-import type { AskedRecord, ConceptRead, Feedback, FlagClosing } from "./questions-api.ts";
+import type { AskedRecord, ConceptRead, FlagClosing } from "./questions-api.ts";
 
 const JUDGED_WORDS = {
   yes: "Yes, it answers the question",
@@ -44,16 +44,14 @@ export const QUESTIONS_WORDS = {
   noCollection: CONCEPT_WORDS.noCollection,
   more: "More Questions",
   removed: "Question removed by an erasure",
-  verdict: (verdict: AskedRecord["verdict"]): string =>
-    verdict === null ? "Not finished" : VERDICT_WORDS[verdict],
+  verdict: verdictWords,
   judge: (state: AskedRecord["judgeState"]): string =>
     state === null ? "Not finished" : JUDGE_WORDS[state],
   judged: JUDGED_WORDS,
   where: WHERE_WORDS,
   asker: ASKER_WORDS,
   closing: CLOSING_WORDS,
-  flaggedAs: (reason: Feedback["reason"]): string =>
-    reason === null ? "Flagged" : `Flagged · ${REASON_WORDS[reason]}`,
+  flaggedAs: flaggedWords,
   terms: {
     askedBy: "Asked By",
     asked: "Asked",

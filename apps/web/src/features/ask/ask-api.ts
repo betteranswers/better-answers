@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 import { useEffect, useRef, useState } from "react";
 
@@ -86,4 +86,23 @@ export const useAnswering = (): Answering => {
 export const useGiveFeedback = () => {
   const api = useTRPC();
   return useMutation(api.ask.giveFeedback.mutationOptions());
+};
+
+export type YourRecord = inferOutput<Api["ask"]["yourRecord"]>;
+
+export const useYourQuestions = () => {
+  const api = useTRPC();
+  return useInfiniteQuery(
+    api.ask.yourQuestions.infiniteQueryOptions(
+      {},
+      { getNextPageParam: (page) => page.nextCursor ?? undefined },
+    ),
+  );
+};
+
+export type YourQuestions = ReturnType<typeof useYourQuestions>;
+
+export const useYourRecord = (id: string) => {
+  const api = useTRPC();
+  return useQuery(api.ask.yourRecord.queryOptions({ id }));
 };

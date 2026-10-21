@@ -197,6 +197,41 @@ test.describe("Questions asked", () => {
     await expect(record.getByRole("link", { name: AUDIT_CONCEPT })).toHaveCount(2);
   });
 
+  test("shows each concept's trust now, not when it was asked", async ({ page, request }) => {
+    const at = await aWorkspaceWithConcepts(request, "Holme Trust");
+    const { concepts } = await seedConcepts(request, {
+      workspaceId: at.workspaceId,
+      userId: at.adminId,
+      concepts: [
+        {
+          title: "Supplier Audits",
+          collection: "audits",
+          kind: "Policy",
+          body: "Each supplier is audited once a year.",
+          trust: "machine-confirmed",
+        },
+      ],
+    });
+    await seedQuestions(request, {
+      workspaceId: at.workspaceId,
+      records: [
+        {
+          question: NEWER_QUESTION,
+          verdict: "related",
+          concepts: [{ iri: concepts[0]?.iri ?? "" }],
+        },
+      ],
+    });
+
+    await signedInAtTheQuestions(page, request, at);
+    await rowsOf(questionsAsked(page)).first().click();
+
+    const record = recordOf(page, NEWER_QUESTION);
+    await expect(record.getByText("Trust", { exact: true })).toBeVisible();
+    await expect(record.getByText(/^Verified automatically/)).toBeVisible();
+    await expect(record.getByText("Unverified", { exact: true })).toHaveCount(0);
+  });
+
   test("closes a flag within its budget, unflagging the record", async ({ page, request }) => {
     const at = await aWorkspaceWithConcepts(request, "Nidd Closings");
     await seedQuestions(request, {

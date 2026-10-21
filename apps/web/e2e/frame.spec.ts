@@ -426,7 +426,11 @@ test("marks a Viewer's home, New question, in Ask's nav", async ({ page, request
   await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
 
   const nav = page.getByRole("navigation", { name: "Ask" });
-  await expect(nav.getByRole("link")).toHaveText(["New Question", "Connect Claude"]);
+  await expect(nav.getByRole("link")).toHaveText([
+    "New Question",
+    "Your Questions",
+    "Connect Claude",
+  ]);
   await expect(nav.getByRole("link", { name: "New Question" })).toHaveAttribute(
     "aria-current",
     "page",
