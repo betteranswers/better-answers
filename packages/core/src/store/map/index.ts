@@ -18,9 +18,9 @@ import { linksAndMarksOf, proseOf } from "@better-answers/schema/concept-file";
 
 import { readableClause, readableParameters } from "../../access/index.ts";
 import type { PlatformPrincipal, Principal, UserPrincipal } from "../../kernel/index.ts";
-import { sentenceAt } from "./sentence.ts";
+import { sectionAt, sentenceAt } from "./sentence.ts";
 
-export { sentenceAt };
+export { sectionAt, sentenceAt };
 
 type Tx = Pick<pg.PoolClient, "query">;
 
@@ -85,15 +85,6 @@ export const targetOf = (raw: string, from: string): OutgoingRef["target"] | und
 
   if (/^[a-z][a-z0-9+.-]*:/i.test(bare) || bare.startsWith("//")) return undefined;
   return { path: resolvedResource(bare, from).slice(1) };
-};
-
-const sectionAt = (body: string, index: number): string | null => {
-  const lines = body.slice(0, index).split("\n");
-  for (let at = lines.length - 1; at >= 0; at -= 1) {
-    const heading = /^#{1,6}\s+(.*)$/.exec(lines[at] ?? "");
-    if (heading !== null) return (heading[1] ?? "").trim();
-  }
-  return null;
 };
 
 const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {

@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-import { autolinkClosesAt, nextOf, nextStopsOf } from "./scan.ts";
+import {
+  autolinkClosesAt,
+  autolinkEndsOf,
+  collapsedWhitespace,
+  isAsciiWhitespace,
+  nextOf,
+} from "./scan.ts";
 import { ULID_CHARACTERS, type Ulid } from "./ulid.ts";
 
 export const CONCEPT_IRI_PREFIX = "https://better-answers.com/c/";
@@ -25,10 +31,6 @@ export type CitedSource = {
   readonly id: string | null;
 };
 
-const ASCII_WHITESPACE = " \t\n\r\f\v";
-
-const isAsciiWhitespace = (ch: string): boolean => ASCII_WHITESPACE.includes(ch);
-
 const lineStartFrom = (text: string, from: number): number => {
   if (from <= 0) return 0;
   if (text[from - 1] === "\n") return from;
@@ -37,9 +39,6 @@ const lineStartFrom = (text: string, from: number): number => {
 };
 
 type Found = { readonly at: number; readonly text: string };
-
-const autolinkEndsOf = (text: string): Int32Array =>
-  nextStopsOf(text, (ch) => ch === ">" || isAsciiWhitespace(ch));
 
 const inlineFormAt = (prose: string, bracket: number, ending: Int32Array): number | undefined => {
   if (prose[bracket + 1] !== "(") return undefined;
@@ -221,12 +220,7 @@ export const proseOf = (body: string): string => {
   return blankedSpans(pieces.join(""));
 };
 
-const normalisedLabel = (label: string): string =>
-  label
-    .split(/[ \t\n\r\f\v]+/)
-    .filter((word) => word !== "")
-    .join(" ")
-    .toLowerCase();
+const normalisedLabel = (label: string): string => collapsedWhitespace(label).toLowerCase();
 
 const labelKey = (label: string): string =>
   label.startsWith("^") ? `^${normalisedLabel(label.slice(1))}` : normalisedLabel(label);

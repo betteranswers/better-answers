@@ -1,6 +1,6 @@
 /** The next position at or after each index whose character `stops` holds, `-1` where
  * there is none. */
-export const nextStopsOf = (text: string, stops: (ch: string) => boolean): Int32Array => {
+const nextStopsOf = (text: string, stops: (ch: string) => boolean): Int32Array => {
   const next = new Int32Array(text.length + 1);
   next[text.length] = -1;
   for (let at = text.length - 1; at >= 0; at -= 1) {
@@ -12,6 +12,19 @@ export const nextStopsOf = (text: string, stops: (ch: string) => boolean): Int32
 /** The next `close` at or after each position, `-1` where there is none. */
 export const nextOf = (text: string, close: string): Int32Array =>
   nextStopsOf(text, (ch) => ch === close);
+
+const ASCII_WHITESPACE = " \t\n\r\f\v";
+
+export const isAsciiWhitespace = (ch: string): boolean => ASCII_WHITESPACE.includes(ch);
+
+export const collapsedWhitespace = (text: string): string =>
+  text
+    .split(/[ \t\n\r\f\v]+/)
+    .filter((word) => word !== "")
+    .join(" ");
+
+export const autolinkEndsOf = (text: string): Int32Array =>
+  nextStopsOf(text, (ch) => ch === ">" || isAsciiWhitespace(ch));
 
 const SCHEME = /[a-z0-9+.-]/i;
 

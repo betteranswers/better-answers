@@ -1,9 +1,9 @@
-import { autolinkClosesAt, nextOf, nextStopsOf } from "@better-answers/schema/scan";
-
-const SPACE = /\s/;
-
-const autolinkEndsOf = (text: string): Int32Array =>
-  nextStopsOf(text, (ch) => ch === ">" || SPACE.test(ch));
+import {
+  autolinkClosesAt,
+  autolinkEndsOf,
+  collapsedWhitespace,
+  nextOf,
+} from "@better-answers/schema/scan";
 
 type SpanOf = (bracket: number, ending: Int32Array, close: Int32Array) => number | undefined;
 
@@ -61,6 +61,17 @@ const ANGLE_BRACKETED = (text: string): string => {
 const flattenedLinks = (text: string): string =>
   ANGLE_BRACKETED(BRACKETED(BRACKETED_REFERENCE(BRACKETED_INLINE(text))));
 
+const HEADING = /^#{1,6}[ \t\n\r\f\v]+([^\n]*)/;
+
+export const sectionAt = (body: string, index: number): string | null => {
+  const lines = body.slice(0, index).split("\n");
+  for (let at = lines.length - 1; at >= 0; at -= 1) {
+    const heading = HEADING.exec(lines[at] ?? "");
+    if (heading !== null) return collapsedWhitespace(heading[1] ?? "");
+  }
+  return null;
+};
+
 export const sentenceAt = (body: string, index: number): string => {
   const before = body.lastIndexOf("\n\n", index);
   const paragraphStart = before === -1 ? 0 : before + 2;
@@ -70,12 +81,12 @@ export const sentenceAt = (body: string, index: number): string => {
 
   let start = 0;
   let end = paragraph.length;
-  for (const boundary of paragraph.matchAll(/[.!?](?=\s|$)/g)) {
+  for (const boundary of paragraph.matchAll(/[.!?](?=[ \t\n\r\f\v]|$)/g)) {
     if (boundary.index < at) start = boundary.index + 1;
     else {
       end = boundary.index + 1;
       break;
     }
   }
-  return flattenedLinks(paragraph.slice(start, end)).replaceAll(/\s+/g, " ").trim();
+  return collapsedWhitespace(flattenedLinks(paragraph.slice(start, end)));
 };
