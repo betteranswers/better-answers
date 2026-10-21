@@ -1,6 +1,5 @@
 import { JUDGE_WORDS, REASON_WORDS, VERDICT_WORDS } from "@/shared/answer-words.ts";
 import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
-import { dayWords } from "@/shared/words.ts";
 
 import type { AskedRecord, ConceptRead, Feedback, FlagClosing } from "./questions-api.ts";
 
@@ -28,37 +27,6 @@ export const CLOSINGS = [
   "fixed-in-the-knowledge",
   "no-fault-in-the-knowledge",
 ] as const satisfies readonly FlagClosing[];
-
-const STATUS_WORDS: ReadonlyMap<string, string> = new Map([
-  ["changed-since-checked", "Changed since verified"],
-  ["out-of-date", "Out of date"],
-  ["draft", "Draft"],
-  ["deprecated", "Deprecated"],
-]);
-
-const RIDER_WORDS: ReadonlyMap<string, string> = new Map([
-  ["imported", " · imported"],
-  ["source-moved-on", " · source moved on"],
-]);
-
-type TrustThen = ConceptRead["trustThen"];
-
-const verifiedWords = (trust: TrustThen): string => {
-  const rider = trust.rider === null ? "" : (RIDER_WORDS.get(trust.rider) ?? "");
-  switch (trust.tier) {
-    case "human-reviewed": {
-      const day = trust.verifiedAt === null ? "" : ` · ${dayWords(trust.verifiedAt)}`;
-      return `Verified by a person${day}${rider}`;
-    }
-    case "machine-confirmed":
-      return `Verified automatically${rider}`;
-    default:
-      return "Unverified";
-  }
-};
-
-export const trustThenWords = (trust: TrustThen): string =>
-  STATUS_WORDS.get(trust.status) ?? verifiedWords(trust);
 
 const ASKER_WORDS = {
   "former-member": "A former member",
@@ -95,7 +63,7 @@ export const QUESTIONS_WORDS = {
     judge: "Judge",
     kind: "Kind",
     collection: "Collection",
-    trustThen: "Trust When Asked",
+    trust: "Trust",
     judged: "Judge’s Verdict",
     note: "Note",
     disputed: "Sentence Disputed",

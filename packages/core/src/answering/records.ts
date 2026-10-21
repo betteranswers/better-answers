@@ -13,7 +13,7 @@ import {
 } from "@better-answers/schema";
 
 import { action, declareActions, record } from "../audit/index.ts";
-import { conceptsByIris, type OpenedConcept } from "../concepts/index.ts";
+import { conceptsByIris, trustOf, trustWords, type OpenedConcept } from "../concepts/index.ts";
 import {
   admit,
   ADMIN_ALONE,
@@ -75,7 +75,8 @@ type ConceptAsRead = {
   readonly kind: string;
   readonly title: string;
   readonly collection: string | null;
-  readonly trustThen: KeptConcept["trust"];
+  readonly trustWords: string;
+  readonly body?: string;
   readonly judged?: CandidateVerdict;
 };
 
@@ -115,6 +116,13 @@ export type QuestionsAskedPage = {
 
 export type QuestionsAskedRefusal = RefusalOf<typeof readQuestionsAskedAction> | Error;
 
+const OF_THE_PAGE = `SELECT r.id, r.asked_at AS "askedAt", r.asked_by AS "askedBy", r.transport, r.collections,
+         r.verdict, r.judge_state AS "judgeState", r.map_state AS "mapState", r.concepts,
+         c.question, c.drafted, r.flagged
+    FROM page r
+    LEFT JOIN question_content c
+           ON c.workspace_id = r.workspace_id AND c.record_id = r.id AND c.asked_at = r.asked_at`;
+
 const A_PAGE_OF_RECORDS = `WITH open_flags AS (
     SELECT DISTINCT record_id FROM question_feedback
      WHERE workspace_id = $1 AND verdict = '${FEEDBACK_FLAG_VERDICT}' AND closed_at IS NULL
@@ -136,12 +144,7 @@ const A_PAGE_OF_RECORDS = `WITH open_flags AS (
       ORDER BY q.asked_at DESC NULLS LAST, q.id DESC NULLS LAST
       LIMIT $3 + 1)
   )
-  SELECT r.id, r.asked_at AS "askedAt", r.asked_by AS "askedBy", r.transport, r.collections,
-         r.verdict, r.judge_state AS "judgeState", r.map_state AS "mapState", r.concepts,
-         c.question, c.drafted, r.flagged
-    FROM page r
-    LEFT JOIN question_content c
-           ON c.workspace_id = r.workspace_id AND c.record_id = r.id AND c.asked_at = r.asked_at
+  ${OF_THE_PAGE}
    ORDER BY r.flagged DESC, r.asked_at DESC, r.id DESC
    LIMIT $3 + 1`;
 
@@ -197,17 +200,22 @@ const irisNamedIn = (rows: readonly PageRow[], feedback: readonly FeedbackRow[])
   ]),
 ];
 
-const conceptAsRead = (kept: KeptConcept, readable: Readable): readonly ConceptAsRead[] => {
-  const now = readable.get(kept.iri);
-  if (now === undefined) return [];
-  const read = {
+const conceptAsRead = (kept: KeptConcept, read: Read): readonly ConceptAsRead[] => {
+  const opened = read.readable.get(kept.iri);
+  if (opened === undefined) return [];
+  const concept = {
     iri: kept.iri,
-    kind: now.kind,
-    title: now.title,
-    collection: now.collection,
-    trustThen: kept.trust,
+    kind: opened.kind,
+    title: opened.title,
+    collection: opened.collection,
+    trustWords: trustWords(trustOf(opened, read.now)),
   };
-  return [kept.judged === undefined ? read : { ...read, judged: kept.judged }];
+  if (kept.judged === undefined) return [concept];
+  return [
+    kept.judged === "yes"
+      ? { ...concept, body: opened.body, judged: kept.judged }
+      : { ...concept, judged: kept.judged },
+  ];
 };
 
 const draftedAsRead = (
@@ -238,12 +246,11 @@ type Read = {
   readonly readable: Readable;
   readonly feedback: ReadonlyMap<string, readonly FeedbackRow[]>;
   readonly askers: PeopleNames;
+  readonly now: Date;
 };
 
 const cutAt = (last: PageRow | undefined): QuestionsAskedCursor | null =>
   last === undefined ? null : { id: last.id, flagged: last.flagged };
-
-const NOTHING_READ: Read = { readable: new Map(), feedback: new Map(), askers: new Map() };
 
 const recordAsRead = (row: PageRow, read: Read): RecordAsRead => ({
   id: row.id,
@@ -256,7 +263,7 @@ const recordAsRead = (row: PageRow, read: Read): RecordAsRead => ({
   judgeState: row.judgeState,
   map: row.mapState ?? { state: "unknown" },
   flagged: row.flagged,
-  concepts: row.concepts.flatMap((kept) => conceptAsRead(kept, read.readable)),
+  concepts: row.concepts.flatMap((kept) => conceptAsRead(kept, read)),
   drafted: draftedAsRead(row.drafted, read.readable),
   feedback: (read.feedback.get(row.id) ?? []).map((given) => feedbackAsRead(given, read.readable)),
 });
@@ -264,21 +271,26 @@ const recordAsRead = (row: PageRow, read: Read): RecordAsRead => ({
 const byRecord = (feedback: readonly FeedbackRow[]): ReadonlyMap<string, readonly FeedbackRow[]> =>
   Map.groupBy(feedback, (given) => given.recordId);
 
+type ReadRefusal = Extract<Awaited<ReturnType<typeof conceptsByIris>>, { ok: false }>["error"];
+
 const readOf = async (
-  admin: AdminUserPrincipal,
+  reader: UserPrincipal,
   tx: Tx,
   rows: readonly PageRow[],
-): Promise<Result<Read, QuestionsAskedRefusal>> => {
-  if (rows.length === 0) return ok(NOTHING_READ);
+  now: Date,
+): Promise<Result<Read, ReadRefusal>> => {
+  if (rows.length === 0) {
+    return ok({ readable: new Map(), feedback: new Map(), askers: new Map(), now });
+  }
   const ids = rows.map((row) => row.id);
   const feedback = await attempt(async () =>
-    (await tx.query(THEIR_FEEDBACK, [admin.workspaceId, ids])).rows.map((row) =>
+    (await tx.query(THEIR_FEEDBACK, [reader.workspaceId, ids])).rows.map((row) =>
       feedbackRow.parse(row),
     ),
   );
   if (!feedback.ok) return err(feedback.error);
   const iris = irisNamedIn(rows, feedback.value);
-  const concepts = iris.length === 0 ? ok([]) : await conceptsByIris(admin, tx, iris);
+  const concepts = iris.length === 0 ? ok([]) : await conceptsByIris(reader, tx, iris);
   if (!concepts.ok) return err(concepts.error);
   const askers = await attempt(() =>
     namesOfActors(
@@ -291,7 +303,22 @@ const readOf = async (
     readable: new Map(concepts.value.map((concept) => [concept.iri, concept])),
     feedback: byRecord(feedback.value),
     askers: askers.value,
+    now,
   });
+};
+
+const rowsOf = (tx: Tx, sql: string, parameters: readonly unknown[]) =>
+  attempt(async () => (await tx.query(sql, [...parameters])).rows.map((row) => pageRow.parse(row)));
+
+const recordsAsRead = async (
+  reader: UserPrincipal,
+  tx: Tx,
+  rows: readonly PageRow[],
+  now: Date,
+): Promise<Result<readonly RecordAsRead[], ReadRefusal>> => {
+  const read = await readOf(reader, tx, rows, now);
+  if (!read.ok) return err(read.error);
+  return ok(rows.map((row) => recordAsRead(row, read.value)));
 };
 
 const pageParameters = (admin: AdminUserPrincipal, { cursor, limit }: QuestionsAskedInput) => [
@@ -305,22 +332,19 @@ export const readQuestionsAsked = async (
   principal: UserPrincipal,
   tx: Tx,
   input: QuestionsAskedInput,
+  now: Date,
 ): Promise<Result<QuestionsAskedPage, QuestionsAskedRefusal>> => {
   const admitted = admit(readQuestionsAskedAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const admin = admitted.value;
 
-  const page = await attempt(async () =>
-    (await tx.query(A_PAGE_OF_RECORDS, pageParameters(admin, input))).rows.map((row) =>
-      pageRow.parse(row),
-    ),
-  );
+  const page = await rowsOf(tx, A_PAGE_OF_RECORDS, pageParameters(admin, input));
   if (!page.ok) return err(page.error);
   const rows = page.value.slice(0, input.limit);
-  const read = await readOf(admin, tx, rows);
-  if (!read.ok) return err(read.error);
+  const records = await recordsAsRead(admin, tx, rows, now);
+  if (!records.ok) return err(records.error);
   return ok({
-    records: rows.map((row) => recordAsRead(row, read.value)),
+    records: records.value,
     nextCursor: page.value.length > input.limit ? cutAt(rows.at(-1)) : null,
   });
 };

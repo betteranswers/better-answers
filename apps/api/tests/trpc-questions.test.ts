@@ -3,11 +3,16 @@ import { z } from "zod";
 
 import { connectAsHost } from "./flow.ts";
 import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
+import { questionsSeeding, seedQuestions } from "./harness-questions.ts";
 import { calledTool, structured, toolAnswered } from "./mcp-call.ts";
-import { appForSuite } from "./suite-app.ts";
+import { appForSuite, aStoppableClock } from "./suite-app.ts";
 import { statusOf, webSignedIn } from "./web-client.ts";
 
-const app = appForSuite();
+const { clock, stopTheClock, moveTheClock } = aStoppableClock();
+
+const app = appForSuite({ clock });
+
+const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
 
 const FULL_SCOPE = "knowledge:read feedback:write offline_access";
 
@@ -123,5 +128,45 @@ describe("Questions asked over tRPC", () => {
 
     expect(refused).toEqual([403, 403]);
     expect(await eventsOn(feedbackId)).toEqual([]);
+  });
+
+  it("words a record's trust by the app's clock", async () => {
+    const workspace = await app().provision();
+    const { concepts } = await seedConcepts(
+      app(),
+      conceptsSeeding.parse({
+        workspaceId: workspace.workspaceId,
+        userId: workspace.admin.id,
+        concepts: [
+          {
+            title: RETENTION_QUESTION,
+            body: "Audit logs are kept for thirteen months.",
+            frontmatter: { stale_after: new Date().toISOString().slice(0, 10) },
+          },
+        ],
+      }),
+    );
+    await seedQuestions(
+      app(),
+      questionsSeeding.parse({
+        workspaceId: workspace.workspaceId,
+        records: [
+          {
+            question: RETENTION_QUESTION,
+            verdict: "related",
+            concepts: [{ iri: concepts[0]?.iri ?? "" }],
+          },
+        ],
+      }),
+    );
+    const { api } = await webSignedIn(app(), workspace.admin.email);
+    const trustWordsNow = async () =>
+      (await api.questions.asked.query({})).records[0]?.concepts[0]?.trustWords;
+
+    stopTheClock();
+    const before = await trustWordsNow();
+    moveTheClock(TWO_DAYS_MS);
+
+    expect([before, await trustWordsNow()]).toEqual(["Unverified", "Out of date"]);
   });
 });

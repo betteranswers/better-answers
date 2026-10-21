@@ -354,9 +354,13 @@ describe("completing a record", () => {
 
 const KEPT_TRUST = { tier: "unverified", status: "current", verifiedAt: null, rider: null };
 
-const asked = (reader: UserPrincipal, input: Partial<QuestionsAskedInput> = {}) =>
+const asked = (
+  reader: UserPrincipal,
+  input: Partial<QuestionsAskedInput> = {},
+  now: Date = new Date(),
+) =>
   readingAs(db().runtimePool, reader, (principal, tx) =>
-    readQuestionsAsked(principal, tx, questionsAskedInput.parse(input)),
+    readQuestionsAsked(principal, tx, questionsAskedInput.parse(input), now),
   );
 
 const closing = (closer: UserPrincipal, feedbackId: string, closedAs: FlagClosing) =>
@@ -367,8 +371,10 @@ const closing = (closer: UserPrincipal, feedbackId: string, closedAs: FlagClosin
 type Seeded = { readonly iri: ConceptIri; readonly contentHash: string };
 
 type RecordShape = {
+  readonly by?: UserPrincipal;
   readonly askedAt?: Date;
   readonly verdict?: "related" | "refuse";
+  readonly answers?: readonly Seeded[];
   readonly cited?: readonly Seeded[];
   readonly drafted?: readonly { sentence: string; concepts: readonly Seeded[] }[];
 };
@@ -384,15 +390,24 @@ const aRecord = (admin: UserPrincipal, shape: RecordShape = {}) =>
     const record = await seed.questionAsked({
       workspaceId: admin.workspaceId,
       askedAt: shape.askedAt ?? new Date(),
-      askedBy: actorIdOfPerson(admin.userId),
+      askedBy: actorIdOfPerson((shape.by ?? admin).userId),
+      predicateRole: (shape.by ?? admin).role,
       completedAt: new Date(),
       verdict: shape.verdict ?? "related",
       judgeState: "not-judged",
-      concepts: (shape.cited ?? []).map(({ iri, contentHash }) => ({
-        iri,
-        contentHash,
-        trust: KEPT_TRUST,
-      })),
+      concepts: [
+        ...(shape.answers ?? []).map(({ iri, contentHash }) => ({
+          iri,
+          contentHash,
+          trust: KEPT_TRUST,
+          judged: "yes" as const,
+        })),
+        ...(shape.cited ?? []).map(({ iri, contentHash }) => ({
+          iri,
+          contentHash,
+          trust: KEPT_TRUST,
+        })),
+      ],
     });
     await seed.questionContent({
       workspaceId: admin.workspaceId,
@@ -439,6 +454,20 @@ const aConceptNarrowedIn = (admin: UserPrincipal, collection: string) =>
       audienceGroups: [group.id],
     });
   });
+
+const STALE_AFTER = "2026-06-01";
+
+const BEFORE_STALE = new Date("2026-05-01T12:00:00Z");
+
+const AFTER_STALE = new Date("2026-07-01T12:00:00Z");
+
+const aConceptStaleAfter = (admin: UserPrincipal, day: string) =>
+  seedingWith(db().pool, (seed) =>
+    seed.conceptIndex({
+      workspaceId: admin.workspaceId,
+      frontmatter: { title: "Expenses", type: "Policy", stale_after: day },
+    }),
+  );
 
 const aMemberOf = async (admin: UserPrincipal, role: "Editor" | "Viewer") => {
   const member = await seedingWith(db().pool, (seed) =>
@@ -569,7 +598,7 @@ describe("reading the questions asked", () => {
             kind: "Policy",
             title: "Expenses",
             collection: "audits",
-            trustThen: KEPT_TRUST,
+            trustWords: "Unverified",
           },
         ],
         drafted: null,
@@ -596,6 +625,19 @@ describe("reading the questions asked", () => {
     const { records } = answered(await asked(admin));
 
     expect(records.map((record) => record.map)).toEqual([{ state: "unknown" }]);
+  });
+
+  it("words trust at the moment the Admin's read is given", async () => {
+    const admin = await anAsker();
+    await aRecord(admin, { cited: [await aConceptStaleAfter(admin, STALE_AFTER)] });
+
+    const wordsAt = async (now: Date) =>
+      answered(await asked(admin, {}, now)).records[0]?.concepts[0]?.trustWords;
+
+    expect([await wordsAt(BEFORE_STALE), await wordsAt(AFTER_STALE)]).toEqual([
+      "Unverified",
+      "Out of date",
+    ]);
   });
 
   it("leaves out an unreadable concept, with no hint", async () => {
