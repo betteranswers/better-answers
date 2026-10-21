@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { PAGE_NUMBER } from "@/shared/list-address.ts";
+import { PAGE_NUMBER, searchText } from "@/shared/list-address.ts";
 import { useSearchedList } from "@/shared/searched-list.ts";
 
 import { openPages } from "./address-router.tsx";
@@ -17,14 +17,14 @@ const SORTS = ["name", "-name"] as const;
 const FAMILIES = ["people", "sources"] as const;
 
 const PAGED = {
-  search: z.string().catch(""),
+  search: searchText(),
   role: z.enum(ROLES).optional().catch(undefined),
   sort: z.enum(SORTS).optional().catch(undefined),
   page: PAGE_NUMBER,
 };
 
 const UNPAGED = {
-  search: z.string().catch(""),
+  search: searchText(),
   family: z.enum(FAMILIES).optional().catch(undefined),
 };
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { PAGE_NUMBER } from "@/shared/list-address.ts";
+import { PAGE_NUMBER, searchText } from "@/shared/list-address.ts";
 
 import type { InvitationStatus } from "./invitations-api.ts";
 
@@ -16,7 +16,7 @@ export const INVITATION_STATUSES = [
 export const DEFAULT_STATUS = INVITATION_STATUSES[0];
 
 export const INVITATIONS_FIELDS = {
-  search: z.string().catch(""),
+  search: searchText(),
   status: z.enum(INVITATION_STATUSES).catch(DEFAULT_STATUS),
   page: PAGE_NUMBER,
 };

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { Keystroke } from "@/shared/keystrokes.tsx";
+import { searchText } from "@/shared/list-address.ts";
 
 import type { Family } from "./audit-log-api.ts";
 
@@ -22,6 +23,6 @@ export const AUDIT_LOG_LIST = "audit";
 export const SEARCH_MAX = 100;
 
 export const AUDIT_LOG_FIELDS = {
-  search: z.string().max(SEARCH_MAX).catch(""),
+  search: searchText(SEARCH_MAX),
   family: z.enum(FAMILIES).optional().catch(undefined),
 };

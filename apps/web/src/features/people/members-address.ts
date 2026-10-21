@@ -4,7 +4,7 @@ import { z } from "zod";
 import { ULID } from "@better-answers/schema/ulid";
 
 import type { Here } from "@/shared/address-ask.ts";
-import { PAGE_NUMBER } from "@/shared/list-address.ts";
+import { PAGE_NUMBER, searchText } from "@/shared/list-address.ts";
 import { CONTROL_CENTRE, detailAt, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import type { Role } from "./people-api.ts";
@@ -22,7 +22,7 @@ const ROLE_FILTERS = ["Admin", "Editor", "Viewer"] as const satisfies readonly R
 const SORTS = ["person", "-person", "role", "-role", "joined", "-joined"] as const;
 
 export const MEMBERS_FIELDS = {
-  search: z.string().catch(""),
+  search: searchText(),
   role: z.enum(ROLE_FILTERS).optional().catch(undefined),
   group: z.string().optional().catch(undefined),
   sort: z.enum(SORTS).optional().catch(undefined),

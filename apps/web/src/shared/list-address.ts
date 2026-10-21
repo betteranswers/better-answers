@@ -11,6 +11,15 @@ type AddressState<Fields extends ListFields> = z.output<z.ZodObject<Fields>>;
 /** The router reads a whole number as one, so a page held as a quoted word is malformed too. */
 export const PAGE_NUMBER = z.number().int().min(1).catch(1);
 
+/** The router reads a typed `42` or `null` as JSON only when JSON writes it back as typed. */
+export const searchText = (max = Number.POSITIVE_INFINITY) =>
+  z
+    .preprocess(
+      (held) => (typeof held === "string" ? held : JSON.stringify(held)),
+      z.string().max(max),
+    )
+    .catch("");
+
 const QUERY = z.record(z.string(), z.unknown());
 
 type Query = z.output<typeof QUERY>;
