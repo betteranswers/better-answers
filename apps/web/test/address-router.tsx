@@ -10,6 +10,8 @@ import { render, waitFor } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
 import { expect } from "vitest";
 
+import { ADDRESS_QUERY } from "@/shared/address-query.ts";
+
 type Wrapper = ComponentType<{ readonly children: ReactNode }>;
 
 export const openPages = async (
@@ -27,7 +29,7 @@ export const openPages = async (
     initialEntries: [...entries],
     initialIndex: entries.length - 1,
   });
-  const router = createRouter({ routeTree, history });
+  const router = createRouter({ routeTree, history, ...ADDRESS_QUERY });
   await router.load();
   render(<RouterProvider router={router} />, { wrapper });
   const at = (href: string) => waitFor(() => expect(router.state.location.href).toBe(href));

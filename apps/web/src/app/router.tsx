@@ -58,6 +58,7 @@ import { MEMBERS_TOOLBAR, MembersPage } from "@/features/people/members-page.tsx
 import { AnswerTestsPage } from "@/features/questions/answer-tests-page.tsx";
 import { QuestionsAskedPage } from "@/features/questions/questions-asked-page.tsx";
 import { ConnectedSourcesPage } from "@/features/sources/connected-sources-page.tsx";
+import { ADDRESS_QUERY } from "@/shared/address-query.ts";
 import type { FailedDuring } from "@/shared/api/query-client.ts";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
 import { CONCEPT_IRI } from "@/shared/knowledge/concept-address.ts";
@@ -516,6 +517,7 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
 
     context,
     defaultErrorComponent: FailedPage,
+    ...ADDRESS_QUERY,
   };
 
   const router =
