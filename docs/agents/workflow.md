@@ -129,6 +129,8 @@ You need:
 
 ### Multi-session coordination
 
+A new worktree gets its base from where it is made. Made from the main checkout, as `EnterWorktree` or a desktop parallel session makes it, it starts from `origin/main`, whatever branch the main checkout has out. Made from a linked worktree, as an `Agent(isolation: "worktree")` delegate's is, it starts from that worktree's HEAD. `docs/operations/local-gates.md`, *Creating and removing a worktree*, says why.
+
 Never write helper scripts to shared /tmp paths. Other sessions run in parallel and overwrite them. Use a session-scoped directory such as `$(mktemp -d)` or `.claude/tmp/<session-id>/`.
 
 Stop only the processes you started, by the pid you recorded when you started them. The Bash tool keeps no shell state between calls, so record the pid in the same call that starts the process, for example `<command> & echo $! > "$dir/run.pid"` in a session-scoped directory. Never stop a process by matching its name or command line, as `pkill -f playwright` or `pkill stryker` do. A name match also stops other sessions' runs. Watching a process by name is fine, as the waiter in `docs/agents/mutation-triage.md` does. On 19/10/2026 one name match stopped other sessions' browser suites, and another stopped a mutation run mid-pass, which left its `src` instrumented.
