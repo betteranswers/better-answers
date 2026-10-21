@@ -1677,10 +1677,10 @@ const PAGE_OF_ROWS = 25;
 const tickOf = (page: Page, name: string): Locator =>
   membersRegion(page).getByRole("checkbox", { name: `Select ${name}`, exact: true });
 
+const pagesOf = (page: Page): Locator => page.getByRole("navigation", { name: "Pages of Members" });
+
 const selectionAction = (page: Page, action: string): Locator =>
   selectionBar(page).getByRole("button", { name: action, exact: true });
-
-const pagesOf = (page: Page): Locator => page.getByRole("navigation", { name: "Pages of Members" });
 
 const refusedLineOf = (page: Page, name: string): Locator =>
   membersRegion(page).getByRole("alert").getByRole("listitem").filter({ hasText: name });
