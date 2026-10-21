@@ -776,6 +776,21 @@ export const consumeInvitationEmails = async (
 ): Promise<CounterOutcome> =>
   countForWorkspace(principal, tx, "invitationEmail", key, rule, now, amount);
 
+export const returnInvitationEmails = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  key: string,
+  rule: CounterRule,
+  countedAt: Date,
+  amount: number,
+): Promise<void> => {
+  await tx.query(
+    `UPDATE invitation_email_counter SET count = GREATEST(count - $4, 0)
+      WHERE workspace_id = $1 AND key = $2 AND window_start = $3`,
+    [principal.workspaceId, key, windowStart(rule, countedAt), amount],
+  );
+};
+
 export const readWorkspaceConfig = async (
   principal: UserPrincipal,
   tx: Tx,

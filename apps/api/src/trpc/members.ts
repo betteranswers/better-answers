@@ -1,6 +1,12 @@
 import type { Logger } from "pino";
 
-import type { Clock, Malformed, Result, UserPrincipal } from "@better-answers/core/kernel";
+import {
+  attempt,
+  type Clock,
+  type Malformed,
+  type Result,
+  type UserPrincipal,
+} from "@better-answers/core/kernel";
 import {
   addToGroup,
   approveRequest,
@@ -47,6 +53,7 @@ import {
   renameGroup,
   renameGroupInput,
   resendInvitation,
+  returnUnsentEmails,
   endEverySignInAndTokenHere,
   endEverySignInAndTokenHereInput,
   type InvitationMinted,
@@ -89,18 +96,17 @@ type Minting<Asked, Minted> = (
   input: Asked & { readonly now: Date },
 ) => Promise<Result<Minted, RefusalAnswer | Error>>;
 
-const committedNow = <Asked, Minted>(
+const committedAt = <Asked, Minted>(
   ctx: Emailing,
   action: Minting<Asked, Minted>,
   input: Result<Asked, Malformed>,
+  now: Date,
 ): Promise<Minted> =>
   crossing(
     ctx,
     action.name,
     given(input, (asked) =>
-      committedAs(ctx, (principal, tx) =>
-        action(principal, tx, { ...asked, now: ctx.clock.now() }),
-      ),
+      committedAs(ctx, (principal, tx) => action(principal, tx, { ...asked, now })),
     ),
   );
 
@@ -113,17 +119,13 @@ const answerOf = (invitation: InvitationToSend, emailSent: boolean) => ({
   emailSent,
 });
 
-const committedThenEmailed =
-  <Asked>(action: Minting<Asked, InvitationToSend>) =>
-  async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
-    const invitation = await committedNow(ctx, action, input);
-    return answerOf(invitation, await sentInvitation(ctx, invitation));
-  };
-
-const emailedEach = async (
+type Emailed = (
   ctx: Emailing,
   invitations: readonly InvitationToSend[],
-): Promise<readonly boolean[]> => {
+  countedAt: Date,
+) => Promise<readonly boolean[]>;
+
+const emailedEach: Emailed = async (ctx, invitations) => {
   const sent: boolean[] = [];
   for (let start = 0; start < invitations.length; start += EMAILS_PER_SECOND) {
     const round = invitations.slice(start, start + EMAILS_PER_SECOND);
@@ -132,14 +134,45 @@ const emailedEach = async (
   return sent;
 };
 
+const emailedReturningUnsent: Emailed = async (ctx, invitations, countedAt) => {
+  const sent = await emailedEach(ctx, invitations, countedAt);
+  const unsent = invitations.filter((_invitation, at) => sent[at] !== true);
+  if (unsent.length === 0) return sent;
+  const returned = await attempt(() =>
+    committedAs(ctx, (principal, tx) =>
+      returnUnsentEmails(principal, tx, {
+        invitationIds: unsent.map((invitation) => invitation.invitationId),
+        countedAt,
+      }),
+    ),
+  );
+  if (!returned.ok || !returned.value.ok) {
+    ctx.log.warn(
+      { event: "trpc.unsent_emails_kept_counted", invitations: unsent.length },
+      "the unsent invitation emails still count against their ceilings",
+    );
+  }
+  return sent;
+};
+
+const committedThenEmailed =
+  <Asked>(action: Minting<Asked, InvitationToSend>, emailed: Emailed) =>
+  async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
+    const now = ctx.clock.now();
+    const invitation = await committedAt(ctx, action, input, now);
+    const [sent] = await emailed(ctx, [invitation], now);
+    return answerOf(invitation, sent === true);
+  };
+
 const committedThenEmailedEach =
   <Asked, Minted extends InvitationToSend, Answer>(
     action: Minting<Asked, readonly Minted[]>,
     answer: (minted: Minted, emailSent: boolean) => Answer,
   ) =>
   async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
-    const minted = await committedNow(ctx, action, input);
-    const sent = await emailedEach(ctx, minted);
+    const now = ctx.clock.now();
+    const minted = await committedAt(ctx, action, input, now);
+    const sent = await emailedReturningUnsent(ctx, minted, now);
     return { invitations: minted.map((one, at) => answer(one, sent[at] === true)) };
   };
 
@@ -237,7 +270,7 @@ export const membersRouter = router({
     .mutation(committedThenEmailedEach(inviteMembers, mintedAnswer)),
   resendInvitation: ownTransactionProcedure
     .input(parsedBy(invitationInput))
-    .mutation(committedThenEmailed(resendInvitation)),
+    .mutation(committedThenEmailed(resendInvitation, emailedReturningUnsent)),
   bulkResendInvitations: ownTransactionProcedure
     .input(parsedBy(bulkInvitationsInput))
     .mutation(committedThenEmailedEach(bulkResendInvitations, answerOf)),
@@ -297,7 +330,7 @@ export const membersRouter = router({
   ),
   approveRequest: ownTransactionProcedure
     .input(parsedBy(approveRequestInput))
-    .mutation(committedThenEmailed(approveRequest)),
+    .mutation(committedThenEmailed(approveRequest, emailedEach)),
   declineRequest: mutationProcedure
     .input(parsedBy(declineRequestInput))
     .mutation(answeredBy(declineRequest)),

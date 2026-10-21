@@ -22,6 +22,7 @@ export {
   bulkCancelInvitations,
   bulkInvitationsInput,
   bulkResendInvitations,
+  returnUnsentEmails,
   type BulkCancelInvitationsRefusal,
   type BulkResendInvitationsRefusal,
 } from "./invitation-bulk.ts";

@@ -18,7 +18,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { refusalOfDeadlock, type Tx } from "../store/postgres/index.ts";
-import { waitingCounted } from "./invitation-ceilings.ts";
+import { unsentReturned, waitingCounted } from "./invitation-ceilings.ts";
 import {
   expiryFrom,
   INVITATION_ACTIONS,
@@ -54,6 +54,12 @@ const bulkResendInvitationsAction = declareAction({
   admits: ADMIN_ALONE,
   input: bulkInvitationsInput,
   refuses: [...ON_A_SET, OFF_TESTING_DOMAIN],
+});
+
+const returnUnsentEmailsAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: bulkInvitationsInput,
+  refuses: ["role-forbids"],
 });
 
 const bulkCancelInvitationsAction = declareAction({
@@ -152,6 +158,23 @@ export const bulkResendInvitations = async (
 
   const done = await attempt(() => renewedUnderHold(admitted.value, tx, renewing));
   return done.ok ? done.value : err(refusalOfDeadlock(done.error));
+};
+
+export type ReturnUnsentEmailsInput = z.output<typeof bulkInvitationsInput> & {
+  readonly countedAt: Date;
+};
+
+export const returnUnsentEmails = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: ReturnUnsentEmailsInput,
+): Promise<Result<undefined, MemberRefusal<"role-forbids"> | Error>> => {
+  const admitted = admit(returnUnsentEmailsAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const returned = await attempt(() =>
+    unsentReturned(admitted.value, tx, distinct(input.invitationIds), input.countedAt),
+  );
+  return returned.ok ? ok(undefined) : err(returned.error);
 };
 
 const CANCELLED_WAITING = `WITH cancelled AS (

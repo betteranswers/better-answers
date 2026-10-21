@@ -4,7 +4,12 @@ import { INVITATION_WAITING_STATUS } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { CeilingMet, err, ok, type AdminUserPrincipal, type Result } from "../kernel/index.ts";
-import { consumeInvitationEmails, type CounterRule, type Tx } from "../store/postgres/index.ts";
+import {
+  consumeInvitationEmails,
+  returnInvitationEmails,
+  type CounterRule,
+  type Tx,
+} from "../store/postgres/index.ts";
 
 const INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 5 };
 
@@ -18,17 +23,15 @@ const WORKSPACE_KEY = "workspace";
 
 type Counter = { readonly key: string; readonly rule: CounterRule; readonly amount: number };
 
-const countersOf = (
-  admin: AdminUserPrincipal,
-  addresses: readonly string[],
-): readonly Counter[] => [
-  ...addresses.map((address) => ({
-    key: counterKeyOf(admin, address),
-    rule: INVITATION_CEILING,
-    amount: 1,
-  })),
-  { key: WORKSPACE_KEY, rule: WORKSPACE_INVITATION_CEILING, amount: addresses.length },
-];
+const countersOf = (admin: AdminUserPrincipal, addresses: readonly string[]): readonly Counter[] =>
+  [
+    ...addresses.map((address) => ({
+      key: counterKeyOf(admin, address),
+      rule: INVITATION_CEILING,
+      amount: 1,
+    })),
+    { key: WORKSPACE_KEY, rule: WORKSPACE_INVITATION_CEILING, amount: addresses.length },
+  ].toSorted((one, other) => byCodeUnit(one.key, other.key));
 
 export const emailsCounted = async (
   admin: AdminUserPrincipal,
@@ -36,10 +39,7 @@ export const emailsCounted = async (
   addresses: readonly string[],
   now: Date,
 ): Promise<Result<undefined, CeilingMet>> => {
-  const counters = countersOf(admin, addresses).toSorted((one, other) =>
-    byCodeUnit(one.key, other.key),
-  );
-  for (const { key, rule, amount } of counters) {
+  for (const { key, rule, amount } of countersOf(admin, addresses)) {
     const counted = await consumeInvitationEmails(admin, tx, key, rule, now, amount);
     if (!counted.allowed) return err(new CeilingMet(counted.retryAfterSeconds));
   }
@@ -66,4 +66,23 @@ export const waitingCounted = async (
     waiting.rows.map((row) => row.address),
     now,
   );
+};
+
+const ADDRESSES_OF = `SELECT lower(email) AS address FROM invitation
+                       WHERE workspace_id = $1 AND id = ANY($2::text[])`;
+
+export const unsentReturned = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  invitationIds: readonly string[],
+  countedAt: Date,
+): Promise<void> => {
+  const unsent = await tx.query<{ address: string }>(ADDRESSES_OF, [
+    admin.workspaceId,
+    invitationIds,
+  ]);
+  const addresses = unsent.rows.map((row) => row.address);
+  for (const { key, rule, amount } of countersOf(admin, addresses)) {
+    await returnInvitationEmails(admin, tx, key, rule, countedAt, amount);
+  }
 };
