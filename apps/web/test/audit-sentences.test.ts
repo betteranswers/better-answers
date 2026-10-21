@@ -317,7 +317,7 @@ describe("an audit event in today's words", () => {
 
     expect(headlineOf(keySet.action)).toBe("Model provider key set");
     expect(sentenceOf(keySet)).toContain("set a model provider’s API key");
-    expect(detailLinesOf(keySet).map((line) => line.label)).toEqual(["Model Provider"]);
+    expect(detailLinesOf(keySet).map((line) => line.label)).toEqual(["Model provider"]);
   });
 });
 
