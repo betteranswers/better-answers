@@ -54,10 +54,14 @@ The erasure union is `ERASURE_FAMILIES` in `packages/core/src/erasure/map.ts`. E
 - The evidence: `source-document`.
 - The platform's records: `question-asked`, `concept-sensitivity-override` (who set the override), `finding` (who reviewed or restored it, and the reason they gave), `suggestion` (who proposed and who decided it, and the decider's reason) and `concept-write-request` (the person's actor id or `human:<address>` in a request's title, frontmatter or body).
 
-Two tables name a person outside the union:
+These tables name a person outside the union. The list is a scan of the schema on 21/10/2026, and no gate holds it, so a new column that names a person goes here or into the union:
 
 - `access_request`. The identity step clears the reason and the invitation on every arm, by the owner's ruling in #792. `requester_id` and `decided_by` keep the person id, because they key the user row, which keeps its id.
-- `audit_event`. It is never rewritten.
+- `invitation.inviter_id`. It keys the user row, which keeps its id. An invitation sent to the person is `identity-invitation`.
+- `subject_request.person_id`. It is the request's own subject, and the request is the record the erasure answers.
+- `audit_event.actor` and `identity_audit_event.actor`. The audit logs are never rewritten, and name a person by person id alone.
+- `oauth_client`, `oauth_access_token`, `oauth_refresh_token` and `oauth_consent`, by `user_id`. Each keys the user row, which keeps its id. The erasure deletes none of them.
+- `group_member.user_id`. Its foreign key to `member` cascades, so ending the member deletes it.
 
 Decided for the S3 block and not yet in the tree:
 

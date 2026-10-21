@@ -1,100 +1,120 @@
 import { PERSON_PREFIX, type PlatformPrincipal } from "../kernel/index.ts";
+import type { Needles } from "../store/git/index.ts";
 import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import type { ErasureFamily } from "./map.ts";
 import { askersOf } from "./questions.ts";
 
-export type ActorsSwept = {
-  readonly commits: number;
-  readonly verifications: number;
-  readonly overrides: number;
-  readonly findings: number;
-  readonly suggestions: number;
-  readonly requests: number;
+export type ActorSweepSubject = {
+  readonly workspaceId: string;
+  readonly needles: Needles;
+  readonly pseudonym: string;
 };
 
-export const NO_ACTORS_SWEPT: ActorsSwept = {
-  commits: 0,
-  verifications: 0,
-  overrides: 0,
-  findings: 0,
-  suggestions: 0,
-  requests: 0,
+type Counts = Readonly<Record<string, number>>;
+
+type ActorSweep = {
+  readonly family: ErasureFamily;
+  readonly statement: string;
+  readonly parameters: (subject: ActorSweepSubject) => readonly unknown[];
 };
 
-const REWRITE_THE_COMMITS = `UPDATE bundle_commit SET actor = $3
-   WHERE workspace_id = $1 AND actor = ANY($2)`;
+const counted = (update: string): string =>
+  `WITH rewritten AS (${update} RETURNING 1) SELECT count(*)::int AS "actorsRewritten" FROM rewritten`;
 
-const REWRITE_THE_VERIFICATIONS = `UPDATE concept_verification SET actor = $3
-   WHERE workspace_id = $1 AND actor = ANY($2)`;
+const byActorId = (subject: ActorSweepSubject): readonly unknown[] => [
+  subject.workspaceId,
+  askersOf(subject.needles.people),
+  `${PERSON_PREFIX}${subject.pseudonym}`,
+];
 
-const REWRITE_THE_OVERRIDES = `UPDATE concept_sensitivity_override SET actor = $3
-   WHERE workspace_id = $1 AND actor = ANY($2)`;
-
-const REWRITE_THE_FINDINGS = `UPDATE finding
-     SET reviewed_by = CASE WHEN reviewed_by = ANY($2) THEN $3 ELSE reviewed_by END,
-         review_reason = CASE WHEN reviewed_by = ANY($2) THEN NULL ELSE review_reason END,
-         restored_by = CASE WHEN restored_by = ANY($2) THEN $3 ELSE restored_by END,
-         restore_reason = CASE WHEN restored_by = ANY($2) THEN '' ELSE restore_reason END
-   WHERE workspace_id = $1 AND (reviewed_by = ANY($2) OR restored_by = ANY($2))`;
-
-const ERASE_FROM_THE_SUGGESTIONS =
-  "SELECT suggestions, requests FROM erase_from_the_suggestions($1, $2, $3, $4)";
-
-export const sweepTheActors = async (
-  tx: Tx,
-  subject: {
-    readonly workspaceId: string;
-    readonly actors: readonly string[];
-    readonly addresses: readonly string[];
-    readonly pseudonym: string;
+const ACTOR_SWEEPS = [
+  {
+    family: "bundle-commit",
+    statement: counted(
+      "UPDATE bundle_commit SET actor = $3 WHERE workspace_id = $1 AND actor = ANY($2)",
+    ),
+    parameters: byActorId,
   },
-): Promise<ActorsSwept> => {
-  const erasedAs = `${PERSON_PREFIX}${subject.pseudonym}`;
-  const parameters = [subject.workspaceId, subject.actors, erasedAs];
-  const commits = await tx.query(REWRITE_THE_COMMITS, parameters);
-  const verifications = await tx.query(REWRITE_THE_VERIFICATIONS, parameters);
-  const overrides = await tx.query(REWRITE_THE_OVERRIDES, parameters);
-  const findings = await tx.query(REWRITE_THE_FINDINGS, parameters);
-  const suggested = await tx.query<Pick<ActorsSwept, "suggestions" | "requests">>(
-    ERASE_FROM_THE_SUGGESTIONS,
-    [subject.workspaceId, subject.actors, subject.addresses, erasedAs],
-  );
-  return {
-    commits: commits.rowCount ?? 0,
-    verifications: verifications.rowCount ?? 0,
-    overrides: overrides.rowCount ?? 0,
-    findings: findings.rowCount ?? 0,
-    ...(suggested.rows[0] ?? { suggestions: 0, requests: 0 }),
-  };
+  {
+    family: "concept-verification",
+    statement: counted(
+      "UPDATE concept_verification SET actor = $3 WHERE workspace_id = $1 AND actor = ANY($2)",
+    ),
+    parameters: byActorId,
+  },
+  {
+    family: "concept-sensitivity-override",
+    statement: counted(
+      "UPDATE concept_sensitivity_override SET actor = $3 WHERE workspace_id = $1 AND actor = ANY($2)",
+    ),
+    parameters: byActorId,
+  },
+  {
+    family: "finding",
+    statement: counted(`UPDATE finding
+       SET reviewed_by = CASE WHEN reviewed_by = ANY($2) THEN $3 ELSE reviewed_by END,
+           review_reason = CASE WHEN reviewed_by = ANY($2) THEN NULL ELSE review_reason END,
+           restored_by = CASE WHEN restored_by = ANY($2) THEN $3 ELSE restored_by END,
+           restore_reason = CASE WHEN restored_by = ANY($2) THEN '' ELSE restore_reason END
+     WHERE workspace_id = $1 AND (reviewed_by = ANY($2) OR restored_by = ANY($2))`),
+    parameters: byActorId,
+  },
+  {
+    family: "suggestion",
+    statement: `SELECT erase_from_the_suggestions($1, $2, $3) AS "actorsRewritten"`,
+    parameters: (subject) => [subject.workspaceId, subject.needles.people, subject.pseudonym],
+  },
+  {
+    family: "concept-write-request",
+    statement: `SELECT rewritten AS "actorsRewritten", bodies_replaced AS "bodiesReplaced"
+                  FROM erase_from_the_write_requests($1, $2, $3, $4)`,
+    parameters: (subject) => [
+      subject.workspaceId,
+      subject.needles.people,
+      subject.needles.addresses,
+      subject.pseudonym,
+    ],
+  },
+] as const satisfies readonly ActorSweep[];
+
+type ActorFamily = (typeof ACTOR_SWEEPS)[number]["family"];
+
+export type ActorsSwept = ReadonlyMap<ActorFamily, Counts>;
+
+export const NO_ACTORS_SWEPT: ActorsSwept = new Map();
+
+const sweptBy = async (tx: Tx, sweep: ActorSweep, subject: ActorSweepSubject): Promise<Counts> => {
+  const answered = await tx.query<Counts>(sweep.statement, [...sweep.parameters(subject)]);
+  const [counts] = answered.rows;
+  if (counts === undefined) throw new Error(`erasure: the ${sweep.family} sweep answered no row`);
+  return counts;
 };
 
-export const eraseFromTheActors = async (
+export const sweepTheActors = async (tx: Tx, subject: ActorSweepSubject): Promise<ActorsSwept> => {
+  const swept = new Map<ActorFamily, Counts>();
+  for (const sweep of ACTOR_SWEEPS) swept.set(sweep.family, await sweptBy(tx, sweep, subject));
+  return swept;
+};
+
+export const eraseFromTheActors = (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  subject: {
-    readonly workspaceId: string;
-    readonly personIds: readonly (string | null)[];
-    readonly addresses: readonly string[];
-    readonly pseudonym: string;
-  },
-): Promise<ActorsSwept> => {
-  const actors = askersOf(subject.personIds);
-  if (actors.length === 0) return NO_ACTORS_SWEPT;
+  subject: ActorSweepSubject,
+): Promise<ActorsSwept> =>
+  withScope(platform, door, subject.workspaceId, (tx) => sweepTheActors(tx, subject));
 
-  return withScope(platform, door, subject.workspaceId, (tx) =>
-    sweepTheActors(tx, {
-      workspaceId: subject.workspaceId,
-      actors,
-      addresses: subject.addresses,
-      pseudonym: subject.pseudonym,
-    }),
-  );
+const summed = (left: Counts, right: Counts): Counts => {
+  const total = new Map(Object.entries(left));
+  for (const [label, count] of Object.entries(right))
+    total.set(label, (total.get(label) ?? 0) + count);
+  return Object.fromEntries(total);
 };
 
-export const inEverySweep = (...sweeps: readonly ActorsSwept[]): ActorsSwept => ({
-  commits: sweeps.reduce((total, sweep) => total + sweep.commits, 0),
-  verifications: sweeps.reduce((total, sweep) => total + sweep.verifications, 0),
-  overrides: sweeps.reduce((total, sweep) => total + sweep.overrides, 0),
-  findings: sweeps.reduce((total, sweep) => total + sweep.findings, 0),
-  suggestions: sweeps.reduce((total, sweep) => total + sweep.suggestions, 0),
-  requests: sweeps.reduce((total, sweep) => total + sweep.requests, 0),
-});
+export const inEverySweep = (...sweeps: readonly ActorsSwept[]): ActorsSwept => {
+  const total = new Map<ActorFamily, Counts>();
+  for (const sweep of sweeps) {
+    for (const [family, counts] of sweep)
+      total.set(family, summed(total.get(family) ?? {}, counts));
+  }
+  return total;
+};

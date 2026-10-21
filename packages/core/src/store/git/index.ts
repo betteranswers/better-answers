@@ -589,12 +589,13 @@ export const fileAtHead = async (
   return (await headOf(gitDir)) === null ? null : fileIn(gitDir, BUNDLE_REF, filePath);
 };
 
-export type Pseudonymisation = {
+export type Needles = {
   readonly addresses: readonly string[];
 
   readonly people: readonly string[];
-  readonly pseudonym: string;
 };
+
+export type Pseudonymisation = Needles & { readonly pseudonym: string };
 
 export type HistoryRewritten = {
   readonly moved: readonly (readonly [string, string])[];
@@ -611,6 +612,8 @@ const PYTHON_SPECIAL = /[()[\]{}?*+\-|^$\\.&~# \t\n\r\v\f]/g;
 const escapedForPython = (literal: string): string =>
   literal.replace(PYTHON_SPECIAL, (character) => `\\${character}`);
 
+const AFTER_AN_ADDRESS = String.raw`(?![A-Za-z0-9_%+-]|\.[A-Za-z0-9])`;
+
 const replacementsFor = (
   addresses: readonly string[],
   people: readonly string[],
@@ -619,7 +622,7 @@ const replacementsFor = (
   [
     ...addresses.map(
       (address) =>
-        `regex:(?i)${escapedForPython(`${PERSON_PREFIX}${address}`)}==>${PERSON_PREFIX}${pseudonym}\n`,
+        `regex:(?i)${escapedForPython(`${PERSON_PREFIX}${address}`)}${AFTER_AN_ADDRESS}==>${PERSON_PREFIX}${pseudonym}\n`,
     ),
     ...people.map((person) => `${PERSON_PREFIX}${person}==>${PERSON_PREFIX}${pseudonym}\n`),
   ].join("");

@@ -1,12 +1,12 @@
-import { boundarySchemas } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
-import { actorIdOfPerson, type ActorId, type PlatformPrincipal } from "../kernel/index.ts";
-import { historyNaming, type GitDoor } from "../store/git/index.ts";
+import type { PlatformPrincipal } from "../kernel/index.ts";
+import { historyNaming, type GitDoor, type Needles } from "../store/git/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { SESSION_VERIFICATION_PREFIXES, VERIFICATION_PREFIXES } from "../workspaces/index.ts";
 import { documentsNaming } from "./documents.ts";
 import { soughtIdentifiersOf, type SoughtIdentifier } from "./identifiers.ts";
+import type { SubjectNamed } from "./needles.ts";
 import { askersOf } from "./questions.ts";
 import type { SubjectIdentifiers, SubjectRequest } from "./requests.ts";
 
@@ -53,11 +53,9 @@ type SubjectHere = {
 
   readonly emails: readonly string[];
 
-  readonly actor: ActorId | null;
-
   readonly memberId: string | null;
 
-  readonly needles: readonly string[];
+  readonly needles: Needles;
 
   readonly identifiers: readonly SoughtIdentifier[];
 };
@@ -96,7 +94,7 @@ const aboutTheActors = async (
   subject: SubjectHere,
   statement: string,
 ): Promise<readonly string[]> => {
-  const actors = askersOf([subject.actor, subject.memberId]);
+  const actors = askersOf(subject.needles.people);
   return actors.length === 0 ? [] : located(tx, statement, [subject.workspaceId, actors]);
 };
 
@@ -113,19 +111,13 @@ const rowsOfThePersonIn =
   (platform, subject, tx) =>
     aboutTheMember(tx, subject, `SELECT id AS location FROM ${table} WHERE user_id = $1`);
 
-const MEMBER_HERE = `SELECT u.id AS location
-     FROM "user" u
-     JOIN member m ON m.user_id = u.id
-    WHERE m.workspace_id = $1 AND (u.id = $2 OR lower(u.email) = ANY($3))
-    LIMIT 1`;
-
-const SIGN_IN_ADDRESSES = `SELECT email AS location FROM "user" WHERE id = ANY($1::text[])`;
-
 const ERASURE_FAMILY_DESCRIPTORS = {
   "concept-file": {
     categories: ["actor-id", "email-address", "name"],
     find: async (platform, subject, tx, door) => {
-      const named = await historyNaming(platform, door, subject.workspaceId, subject.needles);
+      const named = await historyNaming(platform, door, subject.workspaceId, [
+        ...new Set([...subject.emails, ...subject.needles.addresses, ...subject.needles.people]),
+      ]);
       return [
         ...named.blobs.map((blob) => `${blob.commit}:${blob.path}`),
         ...named.authors.map((sha) => `${sha} (author line)`),
@@ -300,7 +292,7 @@ const ERASURE_FAMILY_DESCRIPTORS = {
       located(
         tx,
         "SELECT concept_write_requests_naming AS location FROM concept_write_requests_naming($1, $2)",
-        [askersOf([subject.actor, subject.memberId]), subject.emails],
+        [subject.needles.people, subject.needles.addresses],
       ),
   },
 } satisfies Record<ErasureFamily, ErasureFamilyDescriptor>;
@@ -311,33 +303,22 @@ const soughtWithTheSignInAddresses = (
 ): readonly SoughtIdentifier[] =>
   soughtIdentifiersOf({ ...identifiers, emails: [...identifiers.emails, ...signInAddresses] });
 
-const subjectHereOf = async (tx: Tx, request: SubjectRequest): Promise<SubjectHere> => {
-  const emails = request.identifiers.emails.map((email) => email.trim().toLowerCase());
-
-  const personId =
-    request.personId === null ? null : boundarySchemas.user.select.shape.id.parse(request.personId);
-  const [memberId = null] = await located(tx, MEMBER_HERE, [request.workspaceId, personId, emails]);
-  const signInAddresses = await located(tx, SIGN_IN_ADDRESSES, [
-    [memberId, personId].filter((id) => id !== null),
-  ]);
-  return {
-    workspaceId: request.workspaceId,
-    emails,
-    actor: personId === null ? null : actorIdOfPerson(personId),
-    memberId,
-
-    needles: personId === null ? emails : [...emails, personId],
-    identifiers: soughtWithTheSignInAddresses(request.identifiers, signInAddresses),
-  };
-};
+const subjectHereOf = (request: SubjectRequest, named: SubjectNamed): SubjectHere => ({
+  workspaceId: request.workspaceId,
+  emails: request.identifiers.emails.map((email) => email.trim().toLowerCase()),
+  memberId: named.member,
+  needles: named.needles,
+  identifiers: soughtWithTheSignInAddresses(request.identifiers, named.signInAddresses),
+});
 
 export const erasureMapOf = async (
   platform: PlatformPrincipal,
   tx: Tx,
   door: GitDoor,
   request: SubjectRequest,
+  named: SubjectNamed,
 ): Promise<ErasureMap> => {
-  const subject = await subjectHereOf(tx, request);
+  const subject = subjectHereOf(request, named);
 
   const entries: ErasureMapEntry[] = [];
   for (const family of ERASURE_FAMILIES) {

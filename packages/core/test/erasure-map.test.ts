@@ -9,6 +9,7 @@ import {
   accessAnswerOf,
   ERASURE_FAMILIES,
   erasureMapOf,
+  subjectNamedBy,
   subjectRequestFor,
   type AccessAnswer,
   type ErasureFamily,
@@ -72,8 +73,8 @@ const requestFor = async (
 };
 
 const mapOf = (scenario: Scenario, request: SubjectRequest): Promise<ErasureMap> =>
-  withScope(bootstrap, scenario.postgres, scenario.workspaceId, (tx, platform) =>
-    erasureMapOf(platform, tx, scenario.git, request),
+  withScope(bootstrap, scenario.postgres, scenario.workspaceId, async (tx, platform) =>
+    erasureMapOf(platform, tx, scenario.git, request, await subjectNamedBy(tx, request, null)),
   );
 
 const conceptFileBy = async (
@@ -204,8 +205,9 @@ describe("the erasure map's union", () => {
       "concept-write-request": findsNothing,
     };
 
-    expect(Object.keys(withoutADocumentFinder)).toHaveLength(18);
-    expect(ERASURE_FAMILIES).toHaveLength(19);
+    expect(ERASURE_FAMILIES.filter((family) => !(family in withoutADocumentFinder))).toEqual([
+      "source-document",
+    ]);
   });
 });
 

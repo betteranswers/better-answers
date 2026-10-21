@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { acceptSuggestions, submitSuggestionSet } from "../src/concepts/index.ts";
+import { acceptSuggestions, submitSuggestionSet, type Frontmatter } from "../src/concepts/index.ts";
 import { ERASURE, runErasure } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type UserPrincipal } from "../src/kernel/index.ts";
-import { authorLinesOf } from "./bundle.ts";
+import { authorLinesOf, everyObjectOf } from "./bundle.ts";
 import { erasureDoorsFor } from "./erasure-doors.ts";
 import { objectStoreForSuite } from "./suite-objects.ts";
 import { addressOf, seedingWith } from "./suite-postgres.ts";
@@ -15,7 +15,11 @@ const objects = objectStoreForSuite();
 
 const LOCKED_AT = new Date("2026-06-01T12:00:00.000Z");
 
-const erasing = async (scenario: Scenario, person: { readonly id: string }, email: string) => {
+const erasing = async (
+  scenario: Scenario,
+  person: { readonly id: string | null },
+  email: string,
+) => {
   const request = await seedingWith(db().pool, (seed) =>
     seed.subjectRequest({
       workspaceId: scenario.workspaceId,
@@ -33,7 +37,9 @@ const erasing = async (scenario: Scenario, person: { readonly id: string }, emai
     "SELECT pseudonym FROM erasure_request WHERE workspace_id = $1",
     [scenario.workspaceId],
   );
-  return { run: run.value, erasedAs: `human:${erased.rows[0]?.pseudonym ?? ""}` };
+  const [row] = erased.rows;
+  if (row === undefined) throw new Error("the routine opened no erasure row");
+  return { run: run.value, erasedAs: `human:${row.pseudonym}` };
 };
 
 const aMemberToErase = async () => {
@@ -244,12 +250,38 @@ describe("a write request that names the person", () => {
       frontmatter: anothers.frontmatter,
       body: anothers.body,
     });
-    expect(run.report).toContain("concept-write-request: actorsRewritten 1, found 1");
+    expect(run.report).toContain(
+      "concept-write-request: actorsRewritten 1, bodiesReplaced 0, found 1",
+    );
+  });
+
+  it("rewrites the address of a subject with no user row", async () => {
+    const scenario = await arrange();
+    const email = addressOf("stranger");
+    const naming = await seedingWith(db().pool, (seed) =>
+      seed.conceptWriteRequest({
+        workspaceId: scenario.workspaceId,
+        body: `Ask human:${email} about expenses.`,
+      }),
+    );
+
+    const { run, erasedAs } = await erasing(scenario, { id: null }, email);
+
+    expect(await requestOf(scenario.workspaceId, naming.suggestionId)).toEqual(
+      expect.objectContaining({ body: `Ask ${erasedAs} about expenses.` }),
+    );
+    expect(run.report).toContain(
+      "concept-write-request: actorsRewritten 1, bodiesReplaced 0, found 1",
+    );
   });
 });
 
-describe("an accepted edit the person proposed", () => {
-  const proposedAndAccepted = async (scenario: Scenario, proposer: UserPrincipal) => {
+describe("an edit the person proposed", () => {
+  const proposed = async (
+    scenario: Scenario,
+    proposer: UserPrincipal,
+    named: { readonly frontmatter?: Frontmatter; readonly body?: string } = {},
+  ): Promise<readonly string[]> => {
     const set = await submitSuggestionSet(
       proposer,
       { postgres: scenario.postgres },
@@ -261,37 +293,50 @@ describe("an accepted edit the person proposed", () => {
             path: "knowledge/expenses.md",
             conceptKind: "Policy",
             title: "Expenses",
-            frontmatter: { title: "Expenses", type: "Policy" },
-            body: "Expenses are claimed within sixty days.",
+            frontmatter: named.frontmatter ?? { title: "Expenses", type: "Policy" },
+            body: named.body ?? "Expenses are claimed within sixty days.",
           },
         ],
       },
     );
     if (!set.ok) throw new Error(`the set was not submitted: ${String(set.error)}`);
-    const accepted = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
-      decisions: set.value.suggestionIds.map((suggestionId) => ({
-        suggestionId,
-        expectedTarget: null,
-      })),
+    return set.value.suggestionIds;
+  };
+
+  const accepted = async (scenario: Scenario, suggestionIds: readonly string[]) => {
+    const decided = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+      decisions: suggestionIds.map((suggestionId) => ({ suggestionId, expectedTarget: null })),
     });
-    if (!accepted.ok || !accepted.value.every((each) => each.outcome.ok)) {
+    if (!decided.ok || !decided.value.every((each) => each.outcome.ok)) {
       throw new Error("the acceptance was refused");
     }
   };
 
-  it("leaves the proposer on no author line", async () => {
-    const scenario = await arrange();
-    const proposer = await db().pool.query<{ author: string; email: string }>(
+  const theProposer = async (scenario: Scenario) => {
+    const found = await db().pool.query<{ author: string; email: string }>(
       `SELECT name || ' <' || email || '>' AS author, email FROM "user" WHERE id = $1`,
       [scenario.editor.userId],
     );
-    const { author, email } = proposer.rows[0] ?? { author: "", email: "" };
-    await proposedAndAccepted(scenario, scenario.editor);
-    const actors = await db().pool.query<{ actor: string }>(
-      "SELECT actor FROM bundle_commit WHERE workspace_id = $1",
-      [scenario.workspaceId],
-    );
-    expect(actors.rows).toEqual([{ actor: actorIdOfPerson(scenario.admin.userId) }]);
+    const [row] = found.rows;
+    if (row === undefined) throw new Error("the proposer has no user row");
+    return row;
+  };
+
+  const actorsIn = async (workspaceId: string) =>
+    (
+      await db().pool.query<{ actor: string }>(
+        "SELECT actor FROM bundle_commit WHERE workspace_id = $1",
+        [workspaceId],
+      )
+    ).rows;
+
+  it("rewrites the proposer's author line once their edit was accepted", async () => {
+    const scenario = await arrange();
+    const { author, email } = await theProposer(scenario);
+    await accepted(scenario, await proposed(scenario, scenario.editor));
+    expect(await actorsIn(scenario.workspaceId)).toEqual([
+      { actor: actorIdOfPerson(scenario.admin.userId) },
+    ]);
     expect(await authorLinesOf(scenario.git, scenario.workspaceId)).toEqual([author]);
 
     const { erasedAs } = await erasing(scenario, { id: scenario.editor.userId }, email);
@@ -299,6 +344,31 @@ describe("an accepted edit the person proposed", () => {
     const pseudonym = erasedAs.slice("human:".length);
     expect(await authorLinesOf(scenario.git, scenario.workspaceId)).toEqual([
       `${erasedAs} <${pseudonym}@erased.better-answers.invalid>`,
+    ]);
+  });
+
+  it("writes no trace of the person when accepted after erasure", async () => {
+    const scenario = await arrange();
+    const { email } = await theProposer(scenario);
+    const actor = actorIdOfPerson(scenario.editor.userId);
+    const waiting = await proposed(scenario, scenario.editor, {
+      frontmatter: { title: "Expenses", type: "Policy", verified: [{ by: `human:${email}` }] },
+      body: `Ask ${actor} about expenses.`,
+    });
+
+    const { erasedAs } = await erasing(scenario, { id: scenario.editor.userId }, email);
+    await accepted(scenario, waiting);
+
+    const written = await everyObjectOf(scenario.git, scenario.workspaceId);
+    expect(written).toContain(`Ask ${erasedAs} about expenses.`);
+    for (const trace of [email, scenario.editor.userId]) {
+      expect(written.toLowerCase()).not.toContain(trace.toLowerCase());
+      expect((await authorLinesOf(scenario.git, scenario.workspaceId)).join("\n")).not.toContain(
+        trace,
+      );
+    }
+    expect(await actorsIn(scenario.workspaceId)).toEqual([
+      { actor: actorIdOfPerson(scenario.admin.userId) },
     ]);
   });
 });

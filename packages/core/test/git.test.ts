@@ -9,10 +9,12 @@ import {
   commit,
   commitsAfter,
   fileAt,
+  fileAtHead,
   head,
   historyNaming,
   initRepository,
   openGit,
+  rewriteHistory,
   withRepositoryLock,
   type CommitRequest,
   type GitDoor,
@@ -521,6 +523,30 @@ describe("what a bundle's history names", () => {
     await expect(
       historyNaming(PLATFORM, bundle.door, bundle.workspaceId, [SUBJECT_EMAIL]),
     ).rejects.toThrow(/unable to read/);
+  });
+});
+
+describe("a rewrite of the history by address", () => {
+  it("leaves a longer address that begins with the erased one", async () => {
+    const bundle = await arrange();
+    await commit(
+      bundle.principal,
+      bundle.door,
+      requestFor({
+        content: "Ask human:a@b.com, human:a@b.co.uk or human:A@B.CO.\n",
+      }),
+    );
+    const pseudonym = ulid();
+
+    await rewriteHistory(PLATFORM, bundle.door, bundle.workspaceId, {
+      addresses: ["a@b.co"],
+      people: [],
+      pseudonym,
+    });
+
+    expect(await fileAtHead(bundle.principal, bundle.door, "knowledge/expenses.md")).toBe(
+      `Ask human:a@b.com, human:a@b.co.uk or human:${pseudonym}.\n`,
+    );
   });
 });
 
