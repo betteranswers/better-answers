@@ -83,7 +83,7 @@ describe("the owner's decision reading on reuse", () => {
           gbpPerMillionIn: poundsOf(usdIn, rate),
           gbpPerMillionOut: "0",
           key: told.READING_WORKERS_AI_KEY,
-          decide: clientFor().decide,
+          decideYesNo: clientFor().decideYesNo,
           threshold,
         });
         const priced = `$${usdIn} in per million tokens and nothing out, at £${rate} to the dollar`;
@@ -153,6 +153,7 @@ describe("the owner's decision reading at the entry step", () => {
         provider: "cloudflare",
         model,
         key: { reveal: () => told.READING_WORKERS_AI_KEY },
+        threshold: undefined,
       };
       const { decide } = clientFor();
       const doors = {

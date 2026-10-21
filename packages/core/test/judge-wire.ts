@@ -3,7 +3,7 @@ import { z } from "zod";
 import { conceptIriOf, WELL_FORMED_ULID } from "@better-answers/schema";
 
 import type { ReturnedConcept } from "../src/answering/index.ts";
-import { openModelClient, type ModelClient } from "../src/llm/index.ts";
+import { openModelClient, type ModelAttemptLine, type ModelClient } from "../src/llm/index.ts";
 
 export const A_CANDIDATE: ReturnedConcept = {
   iri: conceptIriOf(WELL_FORMED_ULID.parse("01J6AAAAAAAAAAAAAAAAAAAAAA")),
@@ -25,10 +25,17 @@ export const A_CANDIDATE: ReturnedConcept = {
 
 export type WireSent = { readonly url: string; readonly headers: unknown; readonly body: string };
 
+export type WireLogged = { readonly line: ModelAttemptLine; readonly message: string };
+
 export const clientAnswering = (
   answer: (body: string) => Promise<Response>,
-): { readonly sent: WireSent[]; readonly client: ModelClient } => {
+): {
+  readonly sent: WireSent[];
+  readonly logged: WireLogged[];
+  readonly client: ModelClient;
+} => {
   const sent: WireSent[] = [];
+  const logged: WireLogged[] = [];
   const client = openModelClient({
     fetch: async (input, init) => {
       const body = typeof init?.body === "string" ? init.body : "";
@@ -37,9 +44,9 @@ export const clientAnswering = (
       return answer(body);
     },
     clock: { now: () => new Date() },
-    log: { info: () => {} },
+    log: { info: (line, message) => logged.push({ line, message }) },
   });
-  return { sent, client };
+  return { sent, logged, client };
 };
 
 const messagesBody = z.object({ messages: z.array(z.object({ content: z.string() })) });

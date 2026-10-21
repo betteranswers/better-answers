@@ -13,6 +13,7 @@ import {
   primaryKey,
   text,
 } from "drizzle-orm/pg-core";
+import { z } from "zod";
 
 import { listed, stamp } from "./column-helpers.ts";
 import { questionAsked } from "./question-tables.ts";
@@ -151,5 +152,22 @@ export const modelPrice = pgTable(
     primaryKey({ columns: [table.provider, table.model, table.effectiveFrom] }),
     check("model_price_provider_check", sql.raw(`provider IN (${listed(MODEL_PROVIDERS)})`)),
     check("model_price_rates_check", sql`gbp_per_million_in >= 0 AND gbp_per_million_out >= 0`),
+  ],
+);
+
+export const DECISION_THRESHOLD = z.number().gt(0).lt(1).brand<"DecisionThreshold">();
+export type DecisionThreshold = z.infer<typeof DECISION_THRESHOLD>;
+
+export const decisionThreshold = pgTable(
+  "decision_threshold",
+  {
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    threshold: doublePrecision("threshold").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.provider, table.model] }),
+    check("decision_threshold_provider_check", sql.raw(`provider IN (${listed(MODEL_PROVIDERS)})`)),
+    check("decision_threshold_probability_check", sql`threshold > 0 AND threshold < 1`),
   ],
 );

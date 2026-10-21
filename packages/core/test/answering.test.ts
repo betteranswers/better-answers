@@ -745,7 +745,7 @@ describe("what the slice's four actions answer", () => {
       read: aStepRan,
       reserve: aStepRan,
       callModel: aStepRan,
-      decide: aStepRan,
+      decideYesNo: aStepRan,
       completeRecord: aStepRan,
     };
 

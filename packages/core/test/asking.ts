@@ -59,7 +59,7 @@ export const SUITE_ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index)
 export type Judging = {
   readonly credentials?: Credentials;
   readonly callModel?: ModelClient["callModel"];
-  readonly decide?: ModelClient["decide"];
+  readonly decideYesNo?: ModelClient["decideYesNo"];
 };
 
 const NO_MODEL_CALL = (): never => {
@@ -88,7 +88,7 @@ export const stepsFor = (
         ),
       ),
     callModel: judging.callModel ?? NO_MODEL_CALL,
-    decide: judging.decide ?? NO_MODEL_CALL,
+    decideYesNo: judging.decideYesNo ?? NO_MODEL_CALL,
     completeRecord: async (completion) =>
       flat(
         await withMember(asker, door, (member, tx) =>

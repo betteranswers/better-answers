@@ -43,6 +43,7 @@ import {
   CHOOSABLE_PROVIDERS,
   FIXED_PURPOSE,
   LLM_PURPOSES,
+  DECISION_PROVIDERS,
   type ModelKeySetting,
 } from "@better-answers/core/llm";
 import {
@@ -70,6 +71,7 @@ import {
   provisionWorkspace,
   renameWorkspace,
   restoreSignIn,
+  setDecisionThreshold,
   setModelChoice,
   setModelKey,
   setModelPrice,
@@ -79,6 +81,7 @@ import {
   type AddPersonRefusal,
   type ProvisionRefusal,
   type RenameRefusal,
+  type SetDecisionThresholdRefusal,
   type SetModelChoiceRefusal,
   type SetModelKeyRefusal,
   type SetSpendingLimitRefusal,
@@ -89,6 +92,7 @@ import {
   conceptIndex,
   conceptVerification,
   connectedSource,
+  decisionThreshold,
   erasureRequest,
   mapEdge,
   mapGeneration,
@@ -197,7 +201,7 @@ const NEEDS = {
   "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
   "set-model-key": [modelKey],
   "set-spending-limit": [llmCall, spendReservation],
-  "set-model-choice": [modelChoice, modelPrice],
+  "set-model-choice": [modelChoice, modelPrice, decisionThreshold],
 };
 
 type SliceCommand = keyof typeof NEEDS;
@@ -247,6 +251,8 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
                                                             the model the workspace calls for that purpose, priced and named by the DPIA; a second run replaces it
   set-model-price --provider <${MODEL_PROVIDERS.join("|")}> --model <model> --from <yyyy-mm-dd> --gbp-per-million-in <pounds> --gbp-per-million-out <pounds>
                                                             what a model costs from that day on, per million tokens sent and returned; a model with no price is never called
+  set-decision-threshold --provider <${DECISION_PROVIDERS.join("|")}> --model <model> --threshold <probability>
+                                                            the probability at or above which a decision model's yes is taken; a second run replaces it, and with none set the model never judges
   operator --email <email> --grant|--revoke                 a signed-in person made the platform's operator, or no longer; each change on the identity-set audit log
   restore-sign-in --email <email>                           a person who lost every factor and code, once you have checked who they are another way: their factors and sessions ended, a notice sent, a one-time restore code printed
   import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <sensitivity>] [--dry-run]
@@ -1320,6 +1326,8 @@ const modelChoiceReason = (
       return noSuchWorkspace(asked.workspaceId);
     case "fixed-model-choice":
       return "fixed-model-choice: the embedding model is fixed, since the index's vectors are its own; nothing changed";
+    case "no-decision-threshold":
+      return `no-decision-threshold: ${asked.provider} ${asked.model} is a decision model with no threshold; set one with set-decision-threshold first; nothing changed`;
     case "no-sub-processor":
       return `no-sub-processor: ${asked.provider} is no model provider the DPIA names as a sub-processor (${[...CHOOSABLE_PROVIDERS].join(" · ")}); nothing changed`;
     case "no-model-price":
@@ -1399,6 +1407,51 @@ const setModelPriceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Prom
     `set-model-price: done — ${set.value.provider} ${set.value.model} is priced from ${set.value.effectiveFrom}`,
   );
   return DONE;
+};
+
+const THRESHOLD_FLAGS = ["provider", "model", "threshold"] as const;
+
+const THRESHOLD_NAMED = `--provider <${DECISION_PROVIDERS.join("|")}>, --model <model> and --threshold <probability>`;
+
+const THRESHOLD_USAGE = `set-decision-threshold: ${THRESHOLD_NAMED} are required`;
+
+const setDecisionThresholdCommand = async (
+  doors: Doors,
+  flags: Flags,
+  io: OpsIo,
+): Promise<number> => {
+  const [provider, model, threshold] = THRESHOLD_FLAGS.map((name) => flagValue(flags, name));
+  if (provider === undefined || model === undefined || threshold === undefined) {
+    io.say(THRESHOLD_USAGE);
+    return USAGE;
+  }
+  const table = getTableName(decisionThreshold);
+  if ((await tablesPresent(doors.postgres, [table])).length === 0) {
+    io.say(`set-decision-threshold: not built — ${table} absent from this schema`);
+    return NOT_BUILT;
+  }
+  const set = await setDecisionThreshold(BOOTSTRAP, doors.postgres, { provider, model, threshold });
+  if (!set.ok) {
+    io.say(`set-decision-threshold: REFUSED — ${thresholdReason(set.error, provider)}`);
+    return exitOf(set.error);
+  }
+  io.say(
+    `set-decision-threshold: done — ${set.value.provider} ${set.value.model} judges at ${String(set.value.threshold)}`,
+  );
+  return DONE;
+};
+
+const thresholdReason = (
+  refusal: SetDecisionThresholdRefusal | Error,
+  provider: string,
+): string => {
+  if (refusal instanceof Error) return refusal.message;
+  switch (refusal) {
+    case "malformed":
+      return `malformed: ${THRESHOLD_NAMED}, the model lower case letters, digits, dots and hyphens and the threshold a decimal between 0 and 1, such as 0.7`;
+    case "not-a-decision-model":
+      return `not-a-decision-model: ${provider} speaks no decision shape; only ${DECISION_PROVIDERS.join(" · ")} take a threshold; nothing changed`;
+  }
 };
 
 const OPERATOR_USAGE = "operator: --email <email> and one of --grant or --revoke are required";
@@ -1536,6 +1589,7 @@ const SLICELESS_COMMANDS = new Map<
   ["add-member", addMemberCommand],
   ["rename-workspace", renameWorkspaceCommand],
   ["set-model-price", setModelPriceCommand],
+  ["set-decision-threshold", setDecisionThresholdCommand],
   ["operator", operatorCommand],
   ["restore-sign-in", restoreSignInCommand],
 ]);

@@ -24,6 +24,8 @@ export {
   openModelClient,
   resolveModel,
   RETRY_WAITS_MS,
+  DECISION_PROVIDERS,
+  speaksDecision,
   wireShapeOf,
 } from "./client.ts";
 export type {
@@ -52,6 +54,8 @@ export {
 export type { CallSize, CallSpent } from "./spend.ts";
 export { storeModelPrice } from "./price.ts";
 export type { ModelPrice } from "./price.ts";
+export { decisionThresholdOf, storeDecisionThreshold } from "./threshold.ts";
+export type { StoredDecisionThreshold } from "./threshold.ts";
 
 export const LLM_PURPOSES = llmPurpose.enumValues;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];

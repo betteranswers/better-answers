@@ -26,6 +26,7 @@ const TO_SONNET: ModelToCall = {
   provider: "anthropic",
   model: SONNET,
   key: { reveal: () => A_KEY },
+  threshold: undefined,
 };
 
 const A_CALL: StreamedCall = { system: SYSTEM, prompt: PROMPT, most: MOST };

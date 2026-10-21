@@ -88,8 +88,8 @@ export const stepsFor = (
   reserve: reservingBy(reserveJudge, doors, asker),
   callModel: (to, call) =>
     doors.models.callModel(to, leaving === undefined ? call : { ...call, signal: leaving }),
-  decide: (to, call) =>
-    doors.models.decide(to, leaving === undefined ? call : { ...call, signal: leaving }),
+  decideYesNo: (to, call) =>
+    doors.models.decideYesNo(to, leaving === undefined ? call : { ...call, signal: leaving }),
   completeRecord: (completion) =>
     steppedAs(withMember, doors.door, asker, (member, tx) =>
       completeRecord(member, tx, { ...completion, completedAt: doors.clock.now() }),

@@ -49,6 +49,7 @@ import {
   conceptIndex,
   conceptVerification,
   connectedSource,
+  decisionThreshold,
   erasureRequest,
   ids,
   mapEdge,
@@ -220,7 +221,7 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
   "set-spending-limit": [llmCall, spendReservation],
   "set-model-key": [modelKey],
-  "set-model-choice": [modelChoice, modelPrice],
+  "set-model-choice": [modelChoice, modelPrice, decisionThreshold],
 };
 
 const idOnTheDoneLine = (run: Run): string => {
@@ -2923,6 +2924,107 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
+  describe("set-decision-threshold — the platform sets a decision model's threshold", () => {
+    const thresholding = (
+      app: TestApp,
+      provider: string,
+      model: string,
+      threshold: string,
+    ): Promise<Run> =>
+      ops(app, [
+        "set-decision-threshold",
+        "--provider",
+        provider,
+        "--model",
+        model,
+        "--threshold",
+        threshold,
+      ]);
+
+    const thresholdsHeld = async (app: TestApp, model: string) => {
+      const held = await app.database.superuser.query(
+        "SELECT provider, threshold FROM decision_threshold WHERE model = $1",
+        [model],
+      );
+      return held.rows;
+    };
+
+    const aModel = (): string => `clef-${ulid().toLowerCase()}`;
+
+    it("sets the threshold, and a second run replaces it", async () => {
+      const model = aModel();
+
+      const first = await thresholding(app(), "cloudflare", model, "0.7");
+      const again = await thresholding(app(), "cloudflare", model, "0.65");
+
+      expect([first, again].map(({ exitCode, lines }) => ({ exitCode, lines }))).toEqual([
+        {
+          exitCode: 0,
+          lines: [`set-decision-threshold: done — cloudflare ${model} judges at 0.7`],
+        },
+        {
+          exitCode: 0,
+          lines: [`set-decision-threshold: done — cloudflare ${model} judges at 0.65`],
+        },
+      ]);
+      expect(await thresholdsHeld(app(), model)).toEqual([
+        { provider: "cloudflare", threshold: 0.65 },
+      ]);
+    });
+
+    it("refuses a threshold outside nought and one, writing nothing", async () => {
+      const model = aModel();
+
+      const run = await thresholding(app(), "cloudflare", model, "1");
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 2,
+        lines: [
+          "set-decision-threshold: REFUSED — malformed: --provider <cloudflare>, --model <model> and --threshold <probability>, the model lower case letters, digits, dots and hyphens and the threshold a decimal between 0 and 1, such as 0.7",
+        ],
+      });
+      expect(await thresholdsHeld(app(), model)).toEqual([]);
+    });
+
+    it("refuses anthropic as not a decision model", async () => {
+      const model = aModel();
+
+      const run = await thresholding(app(), "anthropic", model, "0.7");
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 7,
+        lines: [
+          "set-decision-threshold: REFUSED — not-a-decision-model: anthropic speaks no decision shape; only cloudflare take a threshold; nothing changed",
+        ],
+      });
+      expect(await thresholdsHeld(app(), model)).toEqual([]);
+    });
+
+    it("answers usage with the threshold missing, as help names it", async () => {
+      const model = aModel();
+
+      const run = await ops(app(), [
+        "set-decision-threshold",
+        "--provider",
+        "cloudflare",
+        "--model",
+        model,
+      ]);
+      const help = await ops(app(), ["help"]);
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 2,
+        lines: [
+          "set-decision-threshold: --provider <cloudflare>, --model <model> and --threshold <probability> are required",
+        ],
+      });
+      expect(await thresholdsHeld(app(), model)).toEqual([]);
+      expect(help.lines.join("\n")).toContain(
+        "set-decision-threshold --provider <cloudflare> --model <model> --threshold <probability>",
+      );
+    });
+  });
+
   describe("set-model-choice — the platform chooses a workspace's model", () => {
     const HAIKU = "claude-haiku-5-5";
 
@@ -3016,6 +3118,20 @@ describe("pnpm ops — the restore scripts' commands", () => {
         exitCode: 9,
         lines: [
           "set-model-choice: REFUSED — no-sub-processor: local is no model provider the DPIA names as a sub-processor (anthropic · mistral); nothing changed",
+        ],
+      });
+      expect(await choicesHeld(app(), workspaceId)).toEqual([]);
+    });
+
+    it("refuses cloudflare with no threshold, naming the command", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await choosing(app(), workspaceId, "cloudflare");
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 9,
+        lines: [
+          `set-model-choice: REFUSED — no-decision-threshold: cloudflare ${HAIKU} is a decision model with no threshold; set one with set-decision-threshold first; nothing changed`,
         ],
       });
       expect(await choicesHeld(app(), workspaceId)).toEqual([]);

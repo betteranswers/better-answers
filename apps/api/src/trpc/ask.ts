@@ -51,21 +51,13 @@ const answered = async (
   }
   const doors = { door: ctx.doors.postgres, clock: ctx.clock, ...ctx.modelDoors };
   const steps = stepsFor(doors, ctx.principal, "trpc", leaving);
-  let judgingSaid = false;
-  const sayJudging = (): void => {
-    if (!judgingSaid) emit({ kind: "phase", phase: "judging" });
-    judgingSaid = true;
-  };
   const judging = {
     ...steps,
-    callModel: ((to, call) => {
-      sayJudging();
-      return steps.callModel(to, call);
-    }) satisfies typeof steps.callModel,
-    decide: ((to, call) => {
-      sayJudging();
-      return steps.decide(to, call);
-    }) satisfies typeof steps.decide,
+    reserve: (async (reserving) => {
+      const reserved = await steps.reserve(reserving);
+      if (reserved.ok && reserved.value !== undefined) emit({ kind: "phase", phase: "judging" });
+      return reserved;
+    }) satisfies typeof steps.reserve,
   };
   const result = await crossing(
     ctx,

@@ -152,7 +152,7 @@ describe("the reuse reading", () => {
         gbpPerMillionIn: "0.03",
         gbpPerMillionOut: "0",
         key: "0123456789abcdef0123456789abcdef:invented_Token-u15",
-        decide: client.decide,
+        decideYesNo: client.decideYesNo,
         threshold,
       });
 

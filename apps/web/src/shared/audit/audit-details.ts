@@ -81,6 +81,7 @@ const VALUE_LABELS = new Map(
     effectiveFrom: "Priced from",
     gbpPerMillionIn: "£ per million tokens in",
     gbpPerMillionOut: "£ per million tokens out",
+    threshold: "Yes at or above",
     grants: "Access ended",
     closedAs: "Closed as",
     sessions: "Sessions signed out",

@@ -83,6 +83,9 @@ const NO_MODEL: ModelClient & StreamingClient = {
   decide: () => {
     throw new Error("a probe called a model");
   },
+  decideYesNo: () => {
+    throw new Error("a probe called a model");
+  },
   streamModel: () => {
     throw new Error("a probe called a model");
   },
@@ -193,7 +196,7 @@ describe("every entry the server composes", () => {
 describe("the steps the own-transaction road hands an entry", () => {
   it("are the record's writes, a read, a reservation, a call", () => {
     expectTypeOf<keyof Steps>().toEqualTypeOf<
-      "openRecord" | "read" | "reserve" | "callModel" | "decide" | "completeRecord"
+      "openRecord" | "read" | "reserve" | "callModel" | "decideYesNo" | "completeRecord"
     >();
   });
 

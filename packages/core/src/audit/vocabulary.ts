@@ -7,6 +7,7 @@ import {
   CALENDAR_DAY,
   CONTENT_HASH,
   DECIMAL_STRING,
+  DECISION_THRESHOLD,
   FAMILIES,
   FLAG_CLOSINGS,
   type FlagClosing,
@@ -108,6 +109,7 @@ export const DETAIL_KINDS = {
     typeof value === "string" && llmPurpose.enumValues.some((purpose) => purpose === value),
   day: (value: DetailValue) => typeof value === "string" && CALENDAR_DAY.test(value),
   gbp: (value: DetailValue) => typeof value === "string" && DECIMAL_STRING.test(value),
+  decisionThreshold: (value: DetailValue) => DECISION_THRESHOLD.safeParse(value).success,
   flagClosing: (value: DetailValue) =>
     typeof value === "string" && FLAG_CLOSINGS.some((closing) => closing === value),
 } as const;
@@ -124,7 +126,7 @@ type DetailValueOf<K extends DetailKind> = K extends "role"
   ? Role
   : K extends "flag" | "flag?"
     ? boolean
-    : K extends "count"
+    : K extends "count" | "decisionThreshold"
       ? number
       : K extends "grants"
         ? readonly EndedGrant[]

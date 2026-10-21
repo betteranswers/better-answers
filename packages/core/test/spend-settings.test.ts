@@ -4,7 +4,7 @@ import { ulid } from "@better-answers/schema";
 
 import type { PlatformPrincipal } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
-import { setModelPrice, setSpendingLimit } from "../src/workspaces/index.ts";
+import { setDecisionThreshold, setModelPrice, setSpendingLimit } from "../src/workspaces/index.ts";
 import { provisionedWorkspace } from "./platform.ts";
 import { postgresForSuite, whileWritesAreRefused } from "./suite-postgres.ts";
 
@@ -124,5 +124,114 @@ describe("a model's price", () => {
     const refused = await whileWritesAreRefused(db().pool, "model_price", () => pricing());
 
     expect(refused.ok ? "set" : refused.error).toBeInstanceOf(Error);
+  });
+});
+
+const aModel = () => `clef-${ulid().toLowerCase()}`;
+
+const thresholding = (
+  model: string,
+  overrides: { readonly provider?: string; readonly model?: string; readonly threshold?: string },
+) =>
+  setDecisionThreshold(PLATFORM, openPostgres(db().pool), {
+    provider: "cloudflare",
+    model,
+    threshold: "0.7",
+    ...overrides,
+  });
+
+const thresholdsHeld = async (model: string) => {
+  const stored = await db().pool.query(
+    "SELECT provider, threshold FROM decision_threshold WHERE model = $1",
+    [model],
+  );
+  const recorded = await db().pool.query(
+    `SELECT actor, subject_id, detail FROM identity_audit_event
+      WHERE action = 'platform.model.threshold_set' AND detail->>'model' = $1 ORDER BY at, id`,
+    [model],
+  );
+  return { stored: stored.rows, recorded: recorded.rows };
+};
+
+describe("a decision model's threshold", () => {
+  it("stores a threshold and records who set it", async () => {
+    const model = aModel();
+
+    expect(await thresholding(model, {})).toEqual({
+      ok: true,
+      value: { provider: "cloudflare", model, threshold: 0.7 },
+    });
+    expect(await thresholdsHeld(model)).toEqual({
+      stored: [{ provider: "cloudflare", threshold: 0.7 }],
+      recorded: [
+        {
+          actor: PLATFORM.actorId,
+          subject_id: `cloudflare/${model}`,
+          detail: { provider: "cloudflare", model, threshold: 0.7 },
+        },
+      ],
+    });
+  });
+
+  it("replaces a threshold set before, recording each", async () => {
+    const model = aModel();
+
+    await thresholding(model, {});
+    const second = await thresholding(model, { threshold: "0.65" });
+
+    expect(second).toEqual({
+      ok: true,
+      value: { provider: "cloudflare", model, threshold: 0.65 },
+    });
+    expect(await thresholdsHeld(model)).toEqual({
+      stored: [{ provider: "cloudflare", threshold: 0.65 }],
+      recorded: [0.7, 0.65].map((threshold) => ({
+        actor: PLATFORM.actorId,
+        subject_id: `cloudflare/${model}`,
+        detail: { provider: "cloudflare", model, threshold },
+      })),
+    });
+  });
+
+  it.each([
+    ["nought", { threshold: "0" }],
+    ["one", { threshold: "1" }],
+    ["one and a half", { threshold: "1.5" }],
+    ["a word", { threshold: "abc" }],
+    ["a bare fraction", { threshold: ".5" }],
+    ["a provider outside the three", { provider: "openai" }],
+  ])("refuses %s as malformed, writing nothing", async (_shape, overrides) => {
+    const model = aModel();
+
+    expect(await thresholding(model, overrides)).toEqual({ ok: false, error: "malformed" });
+    expect(await thresholdsHeld(model)).toEqual({ stored: [], recorded: [] });
+  });
+
+  it("refuses a model name with capitals as malformed", async () => {
+    expect(await thresholding(aModel(), { model: "Clef Flash" })).toEqual({
+      ok: false,
+      error: "malformed",
+    });
+  });
+
+  it("refuses a messages provider as not a decision model", async () => {
+    const model = aModel();
+
+    expect(await thresholding(model, { provider: "anthropic" })).toEqual({
+      ok: false,
+      error: "not-a-decision-model",
+    });
+    expect(await thresholdsHeld(model)).toEqual({ stored: [], recorded: [] });
+  });
+
+  it("answers the store's failure and sets nothing", async () => {
+    const model = aModel();
+
+    const refused = await whileWritesAreRefused(db().pool, "decision_threshold", () =>
+      thresholding(model, {}),
+    );
+
+    expect(refused.ok ? "set" : refused.error).toBeInstanceOf(Error);
+    expect(await thresholdsHeld(model)).toEqual({ stored: [], recorded: [] });
   });
 });

@@ -361,7 +361,7 @@ The command writes nothing when it refuses. `malformed` is a workspace id that i
 
 ## Set a model's price and a workspace's spending limit
 
-A workspace's question calls a model only when three things stand: a model choice for the purpose, a price for that model on the day of the call, and a spending limit for the workspace. With any of them missing, `ask` calls no model and answers with its evidence. Three commands on the `api` service set the price, the limit and the model choice, and no page can. Money is in pounds sterling: prices, the ledger's `cost_gbp` and the limit are all in pounds, and no exchange rate is read when a call is made. The model choice is what turns the judge on, so set it last: with the key, the price and the limit in place, the next question with an `Answer` among what bears on it calls the model.
+A workspace's question calls a model only when three things stand: a model choice for the purpose, a price for that model on the day of the call, and a spending limit for the workspace. With any of them missing, `ask` calls no model and answers with its evidence. Commands on the `api` service set the price, the limit, a decision model's threshold and the model choice, and no page can. Money is in pounds sterling: prices, the ledger's `cost_gbp` and the limit are all in pounds, and no exchange rate is read when a call is made. The model choice is what turns the judge on, so set it last: with the key, the price and the limit in place, the next question with an `Answer` among what bears on it calls the model.
 
 1. **Price the model, once per estate and again whenever the provider's price or the exchange rate moves.** Read the provider's list price in US dollars from its own price page on the day, convert it to pounds at that day's rate, and set it from that day:
 
@@ -380,7 +380,14 @@ A workspace's question calls a model only when three things stand: a model choic
    ```
 
    A second run replaces the limit, and each run records `platform.workspace.spending_limit_set` in the workspace's audit log under the platform's own actor id; the amount is the setting itself, read as below. Spend counts from the first of each month, and last month's calls never count against this one. At the limit `ask` refuses with `spending-limit-met`, a precondition, and its sentence tells the person their Admin can ask better-answers to raise it. `find` and `open` call no model and keep working.
-3. **Choose the workspace's model for a purpose,** once the model has a price in effect today:
+3. **Set a decision model's threshold,** once the owner's decision reading has chosen one, before the model is chosen for any workspace (§ Read the decision models):
+
+   ```sh
+   docker exec "$api" pnpm ops set-decision-threshold --provider cloudflare --model clef-flash --threshold <probability>
+   ```
+
+   The threshold is the probability at or above which the model's yes is taken, a decimal strictly between 0 and 1, such as `0.7`. Like a price, it is a fact about the model, so it holds for every workspace that judges with it. A second run replaces it. The done line names the provider, the model and the threshold. Each run records `platform.model.threshold_set` in the identity-set audit log under the platform's own actor id, with the provider, the model and the threshold. A model on the Messages API takes no threshold.
+4. **Choose the workspace's model for a purpose,** once the model has a price in effect today:
 
    ```sh
    docker exec "$api" pnpm ops set-model-choice --workspace <id> --purpose judging --provider anthropic --model claude-sonnet-5-5
@@ -388,9 +395,9 @@ A workspace's question calls a model only when three things stand: a model choic
 
    A second run for the same purpose replaces the model in place. The provider must be one the DPIA names as a sub-processor, and the model must have a price on or before today; a call also needs the workspace's model key for that provider (§ Set a workspace's model key). Each run records `platform.workspace.model_choice_set` in the workspace's audit log under the platform's own actor id, with the purpose, the provider and the model. The embedding model is fixed and no command changes it.
 
-A decision model cannot be chosen yet. `set-model-choice` refuses `cloudflare` as `no-sub-processor` until the DPIA names Cloudflare as a sub-processor. After that, the model also needs a threshold set in the code, from the owner's decision reading (§ Read the decision models), or its judging fails and it is never called.
+A decision model cannot be chosen yet. `set-model-choice` refuses one with no threshold as `no-decision-threshold`, and then refuses `cloudflare` as `no-sub-processor` until the DPIA names Cloudflare as a sub-processor. No threshold is set today, because the owner's decision reading of 21/10/2026 found none that makes Clef or Clef-flash a judge on the reuse set. A decision model with no threshold when a question is asked is never called. Its judging fails, and the `api` logs one `llm: a model call never sent` line with `read` `no-threshold`, the purpose, the provider and the model, never the question.
 
-Each command writes nothing when it refuses. For `set-model-choice`, `no-sub-processor` is a provider the DPIA does not name as a sub-processor, `local` and `cloudflare` included, `no-model-price` is a model with no price in effect today, and `fixed-model-choice` is the embedding purpose. `malformed` is a sum that is not a decimal of pounds, a model name that is not lower case letters, digits, dots and hyphens, a day the calendar does not have, a model provider outside the three, or a workspace id that is not one. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached.
+Each command writes nothing when it refuses. `set-model-choice` refuses in this order. `malformed` comes first, then `fixed-model-choice`, the embedding purpose. `no-decision-threshold` is a decision model with no threshold. `no-sub-processor` is a provider the DPIA does not name as a sub-processor, `local` and `cloudflare` included. `no-such-workspace` comes next, then `no-model-price`, a model with no price in effect today. The threshold is checked before the sub-processor because Cloudflare, the only decision provider, is no sub-processor yet, so a threshold check after that one could never refuse. `set-decision-threshold` refuses `malformed` for a threshold that is not a decimal strictly between 0 and 1, such as `0`, `1`, `1.0` or `.5`, and `not-a-decision-model` for a provider whose models speak no decision shape, `anthropic` and `mistral` among them. `malformed` is a sum that is not a decimal of pounds, a model name that is not lower case letters, digits, dots and hyphens, a day the calendar does not have, a model provider outside the three, or a workspace id that is not one. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached.
 
 **How a call is counted.** Before a model call, `ask` reserves the most the call may cost, at that day's price, in the same transaction that would refuse it, so two questions cannot both pass the last of the limit. When the call ends the reservation becomes one `llm_call` row per attempt at what was spent, and the rest is released. A reservation lives ten minutes. If the `api` stops mid-call, the daily sweep settles a reservation past its ten minutes as one failed `llm_call` row at the whole reserved cost, since the provider may have billed the call: the pass's log line counts them as `reservations_settled`, and names a workspace whose settling was refused under `refusals` with the sweep `spend`. Until then an open reservation still counts against the limit.
 
@@ -439,7 +446,7 @@ The decision reading measures Clef-flash and Clef, the decision models on Cloudf
 - **On reuse,** as the judge's decision backend. It asks the reuse set's 34 questions through the product's own `ask` at four thresholds: 0.3, 0.5, 0.7 and 0.9. No threshold is calibrated, and this reading is how one is chosen. Its figures are the reuse reading's, under *Reuse reading, Clef-flash at threshold 0.7* and the like.
 - **At the entry step,** against S2a's recall baseline. For each question of both recall sets, the 340 paraphrases and the 154 buyer-worded questions, it takes the entry step's first 20 points and asks the model whether each answers the question. It reorders the points by that probability and reports recall in the first ten beside `find`'s and the entry step's own, under *Entry step reading*. The product's entry step calls no model, and this reading changes nothing in it.
 
-The judging workspace's model choice is seeded in the container, because `set-model-choice` refuses Cloudflare until the DPIA names it. Only synthetic content is sent.
+The judging workspace's model choice is seeded in the container, because `set-model-choice` refuses Cloudflare until the DPIA names it. Each reuse run stores the threshold it reads at in the container's `decision_threshold` table before it asks, as `set-decision-threshold` would. Only synthetic content is sent.
 
 1. **Have Docker running** and the checkout installed (`pnpm install`).
 2. **Make a Workers AI key:** an API token allowed to run Workers AI on the account, written as `<account id>:<API token>` (§ Set a workspace's model key). Read the day's exchange rate, pounds per US dollar. The list prices in dollars are written in `packages/core/test/readings/decision.reading.ts`; check them against each model's page on Cloudflare's site first.
@@ -458,7 +465,7 @@ A run that judged or scored nothing, as with a key the provider refuses, fails. 
 
 **What it costs.** Clef-flash costs $0.038 and Clef $0.24 per million tokens in, and neither charges for output. All the runs together send a few million tokens, well under £1. The reuse runs' workspaces each have a spending limit of £20. The entry step's calls are made outside any workspace, and the window of each call bounds them to about £3 in all.
 
-**Recording the figures.** Add each run's figures as a row under *The decision reading* in `docs/operations/readings.md`, with the day, the rate and the commit. The owner then decides which threshold, if any, a decision model's judging would run at, and S2b's brief records which backend the first customer's workspace runs, and why.
+**Recording the figures.** Add each run's figures as a row under *The decision reading* in `docs/operations/readings.md`, with the day, the rate and the commit. The owner then decides which threshold, if any, a decision model's judging would run at, and sets it with `set-decision-threshold`, and S2b's brief records which backend the first customer's workspace runs, and why.
 
 ## Read a workspace's unmapped-passage rate
 

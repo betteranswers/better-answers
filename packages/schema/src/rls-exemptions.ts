@@ -45,6 +45,8 @@ export const RLS_EXEMPTIONS = {
     "The identity-set audit log: an action on a person's own identity belongs to no workspace, so no scope could hold its row; it names people by person id and actions by their word, never a name or an address.",
   "public.model_price":
     "What a provider charges for a model is a fact about the provider, the same for every workspace that calls it: it names no tenant and holds rates alone.",
+  "public.decision_threshold":
+    "The probability at which a decision model's yes is taken is a fact about the model, the same for every workspace that judges with it: it names no tenant and holds a number alone.",
 } satisfies Record<string, string>;
 
 export const EXEMPT_TABLE_NAMES: readonly string[] = [

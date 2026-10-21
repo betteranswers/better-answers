@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { ulid } from "@better-answers/schema";
+
 import type { PlatformPrincipal } from "../src/kernel/index.ts";
 import {
   ATTEMPT_TIMEOUT_MS,
@@ -19,7 +21,12 @@ import {
   type ModelToCall,
 } from "../src/llm/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
-import { setModelChoice, setModelKey, setModelPrice } from "../src/workspaces/index.ts";
+import {
+  setDecisionThreshold,
+  setModelChoice,
+  setModelKey,
+  setModelPrice,
+} from "../src/workspaces/index.ts";
 import { bootstrap, provisionedWorkspace } from "./platform.ts";
 import { answered, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
@@ -52,6 +59,7 @@ const TO_SONNET: ModelToCall = {
   provider: "anthropic",
   model: SONNET,
   key: { reveal: () => A_KEY },
+  threshold: undefined,
 };
 
 const THE_ANSWER = '{"fits":[{"iri":"https://acme.example/answer/retention","fits":true}]}';
@@ -355,6 +363,7 @@ const TO_CLEF_FLASH: ModelToCall = {
   provider: "cloudflare",
   model: "clef-flash",
   key: { reveal: () => A_WORKERS_AI_KEY },
+  threshold: undefined,
 };
 
 const A_DECISION: DecisionModelCall = {
@@ -642,6 +651,7 @@ describe("a model of the other wire shape", () => {
   it.each([
     ["a decision model no Messages call", ANSWERED, "callModel"],
     ["a Messages model no decision call", DECIDED, "decide"],
+    ["a Messages model no yes-or-no call", DECIDED, "decideYesNo"],
   ] as const)("sends %s", async (_case, reply, method) => {
     const wire = theWire(reply);
     const { client, lines } = clientOn(wire);
@@ -649,7 +659,7 @@ describe("a model of the other wire shape", () => {
     const called =
       method === "callModel"
         ? await client.callModel(TO_CLEF_FLASH, A_CALL)
-        : await client.decide(TO_SONNET, A_DECISION);
+        : await client[method](TO_SONNET, A_DECISION);
 
     expect(called).toEqual({ outcome: "failed", spent: [] });
     expect(wire.sent).toEqual([]);
@@ -1105,6 +1115,8 @@ const priced = async (provider: string, model: string, from: string) =>
     }),
   );
 
+const aDecisionModel = (): string => `clef-${ulid().toLowerCase()}`;
+
 const choosing = (workspaceId: string, provider: string, model = SONNET, purpose = "judging") =>
   setModelChoice(PLATFORM, openPostgres(db().pool), {
     workspaceId,
@@ -1165,11 +1177,31 @@ describe("setting a model choice", () => {
     expect(await choicesOf(workspaceId)).toEqual([]);
   });
 
-  it("refuses priced Workers AI until the DPIA names it", async () => {
-    await priced("cloudflare", "clef-flash", "2026-10-01");
+  it("refuses priced Workers AI with no threshold stored", async () => {
+    const model = aDecisionModel();
+    await priced("cloudflare", model, "2026-10-01");
     const { workspaceId } = await aWorkspace(undefined, false);
 
-    expect(await choosing(workspaceId, "cloudflare", "clef-flash")).toEqual({
+    expect(await choosing(workspaceId, "cloudflare", model)).toEqual({
+      ok: false,
+      error: "no-decision-threshold",
+    });
+    expect(await choicesOf(workspaceId)).toEqual([]);
+  });
+
+  it("refuses priced, thresholded Workers AI until the DPIA names it", async () => {
+    const model = aDecisionModel();
+    await priced("cloudflare", model, "2026-10-01");
+    answered(
+      await setDecisionThreshold(PLATFORM, openPostgres(db().pool), {
+        provider: "cloudflare",
+        model,
+        threshold: "0.7",
+      }),
+    );
+    const { workspaceId } = await aWorkspace(undefined, false);
+
+    expect(await choosing(workspaceId, "cloudflare", model)).toEqual({
       ok: false,
       error: "no-sub-processor",
     });

@@ -66,6 +66,7 @@ export const STORED_ACT_NAMES = [
   "platform.workspace.model_key_set",
   "platform.workspace.spending_limit_set",
   "platform.model.priced",
+  "platform.model.threshold_set",
   "knowledge.feedback.closed",
   "platform.workspace.model_choice_set",
   "people.person.sessions_ended",
@@ -143,6 +144,7 @@ export const STORED_DETAIL_KEYS = {
   effectiveFrom: "effectiveFrom",
   gbpPerMillionIn: "gbpPerMillionIn",
   gbpPerMillionOut: "gbpPerMillionOut",
+  threshold: "threshold",
   recordId: "recordId",
   closedAs: "closedAs",
 } as const;
