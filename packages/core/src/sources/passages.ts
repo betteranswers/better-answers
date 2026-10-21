@@ -175,14 +175,24 @@ const AFTER = `AND ${MATCH.after({ weight: "$10", rank: "$11", key: ["$12", "$13
 
 const OPENING_POINTS = 160;
 
-const OPENING_READ = OPENING_POINTS * 2;
+const OPENING_READ_WITH_ROOM_TO_TRIM = OPENING_POINTS * 2;
+
+const SPACE_WITHIN_A_LINE = String.raw`[\t \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]`;
+
+const BLANK_AND_HEADING_ONLY_LINES_AHEAD = String.raw`^(?:${SPACE_WITHIN_A_LINE}*(?:#{1,6})?${SPACE_WITHIN_A_LINE}*(?:\r\n|[\n\r\v\f]))+`;
 
 /** Over the page alone: in the matching query, Postgres would cut every matched row's text before its sort. */
 const withOpenings = (
   rows: string,
 ): string => `SELECT found.source_document_id, found.char_start, found.char_end, found.sensitivity,
           found.title, found.weight, found.rank,
-          left(substring(found.content from '\\S.*'), ${String(OPENING_READ)}) AS head
+          left(
+            regexp_replace(
+              regexp_replace(found.content, '${BLANK_AND_HEADING_ONLY_LINES_AHEAD}', ''),
+              '${SPACE_WITHIN_A_LINE}+', ' ', 'g'
+            ),
+            ${String(OPENING_READ_WITH_ROOM_TO_TRIM)}
+          ) AS head
      FROM (${rows}) AS found
     ORDER BY found.weight DESC, found.rank DESC, found.source_document_id, found.char_start`;
 

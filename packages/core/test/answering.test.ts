@@ -490,6 +490,26 @@ describe("the preview's rendering", () => {
       ].join("\n"),
     );
   });
+
+  it("escapes quote marks and backslashes inside a quoted opening line", () => {
+    expect(
+      renderFind({
+        query: "invoice",
+        matches: [
+          {
+            layer: "sources",
+            kind: "document",
+            title: "The bid library's invoice",
+            locator: "01J6DDDDDDDDDDDDDDDDDDDDDD/chars:0-44",
+            sensitivity: "Internal",
+            openingLine: 'The invoice reads "paid" in C:\\ledgers.',
+          },
+        ],
+      }),
+    ).toBe(
+      'document · The bid library\'s invoice · Not company knowledge · Internal · 01J6DDDDDDDDDDDDDDDDDDDDDD/chars:0-44 · "The invoice reads \\"paid\\" in C:\\\\ledgers."',
+    );
+  });
 });
 
 describe("open's and feedback's renderings", () => {
@@ -1849,6 +1869,23 @@ describe("the two knowledge layers a search and a fetch reach", () => {
       ["The kingfisher log", "The kingfisher\tlog   runs\u2028on.", "The kingfisher log runs"],
       ["The kingfisher brief", brief, brief],
       ["The kingfisher ledger", ledger, `${Array.from(ledger).slice(0, 159).join("").trimEnd()}…`],
+      [
+        "The kingfisher cover",
+        `${"\n  ## \n#\n".repeat(40)}The kingfisher cover opens late.`,
+        "The kingfisher cover opens late.",
+      ],
+      [
+        "The kingfisher table",
+        `Name${" ".repeat(200)}Role${" ".repeat(200)}Kingfisher start date`,
+        "Name Role Kingfisher start date",
+      ],
+      ["The kingfisher agenda", "\n# # The kingfisher agenda", "# The kingfisher agenda"],
+      [
+        "The kingfisher spacer",
+        `${" \n#﻿\n".repeat(80)}The kingfisher spacer opens late.`,
+        "The kingfisher spacer opens late.",
+      ],
+      ["The kingfisher grid", `Name${"　  ".repeat(150)}Role kingfisher`, "Name Role kingfisher"],
     ] as const;
     for (const [title, text] of documents)
       await documentHolding(reader.workspaceId, { title, text });
