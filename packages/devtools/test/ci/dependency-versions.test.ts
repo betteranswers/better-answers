@@ -55,13 +55,13 @@ const ceilingOf = (caretRange: string): string => {
 };
 
 describe("renovate.json's better-auth holds", () => {
-  it("holds @better-auth/utils at the peer better-auth core names", () => {
-    const peer =
-      installedWithThePasskeyPlugin("@better-auth/core").peerDependencies["@better-auth/utils"];
+  it("holds @better-auth/utils at the version better-auth depends on", () => {
+    const required =
+      installedWithThePasskeyPlugin("better-auth").dependencies["@better-auth/utils"];
 
-    expect(peer).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(holdOn("@better-auth/utils")).toBe(peer);
-    expect(manifestOf("apps/api/package.json").dependencies["@better-auth/utils"]).toBe(peer);
+    expect(required).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(holdOn("@better-auth/utils")).toBe(required);
+    expect(manifestOf("apps/api/package.json").dependencies["@better-auth/utils"]).toBe(required);
   });
 
   it("holds @simplewebauthn below the next major passkey takes", () => {

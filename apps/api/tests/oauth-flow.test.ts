@@ -575,6 +575,16 @@ describe("the pages, as a person walks them", () => {
     expect(await consentsGiven()).toEqual(before);
   });
 
+  it("refuses a client's key rotation posted to the library", async () => {
+    const posted = await app.client().json("/oauth2/client/rotate-keys", {
+      client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+      client_assertion: "a.b.c",
+      jwks: { keys: [] },
+    });
+
+    expect(posted.status).toBe(404);
+  });
+
   it("refuses a grant whose form names no workspace", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
