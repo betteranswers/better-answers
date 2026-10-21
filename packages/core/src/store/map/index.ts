@@ -13,6 +13,7 @@ import {
   LINKS_TO_LABEL,
   resolvedResource,
   SUPERSEDES_LABEL,
+  type UNRESOLVED_RELATIONS,
 } from "@better-answers/schema";
 import { linksAndMarksOf, proseOf, uriDecoded } from "@better-answers/schema/concept-file";
 import { SCHEMED } from "@better-answers/schema/scan";
@@ -71,8 +72,10 @@ type OutgoingEdge = {
   readonly sentence: string | null;
 };
 
+type Relation = (typeof UNRESOLVED_RELATIONS)[number];
+
 type OutgoingRef = {
-  readonly relation: "link" | "lineage";
+  readonly relation: Relation;
   readonly ordinal: number;
   readonly target: Readonly<{ iri: string } | { path: string }>;
   readonly section: string | null;
@@ -87,7 +90,8 @@ export const targetOf = (raw: string, from: string): OutgoingRef["target"] | und
   if (SCHEMED.test(bare) || bare.startsWith("//")) return undefined;
   const decoded = uriDecoded(bare);
   if (decoded.includes("\u0000")) return undefined;
-  return { path: resolvedResource(decoded, from).slice(1) };
+  const path = resolvedResource(decoded, from).slice(1);
+  return path === "" ? undefined : { path };
 };
 
 const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
@@ -132,7 +136,18 @@ type ResolvedRow = {
 const supersedes = (target: ResolvedTarget, fromKind: string): boolean =>
   target.status === CONCEPT_DEPRECATED_STATUS && target.kind === fromKind;
 
-const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<readonly OutgoingEdge[]> => {
+type UnresolvedReference = {
+  readonly relation: Relation;
+  readonly ordinal: number;
+  readonly targetPath: string;
+};
+
+type Outgoing = {
+  readonly edges: readonly OutgoingEdge[];
+  readonly unresolved: readonly UnresolvedReference[];
+};
+
+const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<Outgoing> => {
   const workspaceId = concept.workspaceId;
   const references = referencesOf(concept);
   const paths = [
@@ -166,12 +181,22 @@ const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<readonly Ou
   }
 
   const cited = new Set<string>();
-  return references.flatMap((ref) => {
+  const unresolved: UnresolvedReference[] = [];
+  const edges = references.flatMap((ref): readonly OutgoingEdge[] => {
     const resolved =
       "iri" in ref.target
         ? (byIri.get(ref.target.iri) ?? { iri: ref.target.iri, kind: null, status: null })
         : byPath.get(ref.target.path);
-    if (resolved === undefined) return [];
+    if (resolved === undefined) {
+      if ("path" in ref.target) {
+        unresolved.push({
+          relation: ref.relation,
+          ordinal: ref.ordinal,
+          targetPath: ref.target.path,
+        });
+      }
+      return [];
+    }
     if (ref.relation === "lineage") {
       if (cited.has(resolved.iri)) return [];
       cited.add(resolved.iri);
@@ -197,18 +222,39 @@ const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<readonly Ou
       },
     ];
   });
+  return { edges, unresolved };
 };
 
 const DERIVED_EDGE_LABELS = [LINKS_TO_LABEL, SUPERSEDES_LABEL, DERIVED_FROM_LABEL];
 
 const replaceOutgoingEdges = async (gen: number, tx: Tx, concept: EdgeSource): Promise<void> => {
   const workspaceId = concept.workspaceId;
-  const edges = await resolveOutgoing(tx, concept);
+  const { edges, unresolved } = await resolveOutgoing(tx, concept);
   await tx.query(
     `DELETE FROM map_edge
       WHERE workspace_id = $1 AND gen = $2 AND from_uid = $3 AND label = ANY($4::text[])`,
     [workspaceId, gen, concept.iri, DERIVED_EDGE_LABELS],
   );
+  await tx.query(
+    "DELETE FROM map_unresolved_reference WHERE workspace_id = $1 AND gen = $2 AND from_uid = $3",
+    [workspaceId, gen, concept.iri],
+  );
+  if (unresolved.length > 0) {
+    await tx.query(
+      `INSERT INTO map_unresolved_reference (workspace_id, gen, from_uid, relation, ordinal,
+                                             target_path)
+       SELECT $1, $2, $3, relation, ordinal, target_path
+         FROM unnest($4::text[], $5::int[], $6::text[]) AS r(relation, ordinal, target_path)`,
+      [
+        workspaceId,
+        gen,
+        concept.iri,
+        unresolved.map((ref) => ref.relation),
+        unresolved.map((ref) => ref.ordinal),
+        unresolved.map((ref) => ref.targetPath),
+      ],
+    );
+  }
   for (const edge of edges) {
     await tx.query(
       `INSERT INTO map_edge (workspace_id, gen, uid, label, from_uid, to_uid, from_kind,
@@ -233,20 +279,6 @@ const replaceOutgoingEdges = async (gen: number, tx: Tx, concept: EdgeSource): P
       ],
     );
   }
-};
-
-const literally = (text: string): string => text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-
-const encodedSpelling = (filename: string): string =>
-  literally(encodeURI(filename.toWellFormed())).replaceAll(
-    /%([0-9A-F])([0-9A-F])/g,
-    (_, high: string, low: string) => `%[${high}${high.toLowerCase()}][${low}${low.toLowerCase()}]`,
-  );
-
-/** A link that names the file by its percent-encoded spelling names it too (`targetOf`). */
-const namePattern = (filename: string): string => {
-  const spellings = new Set([literally(filename), encodedSpelling(filename)]);
-  return `(^|[\\s"'(<:/[])(${[...spellings].join("|")})`;
 };
 
 const liveGeneration = async (workspaceId: string, tx: Tx): Promise<number> => {
@@ -277,12 +309,6 @@ export const writeConceptDelta = async (
 ): Promise<void> => {
   const workspaceId = delta.workspaceId;
   const gen = await liveGeneration(workspaceId, tx);
-
-  const mapped = await tx.query(
-    "SELECT 1 FROM map_node WHERE workspace_id = $1 AND gen = $2 AND uid = $3",
-    [workspaceId, gen, delta.iri],
-  );
-  const isNew = mapped.rowCount === 0;
 
   await tx.query(
     `INSERT INTO map_node (workspace_id, gen, uid, label, kind, published_at, sensitivity,
@@ -323,18 +349,18 @@ export const writeConceptDelta = async (
   );
   await replaceOutgoingEdges(gen, tx, delta);
 
-  if (!isNew) return;
-
-  const naming = await tx.query<ConceptIndexRow>(
+  const citing = await tx.query<ConceptIndexRow>(
     `SELECT workspace_id AS "workspaceId", iri, kind, path, body, frontmatter,
             published_at AS "publishedAt", sensitivity, audience,
             audience_groups AS "audienceGroups"
        FROM concept_index
-      WHERE workspace_id = $1 AND iri <> $2 AND (body ~ $3 OR frontmatter::text ~ $3)`,
-    [workspaceId, delta.iri, namePattern(delta.path.split("/").at(-1) ?? delta.path)],
+      WHERE workspace_id = $1 AND iri IN (
+            SELECT from_uid FROM map_unresolved_reference
+             WHERE workspace_id = $1 AND gen = $2 AND target_path = $3)`,
+    [workspaceId, gen, delta.path],
   );
 
-  for (const { frontmatter, ...row } of naming.rows) {
+  for (const { frontmatter, ...row } of citing.rows) {
     await replaceOutgoingEdges(gen, tx, {
       ...row,
       sources: citedSourcesOf(frontmatter["sources"]),
@@ -545,6 +571,7 @@ export type SweptGeneration = {
   readonly gen: number;
   readonly nodes: number;
   readonly edges: number;
+  readonly unresolved: number;
 };
 
 const SWEEP = `WITH live AS (
@@ -560,12 +587,21 @@ const SWEEP = `WITH live AS (
      WHERE workspace_id = $1 AND gen IS NOT NULL AND gen <> (SELECT live_gen FROM live)
     RETURNING gen
   ),
+  swept_unresolved AS (
+    DELETE FROM map_unresolved_reference
+     WHERE workspace_id = $1 AND gen <> (SELECT live_gen FROM live)
+    RETURNING gen
+  ),
   counted AS (
-    SELECT gen, count(*)::int AS nodes, 0 AS edges FROM swept_nodes GROUP BY gen
+    SELECT gen, count(*)::int AS nodes, 0 AS edges, 0 AS unresolved FROM swept_nodes GROUP BY gen
     UNION ALL
-    SELECT gen, 0 AS nodes, count(*)::int AS edges FROM swept_edges GROUP BY gen
+    SELECT gen, 0 AS nodes, count(*)::int AS edges, 0 AS unresolved FROM swept_edges GROUP BY gen
+    UNION ALL
+    SELECT gen, 0 AS nodes, 0 AS edges, count(*)::int AS unresolved
+      FROM swept_unresolved GROUP BY gen
   )
-  SELECT gen, sum(nodes)::int AS nodes, sum(edges)::int AS edges
+  SELECT gen, sum(nodes)::int AS nodes, sum(edges)::int AS edges,
+         sum(unresolved)::int AS unresolved
     FROM counted
    GROUP BY gen
    ORDER BY gen`;

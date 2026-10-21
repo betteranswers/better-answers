@@ -6,7 +6,13 @@ import psycopg
 from .audit import ParseFindings
 from .bundle import NoSuchBundleError, concepts_at_head
 from .concept_file import MalformedConceptFileError, content_hash_of, parse_concept_file
-from .links import CONCEPT_NODE_LABEL, LINKS_TO_LABEL, ResolvedTarget, outgoing_edges
+from .links import (
+    CONCEPT_NODE_LABEL,
+    LINKS_TO_LABEL,
+    ResolvedTarget,
+    outgoing_edges,
+    unresolved_references,
+)
 from .log import logger
 
 
@@ -28,6 +34,7 @@ class RebuildOutcome(ParseFindings):
     generation: int = 0
     nodes: int = 0
     edges: int = 0
+    unresolved: int = 0
 
     def as_row(self) -> dict[str, Any]:
         return {
@@ -35,6 +42,7 @@ class RebuildOutcome(ParseFindings):
             "generation": self.generation,
             "nodes": self.nodes,
             "edges": self.edges,
+            "unresolved": self.unresolved,
         }
 
 
@@ -166,6 +174,21 @@ def run_rebuild(
                 ),
             )
             outcome.edges += 1
+
+        for reference in unresolved_references(body, frontmatter, record.path, by_path):
+            cursor.execute(
+                "INSERT INTO map_unresolved_reference (workspace_id, gen, from_uid,"
+                " relation, ordinal, target_path) VALUES (%s, %s, %s, %s, %s, %s)",
+                (
+                    workspace_id,
+                    outcome.generation,
+                    record.iri,
+                    reference.relation,
+                    reference.ordinal,
+                    reference.target_path,
+                ),
+            )
+            outcome.unresolved += 1
 
     cursor.execute(
         "UPDATE map_generation SET live_gen = %s WHERE workspace_id = %s",

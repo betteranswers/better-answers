@@ -463,7 +463,8 @@ def _target_of(raw: str, from_path: str) -> tuple[_TargetShape, str] | None:
     decoded = _uri_decoded(bare)
     if "\0" in decoded:
         return None
-    return "path", resolved_resource(decoded, from_path)[1:]
+    path = resolved_resource(decoded, from_path)[1:]
+    return None if path == "" else ("path", path)
 
 
 def _section_at(body: str, index: int) -> str | None:
@@ -723,6 +724,28 @@ class ResolvedTarget:
         self.status = status
 
 
+class UnresolvedReference(NamedTuple):
+    relation: str
+    ordinal: int
+    target_path: str
+
+
+def unresolved_references(
+    body: str,
+    frontmatter: Frontmatter,
+    path: str,
+    by_path: Mapping[str, ResolvedTarget],
+) -> list[UnresolvedReference]:
+    unresolved: list[UnresolvedReference] = []
+    for reference in references_of(body, frontmatter, path):
+        shape, value = reference.target
+        if shape == "path" and value not in by_path:
+            unresolved.append(
+                UnresolvedReference(reference.relation, reference.ordinal, value)
+            )
+    return unresolved
+
+
 class OutgoingEdge:
     __slots__ = ("label", "section", "sentence", "to_kind", "to_uid", "uid")
 
@@ -807,8 +830,10 @@ __all__ = [
     "OutgoingReference",
     "ResolvedTarget",
     "Scalar",
+    "UnresolvedReference",
     "links_and_marks_of",
     "outgoing_edges",
     "prose_of",
     "references_of",
+    "unresolved_references",
 ]

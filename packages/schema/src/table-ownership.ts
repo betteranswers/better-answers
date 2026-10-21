@@ -553,7 +553,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: MAP_DOOR,
     access: "read",
     reason:
-      "The delta builder resolves a link's target to a concept and reads its kind off the index inside the action's own transaction, and a newly landed concept's linkers are found there — the map is derived from the rows the same transaction just wrote.",
+      "The delta builder resolves a link's target to a concept and reads its kind off the index inside the action's own transaction, and the citers waiting on a landed concept's path are read back from it — the map is derived from the rows the same transaction just wrote.",
   },
   {
     table: "public.source_document",

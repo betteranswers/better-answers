@@ -15,6 +15,8 @@ import {
 import { citedSourcesOf, conceptIriOf, ids, ulid, WELL_FORMED_ULID } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
 
+import { readConcept } from "../src/concepts/index.ts";
+import { parseLocator, passageAt } from "../src/sources/index.ts";
 import { planned } from "./planned.ts";
 import {
   answered,
@@ -989,5 +991,160 @@ describe("what a body's markdown makes an edge of", () => {
     expect((await linksFrom(scenario, author.iri)).map((edge) => edge.to_uid)).toEqual([
       product.iri,
     ]);
+  });
+});
+
+type UnresolvedFacts = {
+  readonly relation: string;
+  readonly ordinal: number;
+  readonly target_path: string;
+};
+
+const unresolvedFrom = async (
+  scenario: MapScenario,
+  fromUid: string,
+): Promise<readonly UnresolvedFacts[]> => {
+  const rows = await db().pool.query<UnresolvedFacts>(
+    `SELECT relation, ordinal, target_path FROM map_unresolved_reference
+      WHERE workspace_id = $1 AND from_uid = $2 ORDER BY relation, ordinal`,
+    [scenario.workspaceId, fromUid],
+  );
+  return rows.rows;
+};
+
+const unresolvedAt = async (scenario: MapScenario, targetPath: string): Promise<number> => {
+  const rows = await db().pool.query(
+    "SELECT 1 FROM map_unresolved_reference WHERE workspace_id = $1 AND target_path = $2",
+    [scenario.workspaceId, targetPath],
+  );
+  return rows.rowCount ?? 0;
+};
+
+const LATER = "knowledge/later.md";
+
+const linkingLater = async (scenario: MapScenario, path: string): Promise<IndexRow> => {
+  const author = await authorOf(scenario, "See [the later rule](/knowledge/later.md) first.", path);
+  await land(scenario, deltaOf(author));
+  return author;
+};
+
+const landedAt = async (
+  scenario: MapScenario,
+  path: string,
+  overrides: Partial<IndexRow> = {},
+): Promise<IndexRow> => {
+  const landed = await conceptIn(scenario, { path, kind: "Product", ...overrides });
+  await land(scenario, deltaOf(landed));
+  return landed;
+};
+
+describe("a path reference no concept holds yet", () => {
+  it("stores a link to a path no concept holds", async () => {
+    const scenario = await arrange();
+    const author = await authorOf(
+      scenario,
+      "See [the later rule](/knowledge/later.md), not [the vendor's](//example.test/later.md).",
+    );
+
+    await land(scenario, deltaOf(author));
+
+    expect(await unresolvedFrom(scenario, author.iri)).toEqual([
+      { relation: "link", ordinal: 0, target_path: LATER },
+    ]);
+    expect(await linksFrom(scenario, author.iri)).toEqual([]);
+  });
+
+  it("settles every reference when a concept lands at its path", async () => {
+    const scenario = await arrange();
+    const first = await linkingLater(scenario, "knowledge/policy.md");
+    const second = await linkingLater(scenario, "knowledge/deep/procedure.md");
+
+    const later = await landedAt(scenario, LATER);
+
+    expect(reached(await linksFrom(scenario, first.iri))).toEqual([later.iri]);
+    expect(reached(await linksFrom(scenario, second.iri))).toEqual([later.iri]);
+    expect(await unresolvedAt(scenario, LATER)).toBe(0);
+  });
+
+  it("settles a percent-encoded link at the path it decodes to", async () => {
+    const scenario = await arrange();
+    const author = await authorOf(scenario, "Ask [the team](%C3%A9quipe.md) first.");
+    await land(scenario, deltaOf(author));
+    expect(await unresolvedFrom(scenario, author.iri)).toEqual([
+      { relation: "link", ordinal: 0, target_path: "knowledge/équipe.md" },
+    ]);
+
+    const team = await landedAt(scenario, "knowledge/équipe.md");
+
+    expect(reached(await linksFrom(scenario, author.iri))).toEqual([team.iri]);
+    expect(await unresolvedFrom(scenario, author.iri)).toEqual([]);
+  });
+
+  it("answers a moved concept at the path older links name", async () => {
+    const scenario = await arrange();
+    const moved = await landedAt(scenario, "knowledge/old.md");
+    const author = await authorOf(scenario, "See [the new rule](/knowledge/new.md) first.");
+    await land(scenario, deltaOf(author));
+
+    await db().pool.query("UPDATE concept_index SET path = $2 WHERE iri = $1", [
+      moved.iri,
+      "knowledge/new.md",
+    ]);
+    await land(scenario, deltaOf(moved, { path: "knowledge/new.md" }));
+
+    const read = answered(
+      await readingAs(db().runtimePool, scenario.viewer, (reader, tx) =>
+        readConcept(reader, tx, ids.conceptIri.parse(author.iri), {
+          passageAt: (locator) => passageAt(reader, tx, locator),
+          namesPassage: (locator) => parseLocator(locator).ok,
+          now: new Date(),
+        }),
+      ),
+    );
+    expect(read?.bodyLinks).toEqual([
+      { ordinal: 0, address: "/knowledge/new.md", target: moved.iri },
+    ]);
+  });
+
+  it("settles a sources path into lineage once it lands", async () => {
+    const scenario = await arrange();
+    const successor = await conceptIn(scenario, {
+      path: "knowledge/expenses.md",
+      kind: "Policy",
+      frontmatter: {
+        title: "Expenses",
+        type: "Policy",
+        sources: [{ resource: "/knowledge/policy.md" }],
+      },
+    });
+    await land(scenario, deltaOf(successor));
+    expect(await unresolvedFrom(scenario, successor.iri)).toEqual([
+      { relation: "lineage", ordinal: 0, target_path: "knowledge/policy.md" },
+    ]);
+
+    const retired = await landedAt(scenario, "knowledge/policy.md", {
+      kind: "Policy",
+      status: "deprecated",
+    });
+
+    expect(await edgesFrom(scenario, successor.iri)).toEqual([
+      { label: "SUPERSEDES", to_uid: retired.iri, to_kind: null },
+    ]);
+    expect(await unresolvedFrom(scenario, successor.iri)).toEqual([]);
+  });
+
+  it("drops a rewritten link's unresolved row", async () => {
+    const scenario = await arrange();
+    const author = await linkingLater(scenario, "knowledge/policy.md");
+
+    const rewritten = "See [the other rule](/knowledge/other.md) first.";
+    await amend(author.iri, { body: rewritten });
+    await land(scenario, deltaOf(author, { body: rewritten }));
+
+    expect(await unresolvedFrom(scenario, author.iri)).toEqual([
+      { relation: "link", ordinal: 0, target_path: "knowledge/other.md" },
+    ]);
+    await landedAt(scenario, LATER);
+    expect(await linksFrom(scenario, author.iri)).toEqual([]);
   });
 });

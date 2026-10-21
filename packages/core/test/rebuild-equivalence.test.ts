@@ -115,6 +115,16 @@ const edgesAt = async (workspaceId: string, gen: number) => {
   return rows.rows;
 };
 
+const unresolvedAt = async (workspaceId: string, gen: number) => {
+  const rows = await db().pool.query(
+    `SELECT from_uid, relation, ordinal, target_path
+       FROM map_unresolved_reference WHERE workspace_id = $1 AND gen = $2
+      ORDER BY from_uid, relation, ordinal`,
+    [workspaceId, gen],
+  );
+  return rows.rows;
+};
+
 const liveGenerationOf = async (workspaceId: string): Promise<number | undefined> => {
   const rows = await db().pool.query<{ live_gen: number }>(
     "SELECT live_gen FROM map_generation WHERE workspace_id = $1",
@@ -139,6 +149,8 @@ const buildTheMap = async (scenario: Scenario) => {
 
   const unlanded = conceptIriOf(ulid());
 
+  const neverPath = `knowledge/never-lands-${ulid().toLowerCase()}.md`;
+
   const linker = await wrote(scenario, scenario.admin, {
     body: [
       "# The map",
@@ -162,6 +174,8 @@ const buildTheMap = async (scenario: Scenario) => {
       `[a shortcut]: ${derivedFrom.iri}`,
       `[^handbook]: ${derivedFrom.iri}`,
       `[^policy]: ${derivedFrom.iri}`,
+      "",
+      `And [one nothing ever lands at](/${neverPath}).`,
     ].join("\n"),
 
     frontmatter: {
@@ -210,7 +224,7 @@ const buildTheMap = async (scenario: Scenario) => {
   );
   if (!narrowed.ok) throw new Error(`the narrowing was refused: ${String(narrowed.error)}`);
 
-  return { linker, group };
+  return { linker, group, neverPath };
 };
 
 const EQUIVALENCE_ALLOWANCE_MS = 120_000;
@@ -220,12 +234,13 @@ describe("the worker's rebuild against the api's own map", () => {
     "reproduces the live generation exactly from the bundle and records",
     async () => {
       const scenario = await arrange();
-      const { linker, group } = await buildTheMap(scenario);
+      const { linker, group, neverPath } = await buildTheMap(scenario);
 
       const live = await liveGenerationOf(scenario.workspaceId);
       expect(live, "the api's actions wrote a live generation").toBe(1);
       const liveNodes = await nodesAt(scenario.workspaceId, 1);
       const liveEdges = await edgesAt(scenario.workspaceId, 1);
+      const liveUnresolved = await unresolvedAt(scenario.workspaceId, 1);
 
       expect(liveNodes.length).toBeGreaterThan(4);
       expect(liveEdges.length).toBeGreaterThan(6);
@@ -249,6 +264,10 @@ describe("the worker's rebuild against the api's own map", () => {
       expect(await liveGenerationOf(scenario.workspaceId)).toBe(2);
       expect(await nodesAt(scenario.workspaceId, 2)).toEqual(liveNodes);
       expect(await edgesAt(scenario.workspaceId, 2)).toEqual(liveEdges);
+      expect(await unresolvedAt(scenario.workspaceId, 2)).toEqual(liveUnresolved);
+      expect(liveUnresolved).toEqual([
+        { from_uid: linker.iri, relation: "link", ordinal: 12, target_path: neverPath },
+      ]);
 
       const linkerEdges = liveEdges.filter((edge) => edge["from_uid"] === linker.iri);
 

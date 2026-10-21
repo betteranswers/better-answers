@@ -32,7 +32,10 @@ const jobsOf = async (workspaceId: string) => {
   return found.rows;
 };
 
-const rowsOf = async (workspaceId: string, gen: number | null): Promise<[number, number]> => {
+const rowsOf = async (
+  workspaceId: string,
+  gen: number | null,
+): Promise<[number, number, number]> => {
   const clause = gen === null ? "gen IS NULL" : "gen = $2";
   const parameters = gen === null ? [workspaceId] : [workspaceId, gen];
   const nodes = await db().pool.query(
@@ -43,7 +46,11 @@ const rowsOf = async (workspaceId: string, gen: number | null): Promise<[number,
     `SELECT 1 FROM map_edge WHERE workspace_id = $1 AND ${clause}`,
     parameters,
   );
-  return [nodes.rowCount ?? 0, edges.rowCount ?? 0];
+  const unresolved = await db().pool.query(
+    `SELECT 1 FROM map_unresolved_reference WHERE workspace_id = $1 AND ${clause}`,
+    parameters,
+  );
+  return [nodes.rowCount ?? 0, edges.rowCount ?? 0, unresolved.rowCount ?? 0];
 };
 
 const sweptEvents = async (
@@ -66,6 +73,7 @@ const mapWithLeftovers = async (workspace: ProvisionedWorkspace): Promise<void> 
   await seeded(async (seed) => {
     const live = await seed.mapNode({ workspaceId });
     await seed.mapEdge({ workspaceId, fromUid: live.uid });
+    await seed.mapUnresolvedReference({ workspaceId, fromUid: live.uid });
     const person = await seed.mapNode({
       workspaceId,
       gen: null,
@@ -82,6 +90,7 @@ const mapWithLeftovers = async (workspace: ProvisionedWorkspace): Promise<void> 
     });
     const left = await seed.mapNode({ workspaceId, gen: 2 });
     await seed.mapEdge({ workspaceId, gen: 2, fromUid: left.uid });
+    await seed.mapUnresolvedReference({ workspaceId, gen: 2, fromUid: left.uid });
   });
 };
 
@@ -145,10 +154,10 @@ describe("sweeping a workspace's map", () => {
 
     const swept = await sweeping(workspace);
 
-    expect(swept).toEqual({ ok: true, value: [{ gen: 2, nodes: 2, edges: 1 }] });
-    expect(await rowsOf(workspace.workspaceId, 1)).toEqual([2, 1]);
-    expect(await rowsOf(workspace.workspaceId, null)).toEqual([1, 1]);
-    expect(await rowsOf(workspace.workspaceId, 2)).toEqual([0, 0]);
+    expect(swept).toEqual({ ok: true, value: [{ gen: 2, nodes: 2, edges: 1, unresolved: 1 }] });
+    expect(await rowsOf(workspace.workspaceId, 1)).toEqual([2, 1, 1]);
+    expect(await rowsOf(workspace.workspaceId, null)).toEqual([1, 1, 0]);
+    expect(await rowsOf(workspace.workspaceId, 2)).toEqual([0, 0, 0]);
   });
 
   it("writes one audit event per removed generation, under one batch", async () => {
@@ -171,8 +180,8 @@ describe("sweeping a workspace's map", () => {
     expect(swept).toEqual({
       ok: true,
       value: [
-        { gen: 1, nodes: 2, edges: 1 },
-        { gen: 2, nodes: 2, edges: 1 },
+        { gen: 1, nodes: 2, edges: 1, unresolved: 1 },
+        { gen: 2, nodes: 2, edges: 1, unresolved: 1 },
       ],
     });
     const events = await sweptEvents(workspace.workspaceId);
@@ -194,7 +203,7 @@ describe("sweeping a workspace's map", () => {
     const swept = await sweeping(workspace);
 
     expect(swept).toEqual({ ok: true, value: [] });
-    expect(await rowsOf(workspace.workspaceId, 1)).toEqual([1, 0]);
+    expect(await rowsOf(workspace.workspaceId, 1)).toEqual([1, 0, 0]);
     expect(await sweptEvents(workspace.workspaceId)).toEqual([]);
   });
 
@@ -212,7 +221,7 @@ describe("sweeping a workspace's map", () => {
     const swept = await sweeping(workspace);
 
     expect(swept).toEqual({ ok: true, value: [] });
-    expect(await rowsOf(workspace.workspaceId, 7)).toEqual([1, 0]);
+    expect(await rowsOf(workspace.workspaceId, 7)).toEqual([1, 0, 0]);
   });
 
   it("sweeps one workspace's leftovers and never a neighbour's", async () => {
@@ -223,8 +232,8 @@ describe("sweeping a workspace's map", () => {
 
     const swept = await sweeping(ours);
 
-    expect(swept).toEqual({ ok: true, value: [{ gen: 2, nodes: 2, edges: 1 }] });
-    expect(await rowsOf(theirs.workspaceId, 2)).toEqual([2, 1]);
+    expect(swept).toEqual({ ok: true, value: [{ gen: 2, nodes: 2, edges: 1, unresolved: 1 }] });
+    expect(await rowsOf(theirs.workspaceId, 2)).toEqual([2, 1, 1]);
   });
 
   it("says a workspace that is not an id is malformed", async () => {
@@ -267,8 +276,8 @@ describe("a sweep whose audit event cannot be written", () => {
       const swept = await sweeping(workspace);
 
       expect(swept.ok).toBe(false);
-      expect(await rowsOf(workspace.workspaceId, 2)).toEqual([2, 1]);
-      expect(await rowsOf(workspace.workspaceId, 1)).toEqual([2, 1]);
+      expect(await rowsOf(workspace.workspaceId, 2)).toEqual([2, 1, 1]);
+      expect(await rowsOf(workspace.workspaceId, 1)).toEqual([2, 1, 1]);
     } finally {
       await db().pool.query("GRANT INSERT ON audit_event TO app_rt");
     }
