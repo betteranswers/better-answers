@@ -69,18 +69,27 @@ export function createServer(dependencies: ServerDependencies): Hono {
   });
 
   let identity: "starting" | "ready" | "failed" = "starting";
-  const identityInit = auth.$context.then(
-    () => {
-      identity = "ready";
-    },
-    (cause: unknown) => {
-      identity = "failed";
-      logger.error(
-        { reason: cause instanceof Error ? cause.message : String(cause) },
-        "the authorization server failed to initialise",
-      );
-    },
-  );
+  // The oauth-provider plugin defers its resource seed when its table is missing, so a
+  // started context proves no schema; the seed's own lookup does.
+  const identityInit = auth.$context
+    .then((context) =>
+      context.adapter.findOne({
+        model: "oauthResource",
+        where: [{ field: "identifier", value: mcpUrl }],
+      }),
+    )
+    .then(
+      () => {
+        identity = "ready";
+      },
+      (cause: unknown) => {
+        identity = "failed";
+        logger.error(
+          { reason: cause instanceof Error ? cause.message : String(cause) },
+          "the authorization server failed to initialise",
+        );
+      },
+    );
 
   const image = dependencies.imageDigest ?? null;
 
