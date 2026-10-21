@@ -536,7 +536,10 @@ describe("a body's links to other concepts", () => {
       answering(TO_THE_COMMITTEE),
     );
 
+    const jump = within(article).getByRole("link", { name: "1" }).getAttribute("href") ?? "";
+    const landing = article.querySelector(`[id="${jump.slice(1)}"]`);
+
     expect(addressesIn(article).filter((address) => !address?.startsWith("#"))).toEqual([]);
-    expect(within(article).getByRole("listitem").textContent).toContain(TO_THE_COMMITTEE);
+    expect(landing?.textContent).toContain(TO_THE_COMMITTEE);
   });
 });

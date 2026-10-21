@@ -11,7 +11,7 @@ import {
 import Markdown, { type Components, type ExtraProps } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { linksAndMarksOf } from "@better-answers/schema/concept-file";
+import { linksAndMarksOf, uriDecoded } from "@better-answers/schema/concept-file";
 
 import { cn } from "@/shared/lib/utils.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -198,21 +198,13 @@ const marksDrawn =
     children: [...childrenDrawn(tree.children, { drawing, inLink: false }, true).nodes],
   });
 
-const decoded = (address: string): string => {
-  try {
-    return decodeURI(address);
-  } catch {
-    return address;
-  }
-};
-
 type AnsweredLink = { readonly address: string; readonly target: string };
 
 const pagesByAddress = (bodyLinks: readonly AnsweredLink[]): ReadonlyMap<string, string> =>
   new Map(
     bodyLinks.flatMap(({ address, target }) => {
       const page = conceptPageOf(target);
-      return page === undefined ? [] : [[decoded(address), page]];
+      return page === undefined ? [] : [[uriDecoded(address), page]];
     }),
   );
 
@@ -276,7 +268,7 @@ const jumpWithinThePage = (event: MouseEvent<HTMLAnchorElement>): void => {
 };
 
 const pageOf = (held: Held | undefined, href: string): string | undefined =>
-  held?.pages.get(decoded(href)) ?? conceptPageOf(href);
+  held?.pages.get(uriDecoded(href)) ?? conceptPageOf(href);
 
 function BodyLink(properties: ComponentProps<"a"> & ExtraProps) {
   const { href, children, node } = properties;

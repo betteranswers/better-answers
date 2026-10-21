@@ -97,10 +97,11 @@ export const sentenceAt = (body: string, prose: string, index: number): string =
 
   let start = 0;
   let end = paragraph.length;
-  for (const boundary of paragraph.matchAll(/[.!?](?=[ \t\n\r\f\v]|$)/g)) {
-    if (boundary.index < at) start = boundary.index + 1;
+  for (const boundary of paragraph.matchAll(/[.!?](?:\[\^[^[\]]*\])*(?=[ \t\n\r\f\v]|$)/g)) {
+    const after = boundary.index + boundary[0].length;
+    if (after <= at) start = after;
     else {
-      end = boundary.index + 1;
+      end = after;
       break;
     }
   }

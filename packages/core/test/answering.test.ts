@@ -2194,6 +2194,42 @@ describe("the links in an opened concept's body", () => {
     ]);
   });
 
+  it("lists a footnote defined as a relative path", async () => {
+    const reader = await arrange();
+    const travel = await indexed(reader.workspaceId, "knowledge/travel.md", "Internal");
+    const expenses = await expensesLinking(
+      reader.workspaceId,
+      "knowledge/expenses.md",
+      "Mileage follows the travel policy.[^t]\n\n[^t]: ./travel.md",
+      [travel],
+    );
+
+    const answer = await opened(reader, expenses);
+
+    expect(renderOpen(answer).split("\n").slice(-2)).toEqual([
+      "Links in the body:",
+      `- ./travel.md · ${travel}`,
+    ]);
+  });
+
+  it("lists a percent-encoded address under the file it decodes to", async () => {
+    const reader = await arrange();
+    const team = await indexed(reader.workspaceId, "knowledge/équipe.md", "Internal");
+    const expenses = await expensesLinking(
+      reader.workspaceId,
+      "knowledge/expenses.md",
+      "Ask [the team](./%C3%A9quipe.md).",
+      [team],
+    );
+
+    const answer = await opened(reader, expenses);
+
+    expect(renderOpen(answer).split("\n").slice(-2)).toEqual([
+      "Links in the body:",
+      `- ./%C3%A9quipe.md · ${team}`,
+    ]);
+  });
+
   it("keeps the links through open's output schema", async () => {
     const reader = await arrange();
     const travel = await indexed(reader.workspaceId, "knowledge/travel.md", "Internal");
