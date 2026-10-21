@@ -12,6 +12,7 @@ import {
   type SENSITIVITIES,
 } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
+import { SCHEMED } from "@better-answers/schema/scan";
 
 import { action, declareActions, record } from "../audit/index.ts";
 import {
@@ -188,7 +189,7 @@ const relativeLinksOf = (body: string): readonly RelativeLink[] =>
   [...body.matchAll(INLINE_LINK)].flatMap((match) => {
     const target = match[1] ?? "";
     const file = target.split("#")[0] ?? "";
-    if (file === "" || file.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(file)) return [];
+    if (file === "" || file.startsWith("//") || SCHEMED.test(file)) return [];
     return file.endsWith(".md")
       ? [{ at: match.index + match[0].length - target.length, target, file }]
       : [];

@@ -3,6 +3,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Literal, NamedTuple
 
 from .concept_file import (
+    SCHEMED,
     Frontmatter,
     Scalar,
     SourceEntry,
@@ -72,11 +73,11 @@ def _autolink_ends_of(text: str) -> list[int]:
     return _next_stops(text, stops)
 
 
-_SCHEME = re.compile(r"[a-z0-9+.-]", re.I)
+_SCHEME = re.compile(r"[A-Za-z0-9+.-]")
 
 
 def _colon_after(text: str, at: int) -> int | None:
-    if at + 1 >= len(text) or not re.match(r"[a-z]", text[at + 1], re.I):
+    if at + 1 >= len(text) or not re.match(r"[A-Za-z]", text[at + 1]):
         return None
     scheme = at + 2
     while scheme < len(text) and _SCHEME.match(text[scheme]):
@@ -219,7 +220,6 @@ def _fenced_blocks(body: str) -> list[tuple[int, int]]:
 _BACKTICK_RUN = re.compile(r"`+")
 _HEADING = re.compile(r"^\#{1,6}[ \t\n\r\f\v]+([^\n]*)")
 _SENTENCE_BOUNDARY = re.compile(r"[.!?](?=[ \t\n\r\f\v]|$)")
-_SCHEMED = re.compile(r"^[a-z][a-z0-9+.-]*:", re.I)
 _WHITESPACE_RUN = re.compile(r"[ \t\n\r\f\v]+")
 
 
@@ -393,7 +393,7 @@ def _target_of(raw: str, from_path: str) -> tuple[_TargetShape, str] | None:
     if _IRI.match(bare):
         return "iri", bare
 
-    if _SCHEMED.match(bare) or bare.startswith("//"):
+    if SCHEMED.match(bare) or bare.startswith("//"):
         return None
     return "path", resolved_resource(bare, from_path)[1:]
 

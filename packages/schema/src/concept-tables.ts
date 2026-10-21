@@ -15,6 +15,7 @@ import { listed, stamp } from "./column-helpers.ts";
 import { IRI, type CitedSource } from "./concept-file.ts";
 import { FULL_TEXT_LANGUAGE, searchVector } from "./full-text-match.ts";
 import { AUDIENCE_CHECK, SENSITIVITIES, SENSITIVITY_DEFAULT } from "./readable-columns.ts";
+import { SCHEMED } from "./scan.ts";
 import { sourceDocument } from "./source-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
@@ -105,7 +106,7 @@ export const citedSourcesOf = (value: SourcesValue): readonly CitedSource[] =>
  * starting `/`, else against `from`'s directory.
  */
 export const resolvedResource = (resource: string, from: string): string => {
-  if (resource.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(resource)) return resource;
+  if (resource.startsWith("//") || SCHEMED.test(resource)) return resource;
   const directory = resource.startsWith("/")
     ? ""
     : from.slice(0, Math.max(0, from.lastIndexOf("/")));
