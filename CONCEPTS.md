@@ -75,8 +75,7 @@ bulk commit. Never a file, never held to a closed set.
 A conventional body line naming a concept's other names, written `Also known as: <name>, <name>`.
 Search weights it with the concept's tags.
 
-A confirmed alias lands there through an edit suggestion, and the merge key derives its names from
-it.
+A confirmed alias lands there through an edit suggestion. The merge key never reads it.
 
 ### collection
 

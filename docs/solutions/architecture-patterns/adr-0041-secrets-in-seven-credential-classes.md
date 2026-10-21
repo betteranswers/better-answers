@@ -27,8 +27,8 @@ tags:
 
 A secret belongs to one of seven credential classes: bootstrap, ingestion, acting, agent, LLM provider, repository and object store.
 
-- **Bootstrap** is read once from the environment by each tier's typed config module, `apps/api/src/config.ts` and `apps/worker/src/better_answers_worker/config.py`. It is never read at a call site and never logged. No other class comes from the environment.
-- **The other six** are rows under the envelope, reached through a credentials provider. The provider is built for the LLM-provider class alone (*The LLM-provider class*, below). The first slice that needs another class builds that class's part.
+- **Bootstrap** is read once from the environment by each tier's typed config module, `apps/api/src/config.ts` and `apps/worker/src/better_answers_worker/config.py`. It is never read at a call site and never logged.
+- **The other six.** A credentials provider reads rows under the envelope. It is built for the LLM-provider class alone, whose keys are such rows (*The LLM-provider class*, below). Whether the other five are such rows too, and so never read from the environment, is the second conflict below. The first slice that needs another class builds that class's part.
 - **The provider's shape** is fixed now: tokens stored hashed behind a lookup prefix, expiring and revocable, one rotation path per class, and every access audited.
 
 The table in `docs/operations/SECRETS.md`, under *The classes*, says what each class is for and where it is read. Which record owns that gloss has never been settled. No record says why there are seven classes rather than one, and this record does not invent a reason. Treat it as open.
