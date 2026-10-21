@@ -414,12 +414,12 @@ const writeUnderLock = async (
   if (!parsed.success) return err("malformed");
   const row = parsed.data;
 
-  const committed = await commitAndLandWrite(principal, doors, write, row, now);
-  if (!committed.ok) return err(committed.error);
+  const landed = await commitAndLandWrite(principal, doors, write, row, now);
+  if (!landed.ok) return err(landed.error);
 
   return ok({
     iri: row.iri,
-    sha: committed.value.sha,
+    sha: landed.value.sha,
     auditEventId: write.auditEventId,
     contentHash: write.contentHash,
   });
@@ -503,7 +503,7 @@ const commitAndLandWrite = async (
   at: Date,
 ): Promise<Result<Committed, WriteConceptRefusal | Error>> => {
   const { input } = write;
-  const committed = await commitAndLandAsMember(
+  const landed = await commitAndLandAsMember(
     principal,
     doors,
     {
@@ -514,18 +514,18 @@ const commitAndLandWrite = async (
       trailers: {
         actor: actorIdOf(principal),
         audit: write.auditEventId,
-
         suggestion: input.acceptance?.suggestionId,
       },
-
       expectedHead: "head" in input.expects ? input.expects.head : ANY_HEAD,
       at,
     },
-    (fresh, tx, landing) => landWrite(fresh, tx, write, row, landing),
+    (fresh, tx, committed) => landWrite(fresh, tx, write, row, committed),
   );
-  if (committed.ok || !(committed.error instanceof Error)) return committed;
-  const named = refusalFor(committed.error, WRITE_CONSTRAINTS);
-  return err(typeof named === "string" ? named : committed.error);
+  if (!landed.ok && landed.error instanceof Error) {
+    const named = refusalFor(landed.error, WRITE_CONSTRAINTS);
+    return err(typeof named === "string" ? named : landed.error);
+  }
+  return landed;
 };
 
 const landWrite = async (

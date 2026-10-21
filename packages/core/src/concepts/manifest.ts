@@ -103,7 +103,7 @@ export const writeManifest = async (
     if (atHead.value === "standing") return ok({ written: false });
     if (atHead.value === "taken") return err("path-taken");
 
-    const committed = await commitAndLandAsMember(
+    const landed = await commitAndLandAsMember(
       principal,
       doors,
       {
@@ -115,22 +115,22 @@ export const writeManifest = async (
         expectedHead: ANY_HEAD,
         at: doors.clock.now(),
       },
-      async (fresh, tx, landing) => {
+      async (fresh, tx, committed) => {
         await record(fresh, tx, {
           id: auditEventId,
           action: MANIFEST_ACTIONS.written,
           subjectId: manifest.data.id,
-          detail: { bundleId: manifest.data.id, commitSha: landing.sha },
+          detail: { bundleId: manifest.data.id, commitSha: committed.sha },
         });
         await landBundleCommit(fresh, tx, {
-          commit: landing,
+          commit: committed,
           actor: actorIdOf(fresh),
           auditEventId,
         });
       },
     );
-    if (!committed.ok) return err(committed.error);
+    if (!landed.ok) return err(landed.error);
 
-    return ok({ written: true, sha: committed.value.sha, auditEventId });
+    return ok({ written: true, sha: landed.value.sha, auditEventId });
   });
 };
