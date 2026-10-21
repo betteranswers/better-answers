@@ -57,6 +57,9 @@ How often a G-Cloud row of the buyer-worded set, asked word for word with no col
 | 2026-10-14 | `release/20261014T184033Z-8d0a501` | Reading 2 through `ask`, counted against a list fixed blind beforehand, at least one in the first 20, the 55 rows | 47 of 55 | Old route, archived |
 | 2026-10-14 | `release/20261014T184033Z-8d0a501` | Reading 2 through `ask`, counted against a list fixed blind beforehand, every answering `Answer` in the first ten, the 54 rows | 20 of 54 | Old route, archived |
 | 2026-10-14 | `release/20261014T184033Z-8d0a501` | Reading 2 through `ask`, counted against a list fixed blind beforehand, every answering `Answer` in the first 20, the 54 rows | 27 of 54 | Old route, archived |
+| 2026-10-21 | `release/20261021T141344Z-5ed685a` | AE1: checklist row 45 through `ask` from claude.ai, `audits` named, judged by Claude Sonnet 5.5 | Pass, read by the owner. Both `audits` `Answer`s fit, word for word with who verified them, and none from `lms` or `website`. Record `01M5FN3X9NRPK3A0R47H6GWV8J` | S2b's plan, *Acceptance Examples* |
+| 2026-10-21 | `release/20261021T141344Z-5ed685a` | AE2: the same row, no collection named | Pass, read by the owner. AE1's two `Answer`s under `audits` and two under `website`, *Audit Logs & Buyer Audit Access* among them, with no one retention period stated for every product. No `lms` `Answer` reached the result, though AE14's judge takes one (BA-177). Record `01M5FP1EZS5C1ABP3HDBBVVF3K` | S2b's plan, *Acceptance Examples* |
+| 2026-10-21 | `release/20261021T141344Z-5ed685a` | AE14: the same row, `lms` named | Pass, read by the owner. *Buyer audit of user actions* and *Supplier audit trail* fit under `lms`. Record `01M5FP9EY1RDKP9G6DGQ9Y8Q3T` | S2b's plan, *Acceptance Examples* |
 
 ## The reuse reading
 
