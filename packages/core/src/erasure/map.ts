@@ -26,6 +26,8 @@ export const ERASURE_FAMILIES = [
   "identity-last-active",
   "source-document",
   "question-asked",
+  "concept-sensitivity-override",
+  "finding",
 ] as const;
 
 export type ErasureFamily = (typeof ERASURE_FAMILIES)[number];
@@ -255,6 +257,27 @@ const ERASURE_FAMILY_DESCRIPTORS = {
         tx,
         subject,
         "SELECT id AS location FROM question_asked WHERE workspace_id = $1 AND asked_by = ANY($2)",
+      ),
+  },
+
+  "concept-sensitivity-override": {
+    categories: ["actor-id"],
+    find: (platform, subject, tx) =>
+      aboutTheActors(
+        tx,
+        subject,
+        "SELECT iri AS location FROM concept_sensitivity_override WHERE workspace_id = $1 AND actor = ANY($2)",
+      ),
+  },
+
+  finding: {
+    categories: ["actor-id", "typed-text"],
+    find: (platform, subject, tx) =>
+      aboutTheActors(
+        tx,
+        subject,
+        `SELECT id AS location FROM finding
+          WHERE workspace_id = $1 AND (reviewed_by = ANY($2) OR restored_by = ANY($2))`,
       ),
   },
 } satisfies Record<ErasureFamily, ErasureFamilyDescriptor>;

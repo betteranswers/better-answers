@@ -285,6 +285,10 @@ const withTheVerificationsMoved = (
   [CONCEPT_VERIFICATION]: { ...actions[CONCEPT_VERIFICATION], rehashed: carried.verifications },
 });
 
+const SENSITIVITY_OVERRIDE: ErasureFamily = "concept-sensitivity-override";
+
+const FINDING: ErasureFamily = "finding";
+
 const withTheActorsStep = (actions: ErasureActions, swept: ActorsSwept): ErasureActions => ({
   ...actions,
   [BUNDLE_COMMIT]: { ...actions[BUNDLE_COMMIT], actorsRewritten: swept.commits },
@@ -292,6 +296,8 @@ const withTheActorsStep = (actions: ErasureActions, swept: ActorsSwept): Erasure
     ...actions[CONCEPT_VERIFICATION],
     actorsRewritten: swept.verifications,
   },
+  [SENSITIVITY_OVERRIDE]: { ...actions[SENSITIVITY_OVERRIDE], actorsRewritten: swept.overrides },
+  [FINDING]: { ...actions[FINDING], actorsRewritten: swept.findings },
 });
 
 const rewritingTheBundle = (

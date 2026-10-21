@@ -354,6 +354,20 @@ export const CROSS_OWNER_TABLE_ACCESS = [
       "The erasure map lists every verification the person recorded on a concept, so an access answer names each one.",
   },
   {
+    table: "public.concept_sensitivity_override",
+    by: "erasure",
+    access: "read and write",
+    reason:
+      "An override names who set it, so the erasure map lists each one the person set and every erasure from the workspace rewrites that id to the erasure pseudonym.",
+  },
+  {
+    table: "public.finding",
+    by: "erasure",
+    access: "read and write",
+    reason:
+      "A finding names who reviewed or restored it and keeps the reason they typed, so the erasure map lists each one and every erasure from the workspace rewrites the id to the erasure pseudonym and clears that person's reason.",
+  },
+  {
     table: "public.concept_index",
     by: "erasure",
     access: "read",
