@@ -391,7 +391,8 @@ function SearchRegion() {
   const shown = useMemo(() => matchesOf(matches.data), [matches.data]);
   const beside = useRoomBeside();
   const reading = useReading(query);
-  const panel = useOpening(query, shown, matches.data === undefined, heading);
+  const unread = matches.data === undefined && !asksNothing(query);
+  const panel = useOpening(query, shown, unread, heading);
   useReturnedUnlisted(reading.returning.key, shown, matches.isLoading, heading);
   const open = (match: Match) => {
     flush();
