@@ -25,6 +25,7 @@ tags:
   - unicode
   - multiline
   - whitespace
+  - case-folding
   - links
   - cross-tier
 retire_when: "the two tiers stop each implementing the concept-body reader, for example if the worker reads the api's derived edges instead of deriving its own"
@@ -51,10 +52,12 @@ The api (TypeScript) and the worker (Python) each read a concept body's links an
 
 Both readers now state the line and whitespace rules explicitly, without relying on either engine's defaults (this PR, S2a U2):
 
-- **Lines break at `\n` alone.** At S2a U2 the TypeScript patterns dropped the `m` flag and anchored with `(?<=^|\n)`, and Python anchored with `(?:^|(?<=\n))` without `re.M`. A later fix, "read a concept body in one walk", replaced every expression with a hand-written scanner that keeps the rule: a line starts at the string's start or after a `\n` (`lineStartFrom`, `packages/schema/src/concept-file.ts:35-41`; `_line_start_from`, `apps/worker/src/better_answers_worker/links.py:45-54`).
-- **Whitespace is `[ \t\n\r\f\v]`.** That set, `isAsciiWhitespace` (`packages/schema/src/scan.ts`) and `_TIER_SHARED_WHITESPACE`, replaces `\s`, `\S`, `trim()` and `strip()` in labels, definitions and inline targets (`normalisedLabel`, `targetAfter` and `INLINE_TARGET`, `concept-file.ts:239-261`, `:305`; `_normalised_label`, `_target_after` and `_INLINE_TARGET`, `links.py:298-319`, `:384`).
+- **Lines break at `\n` alone.** At S2a U2 the TypeScript patterns dropped the `m` flag and anchored with `(?<=^|\n)`, and Python anchored with `(?:^|(?<=\n))` without `re.M`. A later fix, "read a concept body in one walk", replaced every expression with a hand-written scanner that keeps the rule: a line starts at the string's start or after a `\n` (`lineStartFrom` in `packages/schema/src/concept-file.ts`; `_line_start_from` in `apps/worker/src/better_answers_worker/links.py`).
+- **Whitespace is `[ \t\n\r\f\v]`.** That set, `isAsciiWhitespace` (`packages/schema/src/scan.ts`) and `_TIER_SHARED_WHITESPACE`, replaces `\s`, `\S`, `trim()` and `strip()` in labels, definitions and inline targets (`normalisedLabel`, `targetAfter` and `INLINE_TARGET` in `concept-file.ts`; `_normalised_label`, `_target_after` and `_INLINE_TARGET` in `links.py`).
 - **The fixture pins each difference.** `contracts/links/cases.json` gains *only plain whitespace is trimmed from a label* (U+FEFF, U+0085) and *a definition starts only after a line feed* (a lone `\r`, U+2028). Both were shown to fail against the earlier readers before the fix.
 - **An edge's heading and sentence follow the same rules.** A LINKS_TO edge stores the heading above its link and the sentence around it. Those readers kept `\s`, `trim()` and `strip()` after this fix, and the TypeScript heading pattern's `.` also stopped at `\r` and U+2028, so a CRLF heading was null in the live map and named in the rebuild. They now use the same set and line rule, and both make each whitespace run one space (`sectionAt` and `sentenceAt`, `packages/core/src/store/map/sentence.ts`; `_section_at` and `_sentence_at`, `links.py`). Collapsing the heading also hides the one place the tiers count characters differently: a code span is blanked one space per UTF-16 unit in TypeScript and per code point in Python, so an emoji in a heading's code span left five spaces in one tier and six in the other. Each link in `contracts/links/cases.json` carries its `section` and `sentence`, and three cases hold these characters in a heading and a sentence.
+- **A blank line is a line of whitespace.** A paragraph ended only at `\n\n`, so in a CRLF body the line between two paragraphs held a `\r`, and a link's sentence ran on into the heading above it. Both tiers agreed, so no id split, but the stored sentence was wrong. A line that holds only the six whitespace characters now ends a paragraph, and *a line of whitespace is a blank line* pins it.
+- **A scheme is ASCII, with no ignore-case flag.** The scheme tests read `[a-z]` under `/i` and `re.I`. Python folds the Kelvin sign (U+212A), the long s (U+017F) and the dotted capital I (U+0130) into that class, and JavaScript's `/i` without `u` folds only ASCII. So the worker read `<Ka:b>` with a Kelvin sign as an autolink, took an ordinal for it and renumbered every later link, and kept a source resource with such a scheme unresolved, which changed its content hash. Each tier now writes `[A-Za-z]` with no flag (`SCHEMED` in `scan.ts` and `concept_file.py`, and the autolink scanner's classes). *An autolink's scheme is ASCII alone* in `contracts/links` and the Kelvin case in `contracts/concept-file` pin it.
 - **Trim with a loop or a split, not a lazy group before a trailing class.** A first draft trimmed the heading with `([^\n]*?)[ \t\n\r\f\v]*$`. The lazy group and the trailing class backtrack against each other, so a heading holding 32,000 spaces, which a blanked code span produces, took 3.8 s in Python and 0.7 s in Node. Both `reader-linear` suites now hold a heading of 80,000 spaces to one second.
 
 ```ts
@@ -69,13 +72,14 @@ label.split(/[ \t\n\r\f\v]+/).filter((word) => word !== "").join(" ").toLowerCas
 
 ## Why This Works
 
-The two engines disagree in three places, checked on Node 24 and Python 3:
+The two engines disagree in four places, checked on Node 24 and Python 3:
 
 | | JavaScript | Python |
 | --- | --- | --- |
 | `^` under multiline | starts a line after `\n`, `\r`, U+2028, U+2029 | after `\n` alone (`re.M`) |
 | `\s` | includes U+FEFF, excludes U+001C–U+001F and U+0085 | the reverse |
 | `trim()` / `strip()` | strips U+FEFF, keeps U+0085 | the reverse |
+| `[a-z]` ignoring case | ASCII alone with `/i`; with `/iu`, also U+212A and U+017F | also U+212A, U+017F and U+0130 (`re.I`) |
 
 An explicit class and an explicit `\n` anchor mean the same in both engines, so the readers agree on every input rather than on the ones a fixture happens to list.
 
@@ -83,8 +87,8 @@ One difference is left: `toLowerCase()` and `str.lower()` follow each runtime's 
 
 ## Prevention
 
-- When both tiers implement one reader of tenant text, write its rules as explicit character classes and anchors. Never lean on `\s`, `\S`, `^`/`$` under a multiline flag, `trim()`/`strip()` or `split()` with no separator. Each engine defines those its own way.
-- Give a cross-tier text fixture at least one case per class of character the engines disagree on: a lone `\r`, U+2028, U+FEFF, U+0085 and a C0 separator such as U+001F. Write the fixture with JSON `\u` escapes so the characters stay visible in review.
+- When both tiers implement one reader of tenant text, write its rules as explicit character classes and anchors. Never lean on `\s`, `\S`, `^`/`$` under a multiline flag, `trim()`/`strip()`, `split()` with no separator, or an ignore-case flag on a letter class. Each engine defines those its own way.
+- Give a cross-tier text fixture at least one case per class of character the engines disagree on: a lone `\r`, a CRLF, U+2028, U+FEFF, U+0085, a C0 separator such as U+001F, and a letter that folds to ASCII, such as U+212A or U+017F. Write the fixture with JSON `\u` escapes so the characters stay visible in review.
 - Show that a new case fails against the earlier reader on both tiers before trusting it. A case both tiers already agree on proves nothing about the split.
 - When mutation-testing a module from another workspace, run it from that module's own workspace. StrykerJS reads `mutate` relative to its project and will not instrument `packages/schema/src/concept-file.ts` from a run started in `packages/core`. This run used the `command` test runner from `packages/schema`, whose command drove core's contract tests.
 
