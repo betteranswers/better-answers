@@ -6,17 +6,19 @@ usage() {
   cat >&2 <<'USAGE'
 host-setup.sh vpc1 --mirror-host <VPC2 address> [--drill-pubkey <file>]
     the production box: /data, the 4 GB swap file, git, the git-mirror deploy keypair,
-    known_hosts for VPC 2, and the host hardening. Prints the deploy key's public half,
-    which vpc2 takes. Run it again with --drill-pubkey once vpc2 has printed root's key.
+    known_hosts for VPC 2, the nightly image prune, and the host hardening. Prints the
+    deploy key's public half, which vpc2 takes. Run it again with --drill-pubkey once vpc2
+    has printed root's key.
 
 host-setup.sh vpc2 --mirror-pubkey <file> --repo <git URL> [--prod-host <VPC1 address>]
     the orchestrator box: the mirror user and /data/mirror, the deploy key restricted to
     mirror-shell, the checkout the drill runs from, the root-only env templates under
-    /etc/better-answers, and the drill's host cron line.
+    /etc/better-answers, the drill's host cron line, and the nightly image prune.
 
-Run as root on the box named. Both are idempotent, so either can be re-run safely. Every
-value is an argument, nothing is read from the environment, and the two env files this
-script creates are empty templates you fill.
+Run as root on the box named, with prune-images.sh beside this script: both boxes install
+it. Both are idempotent, so either can be re-run safely. Every value is an argument,
+nothing is read from the environment, and the two env files this script creates are empty
+templates you fill.
 USAGE
   exit 2
 }
@@ -31,6 +33,17 @@ harden() {
   dpkg-reconfigure -f noninteractive unattended-upgrades >/dev/null
   systemctl enable --now fail2ban chrony >/dev/null
   echo "hardened: password SSH off, unattended-upgrades, fail2ban, chrony"
+}
+
+prune_images() {
+  install -m 755 "$(dirname "$0")/prune-images.sh" /usr/local/bin/better-answers-prune-images
+  # 01:30 UTC: after Coolify's own 00:00 cleanup, before the 02:35 release and the drill's 03:00.
+  cat > /etc/cron.d/better-answers-prune-images <<'CRON'
+# Removes the release images Coolify's cleanup never does: they are pinned by digest, so tagged <none>.
+30 1 * * * root /usr/local/bin/better-answers-prune-images >> /var/log/better-answers-prune-images.log 2>&1
+CRON
+  chmod 644 /etc/cron.d/better-answers-prune-images
+  echo "image prune: nightly at 01:30 UTC, logged to /var/log/better-answers-prune-images.log"
 }
 
 vpc1() {
@@ -56,6 +69,7 @@ vpc1() {
     install -d -m 700 /root/.ssh; touch /root/.ssh/authorized_keys; chmod 600 /root/.ssh/authorized_keys
     grep -qF "$(cat "${drill_pubkey}")" /root/.ssh/authorized_keys || cat "${drill_pubkey}" >> /root/.ssh/authorized_keys
   fi
+  prune_images
   harden
   echo; echo "deploy key PUBLIC half — give it to: host-setup.sh vpc2 --mirror-pubkey <file>"; cat /data/backup/mirror-ssh/id_ed25519.pub
   echo; echo "still yours: the provider firewall (SSH from your IP and from ${mirror_host} only; nothing else inbound), and escrowing /data/backup/mirror-ssh/id_ed25519"
@@ -123,6 +137,7 @@ ENV
 0 3 1 * * root set -a; . /etc/better-answers/drill.env; set +a; /opt/better-answers/deploy/restore-drill.sh >> /var/log/better-answers-drill.log 2>&1
 CRON
   chmod 644 /etc/cron.d/better-answers-drill
+  prune_images
   harden
   echo; echo "fill, as root, mode 0600: /etc/better-answers/drill.env · staging.env (every key the two compose files require, staging values) · backup-age.key (the identity, from escrow — resident here; SECRETS.md says what that means)"
   echo; echo "root's PUBLIC key for the drill — give it to: host-setup.sh vpc1 --mirror-host <this box> --drill-pubkey <file>"; cat /root/.ssh/id_ed25519.pub
