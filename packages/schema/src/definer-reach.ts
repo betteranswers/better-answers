@@ -51,6 +51,20 @@ export const SECURITY_DEFINER_REACH = [
       "Past the caller's grants. `app_rt`'s ALL is revoked on the table, so the read the acceptance path makes of a proposed concept's body exists only here, scoped to the transaction's own workspace.",
   },
   {
+    fn: "public.concept_write_requests_naming",
+    args: "p_actors text[], p_addresses text[]",
+    reaches: ["public.concept_write_request"],
+    reason:
+      "Past the caller's grants. `app_rt`'s ALL is revoked on the table, so the erasure map's read of which requests name a person exists only here. It answers suggestion ids alone, never a request's text, and only in the transaction's own workspace.",
+  },
+  {
+    fn: "public.erase_from_the_suggestions",
+    args: "p_workspace_id text, p_actors text[], p_addresses text[], p_erased_as text",
+    reaches: ["public.suggestion", "public.concept_write_request"],
+    reason:
+      "Past the caller's grants. `app_rt` holds no privilege on `concept_write_request`, and `suggestion_decides_once` refuses any update to a decided suggestion and any change of proposer. The function refuses a workspace other than the transaction's, and accepts only an actor id as the pseudonym. It runs as the table's owner, which is the only caller the trigger lets rewrite who proposed and decided, and then only to that pseudonym.",
+  },
+  {
     fn: "public.analyse_map",
     args: "",
     reaches: ["public.map_node", "public.map_edge"],

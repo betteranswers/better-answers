@@ -171,6 +171,8 @@ describe("the erasure map's union", () => {
       "question-asked",
       "concept-sensitivity-override",
       "finding",
+      "suggestion",
+      "concept-write-request",
     ]);
   });
 
@@ -198,10 +200,12 @@ describe("the erasure map's union", () => {
       "question-asked": findsNothing,
       "concept-sensitivity-override": findsNothing,
       finding: findsNothing,
+      suggestion: findsNothing,
+      "concept-write-request": findsNothing,
     };
 
-    expect(Object.keys(withoutADocumentFinder)).toHaveLength(16);
-    expect(ERASURE_FAMILIES).toHaveLength(17);
+    expect(Object.keys(withoutADocumentFinder)).toHaveLength(18);
+    expect(ERASURE_FAMILIES).toHaveLength(19);
   });
 });
 
@@ -253,6 +257,8 @@ describe("the erasure map for a member", () => {
       NO_QUESTION_ASKED,
       { family: "concept-sensitivity-override", categories: ["actor-id"], locations: [] },
       { family: "finding", categories: ["actor-id", "typed-text"], locations: [] },
+      { family: "suggestion", categories: ["actor-id", "typed-text"], locations: [] },
+      { family: "concept-write-request", categories: ["actor-id", "email-address"], locations: [] },
     ]);
   });
 
@@ -375,6 +381,8 @@ describe("the erasure map for a subject with no user row", () => {
       ["question-asked", []],
       ["concept-sensitivity-override", []],
       ["finding", []],
+      ["suggestion", []],
+      ["concept-write-request", []],
     ]);
   });
 });
@@ -405,6 +413,11 @@ describe("the erasure map in one workspace's scope", () => {
         restoredAt: new Date(),
         restoreReason: "Needed on the payroll page.",
       }),
+      suggestion: await seed.suggestion({ workspaceId: here.workspaceId, proposer: actor }),
+      request: await seed.conceptWriteRequest({
+        workspaceId: here.workspaceId,
+        frontmatter: { title: "Expenses", verified: [{ by: `human:${email}` }] },
+      }),
     }));
     const theirs = await seedingWith(db().pool, async (seed) => ({
       commit: await seed.bundleCommit({ workspaceId: elsewhere.workspaceId, actor }),
@@ -423,6 +436,11 @@ describe("the erasure map in one workspace's scope", () => {
         reviewState: "dismissed",
         reviewedBy: actor,
         reviewedAt: new Date(),
+      }),
+      suggestion: await seed.suggestion({ workspaceId: elsewhere.workspaceId, proposer: actor }),
+      request: await seed.conceptWriteRequest({
+        workspaceId: elsewhere.workspaceId,
+        body: `Ask ${actor} about expenses.`,
       }),
     }));
 
@@ -457,6 +475,8 @@ describe("the erasure map in one workspace's scope", () => {
       ["question-asked", []],
       ["concept-sensitivity-override", [mine.override.iri]],
       ["finding", [mine.finding.id]],
+      ["suggestion", [mine.suggestion.id]],
+      ["concept-write-request", [mine.request.suggestionId]],
     ]);
     const named = map.flatMap((entry) => entry.locations);
     for (const theirsOwn of [
@@ -465,6 +485,8 @@ describe("the erasure map in one workspace's scope", () => {
       theirs.invite.id,
       theirs.override.iri,
       theirs.finding.id,
+      theirs.suggestion.id,
+      theirs.request.suggestionId,
       shaElsewhere,
       elsewhere.workspaceId,
     ]) {

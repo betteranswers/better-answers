@@ -141,6 +141,113 @@ describe("a finding the person reviewed or restored", () => {
   });
 });
 
+describe("a suggestion the person proposed or decided", () => {
+  const suggestionsIn = async (workspaceId: string) =>
+    (
+      await db().pool.query<Record<string, unknown>>(
+        "SELECT id, proposer, decider, reason FROM suggestion WHERE workspace_id = $1 ORDER BY id",
+        [workspaceId],
+      )
+    ).rows;
+
+  const declined = (decider: string, reason: string) => ({
+    status: "declined",
+    decider,
+    decidedAt: new Date("2026-05-01T09:00:00.000Z"),
+    reason,
+  });
+
+  it("names the pseudonym and replaces only the person's reasons", async () => {
+    const { scenario, email, person, actor } = await aMemberToErase();
+    const another = actorIdOfPerson(scenario.admin.userId);
+    const workspaceId = scenario.workspaceId;
+    const [proposed, decided, untouched] = await seedingWith(db().pool, async (seed) => [
+      await seed.suggestion({
+        workspaceId,
+        proposer: actor,
+        ...declined(another, "Not the company's word on this."),
+      }),
+      await seed.suggestion({
+        workspaceId,
+        proposer: another,
+        ...declined(actor, "Priya says the policy changed in May."),
+      }),
+      await seed.suggestion({
+        workspaceId,
+        proposer: another,
+        ...declined(another, "Already in the handbook."),
+      }),
+    ]);
+
+    const { run, erasedAs } = await erasing(scenario, person, email);
+
+    expect(await suggestionsIn(workspaceId)).toEqual(
+      [
+        {
+          id: proposed.id,
+          proposer: erasedAs,
+          decider: another,
+          reason: "Not the company's word on this.",
+        },
+        {
+          id: decided.id,
+          proposer: another,
+          decider: erasedAs,
+          reason: "Removed when its author's personal data was erased.",
+        },
+        {
+          id: untouched.id,
+          proposer: another,
+          decider: another,
+          reason: "Already in the handbook.",
+        },
+      ].toSorted((left, right) => (left.id < right.id ? -1 : 1)),
+    );
+    expect(run.report).toContain("suggestion: actorsRewritten 2, found 2");
+  });
+});
+
+describe("a write request that names the person", () => {
+  const requestOf = async (workspaceId: string, suggestionId: string) =>
+    (
+      await db().pool.query<Record<string, unknown>>(
+        `SELECT title, frontmatter, body FROM concept_write_request
+          WHERE workspace_id = $1 AND suggestion_id = $2`,
+        [workspaceId, suggestionId],
+      )
+    ).rows[0];
+
+  it("names the pseudonym wherever the request named the person", async () => {
+    const { scenario, email, person, actor } = await aMemberToErase();
+    const workspaceId = scenario.workspaceId;
+    const shouted = `human:${email.toUpperCase()}`;
+    const [naming, anothers] = await seedingWith(db().pool, async (seed) => [
+      await seed.conceptWriteRequest({
+        workspaceId,
+        suggestionId: (await seed.suggestion({ workspaceId, proposer: actor })).id,
+        title: `Expenses, checked by ${actor}`,
+        frontmatter: { title: "Expenses", verified: [{ by: shouted }] },
+        body: `Ask ${actor} or ${shouted} about expenses.`,
+      }),
+      await seed.conceptWriteRequest({ workspaceId }),
+    ]);
+
+    const { run, erasedAs } = await erasing(scenario, person, email);
+
+    expect(await requestOf(workspaceId, naming.suggestionId)).toEqual({
+      title: `Expenses, checked by ${erasedAs}`,
+      frontmatter: { title: "Expenses", verified: [{ by: erasedAs }] },
+      body: `Ask ${erasedAs} or ${erasedAs} about expenses.`,
+    });
+    expect(await requestOf(workspaceId, anothers.suggestionId)).toEqual({
+      title: anothers.title,
+      frontmatter: anothers.frontmatter,
+      body: anothers.body,
+    });
+    expect(run.report).toContain("concept-write-request: actorsRewritten 1, found 1");
+  });
+});
+
 describe("an accepted edit the person proposed", () => {
   const proposedAndAccepted = async (scenario: Scenario, proposer: UserPrincipal) => {
     const set = await submitSuggestionSet(

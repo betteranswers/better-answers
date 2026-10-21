@@ -1800,6 +1800,142 @@ const submittingOneRequest = async (client: pg.PoolClient, kind: string): Promis
   }
 };
 
+const ERASED_AS = "human:01J6EEEEEEEEEEEEEEEEEEEEEE";
+
+const PROPOSER = "human:01J6PPPPPPPPPPPPPPPPPPPPPP";
+
+const eraseFrom = (client: pg.PoolClient, workspaceId: string, erasedAs = ERASED_AS) =>
+  client.query<{ suggestions: number; requests: number }>(
+    "SELECT * FROM erase_from_the_suggestions($1, $2, $3, $4)",
+    [workspaceId, [PROPOSER], ["priya@example.com"], erasedAs],
+  );
+
+const requestsNaming = (client: pg.PoolClient) =>
+  client.query<{ concept_write_requests_naming: string }>(
+    "SELECT * FROM concept_write_requests_naming($1, $2)",
+    [[PROPOSER], ["priya@example.com"]],
+  );
+
+describe("the erasure of the suggestions", () => {
+  const twoProposals = async (client: pg.PoolClient) => {
+    const seed = await seedTwoWorkspaces(client);
+    const here = await seed.suggestion({ workspaceId: WS_A, proposer: PROPOSER });
+    await seed.conceptWriteRequest({
+      workspaceId: WS_A,
+      suggestionId: here.id,
+      body: `Ask ${PROPOSER} about expenses.`,
+    });
+    const there = await seed.suggestion({ workspaceId: WS_B, proposer: PROPOSER });
+    await seed.conceptWriteRequest({
+      workspaceId: WS_B,
+      suggestionId: there.id,
+      body: `Ask ${PROPOSER} about expenses.`,
+    });
+    return { here, there };
+  };
+
+  it("serves the api only, and only in its own workspace", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { here, there } = await twoProposals(client);
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      expect((await requestsNaming(client)).rows).toEqual([
+        { concept_write_requests_naming: here.id },
+      ]);
+      await client.query("SAVEPOINT elsewhere");
+      await expect(eraseFrom(client, WS_B)).rejects.toThrow(/scoped to another workspace/);
+      await client.query("ROLLBACK TO SAVEPOINT elsewhere");
+      expect((await eraseFrom(client, WS_A)).rows).toEqual([{ suggestions: 1, requests: 1 }]);
+
+      await client.query("SELECT set_config('app.workspace_id', '', true)");
+      await client.query("SAVEPOINT unscoped");
+      await expect(eraseFrom(client, WS_B)).rejects.toThrow(/scoped to another workspace/);
+      await client.query("ROLLBACK TO SAVEPOINT unscoped");
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      for (const call of [() => requestsNaming(client), () => eraseFrom(client, WS_A)]) {
+        await client.query("SAVEPOINT worker");
+        await expect(call()).rejects.toThrow(/permission denied/);
+        await client.query("ROLLBACK TO SAVEPOINT worker");
+      }
+
+      await client.query("RESET ROLE");
+      const theirs = await client.query(
+        "SELECT s.proposer, r.body FROM suggestion s JOIN concept_write_request r ON r.suggestion_id = s.id WHERE s.id = $1",
+        [there.id],
+      );
+      expect(theirs.rows).toEqual([
+        { proposer: PROPOSER, body: `Ask ${PROPOSER} about expenses.` },
+      ]);
+    });
+  });
+
+  it("refuses a pseudonym that is not an actor id", async () => {
+    await withRollback(db.pool, async (client) => {
+      await twoProposals(client);
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await expect(eraseFrom(client, WS_A, 'human:x", "admin": "yes')).rejects.toThrow(
+        /the pseudonym actor is not an actor id/,
+      );
+    });
+  });
+
+  it("refuses the api the erasure's rewrite of a decided suggestion", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { here } = await twoProposals(client);
+      await deciding(client, here.id);
+      await client.query(
+        `UPDATE suggestion SET status = 'declined', decider = $3, decided_at = now(),
+                reason = 'not the company''s word on this'
+          WHERE workspace_id = $1 AND id = $2`,
+        [WS_A, here.id, PROPOSER],
+      );
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      await client.query("SELECT set_config('app.erasing_suggestions_as', $1, true)", [ERASED_AS]);
+
+      await expect(
+        client.query("UPDATE suggestion SET proposer = $3 WHERE workspace_id = $1 AND id = $2", [
+          WS_A,
+          here.id,
+          ERASED_AS,
+        ]),
+      ).rejects.toThrow(/decided as declined already/);
+    });
+  });
+
+  it("lets the erasure rewrite only who proposed and decided", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { here } = await twoProposals(client);
+      await client.query("SELECT set_config('app.erasing_suggestions_as', $1, true)", [ERASED_AS]);
+
+      for (const [change, value] of [
+        ["status", "returned"],
+        ["set_id", ulid()],
+        ["proposer", "human:01J6CCCCCCCCCCCCCCCCCCCCCC"],
+      ] as const) {
+        await client.query("SAVEPOINT rewrite");
+        await expect(
+          client.query(`UPDATE suggestion SET ${change} = $3 WHERE workspace_id = $1 AND id = $2`, [
+            WS_A,
+            here.id,
+            value,
+          ]),
+        ).rejects.toThrow(/an erasure rewrites who proposed and decided, and nothing else/);
+        await client.query("ROLLBACK TO SAVEPOINT rewrite");
+      }
+      const rewritten = await client.query(
+        "UPDATE suggestion SET proposer = $3 WHERE workspace_id = $1 AND id = $2",
+        [WS_A, here.id, ERASED_AS],
+      );
+      expect(rewritten.rowCount).toBe(1);
+    });
+  });
+});
+
 describe("the kinds a caller may raise, asked of the function", () => {
   it("lands a set only of kinds its caller's tier names", async () => {
     await withRollback(db.pool, async (client) => {

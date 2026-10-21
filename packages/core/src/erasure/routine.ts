@@ -289,6 +289,10 @@ const SENSITIVITY_OVERRIDE: ErasureFamily = "concept-sensitivity-override";
 
 const FINDING: ErasureFamily = "finding";
 
+const SUGGESTION: ErasureFamily = "suggestion";
+
+const CONCEPT_WRITE_REQUEST: ErasureFamily = "concept-write-request";
+
 const withTheActorsStep = (actions: ErasureActions, swept: ActorsSwept): ErasureActions => ({
   ...actions,
   [BUNDLE_COMMIT]: { ...actions[BUNDLE_COMMIT], actorsRewritten: swept.commits },
@@ -298,6 +302,11 @@ const withTheActorsStep = (actions: ErasureActions, swept: ActorsSwept): Erasure
   },
   [SENSITIVITY_OVERRIDE]: { ...actions[SENSITIVITY_OVERRIDE], actorsRewritten: swept.overrides },
   [FINDING]: { ...actions[FINDING], actorsRewritten: swept.findings },
+  [SUGGESTION]: { ...actions[SUGGESTION], actorsRewritten: swept.suggestions },
+  [CONCEPT_WRITE_REQUEST]: {
+    ...actions[CONCEPT_WRITE_REQUEST],
+    actorsRewritten: swept.requests,
+  },
 });
 
 const rewritingTheBundle = (
@@ -340,7 +349,9 @@ const afterTheMembersEnd = async (
   );
   const git = await rewritingTheBundle(platform, doors, workspaceId, { ...subject, addresses });
   if (!git.ok) return err(git.error);
-  const actors = await attempt(() => eraseFromTheActors(platform, doors.postgres, subject));
+  const actors = await attempt(() =>
+    eraseFromTheActors(platform, doors.postgres, { ...subject, addresses }),
+  );
   return actors.ok ? ok({ git: git.value, actors: actors.value }) : err(actors.error);
 };
 
@@ -663,7 +674,7 @@ export const runErasure = async (
     );
     if (!suppressed.ok) return err(suppressed.error);
 
-    const named = { workspaceId, personIds, pseudonym };
+    const named = { workspaceId, personIds, pseudonym, addresses: addresses.inTheBundle };
     const swept = await attempt(async () => {
       const questions = await eraseFromTheQuestions(platform, doors.postgres, named);
       logTheSweep(
@@ -694,7 +705,6 @@ export const runErasure = async (
     const after = await afterTheMembersEnd(platform, doors, {
       ...named,
       erasureRequestId: erasure.id,
-      addresses: addresses.inTheBundle,
       people,
       paths: pathsNaming(map),
     });

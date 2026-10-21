@@ -7,6 +7,8 @@ export type ActorsSwept = {
   readonly verifications: number;
   readonly overrides: number;
   readonly findings: number;
+  readonly suggestions: number;
+  readonly requests: number;
 };
 
 export const NO_ACTORS_SWEPT: ActorsSwept = {
@@ -14,6 +16,8 @@ export const NO_ACTORS_SWEPT: ActorsSwept = {
   verifications: 0,
   overrides: 0,
   findings: 0,
+  suggestions: 0,
+  requests: 0,
 };
 
 const REWRITE_THE_COMMITS = `UPDATE bundle_commit SET actor = $3
@@ -32,24 +36,34 @@ const REWRITE_THE_FINDINGS = `UPDATE finding
          restore_reason = CASE WHEN restored_by = ANY($2) THEN '' ELSE restore_reason END
    WHERE workspace_id = $1 AND (reviewed_by = ANY($2) OR restored_by = ANY($2))`;
 
+const ERASE_FROM_THE_SUGGESTIONS =
+  "SELECT suggestions, requests FROM erase_from_the_suggestions($1, $2, $3, $4)";
+
 export const sweepTheActors = async (
   tx: Tx,
   subject: {
     readonly workspaceId: string;
     readonly actors: readonly string[];
+    readonly addresses: readonly string[];
     readonly pseudonym: string;
   },
 ): Promise<ActorsSwept> => {
-  const parameters = [subject.workspaceId, subject.actors, `${PERSON_PREFIX}${subject.pseudonym}`];
+  const erasedAs = `${PERSON_PREFIX}${subject.pseudonym}`;
+  const parameters = [subject.workspaceId, subject.actors, erasedAs];
   const commits = await tx.query(REWRITE_THE_COMMITS, parameters);
   const verifications = await tx.query(REWRITE_THE_VERIFICATIONS, parameters);
   const overrides = await tx.query(REWRITE_THE_OVERRIDES, parameters);
   const findings = await tx.query(REWRITE_THE_FINDINGS, parameters);
+  const suggested = await tx.query<Pick<ActorsSwept, "suggestions" | "requests">>(
+    ERASE_FROM_THE_SUGGESTIONS,
+    [subject.workspaceId, subject.actors, subject.addresses, erasedAs],
+  );
   return {
     commits: commits.rowCount ?? 0,
     verifications: verifications.rowCount ?? 0,
     overrides: overrides.rowCount ?? 0,
     findings: findings.rowCount ?? 0,
+    ...(suggested.rows[0] ?? { suggestions: 0, requests: 0 }),
   };
 };
 
@@ -59,6 +73,7 @@ export const eraseFromTheActors = async (
   subject: {
     readonly workspaceId: string;
     readonly personIds: readonly (string | null)[];
+    readonly addresses: readonly string[];
     readonly pseudonym: string;
   },
 ): Promise<ActorsSwept> => {
@@ -66,7 +81,12 @@ export const eraseFromTheActors = async (
   if (actors.length === 0) return NO_ACTORS_SWEPT;
 
   return withScope(platform, door, subject.workspaceId, (tx) =>
-    sweepTheActors(tx, { workspaceId: subject.workspaceId, actors, pseudonym: subject.pseudonym }),
+    sweepTheActors(tx, {
+      workspaceId: subject.workspaceId,
+      actors,
+      addresses: subject.addresses,
+      pseudonym: subject.pseudonym,
+    }),
   );
 };
 
@@ -75,4 +95,6 @@ export const inEverySweep = (...sweeps: readonly ActorsSwept[]): ActorsSwept => 
   verifications: sweeps.reduce((total, sweep) => total + sweep.verifications, 0),
   overrides: sweeps.reduce((total, sweep) => total + sweep.overrides, 0),
   findings: sweeps.reduce((total, sweep) => total + sweep.findings, 0),
+  suggestions: sweeps.reduce((total, sweep) => total + sweep.suggestions, 0),
+  requests: sweeps.reduce((total, sweep) => total + sweep.requests, 0),
 });

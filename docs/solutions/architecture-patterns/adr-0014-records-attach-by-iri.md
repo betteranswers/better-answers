@@ -47,18 +47,17 @@ People on records:
 - A member ends by an Admin's removal or by an erasure. Its row is deleted, and its audit event is the record of it.
 - The identity set keeps no team record. A group may carry a team's name (ADR 0038).
 
-The erasure union is `ERASURE_FAMILIES` in `packages/core/src/erasure/map.ts`. Each family has a finder in the erasure map and a step in the erasure routine, and the access answer lists what each finder found. The union holds seventeen families:
+The erasure union is `ERASURE_FAMILIES` in `packages/core/src/erasure/map.ts`. Each family has a finder in the erasure map and a step in the erasure routine, and the access answer lists what each finder found. The union holds nineteen families:
 
 - The bundle: `concept-file` (file text and git author lines), `bundle-commit` and `concept-verification`.
 - The identity set: `identity-user`, `identity-session`, `identity-verification`, `identity-invitation`, `identity-account`, `identity-passkey`, `identity-authenticator`, `identity-recovery-code`, `identity-confirm-failures` and `identity-last-active`.
 - The evidence: `source-document`.
-- The platform's records: `question-asked`, `concept-sensitivity-override` (who set the override) and `finding` (who reviewed or restored it, and the reason they gave).
+- The platform's records: `question-asked`, `concept-sensitivity-override` (who set the override), `finding` (who reviewed or restored it, and the reason they gave), `suggestion` (who proposed and who decided it, and the decider's reason) and `concept-write-request` (the person's actor id or `human:<address>` in a request's title, frontmatter or body).
 
-Four tables name a person outside the union:
+Two tables name a person outside the union:
 
 - `access_request`. The identity step clears the reason and the invitation on every arm, by the owner's ruling in #792. `requester_id` and `decided_by` keep the person id, because they key the user row, which keeps its id.
 - `audit_event`. It is never rewritten.
-- `suggestion` and its `concept_write_request`. The erasure does not reach them yet (BA-220). A suggestion names its proposer and decider, and a declined or returned one keeps the decider's reason. A write request's frontmatter can carry `human:<email>`. The trigger `suggestion_decides_once` refuses any update to a decided suggestion and any change of proposer. `app_rt` holds no `DELETE` on `suggestion` and no privilege on `concept_write_request`. So reaching them needs a migration.
 
 Decided for the S3 block and not yet in the tree:
 

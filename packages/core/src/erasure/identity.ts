@@ -150,7 +150,11 @@ export const eraseFromTheIdentitySet = async (
     );
     const named = { workspaceId: subject.workspaceId, pseudonym: subject.pseudonym };
     const questionsSince = await sweepTheQuestions(tx, { ...named, askers: askersOf([personId]) });
-    const actorsSince = await sweepTheActors(tx, { ...named, actors: askersOf([personId]) });
+    const actorsSince = await sweepTheActors(tx, {
+      ...named,
+      actors: askersOf([personId]),
+      addresses: subject.emails,
+    });
     const done = { membersEnded, lastActive, questionsSince, actorsSince };
 
     const elsewhere = await tx.query(HELD_ELSEWHERE, [personId, subject.workspaceId]);

@@ -368,6 +368,20 @@ export const CROSS_OWNER_TABLE_ACCESS = [
       "A finding names who reviewed or restored it and keeps the reason they typed, so the erasure map lists each one and every erasure from the workspace rewrites the id to the erasure pseudonym and clears that person's reason.",
   },
   {
+    table: "public.suggestion",
+    by: "erasure",
+    access: "read and write",
+    reason:
+      "A suggestion names who proposed and who decided it and keeps the decider's reason, so the erasure map lists each one the person proposed or decided and every erasure from the workspace rewrites both ids to the erasure pseudonym and replaces that person's reason, through `erase_from_the_suggestions`.",
+  },
+  {
+    table: "public.concept_write_request",
+    by: "erasure",
+    access: "write",
+    reason:
+      "A write request's title, frontmatter and body can carry the person's actor id or `human:<address>`, so the erasure map lists each request naming them through `concept_write_requests_naming` and every erasure from the workspace rewrites those to the erasure pseudonym through `erase_from_the_suggestions`, as it rewrites the bundle's files.",
+  },
+  {
     table: "public.concept_index",
     by: "erasure",
     access: "read",

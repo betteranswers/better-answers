@@ -28,6 +28,8 @@ export const ERASURE_FAMILIES = [
   "question-asked",
   "concept-sensitivity-override",
   "finding",
+  "suggestion",
+  "concept-write-request",
 ] as const;
 
 export type ErasureFamily = (typeof ERASURE_FAMILIES)[number];
@@ -278,6 +280,27 @@ const ERASURE_FAMILY_DESCRIPTORS = {
         subject,
         `SELECT id AS location FROM finding
           WHERE workspace_id = $1 AND (reviewed_by = ANY($2) OR restored_by = ANY($2))`,
+      ),
+  },
+
+  suggestion: {
+    categories: ["actor-id", "typed-text"],
+    find: (platform, subject, tx) =>
+      aboutTheActors(
+        tx,
+        subject,
+        `SELECT id AS location FROM suggestion
+          WHERE workspace_id = $1 AND (proposer = ANY($2) OR decider = ANY($2))`,
+      ),
+  },
+
+  "concept-write-request": {
+    categories: ["actor-id", "email-address"],
+    find: (platform, subject, tx) =>
+      located(
+        tx,
+        "SELECT concept_write_requests_naming AS location FROM concept_write_requests_naming($1, $2)",
+        [askersOf([subject.actor, subject.memberId]), subject.emails],
       ),
   },
 } satisfies Record<ErasureFamily, ErasureFamilyDescriptor>;
