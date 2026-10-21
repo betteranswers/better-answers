@@ -38,6 +38,9 @@ services:
   api:
     image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?}
     <<: [*restart, *logging, *mem512]
+    init: true
+    # Coolify's own stop timeout, written here for `docker compose stop`. The api's own 10 s stop deadline falls well inside it.
+    stop_grace_period: 30s
     environment:
       <<: *bootstrap
       # /health names it: the build being replaced answers healthy until the swap, and only this tells them apart.

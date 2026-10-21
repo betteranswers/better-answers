@@ -1,3 +1,5 @@
+import { setTimeout as delay } from "node:timers/promises";
+
 import { serve } from "@hono/node-server";
 
 import {
@@ -9,7 +11,8 @@ import {
   requireIdentityBootstrap,
   requireRunningImage,
 } from "./config.ts";
-import { openDoors } from "./doors.ts";
+import { closeDoors, openDoors } from "./doors.ts";
+import type { EmailSender } from "./email.ts";
 import { logger } from "./logger.ts";
 import { senderAt } from "./product-name.ts";
 import { RECONCILER_INTERVAL_MS, startReconciler } from "./reconciler.ts";
@@ -39,24 +42,43 @@ if (doors.git?.ok === false) {
   process.exit(1);
 }
 
-const sendEmail = emailSender(
+let stopping: Promise<never> | undefined;
+const running: { stop(): Promise<void> }[] = [];
+const sending = new Set<Promise<void>>();
+
+const sendBySmtp = emailSender(
   identity.smtpUrl === undefined ? undefined : pacedTransport(identity.smtpUrl),
   senderAt(identity.hostnames.apex),
   logger,
 );
+const sendEmail: EmailSender = (message) => {
+  const sent = sendBySmtp(message);
+  const settled = (): void => void sending.delete(sent);
+  sending.add(sent);
+  void sent.then(settled, settled);
+  return sent;
+};
 
-serve(
+const app = createServer({
+  doors,
+  publicUrl: identity.publicUrl,
+  hostnames: identity.hostnames,
+  authSecret: identity.authSecret,
+  sendEmail,
+  webRoot: bootstrap.webRoot,
+  imageDigest: image.digest,
+  envelopeKey: envelopeKey.ok ? envelopeKey.value : undefined,
+});
+
+const server = serve(
   {
-    fetch: createServer({
-      doors,
-      publicUrl: identity.publicUrl,
-      hostnames: identity.hostnames,
-      authSecret: identity.authSecret,
-      sendEmail,
-      webRoot: bootstrap.webRoot,
-      imageDigest: image.digest,
-      envelopeKey: envelopeKey.ok ? envelopeKey.value : undefined,
-    }).fetch,
+    fetch: async (request, bindings) => {
+      const response = await app.fetch(request, bindings);
+      if (stopping === undefined) return response;
+      const closing = new Response(response.body, response);
+      closing.headers.set("connection", "close");
+      return closing;
+    },
     port: bootstrap.port,
   },
   (address) => {
@@ -76,6 +98,7 @@ if (!reconciler.ok) {
     "no repositories' root is configured (GIT_STORE_DIR): the head check is not running",
   );
 } else {
+  running.push(reconciler.value);
   logger.info(
     {
       interval_ms: RECONCILER_INTERVAL_MS,
@@ -94,6 +117,7 @@ if (!sweepSettings.ok) {
   if (!sweeps.ok) {
     logger.error({ reason: sweeps.error }, "the sweeps are not running");
   } else {
+    running.push(sweeps.value);
     logger.info(
       {
         interval_ms: SWEEP_INTERVAL_MS,
@@ -105,3 +129,38 @@ if (!sweepSettings.ok) {
     );
   }
 }
+
+/** Coolify kills the container 30 s after the signal, so a stop still waiting on a client or a query is cut well before. */
+const STOP_DEADLINE_MS = 10_000;
+
+const drain = async (): Promise<void> => {
+  await Promise.all([
+    new Promise((closed) => server.close(closed)),
+    ...running.map((job) => job.stop()),
+  ]);
+  await Promise.allSettled(sending);
+  await closeDoors(doors);
+};
+
+const stop = async (signal: NodeJS.Signals): Promise<never> => {
+  logger.info({ signal }, "the api is stopping");
+  const drained = await Promise.race([
+    drain().then(() => true),
+    delay(STOP_DEADLINE_MS).then(() => false),
+  ]);
+  if (drained) {
+    logger.info("the api has stopped");
+  } else {
+    logger.warn(
+      { deadline_ms: STOP_DEADLINE_MS },
+      "the stop reached its deadline, so what was still open is cut",
+    );
+  }
+  process.exit(0);
+};
+
+const stopOn = (signal: NodeJS.Signals): void => {
+  stopping ??= stop(signal);
+};
+process.once("SIGTERM", stopOn);
+process.once("SIGINT", stopOn);
