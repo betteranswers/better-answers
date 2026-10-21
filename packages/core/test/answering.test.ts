@@ -1889,12 +1889,17 @@ describe("the two knowledge layers a search and a fetch reach", () => {
       ["The kingfisher grid", `Name${"　  ".repeat(150)}Role kingfisher`, "Name Role kingfisher"],
       [
         "The kingfisher annex",
-        `${"\n".repeat(5)}#\u2028${"\n".repeat(330)}The kingfisher annex opens late.`,
+        `${"\n".repeat(5)}#\u2029${"\n".repeat(330)}The kingfisher annex opens late.`,
         "The kingfisher annex opens late.",
       ],
       [
+        "The kingfisher folio",
+        `${"#\u2028".repeat(161)}The kingfisher folio opens late.`,
+        "The kingfisher folio opens late.",
+      ],
+      [
         "The kingfisher roll",
-        `${"#\u2028".repeat(100)}${roll}`,
+        `${"#\u0085".repeat(100)}${roll}`,
         `${Array.from(roll).slice(0, 159).join("").trimEnd()}…`,
       ],
     ] as const;
