@@ -16,11 +16,15 @@ import {
   rebuildMap,
   reconcile,
   sweepMap,
+  updateConceptBody,
   type BundleImported,
   type BundleTree,
+  type ConceptBodyRun,
+  type ConceptBodyUpdate,
   type ConceptRewritten,
   type ImportBundleRefusal,
   type UnsoundReason,
+  type UpdateConceptBodyRefusal,
 } from "@better-answers/core/concepts";
 import {
   ERASURE,
@@ -38,6 +42,7 @@ import {
   type PlatformPrincipal,
   type RefusalClass,
   type Result,
+  type UserPrincipal,
 } from "@better-answers/core/kernel";
 import {
   CHOOSABLE_PROVIDERS,
@@ -119,6 +124,7 @@ import type { Mail } from "../email.ts";
 import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { refusalOf, type RefusalWord } from "../refusal.ts";
+import { bodyDiffLines } from "./body-diff.ts";
 
 const DONE = 0;
 const REFUSED = 1;
@@ -199,6 +205,7 @@ const NEEDS = {
   "reindex-connected-sources": [connectedSource, job],
   "erasure-rehearsal": [erasureRequest, suppression],
   "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
+  "update-concept-body": [conceptIndex, bundleCommit],
   "set-model-key": [modelKey],
   "set-spending-limit": [llmCall, spendReservation],
   "set-model-choice": [modelChoice, modelPrice, decisionThreshold],
@@ -259,6 +266,10 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
                                                             the company's bundle landed through the governed write, its verifications imported, its links rewritten to iris
     --sensitivity  one of ${SENSITIVITIES.join(" · ")} (default ${IMPORT_SENSITIVITY_DEFAULT})
     --dry-run      validate the tree and say what a run would do, writing nothing
+  update-concept-body --workspace <id> --iri <iri> --as <member email> [--expect <content hash>] [--dry-run]
+                                                            stdin: the concept's new body; it replaces the body alone, keeping frontmatter, status, verification and citations
+    --expect   the content hash the concept stands at, required on a write; a dry run prints it
+    --dry-run  print the hash the concept stands at and the body's diff, writing nothing
 exit codes: ${DONE} done · ${REFUSED} refused in no refusal word, stop · ${USAGE} usage, or a malformed argument · ${NOT_BUILT} the slice this needs has no tables yet
   a refusal word exits with its class's code: ${Object.entries(EXIT_OF_CLASS)
     .map(([refusalClass, code]) => `${code} ${refusalClass}`)
@@ -839,6 +850,26 @@ const sayImported = (io: OpsIo, imported: BundleImported, seconds: string): void
   );
 };
 
+const memberOf = async (
+  command: string,
+  doors: Doors,
+  workspaceId: string,
+  email: string,
+  io: OpsIo,
+): Promise<Result<UserPrincipal, number>> => {
+  const principal = await principalOfMember(doors.postgres, {
+    workspaceId,
+    email,
+    at: doors.clock.now(),
+  });
+  if (principal.ok) return ok(principal.value);
+  const said =
+    principal.error === "not-a-member"
+      ? `${email} is not a member of workspace ${workspaceId}; invite them first`
+      : undefined;
+  return err(refused(command, workspaceId, principal.error, io, said));
+};
+
 const importBundleCommand = async (
   doors: Doors,
   workspaceId: string,
@@ -862,18 +893,8 @@ const importBundleCommand = async (
     return REFUSED;
   }
   const postgres = doors.postgres;
-  const principal = await principalOfMember(postgres, {
-    workspaceId,
-    email,
-    at: doors.clock.now(),
-  });
-  if (!principal.ok) {
-    const said =
-      principal.error === "not-a-member"
-        ? `${email} is not a member of workspace ${workspaceId}; invite them first`
-        : undefined;
-    return refused("import-bundle", workspaceId, principal.error, io, said);
-  }
+  const principal = await memberOf("import-bundle", doors, workspaceId, email, io);
+  if (!principal.ok) return principal.error;
   const started = doors.clock.now();
   const run = await importBundle(
     principal.value,
@@ -883,6 +904,114 @@ const importBundleCommand = async (
   const seconds = ((doors.clock.now().getTime() - started.getTime()) / 1_000).toFixed(1);
   if (!run.ok) return importRefused(workspaceId, run.error, email, io);
   sayImported(io, run.value, seconds);
+  return DONE;
+};
+
+type BodyAsked = { readonly iri: string; readonly email: string; readonly run: ConceptBodyRun };
+
+const bodyAskedOf = (flags: Flags): Result<BodyAsked, string> => {
+  const iri = flagValue(flags, "iri");
+  const email = flagValue(flags, "as");
+  const base = flagValue(flags, "expect");
+  const dryRun = flags.get("dry-run");
+  if (iri === undefined || email === undefined) {
+    return err("--iri <iri> and --as <member email> are required, with the new body on stdin");
+  }
+  if (dryRun !== undefined && dryRun !== true) return err("--dry-run takes no value");
+  if (dryRun === true) return ok({ iri, email, run: { dryRun, base } });
+  if (base === undefined) {
+    return err(
+      "--expect <content hash> is required on a write; run with --dry-run to read the hash the concept stands at",
+    );
+  }
+  return ok({ iri, email, run: { dryRun: false, base } });
+};
+
+const BODY_KEPT = "frontmatter, status, verification and citations kept";
+
+const BODY_WORDS: Partial<
+  Record<
+    Extract<UpdateConceptBodyRefusal, string>,
+    (asked: BodyAsked, workspaceId: string) => string
+  >
+> = {
+  "role-forbids": (asked) =>
+    `${asked.email} is a Viewer of this workspace; the update runs as an Admin or an Editor`,
+  malformed: (asked) =>
+    `--iri ${asked.iri} is not a concept iri, or the body is longer than a concept holds; nothing was written`,
+  "no-such-concept": (asked, workspaceId) =>
+    `no concept ${asked.iri} stands in workspace ${workspaceId} that ${asked.email} can read; a Restricted concept needs an Admin; nothing was written`,
+  unchanged: (asked) => `the body given is the one ${asked.iri} already holds; nothing was written`,
+  "widening-refused": (asked) =>
+    `${asked.iri} is held narrower than the sources it cites, as after a replay whose sources disagreed; a body update would widen it, so nothing was written`,
+  "stale-precondition": (asked) =>
+    `${asked.iri} moved: ${asked.run.base === undefined ? "its" : `it no longer stands at ${asked.run.base}, or its`} file at the bundle's head is ahead of its row; nothing was written. Run with --dry-run again, and if that refuses the same way a minute later, the rows are behind the bundle: RUNBOOK page 10`,
+  "no-such-repository": () => "this workspace has no bundle repository; provision it first",
+};
+
+const bodyWordSaid = (
+  word: Extract<UpdateConceptBodyRefusal, string>,
+  asked: BodyAsked,
+  workspaceId: string,
+): string => BODY_WORDS[word]?.(asked, workspaceId) ?? word;
+
+const bodyUpdateRefused = (
+  workspaceId: string,
+  refusal: UpdateConceptBodyRefusal | Error,
+  asked: BodyAsked,
+  io: OpsIo,
+): number =>
+  refused(
+    "update-concept-body",
+    workspaceId,
+    refusal,
+    io,
+    refusal instanceof Error ? undefined : bodyWordSaid(refusal, asked, workspaceId),
+  );
+
+const sayBodyUpdate = (io: OpsIo, update: ConceptBodyUpdate): void => {
+  const { path, from, to, written } = update;
+  if (written === undefined) {
+    io.say(`update-concept-body: ${path} stands at ${from.contentHash}; pass it as --expect`);
+    for (const line of bodyDiffLines(from.body, to.body)) io.say(line);
+    io.say(
+      `update-concept-body: dry run — the body would move ${path} from ${from.contentHash} to ${to.contentHash}; ${BODY_KEPT}; nothing was written`,
+    );
+    return;
+  }
+  io.say(
+    `update-concept-body: done — ${path} moved from ${from.contentHash} to ${written.contentHash}, commit ${written.sha.slice(0, 7)}; ${BODY_KEPT}`,
+  );
+};
+
+const updateConceptBodyCommand = async (
+  doors: Doors,
+  workspaceId: string,
+  flags: Flags,
+  io: OpsIo,
+): Promise<number> => {
+  const asked = bodyAskedOf(flags);
+  if (!asked.ok) {
+    io.say(`update-concept-body: ${asked.error}`);
+    return USAGE;
+  }
+  const body = await io.stdin();
+  if (body.trim() === "") {
+    io.say("update-concept-body: the new body is read from stdin, and stdin was empty");
+    return USAGE;
+  }
+  const git = bundleStore(doors, "the bundle the update writes into cannot be opened");
+  if (!git.ok) {
+    io.say(`update-concept-body: REFUSED — ${git.error}`);
+    return REFUSED;
+  }
+  const { iri, email, run } = asked.value;
+  const principal = await memberOf("update-concept-body", doors, workspaceId, email, io);
+  if (!principal.ok) return principal.error;
+  const bundle = { git: git.value, postgres: doors.postgres, clock: doors.clock };
+  const updated = await updateConceptBody(principal.value, bundle, { iri, body, ...run });
+  if (!updated.ok) return bodyUpdateRefused(workspaceId, updated.error, asked.value, io);
+  sayBodyUpdate(io, updated.value);
   return DONE;
 };
 
@@ -1567,6 +1696,7 @@ const SLICE_RUNNERS = {
     reindexConnectedSources(doors, workspaceId, io),
   "erasure-rehearsal": erasureRehearsal,
   "import-bundle": importBundleCommand,
+  "update-concept-body": updateConceptBodyCommand,
   "set-model-key": setModelKeyCommand,
   "set-spending-limit": setSpendingLimitCommand,
   "set-model-choice": setModelChoiceCommand,
