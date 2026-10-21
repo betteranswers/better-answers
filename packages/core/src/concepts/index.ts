@@ -337,15 +337,18 @@ const commitConcept = async (
   const { contentHash, sources } = hashedFileOf(frontmatter, input.body, input.path);
   const mergeKey = boundarySchemas.conceptIdentity.insert.shape.mergeKey.safeParse(input.mergeKey);
 
-  const evidence = boundarySchemas.evidence.insert.array().safeParse(
-    (input.evidence ?? []).map((piece) => ({
-      workspaceId: principal.workspaceId,
-      sourceDocumentId: piece.sourceDocumentId,
-      locator: piece.locator,
-      resource: piece.resource,
-      contentVersion: piece.contentVersion ?? null,
-    })),
-  );
+  const evidence =
+    input.evidence === undefined
+      ? { success: true as const, data: undefined }
+      : boundarySchemas.evidence.insert.array().safeParse(
+          input.evidence.map((piece) => ({
+            workspaceId: principal.workspaceId,
+            sourceDocumentId: piece.sourceDocumentId,
+            locator: piece.locator,
+            resource: piece.resource,
+            contentVersion: piece.contentVersion ?? null,
+          })),
+        );
   if (!mergeKey.success || !evidence.success) return err("malformed");
 
   const auditEventId = ulid();
@@ -371,7 +374,7 @@ type ParsedWrite = {
   readonly contentHash: string;
   readonly sources: readonly HashedSource[];
   readonly mergeKey: string;
-  readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[];
+  readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[] | undefined;
   readonly auditEventId: string;
 };
 
@@ -441,13 +444,13 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
                 iri,
                 kind: foldKind(input.kind),
                 fallback: heldVisibilityOf(held),
-                citing: write.evidence.map((piece) => piece.sourceDocumentId),
+                citing: write.evidence?.map((piece) => piece.sourceDocumentId),
               }),
 
         catalogued: await holdsEveryDocument(
           fresh,
           tx,
-          write.evidence.map((piece) => piece.sourceDocumentId),
+          write.evidence?.map((piece) => piece.sourceDocumentId) ?? [],
         ),
 
         resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
@@ -546,7 +549,7 @@ const landWrite = async (
         iri: row.iri,
         commitSha: committed.sha,
         contentHash: write.contentHash,
-        evidenceCount: write.evidence.length,
+        evidenceCount: write.evidence?.length ?? 0,
       },
     });
   } else {
