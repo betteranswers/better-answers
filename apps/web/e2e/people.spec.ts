@@ -1,6 +1,10 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { MEMBER_PAGE_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
+import {
+  MEMBER_PAGE_KEYSTROKES,
+  PEOPLE_KEYSTROKES,
+  PEOPLE_SELECT_FIRST,
+} from "@/features/people/people-state.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -100,9 +104,6 @@ const priyasRemovalHeld = async (page: Page, api: APIRequestContext, workspaceNa
 const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
 
 const outcomeOf = (page: Page): Locator => membersRegion(page).getByRole("status").nth(1);
-
-const saidLineOf = (page: Page): Locator =>
-  membersRegion(page).locator("output:has(+ [role='alert'])");
 
 const selectionBar = (page: Page): Locator =>
   page.getByRole("toolbar", { name: "Selected Members" });
@@ -928,12 +929,20 @@ test.describe("a member's own page", () => {
 
   test("drops the select-first line once a key ticks a member", async ({ page, request }) => {
     await skippedToMembers(page, request, "Calder Ticking");
-    await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.tick.key);
+    const said = membersRegion(page).getByText(PEOPLE_SELECT_FIRST.member);
 
-    await tickOf(page, "Priya Shah").focus();
-    await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
-    await expect(tickOf(page, "Priya Shah")).toBeChecked();
-    await expect(saidLineOf(page), "the select-first line outlived the tick").toHaveText("");
+    for (const { key } of [PEOPLE_KEYSTROKES.tick, PEOPLE_KEYSTROKES.changeSelectedRoles]) {
+      await listHeading(page).focus();
+      await page.keyboard.press(key);
+      await expect(said, `${key} with no member in focus or ticked said nothing`).toHaveCount(1);
+
+      await tickOf(page, "Priya Shah").focus();
+      await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
+      await expect(tickOf(page, "Priya Shah")).toBeChecked();
+      await expect(said, `the select-first line of ${key} outlived the tick`).toHaveCount(0);
+      await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
+      await expect(tickOf(page, "Priya Shah")).not.toBeChecked();
+    }
   });
 
   test("opens a member and changes their role by keyboard alone", async ({ page, request }) => {

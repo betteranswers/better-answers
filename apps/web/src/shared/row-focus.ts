@@ -27,6 +27,6 @@ export const onTheRowInFocus =
       say(() => selectFirst);
       return;
     }
-    say((said) => (said === selectFirst ? undefined : said));
+    say((said) => (said?.words === selectFirst.words ? undefined : said));
     act(row);
   };

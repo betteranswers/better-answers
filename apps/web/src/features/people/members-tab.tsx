@@ -305,13 +305,13 @@ const useLastSaid = (heading: RefObject<HTMLElement | null>) => {
   const say = (outcome: Outcome | undefined, refused: RefusedRows = NO_MARKS) => {
     setShown({ outcome, refused });
   };
-  const sayOver: Saying = (next) => {
+  const sayFrom: Saying = (next) => {
     setShown((was) => {
       const outcome = next(was.outcome);
       return outcome === was.outcome ? was : { outcome, refused: NO_MARKS };
     });
   };
-  return { ...shown, say, sayOver };
+  return { ...shown, say, sayFrom };
 };
 
 function MemberList(properties: {
@@ -326,7 +326,7 @@ function MemberList(properties: {
   const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
   const searchRef = useRef<HTMLInputElement>(null);
   const openMember = useOpenMember(narrowed.flush);
-  const { outcome, refused, say, sayOver } = useLastSaid(heading);
+  const { outcome, refused, say, sayFrom } = useLastSaid(heading);
   const invite = useInviteAction(say);
 
   const columns = useMemo(() => memberColumns(refused), [refused]);
@@ -356,10 +356,10 @@ function MemberList(properties: {
   useInFocusKeystrokes({
     inFocus: () => rowInFocus(narrowed.data, (member) => member.personId),
     open: openMember,
-    tick: (personId) => {
-      setTicked(toggled(ticked, personId));
+    tick: (member) => {
+      setTicked(toggled(ticked, member.personId));
     },
-    say: sayOver,
+    say: sayFrom,
   });
 
   return (
@@ -451,7 +451,7 @@ function MemberList(properties: {
 function useInFocusKeystrokes(properties: {
   readonly inFocus: () => ListedMember | undefined;
   readonly open: (personId: string, at: OpenedAt) => void;
-  readonly tick: (personId: string) => void;
+  readonly tick: (member: ListedMember) => void;
   readonly say: Saying;
 }) {
   const acting = onTheRowInFocus(properties.inFocus, properties.say, NOTHING_IN_FOCUS);
@@ -466,12 +466,7 @@ function useInFocusKeystrokes(properties: {
   useKeystroke(KEY.changeGroups, opening("groups"));
   useKeystroke(KEY.remove, opening("removal"));
   useKeystroke(KEY.flagName, opening("flag"));
-  useKeystroke(
-    KEY.tick,
-    acting((member) => {
-      properties.tick(member.personId);
-    }),
-  );
+  useKeystroke(KEY.tick, acting(properties.tick));
 }
 
 export function MembersTab() {
