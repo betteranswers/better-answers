@@ -252,6 +252,39 @@ describe("what a record refuses", () => {
     });
   });
 
+  it("keeps a listed map state, on a completed record only", async () => {
+    await withRollback(db().pool, async (client) => {
+      const seed = testData(client);
+      const completed = await seed.questionAsked({
+        workspaceId: WS_A,
+        completedAt: new Date(),
+        verdict: "related",
+        judgeState: "not-judged",
+      });
+      const open = await seed.questionAsked({ workspaceId: WS_A });
+      const kept = (record: Record, value: string) =>
+        refusalOf(client, () =>
+          client.query(
+            "UPDATE question_asked SET map_state = $1 WHERE workspace_id = $2 AND id = $3",
+            [value, WS_A, record.id],
+          ),
+        );
+
+      const refused = "question_asked_map_state_check";
+      const since = (value: string) => `{"state":"unavailable_since","since":${value}}`;
+
+      expect(await kept(completed, '{"state":"live"}')).toBe("admitted");
+      expect(await kept(completed, since('"2026-10-21T09:00:00.000Z"'))).toBe("admitted");
+      expect(await kept(completed, '{"state":"stale"}')).toBe(refused);
+      expect(await kept(completed, "{}")).toBe(refused);
+      expect(await kept(completed, "null")).toBe(refused);
+      expect(await kept(completed, '{"state":"live","since":"2026-10-21"}')).toBe(refused);
+      expect(await kept(completed, since("12"))).toBe(refused);
+      expect(await kept(completed, '{"state":"unavailable_since"}')).toBe(refused);
+      expect(await kept(open, '{"state":"live"}')).toBe(refused);
+    });
+  });
+
   it("takes the asker's role from the three a member holds", async () => {
     await withRollback(db().pool, async (client) => {
       const record = await testData(client).questionAsked({ workspaceId: WS_A });

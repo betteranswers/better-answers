@@ -5,6 +5,7 @@ import {
   ids,
   JUDGE_STATES,
   QUESTION_VERDICTS,
+  recordMapState,
   type ConceptIri,
 } from "@better-answers/schema";
 
@@ -214,11 +215,7 @@ export const answerOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
       }),
     ),
     unmappedPassages: z.array(passageView),
-    map: z.discriminatedUnion("state", [
-      z.object({ state: z.literal("live") }),
-      z.object({ state: z.literal("as_of"), at: z.string() }),
-      z.object({ state: z.literal("unavailable_since"), since: z.string() }),
-    ]),
+    map: recordMapState,
     collections: z
       .array(z.string())
       .describe("The collections considered: those named, or every one you can read."),

@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   boundarySchemas,
   FEEDBACK_FLAG_VERDICT,
+  MAP_LIVE,
+  MAP_UNAVAILABLE,
   type FEEDBACK_REASONS,
 } from "@better-answers/schema";
 
@@ -29,16 +31,33 @@ export const ANSWER_MEASURES: AnswerMeasuresPrincipal = {
 
 const INCOMPLETE = "incomplete" satisfies (typeof FEEDBACK_REASONS)[number];
 
-const theCounts = z.object({
+const BY_THE_MAP = {
+  withTheMap: `a.map_state->>'state' = '${MAP_LIVE}'`,
+  mapUnavailable: `a.map_state->>'state' = '${MAP_UNAVAILABLE}'`,
+  mapUnknown: "a.map_state IS NULL",
+} as const;
+
+const twoCounts = z.object({
   flaggedIncomplete: z.number().int(),
   showedUnmappedPassages: z.number().int(),
 });
 
+const theCounts = z.object({
+  withTheMap: twoCounts,
+  mapUnavailable: twoCounts,
+  mapUnknown: twoCounts,
+} satisfies Record<keyof typeof BY_THE_MAP, typeof twoCounts>);
+
 export type UnmappedPassageRate = z.output<typeof theCounts>;
 
-const THE_COUNTS = `SELECT count(*)::int AS "flaggedIncomplete",
-         count(*) FILTER (WHERE cardinality(a.unmapped_passages) > 0)::int
-           AS "showedUnmappedPassages"
+const countedWhere = (map: string) => `json_build_object(
+           'flaggedIncomplete', count(*) FILTER (WHERE ${map}),
+           'showedUnmappedPassages',
+             count(*) FILTER (WHERE ${map} AND cardinality(a.unmapped_passages) > 0))`;
+
+const THE_COUNTS = `SELECT ${Object.entries(BY_THE_MAP)
+  .map(([name, map]) => `${countedWhere(map)} AS "${name}"`)
+  .join(",\n         ")}
     FROM question_asked a
    WHERE a.workspace_id = $1
      AND EXISTS (SELECT 1 FROM question_feedback f

@@ -85,6 +85,7 @@ const REFUSED: Completion = {
   judgeState: "not-judged",
   concepts: [],
   unmappedPassages: [],
+  map: { state: "live" },
 };
 
 const skeletonOf = async (recordId: string) => {
@@ -229,6 +230,7 @@ describe("completing a record", () => {
           { iri: backups, contentHash: HASH_OF.backups, trust: UNVERIFIED },
         ],
         unmappedPassages: [],
+        map: { state: "live" },
         drafted: [{ sentence: "Audit logs are kept for a year.", concepts: [retention] }],
       },
       completedAt,
@@ -559,6 +561,7 @@ describe("reading the questions asked", () => {
         question: QUESTION,
         verdict: "related",
         judgeState: "not-judged",
+        map: { state: "unknown" },
         flagged: false,
         concepts: [
           {
@@ -573,6 +576,26 @@ describe("reading the questions asked", () => {
         feedback: [],
       },
     ]);
+  });
+
+  it("reads the map's state the record kept", async () => {
+    const admin = await anAsker();
+    const { recordId } = answered(await opening(admin));
+    const map = { state: "unavailable_since", since: "2026-10-21T09:00:00.000Z" } as const;
+    answered(await completing(admin, recordId, { ...REFUSED, map }));
+
+    const { records } = answered(await asked(admin));
+
+    expect(records.map((record) => record.map)).toEqual([map]);
+  });
+
+  it("reads a record kept before the map's state as unknown", async () => {
+    const admin = await anAsker();
+    await aRecord(admin);
+
+    const { records } = answered(await asked(admin));
+
+    expect(records.map((record) => record.map)).toEqual([{ state: "unknown" }]);
   });
 
   it("leaves out an unreadable concept, with no hint", async () => {

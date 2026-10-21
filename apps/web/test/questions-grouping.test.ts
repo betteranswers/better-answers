@@ -11,6 +11,7 @@ const aRecord = (shape: Shape): AskedRecord => ({
   collectionsNamed: [],
   question: `Question ${shape.id}`,
   judgeState: "not-judged",
+  map: { state: "live" },
   concepts: [],
   drafted: null,
   feedback: [],
