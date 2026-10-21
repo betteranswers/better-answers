@@ -914,6 +914,7 @@ test.describe("the Knowledge Search page", () => {
 
     await searchBox(page).fill("pallet");
     await saysARefusal(alerted(page));
+    await expect(said(page), "a failed read says something beside its alert").toHaveCount(0);
     await page.unroute(isAFind);
     await searchRegion(page).getByRole("button", { name: "Retry" }).click();
     await expect(matchesOf(page)).toHaveCount(A_PAGE);
