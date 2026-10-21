@@ -32,6 +32,8 @@ Words: *answer*, *related knowledge*, *judge*, *decision model*, *model client*,
 - **The readings.** The owner reads the reuse set on Claude Sonnet 5.5, the first judging model choice, and on Claude Haiku 5.5, then on the decision backend. A cheaper backend that holds on the hard negatives may replace Sonnet 5.5 (the plan's U14, U15).
 - **A decision model's threshold.** An ops command stores it per provider and model before any workspace runs that backend, and `set-model-choice` refuses a decision model without one (BA-184).
 
+**The owner's choice from the readings (21/10/2026).** Phew's workspace judges with Claude Sonnet 5.5 at its default effort, and no decision model has a threshold. On the reuse set Sonnet 5.5 took 28 of 32 fits and no hard negative or unrelated `Answer`. Clef and Clef-flash took unrelated `Answer`s at every threshold that kept their fits (§ [the decision reading](../../operations/readings.md#the-decision-reading)). Claude Haiku 5.5 at its default effort matched Sonnet 5.5 at about a fifteenth of the cost, but 34 questions cannot tell the two apart, so it waits for a larger set.
+
 **Open for the plan.** How an `Answer`'s unbounded text fits a host's tool-result limit, after the U6b reading (BA-171). Whether `ask` reaches each collection's `Answer`s when none is named, a ranking change that ends `ask`'s first ten equalling `find`'s (BA-177).
 
 **Seams.** The core slice interface for the judge and the map's state, the api harness for both transports, and the browser suite for both record pages. The model client's wire fake keeps `check` off a real model.
