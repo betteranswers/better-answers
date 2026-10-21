@@ -157,6 +157,7 @@ export const DETAIL_KEYS = [
   ["knowledge.concept.committed", "commitSha"],
   ["knowledge.concept.committed", "contentHash"],
   ["knowledge.concept.committed", "evidenceCount"],
+  ["knowledge.concept.committed", "fromContentHash"],
   ["knowledge.concept.committed", "iri"],
   ["knowledge.feedback.closed", "closedAs"],
   ["knowledge.feedback.closed", "recordId"],

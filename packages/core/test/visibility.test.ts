@@ -465,6 +465,28 @@ describe("what a governed write derives from its cited connected sources", () =>
   });
 });
 
+describe("what an edit keeps of a concept's citations", () => {
+  it.each([
+    ["keeps", "no evidence", undefined],
+    ["clears", "empty evidence", []],
+  ] as const)("%s the citations when an edit names %s", async (outcome, _named, evidence) => {
+    const scenario = await arrange();
+    const source = await connectedSourceHolding(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [source.documentId]);
+
+    const edited = await rewriteCiting(scenario, scenario.editor, written, evidence);
+    if (!edited.ok) throw new Error(`the edit answered ${String(edited.error)}`);
+    const event = await db().pool.query<{ detail: { evidenceCount: number } }>(
+      "SELECT detail FROM audit_event WHERE id = $1",
+      [edited.value.auditEventId],
+    );
+
+    const cited = outcome === "keeps" ? [source.documentId] : [];
+    expect(await documentsCitedBy(scenario.workspaceId, written.iri)).toEqual(cited);
+    expect(event.rows[0]?.detail.evidenceCount).toBe(cited.length);
+  });
+});
+
 describe("what a re-write may not do to a concept's sensitivity", () => {
   it("refuses citations that widen the sensitivity or audience, committing nothing", async () => {
     const scenario = await arrange();

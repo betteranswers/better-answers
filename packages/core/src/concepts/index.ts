@@ -51,12 +51,21 @@ import {
   type UserId,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { ANY_HEAD, type CommitAuthor, type Committed, type GitDoor } from "../store/git/index.ts";
+import {
+  ANY_HEAD,
+  fileAtHead,
+  type CommitAuthor,
+  type Committed,
+  type GitDoor,
+} from "../store/git/index.ts";
 import { analyseMap } from "../store/map/index.ts";
 import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { withBundleWrite } from "./fence.ts";
 import {
+  contentHashOf,
   hashedFileOf,
+  normalisedBody,
+  parseConceptFile,
   renderConceptFile,
   type Frontmatter,
   type FrontmatterSource,
@@ -119,7 +128,7 @@ import {
   type SuggestionPayload,
 } from "./suggestions.ts";
 import { trustOf, trustWords, type ConceptVerification, type Trust } from "./trust.ts";
-import { conceptVisibilityFrom } from "./visibility.ts";
+import { citationCountOf, conceptVisibilityFrom } from "./visibility.ts";
 import type { PassedOnCommitRefusal } from "./vocabulary.ts";
 
 export {
@@ -213,6 +222,7 @@ const CONCEPT_ACTIONS = declareActions("knowledge", {
     iri: "iri",
     commitSha: "gitSha",
     contentHash: "contentHash",
+    fromContentHash: "contentHash?",
     evidenceCount: "count",
   }),
   accepted: action("knowledge.suggestion.accepted", {
@@ -337,15 +347,18 @@ const commitConcept = async (
   const { contentHash, sources } = hashedFileOf(frontmatter, input.body, input.path);
   const mergeKey = boundarySchemas.conceptIdentity.insert.shape.mergeKey.safeParse(input.mergeKey);
 
-  const evidence = boundarySchemas.evidence.insert.array().safeParse(
-    (input.evidence ?? []).map((piece) => ({
-      workspaceId: principal.workspaceId,
-      sourceDocumentId: piece.sourceDocumentId,
-      locator: piece.locator,
-      resource: piece.resource,
-      contentVersion: piece.contentVersion ?? null,
-    })),
-  );
+  const evidence =
+    input.evidence === undefined
+      ? { success: true as const, data: undefined }
+      : boundarySchemas.evidence.insert.array().safeParse(
+          input.evidence.map((piece) => ({
+            workspaceId: principal.workspaceId,
+            sourceDocumentId: piece.sourceDocumentId,
+            locator: piece.locator,
+            resource: piece.resource,
+            contentVersion: piece.contentVersion ?? null,
+          })),
+        );
   if (!mergeKey.success || !evidence.success) return err("malformed");
 
   const auditEventId = ulid();
@@ -371,7 +384,7 @@ type ParsedWrite = {
   readonly contentHash: string;
   readonly sources: readonly HashedSource[];
   readonly mergeKey: string;
-  readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[];
+  readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[] | undefined;
   readonly auditEventId: string;
 };
 
@@ -415,7 +428,14 @@ const writeUnderLock = async (
   if (!parsed.success) return err("malformed");
   const row = parsed.data;
 
-  const landed = await commitAndLandWrite(principal, doors, write, row, now);
+  const landed = await commitAndLandWrite(
+    principal,
+    doors,
+    write,
+    row,
+    now,
+    existing.value.value.held?.contentHash,
+  );
   if (!landed.ok) return err(landed.error);
 
   return ok({
@@ -441,13 +461,13 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
                 iri,
                 kind: foldKind(input.kind),
                 fallback: heldVisibilityOf(held),
-                citing: write.evidence.map((piece) => piece.sourceDocumentId),
+                citing: write.evidence?.map((piece) => piece.sourceDocumentId),
               }),
 
         catalogued: await holdsEveryDocument(
           fresh,
           tx,
-          write.evidence.map((piece) => piece.sourceDocumentId),
+          write.evidence?.map((piece) => piece.sourceDocumentId) ?? [],
         ),
 
         resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
@@ -502,6 +522,7 @@ const commitAndLandWrite = async (
   write: ParsedWrite,
   row: IndexRow,
   at: Date,
+  fromContentHash: string | undefined,
 ): Promise<Result<Committed, WriteConceptRefusal | Error>> => {
   const { input } = write;
   const landed = await commitAndLandAsMember(
@@ -520,7 +541,7 @@ const commitAndLandWrite = async (
       expectedHead: "head" in input.expects ? input.expects.head : ANY_HEAD,
       at,
     },
-    (fresh, tx, committed) => landWrite(fresh, tx, write, row, committed),
+    (fresh, tx, committed) => landWrite(fresh, tx, write, row, committed, fromContentHash),
   );
   if (!landed.ok && landed.error instanceof Error) {
     const named = refusalFor(landed.error, WRITE_CONSTRAINTS);
@@ -535,19 +556,23 @@ const landWrite = async (
   write: ParsedWrite,
   row: IndexRow,
   committed: Committed,
+  fromContentHash: string | undefined,
 ): Promise<void> => {
   const acceptance = write.input.acceptance;
   if (acceptance === undefined) {
+    const detail = {
+      iri: row.iri,
+      commitSha: committed.sha,
+      contentHash: write.contentHash,
+      evidenceCount:
+        write.evidence?.length ??
+        (fromContentHash === undefined ? 0 : await citationCountOf(fresh, tx, row.iri)),
+    };
     await record(fresh, tx, {
       id: write.auditEventId,
       action: CONCEPT_ACTIONS.committed,
       subjectId: row.iri,
-      detail: {
-        iri: row.iri,
-        commitSha: committed.sha,
-        contentHash: write.contentHash,
-        evidenceCount: write.evidence.length,
-      },
+      detail: fromContentHash === undefined ? detail : { ...detail, fromContentHash },
     });
   } else {
     await record(fresh, tx, {
@@ -1156,6 +1181,147 @@ export const importBundle = async (
   return input.dryRun === true
     ? dryRunImport(principal, doors.git, opened.value)
     : runImport(principal, doors, opened.value, sensitivity);
+};
+
+export type ConceptBodyRun =
+  | { readonly dryRun: true; readonly base?: string | undefined }
+  | { readonly dryRun: false; readonly base: string };
+
+export type UpdateConceptBodyInput = {
+  readonly iri: string;
+  readonly body: string;
+} & ConceptBodyRun;
+
+type BodyAt = { readonly contentHash: string; readonly body: string };
+
+export type ConceptBodyUpdate = {
+  readonly iri: ConceptIri;
+  readonly path: string;
+  readonly from: BodyAt;
+  readonly to: BodyAt;
+
+  readonly written: ConceptWritten | undefined;
+};
+
+const updateConceptBodyAction = declareAction({
+  admits: BUNDLE_WRITERS,
+  input: z.custom<UpdateConceptBodyInput>(),
+  refuses: ["role-forbids", "malformed", "no-such-concept", "unchanged", "stale-precondition"],
+});
+
+export type UpdateConceptBodyRefusal =
+  | RefusalOf<typeof updateConceptBodyAction>
+  | WriteConceptRefusal;
+
+type StandingBody = { readonly held: Held; readonly author: CommitAuthor };
+
+const standingBodyOf = (principal: UserPrincipal, postgres: PostgresDoor, iri: ConceptIri) =>
+  attempt(() =>
+    withMember(principal, postgres, async (fresh, tx): Promise<StandingBody | undefined> => {
+      const held = await heldByIri(fresh, tx, iri);
+      return held === undefined
+        ? undefined
+        : { held, author: await authorOf(fresh, tx, fresh.userId) };
+    }),
+  );
+
+const disagreement = (path: string, why: string): Error =>
+  new Error(`the bundle and the index disagree: ${path} ${why}`);
+
+type ConceptFile = { readonly frontmatter: Frontmatter; readonly body: string };
+
+const fileHeldAt = async (
+  principal: UserPrincipal,
+  git: GitDoor,
+  held: Held,
+): Promise<Result<ConceptFile, "stale-precondition" | Error>> => {
+  const content = await attempt(() => fileAtHead(principal, git, held.path));
+  if (!content.ok) return err(content.error);
+  if (content.value === null) return err(disagreement(held.path, "is not in the bundle's head"));
+  const parsed = parseConceptFile(content.value);
+  if (!parsed.ok) return err(disagreement(held.path, "does not parse at the bundle's head"));
+  const { frontmatter, body } = parsed.value;
+  // A write commits to git before its rows land, so a head ahead of the row is a write in flight.
+  return contentHashOf(frontmatter, body, held.path) === held.contentHash
+    ? ok(parsed.value)
+    : err("stale-precondition");
+};
+
+type HeldBody = StandingBody & { readonly file: ConceptFile };
+
+const heldBodyOf = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  iri: ConceptIri,
+): Promise<Result<HeldBody, UpdateConceptBodyRefusal | Error>> => {
+  const standing = await standingBodyOf(principal, doors.postgres, iri);
+  if (!standing.ok) return err(standing.error);
+  if (!standing.value.ok) return err(standing.value.error);
+  if (standing.value.value === undefined) return err("no-such-concept");
+  const file = await fileHeldAt(principal, doors.git, standing.value.value.held);
+  return file.ok ? ok({ ...standing.value.value, file: file.value }) : err(file.error);
+};
+
+const wellFormedOf = (asked: string, body: string): ConceptIri | undefined => {
+  const iri = ids.conceptIri.safeParse(asked);
+  const fits = boundarySchemas.conceptIndex.insert.shape.body.safeParse(body);
+  return iri.success && fits.success && body.trim() !== "" ? iri.data : undefined;
+};
+
+const bodyRefusalOf = (
+  held: string,
+  to: string,
+  base: string | undefined,
+): UpdateConceptBodyRefusal | undefined => {
+  if (to === held) return "unchanged";
+  return base !== undefined && base !== held ? "stale-precondition" : undefined;
+};
+
+/**
+ * Replaces a standing concept's body and keeps everything else: its frontmatter as the file
+ * holds it, its status, its verifications and its citations.
+ */
+export const updateConceptBody = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  input: UpdateConceptBodyInput,
+): Promise<Result<ConceptBodyUpdate, UpdateConceptBodyRefusal | Error>> => {
+  const admitted = admit(updateConceptBodyAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const body = normalisedBody(input.body);
+  const iri = wellFormedOf(input.iri, body);
+  if (iri === undefined) return err("malformed");
+
+  const standing = await heldBodyOf(admitted.value, doors, iri);
+  if (!standing.ok) return err(standing.error);
+  const { held, author, file } = standing.value;
+  const to = contentHashOf(file.frontmatter, body, held.path);
+  const refusal = bodyRefusalOf(held.contentHash, to, input.base);
+  if (refusal !== undefined) return err(refusal);
+
+  const update = {
+    iri,
+    path: held.path,
+    from: { contentHash: held.contentHash, body: file.body },
+    to: { contentHash: to, body },
+  };
+  if (input.dryRun) return ok({ ...update, written: undefined });
+
+  const written = await writeConcept(admitted.value, doors, {
+    iri,
+    mergeKey: held.mergeKey,
+    path: held.path,
+    kind: held.kind,
+    title: held.title,
+    frontmatter: file.frontmatter,
+    body,
+    message: `Update the body of ${held.path} in place`,
+    author,
+    expects: { base: input.base },
+    status: held.status,
+  });
+  if (!written.ok) return err(written.error);
+  return ok({ ...update, written: written.value });
 };
 
 export type OpenedConcept = {

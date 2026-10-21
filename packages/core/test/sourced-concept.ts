@@ -269,7 +269,7 @@ export const rewriteCiting = async (
   scenario: Scenario,
   writer: UserPrincipal,
   written: SourcedConcept,
-  documents: readonly string[],
+  documents: readonly string[] | undefined,
   overrides: Partial<WriteConceptInput> = {},
 ) =>
   writeConcept(writer, doorsOf(scenario), {
@@ -283,11 +283,15 @@ export const rewriteCiting = async (
     message: "Re-write the note",
     author: { name: "Ada Editor", email: "ada@acme.invalid" },
     expects: { head: await head(writer, scenario.git) },
-    evidence: documents.map((sourceDocumentId, at) => ({
-      sourceDocumentId,
-      locator: `p.${at + 1}`,
-      resource: `Document ${at + 1}`,
-    })),
+    ...(documents === undefined
+      ? {}
+      : {
+          evidence: documents.map((sourceDocumentId, at) => ({
+            sourceDocumentId,
+            locator: `p.${at + 1}`,
+            resource: `Document ${at + 1}`,
+          })),
+        }),
     ...overrides,
   });
 

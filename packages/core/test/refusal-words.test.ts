@@ -150,6 +150,7 @@ const CATALOGUED = {
   "rename-refused": "inapplicable by concepts",
   "reclassification-refused": "inapplicable by concepts",
   "unreadable-commit": "inapplicable by concepts",
+  unchanged: "inapplicable by concepts",
   "no-such-repository": "precondition by concepts",
   "history-diverged": "precondition by concepts",
   held: "conflict by concepts",

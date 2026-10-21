@@ -185,6 +185,27 @@ describe("a governed write", () => {
     expect(joined.rows).toEqual([{ action: "knowledge.concept.committed", sha: written.sha }]);
   });
 
+  it("names the hash it replaced, and none on a create", async () => {
+    const scenario = await arrange();
+    const input = writeFor();
+    const replacedOf = async (auditEventId: string) => {
+      const read = await db().pool.query<{ detail: Record<string, unknown> }>(
+        "SELECT detail FROM audit_event WHERE id = $1",
+        [auditEventId],
+      );
+      return read.rows[0]?.detail["fromContentHash"];
+    };
+
+    const created = await landed(scenario, input);
+    const edited = await landed(
+      scenario,
+      rewriteOf(input, created, { body: "Expenses are claimed within sixty days." }),
+    );
+
+    expect(await replacedOf(created.auditEventId)).toBeUndefined();
+    expect(await replacedOf(edited.auditEventId)).toBe(created.contentHash);
+  });
+
   it("writes the file with its frontmatter, body and own IRI", async () => {
     const scenario = await arrange();
     const input = writeFor();

@@ -222,6 +222,7 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "set-spending-limit": [llmCall, spendReservation],
   "set-model-key": [modelKey],
   "set-model-choice": [modelChoice, modelPrice, decisionThreshold],
+  "update-concept-body": [conceptIndex, bundleCommit],
 };
 
 const idOnTheDoneLine = (run: Run): string => {

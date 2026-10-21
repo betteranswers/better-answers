@@ -25,7 +25,7 @@ const UNHASHED_KEYS: ReadonlySet<string> = new Set([
   "iri",
 ]);
 
-const normalisedBody = (body: string): string =>
+export const normalisedBody = (body: string): string =>
   `${body
     .replaceAll("\r\n", "\n")
     .split("\n")

@@ -549,8 +549,7 @@ describe("a re-write whose rows were lost", () => {
     expect(counted.rows).toEqual([{ concepts: "1", identities: "1" }]);
   });
 
-  it("lands Restricted, flagged in its audit event, when sources differ", async () => {
-    const scenario = await arrange();
+  const allowancesCitingTheHandbook = async (scenario: Scenario) => {
     const internal = await connectedSourceHolding(db(), scenario.workspaceId);
     const restricted = await connectedSourceHolding(db(), scenario.workspaceId, {
       sensitivity: "Restricted",
@@ -560,6 +559,23 @@ describe("a re-write whose rows were lost", () => {
       evidence: [{ sourceDocumentId: internal.documentId, ...handbook }],
     });
     const first = await landed(scenario, scenario.editor, input);
+    const minuted = (head: string | null): WriteConceptInput => ({
+      ...input,
+      iri: first.iri,
+      frontmatter: { title: "Allowances", type: "Guideline", sources: [handbook, minutes] },
+      evidence: [
+        { sourceDocumentId: internal.documentId, ...handbook },
+        { sourceDocumentId: restricted.documentId, ...minutes },
+      ],
+      body: "# Allowances\n\nWhat the board minuted.",
+      expects: { head },
+    });
+    return { internal, input, first, minuted };
+  };
+
+  it("lands Restricted, flagged in its audit event, when sources differ", async () => {
+    const scenario = await arrange();
+    const { input, first, minuted } = await allowancesCitingTheHandbook(scenario);
     expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
       sensitivity: "Internal",
     });
@@ -570,17 +586,7 @@ describe("a re-write whose rows were lost", () => {
       body: "# Allowances\n\nThe same sources, other words.",
       expects: { head: first.sha },
     });
-    const history = await writeInTheWindow(scenario, scenario.editor, {
-      ...input,
-      iri: first.iri,
-      frontmatter: { title: "Allowances", type: "Guideline", sources: [handbook, minutes] },
-      evidence: [
-        { sourceDocumentId: internal.documentId, ...handbook },
-        { sourceDocumentId: restricted.documentId, ...minutes },
-      ],
-      body: "# Allowances\n\nWhat the board minuted.",
-      expects: { head: unchanged },
-    });
+    const history = await writeInTheWindow(scenario, scenario.editor, minuted(unchanged));
 
     const run = await reconciled(scenario);
 
@@ -596,6 +602,39 @@ describe("a re-write whose rows were lost", () => {
       true,
       false,
     ]);
+  });
+
+  it("refuses an edit naming no evidence while held Restricted", async () => {
+    const scenario = await arrange();
+    const { internal, input, first, minuted } = await allowancesCitingTheHandbook(scenario);
+    const history = await writeInTheWindow(scenario, scenario.editor, minuted(first.sha));
+    await reconciled(scenario);
+    const quarantined = await conceptRow(scenario.workspaceId, first.iri);
+
+    const edited = await writeConcept(scenario.admin, doorsOf(scenario), {
+      iri: first.iri,
+      mergeKey: input.mergeKey,
+      path: input.path,
+      kind: input.kind,
+      title: input.title,
+      frontmatter: minuted(first.sha).frontmatter,
+      body: "# Allowances\n\nWhat the board minuted, reworded.",
+      message: "Reword the allowances guideline",
+      author: input.author,
+      expects: { base: String(quarantined?.["content_hash"]) },
+      status: "stable",
+    });
+
+    expect(edited).toEqual({ ok: false, error: "widening-refused" });
+    expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
+      commit_sha: history.at(-1),
+      sensitivity: "Restricted",
+    });
+    const cited = await db().pool.query(
+      "SELECT source_document_id FROM concept_evidence WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, first.iri],
+    );
+    expect(cited.rows).toEqual([{ source_document_id: internal.documentId }]);
   });
 
   it("stays Restricted through publish and narrowing cascades, unlike its neighbour", async () => {
