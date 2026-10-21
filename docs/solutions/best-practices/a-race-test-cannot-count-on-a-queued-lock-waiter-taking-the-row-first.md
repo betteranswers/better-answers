@@ -32,12 +32,12 @@ tags:
 
 ## Context
 
-A write in `packages/core` holds its member row `FOR SHARE` (`withMember`) while git commits, then opens a new transaction for the landing and reads the member row again. Two tests race that write against a statement that changes the member row:
+A write in `packages/core` reads its member row `FOR SHARE` (`withMember`) in one transaction to check its preconditions, then opens another that reads the member row again and holds it while git commits and the rows land. Until BA-221 the landing had a third transaction of its own. Two tests raced the write against a statement that changes the member row:
 
 - `concepts.test.ts`, "refuses before committing for a revocation the read cannot see", queues an `UPDATE` (the revocation).
-- `erasure-routine.test.ts`, "ends the member after a commit underway, then rewrites it", queues the erasure routine's `DELETE FROM member`.
+- `erasure-routine.test.ts`, "ends the member after a commit underway, then rewrites it", queued the erasure routine's `DELETE FROM member`.
 
-Each test waits until the statement is blocked on the held row, releases the hold, and expects the write's next read to see the change. Both failed rarely, under load, with that read seeing the old row.
+Each test waited until the statement was blocked on the held row, released the hold, and expected the write's next read to see the change. Both failed rarely, under load, with that read seeing the old row. Since BA-221 no read follows the commit, so the erasure test, now "ends the member once a commit underway lands, then rewrites", has no next read to gate.
 
 ## Why the waiter loses
 
@@ -72,19 +72,18 @@ execFileSync("docker", ["exec", box, "kill", "-CONT", pid]);
 Do not let the racing read start until the change it must see has settled. `lendingOnceSettled` in `packages/core/test/suite-postgres.ts` wraps a pool so that `connect` first awaits a promise. Give the write the wrapped pool, and point the promise at the state, not at a lock wait:
 
 ```ts
-let ended: Promise<unknown> = Promise.resolve();
-const postgres = { pool: lendingOnceSettled(scenario.postgres.pool, () => ended) };
+let revoking: Promise<unknown> = Promise.resolve();
+const postgres = { pool: lendingOnceSettled(scenario.postgres.pool, () => revoking) };
 // ...
-await until(async () => (await countWaitingOnLocks(db().pool)) === 1);
-ended = until(() => theMemberHasEnded(member));
-await gate.unpark();
+revoking = revoke(revoker, scenario, "here");
+await until(() => isBlockedOnALock(pid));
 ```
 
 The promise starts resolved, so the write's first connection, the one that holds the row, opens at once. It changes only once the waiter is queued.
 
-Gate on the state you need, not on the statement or routine that produces it. The erasure routine carries on after it ends the member, so awaiting the routine would block the landing for no reason. The member row being gone is the fact the test needs. The concepts test awaits the revocation itself, which ends when its change commits.
+Gate on the state you need, not on a statement or routine that goes on past it. The revocation ends when its change commits, so the concepts test awaits it. The erasure routine carries on after it ends the member, so a gate on it awaited the member row being gone, not the routine.
 
-The gate does not weaken the test. With `commitAsMember` switched to `withMemberUnheld`, so that the commit no longer holds the member row, the test still fails, at its 60 s timeout. With the gate, the forced pause passed 5 of 5 runs, and the unpaused test passed 100 of 100.
+The gate does not weaken the test. With the erasure test's commit switched to `withMemberUnheld`, so that the commit no longer held the member row, the test still failed, at its 60 s timeout. With the gate, the forced pause passed 5 of 5 runs, and the unpaused test passed 100 of 100.
 
 ## Related
 

@@ -52,13 +52,18 @@ import type { Acceptance } from "./index.ts";
 import { markDeciding } from "./suggestions.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
 
-export const commitAsMember = async (
+export const commitAndLandAsMember = async (
   principal: UserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
   request: CommitRequest,
+  land: (fresh: UserPrincipal, tx: Tx, committed: Committed) => Promise<void>,
 ): Promise<Result<Committed, CommitRefusal | PrincipalRefusal | Error>> => {
   const held = await attempt(() =>
-    withMember(principal, doors.postgres, (fresh) => commit(fresh, doors.git, request)),
+    withMember(principal, doors.postgres, async (fresh, tx) => {
+      const committed = await commit(fresh, doors.git, request);
+      if (committed.ok) await land(fresh, tx, committed.value);
+      return committed;
+    }),
   );
   if (!held.ok) return err(held.error);
   return held.value.ok ? held.value.value : err(held.value.error);

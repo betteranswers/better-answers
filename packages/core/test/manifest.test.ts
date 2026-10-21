@@ -10,7 +10,14 @@ import {
   type WriteManifestInput,
 } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
-import { bundleHistory, commitFacts, fileAtCommit, removeRepository } from "./bundle.ts";
+import {
+  bundleHistory,
+  commitFacts,
+  fileAtCommit,
+  gatingRefUpdates,
+  removeRepository,
+} from "./bundle.ts";
+import { writeRevokedWhileParked } from "./revocation-race.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange } = suiteWithBundles();
@@ -232,5 +239,33 @@ describe("the manifest, the bundle's first commit", () => {
       error: "not-a-member",
     });
     await nothingWritten(scenario);
+  });
+
+  it("answers a manifest written when a revocation follows its commit", async () => {
+    const scenario = await arrange();
+    const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
+    await gate.park();
+
+    const landed = await writeRevokedWhileParked(
+      db().pool,
+      scenario.postgres,
+      {
+        write: (postgres) =>
+          writeManifest(scenario.editor, { ...doorsOf(scenario), postgres }, manifestFor()),
+        revoke: (client) =>
+          client.query(
+            "UPDATE member SET credentials_revoked_at = now() WHERE workspace_id = $1 AND user_id = $2",
+            [scenario.workspaceId, scenario.editor.userId],
+          ),
+      },
+      async (writeThenRevoke) => {
+        await writeThenRevoke(gate.parked);
+        await gate.unpark();
+      },
+    );
+
+    expect(landed).toMatchObject({ ok: true, value: { written: true } });
+    if (!landed.ok) return;
+    await onlyTheStandingManifest(scenario, landed.value);
   });
 });

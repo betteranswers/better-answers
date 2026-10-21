@@ -36,17 +36,18 @@ import {
   bundlesForSuite,
   commitFacts,
   fileAtCommit,
+  gatingRefUpdates,
   removeRepository,
 } from "./bundle.ts";
 import { gitStarts } from "./git-starts.ts";
 import { confirmedSessionFor } from "./identity-rows.ts";
+import { backendPidOf, isBlockedOnALock, writeRevokedWhileParked } from "./revocation-race.ts";
 import { conceptCiting, connectedSourceHolding } from "./sourced-concept.ts";
 import {
   abortTheTransaction,
   answered,
   holdingTable,
   isBlockedOnTable,
-  lendingOnceSettled,
   postgresForSuite,
   readingAs,
   until,
@@ -1234,19 +1235,20 @@ const revoke = (
 const revokeEditor = (scenario: Scenario, scope: RevocationScope): Promise<unknown> =>
   revoke(db().pool, scenario, scope);
 
-const backendPidOf = async (client: pg.PoolClient): Promise<number> => {
-  const found = await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
-  const pid = found.rows[0]?.pid;
-  if (pid === undefined) throw new Error("the connection did not name its backend");
-  return pid;
-};
-
-const isBlockedOnALock = async (pid: number): Promise<boolean> => {
-  const found = await db().pool.query("SELECT 1 FROM pg_locks WHERE pid = $1 AND NOT granted", [
-    pid,
-  ]);
-  return (found.rowCount ?? 0) > 0;
-};
+const conceptRevokedWhileParked = (
+  scenario: Scenario,
+  parking: Parameters<typeof writeRevokedWhileParked>[3],
+) =>
+  writeRevokedWhileParked(
+    db().pool,
+    scenario.postgres,
+    {
+      write: (postgres) =>
+        writeConcept(scenario.editor, { ...doorsOf(scenario), postgres }, writeFor()),
+      revoke: (client) => revoke(client, scenario, "here"),
+    },
+    parking,
+  );
 
 const expectCommitsWithoutRows = async (scenario: Scenario, commits: number): Promise<void> => {
   expect(await rowsFor(scenario.workspaceId)).toMatchObject({ concepts: "0", commits: "0" });
@@ -1320,7 +1322,7 @@ describe("authority that moved while the action was in flight", () => {
             settled = true;
           });
 
-          await until(() => isBlockedOnALock(pid));
+          await until(() => isBlockedOnALock(db().pool, pid));
 
           expect(settled).toBe(false);
         });
@@ -1341,25 +1343,11 @@ describe("authority that moved while the action was in flight", () => {
   it("refuses before committing for a revocation the read cannot see", async () => {
     const scenario = await arrange();
 
-    const revoker = await db().pool.connect();
-    let acting: Promise<Result<unknown, unknown>> | undefined;
-    let revoking: Promise<unknown> = Promise.resolve();
-    const postgres = { pool: lendingOnceSettled(scenario.postgres.pool, () => revoking) };
-    try {
-      await holdingTable(db().pool, "concept_index", async () => {
-        acting = writeConcept(scenario.editor, { ...doorsOf(scenario), postgres }, writeFor());
-        await until(() => isBlockedOnTable(db().pool, "concept_index"));
-
-        const pid = await backendPidOf(revoker);
-        revoking = revoke(revoker, scenario, "here");
-        await until(() => isBlockedOnALock(pid));
-      });
-      await revoking;
-    } finally {
-      revoker.release();
-    }
-
-    const landed = await acting;
+    const landed = await conceptRevokedWhileParked(scenario, (writeThenRevoke) =>
+      holdingTable(db().pool, "concept_index", () =>
+        writeThenRevoke(() => isBlockedOnTable(db().pool, "concept_index")),
+      ),
+    );
 
     expect(landed).toEqual({ ok: false, error: "credentials-revoked" });
 
@@ -1369,6 +1357,27 @@ describe("authority that moved while the action was in flight", () => {
       concepts: "0",
       commits: "0",
       identities: "0",
+    });
+  });
+
+  it("answers a write landed when a revocation follows its commit", async () => {
+    const scenario = await arrange();
+    const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
+    await gate.park();
+
+    const landed = await conceptRevokedWhileParked(scenario, async (writeThenRevoke) => {
+      await writeThenRevoke(gate.parked);
+      await gate.unpark();
+    });
+
+    expect(landed).toMatchObject({ ok: true });
+    const history = await bundleHistory(scenario.git, scenario.workspaceId);
+    expect(history).toHaveLength(1);
+    expect(await recordedCommits(scenario.workspaceId)).toEqual(history);
+    expect(await rowsFor(scenario.workspaceId)).toMatchObject({ concepts: "1", commits: "1" });
+    expect(await write(scenario, scenario.editor, writeFor())).toEqual({
+      ok: false,
+      error: "credentials-revoked",
     });
   });
 });

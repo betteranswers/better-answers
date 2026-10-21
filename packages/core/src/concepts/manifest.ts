@@ -18,10 +18,10 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { ANY_HEAD, fileAtHead, type CommitAuthor, type GitDoor } from "../store/git/index.ts";
-import { withMember, type PostgresDoor } from "../store/postgres/index.ts";
+import type { PostgresDoor } from "../store/postgres/index.ts";
 import { withBundleWrite } from "./fence.ts";
 import { scalarPairOf, type FrontmatterSource } from "./file.ts";
-import { commitAsMember, landBundleCommit } from "./landing.ts";
+import { commitAndLandAsMember, landBundleCommit } from "./landing.ts";
 import type { PassedOnCommitRefusal } from "./vocabulary.ts";
 
 const MANIFEST_ACTIONS = declareActions("knowledge", {
@@ -103,35 +103,34 @@ export const writeManifest = async (
     if (atHead.value === "standing") return ok({ written: false });
     if (atHead.value === "taken") return err("path-taken");
 
-    const committed = await commitAsMember(principal, doors, {
-      path: BUNDLE_MANIFEST_PATH,
-      content: renderBundleManifest(manifest.data),
-      message: input.message,
-      author: input.author,
-      trailers: { actor: actorIdOf(principal), audit: auditEventId },
-      expectedHead: ANY_HEAD,
-      at: doors.clock.now(),
-    });
-    if (!committed.ok) return err(committed.error);
-
-    const landed = await attempt(() =>
-      withMember(principal, doors.postgres, async (fresh, tx) => {
+    const landed = await commitAndLandAsMember(
+      principal,
+      doors,
+      {
+        path: BUNDLE_MANIFEST_PATH,
+        content: renderBundleManifest(manifest.data),
+        message: input.message,
+        author: input.author,
+        trailers: { actor: actorIdOf(principal), audit: auditEventId },
+        expectedHead: ANY_HEAD,
+        at: doors.clock.now(),
+      },
+      async (fresh, tx, committed) => {
         await record(fresh, tx, {
           id: auditEventId,
           action: MANIFEST_ACTIONS.written,
           subjectId: manifest.data.id,
-          detail: { bundleId: manifest.data.id, commitSha: committed.value.sha },
+          detail: { bundleId: manifest.data.id, commitSha: committed.sha },
         });
         await landBundleCommit(fresh, tx, {
-          commit: committed.value,
+          commit: committed,
           actor: actorIdOf(fresh),
           auditEventId,
         });
-      }),
+      },
     );
     if (!landed.ok) return err(landed.error);
-    if (!landed.value.ok) return err(landed.value.error);
 
-    return ok({ written: true, sha: committed.value.sha, auditEventId });
+    return ok({ written: true, sha: landed.value.sha, auditEventId });
   });
 };
