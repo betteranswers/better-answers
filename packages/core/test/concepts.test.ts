@@ -2047,8 +2047,8 @@ describe("the trust words", () => {
         rider: null,
       }),
     ).toBe("Verified by Priya Shah · when the contract ends");
-    expect(mapWords({ state: "as_of", at: "when the contract ends" })).toBe(
-      "map as of when the contract ends",
+    expect(mapWords({ state: "unavailable_since", since: "when the contract ends" })).toBe(
+      "map unavailable since when the contract ends",
     );
   });
 

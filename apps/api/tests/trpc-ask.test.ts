@@ -231,6 +231,20 @@ describe("ask over tRPC", () => {
     expect(webRecord).not.toBe(mcpRecord);
   });
 
+  it("keeps the map's state on the record over both transports", async () => {
+    const { web, mcp } = await anAdminAsking();
+    wire.answerWith(judgeSaying([USERS.title]));
+
+    await streamed(web, { question: QUESTION });
+    await mcp("ask", { question: QUESTION });
+
+    const { records } = await web.questions.asked.query({});
+    expect(records.map(({ transport, map }) => ({ transport, map }))).toEqual([
+      { transport: "mcp", map: { state: "live" } },
+      { transport: "trpc", map: { state: "live" } },
+    ]);
+  });
+
   it("ends with a refusal, no result and no prose", async () => {
     const { workspace, web } = await anAdminAsking({ limitGbp: "0.001" });
     wire.answerWith(judgeSaying([USERS.title]));

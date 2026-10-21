@@ -2466,6 +2466,7 @@ describe("the questions a person asked", () => {
         judgeState: "not-judged",
         concepts: [],
         unmappedPassages: [],
+        map: { state: "live" },
         drafted: [{ sentence: "The landlord signs off the Leeds lease.", concepts: [] }],
       }),
     );

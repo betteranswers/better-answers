@@ -102,6 +102,8 @@ import {
   FEEDBACK_VERDICTS,
   FLAG_CLOSINGS,
   JUDGE_STATES,
+  MAP_LIVE,
+  MAP_UNAVAILABLE,
   QUESTION_TRANSPORTS,
   QUESTION_VERDICTS,
   questionAsked,
@@ -819,6 +821,13 @@ const recordConcept = z.strictObject({
 
 export type RecordConcept = z.output<typeof recordConcept>;
 
+export const recordMapState = z.discriminatedUnion("state", [
+  z.strictObject({ state: z.literal(MAP_LIVE) }),
+  z.strictObject({ state: z.literal(MAP_UNAVAILABLE), since: z.string() }),
+]);
+
+export type RecordMapState = z.output<typeof recordMapState>;
+
 const questionAskedRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.regex(ULID),
@@ -831,6 +840,7 @@ const questionAskedRefinements = {
   judgeState: (schema: z.ZodString) => schema.pipe(z.enum(JUDGE_STATES)),
   concepts: (schema: z.ZodType) => schema.pipe(z.array(recordConcept)),
   unmappedPassages: (schema: z.ZodArray<z.ZodString>) => z.array(schema.element.trim().min(1)),
+  mapState: (schema: z.ZodType) => schema.pipe(recordMapState),
 };
 
 const questionAskedSelect = createSelectSchema(questionAsked, questionAskedRefinements);

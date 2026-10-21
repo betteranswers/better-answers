@@ -35,10 +35,13 @@ import {
   type AuditEventActor,
   type PeopleNames,
 } from "../workspaces/index.ts";
+import type { MapState } from "./plan.ts";
 
 const RECORD_ACTIONS = declareActions("knowledge", {
   flagClosed: action("knowledge.feedback.closed", { recordId: "id", closedAs: "flagClosing" }),
 });
+
+type RecordedMap = MapState | { readonly state: "unknown" };
 
 const QUESTIONS_ASKED_PAGE = 50;
 
@@ -98,6 +101,7 @@ type RecordAsRead = {
   readonly question: string | null;
   readonly verdict: QuestionVerdict | null;
   readonly judgeState: JudgeState | null;
+  readonly map: RecordedMap;
   readonly flagged: boolean;
   readonly concepts: readonly ConceptAsRead[];
   readonly drafted: readonly DraftedSentence[] | null;
@@ -133,7 +137,8 @@ const A_PAGE_OF_RECORDS = `WITH open_flags AS (
       LIMIT $3 + 1)
   )
   SELECT r.id, r.asked_at AS "askedAt", r.asked_by AS "askedBy", r.transport, r.collections,
-         r.verdict, r.judge_state AS "judgeState", r.concepts, c.question, c.drafted, r.flagged
+         r.verdict, r.judge_state AS "judgeState", r.map_state AS "mapState", r.concepts,
+         c.question, c.drafted, r.flagged
     FROM page r
     LEFT JOIN question_content c
            ON c.workspace_id = r.workspace_id AND c.record_id = r.id AND c.asked_at = r.asked_at
@@ -156,6 +161,7 @@ const pageRow = skeleton
     collections: true,
     verdict: true,
     judgeState: true,
+    mapState: true,
     concepts: true,
   })
   .extend({
@@ -248,6 +254,7 @@ const recordAsRead = (row: PageRow, read: Read): RecordAsRead => ({
   question: row.question,
   verdict: row.verdict,
   judgeState: row.judgeState,
+  map: row.mapState ?? { state: "unknown" },
   flagged: row.flagged,
   concepts: row.concepts.flatMap((kept) => conceptAsRead(kept, read.readable)),
   drafted: draftedAsRead(row.drafted, read.readable),

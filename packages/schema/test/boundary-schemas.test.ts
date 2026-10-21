@@ -613,6 +613,7 @@ const acceptedRows = {
         },
       ],
       unmappedPassages: [`${DOCUMENT_ID}/chars:0-120`],
+      mapState: { state: "unavailable_since", since: "2026-05-02T09:00:00.000Z" },
     },
   ],
   questionContent: [
@@ -1279,6 +1280,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.questionAsked[1], verdict: "evidence" },
       { ...acceptedRows.questionAsked[1], judgeState: "failed" },
       { ...acceptedRows.questionAsked[1], unmappedPassages: [""] },
+      { ...acceptedRows.questionAsked[1], mapState: { state: "unavailable_since" } },
       {
         ...acceptedRows.questionAsked[1],
         concepts: [{ ...acceptedRows.questionAsked[1].concepts[0], body: "The concept's text." }],
@@ -2334,6 +2336,7 @@ describe("5 — the inferred type is pinned", () => {
         judged?: "yes" | "no";
       }[];
       unmappedPassages: string[];
+      mapState: { state: "live" } | { state: "unavailable_since"; since: string } | null;
     };
     questionContent: {
       workspaceId: WorkspaceId;

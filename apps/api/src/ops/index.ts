@@ -2,7 +2,11 @@ import { getTableName, type Table } from "drizzle-orm";
 import type { Logger } from "pino";
 
 import type { Sensitivity } from "@better-answers/core/access";
-import { ANSWER_MEASURES, unmappedPassageRate } from "@better-answers/core/answering";
+import {
+  ANSWER_MEASURES,
+  unmappedPassageRate,
+  type UnmappedPassageRate,
+} from "@better-answers/core/answering";
 import {
   MAP_MAINTENANCE,
   mapCounts,
@@ -217,7 +221,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
     --wait-seconds <n>  the same, for a whole number of seconds an operator names instead
   map-sweep --workspace <id>                                delete every generation of the map but the live one
   map-counts --workspace <id>                               nodes per label and edges, as JSON, for the drill's diff
-  unmapped-passage-rate --workspace <id>                    the records flagged incomplete, and how many of them showed unmapped passages, as JSON
+  unmapped-passage-rate --workspace <id>                    the records flagged incomplete, and how many of them showed unmapped passages, by the map's state, as JSON
   reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed
   object-store-orphans --workspace <id> [--list]            recovery order step 5: remove the originals a failed connect or a lost race left, past a ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace, that no document row names
     --list         say how many there are, removing none
@@ -1471,6 +1475,14 @@ const restoreSignInCommand = async (doors: Doors, flags: Flags, io: OpsIo): Prom
   return DONE;
 };
 
+const twoCountsSaid = ({
+  flaggedIncomplete,
+  showedUnmappedPassages,
+}: UnmappedPassageRate["withTheMap"]) => ({
+  flagged_incomplete: flaggedIncomplete,
+  showed_unmapped_passages: showedUnmappedPassages,
+});
+
 const unmappedPassageRateCommand = async (
   doors: Doors,
   workspaceId: string,
@@ -1478,11 +1490,12 @@ const unmappedPassageRateCommand = async (
 ): Promise<number> => {
   const counted = await unmappedPassageRate(ANSWER_MEASURES, doors.postgres, { workspaceId });
   if (!counted.ok) return refused("unmapped-passage-rate", workspaceId, counted.error, io);
-  const { flaggedIncomplete, showedUnmappedPassages } = counted.value;
+  const { withTheMap, mapUnavailable, mapUnknown } = counted.value;
   io.say(
     JSON.stringify({
-      flagged_incomplete: flaggedIncomplete,
-      showed_unmapped_passages: showedUnmappedPassages,
+      with_the_map: twoCountsSaid(withTheMap),
+      map_unavailable: twoCountsSaid(mapUnavailable),
+      map_unknown: twoCountsSaid(mapUnknown),
     }),
   );
   return DONE;

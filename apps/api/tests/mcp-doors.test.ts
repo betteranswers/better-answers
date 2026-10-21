@@ -11,7 +11,7 @@ import {
 } from "@better-answers/core/kernel";
 import type { CallSize, CallSpent, ModelClient, StreamingClient } from "@better-answers/core/llm";
 import { withHeldPrincipal, withPrincipalRead, type Tx } from "@better-answers/core/store/postgres";
-import type { JudgeState, QuestionVerdict } from "@better-answers/schema";
+import type { JudgeState, QuestionVerdict, RecordMapState } from "@better-answers/schema";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
 
 import { MCP_SCOPES } from "../src/auth/constants.ts";
@@ -213,6 +213,7 @@ describe("the steps the own-transaction road hands an entry", () => {
       readonly verdict: QuestionVerdict;
       readonly judgeState: JudgeState;
       readonly unmappedPassages: readonly { readonly locator: string }[];
+      readonly map: RecordMapState;
       readonly settled?:
         | {
             readonly reservationId: string;

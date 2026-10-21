@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0091_the-claim-after-backoff"
+MIGRATION_ID = "0092_the-map-state"
 
-MIGRATION_WHEN = 1792589722576
+MIGRATION_WHEN = 1792601561164
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -497,6 +497,7 @@ TABLES: dict[str, dict[str, str]] = {
         "judge_state": "text",
         "concepts": "jsonb NOT NULL",
         "unmapped_passages": "text[] NOT NULL",
+        "map_state": "jsonb",
     },
     "public.question_content": {
         "workspace_id": "text NOT NULL",

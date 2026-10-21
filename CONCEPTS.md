@@ -114,8 +114,9 @@ knowledge base on every commit and from the records as they change; never a sour
 **Two** fixed phrases tell its state: **map as of <time>** (the ordinary case — the map agrees with
 the knowledge base, stamped) and **map unavailable since <time>** (the panel is replaced by the
 phrase and one sentence of what still works). Because the map lives inside the same Postgres the api
-commits to, it is unavailable only when the database itself is, at which point nothing else works
-either. There is no third phrase: an edit's delta joins the api's commit transaction, so the map is
+commits to, it is unavailable when the database itself is, at which point nothing else works
+either, and for one answer whose walk outruns its timeout, which then rests on its entry points
+alone. There is no third phrase: an edit's delta joins the api's commit transaction, so the map is
 never behind for an edit, and a full rebuild writes beside the live generation and flips in one row
 update, so it is never behind during a rebuild either. Never a verdict; an answer carries the phrase
 in its context header line.
@@ -1285,8 +1286,10 @@ to a use case, never a source and never company knowledge. Not a pack, not an op
 
 The retained record of every answer the platform gave, and the page an Admin reads it on, flagged
 first: who asked, where, what was answered, what it cited and how trusted that was at the time, the
-predicate that applied and, on reuse, the matched `Answer` and the judge's verdict; with the feedback
-and corrections it received.
+predicate that applied and, on reuse, the matched `Answer` and the judge's verdict; the map's state
+the answer carried; with the feedback and corrections it received.
+
+A record kept before the platform kept the map's state reads as unknown, never as live.
 
 Not part of the audit log. Content is kept twelve months by default, then thinned to the skeleton —
 citations, trust then, verdicts, feedback and corrections — kept for good.
@@ -1329,8 +1332,9 @@ The workspace's tests are replayed retrieval-only when the answer path changes a
 ### unmapped-passage rate
 
 _Internal._ of a workspace's *Questions asked* records flagged *incomplete*, how many showed unmapped
-passages: two counts, never one percentage. With recall at ten on the answer tests, it is one of the
-two readings that bring vectors in.
+passages: two counts, never one percentage, given apart for answers with the map, with the map
+unavailable, and with no map state kept. With recall at ten on the answer tests, the pair for
+answers with the map is one of the two readings that bring vectors in.
 
 ### audit event
 

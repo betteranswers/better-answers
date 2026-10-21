@@ -4,6 +4,7 @@ import type {
   JudgeState,
   QuestionTransport,
   QuestionVerdict,
+  RecordMapState,
 } from "@better-answers/schema";
 
 import type { Trust } from "../concepts/index.ts";
@@ -62,7 +63,8 @@ export type DraftedSentence = {
 };
 
 const COMPLETED = `UPDATE question_asked
-     SET completed_at = $3, verdict = $4, judge_state = $5, concepts = $6, unmapped_passages = $7
+     SET completed_at = $3, verdict = $4, judge_state = $5, concepts = $6, unmapped_passages = $7,
+         map_state = $8
    WHERE workspace_id = $1 AND id = $2 AND completed_at IS NULL
   RETURNING asked_at::text AS asked_at`;
 
@@ -88,6 +90,7 @@ export type RecordCompletion = {
   readonly judgeState: JudgeState;
   readonly concepts: readonly RecordedConcept[];
   readonly unmappedPassages: readonly { readonly locator: string }[];
+  readonly map: RecordMapState;
   readonly drafted?: readonly DraftedSentence[];
   readonly settled?:
     | {
@@ -115,6 +118,7 @@ export const completeRecord = async (
       input.judgeState,
       JSON.stringify(input.concepts.map(asKept)),
       input.unmappedPassages.map((passage) => passage.locator),
+      JSON.stringify(input.map),
     ]);
     const [record] = completed.rows;
     if (record === undefined) {

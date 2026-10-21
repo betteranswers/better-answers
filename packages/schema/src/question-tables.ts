@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { check, foreignKey, index, jsonb, primaryKey, text } from "drizzle-orm/pg-core";
 
 import { ACTOR_ID_PATTERN } from "./actor-id.ts";
-import type { DraftedSentence, RecordConcept } from "./boundary-schemas.ts";
+import type { DraftedSentence, RecordConcept, RecordMapState } from "./boundary-schemas.ts";
 import { listed, stamp } from "./column-helpers.ts";
 import { ROLES } from "./roles.ts";
 import { withRLS } from "./with-rls.ts";
@@ -15,6 +15,10 @@ export type JudgeState = (typeof JUDGE_STATES)[number];
 
 export const CANDIDATE_VERDICTS = ["yes", "no"] as const;
 export type CandidateVerdict = (typeof CANDIDATE_VERDICTS)[number];
+
+export const MAP_LIVE = "live";
+
+export const MAP_UNAVAILABLE = "unavailable_since";
 
 export const QUESTION_TRANSPORTS = ["mcp", "trpc"] as const;
 export type QuestionTransport = (typeof QUESTION_TRANSPORTS)[number];
@@ -51,6 +55,7 @@ export const questionAsked = withRLS(
     judgeState: text("judge_state"),
     concepts: jsonb("concepts").$type<RecordConcept[]>().notNull().default([]),
     unmappedPassages: text("unmapped_passages").array().notNull().default([]),
+    mapState: jsonb("map_state").$type<RecordMapState>(),
   },
   "workspaceId",
   (table) => [
@@ -84,6 +89,17 @@ export const questionAsked = withRLS(
       ),
     ),
     check("question_asked_concepts_check", sql.raw("jsonb_typeof(concepts) = 'array'")),
+    check(
+      "question_asked_map_state_check",
+      sql.raw(
+        `map_state IS NULL
+         OR (completed_at IS NOT NULL
+             AND (map_state = jsonb_build_object('state', '${MAP_LIVE}')
+                  OR (map_state = jsonb_build_object(
+                        'state', '${MAP_UNAVAILABLE}', 'since', map_state->'since')
+                      AND jsonb_typeof(map_state->'since') = 'string')))`,
+      ),
+    ),
   ],
 );
 

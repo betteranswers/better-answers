@@ -66,6 +66,7 @@ import {
   suppression,
   ulid,
   type ConceptIri,
+  type RecordMapState,
 } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
@@ -1460,6 +1461,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       app: TestApp,
       workspaceId: string,
       unmappedPassages: readonly string[],
+      mapState: RecordMapState | null = { state: "live" },
     ): Promise<void> => {
       const client = await app.database.superuser.connect();
       try {
@@ -1470,6 +1472,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           verdict: "related",
           judgeState: "not-judged",
           unmappedPassages: [...unmappedPassages],
+          mapState,
         });
         await seed.questionFeedback({
           workspaceId,
@@ -1482,17 +1485,24 @@ describe("pnpm ops — the restore scripts' commands", () => {
       }
     };
 
-    it("reports two of three records showing unmapped passages", async () => {
+    it("reports two of three mapped records showing unmapped passages", async () => {
       const { workspaceId } = await app().provision();
       await flaggedIncomplete(app(), workspaceId, ["documents/handbook.pdf#page=4"]);
       await flaggedIncomplete(app(), workspaceId, ["documents/handbook.pdf#page=9"]);
       await flaggedIncomplete(app(), workspaceId, []);
+      await flaggedIncomplete(app(), workspaceId, ["documents/handbook.pdf#page=2"], null);
 
       const run = await ops(app(), ["unmapped-passage-rate", "--workspace", workspaceId]);
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 0,
-        lines: ['{"flagged_incomplete":3,"showed_unmapped_passages":2}'],
+        lines: [
+          JSON.stringify({
+            with_the_map: { flagged_incomplete: 3, showed_unmapped_passages: 2 },
+            map_unavailable: { flagged_incomplete: 0, showed_unmapped_passages: 0 },
+            map_unknown: { flagged_incomplete: 1, showed_unmapped_passages: 1 },
+          }),
+        ],
       });
     });
 

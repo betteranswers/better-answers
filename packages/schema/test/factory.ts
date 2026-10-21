@@ -993,6 +993,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       judgeState: null,
       concepts: [],
       unmappedPassages: [],
+      mapState: null,
       ...overrides,
       workspaceId,
     });

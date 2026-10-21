@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { RecordMapState } from "@better-answers/schema";
+
 import { ANSWER_MEASURES, unmappedPassageRate } from "../src/answering/index.ts";
 import type { PostgresDoor } from "../src/store/postgres/index.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
@@ -11,10 +13,18 @@ const A_PASSAGE = "documents/handbook.pdf#page=4";
 
 type Flag = "incomplete" | "wrong";
 
+const LIVE: RecordMapState = { state: "live" };
+
+const UNAVAILABLE: RecordMapState = {
+  state: "unavailable_since",
+  since: "2026-10-21T09:00:00.000Z",
+};
+
 const aRecordFlagged = (
   workspaceId: string,
   flags: readonly Flag[],
   unmappedPassages: readonly string[] = [],
+  mapState: RecordMapState | null = LIVE,
 ) =>
   seedingWith(db().pool, async (seed) => {
     const record = await seed.questionAsked({
@@ -23,12 +33,19 @@ const aRecordFlagged = (
       verdict: "related",
       judgeState: "not-judged",
       unmappedPassages: [...unmappedPassages],
+      mapState,
     });
     for (const reason of flags) {
       await seed.questionFeedback({ workspaceId, recordId: record.id, verdict: "flag", reason });
     }
     return record;
   });
+
+const ONE = { flaggedIncomplete: 1, showedUnmappedPassages: 1 };
+
+const NONE = { flaggedIncomplete: 0, showedUnmappedPassages: 0 };
+
+const NONE_LEFT_OUT = { mapUnavailable: NONE, mapUnknown: NONE };
 
 const rateOf = (workspace: ProvisionedWorkspace, workspaceId: string = workspace.workspaceId) =>
   unmappedPassageRate(ANSWER_MEASURES, workspace.door, { workspaceId });
@@ -63,7 +80,20 @@ describe("the unmapped-passage rate", () => {
 
     expect(await rateOf(workspace)).toEqual({
       ok: true,
-      value: { flaggedIncomplete: 3, showedUnmappedPassages: 2 },
+      value: { ...NONE_LEFT_OUT, withTheMap: { flaggedIncomplete: 3, showedUnmappedPassages: 2 } },
+    });
+  });
+
+  it("counts a map-unavailable or unknown answer apart from mapped ones", async () => {
+    const workspace = await provisionedWorkspace(db(), "Map-less");
+    const { workspaceId } = workspace;
+    await aRecordFlagged(workspaceId, ["incomplete"], [A_PASSAGE], LIVE);
+    await aRecordFlagged(workspaceId, ["incomplete"], [A_PASSAGE], UNAVAILABLE);
+    await aRecordFlagged(workspaceId, ["incomplete"], [A_PASSAGE], null);
+
+    expect(await rateOf(workspace)).toEqual({
+      ok: true,
+      value: { withTheMap: ONE, mapUnavailable: ONE, mapUnknown: ONE },
     });
   });
 
@@ -73,7 +103,7 @@ describe("the unmapped-passage rate", () => {
 
     expect(await rateOf(workspace)).toEqual({
       ok: true,
-      value: { flaggedIncomplete: 1, showedUnmappedPassages: 1 },
+      value: { ...NONE_LEFT_OUT, withTheMap: { flaggedIncomplete: 1, showedUnmappedPassages: 1 } },
     });
   });
 
@@ -94,7 +124,7 @@ describe("the unmapped-passage rate", () => {
 
     expect(await rateOf(workspace)).toEqual({
       ok: true,
-      value: { flaggedIncomplete: 1, showedUnmappedPassages: 1 },
+      value: { ...NONE_LEFT_OUT, withTheMap: { flaggedIncomplete: 1, showedUnmappedPassages: 1 } },
     });
   });
 
@@ -105,7 +135,7 @@ describe("the unmapped-passage rate", () => {
 
     expect(await rateOf(workspace)).toEqual({
       ok: true,
-      value: { flaggedIncomplete: 0, showedUnmappedPassages: 0 },
+      value: { ...NONE_LEFT_OUT, withTheMap: { flaggedIncomplete: 0, showedUnmappedPassages: 0 } },
     });
   });
 
@@ -115,7 +145,10 @@ describe("the unmapped-passage rate", () => {
 
     expect(
       await unmappedPassageRate(ANSWER_MEASURES, door, { workspaceId: workspace.workspaceId }),
-    ).toEqual({ ok: true, value: { flaggedIncomplete: 0, showedUnmappedPassages: 0 } });
+    ).toEqual({
+      ok: true,
+      value: { ...NONE_LEFT_OUT, withTheMap: { flaggedIncomplete: 0, showedUnmappedPassages: 0 } },
+    });
     expect(statements[0]).toBe("BEGIN READ ONLY");
   });
 

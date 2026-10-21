@@ -186,9 +186,7 @@ describe("the answer's rendering", () => {
   });
 
   it("says the map's state in words", () => {
-    expect(mapWords({ state: "as_of", at: "2026-09-01T10:00:00Z" })).toBe(
-      "map as of 1 September 2026",
-    );
+    expect(mapWords({ state: "live" })).toBe("map as of now");
     expect(mapWords({ state: "unavailable_since", since: "2026-09-01T10:00:00Z" })).toBe(
       "map unavailable since 1 September 2026",
     );
@@ -1198,6 +1196,14 @@ describe("what ask answers with no model", () => {
     return read.rows;
   };
 
+  const mapStateOf = async (recordId: string): Promise<unknown> => {
+    const read = await db().pool.query<{ map_state: unknown }>(
+      "SELECT map_state FROM question_asked WHERE id = $1",
+      [recordId],
+    );
+    return read.rows[0]?.map_state;
+  };
+
   it("refuses a question nothing matches, no judge having run", async () => {
     const { asker } = await anAsker();
 
@@ -1460,16 +1466,20 @@ describe("what ask answers with no model", () => {
     expect(ASK_CAPS.related).toBeGreaterThan(ASK_CAPS.entryPoints);
   });
 
-  it("answers from its entry points when the walk times out", async () => {
+  const askedWhileTheWalkStalls = async () => {
     const { workspaceId, asker } = await anAsker();
     const reached = await seededIn(workspaceId, CONSOLE_EXPORTS);
     const entry = await seededIn(workspaceId, { ...RETENTION_ANSWER, linksTo: [reached] });
     const now = new Date();
-
     const stalled = await holdingTable(db().pool, "map_node", () =>
       askedAsIs(db(), asker, { question: RETENTION_QUESTION }, { now }),
     );
     const after = await asked(db(), asker, { question: RETENTION_QUESTION });
+    return { reached, entry, now, stalled, after };
+  };
+
+  it("answers from its entry points when the walk times out", async () => {
+    const { reached, entry, now, stalled, after } = await askedWhileTheWalkStalls();
 
     expect([stalled.verdict, irisOf(stalled), stalled.map]).toEqual([
       "related",
@@ -1477,6 +1487,15 @@ describe("what ask answers with no model", () => {
       { state: "unavailable_since", since: now.toISOString() },
     ]);
     expect([irisOf(after), after.map]).toEqual([[entry, reached], { state: "live" }]);
+  });
+
+  it("records the map unavailable when the walk times out", async () => {
+    const { now, stalled, after } = await askedWhileTheWalkStalls();
+
+    expect([await mapStateOf(stalled.recordId), await mapStateOf(after.recordId)]).toEqual([
+      { state: "unavailable_since", since: now.toISOString() },
+      { state: "live" },
+    ]);
   });
 
   it("keeps the question and what it returned on its record", async () => {

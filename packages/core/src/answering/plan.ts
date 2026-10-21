@@ -4,6 +4,7 @@ import {
   type JudgeState,
   type ModelProvider,
   type QuestionVerdict,
+  type RecordMapState,
 } from "@better-answers/schema";
 
 import {
@@ -33,10 +34,7 @@ import type { Tx } from "../store/postgres/index.ts";
 import { passageViewOf, type AskInput, type Evidence, type PassageView } from "./boundary.ts";
 import type { RecordedConcept } from "./record.ts";
 
-export type MapState =
-  | { readonly state: "live" }
-  | { readonly state: "as_of"; readonly at: string }
-  | { readonly state: "unavailable_since"; readonly since: string };
+export type MapState = Readonly<RecordMapState>;
 
 export const ANSWER_KIND = "Answer";
 

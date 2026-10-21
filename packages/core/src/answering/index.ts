@@ -102,7 +102,11 @@ export {
   readQuestionsAsked,
   type QuestionsAskedInput,
 } from "./records.ts";
-export { ANSWER_MEASURES, unmappedPassageRate } from "./unmapped-passage-rate.ts";
+export {
+  ANSWER_MEASURES,
+  unmappedPassageRate,
+  type UnmappedPassageRate,
+} from "./unmapped-passage-rate.ts";
 
 export {
   TRUST_RIDERS,
@@ -518,6 +522,7 @@ export const ask = async <Refused = never>(
     judgeState: answer.judgeState,
     concepts,
     unmappedPassages: answer.unmappedPassages,
+    map: answer.map,
     settled,
   });
   if (!completed.ok) return completed;
@@ -593,8 +598,6 @@ export const mapWords = (map: MapState): string => {
   switch (map.state) {
     case "live":
       return "map as of now";
-    case "as_of":
-      return `map as of ${ukLongDate(map.at)}`;
     case "unavailable_since":
       return `map unavailable since ${ukLongDate(map.since)}`;
   }
