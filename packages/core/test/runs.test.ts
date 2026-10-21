@@ -197,6 +197,33 @@ describe("what the api puts on the worker's queue", () => {
     ]);
     expect(rows.rowCount).toBe(0);
   });
+
+  it("a person whose membership moved cannot queue a job", async () => {
+    const kept = await arrange();
+    const revoked = await arrange();
+    await db().pool.query(
+      "UPDATE member SET credentials_revoked_at = $3 WHERE workspace_id = $1 AND user_id = $2",
+      [revoked.workspaceId, revoked.admin.userId, new Date()],
+    );
+
+    const rebuildAsAdmin = (scenario: Scenario) =>
+      enqueueJob(scenario.admin, scenario.postgres, {
+        workspaceId: scenario.workspaceId,
+        kind: "full-rebuild",
+        reason: "drill",
+      });
+
+    const fromKept = await rebuildAsAdmin(kept);
+    const fromRevoked = await rebuildAsAdmin(revoked);
+
+    const rows = await db().pool.query<{ workspace_id: string }>(
+      "SELECT workspace_id FROM job WHERE workspace_id = ANY($1::text[])",
+      [[kept.workspaceId, revoked.workspaceId]],
+    );
+    expect(rows.rows).toEqual([{ workspace_id: kept.workspaceId }]);
+    expect(fromKept.ok).toBe(true);
+    expect(fromRevoked).toEqual({ ok: false, error: "credentials-revoked" });
+  });
 });
 
 const CONNECTED_SOURCE = "01K4Q9F3V8YXP7R2M6ZKWC3TDS";

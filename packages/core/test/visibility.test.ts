@@ -51,6 +51,7 @@ import {
   seededBy,
   visibilityHeld,
   visibilitySuite,
+  writeUpIncluding,
   type Sourced,
 } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
@@ -243,25 +244,6 @@ const platformCascade = (
       },
     ),
   );
-
-const writeUpIncluding = (
-  workspaceId: string,
-  iris: readonly string[],
-  held: { readonly sensitivity?: string; readonly audienceGroups?: readonly string[] } = {},
-): Promise<string> =>
-  seededBy(db(), async (seed) => {
-    const writeUp = await seed.writeUp({
-      workspaceId,
-      ...(held.sensitivity === undefined ? {} : { sensitivity: held.sensitivity }),
-      ...(held.audienceGroups === undefined
-        ? {}
-        : { audience: "groups", audienceGroups: [...held.audienceGroups] }),
-    });
-    for (const [ordinal, iri] of iris.entries()) {
-      await seed.writeUpInclude({ workspaceId, writeUpId: writeUp.id, iri, ordinal });
-    }
-    return writeUp.id;
-  });
 
 describe("what a governed write derives from its cited connected sources", () => {
   it("lands the most restrictive sensitivity on both row and map", async () => {
@@ -585,7 +567,7 @@ describe("what a re-write may not do to a concept's sensitivity", () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
-    const writeUp = await writeUpIncluding(scenario.workspaceId, [written.iri]);
+    const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [written.iri]);
     const footnotes = () =>
       reading(scenario.viewer, (viewer, tx) => footnotesOf(viewer, tx, writeUp));
     expect(await footnotes()).toEqual({
@@ -645,7 +627,7 @@ describe("narrowing a connected source", () => {
       body: `See [the first note](/${cited.path}).`,
     });
     const untouched = await conceptCiting(scenario, scenario.editor, [other.documentId]);
-    const writeUp = await writeUpIncluding(scenario.workspaceId, [cited.iri, untouched.iri]);
+    const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [cited.iri, untouched.iri]);
 
     const narrowed = await reading(scenario.admin, (admin, tx) =>
       narrowingAsked(admin, tx, {
@@ -804,7 +786,7 @@ describe("narrowing a connected source", () => {
   it("narrows to named groups; an outside Viewer loses the concept", async () => {
     const { scenario, hr, connectedSource } = await workspaceWithHrConnectedSource();
     const written = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
-    const writeUp = await writeUpIncluding(scenario.workspaceId, [written.iri]);
+    const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [written.iri]);
 
     const narrowed = await reading(scenario.admin, (admin, tx) =>
       narrowingAsked(admin, tx, {
@@ -1092,7 +1074,7 @@ describe("narrowing a connected source", () => {
     const other = await connectedSourceHolding(db(), scenario.workspaceId);
     const narrowing = await conceptCiting(scenario, scenario.editor, [other.documentId]);
     const cited = await conceptCiting(scenario, scenario.editor, [open.documentId]);
-    const writeUp = await writeUpIncluding(scenario.workspaceId, [narrowing.iri, cited.iri]);
+    const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [narrowing.iri, cited.iri]);
 
     await narrowingBesideAParkedWrite(
       scenario,
@@ -1259,7 +1241,7 @@ describe("publishing a connected source", () => {
     const other = await connectedSourceHolding(db(), scenario.workspaceId, unpublishedForHr);
     const cited = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
     const untouched = await conceptCiting(scenario, scenario.editor, [other.documentId]);
-    const writeUp = await writeUpIncluding(scenario.workspaceId, [cited.iri], {
+    const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [cited.iri], {
       sensitivity: "Restricted",
       audienceGroups: [hr],
     });
@@ -1334,7 +1316,7 @@ describe("widening a connected source", () => {
     const other = await connectedSourceForGroups(db(), scenario.workspaceId, [hr], "Restricted");
     const cited = await conceptCiting(scenario, scenario.admin, [connectedSource.documentId]);
     const untouched = await conceptCiting(scenario, scenario.admin, [other.documentId]);
-    const writeUp = await writeUpIncluding(scenario.workspaceId, [cited.iri], {
+    const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [cited.iri], {
       sensitivity: "Restricted",
       audienceGroups: [hr],
     });
@@ -1702,7 +1684,7 @@ describe("a cascade under a platform principal", () => {
   it("re-derives the concepts citing a source's documents, and their write-ups", async () => {
     const { scenario, connectedSource, other, cited } = await citedBesideAnother();
     const untouched = await conceptCiting(scenario, scenario.editor, [other.documentId]);
-    const writeUp = await writeUpIncluding(scenario.workspaceId, [cited.iri]);
+    const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [cited.iri]);
     await documentNarrowedBySync(db().pool, scenario.workspaceId, connectedSource);
 
     const cascaded = await platformCascade(scenario, connectedSource, async () => undefined);
@@ -1726,7 +1708,7 @@ describe("an Admin's recorded override", () => {
       kind: "Person",
       frontmatter: { title: "Ada Lovelace", type: "Person" },
     });
-    const writeUp = await writeUpIncluding(scenario.workspaceId, [person.iri]);
+    const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [person.iri]);
 
     await db().pool.query(
       "UPDATE write_up SET sensitivity = 'Restricted' WHERE workspace_id = $1 AND id = $2",
