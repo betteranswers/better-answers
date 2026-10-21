@@ -101,6 +101,9 @@ const membersRegion = (page: Page) => page.getByRole("region", { name: "Members"
 
 const outcomeOf = (page: Page): Locator => membersRegion(page).getByRole("status").nth(1);
 
+const selectionBar = (page: Page): Locator =>
+  page.getByRole("toolbar", { name: "Selected Members" });
+
 const describing = async (control: Locator): Promise<string> =>
   control
     .page()
@@ -291,7 +294,10 @@ const saysToPickAMemberAfter = async (page: Page, key: string): Promise<void> =>
   await expect(outcomeOf(page)).toHaveText("");
   await page.keyboard.press(key);
   await expect(outcomeOf(page)).toHaveText(/\S/);
-  await expect(page, "the keystroke left Members").toHaveURL(new RegExp(`${MEMBERS_PAGE}(#.*)?$`));
+  await expect(page, "the keystroke left Members").toHaveURL(
+    (url) => url.pathname === MEMBERS_PAGE,
+  );
+  await expect(selectionBar(page), "the keystroke selected a member").toHaveCount(0);
 };
 
 const skippedToMembers = async (page: Page, api: APIRequestContext, workspaceName: string) => {
@@ -1671,9 +1677,6 @@ const PAGE_OF_ROWS = 25;
 const tickOf = (page: Page, name: string): Locator =>
   membersRegion(page).getByRole("checkbox", { name: `Select ${name}`, exact: true });
 
-const selectionBar = (page: Page): Locator =>
-  page.getByRole("toolbar", { name: "Selected Members" });
-
 const selectionAction = (page: Page, action: string): Locator =>
   selectionBar(page).getByRole("button", { name: action, exact: true });
 
@@ -2389,7 +2392,9 @@ test.describe("bulk actions on the members ticked", () => {
       expect(line, "a line of the address ends inside a word").toMatch(/[@.-]$/);
     }
   });
+});
 
+test.describe("keys on a member paged out of view", () => {
   test("acts on no member paged out of view by key", async ({ page, request }) => {
     await aWorkspaceOfThirtyEditors(page, request, "Calder Paging");
     const pagedAwayFromPersonOne = async (): Promise<void> => {
@@ -2397,13 +2402,6 @@ test.describe("bulk actions on the members ticked", () => {
       await memberLink(page, "Person 01").focus();
       await page.keyboard.press(PEOPLE_KEYSTROKES.nextPage.key);
       await expect(memberLink(page, "Person 01")).toHaveCount(0);
-    };
-    const saysToPickAMember = async (key: string): Promise<void> => {
-      await expect(outcomeOf(page), `${key} said nothing of a member out of view`).toHaveText(/\S/);
-      await expect(page, `${key} opened a member out of view`).toHaveURL(
-        (url) => url.pathname === MEMBERS_PAGE,
-      );
-      await expect(selectionBar(page), `${key} selected a member out of view`).toHaveCount(0);
     };
 
     for (const { key } of [
@@ -2413,15 +2411,13 @@ test.describe("bulk actions on the members ticked", () => {
       PEOPLE_KEYSTROKES.tick,
     ]) {
       await pagedAwayFromPersonOne();
-      await page.keyboard.press(key);
-      await saysToPickAMember(key);
+      await saysToPickAMemberAfter(page, key);
     }
 
     await pagedAwayFromPersonOne();
     await page.keyboard.press(PEOPLE_KEYSTROKES.previousPage.key);
     await expect(memberLink(page, "Person 01")).toBeVisible();
-    await page.keyboard.press(PEOPLE_KEYSTROKES.open.key);
-    await saysToPickAMember(`${PEOPLE_KEYSTROKES.previousPage.key} ${PEOPLE_KEYSTROKES.open.key}`);
+    await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.open.key);
 
     await memberLink(page, "Person 01").focus();
     await page.keyboard.press(PEOPLE_KEYSTROKES.open.key);

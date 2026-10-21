@@ -612,7 +612,10 @@ test.describe("the Knowledge Search page", () => {
     ).toBeFocused();
   });
 
-  for (const width of [320, 1280]) {
+  for (const [width, landsOn] of [
+    [320, "Search"],
+    [1280, FORKLIFT_GUIDE],
+  ] as const) {
     test(`keeps the passage through a failed list, at ${String(width)} px`, async ({
       page,
       request,
@@ -632,11 +635,10 @@ test.describe("the Knowledge Search page", () => {
       await matchesOf(page).getByRole("button", { name: FORKLIFT_GUIDE }).click();
       await typed.promise;
       await saysARefusal(alerted(page));
-      const landing =
-        width === 320
-          ? searchRegion(page).getByRole("heading", { name: "Search" })
-          : passagePanel(page, FORKLIFT_GUIDE).getByRole("heading", { name: FORKLIFT_GUIDE });
-      await expect(landing, "a failed list left focus on the page").toBeFocused();
+      await expect(
+        page.getByRole("heading", { name: landsOn, exact: true }),
+        "a failed list left focus on the page",
+      ).toBeFocused();
       await page.unroute(isTheTypedFind);
       await searchRegion(page).getByRole("button", { name: "Retry" }).click();
 
