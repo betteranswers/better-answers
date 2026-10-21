@@ -504,9 +504,9 @@ def _paragraph_around(body: str, index: int) -> tuple[int, int]:
     return above + 1, len(body) if below == -1 else below
 
 
-def _sentence_at(body: str, index: int) -> str:
+def _sentence_at(body: str, prose: str, index: int) -> str:
     paragraph_start, paragraph_end = _paragraph_around(body, index)
-    paragraph = body[paragraph_start:paragraph_end]
+    paragraph = prose[paragraph_start:paragraph_end]
     at = index - paragraph_start
 
     start = 0
@@ -628,7 +628,7 @@ def references_of(
                 link.ordinal,
                 target,
                 _section_at(prose, link.at),
-                _sentence_at(prose, link.at),
+                _sentence_at(body, prose, link.at),
             )
         )
 

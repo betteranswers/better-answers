@@ -90,9 +90,9 @@ const paragraphAround = (body: string, index: number): readonly [number, number]
   return [above + 1, below === -1 ? body.length : below];
 };
 
-export const sentenceAt = (body: string, index: number): string => {
+export const sentenceAt = (body: string, prose: string, index: number): string => {
   const [paragraphStart, paragraphEnd] = paragraphAround(body, index);
-  const paragraph = body.slice(paragraphStart, paragraphEnd);
+  const paragraph = prose.slice(paragraphStart, paragraphEnd);
   const at = index - paragraphStart;
 
   let start = 0;

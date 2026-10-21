@@ -22,7 +22,7 @@ describe("the reader stays linear on a tenant's worst shapes", () => {
     const linked = "[a](b)".repeat(10_000) + "[".repeat(20_000);
     const prose = proseOf(linked);
 
-    expect(takenBy(() => sentenceAt(prose, prose.length - 1))).toBeLessThan(1000);
+    expect(takenBy(() => sentenceAt(linked, prose, prose.length - 1))).toBeLessThan(1000);
   });
 
   it("reads a heading of eighty thousand spaces inside a second", () => {

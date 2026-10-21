@@ -100,7 +100,7 @@ const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
         target,
         section: sectionAt(prose, link.at),
 
-        sentence: sentenceAt(prose, link.at),
+        sentence: sentenceAt(concept.body, prose, link.at),
       },
     ];
   });
