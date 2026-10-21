@@ -410,7 +410,7 @@ describe("ask with a judge", () => {
     ]);
   });
 
-  it("keeps an `Answer` past the cap related, and unsent", async () => {
+  it("shows an `Answer` past the cap as an unsent preview", async () => {
     const { asker, wire } = await arranged([USERS, SUPPLIER], [USERS.title, SUPPLIER.title]);
 
     const answer = await askedWith(asker, { question: QUESTION }, wire, {
@@ -421,7 +421,9 @@ describe("ask with a judge", () => {
     const sentFor = [...candidatesIn(promptOf(wire.sent[0]?.body ?? ""))];
     expect(sentFor).toHaveLength(1);
     expect(titlesOf(answer.answers)).toEqual(sentFor.map(([title]) => title));
-    expect(answer.related.map(({ kind }) => kind)).toEqual(["Answer"]);
+    expect(answer.related.map((concept) => [concept.kind, "body" in concept])).toEqual([
+      ["Answer", false],
+    ]);
   });
 
   const askedBesideACopy = async (status: NonNullable<SeededConcept["status"]>) => {
@@ -436,9 +438,13 @@ describe("ask with a judge", () => {
   it("never offers a Deprecated Answer to the judge", async () => {
     const { answer, copy } = await askedBesideACopy("deprecated");
 
-    expect(answer.related.map(({ iri, trustWords }) => ({ iri, trustWords }))).toEqual([
-      { iri: copy, trustWords: "Deprecated" },
-    ]);
+    expect(
+      answer.related.map((concept) => ({
+        iri: concept.iri,
+        trustWords: concept.trustWords,
+        inFull: "body" in concept,
+      })),
+    ).toEqual([{ iri: copy, trustWords: "Deprecated", inFull: false }]);
   });
 
   it("never reads an unpublished Draft Answer for the judge", async () => {

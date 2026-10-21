@@ -23,12 +23,13 @@ import {
   type WireShapeName,
 } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import type {
-  AnswerPlan,
-  AskCaps,
-  DecisionThresholds,
-  RelatedConcept,
-  ReturnedConcept,
+import {
+  previewed,
+  type AnswerPlan,
+  type AskCaps,
+  type DecisionThresholds,
+  type RelatedConcept,
+  type ReturnedConcept,
 } from "./plan.ts";
 import type { RecordCompletion } from "./record.ts";
 
@@ -280,7 +281,7 @@ const judgedPlan = (
       verdict: answers.length === 0 ? "related" : "ok",
       judgeState: "judged",
       answers,
-      related: plan.answer.related.filter((concept) => !fits.has(concept.iri)),
+      related: plan.answer.related.filter((concept) => !fits.has(concept.iri)).map(previewed),
     },
     concepts: plan.concepts.map((concept) => {
       const verdict = judged.get(concept.iri);

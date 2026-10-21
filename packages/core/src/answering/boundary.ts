@@ -194,24 +194,28 @@ const relatedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
       .string()
       .exactOptional()
       .describe(
-        "An `Answer`'s own words, to quote unchanged. Any other concept comes without them: read it with `open` before writing from it.",
+        "An `Answer`'s own words when no judge ran or judging failed, to quote unchanged. Any other concept, and every `Answer` once the judge has run, comes without them: read it with `open` before writing from it.",
       ),
-    evidence: z.array(evidenceItem).exactOptional().describe("An `Answer`'s sources."),
+    evidence: z
+      .array(evidenceItem)
+      .exactOptional()
+      .describe("An `Answer`'s sources, when its words come too."),
   });
 
 export const answerOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
   z.object({
     verdict: z.enum(QUESTION_VERDICTS),
-    judgeState: z
-      .enum(JUDGE_STATES)
-      .describe("How the judge stood: an `Answer` it did not judge is never a fit."),
+    recordId: z.string().describe("The id of the record kept of this question."),
     answers: z
       .array(returnedConceptWith(trust))
       .describe("Every `Answer` a judge found to fit the question, as it stands."),
+    judgeState: z
+      .enum(JUDGE_STATES)
+      .describe("How the judge stood: an `Answer` it did not judge is never a fit."),
     related: z
       .array(relatedConceptWith(trust))
       .describe(
-        "The concepts that bear on the question, best first: an unjudged `Answer` as it stands, any other by its line.",
+        "The concepts that bear on the question, best first: an `Answer` as it stands when no judge ran or judging failed, and every other by its line.",
       ),
     conflicts: z.array(
       z.object({
@@ -225,7 +229,6 @@ export const answerOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
       .array(z.string())
       .describe("The collections considered: those named, or every one you can read."),
     readableCollections: z.array(z.string()).describe("The collections you may name."),
-    recordId: z.string().describe("The id of the record kept of this question."),
   });
 
 export const openOutputWith = <Trust extends z.ZodType>(trust: Trust) =>

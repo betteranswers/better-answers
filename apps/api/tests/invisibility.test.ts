@@ -169,7 +169,8 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
           },
         ],
       });
-      expect(rendered(seen)).toContain(`${iri} — ${page}`);
+      expect(rendered(seen)).toContain(iri);
+      expect(rendered(seen)).not.toContain(page);
     });
   });
 

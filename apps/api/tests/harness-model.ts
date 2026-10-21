@@ -49,7 +49,7 @@ export type SentToModel = {
   readonly signal: AbortSignal | null | undefined;
 };
 
-type Answering = (sent: SentToModel) => Response | Promise<Response>;
+export type Answering = (sent: SentToModel) => Response | Promise<Response>;
 
 export const aModelWire = () => {
   const sent: SentToModel[] = [];
