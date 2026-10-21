@@ -94,7 +94,6 @@ const READS_WINDOW_MS = 60_000;
 
 const FILL_AND_REFUSAL_MS = 10_000;
 
-/** The api counts the reads in windows fixed to the clock's minute, on this machine's clock. */
 const aFreshReadsWindow = async (): Promise<void> => {
   const left = READS_WINDOW_MS - (Date.now() % READS_WINDOW_MS);
   if (left > FILL_AND_REFUSAL_MS) return;
