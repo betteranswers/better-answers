@@ -38,7 +38,8 @@ const STEPS: Readonly<Record<string, string>> = {
   "members/eventsNamed":
     "the audit log's read, its export and a member's activity call it after admitting an Admin",
   "runs/enqueueJob": "opens the transaction enqueueJobIn admits in",
-  "sources/findPassages": "find and ask call it with the reader they admitted",
+  "sources/findPassages": "ask calls it with the reader it admitted",
+  "sources/findPassagesWithOpening": "find calls it with the reader it admitted",
   "sources/passageAt": "open, ask and a concept's read call it for the reader each admitted",
   "sources/passageCountsOf": "find and ask call it with the reader they admitted",
 };

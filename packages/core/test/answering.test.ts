@@ -448,13 +448,14 @@ describe("the preview's rendering", () => {
             title: "The bid library's invoice",
             locator: "01J6DDDDDDDDDDDDDDDDDDDDDD/chars:0-44",
             sensitivity: "Internal",
+            openingLine: "The invoice was settled in March.",
           },
         ],
         nextCursor: "eyJydW4iOiJ3ZWFrIn0",
       }),
     ).toBe(
       [
-        "document · The bid library's invoice · Not company knowledge · Internal · 01J6DDDDDDDDDDDDDDDDDDDDDD/chars:0-44",
+        'document · The bid library\'s invoice · Not company knowledge · Internal · 01J6DDDDDDDDDDDDDDDDDDDDDD/chars:0-44 · "The invoice was settled in March."',
         "",
         "More follow: call find again with cursor eyJydW4iOiJ3ZWFrIn0",
       ].join("\n"),
@@ -1794,6 +1795,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
             title: INVOICE_TITLE,
             locator: invoice.locator,
             sensitivity: "Internal",
+            openingLine: INVOICE_TEXT,
           },
         ],
       },
@@ -1801,8 +1803,39 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     expect(found.ok && renderFind(found.value)).toBe(
       [
         `Policy · ${CONCEPT_TITLE} · No collection · Unverified · ${iri}`,
-        `document · ${INVOICE_TITLE} · ${NOT_COMPANY_KNOWLEDGE} · Internal · ${invoice.locator}`,
+        `document · ${INVOICE_TITLE} · ${NOT_COMPANY_KNOWLEDGE} · Internal · ${invoice.locator} · "${INVOICE_TEXT}"`,
       ].join("\n"),
+    );
+  });
+
+  it("previews a passage by its first worded line, cut short", async () => {
+    const reader = await arrange();
+    const brief = `𝔸 The kingfisher brief ${"a".repeat(137)}`;
+    const ledger = `The kingfisher ledger ${"runs on ".repeat(30)}to the end.`;
+    const documents = [
+      [
+        "The kingfisher minutes",
+        "\n  \n#\n  ## The kingfisher minutes open here.\r\nThey go on below.",
+        "The kingfisher minutes open here.",
+      ],
+      ["The kingfisher tags", "#kingfisher notes\rSecond line.", "#kingfisher notes"],
+      ["The kingfisher log", "The kingfisher\tlog   runs\u2028on.", "The kingfisher log runs"],
+      ["The kingfisher brief", brief, brief],
+      ["The kingfisher ledger", ledger, `${Array.from(ledger).slice(0, 159).join("").trimEnd()}…`],
+    ] as const;
+    for (const [title, text] of documents)
+      await documentHolding(reader.workspaceId, { title, text });
+
+    const found = await searching(reader);
+
+    const openings = new Map(
+      (found.ok ? found.value.matches : []).flatMap((match) =>
+        match.layer === "sources" ? [[match.title, match.openingLine]] : [],
+      ),
+    );
+    expect(Array.from(brief), "the brief's line is exactly the opening's length").toHaveLength(160);
+    expect(Object.fromEntries(openings)).toEqual(
+      Object.fromEntries(documents.map(([title, , opening]) => [title, opening])),
     );
   });
 
@@ -1901,6 +1934,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
         title: INVOICE_TITLE,
         locator: visible.locator,
         sensitivity: "Internal",
+        openingLine: INVOICE_TEXT,
       },
     ]);
   });
@@ -1999,6 +2033,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
             title: "The bid library's invoice",
             locator: invoice.locator,
             sensitivity: "Internal",
+            openingLine: INVOICE_TEXT,
           },
         ],
       },

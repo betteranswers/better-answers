@@ -477,6 +477,9 @@ test.describe("the Knowledge Search page", () => {
     await expect(first).toContainText("Document");
     await expect(first).toContainText("Not company knowledge");
     await expect(first).toContainText("Internal");
+    await expect(first, "the match shows its passage's opening line").toContainText(
+      "Pallet bay 1 takes stock wrapped and labelled before it is racked.",
+    );
     const opener = first.getByRole("button", { name: HANDBOOK });
     await expect(opener).toHaveAttribute("aria-expanded", "false");
     await opener.click();
@@ -788,7 +791,9 @@ test.describe("the Knowledge Search page", () => {
       await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();
       const heading = page.getByRole("heading", { name: HANDBOOK });
       await expect(heading).toBeFocused();
-      await expect(page.getByText(PALLET_PASSAGES[0] ?? "")).toBeVisible();
+      await expect(
+        passagePanel(page, HANDBOOK).or(matchesOf(page).getByRole("region", { name: HANDBOOK })),
+      ).toContainText(PALLET_PASSAGES[0] ?? "");
 
       let withheld = 1;
       await page.route(

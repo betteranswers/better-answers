@@ -29,11 +29,11 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import {
-  findPassages,
+  findPassagesWithOpening,
   parseLocator,
   passageAt,
   passageCountsOf,
-  type PassageMatch,
+  type PassageMatchWithOpening,
 } from "../sources/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import {
@@ -138,6 +138,7 @@ type DocumentMatch = {
   readonly title: string;
   readonly locator: string;
   readonly sensitivity: string;
+  readonly openingLine: string;
 };
 
 export type FindMatch<Iri extends string = ConceptIri> = ConceptMatch<Iri> | DocumentMatch;
@@ -266,11 +267,11 @@ const conceptRun =
   };
 
 const passageRun =
-  ({ principal, tx, query }: Search, counted: Counted): RunReader<PassageMatch> =>
+  ({ principal, tx, query }: Search, counted: Counted): RunReader<PassageMatchWithOpening> =>
   async (limit, after) => {
     const counts = await counted();
     if (!counts.ok) return err(counts.error);
-    const found = await findPassages(principal, tx, {
+    const found = await findPassagesWithOpening(principal, tx, {
       query,
       limit,
       after: after?.run === "passages" ? after.bound : undefined,
@@ -373,12 +374,13 @@ const conceptMatchOf = (concept: OpenedConcept, now: Date): ConceptMatch<Concept
   };
 };
 
-const documentMatchOf = (match: PassageMatch): DocumentMatch => ({
+const documentMatchOf = (match: PassageMatchWithOpening): DocumentMatch => ({
   layer: "sources",
   kind: "document",
   title: match.title,
   locator: match.locator,
   sensitivity: match.sensitivity,
+  openingLine: match.openingLine,
 });
 
 const openAction = declareAction({
@@ -532,7 +534,7 @@ export const ask = async <Refused = never>(
 const findLine = (match: FindMatch<string>): string =>
   match.layer === "bundles"
     ? `${match.kind} · ${match.title} · ${match.collection ?? NO_COLLECTION} · ${match.trustWords} · ${match.iri}`
-    : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator}`;
+    : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator} · "${match.openingLine}"`;
 
 export const renderFind = (result: FindResult<string>): string => {
   if (result.matches.length === 0) return "Nothing in the company's knowledge matches that.";

@@ -114,7 +114,7 @@ const findEntry = defineEntry({
   name: "find",
   title: "Find in the company's knowledge",
   description:
-    "Search the company's knowledge and preview what it finds: one line per match. A concept carries its kind, title and trust state; a document nothing on the map covers carries its title, the sensitivity it is held under and the marker 'Not company knowledge'. Use `open` to read a match in full — a concept by its `iri`, a document by the `locator` on its line. When more matches follow, the answer carries `nextCursor`; pass it back as `cursor` for the next page.",
+    "Search the company's knowledge and preview what it finds: one line per match. A concept carries its kind, title and trust state; a document nothing on the map covers carries its title, the sensitivity it is held under, the marker 'Not company knowledge' and, in quotes after its `locator`, the opening line of the passage that matched. Use `open` to read a match in full — a concept by its `iri`, a document by the `locator` on its line. When more matches follow, the answer carries `nextCursor`; pass it back as `cursor` for the next page.",
   scopes: ["knowledge:read"],
   // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the answering slice's own schema; the emitted-schema test reads its keys
   input: findInput,

@@ -5,6 +5,7 @@ import {
   connectTheHandbook,
   locatorOf,
   THE_ACCOUNT_NUMBER,
+  THE_OPENING,
   THE_PASSAGE,
   THE_PASSAGE_QUOTED,
   THE_QUERY,
@@ -84,10 +85,11 @@ describe("one uploaded document, read back over the MCP surface", () => {
           title: THE_TITLE,
           locator,
           sensitivity: "Internal",
+          openingLine: THE_OPENING,
         },
       ]);
       expect(rendered(found)).toBe(
-        `document · ${THE_TITLE} · Not company knowledge · Internal · ${locator}`,
+        `document · ${THE_TITLE} · Not company knowledge · Internal · ${locator} · "${THE_OPENING}"`,
       );
       expect(structured(opened)).toEqual({
         found: true,

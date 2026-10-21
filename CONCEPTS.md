@@ -659,6 +659,8 @@ its *effective class*, its audience and whether it is published.
 
 Served, it is the text a *locator* resolves to, with its source document's title and its
 sensitivity word: the unit `open` returns and a match marked *Not company knowledge* previews.
+A match previews it by its *opening line*: its first line with words, less any heading marks, cut
+short past 160 characters.
 Never the original text.
 
 ### window

@@ -33,6 +33,7 @@ import {
   THE_ACCOUNT_NUMBER,
   THE_BANK_DETAILS,
   THE_HANDBOOK,
+  THE_OPENING,
   THE_PASSAGE,
   THE_PASSAGE_QUOTED,
   THE_PLACEHOLDER,
@@ -267,10 +268,11 @@ describe("one uploaded document, read back through both tiers", () => {
           title: THE_TITLE,
           locator,
           sensitivity: "Internal",
+          openingLine: THE_OPENING,
         },
       ]);
       expect(renderFind(found)).toBe(
-        `document · ${THE_TITLE} · Not company knowledge · Internal · ${locator}`,
+        `document · ${THE_TITLE} · Not company knowledge · Internal · ${locator} · "${THE_OPENING}"`,
       );
       expect(opened).toEqual({
         found: true,
