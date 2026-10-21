@@ -25,6 +25,7 @@ import { type TestData, testData } from "./factory.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
 import { ADMITTED, privilegesHeld, refusalOf, refusesEach, sqlstateOf } from "./probes.ts";
 import {
+  A_BACKUP_ROW,
   A_BUNDLE_COMMIT,
   A_BUNDLE_COMMIT_WITH_A_PARENT,
   A_CITATION,
@@ -3883,6 +3884,210 @@ describe("the sweep pass", () => {
           [ulid(), "delete", 1, 0, 0, 0],
           /sweep_pass_upload_sweep_check/,
         ],
+      ]);
+    });
+  });
+});
+
+type BackupRow = {
+  readonly kind: string;
+  readonly store: string;
+  readonly startedAt: string;
+  readonly finishedAt: string;
+  readonly outcome: string;
+  readonly bytes: number | null;
+  readonly location: string | null;
+  readonly reportUrl: string | null;
+  readonly containsPersonalData: boolean;
+  readonly expiresAt: string | null;
+  readonly rtoMinutes: number | null;
+};
+
+const backupParameters = (row: BackupRow): unknown[] => [
+  row.kind,
+  row.store,
+  row.startedAt,
+  row.finishedAt,
+  row.outcome,
+  row.bytes,
+  row.location,
+  row.reportUrl,
+  row.containsPersonalData,
+  row.expiresAt,
+  row.rtoMinutes,
+];
+
+const AN_HOURLY_DUMP: BackupRow = {
+  kind: "backup",
+  store: "postgres",
+  startedAt: "2026-10-21T10:00:00Z",
+  finishedAt: "2026-10-21T10:03:00Z",
+  outcome: "ok",
+  bytes: 52_428_800,
+  location: "pg/hourly/pg-20261021T100000Z.dump.age",
+  reportUrl: null,
+  containsPersonalData: true,
+  expiresAt: "2026-10-23T10:03:00Z",
+  rtoMinutes: null,
+};
+
+const A_FAILED_DUMP: BackupRow = {
+  ...AN_HOURLY_DUMP,
+  startedAt: "2026-10-21T11:00:00Z",
+  finishedAt: "2026-10-21T11:01:00Z",
+  outcome: "failed",
+  bytes: null,
+  location: null,
+  expiresAt: null,
+};
+
+const A_DRILL: BackupRow = {
+  kind: "drill",
+  store: "all",
+  startedAt: "2026-10-01T03:00:00Z",
+  finishedAt: "2026-10-01T04:10:00Z",
+  outcome: "ok",
+  bytes: null,
+  location: "drills/",
+  reportUrl: "drills/drill-20261001T030000Z.md",
+  containsPersonalData: false,
+  expiresAt: null,
+  rtoMinutes: 70,
+};
+
+const A_RESTORE: BackupRow = {
+  kind: "restore",
+  store: "postgres",
+  startedAt: "2026-10-21T12:00:00Z",
+  finishedAt: "2026-10-21T12:40:00Z",
+  outcome: "ok",
+  bytes: null,
+  location: "pg/daily/pg-20261021T020000Z.dump.age",
+  reportUrl: null,
+  containsPersonalData: false,
+  expiresAt: null,
+  rtoMinutes: 40,
+};
+
+describe("the backup table", () => {
+  it("admits each row its scripts write", async () => {
+    await withRollback(db.pool, async (client) => {
+      for (const row of [AN_HOURLY_DUMP, A_FAILED_DUMP, A_DRILL, A_RESTORE]) {
+        await client.query(A_BACKUP_ROW, backupParameters(row));
+      }
+
+      const read = await client.query<{ kind: string; store: string; outcome: string }>(
+        "SELECT kind, store, outcome FROM backup ORDER BY started_at",
+      );
+      expect(read.rows).toEqual([
+        { kind: "drill", store: "all", outcome: "ok" },
+        { kind: "backup", store: "postgres", outcome: "ok" },
+        { kind: "backup", store: "postgres", outcome: "failed" },
+        { kind: "restore", store: "postgres", outcome: "ok" },
+      ]);
+    });
+  });
+
+  it.each(["app_rt", "worker_rt"])("refuses %s reading or writing any row", async (role) => {
+    await withRollback(db.pool, async (client) => {
+      await client.query(A_BACKUP_ROW, backupParameters(AN_HOURLY_DUMP));
+      expect(Object.values(await privilegesHeld(client, role, "backup"))).not.toContain(true);
+      await client.query(`SET LOCAL ROLE ${role}`);
+
+      await refusesEach(client, [
+        ["SELECT kind FROM backup", `${role} reads no copy's whereabouts`],
+        [
+          A_BACKUP_ROW,
+          `${role} could record a copy nobody made`,
+          backupParameters({ ...AN_HOURLY_DUMP, startedAt: "2026-10-21T13:00:00Z" }),
+        ],
+        ["UPDATE backup SET outcome = 'ok'", "or turn a failed copy into a good one"],
+        ["DELETE FROM backup", "or remove the row a missed copy is read from"],
+      ]);
+    });
+  });
+
+  it("refuses each row no run could make", async () => {
+    await withRollback(db.pool, async (client) => {
+      await client.query(A_BACKUP_ROW, backupParameters(AN_HOURLY_DUMP));
+      const standing = await client.query("SELECT bytes, location FROM backup");
+      expect(standing.rows).toEqual([
+        { bytes: String(AN_HOURLY_DUMP.bytes), location: AN_HOURLY_DUMP.location },
+      ]);
+
+      const refused = (why: string, row: BackupRow, constraint: string) =>
+        [A_BACKUP_ROW, why, backupParameters(row), new RegExp(`"${constraint}"`)] as const;
+      await refusesEach(client, [
+        refused(
+          "a run is a backup, a drill or a restore",
+          { ...AN_HOURLY_DUMP, kind: "snapshot" },
+          "backup_kind_check",
+        ),
+        refused(
+          "a copy is of a store the deploy keeps",
+          { ...AN_HOURLY_DUMP, store: "tape" },
+          "backup_store_check",
+        ),
+        refused(
+          "a backup copies one store",
+          { ...AN_HOURLY_DUMP, store: "all" },
+          "backup_shape_check",
+        ),
+        refused(
+          "a drill measures its recovery time",
+          { ...A_DRILL, rtoMinutes: null },
+          "backup_shape_check",
+        ),
+        refused(
+          "a drill keeps no copy of personal data",
+          { ...A_DRILL, containsPersonalData: true },
+          "backup_shape_check",
+        ),
+        refused(
+          "a restore keeps no copy of personal data",
+          { ...A_RESTORE, containsPersonalData: true },
+          "backup_shape_check",
+        ),
+        refused(
+          "a restore makes no copy that could expire",
+          { ...A_RESTORE, expiresAt: "2026-11-21T12:40:00Z" },
+          "backup_shape_check",
+        ),
+        refused(
+          "a restore reads the backups' copies, never the git mirror",
+          { ...A_RESTORE, store: "git-mirror" },
+          "backup_shape_check",
+        ),
+        refused(
+          "a good copy says where it is",
+          { ...AN_HOURLY_DUMP, location: null },
+          "backup_recorded_copy_check",
+        ),
+        refused(
+          "a failed copy is nowhere",
+          { ...A_FAILED_DUMP, location: "pg/hourly/pg-20261021T110000Z.dump.age" },
+          "backup_recorded_copy_check",
+        ),
+        refused(
+          "a failed copy measured no size",
+          { ...A_FAILED_DUMP, bytes: 1024 },
+          "backup_recorded_copy_check",
+        ),
+        refused(
+          "a run finishes after it starts",
+          { ...AN_HOURLY_DUMP, finishedAt: "2026-10-21T09:59:00Z" },
+          "backup_span_check",
+        ),
+        refused(
+          "a copy's size is never negative",
+          { ...AN_HOURLY_DUMP, bytes: -1 },
+          "backup_span_check",
+        ),
+        refused(
+          "a run of one kind on one store starts once a moment",
+          AN_HOURLY_DUMP,
+          "backup_kind_store_started_at_pk",
+        ),
       ]);
     });
   });

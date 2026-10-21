@@ -269,6 +269,21 @@ const acceptedRows = {
       generations: 1,
     },
   ],
+  backup: [
+    {
+      kind: "backup",
+      store: "postgres",
+      startedAt: NOW,
+      finishedAt: NOW,
+      outcome: "ok",
+      bytes: 1024,
+      location: "pg/hourly/pg-20260924T020000Z.dump.age",
+      reportUrl: null,
+      containsPersonalData: true,
+      expiresAt: NOW,
+      rtoMinutes: null,
+    },
+  ],
 
   identityAuditEvent: [
     {
@@ -975,6 +990,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "ingressCounter",
         "contractStamp",
         "sweepPass",
+        "backup",
         "auditEvent",
         "identityAuditEvent",
         "accessRequest",
@@ -1090,6 +1106,13 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.sweepPass[0], uploadSweep: "delete" },
       { ...acceptedRows.sweepPass[0], found: -1 },
       { ...acceptedRows.sweepPass[0], removed: 0.5 },
+    ],
+    backup: [
+      { ...acceptedRows.backup[0], kind: "snapshot" },
+      { ...acceptedRows.backup[0], store: "tape" },
+      { ...acceptedRows.backup[0], outcome: "partial" },
+      { ...acceptedRows.backup[0], bytes: -1 },
+      { ...acceptedRows.backup[0], bytes: 0.5 },
     ],
     mcpCallCounter: [{ ...acceptedRows.mcpCallCounter[0], count: -1 }],
     testWorkspaceMark: [
@@ -1847,6 +1870,19 @@ describe("5 — the inferred type is pinned", () => {
       found: number;
       removed: number;
       generations: number;
+    };
+    backup: {
+      kind: "backup" | "drill" | "restore";
+      store: "postgres" | "objectstore" | "git" | "git-mirror" | "all";
+      startedAt: Date;
+      finishedAt: Date;
+      outcome: "ok" | "failed";
+      bytes: number | null;
+      location: string | null;
+      reportUrl: string | null;
+      containsPersonalData: boolean;
+      expiresAt: Date | null;
+      rtoMinutes: number | null;
     };
     session: {
       id: string;

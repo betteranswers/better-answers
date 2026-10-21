@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, integer, pgTable, text } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, integer, pgTable, primaryKey, text } from "drizzle-orm/pg-core";
 
 import { listed, stamp } from "./column-helpers.ts";
 
@@ -41,6 +41,52 @@ export const sweepPass = pgTable(
       "sweep_pass_counts_check",
       sql`refused BETWEEN 0 AND workspaces AND removed BETWEEN 0 AND found AND generations >= 0
           AND (upload_sweep = 'remove' OR removed = 0)`,
+    ),
+  ],
+);
+
+export const BACKUP_KINDS = ["backup", "drill", "restore"] as const;
+export const BACKUP_STORES = ["postgres", "objectstore", "git", "git-mirror", "all"] as const;
+export const BACKUP_OUTCOMES = ["ok", "failed"] as const;
+
+export const backup = pgTable(
+  "backup",
+  {
+    kind: text("kind").notNull(),
+    store: text("store").notNull(),
+    startedAt: stamp("started_at").notNull(),
+    finishedAt: stamp("finished_at").notNull(),
+    outcome: text("outcome").notNull(),
+    bytes: bigint("bytes", { mode: "number" }),
+    location: text("location"),
+    reportUrl: text("report_url"),
+    containsPersonalData: boolean("contains_personal_data").notNull(),
+    expiresAt: stamp("expires_at"),
+    rtoMinutes: integer("rto_minutes"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.kind, table.store, table.startedAt] }),
+    check("backup_kind_check", sql.raw(`kind IN (${listed(BACKUP_KINDS)})`)),
+    check("backup_store_check", sql.raw(`store IN (${listed(BACKUP_STORES)})`)),
+    check("backup_outcome_check", sql.raw(`outcome IN (${listed(BACKUP_OUTCOMES)})`)),
+    check(
+      "backup_span_check",
+      sql`finished_at >= started_at AND (bytes IS NULL OR bytes >= 0)
+          AND (rto_minutes IS NULL OR rto_minutes >= 0)`,
+    ),
+    check(
+      "backup_shape_check",
+      sql`(kind = 'backup' AND store <> 'all' AND report_url IS NULL AND rto_minutes IS NULL)
+          OR (kind = 'drill' AND store = 'all' AND bytes IS NULL AND expires_at IS NULL
+              AND report_url IS NOT NULL AND rto_minutes IS NOT NULL AND NOT contains_personal_data)
+          OR (kind = 'restore' AND store IN ('postgres', 'objectstore', 'git') AND bytes IS NULL
+              AND expires_at IS NULL AND report_url IS NULL AND rto_minutes IS NOT NULL
+              AND NOT contains_personal_data)`,
+    ),
+    check(
+      "backup_recorded_copy_check",
+      sql`(outcome = 'ok') = (location IS NOT NULL)
+          AND (outcome = 'ok' OR (bytes IS NULL AND expires_at IS NULL))`,
     ),
   ],
 );

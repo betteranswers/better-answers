@@ -4,11 +4,14 @@ export const MAP_DOOR = "packages/core/src/store/map";
 
 export const MIGRATE_TS_DIRECTORY = "apps/api/src";
 
+export const DEPLOY_SCRIPTS = "deploy";
+
 export const OWNERS_OUTSIDE_CORE = [
   IDENTITY_PROVIDER,
   POSTGRES_DOOR,
   MAP_DOOR,
   MIGRATE_TS_DIRECTORY,
+  DEPLOY_SCRIPTS,
 ] as const;
 
 export const NEVER_AN_OWNER: ReadonlySet<string> = new Set(["kernel", "store"]);
@@ -42,6 +45,8 @@ export const TABLE_OWNERS = {
   "public.contract_stamp": MIGRATE_TS_DIRECTORY,
 
   "public.sweep_pass": "sweeps",
+
+  "public.backup": DEPLOY_SCRIPTS,
 
   "public.workspace_config": "workspaces",
   "public.group": "members",

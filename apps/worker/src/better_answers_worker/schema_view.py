@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0093_the-erased-suggestions"
+MIGRATION_ID = "0094_the-backup"
 
-MIGRATION_WHEN = 1792603359080
+MIGRATION_WHEN = 1792609491070
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -65,6 +65,19 @@ TABLES: dict[str, dict[str, str]] = {
         "verified": "boolean NOT NULL",
         "failed_verification_count": "integer NOT NULL",
         "locked_until": "timestamp with time zone",
+    },
+    "public.backup": {
+        "kind": "text NOT NULL",
+        "store": "text NOT NULL",
+        "started_at": "timestamp with time zone NOT NULL",
+        "finished_at": "timestamp with time zone NOT NULL",
+        "outcome": "text NOT NULL",
+        "bytes": "bigint",
+        "location": "text",
+        "report_url": "text",
+        "contains_personal_data": "boolean NOT NULL",
+        "expires_at": "timestamp with time zone",
+        "rto_minutes": "integer",
     },
     "public.bundle_commit": {
         "workspace_id": "text NOT NULL",
