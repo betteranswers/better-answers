@@ -329,6 +329,7 @@ const afterTheMembersEnd = async (
 const withTheIdentityStep = (actions: ErasureActions, swept: IdentitySwept): ErasureActions => ({
   ...actions,
   "identity-user": { ...actions["identity-user"], membershipsEnded: swept.membersEnded },
+  "concept-owner": { ...actions["concept-owner"], deleted: swept.ownersDeleted },
 });
 
 const identityStepLineOf = (
