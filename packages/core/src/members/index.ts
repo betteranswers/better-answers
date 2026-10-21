@@ -25,6 +25,7 @@ export {
   type BulkCancelInvitationsRefusal,
   type BulkResendInvitationsRefusal,
 } from "./invitation-bulk.ts";
+export { returnUnsentEmails, type Counted } from "./invitation-ceilings.ts";
 export {
   countInvitations,
   listInvitations,

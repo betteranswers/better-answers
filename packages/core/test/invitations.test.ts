@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
-import type { Result, UserPrincipal } from "../src/kernel/index.ts";
+import { ok, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import {
   approveRequest,
   cancelInvitation,
@@ -9,6 +9,10 @@ import {
   listInvitationsInput,
   requestAccess,
   resendInvitation,
+  returnUnsentEmails,
+  type Approved,
+  type Counted,
+  type InvitationToSend,
 } from "../src/members/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
 import {
@@ -78,6 +82,7 @@ describe("inviting a person by address", () => {
         expiresAt: A_WEEK_LATER,
         workspaceName: "Calder",
         replaced: false,
+        countedAt: INVITED_AT,
       },
     });
     const { invitationId } = answeredValue(invited);
@@ -120,6 +125,7 @@ describe("inviting a person by address", () => {
       expiresAt: A_WEEK_LATER,
       workspaceName: "Neutral",
       replaced: false,
+      countedAt: INVITED_AT,
     });
     expect({ ...toKnown, invitationId: "", address: "" }).toEqual({
       ...toUnknown,
@@ -441,6 +447,7 @@ describe("resending an invitation", () => {
         invitedAt: "2031-06-15T09:30:00.000Z",
         expiresAt: "2031-07-02T12:00:00.000Z",
         workspaceName: "Resending",
+        countedAt: now,
       },
     });
     expect(await invitationEvents(workspace)).toEqual([
@@ -523,6 +530,66 @@ describe("resending an invitation", () => {
       error: "no-such-invitation",
     });
     expect(await emailsCountedTo(workspace, address)).toBe(1);
+  });
+});
+
+describe("an invitation email that did not go", () => {
+  const LAST_SECOND = new Date("2031-06-15T09:59:59.000Z");
+
+  const returned = (
+    workspace: ProvisionedWorkspace,
+    unsent: Counted<{ readonly invitationId: string }>,
+  ) =>
+    as(workspace, workspace.adminUserId, async (principal, tx) =>
+      ok(await returnUnsentEmails(principal, tx, [unsent])),
+    );
+
+  it("takes a counted invitation, never an approval's", () => {
+    type Unsent = Parameters<typeof returnUnsentEmails>[2];
+    expectTypeOf<readonly Counted<InvitationToSend>[]>().toExtend<Unsent>();
+    expectTypeOf<readonly Approved[]>().not.toExtend<Unsent>();
+  });
+
+  it("lets a resend the ceiling refused go once returned", async () => {
+    const workspace = await provisionedWorkspace(db(), "UnsentReturned");
+    const address = addressOf("priya");
+    const invited = await atTheCeiling(workspace, address);
+
+    answeredValue(await returned(workspace, invited));
+
+    const resent = await resending(workspace, invited.invitationId, LAST_SECOND);
+
+    expect(ceilingOf(resent)).toBeUndefined();
+    expect(resent).toMatchObject({ ok: true });
+    expect(await emailsCountedTo(workspace, address)).toBe(5);
+    expect(await emailsCountedFrom(workspace)).toBe(5);
+  });
+
+  it("returns nothing to an hour it was not counted in", async () => {
+    const workspace = await provisionedWorkspace(db(), "UnsentOtherHour");
+    const address = addressOf("priya");
+    const invited = await atTheCeiling(workspace, address);
+
+    answeredValue(
+      await returned(workspace, { ...invited, countedAt: new Date("2031-06-15T10:00:00.000Z") }),
+    );
+
+    expect(await emailsCountedTo(workspace, address)).toBe(5);
+    expect(ceilingOf(await resending(workspace, invited.invitationId, LAST_SECOND))).toBe(1);
+  });
+
+  it("returns no more than was counted, banking no room", async () => {
+    const workspace = await provisionedWorkspace(db(), "UnsentFloor");
+    const address = addressOf("priya");
+    const invited = answeredValue(await invite(workspace, address, "Viewer"));
+
+    answeredValue(await returned(workspace, invited));
+    answeredValue(await returned(workspace, invited));
+    for (let resend = 0; resend < 5; resend += 1) {
+      answeredValue(await resending(workspace, invited.invitationId, INVITED_AT));
+    }
+
+    expect(ceilingOf(await resending(workspace, invited.invitationId, LAST_SECOND))).toBe(1);
   });
 });
 

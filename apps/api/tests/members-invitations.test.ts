@@ -12,6 +12,7 @@ import {
   emailsTo,
   eventsOn,
   ISO_INSTANT,
+  PER_ADDRESS_CEILING,
   SEVEN_DAYS_MS,
   ULID,
   type Api,
@@ -57,8 +58,6 @@ const anAdmin = async () => {
   const workspace = await app().provision({ name: "Calder Joinery" });
   return { workspace, ...(await webSignedIn(app(), workspace.admin.email)) };
 };
-
-const PER_ADDRESS_CEILING = 5;
 
 const TO_THE_CEILING = [...Array.from({ length: PER_ADDRESS_CEILING }, () => 200), 429];
 
@@ -313,6 +312,47 @@ describe("the per-address ceiling over tRPC", () => {
     expect(refused).toMatchObject({ data: { httpStatus: 429, code: "TOO_MANY_REQUESTS" } });
     expect(emailsTo(app(), toBen.address)).toHaveLength(1);
     expect(await api.members.invitations.query()).toEqual(before);
+  });
+
+  it("lets a resend go after four resends that failed", async () => {
+    const { api } = await anAdmin();
+    const ana = anAddress("ana");
+    stopTheClock();
+    const invited = await invitedOne(api, ana);
+    unreachable.add(ana);
+    const failed: unknown[] = [];
+    for (let resend = 1; resend < PER_ADDRESS_CEILING; resend += 1) {
+      failed.push(
+        await api.members.resendInvitation.mutate({ invitationId: invited.invitationId }),
+      );
+    }
+    unreachable.delete(ana);
+
+    const resent = await statusOf(
+      api.members.resendInvitation.mutate({ invitationId: invited.invitationId }),
+    );
+
+    expect(failed).toEqual(
+      Array.from({ length: PER_ADDRESS_CEILING - 1 }, () =>
+        expect.objectContaining({ emailSent: false }),
+      ),
+    );
+    expect(resent).toBe(200);
+  });
+
+  it("counts a partial send's delivered emails, not its failed ones", async () => {
+    const { api } = await anAdmin();
+    const online = anAddress("online");
+    const offline = anAddress("offline");
+    unreachable.add(offline);
+    stopTheClock();
+    for (let attempt = 0; attempt < PER_ADDRESS_CEILING; attempt += 1) {
+      await inviting(api, [online, offline]);
+    }
+    unreachable.delete(offline);
+
+    expect(await statusOf(inviting(api, [online]))).toBe(429);
+    expect(await statusOf(inviting(api, [offline]))).toBe(200);
   });
 
   it("answers a stale tab the refusal, never the ceiling", async () => {

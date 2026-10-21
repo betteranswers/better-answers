@@ -1,6 +1,13 @@
 import type { Logger } from "pino";
 
-import type { Clock, Malformed, Result, UserPrincipal } from "@better-answers/core/kernel";
+import {
+  attempt,
+  ok,
+  type Clock,
+  type Malformed,
+  type Result,
+  type UserPrincipal,
+} from "@better-answers/core/kernel";
 import {
   addToGroup,
   approveRequest,
@@ -47,8 +54,10 @@ import {
   renameGroup,
   renameGroupInput,
   resendInvitation,
+  returnUnsentEmails,
   endEverySignInAndTokenHere,
   endEverySignInAndTokenHereInput,
+  type Counted,
   type InvitationMinted,
   type InvitationToSend,
 } from "@better-answers/core/members";
@@ -113,11 +122,29 @@ const answerOf = (invitation: InvitationToSend, emailSent: boolean) => ({
   emailSent,
 });
 
+const isCounted = (invitation: InvitationToSend): invitation is Counted<InvitationToSend> =>
+  "countedAt" in invitation;
+
+const unsentReturned = async (ctx: Emailing, unsent: readonly InvitationToSend[]) => {
+  const counted = unsent.filter(isCounted);
+  if (counted.length === 0) return;
+  const returned = await attempt(() =>
+    committedAs(ctx, async (principal, tx) => ok(await returnUnsentEmails(principal, tx, counted))),
+  );
+  if (returned.ok && returned.value.ok) return;
+  ctx.log.warn(
+    { event: "trpc.unsent_emails_kept_counted", invitations: counted.length },
+    "the unsent invitation emails still count against their ceilings",
+  );
+};
+
 const committedThenEmailed =
   <Asked>(action: Minting<Asked, InvitationToSend>) =>
   async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
     const invitation = await committedNow(ctx, action, input);
-    return answerOf(invitation, await sentInvitation(ctx, invitation));
+    const sent = await sentInvitation(ctx, invitation);
+    if (!sent) await unsentReturned(ctx, [invitation]);
+    return answerOf(invitation, sent);
   };
 
 const emailedEach = async (
@@ -140,6 +167,10 @@ const committedThenEmailedEach =
   async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
     const minted = await committedNow(ctx, action, input);
     const sent = await emailedEach(ctx, minted);
+    await unsentReturned(
+      ctx,
+      minted.filter((_one, at) => sent[at] !== true),
+    );
     return { invitations: minted.map((one, at) => answer(one, sent[at] === true)) };
   };
 

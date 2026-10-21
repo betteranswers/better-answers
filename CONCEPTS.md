@@ -1733,7 +1733,8 @@ of time; once met, the action fails whole and answers only when it may be tried 
 A ceiling is no *refusal*: time is its only remedy, so it carries a wait and no word. Its key
 decides what it bounds. A key naming the target stops one target being reached too often, but not
 one actor reaching many targets, so a shared resource needs a ceiling keyed on the actor as well.
-An action over many items counts every item, not one call. The words shown when one is met name
+An action over many items counts every item, not one call. A count for an invitation email that
+did not go is given back to the window it was counted in. The words shown when one is met name
 nobody, because the answer does not say which ceiling was met.
 
 ### end every sign-in and token

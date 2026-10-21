@@ -18,7 +18,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { refusalOfDeadlock, type Tx } from "../store/postgres/index.ts";
-import { waitingCounted } from "./invitation-ceilings.ts";
+import { waitingCounted, type Counted } from "./invitation-ceilings.ts";
 import {
   expiryFrom,
   INVITATION_ACTIONS,
@@ -107,7 +107,7 @@ const renewedUnderHold = async (
   renewing: Renewing,
 ): Promise<
   Result<
-    readonly InvitationToSend[],
+    readonly Counted<InvitationToSend>[],
     RefusedItems<MemberRefusal<"no-such-invitation" | "off-testing-domain">> | CeilingMet
   >
 > => {
@@ -130,7 +130,7 @@ const renewedUnderHold = async (
     invitations.map(({ invitationId }) => ({ subjectId: invitationId, detail: {} })),
   );
   const workspaceName = await workspaceNameOf(admin, tx);
-  return ok(invitations.map((invitation) => ({ ...invitation, workspaceName })));
+  return ok(invitations.map((invitation) => ({ ...invitation, workspaceName, countedAt: now })));
 };
 
 export type BulkResendInvitationsInput = z.output<typeof bulkInvitationsInput> & {
@@ -145,7 +145,7 @@ export const bulkResendInvitations = async (
   principal: UserPrincipal,
   tx: Tx,
   input: BulkResendInvitationsInput,
-): Promise<Result<readonly InvitationToSend[], BulkResendInvitationsRefusal>> => {
+): Promise<Result<readonly Counted<InvitationToSend>[], BulkResendInvitationsRefusal>> => {
   const admitted = admit(bulkResendInvitationsAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const renewing = { invitationIds: distinct(input.invitationIds), now: input.now };
