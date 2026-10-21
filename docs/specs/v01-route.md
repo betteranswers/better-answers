@@ -14,7 +14,7 @@ The route is the way from the foundation to a finished v0.1, cut into blocks. Th
 | [S6](route/s6.md) | knowledge | A bid's question set answered and exported as a response-set document | S2b, S3 | unplanned | | |
 | [S7](route/s7.md) | knowledge | Suggested concepts extracted from synced sources within the spending limit | S4, S3 (the Kinds rename) | unplanned | | |
 | [S8](route/s8.md) | knowledge | Concept vectors, taken up only when its trigger fires | trigger | reserve | | |
-| [S3](route/s3.md) | records | Concepts typed and edited, guides built from them, owners per collection | none | unplanned | next | |
+| [S3](route/s3.md) | records | Concepts typed and edited, guides built from them, owners per collection | none | planned | next | [plan](../plans/2026-10-21-1721-feat-s3-concepts-and-guides-plan.md) |
 | [S5](route/s5.md) | records | Every suggestion decided on To decide, and answers promoted to `Answer`s | S2b, S3, S7 (the by-sync filter), V1 (flag routing) | unplanned | | |
 | [V1](route/v1.md) | records | Verification requests, shelf life, and conflicts a person resolves | S3 | unplanned | | |
 | [P1](route/p1.md) | people | People's pages, Microsoft sign-in and the Account page | none | building | | [people layout rework](../plans/2026-10-01-1807-feat-people-layout-rework-plan.md), [sign-in and security](../plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md) |
