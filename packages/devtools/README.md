@@ -183,6 +183,16 @@ override, both ways.
 parameter. It resolves the receiver through scope, so a local that shadows a parameter goes
 past, and `test/parameter-never-mutated.test.ts` runs it both ways.
 
+`auth-types-stay-in-the-seam` keeps Better Auth's inferred types inside the web's auth seam. The
+import lint already lets only `features/auth/auth-hooks.ts` import `authClient`, so the one path
+left out is an export of that file. A binding is tainted when it is imported from better-auth or
+the client, or when its declaration names a tainted binding. The rule refuses an export whose
+written type names a tainted binding, an export with an inferred type whose code names one, and
+a re-export of the library or the client. It reads names, not types, so an export that reads the
+library writes its type out. `.oxlintrc.json` turns it on for `apps/web` and off for
+`auth-client.ts`, the one file that exports the library's object. `test/auth-types-stay-in-the-seam.test.ts`
+runs it both ways.
+
 ## The comment gate — three parts, all in root `check`
 
 The comment rules are held in three places. `.oxlintrc.json` holds them for TypeScript, a

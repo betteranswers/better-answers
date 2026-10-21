@@ -10,6 +10,7 @@ import {
   useQueryClient,
   type Query,
   type QueryClient,
+  type UseMutationResult,
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { inferOutput } from "@trpc/tanstack-react-query";
@@ -208,8 +209,10 @@ const returnPathOf = (query: string): { readonly redirect?: string } => {
   return redirect === null ? {} : { redirect };
 };
 
+type CodeAsked = { email: string; type: "sign-in" };
+
 const sendVerificationOtpOptions = () =>
-  mutationOptions<unknown, Error, { email: string; type: "sign-in" }>({
+  mutationOptions<unknown, Error, CodeAsked>({
     mutationFn: (input) =>
       unwrapWithTheWait((reading) =>
         authClient.emailOtp.sendVerificationOtp(
@@ -219,12 +222,15 @@ const sendVerificationOtpOptions = () =>
       ),
   });
 
-export const useSendVerificationOtp = () => useMutation(sendVerificationOtpOptions());
+export const useSendVerificationOtp = (): UseMutationResult<unknown, Error, CodeAsked> =>
+  useMutation(sendVerificationOtpOptions());
 
 export type SignedIn = { readonly displayNameGiven: boolean };
 
+type CodeGiven = { email: string; otp: string };
+
 const signInEmailOtpOptions = () =>
-  mutationOptions<SignedIn, Error, { email: string; otp: string }>({
+  mutationOptions<SignedIn, Error, CodeGiven>({
     mutationFn: async (input) => {
       const answer = await unwrapWithTheWait((reading) =>
         authClient.signIn.emailOtp(input, reading),
@@ -234,7 +240,8 @@ const signInEmailOtpOptions = () =>
     onSuccess: signedInHere,
   });
 
-export const useSignInEmailOtp = () => useMutation(signInEmailOtpOptions());
+export const useSignInEmailOtp = (): UseMutationResult<SignedIn, Error, CodeGiven> =>
+  useMutation(signInEmailOtpOptions());
 
 const LINK_TOKEN = /^#([A-Za-z0-9]{1,128})$/;
 
@@ -402,7 +409,13 @@ const signOutOptions = () =>
     mutationFn: () => unwrapWithTheWait((reading) => authClient.signOut({ fetchOptions: reading })),
   });
 
-export const useSignOut = (returnTo?: string) => {
+type SigningOut = {
+  readonly signingOut: boolean;
+  readonly failure: Error | null;
+  readonly signOut: () => void;
+};
+
+export const useSignOut = (returnTo?: string): SigningOut => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const signOut = useMutation(signOutOptions());
@@ -452,8 +465,10 @@ const setActiveWorkspace = (organizationId: string) =>
     },
   );
 
+type WorkspacePicked = { organizationId: string };
+
 const setActiveOrganizationOptions = () =>
-  mutationOptions<unknown, SwitchRefused, { organizationId: string }>({
+  mutationOptions<unknown, SwitchRefused, WorkspacePicked>({
     mutationFn: (input) => setActiveWorkspace(input.organizationId),
   });
 
@@ -482,7 +497,11 @@ export const forgetAWorkspaceLeftElsewhere = (queryClient: QueryClient, api: Api
   });
 };
 
-export const useSetActiveOrganization = () => {
+export const useSetActiveOrganization = (): UseMutationResult<
+  unknown,
+  SwitchRefused,
+  WorkspacePicked
+> => {
   const queryClient = useQueryClient();
   const api = useTRPC();
   return useMutation({
@@ -506,7 +525,7 @@ export const followTheSession = async (queryClient: QueryClient, api: ApiProxy):
   void queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
 };
 
-export const useSwitchWorkspace = () => {
+export const useSwitchWorkspace = (): UseMutationResult<unknown, SwitchRefused, SwitchedTo> => {
   const queryClient = useQueryClient();
   const api = useTRPC();
   const navigate = useNavigate();
@@ -523,8 +542,10 @@ export const useSwitchWorkspace = () => {
 const resumeAnswer = z.object({ redirect: z.boolean().optional(), url: z.string().optional() });
 export type ResumeAnswer = z.infer<typeof resumeAnswer>;
 
+type ResumeAsked = { postLogin: true };
+
 const oauthContinueOptions = () =>
-  mutationOptions<ResumeAnswer, Error, { postLogin: true }>({
+  mutationOptions<ResumeAnswer, Error, ResumeAsked>({
     mutationFn: async (input) => {
       const { data, error } = await authClient.oauth2.continue(input);
       if (error !== null) {
@@ -534,4 +555,5 @@ const oauthContinueOptions = () =>
     },
   });
 
-export const useOAuthContinue = () => useMutation(oauthContinueOptions());
+export const useOAuthContinue = (): UseMutationResult<ResumeAnswer, Error, ResumeAsked> =>
+  useMutation(oauthContinueOptions());
