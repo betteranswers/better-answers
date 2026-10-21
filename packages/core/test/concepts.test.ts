@@ -2013,7 +2013,7 @@ describe("the trust words", () => {
     expect(trustWords(unverified)).toBe("Unverified");
   });
 
-  it("says a person verified, omitting a missing name or date", () => {
+  it("says a person verified, omitting a missing date", () => {
     expect(
       trustWords({
         tier: "human-reviewed",
@@ -2023,15 +2023,6 @@ describe("the trust words", () => {
         rider: null,
       }),
     ).toBe("Verified by Priya Shah");
-    expect(
-      trustWords({
-        tier: "human-reviewed",
-        status: "current",
-        verifiedBy: null,
-        verifiedAt: null,
-        rider: null,
-      }),
-    ).toBe("Verified by a person");
   });
 
   it("names a verifier erasure left nameless a former member", () => {

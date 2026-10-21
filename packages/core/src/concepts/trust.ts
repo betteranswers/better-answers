@@ -1,8 +1,9 @@
 import { isActorId, isPersonActor, type ActorId } from "../kernel/index.ts";
 import type { Frontmatter, FrontmatterValue } from "./file.ts";
 
-export const TRUST_TIERS = ["unverified", "machine-confirmed", "human-reviewed"] as const;
-type TrustTier = (typeof TRUST_TIERS)[number];
+export const UNREVIEWED_TIERS = ["unverified", "machine-confirmed"] as const;
+
+export const TRUST_TIERS = [...UNREVIEWED_TIERS, "human-reviewed"] as const;
 
 export const TRUST_STATUSES = [
   "current",
@@ -16,16 +17,16 @@ export type TrustStatus = (typeof TRUST_STATUSES)[number];
 export const TRUST_RIDERS = ["imported", "source-moved-on"] as const;
 type TrustRider = (typeof TRUST_RIDERS)[number];
 
-export type Trust = {
-  readonly tier: TrustTier;
-  readonly status: TrustStatus;
-
-  readonly verifiedBy: string | null;
-
+type Verification = {
   readonly verifiedAt: string | null;
 
   readonly rider: TrustRider | null;
-};
+} & (
+  | { readonly tier: "human-reviewed"; readonly verifiedBy: string }
+  | { readonly tier: (typeof UNREVIEWED_TIERS)[number]; readonly verifiedBy: string | null }
+);
+
+export type Trust = Verification & { readonly status: TrustStatus };
 
 export type ConceptVerification = {
   readonly actor: ActorId;
@@ -70,10 +71,8 @@ const verificationWords = (trust: Trust): string => {
   }
 };
 
-const verifierWords = (verifiedBy: string | null): string => {
-  if (verifiedBy === null) return "a person";
-  return isActorId(verifiedBy) && isPersonActor(verifiedBy) ? "a former member" : verifiedBy;
-};
+const verifierWords = (verifiedBy: string): string =>
+  isActorId(verifiedBy) && isPersonActor(verifiedBy) ? "a former member" : verifiedBy;
 
 export const ukLongDate = (iso: string): string => {
   const date = new Date(iso);
@@ -87,12 +86,12 @@ export const ukLongDate = (iso: string): string => {
   });
 };
 
-export const trustOf = (concept: Trusted, now: Date): Trust => {
-  const { tier, verifiedBy, verifiedAt, rider } = trustOfVerification(concept.verification);
-  return { tier, status: trustStatusOf(concept, now), verifiedBy, verifiedAt, rider };
-};
+export const trustOf = (concept: Trusted, now: Date): Trust => ({
+  ...trustOfVerification(concept.verification),
+  status: trustStatusOf(concept, now),
+});
 
-const trustOfVerification = (verification: Trusted["verification"]): Omit<Trust, "status"> =>
+const trustOfVerification = (verification: Trusted["verification"]): Verification =>
   verification === undefined
     ? { tier: "unverified", verifiedBy: null, verifiedAt: null, rider: null }
     : {
