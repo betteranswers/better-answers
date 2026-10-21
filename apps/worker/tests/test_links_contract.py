@@ -24,7 +24,12 @@ def test_makes_exactly_the_links_each_case_names_by_ordinal() -> None:
         {
             "case": case["case"],
             "links": [
-                {"uid": edge.uid, "to": edge.to_uid}
+                {
+                    "uid": edge.uid,
+                    "to": edge.to_uid,
+                    "section": edge.section,
+                    "sentence": edge.sentence,
+                }
                 for edge in outgoing_edges(
                     iri=citing["iri"],
                     kind=citing["kind"],
@@ -44,7 +49,12 @@ def test_makes_exactly_the_links_each_case_names_by_ordinal() -> None:
         {
             "case": case["case"],
             "links": [
-                {"uid": f"links_to:{citing['iri']}:{link['ordinal']}", "to": link["to"]}
+                {
+                    "uid": f"links_to:{citing['iri']}:{link['ordinal']}",
+                    "to": link["to"],
+                    "section": link["section"],
+                    "sentence": link["sentence"],
+                }
                 for link in case["links"]
             ],
         }
