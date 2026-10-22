@@ -216,12 +216,12 @@ const standingToEdit = async (
       held,
       row,
       standing: await routeOf(reader, tx, { iri, path: held.path }),
-      usedIn: await placesUsingReadableOrNot(reader, tx, iri),
     };
   });
   if (!read.ok) return err(read.error);
   if (read.value === undefined) return err("no-such-concept");
-  const { held, row, standing, usedIn } = read.value;
+  const { held, row, standing } = read.value;
+  const usedIn = standing === "commits" ? await placesUsingReadableOrNot(reader, tx, iri) : 0;
   const opened = await openedSourcesOf(reader, tx, row.frontmatter, passageAt);
   if (!opened.ok) return err(opened.error);
   const withheld = opened.value.filter((source) => source.withheld);
@@ -357,6 +357,7 @@ const SAVED_FIELDS = {
   }),
   sources: z.array(SOURCE_ENTRY).readonly(),
   base: boundarySchemas.conceptIndex.insert.shape.contentHash.nullable(),
+  withheld: z.number().int().min(0),
   reuse: z.literal("confirmed").optional(),
 };
 
@@ -404,6 +405,7 @@ type Commit = {
 type Saving = Commit & {
   readonly offered: readonly SourceEntry[];
   readonly standing: Standing;
+  readonly unchanged: boolean;
 };
 
 type Parsed = z.output<typeof saveConceptInput>;
@@ -471,6 +473,8 @@ const savingOver = async (
         doors.passages(fresh, tx),
       );
       if (!opened.ok) return opened;
+      const withheld = opened.value.filter((source) => source.withheld).length;
+      if (withheld !== input.withheld) return err("stale-precondition" as const);
       return ok({
         held,
         stored: stored.value,
@@ -492,6 +496,7 @@ const savingOver = async (
     file,
     offered: input.sources,
     standing,
+    unchanged: rendersAlike(stored, file),
     author,
     reuse: input.reuse,
     message: `Edit ${held.path}`,
@@ -506,7 +511,8 @@ const savingNew = async (
 ): Promise<Result<Saving, SaveConceptRefusal | Error>> => {
   const path = newConceptPathOf(collection, input.parts.title);
   const file = editedFileOf({ frontmatter: {}, body: "" }, input.parts, input.sources);
-  if (path === undefined || file === undefined || input.base !== null) return err("malformed");
+  const fresh = input.base === null && input.withheld === 0;
+  if (path === undefined || file === undefined || !fresh) return err("malformed");
   const read = await attempt(() =>
     withMember(principal, doors.postgres, async (fresh, tx) => ({
       standing: await routeOf(fresh, tx, { iri: null, path }),
@@ -522,6 +528,7 @@ const savingNew = async (
     base: null,
     file,
     offered: input.sources,
+    unchanged: false,
     ...read.value.value,
     reuse: input.reuse,
     message: `Add ${path}`,
@@ -533,11 +540,14 @@ const routed = async (
   doors: WriteDoors,
   saving: Saving,
 ): Promise<Result<ConceptSaved, SaveConceptRefusal | Error>> => {
-  if (saving.standing === "suggests") return suggested(principal, doors, saving);
+  const unchanged = ok({ outcome: "unchanged" as const, iri: saving.iri ?? saving.path });
+  if (saving.standing === "suggests") {
+    return saving.unchanged ? unchanged : suggested(principal, doors, saving);
+  }
   const written = await committed(principal, doors, saving);
   if (written.ok)
     return ok({ outcome: "committed", iri: written.value.iri, sha: written.value.sha });
-  if (written.error === "unchanged") return ok({ outcome: "unchanged", iri: saving.iri ?? "" });
+  if (written.error === "unchanged") return unchanged;
   return written.error === "owner-forbids"
     ? suggested(principal, doors, saving)
     : err(written.error);

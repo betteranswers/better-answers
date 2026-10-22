@@ -73,6 +73,7 @@ const saveOf = (iri: ConceptIri, seed: ConceptToEdit): SaveOver => ({
   parts: seed.parts,
   sources: seed.sources,
   base: seed.base,
+  withheld: seed.withheld.count,
 });
 
 const saved = (scenario: Scenario, principal: UserPrincipal, input: SaveConceptInput) =>
@@ -133,6 +134,28 @@ describe("a save seeded from the raw file", () => {
     expect(file).toContain(`"locator": ${JSON.stringify(restricted.locator)}`);
     expect(file).toContain('"resource": "minutes"');
     expect(file).toContain('"title": "Expenses, retitled"');
+  });
+
+  it("refuses a save whose withheld count has moved", async () => {
+    const scenario = await arrange();
+    const restricted = await documentLanded(db().pool, scenario.workspaceId, {
+      title: "Board minutes",
+      text: "The board reviews pay in March.",
+      sensitivity: "Restricted",
+    });
+    const concept = await written(scenario, {
+      sources: [{ title: "Board minutes", resource: "minutes", locator: restricted.locator }],
+    });
+    await overriddenBy(db(), scenario, concept.iri, "Internal");
+    const before = await historyOf(scenario);
+
+    const { answer } = await editedBy(scenario, scenario.editor, concept.iri, (seed) => ({
+      ...withBody("Claim within a fortnight.")(seed),
+      withheld: 0,
+    }));
+
+    expect(answer).toEqual({ ok: false, error: "stale-precondition" });
+    expect(await historyOf(scenario)).toEqual(before);
   });
 
   it("writes no commit and no audit for an unchanged save", async () => {
@@ -356,6 +379,19 @@ describe("who a save commits for", () => {
     ]);
   });
 
+  it("files no suggestion for an outsider's unchanged save", async () => {
+    const scenario = await arrange();
+    const concept = await written(scenario);
+
+    const { answer } = await editedBy(scenario, scenario.unowned, concept.iri);
+
+    expect(answer).toEqual({ ok: true, value: { outcome: "unchanged", iri: concept.iri } });
+    const filed = await db().pool.query("SELECT 1 FROM suggestion WHERE workspace_id = $1", [
+      scenario.workspaceId,
+    ]);
+    expect(filed.rows).toEqual([]);
+  });
+
   it("lands a new concept at its collection's path", async () => {
     const scenario = await arrange();
 
@@ -370,6 +406,7 @@ describe("who a save commits for", () => {
       },
       sources: [],
       base: null,
+      withheld: 0,
     });
 
     expect(answer).toMatchObject({ ok: true, value: { outcome: "committed" } });

@@ -944,6 +944,8 @@ const BODY_WORDS: Partial<
   unchanged: (asked) => `the body given is the one ${asked.iri} already holds; nothing was written`,
   "widening-refused": (asked) =>
     `${asked.iri} is held narrower than the sources it cites, as after a replay whose file cited a document the catalogue no longer holds; a body update would widen it, so nothing was written`,
+  "no-such-document": (asked) =>
+    `${asked.iri} cites a document the catalogue no longer holds, so its file cannot be written again by this command; escalate it; nothing was written`,
   "body-locator-refused": (asked) =>
     `the body names a passage locator that ${asked.iri}'s sources do not cite; cite the passage in its sources first; nothing was written`,
   "stale-precondition": (asked) =>

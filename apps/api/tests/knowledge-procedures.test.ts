@@ -664,6 +664,7 @@ describe("an edit saved over tRPC", () => {
       parts: { ...seed.parts, body: "Keep a hundred metres from a nesting heron." },
       sources: seed.sources,
       base: seed.base,
+      withheld: seed.withheld.count,
     };
 
     const naming = { ...save, author: { name: "Someone Else", email: "someone@else.invalid" } };
