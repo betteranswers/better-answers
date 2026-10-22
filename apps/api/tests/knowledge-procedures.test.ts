@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { overrideConceptSensitivity, writeConcept } from "@better-answers/core/concepts";
 import { head, initRepository } from "@better-answers/core/store/git";
 import { documentLanded, type DocumentShape } from "@better-answers/core/testing/documents";
-import { ulid } from "@better-answers/schema";
+import { testData } from "@better-answers/schema/testing";
 
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { connectAsHost, signIn } from "./flow.ts";
@@ -625,10 +625,12 @@ const aPolicyItsEditorOwns = async () => {
   const { workspaceId, admin, viewer, git, writer, doors } = await aWorkspaceBeingWritten();
   const editor = await app().person();
   await app().addMember(workspaceId, editor.id, "Editor");
-  await app().database.superuser.query(
-    "INSERT INTO concept_owner (workspace_id, id, collection, person_id) VALUES ($1, $2, 'policy', $3)",
-    [workspaceId, ulid(), editor.id],
-  );
+  const client = await app().database.superuser.connect();
+  try {
+    await testData(client).conceptOwner({ workspaceId, collection: "policy", personId: editor.id });
+  } finally {
+    client.release();
+  }
   const written = await writeConcept(writer, doors, {
     mergeKey: "policy:heron-disturbance",
     path: "knowledge/policy/heron-disturbance.md",

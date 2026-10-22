@@ -613,6 +613,12 @@ describe("a re-write whose rows were lost", () => {
     ]);
   });
 
+  const uncatalogued = (scenario: Scenario, documentId: string) =>
+    db().pool.query("DELETE FROM source_document WHERE workspace_id = $1 AND id = $2", [
+      scenario.workspaceId,
+      documentId,
+    ]);
+
   const minutedThenUncatalogued = async (scenario: Scenario) => {
     const cited = await allowancesCitingTheHandbook(scenario);
     const history = await writeInTheWindow(
@@ -620,10 +626,7 @@ describe("a re-write whose rows were lost", () => {
       scenario.editor,
       cited.minuted(cited.first.sha),
     );
-    await db().pool.query("DELETE FROM source_document WHERE workspace_id = $1 AND id = $2", [
-      scenario.workspaceId,
-      cited.restricted.documentId,
-    ]);
+    await uncatalogued(scenario, cited.restricted.documentId);
     return { ...cited, history };
   };
 
@@ -631,13 +634,11 @@ describe("a re-write whose rows were lost", () => {
     const scenario = await arrange();
     const { internal, first, history } = await minutedThenUncatalogued(scenario);
 
-    const run = await reconciled(scenario);
-
-    expect(run).toMatchObject({ replayed: [history[1]], stopped: undefined });
+    expect(await reconciled(scenario)).toMatchObject({ replayed: history.slice(1) });
     expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
-      commit_sha: history[1],
       sensitivity: "Restricted",
       audience: "everyone",
+      commit_sha: history.at(-1),
     });
     expect(await citedDocuments(scenario.workspaceId, first.iri)).toEqual([
       {
@@ -713,10 +714,7 @@ describe("a re-write whose rows were lost", () => {
       body: "# Allowances\n\nWhat the board minuted.",
       expects: { head: beside.sha },
     });
-    await db().pool.query("DELETE FROM source_document WHERE workspace_id = $1 AND id = $2", [
-      scenario.workspaceId,
-      minutesSource.documentId,
-    ]);
+    await uncatalogued(scenario, minutesSource.documentId);
     expect(await reconciled(scenario)).toMatchObject({ stopped: undefined });
     expect(
       (await replayedEvents(scenario.workspaceId)).map(

@@ -66,7 +66,9 @@ const toEdit = async (scenario: Scenario, principal: UserPrincipal, iri: Concept
     ),
   );
 
-const saveOf = (iri: ConceptIri, seed: ConceptToEdit): SaveConceptInput => ({
+type SaveOver = Extract<SaveConceptInput, { readonly iri: string }>;
+
+const saveOf = (iri: ConceptIri, seed: ConceptToEdit): SaveOver => ({
   iri,
   parts: seed.parts,
   sources: seed.sources,
@@ -75,6 +77,23 @@ const saveOf = (iri: ConceptIri, seed: ConceptToEdit): SaveConceptInput => ({
 
 const saved = (scenario: Scenario, principal: UserPrincipal, input: SaveConceptInput) =>
   saveConcept(principal, saveDoors(scenario), input);
+
+const editedBy = async (
+  scenario: Scenario,
+  principal: UserPrincipal,
+  iri: ConceptIri,
+  change: (seed: ConceptToEdit) => Partial<SaveOver> = () => ({}),
+) => {
+  const seed = await toEdit(scenario, principal, iri);
+  const answer = await saved(scenario, principal, { ...saveOf(iri, seed), ...change(seed) });
+  return { seed, answer };
+};
+
+const withBody =
+  (body: string) =>
+  (seed: ConceptToEdit): Partial<SaveOver> => ({ parts: { ...seed.parts, body } });
+
+const historyOf = (scenario: Scenario) => bundleHistory(scenario.git, scenario.workspaceId);
 
 const fileAtHead = async (scenario: Scenario, path: string) => {
   const facts = await commitFacts(scenario.git, scenario.workspaceId, "main");
@@ -103,11 +122,9 @@ describe("a save seeded from the raw file", () => {
     await overriddenBy(db(), scenario, concept.iri, "Internal");
     const path = await pathOf(concept.iri);
 
-    const seed = await toEdit(scenario, scenario.editor, concept.iri);
-    const answer = await saved(scenario, scenario.editor, {
-      ...saveOf(concept.iri, seed),
-      parts: { ...seed.parts, title: "Expenses, retitled" },
-    });
+    const { seed, answer } = await editedBy(scenario, scenario.editor, concept.iri, (opened) => ({
+      parts: { ...opened.parts, title: "Expenses, retitled" },
+    }));
 
     expect(seed.sources).toEqual([handbook]);
     expect(seed.withheld).toEqual({ count: 1, labels: ["Board minutes"] });
@@ -121,18 +138,17 @@ describe("a save seeded from the raw file", () => {
   it("writes no commit and no audit for an unchanged save", async () => {
     const scenario = await arrange();
     const concept = await written(scenario);
-    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+    const before = await historyOf(scenario);
     const events = await auditEventRowsOf(
       db().pool,
       scenario.workspaceId,
       "knowledge.concept.committed",
     );
 
-    const seed = await toEdit(scenario, scenario.admin, concept.iri);
-    const answer = await saved(scenario, scenario.admin, saveOf(concept.iri, seed));
+    const { answer } = await editedBy(scenario, scenario.admin, concept.iri);
 
     expect(answer).toEqual({ ok: true, value: { outcome: "unchanged", iri: concept.iri } });
-    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
+    expect(await historyOf(scenario)).toEqual(before);
     expect(
       await auditEventRowsOf(db().pool, scenario.workspaceId, "knowledge.concept.committed"),
     ).toEqual(events);
@@ -141,16 +157,17 @@ describe("a save seeded from the raw file", () => {
   it("a body whitespace-only change still commits", async () => {
     const scenario = await arrange();
     const concept = await written(scenario, {}, "Claim within thirty days.\n\nKeep receipts.");
-    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+    const before = await historyOf(scenario);
 
-    const seed = await toEdit(scenario, scenario.admin, concept.iri);
-    const answer = await saved(scenario, scenario.admin, {
-      ...saveOf(concept.iri, seed),
-      parts: { ...seed.parts, body: "Claim within thirty days.\n\n\nKeep receipts." },
-    });
+    const { answer } = await editedBy(
+      scenario,
+      scenario.admin,
+      concept.iri,
+      withBody("Claim within thirty days.\n\n\nKeep receipts."),
+    );
 
     expect(answer).toMatchObject({ ok: true, value: { outcome: "committed" } });
-    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(before.length + 1);
+    expect(await historyOf(scenario)).toHaveLength(before.length + 1);
   });
 
   it("commits a change to a source's title alone", async () => {
@@ -158,16 +175,14 @@ describe("a save seeded from the raw file", () => {
     const concept = await written(scenario, {
       sources: [{ title: "Handbook", resource: "handbook" }],
     });
-    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+    const before = await historyOf(scenario);
 
-    const seed = await toEdit(scenario, scenario.admin, concept.iri);
-    const answer = await saved(scenario, scenario.admin, {
-      ...saveOf(concept.iri, seed),
+    const { answer } = await editedBy(scenario, scenario.admin, concept.iri, () => ({
       sources: [{ title: "The staff handbook", resource: "handbook" }],
-    });
+    }));
 
     expect(answer).toMatchObject({ ok: true, value: { outcome: "committed" } });
-    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(before.length + 1);
+    expect(await historyOf(scenario)).toHaveLength(before.length + 1);
   });
 
   it("writes no commit re-saving an imported file unchanged", async () => {
@@ -195,13 +210,12 @@ describe("a save seeded from the raw file", () => {
     );
     const iri = found.rows[0]?.iri;
     if (iri === undefined) throw new Error("the import landed no concept");
-    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+    const before = await historyOf(scenario);
 
-    const seed = await toEdit(scenario, scenario.admin, iri);
-    const answer = await saved(scenario, scenario.admin, saveOf(iri, seed));
+    const { answer } = await editedBy(scenario, scenario.admin, iri);
 
     expect(answer).toEqual({ ok: true, value: { outcome: "unchanged", iri } });
-    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
+    expect(await historyOf(scenario)).toEqual(before);
   });
 
   it("derives evidence rows from the file's sources alone", async () => {
@@ -210,14 +224,16 @@ describe("a save seeded from the raw file", () => {
     const concept = await written(scenario);
     const locator = passageLocatorOf(handbook.documentId, 0, 4);
 
-    const seed = await toEdit(scenario, scenario.admin, concept.iri);
-    const answer = await saved(scenario, scenario.admin, {
-      ...saveOf(concept.iri, seed),
+    const { answer } = await editedBy(scenario, scenario.admin, concept.iri, () => ({
       sources: [
         { title: "Handbook", resource: "handbook", locator },
-        { title: "Another policy", resource: concept.iri },
+        {
+          title: "Another policy",
+          resource: concept.iri,
+          locator: passageLocatorOf(handbook.documentId, 5, 9),
+        },
       ],
-    });
+    }));
 
     expect(answer).toMatchObject({ ok: true, value: { outcome: "committed" } });
     const cited = await db().pool.query(
@@ -233,42 +249,40 @@ describe("what a save refuses", () => {
     const scenario = await arrange();
     const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
     const concept = await written(scenario, { sources: ["Handbook"] });
-    const before = await bundleHistory(scenario.git, scenario.workspaceId);
-    const seed = await toEdit(scenario, scenario.admin, concept.iri);
+    const before = await historyOf(scenario);
 
-    const refused = await saved(scenario, scenario.admin, {
-      ...saveOf(concept.iri, seed),
+    const { answer: refused } = await editedBy(scenario, scenario.admin, concept.iri, () => ({
       sources: [passageLocatorOf(handbook.documentId, 0, 4)],
-    });
+    }));
 
     expect(refused).toEqual({ ok: false, error: "source-label-refused" });
-    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
+    expect(await historyOf(scenario)).toEqual(before);
   });
 
   it("refuses a passage locator in the body outside sources", async () => {
     const scenario = await arrange();
     const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
     const concept = await written(scenario);
-    const before = await bundleHistory(scenario.git, scenario.workspaceId);
-    const seed = await toEdit(scenario, scenario.admin, concept.iri);
+    const before = await historyOf(scenario);
 
-    const refused = await saved(scenario, scenario.admin, {
-      ...saveOf(concept.iri, seed),
-      parts: {
-        ...seed.parts,
-        body: `${seed.parts.body} See ${passageLocatorOf(handbook.documentId, 0, 4)}.`,
-      },
-    });
+    const { answer: refused } = await editedBy(scenario, scenario.admin, concept.iri, (seed) =>
+      withBody(`${seed.parts.body} See ${passageLocatorOf(handbook.documentId, 0, 4)}.`)(seed),
+    );
 
     expect(refused).toEqual({ ok: false, error: "body-locator-refused" });
-    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
+    expect(await historyOf(scenario)).toEqual(before);
   });
 
-  it("counts write-up includes and inbound links as places", async () => {
-    const scenario = await arrange();
+  const usedTwice = async (scenario: Scenario) => {
     const concept = await written(scenario);
     await writeUpIncluding(db(), scenario.workspaceId, [concept.iri]);
     await written(scenario, {}, `See [the expenses policy](${concept.iri}).`);
+    return concept;
+  };
+
+  it("counts write-up includes and inbound links as places", async () => {
+    const scenario = await arrange();
+    const concept = await usedTwice(scenario);
 
     const seed = await toEdit(scenario, scenario.admin, concept.iri);
 
@@ -277,18 +291,16 @@ describe("what a save refuses", () => {
 
   it("refuses a reused concept's save until confirmed", async () => {
     const scenario = await arrange();
-    const concept = await written(scenario);
-    await writeUpIncluding(db(), scenario.workspaceId, [concept.iri]);
-    await written(scenario, {}, `See [the expenses policy](${concept.iri}).`);
+    const concept = await usedTwice(scenario);
     const seed = await toEdit(scenario, scenario.admin, concept.iri);
     const edit = {
       ...saveOf(concept.iri, seed),
       parts: { ...seed.parts, body: "Expenses are claimed within a fortnight." },
     };
-    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+    const before = await historyOf(scenario);
 
     const refused = await saved(scenario, scenario.admin, edit);
-    const afterRefusal = await bundleHistory(scenario.git, scenario.workspaceId);
+    const afterRefusal = await historyOf(scenario);
     const confirmed = await saved(scenario, scenario.admin, { ...edit, reuse: "confirmed" });
 
     expect(refused).toEqual({ ok: false, error: "reuse-unconfirmed" });
@@ -301,12 +313,12 @@ describe("who a save commits for", () => {
   it("commits an owner's save with the owner as author", async () => {
     const scenario = await arrange();
     const concept = await written(scenario);
-    const seed = await toEdit(scenario, scenario.editor, concept.iri);
-
-    const answer = await saved(scenario, scenario.editor, {
-      ...saveOf(concept.iri, seed),
-      parts: { ...seed.parts, body: "Claim within a fortnight." },
-    });
+    const { seed, answer } = await editedBy(
+      scenario,
+      scenario.editor,
+      concept.iri,
+      withBody("Claim within a fortnight."),
+    );
 
     expect(seed.standing).toBe("commits");
     expect(answer).toMatchObject({ ok: true, value: { outcome: "committed" } });
@@ -321,17 +333,18 @@ describe("who a save commits for", () => {
   it("turns an outsider's save into an edit suggestion", async () => {
     const scenario = await arrange();
     const concept = await written(scenario);
-    const seed = await toEdit(scenario, scenario.unowned, concept.iri);
-    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+    const before = await historyOf(scenario);
 
-    const answer = await saved(scenario, scenario.unowned, {
-      ...saveOf(concept.iri, seed),
-      parts: { ...seed.parts, body: "Claim within a fortnight." },
-    });
+    const { seed, answer } = await editedBy(
+      scenario,
+      scenario.unowned,
+      concept.iri,
+      withBody("Claim within a fortnight."),
+    );
 
     expect(seed.standing).toBe("suggests");
     expect(answer).toMatchObject({ ok: true, value: { outcome: "suggested" } });
-    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
+    expect(await historyOf(scenario)).toEqual(before);
     const waiting = await db().pool.query(
       `SELECT s.kind, s.status, r.base_content_hash FROM suggestion s
          JOIN concept_write_request r ON r.workspace_id = s.workspace_id AND r.suggestion_id = s.id

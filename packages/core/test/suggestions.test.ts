@@ -633,7 +633,9 @@ describe("accepting a suggestion", () => {
 describe("an acceptance of a suggestion that changes nothing", () => {
   it("still decides an acceptance whose payload equals the file", async () => {
     const scenario = await arrange();
-    const { input, written } = await editorWrote(scenario);
+    const { input, written } = await editorWrote(scenario, {
+      frontmatter: { iri: "", type: "Policy", title: "Expenses", status: "stable" },
+    });
     const stored = parseConceptFile(
       await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path),
     );

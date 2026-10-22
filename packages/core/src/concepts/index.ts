@@ -118,12 +118,12 @@ export {
   updateConceptBody,
   type ConceptBodyRun,
   type ConceptBodyUpdate,
-  type ConceptSaved,
   type ConceptToEdit,
   type SaveConceptInput,
-  type SaveConceptRefusal,
   type UpdateConceptBodyRefusal,
 } from "./edit.ts";
+/** @public S3 */
+export type { ConceptParts, ConceptSaved, SaveConceptRefusal } from "./edit.ts";
 export {
   carryVerificationsOntoRewrite,
   foldKind,

@@ -23,12 +23,13 @@ import {
   err,
   isPortablePath,
   ok,
+  type PrincipalRefusal,
   type RefusalOf,
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { CommitAuthor } from "../store/git/index.ts";
-import { withMember, type Tx } from "../store/postgres/index.ts";
+import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import {
   contentHashOf,
   normalisedBody,
@@ -74,13 +75,13 @@ export type ConceptToEdit = {
 
 export type EditedConcept = { readonly iri: string } | { readonly collection: string };
 
-const STANDING_IN_A_COLLECTION = (collection: string): OwnedConcept => ({
+const ownedInCollection = (collection: string): OwnedConcept => ({
   iri: null,
   path: `knowledge/${collection}/`,
 });
 
 /** Only routes a save: the governed write reads the owner again and decides. */
-export const standingOn = async (
+const standingOn = async (
   principal: UserPrincipal,
   tx: Tx,
   concept: OwnedConcept,
@@ -189,7 +190,7 @@ export const conceptToEdit = async (
   const { data } = target;
   if ("collection" in data) {
     const standing = await attempt(() =>
-      standingOn(reader, tx, STANDING_IN_A_COLLECTION(data.collection)),
+      standingOn(reader, tx, ownedInCollection(data.collection)),
     );
     if (!standing.ok) return err(standing.error);
     const none = { count: 0, labels: [] };
@@ -239,7 +240,7 @@ const standingToEdit = async (
 };
 
 /** Keeps each source the editor cannot open where it stood, and fills the others in order. */
-export const mergedSources = (
+const mergedSources = (
   stored: readonly Opened[],
   visible: readonly SourceEntry[],
 ): readonly SourceEntry[] => {
@@ -337,7 +338,7 @@ const slugOf = (title: string): string =>
     .replaceAll(/^-+|-+$/gu, "");
 
 /** A new concept's path in its collection, so the collection stays the path's first folder. */
-export const newConceptPathOf = (collection: string, title: string): string | undefined => {
+const newConceptPathOf = (collection: string, title: string): string | undefined => {
   const slug = slugOf(title);
   const path = `knowledge/${collection}/${slug}.md`;
   return COLLECTION.test(collection) &&
@@ -378,7 +379,7 @@ export type ConceptSaved =
   | { readonly outcome: "unchanged"; readonly iri: string }
   | { readonly outcome: "suggested"; readonly suggestionId: string };
 
-export const saveConceptAction = declareAction({
+const saveConceptAction = declareAction({
   admits: ANY_ROLE,
   input: z.custom<SaveConceptInput>(),
   refuses: [
@@ -414,6 +415,16 @@ type Saving = Commit & {
 
 type Parsed = z.output<typeof saveConceptInput>;
 
+const inMember = async <Value, Refused>(
+  principal: UserPrincipal,
+  postgres: PostgresDoor,
+  work: (fresh: UserPrincipal, tx: Tx) => Promise<Result<Value, Refused>>,
+): Promise<Result<Value, Refused | PrincipalRefusal | Error>> => {
+  const read = await attempt(() => withMember(principal, postgres, work));
+  if (!read.ok) return err(read.error);
+  return read.value.ok ? read.value.value : err(read.value.error);
+};
+
 type SaveDoors = WriteDoors & {
   readonly passages: (principal: UserPrincipal, tx: Tx) => PassageReader;
 };
@@ -438,14 +449,24 @@ export const saveConcept = async (
   return refusal === undefined ? routed(admitted.value, doors, saving.value) : err(refusal);
 };
 
+type StoredToSave = {
+  readonly held: Held;
+  readonly stored: ConceptFile;
+  readonly opened: readonly Opened[];
+  readonly standing: Standing;
+  readonly author: CommitAuthor;
+};
+
 const savingOver = async (
   principal: UserPrincipal,
   doors: SaveDoors,
   input: Parsed,
   iri: ConceptIri,
 ): Promise<Result<Saving, SaveConceptRefusal | Error>> => {
-  const read = await attempt(() =>
-    withMember(principal, doors.postgres, async (fresh, tx) => {
+  const read = await inMember(
+    principal,
+    doors.postgres,
+    async (fresh, tx): Promise<Result<StoredToSave, SaveConceptRefusal | Error>> => {
       const held = await heldByIri(fresh, tx, iri);
       if (held === undefined) return err("no-such-concept" as const);
       if (held.contentHash !== input.base) return err("stale-precondition" as const);
@@ -465,12 +486,10 @@ const savingOver = async (
         standing: await standingOn(fresh, tx, { iri, path: held.path }),
         author: await authorOf(fresh, tx, fresh.userId),
       });
-    }),
+    },
   );
   if (!read.ok) return err(read.error);
-  if (!read.value.ok) return err(read.value.error);
-  if (!read.value.value.ok) return err(read.value.value.error);
-  const { held, stored, opened, standing, author } = read.value.value.value;
+  const { held, stored, opened, standing, author } = read.value;
   const file = editedFileOf(stored, input.parts, mergedSources(opened, input.sources));
   if (file === undefined) return err("malformed");
   return ok({
@@ -626,19 +645,15 @@ const standingBodyOf = async (
   doors: WriteDoors,
   iri: ConceptIri,
 ): Promise<Result<StandingBody, UpdateConceptBodyRefusal | Error>> => {
-  const read = await attempt(() =>
-    withMember(principal, doors.postgres, async (fresh, tx) => {
-      const held = await heldByIri(fresh, tx, iri);
-      if (held === undefined) return err("no-such-concept" as const);
-      const refusal = await ownerAdmits(fresh, tx, { iri, path: held.path });
-      if (refusal !== undefined) return err(refusal);
-      return ok({ held, author: await authorOf(fresh, tx, fresh.userId) });
-    }),
-  );
+  const read = await inMember(principal, doors.postgres, async (fresh, tx) => {
+    const held = await heldByIri(fresh, tx, iri);
+    if (held === undefined) return err("no-such-concept" as const);
+    const refusal = await ownerAdmits(fresh, tx, { iri, path: held.path });
+    if (refusal !== undefined) return err(refusal);
+    return ok({ held, author: await authorOf(fresh, tx, fresh.userId) });
+  });
   if (!read.ok) return err(read.error);
-  if (!read.value.ok) return err(read.value.error);
-  if (!read.value.value.ok) return err(read.value.value.error);
-  const { held, author } = read.value.value.value;
+  const { held, author } = read.value;
   const file = await storedFileOf(principal, doors.git, held);
   return file.ok ? ok({ held, author, file: file.value }) : err(file.error);
 };
