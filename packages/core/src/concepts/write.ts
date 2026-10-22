@@ -1,0 +1,485 @@
+import { isDeepStrictEqual } from "node:util";
+
+import { z } from "zod";
+
+import { boundarySchemas, conceptIriOf, type ConceptIri } from "@better-answers/schema";
+
+import { widens, type Visibility } from "../access/index.ts";
+import { action, declareActions, record } from "../audit/index.ts";
+import {
+  actorIdOf,
+  admit,
+  ANY_ROLE,
+  attempt,
+  declareAction,
+  err,
+  ok,
+  refusalFor,
+  ulid,
+  type AdmittedOf,
+  type Clock,
+  type PrincipalRefusal,
+  type RefusalOf,
+  type Result,
+  type UserPrincipal,
+} from "../kernel/index.ts";
+import { ANY_HEAD, type CommitAuthor, type Committed, type GitDoor } from "../store/git/index.ts";
+import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { withBundleWrite } from "./fence.ts";
+import { hashedFileOf, renderConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
+import {
+  commitAndLandAsMember,
+  foldKind,
+  heldByIri,
+  heldVisibilityOf,
+  holderOfPath,
+  holdsEveryDocument,
+  indexRowOf,
+  type IndexRow,
+  landRows,
+  WRITE_CONSTRAINTS,
+  type Held,
+} from "./landing.ts";
+import { deciderAdmits, ownerAdmits, standingConcept } from "./owners.ts";
+import {
+  conceptOfSuggestion,
+  payloadFor,
+  suggestionIsWaiting,
+  targetOfMergeKey,
+  type SuggestionKind,
+  type SuggestionPayload,
+} from "./suggestions.ts";
+import { citationCountOf, conceptVisibilityFrom } from "./visibility.ts";
+import type { PassedOnCommitRefusal } from "./vocabulary.ts";
+
+const CONCEPT_ACTIONS = declareActions("knowledge", {
+  committed: action("knowledge.concept.committed", {
+    iri: "iri",
+    commitSha: "gitSha",
+    contentHash: "contentHash",
+    fromContentHash: "contentHash?",
+    evidenceCount: "count",
+  }),
+  accepted: action("knowledge.suggestion.accepted", {
+    iri: "iri",
+    commitSha: "gitSha",
+    contentHash: "contentHash",
+    setId: "id",
+  }),
+});
+
+type EvidenceInput = {
+  readonly sourceDocumentId: string;
+  readonly locator: string;
+
+  readonly resource: string;
+  readonly contentVersion?: string;
+};
+
+type WritePrecondition = { readonly head: string | null } | { readonly base: string | null };
+
+export type Acceptance = {
+  readonly suggestionId: string;
+  readonly setId: string;
+  readonly kind: SuggestionKind;
+
+  readonly batchId?: string | undefined;
+};
+
+export type WriteConceptInput = {
+  readonly iri?: string | undefined;
+
+  readonly mergeKey: string;
+
+  readonly path: string;
+  readonly kind: string;
+  readonly title: string;
+  readonly frontmatter: Frontmatter;
+  readonly body: string;
+
+  readonly message: string;
+
+  readonly author: CommitAuthor;
+
+  readonly expects: WritePrecondition;
+
+  readonly acceptance?: Acceptance | undefined;
+
+  readonly sensitivity?: string;
+  readonly status?: string;
+  readonly evidence?: readonly EvidenceInput[];
+};
+
+export type ConceptWritten = {
+  readonly iri: ConceptIri;
+
+  readonly sha: string;
+
+  readonly auditEventId: string;
+  readonly contentHash: string;
+};
+
+export const writeConceptAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.custom<WriteConceptInput>(),
+  refuses: [
+    "role-forbids",
+    "owner-forbids",
+    "malformed",
+    "no-such-concept",
+    "no-such-document",
+    "already-decided",
+    "merge-key-taken",
+    "resolution-moved",
+    "stale-precondition",
+    "rename-refused",
+    "path-taken",
+    "reclassification-refused",
+    "widening-refused",
+  ],
+});
+
+export type WriteConceptRefusal =
+  | RefusalOf<typeof writeConceptAction>
+  | PassedOnCommitRefusal
+  | PrincipalRefusal;
+
+const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
+  const named = { ...input.frontmatter };
+  if (typeof named["type"] !== "string") named["type"] = input.kind;
+  if (typeof named["title"] !== "string") named["title"] = input.title;
+  if (input.status !== undefined) named["status"] = input.status;
+  named["iri"] = iri;
+  return named;
+};
+
+export type WriteDoors = {
+  readonly git: GitDoor;
+  readonly postgres: PostgresDoor;
+  readonly clock: Clock;
+};
+
+/**
+ * An `iri` edits a concept that must already stand. An `acceptance` needs a `base` and carries no
+ * status, sensitivity or evidence.
+ */
+export const writeConcept = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  input: WriteConceptInput,
+): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
+  const admitted = admit(writeConceptAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  if (input.acceptance !== undefined && !acceptsAsProposed(input)) return err("malformed");
+  return commitConcept(admitted.value, doors, input);
+};
+
+const acceptsAsProposed = (input: WriteConceptInput): boolean =>
+  "base" in input.expects &&
+  input.status === undefined &&
+  input.sensitivity === undefined &&
+  input.evidence === undefined;
+
+const commitConcept = async (
+  principal: AdmittedOf<typeof writeConceptAction>,
+  doors: WriteDoors,
+  input: WriteConceptInput,
+): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
+  const iri = input.iri ?? conceptIriOf(ulid());
+  const frontmatter = fileFrontmatterOf(input, iri);
+  const body = boundarySchemas.conceptIndex.insert.shape.body.safeParse(input.body);
+  if (!body.success) return err("malformed");
+  const { contentHash, sources } = hashedFileOf(frontmatter, input.body, input.path);
+  const mergeKey = boundarySchemas.conceptIdentity.insert.shape.mergeKey.safeParse(input.mergeKey);
+
+  const evidence =
+    input.evidence === undefined
+      ? { success: true as const, data: undefined }
+      : boundarySchemas.evidence.insert.array().safeParse(
+          input.evidence.map((piece) => ({
+            workspaceId: principal.workspaceId,
+            sourceDocumentId: piece.sourceDocumentId,
+            locator: piece.locator,
+            resource: piece.resource,
+            contentVersion: piece.contentVersion ?? null,
+          })),
+        );
+  if (!mergeKey.success || !evidence.success) return err("malformed");
+
+  const auditEventId = ulid();
+
+  return withBundleWrite(principal, doors, () =>
+    writeUnderLock(principal, doors, {
+      input,
+      iri,
+      frontmatter,
+      contentHash,
+      sources,
+      mergeKey: mergeKey.data,
+      evidence: evidence.data,
+      auditEventId,
+    }),
+  );
+};
+
+type ParsedWrite = {
+  readonly input: WriteConceptInput;
+  readonly iri: string;
+  readonly frontmatter: Frontmatter;
+  readonly contentHash: string;
+  readonly sources: readonly HashedSource[];
+  readonly mergeKey: string;
+  readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[] | undefined;
+  readonly auditEventId: string;
+};
+
+type Existing = {
+  readonly held: Held | undefined;
+  readonly derived: Visibility | undefined;
+  readonly catalogued: boolean;
+  readonly resolved: string | undefined;
+  readonly holder: string | undefined;
+  readonly waiting: boolean;
+  readonly admission: WriteConceptRefusal | undefined;
+};
+
+const writeUnderLock = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  write: ParsedWrite,
+): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
+  const existing = await existingOf(principal, doors.postgres, write);
+  if (!existing.ok) return err(existing.error);
+  if (!existing.value.ok) return err(existing.value.error);
+  const refusal = existing.value.value.admission ?? writeRefusalOf(write, existing.value.value);
+  if (refusal !== undefined) return err(refusal);
+
+  const now = doors.clock.now();
+  const parsed = indexRowOf(
+    {
+      workspaceId: principal.workspaceId,
+      iri: write.iri,
+      path: write.input.path,
+      kind: write.input.kind,
+      title: write.input.title,
+      frontmatter: write.frontmatter,
+      body: write.input.body,
+      contentHash: write.contentHash,
+      status: write.input.status,
+      sensitivity: write.input.sensitivity,
+    },
+    existing.value.value.held,
+    now,
+  );
+  if (!parsed.success) return err("malformed");
+  const row = parsed.data;
+
+  const landed = await commitAndLandWrite(
+    principal,
+    doors,
+    write,
+    row,
+    now,
+    existing.value.value.held?.contentHash,
+  );
+  if (!landed.ok) return err(landed.error);
+
+  return ok({
+    iri: row.iri,
+    sha: landed.value.sha,
+    auditEventId: write.auditEventId,
+    contentHash: write.contentHash,
+  });
+};
+
+const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: ParsedWrite) =>
+  attempt(() =>
+    withMember(principal, postgres, async (fresh, tx): Promise<Existing> => {
+      const { input, iri } = write;
+      const admission = await writersRefusal(fresh, tx, write, input.path);
+      const held = await heldByIri(fresh, tx, iri);
+      return {
+        admission,
+        held,
+
+        derived:
+          held === undefined
+            ? undefined
+            : await conceptVisibilityFrom(fresh, tx, {
+                iri,
+                kind: foldKind(input.kind),
+                fallback: heldVisibilityOf(held),
+                citing: write.evidence?.map((piece) => piece.sourceDocumentId),
+              }),
+
+        catalogued: await holdsEveryDocument(
+          fresh,
+          tx,
+          write.evidence?.map((piece) => piece.sourceDocumentId) ?? [],
+        ),
+
+        resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
+        holder: await holderOfPath(fresh, tx, input.path),
+        waiting:
+          input.acceptance === undefined ||
+          (await suggestionIsWaiting(fresh, tx, input.acceptance.suggestionId)),
+      };
+    }),
+  );
+
+const WRITE_REFUSALS: readonly (readonly [
+  WriteConceptRefusal,
+  (write: ParsedWrite, existing: Existing) => boolean,
+])[] = [
+  ["no-such-concept", ({ input }, { held }) => input.iri !== undefined && held === undefined],
+  ["no-such-document", (_, { catalogued }) => !catalogued],
+  ["already-decided", (_, { waiting }) => !waiting],
+  ["merge-key-taken", ({ iri }, { resolved }) => resolved !== undefined && resolved !== iri],
+  [
+    "resolution-moved",
+    ({ input, iri }, { resolved }) =>
+      input.acceptance !== undefined && input.iri !== undefined && resolved !== iri,
+  ],
+  [
+    "stale-precondition",
+    ({ input }, { held }) =>
+      "base" in input.expects && (held?.contentHash ?? null) !== input.expects.base,
+  ],
+  ["rename-refused", ({ input }, { held }) => held !== undefined && held.path !== input.path],
+  ["path-taken", ({ iri }, { holder }) => holder !== undefined && holder !== iri],
+  [
+    "reclassification-refused",
+    ({ input }, { held }) =>
+      held !== undefined &&
+      input.sensitivity !== undefined &&
+      input.sensitivity !== held.sensitivity,
+  ],
+  [
+    "widening-refused",
+    (_, { held, derived }) =>
+      held !== undefined && derived !== undefined && widens(heldVisibilityOf(held), derived),
+  ],
+];
+
+const writeRefusalOf = (write: ParsedWrite, existing: Existing): WriteConceptRefusal | undefined =>
+  WRITE_REFUSALS.find(([, refuses]) => refuses(write, existing))?.[0];
+
+const writersRefusal = async (
+  fresh: UserPrincipal,
+  tx: Tx,
+  write: ParsedWrite,
+  path: string,
+): Promise<WriteConceptRefusal | undefined> => {
+  const { input } = write;
+  if (input.acceptance === undefined) {
+    return ownerAdmits(fresh, tx, await standingConcept(fresh, tx, write.iri, path));
+  }
+  const payload = await payloadFor(fresh, tx, input.acceptance.suggestionId);
+  if (payload === undefined) return "already-decided";
+  const concept = await conceptOfSuggestion(fresh, tx, payload);
+  const refusal = await deciderAdmits(fresh, tx, concept, payload.kind);
+  if (refusal !== undefined) return refusal;
+  return writesItsSuggestion(write, payload) ? undefined : "malformed";
+};
+
+const writesItsSuggestion = (write: ParsedWrite, payload: SuggestionPayload) =>
+  namesItsSuggestion(write, payload) && carriesItsProposal(write, payload);
+
+const namesItsSuggestion = ({ input, mergeKey }: ParsedWrite, payload: SuggestionPayload) =>
+  payload.kind === input.acceptance?.kind &&
+  payload.mergeKey === mergeKey &&
+  payload.path === input.path &&
+  payload.conceptKind === input.kind;
+
+const carriesItsProposal = ({ input }: ParsedWrite, payload: SuggestionPayload) =>
+  payload.title === input.title &&
+  payload.body === input.body &&
+  isDeepStrictEqual(payload.frontmatter, input.frontmatter) &&
+  "base" in input.expects &&
+  payload.baseContentHash === input.expects.base;
+
+const commitAndLandWrite = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  write: ParsedWrite,
+  row: IndexRow,
+  at: Date,
+  fromContentHash: string | undefined,
+): Promise<Result<Committed, WriteConceptRefusal | Error>> => {
+  const { input } = write;
+  const landed = await commitAndLandAsMember(
+    principal,
+    doors,
+    {
+      path: row.path,
+      content: renderConceptFile(write.frontmatter, input.body),
+      message: input.message,
+      author: input.author,
+      trailers: {
+        actor: actorIdOf(principal),
+        audit: write.auditEventId,
+        suggestion: input.acceptance?.suggestionId,
+      },
+      expectedHead: "head" in input.expects ? input.expects.head : ANY_HEAD,
+      at,
+    },
+    (fresh, tx, committed) => landWrite(fresh, tx, write, row, committed, fromContentHash),
+    (fresh, tx) => writersRefusal(fresh, tx, write, row.path),
+  );
+  if (!landed.ok && landed.error instanceof Error) {
+    const named = refusalFor(landed.error, WRITE_CONSTRAINTS);
+    return err(typeof named === "string" ? named : landed.error);
+  }
+  return landed;
+};
+
+const landWrite = async (
+  fresh: UserPrincipal,
+  tx: Tx,
+  write: ParsedWrite,
+  row: IndexRow,
+  committed: Committed,
+  fromContentHash: string | undefined,
+): Promise<void> => {
+  const acceptance = write.input.acceptance;
+  if (acceptance === undefined) {
+    const detail = {
+      iri: row.iri,
+      commitSha: committed.sha,
+      contentHash: write.contentHash,
+      evidenceCount:
+        write.evidence?.length ??
+        (fromContentHash === undefined ? 0 : await citationCountOf(fresh, tx, row.iri)),
+    };
+    await record(fresh, tx, {
+      id: write.auditEventId,
+      action: CONCEPT_ACTIONS.committed,
+      subjectId: row.iri,
+      detail: fromContentHash === undefined ? detail : { ...detail, fromContentHash },
+    });
+  } else {
+    await record(fresh, tx, {
+      id: write.auditEventId,
+      action: CONCEPT_ACTIONS.accepted,
+      subjectId: acceptance.suggestionId,
+      batchId: acceptance.batchId,
+      detail: {
+        iri: row.iri,
+        commitSha: committed.sha,
+        contentHash: write.contentHash,
+        setId: acceptance.setId,
+      },
+    });
+  }
+  await landRows(fresh, tx, {
+    ...row,
+    mergeKey: write.mergeKey,
+    commit: committed,
+    actor: actorIdOf(fresh),
+    auditEventId: write.auditEventId,
+    sources: write.sources,
+    evidence: write.evidence,
+    restsAlsoOn: [],
+    acceptance,
+  });
+};
