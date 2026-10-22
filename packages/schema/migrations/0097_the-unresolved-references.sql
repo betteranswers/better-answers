@@ -48,10 +48,11 @@ BEGIN
     PERFORM set_config('app.workspace_id', scope, true);
     INSERT INTO public.job (workspace_id, id, kind, reason)
     SELECT scope, pg_temp.new_ulid(), 'full-rebuild', 'upgrade'
-     WHERE EXISTS (SELECT 1 FROM public.map_generation)
+     WHERE EXISTS (SELECT 1 FROM public.map_generation WHERE workspace_id = scope)
        AND NOT EXISTS (
          SELECT 1 FROM public.job
-          WHERE kind = 'full-rebuild' AND status = 'queued' AND attempts = 0
+          WHERE workspace_id = scope
+            AND kind = 'full-rebuild' AND status = 'queued' AND attempts = 0
        );
   END LOOP;
   PERFORM set_config('app.workspace_id', '', true);
