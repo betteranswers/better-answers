@@ -111,8 +111,10 @@ export {
 export { withBundleFenceAs } from "./fence.ts";
 export {
   conceptToEdit,
+  conceptToEditInput,
   saveConcept,
   saveConceptInput,
+  standingOnConcept,
   updateConceptBody,
   type ConceptBodyRun,
   type ConceptBodyUpdate,

@@ -39,7 +39,7 @@ import {
 } from "./file.ts";
 import { foldKind, heldByIri, mergeKeyOf, placesUsing, type Held } from "./landing.ts";
 import { authorOf } from "./loader.ts";
-import { ownerAdmits, ownerOf, type OwnedConcept } from "./owners.ts";
+import { ownerAdmits, ownerOf, standingConcept, type OwnedConcept } from "./owners.ts";
 import { resolvedSourcesOf, type PassageReader } from "./read.ts";
 import { submitSuggestionSet, type SubmitSuggestionSetRefusal } from "./suggestions.ts";
 import {
@@ -88,6 +88,12 @@ export const standingOn = async (
   principal.role === "Admin" || (await ownerOf(principal, tx, concept)) === principal.userId
     ? "commits"
     : "suggests";
+
+export const standingOnConcept = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  iri: string,
+): Promise<Standing> => standingOn(principal, tx, await standingConcept(principal, tx, iri, ""));
 
 const stringOf = (value: FrontmatterValue | undefined): string | null =>
   typeof value === "string" ? value : null;
@@ -162,7 +168,7 @@ const conceptToEditAction = declareAction({
 
 export type ConceptToEditRefusal = RefusalOf<typeof conceptToEditAction>;
 
-const EDITED_CONCEPT = z.union([
+export const conceptToEditInput = z.union([
   z.strictObject({ iri: ids.conceptIri }),
   z.strictObject({ collection: z.string().regex(COLLECTION) }),
 ]);
@@ -176,7 +182,7 @@ export const conceptToEdit = async (
 ): Promise<Result<ConceptToEdit, ConceptToEditRefusal | Error>> => {
   const admitted = admit(conceptToEditAction, principal, asked);
   if (!admitted.ok) return err(admitted.error);
-  const target = EDITED_CONCEPT.safeParse(asked);
+  const target = conceptToEditInput.safeParse(asked);
   if (!target.success) return err("malformed");
   const reader = admitted.value;
 
