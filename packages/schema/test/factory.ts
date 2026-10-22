@@ -35,6 +35,12 @@ type Registry = typeof boundarySchemas;
 type InsertInput<TName extends keyof Registry> = z.input<Registry[TName]["insert"]>;
 type Row<TName extends keyof Registry> = z.infer<Registry[TName]["select"]>;
 
+type InASection<TInput> = Partial<Omit<TInput, "guideId" | "sectionId">> &
+  (
+    | { readonly guideId: string; readonly sectionId: string }
+    | { readonly guideId?: string | null; readonly sectionId?: null }
+  );
+
 export type TestData = {
   workspace(overrides?: Partial<InsertInput<"workspace">>): Promise<Row<"workspace">>;
 
@@ -166,9 +172,8 @@ export type TestData = {
 
   guideSection(overrides?: Partial<InsertInput<"guideSection">>): Promise<Row<"guideSection">>;
 
-  /** Seeds a section of a guide it seeds when given no `sectionId` with its `guideId`. */
   guideExpectedFact(
-    overrides?: Partial<InsertInput<"guideExpectedFact">>,
+    overrides?: InASection<InsertInput<"guideExpectedFact">>,
   ): Promise<Row<"guideExpectedFact">>;
 
   guideDefinitionVersion(
@@ -176,7 +181,7 @@ export type TestData = {
   ): Promise<Row<"guideDefinitionVersion">>;
 
   /** Homed in a section it seeds, unless given one; a response home names a question instead. */
-  writeUp(overrides?: Partial<InsertInput<"writeUp">>): Promise<Row<"writeUp">>;
+  writeUp(overrides?: InASection<InsertInput<"writeUp">>): Promise<Row<"writeUp">>;
 
   writeUpInclude(
     overrides?: Partial<InsertInput<"writeUpInclude">>,
@@ -1059,9 +1064,9 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const sectionOf = async (
     workspaceId: string,
-    overrides: { readonly guideId?: string | null; readonly sectionId?: string | null },
+    overrides: InASection<object>,
   ): Promise<{ readonly guideId: string; readonly sectionId: string }> => {
-    if (typeof overrides.guideId === "string" && typeof overrides.sectionId === "string") {
+    if (typeof overrides.sectionId === "string") {
       return { guideId: overrides.guideId, sectionId: overrides.sectionId };
     }
     const section = await guideSection(
@@ -1102,7 +1107,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
-  const homeOf = async (workspaceId: string, overrides: Partial<InsertInput<"writeUp">>) =>
+  const homeOf = async (workspaceId: string, overrides: InASection<InsertInput<"writeUp">>) =>
     overrides.home === "response"
       ? {
           home: overrides.home,
