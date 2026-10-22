@@ -1,13 +1,21 @@
 import {
   expect,
   type APIRequestContext,
+  type Locator,
   type Page,
   type Response,
   type Route,
 } from "@playwright/test";
 import { z } from "zod";
 
-import { keyListed, keystrokesDismissed, keystrokesListed, seedConcepts } from "./harness.ts";
+import {
+  keyListed,
+  keystrokesDismissed,
+  keystrokesListed,
+  navOf,
+  railOf,
+  seedConcepts,
+} from "./harness.ts";
 
 /** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 export const isAFind = (url: URL): boolean => url.pathname.includes("knowledge.find");
@@ -141,4 +149,11 @@ export const conceptsSeeded = async (
 ) => {
   const { concepts } = await seedConcepts(api, input);
   return new Map(concepts.map((concept) => [concept.title, concept]));
+};
+
+export const knowledgeMenuOpened = async (page: Page): Promise<Locator> => {
+  await railOf(page).getByRole("link", { name: "Knowledge" }).click();
+  const menu = navOf(page, "Knowledge");
+  await expect(menu).toBeVisible();
+  return menu;
 };
