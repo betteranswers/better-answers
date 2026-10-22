@@ -63,7 +63,7 @@ type GuideSeeded = {
 
 const templateFor = (input: SeedGuideInput): Template | undefined =>
   COLLECTION.test(input.collection) && (input.subjectIri === null || IRI.test(input.subjectIri))
-    ? TEMPLATES[input.templateId]
+    ? TEMPLATES.get(input.templateId)
     : undefined;
 
 const FACTS_AS_GIVEN = `jsonb_to_recordset($5::jsonb)

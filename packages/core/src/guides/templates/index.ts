@@ -41,4 +41,4 @@ export type Template = {
   readonly sections: readonly SectionTemplate[];
 };
 
-export const TEMPLATES: Readonly<Record<string, Template>> = { [BID_LIBRARY.id]: BID_LIBRARY };
+export const TEMPLATES: ReadonlyMap<string, Template> = new Map([[BID_LIBRARY.id, BID_LIBRARY]]);

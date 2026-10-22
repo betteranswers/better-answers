@@ -237,6 +237,21 @@ describe("seeding a guide from a template", () => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
   });
 
+  it("refuses a seed naming no shipped template", async () => {
+    const { ng } = await seededOnce();
+    const { scenario } = ng;
+    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+
+    const refused = await seedGuide(ng.admin, doorsOf(scenario), {
+      ...BID_LIBRARY,
+      templateId: "constructor",
+    });
+
+    expect(refused).toEqual({ ok: false, error: "malformed" });
+    expect(await counted("guide_definition", scenario.workspaceId)).toBe(1);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
+  });
+
   it("writes version one of every section's write-up", async () => {
     const { ng, guideId } = await seededOnce();
     const { workspaceId } = ng.scenario;

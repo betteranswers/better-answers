@@ -44,8 +44,8 @@ const fact = (
 
 describe("the shipped templates", () => {
   it("parses every shipped template into expected fact rows", () => {
-    expect(Object.keys(TEMPLATES)).toEqual(["bid-library"]);
-    const template = TEMPLATES["bid-library"];
+    expect([...TEMPLATES.keys()]).toEqual(["bid-library"]);
+    const template = TEMPLATES.get("bid-library");
     if (template === undefined) throw new Error("the bid-library template is not shipped");
 
     expect(guideRowsOf(template, PLACED, counter())).toEqual({
