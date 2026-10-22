@@ -66,6 +66,19 @@ export const ownerOf = (
   concept: OwnedConcept,
 ): Promise<UserId | undefined> => readOwner(principal, tx, concept, false);
 
+export const standingConcept = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  iri: string,
+  asked: string,
+): Promise<OwnedConcept> => {
+  const standing = await tx.query<{ path: string }>(
+    "SELECT path FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+    [principal.workspaceId, iri],
+  );
+  return { iri, path: standing.rows[0]?.path ?? asked };
+};
+
 export type OwnerRefusal = KernelRefusal<"owner-forbids">;
 
 const HOLDING_THE_CONCEPT = `SELECT 1 FROM concept_identity

@@ -20,6 +20,7 @@ import {
   parkedOnTable,
   writeRevokedWhileParked,
 } from "./revocation-race.ts";
+import { connectedSourceHolding } from "./sourced-concept.ts";
 import { seedingWith, statementsWaitingOnALock, until } from "./suite-postgres.ts";
 import { doorsOf, nameOwnerAs, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -90,6 +91,16 @@ const ownedByTheViewer = async () => {
   return { scenario, input, landed };
 };
 
+const landedByTheGuidanceOwner = async () => {
+  const scenario = await arrange();
+  await nameOwnerAs(scenario.admin, scenario.postgres, {
+    collection: "guidance",
+    personId: scenario.viewer.userId,
+  });
+  const input = conceptAt("knowledge/guidance/expenses.md");
+  return { scenario, input, landed: await landedAs(scenario, scenario.viewer, input) };
+};
+
 describe("a direct write, decided by the concept's owner", () => {
   it("commits an owning Editor's direct write with them as author", async () => {
     const scenario = await arrange();
@@ -142,14 +153,7 @@ describe("a direct write, decided by the concept's owner", () => {
   });
 
   it("takes a new concept's owner from its collection", async () => {
-    const scenario = await arrange();
-    await nameOwnerAs(scenario.admin, scenario.postgres, {
-      collection: "guidance",
-      personId: scenario.viewer.userId,
-    });
-    const input = conceptAt("knowledge/guidance/expenses.md");
-
-    const landed = await landedAs(scenario, scenario.viewer, input);
+    const { scenario, input, landed } = await landedByTheGuidanceOwner();
 
     expect(await ownerRead(scenario, { iri: landed.iri, path: input.path })).toBe(
       scenario.viewer.userId,
@@ -200,6 +204,7 @@ describe("ownership judged at the time of the act", () => {
 
   it("refuses an owner cleared between the read and the commit", async () => {
     const scenario = await arrange();
+    const cited = await connectedSourceHolding(db(), scenario.workspaceId);
 
     const landed = await writeRevokedWhileParked(
       db().pool,
@@ -209,7 +214,11 @@ describe("ownership judged at the time of the act", () => {
           writeConcept(
             scenario.editor,
             { ...doorsOf(scenario), postgres },
-            conceptAt("knowledge/policy/expenses.md"),
+            conceptAt("knowledge/policy/expenses.md", {
+              evidence: [
+                { sourceDocumentId: cited.documentId, locator: "p.1", resource: "Handbook" },
+              ],
+            }),
           ),
         revoke: (client) =>
           client.query(
@@ -217,11 +226,22 @@ describe("ownership judged at the time of the act", () => {
             [scenario.workspaceId],
           ),
       },
-      parkedOnTable(db().pool, "concept_index"),
+      parkedOnTable(db().pool, "source_document"),
     );
 
     expect(landed).toEqual({ ok: false, error: "owner-forbids" });
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
+  });
+
+  it("refuses an owner writing another collection's concept by path", async () => {
+    const { scenario, input, landed } = await landedByTheGuidanceOwner();
+
+    const refused = await writeAs(scenario, scenario.editor, {
+      ...rewriteOf(input, landed),
+      path: "knowledge/policy/expenses.md",
+    });
+
+    expect(refused).toEqual({ ok: false, error: "owner-forbids" });
   });
 
   it("refuses a non-owner before saying a path is taken", async () => {

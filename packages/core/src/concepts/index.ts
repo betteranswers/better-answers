@@ -102,7 +102,7 @@ import {
   type Unsound,
 } from "./loader.ts";
 import { manifestAtHead, writeManifest, type WriteManifestRefusal } from "./manifest.ts";
-import { deciderAdmits, ownerAdmits, type OwnedConcept, type OwnerRefusal } from "./owners.ts";
+import { deciderAdmits, ownerAdmits, standingConcept, type OwnerRefusal } from "./owners.ts";
 import {
   bodyLinksOf,
   paneOf,
@@ -448,7 +448,7 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
   attempt(() =>
     withMember(principal, postgres, async (fresh, tx): Promise<Existing> => {
       const { input, iri } = write;
-      const admission = await writersRefusal(fresh, tx, write, { iri, path: input.path });
+      const admission = await writersRefusal(fresh, tx, write, input.path);
       const held = await heldByIri(fresh, tx, iri);
       return {
         admission,
@@ -520,10 +520,12 @@ const writersRefusal = async (
   fresh: UserPrincipal,
   tx: Tx,
   write: ParsedWrite,
-  concept: OwnedConcept,
+  path: string,
 ): Promise<WriteConceptRefusal | undefined> => {
   const { input } = write;
-  if (input.acceptance === undefined) return ownerAdmits(fresh, tx, concept);
+  if (input.acceptance === undefined) {
+    return ownerAdmits(fresh, tx, await standingConcept(fresh, tx, write.iri, path));
+  }
   const payload = await payloadFor(fresh, tx, input.acceptance.suggestionId);
   if (payload === undefined) return "already-decided";
   if (!writesItsSuggestion(write, payload)) return "malformed";
@@ -565,7 +567,7 @@ const commitAndLandWrite = async (
       at,
     },
     (fresh, tx, committed) => landWrite(fresh, tx, write, row, committed, fromContentHash),
-    (fresh, tx) => writersRefusal(fresh, tx, write, row),
+    (fresh, tx) => writersRefusal(fresh, tx, write, row.path),
   );
   if (!landed.ok && landed.error instanceof Error) {
     const named = refusalFor(landed.error, WRITE_CONSTRAINTS);

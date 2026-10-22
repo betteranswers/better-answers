@@ -39,7 +39,12 @@ import {
   type Tx,
 } from "../store/postgres/index.ts";
 import type { Frontmatter } from "./index.ts";
-import { deciderAdmits, type DeciderRefusal, type OwnedConcept } from "./owners.ts";
+import {
+  deciderAdmits,
+  standingConcept,
+  type DeciderRefusal,
+  type OwnedConcept,
+} from "./owners.ts";
 
 const SUGGESTION_ACTIONS = declareActions("knowledge", {
   declined: action("knowledge.suggestion.declined", { setId: "id" }),
@@ -274,12 +279,9 @@ export const conceptOfSuggestion = async (
   payload: SuggestionPayload,
 ): Promise<OwnedConcept> => {
   const target = await targetOfMergeKey(principal, tx, payload.mergeKey);
-  if (target === undefined) return { iri: null, path: payload.path };
-  const standing = await tx.query<{ path: string }>(
-    "SELECT path FROM concept_index WHERE workspace_id = $1 AND iri = $2",
-    [principal.workspaceId, target],
-  );
-  return { iri: target, path: standing.rows[0]?.path ?? payload.path };
+  return target === undefined
+    ? { iri: null, path: payload.path }
+    : standingConcept(principal, tx, target, payload.path);
 };
 
 const decidersRefusal = async (
