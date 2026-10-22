@@ -299,7 +299,10 @@ ${concept.body}
 `;
 
 /** The imported half of Northgate, with one more verification on each key named in `verifyingAlso`. */
-const northgateTree = (reviewer: string, verifyingAlso: readonly ImportedKey[] = []): BundleTree =>
+export const northgateTree = (
+  reviewer: string,
+  verifyingAlso: readonly ImportedKey[] = [],
+): BundleTree =>
   new Map([
     [
       "manifest.yaml",
@@ -316,7 +319,7 @@ const northgateTree = (reviewer: string, verifyingAlso: readonly ImportedKey[] =
     }),
   ]);
 
-const importedBy = async (admin: UserPrincipal, scenario: Scenario, tree: BundleTree) => {
+export const importedBy = async (admin: UserPrincipal, scenario: Scenario, tree: BundleTree) => {
   const run = await importBundle(
     admin,
     { ...doorsOf(scenario), log: { warn: () => undefined } },

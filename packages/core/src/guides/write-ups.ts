@@ -8,13 +8,15 @@ import {
 
 import type { Sensitivity } from "../access/index.ts";
 import { action, declareActions } from "../audit/index.ts";
-import { actorIdOf, type UserPrincipal } from "../kernel/index.ts";
-import type { Tx } from "../store/postgres/index.ts";
+import { actorIdOf, type Principal, type UserPrincipal } from "../kernel/index.ts";
+import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 
 export const SECTION_HOME = "section" satisfies (typeof WRITE_UP_HOMES)[number];
 
 export const EXPECTATION_UNMET =
   "expectation-unmet" satisfies (typeof NEEDS_REVIEW_REASONS)[number];
+
+const CONCEPT_CHANGED = "concept-changed" satisfies (typeof NEEDS_REVIEW_REASONS)[number];
 
 const INTERNAL = "Internal" satisfies Sensitivity;
 
@@ -128,4 +130,23 @@ export const insertSectionWriteUps = async (
       INTERNAL,
     ],
   );
+};
+
+/** A mark a person already set for another reason, or this one, stays as it is. */
+export const flagWriteUpsCiting = async (
+  principal: Principal,
+  tx: Tx,
+  input: { readonly iri: string; readonly contentHash: string },
+): Promise<readonly string[]> => {
+  const marked = await tx.query<{ id: string }>(
+    `UPDATE write_up w SET needs_review = $4
+      WHERE w.workspace_id = ${scopeClause(1)}
+        AND (w.needs_review IS NULL OR w.needs_review = $5)
+        AND EXISTS (SELECT 1 FROM write_up_include i
+                     WHERE i.workspace_id = w.workspace_id AND i.write_up_id = w.id
+                       AND i.iri = $2 AND i.content_hash <> $3)
+    RETURNING w.id`,
+    [scopeParameter(principal), input.iri, input.contentHash, CONCEPT_CHANGED, EXPECTATION_UNMET],
+  );
+  return marked.rows.map((row) => row.id);
 };

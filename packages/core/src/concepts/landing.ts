@@ -24,33 +24,11 @@ import {
   type Visibility,
 } from "../access/index.ts";
 import { foldKind, landBundleCommit } from "../bundle/index.ts";
-import { recomputeWriteUpsIncluding } from "../guides/index.ts";
-import {
-  attempt,
-  err,
-  type ActorId,
-  type PlatformPrincipal,
-  type Principal,
-  type PrincipalRefusal,
-  type Result,
-  type UserPrincipal,
-} from "../kernel/index.ts";
-import {
-  commit,
-  fileAt,
-  type CommitRefusal,
-  type CommitRequest,
-  type Committed,
-  type GitDoor,
-} from "../store/git/index.ts";
+import { flagWriteUpsCiting, recomputeWriteUpsIncluding } from "../guides/index.ts";
+import type { ActorId, PlatformPrincipal, Principal } from "../kernel/index.ts";
+import { fileAt, type Committed, type GitDoor } from "../store/git/index.ts";
 import { writeConceptDelta } from "../store/map/index.ts";
-import {
-  scopeClause,
-  scopeParameter,
-  withMember,
-  type PostgresDoor,
-  type Tx,
-} from "../store/postgres/index.ts";
+import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import { contentHashOf, parseConceptFile, type Frontmatter } from "./file.ts";
 import type { Acceptance } from "./index.ts";
 import { markDeciding } from "./suggestions.ts";
@@ -360,6 +338,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
       visibility.audienceGroups,
     ],
   );
+  await flagWriteUpsCiting(principal, tx, { iri: index.iri, contentHash: index.contentHash });
   await landBundleCommit(principal, tx, index);
 
   await writeConceptDelta(principal, tx, {

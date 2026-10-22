@@ -5,3 +5,4 @@ export { seedGuide } from "./seed.ts";
 export { writeSkeleton } from "./skeleton.ts";
 export { TEMPLATES } from "./templates/index.ts";
 export { recomputeWriteUpsIncluding } from "./visibility.ts";
+export { flagWriteUpsCiting } from "./write-ups.ts";

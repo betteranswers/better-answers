@@ -4,7 +4,7 @@ import { head } from "@better-answers/core/store/git";
 import { ulid } from "@better-answers/schema";
 
 import { withBundleWrite } from "../src/bundle/index.ts";
-import { overrideConceptSensitivity } from "../src/concepts/index.ts";
+import { overrideConceptSensitivity, writeConcept } from "../src/concepts/index.ts";
 import {
   coverageOf,
   includeAvailable,
@@ -14,7 +14,14 @@ import {
 } from "../src/guides/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit } from "./bundle.ts";
-import { EMPLOYERS_LIABILITY, northgate, typedBy, type Northgate } from "./fixtures/northgate.ts";
+import {
+  EMPLOYERS_LIABILITY,
+  importedBy,
+  northgate,
+  northgateTree,
+  typedBy,
+  type Northgate,
+} from "./fixtures/northgate.ts";
 import { answered, readingAs } from "./suite-postgres.ts";
 import { doorsOf, suiteWithBundles } from "./workspace-with-bundle.ts";
 
@@ -558,5 +565,117 @@ describe("including an available concept", () => {
     expect(await counted("write_up_include", workspaceId)).toBe(24);
     expect(await counted("write_up_version", workspaceId)).toBe(8);
     expect(await head(ng.admin, git)).toBe(headBefore);
+  });
+});
+
+const marksBySection = async (workspaceId: string, guideId: string) => {
+  const found = await db().pool.query<{ prompt: string; needs_review: string | null }>(
+    `SELECT s.prompt, w.needs_review FROM write_up w
+       JOIN guide_section s ON s.workspace_id = w.workspace_id AND s.guide_id = w.guide_id
+                           AND s.id = w.section_id
+      WHERE w.workspace_id = $1 AND w.guide_id = $2
+      ORDER BY s.prompt`,
+    [workspaceId, guideId],
+  );
+  return Object.fromEntries(found.rows.map((row) => [row.prompt, row.needs_review]));
+};
+
+const AS_SEEDED = {
+  Certifications: null,
+  "Company overview": null,
+  "Data protection": null,
+  "Information security": null,
+  "Insurance and financial standing": "expectation-unmet",
+  "Security testing": null,
+  "Support and service levels": null,
+  "What we offer": null,
+};
+
+const indexedOf = async (workspaceId: string, iri: string) => {
+  const found = await db().pool.query<{
+    path: string;
+    title: string;
+    content_hash: string;
+    merge_key: string;
+  }>(
+    `SELECT c.path, c.title, c.content_hash, i.merge_key
+       FROM concept_index c
+       JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
+      WHERE c.workspace_id = $1 AND c.iri = $2`,
+    [workspaceId, iri],
+  );
+  const row = found.rows[0];
+  if (row === undefined) throw new Error(`${iri} is not indexed`);
+  return row;
+};
+
+describe("a change to a concept a write-up includes", () => {
+  it("marks citing write-ups when a concept's content changes", async () => {
+    const { ng, guideId } = await seeded();
+    const { workspaceId } = ng.scenario;
+    const certificate = ng.iri("cyberEssentialsPlus");
+    const held = await indexedOf(workspaceId, certificate);
+    const hours = await indexedOf(workspaceId, ng.iri("supportHours"));
+    answered(
+      await writeConcept(ng.editor, doorsOf(ng.scenario), {
+        iri: ng.iri("supportHours"),
+        mergeKey: hours.merge_key,
+        path: hours.path,
+        kind: "company fact",
+        title: hours.title,
+        frontmatter: { title: hours.title, type: "company fact", tags: ["support-hours"] },
+        body: "The service desk answers from 08:00 to 18:00 on working days.",
+        message: "Deprecate the support hours",
+        author: { name: "Nadia Editor", email: "nadia@northgate.invalid" },
+        expects: { base: hours.content_hash },
+        status: "deprecated",
+      }),
+    );
+    expect((await indexedOf(workspaceId, ng.iri("supportHours"))).content_hash).toBe(
+      hours.content_hash,
+    );
+
+    answered(
+      await writeConcept(ng.editor, doorsOf(ng.scenario), {
+        iri: certificate,
+        mergeKey: held.merge_key,
+        path: held.path,
+        kind: "certification",
+        title: held.title,
+        frontmatter: { title: held.title, type: "certification", tags: ["cyber-essentials-plus"] },
+        body: "Northgate holds Cyber Essentials Plus, renewed each March by an accredited body.",
+        message: "Say when the certificate is renewed",
+        author: { name: "Nadia Editor", email: "nadia@northgate.invalid" },
+        expects: { base: held.content_hash },
+      }),
+    );
+
+    expect(await marksBySection(workspaceId, guideId)).toEqual({
+      ...AS_SEEDED,
+      Certifications: "concept-changed",
+      "Information security": "concept-changed",
+    });
+  });
+
+  it("leaves write-ups unmarked when a verification lands", async () => {
+    const { ng, guideId } = await seeded();
+    const { workspaceId } = ng.scenario;
+    const certificate = ng.iri("iso27001");
+    const before = await indexedOf(workspaceId, certificate);
+
+    const imported = await importedBy(
+      ng.admin,
+      ng.scenario,
+      northgateTree(ng.reviewer, ["iso27001"]),
+    );
+
+    expect(imported.verifications).toEqual({ recorded: 1, present: 4 });
+    const verified = await db().pool.query<{ content_hash: string | null }>(
+      "SELECT content_hash FROM concept_verification WHERE workspace_id = $1 AND iri = $2",
+      [workspaceId, certificate],
+    );
+    expect(verified.rows).toHaveLength(1);
+    expect((await indexedOf(workspaceId, certificate)).content_hash).toBe(before.content_hash);
+    expect(await marksBySection(workspaceId, guideId)).toEqual(AS_SEEDED);
   });
 });
