@@ -9,7 +9,6 @@ type MatchAt = {
   readonly guideCollection: string;
 };
 
-/** Every fact tag must be held, and a fact naming no collection takes the guide's. */
 export const matchesTheFact = (at: MatchAt): string =>
   `c.workspace_id = $${at.scope}
      AND ${readableClause("c", at.reader)}

@@ -141,7 +141,6 @@ type CommitRowReplay = {
   readonly detail: ReplayedDetail;
 };
 
-/** A commit that changes no concept: its row and its audit event land, and nothing is derived. */
 const replayCommitRow = async (
   platform: ReconcilerPrincipal,
   door: PostgresDoor,
@@ -259,7 +258,6 @@ const replayableOf = (
   return parsed.success ? parsed.data : undefined;
 };
 
-/** The detail of a commit that changes no concept, a manifest or a skeleton, else undefined. */
 const rowAloneOf = (
   read: CommitRead,
   trailers: TrailerFacts,
