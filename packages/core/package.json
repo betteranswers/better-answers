@@ -10,6 +10,7 @@
     "./audit": "./src/audit/index.ts",
     "./sources": "./src/sources/index.ts",
     "./concepts": "./src/concepts/index.ts",
+    "./bundle": "./src/bundle/index.ts",
     "./answering": "./src/answering/index.ts",
     "./guides": "./src/guides/index.ts",
     "./erasure": "./src/erasure/index.ts",

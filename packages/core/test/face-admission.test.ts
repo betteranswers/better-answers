@@ -24,6 +24,11 @@ const STEPS: Readonly<Record<string, string>> = {
     "the audit log's read and a member's activity call it after admitting an Admin",
   "audit/record": "writes the audit event of the action that called it, in its transaction",
   "audit/recordEach": "writes the audit events of the action that called it, in its transaction",
+  "bundle/authorOf": "an admitted write reads the git author of the person it names",
+  "bundle/commitAndLandAsMember":
+    "an admitted write commits through it, and it runs that write's own checks",
+  "bundle/landBundleCommit": "an admitted write and the reconciler land their commit's row",
+  "bundle/withBundleWrite": "takes the lock for a write that admitted its person first",
   "concepts/cascadingVisibility": "runs its caller's write, and that write's own checks",
   "concepts/conceptCountsOf": "find and ask call it with the reader they admitted",
   "concepts/evidenceOf": "ask calls it with the reader it admitted",
@@ -31,8 +36,10 @@ const STEPS: Readonly<Record<string, string>> = {
   "concepts/ownerOf": "an act that admitted a person reads it, and it decides nothing",
   "concepts/standingOnConcept": "open calls it with the reader it admitted, and it decides nothing",
   "concepts/readConcept": "open calls it with the reader it admitted",
+  "guides/flagWriteUpsCiting": "a landed write and its replay call it in their own transaction",
   "guides/recomputeWriteUpsIncluding":
     "a visibility change and a landed write call it in their own transaction",
+  "guides/writeSkeleton": "runs inside the withBundleWrite of an act that admitted its person",
   "llm/reserveSpend": "a step of ask, which admits the asker before it reserves a call's spend",
   "llm/resolveModel": "a step of ask, which admits the asker before it resolves the model it calls",
   "llm/settleSpend": "a step of ask, which admits the asker before it settles a call's spend",

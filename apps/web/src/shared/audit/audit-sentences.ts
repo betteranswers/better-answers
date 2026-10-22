@@ -90,6 +90,11 @@ const exported = (detail: Slots["detail"]): string => {
   return typeof count === "number" ? counted(count, "event", "events") : "events";
 };
 
+const included = (detail: Slots["detail"]): string => {
+  const count = detail["included"];
+  return typeof count === "number" ? counted(count, "concept", "concepts") : "concepts";
+};
+
 const SENTENCES = {
   "knowledge.check.imported": ({ by, named }) =>
     `${by} imported a verification of ${conceptNamed(namedIn(named, "iri"))}`,
@@ -97,6 +102,9 @@ const SENTENCES = {
     `${by} overrode the sensitivity of ${conceptNamed(subject)}`,
   "knowledge.concept.committed": ({ by, subject }) => `${by} saved ${conceptNamed(subject)}`,
   "knowledge.feedback.closed": ({ by }) => `${by} closed a flag on an answer`,
+  "knowledge.guide.included": ({ by, detail }) =>
+    `${by} included ${included(detail)} in a section of a guide`,
+  "knowledge.guide.seeded": ({ by }) => `${by} seeded a guide from a template`,
   "knowledge.manifest.written": ({ by }) => `${by} updated the knowledge base’s description`,
   "knowledge.owner.named": ({ by, detail, named }) =>
     "personId" in detail

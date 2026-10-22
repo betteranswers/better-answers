@@ -1,6 +1,8 @@
 import { boundarySchemas, BUNDLE_MANIFEST_PATH, IRI, ULID } from "@better-answers/schema";
 
-import { batchIdFor, eventsOfAction, record } from "../audit/index.ts";
+import { batchIdFor, eventsOfAction, record, type DetailOf } from "../audit/index.ts";
+import { landBundleCommit, tryBundleFenceAs } from "../bundle/index.ts";
+import { SKELETON_PROJECTION } from "../guides/index.ts";
 import {
   attempt,
   attemptResult,
@@ -24,7 +26,6 @@ import {
   type Tx,
 } from "../store/postgres/index.ts";
 import { workspaceIds } from "../workspaces/index.ts";
-import { tryBundleFenceAs } from "./fence.ts";
 import { contentHashOf, parseConceptFile, type Frontmatter } from "./file.ts";
 import type { Acceptance } from "./index.ts";
 import {
@@ -33,7 +34,6 @@ import {
   heldByIri,
   indexRowOf,
   type IndexRow,
-  landBundleCommit,
   landRows,
   mergeKeyOf,
   WRITE_CONSTRAINTS,
@@ -78,6 +78,7 @@ type TrailerFacts = {
   readonly actor: ActorId;
   readonly auditEventId: string;
   readonly suggestionId: string | undefined;
+  readonly projection: string | undefined;
 };
 
 type CommitFacts = TrailerFacts & {
@@ -99,6 +100,7 @@ const trailerFactsOf = (read: CommitRead): TrailerFacts | undefined => {
     actor,
     auditEventId: audit,
     suggestionId: read.trailers["Suggestion"],
+    projection: read.trailers["Projection"],
   };
 };
 
@@ -130,25 +132,30 @@ const alreadyLanded = async (
   return (known.rowCount ?? 0) > 0;
 };
 
-const replayManifestCommit = async (
+type ReplayedDetail = DetailOf<typeof RECONCILER_ACTIONS.replayed.detail>;
+
+type CommitRowReplay = {
+  readonly workspaceId: WorkspaceId;
+  readonly trailers: TrailerFacts;
+  readonly batchId: string | undefined;
+  readonly detail: ReplayedDetail;
+};
+
+const replayCommitRow = async (
   platform: ReconcilerPrincipal,
   door: PostgresDoor,
-  workspaceId: WorkspaceId,
-  content: string,
-  trailers: TrailerFacts,
-  batchId: string | undefined,
+  replay: CommitRowReplay,
 ): Promise<Result<Replayed, ReplayRefusal | Error>> => {
-  const manifest = parseBundleManifest(content);
-  if (!manifest.ok) return err("unreadable-commit");
+  const { trailers, batchId } = replay;
   const landed = await attempt(() =>
-    withScope(platform, door, workspaceId, async (tx): Promise<Replayed> => {
+    withScope(platform, door, replay.workspaceId, async (tx): Promise<Replayed> => {
       if (await alreadyLanded(platform, tx, trailers)) return "skipped";
       await record(platform, tx, {
         id: trailers.auditEventId,
         action: RECONCILER_ACTIONS.replayed,
         subjectId: trailers.sha,
         batchId,
-        detail: { commitSha: trailers.sha, bundleId: manifest.value.id },
+        detail: replay.detail,
       });
       await landBundleCommit(platform, tx, {
         commit: { sha: trailers.sha, parent: trailers.parent },
@@ -251,6 +258,19 @@ const replayableOf = (
   return parsed.success ? parsed.data : undefined;
 };
 
+const rowAloneOf = (
+  read: CommitRead,
+  trailers: TrailerFacts,
+): Result<ReplayedDetail, "unreadable-commit"> | undefined => {
+  if (read.change?.path === BUNDLE_MANIFEST_PATH) {
+    const manifest = parseBundleManifest(read.change.content);
+    return manifest.ok
+      ? ok({ commitSha: trailers.sha, bundleId: manifest.value.id })
+      : err("unreadable-commit");
+  }
+  return trailers.projection === SKELETON_PROJECTION ? ok({ commitSha: trailers.sha }) : undefined;
+};
+
 const replayCommit = async (
   platform: ReconcilerPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
@@ -262,15 +282,15 @@ const replayCommit = async (
   if (!read.ok) return err(read.error);
   const trailers = trailerFactsOf(read.value);
   if (trailers === undefined) return err("unreadable-commit");
-  if (read.value.change?.path === BUNDLE_MANIFEST_PATH) {
-    return replayManifestCommit(
-      platform,
-      doors.postgres,
+  const alone = rowAloneOf(read.value, trailers);
+  if (alone !== undefined) {
+    if (!alone.ok) return err(alone.error);
+    return replayCommitRow(platform, doors.postgres, {
       workspaceId,
-      read.value.change.content,
       trailers,
       batchId,
-    );
+      detail: alone.value,
+    });
   }
   const facts = factsOf(read.value, trailers);
   if (facts === undefined) return err("unreadable-commit");

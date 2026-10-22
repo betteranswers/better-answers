@@ -48,6 +48,7 @@ import {
   type IdentityArm,
   type RunErasureRefusal,
 } from "../src/erasure/index.ts";
+import { seedGuide } from "../src/guides/index.ts";
 import { actorIdOfPerson, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import {
   acceptInvitation,
@@ -59,6 +60,7 @@ import { asAnotherProcess } from "./bundle-fence.ts";
 import {
   authorLinesOf,
   bundleHistory,
+  commitFacts,
   everyObjectOf,
   gatingRefUpdates,
   objectPresent,
@@ -1190,6 +1192,40 @@ describe("the git step", () => {
       first: standing.find((row) => row.subject_request_id === subjectRequestId)?.completed_at,
       second: standing.find((row) => row.subject_request_id === second)?.completed_at,
     }).toEqual({ first: LOCKED_AT, second: null });
+  });
+});
+
+describe("a skeleton commit the person caused", () => {
+  it("rewrites the author line of a skeleton commit", async () => {
+    const scenario = await arrange();
+    const { workspaceId, git } = scenario;
+    const email = addressOf("priya");
+    const person = await seedingWith(db().pool, async (seed) => {
+      const seeded = await seed.user({ name: "Priya Anand", email });
+      await seed.member({ workspaceId, userId: seeded.id, role: "Admin" });
+      return seeded;
+    });
+    const subjectRequestId = await erasureRequestAbout(workspaceId, person.id, email);
+    const seeder = await principalFor(db(), workspaceId, person.id);
+    const { guideId } = answered(
+      await seedGuide(seeder, doorsOf(scenario), {
+        templateId: "bid-library",
+        collection: "company",
+        subjectIri: null,
+      }),
+    );
+    expect(await authorLinesOf(git, workspaceId)).toEqual([`Priya Anand <${email}>`]);
+
+    await completing(scenario, subjectRequestId);
+
+    const pseudonym = await pseudonymIn(workspaceId);
+    expect(await authorLinesOf(git, workspaceId)).toEqual([
+      `human:${pseudonym} <${pseudonym}@erased.better-answers.invalid>`,
+    ]);
+    const [rewritten = ""] = await bundleHistory(git, workspaceId);
+    expect((await commitFacts(git, workspaceId, rewritten)).files).toEqual([
+      `guides/${guideId}.yaml`,
+    ]);
   });
 });
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { BUNDLE_MANIFEST_PATH, bundleManifest, type BundleManifest } from "@better-answers/schema";
 
 import { action, declareActions, record } from "../audit/index.ts";
+import { commitAndLandAsMember, landBundleCommit, withBundleWrite } from "../bundle/index.ts";
 import {
   actorIdOf,
   admit,
@@ -20,9 +21,7 @@ import {
 } from "../kernel/index.ts";
 import { ANY_HEAD, fileAtHead, type CommitAuthor, type GitDoor } from "../store/git/index.ts";
 import type { PostgresDoor } from "../store/postgres/index.ts";
-import { withBundleWrite } from "./fence.ts";
 import { scalarPairOf, type FrontmatterSource } from "./file.ts";
-import { commitAndLandAsMember, landBundleCommit } from "./landing.ts";
 import type { PassedOnCommitRefusal } from "./vocabulary.ts";
 
 const MANIFEST_ACTIONS = declareActions("knowledge", {

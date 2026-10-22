@@ -23,66 +23,16 @@ import {
   visibilityOf,
   type Visibility,
 } from "../access/index.ts";
-import { recomputeWriteUpsIncluding } from "../guides/index.ts";
-import {
-  attempt,
-  err,
-  type ActorId,
-  type PlatformPrincipal,
-  type Principal,
-  type PrincipalRefusal,
-  type Result,
-  type UserPrincipal,
-} from "../kernel/index.ts";
-import {
-  commit,
-  fileAt,
-  type CommitRefusal,
-  type CommitRequest,
-  type Committed,
-  type GitDoor,
-} from "../store/git/index.ts";
+import { foldKind, landBundleCommit } from "../bundle/index.ts";
+import { flagWriteUpsCiting, recomputeWriteUpsIncluding } from "../guides/index.ts";
+import type { ActorId, PlatformPrincipal, Principal } from "../kernel/index.ts";
+import { fileAt, type Committed, type GitDoor } from "../store/git/index.ts";
 import { writeConceptDelta } from "../store/map/index.ts";
-import {
-  scopeClause,
-  scopeParameter,
-  withMember,
-  type PostgresDoor,
-  type Tx,
-} from "../store/postgres/index.ts";
+import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import { contentHashOf, parseConceptFile, type Frontmatter } from "./file.ts";
 import type { Acceptance } from "./index.ts";
 import { markDeciding } from "./suggestions.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
-
-export const commitAndLandAsMember = async <Refused extends string = never>(
-  principal: UserPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
-  request: CommitRequest,
-  land: (fresh: UserPrincipal, tx: Tx, committed: Committed) => Promise<void>,
-  admits: (fresh: UserPrincipal, tx: Tx) => Promise<Refused | undefined>,
-): Promise<Result<Committed, CommitRefusal | Refused | PrincipalRefusal | Error>> => {
-  const held = await attempt(() =>
-    withMember(principal, doors.postgres, async (fresh, tx) => {
-      const refusal = await admits(fresh, tx);
-      if (refusal !== undefined) return err(refusal);
-      const committed = await commit(fresh, doors.git, request);
-      if (committed.ok) await land(fresh, tx, committed.value);
-      return committed;
-    }),
-  );
-  if (!held.ok) return err(held.error);
-  return held.value.ok ? held.value.value : err(held.value.error);
-};
-
-export const foldKind = (kind: string): string =>
-  kind.replaceAll(/\S+/g, (word) => {
-    const cased = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    if (cased.endsWith("ies")) return `${cased.slice(0, -3)}y`;
-    if (/(s|x|z|ch|sh)es$/.test(cased)) return cased.slice(0, -2);
-    if (/(ss|us|is)$/.test(cased) || !cased.endsWith("s")) return cased;
-    return cased.slice(0, -1);
-  });
 
 export const mergeKeyOf = (foldedKind: string, title: string): string =>
   `${foldedKind}:${title.trim().replaceAll(/\s+/g, " ").toLowerCase()}`;
@@ -315,30 +265,6 @@ type Landing = z.infer<typeof conceptRow> & {
   readonly acceptance: Acceptance | undefined;
 };
 
-type CommitLanding = {
-  readonly commit: Committed;
-  readonly actor: ActorId;
-  readonly auditEventId: string;
-};
-
-export const landBundleCommit = async (
-  principal: Principal,
-  tx: Tx,
-  landing: CommitLanding,
-): Promise<void> => {
-  await tx.query(
-    `INSERT INTO bundle_commit (workspace_id, sha, parent_sha, audit_event_id, actor)
-     VALUES (${scopeClause(1)}, $2, $3, $4, $5)`,
-    [
-      scopeParameter(principal),
-      landing.commit.sha,
-      landing.commit.parent,
-      landing.auditEventId,
-      landing.actor,
-    ],
-  );
-};
-
 const landEvidence = async (
   principal: Principal,
   tx: Tx,
@@ -412,6 +338,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
       visibility.audienceGroups,
     ],
   );
+  await flagWriteUpsCiting(principal, tx, { iri: index.iri, contentHash: index.contentHash });
   await landBundleCommit(principal, tx, index);
 
   await writeConceptDelta(principal, tx, {

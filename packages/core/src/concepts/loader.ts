@@ -16,6 +16,7 @@ import { uriDecoded } from "@better-answers/schema/concept-file";
 import { SCHEMED } from "@better-answers/schema/scan";
 
 import { action, declareActions, record } from "../audit/index.ts";
+import { foldKind } from "../bundle/index.ts";
 import {
   err,
   isPortablePath,
@@ -28,10 +29,9 @@ import {
   type Result,
   type UserId,
 } from "../kernel/index.ts";
-import type { CommitAuthor } from "../store/git/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import type { Frontmatter, FrontmatterSource } from "./file.ts";
-import { foldKind, mergeKeyOf } from "./landing.ts";
+import { mergeKeyOf } from "./landing.ts";
 
 const IMPORT_ACTIONS = declareActions("knowledge", {
   verificationImported: action("knowledge.check.imported", { iri: "iri", verificationId: "id" }),
@@ -338,24 +338,6 @@ export const personIdsByEmail = async (
   return new Map(
     found.rows.map((row) => [row.email, boundarySchemas.user.select.shape.id.parse(row.id)]),
   );
-};
-
-export const authorOf = async (
-  principal: Principal,
-  tx: Tx,
-  personId: UserId,
-): Promise<CommitAuthor> => {
-  const found = await tx.query<CommitAuthor>(
-    `SELECT u.name, u.email FROM "user" u
-       JOIN member m ON m.user_id = u.id AND m.workspace_id = ${scopeClause(1)}
-      WHERE u.id = $2`,
-    [scopeParameter(principal), personId],
-  );
-  const row = found.rows[0];
-  if (row === undefined) {
-    throw new Error("the running member has no user row to sign the commits with");
-  }
-  return row;
 };
 
 export type StandingConcept = {

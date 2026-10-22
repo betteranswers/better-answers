@@ -27,7 +27,8 @@ tags:
 A guide definition and every write-up are platform records in Postgres, with append-only versions and actor provenance. They cite concepts by IRI and never restate them. The bundle holds concepts only.
 
 - A write-up has two homes: a guide section and a response.
-- The platform writes each guide's skeleton projection into the workspace repository: kind, subject, roles, and the ordered sections with their prompts and included concepts' IRIs. It holds no prose, is regenerated when the guide definition changes, and is never hand-edited.
+- The platform writes each guide's skeleton projection into the workspace repository at `guides/<guide id>.yaml`, outside `knowledge/`, so neither concept reader walks it. It holds the kind, subject and roles, and the ordered sections with their prompts, role labels, expected facts' names and included concepts' IRIs. It holds no prose, is regenerated when the guide definition or its includes change, and is never hand-edited. Each regeneration is one governed commit with a `Projection: guides` trailer, its audit event and its `bundle_commit` row (ADR 0012). A render equal to the file at head writes no commit.
+- A guide is seeded from a template, which is shipped data, never a platform table. Seeding fills each section's includes from the concepts that meet its expected facts. A concept written later changes no include: a person includes it, and coverage shows it as available until then.
 - A Q&A pair is a concept, `type: Answer` (ADR 0011): the question as `title`, the answer as the body, and `sources[]` naming the entry it came from and the concepts it rests on. Its usage and submissions are records attached by IRI.
 - Where a context wording lives is ADR 0014's rule, and an include chooses it. There is no `variants:` key and no guide-shaped tag on a concept. A wording that states a different claim is a separate concept.
 - A guide's readers are roles, and roles are levels: Admin, Editor, Viewer. Per role, the guide definition sets the default layer and the action threshold.
@@ -51,5 +52,7 @@ A guide definition and every write-up are platform records in Postgres, with app
 - Database only, with no skeleton projection: gives up the structural portability no competitor offers.
 
 ## History
+
+On 22/10/2026 the skeleton was built (BA-235). This doc gained its path, its role labels and expected facts' names, the template it is seeded from, and the rule that a concept write adds no include.
 
 The full record, with its eight amendments (tickets 38, 45 and 46, 47, 16, 19, 20, 23 and 39): `docs/archive/adr/0004-guides-and-compositions-are-platform-records.md`.

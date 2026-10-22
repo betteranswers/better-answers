@@ -71,6 +71,8 @@ export const STORED_ACT_NAMES = [
   "platform.workspace.model_choice_set",
   "people.person.sessions_ended",
   "knowledge.owner.named",
+  "knowledge.guide.seeded",
+  "knowledge.guide.included",
 ] as const;
 
 export const STORED_DETAIL_KEYS = {
@@ -150,4 +152,7 @@ export const STORED_DETAIL_KEYS = {
   closedAs: "closedAs",
   fromContentHash: "fromContentHash",
   collection: "collection",
+  guideId: "guideId",
+  writeUpId: "writeUpId",
+  included: "included",
 } as const;

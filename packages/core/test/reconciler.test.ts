@@ -518,6 +518,76 @@ describe("a manifest commit whose rows were lost", () => {
   });
 });
 
+const committedByHand = async (
+  scenario: Scenario,
+  change: { readonly path: string; readonly content: string; readonly projection?: string },
+  expectedHead: string | null,
+): Promise<string> => {
+  const made = await commit(scenario.admin, scenario.git, {
+    path: change.path,
+    content: change.content,
+    message: `Commit ${change.path} by hand`,
+    author: { name: "Grace Admin", email: "grace@acme.invalid" },
+    trailers: { actor: actorIdOf(scenario.admin), audit: ulid(), projection: change.projection },
+    expectedHead,
+    at: new Date(),
+  });
+  if (!made.ok) throw new Error(`the hand-made commit was refused: ${String(made.error)}`);
+  return made.value.sha;
+};
+
+const A_SKELETON = {
+  path: `guides/${ulid()}.yaml`,
+  content: '{\n  "sections": []\n}\n',
+  projection: "guides",
+} as const;
+
+describe("a skeleton commit whose rows were lost", () => {
+  it("replays a projection commit its rows never reached", async () => {
+    const scenario = await arrange();
+    const sha = await committedByHand(scenario, A_SKELETON, null);
+
+    const { replayed, stopped } = await reconciled(scenario);
+
+    expect(stopped).toBeUndefined();
+    expect(replayed).toEqual([sha]);
+    expect(await recordedChain(scenario.workspaceId)).toEqual([[sha, null]]);
+    expect((await replayedEvents(scenario.workspaceId)).map((event) => event["detail"])).toEqual([
+      { commitSha: sha },
+    ]);
+  });
+
+  it("replays concept commits past a projection commit", async () => {
+    const scenario = await arrange();
+    const iri = conceptIriOf(ulid());
+    const skeleton = await committedByHand(scenario, A_SKELETON, null);
+    const concept = await committedByHand(
+      scenario,
+      {
+        path: "knowledge/guidelines/fuel.md",
+        content: renderConceptFile(
+          { title: "Fuel", type: "Guideline", iri },
+          "# Fuel\n\nClaim fuel at the published rate per mile.",
+        ),
+      },
+      skeleton,
+    );
+
+    const { replayed, stopped } = await reconciled(scenario);
+
+    expect(stopped).toBeUndefined();
+    expect(replayed).toEqual([skeleton, concept]);
+    expect(await recordedChain(scenario.workspaceId)).toEqual([
+      [skeleton, null],
+      [concept, skeleton],
+    ]);
+    expect(await conceptRow(scenario.workspaceId, iri)).toMatchObject({
+      path: "knowledge/guidelines/fuel.md",
+      commit_sha: concept,
+    });
+  });
+});
+
 describe("a re-write whose rows were lost", () => {
   it("keeps identity, class and status while sources match the citations", async () => {
     const scenario = await arrange();
