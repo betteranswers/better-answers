@@ -38,7 +38,7 @@ import {
   type FrontmatterSource,
   type FrontmatterValue,
 } from "./file.ts";
-import { foldKind, heldByIri, mergeKeyOf, placesUsing, type Held } from "./landing.ts";
+import { foldKind, heldByIri, mergeKeyOf, placesUsingReadableOrNot, type Held } from "./landing.ts";
 import { authorOf } from "./loader.ts";
 import { ownerAdmits, ownerOf, standingConcept, type OwnedConcept } from "./owners.ts";
 import { resolvedSourcesOf, type PassageReader } from "./read.ts";
@@ -80,8 +80,7 @@ const ownedInCollection = (collection: string): OwnedConcept => ({
   path: `knowledge/${collection}/`,
 });
 
-/** Only routes a save: the governed write reads the owner again and decides. */
-const standingOn = async (
+const routeOf = async (
   principal: UserPrincipal,
   tx: Tx,
   concept: OwnedConcept,
@@ -94,7 +93,7 @@ export const standingOnConcept = async (
   principal: UserPrincipal,
   tx: Tx,
   iri: string,
-): Promise<Standing> => standingOn(principal, tx, await standingConcept(principal, tx, iri, ""));
+): Promise<Standing> => routeOf(principal, tx, await standingConcept(principal, tx, iri, ""));
 
 const stringOf = (value: FrontmatterValue | undefined): string | null =>
   typeof value === "string" ? value : null;
@@ -174,7 +173,6 @@ export const conceptToEditInput = z.union([
   z.strictObject({ collection: z.string().regex(COLLECTION) }),
 ]);
 
-/** Seeds an edit from the raw row; a source the reader cannot open is counted, never shown. */
 export const conceptToEdit = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -189,9 +187,7 @@ export const conceptToEdit = async (
 
   const { data } = target;
   if ("collection" in data) {
-    const standing = await attempt(() =>
-      standingOn(reader, tx, ownedInCollection(data.collection)),
-    );
+    const standing = await attempt(() => routeOf(reader, tx, ownedInCollection(data.collection)));
     if (!standing.ok) return err(standing.error);
     const none = { count: 0, labels: [] };
     return ok({
@@ -219,8 +215,8 @@ const standingToEdit = async (
     return {
       held,
       row,
-      standing: await standingOn(reader, tx, { iri, path: held.path }),
-      usedIn: await placesUsing(reader, tx, iri),
+      standing: await routeOf(reader, tx, { iri, path: held.path }),
+      usedIn: await placesUsingReadableOrNot(reader, tx, iri),
     };
   });
   if (!read.ok) return err(read.error);
@@ -239,8 +235,7 @@ const standingToEdit = async (
   });
 };
 
-/** Keeps each source the editor cannot open where it stood, and fills the others in order. */
-const mergedSources = (
+const withWithheldInPlace = (
   stored: readonly Opened[],
   visible: readonly SourceEntry[],
 ): readonly SourceEntry[] => {
@@ -261,7 +256,6 @@ const mergedSources = (
 const isEmpty = (value: FrontmatterValue | null): boolean =>
   value === null || value === "" || (Array.isArray(value) && value.length === 0);
 
-/** An unchanged part keeps the stored key as written, and an emptied one drops it. */
 const withPart = (
   frontmatter: Frontmatter,
   key: string,
@@ -337,7 +331,6 @@ const slugOf = (title: string): string =>
     .replaceAll(/[^a-z0-9]+/gu, "-")
     .replaceAll(/^-+|-+$/gu, "");
 
-/** A new concept's path in its collection, so the collection stays the path's first folder. */
 const newConceptPathOf = (collection: string, title: string): string | undefined => {
   const slug = slugOf(title);
   const path = `knowledge/${collection}/${slug}.md`;
@@ -429,7 +422,6 @@ type SaveDoors = WriteDoors & {
   readonly passages: (principal: UserPrincipal, tx: Tx) => PassageReader;
 };
 
-/** The client sends the parts it edits; the server lays them over the stored file. */
 export const saveConcept = async (
   principal: UserPrincipal,
   doors: SaveDoors,
@@ -483,14 +475,14 @@ const savingOver = async (
         held,
         stored: stored.value,
         opened: opened.value,
-        standing: await standingOn(fresh, tx, { iri, path: held.path }),
+        standing: await routeOf(fresh, tx, { iri, path: held.path }),
         author: await authorOf(fresh, tx, fresh.userId),
       });
     },
   );
   if (!read.ok) return err(read.error);
   const { held, stored, opened, standing, author } = read.value;
-  const file = editedFileOf(stored, input.parts, mergedSources(opened, input.sources));
+  const file = editedFileOf(stored, input.parts, withWithheldInPlace(opened, input.sources));
   if (file === undefined) return err("malformed");
   return ok({
     iri,
@@ -517,7 +509,7 @@ const savingNew = async (
   if (path === undefined || file === undefined || input.base !== null) return err("malformed");
   const read = await attempt(() =>
     withMember(principal, doors.postgres, async (fresh, tx) => ({
-      standing: await standingOn(fresh, tx, { iri: null, path }),
+      standing: await routeOf(fresh, tx, { iri: null, path }),
       author: await authorOf(fresh, tx, fresh.userId),
     })),
   );
@@ -675,8 +667,7 @@ const bodyRefusalOf = (
 };
 
 /**
- * Replaces a standing concept's body through the save route's commit. Its frontmatter, status,
- * verifications and citations stay.
+ * Replaces a standing concept's body. Its frontmatter, status, verifications and citations stay.
  */
 export const updateConceptBody = async (
   principal: UserPrincipal,

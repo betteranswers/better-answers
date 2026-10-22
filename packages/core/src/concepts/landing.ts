@@ -180,8 +180,11 @@ const PLACES_USING = `SELECT
       WHERE g.workspace_id = ${scopeClause(1)} AND e.to_uid = $2 AND e.label = '${LINKS_TO_LABEL}'
         AND e.from_uid <> $2) AS places`;
 
-/** Every write-up including the concept and every concept linking to it, readable or not. */
-export const placesUsing = async (principal: Principal, tx: Tx, iri: string): Promise<number> => {
+export const placesUsingReadableOrNot = async (
+  principal: Principal,
+  tx: Tx,
+  iri: string,
+): Promise<number> => {
   const found = await tx.query<{ places: string }>(PLACES_USING, [scopeParameter(principal), iri]);
   return Number(found.rows[0]?.places ?? 0);
 };
@@ -210,7 +213,6 @@ export const holdsEveryDocument = async (
 
 export type EvidenceRow = z.infer<typeof boundarySchemas.evidence.insert>;
 
-/** A source whose locator addresses a passage cites that passage's document; a concept never does. */
 export const evidenceOfSources = (
   workspaceId: EvidenceRow["workspaceId"],
   frontmatter: Frontmatter,

@@ -255,7 +255,6 @@ export type SourcedConcept = ConceptWritten & {
 
 let sequence = 0;
 
-/** The `sources` that cite each document by a passage locator, so each becomes an evidence row. */
 const sourcesCiting = (
   documents: readonly string[],
 ): { readonly sources?: readonly FrontmatterSource[] } =>

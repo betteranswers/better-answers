@@ -56,7 +56,6 @@ export const parsedPassageLocator = (wire: string): PassageLocator | undefined =
   return { sourceDocumentId: documentPart, ...span };
 };
 
-/** Every passage locator written anywhere in the text, in the order written. */
 export const passageLocatorsIn = (text: string): readonly string[] =>
   [...text.matchAll(WRITTEN_LOCATOR)]
     .map(([written]) => written)

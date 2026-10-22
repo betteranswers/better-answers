@@ -44,7 +44,7 @@ import {
   indexRowOf,
   type IndexRow,
   landRows,
-  placesUsing,
+  placesUsingReadableOrNot,
   WRITE_CONSTRAINTS,
   type EvidenceRow,
   type Held,
@@ -163,10 +163,6 @@ export type WriteDoors = {
   readonly clock: Clock;
 };
 
-/**
- * An `iri` edits a standing concept. An `acceptance` needs a `base` and carries no status or
- * sensitivity. Evidence is the file's `sources`.
- */
 export const writeConcept = async (
   principal: UserPrincipal,
   doors: WriteDoors,
@@ -243,7 +239,7 @@ const writeUnderLock = async (
   const facts = await existingOf(principal, doors.postgres, write);
   if (!facts.ok) return err(facts.error);
   if (!facts.value.ok) return err(facts.value.error);
-  const stored = await storedRenderOf(principal, doors.git, write, facts.value.value.held);
+  const stored = await directEditStoredRender(principal, doors.git, write, facts.value.value.held);
   const existing = { ...facts.value.value, stored };
   const refusal = existing.admission ?? writeRefusalOf(write, existing);
   if (refusal !== undefined) return err(refusal);
@@ -317,7 +313,7 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
         waiting:
           input.acceptance === undefined ||
           (await suggestionIsWaiting(fresh, tx, input.acceptance.suggestionId)),
-        places: asksReuse(write, held) ? await placesUsing(fresh, tx, iri) : 0,
+        places: asksReuse(write, held) ? await placesUsingReadableOrNot(fresh, tx, iri) : 0,
       };
     }),
   );
@@ -373,8 +369,7 @@ const isDirectEdit = ({ input }: ParsedWrite, held: Held | undefined): held is H
 const asksReuse = (write: ParsedWrite, held: Held | undefined): boolean =>
   isDirectEdit(write, held) && write.input.reuse !== "confirmed";
 
-/** An acceptance still decides its suggestion, so only a direct edit can answer unchanged. */
-const storedRenderOf = async (
+const directEditStoredRender = async (
   principal: UserPrincipal,
   door: GitDoor,
   write: ParsedWrite,
@@ -390,7 +385,6 @@ export type ConceptFile = { readonly frontmatter: Frontmatter; readonly body: st
 const disagreement = (path: string, why: string): Error =>
   new Error(`the bundle and the index disagree: ${path} ${why}`);
 
-/** The file at the bundle's head, refused as stale while its hash runs ahead of the row's. */
 export const storedFileOf = async (
   principal: UserPrincipal,
   door: GitDoor,
