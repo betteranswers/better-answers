@@ -551,6 +551,29 @@ describe("the owner-visible reads", () => {
     });
   });
 
+  it("counts no owned concept its owner cannot read", async () => {
+    const { scenario, landed } = await ownedByTheViewer();
+    const held = await landedAs(
+      scenario,
+      scenario.admin,
+      conceptAt("knowledge/held/salaries.md", {
+        sensitivity: "Restricted",
+        expects: { head: landed.sha },
+      }),
+    );
+    await nameOwnerAs(scenario.admin, scenario.postgres, {
+      iri: held.iri,
+      personId: scenario.viewer.userId,
+    });
+
+    const viewers = await ownedRead(scenario, scenario.viewer);
+
+    expect(viewers).toEqual({
+      ok: true,
+      value: { ok: true, value: { collections: [], concepts: 1 } },
+    });
+  });
+
   it("lists only collections the reader may read", async () => {
     const scenario = await arrange();
     const policy = await landedAs(
