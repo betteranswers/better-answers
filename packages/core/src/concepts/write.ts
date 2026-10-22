@@ -375,7 +375,7 @@ const directEditStoredRender = async (
   write: ParsedWrite,
   held: Held | undefined,
 ): Promise<string | undefined> => {
-  if (!isDirectEdit(write, held)) return undefined;
+  if (!isDirectEdit(write, held) || write.contentHash !== held.contentHash) return undefined;
   const stored = await storedFileOf(principal, door, held);
   return stored.ok ? renderConceptFile(stored.value.frontmatter, stored.value.body) : undefined;
 };
