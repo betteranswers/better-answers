@@ -40,7 +40,6 @@ import { type CommitAuthor, type GitDoor } from "../store/git/index.ts";
 import { analyseMap } from "../store/map/index.ts";
 import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { type Frontmatter, type FrontmatterSource } from "./file.ts";
-import { heldByIri, type Held } from "./landing.ts";
 import { latestVerificationOf } from "./latest-verification.ts";
 import {
   authorOf,
