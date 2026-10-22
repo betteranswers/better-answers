@@ -383,6 +383,27 @@ export const CROSS_OWNER_TABLE_ACCESS = [
       "An owner row names the person and nothing else, so the erasure map lists each one naming the person and the member's ending deletes them; the concept falls back to its collection's owner, or to Admins.",
   },
   {
+    table: "public.write_up_version",
+    by: "erasure",
+    access: "read and write",
+    reason:
+      "A write-up version names who saved it, so the erasure map lists each one the person saved and every erasure from the workspace rewrites that id to the erasure pseudonym through `pseudonymise_record_actors`, keeping the version's text.",
+  },
+  {
+    table: "public.guide_definition_version",
+    by: "erasure",
+    access: "read and write",
+    reason:
+      "A guide definition version names who saved it, so the erasure map lists each one the person saved and every erasure from the workspace rewrites that id to the erasure pseudonym through `pseudonymise_record_actors`, keeping the definition.",
+  },
+  {
+    table: "public.usage",
+    by: "erasure",
+    access: "read and write",
+    reason:
+      "A usage row names who copied, exported or submitted the work, so the erasure map lists each one the person made and every erasure from the workspace rewrites that id to the erasure pseudonym.",
+  },
+  {
     table: "public.finding",
     by: "erasure",
     access: "read and write",
