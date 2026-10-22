@@ -408,8 +408,9 @@ An Admin action with an audit row. The only way anyone but the platform reaches 
 A locator into a source — a document or a span of it; a resource read live; a record the platform
 generated — with the content's version, that backs a concept.
 
-Recorded when the concept is committed and kept until nothing cites it. A concept file's `sources`
-are its projection; a concept resting on another concept is a link, never evidence — except a
+Recorded when the concept is committed and kept until nothing cites it. It is derived from the
+concept file's `sources`, the one list: a source whose locator addresses a passage cites that
+passage's document. A concept resting on another concept is a link, never evidence — except a
 successor's `sources[]` entry naming the concept it supersedes (lineage).
 
 ### sensitivity
