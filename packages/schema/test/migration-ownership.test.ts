@@ -36,6 +36,7 @@ const FORBIDDEN_IN_GENERATED = [
   /\bmap_node\b/u,
   /\bmap_edge\b/u,
   /\bmap_generation\b/u,
+  /\bmap_unresolved_reference\b/u,
 ];
 
 describe("the migration journal", () => {

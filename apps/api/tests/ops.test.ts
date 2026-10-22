@@ -55,6 +55,7 @@ import {
   mapEdge,
   mapGeneration,
   mapNode,
+  mapUnresolvedReference,
   job,
   llmCall,
   modelChoice,
@@ -198,6 +199,7 @@ const mapped = async (app: TestApp, workspaceId: string): Promise<void> => {
     await seed.mapEdge({ workspaceId, fromUid: entry.uid });
     const left = await seed.mapNode({ workspaceId, gen: 2 });
     await seed.mapEdge({ workspaceId, gen: 2, fromUid: left.uid });
+    await seed.mapUnresolvedReference({ workspaceId, gen: 2, fromUid: left.uid });
   } finally {
     client.release();
   }
@@ -210,8 +212,8 @@ const ULID_SHAPE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const BOOTSTRAP_ACTOR = "process:better-answers-bootstrap";
 
 const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
-  "map-rebuild": [mapGeneration, mapNode, mapEdge, job],
-  "map-sweep": [mapGeneration, mapNode, mapEdge],
+  "map-rebuild": [mapGeneration, mapNode, mapEdge, mapUnresolvedReference, job],
+  "map-sweep": [mapGeneration, mapNode, mapEdge, mapUnresolvedReference],
   "map-counts": [mapGeneration, mapNode, mapEdge],
   "unmapped-passage-rate": [questionAsked, questionFeedback],
   "reconcile-watermark": [conceptIndex, bundleCommit],
@@ -1523,7 +1525,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await ops(app(), ["map-sweep", "--workspace", workspaceId, "--wait"]);
 
       expect(run.exitCode).toBe(0);
-      expect(run.lines).toEqual(["map-sweep: done — swept generation 2 (2 nodes, 1 edge)"]);
+      expect(run.lines).toEqual([
+        "map-sweep: done — swept generation 2 (2 nodes, 1 edge, 1 unresolved reference)",
+      ]);
 
       const counted = await ops(app(), ["map-counts", "--workspace", workspaceId]);
       expect(answered(counted)).toEqual({

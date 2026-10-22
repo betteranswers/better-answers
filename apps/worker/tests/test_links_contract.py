@@ -7,6 +7,8 @@ from better_answers_worker.links import (
     ResolvedTarget,
     links_and_marks_of,
     outgoing_edges,
+    references_of,
+    unresolved_references,
 )
 
 CONTRACTS_DIR = Path(__file__).resolve().parents[3] / "contracts"
@@ -34,9 +36,9 @@ def test_makes_exactly_the_links_each_case_names_by_ordinal() -> None:
                 for edge in outgoing_edges(
                     iri=citing["iri"],
                     kind=citing["kind"],
-                    path=citing["path"],
-                    body=case["body"],
-                    frontmatter={"sources": case["sources"]},
+                    references=references_of(
+                        case["body"], {"sources": case["sources"]}, citing["path"]
+                    ),
                     by_path={
                         held["path"]: ResolvedTarget(held["iri"], "Policy", "stable")
                         for held in case.get("held", [])
@@ -62,6 +64,39 @@ def test_makes_exactly_the_links_each_case_names_by_ordinal() -> None:
                 for link in case["links"]
             ],
         }
+        for case in fixture["cases"]
+    ]
+
+
+def test_leaves_unresolved_exactly_the_paths_each_case_names() -> None:
+    fixture = read_links()
+    citing = fixture["citing"]
+
+    made = [
+        {
+            "case": case["case"],
+            "unresolved": [
+                {
+                    "relation": reference.relation,
+                    "ordinal": reference.ordinal,
+                    "path": reference.target_path,
+                }
+                for reference in unresolved_references(
+                    references_of(
+                        case["body"], {"sources": case["sources"]}, citing["path"]
+                    ),
+                    {
+                        held["path"]: ResolvedTarget(held["iri"], "Policy", "stable")
+                        for held in case.get("held", [])
+                    },
+                )
+            ],
+        }
+        for case in fixture["cases"]
+    ]
+
+    assert made == [
+        {"case": case["case"], "unresolved": case["unresolved"]}
         for case in fixture["cases"]
     ]
 

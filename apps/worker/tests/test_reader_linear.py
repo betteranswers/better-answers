@@ -1,7 +1,12 @@
 import time
 from collections.abc import Callable
 
-from better_answers_worker.links import links_and_marks_of, outgoing_edges, prose_of
+from better_answers_worker.links import (
+    links_and_marks_of,
+    outgoing_edges,
+    prose_of,
+    references_of,
+)
 
 BODY_MAX_SECONDS = 1.0
 
@@ -46,9 +51,7 @@ def test_reads_a_heading_of_eighty_thousand_spaces_inside_a_second() -> None:
             lambda: outgoing_edges(
                 iri="https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM",
                 kind="Policy",
-                path="knowledge/expenses.md",
-                body=spaced,
-                frontmatter=FRONTMATTER,
+                references=references_of(spaced, FRONTMATTER, "knowledge/expenses.md"),
                 by_path={},
                 by_iri={},
             )

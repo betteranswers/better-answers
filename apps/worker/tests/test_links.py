@@ -8,6 +8,7 @@ from better_answers_worker.links import (
     outgoing_edges,
     prose_of,
     references_of,
+    unresolved_references,
 )
 
 IRI = "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM"
@@ -27,9 +28,7 @@ def edges(
     return outgoing_edges(
         iri=IRI,
         kind=kind,
-        path=PATH,
-        body=body,
-        frontmatter=frontmatter or {},
+        references=references_of(body, frontmatter or {}, PATH),
         by_path=by_path or {},
         by_iri=by_iri or {},
     )
@@ -110,6 +109,23 @@ def test_a_path_target_makes_an_edge_only_once_resolved() -> None:
         },
     )
     assert [(edge.to_uid, edge.to_kind) for edge in landed] == [(OTHER_IRI, "Evidence")]
+
+
+def test_a_path_no_concept_holds_is_an_unresolved_reference() -> None:
+    body = (
+        f"See [the receipts](./receipts.md), [the team](%C3%A9quipe.md),"
+        f" [the board](/knowledge/board.md#minutes) and [nothing yet]({UNLANDED_IRI})."
+    )
+    frontmatter: Frontmatter = {"sources": [{"resource": "/knowledge/policy.md"}]}
+    held = {"knowledge/receipts.md": ResolvedTarget(OTHER_IRI, "Evidence", "stable")}
+
+    found = unresolved_references(references_of(body, frontmatter, PATH), held)
+
+    assert [tuple(reference) for reference in found] == [
+        ("link", 1, "knowledge/équipe.md"),
+        ("link", 2, "knowledge/board.md"),
+        ("lineage", 0, "knowledge/policy.md"),
+    ]
 
 
 def test_a_scheme_or_protocol_relative_target_is_never_a_concept() -> None:

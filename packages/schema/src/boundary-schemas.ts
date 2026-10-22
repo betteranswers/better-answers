@@ -97,7 +97,9 @@ import {
   mapEdge,
   mapGeneration,
   mapNode,
+  mapUnresolvedReference,
   SOURCE_ENTITY_LABEL_PREFIX,
+  UNRESOLVED_RELATIONS,
 } from "./map-tables.ts";
 import {
   backup,
@@ -997,6 +999,28 @@ const mapEdgeInsert = createInsertSchema(mapEdge, mapEdgeRefinements).refine(
 );
 const mapEdgeUpdate = createUpdateSchema(mapEdge, mapEdgeRefinements);
 
+const mapUnresolvedReferenceRefinements = {
+  workspaceId,
+  gen: generation,
+  fromUid: conceptIri,
+  relation: (schema: z.ZodString) => schema.pipe(z.enum(UNRESOLVED_RELATIONS)),
+  ordinal: (schema: z.ZodNumber) => schema.int().nonnegative(),
+  targetPath: mapKey,
+};
+
+const mapUnresolvedReferenceSelect = createSelectSchema(
+  mapUnresolvedReference,
+  mapUnresolvedReferenceRefinements,
+);
+const mapUnresolvedReferenceInsert = createInsertSchema(
+  mapUnresolvedReference,
+  mapUnresolvedReferenceRefinements,
+);
+const mapUnresolvedReferenceUpdate = createUpdateSchema(
+  mapUnresolvedReference,
+  mapUnresolvedReferenceRefinements,
+);
+
 const outcomeScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 const outcome = z.union([
   z.record(
@@ -1258,6 +1282,12 @@ export const boundarySchemas = {
     select: mapEdgeSelect,
     insert: mapEdgeInsert,
     update: mapEdgeUpdate,
+  },
+  mapUnresolvedReference: {
+    table: mapUnresolvedReference,
+    select: mapUnresolvedReferenceSelect,
+    insert: mapUnresolvedReferenceInsert,
+    update: mapUnresolvedReferenceUpdate,
   },
   job: { table: job, select: jobSelect, insert: jobInsert, update: jobUpdate },
   suggestion: {

@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0096_the-concept-owner"
+MIGRATION_ID = "0097_the-unresolved-references"
 
-MIGRATION_WHEN = 1792627718881
+MIGRATION_WHEN = 1792641516258
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -342,6 +342,14 @@ TABLES: dict[str, dict[str, str]] = {
         "sensitivity": "text NOT NULL",
         "audience": "text NOT NULL",
         "audience_groups": "text[]",
+    },
+    "public.map_unresolved_reference": {
+        "workspace_id": "text NOT NULL",
+        "gen": "integer NOT NULL",
+        "from_uid": "text NOT NULL",
+        "relation": "text NOT NULL",
+        "ordinal": "integer NOT NULL",
+        "target_path": "text NOT NULL",
     },
     "public.mcp_call_counter": {
         "workspace_id": "text NOT NULL",

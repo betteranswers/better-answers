@@ -851,30 +851,6 @@ describe("the map a governed write leaves behind", () => {
     ]);
   });
 
-  it("backfills the map when an edit reaches a lost concept", async () => {
-    const scenario = await arrange();
-    const product = writeFor({ kind: "Product", status: "stable" });
-    const first = await landed(scenario, product);
-    const filename = product.path.split("/").at(-1) ?? "";
-    const policy = writeFor({
-      status: "stable",
-      body: `See [the product](./${filename}) for tiers.`,
-      expects: { head: first.sha },
-    });
-    const second = await landed(scenario, policy);
-
-    await db().pool.query("DELETE FROM map_edge WHERE workspace_id = $1", [scenario.workspaceId]);
-    await db().pool.query("DELETE FROM map_node WHERE workspace_id = $1", [scenario.workspaceId]);
-
-    await landed(scenario, { ...product, iri: first.iri, expects: { head: second.sha } });
-
-    const edges = await db().pool.query(
-      "SELECT from_uid, to_uid FROM map_edge WHERE workspace_id = $1",
-      [scenario.workspaceId],
-    );
-    expect(edges.rows).toEqual([{ from_uid: second.iri, to_uid: first.iri }]);
-  });
-
   it("derives succession over a deprecated same-kind concept, else derivation", async () => {
     const scenario = await arrange();
 

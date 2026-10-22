@@ -1,5 +1,5 @@
 {
-  "description": "links (ADR 0031, ADR 0015): what a concept body's footnotes make of the map, said once for both tiers. The api derives a concept's LINKS_TO edges at every governed write (`packages/core/src/store/map/index.ts`) and the worker derives them again in the full rebuild (`apps/worker/src/better_answers_worker/links.py`); an edge's id carries its link's ordinal, so the two must count links alike or the rebuilt map and the live one name different edges. A footnote reference `[^label]` is a **citation mark** when its label, trimmed, with inner whitespace collapsed and compared without case, is the `id` of an entry in the concept's `sources` list. A mark resolves to the first entry carrying that id, whether or not the body holds a definition for it, and it is never a link: it makes no edge and takes no ordinal. A footnote reference whose label is no source id is a link when the body defines it, and it then takes an ordinal and makes an edge when its definition names a concept, as OKF allows. One with neither a source nor a definition is plain text: no edge, no ordinal, no error. A footnote definition line `[^label]: ...` is never a link and takes no ordinal. A reference definition's target written in angle brackets is the definition's, not an autolink, and takes no ordinal. Everything else in the prose that today takes an ordinal still does. Only a record-form `sources` entry carries an `id`; a string-form entry carries none, so no mark resolves to it. Every case is read as the concept `citing` below. A concept IRI target is one no concept holds yet, so both tiers make the edge with no kind and no lookup. A relative path target makes an edge only to a concept the case's `held` list places at the path it resolves to; a case with no `held` list holds none. A path is resolved against `citing`'s path once its fragment is cut and its percent-encoded UTF-8 is decoded, as JavaScript's decodeURI decodes: an escape of one of ; / ? : @ & = + $ , # stays as written, and an address holding a `%` that starts no escape, or escapes that are no UTF-8, is read whole as written. A path that decodes to one holding NUL names no file. No source's resource is a concept, so no case makes a lineage edge. `links` is every LINKS_TO edge the case makes, in ordinal order, by ordinal, target, `section` and `sentence`. `section` is the text of the nearest heading above the link, or null, and `sentence` is the sentence the link sits in, with each link reduced to its text. A sentence ends at a full stop, question mark or exclamation mark followed by whitespace or the paragraph's end, and footnote references written straight after that mark end the sentence with it. Both are trimmed, with each run of whitespace made one space. `marks` is every citation mark, as written, with the index of the `sources` entry it resolves to, in body order. Throughout, a line ends at a line feed alone, whitespace is the six characters space, tab, line feed, carriage return, form feed and vertical tab, a line of the body holding only whitespace is blank and ends a paragraph, and a scheme is an ASCII letter followed by ASCII letters, digits, plus, full stop and hyphen. The TypeScript half drives the api's map write (`packages/core/test/links.contract.test.ts`) and the Python half the worker's edge derivation (`apps/worker/tests/test_links_contract.py`).",
+  "description": "links (ADR 0031, ADR 0015): what a concept body's footnotes make of the map, said once for both tiers. The api derives a concept's LINKS_TO edges at every governed write (`packages/core/src/store/map/index.ts`) and the worker derives them again in the full rebuild (`apps/worker/src/better_answers_worker/links.py`); an edge's id carries its link's ordinal, so the two must count links alike or the rebuilt map and the live one name different edges. A footnote reference `[^label]` is a **citation mark** when its label, trimmed, with inner whitespace collapsed and compared without case, is the `id` of an entry in the concept's `sources` list. A mark resolves to the first entry carrying that id, whether or not the body holds a definition for it, and it is never a link: it makes no edge and takes no ordinal. A footnote reference whose label is no source id is a link when the body defines it, and it then takes an ordinal and makes an edge when its definition names a concept, as OKF allows. One with neither a source nor a definition is plain text: no edge, no ordinal, no error. A footnote definition line `[^label]: ...` is never a link and takes no ordinal. A reference definition's target written in angle brackets is the definition's, not an autolink, and takes no ordinal. Everything else in the prose that today takes an ordinal still does. Only a record-form `sources` entry carries an `id`; a string-form entry carries none, so no mark resolves to it. Every case is read as the concept `citing` below. A concept IRI target is one no concept holds yet, so both tiers make the edge with no kind and no lookup. A path target makes an edge only to a concept the case's `held` list places at the path it resolves to; a case with no `held` list holds none. A path that starts with a slash resolves from the bundle's root, and any other resolves against `citing`'s folder. A path is resolved against `citing`'s path once its fragment is cut and its percent-encoded UTF-8 is decoded, as JavaScript's decodeURI decodes: an escape of one of ; / ? : @ & = + $ , # stays as written, and an address holding a `%` that starts no escape, or escapes that are no UTF-8, is read whole as written. A path that decodes to one holding NUL names no file, and nor does one that resolves to the bundle's root. No source's resource is a concept a case holds, so no case makes a lineage edge. A source's resource that is a path is resolved as a link's path is. `links` is every LINKS_TO edge the case makes, in ordinal order, by ordinal, target, `section` and `sentence`. `section` is the text of the nearest heading above the link, or null, and `sentence` is the sentence the link sits in, with each link reduced to its text. A sentence ends at a full stop, question mark or exclamation mark followed by whitespace or the paragraph's end, and footnote references written straight after that mark end the sentence with it. Both are trimmed, with each run of whitespace made one space. `unresolved` is every path reference the case's `held` list does not place, so neither tier looks anything up: each link and each `sources` entry whose path, resolved and decoded as above, names no held concept, by relation (`link` or `lineage`), ordinal (a link's ordinal, or a source's index in `sources`) and path without its leading slash, links in ordinal order and then sources in list order. An IRI target and an address that names no file are never unresolved. The concept that later lands at a path settles every reference waiting on it. `marks` is every citation mark, as written, with the index of the `sources` entry it resolves to, in body order. Throughout, a line ends at a line feed alone, whitespace is the six characters space, tab, line feed, carriage return, form feed and vertical tab, a line of the body holding only whitespace is blank and ends a paragraph, and a scheme is an ASCII letter followed by ASCII letters, digits, plus, full stop and hyphen. The TypeScript half drives the api's map write (`packages/core/test/links.contract.test.ts`) and the Python half the worker's edge derivation (`apps/worker/tests/test_links_contract.py`).",
   "citing": {
     "iri": "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM",
     "path": "knowledge/expenses.md",
@@ -23,6 +23,7 @@
           "sentence": "See the product for tiers."
         }
       ],
+      "unresolved": [],
       "marks": [
         {
           "mark": "[^a]",
@@ -48,6 +49,7 @@
           "sentence": "Mileage follows the rates policy.^b"
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "OKF allows a footnote to link a concept; `b` is no source's id, so the footnote stays a link and takes the first ordinal."
     },
@@ -68,6 +70,7 @@
           "sentence": "See the product."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "`c` names no source and the body defines nothing for it, so it is text: no edge, no ordinal, no error."
     },
@@ -85,6 +88,7 @@
         }
       ],
       "links": [],
+      "unresolved": [],
       "marks": [
         {
           "mark": "[^a]",
@@ -115,6 +119,7 @@
           "sentence": "See the product."
         }
       ],
+      "unresolved": [],
       "marks": [
         {
           "mark": "[^aud-047]",
@@ -137,6 +142,7 @@
         }
       ],
       "links": [],
+      "unresolved": [],
       "marks": [
         {
           "mark": "[^a]",
@@ -155,6 +161,13 @@
           "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
           "section": null,
           "sentence": "See the product."
+        }
+      ],
+      "unresolved": [
+        {
+          "relation": "lineage",
+          "ordinal": 0,
+          "path": "knowledge/AUD-047"
         }
       ],
       "marks": [],
@@ -177,6 +190,7 @@
           "sentence": "See the product for tiers."
         }
       ],
+      "unresolved": [],
       "marks": [
         {
           "mark": "[^a]",
@@ -226,6 +240,7 @@
           "sentence": "So do nowhere, inline, full, collapsed and https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP, and so does a footnote link.^rates"
         }
       ],
+      "unresolved": [],
       "marks": [
         {
           "mark": "[^a]",
@@ -251,6 +266,7 @@
           "sentence": "Only this one maps.^a"
         }
       ],
+      "unresolved": [],
       "marks": [
         {
           "mark": "[^a]",
@@ -282,6 +298,7 @@
           "sentence": "See ^a and the rates."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "Only a bare footnote reference can be a citation mark. An inline link whose text starts with a caret, and a full reference whose label does, are links like any other, even where the label names a source."
     },
@@ -302,6 +319,7 @@
           "sentence": "See the product."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "An id that is only whitespace is no id, so an empty footnote label resolves to nothing and is plain text."
     },
@@ -317,6 +335,7 @@
           "sentence": "Mileage is paid ~~~ at cost, see the rates."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A run of tildes or backticks opens a fenced block only where a line starts with it, so a run mid-line leaves the link after it in the prose."
     },
@@ -341,6 +360,7 @@
           "sentence": "See the product."
         }
       ],
+      "unresolved": [],
       "marks": [
         {
           "mark": "[^a]",
@@ -370,6 +390,7 @@
           "sentence": "See the product."
         }
       ],
+      "unresolved": [],
       "marks": [
         {
           "mark": "[^12]",
@@ -395,6 +416,7 @@
           "sentence": "See the product."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "Space, tab, line feed, carriage return, form feed and vertical tab are the whitespace a label loses. A byte-order mark or a next-line character is part of the label, so neither label here names the source."
     },
@@ -403,6 +425,7 @@
       "body": "Mileage follows the rates policy.[^b]\r[^b]: https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN\n\nRates are reviewed yearly.[^c]\u2028[^c]: https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
       "sources": [],
       "links": [],
+      "unresolved": [],
       "marks": [],
       "why": "A carriage return alone or a line separator does not start a line, so neither definition here defines anything, and both footnotes are plain text."
     },
@@ -423,6 +446,7 @@
           "sentence": "[[[[[] Claims close the product."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A run of brackets before the first `]` is one bare link of the whole span: it names nothing and takes the first ordinal, and the readable link after it takes the next. However many brackets a body holds, the reader walks it once."
     },
@@ -431,6 +455,7 @@
       "body": "```\n[a](https://better-answers.com/c/01J6SSSSSSSSSSSSSSSSSSSSSS)\nSee [the handbook](https://better-answers.com/c/01J6SSSSSSSSSSSSSSSSSSSSSS).",
       "sources": [],
       "links": [],
+      "unresolved": [],
       "marks": [],
       "why": "A fence that no line closes runs to the body's end, and every link inside it is blanked with it, so nothing inside maps. The reader costs one walk, wherever the fence ends."
     },
@@ -451,6 +476,7 @@
           "sentence": "Read the handbook.^a"
         }
       ],
+      "unresolved": [],
       "marks": [
         {
           "mark": "[^a]",
@@ -471,6 +497,7 @@
           "sentence": "Read the rates."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A space is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the space after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
     },
@@ -486,6 +513,7 @@
           "sentence": "Read the rates."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A tab is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the tab after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
     },
@@ -501,6 +529,7 @@
           "sentence": "Read the rates."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A line feed is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the line feed after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
     },
@@ -516,6 +545,7 @@
           "sentence": "Read the rates."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A carriage return is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the carriage return after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
     },
@@ -531,6 +561,7 @@
           "sentence": "Read the rates."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A form feed is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the form feed after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
     },
@@ -546,6 +577,7 @@
           "sentence": "Read the rates."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A vertical tab is one of the six, so the reference's label reads as `the rates` and the definition's target is the run between the vertical tab after the colon and the next one. The reference resolves to the concept and takes the first ordinal; the definition line names nothing."
     },
@@ -561,6 +593,7 @@
           "sentence": "See the product\u2028for tiers."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "An edge carries the heading above its link and the sentence the link sits in. A line ends at a line feed alone, so a carriage return or a line separator inside a heading is part of its line. Only the six whitespace characters are trimmed and made one space, in a heading and in a sentence, so the carriage return becomes a space and the line separator stays where it is written."
     },
@@ -576,6 +609,7 @@
           "sentence": "Claims close.\ufeffSee the product\u0085or https://example.test/a\ufeffb and https://example.test/c\u0085d.\u0085 Next one."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A heading's marks need one of the six whitespace characters after them, so the line after a byte-order mark is no heading and the one above it stands, with its next-line characters kept. A sentence ends at a full stop that one of the six or the paragraph's end follows, so a full stop before a byte-order mark or a next-line character ends nothing. Neither character stops an autolink, so both autolinks lose their angle brackets."
     },
@@ -591,6 +625,7 @@
           "sentence": "See the product."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A heading is read from the prose, where a code span is blanked to spaces, and its whitespace runs become one space. So the heading reads the same however each tier counts the characters of an emoji it blanked."
     },
@@ -606,6 +641,7 @@
           "sentence": "<\u212aa:b> <a\u017f:b> See the product."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A scheme is an ASCII letter, then ASCII letters, digits, plus, full stop and hyphen. The Kelvin sign and the long s fold to k and s under Python's case-insensitive matching, but neither is in the scheme, so neither bracketed run is an autolink, takes an ordinal or loses its angle brackets."
     },
@@ -627,6 +663,7 @@
           "sentence": "See the rates."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A line ends at a line feed alone, so in a CRLF body the line between two paragraphs holds a carriage return. A line holding only the other five whitespace characters is blank, and a blank line ends a paragraph, so a link's sentence never runs into the heading or the paragraph above it."
     },
@@ -642,6 +679,7 @@
           "sentence": "The rate is per mile, see the policy."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A line is blank when the body's own line holds only whitespace. A code span is blanked to spaces in the prose, but its line in the body is not blank, so the paragraph runs on through it."
     },
@@ -663,6 +701,7 @@
           "sentence": "Rates are reviewed yearly.^rates"
         }
       ],
+      "unresolved": [],
       "marks": [{ "mark": "[^a]", "source": 0 }],
       "why": "A writer puts a footnote after the full stop of the claim it backs, so the footnote belongs to that sentence and the sentence ends after it. The link after a mark starts a new sentence, and a footnote link sitting on a full stop stays in the sentence it ends."
     },
@@ -684,6 +723,7 @@
           "sentence": "Mileage follows the policy.^p"
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "Angle brackets around a definition's target delimit the target, so the target is the reference's and makes no second edge. It takes no ordinal, as a target written without brackets takes none. The reference definition's label still takes the ordinal after the two links, and the footnote definition's takes none."
     },
@@ -692,6 +732,13 @@
       "body": "Read [the rates].\n\n[the rates]: <<https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV>>",
       "sources": [],
       "links": [],
+      "unresolved": [
+        {
+          "relation": "link",
+          "ordinal": 0,
+          "path": "knowledge/<https:/better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV>"
+        }
+      ],
       "marks": [],
       "why": "Only the outer pair delimits the target, so the reference names <https://better-answers.com/c/01J6VVVVVVVVVVVVVVVVVVVVVV>, which is no concept IRI and no held path. The bracketed run inside the target is the target's too, not an autolink."
     },
@@ -719,6 +766,7 @@
           "sentence": "See the team and the same team."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "An IRI's percent-encoded UTF-8 names the decoded characters (RFC 3987), so %C3%A9 is é. The path is decoded before its dot segments fold, so %2E%2E is a step up."
     },
@@ -737,6 +785,18 @@
         }
       ],
       "links": [],
+      "unresolved": [
+        {
+          "relation": "link",
+          "ordinal": 0,
+          "path": "knowledge/roles%2Fboard.md"
+        },
+        {
+          "relation": "link",
+          "ordinal": 1,
+          "path": "knowledge/minutes%3Fdraft.md"
+        }
+      ],
       "marks": [],
       "why": "An escape of one of ; / ? : @ & = + $ , # is not that character (RFC 3986), so %2F is no path separator and neither address names a held file. JavaScript's decodeURI keeps these escapes as written, and so does the worker."
     },
@@ -762,6 +822,13 @@
           "sentence": "See the café and the odd one."
         }
       ],
+      "unresolved": [
+        {
+          "relation": "link",
+          "ordinal": 1,
+          "path": "knowledge/x%zz%C3%A9.md"
+        }
+      ],
       "marks": [],
       "why": "%E9 alone is no UTF-8, and %zz is no escape. Either one leaves the whole address as written, the escape beside a bad one included, so x%zz%C3%A9.md is not x%zzé.md."
     },
@@ -777,6 +844,7 @@
           "sentence": "See the notes and the product."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "%00 decodes to NUL, which no stored path can hold, so the decoded path names no file. The address still takes its ordinal, and the body's other links still make their edges."
     },
@@ -798,8 +866,140 @@
           "sentence": "See its duties and the top."
         }
       ],
+      "unresolved": [],
       "marks": [],
       "why": "A fragment names a place in the file, not the file, so the path resolves without it. An address that is only a fragment names no file and makes no edge, though it takes its ordinal."
+    },
+    {
+      "case": "a relative path no concept holds is unresolved",
+      "body": "Keep [the receipts](./receipts.md) and read [the rates](../finance/rates.md).",
+      "sources": [],
+      "links": [],
+      "unresolved": [
+        {
+          "relation": "link",
+          "ordinal": 0,
+          "path": "knowledge/receipts.md"
+        },
+        {
+          "relation": "link",
+          "ordinal": 1,
+          "path": "finance/rates.md"
+        }
+      ],
+      "marks": [],
+      "why": "A relative path resolves against the citing concept's folder, dot segments folded, and names a file the case does not hold. The link takes its ordinal and makes no edge, so the reference waits as unresolved until a concept lands at the path."
+    },
+    {
+      "case": "an absolute path no concept holds is unresolved",
+      "body": "The [board's terms](/knowledge/board.md) apply.",
+      "sources": [],
+      "links": [],
+      "unresolved": [
+        {
+          "relation": "link",
+          "ordinal": 0,
+          "path": "knowledge/board.md"
+        }
+      ],
+      "marks": [],
+      "why": "A path that starts with a slash resolves from the bundle's root, not the citing concept's folder. Stored without its leading slash, it is the path a concept would land at."
+    },
+    {
+      "case": "an unresolved path is stored without its fragment",
+      "body": "See [its duties](roles/committee.md#duties).",
+      "sources": [],
+      "links": [],
+      "unresolved": [
+        {
+          "relation": "link",
+          "ordinal": 0,
+          "path": "knowledge/roles/committee.md"
+        }
+      ],
+      "marks": [],
+      "why": "A fragment names a place in the file, not the file, so the reference waits on the file's path alone. A concept landing at that path settles it."
+    },
+    {
+      "case": "a percent-encoded path waits under the name it decodes to",
+      "body": "Ask [the team](%C3%A9quipe.md) first.",
+      "sources": [],
+      "links": [],
+      "unresolved": [
+        {
+          "relation": "link",
+          "ordinal": 0,
+          "path": "knowledge/équipe.md"
+        }
+      ],
+      "marks": [],
+      "why": "The path is decoded before it is stored, so a concept landing at équipe.md settles a reference written %C3%A9quipe.md."
+    },
+    {
+      "case": "a sources path no concept holds is unresolved lineage",
+      "body": "Claims close within 30 days.",
+      "sources": [
+        {
+          "resource": "/knowledge/policy.md"
+        },
+        {
+          "resource": "https://example.test/handbook"
+        }
+      ],
+      "links": [],
+      "unresolved": [
+        {
+          "relation": "lineage",
+          "ordinal": 0,
+          "path": "knowledge/policy.md"
+        }
+      ],
+      "marks": [],
+      "why": "A sources entry whose resource is a path no concept holds makes no lineage edge yet, and waits as unresolved by its index in the list. A resource with a scheme names no file and never waits."
+    },
+    {
+      "case": "a held path resolves and the rest stay unresolved",
+      "body": "Keep [the receipts](./receipts.md) at [the rates](./rates.md).",
+      "sources": [],
+      "held": [
+        {
+          "iri": "https://better-answers.com/c/01J6ZZZZZZZZZZZZZZZZZZZZZZ",
+          "path": "knowledge/receipts.md"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6ZZZZZZZZZZZZZZZZZZZZZZ",
+          "section": null,
+          "sentence": "Keep the receipts at the rates."
+        }
+      ],
+      "unresolved": [
+        {
+          "relation": "link",
+          "ordinal": 1,
+          "path": "knowledge/rates.md"
+        }
+      ],
+      "marks": [],
+      "why": "Each path reference is judged alone. One the held list places makes its edge, and one it does not place waits as unresolved, with the ordinal it took in the body."
+    },
+    {
+      "case": "an address that resolves to the root names no file",
+      "body": "See [the root](/) and [the folder above](..) and [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).",
+      "sources": [],
+      "links": [
+        {
+          "ordinal": 2,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+          "section": null,
+          "sentence": "See the root and the folder above and the product."
+        }
+      ],
+      "unresolved": [],
+      "marks": [],
+      "why": "A path that resolves to the bundle's root has no file name, so no concept can land there and nothing waits on it. Each address still takes its ordinal."
     }
   ]
 }

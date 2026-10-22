@@ -319,6 +319,15 @@ nothing.
 
 _Internal._ the removal of every generation of a workspace's map but the live one.
 
+### unresolved reference
+
+_Internal._ a link or a `sources` entry in a concept that names a path no concept holds yet, kept so
+the concept that lands there settles it.
+
+It is a row of `map_unresolved_reference`: the citing concept, the relation, the ordinal and the
+path, decoded. A concept that lands at the path, new or moved, turns every row naming it into an
+edge in the same transaction.
+
 ### concept index
 
 _Internal._ the platform's derived row for every concept, written when the concept's commit is made,

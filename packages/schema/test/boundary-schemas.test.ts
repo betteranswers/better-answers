@@ -805,6 +805,25 @@ const acceptedRows = {
     },
   ],
 
+  mapUnresolvedReference: [
+    {
+      workspaceId: WS_ID,
+      gen: 1,
+      fromUid: CONCEPT_IRI,
+      relation: "link",
+      ordinal: 0,
+      targetPath: "knowledge/later.md",
+    },
+    {
+      workspaceId: WS_ID,
+      gen: 1,
+      fromUid: CONCEPT_IRI,
+      relation: "lineage",
+      ordinal: 0,
+      targetPath: "knowledge/policy.md",
+    },
+  ],
+
   job: [
     { workspaceId: WS_ID, id: "01J6J1AAAAAAAAAAAAAAAAAAAA", kind: "nightly-audit" },
     {
@@ -1015,6 +1034,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "mapGeneration",
         "mapNode",
         "mapEdge",
+        "mapUnresolvedReference",
 
         "job",
 
@@ -1191,6 +1211,13 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.mapEdge[0], sensitivity: "Secret" },
       { ...acceptedRows.mapEdge[0], fromUid: "   " },
       { ...acceptedRows.mapEdge[1], label: "source-entity:mentions" },
+    ],
+    mapUnresolvedReference: [
+      { ...acceptedRows.mapUnresolvedReference[0], relation: "edge" },
+      { ...acceptedRows.mapUnresolvedReference[0], ordinal: -1 },
+      { ...acceptedRows.mapUnresolvedReference[0], gen: 0 },
+      { ...acceptedRows.mapUnresolvedReference[0], fromUid: "expenses" },
+      { ...acceptedRows.mapUnresolvedReference[0], targetPath: "   " },
     ],
 
     suggestion: [
@@ -2193,6 +2220,14 @@ describe("5 — the inferred type is pinned", () => {
       toKind: string | null;
       section: string | null;
       sentence: string | null;
+    };
+    mapUnresolvedReference: {
+      workspaceId: WorkspaceId;
+      gen: number;
+      fromUid: ConceptIri;
+      relation: "link" | "lineage";
+      ordinal: number;
+      targetPath: string;
     };
     job: {
       workspaceId: WorkspaceId;

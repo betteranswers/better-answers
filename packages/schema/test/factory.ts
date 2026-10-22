@@ -116,6 +116,10 @@ export type TestData = {
 
   mapEdge(overrides?: Partial<InsertInput<"mapEdge">>): Promise<Row<"mapEdge">>;
 
+  mapUnresolvedReference(
+    overrides?: Partial<InsertInput<"mapUnresolvedReference">>,
+  ): Promise<Row<"mapUnresolvedReference">>;
+
   suggestion(overrides?: Partial<InsertInput<"suggestion">>): Promise<Row<"suggestion">>;
 
   conceptWriteRequest(
@@ -706,6 +710,19 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const mapUnresolvedReference: TestData["mapUnresolvedReference"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "mapUnresolvedReference", {
+      gen: await liveGenFor(workspaceId),
+      fromUid: conceptIriOf(ulid()),
+      relation: "link",
+      ordinal: 0,
+      targetPath: `knowledge/${ulid().toLowerCase()}.md`,
+      ...overrides,
+      workspaceId,
+    });
+  };
+
   const job: TestData["job"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
 
@@ -1157,6 +1174,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     mapGeneration,
     mapNode,
     mapEdge,
+    mapUnresolvedReference,
     job,
     suggestion,
     conceptWriteRequest,

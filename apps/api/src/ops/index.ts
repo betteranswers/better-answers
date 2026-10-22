@@ -102,6 +102,7 @@ import {
   mapEdge,
   mapGeneration,
   mapNode,
+  mapUnresolvedReference,
   job,
   llmCall,
   MODEL_PROVIDERS,
@@ -196,8 +197,8 @@ const flagValue = (flags: Flags, name: string): string | undefined => {
 const MAP_TABLES = [mapGeneration, mapNode, mapEdge];
 
 const NEEDS = {
-  "map-rebuild": [...MAP_TABLES, job],
-  "map-sweep": MAP_TABLES,
+  "map-rebuild": [...MAP_TABLES, mapUnresolvedReference, job],
+  "map-sweep": [...MAP_TABLES, mapUnresolvedReference],
   "map-counts": MAP_TABLES,
   "unmapped-passage-rate": [questionAsked, questionFeedback],
   "reconcile-watermark": [conceptIndex, bundleCommit],
@@ -646,8 +647,9 @@ const mapSweepCommand = async (doors: Doors, workspaceId: string, io: OpsIo): Pr
   const generations = swept.value.map((generation) => generation.gen).join(", ");
   const nodes = swept.value.reduce((total, generation) => total + generation.nodes, 0);
   const edges = swept.value.reduce((total, generation) => total + generation.edges, 0);
+  const unresolved = swept.value.reduce((total, generation) => total + generation.unresolved, 0);
   io.say(
-    `map-sweep: done — swept ${plural(swept.value.length, "generation")} ${generations} (${counted(nodes, "node")}, ${counted(edges, "edge")})`,
+    `map-sweep: done — swept ${plural(swept.value.length, "generation")} ${generations} (${counted(nodes, "node")}, ${counted(edges, "edge")}, ${counted(unresolved, "unresolved reference")})`,
   );
   return DONE;
 };

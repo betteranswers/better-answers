@@ -463,7 +463,8 @@ def _target_of(raw: str, from_path: str) -> tuple[_TargetShape, str] | None:
     decoded = _uri_decoded(bare)
     if "\0" in decoded:
         return None
-    return "path", resolved_resource(decoded, from_path)[1:]
+    path = resolved_resource(decoded, from_path)[1:]
+    return None if path == "" else ("path", path)
 
 
 def _section_at(body: str, index: int) -> str | None:
@@ -723,6 +724,23 @@ class ResolvedTarget:
         self.status = status
 
 
+class UnresolvedReference(NamedTuple):
+    relation: str
+    ordinal: int
+    target_path: str
+
+
+def unresolved_references(
+    references: Sequence[OutgoingReference],
+    by_path: Mapping[str, ResolvedTarget],
+) -> list[UnresolvedReference]:
+    return [
+        UnresolvedReference(reference.relation, reference.ordinal, reference.target[1])
+        for reference in references
+        if reference.target[0] == "path" and reference.target[1] not in by_path
+    ]
+
+
 class OutgoingEdge:
     __slots__ = ("label", "section", "sentence", "to_kind", "to_uid", "uid")
 
@@ -747,15 +765,13 @@ def outgoing_edges(
     *,
     iri: str,
     kind: str,
-    path: str,
-    body: str,
-    frontmatter: Frontmatter,
+    references: Sequence[OutgoingReference],
     by_path: dict[str, ResolvedTarget],
     by_iri: dict[str, ResolvedTarget],
 ) -> list[OutgoingEdge]:
     edges: list[OutgoingEdge] = []
     cited: set[str] = set()
-    for reference in references_of(body, frontmatter, path):
+    for reference in references:
         shape, value = reference.target
         if shape == "iri":
             resolved = by_iri.get(value) or ResolvedTarget(value, None, None)
@@ -807,8 +823,10 @@ __all__ = [
     "OutgoingReference",
     "ResolvedTarget",
     "Scalar",
+    "UnresolvedReference",
     "links_and_marks_of",
     "outgoing_edges",
     "prose_of",
     "references_of",
+    "unresolved_references",
 ]
