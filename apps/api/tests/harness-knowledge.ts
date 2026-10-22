@@ -1,4 +1,6 @@
-import { posix } from "node:path";
+import { execFile } from "node:child_process";
+import { join, posix } from "node:path";
+import { promisify } from "node:util";
 
 import { z } from "zod";
 
@@ -9,6 +11,7 @@ import {
   nameOwner,
   nameOwnerInput,
   overrideConceptSensitivity,
+  submitSuggestionSet,
   writeConcept,
 } from "@better-answers/core/concepts";
 import { actorIdOfPerson, type UserPrincipal } from "@better-answers/core/kernel";
@@ -20,6 +23,8 @@ import { inOneTransaction, seedPassages } from "./harness-sources.ts";
 import { actingIn, openTestGit, type TestApp } from "./harness.ts";
 
 const SUITE_VERIFIER = "process:better-answers-browser-suite";
+
+const execFileAsync = promisify(execFile);
 
 type SourceKeys = {
   readonly title?: string | undefined;
@@ -530,11 +535,14 @@ const writerRefused = (role: Role | undefined): readonly Refusal[] => {
   ];
 };
 
-const refuse = (refusals: readonly Refusal[]): void => {
-  if (refusals.length === 0) return;
-  throw new z.ZodRealError(
+const refusedWith = (refusals: readonly Refusal[]): z.ZodError =>
+  new z.ZodRealError(
     refusals.map(({ path, message }) => ({ code: "custom", path: [...path], message })),
   );
+
+const refuse = (refusals: readonly Refusal[]): void => {
+  if (refusals.length === 0) return;
+  throw refusedWith(refusals);
 };
 
 export const seedConcepts = async (
@@ -634,4 +642,98 @@ export const seedConceptIndex = async (
   });
   await app.database.superuser.query("ANALYZE concept_identity, concept_index");
   return { seeded };
+};
+
+export const editSuggesting = z.strictObject({
+  workspaceId: z.string().min(1),
+  userId: z.string().min(1),
+  iri: z.string().min(1),
+  title: z.string().min(1).optional(),
+  body: z.string().min(1).optional(),
+});
+
+type StandingFile = {
+  readonly path: string;
+  readonly kind: string;
+  readonly title: string;
+  readonly frontmatter: Readonly<Record<string, unknown>>;
+  readonly body: string;
+  readonly content_hash: string;
+  readonly merge_key: string;
+};
+
+const standingFileOf = async (
+  app: TestApp,
+  asked: { readonly workspaceId: string; readonly iri: string },
+): Promise<StandingFile> => {
+  const found = await app.database.superuser.query<StandingFile>(
+    `SELECT c.path, c.kind, c.title, c.frontmatter, c.body, c.content_hash, i.merge_key
+       FROM concept_index c
+       JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
+      WHERE c.workspace_id = $1 AND c.iri = $2`,
+    [asked.workspaceId, asked.iri],
+  );
+  const standing = found.rows[0];
+  if (standing === undefined) {
+    throw refusedWith([{ path: ["iri"], message: "the workspace holds no concept at this IRI" }]);
+  }
+  return standing;
+};
+
+export const seedEditSuggestion = async (
+  app: TestApp,
+  asked: z.output<typeof editSuggesting>,
+): Promise<{ readonly suggestionId: string; readonly setId: string }> => {
+  const { workspaceId, userId } = asked;
+  const standing = await standingFileOf(app, asked);
+  const title = asked.title ?? standing.title;
+  const principal = await actingIn(app, { workspaceId, userId }, async (resolved) => resolved);
+  const submitted = await submitSuggestionSet(
+    principal,
+    { postgres: app.doors.postgres },
+    {
+      kind: "edit",
+      requests: [
+        {
+          mergeKey: standing.merge_key,
+          path: standing.path,
+          conceptKind: standing.kind,
+          title,
+          frontmatter: conceptFrontmatter.parse({ ...standing.frontmatter, title }),
+          body: asked.body ?? standing.body,
+          baseContentHash: standing.content_hash,
+        },
+      ],
+    },
+  );
+  if (!submitted.ok) {
+    throw refusedWith([
+      { path: ["userId"], message: `the suggestion was refused: ${String(submitted.error)}` },
+    ]);
+  }
+  const [suggestionId] = submitted.value.suggestionIds;
+  if (suggestionId === undefined) throw new Error("the set holds no suggestion");
+  return { suggestionId, setId: submitted.value.setId };
+};
+
+export const commitAuthorsAsking = z.strictObject({
+  workspaceId: z.string().min(1),
+  iri: z.string().min(1),
+});
+
+export const commitAuthorsOf = async (
+  app: TestApp,
+  asked: z.output<typeof commitAuthorsAsking>,
+): Promise<{ readonly authors: readonly string[] }> => {
+  const standing = await standingFileOf(app, asked);
+  const { stdout } = await execFileAsync("git", [
+    "--git-dir",
+    join(openTestGit(app).root, `${asked.workspaceId}.git`),
+    "log",
+    "--format=%an <%ae>",
+    "main",
+    "--",
+    standing.path,
+  ]);
+  return { authors: stdout.split("\n").filter((line) => line !== "") };
 };
