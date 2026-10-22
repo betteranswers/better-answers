@@ -328,15 +328,39 @@ describe("an override named while a write is in flight", () => {
   });
 });
 
+const ERASING: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-ops" };
+
+const erasingTheEditor = async (scenario: Scenario) => {
+  const { pseudonym } = await seedingWith(db().pool, (seed) =>
+    seed.erasureRequest({ workspaceId: scenario.workspaceId }),
+  );
+  return () =>
+    eraseFromTheIdentitySet(ERASING, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+      personId: scenario.editor.userId,
+      emails: [],
+      needles: { addresses: [], people: [scenario.editor.userId] },
+      pseudonym,
+    });
+};
+
+const erasureWaitsOnTheMember = async () =>
+  (await statementsWaitingOnALock(db().pool)).some((query) => query.includes("FROM member"));
+
+const ownersLeft = async (scenario: Scenario) =>
+  (
+    await db().pool.query(
+      "SELECT 1 FROM concept_owner WHERE workspace_id = $1 AND person_id = $2",
+      [scenario.workspaceId, scenario.editor.userId],
+    )
+  ).rowCount;
+
 describe("an owner erased while their write is in flight", () => {
   it("finishes both the erasure and the write, deadlocking neither", async () => {
     const scenario = await arrange();
     const input = conceptAt("knowledge/policy/expenses.md");
     const landed = await landedAs(scenario, scenario.editor, input);
-    const platform: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-ops" };
-    const { pseudonym } = await seedingWith(db().pool, (seed) =>
-      seed.erasureRequest({ workspaceId: scenario.workspaceId }),
-    );
+    const erase = await erasingTheEditor(scenario);
     let erasing: Promise<unknown> = Promise.resolve();
     const postgres = {
       ...scenario.postgres,
@@ -352,19 +376,9 @@ describe("an owner erased while their write is in flight", () => {
         rewriteOf(input, landed),
       );
       await until(() => isBlockedOnTable(db().pool, "concept_identity"));
-      erased = eraseFromTheIdentitySet(platform, scenario.postgres, {
-        workspaceId: scenario.workspaceId,
-        personId: scenario.editor.userId,
-        emails: [],
-        needles: { addresses: [], people: [scenario.editor.userId] },
-        pseudonym,
-      });
+      erased = erase();
       erasing = erased;
-      await until(async () =>
-        (await statementsWaitingOnALock(db().pool)).some((query) =>
-          query.includes("DELETE FROM member"),
-        ),
-      );
+      await until(erasureWaitsOnTheMember);
     });
     const [write, erasure] = await Promise.allSettled([pending, erased]);
 
@@ -373,11 +387,36 @@ describe("an owner erased while their write is in flight", () => {
       value: { membersEnded: 1, ownersDeleted: EDITORS_COLLECTIONS.length },
     });
     expect(write).toEqual({ status: "fulfilled", value: { ok: false, error: "not-a-member" } });
-    const left = await db().pool.query(
-      "SELECT 1 FROM concept_owner WHERE workspace_id = $1 AND person_id = $2",
-      [scenario.workspaceId, scenario.editor.userId],
-    );
-    expect(left.rowCount).toBe(0);
+    expect(await ownersLeft(scenario)).toBe(0);
+  });
+
+  it("counts an owner named while the erasure waits", async () => {
+    const scenario = await arrange();
+    const erase = await erasingTheEditor(scenario);
+    const holder = await db().pool.connect();
+    let erased: ReturnType<typeof eraseFromTheIdentitySet> | undefined;
+    try {
+      await holder.query("BEGIN");
+      await holder.query(
+        "SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2 FOR KEY SHARE",
+        [scenario.workspaceId, scenario.editor.userId],
+      );
+      erased = erase();
+      await until(erasureWaitsOnTheMember);
+      await nameOwnerAs(scenario.admin, scenario.postgres, {
+        collection: "guidance",
+        personId: scenario.editor.userId,
+      });
+    } finally {
+      await holder.query("COMMIT");
+      holder.release();
+    }
+
+    expect(await erased).toMatchObject({
+      membersEnded: 1,
+      ownersDeleted: EDITORS_COLLECTIONS.length + 1,
+    });
+    expect(await ownersLeft(scenario)).toBe(0);
   });
 });
 

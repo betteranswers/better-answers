@@ -142,6 +142,10 @@ export const eraseFromTheIdentitySet = async (
     const lastActive = rowsOf(
       await tx.query("DELETE FROM workspace_last_active WHERE user_id = $1", [personId]),
     );
+    await tx.query("SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE", [
+      subject.workspaceId,
+      personId,
+    ]);
     const ownersTheMemberCascades = rowsOf(
       await tx.query("SELECT 1 FROM concept_owner WHERE workspace_id = $1 AND person_id = $2", [
         subject.workspaceId,
