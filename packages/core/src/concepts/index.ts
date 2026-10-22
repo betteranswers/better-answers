@@ -1109,3 +1109,11 @@ export const evidenceForAReadableConcept = (alias: string, roleParameter: number
             WHERE ce.workspace_id = ${alias}.workspace_id
               AND ce.source_document_id = ${alias}.source_document_id
               AND ${readableClause("ci", roleParameter)})`;
+
+export {
+  acceptWaitingInput,
+  declineWaitingInput,
+  waitingEdit,
+  waitingEditInput,
+  waitingOnYou,
+} from "./waiting.ts";

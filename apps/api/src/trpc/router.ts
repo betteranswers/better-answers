@@ -40,6 +40,7 @@ import {
   router,
 } from "./base.ts";
 import { consoleRouter } from "./console.ts";
+import { inboxRouter } from "./inbox.ts";
 import { knowledgeRouter } from "./knowledge.ts";
 import { membersRouter } from "./members.ts";
 import { personRouter } from "./person.ts";
@@ -71,6 +72,7 @@ export const appRouter = router({
   console: consoleRouter,
   members: membersRouter,
   knowledge: knowledgeRouter,
+  inbox: inboxRouter,
   ask: askRouter,
   questions: questionsRouter,
   modelChoices: router({
