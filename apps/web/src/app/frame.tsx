@@ -240,7 +240,8 @@ export function WorkspaceFrame(properties: { readonly page?: Handed }) {
   const standing = useOperatorStanding();
   const held = member.data;
   const role = held?.role;
-  const visible = useMemo(() => visibleTo(readerOf(role), AREAS), [role]);
+  const owns = held?.owns;
+  const visible = useMemo(() => visibleTo(readerOf(role, owns), AREAS), [role, owns]);
 
   return (
     <Frame

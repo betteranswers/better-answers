@@ -22,13 +22,22 @@ type Detail = {
   readonly param: string;
 };
 
+export type Owns = { readonly collections: readonly string[]; readonly concepts: number };
+
+export const OWNS_NOTHING: Owns = { collections: [], concepts: 0 };
+
+const OWNING = {
+  "of-a-collection": (owns) => owns.collections.length > 0,
+  "of-anything": (owns) => owns.collections.length > 0 || owns.concepts > 0,
+} as const satisfies Readonly<Record<string, (owns: Owns) => boolean>>;
+
 export type Page = {
   readonly name: string;
   readonly path: string;
   readonly icon: IconName;
   readonly built: boolean;
   readonly seenBy: readonly RoleOrOperator[];
-  readonly owners?: true;
+  readonly owners?: keyof typeof OWNING;
   readonly movedFrom?: readonly string[];
   readonly actions?: readonly Action[];
   readonly detail?: Detail;
@@ -129,7 +138,7 @@ export const KNOWLEDGE = {
           icon: "table",
           built: false,
           seenBy: ADMINS,
-          owners: true,
+          owners: "of-a-collection",
         },
         {
           name: "Due for Verification",
@@ -137,7 +146,7 @@ export const KNOWLEDGE = {
           icon: "verification",
           built: false,
           seenBy: ADMINS,
-          owners: true,
+          owners: "of-a-collection",
         },
         {
           name: "Conflicts",
@@ -145,7 +154,7 @@ export const KNOWLEDGE = {
           icon: "conflicts",
           built: false,
           seenBy: ADMINS,
-          owners: true,
+          owners: "of-a-collection",
         },
         {
           name: "Kinds",
@@ -153,15 +162,15 @@ export const KNOWLEDGE = {
           icon: "kinds",
           built: false,
           seenBy: ADMINS,
-          owners: true,
+          owners: "of-a-collection",
         },
         {
           name: "Collections and Owners",
           path: "/knowledge/collections-and-owners",
           icon: "owners",
-          built: false,
+          built: true,
           seenBy: ADMINS,
-          owners: true,
+          owners: "of-a-collection",
         },
         {
           name: "Exports",
@@ -169,7 +178,7 @@ export const KNOWLEDGE = {
           icon: "exports",
           built: false,
           seenBy: ADMINS,
-          owners: true,
+          owners: "of-a-collection",
         },
       ],
     },
@@ -190,7 +199,7 @@ const INBOX = {
           icon: "tray",
           built: false,
           seenBy: ADMINS,
-          owners: true,
+          owners: "of-anything",
         },
       ],
     },
@@ -483,10 +492,13 @@ export const HOMES = {
 
 export type Reader = {
   readonly role: RoleOrOperator | undefined;
-  readonly owns: readonly string[];
+  readonly owns: Owns;
 };
 
-export const readerOf = (role: RoleOrOperator | undefined): Reader => ({ role, owns: [] });
+export const readerOf = (role: RoleOrOperator | undefined, owns: Owns = OWNS_NOTHING): Reader => ({
+  role,
+  owns,
+});
 
 export const OPERATOR_READER: Reader = readerOf("operator");
 
@@ -499,8 +511,9 @@ export type VisibleTree = {
 
 export const NO_TREE: VisibleTree = { areas: [], home: undefined };
 
-const sees = (role: RoleOrOperator, owns: readonly string[], page: Page): boolean =>
-  page.built && (page.seenBy.includes(role) || (page.owners === true && owns.length > 0));
+const sees = (role: RoleOrOperator, owns: Owns, page: Page): boolean =>
+  page.built &&
+  (page.seenBy.includes(role) || (page.owners !== undefined && OWNING[page.owners](owns)));
 
 const shownOf = (
   area: Area,

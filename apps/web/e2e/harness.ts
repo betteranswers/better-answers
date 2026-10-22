@@ -365,6 +365,18 @@ export const seedConcepts = (
   input: { workspaceId: string; userId: string; concepts: readonly SeedConcept[] },
 ) => ask(api, "/concepts", input, seededConcepts);
 
+type SeedOwner = (
+  | { readonly collection: string; readonly iri?: never }
+  | { readonly iri: string; readonly collection?: never }
+) & { readonly personId: string | null };
+
+const ownersNamed = z.object({ named: z.number() });
+
+export const nameOwners = (
+  api: APIRequestContext,
+  input: { workspaceId: string; userId: string; owners: readonly SeedOwner[] },
+) => ask(api, "/owners", input, ownersNamed);
+
 type SeedFlag = {
   readonly reason: (typeof FEEDBACK_REASONS)[number];
   readonly note?: string;

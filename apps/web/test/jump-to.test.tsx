@@ -108,6 +108,7 @@ describe("what jump-to lists", () => {
           "Your Questions",
           "Connect Claude",
           "Search",
+          "Collections and Owners",
           "Connected Sources",
           "Models and Spend",
           "Questions Asked",

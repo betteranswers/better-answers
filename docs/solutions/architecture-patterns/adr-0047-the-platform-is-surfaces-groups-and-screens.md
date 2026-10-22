@@ -54,7 +54,7 @@ One navigation list in `apps/web/src/shared/` declares every area, menu group an
 - **Ask**: asking, and the cited answers a person got. Every role sees it. It is the home of an Editor and a Viewer.
 - **Knowledge**: the curated map. Its Browse menu group is every role's. Its Curation menu group is for Admins and owners.
 - **The work area**: work produced from the knowledge for someone outside, question sets first. Its name waits for S6, which builds its first page.
-- **Inbox**: what waits on the person. It is for Admins, and for the owner of any collection.
+- **Inbox**: what waits on the person. It is for Admins, and for the owner of any collection or concept.
 - **Control Centre**: the Admin's one area, in eight menu groups: Overview, Suggestions, Sources, Models, Questions, People, Personal data and System.
 - **Briefings** joins at Then: what the platform tells a person unasked, such as sector and account signals, each cited.
 
@@ -65,8 +65,8 @@ The utilities sit at the rail's foot: Keyboard shortcuts today, and help and set
 | Area | Menu group | Pages (built today in bold) | Seen by |
 |---|---|---|---|
 | Ask | (none) | **New question** · **Your questions** · **Connect Claude** | every role (New question is the home of Editor and Viewer) |
-| Knowledge | Browse · Curation | **Search** · Guides · All knowledge · Due for verification · Conflicts · Kinds · Collections and owners · Exports | Browse: every role. Curation: Admins and owners |
-| Inbox | (none) | Waiting on you | Admins and owners |
+| Knowledge | Browse · Curation | **Search** · Guides · All knowledge · Due for verification · Conflicts · Kinds · **Collections and owners** · Exports | Browse: every role. Curation: Admins and owners of a collection |
+| Inbox | (none) | Waiting on you | Admins and owners of any collection or concept |
 | Control Centre | Overview | Overview | Admin |
 | | Suggestions | To decide | Admin |
 | | Sources | **Connected sources** · Publishing rules · Cost estimates · Backlogs · Removed at source · Share agents | Admin |
@@ -90,14 +90,14 @@ Control Centre's menu groups keep root addresses, `/<group>/<page>`, so today's 
 
 **Who sees what.**
 
-- A person sees a page by their role, or by owning a collection the page serves. A menu group or an area with no page the person may see is hidden whole.
-- Owning a collection grants actions, so a Viewer may own one. Ownership lands with S3. Until then, visibility reads roles alone.
+- A person sees a page by their role, by owning a collection the page serves, or, for Inbox › Waiting on you, by owning any concept, through its collection or its own override. A menu group or an area with no page the person may see is hidden whole.
+- Owning grants actions, so a Viewer may own a collection or a concept. The member read carries what the person owns beside their role, so ownership is decided from the same answer as the role, with no second read to wait on.
 - Waiting suggestions are decided in Control Centre › Suggestions › To decide. A person's Inbox holds their own items and points into it.
 - Control Centre is for Admins alone, so an Editor sees no Questions page there. An Editor who owns the `Answer` collection reaches its promotions through their Inbox. An Editor who owns nothing sees neither.
 - An area, menu group or page that is not built appears nowhere: not in the rail, the menu or jump-to.
 - A role's home always shows. Until it is built, it says plainly that it is on its way. An Editor's and a Viewer's home is Ask › New question. An Admin's home is People › Members until Control Centre › Overview is built.
 - An address that is not built, or that the person may not see, shows the same not-found page as an address that never existed, and offers the person's home. A member sees it inside the frame, named in the breadcrumb. Anyone else sees it in the sign-in pages' layout, and a signed-out visitor is offered sign-in instead.
-- Whether a page is hidden is decided when the person arrives at it. A role that changes while they are on it takes effect at their next move, so an Admin who demotes themself still sees the action confirmed. While the role cannot be read, a page draws its own loading or failed state. A page reached in that state is decided when the role arrives, as though the person arrived then. From that point it keeps its verdict until their next move, like any other.
+- Whether a page is hidden is decided when the person arrives at it. A role that changes while they are on it takes effect at their next move, so an Admin who demotes themself still sees the action confirmed. While the role cannot be read, a page draws its own loading or failed state. A page reached in that state is decided when the role arrives, as though the person arrived then. From that point it keeps its verdict until their next move, like any other. An ownership change takes effect the same way, at the person's next move. A page whose own read the api refuses by ownership reads the member again and is decided again, as though the person arrived then.
 - Hiding is navigation only. The api still refuses every action, by role or by ownership.
 
 **The console** stays the operator's separate area. It is reached from the workspace switcher, which lists it to the operator alone. It is a place, not an account setting.
@@ -120,7 +120,7 @@ Control Centre's menu groups keep root addresses, `/<group>/<page>`, so today's 
 | Area | Built | v0.1 | Next, Then and Later |
 |---|---|---|---|
 | Ask | New question, Your questions, Connect Claude | none | none yet |
-| Knowledge | Search, and the concept page, its detail | Guides, All knowledge, Kinds, Collections and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
+| Knowledge | Search, and the concept page, its detail. Collections and owners | Guides, All knowledge, Kinds (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
 | Inbox | none | Waiting on you, which S3 builds and S5 and V1 add their queues to | Then: approvals of actions an agent takes as the person |
@@ -179,3 +179,5 @@ Amended 13/10/2026 by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask
 Amended 15/10/2026 by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, U18). Ask › *New question* is built and is an Editor's and a Viewer's home. Ask's own address, `/ask`, stood as that home while none of the area's pages was built; it now leads to New question for every role, and no area keeps an address of its own. The steps to connect Claude left the home's body for a page of their own, Ask › *Connect Claude*, one link from New question (BA-112). Every role sees Ask, an Admin too. The four levels and every rule above stand.
 
 Amended 22/10/2026 by the `S3` plan (`docs/plans/2026-10-21-1721-feat-s3-concepts-and-guides-plan.md`, BA-231, KTD2). The api now refuses by ownership as well as by role: a concept's direct write, and the decision on an *edit* or a *promotion*, admit its owner or an Admin, and anyone else is refused `owner-forbids`. Hiding stays navigation only. The four levels and every rule above stand.
+
+Amended 22/10/2026 by the `S3` plan (`docs/plans/2026-10-21-1721-feat-s3-concepts-and-guides-plan.md`, BA-12, KTD4 and KTD15). Ownership has landed, so visibility reads it. A page is seen by role, by owning a collection, or, for Waiting on you, by owning any concept. Knowledge › Curation › *Collections and owners* is built: an Admin names or clears each collection's owner there, and an owner of a collection reads it with no picker. An ownership change takes effect at the person's next move, like a role change. Hiding stays navigation only, and the api refuses by role or by ownership. Exports keeps its owners' arm until BA-238 makes it Admin-only. The four levels and every rule above stand.

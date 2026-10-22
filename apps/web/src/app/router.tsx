@@ -50,6 +50,7 @@ import { EveryonePage } from "@/features/console/everyone-page.tsx";
 import { NamesWaitingPage } from "@/features/console/names-waiting-page.tsx";
 import { isTheOperator, mustSignInForTheConsole } from "@/features/console/operator.ts";
 import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
+import { CollectionsAndOwnersPage } from "@/features/knowledge/collections-and-owners-page.tsx";
 import { ConceptPage } from "@/features/knowledge/concept-page.tsx";
 import { SearchPage } from "@/features/knowledge/search-page.tsx";
 import { AuditLogPage } from "@/features/people/audit-log-page.tsx";
@@ -67,6 +68,7 @@ import { CONCEPT_IRI } from "@/shared/knowledge/concept-address.ts";
 import {
   memberRefusal,
   NEEDS_A_PICK,
+  ownsHeld,
   roleHeld,
   SECOND_FACTOR_PENDING,
   useMember,
@@ -108,6 +110,7 @@ const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>
   ["/ask/your-questions", { draw: YourQuestionsPage }],
   ["/ask/connect-claude", { draw: ConnectClaudePage }],
   ["/knowledge/search", { draw: SearchPage }],
+  ["/knowledge/collections-and-owners", { draw: CollectionsAndOwnersPage }],
   ["/sources/connected-sources", { draw: ConnectedSourcesPage }],
   ["/models/models-and-spend", { draw: ModelsAndSpendPage, toolbar: MODELS_AND_SPEND_TOOLBAR }],
   ["/questions/questions-asked", { draw: QuestionsAskedPage }],
@@ -304,7 +307,7 @@ const shellRoute = createRoute({
 });
 
 const memberOf = (context: ShellContext): Reader =>
-  readerOf(roleHeld(context.queryClient, context.api));
+  readerOf(roleHeld(context.queryClient, context.api), ownsHeld(context.queryClient, context.api));
 
 function RoleUnread() {
   const member = useMember();

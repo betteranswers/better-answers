@@ -24,6 +24,9 @@ export const useRole = () => {
 export const roleHeld = (queryClient: QueryClient, api: ApiProxy) =>
   queryClient.getQueryData(memberOptions(api).queryKey)?.role;
 
+export const ownsHeld = (queryClient: QueryClient, api: ApiProxy) =>
+  queryClient.getQueryData(memberOptions(api).queryKey)?.owns;
+
 export const workspaceHeld = (queryClient: QueryClient, api: ApiProxy) =>
   queryClient.getQueryData(memberOptions(api).queryKey)?.workspace.id;
 
