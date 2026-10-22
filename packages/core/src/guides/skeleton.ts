@@ -23,7 +23,7 @@ import {
 import { withMemberUnheld, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import type { GuideDefinition } from "./definition.ts";
 
-const SKELETON_PROJECTION = "guides";
+export const SKELETON_PROJECTION = "guides";
 
 const skeletonSection = z.strictObject({
   id: z.string(),
