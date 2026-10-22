@@ -1,3 +1,4 @@
+export { eraseFromTheIdentitySet } from "./identity.ts";
 export type { IdentityArm } from "./identity.ts";
 export {
   erasureMatchesIn,

@@ -11,7 +11,8 @@ import {
   type OwnedConcept,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
-import type { Result, UserPrincipal } from "../src/kernel/index.ts";
+import { eraseFromTheIdentitySet } from "../src/erasure/index.ts";
+import type { PlatformPrincipal, Result, UserPrincipal } from "../src/kernel/index.ts";
 import { withMember } from "../src/store/postgres/index.ts";
 import { bundleHistory, commitFacts, gatingRefUpdates } from "./bundle.ts";
 import {
@@ -21,8 +22,21 @@ import {
   writeRevokedWhileParked,
 } from "./revocation-race.ts";
 import { connectedSourceHolding } from "./sourced-concept.ts";
-import { seedingWith, statementsWaitingOnALock, until } from "./suite-postgres.ts";
-import { doorsOf, nameOwnerAs, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
+import {
+  holdingTable,
+  isBlockedOnTable,
+  lendingOnceSettled,
+  seedingWith,
+  statementsWaitingOnALock,
+  until,
+} from "./suite-postgres.ts";
+import {
+  doorsOf,
+  EDITORS_COLLECTIONS,
+  nameOwnerAs,
+  suiteWithBundles,
+  type Scenario,
+} from "./workspace-with-bundle.ts";
 
 const { db, arrange } = suiteWithBundles();
 
@@ -311,6 +325,59 @@ describe("an override named while a write is in flight", () => {
     expect(await ownerRead(scenario, { iri: landed.iri, path: input.path })).toBe(
       scenario.viewer.userId,
     );
+  });
+});
+
+describe("an owner erased while their write is in flight", () => {
+  it("finishes both the erasure and the write, deadlocking neither", async () => {
+    const scenario = await arrange();
+    const input = conceptAt("knowledge/policy/expenses.md");
+    const landed = await landedAs(scenario, scenario.editor, input);
+    const platform: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-ops" };
+    const { pseudonym } = await seedingWith(db().pool, (seed) =>
+      seed.erasureRequest({ workspaceId: scenario.workspaceId }),
+    );
+    let erasing: Promise<unknown> = Promise.resolve();
+    const postgres = {
+      ...scenario.postgres,
+      pool: lendingOnceSettled(scenario.postgres.pool, () => erasing),
+    };
+    let pending: Promise<Result<ConceptWritten, unknown>> | undefined;
+    let erased: ReturnType<typeof eraseFromTheIdentitySet> | undefined;
+
+    await holdingTable(db().pool, "concept_identity", async () => {
+      pending = writeConcept(
+        scenario.editor,
+        { ...doorsOf(scenario), postgres },
+        rewriteOf(input, landed),
+      );
+      await until(() => isBlockedOnTable(db().pool, "concept_identity"));
+      erased = eraseFromTheIdentitySet(platform, scenario.postgres, {
+        workspaceId: scenario.workspaceId,
+        personId: scenario.editor.userId,
+        emails: [],
+        needles: { addresses: [], people: [scenario.editor.userId] },
+        pseudonym,
+      });
+      erasing = erased;
+      await until(async () =>
+        (await statementsWaitingOnALock(db().pool)).some((query) =>
+          query.includes("DELETE FROM member"),
+        ),
+      );
+    });
+    const [write, erasure] = await Promise.allSettled([pending, erased]);
+
+    expect(erasure).toMatchObject({
+      status: "fulfilled",
+      value: { membersEnded: 1, ownersDeleted: EDITORS_COLLECTIONS.length },
+    });
+    expect(write).toEqual({ status: "fulfilled", value: { ok: false, error: "not-a-member" } });
+    const left = await db().pool.query(
+      "SELECT 1 FROM concept_owner WHERE workspace_id = $1 AND person_id = $2",
+      [scenario.workspaceId, scenario.editor.userId],
+    );
+    expect(left.rowCount).toBe(0);
   });
 });
 

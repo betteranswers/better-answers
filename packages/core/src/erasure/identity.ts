@@ -142,8 +142,8 @@ export const eraseFromTheIdentitySet = async (
     const lastActive = rowsOf(
       await tx.query("DELETE FROM workspace_last_active WHERE user_id = $1", [personId]),
     );
-    const ownersDeleted = rowsOf(
-      await tx.query("DELETE FROM concept_owner WHERE workspace_id = $1 AND person_id = $2", [
+    const ownersTheMemberCascades = rowsOf(
+      await tx.query("SELECT 1 FROM concept_owner WHERE workspace_id = $1 AND person_id = $2", [
         subject.workspaceId,
         personId,
       ]),
@@ -161,7 +161,13 @@ export const eraseFromTheIdentitySet = async (
     const named = { workspaceId: subject.workspaceId, pseudonym: subject.pseudonym };
     const questionsSince = await sweepTheQuestions(tx, { ...named, askers: askersOf([personId]) });
     const actorsSince = await sweepTheActors(tx, { ...named, needles: subject.needles });
-    const done = { membersEnded, ownersDeleted, lastActive, questionsSince, actorsSince };
+    const done = {
+      membersEnded,
+      ownersDeleted: ownersTheMemberCascades,
+      lastActive,
+      questionsSince,
+      actorsSince,
+    };
 
     const elsewhere = await tx.query(HELD_ELSEWHERE, [personId, subject.workspaceId]);
     if (elsewhere.rows.length > 0) return { arm: "held-elsewhere", ...SWEPT_NOTHING, ...done };
