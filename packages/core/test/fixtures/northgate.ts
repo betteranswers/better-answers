@@ -13,7 +13,7 @@ import { addressOf, answered, readingAs } from "../suite-postgres.ts";
 import { doorsOf, memberOf, principalFor, type Scenario } from "../workspace-with-bundle.ts";
 
 /** Northgate Example Ltd, a fictional supplier whose knowledge base meets the bid-library template. */
-const NORTHGATE = {
+export const NORTHGATE = {
   collection: "company",
   sections: 8,
   writeUps: 8,
