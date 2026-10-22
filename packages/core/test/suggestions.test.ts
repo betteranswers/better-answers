@@ -9,6 +9,8 @@ import {
   acceptSuggestions,
   contentHashOf,
   declineSuggestion,
+  foldKind,
+  mergeKeyOf,
   parseConceptFile,
   submitSuggestionSet,
   suggestionSetSummary,
@@ -1667,5 +1669,55 @@ describe("what a suggestion set refuses before it does any work", () => {
       { ok: false, error: "malformed" },
     ]);
     expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
+  });
+});
+
+const RETITLED = "Travel Expenses";
+
+const retitled = { title: RETITLED, frontmatter: { title: RETITLED, type: "Policy" } };
+
+const mergeKeyHeldBy = async (iri: string): Promise<string | undefined> => {
+  const found = await db().pool.query<{ merge_key: string }>(
+    "SELECT merge_key FROM concept_identity WHERE iri = $1",
+    [iri],
+  );
+  return found.rows[0]?.merge_key;
+};
+
+describe("an accepted edit's identity and state", () => {
+  it("re-keys an accepted retitle to its new title", async () => {
+    const scenario = await arrange();
+    const { written, set } = await proposedAgainst(scenario, "edit", {}, retitled);
+
+    await acceptedOne(scenario, set.setId);
+
+    expect(await mergeKeyHeldBy(written.iri)).toBe(mergeKeyOf(foldKind("Policy"), RETITLED));
+  });
+
+  it("keeps the key of an accepted edit keeping its title", async () => {
+    const scenario = await arrange();
+    const { input, written, set } = await proposedAgainst(scenario, "edit");
+
+    await acceptedOne(scenario, set.setId);
+
+    expect(await mergeKeyHeldBy(written.iri)).toBe(input.mergeKey);
+  });
+
+  it("returns an accepted retitle onto a title already taken", async () => {
+    const scenario = await arrange();
+    const { input, written, set } = await proposedAgainst(scenario, "edit", {}, retitled);
+    await editorWrote(scenario, {
+      ...retitled,
+      mergeKey: mergeKeyOf(foldKind("Policy"), RETITLED),
+      expects: { head: written.sha },
+    });
+    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+
+    const [outcome] = await acceptAll(scenario, set.setId);
+
+    expect(outcome?.outcome).toEqual({ ok: false, error: "resolution-moved" });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "returned" });
+    expect(await mergeKeyHeldBy(written.iri)).toBe(input.mergeKey);
   });
 });
