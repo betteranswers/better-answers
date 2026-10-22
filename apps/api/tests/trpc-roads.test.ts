@@ -510,6 +510,8 @@ describe("every mutation on an own-transaction road", () => {
 
     expect(paths.toSorted()).toEqual([
       "ask.question",
+      "inbox.accept",
+      "inbox.decline",
       "knowledge.saveConcept",
       "members.approveRequest",
       "members.bulkChangeRole",
