@@ -38,7 +38,7 @@ FROM ghcr.io/astral-sh/uv:0.13.0@sha256:cdc6093146eb3ff6a40107b38f008b789e050e77
 # image carries Debian's Python, 3.13.5 on 24/09/2026, ten releases behind the 3.13.15
 # pinned below, at a path the build stage's venv does not point to. `nonroot`, so a lost
 # `USER` line would still not run the worker as root.
-FROM gcr.io/distroless/cc-debian13:nonroot@sha256:54df941ed0d06a1bd95ef5e0ce391fd8d9f94b64782dc9a60062727849ee3f97 AS distroless
+FROM gcr.io/distroless/cc-debian13:nonroot@sha256:b7e81cb1af38d9345680e68bcf564d388f96304e25222030fc8c051faf8565b3 AS distroless
 
 # The one pin of the Python image. The build stage makes the venv with its interpreter and
 # the `tree` stage hands that same interpreter to the runtime, so the two cannot drift.
