@@ -1,13 +1,11 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
-import { refusalOf, useTRPC, type ApiError, type RefusalWord } from "@/shared/api/trpc.ts";
 import { useKeystroke, usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
 import { ListRead, ListState } from "@/shared/list-pages.tsx";
-import { memberChanged, useRole } from "@/shared/member.ts";
+import { useRole } from "@/shared/member.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { ownsNoLonger, useArrivalDecidedAgainOnceUnowned } from "@/shared/ownership.ts";
 import { ListHead, PageHead } from "@/shared/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
 import { keyedRow, rowInFocus } from "@/shared/row-focus.ts";
@@ -34,8 +32,6 @@ const COLLECTIONS_AND_OWNERS = pageNamed(CURATION, "Collections and Owners");
 const NAMING: readonly Keystroke[] = [KEY.changeOwner];
 
 const NO_KEYSTROKES: readonly Keystroke[] = [];
-
-const OWNER_FORBIDS: RefusalWord = "owner-forbids";
 
 const NO_OWNER = "";
 
@@ -99,24 +95,6 @@ const useNaming = (choices: readonly Owner[], say: (outcome: Outcome) => void): 
       );
     },
   };
-};
-
-const useArrivalDecidedAgainOnceUnowned = (failure: ApiError | null) => {
-  const api = useTRPC();
-  const queryClient = useQueryClient();
-  const router = useRouter();
-  const unowned = failure !== null && refusalOf(failure)?.word === OWNER_FORBIDS;
-
-  useEffect(() => {
-    if (!unowned) return;
-    let here = true;
-    void memberChanged(queryClient, api, { readAgain: true, ifUnread: "keep" }).then(() => {
-      if (here) void router.invalidate();
-    });
-    return () => {
-      here = false;
-    };
-  }, [unowned, queryClient, api, router]);
 };
 
 function OwnerPicker(properties: { readonly owned: CollectionOwned; readonly naming: Naming }) {
@@ -228,7 +206,7 @@ function CollectionsRegion() {
   const admin = useRole() === "Admin";
   const [outcome, say] = useState<Outcome>();
   const naming = useNaming(useOwnerChoices(admin), say);
-  useArrivalDecidedAgainOnceUnowned(read.error);
+  useArrivalDecidedAgainOnceUnowned(ownsNoLonger(read.error));
   usePageKeystrokes(admin ? NAMING : NO_KEYSTROKES);
   const listed = read.data?.collections;
 
