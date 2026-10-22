@@ -943,7 +943,11 @@ const BODY_WORDS: Partial<
     `no concept ${asked.iri} stands in workspace ${workspaceId} that ${asked.email} can read; a Restricted concept needs an Admin; nothing was written`,
   unchanged: (asked) => `the body given is the one ${asked.iri} already holds; nothing was written`,
   "widening-refused": (asked) =>
-    `${asked.iri} is held narrower than the sources it cites, as after a replay whose sources disagreed; a body update would widen it, so nothing was written`,
+    `${asked.iri} is held narrower than the sources it cites, as after a replay whose file cited a document the catalogue no longer holds; a body update would widen it, so nothing was written`,
+  "no-such-document": (asked) =>
+    `${asked.iri} cites a document the catalogue no longer holds, so its file cannot be written again by this command; escalate it; nothing was written`,
+  "body-locator-refused": (asked) =>
+    `the body names a passage locator that ${asked.iri}'s sources do not cite; cite the passage in its sources first; nothing was written`,
   "stale-precondition": (asked) =>
     `${asked.iri} moved: ${asked.run.base === undefined ? "its" : `it no longer stands at ${asked.run.base}, or its`} file at the bundle's head is ahead of its row; nothing was written. Run with --dry-run again, and if that refuses the same way a minute later, the rows are behind the bundle: RUNBOOK page 10`,
   "no-such-repository": () => "this workspace has no bundle repository; provision it first",

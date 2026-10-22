@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { head } from "@better-answers/core/store/git";
-import { conceptIriOf, ulid } from "@better-answers/schema";
+import { conceptIriOf, passageLocatorOf, ulid } from "@better-answers/schema";
 
 import {
   acceptSuggestions,
@@ -184,12 +184,12 @@ const buildTheMap = async (scenario: Scenario) => {
       sources: [
         { resource: superseded.iri, locator: "p.1", id: "handbook" },
         { resource: derivedFrom.iri, locator: "p.2" },
+        {
+          resource: "The handbook",
+          locator: passageLocatorOf(connectedSource.documentId, 0, 1),
+        },
       ],
     },
-
-    evidence: [
-      { sourceDocumentId: connectedSource.documentId, locator: "p.1", resource: "The handbook" },
-    ],
   });
 
   await wrote(scenario, scenario.admin, {
@@ -265,7 +265,13 @@ describe("the worker's rebuild against the api's own map", () => {
       expect(await nodesAt(scenario.workspaceId, 2)).toEqual(liveNodes);
       expect(await edgesAt(scenario.workspaceId, 2)).toEqual(liveEdges);
       expect(await unresolvedAt(scenario.workspaceId, 2)).toEqual(liveUnresolved);
-      expect(liveUnresolved).toEqual([
+      expect(liveUnresolved, "a source label waits as a path, in both tiers").toEqual([
+        {
+          from_uid: linker.iri,
+          relation: "lineage",
+          ordinal: 2,
+          target_path: "knowledge/The handbook",
+        },
         { from_uid: linker.iri, relation: "link", ordinal: 12, target_path: neverPath },
       ]);
 

@@ -158,19 +158,37 @@ const resolvedOf = async (
   const cited = citedSourceOf(entry);
   // Stryker disable next-line ConditionalExpression: the insert boundary refuses an entry naming no resource, so none reaches this; hides → true, killed in import-bundle.test.ts
   if (cited === undefined) return ok(undefined);
-  const source = labelOf(entry, cited.resource);
-  const named = namedItem(cited.id, source, placeOf(doors, cited.locator));
   const opening = openingNamed(doors, cited.locator, cited.resource);
-  if (opening === undefined) return ok({ entry, item: named, points: false, opens: false });
+  const named = (label: string) => namedItem(cited.id, label, placeOf(doors, cited.locator));
+  if (opening === undefined) {
+    return ok({ entry, item: named(labelOf(entry, cited.resource)), points: false, opens: false });
+  }
   const opens = await opensFor(doors, opening);
   if (!opens.ok) return err(opens.error);
-  return ok({
-    entry,
-    item: opens.value ? { ...named, ...opening } : named,
-    points: true,
-    opens: opens.value,
-  });
+  if (opens.value) {
+    return ok({
+      entry,
+      item: { ...named(labelOf(entry, cited.resource)), ...opening },
+      points: true,
+      opens: true,
+    });
+  }
+  const points = "iri" in opening ? await mintedConcept(doors, opening.iri) : ok(true);
+  if (!points.ok) return err(points.error);
+  const label =
+    "iri" in opening ? labelOf(entry, WITHHELD_CONCEPT) : labelOf(entry, cited.resource);
+  return ok({ entry, item: named(label), points: points.value, opens: false });
 };
+
+const WITHHELD_CONCEPT = "A concept you cannot open";
+
+const MINTED_CONCEPT = "SELECT 1 FROM concept_identity WHERE workspace_id = $1 AND iri = $2";
+
+const mintedConcept = (doors: Doors, iri: ConceptIri): Promise<Result<boolean, Error>> =>
+  attempt(async () => {
+    const minted = await doors.tx.query(MINTED_CONCEPT, [doors.principal.workspaceId, iri]);
+    return minted.rows.length > 0;
+  });
 
 export const resolvedSourcesOf = async (
   doors: Doors,

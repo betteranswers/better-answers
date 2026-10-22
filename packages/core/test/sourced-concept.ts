@@ -1,12 +1,14 @@
 import type pg from "pg";
 
 import { head } from "@better-answers/core/store/git";
+import { passageLocatorOf } from "@better-answers/schema";
 import { testData, type MigratedPostgres, type TestData } from "@better-answers/schema/testing";
 
 import {
   overrideConceptSensitivity,
   writeConcept,
   type ConceptWritten,
+  type FrontmatterSource,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
@@ -253,6 +255,18 @@ export type SourcedConcept = ConceptWritten & {
 
 let sequence = 0;
 
+const sourcesCiting = (
+  documents: readonly string[],
+): { readonly sources?: readonly FrontmatterSource[] } =>
+  documents.length === 0
+    ? {}
+    : {
+        sources: documents.map((sourceDocumentId, at) => ({
+          resource: `Document ${at + 1}`,
+          locator: passageLocatorOf(sourceDocumentId, at, at + 1),
+        })),
+      };
+
 export const conceptCiting = async (
   scenario: Scenario,
   writer: UserPrincipal,
@@ -268,18 +282,13 @@ export const conceptCiting = async (
     path,
     kind: "Note",
     title,
-    frontmatter: { title, type: "Note" },
     body: `Note ${sequence} rests on what it cites.`,
     message: `Record sourced note ${sequence}`,
     author: { name: "Ada Editor", email: "ada@acme.invalid" },
     expects: { head: await head(writer, scenario.git) },
     status: "stable",
-    evidence: documents.map((sourceDocumentId, at) => ({
-      sourceDocumentId,
-      locator: `p.${at + 1}`,
-      resource: `Document ${at + 1}`,
-    })),
     ...overrides,
+    frontmatter: { title, type: "Note", ...sourcesCiting(documents), ...overrides.frontmatter },
   });
   if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
   return { ...written.value, path, mergeKey, title };
@@ -289,7 +298,7 @@ export const rewriteCiting = async (
   scenario: Scenario,
   writer: UserPrincipal,
   written: SourcedConcept,
-  documents: readonly string[] | undefined,
+  documents: readonly string[],
   overrides: Partial<WriteConceptInput> = {},
 ) =>
   writeConcept(writer, doorsOf(scenario), {
@@ -298,21 +307,17 @@ export const rewriteCiting = async (
     path: written.path,
     kind: "Note",
     title: written.title,
-    frontmatter: { title: written.title, type: "Note" },
     body: "The note says something else now.",
     message: "Re-write the note",
     author: { name: "Ada Editor", email: "ada@acme.invalid" },
     expects: { head: await head(writer, scenario.git) },
-    ...(documents === undefined
-      ? {}
-      : {
-          evidence: documents.map((sourceDocumentId, at) => ({
-            sourceDocumentId,
-            locator: `p.${at + 1}`,
-            resource: `Document ${at + 1}`,
-          })),
-        }),
     ...overrides,
+    frontmatter: {
+      title: written.title,
+      type: "Note",
+      ...sourcesCiting(documents),
+      ...overrides.frontmatter,
+    },
   });
 
 export const overriddenBy = (

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { writeConcept } from "@better-answers/core/concepts";
+import { overrideConceptSensitivity, writeConcept } from "@better-answers/core/concepts";
 import type { UserPrincipal } from "@better-answers/core/kernel";
 import { head, initRepository } from "@better-answers/core/store/git";
 import {
@@ -9,7 +9,7 @@ import {
   groupSeeded,
   type DocumentShape,
 } from "@better-answers/core/testing/documents";
-import { ULID } from "@better-answers/schema";
+import { passageLocatorOf, ULID } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { connectAsHost } from "./flow.ts";
@@ -60,6 +60,11 @@ const conceptWrittenIn = async (
   return written.value.iri;
 };
 
+const sharedPastItsEvidence = (workspace: Awaited<ReturnType<TestApp["provision"]>>, iri: string) =>
+  actingIn(app, { workspaceId: workspace.workspaceId, userId: workspace.admin.id }, (admin, tx) =>
+    overrideConceptSensitivity(admin, tx, { iri, sensitivity: "Internal", audience: "everyone" }),
+  );
+
 const clientAndTokenFor = async (person: { readonly email: string }) => ({
   client: app.client(),
   token: (
@@ -92,10 +97,13 @@ const restrictedSourcedConcept = async () => {
     mergeKey: "note:board-remuneration",
     path: "knowledge/board-remuneration.md",
     title: TITLE,
-    frontmatter: { title: TITLE, type: "Note" },
+    frontmatter: {
+      title: TITLE,
+      type: "Note",
+      sources: [{ resource: "Board minutes", locator: passageLocatorOf(documentId, 0, 1) }],
+    },
     body: "The board's remuneration is reviewed each March.",
     message: "Record the board's remuneration note",
-    evidence: [{ sourceDocumentId: documentId, locator: "p.4", resource: "Board minutes" }],
   });
   return {
     iri,
@@ -230,9 +238,6 @@ const documentsAndTheConceptOverThem = async () => {
     },
     body: "The kingfisher rule is stated here.",
     message: "Record the kingfisher policy",
-    evidence: [
-      { sourceDocumentId: covered.documentId, locator: covered.locator, resource: COVERED_TITLE },
-    ],
   });
 
   return {
@@ -468,12 +473,13 @@ const aConceptCitingRestrictedMinutes = async () => {
     mergeKey: "note:heron-policy",
     path: "knowledge/heron-policy.md",
     title: HERON_TITLE,
-    frontmatter: { title: HERON_TITLE, type: "Note" },
+    frontmatter: {
+      title: HERON_TITLE,
+      type: "Note",
+      sources: [{ resource: "handbook", locator: handbook.locator }],
+    },
     body: "The heron rule is stated here.",
     message: "Record the heron policy",
-    evidence: [
-      { sourceDocumentId: handbook.documentId, locator: handbook.locator, resource: "handbook" },
-    ],
   });
   const body = `The kingfisher review stands. See [${HERON_TITLE}](${heron}).`;
   const iri = await conceptWrittenIn(workspace, {
@@ -491,10 +497,8 @@ const aConceptCitingRestrictedMinutes = async () => {
     },
     body,
     message: "Record the kingfisher review",
-    evidence: [
-      { sourceDocumentId: handbook.documentId, locator: handbook.locator, resource: "handbook" },
-    ],
   });
+  await sharedPastItsEvidence(workspace, iri);
   return {
     iri,
     heron,

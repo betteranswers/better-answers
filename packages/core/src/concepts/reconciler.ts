@@ -1,10 +1,4 @@
-import {
-  boundarySchemas,
-  BUNDLE_MANIFEST_PATH,
-  IRI,
-  resolvedResource,
-  ULID,
-} from "@better-answers/schema";
+import { boundarySchemas, BUNDLE_MANIFEST_PATH, IRI, ULID } from "@better-answers/schema";
 
 import { batchIdFor, eventsOfAction, record } from "../audit/index.ts";
 import {
@@ -31,9 +25,11 @@ import {
 } from "../store/postgres/index.ts";
 import { workspaceIds } from "../workspaces/index.ts";
 import { tryBundleFenceAs } from "./fence.ts";
-import { hashedFileOf, parseConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
+import { contentHashOf, parseConceptFile, type Frontmatter } from "./file.ts";
 import type { Acceptance } from "./index.ts";
 import {
+  cataloguedOf,
+  evidenceOfSources,
   heldByIri,
   indexRowOf,
   type IndexRow,
@@ -41,6 +37,7 @@ import {
   landRows,
   mergeKeyOf,
   WRITE_CONSTRAINTS,
+  type EvidenceRow,
   type Held,
 } from "./landing.ts";
 import { parseBundleManifest } from "./manifest.ts";
@@ -181,27 +178,18 @@ const derivedMergeKey = async (
   return holder === undefined || holder === iri ? derived : iri;
 };
 
-const fileCitesTheStandingEvidence = async (
+const catalogued = async (
   platform: PlatformPrincipal,
   tx: Tx,
-  facts: CommitFacts,
-  cited: readonly HashedSource[],
-): Promise<boolean> => {
-  const standing = await tx.query<{ resource: string; locator: string }>(
-    `SELECT e.resource, ce.locator
-       FROM concept_evidence ce
-       JOIN evidence e ON e.workspace_id = ce.workspace_id
-                      AND e.source_document_id = ce.source_document_id AND e.locator = ce.locator
-      WHERE ce.workspace_id = ${scopeClause(1)} AND ce.iri = $2`,
-    [scopeParameter(platform), facts.iri],
+  evidence: readonly EvidenceRow[],
+): Promise<{ readonly held: readonly EvidenceRow[]; readonly every: boolean }> => {
+  const known = await cataloguedOf(
+    platform,
+    tx,
+    evidence.map((piece) => piece.sourceDocumentId),
   );
-  const pairs = (sources: readonly HashedSource[]) =>
-    new Set(sources.map((pair) => JSON.stringify(pair)));
-  const filed = pairs(cited);
-  const held = pairs(
-    standing.rows.map((row) => [resolvedResource(row.resource, facts.path), row.locator]),
-  );
-  return filed.size === held.size && [...filed].every((pair) => held.has(pair));
+  const held = evidence.filter((piece) => known.has(piece.sourceDocumentId));
+  return { held, every: held.length === evidence.length };
 };
 
 const lastRecordedCommit = async (platform: PlatformPrincipal, tx: Tx): Promise<string | null> => {
@@ -233,18 +221,16 @@ const suggestedBy = async (
       };
 };
 
-type Replayable = { readonly row: IndexRow; readonly sources: readonly HashedSource[] };
-
 const replayableOf = (
   workspaceId: WorkspaceId,
   facts: CommitFacts,
   held: Held | undefined,
   clock: Clock,
-): Replayable | undefined => {
+): IndexRow | undefined => {
   const kind = stringIn(facts.frontmatter, "type") ?? held?.kind;
   const title = stringIn(facts.frontmatter, "title") ?? held?.title;
   if (kind === undefined || title === undefined) return undefined;
-  const { contentHash, sources } = hashedFileOf(facts.frontmatter, facts.body, facts.path);
+  const contentHash = contentHashOf(facts.frontmatter, facts.body, facts.path);
 
   const parsed = indexRowOf(
     {
@@ -262,7 +248,7 @@ const replayableOf = (
     held,
     clock.now(),
   );
-  return parsed.success ? { row: parsed.data, sources } : undefined;
+  return parsed.success ? parsed.data : undefined;
 };
 
 const replayCommit = async (
@@ -301,14 +287,18 @@ const replayCommit = async (
 
         if (held !== undefined && held.path !== facts.path) return err("rename-refused");
         const suggested = await suggestedBy(platform, tx, facts.suggestionId);
-        const replayable = replayableOf(workspaceId, facts, held, doors.clock);
-        if (replayable === undefined) return err("unreadable-commit");
-        const { row, sources } = replayable;
+        const row = replayableOf(workspaceId, facts, held, doors.clock);
+        if (row === undefined) return err("unreadable-commit");
         const mergeKey =
           suggested.mergeKey ??
           held?.mergeKey ??
           (await derivedMergeKey(platform, tx, row.iri, row.kind, row.title));
-        const evidenceAgrees = await fileCitesTheStandingEvidence(platform, tx, facts, sources);
+        const evidence = await catalogued(
+          platform,
+          tx,
+          evidenceOfSources(workspaceId, facts.frontmatter),
+        );
+        const evidenceAgrees = evidence.every;
 
         await record(platform, tx, {
           id: facts.auditEventId,
@@ -328,9 +318,7 @@ const replayCommit = async (
           commit: { sha: facts.sha, parent: facts.parent },
           actor: facts.actor,
           auditEventId: facts.auditEventId,
-          sources,
-
-          evidence: undefined,
+          evidence: evidence.held,
 
           restsAlsoOn: restsAlsoOnWhenReplayed(evidenceAgrees),
           acceptance: suggested.acceptance,

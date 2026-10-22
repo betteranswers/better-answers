@@ -77,7 +77,7 @@ const canonicalText = (value: FrontmatterValue | undefined): string =>
 export const contentHashOf = (frontmatter: Frontmatter, body: string, path: string): string =>
   hashedFileOf(frontmatter, body, path).contentHash;
 
-export const hashedFileOf = (frontmatter: Frontmatter, body: string, path: string): HashedFile => {
+const hashedFileOf = (frontmatter: Frontmatter, body: string, path: string): HashedFile => {
   const sources = reducedSources(frontmatter["sources"], path);
   const contentHash = createHash("sha256")
     .update(`${canonicalOver(frontmatter, sources)}\n${normalisedBody(body)}`, "utf8")

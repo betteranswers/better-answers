@@ -29,6 +29,7 @@ const STEPS: Readonly<Record<string, string>> = {
   "concepts/evidenceOf": "ask calls it with the reader it admitted",
   "concepts/findConcepts": "find and ask call it with the reader they admitted",
   "concepts/ownerOf": "an act that admitted a person reads it, and it decides nothing",
+  "concepts/standingOnConcept": "open calls it with the reader it admitted, and it decides nothing",
   "concepts/readConcept": "open calls it with the reader it admitted",
   "guides/recomputeWriteUpsIncluding":
     "a visibility change and a landed write call it in their own transaction",

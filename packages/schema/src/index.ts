@@ -10,6 +10,7 @@ export * from "./boundary-schemas.ts";
 export * from "./ids.ts";
 export * from "./roles.ts";
 export * from "./ulid.ts";
+export * from "./passage-locator.ts";
 export * from "./bundle-manifest.ts";
 export * from "./contract-digest.ts";
 export * from "./contract-stamp.ts";

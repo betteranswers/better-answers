@@ -1,60 +1,27 @@
-import { ULID } from "@better-answers/schema";
+import {
+  parsedPassageLocator,
+  passageLocatorOf,
+  type PassageLocator,
+} from "@better-answers/schema";
 
 import { err, NOT_FOUND, ok, type Result } from "../kernel/index.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
 const ORDINAL_DIGITS = 6;
 const PASSAGE_ID_SEPARATOR = "#";
-const SPAN_PREFIX = "chars:";
-const SPAN_SEPARATOR = "-";
-const PATH_SEPARATOR = "/";
-
-const OFFSET = /^(?:0|[1-9][0-9]*)$/;
 
 export type LocatorRefusal = SourceRefusal<"not-found">;
 
-export type Locator = {
-  readonly sourceDocumentId: string;
-  readonly charStart: number;
-  readonly charEnd: number;
-};
+export type Locator = PassageLocator;
 
 export const passageIdOf = (sourceDocumentId: string, ordinal: number): string =>
   `${sourceDocumentId}${PASSAGE_ID_SEPARATOR}${String(ordinal).padStart(ORDINAL_DIGITS, "0")}`;
 
-export const locatorOf = (sourceDocumentId: string, charStart: number, charEnd: number): string =>
-  `${sourceDocumentId}${PATH_SEPARATOR}${SPAN_PREFIX}${charStart}${SPAN_SEPARATOR}${charEnd}`;
-
-type Span = Pick<Locator, "charStart" | "charEnd">;
-
-const twoParts = (joined: string, separator: string): readonly [string, string] | undefined => {
-  const [first, second, ...beyond] = joined.split(separator);
-  if (first === undefined || second === undefined || beyond.length > 0) return undefined;
-  return [first, second];
-};
-
-const spanOf = (spanPart: string): Span | undefined => {
-  if (!spanPart.startsWith(SPAN_PREFIX)) return undefined;
-  const offsets = twoParts(spanPart.slice(SPAN_PREFIX.length), SPAN_SEPARATOR);
-  if (offsets === undefined) return undefined;
-  const [start, end] = offsets;
-  if (!OFFSET.test(start) || !OFFSET.test(end)) return undefined;
-
-  const charStart = Number(start);
-  const charEnd = Number(end);
-
-  if (charStart >= charEnd) return undefined;
-  return { charStart, charEnd };
-};
+export const locatorOf = passageLocatorOf;
 
 export const parseLocator = (wire: string): Result<Locator, LocatorRefusal> => {
-  const parts = twoParts(wire, PATH_SEPARATOR);
-  if (parts === undefined) return err(NOT_FOUND);
-  const [documentPart, spanPart] = parts;
-
-  const span = spanOf(spanPart);
-  if (span === undefined || !ULID.test(documentPart)) return err(NOT_FOUND);
-  return ok({ sourceDocumentId: documentPart, ...span });
+  const locator = parsedPassageLocator(wire);
+  return locator === undefined ? err(NOT_FOUND) : ok(locator);
 };
 
 export const spanText = (text: string, locator: Locator): Result<string, LocatorRefusal> => {

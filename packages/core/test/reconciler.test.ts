@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { commit, withRepositoryLock } from "@better-answers/core/store/git";
-import { conceptIriOf, ulid } from "@better-answers/schema";
+import { conceptIriOf, passageLocatorOf, ulid } from "@better-answers/schema";
 
 import {
   acceptSuggestions,
@@ -216,6 +216,11 @@ const sensitivitiesOf = async (workspaceId: string, iris: readonly string[]) => 
 
 const handbook = { resource: "/sources/handbook.pdf", locator: "p.1" };
 const minutes = { resource: "/sources/board-minutes.pdf", locator: "p.2" };
+
+const citing = (source: { readonly resource: string }, documentId: string) => ({
+  resource: source.resource,
+  locator: passageLocatorOf(documentId, 0, 1),
+});
 
 const decisionOf = async (suggestionId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
@@ -555,59 +560,101 @@ describe("a re-write whose rows were lost", () => {
       sensitivity: "Restricted",
     });
     const input = guideline("Allowances", {
-      frontmatter: { title: "Allowances", type: "Guideline", sources: [handbook] },
-      evidence: [{ sourceDocumentId: internal.documentId, ...handbook }],
+      frontmatter: {
+        title: "Allowances",
+        type: "Guideline",
+        sources: [citing(handbook, internal.documentId)],
+      },
     });
     const first = await landed(scenario, scenario.editor, input);
     const minuted = (head: string | null): WriteConceptInput => ({
       ...input,
       iri: first.iri,
-      frontmatter: { title: "Allowances", type: "Guideline", sources: [handbook, minutes] },
-      evidence: [
-        { sourceDocumentId: internal.documentId, ...handbook },
-        { sourceDocumentId: restricted.documentId, ...minutes },
-      ],
+      frontmatter: {
+        title: "Allowances",
+        type: "Guideline",
+        sources: [citing(handbook, internal.documentId), citing(minutes, restricted.documentId)],
+      },
       body: "# Allowances\n\nWhat the board minuted.",
       expects: { head },
     });
-    return { internal, input, first, minuted };
+    return { internal, restricted, input, first, minuted };
   };
 
-  it("lands Restricted, flagged in its audit event, when sources differ", async () => {
+  const citedDocuments = async (workspaceId: string, iri: string) => {
+    const cited = await db().pool.query<{ source_document_id: string; locator: string }>(
+      `SELECT source_document_id, locator FROM concept_evidence
+        WHERE workspace_id = $1 AND iri = $2 ORDER BY locator`,
+      [workspaceId, iri],
+    );
+    return cited.rows;
+  };
+
+  it("replays a commit's evidence rows from its file", async () => {
     const scenario = await arrange();
-    const { input, first, minuted } = await allowancesCitingTheHandbook(scenario);
-    expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
-      sensitivity: "Internal",
-    });
+    const { internal, restricted, first, minuted } = await allowancesCitingTheHandbook(scenario);
 
-    const [, unchanged = null] = await writeInTheWindow(scenario, scenario.editor, {
-      ...input,
-      iri: first.iri,
-      body: "# Allowances\n\nThe same sources, other words.",
-      expects: { head: first.sha },
-    });
-    const history = await writeInTheWindow(scenario, scenario.editor, minuted(unchanged));
-
+    const history = await writeInTheWindow(scenario, scenario.editor, minuted(first.sha));
     const run = await reconciled(scenario);
 
-    expect(run).toMatchObject({ replayed: history.slice(1), stopped: undefined });
+    expect(run).toMatchObject({ replayed: [history[1]], stopped: undefined });
+    expect(await citedDocuments(scenario.workspaceId, first.iri)).toEqual(
+      [citing(handbook, internal.documentId), citing(minutes, restricted.documentId)]
+        .map(({ locator }) => ({ source_document_id: locator.split("/")[0], locator }))
+        .toSorted((one, other) => one.locator.localeCompare(other.locator)),
+    );
     expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
-      commit_sha: history[2],
+      commit_sha: history[1],
       sensitivity: "Restricted",
-      audience: "everyone",
     });
     const events = await replayedEvents(scenario.workspaceId);
-    expect(events.map((event) => event["subject_id"])).toEqual(history.slice(1));
     expect(events.map((event) => replayDetail.parse(event["detail"]).evidenceAgrees)).toEqual([
       true,
+    ]);
+  });
+
+  const uncatalogued = (scenario: Scenario, documentId: string) =>
+    db().pool.query("DELETE FROM source_document WHERE workspace_id = $1 AND id = $2", [
+      scenario.workspaceId,
+      documentId,
+    ]);
+
+  const minutedThenUncatalogued = async (scenario: Scenario) => {
+    const cited = await allowancesCitingTheHandbook(scenario);
+    const history = await writeInTheWindow(
+      scenario,
+      scenario.editor,
+      cited.minuted(cited.first.sha),
+    );
+    await uncatalogued(scenario, cited.restricted.documentId);
+    return { ...cited, history };
+  };
+
+  it("lands Restricted, flagged, when its file cites an uncatalogued document", async () => {
+    const scenario = await arrange();
+    const { internal, first, history } = await minutedThenUncatalogued(scenario);
+
+    expect(await reconciled(scenario)).toMatchObject({ replayed: history.slice(1) });
+    expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
+      sensitivity: "Restricted",
+      audience: "everyone",
+      commit_sha: history.at(-1),
+    });
+    expect(await citedDocuments(scenario.workspaceId, first.iri)).toEqual([
+      {
+        source_document_id: internal.documentId,
+        locator: citing(handbook, internal.documentId).locator,
+      },
+    ]);
+    const events = await replayedEvents(scenario.workspaceId);
+    expect(events.map((event) => replayDetail.parse(event["detail"]).evidenceAgrees)).toEqual([
       false,
     ]);
   });
 
-  it("refuses an edit naming no evidence while held Restricted", async () => {
+  it("refuses an edit widening a concept a replay held Restricted", async () => {
     const scenario = await arrange();
-    const { internal, input, first, minuted } = await allowancesCitingTheHandbook(scenario);
-    const history = await writeInTheWindow(scenario, scenario.editor, minuted(first.sha));
+    const { internal, input, first, history } = await minutedThenUncatalogued(scenario);
     await reconciled(scenario);
     const quarantined = await conceptRow(scenario.workspaceId, first.iri);
 
@@ -617,7 +664,7 @@ describe("a re-write whose rows were lost", () => {
       path: input.path,
       kind: input.kind,
       title: input.title,
-      frontmatter: minuted(first.sha).frontmatter,
+      frontmatter: input.frontmatter,
       body: "# Allowances\n\nWhat the board minuted, reworded.",
       message: "Reword the allowances guideline",
       author: input.author,
@@ -630,11 +677,12 @@ describe("a re-write whose rows were lost", () => {
       commit_sha: history.at(-1),
       sensitivity: "Restricted",
     });
-    const cited = await db().pool.query(
-      "SELECT source_document_id FROM concept_evidence WHERE workspace_id = $1 AND iri = $2",
-      [scenario.workspaceId, first.iri],
-    );
-    expect(cited.rows).toEqual([{ source_document_id: internal.documentId }]);
+    expect(await citedDocuments(scenario.workspaceId, first.iri)).toEqual([
+      {
+        source_document_id: internal.documentId,
+        locator: citing(handbook, internal.documentId).locator,
+      },
+    ]);
   });
 
   it("stays Restricted through publish and narrowing cascades, unlike its neighbour", async () => {
@@ -643,13 +691,10 @@ describe("a re-write whose rows were lost", () => {
       sensitivity: "Public",
       publishedAt: null,
     });
-    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, {
-      sensitivity: "Restricted",
-    });
+    const minutesSource = await connectedSourceHolding(db(), scenario.workspaceId);
     const citingTheWebsite = (title: string) =>
       guideline(title, {
-        frontmatter: { title, type: "Guideline", sources: [handbook] },
-        evidence: [{ sourceDocumentId: website.documentId, ...handbook }],
+        frontmatter: { title, type: "Guideline", sources: [citing(handbook, website.documentId)] },
         sensitivity: "Restricted",
       });
     const input = citingTheWebsite("Allowances");
@@ -661,14 +706,15 @@ describe("a re-write whose rows were lost", () => {
     await writeInTheWindow(scenario, scenario.admin, {
       ...input,
       iri: first.iri,
-      frontmatter: { title: "Allowances", type: "Guideline", sources: [handbook, minutes] },
-      evidence: [
-        { sourceDocumentId: website.documentId, ...handbook },
-        { sourceDocumentId: restricted.documentId, ...minutes },
-      ],
+      frontmatter: {
+        title: "Allowances",
+        type: "Guideline",
+        sources: [citing(handbook, website.documentId), citing(minutes, minutesSource.documentId)],
+      },
       body: "# Allowances\n\nWhat the board minuted.",
       expects: { head: beside.sha },
     });
+    await uncatalogued(scenario, minutesSource.documentId);
     expect(await reconciled(scenario)).toMatchObject({ stopped: undefined });
     expect(
       (await replayedEvents(scenario.workspaceId)).map(
@@ -706,10 +752,13 @@ describe("a re-write whose rows were lost", () => {
   it("is replayed though its author may no longer read it", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
-    const cited = [
-      { sourceDocumentId: connectedSource.documentId, locator: "p.1", resource: "Handbook" },
-    ];
-    const input = guideline("Hospitality", { evidence: cited });
+    const input = guideline("Hospitality", {
+      frontmatter: {
+        title: "Hospitality",
+        type: "Guideline",
+        sources: [citing(handbook, connectedSource.documentId)],
+      },
+    });
     const first = await landed(scenario, scenario.editor, input);
     const body = "# Hospitality\n\nA meal a day, receipted.";
     const history = await writeInTheWindow(scenario, scenario.editor, {

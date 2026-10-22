@@ -4,6 +4,9 @@ import {
   AUDIENCE_EVERYONE,
   boundarySchemas,
   citedSourcesOf,
+  IRI,
+  LINKS_TO_LABEL,
+  parsedPassageLocator,
   CONCEPT_DRAFT_STATUS,
   PUBLISHED_STATUSES,
   SENSITIVITY_DEFAULT,
@@ -47,7 +50,7 @@ import {
   type PostgresDoor,
   type Tx,
 } from "../store/postgres/index.ts";
-import { contentHashOf, parseConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
+import { contentHashOf, parseConceptFile, type Frontmatter } from "./file.ts";
 import type { Acceptance } from "./index.ts";
 import { markDeciding } from "./suggestions.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
@@ -168,19 +171,65 @@ export const holderOfPath = async (
   return found.rows[0]?.iri;
 };
 
+const PLACES_USING = `SELECT
+    (SELECT count(DISTINCT i.write_up_id) FROM write_up_include i
+      WHERE i.workspace_id = ${scopeClause(1)} AND i.iri = $2)
+  + (SELECT count(DISTINCT e.from_uid)
+       FROM map_generation g
+       JOIN map_edge e ON e.workspace_id = g.workspace_id AND e.gen = g.live_gen
+      WHERE g.workspace_id = ${scopeClause(1)} AND e.to_uid = $2 AND e.label = '${LINKS_TO_LABEL}'
+        AND e.from_uid <> $2) AS places`;
+
+export const placesUsingReadableOrNot = async (
+  principal: Principal,
+  tx: Tx,
+  iri: string,
+): Promise<number> => {
+  const found = await tx.query<{ places: string }>(PLACES_USING, [scopeParameter(principal), iri]);
+  return Number(found.rows[0]?.places ?? 0);
+};
+
+export const cataloguedOf = async (
+  principal: Principal,
+  tx: Tx,
+  documentIds: readonly string[],
+): Promise<ReadonlySet<string>> => {
+  const distinct = [...new Set(documentIds)];
+  if (distinct.length === 0) return new Set();
+  const found = await tx.query<{ id: string }>(
+    `SELECT id FROM source_document
+      WHERE workspace_id = ${scopeClause(1)} AND id = ANY($2::text[])`,
+    [scopeParameter(principal), distinct],
+  );
+  return new Set(found.rows.map((row) => row.id));
+};
+
 export const holdsEveryDocument = async (
   principal: Principal,
   tx: Tx,
   documentIds: readonly string[],
-): Promise<boolean> => {
-  const distinct = [...new Set(documentIds)];
-  if (distinct.length === 0) return true;
-  const found = await tx.query<{ held: number }>(
-    `SELECT count(*)::int AS held FROM source_document
-      WHERE workspace_id = ${scopeClause(1)} AND id = ANY($2::text[])`,
-    [scopeParameter(principal), distinct],
-  );
-  return found.rows[0]?.held === distinct.length;
+): Promise<boolean> =>
+  (await cataloguedOf(principal, tx, documentIds)).size === new Set(documentIds).size;
+
+export type EvidenceRow = z.infer<typeof boundarySchemas.evidence.insert>;
+
+export const evidenceOfSources = (
+  workspaceId: EvidenceRow["workspaceId"],
+  frontmatter: Frontmatter,
+): readonly EvidenceRow[] => {
+  const rows = new Map<string, EvidenceRow>();
+  for (const { resource, locator } of citedSourcesOf(frontmatter["sources"])) {
+    const passage = locator === null ? undefined : parsedPassageLocator(locator);
+    if (locator === null || passage === undefined || IRI.test(resource)) continue;
+    rows.set(locator, {
+      workspaceId,
+      sourceDocumentId: passage.sourceDocumentId,
+      locator,
+      resource,
+      contentVersion: null,
+    });
+  }
+  return [...rows.values()];
 };
 
 const sameVisibility = (one: Visibility, other: Visibility): boolean =>
@@ -253,17 +302,13 @@ export const indexRowOf = (facts: RowFacts, held: Held | undefined, now: Date) =
 
 export type IndexRow = Extract<ReturnType<typeof indexRowOf>, { readonly success: true }>["data"];
 
-type EvidenceRow = z.infer<typeof boundarySchemas.evidence.insert>;
-
 type Landing = z.infer<typeof conceptRow> & {
   readonly mergeKey: string;
   readonly commit: Committed;
   readonly actor: ActorId;
   readonly auditEventId: string;
 
-  readonly sources: readonly HashedSource[];
-
-  readonly evidence: readonly EvidenceRow[] | undefined;
+  readonly evidence: readonly EvidenceRow[];
 
   readonly restsAlsoOn: readonly Visibility[];
 
@@ -324,9 +369,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
      ON CONFLICT (workspace_id, iri) DO UPDATE SET merge_key = EXCLUDED.merge_key`,
     [index.workspaceId, index.iri, index.mergeKey],
   );
-  if (index.evidence !== undefined) {
-    await landEvidence(principal, tx, index.iri, index.evidence);
-  }
+  await landEvidence(principal, tx, index.iri, index.evidence);
   const held = visibilityOf({
     sensitivity: index.sensitivity,
     audience: index.audience,

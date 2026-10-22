@@ -65,15 +65,6 @@ export const replaceCitations = async (
   }
 };
 
-export const citationCountOf = async (principal: Principal, tx: Tx, iri: string) => {
-  const counted = await tx.query<{ citations: number }>(
-    `SELECT count(*)::int AS citations FROM concept_evidence
-      WHERE workspace_id = ${scopeClause(1)} AND iri = $2`,
-    [scopeParameter(principal), iri],
-  );
-  return counted.rows[0]?.citations ?? 0;
-};
-
 type OverrideRow = VisibilityRow & { readonly actor: string; readonly recorded_at: Date };
 
 const overrideOf = async (

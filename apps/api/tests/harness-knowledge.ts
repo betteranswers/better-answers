@@ -362,11 +362,6 @@ const conceptWritten = async (
       expects: { head: await head(principal, git) },
       status: "stable",
       sensitivity: concept.sensitivity,
-      evidence: citations.flatMap(({ document, resource, locator }) =>
-        document === undefined || locator === undefined
-          ? []
-          : [{ sourceDocumentId: document.documentId, locator, resource }],
-      ),
     },
   );
   if (!written.ok) throw new Error(`${concept.title} was refused: ${String(written.error)}`);

@@ -1,8 +1,12 @@
+import { execFileSync } from "node:child_process";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { writeConcept } from "@better-answers/core/concepts";
+import { overrideConceptSensitivity, writeConcept } from "@better-answers/core/concepts";
 import { head, initRepository } from "@better-answers/core/store/git";
 import { documentLanded, type DocumentShape } from "@better-answers/core/testing/documents";
+import { testData } from "@better-answers/schema/testing";
 
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { connectAsHost, signIn } from "./flow.ts";
@@ -134,11 +138,15 @@ const aConceptCitingRestrictedMinutes = async () => {
     author: { name: admin.name, email: admin.email },
     expects: { head: await head(writer, git) },
     status: "stable",
-    evidence: [
-      { sourceDocumentId: handbook.documentId, locator: handbook.locator, resource: "handbook" },
-    ],
   });
   if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
+  await actingIn(app(), { workspaceId, userId: admin.id }, (held, tx) =>
+    overrideConceptSensitivity(held, tx, {
+      iri: written.value.iri,
+      sensitivity: "Internal",
+      audience: "everyone",
+    }),
+  );
   return {
     iri: written.value.iri,
     handbook: handbook.locator,
@@ -281,7 +289,6 @@ const threeNotesAskingTheBoard = async () => {
       expects: { head: await head(writer, git) },
       status: "stable",
       sensitivity: concept.sensitivity,
-      evidence: [],
     });
     if (!landed.ok) throw new Error(`the write was refused: ${String(landed.error)}`);
     return landed.value.iri;
@@ -469,7 +476,7 @@ describe("knowledge.open over tRPC", () => {
     expect(opened).toMatchObject({
       concept: {
         access: "partly-included",
-        lead: "Based on your current access, some of the evidence isn't included.",
+        lead: "Based on your current access, some of the evidence isn't included. An Admin shared this concept beyond its evidence.",
         next: "Ask an Admin for access to the sources, or read the concept as it stands.",
         evidence: [
           { id: "HANDBOOK", source: HANDBOOK_TITLE, locator: handbook },
@@ -611,5 +618,74 @@ describe("the knowledge reads' per-person ceiling", () => {
     const opened = await refusalOfCall(api.knowledge.open.query({ iri: iriOf(NESTING) }));
 
     expect(opened).toMatchObject({ data: { code: "TOO_MANY_REQUESTS", httpStatus: 429 } });
+  });
+});
+
+const aPolicyItsEditorOwns = async () => {
+  const { workspaceId, admin, viewer, git, writer, doors } = await aWorkspaceBeingWritten();
+  const editor = await app().person();
+  await app().addMember(workspaceId, editor.id, "Editor");
+  const client = await app().database.superuser.connect();
+  try {
+    await testData(client).conceptOwner({ workspaceId, collection: "policy", personId: editor.id });
+  } finally {
+    client.release();
+  }
+  const written = await writeConcept(writer, doors, {
+    mergeKey: "policy:heron-disturbance",
+    path: "knowledge/policy/heron-disturbance.md",
+    kind: "Policy",
+    title: "Heron disturbance",
+    frontmatter: { title: "Heron disturbance", type: "Policy" },
+    body: "Keep fifty metres from a nesting heron.\n",
+    message: "Record the heron disturbance policy",
+    author: { name: admin.name, email: admin.email },
+    expects: { head: await head(writer, git) },
+    status: "stable",
+    sensitivity: "Internal",
+  });
+  if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
+  const authorOfHead = () =>
+    execFileSync(
+      "git",
+      ["-C", path.join(git.root, `${workspaceId}.git`), "log", "-1", "--format=%an <%ae>"],
+      { encoding: "utf8" },
+    ).trim();
+  return { iri: written.value.iri, editor, viewer, authorOfHead };
+};
+
+describe("an edit saved over tRPC", () => {
+  it("signs a save as the signed-in person, never the client", async () => {
+    const { iri, editor, authorOfHead } = await aPolicyItsEditorOwns();
+    const { api } = await webSignedIn(app(), editor.email);
+    const seed = await api.knowledge.conceptToEdit.query({ iri });
+    const save = {
+      iri,
+      parts: { ...seed.parts, body: "Keep a hundred metres from a nesting heron." },
+      sources: seed.sources,
+      base: seed.base,
+      withheld: seed.withheld.map((source) => source.at),
+    };
+
+    const naming = { ...save, author: { name: "Someone Else", email: "someone@else.invalid" } };
+
+    const forged = await refusalOfCall(api.knowledge.saveConcept.mutate(naming));
+    const saved = await api.knowledge.saveConcept.mutate(save);
+
+    expect(forged).toMatchObject(MALFORMED);
+    expect(saved).toMatchObject({ outcome: "committed", iri });
+    expect(authorOfHead()).toBe(`${editor.name} <${editor.email}>`);
+  });
+
+  it("answers each reader's standing beside the concept read", async () => {
+    const { iri, editor, viewer } = await aPolicyItsEditorOwns();
+    const owner = (await webSignedIn(app(), editor.email)).api;
+    const outsider = (await webSignedIn(app(), viewer.email)).api;
+
+    const owners = await owner.knowledge.open.query({ iri });
+    const outsiders = await outsider.knowledge.open.query({ iri });
+
+    expect(owners).toMatchObject({ found: true, standing: "commits" });
+    expect(outsiders).toMatchObject({ found: true, standing: "suggests" });
   });
 });

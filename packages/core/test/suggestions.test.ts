@@ -9,6 +9,7 @@ import {
   acceptSuggestions,
   contentHashOf,
   declineSuggestion,
+  parseConceptFile,
   submitSuggestionSet,
   suggestionSetSummary,
   writeConcept,
@@ -22,8 +23,7 @@ import {
 } from "../src/concepts/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
-import { bundleHistory, commitFacts } from "./bundle.ts";
-import { connectedSourceHolding } from "./sourced-concept.ts";
+import { bundleHistory, commitFacts, fileAtCommit } from "./bundle.ts";
 import {
   abortTheTransaction,
   holdingTable,
@@ -627,6 +627,36 @@ describe("accepting a suggestion", () => {
       "no-such-suggestion",
     ]);
     expect(await bundleHistory(here.git, here.workspaceId)).toEqual([]);
+  });
+});
+
+describe("an acceptance of a suggestion that changes nothing", () => {
+  it("still decides an acceptance whose payload equals the file", async () => {
+    const scenario = await arrange();
+    const { input, written } = await editorWrote(scenario, {
+      frontmatter: { iri: "", type: "Policy", title: "Expenses", status: "stable" },
+    });
+    const stored = parseConceptFile(
+      await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path),
+    );
+    if (!stored.ok) throw new Error("the stored file does not parse");
+    const set = await submitted(scenario, scenario.viewer, "edit", [
+      {
+        mergeKey: input.mergeKey,
+        path: input.path,
+        conceptKind: input.kind,
+        title: input.title,
+        frontmatter: stored.value.frontmatter,
+        body: stored.value.body,
+        baseContentHash: written.contentHash,
+      },
+    ]);
+
+    const [outcome] = await acceptAll(scenario, set.setId, scenario.editor);
+
+    expect(outcome?.outcome).toMatchObject({ ok: true });
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "accepted" });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(2);
   });
 });
 
@@ -1373,10 +1403,7 @@ describe("an acceptance reached straight through the write path", () => {
     expect(onItsOwn).toMatchObject({ ok: true });
   });
 
-  type Moved = (
-    set: SuggestionSetSubmitted,
-    scenario: Scenario,
-  ) => Partial<WriteConceptInput> | Promise<Partial<WriteConceptInput>>;
+  type Moved = (set: SuggestionSetSubmitted) => Partial<WriteConceptInput>;
   it.each([
     ["body", () => ({ body: "Expenses are claimed whenever." })],
     ["merge key", () => ({ mergeKey: "policy:another" })],
@@ -1385,15 +1412,6 @@ describe("an acceptance reached straight through the write path", () => {
     ["frontmatter", () => ({ frontmatter: { title: "Expenses", type: "Policy", owner: "Ada" } })],
     ["status", () => ({ status: "draft" })],
     ["sensitivity", () => ({ sensitivity: "Internal" })],
-    [
-      "evidence",
-      async (_set, scenario) => {
-        const cited = await connectedSourceHolding(db(), scenario.workspaceId);
-        return {
-          evidence: [{ sourceDocumentId: cited.documentId, locator: "p.1", resource: "Handbook" }],
-        };
-      },
-    ],
     [
       "suggestion kind",
       (set) => ({
@@ -1413,7 +1431,7 @@ describe("an acceptance reached straight through the write path", () => {
       const refused = await writeConcept(
         scenario.editor,
         doorsOf(scenario),
-        acceptanceOf(input, written, set, await moved(set, scenario)),
+        acceptanceOf(input, written, set, moved(set)),
       );
 
       expect(refused).toEqual({ ok: false, error: "malformed" });
