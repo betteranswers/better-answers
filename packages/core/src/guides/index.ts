@@ -23,6 +23,9 @@ import {
 } from "../kernel/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 
+export { guideRowsOf } from "./definition.ts";
+export { TEMPLATES } from "./templates/index.ts";
+
 export type Footnote = {
   readonly label: string;
   readonly iri: string;
