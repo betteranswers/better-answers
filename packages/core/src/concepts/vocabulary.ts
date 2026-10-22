@@ -15,6 +15,9 @@ export const CONCEPT_REFUSALS = {
   "reclassification-refused": "inapplicable",
   "unreadable-commit": "inapplicable",
   unchanged: "inapplicable",
+  "reuse-unconfirmed": "inapplicable",
+  "source-label-refused": "inapplicable",
+  "body-locator-refused": "inapplicable",
 
   "no-such-repository": "precondition",
   "history-diverged": "precondition",

@@ -9,6 +9,7 @@ import {
   acceptSuggestions,
   contentHashOf,
   declineSuggestion,
+  parseConceptFile,
   submitSuggestionSet,
   suggestionSetSummary,
   writeConcept,
@@ -22,7 +23,7 @@ import {
 } from "../src/concepts/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
-import { bundleHistory, commitFacts } from "./bundle.ts";
+import { bundleHistory, commitFacts, fileAtCommit } from "./bundle.ts";
 import {
   abortTheTransaction,
   holdingTable,
@@ -626,6 +627,34 @@ describe("accepting a suggestion", () => {
       "no-such-suggestion",
     ]);
     expect(await bundleHistory(here.git, here.workspaceId)).toEqual([]);
+  });
+});
+
+describe("an acceptance of a suggestion that changes nothing", () => {
+  it("still decides an acceptance whose payload equals the file", async () => {
+    const scenario = await arrange();
+    const { input, written } = await editorWrote(scenario);
+    const stored = parseConceptFile(
+      await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path),
+    );
+    if (!stored.ok) throw new Error("the stored file does not parse");
+    const set = await submitted(scenario, scenario.viewer, "edit", [
+      {
+        mergeKey: input.mergeKey,
+        path: input.path,
+        conceptKind: input.kind,
+        title: input.title,
+        frontmatter: stored.value.frontmatter,
+        body: stored.value.body,
+        baseContentHash: written.contentHash,
+      },
+    ]);
+
+    const [outcome] = await acceptAll(scenario, set.setId, scenario.editor);
+
+    expect(outcome?.outcome).toMatchObject({ ok: true });
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "accepted" });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(2);
   });
 });
 

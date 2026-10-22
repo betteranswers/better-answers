@@ -5,6 +5,7 @@ import {
   boundarySchemas,
   citedSourcesOf,
   IRI,
+  LINKS_TO_LABEL,
   parsedPassageLocator,
   CONCEPT_DRAFT_STATUS,
   PUBLISHED_STATUSES,
@@ -168,6 +169,21 @@ export const holderOfPath = async (
     [scopeParameter(principal), path],
   );
   return found.rows[0]?.iri;
+};
+
+const PLACES_USING = `SELECT
+    (SELECT count(DISTINCT i.write_up_id) FROM write_up_include i
+      WHERE i.workspace_id = ${scopeClause(1)} AND i.iri = $2)
+  + (SELECT count(DISTINCT e.from_uid)
+       FROM map_generation g
+       JOIN map_edge e ON e.workspace_id = g.workspace_id AND e.gen = g.live_gen
+      WHERE g.workspace_id = ${scopeClause(1)} AND e.to_uid = $2 AND e.label = '${LINKS_TO_LABEL}'
+        AND e.from_uid <> $2) AS places`;
+
+/** Every write-up including the concept and every concept linking to it, readable or not. */
+export const placesUsing = async (principal: Principal, tx: Tx, iri: string): Promise<number> => {
+  const found = await tx.query<{ places: string }>(PLACES_USING, [scopeParameter(principal), iri]);
+  return Number(found.rows[0]?.places ?? 0);
 };
 
 export const cataloguedOf = async (

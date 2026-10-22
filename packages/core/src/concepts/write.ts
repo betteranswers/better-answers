@@ -23,10 +23,16 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { ANY_HEAD, type CommitAuthor, type Committed, type GitDoor } from "../store/git/index.ts";
+import {
+  ANY_HEAD,
+  fileAtHead,
+  type CommitAuthor,
+  type Committed,
+  type GitDoor,
+} from "../store/git/index.ts";
 import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { withBundleWrite } from "./fence.ts";
-import { contentHashOf, renderConceptFile, type Frontmatter } from "./file.ts";
+import { contentHashOf, parseConceptFile, renderConceptFile, type Frontmatter } from "./file.ts";
 import {
   commitAndLandAsMember,
   evidenceOfSources,
@@ -38,6 +44,7 @@ import {
   indexRowOf,
   type IndexRow,
   landRows,
+  placesUsing,
   WRITE_CONSTRAINTS,
   type EvidenceRow,
   type Held,
@@ -101,6 +108,8 @@ export type WriteConceptInput = {
 
   readonly sensitivity?: string;
   readonly status?: string;
+
+  readonly reuse?: "confirmed" | undefined;
 };
 
 export type ConceptWritten = {
@@ -128,7 +137,9 @@ export const writeConceptAction = declareAction({
     "rename-refused",
     "path-taken",
     "reclassification-refused",
+    "unchanged",
     "widening-refused",
+    "reuse-unconfirmed",
   ],
 });
 
@@ -211,25 +222,30 @@ type ParsedWrite = {
   readonly auditEventId: string;
 };
 
-type Existing = {
+type Facts = {
   readonly held: Held | undefined;
   readonly derived: Visibility | undefined;
   readonly catalogued: boolean;
   readonly resolved: string | undefined;
   readonly holder: string | undefined;
   readonly waiting: boolean;
+  readonly places: number;
   readonly admission: WriteConceptRefusal | undefined;
 };
+
+type Existing = Facts & { readonly stored: string | undefined };
 
 const writeUnderLock = async (
   principal: UserPrincipal,
   doors: WriteDoors,
   write: ParsedWrite,
 ): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
-  const existing = await existingOf(principal, doors.postgres, write);
-  if (!existing.ok) return err(existing.error);
-  if (!existing.value.ok) return err(existing.value.error);
-  const refusal = existing.value.value.admission ?? writeRefusalOf(write, existing.value.value);
+  const facts = await existingOf(principal, doors.postgres, write);
+  if (!facts.ok) return err(facts.error);
+  if (!facts.value.ok) return err(facts.value.error);
+  const stored = await storedRenderOf(principal, doors.git, write, facts.value.value.held);
+  const existing = { ...facts.value.value, stored };
+  const refusal = existing.admission ?? writeRefusalOf(write, existing);
   if (refusal !== undefined) return err(refusal);
 
   const now = doors.clock.now();
@@ -246,7 +262,7 @@ const writeUnderLock = async (
       status: write.input.status,
       sensitivity: write.input.sensitivity,
     },
-    existing.value.value.held,
+    existing.held,
     now,
   );
   if (!parsed.success) return err("malformed");
@@ -258,7 +274,7 @@ const writeUnderLock = async (
     write,
     row,
     now,
-    existing.value.value.held?.contentHash,
+    existing.held?.contentHash,
   );
   if (!landed.ok) return err(landed.error);
 
@@ -272,7 +288,7 @@ const writeUnderLock = async (
 
 const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: ParsedWrite) =>
   attempt(() =>
-    withMember(principal, postgres, async (fresh, tx): Promise<Existing> => {
+    withMember(principal, postgres, async (fresh, tx): Promise<Facts> => {
       const { input, iri } = write;
       const admission = await writersRefusal(fresh, tx, write, input.path);
       const held = await heldByIri(fresh, tx, iri);
@@ -301,6 +317,7 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
         waiting:
           input.acceptance === undefined ||
           (await suggestionIsWaiting(fresh, tx, input.acceptance.suggestionId)),
+        places: asksReuse(write, held) ? await placesUsing(fresh, tx, iri) : 0,
       };
     }),
   );
@@ -333,11 +350,62 @@ const WRITE_REFUSALS: readonly (readonly [
       input.sensitivity !== held.sensitivity,
   ],
   [
+    "unchanged",
+    (write, { stored, held }) => stored === renderedOf(write) && rowsAsHeld(write, held),
+  ],
+  [
     "widening-refused",
     (_, { held, derived }) =>
       held !== undefined && derived !== undefined && widens(heldVisibilityOf(held), derived),
   ],
+  ["reuse-unconfirmed", (_, { places }) => places > 1],
 ];
+
+const renderedOf = (write: ParsedWrite): string =>
+  renderConceptFile(write.frontmatter, write.input.body);
+
+const rowsAsHeld = ({ input, mergeKey }: ParsedWrite, held: Held | undefined): boolean =>
+  held?.mergeKey === mergeKey && held.title === input.title && held.kind === foldKind(input.kind);
+
+const isDirectEdit = ({ input }: ParsedWrite, held: Held | undefined): held is Held =>
+  held !== undefined && input.acceptance === undefined;
+
+const asksReuse = (write: ParsedWrite, held: Held | undefined): boolean =>
+  isDirectEdit(write, held) && write.input.reuse !== "confirmed";
+
+/** An acceptance still decides its suggestion, so only a direct edit can answer unchanged. */
+const storedRenderOf = async (
+  principal: UserPrincipal,
+  door: GitDoor,
+  write: ParsedWrite,
+  held: Held | undefined,
+): Promise<string | undefined> => {
+  if (!isDirectEdit(write, held)) return undefined;
+  const stored = await storedFileOf(principal, door, held);
+  return stored.ok ? renderConceptFile(stored.value.frontmatter, stored.value.body) : undefined;
+};
+
+export type ConceptFile = { readonly frontmatter: Frontmatter; readonly body: string };
+
+const disagreement = (path: string, why: string): Error =>
+  new Error(`the bundle and the index disagree: ${path} ${why}`);
+
+/** The file at the bundle's head, refused as stale while its hash runs ahead of the row's. */
+export const storedFileOf = async (
+  principal: UserPrincipal,
+  door: GitDoor,
+  held: Held,
+): Promise<Result<ConceptFile, "stale-precondition" | Error>> => {
+  const content = await attempt(() => fileAtHead(principal, door, held.path));
+  if (!content.ok) return err(content.error);
+  if (content.value === null) return err(disagreement(held.path, "is not in the bundle's head"));
+  const parsed = parseConceptFile(content.value);
+  if (!parsed.ok) return err(disagreement(held.path, "does not parse at the bundle's head"));
+  const { frontmatter, body } = parsed.value;
+  return contentHashOf(frontmatter, body, held.path) === held.contentHash
+    ? ok(parsed.value)
+    : err("stale-precondition");
+};
 
 const writeRefusalOf = (write: ParsedWrite, existing: Existing): WriteConceptRefusal | undefined =>
   WRITE_REFUSALS.find(([, refuses]) => refuses(write, existing))?.[0];

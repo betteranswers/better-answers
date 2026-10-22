@@ -524,6 +524,30 @@ describe("what a concept read cannot open", () => {
     expect(admin?.frontmatter["sources"]).toEqual([cited]);
   });
 
+  it("labels a withheld concept source with the withheld words", async () => {
+    const scenario = await arrange();
+    const { withheld } = await readableAndWithheld(scenario);
+    const written = await noteNaming(scenario, [{ resource: withheld.iri }]);
+
+    const viewer = await readFor(scenario.viewer, written.iri);
+
+    expect(viewer?.pane.evidence).toEqual([{ source: "A concept you cannot open" }]);
+    expect(JSON.stringify(viewer)).not.toContain(withheld.iri);
+  });
+
+  it("names no sharer when only an unwritten concept is unopened", async () => {
+    const scenario = await arrange();
+    const written = await noteNaming(scenario, [
+      { title: "A note not yet written", resource: conceptIriOf(ulid()) },
+    ]);
+    await overriddenTo(scenario, written.iri, "Public");
+
+    const pane = await paneFor(scenario.viewer, written.iri);
+
+    expect(pane?.access).toBe("included");
+    expect(pane?.sharedBeyondEvidence).toBeUndefined();
+  });
+
   it("keeps a page locator on a source written as text", async () => {
     const scenario = await arrange();
     const { locator } = await restrictedPassage(scenario);
