@@ -7,6 +7,7 @@ import {
   citedSourcesOf,
   COLLECTION,
   CONCEPT_PATH,
+  CONCEPT_STABLE_STATUS,
   ids,
   parsedPassageLocator,
   passageLocatorsIn,
@@ -39,7 +40,7 @@ import {
   type FrontmatterValue,
 } from "./file.ts";
 import { foldKind, heldByIri, mergeKeyOf, placesUsingReadableOrNot, type Held } from "./landing.ts";
-import { authorOf } from "./loader.ts";
+import { authorOf, IMPORT_SENSITIVITY_DEFAULT } from "./loader.ts";
 import { ownerAdmits, ownerOf, standingConcept, type OwnedConcept } from "./owners.ts";
 import { resolvedSourcesOf, type PassageReader } from "./read.ts";
 import { submitSuggestionSet, type SubmitSuggestionSetRefusal } from "./suggestions.ts";
@@ -48,6 +49,7 @@ import {
   writeConcept,
   type ConceptFile,
   type ConceptWritten,
+  type WriteConceptInput,
   type WriteConceptRefusal,
   type WriteDoors,
 } from "./write.ts";
@@ -64,10 +66,12 @@ export type ConceptParts = {
 
 export type Standing = "commits" | "suggests";
 
+type WithheldSource = { readonly at: number; readonly label: string };
+
 export type ConceptToEdit = {
   readonly parts: ConceptParts;
   readonly sources: readonly SourceEntry[];
-  readonly withheld: { readonly count: number; readonly labels: readonly string[] };
+  readonly withheld: readonly WithheldSource[];
   readonly base: string | null;
   readonly standing: Standing;
   readonly usedIn: number;
@@ -189,11 +193,10 @@ export const conceptToEdit = async (
   if ("collection" in data) {
     const standing = await attempt(() => routeOf(reader, tx, ownedInCollection(data.collection)));
     if (!standing.ok) return err(standing.error);
-    const none = { count: 0, labels: [] };
     return ok({
       parts: EMPTY_PARTS,
       sources: [],
-      withheld: none,
+      withheld: [],
       base: null,
       standing: standing.value,
       usedIn: 0,
@@ -224,16 +227,18 @@ const standingToEdit = async (
   const usedIn = standing === "commits" ? await placesUsingReadableOrNot(reader, tx, iri) : 0;
   const opened = await openedSourcesOf(reader, tx, row.frontmatter, passageAt);
   if (!opened.ok) return err(opened.error);
-  const withheld = opened.value.filter((source) => source.withheld);
   return ok({
     parts: partsOf(row.frontmatter, row.body, held),
     sources: opened.value.filter((source) => !source.withheld).map((source) => source.entry),
-    withheld: { count: withheld.length, labels: withheld.map((source) => source.label) },
+    withheld: withheldOf(opened.value),
     base: held.contentHash,
     standing,
     usedIn,
   });
 };
+
+const withheldOf = (opened: readonly Opened[]): readonly WithheldSource[] =>
+  opened.flatMap((source, at) => (source.withheld ? [{ at, label: source.label }] : []));
 
 const withWithheldInPlace = (
   stored: readonly Opened[],
@@ -314,11 +319,15 @@ const sourceLabelRefusalOf = (
     ? "source-label-refused"
     : undefined;
 
-const bodyLocatorRefusalOf = (file: ConceptFile): "body-locator-refused" | undefined => {
-  const cited = new Set(
-    citedSourcesOf(file.frontmatter["sources"]).map((source) => source.locator),
-  );
-  return passageLocatorsIn(file.body).some((locator) => !cited.has(locator))
+const citedLocatorsOf = (sources: FrontmatterValue | undefined): readonly (string | null)[] =>
+  citedSourcesOf(sources).map((source) => source.locator);
+
+const bodyLocatorRefusalOf = (
+  body: string,
+  namable: readonly (string | null)[],
+): "body-locator-refused" | undefined => {
+  const named = new Set(namable);
+  return passageLocatorsIn(body).some((locator) => !named.has(locator))
     ? "body-locator-refused"
     : undefined;
 };
@@ -357,7 +366,7 @@ const SAVED_FIELDS = {
   }),
   sources: z.array(SOURCE_ENTRY).readonly(),
   base: boundarySchemas.conceptIndex.insert.shape.contentHash.nullable(),
-  withheld: z.number().int().min(0),
+  withheld: z.array(z.number().int().min(0)).readonly(),
   reuse: z.literal("confirmed").optional(),
 };
 
@@ -403,6 +412,8 @@ type Commit = {
 };
 
 type Saving = Commit & {
+  readonly heldKey: string;
+  readonly storedBody: string;
   readonly offered: readonly SourceEntry[];
   readonly standing: Standing;
   readonly unchanged: boolean;
@@ -439,9 +450,15 @@ export const saveConcept = async (
       : await savingNew(admitted.value, doors, parsed.data, parsed.data.collection);
   if (!saving.ok) return err(saving.error);
   const refusal =
-    sourceLabelRefusalOf(saving.value.offered) ?? bodyLocatorRefusalOf(saving.value.file);
+    sourceLabelRefusalOf(saving.value.offered) ??
+    bodyLocatorRefusalOf(saving.value.file.body, namableBy(saving.value));
   return refusal === undefined ? routed(admitted.value, doors, saving.value) : err(refusal);
 };
+
+const namableBy = (saving: Saving): readonly (string | null)[] =>
+  saving.standing === "commits"
+    ? citedLocatorsOf(saving.file.frontmatter["sources"])
+    : [...citedLocatorsOf(sourcesValueOf(saving.offered)), ...passageLocatorsIn(saving.storedBody)];
 
 type StoredToSave = {
   readonly held: Held;
@@ -473,8 +490,8 @@ const savingOver = async (
         doors.passages(fresh, tx),
       );
       if (!opened.ok) return opened;
-      const withheld = opened.value.filter((source) => source.withheld).length;
-      if (withheld !== input.withheld) return err("stale-precondition" as const);
+      const withheld = withheldOf(opened.value).map((source) => source.at);
+      if (!isDeepStrictEqual(withheld, input.withheld)) return err("stale-precondition" as const);
       return ok({
         held,
         stored: stored.value,
@@ -491,7 +508,9 @@ const savingOver = async (
   return ok({
     iri,
     path: held.path,
-    mergeKey: held.mergeKey,
+    mergeKey: mergeKeyAfter(held, input.parts),
+    heldKey: held.mergeKey,
+    storedBody: stored.body,
     base: held.contentHash,
     file,
     offered: input.sources,
@@ -503,6 +522,11 @@ const savingOver = async (
   });
 };
 
+const mergeKeyAfter = (held: Held, parts: ConceptParts): string => {
+  const edited = mergeKeyOf(foldKind(parts.kind), parts.title);
+  return edited === mergeKeyOf(held.kind, held.title) ? held.mergeKey : edited;
+};
+
 const savingNew = async (
   principal: UserPrincipal,
   doors: SaveDoors,
@@ -511,7 +535,7 @@ const savingNew = async (
 ): Promise<Result<Saving, SaveConceptRefusal | Error>> => {
   const path = newConceptPathOf(collection, input.parts.title);
   const file = editedFileOf({ frontmatter: {}, body: "" }, input.parts, input.sources);
-  const fresh = input.base === null && input.withheld === 0;
+  const fresh = input.base === null && input.withheld.length === 0;
   if (path === undefined || file === undefined || !fresh) return err("malformed");
   const read = await attempt(() =>
     withMember(principal, doors.postgres, async (fresh, tx) => ({
@@ -521,10 +545,13 @@ const savingNew = async (
   );
   if (!read.ok) return err(read.error);
   if (!read.value.ok) return err(read.value.error);
+  const mergeKey = mergeKeyOf(foldKind(input.parts.kind), input.parts.title);
   return ok({
     iri: undefined,
     path,
-    mergeKey: mergeKeyOf(foldKind(input.parts.kind), input.parts.title),
+    mergeKey,
+    heldKey: mergeKey,
+    storedBody: "",
     base: null,
     file,
     offered: input.sources,
@@ -553,12 +580,14 @@ const routed = async (
     : err(written.error);
 };
 
+const SAVED_NEW = { status: CONCEPT_STABLE_STATUS, sensitivity: IMPORT_SENSITIVITY_DEFAULT };
+
 const committed = (
   principal: UserPrincipal,
   doors: WriteDoors,
   edit: Commit,
-): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> =>
-  writeConcept(principal, doors, {
+): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
+  const write: WriteConceptInput = {
     iri: edit.iri,
     mergeKey: edit.mergeKey,
     path: edit.path,
@@ -570,7 +599,13 @@ const committed = (
     author: edit.author,
     expects: { base: edit.base },
     reuse: edit.reuse,
-  });
+  };
+  return writeConcept(
+    principal,
+    doors,
+    edit.iri === undefined ? { ...write, ...SAVED_NEW } : write,
+  );
+};
 
 const suggested = async (
   principal: UserPrincipal,
@@ -581,7 +616,7 @@ const suggested = async (
     kind: SUGGESTION_EDIT_KIND,
     requests: [
       {
-        mergeKey: saving.mergeKey,
+        mergeKey: saving.heldKey,
         path: saving.path,
         conceptKind: saving.file.kind,
         title: saving.file.title,
@@ -673,7 +708,7 @@ const bodyRefusalOf = (
 ): UpdateConceptBodyRefusal | undefined => {
   if (rendersAlike(file, to)) return "unchanged";
   if (base !== undefined && base !== held.contentHash) return "stale-precondition";
-  return bodyLocatorRefusalOf(to);
+  return bodyLocatorRefusalOf(to.body, citedLocatorsOf(to.frontmatter["sources"]));
 };
 
 /**

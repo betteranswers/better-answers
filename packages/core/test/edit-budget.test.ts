@@ -111,7 +111,7 @@ describe("the governed edit at 250 concepts", () => {
               parts: { ...seed.parts, body: `${seed.parts.body} Saved ${edit}.` },
               sources: seed.sources,
               base: seed.base,
-              withheld: seed.withheld.count,
+              withheld: seed.withheld.map((source) => source.at),
             },
           );
           expect(saved).toMatchObject({ ok: true, value: { outcome: "committed" } });
