@@ -47,12 +47,20 @@ People on records:
 - A member ends by an Admin's removal or by an erasure. Its row is deleted, and its audit event is the record of it.
 - The identity set keeps no team record. A group may carry a team's name (ADR 0038).
 
-The erasure union is `ERASURE_FAMILIES` in `packages/core/src/erasure/map.ts`. Each family has a finder in the erasure map and a step in the erasure routine, and the access answer lists what each finder found. The union holds twenty families:
+The erasure union is `ERASURE_FAMILIES` in `packages/core/src/erasure/map.ts`. Each family has a finder in the erasure map and a step in the erasure routine, and the access answer lists what each finder found. The union holds these families:
 
 - The bundle: `concept-file` (file text and git author lines), `bundle-commit` and `concept-verification`.
 - The identity set: `identity-user`, `identity-session`, `identity-verification`, `identity-invitation`, `identity-account`, `identity-passkey`, `identity-authenticator`, `identity-recovery-code`, `identity-confirm-failures` and `identity-last-active`.
 - The evidence: `source-document`.
-- The platform's records: `question-asked`, `concept-sensitivity-override` (who set the override), `finding` (who reviewed or restored it, and the reason they gave), `suggestion` (who proposed and who decided it, and the decider's reason) `concept-write-request` (the person's actor id or `human:<address>` in a request's title, frontmatter or body) and `concept-owner` (a collection or a concept the person owns). An owner row names the person and nothing else, so the member's ending deletes it, and the concept falls back to its collection's owner or to Admins.
+- The platform's records:
+  - `question-asked`.
+  - `concept-sensitivity-override`: who set the override.
+  - `finding`: who reviewed or restored it, and the reason they gave.
+  - `suggestion`: who proposed it, who decided it, and the decider's reason.
+  - `concept-write-request`: the person's actor id or `human:<address>` in a request's title, frontmatter or body.
+  - `concept-owner`: a collection or a concept the person owns. An owner row names the person and nothing else, so the member's ending deletes it. The concept then falls back to its collection's owner or to Admins.
+  - `write-up-version` and `guide-definition-version`: who saved a version. A version's text is company prose and is never derived again, so the erasure rewrites its actor and keeps the text. The erasure cannot rewrite a `human:` token inside a version's `markdown`, so the writer of versions keeps such tokens out.
+  - `usage`: who copied, exported or submitted a concept or a write-up.
 
 These tables name a person outside the union. The list is a scan of the schema on 21/10/2026, and no gate holds it, so a new column that names a person goes here or into the union:
 
@@ -70,10 +78,13 @@ A concept's owner:
 - A person who has left the workspace owns nothing: an owner row keys to `member`, and ending the member deletes it by the foreign key's cascade, as `group_member` does.
 - `attachedByIri()` is the one by-IRI key, exported from `packages/schema/src/concept-tables.ts`. Every table that attaches to a concept by IRI uses it, `write_up_include` included.
 
-Decided for the S3 block and not yet in the tree:
+A write-up's homes and the versions:
 
-- A write-up declares its two homes, `section` and `response`, together, so the second home adds a writer and never a migration.
-- The version column set is one helper, `versionColumns()`.
+- A write-up declares its two homes, `section` and `response`, together (`WRITE_UP_HOMES`, held by the CHECK `write_up_home_check`), so the second home adds a writer and never a migration. A section home keys to `guide_section` by `(workspace_id, guide_id, section_id)`, one write-up per section. A response home names its `question_id`, which has no foreign key until the migration that creates the question table adds one. That migration changes no home column.
+- The version column set is one helper, `versionColumns()`, with its CHECKs in `versionChecks()`. `write_up_version` and `guide_definition_version` use it. Neither carries a status or a current flag: the latest version is the current one. `app_rt` holds no UPDATE or DELETE on either table.
+- The one path that rewrites a version's actor is the definer `public.pseudonymise_record_actors`, which the erasure calls once per version table. It refuses a workspace other than the transaction's, a person that is not a person id and a pseudonym no erasure in the workspace minted, and it touches `actor` alone.
+- A version keys to its write-up or guide definition with no cascade, so a record that holds a version is never deleted with it.
+- The refusal reaches further than the record. A workspace that holds a version row cannot be deleted, although every other tenant table cascades from `workspace`. A concept whose IRI a guide definition names by `attachedByIri()` cannot be deleted while that guide holds a version, because the cascade stops at the version. A guide definition also cannot be deleted while a write-up is homed in one of its sections or an include names one of its expected facts, because those two keys do not cascade either. So a re-seed updates a guide's facts in place and never deletes and inserts them again. No product path deletes a workspace, a concept identity or a guide definition today.
 
 ## Why
 
@@ -106,4 +117,4 @@ The full record, with its amendments (tickets 23, 24, 39 and 50, T-073, T-059, T
 
 The question set's input object, in the archived record, was missing from this doc until 20/10/2026, when a sample of the map tickets found S6 resting on it.
 
-On 22/10/2026 `concept_owner` and `attachedByIri()` reached the tree (BA-231, migration `0096_the-concept-owner`), and the erasure union gained `concept-owner`. `suggestion` and `concept_write_request` joined the union on 21/10/2026 (BA-220).
+On 22/10/2026 `concept_owner` and `attachedByIri()` reached the tree (BA-231, migration `0096_the-concept-owner`), and the erasure union gained `concept-owner`. `suggestion` and `concept_write_request` joined the union on 21/10/2026 (BA-220). On 22/10/2026 the guide records reached the tree (BA-234, migration `0098_the-guide-records`): the write-up's homes, `versionColumns()`, the guide definition with its roles, sections and expected facts, and `usage`. The union gained `write-up-version`, `guide-definition-version` and `usage`.

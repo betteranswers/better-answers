@@ -20,10 +20,13 @@ import {
   type SeededBefore0072,
 } from "./before-the-knowledge-words.ts";
 import { endPool, POSTGRES_COMMAND, withRollback } from "./harness.ts";
+import { migrationsFolderBefore } from "./journal-statements.ts";
 import { ADMITTED, refusalOf, sqlstateOf } from "./probes.ts";
 
 /** A non-superuser that owns every object, so the forced policies hold it as they hold `migrate`. */
 const THE_OWNER = "the_knowledge_words_owner";
+
+const THE_GUIDE_RECORDS = "0098_the-guide-records";
 
 const OWNED_BY_THE_OWNER = `DO $$
 DECLARE target text;
@@ -220,7 +223,7 @@ beforeAll(async () => {
 
   const owner = new pg.Pool({ connectionString: uriAs(container, THE_OWNER), max: 1 });
   try {
-    await migrate(drizzle(owner), { migrationsFolder });
+    await migrate(drizzle(owner), { migrationsFolder: migrationsFolderBefore(THE_GUIDE_RECORDS) });
   } finally {
     await endPool(owner);
   }
@@ -254,11 +257,30 @@ const SEEDED_IN_EACH: Standing = {
 };
 
 describe("migration 0072 over a populated 0071 database, as its owner", () => {
-  it("applies 0072 and each later migration through the real journal", async () => {
+  it("applies 0072 and every later migration before the guide records", async () => {
     const journal = journalMigrationFiles();
     const the0072 = journal.findIndex((file) => file.endsWith("0072_the-knowledge-words.sql"));
+    const theGuideRecords = journal.findIndex((file) => file.endsWith(`${THE_GUIDE_RECORDS}.sql`));
 
-    expect([appliedBefore, (await migrationRows()).length]).toEqual([the0072, journal.length]);
+    expect([appliedBefore, (await migrationRows()).length]).toEqual([the0072, theGuideRecords]);
+  });
+
+  it("stops at the guide records over its stored write-ups", async () => {
+    const applied = (await migrationRows()).length;
+    const owner = new pg.Pool({ connectionString: uriAs(container, THE_OWNER), max: 1 });
+    const refusal = await migrate(drizzle(owner), { migrationsFolder })
+      .then(() => "migrated")
+      .catch((error: unknown) =>
+        error instanceof Error && error.cause instanceof Error
+          ? error.cause.message
+          : String(error),
+      )
+      .finally(() => endPool(owner));
+
+    expect({ refusal, applied: (await migrationRows()).length }).toEqual({
+      refusal: expect.stringMatching(/^write_up and write_up_include hold rows/),
+      applied,
+    });
   });
 
   it("finds every old word seeded, in both workspaces", () => {
@@ -388,3 +410,18 @@ const raisingOne = async (client: pg.PoolClient, kind: string): Promise<string> 
     await client.query("ROLLBACK TO SAVEPOINT raising");
   }
 };
+
+describe("the journal after the guide records' guard", () => {
+  it("applies every later migration once the write-ups are cleared", async () => {
+    await superuser.query("DELETE FROM write_up_include");
+    await superuser.query("DELETE FROM write_up");
+    const owner = new pg.Pool({ connectionString: uriAs(container, THE_OWNER), max: 1 });
+    try {
+      await migrate(drizzle(owner), { migrationsFolder });
+    } finally {
+      await endPool(owner);
+    }
+
+    expect((await migrationRows()).length).toBe(journalMigrationFiles().length);
+  });
+});

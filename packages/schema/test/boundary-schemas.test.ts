@@ -48,6 +48,13 @@ const CONNECTED_SOURCE_ID = "01J6VVVVVVVVVVVVVVVVVVVVVV";
 
 const DOCUMENT_ID = "01J6NNNNNNNNNNNNNNNNNNNNNN";
 const WRITE_UP_ID = "01J6WWWWWWWWWWWWWWWWWWWWWW";
+const RESPONSE_WRITE_UP_ID = "01J6WWWWWWWWWWWWWWWWWWWWW2";
+
+const GUIDE_ID = "01J6BBBBBBBBBBBBBBBBBBBBBB";
+const SECTION_ID = "insurance";
+const EXPECTED_FACT_ID = "01J6BBBBBBBBBBBBBBBBBBBBB2";
+const USAGE_ID = "01J6BBBBBBBBBBBBBBBBBBBBB3";
+const CONCEPT_USAGE_ID = "01J6BBBBBBBBBBBBBBBBBBBBB4";
 
 const OWNER_ID = "01J6TTTTTTTTTTTTTTTTTTTTTT";
 const OVERRIDE_ID = "01J6TTTTTTTTTTTTTTTTTTTTT2";
@@ -589,6 +596,74 @@ const acceptedRows = {
     { workspaceId: WS_ID, id: OWNER_ID, collection: "policy", iri: null, personId: USER_ID },
     { workspaceId: WS_ID, id: OVERRIDE_ID, collection: null, iri: CONCEPT_IRI, personId: USER_ID },
   ],
+  guideDefinition: [
+    {
+      workspaceId: WS_ID,
+      id: GUIDE_ID,
+      kind: "bid",
+      collection: "bids",
+      template: "bid-response",
+      subjectIri: CONCEPT_IRI,
+    },
+  ],
+  guideRole: [
+    {
+      workspaceId: WS_ID,
+      guideId: GUIDE_ID,
+      role: "Editor",
+      defaultLayer: "assembled",
+      actionThreshold: "human-reviewed",
+    },
+  ],
+  guideSection: [
+    {
+      workspaceId: WS_ID,
+      guideId: GUIDE_ID,
+      id: SECTION_ID,
+      parentId: null,
+      ordinal: 0,
+      prompt: "Describe how you insure the work.",
+      roleLabel: "say",
+      usageNote: null,
+      layers: ["assembled", "quoted"],
+    },
+    {
+      workspaceId: WS_ID,
+      guideId: GUIDE_ID,
+      id: "insurance-limits",
+      parentId: SECTION_ID,
+      ordinal: 0,
+      prompt: "State the limits.",
+      roleLabel: "know",
+      usageNote: "Quote the certificate.",
+      layers: ["quoted"],
+      hidden: true,
+    },
+  ],
+  guideExpectedFact: [
+    {
+      workspaceId: WS_ID,
+      id: EXPECTED_FACT_ID,
+      guideId: GUIDE_ID,
+      sectionId: SECTION_ID,
+      ordinal: 0,
+      name: "Insurance cover",
+      kind: "Policy",
+      tags: ["insurance"],
+      collection: null,
+      atLeast: 2,
+    },
+  ],
+  guideDefinitionVersion: [
+    {
+      workspaceId: WS_ID,
+      guideId: GUIDE_ID,
+      version: 1,
+      actor: `human:${USER_ID}`,
+      note: null,
+      content: { sections: [SECTION_ID] },
+    },
+  ],
   writeUp: [
     {
       workspaceId: WS_ID,
@@ -596,10 +671,66 @@ const acceptedRows = {
       publishedAt: NOW,
       sensitivity: "Internal",
       audience: "everyone",
+      home: "section",
+      guideId: GUIDE_ID,
+      sectionId: SECTION_ID,
+      questionId: null,
+      needsReview: "concept-changed",
+    },
+    {
+      workspaceId: WS_ID,
+      id: RESPONSE_WRITE_UP_ID,
+      sensitivity: "Internal",
+      audience: "everyone",
+      home: "response",
+      guideId: null,
+      sectionId: null,
+      questionId: QUESTION_RECORD_ID,
     },
   ],
   writeUpInclude: [
-    { workspaceId: WS_ID, writeUpId: WRITE_UP_ID, id: "i1", ordinal: 0, iri: CONCEPT_IRI },
+    {
+      workspaceId: WS_ID,
+      writeUpId: WRITE_UP_ID,
+      id: "i1",
+      ordinal: 0,
+      iri: CONCEPT_IRI,
+      contentHash: CONTENT_SHA256,
+      expectedFactId: EXPECTED_FACT_ID,
+      wordingHeading: "Our cover",
+      wordingHash: CONTENT_SHA256,
+    },
+  ],
+  writeUpVersion: [
+    {
+      workspaceId: WS_ID,
+      writeUpId: WRITE_UP_ID,
+      version: 1,
+      actor: `human:${USER_ID}`,
+      note: "First draft.",
+      markdown: "We hold public liability cover of five million pounds.",
+      includes: [{ iri: CONCEPT_IRI, contentHash: CONTENT_SHA256 }],
+    },
+  ],
+  usage: [
+    {
+      workspaceId: WS_ID,
+      id: USAGE_ID,
+      actor: `human:${USER_ID}`,
+      act: "copied",
+      writeUpId: WRITE_UP_ID,
+      writeUpVersion: 1,
+      iri: null,
+    },
+    {
+      workspaceId: WS_ID,
+      id: CONCEPT_USAGE_ID,
+      actor: `human:${USER_ID}`,
+      act: "exported",
+      writeUpId: null,
+      writeUpVersion: null,
+      iri: CONCEPT_IRI,
+    },
   ],
   questionAsked: [
     {
@@ -1050,8 +1181,15 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "conceptEvidence",
         "conceptSensitivityOverride",
         "conceptOwner",
+        "guideDefinition",
+        "guideRole",
+        "guideSection",
+        "guideExpectedFact",
+        "guideDefinitionVersion",
         "writeUp",
         "writeUpInclude",
+        "writeUpVersion",
+        "usage",
         "questionAsked",
         "questionContent",
         "questionFeedback",
@@ -1336,6 +1474,54 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
         ...acceptedRows.conceptWriteRequest[0],
         frontmatter: { title: "x".repeat(CONCEPT_FRONTMATTER_MAX) },
       },
+    ],
+    guideDefinition: [
+      { ...acceptedRows.guideDefinition[0], id: "bid-guide" },
+      { ...acceptedRows.guideDefinition[0], collection: "bids/2026" },
+      { ...acceptedRows.guideDefinition[0], subjectIri: "expenses" },
+    ],
+    guideRole: [
+      { ...acceptedRows.guideRole[0], role: "Owner" },
+      { ...acceptedRows.guideRole[0], defaultLayer: "summarised" },
+      { ...acceptedRows.guideRole[0], actionThreshold: "verified" },
+    ],
+    guideSection: [
+      { ...acceptedRows.guideSection[0], layers: [] },
+      { ...acceptedRows.guideSection[0], layers: ["drafted"] },
+      { ...acceptedRows.guideSection[0], roleLabel: "tell" },
+      { ...acceptedRows.guideSection[0], ordinal: -1 },
+      { ...acceptedRows.guideSection[1], usageNote: "   " },
+    ],
+    guideExpectedFact: [
+      { ...acceptedRows.guideExpectedFact[0], atLeast: 0 },
+      { ...acceptedRows.guideExpectedFact[0], tags: [" "] },
+      { ...acceptedRows.guideExpectedFact[0], collection: "a/b" },
+      { ...acceptedRows.guideExpectedFact[0], id: "insurance-cover" },
+    ],
+    guideDefinitionVersion: [
+      { ...acceptedRows.guideDefinitionVersion[0], version: 0 },
+      { ...acceptedRows.guideDefinitionVersion[0], actor: USER_ID },
+    ],
+    writeUp: [
+      { ...acceptedRows.writeUp[0], home: "inbox" },
+      { ...acceptedRows.writeUp[0], needsReview: "stale" },
+      { ...acceptedRows.writeUp[1], questionId: "question-1" },
+    ],
+    writeUpInclude: [
+      { ...acceptedRows.writeUpInclude[0], contentHash: "a".repeat(63) },
+      { ...acceptedRows.writeUpInclude[0], wordingHash: "A".repeat(64) },
+      { ...acceptedRows.writeUpInclude[0], wordingHeading: "  " },
+      { ...acceptedRows.writeUpInclude[0], expectedFactId: "insurance-cover" },
+    ],
+    writeUpVersion: [
+      { ...acceptedRows.writeUpVersion[0], version: 0 },
+      { ...acceptedRows.writeUpVersion[0], actor: "priya@example.invalid" },
+      { ...acceptedRows.writeUpVersion[0], note: "  " },
+    ],
+    usage: [
+      { ...acceptedRows.usage[0], act: "viewed" },
+      { ...acceptedRows.usage[0], writeUpVersion: 0 },
+      { ...acceptedRows.usage[1], iri: "expenses" },
     ],
     questionAsked: [
       { ...acceptedRows.questionAsked[0], askedBy: USER_ID },
@@ -2404,6 +2590,16 @@ describe("5 — the inferred type is pinned", () => {
       workspaceId: WorkspaceId;
       id: WriteUpId;
       createdAt: Date;
+      home: "section" | "response";
+      guideId: string | null;
+      sectionId: string | null;
+      questionId: string | null;
+      needsReview:
+        | "concept-changed"
+        | "concept-removed"
+        | "expectation-unmet"
+        | "review-finding"
+        | null;
     };
     writeUpInclude: {
       workspaceId: WorkspaceId;
@@ -2411,6 +2607,79 @@ describe("5 — the inferred type is pinned", () => {
       id: string;
       ordinal: number;
       iri: ConceptIri;
+      contentHash: string;
+      expectedFactId: string | null;
+      wordingHeading: string | null;
+      wordingHash: string | null;
+    };
+    writeUpVersion: {
+      workspaceId: WorkspaceId;
+      writeUpId: WriteUpId;
+      version: number;
+      actor: string;
+      at: Date;
+      note: string | null;
+      markdown: string;
+      includes: UnrefinedJson;
+    };
+    guideDefinition: {
+      workspaceId: WorkspaceId;
+      id: string;
+      kind: string;
+      collection: string;
+      template: string;
+      subjectIri: ConceptIri | null;
+      createdAt: Date;
+    };
+    guideRole: {
+      workspaceId: WorkspaceId;
+      guideId: string;
+      role: "Admin" | "Editor" | "Viewer";
+      defaultLayer: "assembled" | "quoted";
+      actionThreshold: "unverified" | "machine-confirmed" | "human-reviewed";
+    };
+    guideSection: {
+      workspaceId: WorkspaceId;
+      guideId: string;
+      id: string;
+      parentId: string | null;
+      ordinal: number;
+      prompt: string;
+      roleLabel: "know" | "say" | "show" | "do";
+      usageNote: string | null;
+      layers: ("assembled" | "quoted")[];
+      hidden: boolean;
+    };
+    guideExpectedFact: {
+      workspaceId: WorkspaceId;
+      id: string;
+      guideId: string;
+      sectionId: string;
+      ordinal: number;
+      name: string;
+      kind: string;
+      tags: string[];
+      collection: string | null;
+      atLeast: number;
+    };
+    guideDefinitionVersion: {
+      workspaceId: WorkspaceId;
+      guideId: string;
+      version: number;
+      actor: string;
+      at: Date;
+      note: string | null;
+      content: UnrefinedJson;
+    };
+    usage: {
+      workspaceId: WorkspaceId;
+      id: string;
+      actor: string;
+      at: Date;
+      act: "copied" | "exported" | "submitted";
+      writeUpId: WriteUpId | null;
+      writeUpVersion: number | null;
+      iri: ConceptIri | null;
     };
     questionAsked: {
       workspaceId: WorkspaceId;

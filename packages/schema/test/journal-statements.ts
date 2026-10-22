@@ -6,7 +6,7 @@ import type pg from "pg";
 import { z } from "zod";
 
 import { migrationsFolder } from "../src/index.ts";
-import { journalMetaFolder, journalMigrationFiles } from "../src/journal.ts";
+import { journalEntries, journalMetaFolder, journalMigrationFiles } from "../src/journal.ts";
 
 const SEPARATOR = "--> statement-breakpoint";
 
@@ -31,6 +31,13 @@ export const migrationsFolderEndingAt = (tag: string): string => {
     cpSync(path.join(migrationsFolder, `${entry.tag}.sql`), path.join(folder, `${entry.tag}.sql`));
   }
   return folder;
+};
+
+export const migrationsFolderBefore = (tag: string): string => {
+  const entries = journalEntries();
+  const previous = entries[entries.findIndex((entry) => entry.tag === tag) - 1];
+  if (previous === undefined) throw new Error(`nothing in the journal comes before ${tag}`);
+  return migrationsFolderEndingAt(previous.tag);
 };
 
 export const migrationStatements = (tag: string): readonly string[] => {

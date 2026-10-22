@@ -27,6 +27,12 @@ const byActorId = (subject: ActorSweepSubject): readonly unknown[] => [
   `${PERSON_PREFIX}${subject.pseudonym}`,
 ];
 
+const byPersonId = (subject: ActorSweepSubject): readonly unknown[] => [
+  subject.workspaceId,
+  subject.needles.people,
+  subject.pseudonym,
+];
+
 const ACTOR_SWEEPS = [
   {
     family: "bundle-commit",
@@ -62,7 +68,7 @@ const ACTOR_SWEEPS = [
   {
     family: "suggestion",
     statement: `SELECT erase_from_the_suggestions($1, $2, $3) AS "actorsRewritten"`,
-    parameters: (subject) => [subject.workspaceId, subject.needles.people, subject.pseudonym],
+    parameters: byPersonId,
   },
   {
     family: "concept-write-request",
@@ -74,6 +80,21 @@ const ACTOR_SWEEPS = [
       subject.needles.addresses,
       subject.pseudonym,
     ],
+  },
+  {
+    family: "write-up-version",
+    statement: `SELECT pseudonymise_record_actors($1, 'write_up_version', $2, $3) AS "actorsRewritten"`,
+    parameters: byPersonId,
+  },
+  {
+    family: "guide-definition-version",
+    statement: `SELECT pseudonymise_record_actors($1, 'guide_definition_version', $2, $3) AS "actorsRewritten"`,
+    parameters: byPersonId,
+  },
+  {
+    family: "usage",
+    statement: counted("UPDATE usage SET actor = $3 WHERE workspace_id = $1 AND actor = ANY($2)"),
+    parameters: byActorId,
   },
 ] as const satisfies readonly ActorSweep[];
 

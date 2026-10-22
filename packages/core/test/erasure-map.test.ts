@@ -107,6 +107,12 @@ const SECOND_FACTOR_FAMILIES: ReadonlySet<ErasureFamily> = new Set([
   "identity-last-active",
 ]);
 
+const RECORD_FAMILIES: ReadonlySet<ErasureFamily> = new Set([
+  "write-up-version",
+  "guide-definition-version",
+  "usage",
+]);
+
 const QUESTIONS: ErasureFamily = "question-asked";
 
 const NO_QUESTION_ASKED = {
@@ -175,6 +181,9 @@ describe("the erasure map's union", () => {
       "suggestion",
       "concept-write-request",
       "concept-owner",
+      "write-up-version",
+      "guide-definition-version",
+      "usage",
     ]);
   });
 
@@ -205,6 +214,9 @@ describe("the erasure map's union", () => {
       suggestion: findsNothing,
       "concept-write-request": findsNothing,
       "concept-owner": findsNothing,
+      "write-up-version": findsNothing,
+      "guide-definition-version": findsNothing,
+      usage: findsNothing,
     };
 
     expect(ERASURE_FAMILIES.filter((family) => !(family in withoutADocumentFinder))).toEqual([
@@ -264,6 +276,9 @@ describe("the erasure map for a member", () => {
       { family: "suggestion", categories: ["actor-id", "typed-text"], locations: [] },
       { family: "concept-write-request", categories: ["actor-id", "email-address"], locations: [] },
       { family: "concept-owner", categories: ["actor-id"], locations: [] },
+      { family: "write-up-version", categories: ["actor-id"], locations: [] },
+      { family: "guide-definition-version", categories: ["actor-id"], locations: [] },
+      { family: "usage", categories: ["actor-id"], locations: [] },
     ]);
   });
 
@@ -296,6 +311,35 @@ describe("the erasure map for a member", () => {
     expect(map.find((entry) => entry.family === "concept-owner")?.locations).toEqual(
       [owners.collection.id, owners.concept.id].toSorted(byCodeUnit),
     );
+  });
+
+  it("lists a subject's versions and usage by actor", async () => {
+    const held = await workspaceHoldingAMember();
+    const { workspaceId, viewer } = held.scenario;
+    const heldBy = async (actor: string) =>
+      seedingWith(db().pool, async (seed) => ({
+        writeUp: await seed.writeUpVersion({ workspaceId, actor }),
+        guide: await seed.guideDefinitionVersion({ workspaceId, actor }),
+        usage: await seed.usage({ workspaceId, actor }),
+      }));
+    const theirs = await heldBy(actorIdOfPerson(held.person.id));
+    await heldBy(actorIdOfPerson(viewer.userId));
+
+    const map = await mapOf(held.scenario, held.request);
+
+    expect(map.filter((entry) => RECORD_FAMILIES.has(entry.family))).toEqual([
+      {
+        family: "write-up-version",
+        categories: ["actor-id"],
+        locations: [`${theirs.writeUp.writeUpId} (version 1)`],
+      },
+      {
+        family: "guide-definition-version",
+        categories: ["actor-id"],
+        locations: [`${theirs.guide.guideId} (version 1)`],
+      },
+      { family: "usage", categories: ["actor-id"], locations: [theirs.usage.id] },
+    ]);
   });
 
   it("names each question they asked here, and no other", async () => {
@@ -420,6 +464,9 @@ describe("the erasure map for a subject with no user row", () => {
       ["suggestion", []],
       ["concept-write-request", []],
       ["concept-owner", []],
+      ["write-up-version", []],
+      ["guide-definition-version", []],
+      ["usage", []],
     ]);
   });
 });
@@ -525,6 +572,9 @@ describe("the erasure map in one workspace's scope", () => {
       ["suggestion", [mine.suggestion.id]],
       ["concept-write-request", [mine.request.suggestionId]],
       ["concept-owner", [mine.owner.id]],
+      ["write-up-version", []],
+      ["guide-definition-version", []],
+      ["usage", []],
     ]);
     const named = map.flatMap((entry) => entry.locations);
     for (const theirsOwn of [

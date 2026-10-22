@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0097_the-unresolved-references"
+MIGRATION_ID = "0098_the-guide-records"
 
-MIGRATION_WHEN = 1792641516258
+MIGRATION_WHEN = 1792661617340
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -236,6 +236,55 @@ TABLES: dict[str, dict[str, str]] = {
         "group_id": "text NOT NULL",
         "user_id": "text NOT NULL",
         "added_at": "timestamp with time zone NOT NULL",
+    },
+    "public.guide_definition": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "template": "text NOT NULL",
+        "kind": "text NOT NULL",
+        "collection": "text NOT NULL",
+        "subject_iri": "text",
+        "created_at": "timestamp with time zone NOT NULL",
+    },
+    "public.guide_definition_version": {
+        "workspace_id": "text NOT NULL",
+        "guide_id": "text NOT NULL",
+        "version": "integer NOT NULL",
+        "actor": "text NOT NULL",
+        "at": "timestamp with time zone NOT NULL",
+        "note": "text",
+        "content": "jsonb NOT NULL",
+    },
+    "public.guide_expected_fact": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "guide_id": "text NOT NULL",
+        "section_id": "text NOT NULL",
+        "ordinal": "integer NOT NULL",
+        "name": "text NOT NULL",
+        "kind": "text NOT NULL",
+        "tags": "text[] NOT NULL",
+        "collection": "text",
+        "at_least": "integer NOT NULL",
+    },
+    "public.guide_role": {
+        "workspace_id": "text NOT NULL",
+        "guide_id": "text NOT NULL",
+        "role": "text NOT NULL",
+        "default_layer": "text NOT NULL",
+        "action_threshold": "text NOT NULL",
+    },
+    "public.guide_section": {
+        "workspace_id": "text NOT NULL",
+        "guide_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "parent_id": "text",
+        "ordinal": "integer NOT NULL",
+        "prompt": "text NOT NULL",
+        "role_label": "text NOT NULL",
+        "usage_note": "text",
+        "layers": "text[] NOT NULL",
+        "hidden": "boolean NOT NULL",
     },
     "public.identity_audit_event": {
         "id": "text NOT NULL",
@@ -663,6 +712,16 @@ TABLES: dict[str, dict[str, str]] = {
         "workspace_id": "text NOT NULL",
         "testing_domain": "text NOT NULL",
     },
+    "public.usage": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "actor": "text NOT NULL",
+        "at": "timestamp with time zone NOT NULL",
+        "act": "text NOT NULL",
+        "write_up_id": "text",
+        "write_up_version": "integer",
+        "iri": "text",
+    },
     "public.user": {
         "id": "text NOT NULL",
         "name": "text NOT NULL",
@@ -714,6 +773,11 @@ TABLES: dict[str, dict[str, str]] = {
         "audience": "text NOT NULL",
         "audience_groups": "text[]",
         "created_at": "timestamp with time zone NOT NULL",
+        "home": "text NOT NULL",
+        "guide_id": "text",
+        "section_id": "text",
+        "question_id": "text",
+        "needs_review": "text",
     },
     "public.write_up_include": {
         "workspace_id": "text NOT NULL",
@@ -721,5 +785,19 @@ TABLES: dict[str, dict[str, str]] = {
         "id": "text NOT NULL",
         "ordinal": "integer NOT NULL",
         "iri": "text NOT NULL",
+        "content_hash": "text NOT NULL",
+        "expected_fact_id": "text",
+        "wording_heading": "text",
+        "wording_hash": "text",
+    },
+    "public.write_up_version": {
+        "workspace_id": "text NOT NULL",
+        "write_up_id": "text NOT NULL",
+        "version": "integer NOT NULL",
+        "actor": "text NOT NULL",
+        "at": "timestamp with time zone NOT NULL",
+        "note": "text",
+        "markdown": "text NOT NULL",
+        "includes": "jsonb NOT NULL",
     },
 }

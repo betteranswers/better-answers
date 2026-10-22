@@ -97,10 +97,17 @@ export const TABLE_OWNERS = {
 
   "public.write_up": "guides",
   "public.write_up_include": "guides",
+  "public.write_up_version": "guides",
+  "public.guide_definition": "guides",
+  "public.guide_role": "guides",
+  "public.guide_section": "guides",
+  "public.guide_expected_fact": "guides",
+  "public.guide_definition_version": "guides",
 
   "public.question_asked": "answering",
   "public.question_content": "answering",
   "public.question_feedback": "answering",
+  "public.usage": "answering",
 } satisfies Record<string, string>;
 
 export type OwnedTable = keyof typeof TABLE_OWNERS;
@@ -374,6 +381,27 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "read and write",
     reason:
       "An owner row names the person and nothing else, so the erasure map lists each one naming the person and the member's ending deletes them; the concept falls back to its collection's owner, or to Admins.",
+  },
+  {
+    table: "public.write_up_version",
+    by: "erasure",
+    access: "read and write",
+    reason:
+      "A write-up version names who saved it, so the erasure map lists each one the person saved and every erasure from the workspace rewrites that id to the erasure pseudonym through `pseudonymise_record_actors`, keeping the version's text.",
+  },
+  {
+    table: "public.guide_definition_version",
+    by: "erasure",
+    access: "read and write",
+    reason:
+      "A guide definition version names who saved it, so the erasure map lists each one the person saved and every erasure from the workspace rewrites that id to the erasure pseudonym through `pseudonymise_record_actors`, keeping the definition.",
+  },
+  {
+    table: "public.usage",
+    by: "erasure",
+    access: "read and write",
+    reason:
+      "A usage row names who copied, exported or submitted the work, so the erasure map lists each one the person made and every erasure from the workspace rewrites that id to the erasure pseudonym.",
   },
   {
     table: "public.finding",

@@ -45,7 +45,7 @@ A person's second factor is theirs, across every workspace (ADR 0048). Being an 
 - When a person who needed no factor is made an Admin or the operator, the same action clears the confirmation on every one of their sessions, so each confirms again as an Admin.
 - Removing a factor clears the confirmation of the person's other sessions: a confirmation never outlives the factor that may have made it.
 
-Erasure rewrites `human:<email>` and `human:<person id>` to `human:<erasure pseudonym>` across a workspace's files, history (git author lines and commit trailers), `bundle_commit` rows and verification rows. The pseudonym is minted at erasure, one per workspace, and kept on the erasure request. It is never the person id. The user row is pseudonymised: email to a unique tombstone, name cleared, id kept. The audit log holds ids and never an email or a name, and it is never rewritten.
+Erasure rewrites `human:<email>` and `human:<person id>` to `human:<erasure pseudonym>` across a workspace's files, history (git author lines and commit trailers), `bundle_commit` rows and verification rows. It rewrites the actor of `write_up_version` and `guide_definition_version` rows through the definer `public.pseudonymise_record_actors`, because the api holds no UPDATE on either, and of `usage` rows directly. A version's text is kept. The pseudonym is minted at erasure, one per workspace, and kept on the erasure request. It is never the person id. The user row is pseudonymised: email to a unique tombstone, name cleared, id kept. The audit log holds ids and never an email or a name, and it is never rewritten.
 
 The audit slice, `packages/core/src/audit/`, has two doors. `record` takes a Principal and derives the actor. `recordFor` takes the platform principal and an explicit actor. The kernel's actor id has three forms: `human:<person id>`, `process:better-answers-<purpose>`, or an agent's id. An audit action is named `family.subject.verb`, in four families: people, knowledge, sources and platform.
 
@@ -72,3 +72,5 @@ The audit slice, `packages/core/src/audit/`, has two doors. `record` takes a Pri
 ## History
 
 The full record, with its three amendments (T-440, T-458, T-460): `docs/archive/adr/0035-one-id-per-person.md`.
+
+On 22/10/2026 the version tables and `usage` joined the records erasure rewrites (BA-234).

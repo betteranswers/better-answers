@@ -424,7 +424,7 @@ const bundleCommitRowsIn = async (workspaceId: string) => {
 };
 
 const actorsIn = async (
-  table: "bundle_commit" | "concept_verification",
+  table: "bundle_commit" | "concept_verification" | "guide_definition_version" | "usage",
   workspaceId: string,
 ): Promise<readonly string[]> => {
   const read = await db().pool.query<{ actor: string }>(
@@ -3129,7 +3129,52 @@ describe("the person's actor id on the platform's records", () => {
     expect(await actorsIn("bundle_commit", scenario.workspaceId)).toEqual([erased]);
     expect(await actorsIn("concept_verification", scenario.workspaceId)).toEqual([erased]);
   });
+
+  it("rewrites a version's actor and keeps its prose", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const { workspaceId } = scenario;
+    const actor = actorIdOfPerson(person.id);
+    await seedingWith(db().pool, async (seed) => {
+      const first = await seed.writeUpVersion({ workspaceId, actor, markdown: "Cover of £5m." });
+      await seed.writeUpVersion({
+        workspaceId,
+        writeUpId: first.writeUpId,
+        version: 2,
+        actor,
+        markdown: "Cover of £10m.",
+      });
+      await seed.usage({ workspaceId, actor, writeUpId: first.writeUpId, writeUpVersion: 2 });
+      await seed.guideDefinitionVersion({ workspaceId, actor });
+    });
+
+    const done = await completing(scenario, subjectRequestId);
+
+    const erased = `human:${await pseudonymIn(workspaceId)}`;
+    expect(await recordActorsIn(workspaceId)).toEqual({
+      versions: [
+        { actor: erased, markdown: "Cover of £5m." },
+        { actor: erased, markdown: "Cover of £10m." },
+      ],
+      guides: [erased],
+      usage: [erased],
+    });
+    expect(done.report).toContain("write-up-version: actorsRewritten 2, found 2");
+    expect(done.report).toContain("guide-definition-version: actorsRewritten 1, found 1");
+    expect(done.report).toContain("usage: actorsRewritten 1, found 1");
+  });
 });
+
+const recordActorsIn = async (workspaceId: string) => {
+  const versions = await db().pool.query<{ actor: string; markdown: string }>(
+    "SELECT actor, markdown FROM write_up_version WHERE workspace_id = $1 ORDER BY version",
+    [workspaceId],
+  );
+  return {
+    versions: versions.rows,
+    guides: await actorsIn("guide_definition_version", workspaceId),
+    usage: await actorsIn("usage", workspaceId),
+  };
+};
 
 const A_LATE_CONCEPT = {
   mergeKey: "guideline:late-claims",

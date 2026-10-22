@@ -35,6 +35,12 @@ type Registry = typeof boundarySchemas;
 type InsertInput<TName extends keyof Registry> = z.input<Registry[TName]["insert"]>;
 type Row<TName extends keyof Registry> = z.infer<Registry[TName]["select"]>;
 
+type InASection<TInput> = Partial<Omit<TInput, "guideId" | "sectionId">> &
+  (
+    | { readonly guideId: string; readonly sectionId: string }
+    | { readonly guideId?: string | null; readonly sectionId?: null }
+  );
+
 export type TestData = {
   workspace(overrides?: Partial<InsertInput<"workspace">>): Promise<Row<"workspace">>;
 
@@ -158,11 +164,35 @@ export type TestData = {
 
   job(overrides?: Partial<InsertInput<"job">>): Promise<Row<"job">>;
 
-  writeUp(overrides?: Partial<InsertInput<"writeUp">>): Promise<Row<"writeUp">>;
+  guideDefinition(
+    overrides?: Partial<InsertInput<"guideDefinition">>,
+  ): Promise<Row<"guideDefinition">>;
+
+  guideRole(overrides?: Partial<InsertInput<"guideRole">>): Promise<Row<"guideRole">>;
+
+  guideSection(overrides?: Partial<InsertInput<"guideSection">>): Promise<Row<"guideSection">>;
+
+  guideExpectedFact(
+    overrides?: InASection<InsertInput<"guideExpectedFact">>,
+  ): Promise<Row<"guideExpectedFact">>;
+
+  guideDefinitionVersion(
+    overrides?: Partial<InsertInput<"guideDefinitionVersion">>,
+  ): Promise<Row<"guideDefinitionVersion">>;
+
+  /** Homed in a section it seeds, unless given one; a response home names a question instead. */
+  writeUp(overrides?: InASection<InsertInput<"writeUp">>): Promise<Row<"writeUp">>;
 
   writeUpInclude(
     overrides?: Partial<InsertInput<"writeUpInclude">>,
   ): Promise<Row<"writeUpInclude">>;
+
+  writeUpVersion(
+    overrides?: Partial<InsertInput<"writeUpVersion">>,
+  ): Promise<Row<"writeUpVersion">>;
+
+  /** Of a write-up version it seeds, unless given an `iri` or a version with its write-up. */
+  usage(overrides?: Partial<InsertInput<"usage">>): Promise<Row<"usage">>;
 
   questionAsked(overrides?: Partial<InsertInput<"questionAsked">>): Promise<Row<"questionAsked">>;
 
@@ -988,16 +1018,122 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const guideDefinition: TestData["guideDefinition"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "guideDefinition", {
+      id: ulid(),
+      kind: "bid",
+      collection: "bids",
+      template: "bid-response",
+      subjectIri: null,
+      ...overrides,
+      workspaceId,
+    });
+  };
+
+  const guideRole: TestData["guideRole"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const guideId = overrides.guideId ?? (await guideDefinition({ workspaceId })).id;
+    return insertRow(client, "guideRole", {
+      role: "Editor",
+      defaultLayer: "assembled",
+      actionThreshold: "human-reviewed",
+      ...overrides,
+      workspaceId,
+      guideId,
+    });
+  };
+
+  const guideSection: TestData["guideSection"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const guideId = overrides.guideId ?? (await guideDefinition({ workspaceId })).id;
+    return insertRow(client, "guideSection", {
+      id: `s${ulid().toLowerCase()}`,
+      parentId: null,
+      ordinal: 0,
+      prompt: "Describe how you insure the work.",
+      roleLabel: "say",
+      usageNote: null,
+      layers: ["assembled"],
+      hidden: false,
+      ...overrides,
+      workspaceId,
+      guideId,
+    });
+  };
+
+  const sectionOf = async (
+    workspaceId: string,
+    overrides: InASection<object>,
+  ): Promise<{ readonly guideId: string; readonly sectionId: string }> => {
+    if (typeof overrides.sectionId === "string") {
+      return { guideId: overrides.guideId, sectionId: overrides.sectionId };
+    }
+    const section = await guideSection(
+      typeof overrides.guideId === "string"
+        ? { workspaceId, guideId: overrides.guideId }
+        : { workspaceId },
+    );
+    return { guideId: section.guideId, sectionId: section.id };
+  };
+
+  const guideExpectedFact: TestData["guideExpectedFact"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "guideExpectedFact", {
+      id: ulid(),
+      ordinal: 0,
+      name: "Insurance cover",
+      kind: "Policy",
+      tags: [],
+      collection: null,
+      atLeast: 1,
+      ...overrides,
+      workspaceId,
+      ...(await sectionOf(workspaceId, overrides)),
+    });
+  };
+
+  const guideDefinitionVersion: TestData["guideDefinitionVersion"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const guideId = overrides.guideId ?? (await guideDefinition({ workspaceId })).id;
+    return insertRow(client, "guideDefinitionVersion", {
+      version: 1,
+      actor: `human:${ulid()}`,
+      note: null,
+      content: { sections: [] },
+      ...overrides,
+      workspaceId,
+      guideId,
+    });
+  };
+
+  const homeOf = async (workspaceId: string, overrides: InASection<InsertInput<"writeUp">>) =>
+    overrides.home === "response"
+      ? {
+          home: overrides.home,
+          guideId: overrides.guideId ?? null,
+          sectionId: overrides.sectionId ?? null,
+          questionId: overrides.questionId ?? ulid(),
+        }
+      : {
+          home: overrides.home ?? "section",
+          ...(await sectionOf(workspaceId, overrides)),
+          questionId: overrides.questionId ?? null,
+        };
+
   const writeUp: TestData["writeUp"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const placed = await homeOf(workspaceId, overrides);
     return insertRow(client, "writeUp", {
       id: ulid(),
       publishedAt: new Date(),
       sensitivity: "Internal",
       audience: AUDIENCE_EVERYONE,
       audienceGroups: null,
+      needsReview: null,
       ...overrides,
       workspaceId,
+      ...placed,
     });
   };
 
@@ -1008,10 +1144,63 @@ export const testData = (client: pg.PoolClient): TestData => {
     return insertRow(client, "writeUpInclude", {
       id: `i${ulid().toLowerCase()}`,
       ordinal: 0,
+      contentHash: hexOfLength(64),
+      expectedFactId: null,
+      wordingHeading: null,
+      wordingHash: null,
       ...overrides,
       workspaceId,
       writeUpId,
       iri,
+    });
+  };
+
+  const writeUpVersion: TestData["writeUpVersion"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const writeUpId = overrides.writeUpId ?? (await writeUp({ workspaceId })).id;
+    return insertRow(client, "writeUpVersion", {
+      version: 1,
+      actor: `human:${ulid()}`,
+      note: null,
+      markdown: "We hold public liability cover of five million pounds.",
+      includes: [],
+      ...overrides,
+      workspaceId,
+      writeUpId,
+    });
+  };
+
+  const usageTargetOf = async (
+    workspaceId: string,
+    overrides: Partial<InsertInput<"usage">>,
+  ): Promise<Pick<InsertInput<"usage">, "writeUpId" | "writeUpVersion" | "iri">> => {
+    if (typeof overrides.iri === "string") {
+      return { writeUpId: null, writeUpVersion: null, iri: overrides.iri };
+    }
+    if (typeof overrides.writeUpId === "string" && typeof overrides.writeUpVersion === "number") {
+      return {
+        writeUpId: overrides.writeUpId,
+        writeUpVersion: overrides.writeUpVersion,
+        iri: null,
+      };
+    }
+    const saved = await writeUpVersion(
+      typeof overrides.writeUpId === "string"
+        ? { workspaceId, writeUpId: overrides.writeUpId }
+        : { workspaceId },
+    );
+    return { writeUpId: saved.writeUpId, writeUpVersion: saved.version, iri: null };
+  };
+
+  const usage: TestData["usage"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "usage", {
+      id: ulid(),
+      actor: `human:${ulid()}`,
+      act: "copied",
+      ...overrides,
+      workspaceId,
+      ...(await usageTargetOf(workspaceId, overrides)),
     });
   };
 
@@ -1187,8 +1376,15 @@ export const testData = (client: pg.PoolClient): TestData => {
     conceptEvidence,
     conceptSensitivityOverride,
     conceptOwner,
+    guideDefinition,
+    guideRole,
+    guideSection,
+    guideExpectedFact,
+    guideDefinitionVersion,
     writeUp,
     writeUpInclude,
+    writeUpVersion,
+    usage,
     questionAsked,
     questionContent,
     questionFeedback,

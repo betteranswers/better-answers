@@ -24,7 +24,8 @@ tags:
 
 A write-up's prose (a guide section's Brief, a response) is stored as markdown. Every claim in it that rests on a concept carries a footnote: a markdown footnote reference labelled by the include's id (`…within 30 days[^i7].`).
 
-- The include row carries the concept's IRI, the context wording chosen (its heading and the hash of that section's text), the concept's content hash at generation and the cited span.
+- The include row carries the concept's IRI, the context wording chosen (its heading and the hash of that section's text), the concept's content hash at generation and the cited span. `write_up_include` holds the concept's hash in `content_hash`, and the chosen wording in `wording_heading` and `wording_hash`, which `write_up_include_wording_check` requires together or not at all. It also names the expected fact it meets, `expected_fact_id`, so coverage counts a fact's includes by a join. The cited span is not yet a column.
+- A saved Brief is a row of `write_up_version`: the markdown as saved, never normalised, and the include rows as they stood. The live include list stays rows in `write_up_include`.
 - Footnote definitions are never stored. They are rendered from the include rows every time the prose is shown, exported or copied.
 - Rows own what is included and markers own placement. A save reconciles the two. A marker whose label has no include row is refused before a version is written. An include with no marker is allowed and shown "not placed". Deleting a marker never deletes its row.
 - Two footnote kinds share one syntax, and the page always says which. An OKF source footnote in a concept body is a citation mark. Its label is the `id` of an entry in the file's `sources`, matched ignoring case and surrounding whitespace. It resolves to the first such entry, whether or not the file defines it. A citation mark is never a link and never a map edge. A concept-body footnote whose label is no source id is a link when the file defines it, as OKF allows. An include marker in a write-up has no definition.
@@ -61,3 +62,5 @@ The gate that treats uncited text as below threshold is the Editor's.
 The full record, with its one amendment (ticket 79, applied by T-001, making roles levels): `docs/archive/adr/0015-compositions-cite-concepts-by-footnote.md`. S2a's plan made a concept body's source footnote a citation mark (`docs/plans/2026-10-09-1344-feat-s2a-search-and-concept-page-plan.md`, KTD5).
 
 The promotion-gate line, the archived amendment of ticket 37, was missing from this doc until 20/10/2026, when the route's rewrite found S5 resting on it.
+
+On 22/10/2026 the include columns and the write-up version reached the tree (BA-234, migration `0098_the-guide-records`).

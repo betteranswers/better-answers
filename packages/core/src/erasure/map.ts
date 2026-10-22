@@ -31,6 +31,9 @@ export const ERASURE_FAMILIES = [
   "suggestion",
   "concept-write-request",
   "concept-owner",
+  "write-up-version",
+  "guide-definition-version",
+  "usage",
 ] as const;
 
 export type ErasureFamily = (typeof ERASURE_FAMILIES)[number];
@@ -305,6 +308,38 @@ const ERASURE_FAMILY_DESCRIPTORS = {
         subject,
         "SELECT id AS location FROM concept_owner WHERE person_id = $1 AND workspace_id = $2",
         [subject.workspaceId],
+      ),
+  },
+
+  "write-up-version": {
+    categories: ["actor-id"],
+    find: (platform, subject, tx) =>
+      aboutTheActors(
+        tx,
+        subject,
+        `SELECT write_up_id || ' (version ' || version || ')' AS location FROM write_up_version
+          WHERE workspace_id = $1 AND actor = ANY($2)`,
+      ),
+  },
+
+  "guide-definition-version": {
+    categories: ["actor-id"],
+    find: (platform, subject, tx) =>
+      aboutTheActors(
+        tx,
+        subject,
+        `SELECT guide_id || ' (version ' || version || ')' AS location FROM guide_definition_version
+          WHERE workspace_id = $1 AND actor = ANY($2)`,
+      ),
+  },
+
+  usage: {
+    categories: ["actor-id"],
+    find: (platform, subject, tx) =>
+      aboutTheActors(
+        tx,
+        subject,
+        "SELECT id AS location FROM usage WHERE workspace_id = $1 AND actor = ANY($2)",
       ),
   },
 } satisfies Record<ErasureFamily, ErasureFamilyDescriptor>;
