@@ -180,23 +180,18 @@ const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<Outgoing> =
     }
   }
 
+  const unresolved = references.flatMap((ref): readonly UnresolvedReference[] =>
+    "path" in ref.target && !byPath.has(ref.target.path)
+      ? [{ relation: ref.relation, ordinal: ref.ordinal, targetPath: ref.target.path }]
+      : [],
+  );
   const cited = new Set<string>();
-  const unresolved: UnresolvedReference[] = [];
   const edges = references.flatMap((ref): readonly OutgoingEdge[] => {
     const resolved =
       "iri" in ref.target
         ? (byIri.get(ref.target.iri) ?? { iri: ref.target.iri, kind: null, status: null })
         : byPath.get(ref.target.path);
-    if (resolved === undefined) {
-      if ("path" in ref.target) {
-        unresolved.push({
-          relation: ref.relation,
-          ordinal: ref.ordinal,
-          targetPath: ref.target.path,
-        });
-      }
-      return [];
-    }
+    if (resolved === undefined) return [];
     if (ref.relation === "lineage") {
       if (cited.has(resolved.iri)) return [];
       cited.add(resolved.iri);

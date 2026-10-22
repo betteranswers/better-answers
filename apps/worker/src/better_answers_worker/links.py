@@ -731,19 +731,14 @@ class UnresolvedReference(NamedTuple):
 
 
 def unresolved_references(
-    body: str,
-    frontmatter: Frontmatter,
-    path: str,
+    references: Sequence[OutgoingReference],
     by_path: Mapping[str, ResolvedTarget],
 ) -> list[UnresolvedReference]:
-    unresolved: list[UnresolvedReference] = []
-    for reference in references_of(body, frontmatter, path):
-        shape, value = reference.target
-        if shape == "path" and value not in by_path:
-            unresolved.append(
-                UnresolvedReference(reference.relation, reference.ordinal, value)
-            )
-    return unresolved
+    return [
+        UnresolvedReference(reference.relation, reference.ordinal, reference.target[1])
+        for reference in references
+        if reference.target[0] == "path" and reference.target[1] not in by_path
+    ]
 
 
 class OutgoingEdge:
@@ -770,15 +765,13 @@ def outgoing_edges(
     *,
     iri: str,
     kind: str,
-    path: str,
-    body: str,
-    frontmatter: Frontmatter,
+    references: Sequence[OutgoingReference],
     by_path: dict[str, ResolvedTarget],
     by_iri: dict[str, ResolvedTarget],
 ) -> list[OutgoingEdge]:
     edges: list[OutgoingEdge] = []
     cited: set[str] = set()
-    for reference in references_of(body, frontmatter, path):
+    for reference in references:
         shape, value = reference.target
         if shape == "iri":
             resolved = by_iri.get(value) or ResolvedTarget(value, None, None)

@@ -28,9 +28,7 @@ def edges(
     return outgoing_edges(
         iri=IRI,
         kind=kind,
-        path=PATH,
-        body=body,
-        frontmatter=frontmatter or {},
+        references=references_of(body, frontmatter or {}, PATH),
         by_path=by_path or {},
         by_iri=by_iri or {},
     )
@@ -121,7 +119,7 @@ def test_a_path_no_concept_holds_is_an_unresolved_reference() -> None:
     frontmatter: Frontmatter = {"sources": [{"resource": "/knowledge/policy.md"}]}
     held = {"knowledge/receipts.md": ResolvedTarget(OTHER_IRI, "Evidence", "stable")}
 
-    found = unresolved_references(body, frontmatter, PATH, held)
+    found = unresolved_references(references_of(body, frontmatter, PATH), held)
 
     assert [tuple(reference) for reference in found] == [
         ("link", 1, "knowledge/équipe.md"),

@@ -11,6 +11,7 @@ from .links import (
     LINKS_TO_LABEL,
     ResolvedTarget,
     outgoing_edges,
+    references_of,
     unresolved_references,
 )
 from .log import logger
@@ -142,12 +143,11 @@ def run_rebuild(
         if actual != record.content_hash:
             outcome.note_mismatch(record.path, record.content_hash, actual)
 
+        references = references_of(body, frontmatter, record.path)
         for edge in outgoing_edges(
             iri=record.iri,
             kind=record.kind,
-            path=record.path,
-            body=body,
-            frontmatter=frontmatter,
+            references=references,
             by_path=by_path,
             by_iri=by_iri,
         ):
@@ -175,7 +175,7 @@ def run_rebuild(
             )
             outcome.edges += 1
 
-        for reference in unresolved_references(body, frontmatter, record.path, by_path):
+        for reference in unresolved_references(references, by_path):
             cursor.execute(
                 "INSERT INTO map_unresolved_reference (workspace_id, gen, from_uid,"
                 " relation, ordinal, target_path) VALUES (%s, %s, %s, %s, %s, %s)",

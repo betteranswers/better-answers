@@ -7,6 +7,7 @@ from better_answers_worker.links import (
     ResolvedTarget,
     links_and_marks_of,
     outgoing_edges,
+    references_of,
     unresolved_references,
 )
 
@@ -35,9 +36,9 @@ def test_makes_exactly_the_links_each_case_names_by_ordinal() -> None:
                 for edge in outgoing_edges(
                     iri=citing["iri"],
                     kind=citing["kind"],
-                    path=citing["path"],
-                    body=case["body"],
-                    frontmatter={"sources": case["sources"]},
+                    references=references_of(
+                        case["body"], {"sources": case["sources"]}, citing["path"]
+                    ),
                     by_path={
                         held["path"]: ResolvedTarget(held["iri"], "Policy", "stable")
                         for held in case.get("held", [])
@@ -81,9 +82,9 @@ def test_leaves_unresolved_exactly_the_paths_each_case_names() -> None:
                     "path": reference.target_path,
                 }
                 for reference in unresolved_references(
-                    case["body"],
-                    {"sources": case["sources"]},
-                    citing["path"],
+                    references_of(
+                        case["body"], {"sources": case["sources"]}, citing["path"]
+                    ),
                     {
                         held["path"]: ResolvedTarget(held["iri"], "Policy", "stable")
                         for held in case.get("held", [])
