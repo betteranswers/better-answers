@@ -103,6 +103,7 @@ import {
 } from "./suite-postgres.ts";
 import {
   doorsOf,
+  EDITORS_COLLECTIONS,
   memberOf,
   principalFor,
   suiteWithBundles,
@@ -1813,6 +1814,30 @@ describe("the identity set on the person's last workspace", () => {
     ]);
   });
 
+  it("deletes an erased person's owner rows", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    await seedingWith(db().pool, (seed) =>
+      seed.conceptOwner({
+        workspaceId: scenario.workspaceId,
+        collection: "expenses-desk",
+        personId: person.id,
+      }),
+    );
+    const ownersOf = async (personId: string) =>
+      (
+        await db().pool.query(
+          "SELECT collection FROM concept_owner WHERE workspace_id = $1 AND person_id = $2",
+          [scenario.workspaceId, personId],
+        )
+      ).rowCount;
+
+    const done = await completing(scenario, subjectRequestId);
+
+    expect(await ownersOf(person.id)).toBe(0);
+    expect(await ownersOf(scenario.editor.userId)).toBe(EDITORS_COLLECTIONS.length);
+    expect(done.report).toContain("- concept-owner: deleted 1, found 1\n");
+  });
+
   it("stores identical identity lines on both arms, never naming elsewhere", async () => {
     const { runs, elsewhereId } = await erasedOnEachArmOnce();
     const identityLinesOf = async (done: ErasureRun) => {
@@ -3108,7 +3133,7 @@ describe("the person's actor id on the platform's records", () => {
 
 const A_LATE_CONCEPT = {
   mergeKey: "guideline:late-claims",
-  path: "knowledge/guidelines/late-claims.md",
+  path: "knowledge/late-claims/late-claims.md",
   kind: "Guideline",
   title: "Late claims",
   frontmatter: { title: "Late claims", type: "Guideline" },
@@ -3118,12 +3143,25 @@ const A_LATE_CONCEPT = {
   sensitivity: "Internal",
 } as const;
 
+const owningTheLateClaims = async (scenario: Scenario, personId: string): Promise<void> => {
+  const { workspaceId } = scenario;
+  const held = await db().pool.query(
+    "SELECT 1 FROM concept_owner WHERE workspace_id = $1 AND collection = 'late-claims'",
+    [workspaceId],
+  );
+  if (held.rowCount !== 0) return;
+  await seedingWith(db().pool, (seed) =>
+    seed.conceptOwner({ workspaceId, collection: "late-claims", personId }),
+  );
+};
+
 const writingAsThePerson = async (
   scenario: Scenario,
   person: { readonly id: string },
   email: string,
 ) => {
   const writer = await principalFor(db(), scenario.workspaceId, person.id);
+  await owningTheLateClaims(scenario, person.id);
   const history = await bundleHistory(scenario.git, scenario.workspaceId);
   return writeConcept(writer, doorsOf(scenario), {
     ...A_LATE_CONCEPT,
@@ -3217,6 +3255,7 @@ describe("a commit made as the person while the routine runs", () => {
     const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
     const writer = await principalFor(db(), scenario.workspaceId, person.id);
+    await owningTheLateClaims(scenario, person.id);
     const impatient = { ...doorsOf(scenario), git: { ...scenario.git, commitBudgetMs: 500 } };
 
     await gate.park();
@@ -3243,6 +3282,7 @@ describe("a commit made as the person while the routine runs", () => {
     const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
     const elsewhere = await asAnotherProcess(scenario.git);
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
+    await owningTheLateClaims(scenario, scenario.editor.userId);
 
     await gate.park();
     const writing = writeConcept(

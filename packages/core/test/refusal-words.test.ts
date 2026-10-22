@@ -59,6 +59,7 @@ const SEVEN_CLASSES = [
 const CATALOGUED = {
   malformed: "malformed by kernel",
   "role-forbids": "forbidden by kernel",
+  "owner-forbids": "forbidden by kernel",
   "not-found": "absent by kernel",
   "not-the-operator": "forbidden by kernel",
   "confirmation-too-old": "precondition by kernel",
@@ -146,7 +147,6 @@ const CATALOGUED = {
   "manifest-taken": "conflict by concepts",
   "resolution-moved": "conflict by concepts",
   "kind-forbids": "forbidden by concepts",
-  "class-unreadable": "forbidden by concepts",
   "rename-refused": "inapplicable by concepts",
   "reclassification-refused": "inapplicable by concepts",
   "unreadable-commit": "inapplicable by concepts",

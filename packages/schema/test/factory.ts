@@ -150,6 +150,8 @@ export type TestData = {
     overrides?: Partial<InsertInput<"conceptSensitivityOverride">>,
   ): Promise<Row<"conceptSensitivityOverride">>;
 
+  conceptOwner(overrides?: Partial<InsertInput<"conceptOwner">>): Promise<Row<"conceptOwner">>;
+
   job(overrides?: Partial<InsertInput<"job">>): Promise<Row<"job">>;
 
   writeUp(overrides?: Partial<InsertInput<"writeUp">>): Promise<Row<"writeUp">>;
@@ -954,6 +956,21 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const conceptOwner: TestData["conceptOwner"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const personId =
+      overrides.personId ?? (await member({ workspaceId, userId: (await user()).id })).userId;
+    const iri = overrides.iri ?? null;
+    return insertRow(client, "conceptOwner", {
+      id: ulid(),
+      collection: iri === null ? "policy" : null,
+      ...overrides,
+      workspaceId,
+      iri,
+      personId,
+    });
+  };
+
   const writeUp: TestData["writeUp"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     return insertRow(client, "writeUp", {
@@ -1151,6 +1168,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     suppression,
     conceptEvidence,
     conceptSensitivityOverride,
+    conceptOwner,
     writeUp,
     writeUpInclude,
     questionAsked,

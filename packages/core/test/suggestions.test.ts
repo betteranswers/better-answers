@@ -17,11 +17,13 @@ import {
   type ConceptWritten,
   type SuggestionKind,
   type SuggestionRequest,
+  type SuggestionSetSubmitted,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
 import { bundleHistory, commitFacts } from "./bundle.ts";
+import { connectedSourceHolding } from "./sourced-concept.ts";
 import {
   abortTheTransaction,
   holdingTable,
@@ -35,15 +37,17 @@ const { db, arrange } = suiteWithBundles();
 
 let proposed = 0;
 
+const SUGGESTED_BODY = "Expenses are claimed within sixty days.";
+
 const requestFor = (overrides: Partial<SuggestionRequest> = {}): SuggestionRequest => {
   proposed += 1;
   return {
     mergeKey: `policy:expenses-${proposed}`,
-    path: `knowledge/expenses-${proposed}.md`,
+    path: `knowledge/policy/expenses-${proposed}.md`,
     conceptKind: "Policy",
     title: "Expenses",
     frontmatter: { title: "Expenses", type: "Policy" },
-    body: "Expenses are claimed within sixty days.",
+    body: SUGGESTED_BODY,
     ...overrides,
   };
 };
@@ -134,7 +138,7 @@ const editorWrote = async (scenario: Scenario, overrides: Partial<WriteConceptIn
   proposed += 1;
   const input: WriteConceptInput = {
     mergeKey: `policy:expenses-${proposed}`,
-    path: `knowledge/expenses-${proposed}.md`,
+    path: `knowledge/policy/expenses-${proposed}.md`,
     kind: "Policy",
     title: "Expenses",
     frontmatter: { title: "Expenses", type: "Policy" },
@@ -434,6 +438,79 @@ describe("accepting a suggestion", () => {
     expect(facts.committer).toContain("Better Answers");
   });
 
+  it("commits an accepted Viewer edit with the Viewer as author", async () => {
+    const scenario = await arrange();
+    const viewer = await db().pool.query<{ name: string; email: string }>(
+      'SELECT name, email FROM "user" WHERE id = $1',
+      [scenario.viewer.userId],
+    );
+    const set = await submitted(scenario, scenario.viewer, "edit", [requestFor()]);
+
+    const [outcome] = await acceptAll(scenario, set.setId, scenario.editor);
+
+    const facts = await commitFacts(
+      scenario.git,
+      scenario.workspaceId,
+      acceptedOf(outcome)?.sha ?? "",
+    );
+    const person = viewer.rows[0];
+    expect({ author: facts.author, actor: facts.trailers["Actor"] }).toEqual({
+      author: `${person?.name} <${person?.email}>`,
+      actor: `human:${scenario.editor.userId}`,
+    });
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({
+      status: "accepted",
+      decider: `human:${scenario.editor.userId}`,
+    });
+  });
+
+  it("refuses acceptance by an Editor who does not own it", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.viewer, "edit", [requestFor()]);
+
+    const outcomes = await acceptAll(scenario, set.setId, scenario.unowned);
+
+    expect(outcomes.map(refusalOf)).toEqual(["owner-forbids"]);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({
+      status: "waiting",
+      decider: null,
+    });
+  });
+
+  it("decides each batched decision by its own target's owner", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.viewer, "edit", [
+      requestFor(),
+      requestFor({ path: `knowledge/unowned/expenses-${proposed}.md` }),
+    ]);
+
+    const outcomes = await acceptAll(scenario, set.setId, scenario.editor);
+
+    expect(outcomes.map(refusalOf)).toEqual([undefined, "owner-forbids"]);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
+  });
+
+  it("leaves a citation fix to an Admin, not the owner", async () => {
+    const scenario = await arrange();
+    const { input, written } = await editorWrote(scenario);
+    const set = await platformCitationFix(
+      scenario,
+      requestFor({
+        mergeKey: input.mergeKey,
+        path: input.path,
+        body: `${input.body} Receipts are kept for six years.`,
+        baseContentHash: written.contentHash,
+      }),
+    );
+
+    const byTheOwner = await acceptAll(scenario, set.setId, scenario.editor);
+    const byAnAdmin = await acceptAll(scenario, set.setId, scenario.admin);
+
+    expect(byTheOwner.map(refusalOf)).toEqual(["role-forbids"]);
+    expect(byAnAdmin.map(refusalOf)).toEqual([undefined]);
+  });
+
   it("commits a run's suggested concept, authored by the accepting Admin", async () => {
     const scenario = await arrange();
     const admin = await db().pool.query<{ name: string }>('SELECT name FROM "user" WHERE id = $1', [
@@ -514,15 +591,19 @@ describe("accepting a suggestion", () => {
     expect(concepts.rows).toEqual([{ count: "1" }]);
   });
 
-  it("refuses a Viewer and an Editor, leaving the set waiting", async () => {
+  it("refuses a Viewer and a non-owning Editor, leaving it waiting", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
+    const suggestionId = set.suggestionIds[0] ?? "";
 
-    for (const principal of [scenario.viewer, scenario.editor]) {
+    for (const principal of [scenario.viewer, scenario.unowned]) {
       const refused = await acceptSuggestions(principal, doorsOf(scenario), {
-        decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }],
+        decisions: [{ suggestionId, expectedTarget: null }],
       });
-      expect(refused).toEqual({ ok: false, error: "role-forbids" });
+      expect(refused).toEqual({
+        ok: true,
+        value: [{ suggestionId, outcome: { ok: false, error: "owner-forbids" } }],
+      });
     }
 
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
@@ -642,14 +723,50 @@ describe("declining a suggestion", () => {
     ]);
   });
 
-  it("refuses an Editor, and a reason nobody wrote", async () => {
+  it("declines as owner, recording the owner as decider", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.viewer, "edit", [requestFor()]);
+    const suggestionId = set.suggestionIds[0] ?? "";
+
+    const declined = await declineSuggestion(scenario.editor, doorsOf(scenario), {
+      suggestionId,
+      reason: "not the company's word on this",
+    });
+
+    expect(declined).toMatchObject({ ok: true, value: { status: "declined" } });
+    expect(await suggestionRow(suggestionId)).toMatchObject({
+      status: "declined",
+      decider: `human:${scenario.editor.userId}`,
+    });
+  });
+
+  it("judges a decline by the concept's own path", async () => {
+    const scenario = await arrange();
+    const { input, written } = await editorWrote(scenario);
+    const set = await submitted(scenario, scenario.viewer, "edit", [
+      requestFor({
+        mergeKey: input.mergeKey,
+        path: `knowledge/unowned/expenses-${proposed}.md`,
+        baseContentHash: written.contentHash,
+      }),
+    ]);
+
+    const declined = await declineSuggestion(scenario.editor, doorsOf(scenario), {
+      suggestionId: set.suggestionIds[0] ?? "",
+      reason: "not the company's word on this",
+    });
+
+    expect(declined).toMatchObject({ ok: true, value: { status: "declined" } });
+  });
+
+  it("refuses a non-owning Editor, and a blank reason", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = set.suggestionIds[0] ?? "";
 
-    const byEditor = await declineSuggestion(scenario.editor, doorsOf(scenario), {
+    const byEditor = await declineSuggestion(scenario.unowned, doorsOf(scenario), {
       suggestionId,
-      reason: "no",
+      reason: "not the company's word on this",
     });
     const blank = await declineSuggestion(scenario.admin, doorsOf(scenario), {
       suggestionId,
@@ -657,7 +774,7 @@ describe("declining a suggestion", () => {
     });
 
     expect([byEditor, blank]).toEqual([
-      { ok: false, error: "role-forbids" },
+      { ok: false, error: "owner-forbids" },
       { ok: false, error: "malformed" },
     ]);
     expect(await suggestionRow(suggestionId)).toMatchObject({ status: "waiting" });
@@ -928,7 +1045,7 @@ describe("two actions over one suggestion", () => {
 
     const clash = await writeConcept(scenario.editor, doorsOf(scenario), {
       ...input,
-      path: "knowledge/second.md",
+      path: "knowledge/policy/second.md",
       expects: { head: null },
     });
 
@@ -1194,7 +1311,7 @@ describe("what a write may not do with an IRI", () => {
     const refused = await writeConcept(scenario.editor, doorsOf(scenario), {
       iri: conceptIriOf(ulid()),
       mergeKey: "policy:invented",
-      path: "knowledge/invented.md",
+      path: "knowledge/policy/invented.md",
       kind: "Policy",
       title: "Invented",
       frontmatter: { title: "Invented" },
@@ -1215,13 +1332,17 @@ describe("an acceptance reached straight through the write path", () => {
     written: ConceptWritten,
     set: { readonly setId: string; readonly suggestionIds: readonly string[] },
     overrides: Partial<WriteConceptInput> = {},
-  ): WriteConceptInput => ({
-    ...input,
-    iri: written.iri,
-    expects: { base: written.contentHash },
-    acceptance: { suggestionId: set.suggestionIds[0] ?? "", setId: set.setId, kind: "edit" },
-    ...overrides,
-  });
+  ): WriteConceptInput => {
+    const { status: _status, sensitivity: _sensitivity, ...proposed } = input;
+    return {
+      ...proposed,
+      iri: written.iri,
+      body: SUGGESTED_BODY,
+      expects: { base: written.contentHash },
+      acceptance: { suggestionId: set.suggestionIds[0] ?? "", setId: set.setId, kind: "edit" },
+      ...overrides,
+    };
+  };
 
   const leftWaiting = async (
     scenario: Scenario,
@@ -1232,17 +1353,139 @@ describe("an acceptance reached straight through the write path", () => {
     expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
   };
 
-  it("refuses an Editor, since only an Admin decides", async () => {
+  it("refuses an acceptance written onto another concept", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
+    const other = await editorWrote(scenario, { expects: { head: written.sha } });
 
-    const refused = await writeConcept(
+    const elsewhere = await writeConcept(
+      scenario.editor,
+      doorsOf(scenario),
+      acceptanceOf(other.input, other.written, set),
+    );
+    const onItsOwn = await writeConcept(
       scenario.editor,
       doorsOf(scenario),
       acceptanceOf(input, written, set),
     );
 
-    expect(refused).toEqual({ ok: false, error: "role-forbids" });
+    expect(elsewhere).toEqual({ ok: false, error: "malformed" });
+    expect(onItsOwn).toMatchObject({ ok: true });
+  });
+
+  type Moved = (
+    set: SuggestionSetSubmitted,
+    scenario: Scenario,
+  ) => Partial<WriteConceptInput> | Promise<Partial<WriteConceptInput>>;
+  it.each([
+    ["body", () => ({ body: "Expenses are claimed whenever." })],
+    ["merge key", () => ({ mergeKey: "policy:another" })],
+    ["kind", () => ({ kind: "Guideline" })],
+    ["title", () => ({ title: "Expenses and receipts" })],
+    ["frontmatter", () => ({ frontmatter: { title: "Expenses", type: "Policy", owner: "Ada" } })],
+    ["status", () => ({ status: "draft" })],
+    ["sensitivity", () => ({ sensitivity: "Internal" })],
+    [
+      "evidence",
+      async (_set, scenario) => {
+        const cited = await connectedSourceHolding(db(), scenario.workspaceId);
+        return {
+          evidence: [{ sourceDocumentId: cited.documentId, locator: "p.1", resource: "Handbook" }],
+        };
+      },
+    ],
+    [
+      "suggestion kind",
+      (set) => ({
+        acceptance: {
+          suggestionId: set.suggestionIds[0] ?? "",
+          setId: set.setId,
+          kind: "citation-fix",
+        },
+      }),
+    ],
+  ] satisfies readonly (readonly [string, Moved])[])(
+    "refuses an acceptance whose %s is not the suggestion's",
+    async (_field, moved) => {
+      const scenario = await arrange();
+      const { input, written, set } = await proposedAgainst(scenario, "edit");
+
+      const refused = await writeConcept(
+        scenario.editor,
+        doorsOf(scenario),
+        acceptanceOf(input, written, set, await moved(set, scenario)),
+      );
+
+      expect(refused).toEqual({ ok: false, error: "malformed" });
+      await leftWaiting(scenario, set, 1);
+    },
+  );
+
+  it("refuses a suggestion landed at another collection's path", async () => {
+    const scenario = await arrange();
+    const proposal = requestFor();
+    const set = await submitted(scenario, scenario.viewer, "edit", [proposal]);
+    const elsewhere = proposal.path.replace("knowledge/policy/", "knowledge/unowned/");
+
+    const refused = await writeConcept(scenario.editor, doorsOf(scenario), {
+      mergeKey: proposal.mergeKey,
+      path: elsewhere,
+      kind: proposal.conceptKind,
+      title: proposal.title,
+      frontmatter: proposal.frontmatter,
+      body: proposal.body,
+      message: "Accept the suggested change to Expenses",
+      author: { name: "Ada Editor", email: "ada@acme.invalid" },
+      expects: { base: null },
+      acceptance: { suggestionId: set.suggestionIds[0] ?? "", setId: set.setId, kind: "edit" },
+    });
+
+    expect(refused).toEqual({ ok: false, error: "malformed" });
+    const indexed = await db().pool.query(
+      "SELECT path FROM concept_index WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(indexed.rows).toEqual([]);
+    await leftWaiting(scenario, set, 0);
+  });
+
+  it("refuses one whose base is not the suggestion's", async () => {
+    const scenario = await arrange();
+    const { input, written, set } = await proposedAgainst(scenario, "edit");
+    const moved = await rewrittenAgainst(scenario, input, written, {
+      body: "Expenses are claimed within ten days.",
+    });
+    if (!moved.ok) throw new Error(`the re-write was refused: ${String(moved.error)}`);
+
+    const refused = await writeConcept(
+      scenario.editor,
+      doorsOf(scenario),
+      acceptanceOf(input, written, set, { expects: { base: moved.value.contentHash } }),
+    );
+
+    expect(refused).toEqual({ ok: false, error: "malformed" });
+    await leftWaiting(scenario, set, 2);
+  });
+
+  it("refuses a non-owner the same, whatever body they send", async () => {
+    const scenario = await arrange();
+    const { input, written, set } = await proposedAgainst(scenario, "edit");
+
+    const rightBody = await writeConcept(
+      scenario.unowned,
+      doorsOf(scenario),
+      acceptanceOf(input, written, set),
+    );
+    const wrongBody = await writeConcept(
+      scenario.unowned,
+      doorsOf(scenario),
+      acceptanceOf(input, written, set, { body: "Expenses are claimed whenever." }),
+    );
+
+    expect([rightBody, wrongBody]).toEqual([
+      { ok: false, error: "owner-forbids" },
+      { ok: false, error: "owner-forbids" },
+    ]);
     await leftWaiting(scenario, set, 1);
   });
 

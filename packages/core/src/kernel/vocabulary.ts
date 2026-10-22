@@ -3,6 +3,7 @@ import type { RefusalClass, Vocabulary } from "./refusal.ts";
 export const KERNEL_REFUSALS = {
   malformed: "malformed",
   "role-forbids": "forbidden",
+  "owner-forbids": "forbidden",
   "not-found": "absent",
 
   "not-the-operator": "forbidden",

@@ -92,6 +92,7 @@ export const TABLE_OWNERS = {
 
   "public.concept_evidence": "concepts",
   "public.concept_sensitivity_override": "concepts",
+  "public.concept_owner": "concepts",
 
   "public.write_up": "guides",
   "public.write_up_include": "guides",
@@ -367,6 +368,13 @@ export const CROSS_OWNER_TABLE_ACCESS = [
       "An override names who set it, so the erasure map lists each one the person set and every erasure from the workspace rewrites that id to the erasure pseudonym.",
   },
   {
+    table: "public.concept_owner",
+    by: "erasure",
+    access: "read and write",
+    reason:
+      "An owner row names the person and nothing else, so the erasure map lists each one naming the person and the member's ending deletes them; the concept falls back to its collection's owner, or to Admins.",
+  },
+  {
     table: "public.finding",
     by: "erasure",
     access: "read and write",
@@ -468,7 +476,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "concepts",
     access: "read",
     reason:
-      "The same read joins the member row: a proposer is a string a producer wrote and `user` is global by design, so a lookup by id alone would let a compromised producer put any person on the platform into another tenant's commit. Only a member of this workspace can be named as an author.",
+      "The same read joins the member row: a proposer is a string a producer wrote and `user` is global by design, so a lookup by id alone would let a compromised producer put any person on the platform into another tenant's commit. Only a member of this workspace can be named as an author. Naming an owner reads it too, to refuse a person who is not a member before the owner row's foreign key to it would.",
   },
   {
     table: "public.invitation",

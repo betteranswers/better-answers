@@ -11,8 +11,6 @@ export const CONCEPT_REFUSALS = {
 
   "kind-forbids": "forbidden",
 
-  "class-unreadable": "forbidden",
-
   "rename-refused": "inapplicable",
   "reclassification-refused": "inapplicable",
   "unreadable-commit": "inapplicable",

@@ -60,6 +60,13 @@ const documentNamed = thing("document");
 
 const conceptNamed = thing("concept");
 
+const ownedSubject = (detail: Slots["detail"], named: Slots["named"]): string => {
+  const collection = detail["collection"];
+  return typeof collection === "string"
+    ? `the collection ${collection}`
+    : conceptNamed(namedIn(named, "iri"));
+};
+
 const role = (detail: Slots["detail"]): string => {
   const held = detail["role"];
   return typeof held === "string" ? held : "a role";
@@ -91,6 +98,10 @@ const SENTENCES = {
   "knowledge.concept.committed": ({ by, subject }) => `${by} saved ${conceptNamed(subject)}`,
   "knowledge.feedback.closed": ({ by }) => `${by} closed a flag on an answer`,
   "knowledge.manifest.written": ({ by }) => `${by} updated the knowledge base’s description`,
+  "knowledge.owner.named": ({ by, detail, named }) =>
+    "personId" in detail
+      ? `${by} named ${person(namedIn(named, "personId"))} owner of ${ownedSubject(detail, named)}`
+      : `${by} cleared the owner of ${ownedSubject(detail, named)}`,
   "knowledge.suggestion.accepted": ({ by, named }) =>
     `${by} accepted a suggestion, saved as ${conceptNamed(namedIn(named, "iri"))}`,
   "knowledge.suggestion.declined": ({ by }) => `${by} declined a suggestion`,

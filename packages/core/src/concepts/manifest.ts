@@ -6,6 +6,7 @@ import { action, declareActions, record } from "../audit/index.ts";
 import {
   actorIdOf,
   admit,
+  ADMIN_ALONE,
   attempt,
   declareAction,
   err,
@@ -56,10 +57,8 @@ export type ManifestWritten =
   | { readonly written: true; readonly sha: string; readonly auditEventId: string }
   | { readonly written: false };
 
-export const BUNDLE_WRITERS = { role: "Editor", purposes: [] } as const;
-
 const writeManifestAction = declareAction({
-  admits: BUNDLE_WRITERS,
+  admits: ADMIN_ALONE,
   input: z.custom<WriteManifestInput>(),
   refuses: ["role-forbids", "malformed", "path-taken"],
 });
@@ -103,7 +102,7 @@ export const writeManifest = async (
     if (atHead.value === "standing") return ok({ written: false });
     if (atHead.value === "taken") return err("path-taken");
 
-    const landed = await commitAndLandAsMember(
+    const landed = await commitAndLandAsMember<never>(
       principal,
       doors,
       {
@@ -128,6 +127,7 @@ export const writeManifest = async (
           auditEventId,
         });
       },
+      async () => undefined,
     );
     if (!landed.ok) return err(landed.error);
 

@@ -17,6 +17,7 @@ export type IdentitySwept = {
 
   readonly pseudonymised: number;
   readonly membersEnded: number;
+  readonly ownersDeleted: number;
   readonly sessions: number;
   readonly verifications: number;
   readonly accounts: number;
@@ -38,6 +39,7 @@ export type IdentitySwept = {
 const SWEPT_NOTHING = {
   pseudonymised: 0,
   membersEnded: 0,
+  ownersDeleted: 0,
   sessions: 0,
   verifications: 0,
   accounts: 0,
@@ -140,6 +142,16 @@ export const eraseFromTheIdentitySet = async (
     const lastActive = rowsOf(
       await tx.query("DELETE FROM workspace_last_active WHERE user_id = $1", [personId]),
     );
+    await tx.query("SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE", [
+      subject.workspaceId,
+      personId,
+    ]);
+    const ownersTheMemberCascades = rowsOf(
+      await tx.query("SELECT 1 FROM concept_owner WHERE workspace_id = $1 AND person_id = $2", [
+        subject.workspaceId,
+        personId,
+      ]),
+    );
     const ended = await tx.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
       subject.workspaceId,
       personId,
@@ -153,7 +165,13 @@ export const eraseFromTheIdentitySet = async (
     const named = { workspaceId: subject.workspaceId, pseudonym: subject.pseudonym };
     const questionsSince = await sweepTheQuestions(tx, { ...named, askers: askersOf([personId]) });
     const actorsSince = await sweepTheActors(tx, { ...named, needles: subject.needles });
-    const done = { membersEnded, lastActive, questionsSince, actorsSince };
+    const done = {
+      membersEnded,
+      ownersDeleted: ownersTheMemberCascades,
+      lastActive,
+      questionsSince,
+      actorsSince,
+    };
 
     const elsewhere = await tx.query(HELD_ELSEWHERE, [personId, subject.workspaceId]);
     if (elsewhere.rows.length > 0) return { arm: "held-elsewhere", ...SWEPT_NOTHING, ...done };

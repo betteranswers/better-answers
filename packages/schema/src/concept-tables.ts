@@ -14,6 +14,7 @@ import { ACTOR_ID_PATTERN } from "./actor-id.ts";
 import { listed, stamp } from "./column-helpers.ts";
 import { IRI, type CitedSource } from "./concept-file.ts";
 import { FULL_TEXT_LANGUAGE, searchVector } from "./full-text-match.ts";
+import { member } from "./identity-tables.ts";
 import { AUDIENCE_CHECK, SENSITIVITIES, SENSITIVITY_DEFAULT } from "./readable-columns.ts";
 import { SCHEMED } from "./scan.ts";
 import { sourceDocument } from "./source-tables.ts";
@@ -157,7 +158,7 @@ export const conceptIdentity = withRLS(
  * Every cross-table key names the workspace beside the id: a foreign-key check bypasses
  * row-level security and would confirm another tenant's row.
  */
-const identityKey = (
+export const attachedByIri = (
   table: { readonly workspaceId: AnyPgColumn; readonly iri: AnyPgColumn },
   name: string,
 ) =>
@@ -206,7 +207,10 @@ const CONCEPT_SEARCH = [
   `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, body), 'C')`,
 ].join(" || ");
 
-const CONCEPT_COLLECTION = `substring(path from '^knowledge/([^/]+)/')`;
+export const collectionOf = (path: string): string =>
+  `substring(${path} from '^knowledge/([^/]+)/')`;
+
+export const COLLECTION = /^(?!\.{1,2}$)[^/\s]+$/;
 
 export const conceptIndex = withRLS(
   "concept_index",
@@ -231,12 +235,12 @@ export const conceptIndex = withRLS(
     updatedAt: stamp("updated_at").notNull().defaultNow(),
 
     search: searchVector("search").notNull().generatedAlwaysAs(sql.raw(CONCEPT_SEARCH)),
-    collection: text("collection").generatedAlwaysAs(sql.raw(CONCEPT_COLLECTION)),
+    collection: text("collection").generatedAlwaysAs(sql.raw(collectionOf("path"))),
   },
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.iri] }),
-    identityKey(table, "concept_index_identity_fk"),
+    attachedByIri(table, "concept_index_identity_fk"),
     check("concept_index_iri_check", sql.raw(`iri ~ '${IRI.source}'`)),
     check("concept_index_audience_check", sql.raw(AUDIENCE_CHECK)),
 
@@ -301,7 +305,7 @@ export const conceptVerification = withRLS(
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    identityKey(table, "concept_verification_identity_fk"),
+    attachedByIri(table, "concept_verification_identity_fk"),
 
     index("concept_verification_workspace_id_iri_verified_at_idx").on(
       table.workspaceId,
@@ -333,7 +337,7 @@ export const conceptEvidence = withRLS(
     primaryKey({
       columns: [table.workspaceId, table.iri, table.sourceDocumentId, table.locator],
     }),
-    identityKey(table, "concept_evidence_identity_fk"),
+    attachedByIri(table, "concept_evidence_identity_fk"),
     foreignKey({
       columns: [table.workspaceId, table.sourceDocumentId, table.locator],
       foreignColumns: [evidence.workspaceId, evidence.sourceDocumentId, evidence.locator],
@@ -363,12 +367,49 @@ export const conceptSensitivityOverride = withRLS(
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.iri] }),
-    identityKey(table, "concept_sensitivity_override_identity_fk"),
+    attachedByIri(table, "concept_sensitivity_override_identity_fk"),
     check(
       "concept_sensitivity_override_sensitivity_check",
       sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`),
     ),
     check("concept_sensitivity_override_audience_check", sql.raw(AUDIENCE_CHECK)),
     check("concept_sensitivity_override_actor_check", sql.raw(`actor ~ '^${ACTOR_ID_PATTERN}$'`)),
+  ],
+);
+
+export const conceptOwner = withRLS(
+  "concept_owner",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    id: text("id").notNull(),
+    collection: text("collection"),
+    iri: text("iri"),
+    personId: text("person_id").notNull(),
+    createdAt: stamp("created_at").notNull().defaultNow(),
+  },
+  "workspaceId",
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.id] }),
+    attachedByIri(table, "concept_owner_identity_fk"),
+    foreignKey({
+      columns: [table.workspaceId, table.personId],
+      foreignColumns: [member.workspaceId, member.userId],
+      name: "concept_owner_member_fk",
+    }).onDelete("cascade"),
+    check("concept_owner_one_subject_check", sql.raw("(collection IS NULL) <> (iri IS NULL)")),
+    check(
+      "concept_owner_collection_check",
+      sql.raw(`collection IS NULL OR collection ~ '${COLLECTION.source}'`),
+    ),
+
+    uniqueIndex("concept_owner_workspace_id_collection_uidx")
+      .on(table.workspaceId, table.collection)
+      .where(sql.raw("collection IS NOT NULL")),
+    uniqueIndex("concept_owner_workspace_id_iri_uidx")
+      .on(table.workspaceId, table.iri)
+      .where(sql.raw("iri IS NOT NULL")),
+    index("concept_owner_workspace_id_person_id_idx").on(table.workspaceId, table.personId),
   ],
 );

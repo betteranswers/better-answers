@@ -750,7 +750,7 @@ const AUDIT_COMMITTEE = "knowledge/roles/audit-committee.md";
 const TO_THE_COMMITTEE = "See the [Audit Committee](../roles/audit-committee.md).";
 
 const noteAt = (scenario: Scenario, path: string, overrides: Partial<WriteConceptInput> = {}) =>
-  conceptCiting(scenario, scenario.editor, [], { sensitivity: "Internal", path, ...overrides });
+  conceptCiting(scenario, scenario.admin, [], { sensitivity: "Internal", path, ...overrides });
 
 type SeededConcept = Parameters<Parameters<typeof seededBy>[1]>[0]["conceptIndex"];
 

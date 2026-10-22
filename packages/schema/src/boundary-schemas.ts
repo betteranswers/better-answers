@@ -15,6 +15,8 @@ import {
   CONCEPT_IRI,
   CONCEPT_PATH,
   CONCEPT_STATUSES,
+  COLLECTION,
+  conceptOwner,
   conceptSensitivityOverride,
   conceptEvidence,
   conceptIdentity,
@@ -697,6 +699,18 @@ const conceptSensitivityOverrideUpdate = createUpdateSchema(
   conceptSensitivityOverrideRefinements,
 );
 
+const conceptOwnerRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  collection: (schema: z.ZodString) => schema.regex(COLLECTION),
+  iri: conceptIri,
+  personId: (schema: z.ZodString) => schema.regex(ULID),
+};
+
+const conceptOwnerSelect = createSelectSchema(conceptOwner, conceptOwnerRefinements);
+const conceptOwnerInsert = createInsertSchema(conceptOwner, conceptOwnerRefinements);
+const conceptOwnerUpdate = createUpdateSchema(conceptOwner, conceptOwnerRefinements);
+
 const rulesInForce = z.strictObject({
   default_on: z.boolean(),
   default_off: z.boolean(),
@@ -1269,6 +1283,12 @@ export const boundarySchemas = {
     select: conceptSensitivityOverrideSelect,
     insert: conceptSensitivityOverrideInsert,
     update: conceptSensitivityOverrideUpdate,
+  },
+  conceptOwner: {
+    table: conceptOwner,
+    select: conceptOwnerSelect,
+    insert: conceptOwnerInsert,
+    update: conceptOwnerUpdate,
   },
   connectedSource: {
     table: connectedSource,

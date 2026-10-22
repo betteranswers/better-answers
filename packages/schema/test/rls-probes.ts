@@ -227,3 +227,6 @@ export const A_PRICE_FROM_OCTOBER = `INSERT INTO model_price
 
 export const A_THRESHOLD_OF = `INSERT INTO decision_threshold (provider, model, threshold)
   VALUES ($1, 'clef-flash', $2)`;
+
+export const A_CONCEPT_OWNER = `INSERT INTO concept_owner (workspace_id, id, collection, iri, person_id)
+                         VALUES ($1, $2, $3, $4, $5)`;

@@ -107,7 +107,7 @@ describe("a bundle another process is rewriting", () => {
     const scenario = await arrange();
     const rewriting = await rewritingElsewhere(db().pool, scenario.workspaceId);
 
-    const writing = writeManifest(scenario.editor, doorsOf(scenario), A_MANIFEST);
+    const writing = writeManifest(scenario.admin, doorsOf(scenario), A_MANIFEST);
     await until(waitingOnTheFence);
     await rewriting.release();
 

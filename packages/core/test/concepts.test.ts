@@ -41,13 +41,16 @@ import {
 } from "./bundle.ts";
 import { gitStarts } from "./git-starts.ts";
 import { confirmedSessionFor } from "./identity-rows.ts";
-import { backendPidOf, isBlockedOnALock, writeRevokedWhileParked } from "./revocation-race.ts";
+import {
+  backendPidOf,
+  isBlockedOnALock,
+  parkedOnTable,
+  writeRevokedWhileParked,
+} from "./revocation-race.ts";
 import { conceptCiting, connectedSourceHolding } from "./sourced-concept.ts";
 import {
   abortTheTransaction,
   answered,
-  holdingTable,
-  isBlockedOnTable,
   postgresForSuite,
   readingAs,
   until,
@@ -76,7 +79,7 @@ const writeFor = (overrides: Partial<WriteConceptInput> = {}): WriteConceptInput
 
 const unnamedWrite = (overrides: Partial<WriteConceptInput>): WriteConceptInput => ({
   mergeKey: `policy:expenses-${minted}`,
-  path: `knowledge/expenses-${minted}.md`,
+  path: `knowledge/policy/expenses-${minted}.md`,
   kind: "Policy",
   title: "Expenses",
 
@@ -705,7 +708,7 @@ describe("the map a governed write leaves behind", () => {
     const travel = writeFor({
       kind: "Guideline",
       status: "stable",
-      path: "knowledge/travel.md",
+      path: "knowledge/policy/travel.md",
       expects: { head: first.sha },
     });
     const written = await landed(scenario, travel);
@@ -1002,12 +1005,12 @@ describe("what a governed write refuses", () => {
     expect(await recordedCommits(scenario.workspaceId)).toHaveLength(2);
   });
 
-  it("refuses a Viewer before anything is committed", async () => {
+  it("refuses a Viewer owning nothing before anything is committed", async () => {
     const scenario = await arrange();
 
     const refused = await write(scenario, scenario.viewer, writeFor());
 
-    expect(refused).toEqual({ ok: false, error: "role-forbids" });
+    expect(refused).toEqual({ ok: false, error: "owner-forbids" });
     expect(await head(scenario.editor, scenario.git)).toBeNull();
     expect(await rowsFor(scenario.workspaceId)).toMatchObject({ concepts: "0", commits: "0" });
   });
@@ -1029,7 +1032,7 @@ describe("what a governed write refuses", () => {
   ])("refuses a path %s without committing", async (_why, path) => {
     const scenario = await arrange();
 
-    const refused = await write(scenario, scenario.editor, writeFor({ path }));
+    const refused = await write(scenario, scenario.admin, writeFor({ path }));
 
     expect(refused).toEqual({ ok: false, error: "malformed" });
     expect(await head(scenario.editor, scenario.git)).toBeNull();
@@ -1219,7 +1222,7 @@ describe("what a re-write of an existing concept may not move", () => {
     const moved = await write(
       scenario,
       scenario.editor,
-      rewriteOf(input, first, { path: "knowledge/moved.md" }),
+      rewriteOf(input, first, { path: "knowledge/policy/moved.md" }),
     );
 
     expect(moved).toEqual({ ok: false, error: "rename-refused" });
@@ -1364,10 +1367,9 @@ describe("authority that moved while the action was in flight", () => {
   it("refuses before committing for a revocation the read cannot see", async () => {
     const scenario = await arrange();
 
-    const landed = await conceptRevokedWhileParked(scenario, (writeThenRevoke) =>
-      holdingTable(db().pool, "concept_index", () =>
-        writeThenRevoke(() => isBlockedOnTable(db().pool, "concept_index")),
-      ),
+    const landed = await conceptRevokedWhileParked(
+      scenario,
+      parkedOnTable(db().pool, "concept_index"),
     );
 
     expect(landed).toEqual({ ok: false, error: "credentials-revoked" });
@@ -1883,7 +1885,7 @@ describe("opening a concept by IRI", () => {
 const RETENTION = "Retention of audit logs";
 
 const retentionAt = (scenario: Scenario, path: string) =>
-  conceptCiting(scenario, scenario.editor, [], { path, title: RETENTION, sensitivity: "Internal" });
+  conceptCiting(scenario, scenario.admin, [], { path, title: RETENTION, sensitivity: "Internal" });
 
 const retentionPaths = async (reader: UserPrincipal, collections?: readonly string[]) => {
   const found = await reading(reader, (principal, tx) =>

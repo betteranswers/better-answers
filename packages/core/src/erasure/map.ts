@@ -30,6 +30,7 @@ export const ERASURE_FAMILIES = [
   "finding",
   "suggestion",
   "concept-write-request",
+  "concept-owner",
 ] as const;
 
 export type ErasureFamily = (typeof ERASURE_FAMILIES)[number];
@@ -293,6 +294,17 @@ const ERASURE_FAMILY_DESCRIPTORS = {
         tx,
         "SELECT concept_write_requests_naming AS location FROM concept_write_requests_naming($1, $2)",
         [subject.needles.people, subject.needles.addresses],
+      ),
+  },
+
+  "concept-owner": {
+    categories: ["actor-id"],
+    find: (platform, subject, tx) =>
+      aboutTheMember(
+        tx,
+        subject,
+        "SELECT id AS location FROM concept_owner WHERE person_id = $1 AND workspace_id = $2",
+        [subject.workspaceId],
       ),
   },
 } satisfies Record<ErasureFamily, ErasureFamilyDescriptor>;

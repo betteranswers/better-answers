@@ -174,6 +174,7 @@ describe("the erasure map's union", () => {
       "finding",
       "suggestion",
       "concept-write-request",
+      "concept-owner",
     ]);
   });
 
@@ -203,6 +204,7 @@ describe("the erasure map's union", () => {
       finding: findsNothing,
       suggestion: findsNothing,
       "concept-write-request": findsNothing,
+      "concept-owner": findsNothing,
     };
 
     expect(ERASURE_FAMILIES.filter((family) => !(family in withoutADocumentFinder))).toEqual([
@@ -261,7 +263,39 @@ describe("the erasure map for a member", () => {
       { family: "finding", categories: ["actor-id", "typed-text"], locations: [] },
       { family: "suggestion", categories: ["actor-id", "typed-text"], locations: [] },
       { family: "concept-write-request", categories: ["actor-id", "email-address"], locations: [] },
+      { family: "concept-owner", categories: ["actor-id"], locations: [] },
     ]);
+  });
+
+  it("finds the owner rows naming the subject", async () => {
+    const held = await workspaceHoldingAMember();
+    const { workspaceId, viewer } = held.scenario;
+    const owners = await seedingWith(db().pool, async (seed) => {
+      const concept = await seed.conceptIdentity({ workspaceId });
+      return {
+        collection: await seed.conceptOwner({
+          workspaceId,
+          collection: "expenses-desk",
+          personId: held.person.id,
+        }),
+        concept: await seed.conceptOwner({
+          workspaceId,
+          iri: concept.iri,
+          personId: held.person.id,
+        }),
+        another: await seed.conceptOwner({
+          workspaceId,
+          collection: "travel-desk",
+          personId: viewer.userId,
+        }),
+      };
+    });
+
+    const map = await mapOf(held.scenario, held.request);
+
+    expect(map.find((entry) => entry.family === "concept-owner")?.locations).toEqual(
+      [owners.collection.id, owners.concept.id].toSorted(byCodeUnit),
+    );
   });
 
   it("names each question they asked here, and no other", async () => {
@@ -385,6 +419,7 @@ describe("the erasure map for a subject with no user row", () => {
       ["finding", []],
       ["suggestion", []],
       ["concept-write-request", []],
+      ["concept-owner", []],
     ]);
   });
 });
@@ -420,6 +455,11 @@ describe("the erasure map in one workspace's scope", () => {
         workspaceId: here.workspaceId,
         frontmatter: { title: "Expenses", verified: [{ by: `human:${email}` }] },
       }),
+      owner: await seed.conceptOwner({
+        workspaceId: here.workspaceId,
+        collection: "expenses-desk",
+        personId: person.id,
+      }),
     }));
     const theirs = await seedingWith(db().pool, async (seed) => ({
       commit: await seed.bundleCommit({ workspaceId: elsewhere.workspaceId, actor }),
@@ -443,6 +483,11 @@ describe("the erasure map in one workspace's scope", () => {
       request: await seed.conceptWriteRequest({
         workspaceId: elsewhere.workspaceId,
         body: `Ask ${actor} about expenses.`,
+      }),
+      owner: await seed.conceptOwner({
+        workspaceId: elsewhere.workspaceId,
+        collection: "expenses-desk",
+        personId: person.id,
       }),
     }));
 
@@ -479,6 +524,7 @@ describe("the erasure map in one workspace's scope", () => {
       ["finding", [mine.finding.id]],
       ["suggestion", [mine.suggestion.id]],
       ["concept-write-request", [mine.request.suggestionId]],
+      ["concept-owner", [mine.owner.id]],
     ]);
     const named = map.flatMap((entry) => entry.locations);
     for (const theirsOwn of [
@@ -489,6 +535,7 @@ describe("the erasure map in one workspace's scope", () => {
       theirs.finding.id,
       theirs.suggestion.id,
       theirs.request.suggestionId,
+      theirs.owner.id,
       shaElsewhere,
       elsewhere.workspaceId,
     ]) {

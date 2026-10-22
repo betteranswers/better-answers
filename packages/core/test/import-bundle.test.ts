@@ -182,7 +182,7 @@ const imported = async (
   tree: BundleTree,
   overrides: Partial<ImportBundleInput> = {},
 ): Promise<BundleImported> => {
-  const run = await importing(scenario, scenario.editor, { tree, ...overrides });
+  const run = await importing(scenario, scenario.admin, { tree, ...overrides });
   if (!run.ok) throw new Error(`the import was refused: ${JSON.stringify(run.error)}`);
   return run.value;
 };
@@ -211,7 +211,7 @@ const rowsFor = async (workspaceId: string) => {
 
 const nothingWritten = async (scenario: Scenario) => {
   const [sha, rows] = await Promise.all([
-    head(scenario.editor, scenario.git),
+    head(scenario.admin, scenario.git),
     rowsFor(scenario.workspaceId),
   ]);
   expect({ head: sha, ...rows }).toEqual({
@@ -321,7 +321,7 @@ const standingConcept = (
   mergeKey: string,
   overrides: Partial<WriteConceptInput> = {},
 ) =>
-  writeConcept(scenario.editor, doorsOf(scenario), {
+  writeConcept(scenario.admin, doorsOf(scenario), {
     mergeKey,
     path: "knowledge/elsewhere.md",
     kind: "Answer",
@@ -413,7 +413,7 @@ describe("importing the bundle", () => {
     const { scenario, verifiers } = await arranged();
     const { log, warnings } = warningsKept();
 
-    await importing(scenario, scenario.editor, { tree: soundBundle(verifiers) }, log);
+    await importing(scenario, scenario.admin, { tree: soundBundle(verifiers) }, log);
 
     expect(await plannersRowEstimates()).toEqual(await mapRowsHeld());
     expect(warnings).toEqual([]);
@@ -424,7 +424,7 @@ describe("importing the bundle", () => {
     const { log, warnings } = warningsKept();
 
     const run = await analyseHeldOff(() =>
-      importing(scenario, scenario.editor, { tree: soundBundle(verifiers) }, log),
+      importing(scenario, scenario.admin, { tree: soundBundle(verifiers) }, log),
     );
 
     expect(run).toMatchObject({ ok: true, value: { landed: PATHS_IN_ORDER, dryRun: false } });
@@ -443,7 +443,7 @@ describe("importing the bundle", () => {
 
     const stopped = await analyseHeldOff(() =>
       movedBetweenThePasses(LINKED.supportHours, () =>
-        importing(scenario, scenario.editor, { tree: soundBundle(verifiers) }, log),
+        importing(scenario, scenario.admin, { tree: soundBundle(verifiers) }, log),
       ),
     );
 
@@ -478,8 +478,8 @@ describe("importing the bundle", () => {
     expect({ subject: second.subject, author: second.author, trailers: second.trailers }).toEqual({
       subject:
         "Import knowledge/company/answers/data-retention-period.md from Acme Bid Library v1, entry ENTRY-002",
-      author: await authorOf(scenario.editor),
-      trailers: { Actor: `human:${scenario.editor.userId}`, Audit: expect.any(String) },
+      author: await authorOf(scenario.admin),
+      trailers: { Actor: `human:${scenario.admin.userId}`, Audit: expect.any(String) },
     });
     expect(await indexRows(scenario.workspaceId)).toEqual([
       {
@@ -664,7 +664,7 @@ describe("importing the bundle", () => {
     expect(batches.size).toBe(1);
     expect([...batches][0]).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
     expect(new Set(auditEvents.map((row) => row["actor"]))).toEqual(
-      new Set([`human:${scenario.editor.userId}`]),
+      new Set([`human:${scenario.admin.userId}`]),
     );
   });
 
@@ -705,7 +705,7 @@ describe("importing the bundle", () => {
     if (!standing.ok)
       throw new Error(`the standing concept was refused: ${String(standing.error)}`);
 
-    const stopped = await importing(scenario, scenario.editor, { tree: soundBundle(verifiers) });
+    const stopped = await importing(scenario, scenario.admin, { tree: soundBundle(verifiers) });
 
     expect(stopped).toEqual(
       stoppedAt(
@@ -771,7 +771,7 @@ describe("importing the bundle", () => {
     const { stopped, other } = await landedBetweenTheReadAndTheWrite(
       scenario,
       LINKED.supportHours,
-      () => importing(scenario, scenario.editor, { tree: soundBundle(verifiers) }),
+      () => importing(scenario, scenario.admin, { tree: soundBundle(verifiers) }),
     );
 
     expect(stopped).toEqual(
@@ -785,7 +785,7 @@ describe("importing the bundle", () => {
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
     expect(history).toHaveLength(3);
     expect(history[1]).toBe(other.sha);
-    expect(await head(scenario.editor, scenario.git)).toBe(history[2]);
+    expect(await head(scenario.admin, scenario.git)).toBe(history[2]);
     expect(await rowsFor(scenario.workspaceId)).toEqual({
       concepts: "2",
       commits: "3",
@@ -872,8 +872,8 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
     }).toEqual({
       subject:
         "Rewrite the links in knowledge/company/answers/support-hours.md to the iris of the concepts they name",
-      author: await authorOf(scenario.editor),
-      actor: `human:${scenario.editor.userId}`,
+      author: await authorOf(scenario.admin),
+      actor: `human:${scenario.admin.userId}`,
     });
     expect(
       (await knowledgeEventsOf(scenario.workspaceId)).slice(-3).map((row) => row["action"]),
@@ -904,7 +904,7 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
     const { scenario, verifiers } = await arranged();
 
     const stopped = await movedBetweenThePasses(LINKED.supportHours, () =>
-      importing(scenario, scenario.editor, { tree: soundBundle(verifiers) }),
+      importing(scenario, scenario.admin, { tree: soundBundle(verifiers) }),
     );
 
     expect(stopped).toEqual(STOPPED_WHERE_THE_CONCEPT_MOVED);
@@ -1225,7 +1225,7 @@ describe("what the import refuses before it writes anything", () => {
   ])("refuses %s", async (_shape, tree, unsound) => {
     const { scenario, verifiers } = await arranged();
 
-    const refused = await importing(scenario, scenario.editor, { tree: tree(verifiers) });
+    const refused = await importing(scenario, scenario.admin, { tree: tree(verifiers) });
 
     expect(refused, "the refusal names the file and the reason").toEqual({
       ok: false,
@@ -1243,21 +1243,21 @@ describe("what the import refuses before it writes anything", () => {
     await nothingWritten(scenario);
   });
 
-  it("refuses an Editor asked to land the bundle Restricted", async () => {
+  it.each([false, true])("refuses an Editor the import, by role, dry run %s", async (dryRun) => {
     const { scenario, verifiers } = await arranged();
 
     const refused = await importing(scenario, scenario.editor, {
       tree: soundBundle(verifiers),
-      sensitivity: "Restricted",
+      dryRun,
     });
 
-    expect(refused).toEqual({ ok: false, error: "class-unreadable" });
+    expect(refused).toEqual({ ok: false, error: "role-forbids" });
     await nothingWritten(scenario);
   });
 
   it("refuses a bundle whose workspace carries another manifest id", async () => {
     const { scenario, verifiers } = await arranged();
-    const other = await writeManifest(scenario.editor, doorsOf(scenario), {
+    const other = await writeManifest(scenario.admin, doorsOf(scenario), {
       manifest: {
         id: "01J6DDDDDDDDDDDDDDDDDDDDDD",
         origin: "company",
@@ -1270,8 +1270,8 @@ describe("what the import refuses before it writes anything", () => {
     });
     if (!other.ok) throw new Error(`the manifest was refused: ${String(other.error)}`);
 
-    const run = await importing(scenario, scenario.editor, { tree: soundBundle(verifiers) });
-    const dry = await importing(scenario, scenario.editor, {
+    const run = await importing(scenario, scenario.admin, { tree: soundBundle(verifiers) });
+    const dry = await importing(scenario, scenario.admin, {
       tree: soundBundle(verifiers),
       dryRun: true,
     });
@@ -1291,13 +1291,13 @@ describe("what the import refuses before it writes anything", () => {
     const { scenario, verifiers } = await arranged();
     const release = await holdMainRef(scenario.git, scenario.workspaceId);
 
-    const refused = await importing(scenario, scenario.editor, { tree: soundBundle(verifiers) });
+    const refused = await importing(scenario, scenario.admin, { tree: soundBundle(verifiers) });
 
     expect(refused).toEqual({ ok: false, error: "stale-precondition" });
     await nothingWritten(scenario);
 
     await release();
-    const rerun = await importing(scenario, scenario.editor, { tree: soundBundle(verifiers) });
+    const rerun = await importing(scenario, scenario.admin, { tree: soundBundle(verifiers) });
 
     expect(rerun).toMatchObject({ ok: true, value: { manifest: "written", dryRun: false } });
   });

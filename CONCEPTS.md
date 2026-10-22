@@ -1269,8 +1269,9 @@ decides where a unit of knowledge lives.
 The person answerable for keeping a concept verified and current: the collection's owner unless the
 concept names its own.
 
-The owner may edit it directly and decides *edit* suggestions on it. Distinct from a connected
-source's owner and from the bundle manifest's owner.
+The owner may edit it directly and decides *edit* suggestions on it, whatever their role; an Admin
+may too. With no owner, only an Admin does, and a person who leaves the workspace owns nothing.
+Distinct from a connected source's owner and from the bundle manifest's owner.
 
 ### usage
 

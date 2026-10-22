@@ -454,7 +454,7 @@ describe("a manifest commit whose rows were lost", () => {
   it("lands its commit row alone, then the concept behind it", async () => {
     const scenario = await arrange();
     const lost = await inTheWindow(() =>
-      writeManifest(scenario.editor, doorsOf(scenario), {
+      writeManifest(scenario.admin, doorsOf(scenario), {
         manifest,
         message: "Write the bundle's manifest",
         author: { name: "Grace Editor", email: "grace@acme.invalid" },

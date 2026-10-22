@@ -673,6 +673,13 @@
       "when": 1792612872459,
       "tag": "0095_the-decision-threshold",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1792627718881,
+      "tag": "0096_the-concept-owner",
+      "breakpoints": true
     }
   ]
 }

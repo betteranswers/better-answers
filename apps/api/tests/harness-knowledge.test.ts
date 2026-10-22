@@ -433,6 +433,14 @@ const aMemberAt = async (workspace: Provisioned, role: "Editor" | "Viewer") => {
 
 const A_CITED_SOURCE = { title: "Synthetic spares list", passages: ["Two spare pumps."] };
 
+const A_PLAIN_SEED = [
+  {
+    title: "Quarry signage",
+    body: "Synthetic signs are repainted yearly.",
+    sources: [A_CITED_SOURCE],
+  },
+];
+
 describe("a concepts seed the harness refuses before it writes", () => {
   it("refuses a held title, and writes none of the seed", async () => {
     const workspace = await app().provision();
@@ -493,45 +501,18 @@ describe("a concepts seed the harness refuses before it writes", () => {
     expect(await leftIn(workspace)).toEqual(NOTHING);
   });
 
-  it("refuses a Viewer as a seed's writer", async () => {
+  it.each([
+    { who: "an Editor", role: "Editor" },
+    { who: "a Viewer", role: "Viewer" },
+  ] as const)("refuses $who as a seed's writer", async ({ role }) => {
     const workspace = await app().provision();
 
     const answered = await askedToSeed({
-      ...(await aMemberAt(workspace, "Viewer")),
-      concepts: [{ title: "Quarry signage", body: "Synthetic signs are repainted yearly." }],
+      ...(await aMemberAt(workspace, role)),
+      concepts: A_PLAIN_SEED,
     });
 
-    expect(answered).toEqual(refusedNaming(["userId", "Editor"]));
-    expect(await leftIn(workspace)).toEqual(NOTHING);
-  });
-
-  it("refuses an Editor's seed that asks an Admin's override", async () => {
-    const workspace = await app().provision();
-
-    const answered = await askedToSeed({
-      ...(await aMemberAt(workspace, "Editor")),
-      concepts: [
-        { title: "Quarry fencing", body: "Synthetic fences are walked weekly." },
-        {
-          title: "Quarry wage reviews",
-          body: "Synthetic wages are reviewed yearly.",
-          audience: "groups",
-          groupMemberIds: [workspace.admin.id],
-        },
-        {
-          title: "Quarry blast licences",
-          body: "Synthetic blasts are licensed yearly.",
-          sources: [A_CITED_SOURCE, { ...A_CITED_SOURCE, sensitivity: "Restricted" }],
-        },
-      ],
-    });
-
-    expect(answered).toEqual(
-      refusedNaming(
-        ["concepts.1.audience", "Admin"],
-        ["concepts.2.sources.1.sensitivity", "Admin"],
-      ),
-    );
+    expect(answered).toEqual(refusedNaming(["userId", "seeded by an Admin"]));
     expect(await leftIn(workspace)).toEqual(NOTHING);
   });
 
@@ -590,19 +571,10 @@ describe("a concepts seed the harness refuses before it writes", () => {
     expect(await leftIn(workspace)).toEqual(NOTHING);
   });
 
-  it("lands an Editor's seed that asks no override", async () => {
+  it("lands the members' refused seed when an Admin writes it", async () => {
     const workspace = await app().provision();
 
-    const [concept] = await conceptsSeeded({
-      ...(await aMemberAt(workspace, "Editor")),
-      concepts: [
-        {
-          title: "Quarry signage",
-          body: "Synthetic signs are repainted yearly.",
-          sources: [A_CITED_SOURCE],
-        },
-      ],
-    });
+    const [concept] = await conceptsSeeded({ ...seedingBy(workspace), concepts: A_PLAIN_SEED });
 
     expect(concept).toMatchObject({ title: "Quarry signage" });
     expect(await leftIn(workspace)).toMatchObject({ concepts: 1, connectedSources: 1 });

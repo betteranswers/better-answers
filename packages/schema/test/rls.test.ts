@@ -30,6 +30,7 @@ import {
   A_BUNDLE_COMMIT_WITH_A_PARENT,
   A_CITATION,
   A_WRITE_UP_INCLUDE,
+  A_CONCEPT_OWNER,
   A_CONCEPT_SENSITIVITY_OVERRIDE,
   A_CONCEPT_IDENTITY,
   A_CONCEPT_INDEX_ROW,
@@ -2803,6 +2804,138 @@ describe("the derivation's tables under app_rt", () => {
         { table: "concept_sensitivity_override", rows: 0 },
         { table: "write_up_include", rows: 0 },
       ]);
+    });
+  });
+});
+
+describe("the concept owners under app_rt", () => {
+  const memberOf = async (seed: TestData, workspaceId: string) =>
+    (await seed.member({ workspaceId, userId: (await seed.user()).id })).userId;
+
+  const asTheApiIn = async (client: pg.PoolClient, workspaceId: string): Promise<void> => {
+    await client.query("SET LOCAL ROLE app_rt");
+    await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
+  };
+
+  it("returns none unscoped and only the tenant's owners", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const ours = await seed.conceptOwner({ workspaceId: WS_A });
+      await seed.conceptOwner({ workspaceId: WS_B });
+      const theirs = await seed.conceptIdentity({ workspaceId: WS_B });
+      const person = await memberOf(seed, WS_A);
+      const stranger = (await seed.user()).id;
+      await client.query("SET LOCAL ROLE app_rt");
+
+      expect((await client.query("SELECT id FROM concept_owner")).rows).toEqual([]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      expect((await client.query("SELECT id FROM concept_owner")).rows).toEqual([{ id: ours.id }]);
+      await refusesEach(client, [
+        [
+          A_CONCEPT_OWNER,
+          "an owner written into another tenant",
+          [WS_B, ulid(), "policy", null, person],
+          /row-level security/,
+        ],
+        [
+          A_CONCEPT_OWNER,
+          "an override on another tenant's concept",
+          [WS_A, ulid(), null, theirs.iri, person],
+          /concept_owner_identity_fk/,
+        ],
+        [
+          A_CONCEPT_OWNER,
+          "an owner who is no member here",
+          [WS_A, ulid(), "guidance", null, stranger],
+          /concept_owner_member_fk/,
+        ],
+      ]);
+    });
+  });
+
+  it("refuses the worker every read and write of owners", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const owner = await seed.conceptOwner({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await refusesEach(client, [
+        ["SELECT 1 FROM concept_owner LIMIT 1", "the worker reading an owner"],
+        [
+          A_CONCEPT_OWNER,
+          "the worker naming an owner",
+          [WS_A, ulid(), "guidance", null, owner.personId],
+        ],
+        ["UPDATE concept_owner SET person_id = person_id", "the worker moving an owner"],
+        ["DELETE FROM concept_owner", "the worker clearing an owner"],
+      ]);
+      const granted = await client.query(
+        "SELECT has_table_privilege('worker_rt', 'concept_owner', 'SELECT, INSERT, UPDATE, DELETE') AS held",
+      );
+      expect(granted.rows).toEqual([{ held: false }]);
+    });
+  });
+
+  it("holds an owner row to one collection or one concept", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const identity = await seed.conceptIdentity({ workspaceId: WS_A });
+      const person = await memberOf(seed, WS_A);
+      await asTheApiIn(client, WS_A);
+
+      await refusesEach(client, [
+        [
+          A_CONCEPT_OWNER,
+          "a row naming a collection and a concept",
+          [WS_A, ulid(), "policy", identity.iri, person],
+          /concept_owner_one_subject_check/,
+        ],
+        [
+          A_CONCEPT_OWNER,
+          "a row naming neither",
+          [WS_A, ulid(), null, null, person],
+          /concept_owner_one_subject_check/,
+        ],
+      ]);
+      const landed = await client.query(A_CONCEPT_OWNER, [WS_A, ulid(), "policy", null, person]);
+      expect(landed.rowCount).toBe(1);
+    });
+  });
+
+  it("refuses a second owner for one collection or concept", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const identity = await seed.conceptIdentity({ workspaceId: WS_A });
+      const first = await memberOf(seed, WS_A);
+      const second = await memberOf(seed, WS_A);
+      await seed.conceptOwner({ workspaceId: WS_A, collection: "policy", personId: first });
+      await seed.conceptOwner({ workspaceId: WS_A, iri: identity.iri, personId: first });
+      await asTheApiIn(client, WS_A);
+
+      await refusesEach(client, [
+        [
+          A_CONCEPT_OWNER,
+          "a second owner of the collection",
+          [WS_A, ulid(), "policy", null, second],
+          /concept_owner_workspace_id_collection_uidx/,
+        ],
+        [
+          A_CONCEPT_OWNER,
+          "a second owner of the concept",
+          [WS_A, ulid(), null, identity.iri, second],
+          /concept_owner_workspace_id_iri_uidx/,
+        ],
+      ]);
+      const elsewhere = await client.query(A_CONCEPT_OWNER, [
+        WS_A,
+        ulid(),
+        "guidance",
+        null,
+        second,
+      ]);
+      expect(elsewhere.rowCount).toBe(1);
     });
   });
 });

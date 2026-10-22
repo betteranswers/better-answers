@@ -414,7 +414,7 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     expect(await standingOf(scene)).toEqual(before);
   });
 
-  it.each(MODES)("refuses a Viewer's %s as role-forbids, exit 5", async (_mode, dryRun) => {
+  it.each(MODES)("refuses a Viewer's %s as owner-forbids, exit 5", async (_mode, dryRun) => {
     const scene = await imported();
     const viewer = await app().person();
     await app().addMember(scene.workspaceId, viewer.id, "Viewer");
@@ -424,7 +424,7 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
 
     expect(run.exitCode).toBe(5);
     expect(run.lines).toEqual([
-      `update-concept-body: REFUSED — ${viewer.email} is a Viewer of this workspace; the update runs as an Admin or an Editor`,
+      `update-concept-body: REFUSED — ${viewer.email} neither owns ${scene.held.iri} nor is an Admin of this workspace; nothing was written`,
     ]);
     expect(await standingOf(scene)).toEqual(before);
   });
