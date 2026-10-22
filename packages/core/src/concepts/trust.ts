@@ -1,4 +1,4 @@
-import { isActorId, isPersonActor, type ActorId } from "../kernel/index.ts";
+import { isActorId, isPersonActor, PERSON_PREFIX, type ActorId } from "../kernel/index.ts";
 import type { Frontmatter, FrontmatterValue } from "./file.ts";
 
 export const UNREVIEWED_TIERS = ["unverified", "machine-confirmed"] as const;
@@ -42,6 +42,39 @@ type Trusted = {
   readonly frontmatter: Frontmatter;
   readonly contentHash: string;
   readonly verification: ConceptVerification | undefined;
+};
+
+export const VERIFICATION_COLUMNS = `v.actor AS verified_by, v.verified_at, v.content_hash AS verified_hash,
+              NULLIF(verifier.name, '') AS verified_by_name`;
+
+export const latestVerificationOf = (alias: string): string => `LEFT JOIN LATERAL (
+                SELECT actor, verified_at, content_hash
+                  FROM concept_verification
+                 WHERE workspace_id = ${alias}.workspace_id AND iri = ${alias}.iri
+                 ORDER BY verified_at DESC, id DESC
+                 LIMIT 1
+              ) v ON true
+         LEFT JOIN "user" verifier
+                ON starts_with(v.actor, '${PERSON_PREFIX}')
+               AND verifier.id = substr(v.actor, ${PERSON_PREFIX.length + 1})`;
+
+export type VerificationRow = {
+  readonly verified_by: string | null;
+  readonly verified_at: Date | null;
+  readonly verified_hash: string | null;
+  readonly verified_by_name: string | null;
+};
+
+export const verificationOf = (row: VerificationRow): ConceptVerification | undefined => {
+  if (row.verified_by === null || row.verified_at === null || !isActorId(row.verified_by)) {
+    return undefined;
+  }
+  return {
+    actor: row.verified_by,
+    at: row.verified_at,
+    contentHash: row.verified_hash,
+    verifierName: row.verified_by_name,
+  };
 };
 
 const RIDER_WORDS = {
