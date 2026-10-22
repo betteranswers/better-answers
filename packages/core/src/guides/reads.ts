@@ -105,7 +105,6 @@ type CoverageRow = {
   readonly available: FactCoverage["available"];
 };
 
-/** Includes count only where the reader may read the concept, so a withheld one neither meets a fact nor shows. */
 const COVERAGE = `
   SELECT g.collection, s.id AS section_id, s.parent_id, s.prompt, w.id AS write_up_id,
          f.id AS fact_id, f.name, f.at_least,

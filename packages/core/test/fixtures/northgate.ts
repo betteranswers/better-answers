@@ -12,7 +12,6 @@ import { groupNamed } from "../sourced-concept.ts";
 import { addressOf, answered, readingAs } from "../suite-postgres.ts";
 import { doorsOf, memberOf, principalFor, type Scenario } from "../workspace-with-bundle.ts";
 
-/** Northgate Example Ltd, a fictional supplier whose knowledge base meets the bid-library template. */
 export const NORTHGATE = {
   collection: "company",
   sections: 8,
@@ -244,8 +243,6 @@ type NorthgateKey = (typeof TYPED)[number]["key"] | ImportedKey;
 
 export type Northgate = {
   readonly scenario: Scenario;
-
-  /** Re-resolved after joining `finance`, so their read predicate holds it. */
   readonly admin: UserPrincipal;
   readonly editor: UserPrincipal;
   readonly viewer: UserPrincipal;
@@ -298,7 +295,6 @@ ${verifiedLines(reviewer, verifications)}---
 ${concept.body}
 `;
 
-/** The imported half of Northgate, with one more verification on each key named in `verifyingAlso`. */
 export const northgateTree = (
   reviewer: string,
   verifyingAlso: readonly ImportedKey[] = [],

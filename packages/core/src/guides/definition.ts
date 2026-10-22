@@ -46,8 +46,6 @@ export type GuideRows = {
     readonly subjectIri: string | null;
   };
   readonly roles: readonly TemplateRole[];
-
-  /** In tree order, each section before the sections inside it. */
   readonly sections: readonly SectionRow[];
   readonly facts: readonly ExpectedFactRow[];
 };
@@ -113,9 +111,7 @@ export type GuideDefinition = {
     readonly ordinal: number;
     readonly prompt: string;
     readonly roleLabel: RoleLabel;
-
-    /** The expected facts' names, in ordinal order. */
-    readonly facts: readonly string[];
+    readonly factNames: readonly string[];
   }[];
 };
 
@@ -128,7 +124,7 @@ export const definitionOf = (rows: GuideRows): GuideDefinition => ({
     ordinal,
     prompt,
     roleLabel,
-    facts: rows.facts.filter((fact) => fact.sectionId === id).map((fact) => fact.name),
+    factNames: rows.facts.filter((fact) => fact.sectionId === id).map((fact) => fact.name),
   })),
 });
 
@@ -144,7 +140,7 @@ const SECTIONS_OF = `SELECT s.id, s.parent_id AS "parentId", s.ordinal, s.prompt
        s.role_label AS "roleLabel",
        COALESCE((SELECT array_agg(f.name ORDER BY f.ordinal) FROM guide_expected_fact f
                   WHERE f.workspace_id = s.workspace_id AND f.guide_id = s.guide_id
-                    AND f.section_id = s.id), '{}') AS facts
+                    AND f.section_id = s.id), '{}') AS "factNames"
   FROM guide_section s WHERE s.workspace_id = $1 AND s.guide_id = $2`;
 
 export const definitionAt = async (

@@ -36,7 +36,6 @@ const skeletonSection = z.strictObject({
   },
 });
 
-/** Strict, so nothing beyond the structure, an actor least of all, rides into a stored version. */
 export const guideSkeleton = z.strictObject({
   guide: z.string(),
   template: z.string(),
@@ -77,7 +76,7 @@ const sectionsUnder = (
       id: section.id,
       prompt: section.prompt,
       roleLabel: section.roleLabel,
-      expects: [...section.facts],
+      expects: [...section.factNames],
       includes: includes
         .filter((include) => include.sectionId === section.id)
         .toSorted(byOrdinal)
@@ -99,7 +98,6 @@ export const skeletonOf = (
   sections: sectionsUnder(definition, includes, null),
 });
 
-/** JSON is YAML 1.2, so the file reads as YAML, is deterministic and needs no dependency. */
 export const renderSkeleton = (
   definition: GuideDefinition,
   includes: readonly SkeletonInclude[],
@@ -117,8 +115,6 @@ export type WriteSkeletonInput = {
   readonly guideId: string;
   readonly content: string;
   readonly auditEventId: string;
-
-  /** The caller's rows, written in the commit's own member transaction. */
   readonly land: (fresh: UserPrincipal, tx: Tx, committed: Committed) => Promise<void>;
 };
 
@@ -128,7 +124,6 @@ export type GuideDoors = {
   readonly clock: Clock;
 };
 
-/** Runs inside its caller's `withBundleWrite`. An unchanged file writes nothing, and `land` does not run. */
 export const writeSkeleton = async (
   principal: UserPrincipal,
   doors: GuideDoors,

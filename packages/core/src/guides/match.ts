@@ -2,10 +2,7 @@ import { readableClause } from "../access/index.ts";
 
 type MatchAt = {
   readonly scope: number;
-
-  /** The first of `readableParameters`' two; the reader's groups take the next. */
   readonly reader: number;
-
   readonly guideCollection: string;
 };
 
@@ -23,7 +20,6 @@ export type FirstMatch = {
   readonly content_hash: string;
 };
 
-/** Each concept once per section, for the first fact selecting it, ordered by fact, title, then IRI. */
 export const firstMatchesSql = (
   at: MatchAt & { readonly facts: string; readonly besides?: number },
 ): string => {

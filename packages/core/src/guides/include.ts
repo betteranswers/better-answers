@@ -175,7 +175,6 @@ const inclusionFor = async (
   };
 };
 
-/** Counted over every include row, not one reader's view, as the mark is the section's own. */
 const CLEAR_WHEN_MET = `
   UPDATE write_up w SET needs_review = NULL
    WHERE w.workspace_id = $1 AND w.id = $2 AND w.needs_review = $3
@@ -252,7 +251,6 @@ const included = async (
   return ok({ included: inclusion.added.length, sha: written.value.sha });
 };
 
-/** Editors and Admins. Writes nothing when no readable concept meeting a fact is left to include. */
 export const includeAvailable = async (
   principal: UserPrincipal,
   doors: GuideDoors,

@@ -30,7 +30,6 @@ export const GUIDE_ACTIONS = declareActions("knowledge", {
   }),
 });
 
-/** Strict, so nothing beyond the include rows, an actor least of all, rides into a version. */
 const includeSnapshot = z.array(
   z.strictObject({
     id: z.string(),
@@ -132,7 +131,6 @@ export const insertSectionWriteUps = async (
   );
 };
 
-/** A mark a person already set for another reason, or this one, stays as it is. */
 export const flagWriteUpsCiting = async (
   principal: Principal,
   tx: Tx,
