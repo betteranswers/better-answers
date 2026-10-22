@@ -14,7 +14,7 @@ export const useOpenMatch = (): ((opening: Opening) => void) => {
         replace: true,
         state: (held) => ({ ...held, openedMatch: key }),
       });
-      // The browser's history folds a replace and a push in one task into one push.
+      // TanStack's browser history folds a replace and a push queued in one microtask into one push.
       router.history.flush();
       void navigate({
         href: page,

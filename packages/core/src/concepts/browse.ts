@@ -139,7 +139,7 @@ type KindConceptRow = {
   readonly content_hash: string;
 } & VerificationRow;
 
-const kindConceptOf = (row: KindConceptRow, now: Date): KindConcept => ({
+const kindConceptOf = (row: KindConceptRow, judgedAt: Date): KindConcept => ({
   iri: ids.conceptIri.parse(row.iri),
   title: row.title,
   kind: row.kind,
@@ -151,13 +151,13 @@ const kindConceptOf = (row: KindConceptRow, now: Date): KindConcept => ({
         contentHash: row.content_hash,
         verification: verificationOf(row),
       },
-      now,
+      judgedAt,
     ),
   ),
 });
 
-const kindConceptsOf = (rows: readonly KindConceptRow[], now: Date): KindConcepts => {
-  const page = rows.slice(0, KIND_PAGE_SIZE).map((row) => kindConceptOf(row, now));
+const kindConceptsOf = (rows: readonly KindConceptRow[], judgedAt: Date): KindConcepts => {
+  const page = rows.slice(0, KIND_PAGE_SIZE).map((row) => kindConceptOf(row, judgedAt));
   const last = page.at(-1);
   return {
     concepts: page,
@@ -168,12 +168,11 @@ const kindConceptsOf = (rows: readonly KindConceptRow[], now: Date): KindConcept
   };
 };
 
-/** `now` decides which concepts are past their shelf life, as their trust words say. */
 export const readKindConcepts = async (
   principal: UserPrincipal,
   tx: Tx,
   input: KindConceptsInput,
-  now: Date,
+  judgedAt: Date,
 ): Promise<Result<KindConcepts, RefusalOf<typeof readKindConceptsAction> | Error>> => {
   const admitted = admit(readKindConceptsAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
@@ -189,6 +188,6 @@ export const readKindConcepts = async (
       cursor?.iri ?? null,
       KIND_PAGE_SIZE + 1,
     ]);
-    return kindConceptsOf(rows, now);
+    return kindConceptsOf(rows, judgedAt);
   });
 };
