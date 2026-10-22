@@ -15,6 +15,7 @@ import {
 } from "@better-answers/schema";
 
 import { readableClause, readableParameters } from "../access/index.ts";
+import { authorOf } from "../bundle/index.ts";
 import {
   admit,
   ANY_ROLE,
@@ -39,7 +40,6 @@ import {
   type FrontmatterValue,
 } from "./file.ts";
 import { foldKind, heldByIri, mergeKeyOf, placesUsingReadableOrNot, type Held } from "./landing.ts";
-import { authorOf } from "./loader.ts";
 import { ownerAdmits, ownerOf, standingConcept, type OwnedConcept } from "./owners.ts";
 import { resolvedSourcesOf, type PassageReader } from "./read.ts";
 import { submitSuggestionSet, type SubmitSuggestionSetRefusal } from "./suggestions.ts";

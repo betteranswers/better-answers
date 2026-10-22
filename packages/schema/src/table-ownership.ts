@@ -515,6 +515,27 @@ export const CROSS_OWNER_TABLE_ACCESS = [
       "The same read joins the member row: a proposer is a string a producer wrote and `user` is global by design, so a lookup by id alone would let a compromised producer put any person on the platform into another tenant's commit. Only a member of this workspace can be named as an author. Naming an owner reads it too, to refuse a person who is not a member before the owner row's foreign key to it would.",
   },
   {
+    table: "public.bundle_commit",
+    by: "bundle",
+    access: "write",
+    reason:
+      "Every commit to the knowledge base lands its row in the transaction that holds the commit, whichever slice's write made it, so the slice that owns the write inserts it; the concepts slice keeps the table, because its reconciler reads the rows and a rewritten history moves them.",
+  },
+  {
+    table: "public.user",
+    by: "bundle",
+    access: "read",
+    reason:
+      "A write to the knowledge base commits with the running member as git author, and a git author line is a name and an address — which the audit log's `human:<person id>` deliberately is not, so the write reads them off the member's person id.",
+  },
+  {
+    table: "public.member",
+    by: "bundle",
+    access: "read",
+    reason:
+      "The same read joins the member row, so only a member of this workspace can sign one of its commits.",
+  },
+  {
     table: "public.invitation",
     by: "members",
     access: "read and write",

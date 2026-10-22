@@ -31,7 +31,7 @@ The tree is `apps/` over `packages/`: `apps/` is what deploys and `packages/` is
 - `access/` holds the read predicate, defined once with one SQL renderer.
 - `store/` holds the four doors, one per shared store, and is the only place a connection is made: `store/postgres`, `store/git`, `store/map` and `store/objects`. Each door is exported under its own name, such as `@better-answers/core/store/postgres`. There is no `store` barrel and no `./store` entry.
 - `llm/` and `audit/` are layers every slice may use.
-- A slice is the capability that owns a set of tables and the invariants over them. The slices today are `sources`, `concepts`, `answering`, `guides`, `erasure`, `runs`, `workspaces`, `members` and `sweeps`. `erasure` sits on top, and no slice imports it.
+- A slice is the capability that owns a set of tables and the invariants over them. The slices today are `sources`, `concepts`, `bundle`, `answering`, `guides`, `erasure`, `runs`, `workspaces`, `members` and `sweeps`. `erasure` sits on top, and no slice imports it. `bundle` owns the knowledge base's write: the repository lock and fence, the commit held in the member's transaction, and its `bundle_commit` row. It holds that invariant over a table `concepts` keeps, writing the row under a declared access, and imports only `kernel` and the store doors, so any slice that writes the knowledge base can import it.
 - `refusals/` holds the refusal catalogue, each slice's vocabulary under its owner's name (ADR 0043). It is no slice, because it owns no table. It imports `kernel` and every slice's face, `erasure` included. Nothing in core but a test imports it.
 
 The import direction has five rules:
@@ -74,5 +74,7 @@ Every one of the four doors is real in a test, and none may be faked. `CODING_ST
 Amended 10/10/2026 by the refusal catalogue plan (`docs/plans/2026-10-10-1241-refactor-one-refusal-catalogue-plan.md`, KTD1). `refusals/` is a zone of its own in the lint rule. Before it, nothing in core but a test imported `erasure`; the catalogue is now the one module that does.
 
 Amended 19/10/2026 on the owner's ruling of 19/10/2026, by BA-204. `apps/test-inbox`, a second TypeScript deployable outside the product, is retired with the signed-in production journeys until go-live, so `apps/api` is again the one TypeScript deployable.
+
+Amended 22/10/2026 by BA-235. The lock, the fence and the commit's landing move out of `concepts` into the `bundle` slice. Guides is about to write the knowledge base too, and `concepts` imports guides, so the write cannot stay in `concepts` without a cycle. It holds two doors, so it cannot sit in either.
 
 The full record, which retired the constitution's tenancy rule to ADR 0032 and whose tier-contract consequences ADR 0031 enacted and corrected, with its amendments (T-078, T-048, T-053, T-114, T-117, T-118, T-253): `docs/archive/adr/0029-apps-over-packages-capability-slices.md`.

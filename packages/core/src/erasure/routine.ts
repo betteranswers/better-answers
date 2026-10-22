@@ -1,11 +1,8 @@
 import { boundarySchemas } from "@better-answers/schema";
 
 import { action, declareActions, record, type DetailOf } from "../audit/index.ts";
-import {
-  carryVerificationsOntoRewrite,
-  moveBundleCommits,
-  withBundleFenceAs,
-} from "../concepts/index.ts";
+import { withBundleFenceAs } from "../bundle/index.ts";
+import { carryVerificationsOntoRewrite, moveBundleCommits } from "../concepts/index.ts";
 import {
   attempt,
   err,

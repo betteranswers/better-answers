@@ -23,6 +23,7 @@ import {
   visibilityOf,
   type Visibility,
 } from "../access/index.ts";
+import { landBundleCommit } from "../bundle/index.ts";
 import { recomputeWriteUpsIncluding } from "../guides/index.ts";
 import {
   attempt,
@@ -54,26 +55,6 @@ import { contentHashOf, parseConceptFile, type Frontmatter } from "./file.ts";
 import type { Acceptance } from "./index.ts";
 import { markDeciding } from "./suggestions.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
-
-export const commitAndLandAsMember = async <Refused extends string = never>(
-  principal: UserPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
-  request: CommitRequest,
-  land: (fresh: UserPrincipal, tx: Tx, committed: Committed) => Promise<void>,
-  admits: (fresh: UserPrincipal, tx: Tx) => Promise<Refused | undefined>,
-): Promise<Result<Committed, CommitRefusal | Refused | PrincipalRefusal | Error>> => {
-  const held = await attempt(() =>
-    withMember(principal, doors.postgres, async (fresh, tx) => {
-      const refusal = await admits(fresh, tx);
-      if (refusal !== undefined) return err(refusal);
-      const committed = await commit(fresh, doors.git, request);
-      if (committed.ok) await land(fresh, tx, committed.value);
-      return committed;
-    }),
-  );
-  if (!held.ok) return err(held.error);
-  return held.value.ok ? held.value.value : err(held.value.error);
-};
 
 export const foldKind = (kind: string): string =>
   kind.replaceAll(/\S+/g, (word) => {
@@ -313,30 +294,6 @@ type Landing = z.infer<typeof conceptRow> & {
   readonly restsAlsoOn: readonly Visibility[];
 
   readonly acceptance: Acceptance | undefined;
-};
-
-type CommitLanding = {
-  readonly commit: Committed;
-  readonly actor: ActorId;
-  readonly auditEventId: string;
-};
-
-export const landBundleCommit = async (
-  principal: Principal,
-  tx: Tx,
-  landing: CommitLanding,
-): Promise<void> => {
-  await tx.query(
-    `INSERT INTO bundle_commit (workspace_id, sha, parent_sha, audit_event_id, actor)
-     VALUES (${scopeClause(1)}, $2, $3, $4, $5)`,
-    [
-      scopeParameter(principal),
-      landing.commit.sha,
-      landing.commit.parent,
-      landing.auditEventId,
-      landing.actor,
-    ],
-  );
 };
 
 const landEvidence = async (

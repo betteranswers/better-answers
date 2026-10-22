@@ -24,6 +24,11 @@ const STEPS: Readonly<Record<string, string>> = {
     "the audit log's read and a member's activity call it after admitting an Admin",
   "audit/record": "writes the audit event of the action that called it, in its transaction",
   "audit/recordEach": "writes the audit events of the action that called it, in its transaction",
+  "bundle/authorOf": "an admitted write reads the git author of the person it names",
+  "bundle/commitAndLandAsMember":
+    "an admitted write commits through it, and it runs that write's own checks",
+  "bundle/landBundleCommit": "an admitted write and the reconciler land their commit's row",
+  "bundle/withBundleWrite": "takes the lock for a write that admitted its person first",
   "concepts/cascadingVisibility": "runs its caller's write, and that write's own checks",
   "concepts/conceptCountsOf": "find and ask call it with the reader they admitted",
   "concepts/evidenceOf": "ask calls it with the reader it admitted",

@@ -1,6 +1,7 @@
 import { boundarySchemas, BUNDLE_MANIFEST_PATH, IRI, ULID } from "@better-answers/schema";
 
 import { batchIdFor, eventsOfAction, record } from "../audit/index.ts";
+import { landBundleCommit, tryBundleFenceAs } from "../bundle/index.ts";
 import {
   attempt,
   attemptResult,
@@ -24,7 +25,6 @@ import {
   type Tx,
 } from "../store/postgres/index.ts";
 import { workspaceIds } from "../workspaces/index.ts";
-import { tryBundleFenceAs } from "./fence.ts";
 import { contentHashOf, parseConceptFile, type Frontmatter } from "./file.ts";
 import type { Acceptance } from "./index.ts";
 import {
@@ -33,7 +33,6 @@ import {
   heldByIri,
   indexRowOf,
   type IndexRow,
-  landBundleCommit,
   landRows,
   mergeKeyOf,
   WRITE_CONSTRAINTS,

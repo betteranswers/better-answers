@@ -19,6 +19,7 @@ import {
 
 import { readableClause, readableParameters, type Sensitivity } from "../access/index.ts";
 import { batchIdFor } from "../audit/index.ts";
+import { authorOf } from "../bundle/index.ts";
 import {
   actorIdOfPerson,
   admit,
@@ -42,7 +43,6 @@ import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.
 import { type Frontmatter, type FrontmatterSource } from "./file.ts";
 import { latestVerificationOf } from "./latest-verification.ts";
 import {
-  authorOf,
   countVerifications,
   IMPORT_SENSITIVITY_DEFAULT,
   personIdsByEmail,
@@ -107,7 +107,6 @@ export {
   readKnowledgeTree,
   type KindConceptsInput,
 } from "./browse.ts";
-export { withBundleFenceAs } from "./fence.ts";
 export {
   conceptToEdit,
   conceptToEditInput,
