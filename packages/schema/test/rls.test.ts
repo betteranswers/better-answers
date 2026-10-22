@@ -70,6 +70,7 @@ import {
   AN_IDENTITY_SET_AUDIT_EVENT_ROW,
   AN_IDENTITY_SET_AUDIT_EVENT_ROW_WITH_ITS_FAMILY,
   AN_INVITATION,
+  AN_UNRESOLVED_REFERENCE,
   ONE_CALL_AGAINST_A_TOKEN,
   REFRESH_THE_READING,
   THE_DETAIL_EDITED,
@@ -1138,14 +1139,20 @@ describe("the concept write path under app_rt", () => {
 });
 
 describe("the map tables under app_rt", () => {
-  const MAP_TABLES = ["map_generation", "map_node", "map_edge"] as const;
+  const MAP_TABLES = [
+    "map_generation",
+    "map_node",
+    "map_edge",
+    "map_unresolved_reference",
+  ] as const;
 
-  it("returns none unscoped and only the tenant's, on all three", async () => {
+  it("returns none unscoped and only the tenant's, on all four", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) {
         const from = await seed.mapNode({ workspaceId });
         await seed.mapEdge({ workspaceId, fromUid: from.uid });
+        await seed.mapUnresolvedReference({ workspaceId, fromUid: from.uid });
       }
       await client.query("SET LOCAL ROLE app_rt");
 
@@ -1159,7 +1166,64 @@ describe("the map tables under app_rt", () => {
         { table: "map_generation", rows: 1 },
         { table: "map_node", rows: 2 },
         { table: "map_edge", rows: 1 },
+        { table: "map_unresolved_reference", rows: 1 },
       ]);
+    });
+  });
+
+  it("refuses the worker an update or delete of references", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const citing = await seed.mapNode({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await client.query(AN_UNRESOLVED_REFERENCE, [
+        WS_A,
+        1,
+        citing.uid,
+        "link",
+        0,
+        "knowledge/later.md",
+      ]);
+      const held = await client.query(
+        "SELECT relation, ordinal, target_path FROM map_unresolved_reference",
+      );
+      expect(held.rows).toEqual([
+        { relation: "link", ordinal: 0, target_path: "knowledge/later.md" },
+      ]);
+
+      await refusesEach(client, [
+        [
+          "UPDATE map_unresolved_reference SET target_path = 'knowledge/elsewhere.md'",
+          "a rebuild writes a generation's references and never rewrites one",
+        ],
+        [
+          "DELETE FROM map_unresolved_reference",
+          "sweeping a retired generation's references is the api's, not this",
+        ],
+      ]);
+    });
+  });
+
+  it("refuses the worker a reference in another workspace", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.mapNode({ workspaceId: WS_A });
+      const citing = await seed.mapNode({ workspaceId: WS_B });
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await expect(
+        client.query(AN_UNRESOLVED_REFERENCE, [
+          WS_B,
+          1,
+          citing.uid,
+          "link",
+          0,
+          "knowledge/later.md",
+        ]),
+      ).rejects.toThrow(/lands in the live generation or the next: live is <NULL>/);
     });
   });
 

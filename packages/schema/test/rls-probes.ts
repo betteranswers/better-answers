@@ -72,6 +72,10 @@ export const A_MAP_NODE_CLASSED =
 export const AN_EDGE = `INSERT INTO map_edge (workspace_id, gen, uid, label, from_uid, to_uid)
        VALUES ($1, $2, $3, $4, $5, $6)`;
 
+export const AN_UNRESOLVED_REFERENCE = `INSERT INTO map_unresolved_reference
+         (workspace_id, gen, from_uid, relation, ordinal, target_path)
+       VALUES ($1, $2, $3, $4, $5, $6)`;
+
 export const AN_EDGE_CARRYING_A_SENTENCE = `INSERT INTO map_edge
          (workspace_id, gen, uid, label, from_uid, to_uid, sentence)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`;

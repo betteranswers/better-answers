@@ -122,3 +122,37 @@ export const mapEdge = withRLS(
     ),
   ],
 );
+
+export const UNRESOLVED_RELATIONS = ["link", "lineage"] as const;
+
+export const mapUnresolvedReference = withRLS(
+  "map_unresolved_reference",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    gen: integer("gen").notNull(),
+    fromUid: text("from_uid").notNull(),
+    relation: text("relation").notNull(),
+    ordinal: integer("ordinal").notNull(),
+    targetPath: text("target_path").notNull(),
+  },
+  "workspaceId",
+  (table) => [
+    uniqueIndex("map_unresolved_reference_uidx").on(
+      table.workspaceId,
+      table.gen,
+      table.fromUid,
+      table.relation,
+      table.ordinal,
+    ),
+    index("map_unresolved_reference_target_idx").on(table.workspaceId, table.gen, table.targetPath),
+    check(
+      "map_unresolved_reference_relation_check",
+      sql.raw(`relation IN (${listed(UNRESOLVED_RELATIONS)})`),
+    ),
+    check("map_unresolved_reference_ordinal_check", sql.raw("ordinal >= 0")),
+    check("map_unresolved_reference_target_path_check", sql.raw("target_path <> ''")),
+    check("map_unresolved_reference_gen_check", sql.raw("gen > 0")),
+  ],
+);

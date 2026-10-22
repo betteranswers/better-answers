@@ -75,6 +75,7 @@ export const TABLE_OWNERS = {
   "public.map_generation": "concepts",
   "public.map_node": "concepts",
   "public.map_edge": "concepts",
+  "public.map_unresolved_reference": "concepts",
 
   "public.suggestion": "concepts",
   "public.concept_write_request": "concepts",
@@ -539,6 +540,13 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "read and write",
     reason:
       "The delta builder replaces a concept's outgoing edges inside the governed write's transaction, and the traversal templates read them with the predicate on every element of every path.",
+  },
+  {
+    table: "public.map_unresolved_reference",
+    by: MAP_DOOR,
+    access: "read and write",
+    reason:
+      "The delta builder replaces a concept's unresolved path references beside its edges, settles the ones naming the path a concept lands at, and sweeps a retired generation's; the delta and the worker's rebuild are its only writers, and no person reads it.",
   },
   {
     table: "public.concept_index",

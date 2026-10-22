@@ -146,6 +146,10 @@
     {"role":"app_rt","object":"public.map_node","kind":"table","is_partition":false,"privilege":"INSERT","grantable":false},
     {"role":"app_rt","object":"public.map_node","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
     {"role":"app_rt","object":"public.map_node","kind":"table","is_partition":false,"privilege":"UPDATE","grantable":false},
+    {"role":"app_rt","object":"public.map_unresolved_reference","kind":"table","is_partition":false,"privilege":"DELETE","grantable":false},
+    {"role":"app_rt","object":"public.map_unresolved_reference","kind":"table","is_partition":false,"privilege":"INSERT","grantable":false},
+    {"role":"app_rt","object":"public.map_unresolved_reference","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
+    {"role":"app_rt","object":"public.map_unresolved_reference","kind":"table","is_partition":false,"privilege":"UPDATE","grantable":false},
     {"role":"app_rt","object":"public.mcp_call_counter","kind":"table","is_partition":false,"privilege":"DELETE","grantable":false},
     {"role":"app_rt","object":"public.mcp_call_counter","kind":"table","is_partition":false,"privilege":"INSERT","grantable":false},
     {"role":"app_rt","object":"public.mcp_call_counter","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
@@ -290,6 +294,8 @@
     {"role":"worker_rt","object":"public.map_generation","kind":"table","is_partition":false,"privilege":"UPDATE","grantable":false},
     {"role":"worker_rt","object":"public.map_node","kind":"table","is_partition":false,"privilege":"INSERT","grantable":false},
     {"role":"worker_rt","object":"public.map_node","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
+    {"role":"worker_rt","object":"public.map_unresolved_reference","kind":"table","is_partition":false,"privilege":"INSERT","grantable":false},
+    {"role":"worker_rt","object":"public.map_unresolved_reference","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
     {"role":"worker_rt","object":"public.source_document","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
     {"role":"worker_rt","object":"public.suppression","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
     {"role":"worker_rt","object":"public.workspace","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false}
@@ -367,7 +373,7 @@
     {"owner":"<migrator>","kind":"<partition-of public.question_content>","relations":1},
     {"owner":"<migrator>","kind":"partitioned table","relations":2},
     {"owner":"<migrator>","kind":"sequence","relations":1},
-    {"owner":"<migrator>","kind":"table","relations":65},
+    {"owner":"<migrator>","kind":"table","relations":66},
     {"owner":"<migrator>","kind":"view","relations":1}
   ]
 }
