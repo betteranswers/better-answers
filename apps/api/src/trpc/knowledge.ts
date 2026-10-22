@@ -1,5 +1,12 @@
 import { find, findInput, open, openInput, type OpenResult } from "@better-answers/core/answering";
-import { collectionsAndOwners, nameOwner, nameOwnerInput } from "@better-answers/core/concepts";
+import {
+  collectionsAndOwners,
+  knowledgeBranchInput,
+  nameOwner,
+  nameOwnerInput,
+  readKnowledgeBranch,
+  readKnowledgeTree,
+} from "@better-answers/core/concepts";
 import { err, NOT_FOUND, ok, type Result } from "@better-answers/core/kernel";
 
 import { MCP_TOKEN_RULE } from "../auth/constants.ts";
@@ -43,6 +50,16 @@ export const knowledgeRouter = router({
       given(input, async (asked) =>
         foundOrRefused(await open(ctx.principal, ctx.tx, asked, ctx.clock.now())),
       ),
+    ),
+  ),
+  tree: knowledgeReadProcedure.query(({ ctx }) =>
+    crossing(ctx, readKnowledgeTree.name, readKnowledgeTree(ctx.principal, ctx.tx)),
+  ),
+  branch: knowledgeReadProcedure.input(parsedBy(knowledgeBranchInput)).query(({ ctx, input }) =>
+    crossing(
+      ctx,
+      readKnowledgeBranch.name,
+      given(input, (asked) => readKnowledgeBranch(ctx.principal, ctx.tx, asked, ctx.clock.now())),
     ),
   ),
   collections: queryProcedure.query(({ ctx }) =>

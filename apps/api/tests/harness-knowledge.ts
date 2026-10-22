@@ -13,7 +13,13 @@ import {
 } from "@better-answers/core/concepts";
 import { actorIdOfPerson, type UserPrincipal } from "@better-answers/core/kernel";
 import { head, initRepository, type GitDoor } from "@better-answers/core/store/git";
-import { AUDIENCES, conceptFrontmatter, SENSITIVITIES } from "@better-answers/schema";
+import {
+  AUDIENCE_GROUPS,
+  AUDIENCES,
+  COLLECTION,
+  conceptFrontmatter,
+  SENSITIVITIES,
+} from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { inOneTransaction, seedPassages } from "./harness-sources.ts";
@@ -584,4 +590,61 @@ export const nameOwners = async (
     }
   }
   return { named: asked.owners.length };
+};
+
+const SEEDED_AT_MOST = 5_000;
+
+export const conceptIndexSeeding = z.strictObject({
+  workspaceId: z.string(),
+  batches: z
+    .array(
+      z.strictObject({
+        collection: z.string().regex(COLLECTION).nullable(),
+        kind: z.string().trim().min(1),
+        count: z.int().min(1).max(SEEDED_AT_MOST),
+        title: z.string().trim().min(1).optional(),
+        sensitivity: z.enum(SENSITIVITIES).optional(),
+        audienceGroups: z.array(z.string()).min(1).optional(),
+      }),
+    )
+    .min(1),
+});
+
+type IndexBatch = z.output<typeof conceptIndexSeeding>["batches"][number];
+
+const seededPath = (batch: IndexBatch, slug: string): string =>
+  batch.collection === null ? `knowledge/${slug}.md` : `knowledge/${batch.collection}/${slug}.md`;
+
+export const seedConceptIndex = async (
+  app: TestApp,
+  asked: z.output<typeof conceptIndexSeeding>,
+): Promise<{ readonly seeded: number }> => {
+  const { workspaceId } = asked;
+  const seeded = await inOneTransaction(app, async (client) => {
+    const seed = testData(client);
+    const { sha: commitSha } = await seed.bundleCommit({ workspaceId });
+    let rows = 0;
+    for (const [at, batch] of asked.batches.entries()) {
+      const width = String(batch.count).length;
+      for (let place = 1; place <= batch.count; place += 1) {
+        const title = `${batch.title ?? batch.kind} ${String(place).padStart(width, "0")}`;
+        await seed.conceptIndex({
+          workspaceId,
+          commitSha,
+          path: seededPath(batch, `seeded-${at}-${place}`),
+          kind: batch.kind,
+          title,
+          frontmatter: { title, type: batch.kind },
+          ...(batch.sensitivity === undefined ? {} : { sensitivity: batch.sensitivity }),
+          ...(batch.audienceGroups === undefined
+            ? {}
+            : { audience: AUDIENCE_GROUPS, audienceGroups: batch.audienceGroups }),
+        });
+        rows += 1;
+      }
+    }
+    return rows;
+  });
+  await app.database.superuser.query("ANALYZE concept_index");
+  return { seeded };
 };

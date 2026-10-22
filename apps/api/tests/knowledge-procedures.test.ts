@@ -6,7 +6,12 @@ import { documentLanded, type DocumentShape } from "@better-answers/core/testing
 
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { connectAsHost, signIn } from "./flow.ts";
-import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
+import {
+  conceptIndexSeeding,
+  conceptsSeeding,
+  seedConceptIndex,
+  seedConcepts,
+} from "./harness-knowledge.ts";
 import { actingIn, openTestGit } from "./harness.ts";
 import { calledTool, rendered, rpcListOf, rpcOf, structured, type Rpc } from "./mcp-call.ts";
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
@@ -298,6 +303,55 @@ const threeNotesAskingTheBoard = async () => {
     ],
   };
 };
+
+describe("the knowledge tree over tRPC", () => {
+  it("reads the knowledge tree through the knowledge router", async () => {
+    const { workspace, viewer } = await aWorkspaceHolding([
+      { ...FEEDING_WRITTEN, collection: "birds" },
+      { ...RINGING_WRITTEN, collection: "birds" },
+      { title: SURVEY, body: "Heron counts are taken each June.", kind: "Procedure" },
+    ]);
+    await seedConceptIndex(
+      app(),
+      conceptIndexSeeding.parse({
+        workspaceId: workspace.workspaceId,
+        batches: [{ collection: "birds", kind: "Answer", count: 60 }],
+      }),
+    );
+    const { api } = await webSignedIn(app(), viewer.email);
+
+    const tree = await api.knowledge.tree.query();
+    const first = await api.knowledge.branch.query({ collection: "birds", kind: "Answer" });
+    const rest = await api.knowledge.branch.query({
+      collection: "birds",
+      kind: "Answer",
+      cursor: first.nextCursor,
+    });
+
+    expect(tree).toEqual({
+      collections: [
+        { collection: "birds", count: 61, kinds: [{ kind: "Answer", count: 61 }] },
+        { collection: null, count: 1, kinds: [{ kind: "Procedure", count: 1 }] },
+      ],
+    });
+    expect([first.concepts.length, rest.concepts.length, rest.nextCursor]).toEqual([50, 11, null]);
+    expect(first.concepts[0]).toMatchObject({ title: "Answer 01", trustWords: "Unverified" });
+    expect(rest.concepts.map(({ title }) => title)).toContain(FEEDING);
+  });
+
+  it("refuses a branch naming a collection with a slash", async () => {
+    const { viewer } = await aWorkspaceOfHerons();
+    const { api } = await webSignedIn(app(), viewer.email);
+
+    const refused = await refusalOfCall(
+      api.knowledge.branch.query({ collection: "birds/herons", kind: "Answer" }),
+    );
+    const answered = await api.knowledge.branch.query({ collection: "birds", kind: "Answer" });
+
+    expect(refused).toMatchObject(MALFORMED);
+    expect(answered).toEqual({ concepts: [], nextCursor: null });
+  });
+});
 
 describe("a body's links over both transports", () => {
   it("answers three unanswerable links alike over MCP", async () => {

@@ -377,6 +377,22 @@ export const nameOwners = (
   input: { workspaceId: string; userId: string; owners: readonly SeedOwner[] },
 ) => ask(api, "/owners", input, ownersNamed);
 
+type SeedIndexBatch = {
+  readonly collection: string | null;
+  readonly kind: string;
+  readonly count: number;
+  readonly title?: string;
+  readonly sensitivity?: "Public" | "Internal" | "Restricted";
+  readonly audienceGroups?: readonly string[];
+};
+
+const indexSeeded = z.object({ seeded: z.number() });
+
+export const seedConceptIndex = (
+  api: APIRequestContext,
+  input: { workspaceId: string; batches: readonly SeedIndexBatch[] },
+) => ask(api, "/concept-index", input, indexSeeded);
+
 type SeedFlag = {
   readonly reason: (typeof FEEDBACK_REASONS)[number];
   readonly note?: string;
