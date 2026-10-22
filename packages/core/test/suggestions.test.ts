@@ -7,8 +7,11 @@ import { testData } from "@better-answers/schema/testing";
 import { open } from "../src/answering/index.ts";
 import {
   acceptSuggestions,
+  conceptByIri,
   contentHashOf,
   declineSuggestion,
+  foldKind,
+  mergeKeyOf,
   parseConceptFile,
   submitSuggestionSet,
   suggestionSetSummary,
@@ -24,6 +27,7 @@ import {
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit } from "./bundle.ts";
+import { documentLanded } from "./suite-documents.ts";
 import {
   abortTheTransaction,
   holdingTable,
@@ -1667,5 +1671,100 @@ describe("what a suggestion set refuses before it does any work", () => {
       { ok: false, error: "malformed" },
     ]);
     expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
+  });
+});
+
+const RETITLED = "Travel Expenses";
+
+const retitled = { title: RETITLED, frontmatter: { title: RETITLED, type: "Policy" } };
+
+const mergeKeyHeldBy = async (iri: string): Promise<string | undefined> => {
+  const found = await db().pool.query<{ merge_key: string }>(
+    "SELECT merge_key FROM concept_identity WHERE iri = $1",
+    [iri],
+  );
+  return found.rows[0]?.merge_key;
+};
+
+describe("an accepted edit's identity and state", () => {
+  it("re-keys an accepted retitle to its new title", async () => {
+    const scenario = await arrange();
+    const { written, set } = await proposedAgainst(scenario, "edit", {}, retitled);
+
+    await acceptedOne(scenario, set.setId);
+
+    expect(await mergeKeyHeldBy(written.iri)).toBe(mergeKeyOf(foldKind("Policy"), RETITLED));
+  });
+
+  it("keeps the key of an accepted edit keeping its title", async () => {
+    const scenario = await arrange();
+    const { input, written, set } = await proposedAgainst(scenario, "edit");
+
+    await acceptedOne(scenario, set.setId);
+
+    expect(await mergeKeyHeldBy(written.iri)).toBe(input.mergeKey);
+  });
+
+  it("returns an accepted retitle onto a title already taken", async () => {
+    const scenario = await arrange();
+    const { input, written, set } = await proposedAgainst(scenario, "edit", {}, retitled);
+    await editorWrote(scenario, {
+      ...retitled,
+      mergeKey: mergeKeyOf(foldKind("Policy"), RETITLED),
+      expects: { head: written.sha },
+    });
+    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+
+    const [outcome] = await acceptAll(scenario, set.setId);
+
+    expect(outcome?.outcome).toEqual({ ok: false, error: "resolution-moved" });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "returned" });
+    expect(await mergeKeyHeldBy(written.iri)).toBe(input.mergeKey);
+  });
+
+  it("publishes an accepted new concept its proposer can open", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.viewer, "edit", [requestFor()]);
+
+    const [outcome] = await acceptAll(scenario, set.setId, scenario.editor);
+    const accepted = acceptedOf(outcome);
+    if (accepted === undefined)
+      throw new Error(`refused: ${String(outcome && refusalOf(outcome))}`);
+    const row = await db().pool.query<Record<string, unknown>>(
+      "SELECT status, sensitivity, published_at IS NOT NULL AS published FROM concept_index WHERE iri = $1",
+      [accepted.iri],
+    );
+    const reopened = await readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
+      conceptByIri(principal, tx, accepted.iri),
+    );
+
+    expect(row.rows[0]).toEqual({ status: "stable", sensitivity: "Internal", published: true });
+    expect(reopened).toMatchObject({ ok: true, value: { iri: accepted.iri } });
+  });
+
+  it("lands an accepted new concept no wider than its sources", async () => {
+    const scenario = await arrange();
+    const minutes = await documentLanded(db().pool, scenario.workspaceId, {
+      title: "Board minutes",
+      text: "The board reviews pay in March.",
+      sensitivity: "Restricted",
+    });
+    const cited = { title: "Board minutes", resource: "minutes", locator: minutes.locator };
+    const request = requestFor();
+    const set = await submitted(scenario, scenario.admin, "edit", [
+      { ...request, frontmatter: { ...request.frontmatter, sources: [cited] } },
+    ]);
+
+    const [outcome] = await acceptAll(scenario, set.setId, scenario.admin);
+    const accepted = acceptedOf(outcome);
+    if (accepted === undefined)
+      throw new Error(`refused: ${String(outcome && refusalOf(outcome))}`);
+    const row = await db().pool.query(
+      "SELECT status, sensitivity FROM concept_index WHERE iri = $1",
+      [accepted.iri],
+    );
+
+    expect(row.rows).toEqual([{ status: "stable", sensitivity: "Restricted" }]);
   });
 });

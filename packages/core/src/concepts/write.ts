@@ -2,7 +2,12 @@ import { isDeepStrictEqual } from "node:util";
 
 import { z } from "zod";
 
-import { boundarySchemas, conceptIriOf, type ConceptIri } from "@better-answers/schema";
+import {
+  boundarySchemas,
+  CONCEPT_STABLE_STATUS,
+  conceptIriOf,
+  type ConceptIri,
+} from "@better-answers/schema";
 
 import { widens, type Visibility } from "../access/index.ts";
 import { action, declareActions, record } from "../audit/index.ts";
@@ -42,6 +47,7 @@ import {
   holderOfPath,
   holdsEveryDocument,
   indexRowOf,
+  mergeKeyOf,
   type IndexRow,
   landRows,
   placesUsingReadableOrNot,
@@ -49,6 +55,7 @@ import {
   type EvidenceRow,
   type Held,
 } from "./landing.ts";
+import { IMPORT_SENSITIVITY_DEFAULT } from "./loader.ts";
 import { deciderAdmits, ownerAdmits, standingConcept } from "./owners.ts";
 import {
   conceptOfSuggestion,
@@ -177,11 +184,20 @@ export const writeConcept = async (
 const acceptsAsProposed = (input: WriteConceptInput): boolean =>
   "base" in input.expects && input.status === undefined && input.sensitivity === undefined;
 
+export const SAVED_NEW = {
+  status: CONCEPT_STABLE_STATUS,
+  sensitivity: IMPORT_SENSITIVITY_DEFAULT,
+};
+
+const landingStateOf = (input: WriteConceptInput): WriteConceptInput =>
+  input.acceptance !== undefined && input.iri === undefined ? { ...input, ...SAVED_NEW } : input;
+
 const commitConcept = async (
   principal: AdmittedOf<typeof writeConceptAction>,
   doors: WriteDoors,
-  input: WriteConceptInput,
+  proposed: WriteConceptInput,
 ): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
+  const input = landingStateOf(proposed);
   const iri = input.iri ?? conceptIriOf(ulid());
   const frontmatter = fileFrontmatterOf(input, iri);
   const body = boundarySchemas.conceptIndex.insert.shape.body.safeParse(input.body);
@@ -223,6 +239,8 @@ type Facts = {
   readonly derived: Visibility | undefined;
   readonly catalogued: boolean;
   readonly resolved: string | undefined;
+  readonly landsAt: string;
+  readonly landsOnto: string | undefined;
   readonly holder: string | undefined;
   readonly waiting: boolean;
   readonly places: number;
@@ -264,14 +282,11 @@ const writeUnderLock = async (
   if (!parsed.success) return err("malformed");
   const row = parsed.data;
 
-  const landed = await commitAndLandWrite(
-    principal,
-    doors,
-    write,
-    row,
-    now,
-    existing.held?.contentHash,
-  );
+  const landed = await commitAndLandWrite(principal, doors, write, row, {
+    at: now,
+    fromContentHash: existing.held?.contentHash,
+    landsAt: existing.landsAt,
+  });
   if (!landed.ok) return err(landed.error);
 
   return ok({
@@ -288,6 +303,7 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
       const { input, iri } = write;
       const admission = await writersRefusal(fresh, tx, write, input.path);
       const held = await heldByIri(fresh, tx, iri);
+      const landsAt = landingKeyOf(write, held);
       return {
         admission,
         held,
@@ -309,6 +325,9 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
         ),
 
         resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
+        landsAt,
+        landsOnto:
+          landsAt === write.mergeKey ? undefined : await targetOfMergeKey(fresh, tx, landsAt),
         holder: await holderOfPath(fresh, tx, input.path),
         waiting:
           input.acceptance === undefined ||
@@ -318,6 +337,12 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
     }),
   );
 
+const landingKeyOf = ({ input, mergeKey }: ParsedWrite, held: Held | undefined): string => {
+  if (input.acceptance === undefined || held === undefined) return mergeKey;
+  const edited = mergeKeyOf(foldKind(input.kind), input.title);
+  return edited === mergeKeyOf(held.kind, held.title) ? mergeKey : edited;
+};
+
 const WRITE_REFUSALS: readonly (readonly [
   WriteConceptRefusal,
   (write: ParsedWrite, existing: Existing) => boolean,
@@ -325,7 +350,12 @@ const WRITE_REFUSALS: readonly (readonly [
   ["no-such-concept", ({ input }, { held }) => input.iri !== undefined && held === undefined],
   ["no-such-document", (_, { catalogued }) => !catalogued],
   ["already-decided", (_, { waiting }) => !waiting],
-  ["merge-key-taken", ({ iri }, { resolved }) => resolved !== undefined && resolved !== iri],
+  [
+    "merge-key-taken",
+    ({ iri }, { resolved, landsOnto }) =>
+      (resolved !== undefined && resolved !== iri) ||
+      (landsOnto !== undefined && landsOnto !== iri),
+  ],
   [
     "resolution-moved",
     ({ input, iri }, { resolved }) =>
@@ -438,13 +468,18 @@ const carriesItsProposal = ({ input }: ParsedWrite, payload: SuggestionPayload) 
   "base" in input.expects &&
   payload.baseContentHash === input.expects.base;
 
+type WriteLanding = {
+  readonly at: Date;
+  readonly fromContentHash: string | undefined;
+  readonly landsAt: string;
+};
+
 const commitAndLandWrite = async (
   principal: UserPrincipal,
   doors: WriteDoors,
   write: ParsedWrite,
   row: IndexRow,
-  at: Date,
-  fromContentHash: string | undefined,
+  landing: WriteLanding,
 ): Promise<Result<Committed, WriteConceptRefusal | Error>> => {
   const { input } = write;
   const landed = await commitAndLandAsMember(
@@ -461,9 +496,9 @@ const commitAndLandWrite = async (
         suggestion: input.acceptance?.suggestionId,
       },
       expectedHead: "head" in input.expects ? input.expects.head : ANY_HEAD,
-      at,
+      at: landing.at,
     },
-    (fresh, tx, committed) => landWrite(fresh, tx, write, row, committed, fromContentHash),
+    (fresh, tx, committed) => landWrite(fresh, tx, write, row, committed, landing),
     (fresh, tx) => writersRefusal(fresh, tx, write, row.path),
   );
   if (!landed.ok && landed.error instanceof Error) {
@@ -479,7 +514,7 @@ const landWrite = async (
   write: ParsedWrite,
   row: IndexRow,
   committed: Committed,
-  fromContentHash: string | undefined,
+  { fromContentHash, landsAt }: WriteLanding,
 ): Promise<void> => {
   const acceptance = write.input.acceptance;
   if (acceptance === undefined) {
@@ -511,7 +546,7 @@ const landWrite = async (
   }
   await landRows(fresh, tx, {
     ...row,
-    mergeKey: write.mergeKey,
+    mergeKey: landsAt,
     commit: committed,
     actor: actorIdOf(fresh),
     auditEventId: write.auditEventId,

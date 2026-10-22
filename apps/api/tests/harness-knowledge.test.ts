@@ -12,6 +12,7 @@ import { harnessControl } from "./harness-control.ts";
 import { actingIn, openTestGit } from "./harness.ts";
 import { calledTool, rpcListOf, rpcOf, structured, type Rpc } from "./mcp-call.ts";
 import { appForSuite } from "./suite-app.ts";
+import { webSignedIn } from "./web-client.ts";
 
 const app = appForSuite();
 
@@ -578,5 +579,56 @@ describe("a concepts seed the harness refuses before it writes", () => {
 
     expect(concept).toMatchObject({ title: "Quarry signage" });
     expect(await leftIn(workspace)).toMatchObject({ concepts: 1, connectedSources: 1 });
+  });
+});
+
+const harnessPosted = async (address: string, body: unknown): Promise<unknown> => {
+  const answered = await harnessControl(app()).request(address, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  expect(answered.status, `the harness's ${address} failed`).toBe(200);
+  return answered.json();
+};
+
+const seededSuggestion = z.object({ suggestionId: z.string(), setId: z.string() });
+
+describe("a waiting edit suggestion the harness seeds", () => {
+  it("seeds an owner and a waiting edit suggestion", async () => {
+    const { workspace, viewer: owner } = await aWorkspaceWithAViewer();
+    const proposer = await app().person();
+    await app().addMember(workspace.workspaceId, proposer.id, "Editor");
+    const [concept] = await conceptsSeeded({
+      workspaceId: workspace.workspaceId,
+      userId: workspace.admin.id,
+      concepts: [{ title: "Quarry signage", collection: "policy", body: "Signs face the road." }],
+    });
+    await harnessPosted("/__harness/owners", {
+      workspaceId: workspace.workspaceId,
+      userId: workspace.admin.id,
+      owners: [{ collection: "policy", personId: owner.id }],
+    });
+
+    const seeded = seededSuggestion.parse(
+      await harnessPosted("/__harness/suggestions", {
+        workspaceId: workspace.workspaceId,
+        userId: proposer.id,
+        iri: concept?.iri,
+        body: "Signs face the road and the footpath.",
+      }),
+    );
+    const { api } = await webSignedIn(app(), owner.email);
+
+    expect(await api.inbox.waiting.query()).toEqual({
+      items: [
+        expect.objectContaining({
+          suggestionId: seeded.suggestionId,
+          target: concept?.iri,
+          proposer: { id: proposer.id, name: proposer.name },
+          owner: { id: owner.id, name: owner.name },
+        }),
+      ],
+    });
   });
 });

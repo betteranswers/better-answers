@@ -8,7 +8,7 @@ export const COLLECTIONS_WORDS = {
   about:
     "A collection is one part of the company’s knowledge, such as a product, a service or a sector. Its owner keeps the concepts in it checked and up to date, unless a concept names an owner of its own.",
   loading: "The collections are still loading.",
-  none: "No collections yet. A collection appears here once a concept is saved in one.",
+  none: "No collections to show yet. A collection appears here once it holds a concept you can read.",
   count: (count: number): string => counted(count, "collection", "collections"),
   owner: "Owner",
   unowned: "No owner yet. Until an Admin names one, only Admins can edit its concepts.",

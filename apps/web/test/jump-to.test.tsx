@@ -100,7 +100,7 @@ describe("what jump-to lists", () => {
 
   it("lists an Admin's built pages, the invite action and members", () => {
     expect(outline(jumpsIn(treeOf("Admin"), [PRIYA, NAMELESS], AT_ROOT))).toEqual([
-      ["Areas", ["Ask", "Knowledge", "Control Centre"]],
+      ["Areas", ["Ask", "Knowledge", "Inbox", "Control Centre"]],
       [
         "Pages",
         [
@@ -110,6 +110,7 @@ describe("what jump-to lists", () => {
           "Search",
           "Knowledge Base",
           "Collections and Owners",
+          "Waiting on You",
           "Connected Sources",
           "Models and Spend",
           "Questions Asked",

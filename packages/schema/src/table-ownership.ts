@@ -505,7 +505,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "concepts",
     access: "read",
     reason:
-      "A direct edit of a concept used in more than one place asks once before it commits, and the count is the write-ups including the concept plus the concepts linking to it, read in one statement inside the write's own transaction so the write decides on the count it holds.",
+      "A direct edit asks once before it commits, and Waiting on you tells an owner before they accept, how many places use the concept an edit would change: the write-ups including it plus the concepts linking to it. A write counts inside its own transaction so it decides on the count it holds, and the waiting list counts in its one statement so a page of suggestions costs one query.",
   },
   {
     table: "public.member",

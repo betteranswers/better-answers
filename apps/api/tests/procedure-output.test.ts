@@ -54,6 +54,10 @@ describe("what a procedure may answer the wire", () => {
       "console.people.list",
       "console.people.namesWaiting",
       "console.workspaces.list",
+      "inbox.accept",
+      "inbox.decline",
+      "inbox.item",
+      "inbox.waiting",
       "knowledge.collections",
       "knowledge.conceptToEdit",
       "knowledge.find",
@@ -182,6 +186,10 @@ describe("what a procedure may answer the wire", () => {
       | "knowledge.kindConcepts"
       | "knowledge.conceptToEdit"
       | "knowledge.saveConcept"
+      | "inbox.waiting"
+      | "inbox.item"
+      | "inbox.accept"
+      | "inbox.decline"
       | "ask.question"
       | "ask.giveFeedback"
       | "ask.yourQuestions"

@@ -7,7 +7,6 @@ import {
   citedSourcesOf,
   COLLECTION,
   CONCEPT_PATH,
-  CONCEPT_STABLE_STATUS,
   ids,
   parsedPassageLocator,
   passageLocatorsIn,
@@ -40,11 +39,12 @@ import {
   type FrontmatterValue,
 } from "./file.ts";
 import { foldKind, heldByIri, mergeKeyOf, placesUsingReadableOrNot, type Held } from "./landing.ts";
-import { authorOf, IMPORT_SENSITIVITY_DEFAULT } from "./loader.ts";
+import { authorOf } from "./loader.ts";
 import { ownerAdmits, ownerOf, standingConcept, type OwnedConcept } from "./owners.ts";
 import { resolvedSourcesOf, type PassageReader } from "./read.ts";
 import { submitSuggestionSet, type SubmitSuggestionSetRefusal } from "./suggestions.ts";
 import {
+  SAVED_NEW,
   storedFileOf,
   writeConcept,
   type ConceptFile,
@@ -579,8 +579,6 @@ const routed = async (
     ? suggested(principal, doors, saving)
     : err(written.error);
 };
-
-const SAVED_NEW = { status: CONCEPT_STABLE_STATUS, sensitivity: IMPORT_SENSITIVITY_DEFAULT };
 
 const committed = (
   principal: UserPrincipal,

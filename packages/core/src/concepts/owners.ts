@@ -130,12 +130,17 @@ const ownedByAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-const OWNED_BY = `SELECT collection FROM concept_owner WHERE workspace_id = $1 AND person_id = $2`;
+const OWNED_BY = `SELECT o.collection FROM concept_owner o
+    WHERE o.workspace_id = $1 AND o.person_id = $2
+      AND (o.collection IS NOT NULL OR EXISTS (
+        SELECT 1 FROM concept_index c
+         WHERE c.workspace_id = o.workspace_id AND c.iri = o.iri AND ${readableClause("c", 3)}))`;
 
 const ownsOf = async (principal: UserPrincipal, tx: Tx): Promise<Owns> => {
   const rows = await tx.query<{ collection: string | null }>(OWNED_BY, [
     principal.workspaceId,
     principal.userId,
+    ...readableParameters(principal),
   ]);
   const collections = rows.rows.flatMap(({ collection }) => collection ?? []);
   return {

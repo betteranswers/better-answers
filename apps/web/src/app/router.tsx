@@ -50,6 +50,9 @@ import { EveryonePage } from "@/features/console/everyone-page.tsx";
 import { NamesWaitingPage } from "@/features/console/names-waiting-page.tsx";
 import { isTheOperator, mustSignInForTheConsole } from "@/features/console/operator.ts";
 import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
+import { SUGGESTION_ID } from "@/features/inbox/inbox-state.ts";
+import { WaitingEditPage } from "@/features/inbox/waiting-edit-page.tsx";
+import { WaitingOnYouPage } from "@/features/inbox/waiting-on-you-page.tsx";
 import { CollectionsAndOwnersPage } from "@/features/knowledge/collections-and-owners-page.tsx";
 import { ConceptPage } from "@/features/knowledge/concept-page.tsx";
 import { KnowledgeBasePage } from "@/features/knowledge/knowledge-base-page.tsx";
@@ -113,6 +116,7 @@ const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>
   ["/knowledge/search", { draw: SearchPage }],
   ["/knowledge/knowledge-base", { draw: KnowledgeBasePage }],
   ["/knowledge/collections-and-owners", { draw: CollectionsAndOwnersPage }],
+  ["/inbox/waiting-on-you", { draw: WaitingOnYouPage }],
   ["/sources/connected-sources", { draw: ConnectedSourcesPage }],
   ["/models/models-and-spend", { draw: ModelsAndSpendPage, toolbar: MODELS_AND_SPEND_TOOLBAR }],
   ["/questions/questions-asked", { draw: QuestionsAskedPage }],
@@ -139,6 +143,15 @@ const BUILT_DETAILS: ReadonlyMap<string, BuiltDetail> = new Map<PagePath, BuiltD
     },
   ],
   ["/knowledge/search", { value: CONCEPT_IRI, draw: (iri) => <ConceptPage iri={iri} /> }],
+  [
+    "/inbox/waiting-on-you",
+    {
+      value: SUGGESTION_ID,
+      draw: (suggestionId) => (
+        <WaitingEditPage suggestionId={suggestionId} notFound={<UnknownPage />} />
+      ),
+    },
+  ],
   ["/people/members", { value: PERSON_ID, draw: (personId) => <MemberPage personId={personId} /> }],
 ]);
 
