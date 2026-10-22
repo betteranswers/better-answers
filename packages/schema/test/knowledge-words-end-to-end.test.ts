@@ -410,3 +410,18 @@ const raisingOne = async (client: pg.PoolClient, kind: string): Promise<string> 
     await client.query("ROLLBACK TO SAVEPOINT raising");
   }
 };
+
+describe("the journal after the guide records' guard", () => {
+  it("applies every later migration once the write-ups are cleared", async () => {
+    await superuser.query("DELETE FROM write_up_include");
+    await superuser.query("DELETE FROM write_up");
+    const owner = new pg.Pool({ connectionString: uriAs(container, THE_OWNER), max: 1 });
+    try {
+      await migrate(drizzle(owner), { migrationsFolder });
+    } finally {
+      await endPool(owner);
+    }
+
+    expect((await migrationRows()).length).toBe(journalMigrationFiles().length);
+  });
+});
