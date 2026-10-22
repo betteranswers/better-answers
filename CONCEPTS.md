@@ -1115,6 +1115,11 @@ numbered footnote; its text is never stored, always rendered from the include.
 A section's statement of which concepts should populate it (by type, relation to the subject, tag
 or feed); coverage is expectation minus what is included.
 
+### expected fact
+
+_Internal._ one named part of a section's *expectation*: the kind, tags and collection it selects,
+and how many concepts it wants. A gap names it.
+
 ### response
 
 A write-up scoped to one question put to the company: a question-set question in v0.1, an
@@ -1960,6 +1965,11 @@ It is Ask › New question for an Editor or a Viewer, and People › Members for
 Overview is built. A role's home shows in the *icon rail* even before it is built, and then says
 plainly that it is on its way. The *console* has one home for everyone, Workspaces › Every
 workspace, which is where the *operator* lands while they belong to no workspace.
+
+### home (of a write-up)
+
+_Internal._ where a *write-up* lives: a guide *section*, or a *response* to one question. A
+write-up has exactly one home.
 
 ### icon rail
 
