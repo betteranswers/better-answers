@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { AUDIENCE_GROUPS } from "@better-answers/schema";
+import { AUDIENCE_GROUPS, CONCEPT_DRAFT_STATUS, type SENSITIVITIES } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
 
 import {
-  readKnowledgeBranch,
+  readKindConcepts,
   readKnowledgeTree,
-  type KnowledgeBranchInput,
+  type KindConceptsInput,
 } from "../src/concepts/index.ts";
 import type { Role, UserPrincipal } from "../src/kernel/index.ts";
 import { withMember, type PostgresDoor } from "../src/store/postgres/index.ts";
@@ -29,8 +29,9 @@ type Shelved = {
   readonly path: string;
   readonly kind?: string;
   readonly title?: string;
-  readonly sensitivity?: "Public" | "Internal" | "Restricted";
+  readonly sensitivity?: (typeof SENSITIVITIES)[number];
   readonly audienceGroups?: readonly string[];
+  readonly draft?: true;
 };
 
 const joined = async (workspaceId: string, role: Role): Promise<UserPrincipal> => {
@@ -58,7 +59,7 @@ const shelvedWith = async (
   commitSha: string,
   shelved: Shelved,
 ): Promise<string> => {
-  const { path, audienceGroups, ...columns } = shelved;
+  const { path, audienceGroups, draft, ...columns } = shelved;
   const title = columns.title ?? path;
   const row = await seed.conceptIndex({
     workspaceId,
@@ -70,6 +71,7 @@ const shelvedWith = async (
     ...(audienceGroups === undefined
       ? {}
       : { audience: AUDIENCE_GROUPS, audienceGroups: [...audienceGroups] }),
+    ...(draft === undefined ? {} : { status: CONCEPT_DRAFT_STATUS, publishedAt: null }),
   });
   return row.iri;
 };
@@ -89,11 +91,11 @@ const treeReadBy = async (shelf: Shelf, reader: UserPrincipal) =>
     answered(await withMember(reader, shelf.postgres, (fresh, tx) => readKnowledgeTree(fresh, tx))),
   );
 
-const branchReadBy = async (shelf: Shelf, reader: UserPrincipal, input: KnowledgeBranchInput) =>
+const kindReadBy = async (shelf: Shelf, reader: UserPrincipal, input: KindConceptsInput) =>
   answered(
     answered(
       await withMember(reader, shelf.postgres, (fresh, tx) =>
-        readKnowledgeBranch(fresh, tx, input, now),
+        readKindConcepts(fresh, tx, input, now),
       ),
     ),
   );
@@ -155,17 +157,20 @@ describe("the knowledge tree", () => {
     const [, withheld] = await shelve(shelf, [
       { path: "knowledge/company/expenses.md" },
       { path: "knowledge/people/grievances.md", audienceGroups: [hr] },
+      { path: "knowledge/people/salaries.md", sensitivity: "Restricted" },
+      { path: "knowledge/people/rota.md", draft: true },
+      { path: "knowledge/drafts/plan.md", draft: true },
     ]);
     const people = { collection: "people", kind: "Policy" };
 
     const insideTree = await treeReadBy(shelf, inside);
     const outsideTree = await treeReadBy(shelf, outside);
-    const insideBranch = await branchReadBy(shelf, inside, people);
-    const outsideBranch = await branchReadBy(shelf, outside, people);
+    const insideBranch = await kindReadBy(shelf, inside, people);
+    const outsideBranch = await kindReadBy(shelf, outside, people);
 
-    expect(insideTree.collections.map(({ collection }) => collection)).toEqual([
-      "company",
-      "people",
+    expect(insideTree.collections.map(({ collection, count }) => [collection, count])).toEqual([
+      ["company", 1],
+      ["people", 1],
     ]);
     expect(outsideTree.collections.map(({ collection }) => collection)).toEqual(["company"]);
     expect(insideBranch.concepts.map(({ iri }) => iri)).toEqual([withheld]);
@@ -181,7 +186,7 @@ describe("the knowledge tree", () => {
     ]);
 
     const tree = await treeReadBy(shelf, shelf.viewer);
-    const outside = await branchReadBy(shelf, shelf.viewer, { collection: null, kind: "Policy" });
+    const outside = await kindReadBy(shelf, shelf.viewer, { collection: null, kind: "Policy" });
 
     expect(tree.collections).toEqual([
       { collection: "archive", count: 1, kinds: [{ kind: "Policy", count: 1 }] },
@@ -199,9 +204,11 @@ const POLICIES = 120;
 
 const numbered = (at: number): string => String(at).padStart(3, "0");
 
+const TIED_ACROSS_THE_PAGE_EDGE = 50;
+
 const policyAt = (at: number): Shelved => ({
   path: `knowledge/company/policy-${numbered(at)}.md`,
-  title: `Policy ${numbered(at === 50 ? 49 : at)}`,
+  title: `Policy ${numbered(at === TIED_ACROSS_THE_PAGE_EDGE ? at - 1 : at)}`,
 });
 
 describe("a kind's concepts", () => {
@@ -213,12 +220,12 @@ describe("a kind's concepts", () => {
     ]);
     const company = { collection: "company", kind: "Policy" };
 
-    const first = await branchReadBy(shelf, shelf.viewer, company);
-    const second = await branchReadBy(shelf, shelf.viewer, {
+    const first = await kindReadBy(shelf, shelf.viewer, company);
+    const second = await kindReadBy(shelf, shelf.viewer, {
       ...company,
       cursor: first.nextCursor,
     });
-    const third = await branchReadBy(shelf, shelf.viewer, {
+    const third = await kindReadBy(shelf, shelf.viewer, {
       ...company,
       cursor: second.nextCursor,
     });

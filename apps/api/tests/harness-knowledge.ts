@@ -629,7 +629,7 @@ export const seedConceptIndex = async (
         sensitivity: batch.sensitivity ?? SEEDED_SENSITIVITY,
         audienceGroups: batch.audienceGroups ?? null,
         concepts: places.map((place) => ({
-          path: seededPath(batch, `seeded-${at}-${place}`),
+          path: seededPath(batch, `seeded-${commitSha.slice(0, 12)}-${at}-${place}`),
           title: `${batch.title ?? batch.kind} ${String(place).padStart(width, "0")}`,
         })),
       });

@@ -1,6 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { readKnowledgeBranch, readKnowledgeTree } from "../src/concepts/index.ts";
+import { conceptIndexRows, testData } from "@better-answers/schema/testing";
+
+import { readKindConcepts, readKnowledgeTree } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { withMember, type PostgresDoor } from "../src/store/postgres/index.ts";
 import { inMs, percentile, recordFigures } from "./figures.ts";
@@ -31,20 +33,30 @@ const seedWideShelf = async (): Promise<Shelf> => {
   const viewerId = await seedingWith(db().pool, async (seed) => {
     const viewer = await seed.user();
     await seed.member({ workspaceId, userId: viewer.id, role: "Viewer" });
-    const commitSha = (await seed.bundleCommit({ workspaceId })).sha;
-    for (let at = 0; at < CONCEPTS; at += 1) {
-      const title = `Concept ${String(CONCEPTS - at).padStart(4, "0")}`;
-      await seed.conceptIndex({
-        workspaceId,
-        commitSha,
-        path: `knowledge/${collectionAt(at)}/concept-${at}.md`,
-        kind: kindAt(at),
-        title,
-        frontmatter: { title, type: kindAt(at) },
-      });
-    }
     return viewer.id;
   });
+  const client = await db().pool.connect();
+  try {
+    const commitSha = (await testData(client).bundleCommit({ workspaceId })).sha;
+    const places = Array.from({ length: CONCEPTS }, (_unused, at) => at);
+    const batches = Map.groupBy(places, (at) => `${collectionAt(at)}/${kindAt(at)}`);
+    for (const held of batches.values()) {
+      const first = held[0] ?? 0;
+      await conceptIndexRows(client, {
+        workspaceId,
+        commitSha,
+        kind: kindAt(first),
+        sensitivity: "Internal",
+        audienceGroups: null,
+        concepts: held.map((at) => ({
+          path: `knowledge/${collectionAt(at)}/concept-${at}.md`,
+          title: `Concept ${String(CONCEPTS - at).padStart(4, "0")}`,
+        })),
+      });
+    }
+  } finally {
+    client.release();
+  }
   await db().pool.query("ANALYZE concept_index, concept_verification");
   return { postgres: door, viewer: await principalFor(db(), workspaceId, viewerId) };
 };
@@ -60,11 +72,11 @@ describe("the knowledge base at 3,000 concepts", () => {
 
   beforeAll(async () => {
     shelf = await seedWideShelf();
-  }, 300_000);
+  }, 60_000);
 
   it("reads the tree and a kind's first page within budget", async () => {
     const treeMs: number[] = [];
-    const branchMs: number[] = [];
+    const kindMs: number[] = [];
     let counted = 0;
     let listed = 0;
     for (let round = 0; round < ROUNDS; round += 1) {
@@ -80,12 +92,12 @@ describe("the knowledge base at 3,000 concepts", () => {
           counted = tree.collections.reduce((sum, { count }) => sum + count, 0);
         }),
       );
-      branchMs.push(
+      kindMs.push(
         await timed(async () => {
           const branch = answered(
             answered(
               await withMember(shelf.viewer, shelf.postgres, (fresh, tx) =>
-                readKnowledgeBranch(
+                readKindConcepts(
                   fresh,
                   tx,
                   { collection: collectionAt(0), kind: kindAt(0) },
@@ -105,10 +117,10 @@ describe("the knowledge base at 3,000 concepts", () => {
         "the slowest tree",
         `${inMs(percentile(treeMs, 1))}, against a budget of ${READ_BUDGET_MS} ms`,
       ],
-      ["a kind's first page at the median", inMs(percentile(branchMs, 0.5))],
+      ["a kind's first page at the median", inMs(percentile(kindMs, 0.5))],
       [
         "the slowest first page",
-        `${inMs(percentile(branchMs, 1))}, against a budget of ${READ_BUDGET_MS} ms`,
+        `${inMs(percentile(kindMs, 1))}, against a budget of ${READ_BUDGET_MS} ms`,
       ],
     ]);
 
@@ -117,7 +129,7 @@ describe("the knowledge base at 3,000 concepts", () => {
     expect(percentile(treeMs, 1), "the slowest tree read, in milliseconds").toBeLessThan(
       READ_BUDGET_MS,
     );
-    expect(percentile(branchMs, 1), "the slowest first page, in milliseconds").toBeLessThan(
+    expect(percentile(kindMs, 1), "the slowest first page, in milliseconds").toBeLessThan(
       READ_BUDGET_MS,
     );
   });

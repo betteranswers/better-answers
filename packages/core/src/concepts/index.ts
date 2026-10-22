@@ -82,6 +82,7 @@ import {
   WRITE_CONSTRAINTS,
   type Held,
 } from "./landing.ts";
+import { latestVerificationOf } from "./latest-verification.ts";
 import {
   authorOf,
   countVerifications,
@@ -123,11 +124,9 @@ import {
   type SuggestionPayload,
 } from "./suggestions.ts";
 import {
-  latestVerificationOf,
   trustOf,
   trustWords,
   verificationOf,
-  VERIFICATION_COLUMNS,
   type ConceptVerification,
   type Trust,
   type VerificationRow,
@@ -144,10 +143,10 @@ export {
   type FrontmatterValue,
 } from "./file.ts";
 export {
-  knowledgeBranchInput,
-  readKnowledgeBranch,
+  kindConceptsInput,
+  readKindConcepts,
   readKnowledgeTree,
-  type KnowledgeBranchInput,
+  type KindConceptsInput,
 } from "./browse.ts";
 export { withBundleFenceAs } from "./fence.ts";
 export {
@@ -1423,14 +1422,16 @@ type ConceptRow = {
   readonly commit_sha: string;
 } & VerificationRow;
 
+const LATEST_VERIFICATION = latestVerificationOf("c");
+
 const conceptSelect = (
   ranked: { readonly columns: string; readonly joins: string } | undefined,
 ): string => `SELECT c.iri, c.path, c.collection, c.kind, c.title, c.frontmatter, c.body, c.status,
               c.content_hash, c.commit_sha,
-              ${VERIFICATION_COLUMNS}${ranked === undefined ? "" : `, ${ranked.columns}`}
+              ${LATEST_VERIFICATION.columns}${ranked === undefined ? "" : `, ${ranked.columns}`}
          FROM concept_index c
          ${ranked?.joins ?? ""}
-         ${latestVerificationOf("c")}
+         ${LATEST_VERIFICATION.joins}
         WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}`;
 
 const CONCEPT_SELECT = conceptSelect(undefined);

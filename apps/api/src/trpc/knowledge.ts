@@ -1,10 +1,10 @@
 import { find, findInput, open, openInput, type OpenResult } from "@better-answers/core/answering";
 import {
   collectionsAndOwners,
-  knowledgeBranchInput,
+  kindConceptsInput,
   nameOwner,
   nameOwnerInput,
-  readKnowledgeBranch,
+  readKindConcepts,
   readKnowledgeTree,
 } from "@better-answers/core/concepts";
 import { err, NOT_FOUND, ok, type Result } from "@better-answers/core/kernel";
@@ -55,11 +55,11 @@ export const knowledgeRouter = router({
   tree: knowledgeReadProcedure.query(({ ctx }) =>
     crossing(ctx, readKnowledgeTree.name, readKnowledgeTree(ctx.principal, ctx.tx)),
   ),
-  branch: knowledgeReadProcedure.input(parsedBy(knowledgeBranchInput)).query(({ ctx, input }) =>
+  kindConcepts: knowledgeReadProcedure.input(parsedBy(kindConceptsInput)).query(({ ctx, input }) =>
     crossing(
       ctx,
-      readKnowledgeBranch.name,
-      given(input, (asked) => readKnowledgeBranch(ctx.principal, ctx.tx, asked, ctx.clock.now())),
+      readKindConcepts.name,
+      given(input, (asked) => readKindConcepts(ctx.principal, ctx.tx, asked, ctx.clock.now())),
     ),
   ),
   collections: queryProcedure.query(({ ctx }) =>

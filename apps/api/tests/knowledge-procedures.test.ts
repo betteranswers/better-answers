@@ -321,8 +321,8 @@ describe("the knowledge tree over tRPC", () => {
     const { api } = await webSignedIn(app(), viewer.email);
 
     const tree = await api.knowledge.tree.query();
-    const first = await api.knowledge.branch.query({ collection: "birds", kind: "Answer" });
-    const rest = await api.knowledge.branch.query({
+    const first = await api.knowledge.kindConcepts.query({ collection: "birds", kind: "Answer" });
+    const rest = await api.knowledge.kindConcepts.query({
       collection: "birds",
       kind: "Answer",
       cursor: first.nextCursor,
@@ -344,9 +344,12 @@ describe("the knowledge tree over tRPC", () => {
     const { api } = await webSignedIn(app(), viewer.email);
 
     const refused = await refusalOfCall(
-      api.knowledge.branch.query({ collection: "birds/herons", kind: "Answer" }),
+      api.knowledge.kindConcepts.query({ collection: "birds/herons", kind: "Answer" }),
     );
-    const answered = await api.knowledge.branch.query({ collection: "birds", kind: "Answer" });
+    const answered = await api.knowledge.kindConcepts.query({
+      collection: "birds",
+      kind: "Answer",
+    });
 
     expect(refused).toMatchObject(MALFORMED);
     expect(answered).toEqual({ concepts: [], nextCursor: null });

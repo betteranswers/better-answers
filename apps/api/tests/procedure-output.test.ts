@@ -54,9 +54,9 @@ describe("what a procedure may answer the wire", () => {
       "console.people.list",
       "console.people.namesWaiting",
       "console.workspaces.list",
-      "knowledge.branch",
       "knowledge.collections",
       "knowledge.find",
+      "knowledge.kindConcepts",
       "knowledge.nameOwner",
       "knowledge.open",
       "knowledge.tree",
@@ -177,7 +177,7 @@ describe("what a procedure may answer the wire", () => {
       | "knowledge.collections"
       | "knowledge.nameOwner"
       | "knowledge.tree"
-      | "knowledge.branch"
+      | "knowledge.kindConcepts"
       | "ask.question"
       | "ask.giveFeedback"
       | "ask.yourQuestions"

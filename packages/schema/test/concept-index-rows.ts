@@ -32,7 +32,6 @@ const INDEX_ROWS = `INSERT INTO concept_index (workspace_id, iri, path, kind, ti
          encode(sha256(convert_to(held.path, 'UTF8')), 'hex'), $6, $7, now(), $8, $9, $10
     FROM unnest($2::text[], $3::text[], $11::text[]) AS held(iri, path, title)`;
 
-/** One statement per table, where `testData`'s `conceptIndex` parses and writes a row at a time. */
 export const conceptIndexRows = async (
   client: pg.PoolClient,
   rows: IndexRows,

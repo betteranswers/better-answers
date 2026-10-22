@@ -16,16 +16,10 @@ import {
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import type { Frontmatter } from "./file.ts";
-import {
-  latestVerificationOf,
-  trustOf,
-  trustWords,
-  verificationOf,
-  VERIFICATION_COLUMNS,
-  type VerificationRow,
-} from "./trust.ts";
+import { latestVerificationOf } from "./latest-verification.ts";
+import { trustOf, trustWords, verificationOf, type VerificationRow } from "./trust.ts";
 
-const BRANCH_PAGE_SIZE = 50;
+const KIND_PAGE_SIZE = 50;
 
 type KindCount = { readonly kind: string; readonly count: number };
 
@@ -93,48 +87,50 @@ export const readKnowledgeTree = async (
 
 const conceptColumns = boundarySchemas.conceptIndex.select.shape;
 
-const branchCursor = z.strictObject({ title: conceptColumns.title, iri: ids.conceptIri });
+const kindCursor = z.strictObject({ title: conceptColumns.title, iri: ids.conceptIri });
 
-type BranchCursor = z.output<typeof branchCursor>;
+type KindCursor = z.output<typeof kindCursor>;
 
 /** Not strict: tRPC's infinite query sends its `direction` beside the cursor. */
-export const knowledgeBranchInput = z.object({
+export const kindConceptsInput = z.object({
   collection: z.string().regex(COLLECTION).nullable(),
   kind: conceptColumns.kind,
-  cursor: branchCursor.nullish(),
+  cursor: kindCursor.nullish(),
 });
 
-export type KnowledgeBranchInput = z.output<typeof knowledgeBranchInput>;
+export type KindConceptsInput = z.output<typeof kindConceptsInput>;
 
-type BranchConcept = {
+type KindConcept = {
   readonly iri: ConceptIri;
   readonly title: string;
   readonly kind: string;
   readonly trustWords: string;
 };
 
-type KnowledgeBranch = {
-  readonly concepts: readonly BranchConcept[];
-  readonly nextCursor: BranchCursor | null;
+type KindConcepts = {
+  readonly concepts: readonly KindConcept[];
+  readonly nextCursor: KindCursor | null;
 };
 
-const readKnowledgeBranchAction = declareAction({
+const readKindConceptsAction = declareAction({
   admits: ANY_ROLE,
-  input: knowledgeBranchInput,
+  input: kindConceptsInput,
   refuses: ["role-forbids"],
 });
 
-const KNOWLEDGE_BRANCH = `SELECT c.iri, c.title, c.kind, c.status, c.frontmatter, c.content_hash,
-              ${VERIFICATION_COLUMNS}
+const LATEST_VERIFICATION = latestVerificationOf("c");
+
+const KIND_CONCEPTS = `SELECT c.iri, c.title, c.kind, c.status, c.frontmatter, c.content_hash,
+              ${LATEST_VERIFICATION.columns}
          FROM concept_index c
-         ${latestVerificationOf("c")}
+         ${LATEST_VERIFICATION.joins}
         WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}
           AND c.collection IS NOT DISTINCT FROM $4 AND c.kind = $5
           AND ($6::text IS NULL OR (c.title COLLATE "C", c.iri) > ($6 COLLATE "C", $7))
         ORDER BY c.title COLLATE "C", c.iri
         LIMIT $8`;
 
-type BranchRow = {
+type KindConceptRow = {
   readonly iri: string;
   readonly title: string;
   readonly kind: string;
@@ -143,7 +139,7 @@ type BranchRow = {
   readonly content_hash: string;
 } & VerificationRow;
 
-const branchConceptOf = (row: BranchRow, now: Date): BranchConcept => ({
+const kindConceptOf = (row: KindConceptRow, now: Date): KindConcept => ({
   iri: ids.conceptIri.parse(row.iri),
   title: row.title,
   kind: row.kind,
@@ -160,39 +156,39 @@ const branchConceptOf = (row: BranchRow, now: Date): BranchConcept => ({
   ),
 });
 
-const branchOf = (rows: readonly BranchRow[], now: Date): KnowledgeBranch => {
-  const page = rows.slice(0, BRANCH_PAGE_SIZE).map((row) => branchConceptOf(row, now));
+const kindConceptsOf = (rows: readonly KindConceptRow[], now: Date): KindConcepts => {
+  const page = rows.slice(0, KIND_PAGE_SIZE).map((row) => kindConceptOf(row, now));
   const last = page.at(-1);
   return {
     concepts: page,
     nextCursor:
-      rows.length > BRANCH_PAGE_SIZE && last !== undefined
+      rows.length > KIND_PAGE_SIZE && last !== undefined
         ? { title: last.title, iri: last.iri }
         : null,
   };
 };
 
 /** `now` decides which concepts are past their shelf life, as their trust words say. */
-export const readKnowledgeBranch = async (
+export const readKindConcepts = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: KnowledgeBranchInput,
+  input: KindConceptsInput,
   now: Date,
-): Promise<Result<KnowledgeBranch, RefusalOf<typeof readKnowledgeBranchAction> | Error>> => {
-  const admitted = admit(readKnowledgeBranchAction, principal, input);
+): Promise<Result<KindConcepts, RefusalOf<typeof readKindConceptsAction> | Error>> => {
+  const admitted = admit(readKindConceptsAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const reader = admitted.value;
   const { collection, kind, cursor } = input;
   return attempt(async () => {
-    const { rows } = await tx.query<BranchRow>(KNOWLEDGE_BRANCH, [
+    const { rows } = await tx.query<KindConceptRow>(KIND_CONCEPTS, [
       reader.workspaceId,
       ...readableParameters(reader),
       collection,
       kind,
       cursor?.title ?? null,
       cursor?.iri ?? null,
-      BRANCH_PAGE_SIZE + 1,
+      KIND_PAGE_SIZE + 1,
     ]);
-    return branchOf(rows, now);
+    return kindConceptsOf(rows, now);
   });
 };
