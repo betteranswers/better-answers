@@ -49,7 +49,7 @@ const AN_ADMINS_PAGES = [
   ["System", "Audit Log", pageNamed(SYSTEM, "Audit Log").path],
 ] as const;
 
-const AREA_NAMES = ["Ask", "Knowledge", "Control Centre"];
+const AREA_NAMES = ["Ask", "Knowledge", "Inbox", "Control Centre"];
 
 const PAGE_NAMES = AN_ADMINS_PAGES.map(([, name]) => name);
 

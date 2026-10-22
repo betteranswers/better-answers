@@ -368,8 +368,18 @@ The page on Control Centre › Suggestions listing every suggestion waiting to b
 included, with its payload.
 
 An Admin decides from it. What holds the waiting suggestions is platform state in no knowledge
-layer: nothing reads a payload but the acceptance path, and no extraction reads another's suggested
-concepts out of it. A person's **Inbox** *area* is not it, and points into it.
+layer: nothing reads a payload but the acceptance path and the deciding person's preview, and no
+extraction reads another's suggested concepts out of it. A person's **Inbox** *area* is not it: an
+*edit* is decided in *Waiting on you*, and the Inbox points into To decide for every other kind.
+
+### Waiting on you
+
+The page in a person's Inbox listing the *edit* suggestions they decide, each with an address of its
+own that sets the current text beside the proposed.
+
+An owner sees the edits on concepts they own and may read; an Admin sees every edit, each owned one
+naming its owner. Accepting commits the change with the proposer as its author, and an edit written
+before the concept last changed is returned to its proposer instead.
 
 ### concept write request
 
@@ -1904,7 +1914,7 @@ The top level of the platform's navigation, one entry in the *icon rail*.
 
 The areas are **Ask** (every role; the *home* of an Editor or a Viewer), **Knowledge** (every role;
 its Curation group for Admins and owners), **Inbox** (Admins and owners: what waits on the person,
-pointing into *To decide*) and **Control Centre** (Admins), with an area for produced work (named
+deciding *edit* suggestions in *Waiting on you* and pointing into *To decide* for the rest) and **Control Centre** (Admins), with an area for produced work (named
 with S6) and **Briefings** (Then) to come. A person sees only the areas holding a *page* they may
 see. The *console* is the operator's area, reached from the *workspace switcher* and never the rail.
 

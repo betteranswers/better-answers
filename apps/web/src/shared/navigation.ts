@@ -192,7 +192,7 @@ export const KNOWLEDGE = {
   ],
 } as const satisfies Area;
 
-const INBOX = {
+export const INBOX = {
   id: "inbox",
   name: "Inbox",
   icon: "tray",
@@ -204,9 +204,10 @@ const INBOX = {
           name: "Waiting on You",
           path: "/inbox/waiting-on-you",
           icon: "tray",
-          built: false,
+          built: true,
           seenBy: ADMINS,
           owners: "of-anything",
+          detail: { param: "suggestion" },
         },
       ],
     },

@@ -53,7 +53,7 @@ describe("the shell's regions", () => {
   it("names an Admin's areas, Ask among them, in the rail", async () => {
     await openAs("Admin", "/people/members");
 
-    expect(namesIn(rail())).toEqual(["Ask", "Knowledge", "Control Centre"]);
+    expect(namesIn(rail())).toEqual(["Ask", "Knowledge", "Inbox", "Control Centre"]);
   });
 
   it("names Ask and Knowledge in a Viewer's icon rail", async () => {
@@ -194,7 +194,7 @@ describe("the shell's regions", () => {
     await openAs("Admin", "/system/not-a-page");
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Page Not Found");
-    expect(namesIn(rail())).toEqual(["Ask", "Knowledge", "Control Centre"]);
+    expect(namesIn(rail())).toEqual(["Ask", "Knowledge", "Inbox", "Control Centre"]);
     expect(screen.getByRole("banner")).toBeDefined();
     expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
   });

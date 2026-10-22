@@ -10,6 +10,7 @@ import {
   menuGroupIn,
   hides,
   HOMES,
+  INBOX,
   KNOWLEDGE,
   movedWithin,
   OWNS_NOTHING,
@@ -136,6 +137,7 @@ describe("the one navigation list", () => {
       "/knowledge/search",
       "/knowledge/knowledge-base",
       "/knowledge/collections-and-owners",
+      "/inbox/waiting-on-you",
       "/sources/connected-sources",
       "/models/models-and-spend",
       "/questions/questions-asked",
@@ -185,6 +187,8 @@ const KNOWLEDGE_WITH_CURATION = [
   ],
 ];
 
+const INBOX_OUTLINE = ["Inbox", [[null, ["Waiting on You"]]]];
+
 describe("what each person is shown", () => {
   for (const role of ["Editor", "Viewer"] as const) {
     it(`shows ${aRole(role)} Ask, at their home, and Search`, () => {
@@ -205,6 +209,7 @@ describe("what each person is shown", () => {
     expect(outline(shown.areas)).toEqual([
       ASK_OUTLINE,
       KNOWLEDGE_WITH_CURATION,
+      INBOX_OUTLINE,
       [
         "Control Centre",
         [
@@ -217,7 +222,7 @@ describe("what each person is shown", () => {
       ],
     ]);
     expect(shown.home).toBe(HOMES.Admin);
-    expect(shown.areas[2]?.opensAt).toBe(HOMES.Admin);
+    expect(shown.areas[3]?.opensAt).toBe(HOMES.Admin);
   });
 
   it("shows nothing and no home while the role is unknown", () => {
@@ -284,10 +289,35 @@ describe("what each person is shown", () => {
     expect(namesFor("Viewer", { collections: [], concepts: 1 })).toEqual(["Anything's"]);
   });
 
-  it("shows Curation to an owner of any collection", () => {
+  it("shows Curation and Inbox to an owner of any collection", () => {
     const owner = readerOf("Editor", { collections: ["policy"], concepts: 0 });
 
-    expect(outline(visibleTo(owner, AREAS).areas)).toEqual([ASK_OUTLINE, KNOWLEDGE_WITH_CURATION]);
+    expect(outline(visibleTo(owner, AREAS).areas)).toEqual([
+      ASK_OUTLINE,
+      KNOWLEDGE_WITH_CURATION,
+      INBOX_OUTLINE,
+    ]);
+  });
+
+  it("shows Waiting on you to an owner and Admins", () => {
+    const waiting = pageNamed(menuGroupIn(INBOX, "inbox"), "Waiting on You");
+    const { path } = waiting;
+    const item = detailAt(waiting, "01JBZ6Q2V7Y9K3M5N8P0R2T4W7");
+    const overrideOwner = readerOf("Viewer", { collections: [], concepts: 1 });
+    const owningNothing = readerOf("Viewer", OWNS_NOTHING);
+    const admin = readerOf("Admin", OWNS_NOTHING);
+
+    expect(outline(visibleTo(overrideOwner, AREAS).areas)).toEqual([
+      ASK_OUTLINE,
+      ["Knowledge", [["Browse", ["Search", "Knowledge Base"]]]],
+      INBOX_OUTLINE,
+    ]);
+    expect(hides(visibleTo(overrideOwner, AREAS), path)).toBe(false);
+    expect(hides(visibleTo(overrideOwner, AREAS), item)).toBe(false);
+    expect(visibleTo(owningNothing, AREAS).areas.map((area) => area.name)).not.toContain("Inbox");
+    expect(hides(visibleTo(owningNothing, AREAS), path)).toBe(true);
+    expect(hides(visibleTo(owningNothing, AREAS), item)).toBe(true);
+    expect(hides(visibleTo(admin, AREAS), path)).toBe(false);
   });
 
   it("hides Curation from an Editor owning nothing", () => {
