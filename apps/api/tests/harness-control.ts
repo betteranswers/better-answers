@@ -20,7 +20,14 @@ import {
   setUpAsking,
   type ScriptedModels,
 } from "./harness-asking.ts";
-import { conceptsSeeding, nameOwners, ownersNaming, seedConcepts } from "./harness-knowledge.ts";
+import {
+  conceptIndexSeeding,
+  conceptsSeeding,
+  nameOwners,
+  ownersNaming,
+  seedConceptIndex,
+  seedConcepts,
+} from "./harness-knowledge.ts";
 import {
   accessAsking,
   askToJoin,
@@ -255,6 +262,11 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
   control.post(`${HARNESS_PREFIX}/concepts`, async (context) => {
     const asked = await readBody(context.req.raw, conceptsSeeding);
     return context.json(await seedConcepts(app, asked));
+  });
+
+  control.post(`${HARNESS_PREFIX}/concept-index`, async (context) => {
+    const asked = await readBody(context.req.raw, conceptIndexSeeding);
+    return context.json(await seedConceptIndex(app, asked));
   });
 
   control.post(`${HARNESS_PREFIX}/owners`, async (context) => {

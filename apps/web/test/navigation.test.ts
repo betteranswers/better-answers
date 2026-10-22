@@ -65,7 +65,7 @@ describe("the one navigation list", () => {
       [
         "Knowledge",
         [
-          ["Browse", ["Search", "Guides"]],
+          ["Browse", ["Search", "Guides", "Knowledge Base"]],
           [
             "Curation",
             [
@@ -124,7 +124,7 @@ describe("the one navigation list", () => {
     ]);
   });
 
-  it("calls only today's fifteen pages built", () => {
+  it("calls only today's sixteen pages built", () => {
     expect(
       pagesOf([...AREAS, CONSOLE])
         .filter((each) => each.built)
@@ -134,6 +134,7 @@ describe("the one navigation list", () => {
       "/ask/your-questions",
       "/ask/connect-claude",
       "/knowledge/search",
+      "/knowledge/knowledge-base",
       "/knowledge/collections-and-owners",
       "/sources/connected-sources",
       "/models/models-and-spend",
@@ -179,7 +180,7 @@ const ASK_OUTLINE = ["Ask", [[null, ["New Question", "Your Questions", "Connect 
 const KNOWLEDGE_WITH_CURATION = [
   "Knowledge",
   [
-    ["Browse", ["Search"]],
+    ["Browse", ["Search", "Knowledge Base"]],
     ["Curation", ["Collections and Owners"]],
   ],
 ];
@@ -191,7 +192,7 @@ describe("what each person is shown", () => {
 
       expect(outline(shown.areas)).toEqual([
         ["Ask", [[null, ["New Question", "Your Questions", "Connect Claude"]]]],
-        ["Knowledge", [["Browse", ["Search"]]]],
+        ["Knowledge", [["Browse", ["Search", "Knowledge Base"]]]],
       ]);
       expect(shown.home).toBe(HOMES[role]);
       expect(shown.areas[0]?.opensAt).toBe(HOMES[role]);
@@ -294,7 +295,7 @@ describe("what each person is shown", () => {
 
     expect(outline(visibleTo(owningNothing, AREAS).areas)).toEqual([
       ASK_OUTLINE,
-      ["Knowledge", [["Browse", ["Search"]]]],
+      ["Knowledge", [["Browse", ["Search", "Knowledge Base"]]]],
     ]);
   });
 
@@ -303,7 +304,7 @@ describe("what each person is shown", () => {
 
     expect(outline(visibleTo(owner, AREAS.map(builtThroughout)).areas)).toEqual([
       ASK_OUTLINE,
-      ["Knowledge", [["Browse", ["Search", "Guides"]]]],
+      ["Knowledge", [["Browse", ["Search", "Guides", "Knowledge Base"]]]],
       ["Inbox", [[null, ["Waiting on You"]]]],
     ]);
   });

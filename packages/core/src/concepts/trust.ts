@@ -44,6 +44,25 @@ type Trusted = {
   readonly verification: ConceptVerification | undefined;
 };
 
+export type VerificationRow = {
+  readonly verified_by: string | null;
+  readonly verified_at: Date | null;
+  readonly verified_hash: string | null;
+  readonly verified_by_name: string | null;
+};
+
+export const verificationOf = (row: VerificationRow): ConceptVerification | undefined => {
+  if (row.verified_by === null || row.verified_at === null || !isActorId(row.verified_by)) {
+    return undefined;
+  }
+  return {
+    actor: row.verified_by,
+    at: row.verified_at,
+    contentHash: row.verified_hash,
+    verifierName: row.verified_by_name,
+  };
+};
+
 const RIDER_WORDS = {
   imported: " · imported",
   "source-moved-on": " · source moved on",

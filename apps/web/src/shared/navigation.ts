@@ -125,6 +125,13 @@ export const KNOWLEDGE = {
           built: false,
           seenBy: EVERY_ROLE,
         },
+        {
+          name: "Knowledge Base",
+          path: "/knowledge/knowledge-base",
+          icon: "knowledge-base",
+          built: true,
+          seenBy: EVERY_ROLE,
+        },
       ],
     },
     {

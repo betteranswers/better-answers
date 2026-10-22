@@ -42,6 +42,7 @@ import {
   Table,
   TestTube,
   Tray,
+  TreeStructure,
   User,
   UserPlus,
   Users,
@@ -77,6 +78,7 @@ export type IconName =
   | "invite"
   | "keystrokes"
   | "kinds"
+  | "knowledge-base"
   | "log"
   | "map"
   | "names"
@@ -129,6 +131,7 @@ const GLYPHS = {
   invite: UserPlus,
   keystrokes: Keyboard,
   kinds: Shapes,
+  "knowledge-base": TreeStructure,
   log: Scroll,
   map: Graph,
   names: IdentificationCard,

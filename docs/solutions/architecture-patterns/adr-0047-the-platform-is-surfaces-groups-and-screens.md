@@ -24,6 +24,7 @@ tags:
   - detail-address
   - member-page
   - concept-page
+  - knowledge-base
   - rename-batch
 ---
 
@@ -65,7 +66,7 @@ The utilities sit at the rail's foot: Keyboard shortcuts today, and help and set
 | Area | Menu group | Pages (built today in bold) | Seen by |
 |---|---|---|---|
 | Ask | (none) | **New question** · **Your questions** · **Connect Claude** | every role (New question is the home of Editor and Viewer) |
-| Knowledge | Browse · Curation | **Search** · Guides · All knowledge · Due for verification · Conflicts · Kinds · **Collections and owners** · Exports | Browse: every role. Curation: Admins and owners of a collection |
+| Knowledge | Browse · Curation | **Search** · Guides · **Knowledge base** · All knowledge · Due for verification · Conflicts · Kinds · **Collections and owners** · Exports | Browse: every role. Curation: Admins and owners of a collection |
 | Inbox | (none) | Waiting on you | Admins and owners of any collection or concept |
 | Control Centre | Overview | Overview | Admin |
 | | Suggestions | To decide | Admin |
@@ -77,7 +78,7 @@ The utilities sit at the rail's foot: Keyboard shortcuts today, and help and set
 | | System | **Audit log** · Signals · Health · Backups | Admin |
 | Console (switcher) | People · Workspaces | **Everyone** · **Names waiting** · **Every workspace** | operator |
 
-In Knowledge, Browse holds Search and Guides, and Curation holds the other six. The work area and Briefings are not declared yet.
+In Knowledge, Browse holds Search, Guides and Knowledge base, and Curation holds the other six. Knowledge base lists the concept index under the read predicate, by collection and kind. It is not the map explorer under Next, because it lists the index and walks no links. The work area and Briefings are not declared yet.
 
 Today's pages that the table does not list moved:
 
@@ -120,7 +121,7 @@ Control Centre's menu groups keep root addresses, `/<group>/<page>`, so today's 
 | Area | Built | v0.1 | Next, Then and Later |
 |---|---|---|---|
 | Ask | New question, Your questions, Connect Claude | none | none yet |
-| Knowledge | Search, and the concept page, its detail. Collections and owners | Guides, All knowledge, Kinds (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
+| Knowledge | Search, and the concept page, its detail. Knowledge base. Collections and owners | Guides, All knowledge, Kinds (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
 | Inbox | none | Waiting on you, which S3 builds and S5 and V1 add their queues to | Then: approvals of actions an agent takes as the person |
@@ -181,3 +182,5 @@ Amended 15/10/2026 by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask
 Amended 22/10/2026 by the `S3` plan (`docs/plans/2026-10-21-1721-feat-s3-concepts-and-guides-plan.md`, BA-231, KTD2). The api now refuses by ownership as well as by role: a concept's direct write, and the decision on an *edit* or a *promotion*, admit its owner or an Admin, and anyone else is refused `owner-forbids`. Hiding stays navigation only. The four levels and every rule above stand.
 
 Amended 22/10/2026 by the `S3` plan (`docs/plans/2026-10-21-1721-feat-s3-concepts-and-guides-plan.md`, BA-12, KTD4 and KTD15). Ownership has landed, so visibility reads it. A page is seen by role, by owning a collection, or, for Waiting on you, by owning any concept. Knowledge › Curation › *Collections and owners* is built: an Admin names or clears each collection's owner there, and an owner of a collection reads it with no picker. An ownership change takes effect at the person's next move, like a role change. Hiding stays navigation only, and the api refuses by role or by ownership. Exports keeps its owners' arm until BA-238 makes it Admin-only. The four levels and every rule above stand.
+
+Amended 22/10/2026 by the `S3` plan (`docs/plans/2026-10-21-1721-feat-s3-concepts-and-guides-plan.md`, BA-239, KTD18). Knowledge › Browse › *Knowledge base* is built, beside Search and Guides, and every role sees it. It reads the concept index under the read predicate: a tree of collections and their kinds, each counting only the concepts the reader may read, and the open kind's concepts beside it. A collection holding nothing the reader may read is absent, and a concept directly under `knowledge/` is listed under *No collection*. It is not the map explorer under Next, because it lists the index and walks no links. The four levels and every rule above stand.

@@ -56,8 +56,10 @@ describe("what a procedure may answer the wire", () => {
       "console.workspaces.list",
       "knowledge.collections",
       "knowledge.find",
+      "knowledge.kindConcepts",
       "knowledge.nameOwner",
       "knowledge.open",
+      "knowledge.tree",
       "members.activity",
       "members.addToGroup",
       "members.approveRequest",
@@ -174,6 +176,8 @@ describe("what a procedure may answer the wire", () => {
       | "knowledge.open"
       | "knowledge.collections"
       | "knowledge.nameOwner"
+      | "knowledge.tree"
+      | "knowledge.kindConcepts"
       | "ask.question"
       | "ask.giveFeedback"
       | "ask.yourQuestions"

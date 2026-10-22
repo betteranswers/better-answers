@@ -37,9 +37,7 @@ import {
   attempt,
   declareAction,
   err,
-  isActorId,
   ok,
-  PERSON_PREFIX,
   personOfActor,
   refusalFor,
   ulid,
@@ -84,6 +82,7 @@ import {
   WRITE_CONSTRAINTS,
   type Held,
 } from "./landing.ts";
+import { latestVerificationOf } from "./latest-verification.ts";
 import {
   authorOf,
   countVerifications,
@@ -124,7 +123,14 @@ import {
   type SuggestionKind,
   type SuggestionPayload,
 } from "./suggestions.ts";
-import { trustOf, trustWords, type ConceptVerification, type Trust } from "./trust.ts";
+import {
+  trustOf,
+  trustWords,
+  verificationOf,
+  type ConceptVerification,
+  type Trust,
+  type VerificationRow,
+} from "./trust.ts";
 import { citationCountOf, conceptVisibilityFrom } from "./visibility.ts";
 import type { PassedOnCommitRefusal } from "./vocabulary.ts";
 
@@ -136,6 +142,12 @@ export {
   type Frontmatter,
   type FrontmatterValue,
 } from "./file.ts";
+export {
+  kindConceptsInput,
+  readKindConcepts,
+  readKnowledgeTree,
+  type KindConceptsInput,
+} from "./browse.ts";
 export { withBundleFenceAs } from "./fence.ts";
 export {
   carryVerificationsOntoRewrite,
@@ -1408,30 +1420,18 @@ type ConceptRow = {
   readonly status: string;
   readonly content_hash: string;
   readonly commit_sha: string;
-  readonly verified_by: string | null;
-  readonly verified_at: Date | null;
-  readonly verified_hash: string | null;
-  readonly verified_by_name: string | null;
-};
+} & VerificationRow;
+
+const LATEST_VERIFICATION = latestVerificationOf("c");
 
 const conceptSelect = (
   ranked: { readonly columns: string; readonly joins: string } | undefined,
 ): string => `SELECT c.iri, c.path, c.collection, c.kind, c.title, c.frontmatter, c.body, c.status,
               c.content_hash, c.commit_sha,
-              v.actor AS verified_by, v.verified_at, v.content_hash AS verified_hash,
-              NULLIF(verifier.name, '') AS verified_by_name${ranked === undefined ? "" : `, ${ranked.columns}`}
+              ${LATEST_VERIFICATION.columns}${ranked === undefined ? "" : `, ${ranked.columns}`}
          FROM concept_index c
          ${ranked?.joins ?? ""}
-         LEFT JOIN LATERAL (
-                SELECT actor, verified_at, content_hash
-                  FROM concept_verification
-                 WHERE workspace_id = c.workspace_id AND iri = c.iri
-                 ORDER BY verified_at DESC, id DESC
-                 LIMIT 1
-              ) v ON true
-         LEFT JOIN "user" verifier
-                ON starts_with(v.actor, '${PERSON_PREFIX}')
-               AND verifier.id = substr(v.actor, ${PERSON_PREFIX.length + 1})
+         ${LATEST_VERIFICATION.joins}
         WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}`;
 
 const CONCEPT_SELECT = conceptSelect(undefined);
@@ -1708,15 +1708,3 @@ export const evidenceForAReadableConcept = (alias: string, roleParameter: number
             WHERE ce.workspace_id = ${alias}.workspace_id
               AND ce.source_document_id = ${alias}.source_document_id
               AND ${readableClause("ci", roleParameter)})`;
-
-const verificationOf = (row: ConceptRow): ConceptVerification | undefined => {
-  if (row.verified_by === null || row.verified_at === null || !isActorId(row.verified_by)) {
-    return undefined;
-  }
-  return {
-    actor: row.verified_by,
-    at: row.verified_at,
-    contentHash: row.verified_hash,
-    verifierName: row.verified_by_name,
-  };
-};

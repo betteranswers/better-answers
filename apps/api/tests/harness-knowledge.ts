@@ -13,8 +13,8 @@ import {
 } from "@better-answers/core/concepts";
 import { actorIdOfPerson, type UserPrincipal } from "@better-answers/core/kernel";
 import { head, initRepository, type GitDoor } from "@better-answers/core/store/git";
-import { AUDIENCES, conceptFrontmatter, SENSITIVITIES } from "@better-answers/schema";
-import { testData } from "@better-answers/schema/testing";
+import { AUDIENCES, COLLECTION, conceptFrontmatter, SENSITIVITIES } from "@better-answers/schema";
+import { conceptIndexRows, testData } from "@better-answers/schema/testing";
 
 import { inOneTransaction, seedPassages } from "./harness-sources.ts";
 import { actingIn, openTestGit, type TestApp } from "./harness.ts";
@@ -584,4 +584,59 @@ export const nameOwners = async (
     }
   }
   return { named: asked.owners.length };
+};
+
+const SEEDED_AT_MOST = 5_000;
+
+export const conceptIndexSeeding = z.strictObject({
+  workspaceId: z.string(),
+  batches: z
+    .array(
+      z.strictObject({
+        collection: z.string().regex(COLLECTION).nullable(),
+        kind: z.string().trim().min(1),
+        count: z.int().min(1).max(SEEDED_AT_MOST),
+        title: z.string().trim().min(1).optional(),
+        sensitivity: z.enum(SENSITIVITIES).optional(),
+        audienceGroups: z.array(z.string()).min(1).optional(),
+      }),
+    )
+    .min(1),
+});
+
+type IndexBatch = z.output<typeof conceptIndexSeeding>["batches"][number];
+
+const seededPath = (batch: IndexBatch, slug: string): string =>
+  batch.collection === null ? `knowledge/${slug}.md` : `knowledge/${batch.collection}/${slug}.md`;
+
+const SEEDED_SENSITIVITY = "Internal" satisfies (typeof SENSITIVITIES)[number];
+
+export const seedConceptIndex = async (
+  app: TestApp,
+  asked: z.output<typeof conceptIndexSeeding>,
+): Promise<{ readonly seeded: number }> => {
+  const { workspaceId } = asked;
+  const seeded = await inOneTransaction(app, async (client) => {
+    const { sha: commitSha } = await testData(client).bundleCommit({ workspaceId });
+    let rows = 0;
+    for (const [at, batch] of asked.batches.entries()) {
+      const width = String(batch.count).length;
+      const places = Array.from({ length: batch.count }, (_unused, place) => place + 1);
+      await conceptIndexRows(client, {
+        workspaceId,
+        commitSha,
+        kind: batch.kind,
+        sensitivity: batch.sensitivity ?? SEEDED_SENSITIVITY,
+        audienceGroups: batch.audienceGroups ?? null,
+        concepts: places.map((place) => ({
+          path: seededPath(batch, `seeded-${commitSha.slice(0, 12)}-${at}-${place}`),
+          title: `${batch.title ?? batch.kind} ${String(place).padStart(width, "0")}`,
+        })),
+      });
+      rows += batch.count;
+    }
+    return rows;
+  });
+  await app.database.superuser.query("ANALYZE concept_identity, concept_index");
+  return { seeded };
 };
