@@ -17,7 +17,6 @@ import {
   notFoundOfferingHome,
   person,
   provision,
-  railOf,
   removeMember,
   saysARefusal,
   seedConcepts,
@@ -26,7 +25,7 @@ import {
   skipLinkReachesThePage,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
-import { listsItsKeystrokes } from "./knowledge.ts";
+import { knowledgeMenuOpened, listsItsKeystrokes } from "./knowledge.ts";
 import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
@@ -126,13 +125,6 @@ const saveOf = (page: Page, collection: string): Locator =>
 
 const said = (page: Page): Locator => collections(page).getByRole("status").nth(1);
 
-const knowledgeMenuOpened = async (page: Page): Promise<Locator> => {
-  await railOf(page).getByRole("link", { name: "Knowledge" }).click();
-  const menu = navOf(page, "Knowledge");
-  await expect(menu).toBeVisible();
-  return menu;
-};
-
 const aRefusal = z.object({
   error: z.object({ data: z.object({ refusal: z.object({ word: z.string() }) }) }),
 });
@@ -158,6 +150,8 @@ test.describe("Collections and Owners", () => {
         - list:
           - listitem:
             - link "Search"
+          - listitem:
+            - link "Knowledge Base"
         - heading "Curation" [level=3]
         - list:
           - listitem:
@@ -207,6 +201,8 @@ test.describe("Collections and Owners", () => {
         - list:
           - listitem:
             - link "Search"
+          - listitem:
+            - link "Knowledge Base"
     `);
 
     await page.goto(COLLECTIONS_AND_OWNERS);
@@ -327,7 +323,7 @@ test.describe("Collections and Owners", () => {
     await expect(page).toHaveURL(new RegExp(`${COLLECTIONS_AND_OWNERS}$`));
     await notFoundOfferingHome(page, "Editor");
     const menu = await knowledgeMenuOpened(page);
-    await expect(menu.getByRole("link")).toHaveText(["Search"]);
+    await expect(menu.getByRole("link")).toHaveText(["Search", "Knowledge Base"]);
   });
 
   test("refuses an Editor owning nothing the list and naming", async ({ page, request }) => {

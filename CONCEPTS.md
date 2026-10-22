@@ -95,7 +95,8 @@ labels each `Answer` it returns with its collection.
 What a page calls a company's knowledge, held as one OKF *bundle*: what a reader is told a concept
 belongs to, and where an accepted suggestion is written.
 
-A company's knowledge is one knowledge base in v0.1.
+A company's knowledge is one knowledge base in v0.1. Knowledge › Knowledge base lists it by
+collection and kind, counting only the concepts the reader may read.
 
 ### bundle
 

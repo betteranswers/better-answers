@@ -1103,7 +1103,10 @@ test.describe("the Knowledge Search page", () => {
 
       await expect(page).toHaveURL(new RegExp(`${SEARCH.path}$`));
       await expect(page.getByRole("heading", { level: 1, name: "Browse" })).toBeVisible();
-      await expect(navOf(page, "Knowledge").getByRole("link")).toHaveText(["Search"]);
+      await expect(navOf(page, "Knowledge").getByRole("link")).toHaveText([
+        "Search",
+        "Knowledge Base",
+      ]);
       await expect(said(page)).toHaveText(/\S/);
       await expect(matchesOf(page)).toHaveCount(0);
     });

@@ -52,6 +52,7 @@ import { isTheOperator, mustSignInForTheConsole } from "@/features/console/opera
 import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
 import { CollectionsAndOwnersPage } from "@/features/knowledge/collections-and-owners-page.tsx";
 import { ConceptPage } from "@/features/knowledge/concept-page.tsx";
+import { KnowledgeBasePage } from "@/features/knowledge/knowledge-base-page.tsx";
 import { SearchPage } from "@/features/knowledge/search-page.tsx";
 import { AuditLogPage } from "@/features/people/audit-log-page.tsx";
 import { GroupsPage } from "@/features/people/groups-page.tsx";
@@ -110,6 +111,7 @@ const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>
   ["/ask/your-questions", { draw: YourQuestionsPage }],
   ["/ask/connect-claude", { draw: ConnectClaudePage }],
   ["/knowledge/search", { draw: SearchPage }],
+  ["/knowledge/knowledge-base", { draw: KnowledgeBasePage }],
   ["/knowledge/collections-and-owners", { draw: CollectionsAndOwnersPage }],
   ["/sources/connected-sources", { draw: ConnectedSourcesPage }],
   ["/models/models-and-spend", { draw: ModelsAndSpendPage, toolbar: MODELS_AND_SPEND_TOOLBAR }],
