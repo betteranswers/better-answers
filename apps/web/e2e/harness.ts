@@ -393,6 +393,24 @@ export const seedConceptIndex = (
   input: { workspaceId: string; batches: readonly SeedIndexBatch[] },
 ) => ask(api, "/concept-index", input, indexSeeded);
 
+const editSuggested = z.object({ suggestionId: z.string(), setId: z.string() });
+
+export const seedEditSuggestion = (
+  api: APIRequestContext,
+  input: { workspaceId: string; userId: string; iri: string; title?: string; body?: string },
+) => ask(api, "/suggestions", input, editSuggested);
+
+const commitAuthors = z.object({ authors: z.array(z.string()) });
+
+export const commitAuthorsOf = async (
+  api: APIRequestContext,
+  input: { workspaceId: string; iri: string },
+) => {
+  const answered = await api.get(`${HARNESS}/commit-authors`, { params: input });
+  expect(answered.ok(), `the commit authors answered ${answered.status()}`).toBe(true);
+  return commitAuthors.parse(await answered.json());
+};
+
 type SeedFlag = {
   readonly reason: (typeof FEEDBACK_REASONS)[number];
   readonly note?: string;
