@@ -16,6 +16,12 @@ const PLACED = {
   subjectIri: null,
 } as const;
 
+const role = (name: string, defaultLayer: string, actionThreshold: string) => ({
+  role: name,
+  defaultLayer,
+  actionThreshold,
+});
+
 const section = (
   id: string,
   parentId: string | null,
@@ -51,9 +57,9 @@ describe("the shipped templates", () => {
         subjectIri: null,
       },
       roles: [
-        { role: "Admin", defaultLayer: "assembled", actionThreshold: "unverified" },
-        { role: "Editor", defaultLayer: "assembled", actionThreshold: "unverified" },
-        { role: "Viewer", defaultLayer: "quoted", actionThreshold: "machine-confirmed" },
+        role("Admin", "assembled", "unverified"),
+        role("Editor", "assembled", "unverified"),
+        role("Viewer", "quoted", "machine-confirmed"),
       ],
       sections: [
         section(

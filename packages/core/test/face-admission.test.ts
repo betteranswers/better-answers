@@ -38,6 +38,7 @@ const STEPS: Readonly<Record<string, string>> = {
   "concepts/readConcept": "open calls it with the reader it admitted",
   "guides/recomputeWriteUpsIncluding":
     "a visibility change and a landed write call it in their own transaction",
+  "guides/writeSkeleton": "runs inside the withBundleWrite of an act that admitted its person",
   "llm/reserveSpend": "a step of ask, which admits the asker before it reserves a call's spend",
   "llm/resolveModel": "a step of ask, which admits the asker before it resolves the model it calls",
   "llm/settleSpend": "a step of ask, which admits the asker before it settles a call's spend",

@@ -86,6 +86,7 @@ const VALUE_LABELS = new Map(
     grants: "Access ended",
     closedAs: "Closed as",
     sessions: "Sessions signed out",
+    included: "Concepts included",
   }),
 );
 
@@ -98,6 +99,8 @@ export const KEPT_OFF_DETAIL_KEYS: Readonly<Partial<Record<DeclaredAction, reado
   "knowledge.check.imported": ["verificationId"],
   "knowledge.concept.committed": ["commitSha", "contentHash", "fromContentHash"],
   "knowledge.feedback.closed": ["recordId"],
+  "knowledge.guide.included": ["guideId", "writeUpId", "commitSha"],
+  "knowledge.guide.seeded": ["guideId", "commitSha"],
   "knowledge.manifest.written": ["bundleId", "commitSha"],
   "knowledge.suggestion.accepted": ["commitSha", "contentHash", "setId"],
   "knowledge.suggestion.declined": ["setId"],
