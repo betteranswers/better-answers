@@ -1,4 +1,4 @@
-import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { useRouter, useRouterState } from "@tanstack/react-router";
 import {
   useCallback,
   useEffect,
@@ -29,6 +29,7 @@ import {
   type Heading,
   type Opened,
 } from "@/shared/knowledge/evidence-panel.tsx";
+import { useOpenMatch } from "@/shared/knowledge/open-match.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { useLanding, useLandingLine, type Landing } from "@/shared/landing.ts";
 import { cn } from "@/shared/lib/utils.ts";
@@ -323,7 +324,7 @@ function Results(properties: {
 
 const useReading = (query: string): Reading => {
   const router = useRouter();
-  const navigate = useNavigate();
+  const openMatch = useOpenMatch();
   const returned = useRouterState({
     select: (state) => RETURNED_TO.safeParse(state.location.state).data?.openedMatch,
   });
@@ -340,19 +341,7 @@ const useReading = (query: string): Reading => {
       },
     },
     onRead: (match, page) => {
-      const searchQuery = router.latestLocation.searchStr;
-      void navigate({
-        to: ".",
-        search: true,
-        replace: true,
-        state: (held) => ({ ...held, openedMatch: keyOf(match) }),
-      });
-      // The browser's history folds a replace and a push in one task into one push.
-      router.history.flush();
-      void navigate({
-        href: page,
-        state: (held) => ({ ...held, openedMatch: undefined, searchQuery }),
-      });
+      openMatch(keyOf(match), page, router.latestLocation.searchStr);
     },
   };
 };

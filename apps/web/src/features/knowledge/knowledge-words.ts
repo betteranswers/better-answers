@@ -1,3 +1,4 @@
+import { CONCEPT_WORDS } from "@/shared/knowledge/concept-words.ts";
 import type { OwnSentences } from "@/shared/refusal-words.ts";
 import { counted } from "@/shared/words.ts";
 
@@ -49,6 +50,29 @@ export const SEARCH_WORDS = {
   selectFirst: "Please select a match first.",
   more: "More Matches",
   document: "Document",
+} as const;
+
+const conceptsCounted = (count: number): string => counted(count, "concept", "concepts");
+
+const collectionNamed = (collection: string | null): string =>
+  collection ?? CONCEPT_WORDS.noCollection;
+
+export const KNOWLEDGE_BASE_WORDS = {
+  about: "Every concept you can read, by collection and kind.",
+  tree: "Collections and kinds",
+  collection: collectionNamed,
+  labelled: (name: string, count: number): string => `${name}, ${conceptsCounted(count)}`,
+  count: conceptsCounted,
+  loading: "The knowledge base is still loading.",
+  none: "No concepts in the knowledge base yet. A concept appears here once it is saved.",
+  concepts: "Concepts",
+  openAKind: "Open a kind to list its concepts.",
+  kindIn: (kind: string, collection: string | null): string =>
+    collection === null ? `${kind}, in no collection` : `${kind} in ${collection}`,
+  conceptsLoading: "The concepts are still loading.",
+  noneOfTheKind: "No concepts of this kind yet.",
+  columns: { title: "Title", kind: "Kind", trust: "Trust" },
+  more: "More Concepts",
 } as const;
 
 export const RELATION_WORDS: ReadonlyMap<string, string> = new Map([
