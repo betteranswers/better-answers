@@ -320,7 +320,10 @@ const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
 
 type WriteDoors = { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock };
 
-/** An `iri` edits a concept that must already stand; an `acceptance` needs a `base` precondition. */
+/**
+ * An `iri` edits a concept that must already stand. An `acceptance` needs a `base` and carries no
+ * status, sensitivity or evidence.
+ */
 export const writeConcept = async (
   principal: UserPrincipal,
   doors: WriteDoors,
@@ -328,9 +331,15 @@ export const writeConcept = async (
 ): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
   const admitted = admit(writeConceptAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
-  if (input.acceptance !== undefined && !("base" in input.expects)) return err("malformed");
+  if (input.acceptance !== undefined && !acceptsAsProposed(input)) return err("malformed");
   return commitConcept(admitted.value, doors, input);
 };
+
+const acceptsAsProposed = (input: WriteConceptInput): boolean =>
+  "base" in input.expects &&
+  input.status === undefined &&
+  input.sensitivity === undefined &&
+  input.evidence === undefined;
 
 const commitConcept = async (
   principal: AdmittedOf<typeof writeConceptAction>,
@@ -528,18 +537,27 @@ const writersRefusal = async (
   }
   const payload = await payloadFor(fresh, tx, input.acceptance.suggestionId);
   if (payload === undefined) return "already-decided";
-  if (!writesItsSuggestion(write, payload)) return "malformed";
-  return deciderAdmits(fresh, tx, await conceptOfSuggestion(fresh, tx, payload), payload.kind);
+  const concept = await conceptOfSuggestion(fresh, tx, payload);
+  const refusal = await deciderAdmits(fresh, tx, concept, payload.kind);
+  if (refusal !== undefined) return refusal;
+  return writesItsSuggestion(write, payload) ? undefined : "malformed";
 };
 
-const writesItsSuggestion = ({ input, mergeKey }: ParsedWrite, payload: SuggestionPayload) =>
+const writesItsSuggestion = (write: ParsedWrite, payload: SuggestionPayload) =>
+  namesItsSuggestion(write, payload) && carriesItsProposal(write, payload);
+
+const namesItsSuggestion = ({ input, mergeKey }: ParsedWrite, payload: SuggestionPayload) =>
   payload.kind === input.acceptance?.kind &&
   payload.mergeKey === mergeKey &&
   payload.path === input.path &&
-  payload.conceptKind === input.kind &&
+  payload.conceptKind === input.kind;
+
+const carriesItsProposal = ({ input }: ParsedWrite, payload: SuggestionPayload) =>
   payload.title === input.title &&
   payload.body === input.body &&
-  isDeepStrictEqual(payload.frontmatter, input.frontmatter);
+  isDeepStrictEqual(payload.frontmatter, input.frontmatter) &&
+  "base" in input.expects &&
+  payload.baseContentHash === input.expects.base;
 
 const commitAndLandWrite = async (
   principal: UserPrincipal,
