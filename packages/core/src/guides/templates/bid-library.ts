@@ -1,4 +1,4 @@
-import type { SectionTemplate, Template } from "./index.ts";
+import type { SectionTemplate, Template } from "./template.ts";
 
 const BOTH_LAYERS = ["assembled", "quoted"] as const;
 
