@@ -43,14 +43,14 @@ export const KNOWLEDGE_BASE_FIELDS = {
 
 type HeldOpen = { readonly collection: string; readonly kind: string };
 
-export type Opened = { readonly collection: string | null; readonly kind: string } | undefined;
+export type OpenKind = { readonly collection: string | null; readonly kind: string } | undefined;
 
 const NOTHING_OPEN = "";
 
 const NO_COLLECTION_HELD = "";
 
-export const openedAt = (held: HeldOpen): Opened =>
-  held.kind === NOTHING_OPEN
+export const openKindAt = (held: HeldOpen): OpenKind =>
+  held.kind.trim() === NOTHING_OPEN
     ? undefined
     : {
         collection: held.collection === NO_COLLECTION_HELD ? null : held.collection,

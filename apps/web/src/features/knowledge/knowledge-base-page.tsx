@@ -22,68 +22,57 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { useHiddenColumns } from "@/shared/wide-layout.ts";
 
 import {
-  useBranch,
+  useKindConcepts,
   useKnowledgeTree,
-  type Branch,
-  type BranchConcept,
   type CollectionCounted,
+  type KindConcept,
+  type KindConceptsRead,
 } from "./knowledge-api.ts";
 import {
   heldOf,
   KNOWLEDGE_BASE_FIELDS,
   KNOWLEDGE_BASE_KEYSTROKES as KEY,
   KNOWLEDGE_BASE_LIST,
-  openedAt,
-  type Opened,
+  openKindAt,
+  type OpenKind,
 } from "./knowledge-state.ts";
-import { KnowledgeTree, type TreeWords } from "./knowledge-tree.tsx";
+import { KnowledgeTree } from "./knowledge-tree.tsx";
 import { KNOWLEDGE_BASE_WORDS as WORDS } from "./knowledge-words.ts";
 
 const KNOWLEDGE_BASE = pageNamed(BROWSE, "Knowledge Base");
 
 const LISTED = Object.values(KEY);
 
-const TREE_WORDS: TreeWords = {
-  name: WORDS.tree,
-  collection: WORDS.collection,
-  labelled: WORDS.labelled,
-};
-
 const NONE: readonly CollectionCounted[] = [];
+
+type ShownKind = {
+  readonly collection: string | null;
+  readonly kind: string;
+  readonly count: number;
+};
 
 const totalOf = (collections: readonly CollectionCounted[]): number =>
   collections.reduce((sum, held) => sum + held.count, 0);
 
-const kindCountOf = (
+const shownKindOf = (
   collections: readonly CollectionCounted[],
-  opened: Opened,
-): number | undefined =>
-  opened === undefined
-    ? undefined
-    : collections
-        .find((held) => held.collection === opened.collection)
-        ?.kinds.find((counted) => counted.kind === opened.kind)?.count;
+  open: OpenKind,
+): ShownKind | undefined => {
+  if (open === undefined) return undefined;
+  const count = collections
+    .find((held) => held.collection === open.collection)
+    ?.kinds.find((counted) => counted.kind === open.kind)?.count;
+  return count === undefined ? undefined : { ...open, count };
+};
 
-const useOpened = () => {
+const useOpenKind = () => {
   const { state, write } = useListAddress(KNOWLEDGE_BASE_LIST, KNOWLEDGE_BASE_FIELDS);
   return {
-    opened: openedAt(state),
-    open: (collection: string | null, kind: string) => {
+    open: openKindAt(state),
+    openKind: (collection: string | null, kind: string) => {
       write(heldOf(collection, kind));
     },
   };
-};
-
-type Read = (concept: BranchConcept, page: string) => void;
-
-const useRead = (): Read => {
-  const openMatch = useOpenMatch();
-  return useCallback(
-    (concept, page) => {
-      openMatch(conceptMatchKey(concept.iri), page, undefined);
-    },
-    [openMatch],
-  );
 };
 
 const useTabStop = () => {
@@ -112,15 +101,15 @@ const useTabStop = () => {
 
 const features = tableFeatures({});
 
-const column = createColumnHelper<typeof features, BranchConcept>();
+const column = createColumnHelper<typeof features, KindConcept>();
 
 function TitleCell(properties: {
-  readonly concept: BranchConcept;
+  readonly concept: KindConcept;
   readonly landsHere: boolean;
   readonly onLanded: () => void;
-  readonly onRead: Read;
 }) {
-  const { concept, onRead } = properties;
+  const { concept } = properties;
+  const openMatch = useOpenMatch();
   const land = useLandingLine(properties.landsHere, properties.onLanded);
   const page = conceptPageOf(concept.iri);
   if (page === undefined) return <span className="font-medium wrap-anywhere">{concept.title}</span>;
@@ -129,7 +118,7 @@ function TitleCell(properties: {
       ref={land}
       href={page}
       onOpen={() => {
-        onRead(concept, page);
+        openMatch({ key: conceptMatchKey(concept.iri), page });
       }}
     >
       {concept.title}
@@ -137,17 +126,12 @@ function TitleCell(properties: {
   );
 }
 
-const columnsOf = (landAt: number | undefined, onLanded: () => void, onRead: Read) =>
+const columnsOf = (landAt: number | undefined, onLanded: () => void) =>
   column.columns([
     column.accessor("title", {
       header: WORDS.columns.title,
       cell: ({ row }) => (
-        <TitleCell
-          concept={row.original}
-          landsHere={row.index === landAt}
-          onLanded={onLanded}
-          onRead={onRead}
-        />
+        <TitleCell concept={row.original} landsHere={row.index === landAt} onLanded={onLanded} />
       ),
     }),
     column.accessor("kind", {
@@ -164,31 +148,30 @@ const NARROW_HIDES: ReadonlySet<string> = new Set(["kind"]);
 
 function ConceptRows(properties: {
   readonly caption: string;
-  readonly branch: Branch;
+  readonly read: KindConceptsRead;
   readonly focusAfterRetry: RefObject<HTMLHeadingElement | null>;
 }) {
-  const { branch } = properties;
+  const { read } = properties;
   const { landAt, landed, landOn } = useLanding();
-  const onRead = useRead();
-  const shown = useMemo(
-    () => branch.data?.pages.flatMap((page) => page.concepts) ?? [],
-    [branch.data],
+  const listed = useMemo(
+    () => read.data?.pages.flatMap((page) => page.concepts) ?? [],
+    [read.data],
   );
-  const columns = useMemo(() => columnsOf(landAt, landed, onRead), [landAt, landed, onRead]);
-  const table = useTable({ features, columns, data: shown, getRowId: (concept) => concept.iri });
+  const columns = useMemo(() => columnsOf(landAt, landed), [landAt, landed]);
+  const table = useTable({ features, columns, data: listed, getRowId: (concept) => concept.iri });
   const [hidden] = useHiddenColumns(NARROW_HIDES);
 
-  if (branch.isPending) {
+  if (read.isPending) {
     return <ListState state={{ kind: "loading", words: WORDS.conceptsLoading }} />;
   }
-  if (branch.data === undefined) {
+  if (read.data === undefined) {
     return (
       <ListState
         state={{
           kind: "failed",
-          words: failedReadWords(branch.error),
+          words: failedReadWords(read.error),
           onRetry: () => {
-            void branch.refetch();
+            void read.refetch();
           },
           focusAfterRetry: properties.focusAfterRetry,
         }}
@@ -207,12 +190,12 @@ function ConceptRows(properties: {
         pages={{
           kind: "more",
           label: WORDS.more,
-          more: branch.hasNextPage,
-          loading: branch.isFetchingNextPage,
-          failed: branch.isFetchNextPageError ? failedReadWords(branch.error) : undefined,
+          more: read.hasNextPage,
+          loading: read.isFetchingNextPage,
+          failed: read.isFetchNextPageError ? failedReadWords(read.error) : undefined,
           onMore: () => {
-            landOn(shown.length);
-            void branch.fetchNextPage();
+            landOn(listed.length);
+            void read.fetchNextPage();
           },
           keystroke: KEY.more,
         }}
@@ -221,21 +204,17 @@ function ConceptRows(properties: {
   );
 }
 
-const keyOf = (opened: Opened): string => JSON.stringify(opened ?? null);
-
 function Concepts(properties: {
-  readonly opened: Opened;
-  readonly count: number;
-  readonly branch: Branch;
+  readonly shown: ShownKind | undefined;
+  readonly read: KindConceptsRead;
 }) {
-  const { opened } = properties;
+  const { shown } = properties;
   const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
   useKeystroke(KEY.concepts, () => {
     heading.current?.focus();
   });
-  const named =
-    opened === undefined ? WORDS.concepts : WORDS.kindIn(opened.kind, opened.collection);
+  const named = shown === undefined ? WORDS.concepts : WORDS.kindIn(shown.kind, shown.collection);
 
   return (
     <section aria-labelledby={headingId} className="min-w-0">
@@ -244,16 +223,16 @@ function Concepts(properties: {
           {named}
         </h3>
         <output className="block text-muted-foreground">
-          {opened === undefined ? "" : WORDS.count(properties.count)}
+          {shown === undefined ? "" : WORDS.count(shown.count)}
         </output>
       </div>
-      {opened === undefined ? (
+      {shown === undefined ? (
         <ListState state={{ kind: "empty", words: WORDS.openAKind, action: null }} />
       ) : (
         <ConceptRows
-          key={keyOf(opened)}
+          key={JSON.stringify([shown.collection, shown.kind])}
           caption={named}
-          branch={properties.branch}
+          read={properties.read}
           focusAfterRetry={heading}
         />
       )}
@@ -263,16 +242,15 @@ function Concepts(properties: {
 
 function Browsed(properties: {
   readonly collections: readonly CollectionCounted[];
-  readonly opened: Opened;
+  readonly open: OpenKind;
   readonly onOpen: (collection: string | null, kind: string) => void;
-  readonly branch: Branch;
+  readonly read: KindConceptsRead;
 }) {
-  const { collections, opened } = properties;
+  const { collections, open } = properties;
   const tabStopRef = useTabStop();
   if (collections.length === 0) {
     return <ListState state={{ kind: "empty", words: WORDS.none, action: null }} />;
   }
-  const count = kindCountOf(collections, opened);
 
   return (
     <div className="@container">
@@ -280,17 +258,12 @@ function Browsed(properties: {
         <div className="border-b border-border p-2 @2xl:border-r @2xl:border-b-0">
           <KnowledgeTree
             collections={collections}
-            opened={opened}
+            open={open}
             onOpen={properties.onOpen}
-            words={TREE_WORDS}
             tabStopRef={tabStopRef}
           />
         </div>
-        <Concepts
-          opened={count === undefined ? undefined : opened}
-          count={count ?? 0}
-          branch={properties.branch}
-        />
+        <Concepts shown={shownKindOf(collections, open)} read={properties.read} />
       </div>
     </div>
   );
@@ -300,8 +273,8 @@ function KnowledgeBaseRegion() {
   const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
   const tree = useKnowledgeTree();
-  const { opened, open } = useOpened();
-  const branch = useBranch(opened);
+  const { open, openKind } = useOpenKind();
+  const read = useKindConcepts(open);
   const collections = tree.data?.collections;
 
   return (
@@ -320,12 +293,7 @@ function KnowledgeBaseRegion() {
           failed={failedReadWords}
           focusAfterRetry={heading}
         >
-          <Browsed
-            collections={collections ?? NONE}
-            opened={opened}
-            onOpen={open}
-            branch={branch}
-          />
+          <Browsed collections={collections ?? NONE} open={open} onOpen={openKind} read={read} />
         </ListRead>
       </Card>
     </section>

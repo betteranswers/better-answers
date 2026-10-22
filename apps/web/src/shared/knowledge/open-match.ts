@@ -1,22 +1,18 @@
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback } from "react";
 
-export type OpenMatch = (
-  openedMatch: string,
-  page: string,
-  searchQuery: string | undefined,
-) => void;
+type Opening = { readonly key: string; readonly page: string; readonly searchQuery?: string };
 
-export const useOpenMatch = (): OpenMatch => {
+export const useOpenMatch = (): ((opening: Opening) => void) => {
   const router = useRouter();
   const navigate = useNavigate();
   return useCallback(
-    (openedMatch, page, searchQuery) => {
+    ({ key, page, searchQuery }) => {
       void navigate({
         to: ".",
         search: true,
         replace: true,
-        state: (held) => ({ ...held, openedMatch }),
+        state: (held) => ({ ...held, openedMatch: key }),
       });
       // The browser's history folds a replace and a push in one task into one push.
       router.history.flush();

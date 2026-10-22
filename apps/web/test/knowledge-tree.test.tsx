@@ -1,9 +1,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Opened } from "@/features/knowledge/knowledge-state.ts";
+import type { OpenKind } from "@/features/knowledge/knowledge-state.ts";
 import { KnowledgeTree } from "@/features/knowledge/knowledge-tree.tsx";
-import { KNOWLEDGE_BASE_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
 
 afterEach(cleanup);
 
@@ -21,13 +20,9 @@ const COLLECTIONS = [
   { collection: null, count: 1, kinds: [{ kind: "policy", count: 1 }] },
 ];
 
-const TREE_WORDS = { name: WORDS.tree, collection: WORDS.collection, labelled: WORDS.labelled };
-
-const drawn = (opened?: Opened) => {
+const drawn = (open?: OpenKind) => {
   const onOpen = vi.fn<(collection: string | null, kind: string) => void>();
-  render(
-    <KnowledgeTree collections={COLLECTIONS} opened={opened} onOpen={onOpen} words={TREE_WORDS} />,
-  );
+  render(<KnowledgeTree collections={COLLECTIONS} open={open} onOpen={onOpen} />);
   return onOpen;
 };
 

@@ -382,7 +382,7 @@ type SeedIndexBatch = {
   readonly kind: string;
   readonly count: number;
   readonly title?: string;
-  readonly sensitivity?: "Public" | "Internal" | "Restricted";
+  readonly sensitivity?: Sensitivity;
   readonly audienceGroups?: readonly string[];
 };
 

@@ -341,7 +341,7 @@ const useReading = (query: string): Reading => {
       },
     },
     onRead: (match, page) => {
-      openMatch(keyOf(match), page, router.latestLocation.searchStr);
+      openMatch({ key: keyOf(match), page, searchQuery: router.latestLocation.searchStr });
     },
   };
 };

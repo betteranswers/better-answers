@@ -12,7 +12,7 @@ import { WHILE_A_CEILING_HOLDS } from "@/shared/api/query-client.ts";
 import { useTRPC } from "@/shared/api/trpc.ts";
 import { memberOptions } from "@/shared/member.ts";
 
-import { MATCHES_A_PAGE, type Opened } from "./knowledge-state.ts";
+import { MATCHES_A_PAGE, type OpenKind } from "./knowledge-state.ts";
 
 type Api = ReturnType<typeof useTRPC>;
 
@@ -38,24 +38,24 @@ export type Matches = ReturnType<typeof useMatches>;
 
 export type CollectionCounted = inferOutput<Api["knowledge"]["tree"]>["collections"][number];
 
-export type BranchConcept = inferOutput<Api["knowledge"]["branch"]>["concepts"][number];
+export type KindConcept = inferOutput<Api["knowledge"]["kindConcepts"]>["concepts"][number];
 
 export const useKnowledgeTree = () => {
   const api = useTRPC();
   return useQuery(api.knowledge.tree.queryOptions(undefined, WHILE_A_CEILING_HOLDS));
 };
 
-export const useBranch = (opened: Opened) => {
+export const useKindConcepts = (open: OpenKind) => {
   const api = useTRPC();
   return useInfiniteQuery(
-    api.knowledge.branch.infiniteQueryOptions(
-      opened === undefined ? skipToken : { collection: opened.collection, kind: opened.kind },
+    api.knowledge.kindConcepts.infiniteQueryOptions(
+      open === undefined ? skipToken : { collection: open.collection, kind: open.kind },
       { getNextPageParam: (page) => page.nextCursor, ...WHILE_A_CEILING_HOLDS },
     ),
   );
 };
 
-export type Branch = ReturnType<typeof useBranch>;
+export type KindConceptsRead = ReturnType<typeof useKindConcepts>;
 
 type Collections = inferOutput<Api["knowledge"]["collections"]>;
 
