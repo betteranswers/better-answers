@@ -122,12 +122,8 @@ export {
 } from "./edit.ts";
 /** @public S3 */
 export type { ConceptParts, ConceptSaved, SaveConceptRefusal } from "./edit.ts";
-export {
-  carryVerificationsOntoRewrite,
-  foldKind,
-  mergeKeyOf,
-  moveBundleCommits,
-} from "./landing.ts";
+export { foldKind } from "../bundle/index.ts";
+export { carryVerificationsOntoRewrite, mergeKeyOf, moveBundleCommits } from "./landing.ts";
 export {
   ERASURE_REHEARSAL_PATH,
   IMPORT_SENSITIVITY_DEFAULT,

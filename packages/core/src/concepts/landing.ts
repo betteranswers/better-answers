@@ -23,7 +23,7 @@ import {
   visibilityOf,
   type Visibility,
 } from "../access/index.ts";
-import { landBundleCommit } from "../bundle/index.ts";
+import { foldKind, landBundleCommit } from "../bundle/index.ts";
 import { recomputeWriteUpsIncluding } from "../guides/index.ts";
 import {
   attempt,
@@ -55,15 +55,6 @@ import { contentHashOf, parseConceptFile, type Frontmatter } from "./file.ts";
 import type { Acceptance } from "./index.ts";
 import { markDeciding } from "./suggestions.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
-
-export const foldKind = (kind: string): string =>
-  kind.replaceAll(/\S+/g, (word) => {
-    const cased = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    if (cased.endsWith("ies")) return `${cased.slice(0, -3)}y`;
-    if (/(s|x|z|ch|sh)es$/.test(cased)) return cased.slice(0, -2);
-    if (/(ss|us|is)$/.test(cased) || !cased.endsWith("s")) return cased;
-    return cased.slice(0, -1);
-  });
 
 export const mergeKeyOf = (foldedKind: string, title: string): string =>
   `${foldedKind}:${title.trim().replaceAll(/\s+/g, " ").toLowerCase()}`;

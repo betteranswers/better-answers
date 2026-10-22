@@ -32,6 +32,15 @@ import {
   type Tx,
 } from "../store/postgres/index.ts";
 
+export const foldKind = (kind: string): string =>
+  kind.replaceAll(/\S+/g, (word) => {
+    const cased = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    if (cased.endsWith("ies")) return `${cased.slice(0, -3)}y`;
+    if (/(s|x|z|ch|sh)es$/.test(cased)) return cased.slice(0, -2);
+    if (/(ss|us|is)$/.test(cased) || !cased.endsWith("s")) return cased;
+    return cased.slice(0, -1);
+  });
+
 type BundleDoors = { readonly git: GitDoor; readonly postgres: PostgresDoor };
 
 export const withBundleWrite = async <T extends Result<unknown, unknown>>(

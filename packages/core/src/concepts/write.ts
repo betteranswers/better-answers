@@ -11,7 +11,7 @@ import {
 
 import { widens, type Visibility } from "../access/index.ts";
 import { action, declareActions, record } from "../audit/index.ts";
-import { commitAndLandAsMember, withBundleWrite } from "../bundle/index.ts";
+import { commitAndLandAsMember, foldKind, withBundleWrite } from "../bundle/index.ts";
 import {
   actorIdOf,
   admit,
@@ -40,7 +40,6 @@ import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.
 import { contentHashOf, parseConceptFile, renderConceptFile, type Frontmatter } from "./file.ts";
 import {
   evidenceOfSources,
-  foldKind,
   heldByIri,
   heldVisibilityOf,
   holderOfPath,

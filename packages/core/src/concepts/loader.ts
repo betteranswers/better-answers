@@ -16,6 +16,7 @@ import { uriDecoded } from "@better-answers/schema/concept-file";
 import { SCHEMED } from "@better-answers/schema/scan";
 
 import { action, declareActions, record } from "../audit/index.ts";
+import { foldKind } from "../bundle/index.ts";
 import {
   err,
   isPortablePath,
@@ -30,7 +31,7 @@ import {
 } from "../kernel/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import type { Frontmatter, FrontmatterSource } from "./file.ts";
-import { foldKind, mergeKeyOf } from "./landing.ts";
+import { mergeKeyOf } from "./landing.ts";
 
 const IMPORT_ACTIONS = declareActions("knowledge", {
   verificationImported: action("knowledge.check.imported", { iri: "iri", verificationId: "id" }),
