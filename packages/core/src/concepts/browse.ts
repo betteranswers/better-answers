@@ -25,7 +25,7 @@ import {
   type VerificationRow,
 } from "./trust.ts";
 
-export const BRANCH_PAGE_SIZE = 50;
+const BRANCH_PAGE_SIZE = 50;
 
 type KindCount = { readonly kind: string; readonly count: number };
 
@@ -35,7 +35,7 @@ type CollectionCount = {
   readonly kinds: readonly KindCount[];
 };
 
-export type KnowledgeTree = { readonly collections: readonly CollectionCount[] };
+type KnowledgeTree = { readonly collections: readonly CollectionCount[] };
 
 const readKnowledgeTreeAction = declareAction({
   admits: ANY_ROLE,
@@ -97,7 +97,8 @@ const branchCursor = z.strictObject({ title: conceptColumns.title, iri: ids.conc
 
 type BranchCursor = z.output<typeof branchCursor>;
 
-export const knowledgeBranchInput = z.strictObject({
+/** Not strict: tRPC's infinite query sends its `direction` beside the cursor. */
+export const knowledgeBranchInput = z.object({
   collection: z.string().regex(COLLECTION).nullable(),
   kind: conceptColumns.kind,
   cursor: branchCursor.nullish(),
@@ -112,7 +113,7 @@ type BranchConcept = {
   readonly trustWords: string;
 };
 
-export type KnowledgeBranch = {
+type KnowledgeBranch = {
   readonly concepts: readonly BranchConcept[];
   readonly nextCursor: BranchCursor | null;
 };

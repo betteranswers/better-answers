@@ -144,13 +144,10 @@ export {
   type FrontmatterValue,
 } from "./file.ts";
 export {
-  BRANCH_PAGE_SIZE,
   knowledgeBranchInput,
   readKnowledgeBranch,
   readKnowledgeTree,
-  type KnowledgeBranch,
   type KnowledgeBranchInput,
-  type KnowledgeTree,
 } from "./browse.ts";
 export { withBundleFenceAs } from "./fence.ts";
 export {
