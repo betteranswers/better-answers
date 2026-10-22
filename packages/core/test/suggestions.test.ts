@@ -7,6 +7,7 @@ import { testData } from "@better-answers/schema/testing";
 import { open } from "../src/answering/index.ts";
 import {
   acceptSuggestions,
+  conceptByIri,
   contentHashOf,
   declineSuggestion,
   foldKind,
@@ -26,6 +27,7 @@ import {
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit } from "./bundle.ts";
+import { documentLanded } from "./suite-documents.ts";
 import {
   abortTheTransaction,
   holdingTable,
@@ -1719,5 +1721,50 @@ describe("an accepted edit's identity and state", () => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
     expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "returned" });
     expect(await mergeKeyHeldBy(written.iri)).toBe(input.mergeKey);
+  });
+
+  it("publishes an accepted new concept its proposer can open", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.viewer, "edit", [requestFor()]);
+
+    const [outcome] = await acceptAll(scenario, set.setId, scenario.editor);
+    const accepted = acceptedOf(outcome);
+    if (accepted === undefined)
+      throw new Error(`refused: ${String(outcome && refusalOf(outcome))}`);
+    const row = await db().pool.query<Record<string, unknown>>(
+      "SELECT status, sensitivity, published_at IS NOT NULL AS published FROM concept_index WHERE iri = $1",
+      [accepted.iri],
+    );
+    const reopened = await readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
+      conceptByIri(principal, tx, accepted.iri),
+    );
+
+    expect(row.rows[0]).toEqual({ status: "stable", sensitivity: "Internal", published: true });
+    expect(reopened).toMatchObject({ ok: true, value: { iri: accepted.iri } });
+  });
+
+  it("lands an accepted new concept no wider than its sources", async () => {
+    const scenario = await arrange();
+    const minutes = await documentLanded(db().pool, scenario.workspaceId, {
+      title: "Board minutes",
+      text: "The board reviews pay in March.",
+      sensitivity: "Restricted",
+    });
+    const cited = { title: "Board minutes", resource: "minutes", locator: minutes.locator };
+    const request = requestFor();
+    const set = await submitted(scenario, scenario.admin, "edit", [
+      { ...request, frontmatter: { ...request.frontmatter, sources: [cited] } },
+    ]);
+
+    const [outcome] = await acceptAll(scenario, set.setId, scenario.admin);
+    const accepted = acceptedOf(outcome);
+    if (accepted === undefined)
+      throw new Error(`refused: ${String(outcome && refusalOf(outcome))}`);
+    const row = await db().pool.query(
+      "SELECT status, sensitivity FROM concept_index WHERE iri = $1",
+      [accepted.iri],
+    );
+
+    expect(row.rows).toEqual([{ status: "stable", sensitivity: "Restricted" }]);
   });
 });

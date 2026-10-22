@@ -969,7 +969,11 @@ describe("a concept carrying a __proto__ front-matter key", () => {
     expect(outcomes.ok && outcomes.value.map((outcome) => outcome.outcome.ok)).toEqual([true]);
     const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1) ?? "";
     const { row, file } = await rowAgainstFile(scenario, sha, request.path);
-    expect(file.frontmatter).toEqual({ ...request.frontmatter, iri: expect.any(String) });
+    expect(file.frontmatter).toEqual({
+      ...request.frontmatter,
+      status: "stable",
+      iri: expect.any(String),
+    });
     expect(row).toEqual(file);
   });
 });
