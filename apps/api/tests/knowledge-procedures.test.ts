@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { writeConcept } from "@better-answers/core/concepts";
+import { overrideConceptSensitivity, writeConcept } from "@better-answers/core/concepts";
 import { head, initRepository } from "@better-answers/core/store/git";
 import { documentLanded, type DocumentShape } from "@better-answers/core/testing/documents";
 
@@ -134,11 +134,15 @@ const aConceptCitingRestrictedMinutes = async () => {
     author: { name: admin.name, email: admin.email },
     expects: { head: await head(writer, git) },
     status: "stable",
-    evidence: [
-      { sourceDocumentId: handbook.documentId, locator: handbook.locator, resource: "handbook" },
-    ],
   });
   if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
+  await actingIn(app(), { workspaceId, userId: admin.id }, (held, tx) =>
+    overrideConceptSensitivity(held, tx, {
+      iri: written.value.iri,
+      sensitivity: "Internal",
+      audience: "everyone",
+    }),
+  );
   return {
     iri: written.value.iri,
     handbook: handbook.locator,
@@ -281,7 +285,6 @@ const threeNotesAskingTheBoard = async () => {
       expects: { head: await head(writer, git) },
       status: "stable",
       sensitivity: concept.sensitivity,
-      evidence: [],
     });
     if (!landed.ok) throw new Error(`the write was refused: ${String(landed.error)}`);
     return landed.value.iri;
@@ -469,7 +472,7 @@ describe("knowledge.open over tRPC", () => {
     expect(opened).toMatchObject({
       concept: {
         access: "partly-included",
-        lead: "Based on your current access, some of the evidence isn't included.",
+        lead: "Based on your current access, some of the evidence isn't included. An Admin shared this concept beyond its evidence.",
         next: "Ask an Admin for access to the sources, or read the concept as it stands.",
         evidence: [
           { id: "HANDBOOK", source: HANDBOOK_TITLE, locator: handbook },

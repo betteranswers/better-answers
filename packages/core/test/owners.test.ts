@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { withRepositoryLock } from "@better-answers/core/store/git";
-import { conceptIriOf, ulid } from "@better-answers/schema";
+import { conceptIriOf, passageLocatorOf, ulid } from "@better-answers/schema";
 
 import {
   collectionsAndOwners,
@@ -231,9 +231,13 @@ describe("ownership judged at the time of the act", () => {
             scenario.editor,
             { ...doorsOf(scenario), postgres },
             conceptAt("knowledge/policy/expenses.md", {
-              evidence: [
-                { sourceDocumentId: cited.documentId, locator: "p.1", resource: "Handbook" },
-              ],
+              frontmatter: {
+                title: "Expenses",
+                type: "Policy",
+                sources: [
+                  { resource: "Handbook", locator: passageLocatorOf(cited.documentId, 0, 1) },
+                ],
+              },
             }),
           ),
         revoke: (client) =>

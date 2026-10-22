@@ -7,7 +7,12 @@ import type { UserPrincipal } from "../src/kernel/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
 import { inMs, percentile, recordFigures } from "./figures.ts";
 import { landRecallSet, theRecallSet } from "./recall.ts";
-import { conceptCiting, connectedSourceHolding, passageUnder } from "./sourced-concept.ts";
+import {
+  conceptCiting,
+  connectedSourceHolding,
+  overriddenBy,
+  passageUnder,
+} from "./sourced-concept.ts";
 import { answered, readingAs, runtimePoolFor } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -83,6 +88,7 @@ const sourcedAnswer = async (scenario: Scenario, cited: ConceptIri): Promise<Con
       "",
     ].join("\n\n"),
   });
+  await overriddenBy(db(), scenario, written.iri, "Internal");
   return written.iri;
 };
 

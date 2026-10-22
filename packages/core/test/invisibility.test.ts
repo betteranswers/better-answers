@@ -32,6 +32,7 @@ import {
   conceptForGroup,
   documentUnder,
   groupNamed,
+  overriddenBy,
   restrictedAndInternal,
   rewriteCiting,
   seededBy,
@@ -230,6 +231,7 @@ describe("a source the reader may not read", () => {
         ],
       },
     });
+    await overriddenBy(db(), scenario, written.iri, "Internal");
 
     const viewer = await opened(scenario.viewer, written.iri);
     const admin = await opened(scenario.admin, written.iri);
@@ -770,7 +772,7 @@ describe("an `Answer` withheld from the asker", () => {
       text: "The board set the retention period in March.",
       sensitivity: "Restricted",
     });
-    await conceptCiting(scenario, scenario.editor, [], {
+    const retention = await conceptCiting(scenario, scenario.editor, [], {
       title: RETENTION.title,
       kind: "Answer",
       sensitivity: "Internal",
@@ -788,6 +790,7 @@ describe("an `Answer` withheld from the asker", () => {
         ],
       },
     });
+    await overriddenBy(db(), scenario, retention.iri, "Internal");
 
     const viewers = await asked(db(), scenario.viewer, QUESTION);
     const admins = await asked(db(), scenario.admin, QUESTION);

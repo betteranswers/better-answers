@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
 import { walkFrom } from "@better-answers/core/store/map";
-import { conceptIriOf, CONCEPT_BODY_MAX, ulid } from "@better-answers/schema";
+import { conceptIriOf, CONCEPT_BODY_MAX, passageLocatorOf, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { mapWords, open } from "../src/answering/index.ts";
@@ -301,14 +301,14 @@ describe("a governed write", () => {
 
     const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
     const input = writeFor({
-      evidence: [
-        {
-          sourceDocumentId: handbook.documentId,
-          locator: "p.4#para-2",
-          resource: "Handbook (2026)",
-        },
-        { sourceDocumentId: handbook.documentId, locator: "p.9", resource: "Handbook (2026)" },
-      ],
+      frontmatter: {
+        title: "Expenses",
+        type: "Policy",
+        sources: [
+          { resource: "Handbook (2026)", locator: passageLocatorOf(handbook.documentId, 0, 4) },
+          { resource: "Handbook (2026)", locator: passageLocatorOf(handbook.documentId, 9, 12) },
+        ],
+      },
     });
 
     const written = await landed(scenario, input);
@@ -341,31 +341,6 @@ describe("a governed write", () => {
         audience: "everyone",
       },
     ]);
-  });
-
-  it("keeps the version its evidence was recorded against", async () => {
-    const scenario = await arrange();
-
-    const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
-    await landed(
-      scenario,
-      writeFor({
-        evidence: [
-          {
-            sourceDocumentId: handbook.documentId,
-            locator: "p.4",
-            resource: "Handbook (2026)",
-            contentVersion: "2026-03-01",
-          },
-        ],
-      }),
-    );
-
-    const stored = await db().pool.query<{ content_version: string | null }>(
-      "SELECT content_version FROM evidence WHERE workspace_id = $1",
-      [scenario.workspaceId],
-    );
-    expect(stored.rows).toEqual([{ content_version: "2026-03-01" }]);
   });
 
   it("folds the row's kind, leaving the file's spelling alone", async () => {
@@ -1044,23 +1019,17 @@ describe("what a governed write refuses", () => {
     expect(await head(scenario.editor, scenario.git)).toBeNull();
   });
 
-  it.each([
-    ["a merge key of no shape", { mergeKey: "   " }],
-    [
-      "an evidence locator of no shape",
-      { evidence: [{ sourceDocumentId: ulid(), locator: "   ", resource: "Handbook" }] },
-    ],
-  ] satisfies readonly (readonly [string, Partial<WriteConceptInput>])[])(
-    "refuses %s without committing",
-    async (_why, invalid) => {
-      const scenario = await arrange();
+  it.each([["a merge key of no shape", { mergeKey: "   " }]] satisfies readonly (readonly [
+    string,
+    Partial<WriteConceptInput>,
+  ])[])("refuses %s without committing", async (_why, invalid) => {
+    const scenario = await arrange();
 
-      const refused = await write(scenario, scenario.editor, writeFor(invalid));
+    const refused = await write(scenario, scenario.editor, writeFor(invalid));
 
-      expect(refused).toEqual({ ok: false, error: "malformed" });
-      expect(await head(scenario.editor, scenario.git)).toBeNull();
-    },
-  );
+    expect(refused).toEqual({ ok: false, error: "malformed" });
+    expect(await head(scenario.editor, scenario.git)).toBeNull();
+  });
 
   it("refuses a body over the cap, taking one at it", async () => {
     const scenario = await arrange();

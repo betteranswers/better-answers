@@ -23,7 +23,6 @@ import {
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
 import { bundleHistory, commitFacts } from "./bundle.ts";
-import { connectedSourceHolding } from "./sourced-concept.ts";
 import {
   abortTheTransaction,
   holdingTable,
@@ -1373,10 +1372,7 @@ describe("an acceptance reached straight through the write path", () => {
     expect(onItsOwn).toMatchObject({ ok: true });
   });
 
-  type Moved = (
-    set: SuggestionSetSubmitted,
-    scenario: Scenario,
-  ) => Partial<WriteConceptInput> | Promise<Partial<WriteConceptInput>>;
+  type Moved = (set: SuggestionSetSubmitted) => Partial<WriteConceptInput>;
   it.each([
     ["body", () => ({ body: "Expenses are claimed whenever." })],
     ["merge key", () => ({ mergeKey: "policy:another" })],
@@ -1385,15 +1381,6 @@ describe("an acceptance reached straight through the write path", () => {
     ["frontmatter", () => ({ frontmatter: { title: "Expenses", type: "Policy", owner: "Ada" } })],
     ["status", () => ({ status: "draft" })],
     ["sensitivity", () => ({ sensitivity: "Internal" })],
-    [
-      "evidence",
-      async (_set, scenario) => {
-        const cited = await connectedSourceHolding(db(), scenario.workspaceId);
-        return {
-          evidence: [{ sourceDocumentId: cited.documentId, locator: "p.1", resource: "Handbook" }],
-        };
-      },
-    ],
     [
       "suggestion kind",
       (set) => ({
@@ -1413,7 +1400,7 @@ describe("an acceptance reached straight through the write path", () => {
       const refused = await writeConcept(
         scenario.editor,
         doorsOf(scenario),
-        acceptanceOf(input, written, set, await moved(set, scenario)),
+        acceptanceOf(input, written, set, moved(set)),
       );
 
       expect(refused).toEqual({ ok: false, error: "malformed" });

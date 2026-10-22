@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
 import { head } from "@better-answers/core/store/git";
-import { conceptIriOf, ulid } from "@better-answers/schema";
+import { conceptIriOf, passageLocatorOf, ulid } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
 import {
   connectedSourceIdTakenAgain,
@@ -362,13 +362,16 @@ describe("what a governed write derives from its cited connected sources", () =>
       path,
       kind: "Note",
       title: "A note on a document nobody catalogued",
-      frontmatter: { title: "A note on a document nobody catalogued", type: "Note" },
+      frontmatter: {
+        title: "A note on a document nobody catalogued",
+        type: "Note",
+        sources: [{ resource: "Document 1", locator: passageLocatorOf(uncatalogued, 0, 1) }],
+      },
       body: "It cites a document the catalogue does not hold.",
       message: "Record a note citing an uncatalogued document",
       author: { name: "Ada Editor", email: "ada@acme.invalid" },
       expects: { head: await head(scenario.editor, scenario.git) },
       sensitivity: "Internal",
-      evidence: [{ sourceDocumentId: uncatalogued, locator: "p.1", resource: "Document 1" }],
     });
 
     expect(refused).toEqual({ ok: false, error: "no-such-document" });
@@ -449,14 +452,19 @@ describe("what a governed write derives from its cited connected sources", () =>
 
 describe("what an edit keeps of a concept's citations", () => {
   it.each([
-    ["keeps", "no evidence", undefined],
-    ["clears", "empty evidence", []],
-  ] as const)("%s the citations when an edit names %s", async (outcome, _named, evidence) => {
+    ["keeps", "still cite it"],
+    ["clears", "cite no document"],
+  ] as const)("%s the citations when the edit's sources %s", async (outcome, _sources) => {
     const scenario = await arrange();
     const source = await connectedSourceHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [source.documentId]);
 
-    const edited = await rewriteCiting(scenario, scenario.editor, written, evidence);
+    const edited = await rewriteCiting(
+      scenario,
+      scenario.editor,
+      written,
+      outcome === "keeps" ? [source.documentId] : [],
+    );
     if (!edited.ok) throw new Error(`the edit answered ${String(edited.error)}`);
     const event = await db().pool.query<{ detail: { evidenceCount: number } }>(
       "SELECT detail FROM audit_event WHERE id = $1",

@@ -26,9 +26,10 @@ import {
 import { ANY_HEAD, type CommitAuthor, type Committed, type GitDoor } from "../store/git/index.ts";
 import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { withBundleWrite } from "./fence.ts";
-import { hashedFileOf, renderConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
+import { contentHashOf, renderConceptFile, type Frontmatter } from "./file.ts";
 import {
   commitAndLandAsMember,
+  evidenceOfSources,
   foldKind,
   heldByIri,
   heldVisibilityOf,
@@ -38,6 +39,7 @@ import {
   type IndexRow,
   landRows,
   WRITE_CONSTRAINTS,
+  type EvidenceRow,
   type Held,
 } from "./landing.ts";
 import { deciderAdmits, ownerAdmits, standingConcept } from "./owners.ts";
@@ -49,7 +51,7 @@ import {
   type SuggestionKind,
   type SuggestionPayload,
 } from "./suggestions.ts";
-import { citationCountOf, conceptVisibilityFrom } from "./visibility.ts";
+import { conceptVisibilityFrom } from "./visibility.ts";
 import type { PassedOnCommitRefusal } from "./vocabulary.ts";
 
 const CONCEPT_ACTIONS = declareActions("knowledge", {
@@ -67,14 +69,6 @@ const CONCEPT_ACTIONS = declareActions("knowledge", {
     setId: "id",
   }),
 });
-
-type EvidenceInput = {
-  readonly sourceDocumentId: string;
-  readonly locator: string;
-
-  readonly resource: string;
-  readonly contentVersion?: string;
-};
 
 type WritePrecondition = { readonly head: string | null } | { readonly base: string | null };
 
@@ -107,7 +101,6 @@ export type WriteConceptInput = {
 
   readonly sensitivity?: string;
   readonly status?: string;
-  readonly evidence?: readonly EvidenceInput[];
 };
 
 export type ConceptWritten = {
@@ -160,8 +153,8 @@ export type WriteDoors = {
 };
 
 /**
- * An `iri` edits a concept that must already stand. An `acceptance` needs a `base` and carries no
- * status, sensitivity or evidence.
+ * An `iri` edits a standing concept. An `acceptance` needs a `base` and carries no status or
+ * sensitivity. Evidence is the file's `sources`.
  */
 export const writeConcept = async (
   principal: UserPrincipal,
@@ -175,10 +168,7 @@ export const writeConcept = async (
 };
 
 const acceptsAsProposed = (input: WriteConceptInput): boolean =>
-  "base" in input.expects &&
-  input.status === undefined &&
-  input.sensitivity === undefined &&
-  input.evidence === undefined;
+  "base" in input.expects && input.status === undefined && input.sensitivity === undefined;
 
 const commitConcept = async (
   principal: AdmittedOf<typeof writeConceptAction>,
@@ -189,21 +179,11 @@ const commitConcept = async (
   const frontmatter = fileFrontmatterOf(input, iri);
   const body = boundarySchemas.conceptIndex.insert.shape.body.safeParse(input.body);
   if (!body.success) return err("malformed");
-  const { contentHash, sources } = hashedFileOf(frontmatter, input.body, input.path);
+  const contentHash = contentHashOf(frontmatter, input.body, input.path);
   const mergeKey = boundarySchemas.conceptIdentity.insert.shape.mergeKey.safeParse(input.mergeKey);
-
-  const evidence =
-    input.evidence === undefined
-      ? { success: true as const, data: undefined }
-      : boundarySchemas.evidence.insert.array().safeParse(
-          input.evidence.map((piece) => ({
-            workspaceId: principal.workspaceId,
-            sourceDocumentId: piece.sourceDocumentId,
-            locator: piece.locator,
-            resource: piece.resource,
-            contentVersion: piece.contentVersion ?? null,
-          })),
-        );
+  const evidence = boundarySchemas.evidence.insert
+    .array()
+    .safeParse(evidenceOfSources(principal.workspaceId, frontmatter));
   if (!mergeKey.success || !evidence.success) return err("malformed");
 
   const auditEventId = ulid();
@@ -214,7 +194,6 @@ const commitConcept = async (
       iri,
       frontmatter,
       contentHash,
-      sources,
       mergeKey: mergeKey.data,
       evidence: evidence.data,
       auditEventId,
@@ -227,9 +206,8 @@ type ParsedWrite = {
   readonly iri: string;
   readonly frontmatter: Frontmatter;
   readonly contentHash: string;
-  readonly sources: readonly HashedSource[];
   readonly mergeKey: string;
-  readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[] | undefined;
+  readonly evidence: readonly EvidenceRow[];
   readonly auditEventId: string;
 };
 
@@ -309,13 +287,13 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
                 iri,
                 kind: foldKind(input.kind),
                 fallback: heldVisibilityOf(held),
-                citing: write.evidence?.map((piece) => piece.sourceDocumentId),
+                citing: write.evidence.map((piece) => piece.sourceDocumentId),
               }),
 
         catalogued: await holdsEveryDocument(
           fresh,
           tx,
-          write.evidence?.map((piece) => piece.sourceDocumentId) ?? [],
+          write.evidence.map((piece) => piece.sourceDocumentId),
         ),
 
         resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
@@ -447,9 +425,7 @@ const landWrite = async (
       iri: row.iri,
       commitSha: committed.sha,
       contentHash: write.contentHash,
-      evidenceCount:
-        write.evidence?.length ??
-        (fromContentHash === undefined ? 0 : await citationCountOf(fresh, tx, row.iri)),
+      evidenceCount: write.evidence.length,
     };
     await record(fresh, tx, {
       id: write.auditEventId,
@@ -477,7 +453,6 @@ const landWrite = async (
     commit: committed,
     actor: actorIdOf(fresh),
     auditEventId: write.auditEventId,
-    sources: write.sources,
     evidence: write.evidence,
     restsAlsoOn: [],
     acceptance,

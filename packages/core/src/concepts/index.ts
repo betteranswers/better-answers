@@ -106,6 +106,7 @@ export {
   parseConceptFile,
   renderConceptFile,
   type Frontmatter,
+  type FrontmatterSource,
   type FrontmatterValue,
 } from "./file.ts";
 export {

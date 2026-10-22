@@ -84,16 +84,25 @@ const sourcedNote = async (
   return { written, locators };
 };
 
-const noteNaming = (
+const noteNaming = async (
   scenario: Scenario,
   sources: FrontmatterValue,
   overrides: Partial<WriteConceptInput> = {},
-) =>
-  conceptCiting(scenario, scenario.editor, [], {
+) => {
+  const written = await conceptCiting(scenario, scenario.editor, [], {
     sensitivity: "Internal",
     ...overrides,
     frontmatter: { type: "Note", sources },
   });
+  const cited = await db().pool.query<{ sensitivity: string }>(
+    "SELECT sensitivity FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+    [scenario.workspaceId, written.iri],
+  );
+  if (cited.rows[0]?.sensitivity === "Restricted") {
+    await overriddenTo(scenario, written.iri, "Internal");
+  }
+  return written;
+};
 
 const overriddenTo = (scenario: Scenario, iri: string, sensitivity: string) =>
   overriddenBy(db(), scenario, iri, sensitivity);
