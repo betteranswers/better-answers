@@ -143,6 +143,7 @@ describe("accepting an invitation over tRPC", () => {
       workspace: { id: workspaceId, name: "Calder Joinery" },
       person: { id: personId, name: "Priya Shah", email: address },
       role: "Editor",
+      owns: { collections: [], concepts: 0 },
     });
     expect(await joinedEventsOf(personId)).toEqual([
       {
