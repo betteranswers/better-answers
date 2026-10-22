@@ -150,7 +150,14 @@ export {
   type UnsoundReason,
 } from "./loader.ts";
 export { writeManifest, type ManifestWritten, type WriteManifestInput } from "./manifest.ts";
-export { nameOwner, ownerOf, type NameOwnerInput } from "./owners.ts";
+export {
+  collectionsAndOwners,
+  nameOwner,
+  nameOwnerInput,
+  ownedBy,
+  ownerOf,
+  type NameOwnerInput,
+} from "./owners.ts";
 /** @public S3 */
 export type { OwnedConcept, OwnerNamed } from "./owners.ts";
 export {

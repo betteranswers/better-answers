@@ -469,7 +469,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "concepts",
     access: "read",
     reason:
-      "Accepting an *edit* suggestion commits with the proposer as git author, and a git author line is a name and an address — which the audit log's `human:<person id>` deliberately is not, so the action reads them off the person the proposer names.",
+      "Accepting an *edit* suggestion commits with the proposer as git author, and a git author line is a name and an address — which the audit log's `human:<person id>` deliberately is not, so the action reads them off the person the proposer names. Collections and owners names each collection's owner, and an owner who is no Admin cannot read the members list, so that read joins the owner's name.",
   },
   {
     table: "public.member",
