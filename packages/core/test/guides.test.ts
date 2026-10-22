@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parse as parseYaml } from "yaml";
 
 import { head } from "@better-answers/core/store/git";
 import { ulid } from "@better-answers/schema";
@@ -45,7 +46,6 @@ const seeded = async (): Promise<Seeded> => {
 
 let shared: Promise<Seeded> | undefined;
 
-/** One seeded Northgate for the cases that change nothing. */
 const seededOnce = (): Promise<Seeded> => (shared ??= seeded());
 
 const coverageAs = async (reader: UserPrincipal, guideId: string): Promise<Coverage> => {
@@ -350,6 +350,7 @@ describe("seeding a guide from a template", () => {
     expect(knowledge(facts.files)).toEqual(knowledge(parent.files));
 
     const file = await fileAtCommit(git, workspaceId, sha, `guides/${guideId}.yaml`);
+    expect(parseYaml(file)).toEqual(JSON.parse(file));
     expect(file.split("\n").slice(0, 24).join("\n")).toBe(
       [
         "{",
@@ -624,12 +625,64 @@ const indexedOf = async (workspaceId: string, iri: string) => {
   return row;
 };
 
+const rewordedBody = async (
+  ng: Northgate,
+  iri: string,
+  facts: { readonly kind: string; readonly tags: readonly string[]; readonly body: string },
+) => {
+  const held = await indexedOf(ng.scenario.workspaceId, iri);
+  answered(
+    await writeConcept(ng.editor, doorsOf(ng.scenario), {
+      iri,
+      mergeKey: held.merge_key,
+      path: held.path,
+      kind: facts.kind,
+      title: held.title,
+      frontmatter: { title: held.title, type: facts.kind, tags: [...facts.tags] },
+      body: facts.body,
+      message: "Reword the concept",
+      author: { name: "Nadia Editor", email: "nadia@northgate.invalid" },
+      expects: { base: held.content_hash },
+      reuse: "confirmed",
+    }),
+  );
+};
+
 describe("a change to a concept a write-up includes", () => {
+  it("replaces an unmet mark and keeps a review finding", async () => {
+    const { ng, guideId } = await seeded();
+    const { workspaceId } = ng.scenario;
+    await db().pool.query(
+      `UPDATE write_up w SET needs_review = 'review-finding'
+         FROM guide_section s
+        WHERE s.workspace_id = w.workspace_id AND s.guide_id = w.guide_id AND s.id = w.section_id
+          AND w.workspace_id = $1 AND w.guide_id = $2 AND s.prompt = 'Certifications'`,
+      [workspaceId, guideId],
+    );
+
+    await rewordedBody(ng, ng.iri("publicLiability"), {
+      kind: "insurance policy",
+      tags: ["public-liability"],
+      body: "Public liability cover of ten million pounds, renewed each April.",
+    });
+    await rewordedBody(ng, ng.iri("cyberEssentialsPlus"), {
+      kind: "certification",
+      tags: ["cyber-essentials-plus"],
+      body: "Northgate holds Cyber Essentials Plus, renewed each March by an accredited body.",
+    });
+
+    expect(await marksBySection(workspaceId, guideId)).toEqual({
+      ...AS_SEEDED,
+      Certifications: "review-finding",
+      "Information security": "concept-changed",
+      "Insurance and financial standing": "concept-changed",
+    });
+  });
+
   it("marks citing write-ups when a concept's content changes", async () => {
     const { ng, guideId } = await seeded();
     const { workspaceId } = ng.scenario;
     const certificate = ng.iri("cyberEssentialsPlus");
-    const held = await indexedOf(workspaceId, certificate);
     const hours = await indexedOf(workspaceId, ng.iri("supportHours"));
     answered(
       await writeConcept(ng.editor, doorsOf(ng.scenario), {
@@ -650,20 +703,11 @@ describe("a change to a concept a write-up includes", () => {
       hours.content_hash,
     );
 
-    answered(
-      await writeConcept(ng.editor, doorsOf(ng.scenario), {
-        iri: certificate,
-        mergeKey: held.merge_key,
-        path: held.path,
-        kind: "certification",
-        title: held.title,
-        frontmatter: { title: held.title, type: "certification", tags: ["cyber-essentials-plus"] },
-        body: "Northgate holds Cyber Essentials Plus, renewed each March by an accredited body.",
-        message: "Say when the certificate is renewed",
-        author: { name: "Nadia Editor", email: "nadia@northgate.invalid" },
-        expects: { base: held.content_hash },
-      }),
-    );
+    await rewordedBody(ng, certificate, {
+      kind: "certification",
+      tags: ["cyber-essentials-plus"],
+      body: "Northgate holds Cyber Essentials Plus, renewed each March by an accredited body.",
+    });
 
     expect(await marksBySection(workspaceId, guideId)).toEqual({
       ...AS_SEEDED,
