@@ -67,6 +67,7 @@ test("offers a way out, shell intact, when a page throws", async ({
   await expect(page.getByRole("navigation", { name: "Areas" }).getByRole("link")).toHaveText([
     "Ask",
     "Knowledge",
+    "Inbox",
     "Control Centre",
   ]);
   const navigation = page.getByRole("navigation", { name: "Control Centre" });
