@@ -45,6 +45,26 @@ export const seededBy = async <T>(
   }
 };
 
+export const writeUpIncluding = (
+  db: MigratedPostgres,
+  workspaceId: string,
+  iris: readonly string[],
+  held: { readonly sensitivity?: string; readonly audienceGroups?: readonly string[] } = {},
+): Promise<string> =>
+  seededBy(db, async (seed) => {
+    const writeUp = await seed.writeUp({
+      workspaceId,
+      ...(held.sensitivity === undefined ? {} : { sensitivity: held.sensitivity }),
+      ...(held.audienceGroups === undefined
+        ? {}
+        : { audience: "groups", audienceGroups: [...held.audienceGroups] }),
+    });
+    for (const [ordinal, iri] of iris.entries()) {
+      await seed.writeUpInclude({ workspaceId, writeUpId: writeUp.id, iri, ordinal });
+    }
+    return writeUp.id;
+  });
+
 export type ConnectedSourceShape = {
   readonly sensitivity?: string;
   readonly audience?: string;

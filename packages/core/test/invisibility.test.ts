@@ -33,9 +33,12 @@ import {
   documentUnder,
   groupNamed,
   restrictedAndInternal,
+  rewriteCiting,
   seededBy,
   visibilityHeld,
   visibilitySuite,
+  writeUpIncluding,
+  type SourcedConcept,
   type Sourced,
 } from "./sourced-concept.ts";
 import { documentLanded } from "./suite-documents.ts";
@@ -368,6 +371,90 @@ describe("a Restricted-sourced concept, to a Viewer", () => {
       "i1",
       "i2",
     ]);
+  });
+});
+
+describe("a re-write that moves only who may read a concept", () => {
+  const heldBy = async (scenario: Scenario, iri: string, writeUp: string) => ({
+    concept: await visibilityHeld(db().pool, "concept_index", scenario.workspaceId, iri),
+    writeUp: await visibilityHeld(db().pool, "write_up", scenario.workspaceId, writeUp),
+  });
+
+  const footnotesFor = (person: UserPrincipal, writeUp: string) =>
+    reading(person, (reader, tx) => footnotesOf(reader, tx, writeUp));
+
+  const footnoteTo = (written: SourcedConcept) => ({
+    ok: true,
+    value: [{ label: expect.any(String), iri: written.iri, title: written.title }],
+  });
+
+  it("takes the write-up along on an audience-only re-write", async () => {
+    const scenario = await arrange();
+    const hr = await groupNamed(db(), scenario, "HR", []);
+    const toEveryone = await connectedSourceHolding(db(), scenario.workspaceId, {
+      sensitivity: "Internal",
+    });
+    const toHr = await connectedSourceForGroups(db(), scenario.workspaceId, [hr], "Internal");
+    const written = await conceptCiting(scenario, scenario.editor, [toEveryone.documentId]);
+    const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [written.iri]);
+    const atEveryone = { sensitivity: "Internal", audience: "everyone", audience_groups: null };
+    expect(await heldBy(scenario, written.iri, writeUp)).toEqual({
+      concept: atEveryone,
+      writeUp: atEveryone,
+    });
+    expect(await footnotesFor(scenario.viewer, writeUp)).toEqual(footnoteTo(written));
+
+    const rewritten = await rewriteCiting(scenario, scenario.editor, written, [toHr.documentId]);
+
+    const atHr = { sensitivity: "Internal", audience: "groups", audience_groups: [hr] };
+    expect(await heldBy(scenario, written.iri, writeUp)).toEqual({
+      concept: atHr,
+      writeUp: atHr,
+    });
+    expect(await footnotesFor(scenario.viewer, writeUp)).toEqual({ ok: true, value: undefined });
+    await asAdmin(scenario, (admin, tx) =>
+      addToGroup(admin, tx, { groupId: hr, userId: scenario.viewer.userId }),
+    );
+    expect(await footnotesFor(scenario.viewer, writeUp)).toEqual(footnoteTo(written));
+    expect(rewritten.ok).toBe(true);
+  });
+
+  it("takes the write-up along on a groups-only re-write", async () => {
+    const scenario = await arrange();
+    const bids = await groupNamed(db(), scenario, "Bids", [scenario.editor]);
+    const legal = await groupNamed(db(), scenario, "Legal", [scenario.viewer]);
+    const bidsAndLegal = [bids, legal].toSorted();
+    const toBoth = await connectedSourceForGroups(
+      db(),
+      scenario.workspaceId,
+      bidsAndLegal,
+      "Internal",
+    );
+    const toBids = await connectedSourceForGroups(db(), scenario.workspaceId, [bids], "Internal");
+    const written = await conceptCiting(scenario, scenario.editor, [toBoth.documentId]);
+    const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [written.iri], {
+      audienceGroups: bidsAndLegal,
+    });
+    const atBoth = { sensitivity: "Internal", audience: "groups", audience_groups: bidsAndLegal };
+    expect(await heldBy(scenario, written.iri, writeUp)).toEqual({
+      concept: atBoth,
+      writeUp: atBoth,
+    });
+    expect(await footnotesFor(scenario.viewer, writeUp)).toEqual(footnoteTo(written));
+
+    const rewritten = await rewriteCiting(scenario, scenario.editor, written, [toBids.documentId]);
+
+    const atBids = { sensitivity: "Internal", audience: "groups", audience_groups: [bids] };
+    expect(await heldBy(scenario, written.iri, writeUp)).toEqual({
+      concept: atBids,
+      writeUp: atBids,
+    });
+    expect(await footnotesFor(scenario.viewer, writeUp)).toEqual({ ok: true, value: undefined });
+    await asAdmin(scenario, (admin, tx) =>
+      addToGroup(admin, tx, { groupId: bids, userId: scenario.viewer.userId }),
+    );
+    expect(await footnotesFor(scenario.viewer, writeUp)).toEqual(footnoteTo(written));
+    expect(rewritten.ok).toBe(true);
   });
 });
 
