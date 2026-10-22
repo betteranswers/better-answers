@@ -6,6 +6,8 @@ import { TRUST_TIERS } from "@better-answers/core/answering";
 import {
   foldKind,
   mergeKeyOf,
+  nameOwner,
+  nameOwnerInput,
   overrideConceptSensitivity,
   writeConcept,
 } from "@better-answers/core/concepts";
@@ -560,4 +562,26 @@ export const seedConcepts = async (
     concepts.push(await seedConcept(app, writer, concept, concepts));
   }
   return { concepts };
+};
+
+export const ownersNaming = z.strictObject({
+  workspaceId: z.string(),
+  userId: z.string(),
+  owners: z.array(nameOwnerInput).min(1),
+});
+
+export const nameOwners = async (
+  app: TestApp,
+  asked: z.output<typeof ownersNaming>,
+): Promise<{ readonly named: number }> => {
+  const { workspaceId, userId } = asked;
+  for (const [at, owner] of asked.owners.entries()) {
+    const { named } = await actingIn(app, { workspaceId, userId }, async (principal, tx) => ({
+      named: await nameOwner(principal, tx, owner),
+    }));
+    if (!named.ok) {
+      refuse([{ path: ["owners", at], message: `naming this owner was refused: ${named.error}` }]);
+    }
+  }
+  return { named: asked.owners.length };
 };

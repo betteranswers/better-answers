@@ -4,7 +4,9 @@ import { withRepositoryLock } from "@better-answers/core/store/git";
 import { conceptIriOf, ulid } from "@better-answers/schema";
 
 import {
+  collectionsAndOwners,
   nameOwner,
+  ownedBy,
   ownerOf,
   writeConcept,
   type ConceptWritten,
@@ -506,5 +508,103 @@ describe("naming an owner", () => {
       { detail: { collection: "policy", personId: scenario.viewer.userId } },
       { detail: { collection: "policy" } },
     ]);
+  });
+});
+
+const nameOf = async (personId: string): Promise<string> => {
+  const found = await db().pool.query<{ name: string }>('SELECT name FROM "user" WHERE id = $1', [
+    personId,
+  ]);
+  const name = found.rows[0]?.name;
+  if (name === undefined) throw new Error(`${personId} has no person row`);
+  return name;
+};
+
+const collectionsReadBy = (scenario: Scenario, reader: UserPrincipal) =>
+  withMember(reader, scenario.postgres, (fresh, tx) => collectionsAndOwners(fresh, tx));
+
+const ownedRead = (scenario: Scenario, reader: UserPrincipal) =>
+  withMember(reader, scenario.postgres, (fresh, tx) => ownedBy(fresh, tx));
+
+describe("the owner-visible reads", () => {
+  it("answers the member's owned collections and concept count", async () => {
+    const { scenario } = await ownedByTheViewer();
+    await nameOwnerAs(scenario.admin, scenario.postgres, {
+      collection: "guidance",
+      personId: scenario.viewer.userId,
+    });
+
+    const viewers = await ownedRead(scenario, scenario.viewer);
+    const unowned = await ownedRead(scenario, scenario.unowned);
+
+    expect(viewers).toEqual({
+      ok: true,
+      value: { ok: true, value: { collections: ["guidance"], concepts: 1 } },
+    });
+    expect(unowned).toEqual({
+      ok: true,
+      value: { ok: true, value: { collections: [], concepts: 0 } },
+    });
+  });
+
+  it("lists only collections the reader may read", async () => {
+    const scenario = await arrange();
+    const policy = await landedAs(
+      scenario,
+      scenario.admin,
+      conceptAt("knowledge/policy/expenses.md"),
+    );
+    await landedAs(
+      scenario,
+      scenario.admin,
+      conceptAt("knowledge/held/salaries.md", {
+        sensitivity: "Restricted",
+        expects: { head: policy.sha },
+      }),
+    );
+    await nameOwnerAs(scenario.admin, scenario.postgres, {
+      iri: policy.iri,
+      personId: scenario.viewer.userId,
+    });
+    const owner = { id: scenario.editor.userId, name: await nameOf(scenario.editor.userId) };
+
+    const editors = await collectionsReadBy(scenario, scenario.editor);
+    const admins = await collectionsReadBy(scenario, scenario.admin);
+
+    expect(editors).toEqual({
+      ok: true,
+      value: { ok: true, value: { collections: [{ collection: "policy", owner, overrides: 1 }] } },
+    });
+    expect(admins).toEqual({
+      ok: true,
+      value: {
+        ok: true,
+        value: {
+          collections: [
+            { collection: "held", owner, overrides: 0 },
+            { collection: "policy", owner, overrides: 1 },
+          ],
+        },
+      },
+    });
+  });
+
+  it("refuses an Editor owning nothing the collections read", async () => {
+    const scenario = await arrange();
+    await landedAs(scenario, scenario.admin, conceptAt("knowledge/policy/expenses.md"));
+
+    const owning = await collectionsReadBy(scenario, scenario.editor);
+    const owningNothing = await collectionsReadBy(scenario, scenario.unowned);
+
+    expect(owning).toMatchObject({ ok: true, value: { ok: true } });
+    expect(owningNothing).toEqual({ ok: true, value: { ok: false, error: "owner-forbids" } });
+  });
+
+  it("refuses a concept's own owner the collections read", async () => {
+    const { scenario } = await ownedByTheViewer();
+
+    const conceptsOwner = await collectionsReadBy(scenario, scenario.viewer);
+
+    expect(conceptsOwner).toEqual({ ok: true, value: { ok: false, error: "owner-forbids" } });
   });
 });

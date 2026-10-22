@@ -86,6 +86,12 @@ and the note on a flag. The file was written from the registry item as
 the table names, as the card's was. It brought no dependency. Its arrival edits are listed below
 with the others.
 
+BA-12 added shadcn's `native-select` on **22 October 2026**, for the owner picker on each row of
+Knowledge › Collections and Owners. The file was written from the registry item as
+`https://ui.shadcn.com/r/styles/new-york-v4/native-select.json` served it that day, whose item
+digest the table names, as the textarea's was. It brought no dependency: `lucide-react` was already
+here. Its arrival edits are listed below with the others.
+
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
 lockfile, which is where a reader reads them and where Renovate moves them.
@@ -143,6 +149,7 @@ the pin.
 | `kibo-ui/banner.tsx` | https://www.kibo-ui.com/r/banner.json | `77b8679e257a6712` | `a7dd5fee14228771` |
 | `card.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/card.json | `c7ebaa49ba2a0613` | `fb5eeec5da002628` |
 | `textarea.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/textarea.json | `2367d3964326b19c` | `80049d59f7302850` |
+| `native-select.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/native-select.json | `950729a758bef332` | `152927ec2dc1ad82` |
 
 The Kibo UI patterns, each read at commit `3d63cdb15b79d972e3dc38a10997987672f9b263` of
 [shadcnblocks/kibo](https://github.com/shadcnblocks/kibo) (MIT), under `packages/patterns/`. The
@@ -389,6 +396,14 @@ The arrival edits on `textarea`:
   file given this repository's format.
 - The field fills with the page surface, `bg-background`, rather than nothing, as `input.tsx` does,
   and its `dark:` utilities are gone, as every other field's are: the tokens flip each colour.
+
+The arrival edits on `native-select`:
+
+- The `cn` import repointed at `@/shared/lib/utils.ts` and the dependency on `cn` dropped, and the
+  file given this repository's format and import order.
+- The select fills with the page surface, `bg-background`, rather than `bg-transparent`, as
+  `input.tsx` and `textarea.tsx` do, and its `dark:` utilities are gone: the tokens flip each
+  colour. Its chevron, lucide's, stays inside this directory.
 
 The edits made on 10 October 2026 for BA-98, which made the dark theme reachable:
 

@@ -1,8 +1,19 @@
 import { find, findInput, open, openInput, type OpenResult } from "@better-answers/core/answering";
+import { collectionsAndOwners, nameOwner, nameOwnerInput } from "@better-answers/core/concepts";
 import { err, NOT_FOUND, ok, type Result } from "@better-answers/core/kernel";
 
 import { MCP_TOKEN_RULE } from "../auth/constants.ts";
-import { crossing, given, parsedBy, queryCeiling, router, type RoadCeiling } from "./base.ts";
+import {
+  answeredBy,
+  crossing,
+  given,
+  mutationProcedure,
+  parsedBy,
+  queryCeiling,
+  queryProcedure,
+  router,
+  type RoadCeiling,
+} from "./base.ts";
 
 type Found = Extract<OpenResult, { readonly found: true }>;
 
@@ -34,4 +45,8 @@ export const knowledgeRouter = router({
       ),
     ),
   ),
+  collections: queryProcedure.query(({ ctx }) =>
+    crossing(ctx, collectionsAndOwners.name, collectionsAndOwners(ctx.principal, ctx.tx)),
+  ),
+  nameOwner: mutationProcedure.input(parsedBy(nameOwnerInput)).mutation(answeredBy(nameOwner)),
 });

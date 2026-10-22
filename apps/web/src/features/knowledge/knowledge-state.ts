@@ -14,6 +14,10 @@ export const CONCEPT_KEYSTROKES = {
   links: { key: "l", action: "Go to the Concept’s Links" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
+export const COLLECTIONS_KEYSTROKES = {
+  changeOwner: { key: "c", action: "Change the Owner of the Collection in Focus" },
+} as const satisfies Readonly<Record<string, Keystroke>>;
+
 export const SEARCH_LIST = "knowledge";
 
 export const QUERY_MAX = 500;

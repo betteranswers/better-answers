@@ -10,13 +10,16 @@ import {
   menuGroupIn,
   hides,
   HOMES,
+  KNOWLEDGE,
   movedWithin,
+  OWNS_NOTHING,
   placeAt,
   readerOf,
   pageNamed,
   pagesOf,
   AREAS,
   visibleTo,
+  type Owns,
   type Role,
   type Page,
   type Area,
@@ -46,7 +49,7 @@ const builtThroughout = (area: Area): Area => ({
   })),
 });
 
-const aPage = (name: string, built: boolean, owners?: true): Page => ({
+const aPage = (name: string, built: boolean, owners?: Page["owners"]): Page => ({
   name,
   path: `/a/${name.toLowerCase()}`,
   icon: "map",
@@ -121,7 +124,7 @@ describe("the one navigation list", () => {
     ]);
   });
 
-  it("calls only today's fourteen pages built", () => {
+  it("calls only today's fifteen pages built", () => {
     expect(
       pagesOf([...AREAS, CONSOLE])
         .filter((each) => each.built)
@@ -131,6 +134,7 @@ describe("the one navigation list", () => {
       "/ask/your-questions",
       "/ask/connect-claude",
       "/knowledge/search",
+      "/knowledge/collections-and-owners",
       "/sources/connected-sources",
       "/models/models-and-spend",
       "/questions/questions-asked",
@@ -170,6 +174,16 @@ describe("the one navigation list", () => {
   });
 });
 
+const ASK_OUTLINE = ["Ask", [[null, ["New Question", "Your Questions", "Connect Claude"]]]];
+
+const KNOWLEDGE_WITH_CURATION = [
+  "Knowledge",
+  [
+    ["Browse", ["Search"]],
+    ["Curation", ["Collections and Owners"]],
+  ],
+];
+
 describe("what each person is shown", () => {
   for (const role of ["Editor", "Viewer"] as const) {
     it(`shows ${aRole(role)} Ask, at their home, and Search`, () => {
@@ -184,12 +198,12 @@ describe("what each person is shown", () => {
     });
   }
 
-  it("shows an Admin Ask, Search and Control Centre's built pages", () => {
+  it("shows an Admin Ask, Knowledge and Control Centre's built pages", () => {
     const shown = visibleTo(readerOf("Admin"), AREAS);
 
     expect(outline(shown.areas)).toEqual([
-      ["Ask", [[null, ["New Question", "Your Questions", "Connect Claude"]]]],
-      ["Knowledge", [["Browse", ["Search"]]]],
+      ASK_OUTLINE,
+      KNOWLEDGE_WITH_CURATION,
       [
         "Control Centre",
         [
@@ -247,22 +261,70 @@ describe("what each person is shown", () => {
         {
           id: "g",
           name: "G",
-          pages: [aPage("Owned", true, true), aPage("Roles", true), aPage("Later", false, true)],
+          pages: [
+            aPage("Collection's", true, "of-a-collection"),
+            aPage("Anything's", true, "of-anything"),
+            aPage("Roles", true),
+            aPage("Later", false, "of-a-collection"),
+          ],
         },
       ],
     };
 
-    const namesFor = (role: Role, owns: readonly string[]) =>
-      pagesOf(visibleTo({ role, owns }, [anArea]).areas).map((each) => each.name);
+    const namesFor = (role: Role, owns: Owns) =>
+      pagesOf(visibleTo(readerOf(role, owns), [anArea]).areas).map((each) => each.name);
 
-    expect(namesFor("Admin", [])).toEqual(["Owned", "Roles"]);
-    expect(namesFor("Viewer", [])).toEqual([]);
-    expect(namesFor("Viewer", ["Answer"])).toEqual(["Owned"]);
+    expect(namesFor("Admin", OWNS_NOTHING)).toEqual(["Collection's", "Anything's", "Roles"]);
+    expect(namesFor("Viewer", OWNS_NOTHING)).toEqual([]);
+    expect(namesFor("Viewer", { collections: ["Answer"], concepts: 0 })).toEqual([
+      "Collection's",
+      "Anything's",
+    ]);
+    expect(namesFor("Viewer", { collections: [], concepts: 1 })).toEqual(["Anything's"]);
+  });
+
+  it("shows Curation to an owner of any collection", () => {
+    const owner = readerOf("Editor", { collections: ["policy"], concepts: 0 });
+
+    expect(outline(visibleTo(owner, AREAS).areas)).toEqual([ASK_OUTLINE, KNOWLEDGE_WITH_CURATION]);
+  });
+
+  it("hides Curation from an Editor owning nothing", () => {
+    const owningNothing = readerOf("Editor", { collections: [], concepts: 0 });
+
+    expect(outline(visibleTo(owningNothing, AREAS).areas)).toEqual([
+      ASK_OUTLINE,
+      ["Knowledge", [["Browse", ["Search"]]]],
+    ]);
+  });
+
+  it("opens Waiting on you, not Curation, to a concept's owner", () => {
+    const owner = readerOf("Editor", { collections: [], concepts: 1 });
+
+    expect(outline(visibleTo(owner, AREAS.map(builtThroughout)).areas)).toEqual([
+      ASK_OUTLINE,
+      ["Knowledge", [["Browse", ["Search", "Guides"]]]],
+      ["Inbox", [[null, ["Waiting on You"]]]],
+    ]);
+  });
+
+  it("shows the not-found page at Curation to the unowned", () => {
+    const path = pageNamed(menuGroupIn(KNOWLEDGE, "curation"), "Collections and Owners").path;
+    const owns = { collections: ["policy"], concepts: 0 };
+
+    expect(hides(visibleTo(readerOf("Editor", owns), AREAS), path)).toBe(false);
+    expect(hides(visibleTo(readerOf("Viewer", owns), AREAS), path)).toBe(false);
+    for (const role of ["Editor", "Viewer"] as const) {
+      expect(hides(visibleTo(readerOf(role, { collections: [], concepts: 1 }), AREAS), path)).toBe(
+        true,
+      );
+      expect(hides(visibleTo(readerOf(role), AREAS), path)).toBe(true);
+    }
   });
 
   it("declares who sees each group once its pages are built", () => {
-    const groupsFor = (role: Role, owns: readonly string[]) =>
-      visibleTo({ role, owns }, AREAS.map(builtThroughout)).areas.map((area) => [
+    const groupsFor = (role: Role, owns: Owns) =>
+      visibleTo(readerOf(role, owns), AREAS.map(builtThroughout)).areas.map((area) => [
         area.name,
         area.menuGroups.map((group) => group.name ?? null),
       ]);
@@ -277,18 +339,18 @@ describe("what each person is shown", () => {
       "System",
     ];
 
-    expect(groupsFor("Admin", [])).toEqual([
+    expect(groupsFor("Admin", OWNS_NOTHING)).toEqual([
       ["Ask", [null]],
       ["Knowledge", ["Browse", "Curation"]],
       ["Inbox", [null]],
       ["Control Centre", controlCentre],
     ]);
     for (const role of ["Editor", "Viewer"] as const) {
-      expect(groupsFor(role, [])).toEqual([
+      expect(groupsFor(role, OWNS_NOTHING)).toEqual([
         ["Ask", [null]],
         ["Knowledge", ["Browse"]],
       ]);
-      expect(groupsFor(role, ["Answer"])).toEqual([
+      expect(groupsFor(role, { collections: ["Answer"], concepts: 0 })).toEqual([
         ["Ask", [null]],
         ["Knowledge", ["Browse", "Curation"]],
         ["Inbox", [null]],

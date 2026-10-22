@@ -7,11 +7,14 @@ import {
   ids,
   type SUGGESTION_KINDS,
 } from "@better-answers/schema";
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 
+import { readableClause, readableParameters } from "../access/index.ts";
 import { action, declareActions, record } from "../audit/index.ts";
 import {
   admit,
   ADMIN_ALONE,
+  ANY_ROLE,
   attempt,
   declareAction,
   err,
@@ -119,17 +122,123 @@ export const deciderAdmits = async (
   return principal.role === "Admin" ? undefined : "role-forbids";
 };
 
-const OWNED_SUBJECT = z.union([
-  z.strictObject({ collection: z.string().regex(COLLECTION) }),
-  z.strictObject({ iri: ids.conceptIri }),
-]);
+type Owns = { readonly collections: readonly string[]; readonly concepts: number };
+
+const ownedByAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.object({}),
+  refuses: ["role-forbids"],
+});
+
+const OWNED_BY = `SELECT collection FROM concept_owner WHERE workspace_id = $1 AND person_id = $2`;
+
+const ownsOf = async (principal: UserPrincipal, tx: Tx): Promise<Owns> => {
+  const rows = await tx.query<{ collection: string | null }>(OWNED_BY, [
+    principal.workspaceId,
+    principal.userId,
+  ]);
+  const collections = rows.rows.flatMap(({ collection }) => collection ?? []);
+  return {
+    collections: collections.toSorted(byCodeUnit),
+    concepts: rows.rows.length - collections.length,
+  };
+};
+
+export const ownedBy = async (
+  principal: UserPrincipal,
+  tx: Tx,
+): Promise<Result<Owns, RefusalOf<typeof ownedByAction> | Error>> => {
+  const admitted = admit(ownedByAction, principal, {});
+  if (!admitted.ok) return err(admitted.error);
+  return attempt(() => ownsOf(admitted.value, tx));
+};
+
+type CollectionOwned = {
+  readonly collection: string;
+  readonly owner: { readonly id: UserId; readonly name: string } | null;
+  readonly overrides: number;
+};
+
+type CollectionsAndOwners = { readonly collections: readonly CollectionOwned[] };
+
+const collectionsAndOwnersAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.object({}),
+  refuses: ["role-forbids", "owner-forbids"],
+});
+
+type CollectionsAndOwnersRefusal = RefusalOf<typeof collectionsAndOwnersAction> | Error;
+
+const COLLECTIONS_AND_OWNERS = `SELECT c.collection, o.person_id, u.name AS person_name,
+         count(overridden.iri)::int AS overrides
+    FROM concept_index c
+    LEFT JOIN concept_owner o
+           ON o.workspace_id = c.workspace_id AND o.collection = c.collection
+    LEFT JOIN "user" u ON u.id = o.person_id
+    LEFT JOIN concept_owner overridden
+           ON overridden.workspace_id = c.workspace_id AND overridden.iri = c.iri
+   WHERE c.workspace_id = $1 AND c.collection IS NOT NULL AND ${readableClause("c", 2)}
+   GROUP BY c.collection, o.person_id, u.name`;
+
+type CollectionRow = {
+  readonly collection: string;
+  readonly person_id: UserId | null;
+  readonly person_name: string | null;
+  readonly overrides: number;
+};
+
+const ownedRow = (row: CollectionRow): CollectionOwned => ({
+  collection: row.collection,
+  owner: row.person_id === null ? null : { id: row.person_id, name: row.person_name ?? "" },
+  overrides: row.overrides,
+});
+
+const OWNS_A_COLLECTION = `SELECT 1 FROM concept_owner
+    WHERE workspace_id = $1 AND person_id = $2 AND collection IS NOT NULL
+    LIMIT 1`;
+
+const collectionOwnerAdmits = async (
+  reader: UserPrincipal,
+  tx: Tx,
+): Promise<OwnerRefusal | undefined> => {
+  if (reader.role === "Admin") return undefined;
+  const owning = await tx.query(OWNS_A_COLLECTION, [reader.workspaceId, reader.userId]);
+  return owning.rowCount === 0 ? "owner-forbids" : undefined;
+};
+
+const collectionsReadBy = async (reader: UserPrincipal, tx: Tx): Promise<CollectionsAndOwners> => {
+  const rows = await tx.query<CollectionRow>(COLLECTIONS_AND_OWNERS, [
+    reader.workspaceId,
+    ...readableParameters(reader),
+  ]);
+  return {
+    collections: rows.rows
+      .map(ownedRow)
+      .toSorted((one, other) => byCodeUnit(one.collection, other.collection)),
+  };
+};
+
+export const collectionsAndOwners = async (
+  principal: UserPrincipal,
+  tx: Tx,
+): Promise<Result<CollectionsAndOwners, CollectionsAndOwnersRefusal>> => {
+  const admitted = admit(collectionsAndOwnersAction, principal, {});
+  if (!admitted.ok) return err(admitted.error);
+  const reader = admitted.value;
+  const refused = await attempt(() => collectionOwnerAdmits(reader, tx));
+  if (!refused.ok) return err(refused.error);
+  if (refused.value !== undefined) return err(refused.value);
+  return attempt(() => collectionsReadBy(reader, tx));
+};
 
 const OWNER_PERSON = boundarySchemas.conceptOwner.insert.shape.personId.nullable();
 
-export type NameOwnerInput = (
-  | { readonly collection: string; readonly iri?: never }
-  | { readonly iri: string; readonly collection?: never }
-) & { readonly personId: string | null };
+export const nameOwnerInput = z.union([
+  z.strictObject({ collection: z.string().regex(COLLECTION), personId: OWNER_PERSON }),
+  z.strictObject({ iri: ids.conceptIri, personId: OWNER_PERSON }),
+]);
+
+export type NameOwnerInput = z.input<typeof nameOwnerInput>;
 
 const nameOwnerAction = declareAction({
   admits: ADMIN_ALONE,
@@ -144,7 +253,7 @@ export type OwnerNamed = {
   readonly personId: string | null;
 };
 
-type Subject = z.infer<typeof OWNED_SUBJECT>;
+type Subject = { readonly collection: string } | { readonly iri: string };
 
 const subjectClause = (subject: Subject): readonly [column: "iri" | "collection", value: string] =>
   "iri" in subject ? ["iri", subject.iri] : ["collection", subject.collection];
@@ -215,12 +324,11 @@ export const nameOwner = async (
   const admitted = admit(nameOwnerAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const admin = admitted.value;
-  const { personId: asked, ...named } = input;
-  const subject = OWNED_SUBJECT.safeParse(named);
-  const personId = OWNER_PERSON.safeParse(asked);
-  if (!subject.success || !personId.success) return err("malformed");
+  const parsed = nameOwnerInput.safeParse(input);
+  if (!parsed.success) return err("malformed");
+  const { personId, ...subject } = parsed.data;
 
-  const written = await attempt(() => openedAndWritten(admin, tx, subject.data, personId.data));
+  const written = await attempt(() => openedAndWritten(admin, tx, subject, personId));
   if (!written.ok) return err(written.error);
   if (written.value !== undefined) return err(written.value);
 
@@ -228,8 +336,8 @@ export const nameOwner = async (
   await record(admin, tx, {
     id: auditEventId,
     action: OWNER_ACTIONS.named,
-    subjectId: subjectClause(subject.data)[1],
-    detail: personId.data === null ? subject.data : { ...subject.data, personId: personId.data },
+    subjectId: subjectClause(subject)[1],
+    detail: personId === null ? subject : { ...subject, personId },
   });
-  return ok({ auditEventId, personId: personId.data });
+  return ok({ auditEventId, personId });
 };

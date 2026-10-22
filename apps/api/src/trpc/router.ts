@@ -1,6 +1,7 @@
 import { octetInputParser } from "@trpc/server/http";
 
-import { err } from "@better-answers/core/kernel";
+import { ownedBy } from "@better-answers/core/concepts";
+import { err, ok, type UserPrincipal } from "@better-answers/core/kernel";
 import { listModelChoices } from "@better-answers/core/llm";
 import { runsOfSubject, runsOfSubjectInput } from "@better-answers/core/runs";
 import {
@@ -23,6 +24,7 @@ import {
   widenConnectedSource,
   widenConnectedSourceInput,
 } from "@better-answers/core/sources";
+import type { Tx } from "@better-answers/core/store/postgres";
 import { readMember, standingAsOperator } from "@better-answers/core/workspaces";
 
 import { askRouter } from "./ask.ts";
@@ -44,10 +46,18 @@ import { personRouter } from "./person.ts";
 import { questionsRouter } from "./questions.ts";
 import { descriptorOf, uploadDoorsOf } from "./upload.ts";
 
+const memberOwning = async (principal: UserPrincipal, tx: Tx) => {
+  const member = await readMember(principal, tx);
+  if (!member.ok) return err(member.error);
+  const owns = await ownedBy(principal, tx);
+  if (!owns.ok) return err(owns.error);
+  return ok({ ...member.value, owns: owns.value });
+};
+
 export const appRouter = router({
   session: router({
     member: queryProcedure.query(({ ctx }) =>
-      crossing(ctx, readMember.name, readMember(ctx.principal, ctx.tx)),
+      crossing(ctx, readMember.name, memberOwning(ctx.principal, ctx.tx)),
     ),
     operator: personProcedure.query(({ ctx }) =>
       crossing(
