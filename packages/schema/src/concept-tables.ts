@@ -46,6 +46,10 @@ export const VERIFICATION_CITATION_FIX_ORIGIN =
 export const VERIFICATION_ERASURE_ORIGIN =
   "erasure-rewrite" satisfies (typeof VERIFICATION_ORIGINS)[number];
 
+export const UNREVIEWED_TIERS = ["unverified", "machine-confirmed"] as const;
+
+export const TRUST_TIERS = [...UNREVIEWED_TIERS, "human-reviewed"] as const;
+
 export {
   CONCEPT_IRI,
   CONCEPT_IRI_PREFIX,

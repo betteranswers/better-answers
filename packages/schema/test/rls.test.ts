@@ -71,6 +71,7 @@ import {
   AN_IDENTITY_SET_AUDIT_EVENT_ROW_WITH_ITS_FAMILY,
   AN_INVITATION,
   AN_UNRESOLVED_REFERENCE,
+  GUIDE_RECORDS,
   ONE_CALL_AGAINST_A_TOKEN,
   REFRESH_THE_READING,
   THE_DETAIL_EDITED,
@@ -115,6 +116,24 @@ const countedRows = async (
   }
   return rows;
 };
+
+const seenUnscopedThenAsTenantA = (
+  tables: readonly string[],
+  seedOneOfEach: (seed: TestData, workspaceId: string) => Promise<unknown>,
+) =>
+  withRollback(db.pool, async (client) => {
+    const seed = await seedTwoWorkspaces(client);
+    for (const workspaceId of [WS_A, WS_B]) await seedOneOfEach(seed, workspaceId);
+    await client.query("SET LOCAL ROLE app_rt");
+    const unscoped = await countedRows(client, tables);
+    await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+    return { unscoped, scoped: await countedRows(client, tables) };
+  });
+
+const noneThenOneEach = (tables: readonly string[]) => ({
+  unscoped: tables.map((table) => ({ table, rows: 0 })),
+  scoped: tables.map((table) => ({ table, rows: 1 })),
+});
 
 const rlsFlags = async (qualified: string) => {
   const [schema, table] = qualified.split(".");
@@ -2656,20 +2675,9 @@ describe("the derivation's tables under app_rt", () => {
   };
 
   it("returns none unscoped and only the tenant's, on all six", async () => {
-    await withRollback(db.pool, async (client) => {
-      const seed = await seedTwoWorkspaces(client);
-      for (const workspaceId of [WS_A, WS_B]) await seedOneOfEach(seed, workspaceId);
-      await client.query("SET LOCAL ROLE app_rt");
-
-      expect(await countedRows(client, DERIVATION_TABLES)).toEqual(
-        DERIVATION_TABLES.map((table) => ({ table, rows: 0 })),
-      );
-
-      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      expect(await countedRows(client, DERIVATION_TABLES)).toEqual(
-        DERIVATION_TABLES.map((table) => ({ table, rows: 1 })),
-      );
-    });
+    expect(await seenUnscopedThenAsTenantA(DERIVATION_TABLES, seedOneOfEach)).toEqual(
+      noneThenOneEach(DERIVATION_TABLES),
+    );
   });
 
   const REFUSED_TO_THE_WORKER = [
@@ -2869,6 +2877,25 @@ describe("the derivation's tables under app_rt", () => {
         { table: "write_up_include", rows: 0 },
       ]);
     });
+  });
+});
+
+describe("the guide records under app_rt", () => {
+  const seedOneOfEach = async (seed: TestData, workspaceId: string) => {
+    const { id: guideId } = await seed.guideDefinition({ workspaceId });
+    await seed.guideRole({ workspaceId, guideId });
+    const { id: sectionId } = await seed.guideSection({ workspaceId, guideId });
+    await seed.guideExpectedFact({ workspaceId, guideId, sectionId });
+    await seed.guideDefinitionVersion({ workspaceId, guideId });
+    const { id: writeUpId } = await seed.writeUp({ workspaceId, guideId, sectionId });
+    const { version } = await seed.writeUpVersion({ workspaceId, writeUpId });
+    await seed.usage({ workspaceId, writeUpId, writeUpVersion: version });
+  };
+
+  it("returns none unscoped and only the tenant's, on all seven", async () => {
+    expect(await seenUnscopedThenAsTenantA(GUIDE_RECORDS, seedOneOfEach)).toEqual(
+      noneThenOneEach(GUIDE_RECORDS),
+    );
   });
 });
 

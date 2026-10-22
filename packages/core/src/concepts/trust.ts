@@ -1,9 +1,9 @@
+import type { UNREVIEWED_TIERS } from "@better-answers/schema";
+
 import { isActorId, isPersonActor, type ActorId } from "../kernel/index.ts";
 import type { Frontmatter, FrontmatterValue } from "./file.ts";
 
-export const UNREVIEWED_TIERS = ["unverified", "machine-confirmed"] as const;
-
-export const TRUST_TIERS = [...UNREVIEWED_TIERS, "human-reviewed"] as const;
+export { TRUST_TIERS, UNREVIEWED_TIERS } from "@better-answers/schema";
 
 export const TRUST_STATUSES = [
   "current",

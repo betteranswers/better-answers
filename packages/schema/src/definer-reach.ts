@@ -72,6 +72,13 @@ export const SECURITY_DEFINER_REACH = [
       "Past the caller's grants. `app_rt` holds no privilege on `concept_write_request`. The function has the guards of `erase_from_the_suggestions`, and also refuses an address that is not an email address, so it rewrites only `human:<person id>` and `human:<address>`, each ending at an address boundary, to `human:<pseudonym>`. A body the rewrite would push past its CHECK becomes a fixed sentence, and a waiting suggestion it belongs to is returned through the decision path. The same limit holds: the guards do not prove the people and addresses are the erasure's subject.",
   },
   {
+    fn: "public.pseudonymise_record_actors",
+    args: "p_workspace_id text, p_table text, p_people text[], p_pseudonym text",
+    reaches: ["public.write_up_version", "public.guide_definition_version"],
+    reason:
+      "Past the caller's grants. `app_rt` holds no UPDATE on either version table, because a version is never rewritten, so an erasure's rewrite of who saved one runs through this function and in no other way. It has the guards of `erase_from_the_suggestions`: it refuses a workspace other than the transaction's, a person that is not a person id, and a pseudonym that no `erasure_request` in the workspace carries. It refuses a table other than the two, names each table in static SQL, and rewrites `actor` from `human:<person id>` to `human:<pseudonym>` and nothing else, so a version's text stays as saved. The guards do not prove the people are that erasure's subject.",
+  },
+  {
     fn: "public.analyse_map",
     args: "",
     reaches: ["public.map_node", "public.map_edge"],

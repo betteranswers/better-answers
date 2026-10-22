@@ -97,10 +97,17 @@ export const TABLE_OWNERS = {
 
   "public.write_up": "guides",
   "public.write_up_include": "guides",
+  "public.write_up_version": "guides",
+  "public.guide_definition": "guides",
+  "public.guide_role": "guides",
+  "public.guide_section": "guides",
+  "public.guide_expected_fact": "guides",
+  "public.guide_definition_version": "guides",
 
   "public.question_asked": "answering",
   "public.question_content": "answering",
   "public.question_feedback": "answering",
+  "public.usage": "answering",
 } satisfies Record<string, string>;
 
 export type OwnedTable = keyof typeof TABLE_OWNERS;

@@ -116,8 +116,40 @@ export const A_SOURCE_DOCUMENT = `INSERT INTO source_document
          (workspace_id, id, connected_source_id, source_system_id, title, media_type, byte_size, original_key)
        VALUES ($1, $2, $3, $4, $5, 'text/markdown', $6, 'documents/x/original')`;
 
-export const A_WRITE_UP_INCLUDE = `INSERT INTO write_up_include (workspace_id, write_up_id, id, ordinal, iri)
-       VALUES ($1, $2, 'i9', 9, $3)`;
+export const A_WRITE_UP_INCLUDE = `INSERT INTO write_up_include (workspace_id, write_up_id, id, ordinal, iri, content_hash)
+       VALUES ($1, $2, 'i9', 9, $3, repeat('a', 64))`;
+
+export const GUIDE_RECORDS = [
+  "guide_definition",
+  "guide_role",
+  "guide_section",
+  "guide_expected_fact",
+  "guide_definition_version",
+  "write_up_version",
+  "usage",
+] as const;
+
+export const A_HOMED_WRITE_UP = `INSERT INTO write_up
+         (workspace_id, id, home, guide_id, section_id, question_id, needs_review)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`;
+
+export const A_WORDED_INCLUDE = `INSERT INTO write_up_include
+         (workspace_id, write_up_id, id, ordinal, iri, content_hash, wording_heading, wording_hash)
+       VALUES ($1, $2, 'i9', 9, $3, repeat('a', 64), $4, $5)`;
+
+export const A_USAGE = `INSERT INTO "usage" (workspace_id, id, actor, act, write_up_id, write_up_version, iri)
+       VALUES ($1, $2, 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', 'copied', $3, $4, $5)`;
+
+export const THE_SECOND_GUIDE_DEFINITION_VERSION = `INSERT INTO guide_definition_version
+         (workspace_id, guide_id, version, actor, content)
+       VALUES ($1, $2, 2, 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', '{}'::jsonb)`;
+
+export const THE_SECOND_WRITE_UP_VERSION = `INSERT INTO write_up_version
+         (workspace_id, write_up_id, version, actor, markdown, includes)
+       VALUES ($1, $2, 2, 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', 'Our approach, revised.', '[]'::jsonb)`;
+
+export const A_GUIDE_ROLE = `INSERT INTO guide_role (workspace_id, guide_id, role, default_layer, action_threshold)
+       VALUES ($1, $2, $3, $4, 'human-reviewed')`;
 
 export const A_CONCEPT_SENSITIVITY_OVERRIDE = `INSERT INTO concept_sensitivity_override
          (workspace_id, iri, sensitivity, audience, actor, audit_event_id)
