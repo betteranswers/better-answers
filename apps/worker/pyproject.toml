@@ -9,7 +9,7 @@ dependencies = [
     # implementation is one pinned library rather than a second toolchain to patch.
     # Version read from PyPI's dulwich release metadata on 06/10/2026; Apache-2.0 under
     # its dual licence, which is the arm this repository takes (ADR 0027).
-    "dulwich==1.2.17",
+    "dulwich==1.2.19",
     # The claim protocol and every read the two job kinds make. It was in the dev group
     # while nothing in `src` opened a connection; the work loop opens one on every tick,
     # so it belongs to what the image ships.
@@ -67,7 +67,7 @@ dependencies = [
     # `apps/worker/tests/test_pipeline_engine_environment.py` holds *when*.
     # Bumping this pin re-runs that probe and that suite and re-dates this record in the
     # same commit.
-    "cocoindex==1.0.25",
+    "cocoindex==1.0.26",
     # The driver the engine's Postgres target acquires its own connections through, and
     # the one the pipeline's per-workspace pool is built from. It is named here rather
     # than left to cocoindex's `postgres` extra, whose floor would let the driver move
@@ -80,7 +80,7 @@ dependencies = [
     # source, because the bytes are addressed by keys the document's catalogue row
     # already holds and nothing here walks a bucket. Read from PyPI on 10/10/2026;
     # Apache-2.0.
-    "boto3==1.43.115",
+    "boto3==1.43.118",
     # The two converters, one per media type (ADR 0013, amended 20/09/2026). `anydoc`
     # answers a `.docx` as GitHub-flavoured Markdown; `pdf-inspector` answers a PDF as
     # Markdown and classifies its pages first. Both are Rust extensions with no model in
