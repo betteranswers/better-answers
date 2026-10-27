@@ -83,6 +83,7 @@ describe("the syntax the lint refuses, with what to write instead", () => {
     ["a list inside another object's `enum`", parsing('  return choices.enum(["a", "b"]);')],
     ["`\\v` with no flag", holding("  return /[\\v]/.test(key);")],
     ["`\\s` under the `u` flag", holding("  return /[\\s]/u.test(key);")],
+    ["`\\\\v` under the `u` flag", holding("  return /\\\\v/u.test(key);")],
   ])("stays silent on %s", (_shape, tree) => {
     expect(lint.flagged(tree)).toEqual([]);
   });
