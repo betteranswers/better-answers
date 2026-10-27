@@ -271,8 +271,8 @@ export function LinkPage() {
 
   const landAfterSignIn = (signedIn: SignedInByLink) => {
     queryClient.clear();
-    void stepAfterSignIn(signedIn.carried, signedIn.displayNameGiven).then((next) =>
-      navigate(leavingFor(next)),
+    void stepAfterSignIn(signedIn.carried, signedIn.displayNameGiven).then((after) =>
+      navigate(leavingFor(after)),
     );
   };
 

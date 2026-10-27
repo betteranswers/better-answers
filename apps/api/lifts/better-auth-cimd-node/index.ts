@@ -139,14 +139,13 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
               : Readable.toWeb(response);
           // Guard: `Response` throws on a status outside 200–599, and a throw in this callback
           // is uncaught, so it would end the process.
+          let reply: Response;
           try {
-            resolve(
-              new Response(body, {
-                headers: responseHeaders(response.headers),
-                status,
-                statusText: response.statusMessage ?? "",
-              }),
-            );
+            reply = new Response(body, {
+              headers: responseHeaders(response.headers),
+              status,
+              statusText: response.statusMessage ?? "",
+            });
           } catch (cause) {
             response.destroy();
             reject(
@@ -154,7 +153,9 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
                 cause,
               }),
             );
+            return;
           }
+          resolve(reply);
         },
       );
       outbound.once("error", reject);

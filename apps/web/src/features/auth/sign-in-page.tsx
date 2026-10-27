@@ -308,8 +308,8 @@ export function SignInPage() {
 
   const moveOnAfterSignIn = (signedIn: SignedIn) => {
     queryClient.clear();
-    void stepAfterSignIn(pageQuery(), signedIn.displayNameGiven).then((next) =>
-      navigate(leavingFor(next)),
+    void stepAfterSignIn(pageQuery(), signedIn.displayNameGiven).then((after) =>
+      navigate(leavingFor(after)),
     );
   };
 
