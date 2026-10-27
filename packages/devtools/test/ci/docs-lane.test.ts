@@ -68,9 +68,6 @@ const laneOf = (changed: readonly string[], separator = "\n"): string =>
 
 const imagesOf = (changed: readonly string[]): string => decide(changed).images;
 
-const dependenciesOf = (changed: readonly string[]): string =>
-  answerOf(answersTo(changed), "dependencies");
-
 type LaneCase = {
   readonly changed: readonly string[];
 
@@ -261,28 +258,6 @@ describe("which lane a change runs in", () => {
     expect(laneOf(["docs/a.md", "docs/b.md"], "\0")).toEqual("docs");
     expect(laneOf(["docs/a\nb.md"], "\0")).toEqual("docs");
     expect(laneOf(["docs/a.md", "src/b.ts"], "\0")).toEqual("full");
-  });
-});
-
-describe("which paths are a dependency change", () => {
-  it.each([
-    "package.json",
-    "apps/api/package.json",
-    "pnpm-lock.yaml",
-    "pnpm-workspace.yaml",
-    "apps/worker/pyproject.toml",
-    "apps/worker/uv.lock",
-  ])("typechecks a pull request that changes %s", (changed) => {
-    expect(dependenciesOf(["apps/api/src/main.ts", changed])).toEqual("yes");
-  });
-
-  it("leaves a change to no manifest or lockfile untypechecked", () => {
-    expect(dependenciesOf(["apps/api/src/main.ts", "docs/vision.md"])).toEqual("no");
-    expect(dependenciesOf(["apps/web/package.json.bak", "packages/core/uv.lock"])).toEqual("no");
-  });
-
-  it("typechecks when given no paths", () => {
-    expect(dependenciesOf([])).toEqual("yes");
   });
 });
 
@@ -551,11 +526,7 @@ const FAN_IN = "check";
 
 const TITLE_JOB = "pr-title";
 
-const TYPECHECK_JOB = "dependency-typecheck";
-
-const JOBS_ON_NO_LANE: readonly string[] = [TITLE_JOB, TYPECHECK_JOB];
-
-const LOCKFILE_JOB = "pr-lockfile";
+const JOBS_ON_NO_LANE: readonly string[] = [TITLE_JOB];
 
 const checkJobs = (): Readonly<Record<string, Job>> => workflow("check.yml").jobs;
 
@@ -645,8 +616,6 @@ type LaneStepCase = {
   readonly lane: string;
 
   readonly images: string;
-
-  readonly dependencies: string;
 };
 
 const aPullRequestOn = (base: string): Context => ({
@@ -660,45 +629,32 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     github: aPullRequestOn(TARGET_TIP),
     fetched: true,
     changedSince: { [TARGET_TIP]: ["pnpm-lock.yaml"] },
-    lane: "pr",
+    lane: "full",
     images: "yes",
-    dependencies: "yes",
-  },
-  {
-    run: "a pull request changing the worker's lockfile",
-    github: aPullRequestOn(TARGET_TIP),
-    fetched: true,
-    changedSince: { [TARGET_TIP]: ["apps/worker/uv.lock"] },
-    lane: "pr",
-    images: "yes",
-    dependencies: "yes",
   },
   {
     run: "a pull request changing source",
     github: aPullRequestOn(TARGET_TIP),
     fetched: true,
     changedSince: { [TARGET_TIP]: ["apps/api/src/main.ts"] },
-    lane: "pr",
+    lane: "full",
     images: "no",
-    dependencies: "no",
   },
   {
     run: "a docs-only pull request",
     github: aPullRequestOn(TARGET_TIP),
     fetched: true,
     changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
-    lane: "pr",
+    lane: "docs",
     images: "no",
-    dependencies: "no",
   },
   {
     run: "an unfetched pull request base",
     github: aPullRequestOn(TARGET_TIP),
     fetched: false,
     changedSince: { [TARGET_TIP]: ["apps/api/src/main.ts"] },
-    lane: "pr",
+    lane: "full",
     images: "yes",
-    dependencies: "yes",
   },
   {
     run: "a docs-only merge group",
@@ -707,7 +663,6 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
     lane: "docs",
     images: "no",
-    dependencies: "no",
   },
   {
     run: "a merge group changing source",
@@ -716,7 +671,6 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { [TARGET_TIP]: ["apps/api/src/main.ts"] },
     lane: "full",
     images: "no",
-    dependencies: "no",
   },
   {
     run: "a merge group changing a lockfile",
@@ -725,7 +679,6 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { [TARGET_TIP]: ["apps/api/src/main.ts", "pnpm-lock.yaml"] },
     lane: "full",
     images: "yes",
-    dependencies: "no",
   },
   {
     run: "a docs group behind an image change",
@@ -737,7 +690,6 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     },
     lane: "full",
     images: "yes",
-    dependencies: "no",
   },
   {
     run: "a test-only group behind an image change",
@@ -749,7 +701,6 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     },
     lane: "full",
     images: "yes",
-    dependencies: "no",
   },
   {
     run: "an unfetched merge group base",
@@ -758,7 +709,6 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
     lane: "full",
     images: "yes",
-    dependencies: "no",
   },
   {
     run: "a merge group with no base",
@@ -767,7 +717,6 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
     lane: "full",
     images: "yes",
-    dependencies: "no",
   },
   {
     run: "a branch's first push",
@@ -776,7 +725,6 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { ["0".repeat(40)]: ["docs/vision.md"] },
     lane: "full",
     images: "yes",
-    dependencies: "no",
   },
   {
     run: "a called run changing source",
@@ -785,14 +733,13 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { [A_BASE]: ["packages/core/src/kernel/actor.ts"] },
     lane: "full",
     images: "no",
-    dependencies: "no",
   },
 ];
 
 type LaneStepRun = {
   readonly status: number | null;
 
-  readonly published: Decision & { readonly dependencies: string };
+  readonly published: Decision;
 
   readonly asked: readonly string[];
 
@@ -879,7 +826,6 @@ const runTheLaneStep = (
     published: {
       lane: answerOf(outputs, "lane"),
       images: answerOf(outputs, "images"),
-      dependencies: answerOf(outputs, "dependencies"),
     },
     asked: readFileSync(asked, "utf8")
       .split("\n")
@@ -895,11 +841,7 @@ describe("the lane inside check.yml", () => {
     const run = runTheLaneStep(scenario);
 
     expect(run.status, `the step printed: ${run.output}`).toBe(0);
-    expect(run.published).toEqual({
-      lane: scenario.lane,
-      images: scenario.images,
-      dependencies: scenario.dependencies,
-    });
+    expect(run.published).toEqual({ lane: scenario.lane, images: scenario.images });
   });
 
   it("diffs a pull request from its base", () => {
@@ -908,32 +850,31 @@ describe("the lane inside check.yml", () => {
       github: aPullRequestOn(A_BASE),
       fetched: true,
       changedSince: { [A_BASE]: ["package.json"] },
-      lane: "pr",
+      lane: "full",
       images: "yes",
-      dependencies: "yes",
     });
 
     expect(run.asked).toEqual(["fetch", "rev-parse", "diff"]);
-    expect(run.published.dependencies).toEqual("yes");
+    expect(run.published).toEqual({ lane: "full", images: "yes" });
   });
 
   it.each([
     {
       word: "the retired affected lane",
       github: aGroupOn(TARGET_TIP),
-      answered: "lane=affected\\nimages=no\\ndependencies=no\\n",
+      answered: "lane=affected\\nimages=no\\n",
+      says: "no lane",
+    },
+    {
+      word: "the retired pr lane",
+      github: aPullRequestOn(TARGET_TIP),
+      answered: "lane=pr\\nimages=no\\n",
       says: "no lane",
     },
     {
       word: "an images answer of maybe",
       github: aGroupOn(TARGET_TIP),
-      answered: "lane=full\\nimages=maybe\\ndependencies=no\\n",
-      says: "neither",
-    },
-    {
-      word: "a pull request's dependencies answer of maybe",
-      github: aPullRequestOn(TARGET_TIP),
-      answered: "lane=full\\nimages=no\\ndependencies=maybe\\n",
+      answered: "lane=full\\nimages=maybe\\n",
       says: "neither",
     },
   ])("refuses $word, publishing nothing", ({ github, answered, says }) => {
@@ -945,14 +886,13 @@ describe("the lane inside check.yml", () => {
         changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
         lane: "",
         images: "",
-        dependencies: "",
       },
       answered,
     );
 
     expect(run.status, `the step printed: ${run.output}`).not.toBe(0);
     expect(run.output).toContain(says);
-    expect(run.published).toEqual({ lane: "", images: "", dependencies: "" });
+    expect(run.published).toEqual({ lane: "", images: "" });
   });
 });
 
@@ -1067,22 +1007,12 @@ type VerdictCase = {
 
   readonly wanted: string;
 
-  readonly typecheck?: { readonly was: string; readonly wanted: string };
-
   readonly withoutItsLegs?: boolean;
 
   readonly says?: string;
 };
 
 const PROVED_NOTHING = "proved nothing";
-
-const NO_TYPECHECK: { readonly was: string; readonly wanted: string } = {
-  was: "skipped",
-  wanted: "skipped",
-};
-
-const typecheckOf = (scenario: VerdictCase): { readonly was: string; readonly wanted: string } =>
-  scenario.typecheck ?? NO_TYPECHECK;
 
 const verdictOf = (run: SpawnSyncReturns<string>): VerdictCase["verdict"] =>
   run.status === 0 ? "passes" : "fails";
@@ -1100,80 +1030,27 @@ const FULL_LEGS = [
 const VERDICTS: readonly VerdictCase[] = [
   {
     verdict: "passes",
-    run: "a pull request whose title passed",
-    lane: "pr",
-    ran: [LOCKFILE_JOB],
+    run: "a full pull request",
+    lane: "full",
+    ran: FULL_LEGS,
     title: "success",
     wanted: "success",
   },
   {
     verdict: "fails",
-    run: "a pull request whose title failed",
-    lane: "pr",
-    ran: [LOCKFILE_JOB],
-    title: "failure",
-    wanted: "success",
-  },
-  {
-    verdict: "fails",
-    run: "a pull request that read no lockfile",
-    lane: "pr",
+    run: "a full pull request that ran no suite",
+    lane: "full",
     ran: [],
     title: "success",
     wanted: "success",
   },
   {
     verdict: "fails",
-    run: "a pull request that ran a suite",
-    lane: "pr",
-    ran: [LOCKFILE_JOB, "full-api"],
-    title: "success",
-    wanted: "success",
-  },
-  {
-    verdict: "fails",
-    run: "a pr lane that read no title",
-    lane: "pr",
-    ran: [LOCKFILE_JOB],
-    title: "skipped",
-    wanted: "skipped",
-    says: PROVED_NOTHING,
-  },
-  {
-    verdict: "passes",
-    run: "a dependency pull request that typechecked",
-    lane: "pr",
-    ran: [LOCKFILE_JOB],
-    title: "success",
-    wanted: "success",
-    typecheck: { was: "success", wanted: "success" },
-  },
-  {
-    verdict: "fails",
-    run: "a dependency pull request whose typecheck failed",
-    lane: "pr",
-    ran: [LOCKFILE_JOB],
-    title: "success",
-    wanted: "success",
-    typecheck: { was: "failure", wanted: "success" },
-  },
-  {
-    verdict: "fails",
-    run: "a dependency pull request that skipped its typecheck",
-    lane: "pr",
-    ran: [LOCKFILE_JOB],
-    title: "success",
-    wanted: "success",
-    typecheck: { was: "skipped", wanted: "success" },
-  },
-  {
-    verdict: "fails",
-    run: "a merge group that typechecked dependencies",
+    run: "a full pull request whose title failed",
     lane: "full",
     ran: FULL_LEGS,
-    title: "success",
+    title: "failure",
     wanted: "success",
-    typecheck: { was: "success", wanted: "skipped" },
   },
   {
     verdict: "passes",
@@ -1234,7 +1111,6 @@ const verdictOn = ({
   ran,
   title,
   wanted,
-  typecheck = NO_TYPECHECK,
   withoutItsLegs,
 }: VerdictCase): SpawnSyncReturns<string> => {
   const legs = Object.keys(checkJobs())
@@ -1251,10 +1127,8 @@ const verdictOn = ({
         ...Object.fromEntries(legs),
         [LANE]: { result: "success" },
         [TITLE_JOB]: { result: title },
-        [TYPECHECK_JOB]: { result: typecheck.was },
       }),
       TITLE_WANTED: wanted,
-      TYPECHECK_WANTED: typecheck.wanted,
     },
   });
 };
@@ -1282,32 +1156,27 @@ describe("the one verdict check.yml reports", () => {
     ).toEqual("${{ always() }}");
   });
 
-  it.each([
-    { job: TITLE_JOB, wantedBy: "TITLE_WANTED" },
-    { job: TYPECHECK_JOB, wantedBy: "TYPECHECK_WANTED" },
-  ])("wants $job's success exactly where it runs", ({ job, wantedBy }) => {
-    const condition = checkJobs()[job]?.if;
-    assert(condition !== undefined, `${job} has an if`);
-    const runsOn = /^\$\{\{ (?<condition>.+) \}\}$/.exec(condition)?.groups?.["condition"];
-    const env = stepsOfJob(FAN_IN).flatMap(envOf);
+  it.each([{ job: TITLE_JOB, wantedBy: "TITLE_WANTED" }])(
+    "wants $job's success exactly where it runs",
+    ({ job, wantedBy }) => {
+      const condition = checkJobs()[job]?.if;
+      assert(condition !== undefined, `${job} has an if`);
+      const runsOn = /^\$\{\{ (?<condition>.+) \}\}$/.exec(condition)?.groups?.["condition"];
+      const env = stepsOfJob(FAN_IN).flatMap(envOf);
 
-    assert(runsOn !== undefined, `${job} runs on no condition this reading can find`);
-    expect(Object.fromEntries(env)[wantedBy]).toEqual(
-      `\${{ (${runsOn}) && 'success' || 'skipped' }}`,
-    );
-  });
+      assert(runsOn !== undefined, `${job} runs on no condition this reading can find`);
+      expect(Object.fromEntries(env)[wantedBy]).toEqual(
+        `\${{ (${runsOn}) && 'success' || 'skipped' }}`,
+      );
+    },
+  );
 
   it.each(VERDICTS)("$verdict on $run", (scenario: VerdictCase) => {
     const ran = verdictOn(scenario);
 
-    const typecheck = typecheckOf(scenario);
-
     expect(verdictOf(ran), `${ran.stdout}${ran.stderr}`).toEqual(scenario.verdict);
     expect(ran.stdout).toContain(
       `${TITLE_JOB}: ${scenario.title} (this lane wants ${scenario.wanted})`,
-    );
-    expect(ran.stdout).toContain(
-      `${TYPECHECK_JOB}: ${typecheck.was} (this lane wants ${typecheck.wanted})`,
     );
   });
 
