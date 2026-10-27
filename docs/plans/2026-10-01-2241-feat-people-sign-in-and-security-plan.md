@@ -510,7 +510,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 - web: `apps/web/src/app/router.tsx`, new `apps/web/src/features/auth/link-screen.tsx`, `apps/web/src/features/auth/sign-in-words.ts`
 - endpoint snapshot: `apps/api/tests/better-auth-endpoints.txt`
 - erasure: `packages/core/src/erasure/identity.ts`, `packages/core/test/identity-rows.ts`
-- docs: `docs/solutions/architecture-patterns/adr-0038-*.md` (sign-in detail names its method)
+- docs: `docs/solutions/architecture-patterns/adr-0038.md` (sign-in detail names its method)
 - tests: new `apps/api/tests/sign-in-link.test.ts`, new `apps/web/e2e/sign-in-link.spec.ts`
 **Approach:**
 1. In `sendVerificationOTP`, mint the link token and nonce, seal the code under the token, and store the hashes, the sealed code and any carried OAuth query in a `verification` row (KTD6, KTD7). Set the binding cookie.
@@ -608,7 +608,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 **Files:**
 - api: `apps/api/src/auth/auth.ts`, new `apps/api/src/auth/passkeys.ts`
 - web: `apps/web/src/features/auth/sign-in-screen.tsx`, new `apps/web/src/features/account/account-page.tsx`, new `apps/web/src/features/account/passkeys-part.tsx`, `apps/web/src/app/band.tsx`, `apps/web/src/app/router.tsx`
-- docs: `docs/solutions/architecture-patterns/adr-0047-*.md`
+- docs: `docs/solutions/architecture-patterns/adr-0047.md`
 - tests: new `apps/api/tests/passkeys.test.ts`, new `apps/web/e2e/passkeys.spec.ts`, `apps/web/e2e/harness.ts` (virtual authenticator)
 **Approach:**
 1. Offer passkeys on the email field through `autocomplete="username webauthn"`, plus a visible button where WebAuthn exists.
@@ -725,7 +725,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 - core: new `packages/core/src/kernel/second-factor.ts` (the predicate and the pending set), `packages/core/src/kernel/vocabulary.ts`, the identity-set facts read in `packages/core/src/store/postgres/index.ts`
 - api: `apps/api/src/trpc/base.ts` (`sessionOf`), `apps/api/src/auth/routes.ts` (`sessionClaims`), `apps/api/src/auth/auth.ts` (OAuth resume, the before-hook over remaining endpoints, `/get-session` without renewal while pending)
 - web: `apps/web/src/features/auth/membership.ts`, `apps/web/src/features/console/operator.ts`, the query and mutation cache handlers in `apps/web/src/shared/api/`
-- docs: new `docs/solutions/architecture-patterns/adr-NNNN-second-factor-for-admins.md`, `docs/solutions/architecture-patterns/adr-0035-*.md`
+- docs: new `docs/solutions/architecture-patterns/adr-NNNN-second-factor-for-admins.md`, `docs/solutions/architecture-patterns/adr-0035.md`
 - tests: new `apps/api/tests/second-factor-gate.test.ts`, new `apps/api/tests/pending-set.test.ts`, `apps/web/e2e/second-factor.spec.ts`
 **Approach:**
 1. Implement the predicate and the pending set in core (KTD1), and apply them at `sessionOf` and `sessionClaims`, at the OAuth resume, and in the before-hook.
@@ -762,7 +762,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 - core: `packages/core/src/kernel/freshness.ts`, `packages/core/src/kernel/principal.ts`, `packages/core/src/members/`, `packages/core/src/workspaces/`
 - api: `apps/api/src/auth/verify.ts`, `apps/api/src/auth/auth.ts` (session lifetime), `apps/api/src/trpc/base.ts`, `apps/api/src/trpc/members.ts`
 - web: new `apps/web/src/features/auth/reconfirm-dialog.tsx`, `apps/web/src/shared/api/trpc.ts`, `apps/web/src/features/console/`
-- docs: `docs/solutions/architecture-patterns/adr-0009-*.md`
+- docs: `docs/solutions/architecture-patterns/adr-0009.md`
 - tests: new `packages/core/test/freshness.test.ts`, new `apps/web/e2e/reconfirm.spec.ts`, `apps/api/tests/provoke.ts` and `apps/api/tests/harness-control.ts` (age the confirmation, not `created_at`)
 **Approach:**
 1. Carry the session id through Claims and the operator's input, and give the principal the confirmation stamp from core's identity-set read (KTD3).
@@ -817,7 +817,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 - schema: the account table's `tid` in `packages/schema/src/identity-tables.ts`, one new migration, and `generate:worker-view`
 - endpoint snapshot: `apps/api/tests/better-auth-endpoints.txt`
 - web: `apps/web/src/features/account/` (linked-account row and add)
-- docs: `docs/solutions/architecture-patterns/adr-0034-*.md`, `CONCEPTS.md` (*sign-in*), `docs/operations/SECRETS.md`
+- docs: `docs/solutions/architecture-patterns/adr-0034.md`, `CONCEPTS.md` (*sign-in*), `docs/operations/SECRETS.md`
 - tests: new `apps/api/tests/microsoft.test.ts`, `apps/web/e2e/harness.ts` (fake OpenID issuer), new `apps/web/e2e/microsoft.spec.ts`
 **Approach:**
 1. Read the client id and secret as a credential class in config.

@@ -91,6 +91,6 @@ The tests it fixed:
 
 ## Related
 
-- `docs/solutions/architecture-patterns/adr-0040-clock-is-a-kernel-value.md`: the clock is a value the api hands down. The stopped clock is that value, given to one suite's api; it is not the process-wide clock patched in tests that ADR 0040 rejects.
+- `docs/solutions/architecture-patterns/adr-0040.md`: the clock is a value the api hands down. The stopped clock is that value, given to one suite's api; it is not the process-wide clock patched in tests that ADR 0040 rejects.
 - `docs/solutions/best-practices/a-ceiling-keyed-on-the-target-does-not-bound-the-actor.md`: what a ceiling counts under, over the same `consumeIngress` and `ingress_counter`.
 - #547 (the fix), #621 (BA-53's six tests, converted).

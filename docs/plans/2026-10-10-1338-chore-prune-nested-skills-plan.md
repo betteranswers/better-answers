@@ -112,7 +112,7 @@ BA-62's test, finished on 06/10/2026, showed that loading nested skills early ch
 | `caching` | `apps/api/` | | `responseMeta` in `mount.ts`. |
 | `adapter-fetch` | `apps/api/` | | `@hono/trpc-server` mounts the router through the fetch adapter, and `apps/api/tests/trpc-roads.test.ts` calls `fetchRequestHandler` itself. BA-66 listed it as a candidate; the code keeps it. |
 | `non-json-content-types` | `apps/api/` | | The upload is a mutation over `octetInputParser` (`apps/api/src/trpc/router.ts`). Named by the route. |
-| `openapi` | `apps/api/` | | Nothing generates the document yet. The decision that outside callers get an OpenAPI document generated from the router is live (`docs/solutions/architecture-patterns/adr-0008-a-contract-for-each-class-of-caller.md`). BA-66 listed it as a candidate; the decision keeps it. |
+| `openapi` | `apps/api/` | | Nothing generates the document yet. The decision that outside callers get an OpenAPI document generated from the router is live (`docs/solutions/architecture-patterns/adr-0008.md`). BA-66 listed it as a candidate; the decision keeps it. |
 | `subscriptions` | `apps/api/` | | No subscription exists yet. The route's answer stream is one, and `docs/architecture/c4-components-api.md` says so. |
 | `server-side-calls` | `apps/api/` | | Nothing calls `createCaller` today. Kept for the owner (below). |
 | `client-setup` | `apps/api/` | | `createTRPCClient` in `apps/api/tests/web-client.ts` and `apps/web/src/shared/api/trpc.ts` (KTD4). |

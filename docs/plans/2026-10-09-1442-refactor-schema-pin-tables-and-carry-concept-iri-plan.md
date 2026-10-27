@@ -72,7 +72,7 @@ The branded ids have no module. Callers reach a parser through `boundarySchemas.
 
 - Linear BA-77, and BA-35's attachments.
 - `.scratch/architecture-survey-2026-10-08/walks/schema.md`, opportunities 1, 2 and the unimported-exports card (machine-local).
-- `docs/solutions/architecture-patterns/adr-0028-boundary-schemas-generated-from-tables.md`.
+- `docs/solutions/architecture-patterns/adr-0028.md`.
 - `CODING_STANDARDS.md`: "Never assert a type with `as`", "Parse every boundary with zod", "Refuse a value once, where it enters".
 
 ---

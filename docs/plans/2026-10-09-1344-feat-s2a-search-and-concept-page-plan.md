@@ -352,7 +352,7 @@ flowchart LR
 - **Goal:** the route spec, the glossary and the decision docs say what this plan changed.
 - **Requirements:** R8; KTD1, KTD3, KTD6.
 - **Dependencies:** none.
-- **Files:** `docs/specs/v01-route.md`, `CONCEPTS.md`, `docs/solutions/architecture-patterns/adr-0016-answers-assert-concepts-only.md`, `docs/solutions/architecture-patterns/adr-0018-one-mcp-surface-grown-by-scope.md`.
+- **Files:** `docs/specs/v01-route.md`, `CONCEPTS.md`, `docs/solutions/architecture-patterns/adr-0016.md`, `docs/solutions/architecture-patterns/adr-0018.md`.
 - **Approach:**
   1. In the route spec, S2a and S2b each get a dated *Owner's lines (09/10/2026)* paragraph, the same shape as *BA-35's lines*. S2a's names the recall measure's move (R3 to R6), the owner-only production reading (R2), the design-system package edge (R7) and any-word matching (R9). S2b's says its recall must-carry is now S2a's measure, reused (R6). Both status rows name this plan.
   2. `CONCEPTS.md`'s *Also known as* entry gains the line form (KTD1). Its *evidence pane* entry is made to agree with the route: an unreadable source is listed in the file's words with no link (KTD6).
@@ -368,7 +368,7 @@ flowchart LR
 - **Dependencies:** WP2 (BA-77), whose `ConceptIri` brand this module carries.
 - **Files:**
   - Create: `packages/schema/src/concept-file.ts`, `packages/schema/test/concept-file.test.ts`, `contracts/links/cases.json`, `packages/core/test/links.contract.test.ts`, `apps/worker/tests/test_links_contract.py`.
-  - Modify: `packages/schema/package.json` (the `./concept-file` subpath), `packages/schema/src/concept-tables.ts` (`IRI`, `conceptIriOf` and `CitedSource` move out and are re-exported), `packages/core/src/store/map/index.ts`, `apps/worker/src/better_answers_worker/links.py`, `contracts/manifest.json`, `packages/core/test/tier-contract.test.ts`, `apps/worker/tests/test_tier_contract.py`, both contract stamps, `docs/solutions/architecture-patterns/adr-0015-compositions-cite-concepts-by-footnote.md`, `docs/solutions/architecture-patterns/adr-0031-tier-contract-is-a-list-of-agreements.md`.
+  - Modify: `packages/schema/package.json` (the `./concept-file` subpath), `packages/schema/src/concept-tables.ts` (`IRI`, `conceptIriOf` and `CitedSource` move out and are re-exported), `packages/core/src/store/map/index.ts`, `apps/worker/src/better_answers_worker/links.py`, `contracts/manifest.json`, `packages/core/test/tier-contract.test.ts`, `apps/worker/tests/test_tier_contract.py`, both contract stamps, `docs/solutions/architecture-patterns/adr-0015.md`, `docs/solutions/architecture-patterns/adr-0031.md`.
 - **Approach:**
   1. Write the module pure, with no drizzle import. The web will import it.
   2. Teach `resolveOutgoing` and `outgoing_edges` the KTD5 rules through the shared fixture, not through each other.
@@ -621,7 +621,7 @@ flowchart LR
 - **Files:**
   - Create: `apps/web/src/features/knowledge/concept-page.tsx`, `concept-body.tsx`, `concept-address.ts`, `concept-frontmatter.ts`, `apps/web/test/concept-body.test.tsx`, `apps/web/test/concept-frontmatter.test.ts`, `apps/web/e2e/concept-page.spec.ts`, `apps/web/e2e/knowledge.ts` (what the two Knowledge specs share).
   - Modify: `apps/web/package.json` (`react-markdown` 10.1.0 and `remark-gfm` 4.0.1, pinned exact; each version read from the npm registry on 10/10/2026 and the API from Context7's `/remarkjs/react-markdown`), `apps/web/src/shared/navigation.ts` (Search's `detail`), `apps/web/src/app/router.tsx` (`BUILT_DETAILS`), `apps/web/src/features/knowledge/evidence-panel.tsx`, `search-page.tsx` (a concept match opens its page). The router throws at start when a page declares a `detail` with no `BUILT_DETAILS` entry, so both land here with the page.
-  - Modify, found in U12: `apps/api/tests/harness-knowledge.ts` and its test (the sources below), `.claude/skills/browser-suite/SKILL.md` (the `seedConcepts` row), `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md` (the concept page is built).
+  - Modify, found in U12: `apps/api/tests/harness-knowledge.ts` and its test (the sources below), `.claude/skills/browser-suite/SKILL.md` (the `seedConcepts` row), `docs/solutions/architecture-patterns/adr-0047.md` (the concept page is built).
 - **Approach:**
   1. Parse the ULID at the route with `concept-file`'s pattern, and map it to the IRI `knowledge.open` takes. A malformed, absent or withheld concept draws the one in-page *not found*, which names nothing and leads back to Search.
   2. Keep the breadcrumb's last part empty until the read lands. While loading, reserve the heading region and draw no body. A failed read draws its own state with a retry, distinct from *not found*.

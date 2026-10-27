@@ -177,6 +177,6 @@ Read against 1.7.7 on 11/10/2026 (BA-147): `dist/db/internal-adapter.mjs` is byt
 
 - Linear BA-34, merged as #514. Linear BA-39 cleared the orphaned promotion lock that #514 had lengthened.
 - `docs/solutions/best-practices/better-auth-closed-endpoints-run-as-server-functions-without-router-guards.md`: another Better Auth 1.7.5 behaviour that differs from what the config suggests, and the record of the closed factor paths that keep two-factor's no-session branch latent.
-- `docs/solutions/architecture-patterns/adr-0009-better-auth-in-process-identity-provider.md`: Better Auth runs in-process as the api's identity provider, which is why its `verification` table sits in the api's Postgres and the api's sweep pass can delete from it.
+- `docs/solutions/architecture-patterns/adr-0009.md`: Better Auth runs in-process as the api's identity provider, which is why its `verification` table sits in the api's Postgres and the api's sweep pass can delete from it.
 - `docs/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md`, U16 (identity-set housekeeping): must keep the day's grace.
 - `CONCEPTS.md`, **sweep pass**; `docs/operations/RUNBOOK.md`, "The daily sweeps" and §11.

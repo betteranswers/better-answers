@@ -173,7 +173,7 @@ This plan covers the shell and layout foundations. The breakdown below is the cu
 - `.scratch/ui-visuals/shell-example-menu-open.png` and `shell-example-menu-closed.png` (machine-local): the reference shell, ReUI's app-shell-14 (`https://reui.io/blocks/application/app-shell/app-shell-14`).
 - `.scratch/ia-2026-09-30/` (machine-local): the structure research of 30/09/2026. Two first-principles proposals, one from the personas' jobs and one from the objects, plus the inventory of intended capabilities. The structure ADR (U1) records the result.
 - `https://flux-agentops.reui.io/`: the Agent Operations reference the owner named.
-- `docs/solutions/architecture-patterns/adr-0017-answers-are-retained-correctable-records.md` and `adr-0046-a-reader-surface-beside-control-centre.md`: the decisions this plan moves.
+- `docs/solutions/architecture-patterns/adr-0017.md` and `adr-0046.md`: the decisions this plan moves.
 - Linear BA-12: the review of what each role can act on.
 
 ---
@@ -299,9 +299,9 @@ U1 settles the words before code names them. U3 (design system) and U8 (name) ca
 - **Requirements:** R19. Governing decisions: the rail-of-surfaces, Control Centre groups, suggestion queue, ownership and visibility Key Decisions.
 - **Dependencies:** none.
 - **Files:**
-  - `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md` (new)
-  - `docs/solutions/architecture-patterns/adr-0017-answers-are-retained-correctable-records.md`
-  - `docs/solutions/architecture-patterns/adr-0046-a-reader-surface-beside-control-centre.md`
+  - `docs/solutions/architecture-patterns/adr-0047.md` (new)
+  - `docs/solutions/architecture-patterns/adr-0017.md`
+  - `docs/solutions/architecture-patterns/adr-0046.md`
   - `CONCEPTS.md`
 - **Approach:**
   1. Write ADR 0047 from `.scratch/ia-2026-09-30/`. It records the rail of surfaces and each surface's groups and screens, marking what is built, v0.1 and later. It also records the decisions of 30/09/2026 (suggestion queue in Control Centre, ownership grants acts, visibility per screen, hidden addresses look absent), the Flux AgentOps mapping, and what stays open: the work surface's name, Search's surface, and the Guru trust words.
@@ -315,7 +315,7 @@ U1 settles the words before code names them. U3 (design system) and U8 (name) ca
      - new entries for *logo*, *workspace switcher*, *breadcrumb* and *jump-to*.
 
      The existing *mark* entry is untouched.
-- **Patterns to follow:** the ADR frontmatter and "The decision / Why / Rejected / History" shape of `adr-0046-a-reader-surface-beside-control-centre.md`. AGENTS.md's rule that a change moving a decision edits its doc in the same commit.
+- **Patterns to follow:** the ADR frontmatter and "The decision / Why / Rejected / History" shape of `adr-0046.md`. AGENTS.md's rule that a change moving a decision edits its doc in the same commit.
 - **Test scenarios:** `Test expectation: none -- decision records and glossary; the docs gate (`pnpm check:docs`) checks their format and the api's avoid-words test reads `CONCEPTS.md`.`
 - **Verification:** ADR 0047's structure table matches the navigation list U2 declares. `CONCEPTS.md` defines every shell word the plan's requirements use. `pnpm check:docs` passes.
 

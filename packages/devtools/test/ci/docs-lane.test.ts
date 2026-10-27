@@ -409,7 +409,8 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   },
   {
     file: "packages/devtools/test/solutions-docs.test.ts",
-    reads: "every doc under docs/solutions, for its applies_when",
+    reads:
+      "every doc under docs/solutions, for its applies_when, and each architecture decision for the ADR format",
     inTheLane: "check:docs:devtools",
   },
   {

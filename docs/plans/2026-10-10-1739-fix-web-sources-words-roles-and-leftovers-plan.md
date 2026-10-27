@@ -114,7 +114,7 @@ BA-134 is one line in a tracked skill. It rides here because BA-115 already edit
 - `apps/web/src/shared/api/query-client.ts`, `apps/web/src/shared/landing.ts`, `apps/web/src/app/jump-to.tsx` and `SeedConcept` in `apps/web/e2e/harness.ts` are S2a's and are not edited.
 - `packages/core/src/kernel/` is the `admission-types` agent's. U5 calls `declareAction` and `admit` and edits neither.
 - Publish's "What the audit row will carry" section stays. F26 names Widen alone.
-- Considered and not built: closing Better Auth's `/organization/list` once the SPA stops reading it. `docs/solutions/architecture-patterns/adr-0009-better-auth-in-process-identity-provider.md` keeps the plugin's reads open and `apps/api/tests/organisation-plugin.test.ts` holds that path kept, so closing it moves a recorded decision. Evidence that would change the call: the owner asking for that path to be closed.
+- Considered and not built: closing Better Auth's `/organization/list` once the SPA stops reading it. `docs/solutions/architecture-patterns/adr-0009.md` keeps the plugin's reads open and `apps/api/tests/organisation-plugin.test.ts` holds that path kept, so closing it moves a recorded decision. Evidence that would change the call: the owner asking for that path to be closed.
 - Considered and not built: a check on ended sign-ins in the new read. The pick refuses such a person in its own word today. Evidence that would change the call: a person reporting a listed workspace they cannot open.
 - Considered and not built: a test that refuses `shared/blueprint.tsx` exporting `Frame` again. TypeScript already refuses an import of a name that is not exported.
 - The design system's `_adherence.oxlintrc.json` lists props for this primitive that the pre-build kit had and the built one lacks. U2 renames the entry and leaves the list.
@@ -531,5 +531,5 @@ A latency-budget or timeout failure is rerun alone on untouched code before it c
 - `apps/worker/src/better_answers_worker/redaction/descriptors.py`: the ten rule ids KTD7 names.
 - `apps/web/src/features/people/member-removal.tsx`: the inline confirmation KTD3 follows.
 - `docs/solutions/logic-errors/a-second-mutate-drops-the-first-actions-callbacks.md`, `docs/solutions/logic-errors/a-non-modal-radix-sheet-still-loops-tab-inside-itself.md` and `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md`: three traps KTD3 and KTD17 step round.
-- `docs/solutions/architecture-patterns/adr-0009-better-auth-in-process-identity-provider.md`: why `/organization/list` stays open.
+- `docs/solutions/architecture-patterns/adr-0009.md`: why `/organization/list` stays open.
 - `apps/web/journeys/every-role.ts` and `apps/web/journeys/admin.spec.ts`: what U6 changes and U7 runs.

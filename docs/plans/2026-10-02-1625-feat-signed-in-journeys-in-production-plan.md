@@ -676,7 +676,7 @@ flowchart LR
 - `apps/api/Dockerfile` (a seventh manifest `COPY`, and the comment's count of projects)
 - `knip.config.ts`, `.gitignore`, `.oxlintrc.json` (`.wrangler/` ignored; the Worker's entry named if knip does not find it)
 - `renovate.json` (a custom manager for the one `wrangler` pin)
-- `docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md`, `AGENTS.md` (KTD20's amendment and the layout table's row)
+- `docs/solutions/architecture-patterns/adr-0029.md`, `AGENTS.md` (KTD20's amendment and the layout table's row)
 
 **Approach:**
 1. The spike, outside the repository. Bind a throwaway Worker to the testing zone's catch-all that logs the header names and the whole of `message.raw`, base64. Send one message from production's Resend account to an address on the testing domain that is none of the three test people's, so a bounce cannot suppress one of theirs. Confirm that `raw` carries a `DKIM-Signature` whose `d=` is the product's apex and that `mailauth` verifies those complete bytes offline. Note how many seconds delivery took, the handler's CPU time, whether a second signature (Amazon SES's) rides along, and whether Resend's signature covers `To`. The pull request records the finding without naming the domain; a missing or failing signature sends U10 to KTD19's fallback.
@@ -839,7 +839,7 @@ flowchart LR
 **Dependencies:** U6.
 
 **Files:**
-- `docs/solutions/architecture-patterns/adr-0022-two-stacks-deployed-by-digest.md` (a release holds only once the journeys pass under gate; the journeys-only night; the build-commit checkout; R16's condition)
+- `docs/solutions/architecture-patterns/adr-0022.md` (a release holds only once the journeys pass under gate; the journeys-only night; the build-commit checkout; R16's condition)
 - `CONCEPTS.md` (entries for the test people and the test inbox, named in full because *inbox* already means the suggestions queue; the Audit log as their permanent record; the release entry's "held")
 - `docs/architecture/` (the test inbox as a system outside the estate, redrawn through `/c4-architecture`)
 - `docs/operations/CI.md` (`release.yml`: the five jobs (gate, promote, journeys, record and report), the journeys-only night and dispatch, `JOURNEYS_MODE`, the outcome words)

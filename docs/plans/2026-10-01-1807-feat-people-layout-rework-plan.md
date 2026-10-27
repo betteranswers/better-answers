@@ -235,10 +235,10 @@ This plan covers P1's People layout rework. The breakdown below is the current u
 - `docs/specs/v01-route.md` § P1: what the block must carry.
 - `docs/archive/specs/T-027.md`: which Arena blocks were ported and which were not.
 - ADR 0038, in `docs/solutions/architecture-patterns/`: the one-role model, the concepts not adopted, and the append-only audit log.
-- `docs/solutions/architecture-patterns/adr-0033-ui-kit-is-tailwind-v4.md`: the three registries, and why Kibo's table was rejected.
-- `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`: admission before the first await, and classed refusal words.
-- `docs/solutions/architecture-patterns/adr-0035-one-id-per-person.md`: the `human:<person id>` actor, and acts named by family.
-- `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`: People's screens, the Audit log under System, and the one navigation list.
+- `docs/solutions/architecture-patterns/adr-0033.md`: the three registries, and why Kibo's table was rejected.
+- `docs/solutions/architecture-patterns/adr-0043.md`: admission before the first await, and classed refusal words.
+- `docs/solutions/architecture-patterns/adr-0035.md`: the `human:<person id>` actor, and acts named by family.
+- `docs/solutions/architecture-patterns/adr-0047.md`: People's screens, the Audit log under System, and the one navigation list.
 - `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-membership-after-failed-reread.md`: query keys that must drop on a workspace switch.
 - `docs/plans/2026-09-30-1959-feat-shell-and-layout-foundations-plan.md`: the shell this plan builds on.
 - The Arena blocks, `react-user-management-blocks/src/blocks/`: a machine-local folder beside the repository. Blocks 1, 2, 4, 5 and 6 are the layout reference, and they use `@tanstack/react-table` v9's `useTable` with a selection bar (`members-block.tsx`).
@@ -480,7 +480,7 @@ flowchart TB
 - `apps/api/src/mcp/crossing.ts`
 - `apps/web/src/shared/api/trpc.ts`
 - `apps/web/src/shared/refusal-outcome.tsx`
-- `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`
+- `docs/solutions/architecture-patterns/adr-0043.md`
 - Tests: `apps/api/tests/trpc-roads.test.ts`, `apps/api/tests/procedure-output.test.ts`, `apps/web/test/refusal-outcome.test.tsx`, `packages/core/test/refusal-words.test.ts`
 
 **Approach:**
@@ -755,7 +755,7 @@ flowchart TB
 - `apps/web/src/features/people/member-sheet.tsx`, retired after its sections move to the page
 - `apps/web/src/features/people/member-removal.tsx`
 - `apps/web/src/features/people/members-screen.tsx`
-- `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`
+- `docs/solutions/architecture-patterns/adr-0047.md`
 - `CONCEPTS.md`
 - Tests: `apps/web/test/navigation.test.ts`, `apps/web/test/breadcrumb.test.ts`, `apps/web/test/jump-to.test.tsx`, `apps/web/e2e/people.spec.ts`, `apps/web/e2e/jump-to.spec.ts`, `apps/web/e2e/frame.spec.ts`
 

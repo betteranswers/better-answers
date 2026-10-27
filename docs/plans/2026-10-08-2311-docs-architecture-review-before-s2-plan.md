@@ -185,7 +185,7 @@ The owner asked that anything a typical repository would not do be flagged as pr
 - The staff check, attached to BA-35: the best-practice verdict per decision, the five corrections R4 carries, the unusual-setup sort, and the IA research read against ADR 0047.
 - The trial survey of the concepts and answering slices, `.lavish/survey-architecture-packages-core-src-concepts-plus-1-2026-10-06-1611.md`, and the 06/10 all-areas survey, `.lavish/survey-architecture-all-2026-10-06-1607.md`.
 - The IA research of 30/09/2026, attached to BA-29. ADR 0047 settles both of `ia-objects.md`'s conflicts. The rail holds surfaces with Control Centre as one area. A person sees a page by role or by owning a collection, and ownership lands with S3. The IA's concept page, reached from matches and citations and listed nowhere, is ADR 0047's detail page, so R1 fits it.
-- Decision docs: `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`, `adr-0015-compositions-cite-concepts-by-footnote.md`, `adr-0031-tier-contract-is-a-list-of-agreements.md`, `adr-0029-apps-over-packages-capability-slices.md`, `adr-0043-what-an-action-is.md`.
+- Decision docs: `docs/solutions/architecture-patterns/adr-0047.md`, `adr-0015.md`, `adr-0031.md`, `adr-0029.md`, `adr-0043.md`.
 - The route spec, `docs/specs/v01-route.md`: S2a's and S2b's blocks and the status table.
 
 ---
@@ -231,7 +231,7 @@ U1 runs first. U2 and U3 follow on one branch, and U3 needs U1's issue numbers. 
 - **Goal:** the concept page's place and the rename cadence are decided in their decision doc, and no other doc contradicts them.
 - **Requirements:** R1, R2, R3, AE2, AE3; KTD2, KTD4, KTD5. R2 carries the owner's choice to batch renames (Key Decisions).
 - **Dependencies:** none.
-- **Files:** `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`, `CODING_STANDARDS.md`, `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md`.
+- **Files:** `docs/solutions/architecture-patterns/adr-0047.md`, `CODING_STANDARDS.md`, `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md`.
 - **Approach:**
   1. In ADR 0047's v0.1 table, the Ask row drops the concept page and the Knowledge row gives Search the concept page as its detail (S2a).
   2. "Two things stay open" becomes one: the work area's name. Search's area is settled as Knowledge.

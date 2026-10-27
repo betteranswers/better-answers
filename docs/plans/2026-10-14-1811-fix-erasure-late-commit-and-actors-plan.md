@@ -204,7 +204,7 @@ sequenceDiagram
 - **Goal:** The decision docs say what the routine now does.
 - **Requirements:** R6; KTD3.
 - **Dependencies:** U3, U4.
-- **Files:** `docs/solutions/architecture-patterns/adr-0019-trust-derived-from-the-file.md`, `docs/solutions/architecture-patterns/adr-0020-personal-data-withheld-at-the-seam.md`.
+- **Files:** `docs/solutions/architecture-patterns/adr-0019.md`, `docs/solutions/architecture-patterns/adr-0020.md`.
 - **Approach:** ADR 0019's sentence narrows to the audit log, in the wording the owner accepted on 14/10/2026. ADR 0020 gains the late commit, the person id in trailers, and an amendment line.
 - **Test expectation:** none, docs only.
 - **Verification:** `check:docs` passes.

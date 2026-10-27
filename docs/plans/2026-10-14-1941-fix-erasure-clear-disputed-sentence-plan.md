@@ -49,7 +49,7 @@ execution: code
   - Modify: `packages/schema/src/question-tables.ts`, `packages/schema/src/table-ownership.ts`, `packages/core/src/erasure/questions.ts`
   - Create: `packages/schema/migrations/0081_the-erased-flags-sentence.sql` (generated), with its snapshot and journal entry, and the regenerated worker view
   - Test: `packages/schema/test/question-tables.test.ts`, `packages/core/test/erasure-routine.test.ts`, `packages/core/test/question-rows.ts`
-  - Docs: `docs/solutions/architecture-patterns/adr-0017-answers-are-retained-correctable-records.md`, `docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`
+  - Docs: `docs/solutions/architecture-patterns/adr-0017.md`, `docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`
 - **Test scenarios:**
   - An erased person's flag keeps its reason and concept, and loses its note and disputed sentence.
   - The table admits a flag's concept with no sentence, and still refuses a concept on helpful feedback and a sentence with no concept.

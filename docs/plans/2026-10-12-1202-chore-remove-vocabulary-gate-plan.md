@@ -72,7 +72,7 @@ Four of the six tests in the describe block "the skills this repository tracks" 
 - KTD2. **`packages/devtools/test/lefthook-config.test.ts` takes `check:docs:core` as its stand-in failing gate.** It still shows a prose-suite step failing beside a `check:gates` step (`knip`), which is what those four sites were written to show.
 - KTD3. **`provision-skills.test.ts` stays in the docs lane.** The design-skill link test still reads `packages/design-system/SKILL.md` through its symlink, so the file keeps its `PROSE_SUITES` row and its place in `check:docs:devtools`. The row's `reads` text is corrected to what the file reads now.
 - KTD4. **One learning is deleted and two are edited.** `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md` describes only the deleted list and is removed. `docs/solutions/best-practices/what-a-rename-prose-pass-gets-wrong-and-the-checks-that-catch-it.md` is about rename passes in general: its passages on the words test and its carve-outs go, its grep-based checks stay, and its link to the deleted learning goes. `docs/solutions/best-practices/renaming-a-table-drizzle-kit-will-not-generate-so-the-migration-and-snapshot-are-written-by-hand.md` loses its link to the deleted learning and any sentence that relies on the words test.
-- KTD5. **The decision doc gets a dated amendment, and its earlier amendments stay.** `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md` says an old word leaves the glossary for `old-words.ts`. Its 08/10/2026 amendment says the old word's row refuses it in reader text until a block's rename lands. A new amendment line dated 12/10/2026 says an old word now leaves the glossary, no list of old words is kept in the tree, and no gate refuses an old word: review holds a staged rename. The pull request body says this decision doc was edited.
+- KTD5. **The decision doc gets a dated amendment, and its earlier amendments stay.** `docs/solutions/architecture-patterns/adr-0047.md` says an old word leaves the glossary for `old-words.ts`. Its 08/10/2026 amendment says the old word's row refuses it in reader text until a block's rename lands. A new amendment line dated 12/10/2026 says an old word now leaves the glossary, no list of old words is kept in the tree, and no gate refuses an old word: review holds a staged rename. The pull request body says this decision doc was edited.
 - KTD6. **`.claude/skills/ce-skill-work/references/evaluate.md` and `references/new-skill.md` are edited through the `ce-skill-work` skill**, as `AGENTS.md` requires for a tracked skill.
 
 ### Risks
@@ -148,7 +148,7 @@ Four of the six tests in the describe block "the skills this repository tracks" 
   - `docs/operations/local-gates.md`
   - `.claude/skills/ce-skill-work/references/evaluate.md`
   - `.claude/skills/ce-skill-work/references/new-skill.md`
-  - `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`
+  - `docs/solutions/architecture-patterns/adr-0047.md`
   - delete `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md`
   - `docs/solutions/best-practices/what-a-rename-prose-pass-gets-wrong-and-the-checks-that-catch-it.md`
   - `docs/solutions/best-practices/renaming-a-table-drizzle-kit-will-not-generate-so-the-migration-and-snapshot-are-written-by-hand.md`

@@ -80,8 +80,6 @@ Before a row turns done, file what the block still owes as Linear issues under i
 | A user story | `docs/specs/v01-stories.md` |
 | What happened, and when | git, and `docs/archive/` |
 
-The merge group runs `packages/devtools/test/route-spec.test.ts` through `pnpm check:docs` in the docs lane and devtools' `check` in the full lane. Each violation names its rule.
-
 ## Not in v0.1
 
 - The bids-and-proposals stage and the Then and Later stages of `VISION.md`. S5 and S6 fix the knowledge-side contract the next stage consumes.

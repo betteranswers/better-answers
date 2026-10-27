@@ -60,4 +60,4 @@ execution: code
 ### U2. Decision doc (owner's proposal)
 
 - **Requirements:** R1 to R4.
-- **Files:** `docs/solutions/architecture-patterns/adr-0012-the-concept-write-path.md`, a new bullet after line 29 that says what the lock is, who holds it and how, and the cap. The wording is a proposal for the owner.
+- **Files:** `docs/solutions/architecture-patterns/adr-0012.md`, a new bullet after line 29 that says what the lock is, who holds it and how, and the cap. The wording is a proposal for the owner.

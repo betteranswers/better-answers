@@ -470,7 +470,7 @@ sequenceDiagram
 **Dependencies:** U1.
 
 **Files:**
-- Modify: `apps/web/CODING_STANDARDS.md`, `packages/design-system/readme.md`, `packages/design-system/guidelines/colors-trust.card.html`, `packages/design-system/guidelines/blueprint-marks.card.html`, `docs/solutions/architecture-patterns/adr-0019-trust-derived-from-the-file.md`, `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`
+- Modify: `apps/web/CODING_STANDARDS.md`, `packages/design-system/readme.md`, `packages/design-system/guidelines/colors-trust.card.html`, `packages/design-system/guidelines/blueprint-marks.card.html`, `docs/solutions/architecture-patterns/adr-0019.md`, `docs/solutions/architecture-patterns/adr-0047.md`
 
 **Approach:**
 1. Add R9's rule, headed by its instruction in the form BA-37 left (no tag), within ADR 0045's 80-word cap.
@@ -478,7 +478,7 @@ sequenceDiagram
 3. Amend ADR 0019's closed set and ADR 0047's direction: one word everywhere, the names kept by R15, R21 and R22, and the words test's list. Each amendment is dated, in the docs' existing style.
 4. Update the two design-system cards' text. Their token names wait for U14.
 
-**Patterns to follow:** the ADR docs' amendment lines; `docs/solutions/architecture-patterns/adr-0045-coding-rule-is-one-imperative.md`.
+**Patterns to follow:** the ADR docs' amendment lines; `docs/solutions/architecture-patterns/adr-0045.md`.
 
 **Test scenarios:** Test expectation: none -- documentation; U2's words test covers the words in these files.
 

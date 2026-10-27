@@ -199,7 +199,7 @@ A signed-in person's browser calls `/get-session` on every page load, so an offi
 - **Goal:** the decision docs and the operations doc say what the code now does.
 - **Requirements:** R9.
 - **Dependencies:** U2, U3, U6. Same commit as their code.
-- **Files:** `docs/solutions/architecture-patterns/adr-0034-one-origin-product-and-authorization-server.md`, `docs/solutions/architecture-patterns/adr-0009-better-auth-in-process-identity-provider.md`, `docs/operations/coolify.md`, `.claude/skills/browser-suite/SKILL.md`.
+- **Files:** `docs/solutions/architecture-patterns/adr-0034.md`, `docs/solutions/architecture-patterns/adr-0009.md`, `docs/operations/coolify.md`, `.claude/skills/browser-suite/SKILL.md`.
 - **Approach:** the one-origin doc's bullets on counts gain the `identity` group, the two email-code groups, the uncounted pages, the limiter switched off and the log line. The Better Auth doc's line on its limiter is rewritten. `coolify.md` says where BA-136's trigger now shows. The browser suite's skill names the limiter in its list of ceilings, so that list changes with it.
 - **Test scenarios:** Test expectation: none -- prose; the words gate and the docs check read it.
 - **Verification:** `pnpm check:docs` passes.

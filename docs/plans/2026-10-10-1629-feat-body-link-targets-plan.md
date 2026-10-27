@@ -119,8 +119,8 @@ The projected rows are KTD1's statement. A row exists only for a target the read
 - `contracts/links/cases.json`: "an edge's id carries its link's ordinal", and how both tiers count.
 - `apps/api/tests/harness-knowledge.ts`: `linksTo` already writes `[Title](file.md)` through `writeConcept`, so the browser suite needs no new seed.
 - `docs/solutions/logic-errors/two-tiers-regex-engines-split-lines-and-whitespace-differently.md`: the ordinal is not "the nth Markdown link", and a third reader must not count for itself.
-- `docs/solutions/architecture-patterns/adr-0016-answers-assert-concepts-only.md`: nothing withheld is counted, hinted at or explained.
-- `docs/solutions/architecture-patterns/adr-0018-one-mcp-surface-grown-by-scope.md`: an outside client cannot open a relative path, so MCP names a target by its IRI.
+- `docs/solutions/architecture-patterns/adr-0016.md`: nothing withheld is counted, hinted at or explained.
+- `docs/solutions/architecture-patterns/adr-0018.md`: an outside client cannot open a relative path, so MCP names a target by its IRI.
 
 ---
 
@@ -222,7 +222,7 @@ The projected rows are KTD1's statement. A row exists only for a target the read
 - **Goal:** the decision that lists `open`'s fields names the new one.
 - **Requirements:** R6.
 - **Dependencies:** U3.
-- **Files:** `docs/solutions/architecture-patterns/adr-0030-mcp-surface-stays-mcp-sdk-v2.md`.
+- **Files:** `docs/solutions/architecture-patterns/adr-0030.md`.
 - **Test expectation:** none -- one line of a decision doc; `pnpm check:docs` holds its words.
 
 ---

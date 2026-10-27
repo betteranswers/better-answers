@@ -156,7 +156,7 @@ A first-principles review on 02/10 tested every reader of a rule: agents, gates,
   - `apps/web/CODING_STANDARDS.md`
   - `apps/worker/CODING_STANDARDS.md`
   - `deploy/CODING_STANDARDS.md`
-  - `docs/solutions/architecture-patterns/adr-0045-coding-rule-is-one-imperative.md`
+  - `docs/solutions/architecture-patterns/adr-0045.md`
 - **Approach:**
   1. Strip the bracket tag from all 65 headings. The root file uses `###`, the workspace files `##`.
   2. Rename the root group headings (KTD1).
@@ -193,7 +193,7 @@ A first-principles review on 02/10 tested every reader of a rule: agents, gates,
     - `packages/schema/test/test-title.ts`
   - Docs:
     - `CODING_STANDARDS.md` (*Land a gate with the test that runs it*)
-    - `docs/solutions/architecture-patterns/adr-0045-coding-rule-is-one-imperative.md`
+    - `docs/solutions/architecture-patterns/adr-0045.md`
     - `packages/devtools/README.md` (the message lines near 166 to 169)
   - Tests:
     - `packages/devtools/test/act-admits-before-await.test.ts`
@@ -312,13 +312,13 @@ A first-principles review on 02/10 tested every reader of a rule: agents, gates,
 - **Dependencies:** U1, so the italic headings match the new names.
 - **Files:**
   - ADR docs in `docs/solutions/architecture-patterns/`:
-    - `adr-0005-own-app-in-two-tiers.md`
-    - `adr-0008-a-contract-for-each-class-of-caller.md`
-    - `adr-0025-signals-are-queries-over-rows.md`
-    - `adr-0027-open-core-under-apache-2-0.md`
-    - `adr-0037-reader-screen-latency-budget.md`
-    - `adr-0041-secrets-in-seven-credential-classes.md`
-    - `adr-0042-product-ships-accessibility-statement.md`
+    - `adr-0005.md`
+    - `adr-0008.md`
+    - `adr-0025.md`
+    - `adr-0027.md`
+    - `adr-0037.md`
+    - `adr-0041.md`
+    - `adr-0042.md`
   - Learning: `docs/solutions/best-practices/a-race-test-held-late-or-released-in-turn-cannot-prove-a-lock-order.md`
   - Plans:
     - `docs/plans/2026-09-30-1959-feat-shell-and-layout-foundations-plan.md`
