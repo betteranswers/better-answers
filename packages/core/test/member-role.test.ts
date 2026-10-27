@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { changeRole, changeRoleInput, listMembers } from "../src/members/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
@@ -129,7 +131,7 @@ describe("what changing a role refuses", () => {
       roleChangedBy(workspace, workspace.adminUserId, viewer, "Editor"),
     );
 
-    expect(failed).toEqual({ ok: false, error: expect.any(Error) });
+    expect(failed).toEqual({ ok: false, error: matching.any(Error) });
     expect((await rolesOf(workspace))[viewer]).toBe("Viewer");
   });
 });
@@ -193,7 +195,7 @@ describe("the last Admin", () => {
     expect(await adminsOf(workspace)).toHaveLength(1);
     expect(answers.filter((answer) => answer.ok)).toHaveLength(1);
     expect(answers.flatMap((answer) => (answer.ok ? [] : [answer.error]))).toEqual([
-      expect.any(String),
+      matching.any(String),
     ]);
     expect(await roleChangesIn(workspace)).toHaveLength(1);
   });

@@ -5,6 +5,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import { runStryker, strykerWorkspace } from "./stryker-workspace.ts";
 
 const SOURCE = `const FAMILIES: readonly string[] = ["knowledge"];
@@ -223,7 +225,7 @@ describe("the vitest runner's patch over a throwaway workspace", () => {
     expect(rowAt(rows, 3, "BlockStatement", "{}")).toMatchObject({
       status: "Killed",
       testsCompleted: 1,
-      statusReason: expect.stringContaining("undefined"),
+      statusReason: matching.stringContaining("undefined"),
     });
 
     expect(rowAt(rows, 4, "ConditionalExpression", "false")).toMatchObject({
@@ -234,7 +236,7 @@ describe("the vitest runner's patch over a throwaway workspace", () => {
     expect(rowAt(rows, 8, "StringLiteral", '""')).toMatchObject({
       status: "Killed",
       testsCompleted: 1,
-      statusReason: expect.stringContaining("is not a family"),
+      statusReason: matching.stringContaining("is not a family"),
     });
 
     expect(

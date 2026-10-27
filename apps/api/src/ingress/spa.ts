@@ -1,5 +1,5 @@
 import { serveStatic } from "@hono/node-server/serve-static";
-import type { Context, MiddlewareHandler } from "hono";
+import type { Context, Env, MiddlewareHandler } from "hono";
 
 import { hostnameOfUrl } from "./hostnames.ts";
 
@@ -12,7 +12,7 @@ export type SpaBuild = {
 export type SpaServing = {
   readonly assets: MiddlewareHandler;
 
-  readonly shell: (context: Context) => Promise<Response | undefined>;
+  readonly shell: (context: Context<Env, string>) => Promise<Response | undefined>;
 };
 
 const asksForAFile = (path: string): boolean => /\.[^./]+$/.test(path);

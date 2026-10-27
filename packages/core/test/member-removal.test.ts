@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import {
   bulkRemoveMembers,
@@ -189,7 +191,7 @@ describe("what removing a member refuses", () => {
       removedBy(workspace, workspace.adminUserId, viewer),
     );
 
-    expect(failed).toEqual({ ok: false, error: expect.any(Error) });
+    expect(failed).toEqual({ ok: false, error: matching.any(Error) });
     expect((await rolesOf(workspace))[viewer]).toBe("Viewer");
     expect(await endedGrants(db().pool, issued)).toEqual([]);
   });
@@ -309,7 +311,7 @@ describe("removing many members at once", () => {
       [viewer]: { role: "Viewer", grants: viewersEnded },
     });
     const [batch] = await batchesOf(workspace, REMOVED);
-    expect(batch).toEqual(expect.any(String));
+    expect(batch).toEqual(matching.any(String));
     expect(await batchesOf(workspace, REMOVED)).toEqual([batch, batch]);
     expect([...(await grantsEndedAbout(editor)), ...(await grantsEndedAbout(viewer))]).toEqual([
       { actor: `human:${adminUserId}`, detail: { workspaceId, grants: editorsEnded } },
@@ -332,6 +334,6 @@ describe("removing many members at once", () => {
     expect(await rolesOf(workspace)).toEqual({ [workspace.adminUserId]: "Admin" });
     const batches = await batchesOf(workspace, REMOVED);
     expect(batches).toHaveLength(200);
-    expect(new Set(batches)).toEqual(new Set([expect.any(String)]));
+    expect(new Set(batches)).toEqual(new Set([matching.any(String)]));
   });
 });

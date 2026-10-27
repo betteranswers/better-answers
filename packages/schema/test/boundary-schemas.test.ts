@@ -2,7 +2,7 @@ import { getTableColumns, is } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { getTableConfig, jsonb, PgDialect, PgTable, pgTable } from "drizzle-orm/pg-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { z } from "zod";
+import { z } from "zod";
 
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "../src/drizzle-zod.ts";
 import {
@@ -1696,7 +1696,7 @@ describe("a __proto__ key in a concept's frontmatter", () => {
   const frontmatterOf = (json: string) =>
     boundarySchemas.conceptIndex.insert.safeParse({
       ...acceptedRows.conceptIndex[0],
-      frontmatter: JSON.parse(json),
+      frontmatter: z.unknown().parse(JSON.parse(json)),
     });
 
   it("is kept like any other key, in an entry too", () => {

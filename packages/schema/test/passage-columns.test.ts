@@ -28,7 +28,7 @@ const WS_B = "01J6EBBBBBBBBBBBBBBBBBBBBB";
 type Attribute = { readonly column: string; readonly notNull: boolean; readonly generated: string };
 
 const attributesOf = async (client: pg.PoolClient, relation: string): Promise<Attribute[]> => {
-  const rows = await client.query(
+  const rows = await client.query<{ column: string; not_null: boolean; generated: string }>(
     `SELECT a.attname AS column, a.attnotnull AS not_null, a.attgenerated AS generated
        FROM pg_attribute a
        JOIN pg_class c ON c.oid = a.attrelid
@@ -48,7 +48,7 @@ const indexShapeOf = async (
   client: pg.PoolClient,
   relation: string,
 ): Promise<{ fullText: boolean; vector: boolean }> => {
-  const rows = await client.query(
+  const rows = await client.query<{ indexdef: string }>(
     "SELECT indexdef FROM pg_indexes WHERE schemaname = 'index' AND tablename = $1",
     [relation],
   );
@@ -190,7 +190,7 @@ describe("the full-text column", () => {
       const { seed } = await seedOneDocument(client, WS_A);
       await seed.passage({ workspaceId: WS_A, content: "the handbook's holiday policy" });
 
-      const computed = await client.query(
+      const computed = await client.query<{ matched: boolean }>(
         `SELECT search @@ to_tsquery('english', 'holiday') AS matched FROM "index".passage`,
       );
       expect(computed.rows[0]?.matched).toBe(true);

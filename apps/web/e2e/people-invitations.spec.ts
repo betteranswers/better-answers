@@ -1,4 +1,5 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
+import { z } from "zod";
 
 import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 
@@ -141,8 +142,9 @@ const resentAsIfItWent = (page: Page) =>
     (url) => url.pathname.includes("members.resendInvitation"),
     async (route) => {
       const answered = await route.fetch();
-      const answers: readonly { readonly result: { readonly data: object } }[] =
-        await answered.json();
+      const answers = z
+        .array(z.object({ result: z.object({ data: z.object({}).loose() }) }))
+        .parse(await answered.json());
       await route.fulfill({
         response: answered,
         json: answers.map(({ result }) => ({

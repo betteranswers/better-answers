@@ -24,7 +24,7 @@ const decisionSchema = z.strictObject({
   applies_when: appliesWhen,
 });
 
-const read = (relative: string) => {
+const read = (relative: string): { readonly frontmatter: unknown; readonly body: string } => {
   const text = readFileSync(path.join(repositoryRoot, relative), "utf8");
   const match = FRONTMATTER.exec(text);
   return {

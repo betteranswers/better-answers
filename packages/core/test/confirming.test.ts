@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import pg from "pg";
 import { describe, expect, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import { CeilingMet } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
 import { SWEEPS, sweepIdentitySet } from "../src/sweeps/index.ts";
@@ -22,6 +24,7 @@ import {
 } from "../src/workspaces/index.ts";
 import { authenticatorFor, passkeyFor, restoreCodeFor } from "./identity-rows.ts";
 import { bootstrap, provisionedWorkspace, seedPerson } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import { AT, secondFactorSuite } from "./second-factor-suite.ts";
 import { addressOf, countWaitingOnLocks, until, whileActionsWaitAt } from "./suite-postgres.ts";
 
@@ -72,15 +75,15 @@ const failuresOf = async (personId: string) =>
   ).rows;
 
 const factorsOf = async (personId: string) =>
-  (
+  rowsFrom(
     await db().pool.query(
       `SELECT (SELECT array_agg(p.id ORDER BY p.id) FROM passkey p WHERE p.user_id = u.id) AS passkeys,
               a.secret, a.verified, u.authenticator_enabled AS enabled,
               u.restore_required_at IS NOT NULL AS "restoreRequired"
          FROM "user" u LEFT JOIN authenticator a ON a.user_id = u.id WHERE u.id = $1`,
       [personId],
-    )
-  ).rows[0];
+    ),
+  )[0];
 
 const tenCodesFor = async (personId: string): Promise<readonly string[]> => {
   const made = await replaceRecoveryCodes(bootstrap, door(), {
@@ -381,7 +384,7 @@ describe("reserving an authenticator try", () => {
 
     expect(await reserving(personId, AT, openPostgres(gone))).toEqual({
       ok: false,
-      error: expect.any(Error),
+      error: matching.any(Error),
     });
   });
 });

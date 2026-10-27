@@ -168,7 +168,10 @@ test("opens on either chord anywhere, Escape handing focus back", async ({ page,
   await expect(triggerOf(page)).toHaveAttribute("aria-keyshortcuts", "Meta+K Control+K");
 
   await opened(page, "Meta+k");
-  expect(await page.evaluate(() => Reflect.get(window, "kept")), "the browser kept ⌘K").toBe(false);
+  expect(
+    await page.evaluate((): unknown => Reflect.get(window, "kept")),
+    "the browser kept ⌘K",
+  ).toBe(false);
   await page.keyboard.press("Escape");
   await expect(dialogOf(page)).toHaveCount(0);
   await expect(triggerOf(page)).toBeFocused();
@@ -259,7 +262,7 @@ const focusStopsRecorded = (page: Page) =>
   });
 
 const focusStops = async (page: Page): Promise<readonly string[]> =>
-  z.array(z.string()).parse(await page.evaluate(() => Reflect.get(window, "focusStops")));
+  z.array(z.string()).parse(await page.evaluate((): unknown => Reflect.get(window, "focusStops")));
 
 test("jumping after a removal focuses the page, not Remove", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Swaledale Smelters");

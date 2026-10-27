@@ -501,7 +501,7 @@ const jobEnvironment = (objects: ObjectStore, database: string): Record<string, 
 
 const recordedCopies = async (database: MigratedPostgres) =>
   (
-    await database.pool.query(
+    await database.pool.query<Record<string, unknown>>(
       `SELECT store, outcome, bytes, location, expires_at > finished_at AS expires_after_finish
          FROM backup WHERE kind = 'backup' ORDER BY store`,
     )

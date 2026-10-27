@@ -251,7 +251,7 @@ const insertRow = async <TName extends keyof Registry>(
   const keys = Object.keys(parsed);
   const names = keys.map((key) => `"${columns[key]?.name ?? key}"`).join(", ");
   const placeholders = keys.map((_, index) => `$${index + 1}`).join(", ");
-  const returned = await client.query(
+  const returned = await client.query<Record<string, unknown>>(
     `INSERT INTO ${qualified} (${names}) VALUES (${placeholders}) RETURNING *`,
     keys.map((key) => {
       const value = parsed[key];
@@ -443,7 +443,9 @@ export const testData = (client: pg.PoolClient): TestData => {
   const passage: TestData["passage"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     if (!(await partitionExists(client, workspaceId))) {
-      const previous = await client.query("SELECT current_workspace_id() AS ws");
+      const previous = await client.query<{ ws: string | null }>(
+        "SELECT current_workspace_id() AS ws",
+      );
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
       await client.query("SELECT create_workspace_partition($1)", [workspaceId]);
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [

@@ -6,6 +6,7 @@ import type { PlatformPrincipal } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
 import { setDecisionThreshold, setModelPrice, setSpendingLimit } from "../src/workspaces/index.ts";
 import { provisionedWorkspace } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import { postgresForSuite, whileWritesAreRefused } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -39,7 +40,7 @@ const limitsStored = async (workspaceId: string) => {
     "SELECT key, value FROM workspace_config WHERE workspace_id = $1 AND key LIKE 'llm.%'",
     [workspaceId],
   );
-  return read.rows;
+  return rowsFrom(read);
 };
 
 describe("a workspace's spending limit", () => {

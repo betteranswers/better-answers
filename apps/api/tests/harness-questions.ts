@@ -135,7 +135,7 @@ export const seedQuestions = async (
   });
 
 export const recordsIn = async (app: TestApp, workspaceId: string) => {
-  const kept = await app.database.superuser.query(
+  const kept = await app.database.superuser.query<Record<string, unknown>>(
     `SELECT r.transport, r.verdict, r.judge_state, r.completed_at IS NOT NULL AS completed, c.question
        FROM question_asked r JOIN question_content c ON c.record_id = r.id
       WHERE r.workspace_id = $1`,
@@ -145,7 +145,7 @@ export const recordsIn = async (app: TestApp, workspaceId: string) => {
 };
 
 export const feedbackKeptOn = async (app: TestApp, recordId: string) => {
-  const kept = await app.database.superuser.query(
+  const kept = await app.database.superuser.query<Record<string, unknown>>(
     `SELECT given_by, verdict, reason, note, disputed_sentence, disputed_concept
        FROM question_feedback WHERE record_id = $1 ORDER BY given_at, id`,
     [recordId],

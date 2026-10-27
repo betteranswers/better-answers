@@ -7,6 +7,7 @@ import { overrideConceptSensitivity, writeConcept } from "@better-answers/core/c
 import { head, initRepository } from "@better-answers/core/store/git";
 import { documentLanded, type DocumentShape } from "@better-answers/core/testing/documents";
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { connectAsHost, signIn } from "./flow.ts";
@@ -199,7 +200,7 @@ describe("knowledge.find over tRPC", () => {
     expect([...first.matches, ...last.matches]).toEqual(whole.matches);
     expect(
       whole.matches.map((match) => (match.layer === "bundles" ? match.iri : match.locator)),
-    ).toEqual(expect.arrayContaining([NESTING, FEEDING, SURVEY, RINGING].map(iriOf)));
+    ).toEqual(matching.arrayContaining([NESTING, FEEDING, SURVEY, RINGING].map(iriOf)));
     expect(whole.matches).toHaveLength(4);
   });
 
@@ -233,7 +234,7 @@ describe("knowledge.find over tRPC", () => {
     const page = await api.knowledge.find.query({ query: QUERY, limit: 20 });
 
     expect(page.matches.map((match) => (match.layer === "bundles" ? match.iri : ""))).toEqual(
-      expect.arrayContaining([NESTING, FEEDING, SURVEY].map(iriOf)),
+      matching.arrayContaining([NESTING, FEEDING, SURVEY].map(iriOf)),
     );
     expect(JSON.stringify(page)).not.toContain(iriOf(RINGING));
     expect(JSON.stringify(page)).not.toContain(RINGING);
@@ -250,7 +251,7 @@ describe("knowledge.find over tRPC", () => {
         match.layer === "bundles" ? [[match.title, match.trustWords]] : [],
       ),
     ).toEqual(
-      expect.arrayContaining([
+      matching.arrayContaining([
         [NESTING, "Verified automatically"],
         [FEEDING, "Unverified"],
         [SURVEY, "Unverified"],
@@ -447,7 +448,7 @@ describe("knowledge.open over tRPC", () => {
 
     const refused = await refusalOfCall(api.knowledge.open.query({ iri: "a heron" }));
 
-    expect(refused).toMatchObject({ data: { refusal: { fields: { iri: expect.any(String) } } } });
+    expect(refused).toMatchObject({ data: { refusal: { fields: { iri: matching.any(String) } } } });
     expect(refused).toMatchObject(MALFORMED);
   });
 

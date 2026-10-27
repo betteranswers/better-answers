@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { walkFrom, walkFromEntries, walkTo, walkToEntries } from "@better-answers/core/store/map";
 import { conceptIriOf, ulid, type ConceptIri } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
 import {
@@ -387,7 +388,7 @@ describe("a re-write that moves only who may read a concept", () => {
 
   const footnoteTo = (written: SourcedConcept) => ({
     ok: true,
-    value: [{ label: expect.any(String), iri: written.iri, title: written.title }],
+    value: [{ label: matching.any(String), iri: written.iri, title: written.title }],
   });
 
   it("takes the write-up along on an audience-only re-write", async () => {

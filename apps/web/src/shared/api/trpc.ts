@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { createTRPCClient, TRPCClientError } from "@trpc/client";
+import { createTRPCClient, isTRPCClientError } from "@trpc/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import { createTRPCContext, createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
 
@@ -19,15 +19,13 @@ export type RefusalWord = Refusal["word"];
 export type RefusalClass = Refusal["class"];
 
 export const refusalOf = (error: Error | ApiError): Refusal | undefined => {
-  if (!(error instanceof TRPCClientError)) return undefined;
-  const refusal: Refusal | undefined = error.data?.refusal;
-  return refusal;
+  if (!isTRPCClientError<AppRouter>(error)) return undefined;
+  return error.data?.refusal;
 };
 
 export const ceilingLiftsIn = (error: Error | ApiError): number | undefined => {
-  if (!(error instanceof TRPCClientError)) return undefined;
-  const seconds: number | undefined = error.data?.retryAfterSeconds;
-  return seconds;
+  if (!isTRPCClientError<AppRouter>(error)) return undefined;
+  return error.data?.retryAfterSeconds;
 };
 
 export const { TRPCProvider, useTRPC, useTRPCClient } = createTRPCContext<AppRouter>();

@@ -8,6 +8,7 @@ import {
   seedCataloguedDocument,
 } from "./catalogue-statements.ts";
 import { type MigratedPostgres } from "./harness.ts";
+import { matching } from "./matching.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
 type Writer = Pick<pg.PoolClient, "query">;
@@ -111,7 +112,7 @@ export const refusesEach = async (
       .catch((cause: unknown) => (cause instanceof Error ? cause.message : String(cause)));
     expect({ why, outcome }).toEqual({
       why,
-      outcome: expect.stringMatching(message),
+      outcome: matching.stringMatching(message),
     });
     await client.query("ROLLBACK TO SAVEPOINT refusal_probe");
   }

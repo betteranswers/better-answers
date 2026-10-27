@@ -33,7 +33,7 @@ const OWNING = {
 
 export type Page = {
   readonly name: string;
-  readonly path: string;
+  readonly path: `/${string}`;
   readonly icon: IconName;
   readonly built: boolean;
   readonly seenBy: readonly RoleOrOperator[];

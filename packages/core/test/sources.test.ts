@@ -4,6 +4,7 @@ import type pg from "pg";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { matching } from "@better-answers/schema/testing/matching";
 import { connectedSourceIdTakenAgain } from "@better-answers/schema/testing/probes";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
@@ -33,6 +34,7 @@ import {
 import { getObject, listObjects, putObject } from "../src/store/objects/index.ts";
 import { withScope, type Tx } from "../src/store/postgres/index.ts";
 import { contractFixture, mediaTypeOutside } from "./contract-fixture.ts";
+import { rowsFrom } from "./rows.ts";
 import {
   passageUnder,
   passageVersionsOf,
@@ -126,7 +128,7 @@ const connectedSourceRowOf = async (
        FROM connected_source WHERE workspace_id = $1 AND id = $2`,
     [workspaceId, connectedSourceId],
   );
-  return read.rows[0];
+  return rowsFrom(read)[0];
 };
 
 const documentRowOf = async (pool: pg.Pool, workspaceId: string, documentId: string) => {
@@ -136,7 +138,7 @@ const documentRowOf = async (pool: pg.Pool, workspaceId: string, documentId: str
        FROM source_document WHERE workspace_id = $1 AND id = $2`,
     [workspaceId, documentId],
   );
-  return read.rows[0];
+  return rowsFrom(read)[0];
 };
 
 const jobRowOf = async (pool: pg.Pool, workspaceId: string, jobId: string) => {
@@ -144,7 +146,7 @@ const jobRowOf = async (pool: pg.Pool, workspaceId: string, jobId: string) => {
     "SELECT kind, reason, status, subject_id FROM job WHERE workspace_id = $1 AND id = $2",
     [workspaceId, jobId],
   );
-  return read.rows[0];
+  return rowsFrom(read)[0];
 };
 
 const countsIn = async (pool: pg.Pool, workspaceId: string) => {
@@ -366,9 +368,9 @@ describe("an Admin connects an upload", () => {
       bound.value.connectedSourceId,
     );
     expect({
-      sensitivity: row?.sensitivity,
-      audience: row?.audience,
-      audience_groups: row?.audience_groups,
+      sensitivity: row?.["sensitivity"],
+      audience: row?.["audience"],
+      audience_groups: row?.["audience_groups"],
     }).toEqual({ sensitivity: "Restricted", audience: "groups", audience_groups: [groupId] });
   });
 
@@ -420,7 +422,7 @@ describe("an Admin connects an upload", () => {
     if (!bound.ok) throw new Error(`the connect was refused: ${String(bound.error)}`);
 
     const row = await documentRowOf(db().pool, scenario.workspaceId, bound.value.documentId);
-    expect(row?.byte_size).toEqual(HANDBOOK_BYTES);
+    expect(row?.["byte_size"]).toEqual(HANDBOOK_BYTES);
   });
 
   it("refuses a body past the cap, whatever its declared size", async () => {
@@ -483,12 +485,12 @@ describe("an Admin connects an upload", () => {
     expect(lost).toEqual(won);
     const { documentId, originalKey } = won.value;
     const row = await documentRowOf(db().pool, scenario.workspaceId, documentId);
-    expect(row?.original_key).toEqual(originalKey);
+    expect(row?.["original_key"]).toEqual(originalKey);
     const got = await getObject(scenario.admin, store().door, originalKey);
     if (!got.ok) throw new Error(`the object door refused the read: ${got.error}`);
     expect(await textOf(got.value)).toEqual(HANDBOOK);
     expect((await storedFor(scenario.admin)).filter((key) => key !== originalKey)).toEqual([
-      expect.stringMatching(
+      matching.stringMatching(
         new RegExp(`^uploads/${connectedSourceId.toLowerCase()}/[0-9a-z]{26}/original$`),
       ),
     ]);
@@ -589,7 +591,7 @@ describe("the sweep collects what failed connects and lost races left", () => {
     const rows = await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.upload.swept");
     expect(rows).toEqual([
       {
-        id: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+        id: matching.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
         actor: "process:better-answers-uploads",
         subject_id: connectedSourceId,
         detail: { [STORED_DETAIL_KEYS.connectedSourceId]: connectedSourceId, documentId },
@@ -615,7 +617,7 @@ describe("the sweep collects what failed connects and lost races left", () => {
     expect(await storedFor(scenario.admin)).toEqual([kept]);
     const rows = await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.upload.swept");
     expect(rows.map((row) => row.detail)).toEqual(
-      expect.arrayContaining([
+      matching.arrayContaining([
         {
           [STORED_DETAIL_KEYS.connectedSourceId]: named.connectedSourceId,
           documentId: named.documentId,

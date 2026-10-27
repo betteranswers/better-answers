@@ -29,6 +29,7 @@ import {
   judgeReplyTo,
   promptOf,
 } from "./judge-wire.ts";
+import { openReservationsIn, rowsFrom } from "./rows.ts";
 import { inputOf } from "./suite-input.ts";
 import { answered, asksTablesLockedAtOnce, postgresForSuite } from "./suite-postgres.ts";
 
@@ -128,25 +129,28 @@ const arranged = async (
   return { workspaceId, asker, iris, wire: judgeSaying(fits) };
 };
 
+const recordedJudgement = z.object({
+  verdict: z.string(),
+  judge_state: z.string(),
+  concepts: z.array(z.object({ iri: z.string(), judged: z.string().optional() })),
+  completed: z.boolean(),
+});
+
 const recordOf = async (recordId: string) => {
   const read = await db().pool.query(
     `SELECT verdict, judge_state, concepts, completed_at IS NOT NULL AS completed
        FROM question_asked WHERE id = $1`,
     [recordId],
   );
-  return read.rows[0];
+  return recordedJudgement.optional().parse(read.rows[0]);
 };
 
 const spendOf = async (workspaceId: string) => {
-  const reservations = await db().pool.query(
-    "SELECT count(*)::integer AS open FROM spend_reservation WHERE workspace_id = $1",
-    [workspaceId],
-  );
   const calls = await db().pool.query(
     "SELECT outcome, tokens_in, tokens_out, answer_id FROM llm_call WHERE workspace_id = $1",
     [workspaceId],
   );
-  return { open: reservations.rows[0]?.open, calls: calls.rows };
+  return { open: await openReservationsIn(db().pool, workspaceId), calls: rowsFrom(calls) };
 };
 
 const expectNoCall = async (workspaceId: string, wire: Wire) => {
@@ -460,12 +464,7 @@ describe("ask with a judge", () => {
     const answer = await askedWith(asker, { question: QUESTION }, wire);
 
     const record = await recordOf(answer.recordId);
-    const judged = new Map(
-      record?.concepts.map((concept: { iri: string; judged?: string }) => [
-        concept.iri,
-        concept.judged,
-      ]),
-    );
+    const judged = new Map(record?.concepts.map((concept) => [concept.iri, concept.judged]));
     expect([record?.verdict, record?.judge_state, record?.completed]).toEqual([
       "ok",
       "judged",

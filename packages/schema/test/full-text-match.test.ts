@@ -17,6 +17,7 @@ import {
 } from "../src/index.ts";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
+import { matching } from "./matching.ts";
 import { matchIsLeakproof, postgresForSuite, refusesEach, UNMARK_THE_MATCH } from "./probes.ts";
 
 const db = postgresForSuite();
@@ -122,7 +123,7 @@ describe("the concept search column's index, after the description joined it", (
       {
         valid: true,
         ready: true,
-        definition: expect.stringContaining("USING gin (search)"),
+        definition: matching.stringContaining("USING gin (search)"),
       },
     ]);
   });
@@ -285,19 +286,19 @@ describe("the any-word rule over concept rows", () => {
     expect(matched).toEqual([
       {
         title: "Audit Logs Retention",
-        weight: expect.closeTo(2 * idfOfAWordInThreeOfFourRows + idfOfAWordInOneOfFourRows, 12),
+        weight: matching.closeTo(2 * idfOfAWordInThreeOfFourRows + idfOfAWordInOneOfFourRows, 12),
         rank: 3,
       },
       {
         title: "Logs",
-        weight: expect.closeTo(
+        weight: matching.closeTo(
           idfOfAWordInThreeOfFourRows + (idfOfAWordInThreeOfFourRows * 1.2 * 2.2) / (1.2 + 1.2),
           12,
         ),
         rank: 2.200000047683716,
       },
-      { title: "Audit", weight: expect.closeTo(idfOfAWordInThreeOfFourRows, 12), rank: 1 },
-      { title: "Log", weight: expect.closeTo(idfOfAWordInThreeOfFourRows, 12), rank: 1 },
+      { title: "Audit", weight: matching.closeTo(idfOfAWordInThreeOfFourRows, 12), rank: 1 },
+      { title: "Log", weight: matching.closeTo(idfOfAWordInThreeOfFourRows, 12), rank: 1 },
     ]);
   });
 
@@ -395,7 +396,7 @@ describe("the any-word rule over concept rows", () => {
     );
 
     expect(matched).toEqual([
-      { title: "See example.com/o'brien", weight: expect.any(Number), rank: 3 },
+      { title: "See example.com/o'brien", weight: matching.any(Number), rank: 3 },
     ]);
   });
 

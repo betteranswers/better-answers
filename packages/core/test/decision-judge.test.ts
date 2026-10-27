@@ -24,6 +24,7 @@ import {
   decisionReplyTo,
 } from "./judge-wire.ts";
 import { bootstrap, provisionedWorkspace } from "./platform.ts";
+import { openReservationsIn, rowsFrom } from "./rows.ts";
 import { answered, postgresForSuite, seedingWith } from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
 
@@ -121,15 +122,11 @@ const seededIn = async (workspaceId: string, shapes: readonly SeededConcept[]) =
 };
 
 const spendOf = async (workspaceId: string) => {
-  const reservations = await db().pool.query(
-    "SELECT count(*)::integer AS open FROM spend_reservation WHERE workspace_id = $1",
-    [workspaceId],
-  );
   const calls = await db().pool.query(
     "SELECT outcome, tokens_in, tokens_out, cost_gbp FROM llm_call WHERE workspace_id = $1",
     [workspaceId],
   );
-  return { open: reservations.rows[0]?.open, calls: calls.rows };
+  return { open: await openReservationsIn(db().pool, workspaceId), calls: rowsFrom(calls) };
 };
 
 const titlesOf = (concepts: readonly { readonly title: string }[]) =>

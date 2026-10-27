@@ -4,6 +4,7 @@ import { conceptIriOf, ulid } from "@better-answers/schema";
 
 import { actorIdOfPerson } from "../src/kernel/index.ts";
 import { personIdOf } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import { seedingWith } from "./suite-postgres.ts";
 
 const A_QUESTION_ASKED = "How long are audit logs kept?";
@@ -90,7 +91,7 @@ export const askedAMicrosecondFiner = async (pool: pg.Pool, recordId: string): P
 };
 
 export const questionRowsOf = async (pool: pg.Pool, recordId: string) => {
-  const read = async (statement: string) => (await pool.query(statement, [recordId])).rows;
+  const read = async (statement: string) => rowsFrom(await pool.query(statement, [recordId]));
   return {
     skeleton: await read("SELECT asked_by, verdict FROM question_asked WHERE id = $1"),
     content: await read("SELECT question FROM question_content WHERE record_id = $1"),

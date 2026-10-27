@@ -1,5 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import type {
   OperatorPrincipal,
   PlatformPrincipal,
@@ -257,7 +259,7 @@ describe("what flagging a display name refuses", () => {
       flaggedBy(workspace, workspace.adminUserId, person),
     );
 
-    expect(failed).toEqual({ ok: false, error: expect.any(Error) });
+    expect(failed).toEqual({ ok: false, error: matching.any(Error) });
     expect(await flaggedIn(workspace)).toEqual([]);
     expect(await raisedFor(person)).toEqual([]);
   });
@@ -266,7 +268,7 @@ describe("what flagging a display name refuses", () => {
 describe("the names waiting for the operator", () => {
   const flagOn = ({ workspaceId, name }: ProvisionedWorkspace) => ({
     workspace: { id: workspaceId, name },
-    raisedAt: expect.stringMatching(ISO_INSTANT),
+    raisedAt: matching.stringMatching(ISO_INSTANT),
   });
 
   it("lists each flagged person with every flagging workspace, oldest first", async () => {
@@ -380,7 +382,7 @@ describe("a flag raised while the operator corrects the name", () => {
 
     expect(heldOpen).toEqual({
       corrected: { ok: true, value: { personId: person, displayName: "Priya Shah" } },
-      waitingAt: [expect.stringContaining("pg_advisory_xact_lock")],
+      waitingAt: [matching.stringContaining("pg_advisory_xact_lock")],
       flagSettled: false,
     });
     expect(await flag).toMatchObject({

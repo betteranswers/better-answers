@@ -64,6 +64,11 @@
     "typescript/no-unnecessary-condition": "error",
     "typescript/require-array-sort-compare": ["error", { "ignoreStringArrays": false }],
     "typescript/no-explicit-any": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-argument": "error",
     "typescript/consistent-type-imports": "error",
     "typescript/no-non-null-assertion": "error",
     "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }],
@@ -102,7 +107,9 @@
     "better-answers/mcp-entry-annotations": "error",
     "better-answers/mcp-entry-no-workspace-argument": "error",
     "better-answers/import-direction": "error",
-    "better-answers/parameter-never-mutated": "error"
+    "better-answers/parameter-never-mutated": "error",
+    "react/react-in-jsx-scope": "off",
+    "typescript/prefer-readonly-parameter-types": "off"
   },
   "overrides": [
     {
@@ -400,7 +407,9 @@
         "anti-slop/no-unknown-returns": "off",
         "anti-slop/no-unknown-type-aliases": "off",
         "anti-slop/no-unsafe-dictionary-type": "off",
-        "anti-slop/no-widen-then-assert": "off"
+        "anti-slop/no-widen-then-assert": "off",
+        "eslint/no-await-in-loop": "off",
+        "eslint/require-unicode-regexp": "off"
       }
     },
     {
@@ -419,6 +428,16 @@
       "files": ["scripts/**", "packages/devtools/src/**"],
       "rules": {
         "node/no-process-env": "off"
+      }
+    },
+    {
+      "files": ["scripts/**"],
+      "rules": {
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-argument": "off"
       }
     },
     {

@@ -247,7 +247,9 @@ const CLOCKED = z.discriminatedUnion("kind", [
 ]);
 
 export const actionClocked = async (page: Page): Promise<number> => {
-  const clocked = CLOCKED.parse(await page.evaluate(() => Reflect.get(window, "actionClocked")));
+  const clocked = CLOCKED.parse(
+    await page.evaluate((): unknown => Reflect.get(window, "actionClocked")),
+  );
   if (clocked.kind === "landed") return clocked.ms;
   throw new Error(
     `the page did not read ${JSON.stringify(clocked.reads)} while the server's answer was held for ${String(clocked.heldMs)} ms: the action waits on a round trip, or the page never reads it`,

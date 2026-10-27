@@ -41,7 +41,7 @@ export const journalEntriesOf = (
 
 const entriesIn = (folder: string): readonly JournalEntry[] => {
   const read = journalEntriesOf(
-    JSON.parse(readFileSync(path.join(folder, "_journal.json"), "utf8")),
+    journalSchema.parse(JSON.parse(readFileSync(path.join(folder, "_journal.json"), "utf8"))),
   );
   if (read.ok) return read.value;
   const { earlier, later } = read.error;

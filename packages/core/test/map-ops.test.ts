@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MAP_MAINTENANCE, mapCounts, rebuildMap, sweepMap } from "@better-answers/core/concepts";
 import type { TestData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
 import { postgresForSuite, seedingWith } from "./suite-postgres.ts";
@@ -253,7 +254,7 @@ describe("rebuilding a workspace's map", () => {
 
     const jobs = await jobsOf(workspace.workspaceId);
     expect(jobs).toEqual([
-      { id: expect.any(String), kind: "full-rebuild", reason: "upgrade", status: "queued" },
+      { id: matching.any(String), kind: "full-rebuild", reason: "upgrade", status: "queued" },
     ]);
     expect(rebuilt).toEqual({ ok: true, value: { jobId: jobs[0]?.id } });
   });

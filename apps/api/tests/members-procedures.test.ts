@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { until } from "@better-answers/core/testing/postgres";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { connectAsHost, refresh, revokeAtEndpoint, setActiveWorkspace } from "./flow.ts";
 import { CLAUDE_CLIENT_ID, startApp, type TestApp } from "./harness.ts";
@@ -88,7 +89,7 @@ describe("the members list over tRPC", () => {
         address: admin.email,
         role: "Admin",
         groups: [],
-        joinedAt: expect.stringMatching(ISO_INSTANT),
+        joinedAt: matching.stringMatching(ISO_INSTANT),
         credentialsRevokedAt: null,
       },
     ]);
@@ -459,7 +460,7 @@ describe("removing a member over tRPC", () => {
             {
               clientId: CLAUDE_CLIENT_ID,
               workspaceId: acme.workspaceId,
-              issuedAt: expect.stringMatching(ISO_INSTANT),
+              issuedAt: matching.stringMatching(ISO_INSTANT),
             },
           ],
         },

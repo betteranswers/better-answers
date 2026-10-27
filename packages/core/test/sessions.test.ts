@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import { openPostgres } from "../src/store/postgres/index.ts";
 import {
   endOneSession,
@@ -95,7 +97,7 @@ const signOutOthers = (seeded: Seeded, at: number) =>
 const endedSession = (seeded: Seeded, at: number) => ({
   sessionId: sessionAt(seeded, at),
   device: "Chrome on macOS",
-  lastActiveAt: expect.any(String),
+  lastActiveAt: matching.any(String),
 });
 
 const aSignOutRecord = (

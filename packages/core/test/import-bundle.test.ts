@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { head } from "@better-answers/core/store/git";
 import { ids, type ConceptIri } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { open, renderOpen } from "../src/answering/index.ts";
 import {
@@ -479,7 +480,7 @@ describe("importing the bundle", () => {
       subject:
         "Import knowledge/company/answers/data-retention-period.md from Acme Bid Library v1, entry ENTRY-002",
       author: await authorOf(scenario.admin),
-      trailers: { Actor: `human:${scenario.admin.userId}`, Audit: expect.any(String) },
+      trailers: { Actor: `human:${scenario.admin.userId}`, Audit: matching.any(String) },
     });
     expect(await indexRows(scenario.workspaceId)).toEqual([
       {
@@ -1092,7 +1093,7 @@ describe("what the import refuses before it writes anything", () => {
       {
         file: "company/answers/broken.md",
         reason: "does-not-parse",
-        about: expect.stringContaining("Nested mappings are not allowed"),
+        about: matching.stringContaining("Nested mappings are not allowed"),
       },
     ],
     [

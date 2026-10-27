@@ -2,6 +2,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { describe, expect, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import { connectAsHost, refresh, revokeAtEndpoint, setActiveWorkspace } from "./flow.ts";
 import type { TestClient } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
@@ -84,8 +86,8 @@ const connectedInBoth = async () => {
     pick: elsewhere.workspaceId,
   });
   expect([inHere.refreshToken, inElsewhere.refreshToken]).toEqual([
-    expect.stringMatching(/./),
-    expect.stringMatching(/./),
+    matching.stringMatching(/./),
+    matching.stringMatching(/./),
   ]);
   return { ...members, inHere, inElsewhere, host: app().client() };
 };
@@ -115,7 +117,10 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
 
     const revoked = await admin.members.endEverySignInAndToken.mutate({ personId: person.id });
 
-    expect(revoked).toEqual({ personId: person.id, revokedAt: expect.stringMatching(ISO_INSTANT) });
+    expect(revoked).toEqual({
+      personId: person.id,
+      revokedAt: matching.stringMatching(ISO_INSTANT),
+    });
     expect(await refusalOfCall(first.api.session.member.query())).toMatchObject(REVOKED_HERE);
     expect(await refusalOfCall(second.api.session.member.query())).toMatchObject(REVOKED_HERE);
     expect((await setActiveWorkspace(second.client, elsewhere.workspaceId)).status).toBe(200);
@@ -197,8 +202,8 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
     ];
 
     expect(answers).toEqual([
-      { personId: person.id, revokedAt: expect.stringMatching(ISO_INSTANT) },
-      { personId: onlyHere.id, revokedAt: expect.stringMatching(ISO_INSTANT) },
+      { personId: person.id, revokedAt: matching.stringMatching(ISO_INSTANT) },
+      { personId: onlyHere.id, revokedAt: matching.stringMatching(ISO_INSTANT) },
     ]);
     const listed = JSON.stringify(await admin.members.list.query());
     for (const said of [JSON.stringify(answers), listed]) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { boundarySchemas, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 import { groupNameTakenAgain } from "@better-answers/schema/testing/probes";
 
 import { attempt } from "../src/kernel/index.ts";
@@ -519,7 +520,7 @@ describe("an action whose statement the store refuses", () => {
 
     await expect(run).rejects.toThrow(/did not commit/);
 
-    expect(outcomes()).toEqual(refusedAlike(verbs, expect.any(Error)));
+    expect(outcomes()).toEqual(refusedAlike(verbs, matching.any(Error)));
 
     expect((await peopleActions(workspace.workspaceId)).map((event) => event.action)).toEqual([
       "people.group.created",
@@ -541,7 +542,7 @@ describe("an action whose statement the store refuses", () => {
       ),
     ).rejects.toThrow(/did not commit/);
 
-    expect(added).toEqual({ ok: false, error: expect.any(Error) });
+    expect(added).toEqual({ ok: false, error: matching.any(Error) });
     expect(await asAdmin(workspace, listGroups)).toEqual({
       ok: true,
       value: [{ id: groupId, name: "HR team", origin: "admin-curated", memberCount: 0 }],
@@ -560,7 +561,7 @@ describe("an action whose statement the store refuses", () => {
       ),
     ).rejects.toThrow(/did not commit/);
 
-    expect(removed).toEqual({ ok: false, error: expect.any(Error) });
+    expect(removed).toEqual({ ok: false, error: matching.any(Error) });
   });
 });
 
@@ -635,7 +636,7 @@ describe("an Admin of another workspace", () => {
 
     const made = await madeGroup(theirs, "HR team");
 
-    expect(made).toEqual(expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/));
+    expect(made).toEqual(matching.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/));
     expect(await groupRowCount(ours.workspaceId)).toBe(1);
   });
 });

@@ -19,6 +19,7 @@
     "./testing": "./test/testing.ts",
     "./testing/apple-git": "./test/apple-git.ts",
     "./testing/authenticator-code": "./test/authenticator-code.ts",
+    "./testing/matching": "./test/matching.ts",
     "./testing/probes": "./test/probes.ts",
     "./testing/test-title": "./test/test-title.ts",
     "./testing/test-title-setup": "./test/test-title-setup.ts",

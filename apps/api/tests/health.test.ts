@@ -1,6 +1,8 @@
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import { capturingLogger, serverFor, startApp, type TestApp } from "./harness.ts";
 import { startTestDatabase } from "./postgres.ts";
 
@@ -91,10 +93,10 @@ describe("the api's health endpoint", () => {
         identity: "failed",
       });
       expect(logs).toContainEqual(
-        expect.objectContaining({
+        matching.objectContaining({
           level: 50,
           msg: "the authorization server failed to initialise",
-          reason: expect.any(String),
+          reason: matching.any(String),
         }),
       );
     } finally {
@@ -131,8 +133,8 @@ describe("two apis starting together over one fresh database", () => {
       );
 
       expect(answers).toEqual([
-        expect.objectContaining({ status: "healthy", identity: "ready" }),
-        expect.objectContaining({ status: "healthy", identity: "ready" }),
+        matching.objectContaining({ status: "healthy", identity: "ready" }),
+        matching.objectContaining({ status: "healthy", identity: "ready" }),
       ]);
     } finally {
       // Destroyed, so a wait that timed out takes its lock with it.

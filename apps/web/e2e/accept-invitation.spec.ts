@@ -1,4 +1,5 @@
 import type { APIRequestContext, Page } from "@playwright/test";
+import { z } from "zod";
 
 import type { Role } from "@/shared/navigation.ts";
 
@@ -214,7 +215,7 @@ test("asks for a name when the join finds none given", async ({
 
   await page.route(SESSION_READ, async (route) => {
     const answered = await route.fetch();
-    const held: { readonly user: object } = await answered.json();
+    const held = z.looseObject({ user: z.looseObject({}) }).parse(await answered.json());
     await route.fulfill({
       response: answered,
       json: { ...held, user: { ...held.user, name: "Selina Held" } },

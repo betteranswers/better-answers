@@ -22,6 +22,7 @@ import {
   streamedEventsOf,
   streamedResponse,
 } from "./judge-wire.ts";
+import { openReservationsIn, rowsFrom } from "./rows.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -140,19 +141,15 @@ const draftKept = async (recordId: string) => {
   const read = await db().pool.query("SELECT drafted FROM question_content WHERE record_id = $1", [
     recordId,
   ]);
-  return read.rows[0]?.drafted;
+  return rowsFrom(read)[0]?.["drafted"];
 };
 
 const spendOf = async (workspaceId: string) => {
-  const open = await db().pool.query(
-    "SELECT count(*)::integer AS open FROM spend_reservation WHERE workspace_id = $1",
-    [workspaceId],
-  );
   const calls = await db().pool.query(
     "SELECT purpose, outcome FROM llm_call WHERE workspace_id = $1 ORDER BY called_at",
     [workspaceId],
   );
-  return { open: open.rows[0]?.open, calls: calls.rows };
+  return { open: await openReservationsIn(db().pool, workspaceId), calls: rowsFrom(calls) };
 };
 
 const arranged = async (

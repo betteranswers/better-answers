@@ -1,4 +1,5 @@
 import pg from "pg";
+import { z } from "zod";
 
 import type { MigratedPostgres } from "@better-answers/schema/testing";
 
@@ -21,12 +22,18 @@ const PLANNED_AS_THE_APP = [
 
 const INDEX_NAMED = /"Index Name": "(?<index>[^"]+)"/gu;
 
-type PlanNode = {
-  readonly "Node Type": string;
-  readonly "CTE Name"?: string;
-  readonly Filter?: string;
-  readonly Plans?: readonly PlanNode[];
-};
+const planNode = z.object({
+  "Node Type": z.string(),
+  "CTE Name": z.string().optional(),
+  Filter: z.string().optional(),
+  get Plans() {
+    return z.array(planNode).optional();
+  },
+});
+
+type PlanNode = z.infer<typeof planNode>;
+
+const loggedPlan = z.object({ Plan: planNode });
 
 const nodesOf = (node: PlanNode): readonly PlanNode[] => [
   node,
@@ -36,7 +43,7 @@ const nodesOf = (node: PlanNode): readonly PlanNode[] => [
 /** auto_explain logs `duration: … plan:` and then the plan as one JSON object. */
 const nodesIn = (notice: string): readonly PlanNode[] => {
   if (!notice.startsWith("duration:")) return [];
-  const logged: { readonly Plan: PlanNode } = JSON.parse(notice.slice(notice.indexOf("{")));
+  const logged = loggedPlan.parse(JSON.parse(notice.slice(notice.indexOf("{"))));
   return nodesOf(logged.Plan);
 };
 

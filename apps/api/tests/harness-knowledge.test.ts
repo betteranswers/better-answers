@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { head } from "@better-answers/core/store/git";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { connectAsHost } from "./flow.ts";
 import { askedOfTheHarness } from "./harness-asked.ts";
@@ -90,7 +91,7 @@ describe("the browser suite's knowledge harness", () => {
     const admin = await foundBy(workspace.admin, "quarry");
     const seen = await foundBy(viewer, "quarry");
 
-    expect(admin).toEqual(expect.arrayContaining([restricted?.iri, internal?.iri]));
+    expect(admin).toEqual(matching.arrayContaining([restricted?.iri, internal?.iri]));
     expect(seen).toContain(internal?.iri);
     expect(seen).not.toContain(restricted?.iri);
   });
@@ -187,7 +188,7 @@ describe("the browser suite's knowledge harness", () => {
     const [cited] = rpcListOf(rpcOf(opened["concept"])["evidence"]);
     expect(cited).toMatchObject({
       source: "Synthetic weighbridge log",
-      locator: expect.any(String),
+      locator: matching.any(String),
     });
     const passage = await calledBy(workspace.admin, "open", { locator: cited?.["locator"] });
 
@@ -223,12 +224,12 @@ describe("the browser suite's knowledge harness", () => {
     });
 
     expect(forTheAdmin).toEqual([
-      { id: "source-1", source: "Synthetic site notice", locator: expect.any(String) },
-      { id: "source-2", source: "The blast licence", locator: expect.any(String) },
+      { id: "source-1", source: "Synthetic site notice", locator: matching.any(String) },
+      { id: "source-2", source: "The blast licence", locator: matching.any(String) },
     ]);
     expect(licence).toMatchObject({ passage: { source: "Synthetic blast licence 2026" } });
     expect(evidenceOf(opened)).toEqual([
-      { id: "source-1", source: "Synthetic site notice", locator: expect.any(String) },
+      { id: "source-1", source: "Synthetic site notice", locator: matching.any(String) },
       { id: "source-2", source: "The blast licence" },
     ]);
     expect(JSON.stringify(opened)).not.toContain("Synthetic blast licence 2026");
@@ -269,7 +270,7 @@ describe("the browser suite's knowledge harness", () => {
 
     expect(refused).toEqual({
       status: 400,
-      said: { fields: [{ field: "concepts.0.sources.0.concept", rule: expect.any(String) }] },
+      said: { fields: [{ field: "concepts.0.sources.0.concept", rule: matching.any(String) }] },
     });
   });
 
@@ -284,7 +285,7 @@ describe("the browser suite's knowledge harness", () => {
 
     expect(refused).toEqual({
       status: 400,
-      said: { fields: [{ field: "concepts.0.sources.0.at", rule: expect.any(String) }] },
+      said: { fields: [{ field: "concepts.0.sources.0.at", rule: matching.any(String) }] },
     });
   });
 
@@ -301,7 +302,7 @@ describe("the browser suite's knowledge harness", () => {
 
     expect(refused).toEqual({
       status: 400,
-      said: { fields: [{ field: "concepts.0.sources.0.sensitivity", rule: expect.any(String) }] },
+      said: { fields: [{ field: "concepts.0.sources.0.sensitivity", rule: matching.any(String) }] },
     });
   });
 
@@ -350,7 +351,7 @@ describe("the browser suite's knowledge harness", () => {
 
     expect(refused).toEqual({
       status: 400,
-      said: { fields: [{ field, rule: expect.any(String) }] },
+      said: { fields: [{ field, rule: matching.any(String) }] },
     });
   });
 
@@ -422,7 +423,7 @@ const NOTHING = { concepts: 0, connectedSources: 0, groups: 0, repository: false
 const refusedNaming = (...fields: readonly (readonly [field: string, rule: string])[]) => ({
   status: 400,
   said: {
-    fields: fields.map(([field, rule]) => ({ field, rule: expect.stringContaining(rule) })),
+    fields: fields.map(([field, rule]) => ({ field, rule: matching.stringContaining(rule) })),
   },
 });
 
@@ -622,7 +623,7 @@ describe("a waiting edit suggestion the harness seeds", () => {
 
     expect(await api.inbox.waiting.query()).toEqual({
       items: [
-        expect.objectContaining({
+        matching.objectContaining({
           suggestionId: seeded.suggestionId,
           target: concept?.iri,
           proposer: { id: proposer.id, name: proposer.name },

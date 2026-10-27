@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import {
@@ -78,11 +79,11 @@ describe("inviting a person over tRPC", () => {
     const invited = await invitedOne(api, address.toUpperCase(), "Editor");
 
     expect(invited).toEqual({
-      invitationId: expect.stringMatching(ULID),
+      invitationId: matching.stringMatching(ULID),
       address,
       role: "Editor",
-      invitedAt: expect.stringMatching(ISO_INSTANT),
-      expiresAt: expect.stringMatching(ISO_INSTANT),
+      invitedAt: matching.stringMatching(ISO_INSTANT),
+      expiresAt: matching.stringMatching(ISO_INSTANT),
       replaced: false,
       emailSent: true,
     });
@@ -92,7 +93,7 @@ describe("inviting a person over tRPC", () => {
       {
         to: address,
         subject: "Join Calder Joinery on better-answers",
-        text: expect.stringContaining(
+        text: matching.stringContaining(
           `https://app.example.test/invitations/${invited.invitationId}`,
         ),
       },
@@ -191,7 +192,9 @@ describe("inviting several addresses over tRPC", () => {
 
     const sent = await inviting(api, [ana.toUpperCase(), ana]);
 
-    expect(sent.invitations).toEqual([expect.objectContaining({ address: ana, emailSent: true })]);
+    expect(sent.invitations).toEqual([
+      matching.objectContaining({ address: ana, emailSent: true }),
+    ]);
     expect(emailsTo(app(), ana)).toHaveLength(1);
     expect(await api.members.invitations.query()).toHaveLength(1);
   });
@@ -212,8 +215,8 @@ describe("inviting several addresses over tRPC", () => {
     ]);
     const [toAna] = sent.invitations;
     expect(emailsTo(app(), ana).map((message) => message.text)).toEqual([
-      expect.stringContaining(`/invitations/${first.invitationId}`),
-      expect.stringContaining(`/invitations/${toAna?.invitationId}`),
+      matching.stringContaining(`/invitations/${first.invitationId}`),
+      matching.stringContaining(`/invitations/${toAna?.invitationId}`),
     ]);
     expect(await eventsOn(app(), first.invitationId)).toEqual([
       "people.invitation.created",
@@ -334,7 +337,7 @@ describe("the per-address ceiling over tRPC", () => {
 
     expect(failed).toEqual(
       Array.from({ length: PER_ADDRESS_CEILING - 1 }, () =>
-        expect.objectContaining({ emailSent: false }),
+        matching.objectContaining({ emailSent: false }),
       ),
     );
     expect(resent).toBe(200);
@@ -452,7 +455,7 @@ describe("the waiting invitations over tRPC", () => {
         invitationId: second.invitationId,
         address: una,
         role: "Admin",
-        invitedAt: expect.stringMatching(ISO_INSTANT),
+        invitedAt: matching.stringMatching(ISO_INSTANT),
         expiresAt: aWeekOn(second.invitedAt).toISOString(),
         invitedBy: "Test person",
         status: "waiting",
@@ -461,7 +464,7 @@ describe("the waiting invitations over tRPC", () => {
         invitationId: first.invitationId,
         address: sam,
         role: "Viewer",
-        invitedAt: expect.stringMatching(ISO_INSTANT),
+        invitedAt: matching.stringMatching(ISO_INSTANT),
         expiresAt: aWeekOn(first.invitedAt).toISOString(),
         invitedBy: "Test person",
         status: "waiting",
@@ -477,8 +480,8 @@ describe("the waiting invitations over tRPC", () => {
     await resentWithItsEmail(api, invited.invitationId);
 
     expect(emailsTo(app(), address).map((message) => message.text)).toEqual([
-      expect.stringContaining(`/invitations/${invited.invitationId}`),
-      expect.stringContaining(`/invitations/${invited.invitationId}`),
+      matching.stringContaining(`/invitations/${invited.invitationId}`),
+      matching.stringContaining(`/invitations/${invited.invitationId}`),
     ]);
     expect(await eventsOn(app(), invited.invitationId)).toEqual([
       "people.invitation.created",

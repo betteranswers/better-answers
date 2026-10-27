@@ -18,6 +18,7 @@ import {
   inTheMonth,
   testData,
 } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import type { SweepSettings } from "../src/config.ts";
 import type { Doors } from "../src/doors.ts";
@@ -213,7 +214,7 @@ describe("the sweeps' daily pass", () => {
     const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
 
     expect(passes(sweeps.logs)).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         level: 30,
         upload_sweep: "list",
         workspaces: 1,
@@ -238,7 +239,7 @@ describe("the sweeps' daily pass", () => {
     const sweeps = await onePass({ uploadSweep: "remove", pingUrl: PING_URL });
 
     expect(passes(sweeps.logs)).toEqual([
-      expect.objectContaining({ level: 30, upload_sweep: "remove", found: 1, removed: 1 }),
+      matching.objectContaining({ level: 30, upload_sweep: "remove", found: 1, removed: 1 }),
     ]);
     expect(sweeps.pinged).toEqual([
       {
@@ -256,7 +257,7 @@ describe("the sweeps' daily pass", () => {
     const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
 
     expect(passes(sweeps.logs)).toEqual([
-      expect.objectContaining({ upload_sweep: "list", found: 1, removed: 0 }),
+      matching.objectContaining({ upload_sweep: "list", found: 1, removed: 0 }),
     ]);
     expect(await listObjects(workspace.admin, objects().door, "")).toEqual({
       ok: true,
@@ -274,7 +275,7 @@ describe("the sweeps' daily pass", () => {
 
     expect(await verificationsLeft()).toEqual([justUnderADay, withinTheDay, live]);
     expect(passes(sweeps.logs)).toEqual([
-      expect.objectContaining({ level: 30, verifications_deleted: 1 }),
+      matching.objectContaining({ level: 30, verifications_deleted: 1 }),
     ]);
   });
 
@@ -292,7 +293,7 @@ describe("the sweeps' daily pass", () => {
     const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
 
     expect(passes(sweeps.logs)).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         level: 30,
         sessions_deleted: 0,
         verifications_deleted: 1,
@@ -311,10 +312,10 @@ describe("the sweeps' daily pass", () => {
     );
 
     expect(passes(sweeps.logs)).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         level: 40,
         verifications_deleted: 0,
-        refusals: [{ sweep: "verifications", reason: expect.any(String) }],
+        refusals: [{ sweep: "verifications", reason: matching.any(String) }],
       }),
     ]);
     expect(sweeps.pinged).toEqual([
@@ -352,12 +353,12 @@ describe("the sweeps' daily pass", () => {
     );
 
     expect(passes(sweeps.logs)).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         level: 40,
         workspaces: 2,
         generations: 0,
         refused: 1,
-        refusals: [{ workspace_id: stuck.workspaceId, sweep: "map", reason: expect.any(String) }],
+        refusals: [{ workspace_id: stuck.workspaceId, sweep: "map", reason: matching.any(String) }],
       }),
     ]);
     expect(sweeps.pinged).toEqual([
@@ -376,11 +377,11 @@ describe("the sweeps' daily pass", () => {
     );
 
     expect(passes(sweeps.logs)).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         level: 40,
         refused: 1,
         refusals: [
-          { workspace_id: orphaned.workspaceId, sweep: "uploads", reason: expect.any(String) },
+          { workspace_id: orphaned.workspaceId, sweep: "uploads", reason: matching.any(String) },
         ],
       }),
     ]);
@@ -397,10 +398,10 @@ describe("the sweeps' daily pass", () => {
 
     expect(passes(sweeps.logs)).toEqual([]);
     expect(sweeps.logs).toContainEqual(
-      expect.objectContaining({
+      matching.objectContaining({
         level: 50,
         msg: "the sweep pass failed",
-        reason: expect.stringContaining("its row was not written"),
+        reason: matching.stringContaining("its row was not written"),
       }),
     );
     expect(sweeps.pinged).toEqual([{ url: `${PING_URL}/fail`, body: "fail" }]);
@@ -417,7 +418,7 @@ describe("the sweeps' daily pass", () => {
 
     expect(await verificationsLeft()).toEqual([live]);
     expect(sweeps.logs).toContainEqual(
-      expect.objectContaining({
+      matching.objectContaining({
         level: 50,
         msg: "the sweep pass failed",
         sessions_deleted: 0,
@@ -435,7 +436,7 @@ describe("the sweeps' daily pass", () => {
     const sweeps = await onePassAt(LATE_NEXT_MONTH);
 
     expect(await contentMonths()).toEqual(monthsOn(0, 1, 2));
-    expect(passes(sweeps.logs)).toEqual([expect.objectContaining({ level: 30, refusals: [] })]);
+    expect(passes(sweeps.logs)).toEqual([matching.objectContaining({ level: 30, refusals: [] })]);
   });
 
   it("names a month it could not make, pinging failure", async () => {
@@ -447,9 +448,9 @@ describe("the sweeps' daily pass", () => {
 
     expect(await contentMonths()).toEqual(monthsOn(0, 1));
     expect(passes(sweeps.logs)).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         level: 40,
-        refusals: [{ sweep: "question-months", reason: expect.any(String) }],
+        refusals: [{ sweep: "question-months", reason: matching.any(String) }],
       }),
     ]);
     expect(sweeps.pinged.map((ping) => ping.url)).toEqual([`${PING_URL}/fail`]);
@@ -507,7 +508,7 @@ describe("the sweeps' daily pass and the spend held", () => {
     const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
 
     expect(passes(sweeps.logs)).toEqual([
-      expect.objectContaining({ level: 30, reservations_settled: 1, refusals: [] }),
+      matching.objectContaining({ level: 30, reservations_settled: 1, refusals: [] }),
     ]);
   });
 
@@ -520,14 +521,14 @@ describe("the sweeps' daily pass and the spend held", () => {
     );
 
     expect(passes(sweeps.logs)).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         level: 40,
         reservations_settled: 0,
         refusals: [
           {
             workspace_id: workspaceId,
             sweep: "spend",
-            reason: expect.stringContaining("the store refused a write to llm_call"),
+            reason: matching.stringContaining("the store refused a write to llm_call"),
           },
         ],
       }),

@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 
 import {
   err,
@@ -26,8 +26,7 @@ const HEADER_OF_FIELD = Object.entries(
 /** A header carries bytes and a name may not be one, so each value is its JSON, percent-encoded. */
 const decoded = (sent: string): Result<z.JSONType, IssueWord> => {
   try {
-    const value: z.JSONType = JSON.parse(decodeURIComponent(sent));
-    return ok(value);
+    return ok(z.json().parse(JSON.parse(decodeURIComponent(sent))));
   } catch {
     return err("bad-format");
   }

@@ -8,6 +8,7 @@ import {
   type FlagClosing,
 } from "@better-answers/schema";
 import { contentPartitionOf, contentPartitions, inTheMonth } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import {
   closeFlag,
@@ -29,6 +30,7 @@ import { makeQuestionMonths } from "../src/sweeps/index.ts";
 import { heldAs } from "./members-suite.ts";
 import { provisionedWorkspace } from "./platform.ts";
 import { askedAMicrosecondFiner } from "./question-rows.ts";
+import { rowsFrom } from "./rows.ts";
 import { inputOf } from "./suite-input.ts";
 import { answered, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
@@ -102,7 +104,7 @@ const skeletonOf = async (recordId: string) => {
        FROM question_asked WHERE id = $1`,
     [recordId],
   );
-  return read.rows;
+  return rowsFrom(read);
 };
 
 const contentOf = async (recordId: string) => {
@@ -110,7 +112,7 @@ const contentOf = async (recordId: string) => {
     "SELECT asked_at, question, drafted FROM question_content WHERE record_id = $1",
     [recordId],
   );
-  return read.rows;
+  return rowsFrom(read);
 };
 
 describe("opening a record", () => {
@@ -159,7 +161,7 @@ describe("opening a record", () => {
     const { recordId } = answered(await opening(inTheGroup));
 
     expect(await skeletonOf(recordId)).toEqual([
-      expect.objectContaining({ predicate_role: "Admin", predicate_groups: [group.id] }),
+      matching.objectContaining({ predicate_role: "Admin", predicate_groups: [group.id] }),
     ]);
   });
 
@@ -170,8 +172,8 @@ describe("opening a record", () => {
 
     expect(opened).toEqual({
       ok: false,
-      error: expect.objectContaining({
-        message: expect.stringContaining('no partition of relation "question_content"'),
+      error: matching.objectContaining({
+        message: matching.stringContaining('no partition of relation "question_content"'),
       }),
     });
   });
@@ -245,7 +247,7 @@ describe("completing a record", () => {
 
     expect(completed).toEqual({ ok: true, value: undefined });
     expect(await skeletonOf(recordId)).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         completed_at: completedAt,
         verdict: "related",
         judge_state: "judged",
@@ -270,7 +272,7 @@ describe("completing a record", () => {
       }),
     ]);
     expect(await contentOf(recordId)).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         question: QUESTION,
         drafted: [{ sentence: "Audit logs are kept for a year.", concepts: [retention] }],
       }),
@@ -285,7 +287,7 @@ describe("completing a record", () => {
 
     answered(await completing(asker, recordId, { ...REFUSED, verdict: "related", drafted }));
 
-    expect(await contentOf(recordId)).toEqual([expect.objectContaining({ drafted })]);
+    expect(await contentOf(recordId)).toEqual([matching.objectContaining({ drafted })]);
   });
 
   it("leaves drafted null when the platform drafts nothing", async () => {
@@ -294,7 +296,7 @@ describe("completing a record", () => {
 
     answered(await completing(asker, recordId, REFUSED));
 
-    expect(await contentOf(recordId)).toEqual([expect.objectContaining({ drafted: null })]);
+    expect(await contentOf(recordId)).toEqual([matching.objectContaining({ drafted: null })]);
   });
 
   it("keeps an unmapped passage's locator and none of its text", async () => {
@@ -310,7 +312,7 @@ describe("completing a record", () => {
     answered(await completing(asker, recordId, { ...REFUSED, unmappedPassages: [shown] }));
 
     const [skeleton] = await skeletonOf(recordId);
-    expect(skeleton).toEqual(expect.objectContaining({ unmapped_passages: [shown.locator] }));
+    expect(skeleton).toEqual(matching.objectContaining({ unmapped_passages: [shown.locator] }));
     const kept = JSON.stringify([skeleton, await contentOf(recordId)]);
     expect([shown.text, shown.source].filter((words) => kept.includes(words))).toEqual([]);
   });
@@ -340,10 +342,10 @@ describe("completing a record", () => {
     }
 
     const [skeleton] = await skeletonOf(recordId);
-    const kept: unknown = skeleton?.concepts;
+    const kept: unknown = skeleton?.["concepts"];
     expect(kept).toEqual([
-      expect.objectContaining({ iri: gone.iri }),
-      expect.objectContaining({ iri: staying.iri }),
+      matching.objectContaining({ iri: gone.iri }),
+      matching.objectContaining({ iri: staying.iri }),
     ]);
   });
 
@@ -354,8 +356,8 @@ describe("completing a record", () => {
 
     const again = await completing(asker, recordId, { ...REFUSED, verdict: "ok" });
 
-    expect(again).toEqual({ ok: false, error: expect.any(Error) });
-    expect(await skeletonOf(recordId)).toEqual([expect.objectContaining({ verdict: "refuse" })]);
+    expect(again).toEqual({ ok: false, error: matching.any(Error) });
+    expect(await skeletonOf(recordId)).toEqual([matching.objectContaining({ verdict: "refuse" })]);
   });
 });
 
@@ -527,7 +529,7 @@ const closingOf = async (feedbackId: string) => {
     "SELECT closed_as, closed_at IS NOT NULL AS stamped FROM question_feedback WHERE id = $1",
     [feedbackId],
   );
-  return read.rows;
+  return rowsFrom(read);
 };
 
 const eventsOn = async (feedbackId: string) => {
@@ -535,7 +537,7 @@ const eventsOn = async (feedbackId: string) => {
     "SELECT action, actor, subject_kind, detail FROM audit_event WHERE subject_id = $1",
     [feedbackId],
   );
-  return read.rows;
+  return rowsFrom(read);
 };
 
 describe("reading the questions asked", () => {
@@ -617,7 +619,7 @@ describe("reading the questions asked", () => {
       {
         id: record.id,
         askedAt: record.askedAt.toISOString(),
-        askedBy: expect.objectContaining({ kind: "person" }),
+        askedBy: matching.objectContaining({ kind: "person" }),
         transport: "mcp",
         collectionsNamed: [],
         question: QUESTION,

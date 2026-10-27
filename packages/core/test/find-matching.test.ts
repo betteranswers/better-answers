@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { conceptIriOf, ids, ulid, type ConceptIri } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { find, findCursor, type FindPosition, type FindResult } from "../src/answering/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
@@ -220,7 +221,7 @@ describe("find's pages", () => {
 
     expect(findCursor.parse(page.nextCursor)).toEqual({
       run: "strong",
-      bound: { weight: expect.closeTo(Math.log(2.4), 12), rank: 2, key: retention },
+      bound: { weight: matching.closeTo(Math.log(2.4), 12), rank: 2, key: retention },
       counts: { size: 2, frequencies: [1, 0, 2, 0] },
     });
   });
@@ -407,7 +408,7 @@ describe("find's pages", () => {
 
     expect(toTheViewer).toEqual({
       query: QUESTION,
-      matches: [expect.objectContaining({ title: "Audit Logs" })],
+      matches: [matching.objectContaining({ title: "Audit Logs" })],
     });
     expect(titlesOf(toTheAdmin)).toEqual([AUDIT_LOGS_RETENTION]);
     expect(toTheAdmin.nextCursor).toBeDefined();

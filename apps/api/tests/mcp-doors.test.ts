@@ -12,6 +12,7 @@ import {
 import type { CallSize, CallSpent, ModelClient, StreamingClient } from "@better-answers/core/llm";
 import { withHeldPrincipal, withPrincipalRead, type Tx } from "@better-answers/core/store/postgres";
 import type { JudgeState, QuestionVerdict, RecordMapState } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
 
 import { MCP_SCOPES } from "../src/auth/constants.ts";
@@ -140,7 +141,7 @@ const probe = (
 const FAILED_AT_ITS_STATEMENT = {
   said: "probe failed.",
   rows: 0,
-  failed: [{ entry: "probe", err: expect.objectContaining({ code: "25006" }) }],
+  failed: [{ entry: "probe", err: matching.objectContaining({ code: "25006" }) }],
 };
 
 describe("a write inside an entry's transaction", () => {

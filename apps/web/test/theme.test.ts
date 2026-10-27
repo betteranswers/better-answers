@@ -28,7 +28,7 @@ const aDevice = (dark: boolean) => {
 const theme = () => document.documentElement.dataset["theme"];
 
 const firstPaint = () => {
-  // oxlint-disable-next-line typescript/no-implied-eval -- the head script is a string by design, run here as the page runs it
+  // oxlint-disable-next-line typescript/no-implied-eval, typescript/no-unsafe-call -- the head script is a string by design, run as the page runs it; lib types `new Function` as the bare Function
   new Function(FIRST_PAINT)();
 };
 

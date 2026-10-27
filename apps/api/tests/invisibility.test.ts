@@ -11,6 +11,7 @@ import {
 } from "@better-answers/core/testing/documents";
 import { passageLocatorOf, ULID } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { connectAsHost } from "./flow.ts";
 import { actingIn, openTestGit, startApp, type TestApp } from "./harness.ts";
@@ -146,8 +147,8 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
       expect(answer).toMatchObject({ verdict: "refuse", related: [], collections: [] });
       expect(answer).toEqual(unrelatedAnswer);
       expect([recordId, unrelatedRecordId]).toEqual([
-        expect.stringMatching(ULID),
-        expect.stringMatching(ULID),
+        matching.stringMatching(ULID),
+        matching.stringMatching(ULID),
       ]);
       expect(recordId).not.toBe(unrelatedRecordId);
       expect(rendered(asked).replace(String(recordId), String(unrelatedRecordId))).toBe(
@@ -305,8 +306,8 @@ describe("the document layer through the MCP entries", () => {
 
     expect(structured(first)).toEqual({
       query: QUERY,
-      hits: [expect.objectContaining({ layer: "bundles", iri, title: COVERING_TITLE })],
-      nextCursor: expect.stringMatching(/^[\w-]+$/),
+      hits: [matching.objectContaining({ layer: "bundles", iri, title: COVERING_TITLE })],
+      nextCursor: matching.stringMatching(/^[\w-]+$/),
     });
     expect(rendered(first)).toBe(
       [

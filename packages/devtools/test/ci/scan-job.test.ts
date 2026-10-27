@@ -65,7 +65,7 @@ const valuesAt = (document: unknown, yqPath: string): readonly unknown[] =>
           const record = recordSchema.safeParse(value);
           const child = record.success ? record.data[key] : undefined;
           if (!iterates) return [child];
-          return Array.isArray(child) ? child : [];
+          return z.array(z.unknown()).catch([]).parse(child);
         }),
       [document],
     );
@@ -163,7 +163,7 @@ const cronOf = (file: string): number => {
 describe("the nightly scan of the images build.yml pushes", () => {
   it("scans one leg per image, reading the tiers from build.yml", () => {
     const tiers = tiersStep();
-    const build = parse(
+    const build: unknown = parse(
       readFileSync(path.join(repositoryRoot, ".github/workflows/build.yml"), "utf8"),
     );
 

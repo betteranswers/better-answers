@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import {
   containersOf,
@@ -123,7 +124,7 @@ describe("the shared test postgres", () => {
   it("starts on its loopback port, printing the variable to export", () => {
     expect(outcomeOf(upFirst)).toEqual("ran");
     expect(upFirst.stdout.split("\n")).toEqual(
-      expect.arrayContaining([
+      matching.arrayContaining([
         `test-postgres: up on 127.0.0.1:${String(port)}; point the test suites at it with:`,
         "export TEST_POSTGRES_URI=shared",
       ]),
@@ -193,7 +194,7 @@ describe("the shared test postgres", () => {
       const run = testPostgres(otherPort, ["up"], otherStem);
       expect({ status: run.status, stderr: run.stderr }).toEqual({
         status: 1,
-        stderr: expect.stringContaining("deploy/test-postgres.sh down, then up"),
+        stderr: matching.stringContaining("deploy/test-postgres.sh down, then up"),
       });
       expect({
         containers: containersOf(elsewhere),

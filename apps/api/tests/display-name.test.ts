@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { displayNameHeldBy } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
@@ -80,7 +82,7 @@ describe("a signed-in person setting their own display name over tRPC", () => {
         actor: `human:${person.id}`,
         subject_id: person.id,
         detail: {},
-        whole: expect.not.stringContaining(displayName),
+        whole: matching.not.stringContaining(displayName),
       },
     ]);
   });

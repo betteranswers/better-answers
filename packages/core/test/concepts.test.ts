@@ -5,6 +5,7 @@ import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/
 import { walkFrom } from "@better-answers/core/store/map";
 import { conceptIriOf, CONCEPT_BODY_MAX, passageLocatorOf, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { mapWords, open } from "../src/answering/index.ts";
 import type { FrontmatterValue, TrustStatus } from "../src/answering/index.ts";
@@ -432,7 +433,7 @@ describe("a governed write", () => {
     expect(started).toHaveLength(7);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([
       first.sha,
-      expect.any(String),
+      matching.any(String),
     ]);
   });
 });
@@ -1377,7 +1378,7 @@ describe("the read a concept's trust is derived from", () => {
       }),
     ).rejects.toThrow(/did not commit/);
 
-    expect(read).toEqual({ ok: false, error: expect.any(Error) });
+    expect(read).toEqual({ ok: false, error: matching.any(Error) });
   });
 });
 
@@ -1411,7 +1412,7 @@ describe("a failure after the commit", () => {
     expect(history).toHaveLength(3);
     expect(recorded).toEqual([history[0]]);
     expect(await head(scenario.editor, scenario.git)).toBe(history[2]);
-    expect(behind).toEqual({ ok: false, error: expect.any(Error) });
+    expect(behind).toEqual({ ok: false, error: matching.any(Error) });
   });
 });
 

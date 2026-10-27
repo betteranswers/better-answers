@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { whileWritesAreRefused } from "@better-answers/core/testing/postgres";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { authorizeUrl, connectAsHost, connectIn, driveToPage, pkce, signIn } from "./flow.ts";
 import { CLAUDE_CLIENT_ID, PUBLIC_URL, type TestApp } from "./harness.ts";
@@ -18,7 +19,7 @@ const REFUSED_WORKSPACE_AUDIT_LOG = "the store refused a write to audit_event";
 const sessionHolder = z.object({ user: z.object({ id: z.string() }) });
 
 const signInRowsOf = (personId: string) =>
-  app().database.superuser.query(
+  app().database.superuser.query<Record<string, unknown>>(
     `SELECT action, actor, subject_id, detail, row_to_json(identity_audit_event)::text AS whole
        FROM identity_audit_event
       WHERE action = 'people.person.signed_in' AND subject_id = $1`,
@@ -65,7 +66,7 @@ describe("a sign-in, recorded on the identity-set audit log", () => {
         actor: `human:${person.id}`,
         subject_id: person.id,
         detail: { method: "email_code" },
-        whole: expect.any(String),
+        whole: matching.any(String),
       },
     ]);
   });
@@ -91,10 +92,10 @@ describe("a sign-in, recorded on the identity-set audit log", () => {
     );
     expect(session.rows).toEqual([{ ip_address: client.ip, user_agent: USER_AGENT }]);
     const [row] = (await signInRowsOf(person.id)).rows;
-    expect(row?.whole).toEqual(expect.any(String));
-    expect(row?.whole).not.toContain(person.email);
-    expect(row?.whole).not.toContain(client.ip);
-    expect(row?.whole).not.toContain(USER_AGENT);
+    expect(row?.["whole"]).toEqual(matching.any(String));
+    expect(row?.["whole"]).not.toContain(person.email);
+    expect(row?.["whole"]).not.toContain(client.ip);
+    expect(row?.["whole"]).not.toContain(USER_AGENT);
   });
 
   it("keeps a refused code a log line, recording nothing", async () => {

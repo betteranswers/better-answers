@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import type { BoundFunctions, queries } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CONNECT_ASSISTANT } from "@/app/words.ts";
@@ -22,7 +23,7 @@ const connectOpened = async () => {
   return within(await screen.findByRole("main"));
 };
 
-const steps = (main: ReturnType<typeof within>) => within(main.getByRole("list"));
+const steps = (main: BoundFunctions<typeof queries>) => within(main.getByRole("list"));
 
 describe("Ask › Connect Claude", () => {
   it("names the steps, Always allow among them, and the address", async () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { SWEEPS, sweepIdentitySet } from "@better-answers/core/sweeps";
 import { ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { consumeIngress, openPostgres } from "../src/store/postgres/index.ts";
 import {
@@ -150,7 +151,7 @@ describe("the identity set's housekeeping", () => {
 
     const result = await whileWritesAreRefused(db().pool, "verification", swept);
 
-    expect(result.verifications).toEqual({ ok: false, error: expect.any(Error) });
+    expect(result.verifications).toEqual({ ok: false, error: matching.any(Error) });
     expect(result.sessions).toEqual({ ok: true, value: 1 });
     expect(result.ingressWindows).toEqual({ ok: true, value: 1 });
     expect(await sessionsLeft()).toEqual([]);
@@ -162,7 +163,7 @@ describe("the identity set's housekeeping", () => {
 
     const result = await whileWritesAreRefused(db().pool, "ingress_counter", swept);
 
-    expect(result.ingressWindows).toEqual({ ok: false, error: expect.any(Error) });
+    expect(result.ingressWindows).toEqual({ ok: false, error: matching.any(Error) });
     expect(result.sessions).toEqual({ ok: true, value: 1 });
     expect(result.verifications).toEqual({ ok: true, value: 1 });
     expect(await sessionsLeft()).toEqual([]);

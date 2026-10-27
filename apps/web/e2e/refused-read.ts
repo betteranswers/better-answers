@@ -25,7 +25,7 @@ export const refusedFromNowOn = (page: Page, procedure: string) =>
     async (route) => {
       const answered = await route.fetch();
       const asked = askedAt(route.request().url());
-      const answers: readonly unknown[] = await answered.json();
+      const answers = z.array(z.unknown()).parse(await answered.json());
       await route.fulfill({
         response: answered,
         json: answers.map((answer, at) => (asked[at] === procedure ? WITHOUT_THE_MARK : answer)),
@@ -54,9 +54,8 @@ export const refusalAnswering = async (page: Page, procedure: string) => {
     askedAt(answer.url()).includes(procedure),
   );
   const answers: unknown = await answered.json();
-  const answer = Array.isArray(answers)
-    ? answers[askedAt(answered.url()).indexOf(procedure)]
-    : answers;
+  const batch = z.array(z.unknown()).safeParse(answers);
+  const answer = batch.success ? batch.data[askedAt(answered.url()).indexOf(procedure)] : answers;
   const refused = aRefusedCall.safeParse(answer);
   if (!refused.success) throw new Error(`the api did not refuse ${procedure}`);
   const { httpStatus, refusal, retryAfterSeconds } = refused.data.error.data;

@@ -59,7 +59,7 @@ const aFlaggedRecordAndANewerOne = async () => {
 };
 
 const eventsOn = async (feedbackId: string) => {
-  const read = await app().database.superuser.query(
+  const read = await app().database.superuser.query<Record<string, unknown>>(
     "SELECT action, actor, detail FROM audit_event WHERE subject_id = $1",
     [feedbackId],
   );

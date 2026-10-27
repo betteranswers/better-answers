@@ -99,9 +99,13 @@ type SourcesValue =
   | readonly SourceEntry[]
   | undefined;
 
+/** `Array.isArray` narrows a readonly array to `any[]`; this narrows to the list members of `T`. */
+export const isList = <T>(value: T): value is Extract<T, readonly unknown[]> =>
+  Array.isArray(value);
+
 /** A value that is not a list cites nothing, and an entry naming no resource is skipped. */
 export const citedSourcesOf = (value: SourcesValue): readonly CitedSource[] =>
-  (Array.isArray(value) ? value : []).flatMap((entry) => {
+  (isList(value) ? value : []).flatMap((entry) => {
     const cited = citedSourceOf(entry);
     return cited === undefined ? [] : [cited];
   });

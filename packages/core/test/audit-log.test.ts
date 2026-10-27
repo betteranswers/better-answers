@@ -3,6 +3,7 @@ import type { z } from "zod";
 
 import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
 import { parse, type Result, type Role, type UserPrincipal } from "../src/kernel/index.ts";
@@ -159,26 +160,26 @@ describe("the audit log", () => {
     expect(page).toEqual({
       events: [
         {
-          id: expect.any(String),
+          id: matching.any(String),
           action: "people.group.created",
           family: "people",
           subjectKind: "group",
           subjectId: bidWriters,
           actor: `human:${workspace.adminUserId}`,
-          at: expect.stringMatching(ISO_INSTANT),
+          at: matching.stringMatching(ISO_INSTANT),
           by: { kind: "person", displayName: "Priya Shah", address },
           subject: { kind: "group", name: "Bid writers" },
           detail: {},
           named: {},
         },
         {
-          id: expect.any(String),
+          id: matching.any(String),
           action: "platform.workspace.provisioned",
           family: "platform",
           subjectKind: "workspace",
           subjectId: workspace.workspaceId,
           actor: "process:better-answers-bootstrap",
-          at: expect.stringMatching(ISO_INSTANT),
+          at: matching.stringMatching(ISO_INSTANT),
           by: { kind: "platform" },
           subject: null,
           detail: { adminUserId: workspace.adminUserId, role: "Admin" },
@@ -389,7 +390,7 @@ describe("the audit log", () => {
       }),
     ).rejects.toThrow(/did not commit/);
 
-    expect(read).toEqual({ ok: false, error: expect.any(Error) });
+    expect(read).toEqual({ ok: false, error: matching.any(Error) });
   });
 });
 
@@ -671,7 +672,7 @@ describe("searching the audit log", () => {
     expect(parse(readAuditLogInput, { search: "a".repeat(100) }).ok).toBe(true);
     expect(parse(readAuditLogInput, { search: "a".repeat(101) })).toEqual({
       ok: false,
-      error: { word: "malformed", fields: { search: expect.anything() } },
+      error: { word: "malformed", fields: { search: matching.anything() } },
     });
   });
 });

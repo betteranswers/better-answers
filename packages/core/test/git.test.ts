@@ -20,6 +20,7 @@ import {
   type GitDoor,
 } from "@better-answers/core/store/git";
 import { boundarySchemas, ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import type { ActorId, PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
 import {
@@ -181,7 +182,7 @@ describe("one commit's index", () => {
       requestFor({ path: "knowledge/b.md", expectedHead: ANY_HEAD }),
     );
 
-    expect(second).toEqual({ ok: true, value: { sha: expect.any(String), parent: first } });
+    expect(second).toEqual({ ok: true, value: { sha: matching.any(String), parent: first } });
     expect(await bundleHistory(bundle.door, bundle.workspaceId)).toEqual([first, shaOf(second)]);
   });
 
@@ -194,7 +195,7 @@ describe("one commit's index", () => {
       requestFor({ expectedHead: ANY_HEAD }),
     );
 
-    expect(first).toEqual({ ok: true, value: { sha: expect.any(String), parent: null } });
+    expect(first).toEqual({ ok: true, value: { sha: matching.any(String), parent: null } });
     expect(await head(bundle.principal, bundle.door)).toBe(shaOf(first));
   });
 
@@ -251,8 +252,8 @@ const BUDGET_MS = 300;
 
 const overBudget = {
   ok: false,
-  error: expect.objectContaining({
-    message: expect.stringContaining(`ran past its ${BUDGET_MS} ms budget`),
+  error: matching.objectContaining({
+    message: matching.stringContaining(`ran past its ${BUDGET_MS} ms budget`),
   }),
 };
 

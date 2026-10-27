@@ -91,6 +91,7 @@ export const appRouter = router({
         given(descriptorOf(ctx.headers), async (fields) => {
           const doors = uploadDoorsOf(ctx.doors);
           if (!doors.ok) return err(doors.error);
+          // oxlint-disable-next-line typescript/no-unsafe-assignment -- tRPC types octetInputParser's output as a bare ReadableStream, whose chunk type defaults to any; the fetch adapter hands it the request's byte stream
           return connectUpload(ctx.principal, doors.value, { ...fields, body: input });
         }),
       ),

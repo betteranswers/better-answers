@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { find } from "../src/answering/index.ts";
 import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
@@ -419,7 +420,7 @@ describe("a sync whose re-derivation fails", () => {
 
     expect(failed.followed).toEqual([{ jobId: followedJob, concepts: 0 }]);
     expect(failed.skipped).toEqual([
-      { jobId: failingJob, reason: expect.stringContaining("the marker is refused") },
+      { jobId: failingJob, reason: matching.stringContaining("the marker is refused") },
     ]);
     expect(afterwards.followed).toEqual([{ jobId: failingJob, concepts: 1 }]);
     expect(await heldRow(scenario, onSecond.iri)).toEqual(RESTRICTED_TO_ADMINS);

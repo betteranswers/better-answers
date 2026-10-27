@@ -5,6 +5,8 @@ import { Readable } from "node:stream";
 
 import { describe, expect, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import {
   createClientMetadataFetcher,
   type HttpsRequest,
@@ -310,7 +312,7 @@ describe("the lift's guards", () => {
       await expect(refused).rejects.toThrow(
         new TypeError(`a Response cannot carry the metadata reply (status ${status})`),
       );
-      await expect(refused).rejects.toMatchObject({ cause: expect.any(RangeError) });
+      await expect(refused).rejects.toMatchObject({ cause: matching.any(RangeError) });
       expect(observed.response?.destroyed).toBe(true);
     },
     2_000,

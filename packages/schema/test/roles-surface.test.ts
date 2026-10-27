@@ -18,6 +18,7 @@ import { declaredTableNames } from "../scripts/worker-view.ts";
 import { identityOf, SECURITY_DEFINER_REACH, ulid } from "../src/index.ts";
 import { testData } from "./factory.ts";
 import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
+import { matching } from "./matching.ts";
 import { privilegesHeld, refusesEach } from "./probes.ts";
 import { A_MAP_NODE } from "./rls-probes.ts";
 
@@ -429,9 +430,9 @@ describe("the functions the journal installs", () => {
       }
 
       expect(fired).toEqual({
-        suggestion_decides_once: expect.stringContaining("this transaction is not making it"),
-        map_generation_flip_guard: expect.stringContaining("a generation flips only to the next"),
-        map_row_generation_guard: expect.stringContaining("lands in the live generation"),
+        suggestion_decides_once: matching.stringContaining("this transaction is not making it"),
+        map_generation_flip_guard: matching.stringContaining("a generation flips only to the next"),
+        map_row_generation_guard: matching.stringContaining("lands in the live generation"),
       });
     });
   });

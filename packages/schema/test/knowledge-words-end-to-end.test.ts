@@ -21,6 +21,7 @@ import {
 } from "./before-the-knowledge-words.ts";
 import { endPool, POSTGRES_COMMAND, withRollback } from "./harness.ts";
 import { migrationsFolderBefore } from "./journal-statements.ts";
+import { matching } from "./matching.ts";
 import { ADMITTED, refusalOf, sqlstateOf } from "./probes.ts";
 
 /** A non-superuser that owns every object, so the forced policies hold it as they hold `migrate`. */
@@ -278,7 +279,7 @@ describe("migration 0072 over a populated 0071 database, as its owner", () => {
       .finally(() => endPool(owner));
 
     expect({ refusal, applied: (await migrationRows()).length }).toEqual({
-      refusal: expect.stringMatching(/^write_up and write_up_include hold rows/),
+      refusal: matching.stringMatching(/^write_up and write_up_include hold rows/),
       applied,
     });
   });
@@ -300,7 +301,7 @@ describe("migration 0072 over a populated 0071 database, as its owner", () => {
   it("keeps the grants, row security, policies and definer settings", () => {
     expect(securityAfter).toEqual(securityBefore);
     expect(Object.values(securityAfter.tables)).toEqual(
-      Object.values(RENAMED).map(() => expect.objectContaining({ rls: true, forced: true })),
+      Object.values(RENAMED).map(() => matching.objectContaining({ rls: true, forced: true })),
     );
   });
 

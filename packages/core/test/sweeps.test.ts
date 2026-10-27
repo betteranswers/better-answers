@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { SWEEPS, sweepEveryWorkspace, withSweepLock } from "@better-answers/core/sweeps";
 import { ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { listObjects, putObject } from "../src/store/objects/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
 import { principalOf, provisionedWorkspace } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import { objectStoreForSuite } from "./suite-objects.ts";
 import {
   countWaitingOnLocks,
@@ -62,10 +64,10 @@ const passesRecorded = async () => {
     `SELECT id, upload_sweep, workspaces, refused, found, removed, generations, at <= now() AS stamped
        FROM sweep_pass ORDER BY at, id`,
   );
-  return recorded.rows;
+  return rowsFrom(recorded);
 };
 
-const A_PASS_ID = expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+const A_PASS_ID = matching.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/);
 
 describe("a sweep pass over every workspace", () => {
   it("removes orphaned uploads past the grace and the map's leftovers", async () => {
@@ -196,7 +198,7 @@ describe("a sweep pass over every workspace", () => {
         totals: { workspaces: 1, refused: 0, found: 0, removed: 0, generations: 0 },
         swept: [
           {
-            workspaceId: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+            workspaceId: matching.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
             uploads: { ok: true, value: { found: 0, removed: 0 } },
             map: { ok: true, value: [] },
             spend: { ok: true, value: 0 },

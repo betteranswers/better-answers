@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { parse, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import {
@@ -686,7 +687,7 @@ describe("a bulk action whose audit event fails", () => {
       asAdmin(workspace, action),
     );
 
-    expect(failed).toEqual({ ok: false, error: expect.any(Error) });
+    expect(failed).toEqual({ ok: false, error: matching.any(Error) });
     expect(await rolesOf(workspace)).toEqual({
       [workspace.adminUserId]: "Admin",
       [viewer]: "Viewer",

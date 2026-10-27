@@ -10,6 +10,7 @@ import { z } from "zod";
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
 import { endPool, testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 const apiRoot = path.resolve(import.meta.dirname, "..");
 
@@ -300,7 +301,7 @@ describe("the production restore, given a dump it cannot read whole", () => {
   });
 
   it("refuses before dropping anything, so every table keeps its rows", async () => {
-    expect(replaced).toMatchObject({ code: 1, said: expect.stringContaining("REFUSED") });
+    expect(replaced).toMatchObject({ code: 1, said: matching.stringContaining("REFUSED") });
     const after = await rowCounts(untouched);
     expect(after).toEqual(before);
     expect(after).toMatchObject({ "public.workspace": 1, "public.oauth_refresh_token": 1 });
@@ -330,7 +331,7 @@ describe("the production restore, given a whole dump that fails part-way", () =>
   it("rolls the whole replacement back, keeping every table's rows", async () => {
     expect(replaced).toMatchObject({
       code: 3,
-      said: expect.stringContaining(`role "${GONE}" does not exist`),
+      said: matching.stringContaining(`role "${GONE}" does not exist`),
     });
     const after = await rowCounts(untouched);
     expect(after).toEqual(before);
@@ -367,7 +368,7 @@ describe("the production restore, over a database holding schema and rows", () =
   it("leaves a journal `migrate` runs over clean", () => {
     expect(migratedAfter).toMatchObject({
       code: 0,
-      said: expect.stringContaining('"msg":"migrations applied"'),
+      said: matching.stringContaining('"msg":"migrations applied"'),
     });
   });
 
@@ -415,7 +416,7 @@ const UNWRITTEN = "backup row not written";
 
 const rowsStartedAt = async (startedAt: string) =>
   (
-    await recorded.query(
+    await recorded.query<Record<string, unknown>>(
       `SELECT kind, store, outcome, bytes, location, report_url, contains_personal_data,
               extract(epoch FROM expires_at - finished_at)::int / 3600 AS kept_hours, rto_minutes
          FROM backup WHERE started_at = $1 ORDER BY store`,
@@ -573,10 +574,10 @@ describe("the production restore's record", () => {
       ran.said,
     )?.[1];
 
-    expect({ code: ran.code, logged }).toEqual({ code: 0, logged: expect.any(String) });
+    expect({ code: ran.code, logged }).toEqual({ code: 0, logged: matching.any(String) });
     await recorded.query(logged ?? "");
     await recorded.query(logged ?? "");
-    expect((await rowsStartedAt(started)).map((row) => row.store)).toEqual([
+    expect((await rowsStartedAt(started)).map((row) => row["store"])).toEqual([
       "git",
       "objectstore",
       "postgres",

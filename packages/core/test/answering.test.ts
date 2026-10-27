@@ -62,6 +62,7 @@ import {
   withoutRecord,
   type SeededConcept,
 } from "./asking.ts";
+import { rowsFrom } from "./rows.ts";
 import {
   codePointsOf,
   documentLanded,
@@ -846,7 +847,7 @@ describe("feedback given on a record", () => {
          FROM question_feedback WHERE record_id = $1 ORDER BY id`,
       [recordId],
     );
-    return read.rows;
+    return rowsFrom(read);
   };
 
   it("stores a flag with its note, sentence and concept", async () => {
@@ -1241,7 +1242,7 @@ describe("what ask answers with no model", () => {
         WHERE r.id = $1`,
       [recordId],
     );
-    return read.rows;
+    return rowsFrom(read);
   };
 
   const mapStateOf = async (recordId: string): Promise<unknown> => {

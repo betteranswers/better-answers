@@ -10,10 +10,12 @@ import { promisify } from "node:util";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
+import { z } from "zod";
 
 import { POSTGRES_IMAGE } from "../src/postgres-image.ts";
 import { testData } from "./factory.ts";
 import { type MigratedPostgres, POSTGRES_COMMAND } from "./harness.ts";
+import { matching } from "./matching.ts";
 import {
   BUILD_LOCK,
   clonedFrom,
@@ -126,10 +128,10 @@ describe("the warm harness", () => {
     const another = await clonedFrom(warm, "another-key-named");
     try {
       expect({ one: await databaseNameOf(one), another: await databaseNameOf(another) }).toEqual({
-        one: expect.stringMatching(
+        one: matching.stringMatching(
           new RegExp(`^ba_one_key_named_[0-9a-f]{12}_${String(warm.runId)}$`, "u"),
         ),
-        another: expect.stringMatching(
+        another: matching.stringMatching(
           new RegExp(`^ba_another_key_named_[0-9a-f]{12}_${String(warm.runId)}$`, "u"),
         ),
       });
@@ -437,6 +439,14 @@ const refusalOf = async (databaseUri: string): Promise<string> => {
   }
 };
 
+const startedInChildSchema = z.object({
+  connectionUri: z.string().exactOptional(),
+  templateDatabase: z.string().exactOptional(),
+  runId: z.number().exactOptional(),
+  source: z.union([z.literal("shared"), z.literal("container")]).exactOptional(),
+  failure: z.string().exactOptional(),
+});
+
 type StartedInChild = Partial<WarmPostgres> & { readonly failure?: string };
 
 const START_IN_CHILD = [
@@ -459,8 +469,7 @@ const startInChild = async (
     cwd: packageRoot,
     env: { ...process.env, TEST_POSTGRES_URI: locator, ...env },
   });
-  const started: StartedInChild = JSON.parse(child.stdout);
-  return started;
+  return startedInChildSchema.parse(JSON.parse(child.stdout));
 };
 
 const hostOf = (connectionUri: string | undefined): string => new URL(connectionUri ?? "").host;
@@ -500,8 +509,8 @@ describe("the warm harness under TEST_POSTGRES_URI", () => {
     }).toEqual({
       source: "shared",
       server: hostOf(warmOfThisRun().connectionUri),
-      template: expect.stringMatching(/^tpl_ts_[0-9a-f]{12}$/u),
-      runId: expect.any(Number),
+      template: matching.stringMatching(/^tpl_ts_[0-9a-f]{12}$/u),
+      runId: matching.any(Number),
       published: true,
     });
   }, 300_000);
@@ -785,7 +794,7 @@ describe("a shared template", () => {
       await writeFile(path.join(folder, "0000_first.sql"), "CREATE TABLE two ();");
 
       expect({ named, again, changed: (await templateNameOver(folder)) !== named }).toEqual({
-        named: expect.stringMatching(/^tpl_ts_[0-9a-f]{12}$/u),
+        named: matching.stringMatching(/^tpl_ts_[0-9a-f]{12}$/u),
         again: named,
         changed: true,
       });
