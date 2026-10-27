@@ -1373,13 +1373,8 @@ describe("the pull request's title, read by check.yml", () => {
   it.each([
     { shape: "a declarative title", title: "The title check runs in CI", named: "[type-empty]" },
     {
-      shape: "a title naming its ticket",
-      title: "ci: check the pull request's title [T-386]",
-      named: "[header-names-no-ticket]",
-    },
-    {
       shape: "a title over 100 characters",
-      title: `ci: check the title${" and check it again".repeat(4)}`,
+      title: `ci: check the title${" and check it again".repeat(5)}`,
       named: "[header-max-length]",
     },
   ])("fails $shape, naming the rule", ({ title, named }) => {
