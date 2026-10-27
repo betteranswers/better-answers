@@ -39,12 +39,6 @@ fi
 
 git -C "$ROOT" worktree add -b "$BRANCH" "$DIR" "$BASE" >&2
 
-# Each creation sweeps, as nothing runs as often as worktrees pile up, off stdout so it never waits.
-# Not before the add: the sweep fetches main too, and the two fetches would race for the ref.
-LOG="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
-  && LOG="$LOG/worktree-sweep.log" || LOG=/dev/null
-nohup bash "$ROOT/.claude/hooks/sweep-worktrees.sh" "$ROOT" </dev/null >"$LOG" 2>&1 &
-
 bash "$ROOT/.claude/hooks/provision-worktree.sh" "$DIR" >&2 \
   || echo "worktree-create-hook: provisioning incomplete — the worktree is usable, install by hand" >&2
 

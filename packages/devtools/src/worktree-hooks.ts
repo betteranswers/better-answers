@@ -1,5 +1,5 @@
-import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -48,25 +48,6 @@ export const commitIn = (worktree: string, file: string): string => {
   return gitIn(worktree, "rev-parse", "HEAD").trim();
 };
 
-export const mergeOnOrigin = (
-  origin: string,
-  primary: string,
-  branch: string,
-  at?: string,
-): void => {
-  gitIn(origin, "fetch", "-q", primary, branch);
-  const dated = at === undefined ? {} : { GIT_AUTHOR_DATE: at, GIT_COMMITTER_DATE: at };
-  const result = spawnSync(
-    "git",
-    ["-C", origin, "merge", "-q", "--no-ff", "--no-edit", "FETCH_HEAD"],
-    {
-      encoding: "utf8",
-      env: { ...process.env, ...dated },
-    },
-  );
-  if (result.status !== 0) throw new Error(`git merge of ${branch} failed:\n${result.stderr}`);
-};
-
 export const worktreeUnder = (
   scratch: string,
   root: string,
@@ -99,39 +80,6 @@ export type HookRun = {
   readonly status: number | null;
   readonly stdout: string;
   readonly stderr: string;
-};
-
-export type Decoy = {
-  readonly pid: number;
-  readonly alive: () => boolean;
-  readonly stop: () => void;
-};
-
-const IDLE = "setInterval(() => {}, 1000)";
-
-const alive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-export const decoyWorker = (worktree: string, orphaned: boolean): Decoy => {
-  const marker = path.join(realpathSync(worktree), "node_modules/vitest/dist/workers/forks.js");
-  if (orphaned) {
-    const started = spawnSync(
-      "sh",
-      ["-c", `node -e '${IDLE}' '${marker}' >/dev/null 2>&1 & echo $!`],
-      { encoding: "utf8" },
-    );
-    const pid = Number(started.stdout.trim());
-    return { pid, alive: () => alive(pid), stop: () => process.kill(pid) };
-  }
-  const child = spawn(process.execPath, ["-e", IDLE, marker], { stdio: "ignore" });
-  const pid = child.pid ?? -1;
-  return { pid, alive: () => alive(pid), stop: () => child.kill() };
 };
 
 export const runHook = (
