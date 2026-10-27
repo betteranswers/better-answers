@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { whileWritesAreRefused } from "@better-answers/core/testing/postgres";
@@ -6,7 +6,7 @@ import { matching } from "@better-answers/schema/testing/matching";
 
 import { authorizeUrl, connectAsHost, connectIn, driveToPage, pkce, signIn } from "./flow.ts";
 import { CLAUDE_CLIENT_ID, PUBLIC_URL, type TestApp } from "./harness.ts";
-import { codeSentPastItsExpiry } from "./provoke.ts";
+import { aWrongCode, codeSentPastItsExpiry } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 
 const app = appForSuite();
@@ -101,7 +101,7 @@ describe("a sign-in, recorded on the identity-set audit log", () => {
   it("keeps a refused code a log line, recording nothing", async () => {
     const person = await app().person();
     const { client, code } = await codeAskedFor(person.email);
-    const wrong = code === "000000" ? "111111" : "000000";
+    const wrong = aWrongCode(code);
     const before = app().logs.length;
 
     const refused = await client.json("/sign-in/email-otp", { email: person.email, otp: wrong });
@@ -142,7 +142,7 @@ describe("an expired sign-in code", () => {
     await codeSentPastItsExpiry(app(), holder.email);
     const other = await app().person();
     const tried = await codeAskedFor(other.email);
-    const wrong = tried.code === "000000" ? "111111" : "000000";
+    const wrong = aWrongCode(tried.code);
     const otherTry = await tried.client.json("/sign-in/email-otp", {
       email: other.email,
       otp: wrong,
@@ -204,7 +204,9 @@ describe("a consent, recorded on the consented workspace's audit log", () => {
       prompt: "login consent",
     });
     const start = await client.fetch(`${PUBLIC_URL}${asked}`, { redirect: "manual" });
-    const toSignIn = new URL(start.headers.get("location") ?? "", PUBLIC_URL);
+    const sentTo = start.headers.get("location");
+    assert(sentTo !== null, "the authorization redirected");
+    const toSignIn = new URL(sentTo, PUBLIC_URL);
     expect(toSignIn.pathname).toBe("/sign-in");
     const before = app().logs.length;
 
@@ -214,7 +216,9 @@ describe("a consent, recorded on the consented workspace's audit log", () => {
     );
 
     expect((await consentRowsBy(admin.id)).rows).toEqual([]);
-    expect(new URL(answered.headers.get("location") ?? "", PUBLIC_URL).pathname).toBe("/sign-in");
+    const answeredTo = answered.headers.get("location");
+    assert(answeredTo !== null, "the consent redirected");
+    expect(new URL(answeredTo, PUBLIC_URL).pathname).toBe("/sign-in");
     expect(linesSince(before, "auth.consent")).toMatchObject([
       { level: 30, principal: admin.id, outcome: "deferred" },
     ]);

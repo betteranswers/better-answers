@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { connectAsHost } from "./flow.ts";
@@ -91,7 +91,10 @@ describe("Questions asked over tRPC", () => {
     const { workspace, flagged } = await aFlaggedRecordAndANewerOne();
     const { api } = await webSignedIn(app(), workspace.admin.email);
     const [record] = (await api.questions.asked.query({})).records;
-    const feedbackId = record?.feedback[0]?.id ?? "";
+    assert(record !== undefined, "the admin reads the flagged record");
+    const [feedback] = record.feedback;
+    assert(feedback !== undefined, "the flagged record carries its flag");
+    const feedbackId = feedback.id;
 
     const closed = await api.questions.closeFlag.mutate({
       feedbackId,
@@ -117,7 +120,11 @@ describe("Questions asked over tRPC", () => {
   it.each(["Editor", "Viewer"] as const)("refuses an %s the read and the closing", async (role) => {
     const { workspace } = await aFlaggedRecordAndANewerOne();
     const { api: admin } = await webSignedIn(app(), workspace.admin.email);
-    const feedbackId = (await admin.questions.asked.query({})).records[0]?.feedback[0]?.id ?? "";
+    const [record] = (await admin.questions.asked.query({})).records;
+    assert(record !== undefined, "the admin reads the flagged record");
+    const [feedback] = record.feedback;
+    assert(feedback !== undefined, "the flagged record carries its flag");
+    const feedbackId = feedback.id;
     const member = await app().person();
     await app().addMember(workspace.workspaceId, member.id, role);
     const { api } = await webSignedIn(app(), member.email);
@@ -149,6 +156,8 @@ describe("Questions asked over tRPC", () => {
         ],
       }),
     );
+    const [retention] = concepts;
+    assert(retention !== undefined, "the retention concept was seeded");
     await seedQuestions(
       app(),
       questionsSeeding.parse({
@@ -157,7 +166,7 @@ describe("Questions asked over tRPC", () => {
           {
             question: RETENTION_QUESTION,
             verdict: "related",
-            concepts: [{ iri: concepts[0]?.iri ?? "" }],
+            concepts: [{ iri: retention.iri }],
           },
         ],
       }),
