@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { matching } from "@better-answers/schema/testing/matching";
 
@@ -185,7 +185,8 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
     const { person, admin, inHere, inElsewhere, host } = await connectedInBoth();
     await admin.members.endEverySignInAndToken.mutate({ personId: person.id });
 
-    const revoking = await revokeAtEndpoint(host, inHere.refreshToken ?? "");
+    assert(inHere.refreshToken !== undefined, "this workspace's connection issued a refresh token");
+    const revoking = await revokeAtEndpoint(host, inHere.refreshToken);
 
     expect(revoking.status).toBe(400);
     expect(await tokenAnswers(host, inElsewhere)).toEqual({ mcp: 200, refresh: 200 });

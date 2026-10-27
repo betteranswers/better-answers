@@ -67,6 +67,12 @@ const HEADER = `\
 # because they are reachable.
 `;
 
+const refreshSnapshotWhenAsked = (mounted: readonly string[]): void => {
+  if (process.env["UPDATE_BETTER_AUTH_ENDPOINTS"] === "1") {
+    writeFileSync(SNAPSHOT, `${HEADER}${mounted.join("\n")}\n`);
+  }
+};
+
 const readSnapshot = (): readonly string[] =>
   readFileSync(SNAPSHOT, "utf8")
     .split("\n")
@@ -97,9 +103,7 @@ describe("what Better Auth mounts behind the fence's catch-all", () => {
   it("mounts exactly the set the committed snapshot names", () => {
     const mounted = mountedPaths(auth);
 
-    if (process.env["UPDATE_BETTER_AUTH_ENDPOINTS"] === "1") {
-      writeFileSync(SNAPSHOT, `${HEADER}${mounted.join("\n")}\n`);
-    }
+    refreshSnapshotWhenAsked(mounted);
 
     const reviewed = readSnapshot();
 

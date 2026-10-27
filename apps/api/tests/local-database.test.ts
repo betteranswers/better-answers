@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
@@ -227,13 +227,14 @@ describe("the local database", () => {
   describe("the synthetic seed, run where the local database runs it", () => {
     it("seeds from the drill's call without adding a second copy", () => {
       const [container] = containersOf(project);
+      assert(container !== undefined, "the local database runs a container");
       const seeded = spawnSync(
         "docker",
         [
           "exec",
           "--env",
           "STAGING_DATABASE_URL=postgresql://better_answers:better_answers@127.0.0.1:5432/better_answers",
-          container ?? "",
+          container,
           "/repo/deploy/seed-synthetic.sh",
         ],
         { encoding: "utf8" },

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, assert, beforeAll, describe, expect, it } from "vitest";
 
 import { makeGroups } from "./harness-people.ts";
 import { startApp, type TestApp } from "./harness.ts";
@@ -62,7 +62,8 @@ describe("the audit log over tRPC", () => {
 
     const [provisioned] = (await api.members.auditLog.query({})).events;
 
-    expect(provisioned?.at).toBe(new Date(provisioned?.at ?? "").toISOString());
+    assert(provisioned !== undefined, "provisioning wrote an event");
+    expect(provisioned.at).toBe(new Date(provisioned.at).toISOString());
   });
 
   it("answers no sign-in, which the identity-set audit log keeps", async () => {

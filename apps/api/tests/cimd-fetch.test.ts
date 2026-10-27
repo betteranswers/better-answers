@@ -242,17 +242,17 @@ describe("the SSRF policy", () => {
   });
 
   it.each([
-    ["a loopback", "127.0.0.1"],
-    ["a private (RFC 1918)", "10.0.0.5"],
-    ["a private (RFC 1918)", "192.168.1.1"],
-    ["a link-local (cloud metadata)", "169.254.169.254"],
-    ["a CGNAT (shared space)", "100.64.0.1"],
-    ["an IPv6 loopback", "::1"],
-    ["an IPv6 unique local", "fd00::1"],
-  ])("refuses %s answer (%s), sending nothing", async (_class, address) => {
+    ["a loopback", "127.0.0.1", 4],
+    ["a private (RFC 1918)", "10.0.0.5", 4],
+    ["a private (RFC 1918)", "192.168.1.1", 4],
+    ["a link-local (cloud metadata)", "169.254.169.254", 4],
+    ["a CGNAT (shared space)", "100.64.0.1", 4],
+    ["an IPv6 loopback", "::1", 6],
+    ["an IPv6 unique local", "fd00::1", 6],
+  ] as const)("refuses %s answer (%s), sending nothing", async (_class, address, family) => {
     const { request, observed } = observedAnswering({ status: 200 });
     const fetcher = createClientMetadataFetcher({
-      lookup: resolvesTo({ address, family: address.includes(":") ? 6 : 4 }),
+      lookup: resolvesTo({ address, family }),
       request,
     });
 

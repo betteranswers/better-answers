@@ -434,9 +434,9 @@ const memberRead = z.object({
 describe("every query the router serves on a workspace road", () => {
   it("is refused, its tab naming another workspace", async () => {
     const { client, left } = await switchedAway();
-    const paths = QUERIES.filter(
-      ([path, procedure]) => !namesNoWorkspace(procedure) && path !== MEMBER_READ,
-    ).map(([path]) => path);
+    const paths = QUERIES.filter(([, procedure]) => !namesNoWorkspace(procedure))
+      .filter(([path]) => path !== MEMBER_READ)
+      .map(([path]) => path);
 
     const words: (readonly [string, string | undefined])[] = [];
     for (const path of paths) {

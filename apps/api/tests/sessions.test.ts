@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { TestClient } from "./harness.ts";
@@ -46,11 +46,11 @@ describe("the person's sessions over the wire", () => {
     const { api } = await webTabOf(client);
     const held = sessionsRead.parse(await api.person.sessions.query());
     const other = held.find((session) => !session.current);
-    expect(other).toBeDefined();
+    assert(other !== undefined, "the second session is listed");
     const mine = await sessionIdOf(client);
     expect(mine).not.toBeNull();
 
-    const ended = await api.person.signOutSession.mutate({ sessionId: other?.id ?? "" });
+    const ended = await api.person.signOutSession.mutate({ sessionId: other.id });
 
     expect(ended).toEqual({ ended: 1 });
     expect(await sessionIdOf(elsewhere)).toBeNull();

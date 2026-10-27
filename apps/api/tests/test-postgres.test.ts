@@ -28,6 +28,8 @@ const composeFile = path.join(repositoryRoot, "deploy/test-postgres.compose.yaml
 
 const stem = `ba-test-postgres-test-${String(process.pid)}`;
 
+const INHERITED_PATH = process.env["PATH"] ?? "";
+
 const projectOf = (stemName: string): string => {
   const digest = /@sha256:([0-9a-f]{64})$/.exec(POSTGRES_IMAGE)?.[1];
   if (digest === undefined) throw new Error("POSTGRES_IMAGE carries no digest");
@@ -92,7 +94,7 @@ describe("the shared test postgres's address", () => {
     chmodSync(path.join(shims, "docker"), 0o755);
     try {
       const run = runScript(script, ["address"], {
-        PATH: `${shims}${path.delimiter}${process.env["PATH"] ?? ""}`,
+        PATH: `${shims}${path.delimiter}${INHERITED_PATH}`,
         TEST_POSTGRES_PROJECT: stem,
         TEST_POSTGRES_PORT: "54999",
       });
