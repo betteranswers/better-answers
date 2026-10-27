@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { grantingFor } from "../src/auth/consent-grant.ts";
@@ -171,7 +171,8 @@ describe("discovery", () => {
     });
 
     expect(response.status).toBe(401);
-    const challenge = response.headers.get("www-authenticate") ?? "";
+    const challenge = response.headers.get("www-authenticate");
+    assert(challenge !== null, "the refusal carries a challenge");
     expect(challenge).toContain('error="invalid_token"');
     expect(challenge).toContain('scope="knowledge:read feedback:write"');
     expect(challenge).toContain(
@@ -271,13 +272,13 @@ describe("the flow, as claude.ai drives it", () => {
     const client = app.client();
 
     await driveToPage(app, client, person);
-    const beforeUpdatedAt =
-      (
-        await app.database.superuser.query<{ updated_at: Date }>(
-          "SELECT updated_at FROM session WHERE user_id = $1",
-          [person.id],
-        )
-      ).rows[0]?.updated_at.getTime() ?? 0;
+    const [before] = (
+      await app.database.superuser.query<{ updated_at: Date }>(
+        "SELECT updated_at FROM session WHERE user_id = $1",
+        [person.id],
+      )
+    ).rows;
+    assert(before !== undefined, "the person holds a session");
 
     const solo = await app.provision({ name: "Solo" });
     await app.addMember(solo.workspaceId, person.id, "Viewer");
@@ -293,8 +294,10 @@ describe("the flow, as claude.ai drives it", () => {
       active_workspace_id: string | null;
       updated_at: Date;
     }>("SELECT active_workspace_id, updated_at FROM session WHERE user_id = $1", [person.id]);
-    expect(after.rows[0]?.active_workspace_id).toBe(solo.workspaceId);
-    expect(after.rows[0]?.updated_at.getTime() ?? 0).toBeGreaterThan(beforeUpdatedAt);
+    const [now] = after.rows;
+    assert(now !== undefined, "the session is still there");
+    expect(now.active_workspace_id).toBe(solo.workspaceId);
+    expect(now.updated_at.getTime()).toBeGreaterThan(before.updated_at.getTime());
   });
 
   it("redirects an unoffered scope back to the host with iss", async () => {
@@ -307,7 +310,9 @@ describe("the flow, as claude.ai drives it", () => {
       });
 
     expect(response.status).toBe(302);
-    const target = new URL(response.headers.get("location") ?? "");
+    const location = response.headers.get("location");
+    assert(location !== null, "the refusal redirected");
+    const target = new URL(location);
     expect(target.origin + target.pathname).toBe("https://claude.ai/api/mcp/auth_callback");
     expect(target.searchParams.get("error")).toBe("invalid_scope");
     expect(target.searchParams.get("iss")).toBe(PUBLIC_URL);
@@ -324,7 +329,7 @@ describe("the flow, as claude.ai drives it", () => {
       });
 
     expect(response.ok).toBe(false);
-    expect(response.headers.get("location") ?? "").not.toContain("code=");
+    expect(response.headers.get("location")).not.toEqual(expect.stringContaining("code="));
     expect(app.metadataFetches.slice(asked)).toEqual([]);
     const registered = await app.database.superuser.query(
       "SELECT 1 FROM oauth_client WHERE client_id = $1",
@@ -343,7 +348,7 @@ describe("the flow, as claude.ai drives it", () => {
       });
 
     expect(response.ok).toBe(false);
-    expect(response.headers.get("location") ?? "").not.toContain("code=");
+    expect(response.headers.get("location")).not.toEqual(expect.stringContaining("code="));
     const registered = await app.database.superuser.query(
       "SELECT 1 FROM oauth_client WHERE client_id = $1",
       [NAMELESS_CLIENT_ID],
@@ -364,7 +369,9 @@ describe("the flow, as claude.ai drives it", () => {
     );
 
     expect(response.status).toBe(302);
-    const target = new URL(response.headers.get("location") ?? "");
+    const location = response.headers.get("location");
+    assert(location !== null, "the refusal redirected");
+    const target = new URL(location);
     expect(target.searchParams.get("error")).toBe("invalid_target");
   });
 
@@ -469,7 +476,9 @@ describe("the pages, as a person walks them", () => {
     const back = await backThroughSignIn(client, acme.admin.email, link.href);
     expect(`${back.origin}${back.pathname}`).toBe(`${PUBLIC_URL}/consent`);
     const connected = await client.form(`/consent${back.search}`, connectIn(acme.workspaceId));
-    const callback = new URL(connected.headers.get("location") ?? "", PUBLIC_URL);
+    const location = connected.headers.get("location");
+    assert(location !== null, "the consent redirected");
+    const callback = new URL(location, PUBLIC_URL);
     expect(`${callback.origin}${callback.pathname}`).toBe(CLAUDE_REDIRECT_URI);
     expect(callback.searchParams.get("code")).not.toBeNull();
   });
@@ -682,9 +691,9 @@ describe("the pages refuse a cross-site form", () => {
       connectIn(acme.workspaceId),
     );
     expect(navigated.status).toBe(302);
-    expect(
-      new URL(navigated.headers.get("location") ?? "").searchParams.get("code"),
-    ).not.toBeNull();
+    const location = navigated.headers.get("location");
+    assert(location !== null, "the authorization redirected");
+    expect(new URL(location).searchParams.get("code")).not.toBeNull();
   });
 
   it("refuses consent posted without Fetch Metadata, unlike any browser navigation", async () => {
@@ -759,7 +768,9 @@ describe("one origin, one session", () => {
       .client()
       .fetch(authorizeUrl({ challenge, scope: "knowledge:read" }), { redirect: "manual" });
 
-    const sent = new URL(start.headers.get("location") ?? "", PUBLIC_URL);
+    const location = start.headers.get("location");
+    assert(location !== null, "the authorization redirected");
+    const sent = new URL(location, PUBLIC_URL);
     expect(`${sent.origin}${sent.pathname}`).toBe(`${PUBLIC_URL}/sign-in`);
 
     expect(sent.searchParams.get("sig")).not.toBeNull();
@@ -832,7 +843,8 @@ describe("refresh and revocation", () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const connected = await connectAsHost(app, client, acme.admin);
-    const first = connected.refreshToken ?? "";
+    const first = connected.refreshToken;
+    assert(first !== undefined, "the connection issued a refresh token");
 
     const refreshed = await refresh(client, first);
     expect(refreshed.status).toBe(200);
@@ -843,7 +855,9 @@ describe("refresh and revocation", () => {
       "SELECT expires_at, revoked FROM oauth_refresh_token WHERE user_id = $1 AND revoked IS NULL ORDER BY created_at DESC LIMIT 1",
       [acme.admin.id],
     );
-    const lifetimeSeconds = (rows.rows[0]?.expires_at.getTime() ?? 0) / 1000 - Date.now() / 1000;
+    const [current] = rows.rows;
+    assert(current !== undefined, "the refresh left a live token");
+    const lifetimeSeconds = current.expires_at.getTime() / 1000 - Date.now() / 1000;
     expect(Math.abs(lifetimeSeconds - REFRESH_TOKEN_LIFETIME_SECONDS)).toBeLessThan(120);
 
     const replayed = await refresh(client, first);
@@ -857,7 +871,8 @@ describe("refresh and revocation", () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const connected = await connectAsHost(app, client, acme.admin);
-    const token = connected.refreshToken ?? "";
+    const token = connected.refreshToken;
+    assert(token !== undefined, "the connection issued a refresh token");
 
     const revoked = await client.fetch("/oauth2/revoke", {
       method: "POST",
@@ -890,7 +905,8 @@ describe("the audit logs", () => {
     const client = app.client();
     const before = app.logs.length;
     const connected = await connectAsHost(app, client, one.admin, { pick: two.workspaceId });
-    const rotated = await json(await refresh(client, connected.refreshToken ?? ""), rotatedTokens);
+    assert(connected.refreshToken !== undefined, "the connection issued a refresh token");
+    const rotated = await json(await refresh(client, connected.refreshToken), rotatedTokens);
     const current = rotated.refresh_token;
     await client.fetch("/oauth2/revoke", {
       method: "POST",
@@ -922,7 +938,7 @@ describe("the audit logs", () => {
 
     const everything = JSON.stringify(app.logs.slice(before));
     expect(everything).not.toContain(connected.accessToken);
-    expect(everything).not.toContain(connected.refreshToken ?? "never");
+    expect(everything).not.toContain(connected.refreshToken);
     expect(everything).not.toContain(current);
     expect(everything).not.toContain(app.codeSentTo(one.admin.email));
   });
@@ -1056,9 +1072,8 @@ describe("the limits", () => {
     },
   } satisfies Record<AddressScope, Counted>;
 
-  const ROUTES: readonly (Counted & { readonly group: string })[] = Object.entries(COUNTS).map(
-    ([group, counted]) => ({ group, ...counted }),
-  );
+  const ROUTES: readonly (Counted & { readonly group: string; readonly windowMs: number })[] =
+    Object.entries(COUNTS).map(([group, counted]) => ({ group, windowMs: MINUTE_MS, ...counted }));
 
   const ceilingsMetSince = (from: number) =>
     app.logs.slice(from).filter((line) => line["event"] === "ingress.address_ceiling_met");
@@ -1085,7 +1100,7 @@ describe("the limits", () => {
   it.each(ROUTES)("logs once a window for $name", async (counted) => {
     const client = app.client();
     const from = app.logs.length;
-    const windowMs = counted.windowMs ?? MINUTE_MS;
+    const { windowMs } = counted;
     atAWindowsStart(windowMs);
 
     await onePast(() => counted.ask(client), counted.max - 1);
@@ -1123,7 +1138,9 @@ describe("the limits", () => {
       { group: "oauth", anthropicRange: false },
       { group: "mcp", anthropicRange: true },
     ]);
-    expect(Object.keys(lines[0] ?? {}).toSorted()).toEqual([
+    const [line] = lines;
+    assert(line !== undefined, "the ceiling was logged");
+    expect(Object.keys(line).toSorted()).toEqual([
       "anthropicRange",
       "event",
       "group",
@@ -1323,23 +1340,25 @@ describe("the limits", () => {
     "/sign-in/email-otp",
   ];
 
-  const counterExpectedFor = (path: string): string => {
-    if (path === "/sign-in/email-otp") return "email-code-sign-in";
-    if (EMAIL_CODE_PATHS.includes(path)) return "email-code-send";
-    if (path.startsWith("/.well-known/")) return "none";
-    return path.startsWith("/oauth2/") || path === "/jwks" ? "oauth" : "identity";
+  const countersExpectedFor = (path: string): readonly string[] => {
+    if (path === "/sign-in/email-otp") return ["email-code-sign-in"];
+    if (EMAIL_CODE_PATHS.includes(path)) return ["email-code-send"];
+    if (path.startsWith("/.well-known/")) return [];
+    return path.startsWith("/oauth2/") || path === "/jwks" ? ["oauth"] : ["identity"];
   };
 
   it("gives each path Better Auth mounts its one count", async () => {
-    const counts: { path: string; count: string }[] = [];
+    const counts: { path: string; counters: readonly string[] }[] = [];
 
     for (const path of mountedPaths(authOver(app))) {
       const client = app.client();
       await client.fetch(path.replaceAll(/:[a-z_]+/g, "any"), { method: "POST" });
-      counts.push({ path, count: (await countedByTheApi(client.ip)).join(" and ") || "none" });
+      counts.push({ path, counters: await countedByTheApi(client.ip) });
     }
 
-    expect(counts).toEqual(counts.map(({ path }) => ({ path, count: counterExpectedFor(path) })));
+    expect(counts).toEqual(
+      counts.map(({ path }) => ({ path, counters: countersExpectedFor(path) })),
+    );
     expect(counts.map(({ path }) => path)).toEqual(
       expect.arrayContaining([...EMAIL_CODE_PATHS, "/oauth2/end-session/confirm"]),
     );
@@ -1406,8 +1425,8 @@ describe("the limits", () => {
     async (group) => {
       const client = app.client();
       stopTheClock();
-      for (const [path, counted] of SIGN_IN_PATHS) {
-        if (counted === group) await askedFromAnotherSite(client, path);
+      for (const [path] of SIGN_IN_PATHS.filter(([, counted]) => counted === group)) {
+        await askedFromAnotherSite(client, path);
       }
 
       refusedOnlyAtTheLast(await onePast(() => COUNTS[group].ask(client), COUNTS[group].max));
