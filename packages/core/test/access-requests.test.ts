@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
+import { inspect } from "node:util";
 
 import pg from "pg";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
@@ -137,7 +138,9 @@ describe("asking to join a workspace", () => {
       },
     ]);
 
-    expect(await eventsAbout(rows[0]?.id ?? "")).toEqual([
+    const [row] = rows;
+    assert(row !== undefined, "the request was recorded");
+    expect(await eventsAbout(row.id)).toEqual([
       {
         action: "people.request.asked",
         actor: `human:${requester}`,
@@ -164,7 +167,9 @@ describe("asking to join a workspace", () => {
     const rows = await requestRows(workspace.id);
     expect(rows.map((row) => row.requester_id)).toEqual([requester]);
 
-    expect(await eventsAbout(rows[0]?.id ?? "")).toHaveLength(1);
+    const [row] = rows;
+    assert(row !== undefined, "the request was recorded");
+    expect(await eventsAbout(row.id)).toHaveLength(1);
   });
 
   it("refuses a blank reason and a malformed requester, writing nothing", async () => {
@@ -212,9 +217,7 @@ describe("asking to join a workspace", () => {
       reason: "Please let me in.",
     });
 
-    expect(asked.ok).toBe(false);
-    if (asked.ok) return;
-    expect(asked.error).toBeInstanceOf(Error);
+    expect(asked).toEqual({ ok: false, error: matching.any(Error) });
   });
 
   it("hands back the insert's failure rather than the acknowledgement", async () => {
@@ -263,7 +266,7 @@ describe("approving a request", () => {
         workspaceName: "Approve",
       },
     });
-    if (!approved.ok) return;
+    assert(approved.ok, inspect(approved));
     const rows = await requestRows(workspace.id);
     expect(rows[0]).toMatchObject({
       status: "approved",
@@ -514,10 +517,12 @@ describe("the Admin's queue", () => {
       ).toBe(true);
     }
     const rows = await requestRows(workspace.id);
+    const [declined] = rows;
+    assert(declined !== undefined, "the first request was recorded");
     expect(
       (
         await as(workspace.id, workspace.adminUserId, (principal, tx) =>
-          declineRequest(principal, tx, { requestId: rows[0]?.id ?? "" }),
+          declineRequest(principal, tx, { requestId: declined.id }),
         )
       ).ok,
     ).toBe(true);
@@ -555,9 +560,9 @@ describe("the Admin's queue", () => {
     ).rejects.toThrow(/did not commit/);
 
     expect(listed).toEqual({ ok: false, error: matching.any(Error) });
-    expect(listed?.ok === false ? String(listed.error) : "").toContain(
-      "current transaction is aborted",
-    );
+    expect(listed).toMatchObject({
+      error: { message: matching.stringContaining("current transaction is aborted") },
+    });
   });
 
   it("fails on an unreadable row rather than omitting it", async () => {
@@ -583,16 +588,23 @@ describe("who may decide", () => {
     requestId: string,
   ) => Promise<Result<unknown, unknown>>;
 
-  const verbs: readonly [string, Verb][] = [
+  const NO_SUCH_REQUEST: Result<unknown, unknown> = { ok: false, error: "no-such-request" };
+
+  const verbs: readonly [string, Verb, Result<unknown, unknown>][] = [
     [
       "approve",
       (principal, tx, requestId) => approveRequest(principal, tx, { requestId, now: new Date() }),
+      NO_SUCH_REQUEST,
     ],
-    ["decline", (principal, tx, requestId) => declineRequest(principal, tx, { requestId })],
-    ["list", (principal, tx) => listWaitingRequests(principal, tx)],
+    [
+      "decline",
+      (principal, tx, requestId) => declineRequest(principal, tx, { requestId }),
+      NO_SUCH_REQUEST,
+    ],
+    ["list", (principal, tx) => listWaitingRequests(principal, tx), { ok: true, value: [] }],
   ];
 
-  for (const [name, verb] of verbs) {
+  for (const [name, verb, outsiderReaches] of verbs) {
     it(`refuses Editors and Viewers the ${name} verb with one word`, async () => {
       const { workspace, requestId } = await withOneWaitingRequest(`Role${name}`);
 
@@ -614,9 +626,7 @@ describe("who may decide", () => {
         verb(principal, tx, requestId),
       );
 
-      expect(reached).toEqual(
-        name === "list" ? { ok: true, value: [] } : { ok: false, error: "no-such-request" },
-      );
+      expect(reached).toEqual(outsiderReaches);
       expect(await requestRows(workspace.id)).toMatchObject([{ status: "waiting" }]);
     });
   }

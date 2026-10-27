@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
@@ -131,12 +133,12 @@ describe("changing the role of many members", () => {
       ok: true,
       value: { changed: sorted(viewers), skipped: 0, promoted: [] },
     });
-    expect(await rolesOf(workspace)).toEqual({
-      [workspace.adminUserId]: "Admin",
-      [viewers[0] ?? ""]: "Editor",
-      [viewers[1] ?? ""]: "Editor",
-      [viewers[2] ?? ""]: "Editor",
-    });
+    expect(await rolesOf(workspace)).toEqual(
+      Object.fromEntries([
+        [workspace.adminUserId, "Admin"],
+        ...viewers.map((viewer) => [viewer, "Editor"]),
+      ]),
+    );
     expect((await auditRowsOf(workspace, ROLE_CHANGED)).map((row) => row.detail)).toEqual([
       { previousRole: "Viewer", role: "Editor" },
       { previousRole: "Viewer", role: "Editor" },
@@ -563,27 +565,35 @@ const RACES = [
   [
     "role changes, disjoint",
     "disjoint",
+    0,
     (ids: readonly string[]) => changingRoles(ids, "Editor"),
     ROLE_CHANGED,
   ],
   [
     "role changes, overlapping",
     "overlapping",
+    1,
     (ids: readonly string[]) => changingRoles(ids, "Editor"),
     ROLE_CHANGED,
   ],
-  ["removals, disjoint", "disjoint", (ids: readonly string[]) => removing(ids), REMOVED],
-  ["removals, overlapping", "overlapping", (ids: readonly string[]) => removing(ids), REMOVED],
+  ["removals, disjoint", "disjoint", 0, (ids: readonly string[]) => removing(ids), REMOVED],
+  ["removals, overlapping", "overlapping", 1, (ids: readonly string[]) => removing(ids), REMOVED],
 ] as const;
+
+const heldBy = (sets: ReadonlyMap<string, readonly string[]>, userId: string) => {
+  const held = sets.get(userId);
+  if (held === undefined) throw new Error(`${userId} holds no set in this race`);
+  return held;
+};
 
 describe("two bulk actions racing", () => {
   it.each(RACES)(
     "lands one whole, refusing the other: %s",
-    async (_race, rows, actionOn, action) => {
+    async (_race, rows, sharedCount, actionOn, action) => {
       const workspace = await provisionedWorkspace(db(), `BulkRaced${action}${rows}`);
       const second = await joining(workspace, "Admin");
       const [shared, firsts, seconds] = [
-        await joiningMany(workspace, "Viewer", rows === "overlapping" ? 1 : 0),
+        await joiningMany(workspace, "Viewer", sharedCount),
         await joiningMany(workspace, "Viewer", 2),
         await joiningMany(workspace, "Viewer", 2),
       ];
@@ -595,16 +605,15 @@ describe("two bulk actions racing", () => {
       const answers = await bothHoldingTheirOwnRow(
         workspace,
         [workspace.adminUserId, second],
-        (principal, tx) => actionOn(setOf.get(principal.userId) ?? [])(principal, tx),
+        (principal, tx) => actionOn(heldBy(setOf, principal.userId))(principal, tx),
       );
 
-      const landed = answers.flatMap((answer) => (answer.ok ? [answer.value.changed] : []));
-      expect(answers.flatMap((answer) => (answer.ok ? [] : [answer.error]))).toEqual([
-        "changed-meanwhile",
-      ]);
-      expect(landed).toHaveLength(1);
-      expect(await subjectsOf(workspace, action)).toEqual(landed[0]);
-      const won = new Set<string>(landed[0]);
+      expect(answers).toHaveLength(2);
+      const [landed, lost] = answers.toSorted((one, other) => Number(other.ok) - Number(one.ok));
+      expect(lost).toEqual({ ok: false, error: "changed-meanwhile" });
+      assert(landed?.ok, inspect(landed));
+      expect(await subjectsOf(workspace, action)).toEqual(landed.value.changed);
+      const won = new Set<string>(landed.value.changed);
       const untouched = [...setOf.values()].flat().filter((id) => !won.has(id));
       const roles = await rolesOf(workspace);
       expect(untouched.map((id) => roles[id])).toEqual(["Viewer", "Viewer"]);
