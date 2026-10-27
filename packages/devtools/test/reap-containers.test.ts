@@ -24,6 +24,9 @@ afterAll(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
+const fulfilled = <T>(settled: readonly PromiseSettledResult<T>[]): readonly T[] =>
+  settled.flatMap((one) => (one.status === "fulfilled" ? [one.value] : []));
+
 type Run = { readonly status: number | null; readonly stdout: string; readonly stderr: string };
 
 const reap = (argv: readonly string[], env: Readonly<Record<string, string>> = {}): Run => {
@@ -196,7 +199,7 @@ describe("reap-containers", () => {
     // With Ryuk off, nothing clears the container once its process is gone and it has stopped.
     const ended = holdAContainer({ TESTCONTAINERS_RYUK_DISABLED: "true" });
     const settled = await Promise.allSettled([live.container, ended.container]);
-    const held = settled.flatMap((one) => (one.status === "fulfilled" ? [one.value] : []));
+    const held = fulfilled(settled);
     try {
       const [liveContainer, endedContainer] = await Promise.all([live.container, ended.container]);
       ended.process.kill("SIGKILL");

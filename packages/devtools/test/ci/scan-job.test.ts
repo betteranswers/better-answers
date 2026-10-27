@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
@@ -168,9 +168,9 @@ describe("the nightly scan of the images build.yml pushes", () => {
     );
 
     expect(matrixLegs().length).toBeGreaterThan(2);
-    expect(valuesAt(build, tiers.env?.[TIERS_VARIABLE] ?? "")).toEqual(
-      matrixLegs().map((leg) => leg.tier),
-    );
+    const tiersAt = tiers.env?.[TIERS_VARIABLE];
+    assert(tiersAt !== undefined, `the tiers step sets ${TIERS_VARIABLE}`);
+    expect(valuesAt(build, tiersAt)).toEqual(matrixLegs().map((leg) => leg.tier));
     expect(tiers.run).toContain(`\${${TIERS_VARIABLE}}`);
     expect(tiers.run).toContain(".github/workflows/build.yml");
 

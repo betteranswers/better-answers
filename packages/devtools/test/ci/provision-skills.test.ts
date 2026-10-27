@@ -83,6 +83,8 @@ const worktreeOf = (primary: string, name: string): string => {
 
 type Run = { readonly status: number | null; readonly stderr: string };
 
+const withStubsFirst = (bin: string): string => `${bin}:${process.env["PATH"] ?? ""}`;
+
 const provision = (worktree: string, env: Readonly<Record<string, string>> = {}): Run => {
   const result = spawnSync("bash", [script, worktree], {
     encoding: "utf8",
@@ -290,7 +292,7 @@ describe("the skills stage of worktree provisioning", () => {
       const primary = primaryCheckout(`${name}-primary`, false);
       const worktree = worktreeOf(primary, `${name}-worktree`);
       const bin = stubInstallers(name, installer);
-      const run = provision(worktree, { PATH: `${bin}:${process.env["PATH"] ?? ""}` });
+      const run = provision(worktree, { PATH: withStubsFirst(bin) });
       return { worktree, run };
     };
 
@@ -318,7 +320,7 @@ describe("the skills stage of worktree provisioning", () => {
       const worktree = worktreeOf(primary, "partial-worktree");
       const bin = stubInstallers("partial", "installs");
 
-      const run = provision(worktree, { PATH: `${bin}:${process.env["PATH"] ?? ""}` });
+      const run = provision(worktree, { PATH: withStubsFirst(bin) });
 
       ready(run);
       expect(readFileSync(path.join(worktree, ".claude/skills/gitnexus/SKILL.md"), "utf8")).toBe(

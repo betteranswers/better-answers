@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
@@ -393,6 +393,31 @@ const legRoots = new Map([
   ["core", "packages/core"],
 ]);
 
+type LineRange = { readonly from: number; readonly to: number };
+
+const RANGED_PIECE = /^(?<file>.+):(?<from>\d+)-(?<to>\d+)$/u;
+
+const wholeFilesOf = (pieces: readonly string[]): readonly string[] =>
+  pieces.filter((piece) => !RANGED_PIECE.test(piece));
+
+const cutFilesOf = (
+  pieces: readonly string[],
+): ReadonlyMap<string, readonly { readonly file: string; readonly lines: LineRange }[]> =>
+  Map.groupBy(
+    pieces.flatMap((piece) => {
+      const ranged = RANGED_PIECE.exec(piece)?.groups;
+      return ranged === undefined
+        ? []
+        : [
+            {
+              file: ranged["file"] ?? "",
+              lines: { from: Number(ranged["from"]), to: Number(ranged["to"]) },
+            },
+          ];
+    }),
+    ({ file }) => file,
+  );
+
 const sliceArgv = (leg: string, shard: number, of: number): readonly string[] => [
   "slice",
   "--leg",
@@ -419,13 +444,16 @@ describe("each mutation leg, run as shards and summed once", () => {
       expect(own.map((shard) => shard.shard)).toEqual(
         Array.from({ length: of }, (_, index) => index + 1),
       );
-      expect(own.every((shard) => shard.of === of && shard.path === legRoots.get(name))).toBe(true);
+      expect(own.map((shard) => ({ of: shard.of, path: shard.path }))).toEqual(
+        own.map(() => ({ of, path: legRoots.get(name) })),
+      );
     }
   });
 
   it("cuts each leg into slices that tile its mutate set", async () => {
     for (const { name, of } of mutationWorkflow().jobs.summary.strategy.matrix.include) {
-      const root = legRoots.get(name) ?? "";
+      const root = legRoots.get(name);
+      assert(root !== undefined, `${name} is a mutation leg`);
       const config = configSchema.parse(CONFIGS.get(root));
       const printed = await Promise.all(
         Array.from({ length: of }, (_, index) =>
@@ -438,23 +466,13 @@ describe("each mutation leg, run as shards and summed once", () => {
         { encoding: "utf8" },
       );
       const slices = printed.map((slice) => slice.split(","));
-      const parts = slices.flat().map((part) => {
-        const [, file = part, from, to] = /^(.+):(\d+)-(\d+)$/u.exec(part) ?? [];
-        return {
-          file,
-          lines: from === undefined ? undefined : { from: Number(from), to: Number(to) },
-        };
-      });
-      const whole = parts.flatMap(({ file, lines }) => (lines === undefined ? [file] : []));
-      const cut = Map.groupBy(
-        parts.flatMap(({ file, lines }) => (lines === undefined ? [] : [{ file, lines }])),
-        ({ file }) => file,
-      );
+      const whole = wholeFilesOf(slices.flat());
+      const cut = cutFilesOf(slices.flat());
 
       expect(script.stdout, `${name}'s script printed another slice: ${script.stderr}`).toBe(
         printed.at(-1),
       );
-      expect(slices.every((slice) => slice.length > 0 && slice[0] !== "")).toBe(true);
+      expect(slices.map((slice) => slice[0])).not.toContain("");
       expect(new Set(whole).size, `${name}'s slices share a file`).toBe(whole.length);
       expect([...whole, ...cut.keys()].toSorted()).toEqual(
         mutateSet(path.join(repositoryRoot, root), config.mutate),
@@ -525,7 +543,7 @@ describe("each mutation leg, run as shards and summed once", () => {
     const [check, ...rest] = stryker.steps;
 
     expect(check?.if).toEqual("inputs.shards");
-    expect(rest.map((step) => step.if?.replace("always() && ", "") ?? "no condition")).toEqual(
+    expect(rest.map((step) => step.if?.replace("always() && ", ""))).toEqual(
       rest.map(() => "env.SELECTED == 'true'"),
     );
   });
@@ -541,7 +559,9 @@ describe("each mutation leg, run as shards and summed once", () => {
     { shards: "web-1", leg: "core", of: 16, refused: true },
   ])("refuses $shards in a $leg shard: $refused", ({ shards, leg, of, refused }) => {
     const [check] = mutationWorkflow().jobs.stryker.steps;
-    const run = spawnSync("bash", ["-c", check?.run ?? "exit 2"], {
+    const script = check?.run;
+    assert(script !== undefined, "the stryker job opens on a script");
+    const run = spawnSync("bash", ["-c", script], {
       encoding: "utf8",
       env: { ...process.env, SHARDS: shards, LEG: leg, OF: String(of) },
     });
@@ -560,9 +580,12 @@ describe("each mutation leg, run as shards and summed once", () => {
   it("knows a shard's leg by the matrix's own names", () => {
     const { stryker } = mutationWorkflow().jobs;
     const [check] = stryker.steps;
-    const checkedLegs = /\^\(([a-z|]+)\)-/u.exec(check?.run ?? "")?.[1]?.split("|") ?? [];
+    const script = check?.run;
+    assert(script !== undefined, "the stryker job opens on a script");
+    const checkedLegs = /\^\(([a-z|]+)\)-/u.exec(script)?.[1];
+    assert(checkedLegs !== undefined, "the check names the legs it accepts");
 
-    expect(checkedLegs.toSorted()).toEqual(
+    expect(checkedLegs.split("|").toSorted()).toEqual(
       [...new Set(stryker.strategy.matrix.include.map((shard) => shard.name))].toSorted(),
     );
   });

@@ -48,8 +48,8 @@ const holdOn = (pattern: string): string => {
 const installedWithThePasskeyPlugin = (name: string): z.infer<typeof manifestSchema> =>
   manifestOf(path.join("apps/api/node_modules", name, "package.json"));
 
-const ceilingOf = (caretRange: string): string => {
-  const major = /^\^(\d+)\./.exec(caretRange)?.[1];
+const ceilingOf = (caretRange: string | undefined): string => {
+  const major = /^\^(\d+)\./.exec(caretRange ?? "")?.[1];
   if (major === undefined) throw new Error(`${caretRange} is not a caret range`);
   return `<${Number(major) + 1}`;
 };
@@ -67,7 +67,7 @@ describe("renovate.json's better-auth holds", () => {
   it("holds @simplewebauthn below the next major passkey takes", () => {
     const passkey = installedWithThePasskeyPlugin("@better-auth/passkey").dependencies;
     const ceilings = ["@simplewebauthn/server", "@simplewebauthn/browser"].map((name) =>
-      ceilingOf(passkey[name] ?? ""),
+      ceilingOf(passkey[name]),
     );
 
     expect(new Set(ceilings).size).toBe(1);
@@ -95,12 +95,12 @@ const pinsOf = (directory: string): readonly (readonly [string, string])[] => {
 
 describe("the workspaces' manifests", () => {
   it("name each external package at one version", () => {
-    const named = new Map<string, { directory: string; version: string }[]>();
-    for (const directory of rootAndWorkspaceManifests()) {
-      for (const [name, version] of pinsOf(directory)) {
-        named.set(name, [...(named.get(name) ?? []), { directory, version }]);
-      }
-    }
+    const named = Map.groupBy(
+      rootAndWorkspaceManifests().flatMap((directory) =>
+        pinsOf(directory).map(([name, version]) => ({ name, directory, version })),
+      ),
+      ({ name }) => name,
+    );
     const split = [...named.entries()]
       .filter(([, pins]) => new Set(pins.map((pin) => pin.version)).size > 1)
       .map(

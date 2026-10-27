@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { repositoryRoot, workspacePackages } from "@better-answers/devtools/paths";
@@ -26,6 +26,20 @@ const manifestOf = (directory: string): Manifest => {
 const scriptsOf = (directory: string): Readonly<Record<string, string>> =>
   manifestOf(directory).scripts ?? {};
 
+const workspacesWith = (
+  name: string,
+): readonly { readonly directory: string; readonly script: string }[] =>
+  workspacePackages().flatMap((directory) => {
+    const script = scriptsOf(directory)[name];
+    return script === undefined ? [] : [{ directory, script }];
+  });
+
+const rootCheck = (): string => {
+  const check = scriptsOf(".")["check"];
+  assert(check !== undefined, "the root has a check script");
+  return check;
+};
+
 const NO_CHECK: Readonly<Record<string, string>> = {
   "packages/design-system":
     "CSS tokens, a stylesheet and guideline cards as HTML — nothing executable to lint, type or test; the workspace exists so apps/web can import the stylesheet by name",
@@ -43,12 +57,9 @@ describe("the workspaces' scripts", () => {
   });
 
   it("has no test script that passes with no tests", () => {
-    const passing = workspacePackages().flatMap((directory) => {
-      const test = scriptsOf(directory)["test"];
-      return test !== undefined && test.includes("--passWithNoTests")
-        ? [`${directory}: ${test}`]
-        : [];
-    });
+    const passing = workspacesWith("test")
+      .filter(({ script }) => script.includes("--passWithNoTests"))
+      .map(({ directory, script }) => `${directory}: ${script}`);
 
     expect(
       passing,
@@ -73,9 +84,9 @@ describe("the workspaces' scripts", () => {
   });
 
   it("runs each workspace's check from the root, skipping one without", () => {
-    const recursive = Object.values(scriptsOf(".")).filter(
-      (script) => script.includes("-r ") && script.includes("run check"),
-    );
+    const recursive = Object.values(scriptsOf("."))
+      .filter((script) => script.includes("-r "))
+      .filter((script) => script.includes("run check"));
 
     expect(recursive.length, "the root runs no workspace's check").toBe(1);
     expect(recursive[0]).toContain("--if-present");
@@ -90,15 +101,14 @@ const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<steps>.+)$/;
 const stepsOf = (check: string): readonly string[] =>
   (RUNNER.exec(check)?.groups?.["steps"] ?? "").split(/\s+/).filter((step) => step.length > 0);
 
+const chainsItsSteps = (check: string): boolean =>
+  check.includes("&&") || stepsOf(check).length === 0;
+
 describe("one run of check names every failure", () => {
   it("runs a workspace's gates through the runner, never chained", () => {
-    const chained = workspacePackages().flatMap((directory) => {
-      const check = scriptsOf(directory)["check"];
-
-      return check !== undefined && (check.includes("&&") || stepsOf(check).length === 0)
-        ? [`${directory}: ${check}`]
-        : [];
-    });
+    const chained = workspacesWith("check")
+      .filter(({ script }) => chainsItsSteps(script))
+      .map(({ directory, script }) => `${directory}: ${script}`);
 
     expect(
       chained,
@@ -107,10 +117,11 @@ describe("one run of check names every failure", () => {
   });
 
   it("names exactly a workspace's gates as its steps", () => {
-    for (const directory of workspacePackages()) {
+    const checked = workspacesWith("check");
+    expect(checked.length).toBeGreaterThan(0);
+
+    for (const { directory, script: check } of checked) {
       const scripts = scriptsOf(directory);
-      const check = scripts["check"];
-      if (check === undefined) continue;
 
       expect(
         stepsOf(check),
@@ -121,7 +132,7 @@ describe("one run of check names every failure", () => {
 
   it("runs the root's own steps through the same runner", () => {
     const scripts = scriptsOf(".");
-    const steps = stepsOf(scripts["check"] ?? "");
+    const steps = stepsOf(rootCheck());
 
     expect(steps.length, "the root check does not call the runner").toBeGreaterThan(0);
     expect(steps.filter((step) => scripts[step] === undefined)).toEqual([]);
@@ -134,7 +145,7 @@ describe("one run of check names every failure", () => {
 describe("the gates a branch never narrows", () => {
   it("come before the tiers, each running over the whole tree", () => {
     const scripts = scriptsOf(".");
-    const steps = gatesNamed(scripts["check"] ?? "");
+    const steps = gatesNamed(rootCheck());
     const tiers = steps.indexOf("check:workspaces");
     const gates = steps.slice(0, tiers);
 
@@ -202,12 +213,16 @@ describe("the runners start through node", () => {
   });
 
   it("starts each runner at the file its package names", () => {
-    const moved = runnerEntries().flatMap(({ directory, name, pkg, file }) => {
-      const bins = binsOf(path.join(directory, "node_modules", pkg));
-      return bins.includes(file)
-        ? []
-        : [`${directory} ${name}: ${pkg}/${file} (bin: ${bins.join(", ")})`];
-    });
+    const moved = runnerEntries()
+      .map((entry) => ({
+        ...entry,
+        bins: binsOf(path.join(entry.directory, "node_modules", entry.pkg)),
+      }))
+      .filter(({ bins, file }) => !bins.includes(file))
+      .map(
+        ({ directory, name, pkg, file, bins }) =>
+          `${directory} ${name}: ${pkg}/${file} (bin: ${bins.join(", ")})`,
+      );
 
     expect(
       moved,
@@ -216,10 +231,8 @@ describe("the runners start through node", () => {
   });
 
   it("starts only the test and mutation scripts at runners", () => {
-    const expected = workspacePackages().flatMap((directory) =>
-      Object.entries(RUNNER_SCRIPTS).flatMap(([name, pkg]) =>
-        scriptsOf(directory)[name] === undefined ? [] : [`${directory} ${name}: ${pkg}`],
-      ),
+    const expected = Object.entries(RUNNER_SCRIPTS).flatMap(([name, pkg]) =>
+      workspacesWith(name).map(({ directory }) => `${directory} ${name}: ${pkg}`),
     );
     const started = runnerEntries().map(
       ({ directory, name, pkg }) => `${directory} ${name}: ${pkg}`,

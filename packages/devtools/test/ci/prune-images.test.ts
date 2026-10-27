@@ -98,6 +98,9 @@ const prune = (on: Box, args: readonly string[] = []): Promise<Ran> =>
 
 const removed = (on: Box): string => readFileSync(path.join(on.state, "removed"), "utf8");
 const calls = (on: Box): string => readFileSync(path.join(on.state, "calls"), "utf8");
+const shellFunctionBody = (script: string, name: string): string =>
+  script.split(`\n${name}() {\n`)[1]?.split("\n}\n")[0] ?? "";
+
 const lines = (...entries: readonly string[]): string =>
   entries.map((entry) => `${entry}\n`).join("");
 
@@ -183,8 +186,7 @@ describe("the nightly image prune", () => {
 
   it("is installed with its cron on both boxes", () => {
     const setup = readFileSync(deployScript("host-setup.sh"), "utf8");
-    const body = (name: string): string =>
-      setup.split(`\n${name}() {\n`)[1]?.split("\n}\n")[0] ?? "";
+    const body = (name: string): string => shellFunctionBody(setup, name);
 
     expect(body("vpc1")).toMatch(/^ {2}prune_images$/m);
     expect(body("vpc2")).toMatch(/^ {2}prune_images$/m);

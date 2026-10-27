@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
@@ -45,7 +45,7 @@ describe("creating a worktree", () => {
       "the sweep sleeps longer than a creation may take, so a hook that waited on it shows here",
     ).toBeLessThan((SWEEP_SECONDS * 1000) / 2);
     await vi.waitFor(() => {
-      expect(existsSync(swept) && readFileSync(swept, "utf8")).toBe(`${root}\n`);
+      expect(readFileSync(swept, "utf8")).toBe(`${root}\n`);
     });
   });
 });

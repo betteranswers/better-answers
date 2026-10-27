@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, assert, describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
@@ -126,6 +126,9 @@ const rootScriptCommands = (): readonly (readonly [string, string])[] =>
     proof.kind === "root-script" ? [[name, proof.script] as const] : [],
   );
 
+const runReachedFrom = (commandLine: string, via: string | undefined): string =>
+  via === undefined ? runOf(commandLine) : reachedFrom(via, runOf(commandLine));
+
 const TSCONFIG = JSON.stringify({
   compilerOptions: {
     strict: true,
@@ -168,7 +171,7 @@ describe("the pre-commit hook", () => {
   it.each(npmCommands())(
     "runs `%s` from a binary this repository's own packages declare",
     (commandLine, packageName, binaryName, via) => {
-      const naming = via === undefined ? runOf(commandLine) : reachedFrom(via, runOf(commandLine));
+      const naming = runReachedFrom(commandLine, via);
       expect(naming).toContain(binaryName);
       expect(existsSync(declaredBinary(packageName, binaryName))).toBe(true);
     },
@@ -184,7 +187,9 @@ describe("the pre-commit hook", () => {
   it.each(rootScriptCommands())(
     "runs `%s` as the root script %s runs it",
     (commandLine, script) => {
-      expect(runOf(commandLine)).toBe(`${rootScripts()[script] ?? ""} {staged_files}`);
+      const rootCommand = rootScripts()[script];
+      assert(rootCommand !== undefined, `${script} is a root script`);
+      expect(runOf(commandLine)).toBe(`${rootCommand} {staged_files}`);
     },
   );
 
@@ -226,8 +231,8 @@ describe("the pre-push gates", () => {
 
   it("runs `format:check` once, though both scripts name it", () => {
     for (const script of PUSHED_SCRIPTS) expect(stepsOf(script)).toContain("format:check");
-    const runs = Object.values(pushCommands()).map((one) => one.run ?? "");
-    expect(runs.filter((run) => run.includes("pnpm run format:check"))).toHaveLength(1);
+    const runs = Object.values(pushCommands()).map((one) => one.run);
+    expect(runs.filter((run) => run?.includes("pnpm run format:check") === true)).toHaveLength(1);
   });
 });
 

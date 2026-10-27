@@ -13,7 +13,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterAll, describe, expect, it, onTestFinished } from "vitest";
+import { afterAll, assert, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
@@ -155,6 +155,10 @@ const isAlive = (pid: number): boolean => {
   }
 };
 
+const killIfAlive = (pid: number): void => {
+  if (isAlive(pid)) process.kill(pid, "SIGKILL");
+};
+
 const goneWithin = async (pid: number, ms: number): Promise<boolean> => {
   const deadline = Date.now() + ms;
   while (isAlive(pid)) {
@@ -217,7 +221,7 @@ describe("the mutant probe over a throwaway workspace", () => {
     );
     const worker = Number(readFileSync(path.join(root, "worker.pid"), "utf8"));
     onTestFinished(() => {
-      if (isAlive(worker)) process.kill(worker, "SIGKILL");
+      killIfAlive(worker);
     });
 
     expect(run.stdout).toContain("verdict: timed out");
@@ -268,13 +272,14 @@ describe("the mutant probe over a throwaway workspace", () => {
       child.on("exit", (code) => resolve(code));
     });
 
-    const deadline = Date.now() + 30_000;
-    while (!readFileSync(file, "utf8").includes("n - 1") || !stderr.includes("RUN")) {
-      if (Date.now() > deadline) {
-        throw new Error(`the mutation never reached the disk:\n${stdout}\n${stderr}`);
-      }
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+    await vi.waitFor(
+      () => {
+        const said = `the mutation never reached the disk:\n${stdout}\n${stderr}`;
+        assert(readFileSync(file, "utf8").includes("n - 1"), said);
+        assert(stderr.includes("RUN"), said);
+      },
+      { timeout: 30_000, interval: 100 },
+    );
     await new Promise((resolve) => setTimeout(resolve, 2_000));
     child.kill("SIGINT");
     const status = await exit;
