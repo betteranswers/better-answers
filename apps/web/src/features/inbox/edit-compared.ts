@@ -10,7 +10,7 @@ export type Compared = {
 const paragraphsOf = (body: string): readonly string[] =>
   body
     .replaceAll("\r\n", "\n")
-    .split(/\n[ \t]*\n/)
+    .split(/\n[ \t]*\n/u)
     .map((paragraph) => paragraph.trim())
     .filter((paragraph) => paragraph !== "");
 

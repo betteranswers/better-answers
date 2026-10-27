@@ -8,7 +8,7 @@ export const selectTheCode = (fieldId: string) => {
 };
 
 export const digitsOf = (entered: string, length = EMAIL_CODE_LENGTH): string =>
-  entered.normalize("NFKC").replaceAll(/\D/g, "").slice(0, length);
+  entered.normalize("NFKC").replaceAll(/\D/gu, "").slice(0, length);
 
 export const worthSending = (
   code: string,

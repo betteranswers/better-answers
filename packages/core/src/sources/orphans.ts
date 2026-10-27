@@ -40,7 +40,7 @@ export const ORPHANED_UPLOAD_GRACE_HOURS = 24;
 
 const AN_HOUR_MS = 60 * 60 * 1000;
 
-const AN_ORIGINAL = /^uploads\/([^/]+)\/(?:([^/]+)\/)?original$/;
+const AN_ORIGINAL = /^uploads\/([^/]+)\/(?:([^/]+)\/)?original$/u;
 
 const NAMED_ORIGINALS = `SELECT original_key FROM source_document
     WHERE workspace_id = $1 AND original_key IS NOT NULL`;

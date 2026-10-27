@@ -7,7 +7,7 @@ const USAGE = "usage: reap-containers [--dry-run]";
 const SESSION_LABEL = "org.testcontainers.session-id";
 const RYUK_LABEL = "org.testcontainers.ryuk";
 
-const RYUK_NAME = /^testcontainers-ryuk-(?<session>.+)$/;
+const RYUK_NAME = /^testcontainers-ryuk-(?<session>.+)$/u;
 
 const STOPPED = new Set(["exited", "dead"]);
 
@@ -74,7 +74,7 @@ const described = (row: Listed): string =>
 
 const removeOrComplain = (row: Listed): boolean => {
   const ran = spawnSync("docker", ["rm", "--force", "--volumes", row.id], { encoding: "utf8" });
-  if (ran.status === 0 || /No such container/i.test(ran.stderr)) {
+  if (ran.status === 0 || /No such container/iu.test(ran.stderr)) {
     say(`removed ${described(row)}`);
     return true;
   }

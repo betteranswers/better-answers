@@ -12,7 +12,7 @@ const WINDOW_TOKENS: ReadonlyMap<string, number> = new Map([
 
 const BYTES_PER_TOKEN = 3;
 
-const WORKERS_AI_KEY = /^[0-9a-f]{32}:[A-Za-z0-9_-]+$/;
+const WORKERS_AI_KEY = /^[0-9a-f]{32}:[A-Za-z0-9_-]+$/u;
 
 export const isWorkersAiKey = (key: string): boolean => WORKERS_AI_KEY.test(key);
 

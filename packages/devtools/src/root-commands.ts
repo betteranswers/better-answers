@@ -12,7 +12,7 @@ export const rootScripts = (): Readonly<Record<string, string>> =>
     .scripts;
 
 const scriptWords = (name: string): readonly string[] =>
-  (rootScripts()[name] ?? "").split(/\s+/).filter((word) => word !== "");
+  (rootScripts()[name] ?? "").split(/\s+/u).filter((word) => word !== "");
 
 const provableCommand = (name: string): readonly string[] => {
   const words = scriptWords(name);
@@ -48,10 +48,12 @@ const manifestOf = (directory: string): WorkspaceManifest =>
 export const workspacesGated = (): readonly string[] =>
   workspacePackages().filter((directory) => manifestOf(directory).scripts?.["check"] !== undefined);
 
-const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<gates>[\s\S]+)$/;
+const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<gates>[\s\S]+)$/u;
 
 const stepsNamed = (command: string): readonly string[] =>
-  (RUNNER.exec(command.trim())?.groups?.["gates"] ?? "").split(/\s+/).filter((gate) => gate !== "");
+  (RUNNER.exec(command.trim())?.groups?.["gates"] ?? "")
+    .split(/\s+/u)
+    .filter((gate) => gate !== "");
 
 const expand = (command: string, seen: readonly string[]): readonly string[] =>
   stepsNamed(command).flatMap((gate) => {
@@ -63,7 +65,7 @@ const expand = (command: string, seen: readonly string[]): readonly string[] =>
 
 export const gatesNamed = (command: string): readonly string[] => expand(command, []);
 
-const SCRIPT_RUN = /^pnpm\s+(?<script>[\w:@./-]+)$/;
+const SCRIPT_RUN = /^pnpm\s+(?<script>[\w:@./-]+)$/u;
 
 export const gatesUnder = (command: string): readonly string[] => {
   const script = SCRIPT_RUN.exec(command.trim())?.groups?.["script"];
@@ -73,10 +75,10 @@ export const gatesUnder = (command: string): readonly string[] => {
   return named.length === 0 ? [script] : named;
 };
 
-const FILTERED = /--filter\s+(?<workspace>\S+)/g;
-const ENTERED = /\bcd\s+(?<directory>[\w./-]+)/g;
+const FILTERED = /--filter\s+(?<workspace>\S+)/gu;
+const ENTERED = /\bcd\s+(?<directory>[\w./-]+)/gu;
 
-const RUNS_A_WHOLE_CHECK = /\bcheck$/;
+const RUNS_A_WHOLE_CHECK = /\bcheck$/u;
 
 export const workspacesChecked = (command: string): readonly string[] => {
   if (!RUNS_A_WHOLE_CHECK.test(command.trim())) return [];

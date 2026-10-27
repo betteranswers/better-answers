@@ -66,11 +66,11 @@ export const HOSTNAME_SURFACES: readonly HostnameSurface[] = [
 
 export const HOSTNAME_REFUSAL = "This address does not serve that path.";
 
-const HOSTNAME_LABEL = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i;
+const HOSTNAME_LABEL = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/u;
 
-const withoutRootDot = (hostname: string): string => hostname.replace(/\.$/, "");
+const withoutRootDot = (hostname: string): string => hostname.replace(/\.$/u, "");
 
-const bareForm = (hostname: string): string => withoutRootDot(hostname.replace(/^\[|\]$/g, ""));
+const bareForm = (hostname: string): string => withoutRootDot(hostname.replace(/^\[|\]$/gu, ""));
 
 export const hostnameOfUrl = (url: string): string => bareForm(new URL(url).hostname);
 
@@ -81,7 +81,7 @@ export const originOfUrl = (url: string): string => {
 };
 
 export const hostIsAsWritten = (url: string): boolean => {
-  const authority = url.slice(url.indexOf("://") + 3).split(/[/?#]/)[0] ?? "";
+  const authority = url.slice(url.indexOf("://") + 3).split(/[/?#]/u)[0] ?? "";
 
   const written = authority.startsWith("[")
     ? authority.slice(0, authority.indexOf("]") + 1)

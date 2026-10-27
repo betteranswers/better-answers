@@ -121,7 +121,7 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
           agent: false,
           headers,
           method: webRequest.method,
-          servername: isIP(url.hostname.replace(/^\[|\]$/g, "")) === 0 ? url.hostname : undefined,
+          servername: isIP(url.hostname.replace(/^\[|\]$/gu, "")) === 0 ? url.hostname : undefined,
           signal,
           lookup: (_hostname, lookupOptions, callback) => {
             if (lookupOptions.all === true) {

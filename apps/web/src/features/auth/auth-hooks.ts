@@ -70,7 +70,7 @@ export const useWorkspacesHeld = (
 const wholeSeconds = z
   .string()
   .trim()
-  .regex(/^\d+$/)
+  .regex(/^\d+$/u)
   .transform((seconds) => Number(seconds));
 
 const waitNamedBy = (response: Response): number | undefined =>
@@ -233,7 +233,7 @@ const signInEmailOtpOptions = () =>
 
 export const useSignInEmailOtp = () => useMutation(signInEmailOtpOptions());
 
-const LINK_TOKEN = /^#([A-Za-z0-9]{1,128})$/;
+const LINK_TOKEN = /^#([A-Za-z0-9]{1,128})$/u;
 
 export const linkTokenOnThisPage = (): string | undefined =>
   LINK_TOKEN.exec(globalThis.location.hash)?.[1];

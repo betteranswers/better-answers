@@ -58,7 +58,7 @@ export {
   type CitedSource,
 } from "./concept-file.ts";
 
-export const GIT_SHA = /^[0-9a-f]{40}$/;
+export const GIT_SHA = /^[0-9a-f]{40}$/u;
 
 type SourceEntry = Readonly<Record<string, string | number | boolean | null>>;
 
@@ -128,13 +128,13 @@ export const resolvedResource = (resource: string, from: string): string => {
   return `/${segments.join("/")}`;
 };
 
-export const CONCEPT_PATH = /^knowledge\/(?!.*\/\.{1,2}\/)(?!\.{1,2}\/)[^/\s][^\s]*\.md$/;
+export const CONCEPT_PATH = /^knowledge\/(?!.*\/\.{1,2}\/)(?!\.{1,2}\/)[^/\s][^\s]*\.md$/u;
 
 export const PUBLISHED_STATUSES = ["stable", "deprecated"] as const;
 
 export const CONCEPT_STABLE_STATUS = "stable" satisfies (typeof PUBLISHED_STATUSES)[number];
 
-export const CONTENT_HASH = /^[0-9a-f]{64}$/;
+export const CONTENT_HASH = /^[0-9a-f]{64}$/u;
 
 /**
  * No CHECK over the stored jsonb: Postgres renders a numeric in full, so a bound there would
@@ -218,7 +218,7 @@ const CONCEPT_SEARCH = [
 export const collectionOf = (path: string): string =>
   `substring(${path} from '^knowledge/([^/]+)/')`;
 
-export const COLLECTION = /^(?!\.{1,2}$)[^/\s]+$/;
+export const COLLECTION = /^(?!\.{1,2}$)[^/\s]+$/u;
 
 export const conceptIndex = withRLS(
   "concept_index",

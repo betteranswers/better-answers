@@ -30,8 +30,8 @@ const PAGE_SIZE = 100;
 const MOST_PAGES = 1000;
 const REQUEST_TIMEOUT_MS = 30_000;
 
-const DIGEST = /^sha256:[0-9a-f]{64}$/;
-const NAME = /^[a-z0-9][a-z0-9._-]*$/;
+const DIGEST = /^sha256:[0-9a-f]{64}$/u;
+const NAME = /^[a-z0-9][a-z0-9._-]*$/u;
 
 const KEPT = {
   image: "an image (`sha-` tag)",

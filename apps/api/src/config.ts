@@ -29,7 +29,7 @@ const bootstrapSchema = z.object({
 });
 
 const httpsOrigin = z
-  .url({ protocol: /^https$/ })
+  .url({ protocol: /^https$/u })
   .refine((value) => {
     const url = new URL(value);
     return (
@@ -60,7 +60,7 @@ const identityBootstrapSchema = z
     AGENT_HOSTNAME: bareHostname,
     APEX_HOSTNAME: bareHostname,
 
-    SMTP_URL: z.url({ protocol: /^smtps?$/ }).optional(),
+    SMTP_URL: z.url({ protocol: /^smtps?$/u }).optional(),
   })
   .refine((parsed) => {
     const hostnames = [
@@ -72,7 +72,7 @@ const identityBootstrapSchema = z
   }, "the three hostnames must differ, the derived `app.` one included: two the same hands one hostname's surface to the other, which is the fence this configuration exists to raise");
 
 const objectStoreSchema = z.object({
-  S3_ENDPOINT: z.url({ protocol: /^https?$/ }),
+  S3_ENDPOINT: z.url({ protocol: /^https?$/u }),
   S3_BUCKET: z.string().min(1),
   S3_REGION: z.string().min(1),
   S3_ACCESS_KEY: z.string().min(1),
@@ -81,7 +81,7 @@ const objectStoreSchema = z.object({
 
 /** fetch refuses a URL with credentials in an error that quotes it whole, and that error is logged. */
 const deadManPingUrl = z
-  .url({ protocol: /^https?$/, abort: true })
+  .url({ protocol: /^https?$/u, abort: true })
   .refine((value) => {
     const url = new URL(value);
     return url.username === "" && url.password === "";
@@ -100,12 +100,12 @@ const headCheckSchema = z.object({
 const runningImageSchema = z.object({
   API_IMAGE_DIGEST: z
     .string()
-    .regex(/^sha256:[0-9a-f]{64}$/, "must be a digest: sha256: followed by 64 hex characters")
+    .regex(/^sha256:[0-9a-f]{64}$/u, "must be a digest: sha256: followed by 64 hex characters")
     .optional(),
 });
 
 const envelopeKeySchema = z.object({
-  KEK: z.string().regex(new RegExp(`^[0-9a-fA-F]{${String(ENVELOPE_KEY_BYTES * 2)}}$`)),
+  KEK: z.string().regex(new RegExp(`^[0-9a-fA-F]{${String(ENVELOPE_KEY_BYTES * 2)}}$`, "u")),
 });
 
 const NO_ENVELOPE_KEY = `KEK must be set to the envelope key: ${String(ENVELOPE_KEY_BYTES * 2)} hexadecimal characters, its ${String(ENVELOPE_KEY_BYTES)} bytes`;

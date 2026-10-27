@@ -8,9 +8,9 @@ import {
 
 import { parsedSource } from "./parsed-source.ts";
 
-const REFUSAL_TYPE = /Refusal$/;
+const REFUSAL_TYPE = /Refusal$/u;
 
-const TAKES_CLASSES = /OfClass$/;
+const TAKES_CLASSES = /OfClass$/u;
 
 export type UnionWord = { readonly word: string; readonly line: number };
 

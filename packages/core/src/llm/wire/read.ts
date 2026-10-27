@@ -31,4 +31,4 @@ export const jsonAs = <T>(shape: z.ZodType<T>, text: string): T | undefined => {
 const SECOND_MS = 1000;
 
 export const retryAfterMsOf = (header: string | null): number | undefined =>
-  /^\d+$/.test(header ?? "") ? Number(header) * SECOND_MS : undefined;
+  /^\d+$/u.test(header ?? "") ? Number(header) * SECOND_MS : undefined;

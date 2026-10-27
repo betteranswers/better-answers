@@ -39,7 +39,7 @@ const mintGroup = (): string =>
 export const mintOneTimeCode = (): string =>
   Array.from({ length: GROUPS_IN_A_CODE }, mintGroup).join("-");
 
-const asMinted = (typed: string): string => typed.toLowerCase().replaceAll(/[\s-]/g, "");
+const asMinted = (typed: string): string => typed.toLowerCase().replaceAll(/[\s-]/gu, "");
 
 const hashOf = (code: string): string => createHash("sha256").update(code).digest("hex");
 

@@ -218,7 +218,7 @@ const pathsIn = (output: string): readonly string[] =>
     ...new Set(
       output
         .split("\n")
-        .map((line) => /^(?<file>[^\s:]+):\d+:\d+:/.exec(line)?.groups?.["file"])
+        .map((line) => /^(?<file>[^\s:]+):\d+:\d+:/u.exec(line)?.groups?.["file"])
         .filter((file): file is string => file !== undefined),
     ),
   ].sort(byCodeUnit);

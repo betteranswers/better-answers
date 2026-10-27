@@ -129,8 +129,8 @@ const trustStatusOf = (concept: Trusted, now: Date): TrustStatus => {
     : "current";
 };
 
-const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
-const OFFSET_DATETIME = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/u;
+const OFFSET_DATETIME = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/u;
 
 const utcMidnight = (year: number, month: number, day: number): number | undefined => {
   const at = new Date(0);

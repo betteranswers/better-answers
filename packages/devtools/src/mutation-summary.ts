@@ -101,7 +101,7 @@ const scored = (mutant: ReportMutant): boolean =>
   killed(mutant) || mutant.status === "Survived" || mutant.status === "NoCoverage";
 
 const oneLine = (replacement: string): string => {
-  const flat = replacement.replaceAll(/\s*\n\s*/g, " ");
+  const flat = replacement.replaceAll(/\s*\n\s*/gu, " ");
   return flat.length > MAX_REPLACEMENT ? `${flat.slice(0, MAX_REPLACEMENT - 1)}…` : flat;
 };
 

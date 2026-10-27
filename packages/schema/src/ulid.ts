@@ -5,7 +5,7 @@ const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 export const ULID_CHARACTERS = "[0-9A-HJKMNP-TV-Z]{26}";
 export const ULID_PATTERN = `^${ULID_CHARACTERS}$`;
 
-export const ULID = new RegExp(ULID_PATTERN);
+export const ULID = new RegExp(ULID_PATTERN, "u");
 
 export const WELL_FORMED_ULID = z.string().regex(ULID).brand<"Ulid">();
 

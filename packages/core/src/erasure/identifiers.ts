@@ -45,7 +45,7 @@ const ASSIGNED_AFTER_UNICODE_15_1 = `
 
 const UNKNOWN_TO_UNICODE_15_1 = new Set(
   ASSIGNED_AFTER_UNICODE_15_1.trim()
-    .split(/\s+/)
+    .split(/\s+/u)
     .flatMap((range) => {
       const [from = 0, to = from] = range.split("-").map((point) => Number.parseInt(point, 16));
       return Array.from({ length: to - from + 1 }, (_, at) => from + at);

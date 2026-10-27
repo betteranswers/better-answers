@@ -40,7 +40,7 @@ export type DisplayNameRefusal = WorkspaceRefusal<
  * Trimming leaves U+0085, so it is named here. No `u` flag: the mutation run negates `\v` to
  * `\V`, which `u` refuses at load.
  */
-const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/;
+const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/u;
 
 const CONTROL_CHARACTER = /\p{Cc}/u;
 

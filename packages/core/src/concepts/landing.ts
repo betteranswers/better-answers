@@ -35,7 +35,7 @@ import { markDeciding } from "./suggestions.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
 
 export const mergeKeyOf = (foldedKind: string, title: string): string =>
-  `${foldedKind}:${title.trim().replaceAll(/\s+/g, " ").toLowerCase()}`;
+  `${foldedKind}:${title.trim().replaceAll(/\s+/gu, " ").toLowerCase()}`;
 
 const conceptRow = boundarySchemas.conceptIndex.insert.omit({ commitSha: true });
 

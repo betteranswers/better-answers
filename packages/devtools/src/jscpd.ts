@@ -37,7 +37,8 @@ export const jscpdArgv = (config: JscpdConfig): readonly string[] => [
 
 type Clone = { readonly left: string; readonly right: string };
 
-const CLONE = /^\s*- (?<left>\S+) \[\d+:\d+ - \d+:\d+].*\n\s*(?<right>\S+) \[\d+:\d+ - \d+:\d+]/gm;
+const CLONE =
+  /^\s*- (?<left>\S+) \[\d+:\d+ - \d+:\d+\].*\n\s*(?<right>\S+) \[\d+:\d+ - \d+:\d+\]/gmu;
 
 const clonesIn = (output: string): readonly Clone[] =>
   [...output.matchAll(CLONE)].map(({ groups }) => ({

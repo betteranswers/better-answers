@@ -12,7 +12,7 @@ export const parsedSource = (file: string, source: string): ParsedSource => {
   const parsed = parseSync(file, source);
   const [first] = parsed.errors;
   if (first !== undefined) throw new Error(`${file} does not parse: ${first.message}`);
-  const starts = [0, ...[...source.matchAll(/\n/g)].map((match) => match.index + 1)];
+  const starts = [0, ...[...source.matchAll(/\n/gu)].map((match) => match.index + 1)];
   return {
     program: parsed.program,
     comments: parsed.comments,

@@ -9,7 +9,7 @@ export const FAMILIES = ["people", "knowledge", "sources", "platform"] as const;
 
 export const ACTION_PATTERN = `^(${FAMILIES.join("|")})\\.[a-z][a-z_]*\\.[a-z][a-z_]*$`;
 
-export const ACTION = new RegExp(ACTION_PATTERN);
+export const ACTION = new RegExp(ACTION_PATTERN, "u");
 
 const familyList = listed(FAMILIES);
 

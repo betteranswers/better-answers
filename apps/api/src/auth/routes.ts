@@ -90,7 +90,7 @@ const sessionNamed = z.object({ session: z.object({ id: z.string() }) });
 
 const carry = (url: string): string => new URL(url).search;
 
-const oauthQuery = (url: string): string => new URL(url).search.replace(/^\?/, "");
+const oauthQuery = (url: string): string => new URL(url).search.replace(/^\?/u, "");
 
 const hostnameOf = (url: string): string => URL.parse(url)?.hostname ?? "an unknown address";
 
@@ -267,7 +267,7 @@ const bindTheLink =
     });
   };
 
-const linkToken = z.object({ token: z.string().regex(/^[A-Za-z0-9]{1,128}$/) });
+const linkToken = z.object({ token: z.string().regex(/^[A-Za-z0-9]{1,128}$/u) });
 
 const tokenOf = async (request: Request): Promise<string | undefined> => {
   const read = await attempt(() => request.json());

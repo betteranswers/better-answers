@@ -149,12 +149,12 @@ const evidenceItem = z.object({
   source: z.string(),
   at: z
     .string()
-    .regex(/\S/)
+    .regex(/\S/u)
     .exactOptional()
     .describe("The concept's own place in the source, such as a page; it opens nothing."),
   locator: z
     .string()
-    .regex(/\S/)
+    .regex(/\S/u)
     .exactOptional()
     .describe("What opens the passage; absent where there is none you may read."),
   iri: z

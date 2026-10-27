@@ -19,19 +19,19 @@ export const isAsciiWhitespace = (ch: string): boolean => ASCII_WHITESPACE.inclu
 
 export const collapsedWhitespace = (text: string): string =>
   text
-    .split(/[ \t\n\r\f\v]+/)
+    .split(/[ \t\n\r\f\v]+/u)
     .filter((word) => word !== "")
     .join(" ");
 
 export const autolinkEndsOf = (text: string): Int32Array =>
   nextStopsOf(text, (ch) => ch === ">" || isAsciiWhitespace(ch));
 
-const SCHEME = /[A-Za-z0-9+.-]/;
+const SCHEME = /[A-Za-z0-9+.-]/u;
 
-export const SCHEMED = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+export const SCHEMED = /^[A-Za-z][A-Za-z0-9+.-]*:/u;
 
 const colonAfter = (text: string, at: number): number | undefined => {
-  if (!/[A-Za-z]/.test(text[at + 1] ?? "")) return undefined;
+  if (!/[A-Za-z]/u.test(text[at + 1] ?? "")) return undefined;
   let scheme = at + 2;
   while (scheme < text.length && SCHEME.test(text[scheme] ?? "")) scheme += 1;
   return text[scheme] === ":" ? scheme : undefined;

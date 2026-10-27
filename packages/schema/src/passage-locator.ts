@@ -4,11 +4,11 @@ const SPAN_PREFIX = "chars:";
 const SPAN_SEPARATOR = "-";
 const PATH_SEPARATOR = "/";
 
-const OFFSET = /^(?:0|[1-9][0-9]*)$/;
+const OFFSET = /^(?:0|[1-9][0-9]*)$/u;
 
 const WRITTEN_LOCATOR = new RegExp(
   `(?<![0-9A-Z])${ULID_CHARACTERS}${PATH_SEPARATOR}${SPAN_PREFIX}[0-9]+${SPAN_SEPARATOR}[0-9]+`,
-  "g",
+  "gu",
 );
 
 export type PassageLocator = {

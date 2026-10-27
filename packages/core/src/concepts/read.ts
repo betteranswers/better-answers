@@ -137,7 +137,7 @@ const openingNamed = (
 const opensFor = (doors: Doors, opening: Opening): Promise<Result<boolean>> =>
   "locator" in opening ? readsPassage(doors, opening.locator) : readsConcept(doors, opening.iri);
 
-const NAMES_A_DOCUMENT = new RegExp(ULID_CHARACTERS, "i");
+const NAMES_A_DOCUMENT = new RegExp(ULID_CHARACTERS, "iu");
 
 const placeOf = (doors: Doors, locator: string | null): string | undefined =>
   locator === null ||

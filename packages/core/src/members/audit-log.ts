@@ -136,7 +136,7 @@ const wordsOfAction = (name: string): string =>
   name.split(".").slice(1).join(" ").replaceAll("_", " ");
 
 const actionsWorded = (search: string): readonly string[] => {
-  const words = search.toLowerCase().split(/\s+/).join(" ");
+  const words = search.toLowerCase().split(/\s+/u).join(" ");
   return STORED_ACT_NAMES.filter(
     (name) =>
       wordsOfAction(name).includes(words) || ACTION_HEADLINES[name].toLowerCase().includes(words),

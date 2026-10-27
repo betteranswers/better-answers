@@ -3,9 +3,9 @@ import type { Node } from "@oxlint/plugins";
 
 import { citationIn } from "../../src/citations.ts";
 
-const A_SPACE = /\s/;
+const A_SPACE = /\s/u;
 
-const A_TEST_PATH = /(?:^|\/)(?:tests?|e2e)\/|\.test\.[cm]?tsx?$/;
+const A_TEST_PATH = /(?:^|\/)(?:tests?|e2e)\/|\.test\.[cm]?tsx?$/u;
 
 const readsAsATest = (filename: string): boolean =>
   A_TEST_PATH.test(filename.replaceAll("\\", "/"));

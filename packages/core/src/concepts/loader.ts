@@ -179,7 +179,7 @@ const verifiedEventsOf = (
   return ok(events);
 };
 
-const INLINE_LINK = /\]\(\s*<?([^)\s>]+)/g;
+const INLINE_LINK = /\]\(\s*<?([^)\s>]+)/gu;
 
 type RelativeLink = {
   readonly at: number;

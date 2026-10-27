@@ -74,7 +74,7 @@ export const waitsOnTheRestoreCode = (held: SecondFactorHeld): boolean =>
   held.restoreRequired && !mayReplace(held);
 
 export const codeAsked = z.object({
-  code: z.string().regex(new RegExp(`^\\d{${String(AUTHENTICATOR_CODE_LENGTH)}}$`)),
+  code: z.string().regex(new RegExp(`^\\d{${String(AUTHENTICATOR_CODE_LENGTH)}}$`, "u")),
 });
 
 export const finishedWith = (

@@ -7,7 +7,7 @@ export const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 
 const TEST_DIRECTORIES: ReadonlySet<string> = new Set(["e2e", "test", "tests"]);
 
-const TEST_FILE = /(^test_|[._](test|spec)\.)/;
+const TEST_FILE = /(^test_|[._](test|spec)\.)/u;
 
 const NEVER_WALKED: ReadonlySet<string> = new Set([
   ".git",
@@ -46,7 +46,7 @@ export const isTestPath = (file: string): boolean => {
   return segments.some((segment) => TEST_DIRECTORIES.has(segment)) || TEST_FILE.test(name);
 };
 
-const PACKAGES_BLOCK = /^packages:\n((?:[ \t]*-[ \t]+\S+[ \t]*\n)+)/m;
+const PACKAGES_BLOCK = /^packages:\n((?:[ \t]*-[ \t]+\S+[ \t]*\n)+)/mu;
 
 export const workspacePackages = (): readonly string[] => {
   const file = readFileSync(path.join(repositoryRoot, "pnpm-workspace.yaml"), "utf8");
@@ -57,9 +57,9 @@ export const workspacePackages = (): readonly string[] => {
     .split("\n")
     .map((line) =>
       line
-        .replace(/^[ \t]*-[ \t]+/, "")
+        .replace(/^[ \t]*-[ \t]+/u, "")
         .trim()
-        .replace(/^["']|["']$/g, ""),
+        .replace(/^["']|["']$/gu, ""),
     )
     .filter((entry) => entry.length > 0);
 

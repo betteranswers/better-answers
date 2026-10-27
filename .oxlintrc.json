@@ -108,6 +108,7 @@
       }
     ],
     "typescript/prefer-ts-expect-error": "error",
+    "eslint/require-unicode-regexp": "error",
     "eslint/no-warning-comments": ["error", { "decoration": ["*"] }],
     "unicorn/no-abusive-eslint-disable": "error",
     "oxc/no-async-await": "off",

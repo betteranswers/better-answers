@@ -210,7 +210,7 @@ const headOf = async (gitDir: string): Promise<string | null> => {
   return standing.ok ? standing.value : null;
 };
 
-const isSubjectLine = (message: string): boolean => message.length > 0 && !/[\r\n]/.test(message);
+const isSubjectLine = (message: string): boolean => message.length > 0 && !/[\r\n]/u.test(message);
 
 const trailerLines = (trailers: CommitTrailers): readonly string[] | undefined => {
   const named: readonly (readonly [string, string | undefined])[] = [
@@ -281,7 +281,7 @@ const meetsExpectedHead = (
 
 const commitFailure = (cause: unknown): "stale-precondition" | Error => {
   const message = cause instanceof Error ? cause.message : String(cause);
-  if (/cannot lock ref|reference already exists|but expected/i.test(message)) {
+  if (/cannot lock ref|reference already exists|but expected/iu.test(message)) {
     return "stale-precondition";
   }
   return cause instanceof Error ? cause : new Error(message);
@@ -490,7 +490,7 @@ export type CommitRead = {
   readonly change: { readonly path: string; readonly content: string } | undefined;
 };
 
-const TRAILER_LINE = /^([A-Za-z][A-Za-z-]*): (.+)$/;
+const TRAILER_LINE = /^([A-Za-z][A-Za-z-]*): (.+)$/u;
 
 const trailersOf = (message: string) => {
   const block = message.trimEnd().split("\n\n").at(-1) ?? "";
@@ -607,7 +607,7 @@ const NOTHING_MOVED: HistoryRewritten = { moved: [], paths: [] };
 
 export const ERASED_DOMAIN = "erased.better-answers.invalid";
 
-const PYTHON_SPECIAL = /[()[\]{}?*+\-|^$\\.&~# \t\n\r\v\f]/g;
+const PYTHON_SPECIAL = /[()[\]{}?*+\-|^$\\.&~# \t\n\r\v\f]/gu;
 
 const escapedForPython = (literal: string): string =>
   literal.replace(PYTHON_SPECIAL, (character) => `\\${character}`);
@@ -672,7 +672,7 @@ const filterRepo = async (gitDir: string, arguments_: readonly string[]): Promis
 
 const DROPPED = "0".repeat(40);
 
-const COMMIT_MAP_LINE = /^([0-9a-f]{40})\s+([0-9a-f]{40})$/;
+const COMMIT_MAP_LINE = /^([0-9a-f]{40})\s+([0-9a-f]{40})$/u;
 
 const commitMapPairs = (mapped: string): readonly (readonly [string, string])[] =>
   mapped.split("\n").flatMap((line) => {

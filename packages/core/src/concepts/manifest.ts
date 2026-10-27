@@ -35,7 +35,7 @@ const renderBundleManifest = (manifest: BundleManifest): string =>
 
 export const parseBundleManifest = (content: string): Result<BundleManifest, "malformed"> => {
   const pairs = new Map<string, FrontmatterSource[string]>();
-  for (const line of content.replace(/\n$/, "").split("\n")) {
+  for (const line of content.replace(/\n$/u, "").split("\n")) {
     const pair = scalarPairOf(line);
     if (pair === undefined || pairs.has(pair.key)) return err("malformed");
     pairs.set(pair.key, pair.value);

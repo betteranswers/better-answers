@@ -15,7 +15,7 @@ export type SpaServing = {
   readonly shell: (context: Context<Env, string>) => Promise<Response | undefined>;
 };
 
-const asksForAFile = (path: string): boolean => /\.[^./]+$/.test(path);
+const asksForAFile = (path: string): boolean => /\.[^./]+$/u.test(path);
 
 const asksForADocument = (accept: string | undefined): boolean =>
   accept !== undefined && accept.includes("text/html");

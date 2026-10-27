@@ -554,7 +554,7 @@ export const renderFind = (result: FindResult<string>): string => {
     : [...lines, "", `More follow: call find again with cursor ${result.nextCursor}`].join("\n");
 };
 
-const quoted = (text: string): readonly string[] => text.split(/\r?\n/).map((line) => `> ${line}`);
+const quoted = (text: string): readonly string[] => text.split(/\r?\n/u).map((line) => `> ${line}`);
 
 export const renderOpen = (result: OpenView<string>): string => {
   if (!result.found) {

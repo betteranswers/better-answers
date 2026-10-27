@@ -162,7 +162,7 @@ export type OpsIo = {
 };
 
 export const parseSince = (value: string): Date | undefined => {
-  const stamp = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(value);
+  const stamp = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/u.exec(value);
   const iso =
     stamp === null
       ? value
@@ -345,7 +345,7 @@ const smoke = async (flags: Flags, io: OpsIo): Promise<number> => {
     io.say("smoke: --url <origin> is required (http://127.0.0.1:3000 inside the stack)");
     return USAGE;
   }
-  const origin = url.replace(/\/$/, "");
+  const origin = url.replace(/\/$/u, "");
 
   const asApp: RequestInit =
     io.appHostname === undefined ? {} : { headers: { host: io.appHostname } };
@@ -408,7 +408,7 @@ const smoke = async (flags: Flags, io: OpsIo): Promise<number> => {
 
 const OUTSIDE_ANY_SECTION = "";
 
-const SECTION_OPENS = /^COPY\s+([^\s(]+)/;
+const SECTION_OPENS = /^COPY\s+([^\s(]+)/u;
 
 const maskToken = (token: string): string =>
   token.length > 8 ? `${token.slice(0, 4)}…${token.slice(-2)}` : token;
@@ -1405,7 +1405,7 @@ const setModelKeyCommand = async (
   const set = await setModelKey(BOOTSTRAP, doors.postgres, io.modelKeySetting.value, {
     workspaceId,
     provider,
-    key: typed.replace(/\r?\n$/, ""),
+    key: typed.replace(/\r?\n$/u, ""),
   });
   if (!set.ok) {
     io.say(`set-model-key: REFUSED — ${modelKeyReason(set.error, workspaceId)}`);

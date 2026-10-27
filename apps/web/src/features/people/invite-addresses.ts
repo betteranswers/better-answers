@@ -2,7 +2,7 @@ import { EMAIL_ADDRESS } from "@better-answers/schema/email-address";
 
 export const MOST_AT_ONCE = 50;
 
-const SEPARATORS = /[,;\r\n]+/;
+const SEPARATORS = /[,;\r\n]+/u;
 
 export type Flag = "malformed" | "already-a-member";
 

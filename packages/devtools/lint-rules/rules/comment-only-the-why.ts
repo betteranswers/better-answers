@@ -8,9 +8,9 @@ import type { Block, Opened } from "../shared/comment-blocks.ts";
 const WORD_LIMIT = 25;
 
 const A_COUNT_OF_CALLERS =
-  /\b(?:two|three|four|five|six|seven|eight|nine|ten|both)\s+(?:other\s+)?(?:specs|callers|call\s+sites)\b/i;
+  /\b(?:two|three|four|five|six|seven|eight|nine|ten|both)\s+(?:other\s+)?(?:specs|callers|call\s+sites)\b/iu;
 
-const wordsIn = (prose: string): number => prose.match(/\S+/g)?.length ?? 0;
+const wordsIn = (prose: string): number => prose.match(/\S+/gu)?.length ?? 0;
 
 const reasonOf = (prose: string, opened: Opened): string | undefined => {
   const rest = prose.slice(opened.opening[0].length);
@@ -30,7 +30,7 @@ const findingIn = (prose: string, overLimit: "tooLong" | "reasonTooLong"): Findi
   if (cited !== undefined) return { messageId: "cites", data: { ...cited } };
   const counted = A_COUNT_OF_CALLERS.exec(prose);
   if (counted !== null)
-    return { messageId: "countsCallers", data: { counted: counted[0].replace(/\s+/g, " ") } };
+    return { messageId: "countsCallers", data: { counted: counted[0].replace(/\s+/gu, " ") } };
   const words = wordsIn(prose);
   return words > WORD_LIMIT
     ? { messageId: overLimit, data: { words, limit: WORD_LIMIT } }
