@@ -57,6 +57,22 @@ const confirmingByPasskey = (refusedCode: () => Promise<Response>) => {
   return asked;
 };
 
+const grantingByRecoveryCode = () => {
+  let granted = false;
+  adasApi(
+    () => (granted ? GRANTED : BOTH_HELD),
+    new Map([
+      [
+        "/second-factor/recovery",
+        () => {
+          granted = true;
+          return answering({ granted: true })();
+        },
+      ],
+    ]),
+  );
+};
+
 describe("the confirm page", () => {
   it("shows only its heading and Sign out while reading", async () => {
     readingForever();
@@ -171,19 +187,7 @@ describe("the confirm page", () => {
 
 describe("the recovery page", () => {
   it("goes to setup with the page's query once accepted", async () => {
-    let granted = false;
-    adasApi(
-      () => (granted ? GRANTED : BOTH_HELD),
-      new Map([
-        [
-          "/second-factor/recovery",
-          () => {
-            granted = true;
-            return answering({ granted: true })();
-          },
-        ],
-      ]),
-    );
+    grantingByRecoveryCode();
     const { router } = await openAsAda("/recovery?redirect=%2Fpeople%2Fmembers");
 
     const field = await screen.findByRole("textbox", { name: "Recovery Code" });

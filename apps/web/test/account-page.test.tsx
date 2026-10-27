@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
 import {
@@ -98,6 +98,18 @@ const adasApi =
     return answered(names.map((name) => answerTo(name, replace, read)));
   };
 
+/** Another tab made a set first: the replace is refused, and every read after it shows that set. */
+const anotherTabMadeASet = () => {
+  let refused = false;
+  return adasApi(
+    () => {
+      refused = true;
+      return HELD;
+    },
+    () => (refused ? A_SET : NO_SET),
+  );
+};
+
 /** The session is held before the page opens: the auth library's own read never settles here. */
 const makeCodesPressed = async () => {
   const clients = createAppClients();
@@ -150,7 +162,9 @@ describe("the Account page's passkeys", () => {
     const remove = await screen.findByRole("button", { name: "Remove" });
 
     expect(remove.getAttribute("aria-disabled")).toBe("true");
-    const reason = document.getElementById(remove.getAttribute("aria-describedby") ?? "");
+    const describedBy = remove.getAttribute("aria-describedby");
+    assert(describedBy !== null, "Remove is described by a reason");
+    const reason = document.getElementById(describedBy);
     expect(reason?.textContent).toBe(SAID_OF_SECOND_FACTOR["last-second-factor"]);
   });
 
@@ -236,17 +250,7 @@ describe("making a first set on the Account page", () => {
   });
 
   it("offers Replace once another tab made a set", async () => {
-    let refused = false;
-    vi.stubGlobal(
-      "fetch",
-      adasApi(
-        () => {
-          refused = true;
-          return HELD;
-        },
-        () => (refused ? A_SET : NO_SET),
-      ),
-    );
+    vi.stubGlobal("fetch", anotherTabMadeASet());
 
     await makeCodesPressed();
 

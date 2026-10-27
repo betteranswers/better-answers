@@ -21,6 +21,9 @@ function filesIn(directory: string): string[] {
 
 const read = (file: string): string => readFileSync(path.join(repositoryRoot, file), "utf8");
 
+const namesIn = (text: string, pattern: RegExp): string[] =>
+  [...text.matchAll(pattern)].map((match) => match.groups?.["name"] ?? "");
+
 const skillFiles = [
   `${skillDirectory}/SKILL.md`,
   ...filesIn(`${skillDirectory}/references`).filter((file) => file.endsWith(".md")),
@@ -53,8 +56,7 @@ describe("the browser-suite skill", () => {
 
   it("names every helper that two or more specs share", () => {
     const shared = modules.flatMap((module) =>
-      [...read(module).matchAll(EXPORTED_NAME)]
-        .map((match) => match.groups?.["name"] ?? "")
+      namesIn(read(module), EXPORTED_NAME)
         .filter(
           (name) => specs.filter((spec) => new RegExp(`\\b${name}\\b`).test(spec)).length >= 2,
         )
@@ -68,13 +70,11 @@ describe("the browser-suite skill", () => {
   });
 
   it("gives rows only to helpers the suite still exports", () => {
-    const exported = new Set(
-      modules.flatMap((module) =>
-        [...read(module).matchAll(EXPORTED_NAME)].map((match) => match.groups?.["name"] ?? ""),
-      ),
-    );
-    const rows = [...skill.matchAll(TABLE_ROW_NAME)].map((match) => match.groups?.["name"] ?? "");
-    const stale = rows.filter((name) => !exported.has(name) && !PLAYWRIGHT_FIXTURES.has(name));
+    const exported = new Set(modules.flatMap((module) => namesIn(read(module), EXPORTED_NAME)));
+    const rows = namesIn(skill, TABLE_ROW_NAME);
+    const stale = rows
+      .filter((name) => !exported.has(name))
+      .filter((name) => !PLAYWRIGHT_FIXTURES.has(name));
     expect(rows.length, "no table row was found, so the check holds nothing").toBeGreaterThan(0);
     expect(stale, `${skillDirectory} has rows for helpers the suite no longer exports`).toEqual([]);
   });

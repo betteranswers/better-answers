@@ -12,11 +12,14 @@ const said = (action: string, key: string): string => `${action} ${key}`;
 const keptOff = (action: (typeof DETAIL_KEYS)[number][0], key: string): boolean =>
   KEPT_OFF_DETAIL_KEYS[action]?.includes(key) ?? false;
 
+const accountedFor = ([action, key]: (typeof DETAIL_KEYS)[number]): boolean =>
+  LABELLED_DETAIL_KEYS.includes(key) || keptOff(action, key);
+
 describe("the audit log's detail labels", () => {
   it("cover every declared key, or keep it off the page", () => {
-    const unlabelled = DETAIL_KEYS.filter(
-      ([action, key]) => !LABELLED_DETAIL_KEYS.includes(key) && !keptOff(action, key),
-    ).map(([action, key]) => said(action, key));
+    const unlabelled = DETAIL_KEYS.filter((entry) => !accountedFor(entry)).map(([action, key]) =>
+      said(action, key),
+    );
 
     expect(
       unlabelled,

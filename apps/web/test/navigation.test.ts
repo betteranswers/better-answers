@@ -1,5 +1,5 @@
 import { cleanup, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
@@ -49,6 +49,12 @@ const builtThroughout = (area: Area): Area => ({
     pages: group.pages.map((each) => ({ ...each, built: true })),
   })),
 });
+
+const groupsFor = (role: Role, owns: Owns) =>
+  visibleTo(readerOf(role, owns), AREAS.map(builtThroughout)).areas.map((area) => [
+    area.name,
+    area.menuGroups.map((group) => group.name ?? null),
+  ]);
 
 const aPage = (name: string, built: boolean, owners?: Page["owners"]): Page => ({
   name,
@@ -153,7 +159,8 @@ describe("the one navigation list", () => {
 
   it("keeps group addresses at the root, the console's under /console", () => {
     const controlCentre = AREAS.find((area) => area.name === "Control Centre");
-    const strays = (controlCentre?.menuGroups ?? []).flatMap((group) =>
+    assert(controlCentre !== undefined, "the navigation lists Control Centre");
+    const strays = controlCentre.menuGroups.flatMap((group) =>
       group.pages.filter((each) => !each.path.startsWith(`/${group.id}`)).map((each) => each.path),
     );
 
@@ -354,11 +361,6 @@ describe("what each person is shown", () => {
   });
 
   it("declares who sees each group once its pages are built", () => {
-    const groupsFor = (role: Role, owns: Owns) =>
-      visibleTo(readerOf(role, owns), AREAS.map(builtThroughout)).areas.map((area) => [
-        area.name,
-        area.menuGroups.map((group) => group.name ?? null),
-      ]);
     const controlCentre = [
       "Overview",
       "Suggestions",
