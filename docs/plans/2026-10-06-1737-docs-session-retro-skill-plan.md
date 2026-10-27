@@ -87,7 +87,7 @@ A session that loses time leaves no record of why. The cause might be a file the
 
 - BA-60 in Linear. The evaluation is `.scratch/ce-evaluation-2026-10-06/worktree-retro.md` in the main checkout.
 - Upstream: https://github.com/mattpocock/skills, MIT, `skills/engineering/retro/SKILL.md` at commit `a7d038f6bf7f01b516408e95e2fb56e0b338fa6f` (blob `12149acf`), and its user page `docs/engineering/retro.md`. The copy on this machine is the older in-progress text at `6654f6b6`. The issue's link to `skills/in-progress/retro/` now returns 404.
-- `docs/agents/issue-tracker.md` sets the rule for a finding put off for later. `docs/solutions/architecture-patterns/adr-0045-coding-rule-is-one-imperative.md` says a rule nothing enforces becomes a ticket for a check.
+- `docs/agents/issue-tracker.md` sets the rule for a finding put off for later. `docs/solutions/architecture-patterns/adr-0045.md` says a rule nothing enforces becomes a ticket for a check.
 - The sibling skill `.claude/skills/survey-architecture/` (#590) is the pattern for layout, inventory and its path test.
 
 ---

@@ -94,5 +94,5 @@ One difference is left: `toLowerCase()` and `str.lower()` follow each runtime's 
 
 ## Related
 
-- `docs/solutions/architecture-patterns/adr-0031-tier-contract-is-a-list-of-agreements.md`: the tier contract, and why each tier holds its own code to the fixture.
-- `docs/solutions/architecture-patterns/adr-0015-compositions-cite-concepts-by-footnote.md`: what a citation mark is.
+- `docs/solutions/architecture-patterns/adr-0031.md`: the tier contract, and why each tier holds its own code to the fixture.
+- `docs/solutions/architecture-patterns/adr-0015.md`: what a citation mark is.

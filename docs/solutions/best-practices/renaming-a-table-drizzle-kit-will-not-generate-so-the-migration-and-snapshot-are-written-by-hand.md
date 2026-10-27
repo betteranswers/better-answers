@@ -107,6 +107,6 @@ Its snapshot `packages/schema/migrations/meta/0066_snapshot.json` differs from 0
 
 ## Related
 
-- `docs/solutions/architecture-patterns/adr-0032-map-is-plain-postgres-tables-under-rls.md`: hand-written SQL in the journal, and the generated, drift-checked `roles-surface.json` and worker schema view.
-- `docs/solutions/architecture-patterns/adr-0007-plain-postgres-and-app-owned-migrations.md`: the api owns every migration.
+- `docs/solutions/architecture-patterns/adr-0032.md`: hand-written SQL in the journal, and the generated, drift-checked `roles-surface.json` and worker schema view.
+- `docs/solutions/architecture-patterns/adr-0007.md`: the api owns every migration.
 - `docs/solutions/best-practices/what-a-rename-prose-pass-gets-wrong-and-the-checks-that-catch-it.md`: the code and prose side of the same rename.

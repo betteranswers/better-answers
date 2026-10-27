@@ -155,7 +155,7 @@ Considered and not built:
 ### Dependencies / Assumptions
 
 - `packages/design-system/readme.md` and `.claude/skills/browser-suite/SKILL.md` are tracked skills, so their edits go through `ce-skill-work`.
-- A change that moves a decision edits its doc in the same commit, so R5 carries an edit to `docs/solutions/architecture-patterns/adr-0033-ui-kit-is-tailwind-v4.md`.
+- A change that moves a decision edits its doc in the same commit, so R5 carries an edit to `docs/solutions/architecture-patterns/adr-0033.md`.
 - The S2b session (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`) reads this plan and its status before it starts its unit 18, the first that touches the web's pages and specs. Its unit 11 comes sooner and adds one refusal sentence, for the spending limit, to `apps/web/src/features/knowledge/refusal-words.ts`.
 - A `kibo-ui` MCP server is entered in `.mcp.json` and was uncommitted in the main checkout on 13/10/2026. It has not been tried.
 - Kibo's strings and its casing per kind were extracted from the page source of `https://www.kibo-ui.com/patterns` on 13/10/2026. Appendix B holds what was read.
@@ -165,8 +165,8 @@ Considered and not built:
 
 - Linear BA-150, with its notes on T-441, BA-36, BA-50 and BA-80.
 - `packages/design-system/readme.md` §3 "Content fundamentals" and §6 "UI kit": the rules R1 to R6 replace. §6 says the platform owns "every word on a page".
-- `docs/solutions/architecture-patterns/adr-0033-ui-kit-is-tailwind-v4.md`: "The platform owns meaning: the trust words, the citation unit, the register, the glossary's vocabulary and every sentence a reader sees."
-- `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`: a refusal crosses tRPC as `{ word, class }`, the catalogue is append-only, and a ceiling carries no word.
+- `docs/solutions/architecture-patterns/adr-0033.md`: "The platform owns meaning: the trust words, the citation unit, the register, the glossary's vocabulary and every sentence a reader sees."
+- `docs/solutions/architecture-patterns/adr-0043.md`: a refusal crosses tRPC as `{ word, class }`, the catalogue is append-only, and a ceiling carries no word.
 - `docs/solutions/best-practices/what-a-rename-prose-pass-gets-wrong-and-the-checks-that-catch-it.md`: what a tree-wide text pass breaks, and the checks that catch it.
 - `docs/solutions/logic-errors/a-stale-tab-acted-in-the-workspace-the-session-had-moved-to.md`: the `workspace-switched` word drives the page, and its sentence does not.
 - `apps/web/src/shared/refusal-words.ts`, `refusal-outcome.tsx` and `outcome.tsx`: the `{ why, next }` type, the class sentences, `saidOfRefusal`, `sentenceOf` and the alert that shows them.
@@ -338,7 +338,7 @@ BA-150's acceptance criteria in Linear are edited to match this contract when ph
 **Files:**
 - `packages/design-system/readme.md`
 - `apps/web/test/typographic-words.test.ts`, `packages/devtools/package.json`
-- `docs/solutions/architecture-patterns/adr-0033-ui-kit-is-tailwind-v4.md`
+- `docs/solutions/architecture-patterns/adr-0033.md`
 - `.claude/agents/ui-designer.md`
 - `apps/web/CODING_STANDARDS.md`
 

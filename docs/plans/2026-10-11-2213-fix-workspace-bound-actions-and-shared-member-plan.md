@@ -109,7 +109,7 @@ Separately, the member read has four production copies of its key, the logic for
 - KTD4. **The tab names its workspace in a request header, and the api's workspace roads compare it.** (session-settled: user-directed — chosen over a `workspaceId` field on each action's input: the header needs one check on each side and no change to an input schema, `packages/core` or its tests.) Implements the first Key Decision; governs R6 to R9. `apiLink` in `apps/web/src/shared/api/link.ts` is the web's one link and already sets headers for uploads, so both of its arms carry the header.
 - KTD5. **The header's value is the workspace of the held member read, read when the request is sent.** That is the read the band draws. `useRemoveMember`'s `meta.workspaceId` already reads the same value. With no member held, the link sends no header and the api refuses, as R7 says. No page in a workspace is drawn in that state: the router's member check runs before the shell, and a reset member read draws the frame's failure, so no action can be pressed from it.
 - KTD6. **The check sits in the first step of each workspace road, straight after `claimsOf`, on mutations only.** `inTheResolversTransaction` and `ownTransactionProcedure` in `apps/api/src/trpc/base.ts` are the two roads. The order becomes: the session's words, the second-factor gate, `no-active-workspace`, the new word, the road's ceiling, the principal, the parsed input, admission, the action. The person's and the operator's roads name no workspace and are not checked.
-- KTD7. **The new word is the transport's: `workspace-switched`, class *conflict*, declared beside `no-active-workspace` in `apps/api/src/refusal.ts`.** The catalogue is append-only, so the name and class are permanent (`docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`). *conflict* is the glossary's "the state moved: read again and decide again". It must not be *unauthenticated*: `wordSendingThemOn` sends the reader to sign-in for that class. A core word beside `admit` was the alternative. Only a browser session can be stale, and `no-session` and `no-active-workspace` set the precedent that a word about the session is the transport's.
+- KTD7. **The new word is the transport's: `workspace-switched`, class *conflict*, declared beside `no-active-workspace` in `apps/api/src/refusal.ts`.** The catalogue is append-only, so the name and class are permanent (`docs/solutions/architecture-patterns/adr-0043.md`). *conflict* is the glossary's "the state moved: read again and decide again". It must not be *unauthenticated*: `wordSendingThemOn` sends the reader to sign-in for that class. A core word beside `admit` was the alternative. Only a browser session can be stale, and `no-session` and `no-active-workspace` set the precedent that a word about the session is the transport's.
 - KTD8. **A refused tab runs the switch's own tail from the app-level hearing.** `createAppRouter` already hears every refused action through `clients.failures.answeredBy`. The step acts on the word alone, with no test of the address, since a refusal that lands after the person left the page still means the tab is stale. It is auth's, in `apps/web/src/features/auth/`, because `forgetTheWorkspaceLeft` and `AUTH_KEYS` are private there. The sentence goes in the band's outcome slot, which sits outside the subtree `Frame` keys by workspace.
 - KTD9. **R12 is held by dropping the held workspace's reads in the same cache event that delivers the member answer.** `Frame` keys the page by the member's workspace, so the page remounts on that answer and would otherwise draw the cached rows. If U5's test shows a cache subscriber runs too late, the fallback is a workspace the tab holds apart from the live member read, which the frame's key and the link both read and which moves only after the drop.
 
@@ -152,8 +152,8 @@ sequenceDiagram
 
 ### Operational Notes
 
-- `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md` gains a History line in U3's commit: a transport word and a check on the workspace roads. The pull request's body says so.
-- Read "Who sees what" in `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md` during U4. Add a History line there only if landing home on this refusal changes a sentence it states.
+- `docs/solutions/architecture-patterns/adr-0043.md` gains a History line in U3's commit: a transport word and a check on the workspace roads. The pull request's body says so.
+- Read "Who sees what" in `docs/solutions/architecture-patterns/adr-0047.md` during U4. Add a History line there only if landing home on this refusal changes a sentence it states.
 
 ---
 
@@ -210,7 +210,7 @@ sequenceDiagram
 - **Files:**
   - modify: `apps/api/src/trpc/base.ts`, `apps/api/src/refusal.ts`, `apps/web/src/shared/api/link.ts`, the file that builds the web's tRPC client under `apps/web/src/shared/api/`, `apps/web/src/shared/refusal-words.ts`, `apps/api/tests/web-client.ts`
   - test: `apps/api/tests/trpc-roads.test.ts`, `apps/api/tests/members-procedures.test.ts`, `apps/web/test/refusal.test.ts`, `apps/web/e2e/people-invitations.spec.ts` (`actedAside` sends the header for the workspace its Admin is signed in to)
-  - docs: `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`
+  - docs: `docs/solutions/architecture-patterns/adr-0043.md`
 - **Approach:**
   1. Declare the word and the header's name once each.
   2. Add the comparison to both roads per KTD6, thrown through `refused` so it is logged once as every refusal is.
@@ -316,7 +316,7 @@ sequenceDiagram
 - Every requirement R1 to R13 has a passing test named in its unit, and AE1 to AE5 each have the scenario that covers them.
 - BA-81's four acceptance criteria and BA-50's two hold as the issues word them, with BA-50's reach as the first Key Decision sets it.
 - The diff adds no migration, edits nothing under `contracts/`, and changes `packages/core` only in `packages/core/scripts/audit-actions.ts`.
-- `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md` carries its History line, and the pull request's body names it.
+- `docs/solutions/architecture-patterns/adr-0043.md` carries its History line, and the pull request's body names it.
 - The plan, its tests and its page sentences say *action* and *member*.
 - No scratch edit, probe or abandoned mechanism from KTD9's choice is left in the diff.
 - `CI`'s `check` is green on the merge group.
@@ -329,7 +329,7 @@ sequenceDiagram
 - Bug history on this ground: `d05ae4b8`, `ff213801`, `8fa930b4`, `afed41ec`, `335dd2a7`.
 - `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md`: choose the cache verb by who is watching; never trust an awaited refetch; prove it on the page.
 - `docs/solutions/logic-errors/a-second-mutate-drops-the-first-actions-callbacks.md`: what must run for every request goes in the mutation's own options.
-- `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`: how a refusal word is declared; the catalogue is append-only.
-- `docs/solutions/architecture-patterns/adr-0037-reader-screen-latency-budget.md`: an action applies at once and a refusal is never retried.
+- `docs/solutions/architecture-patterns/adr-0043.md`: how a refusal word is declared; the catalogue is append-only.
+- `docs/solutions/architecture-patterns/adr-0037.md`: an action applies at once and a refusal is never retried.
 - `docs/solutions/best-practices/a-ceiling-keyed-on-the-target-does-not-bound-the-actor.md`: where the invitation ceilings are counted.
 - tRPC 11: a middleware receives the call's `type`, and `httpBatchLink` and `httpLink` both take a `headers` function.

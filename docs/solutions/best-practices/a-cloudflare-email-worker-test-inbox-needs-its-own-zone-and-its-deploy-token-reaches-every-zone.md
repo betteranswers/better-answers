@@ -183,6 +183,6 @@ Moving the catch-all to a new Worker:
 
 - `docs/plans/2026-10-02-1625-feat-signed-in-journeys-in-production-plan.md`: KTD3 (the test inbox's form) and KTD18 to KTD20 (the Worker stores and judges nothing; the reader verifies DKIM; deployed by hand), units U9 and U10.
 - `docs/operations/RUNBOOK.md` page 13 (the owner's setup, go/no-go and leak steps) and `docs/operations/SECRETS.md` (the read token and the deploy token), both as `a3c19ec8` holds them.
-- `docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md`: why `apps/test-inbox` was a second TypeScript deployable, and its amendment of 19/10/2026 retiring it.
-- `docs/solutions/architecture-patterns/adr-0034-one-origin-product-and-authorization-server.md`: a Worker planted on a hostname under the product's zone would also trip its `__Host-` cookie trigger.
-- `docs/solutions/architecture-patterns/adr-0027-open-core-under-apache-2-0.md`: the testing domain, the account and the Worker's URL stay out of public files.
+- `docs/solutions/architecture-patterns/adr-0029.md`: why `apps/test-inbox` was a second TypeScript deployable, and its amendment of 19/10/2026 retiring it.
+- `docs/solutions/architecture-patterns/adr-0034.md`: a Worker planted on a hostname under the product's zone would also trip its `__Host-` cookie trigger.
+- `docs/solutions/architecture-patterns/adr-0027.md`: the testing domain, the account and the Worker's URL stay out of public files.

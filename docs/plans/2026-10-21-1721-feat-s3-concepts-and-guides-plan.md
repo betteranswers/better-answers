@@ -186,9 +186,9 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Create `packages/core/test/owners.test.ts`.
 - [ ] Edit `packages/core/test/suggestions.test.ts`, `packages/core/test/concepts.test.ts`, `packages/core/test/import-bundle.test.ts`, `packages/core/test/manifest.test.ts`, `packages/core/test/erasure-routine.test.ts` and `packages/core/test/erasure-map.test.ts`.
 - [ ] Edit `apps/api/tests/harness-knowledge.ts` and `apps/api/tests/ops.test.ts`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0012-the-concept-write-path.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0014-records-attach-by-iri.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0012.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0014.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0047.md`.
 
 **Build.**
 
@@ -306,7 +306,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `apps/web/e2e/harness.ts`.
 - [ ] Create `apps/web/e2e/collections-and-owners.spec.ts`.
 - [ ] Edit `.claude/skills/browser-suite/references/harness.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0047.md`.
 
 **Build.**
 
@@ -403,7 +403,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `packages/core/test/suggestions.test.ts`.
 - [ ] Edit `packages/core/test/refusal-words.test.ts`.
 - [ ] Edit `apps/api/tests/knowledge-procedures.test.ts`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0012-the-concept-write-path.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0012.md`.
 
 **Build.**
 
@@ -501,8 +501,8 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Create `apps/web/e2e/concept-editor.spec.ts`.
 - [ ] Create `apps/web/test/markdown-round-trip.test.ts`.
 - [ ] Create `apps/web/test/concept-actions.test.tsx`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0015-compositions-cite-concepts-by-footnote.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0015.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0047.md`.
 
 **Build.**
 
@@ -595,8 +595,8 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `apps/web/test/navigation.test.ts`.
 - [ ] Create `packages/core/test/waiting-on-you.test.ts`.
 - [ ] Create `apps/api/tests/inbox-procedures.test.ts`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0012-the-concept-write-path.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0047.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0012.md`.
 - [ ] Edit `CONCEPTS.md`.
 
 **Build.**
@@ -697,8 +697,8 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Create `packages/core/test/write-budget.test.ts`.
 - [ ] Edit `docs/operations/readings.md`.
 - [ ] Edit `docs/specs/route/s3.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0032-map-is-plain-postgres-tables-under-rls.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0031-tier-contract-is-a-list-of-agreements.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0032.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0031.md`.
 - [ ] Edit `CONCEPTS.md`.
 
 **Build.**
@@ -807,9 +807,9 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `packages/core/test/erasure-map.test.ts`.
 - [ ] Edit `packages/core/test/erasure-routine.test.ts`.
 - [ ] Create `packages/core/test/guide-read-budget.test.ts`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0014-records-attach-by-iri.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0015-compositions-cite-concepts-by-footnote.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0035-one-id-per-person.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0014.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0015.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0035.md`.
 - [ ] Edit `CONCEPTS.md`.
 
 **Build.**
@@ -930,9 +930,9 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `packages/core/test/face-admission.test.ts`.
 - [ ] Edit `packages/core/test/write-budget.test.ts`.
 - [ ] Create `packages/core/test/guide-seed-budget.test.ts`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0004-guides-and-compositions-are-platform-records.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0012-the-concept-write-path.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0004.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0012.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0029.md`.
 
 **Build.**
 
@@ -1075,8 +1075,8 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Create `apps/web/test/brief-editor.test.tsx`.
 - [ ] Edit `apps/web/test/navigation.test.ts`.
 - [ ] Edit `CONCEPTS.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0004-guides-and-compositions-are-platform-records.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0015-compositions-cite-concepts-by-footnote.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0004.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0015.md`.
 
 **Build.**
 
@@ -1185,8 +1185,8 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Create `apps/web/src/features/knowledge/brief-clipboard.ts`.
 - [ ] Create `apps/web/test/brief-clipboard.test.ts`.
 - [ ] Create `apps/web/e2e/guide-copy.spec.ts`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0015-compositions-cite-concepts-by-footnote.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0014-records-attach-by-iri.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0015.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0014.md`.
 
 **Build.**
 
@@ -1286,9 +1286,9 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Create `apps/web/e2e/kinds.spec.ts`.
 - [ ] Create `apps/web/e2e/exports.spec.ts`.
 - [ ] Edit `apps/web/test/navigation.test.ts`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0026-kinds-emerge-from-the-concepts.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0014-records-attach-by-iri.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0047.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0026.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0014.md`.
 
 **Build.**
 
@@ -1389,7 +1389,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Create `apps/web/test/knowledge-tree.test.tsx`.
 - [ ] Edit `apps/web/test/navigation.test.ts`.
 - [ ] Edit `CONCEPTS.md`.
-- [ ] Edit `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`.
+- [ ] Edit `docs/solutions/architecture-patterns/adr-0047.md`.
 
 **Build.**
 

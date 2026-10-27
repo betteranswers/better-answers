@@ -135,6 +135,6 @@ The schema fact saves a dead end. A field added through a plugin's `schema` opti
 
 ## Related
 
-- ADR 0009, `docs/solutions/architecture-patterns/adr-0009-better-auth-in-process-identity-provider.md`: why Better Auth runs in-process behind a seam, and the `disabledPaths` precedent for the organisation plugin.
-- ADR 0034, `docs/solutions/architecture-patterns/adr-0034-one-origin-product-and-authorization-server.md`: the one origin, the same-origin fence on the api's own auth routes, and the endpoint snapshot.
+- ADR 0009, `docs/solutions/architecture-patterns/adr-0009.md`: why Better Auth runs in-process behind a seam, and the `disabledPaths` precedent for the organisation plugin.
+- ADR 0034, `docs/solutions/architecture-patterns/adr-0034.md`: the one origin, the same-origin fence on the api's own auth routes, and the endpoint snapshot.
 - The plan, `docs/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md`: KTD1 (our gate), KTD2 (closed endpoints, library-owned writes), and U6 and U7, which write the routes this doc is for.

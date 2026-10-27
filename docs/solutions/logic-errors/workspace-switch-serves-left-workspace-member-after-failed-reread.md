@@ -182,5 +182,5 @@ The reset is not awaited. Its promise settles with the refetch it starts (the do
 
 ## Related Issues
 
-- `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md` reads the member this note keeps fresh. Its "Who sees what" rules decide a page's visibility from the person's role, so a stale member makes that verdict come from the workspace the person left.
-- `docs/solutions/architecture-patterns/adr-0009-better-auth-in-process-identity-provider.md` keeps Better Auth's `/organization/set-active` for the picker, and the switch calls the same endpoint. The ADR says nothing about the query cache. This note's reading is that a successful set-active tells the tRPC query cache nothing, which is why the web app clears workspace-scoped reads itself.
+- `docs/solutions/architecture-patterns/adr-0047.md` reads the member this note keeps fresh. Its "Who sees what" rules decide a page's visibility from the person's role, so a stale member makes that verdict come from the workspace the person left.
+- `docs/solutions/architecture-patterns/adr-0009.md` keeps Better Auth's `/organization/set-active` for the picker, and the switch calls the same endpoint. The ADR says nothing about the query cache. This note's reading is that a successful set-active tells the tRPC query cache nothing, which is why the web app clears workspace-scoped reads itself.

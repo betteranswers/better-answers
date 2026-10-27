@@ -161,7 +161,7 @@ On `/oauth2/authorize` and `/oauth2/token` a client meets Better Auth's limit fi
 - **Goal:** the decision docs and the operations doc say what the code now does.
 - **Requirements:** R9.
 - **Dependencies:** U1, U2, U3. Same commit as their code.
-- **Files:** `docs/solutions/architecture-patterns/adr-0034-one-origin-product-and-authorization-server.md`, `docs/solutions/architecture-patterns/adr-0009-better-auth-in-process-identity-provider.md`, `docs/operations/coolify.md`.
+- **Files:** `docs/solutions/architecture-patterns/adr-0034.md`, `docs/solutions/architecture-patterns/adr-0009.md`, `docs/operations/coolify.md`.
 - **Approach:** the one-origin doc gains a bullet on the api's own counters: one count per route group and client address, discovery uncounted and served cacheable, and Better Auth counting no path the api counts. The Better Auth doc gains one line. In `coolify.md` the rate-limiting paragraph says the api's counters are the second line for every group but discovery.
 - **Test scenarios:** Test expectation: none -- prose; the words gate and the docs check read it.
 - **Verification:** `pnpm check:docs` passes.

@@ -34,7 +34,7 @@ tags:
 
 ## Context
 
-People U14 (BA-49) added an audit-log export that reads up to 10,000 events. A mutation reads its caller's member `FOR SHARE` (ADR 0043, `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`), and a role change takes every Admin's member row `FOR UPDATE` (`packages/core/src/members/last-admin.ts:36-37`). An export on that road would stall every other Admin's role change for as long as it read. So the export reads through `withMemberUnheld` (`packages/core/src/store/postgres/index.ts:614`), which runs `MEMBER_QUERY` (line 433) without the `FOR SHARE OF m, u` that `MEMBER_QUERY_HELD` (line 452) adds.
+People U14 (BA-49) added an audit-log export that reads up to 10,000 events. A mutation reads its caller's member `FOR SHARE` (ADR 0043, `docs/solutions/architecture-patterns/adr-0043.md`), and a role change takes every Admin's member row `FOR UPDATE` (`packages/core/src/members/last-admin.ts:36-37`). An export on that road would stall every other Admin's role change for as long as it read. So the export reads through `withMemberUnheld` (`packages/core/src/store/postgres/index.ts:614`), which runs `MEMBER_QUERY` (line 433) without the `FOR SHARE OF m, u` that `MEMBER_QUERY_HELD` (line 452) adds.
 
 The plan's test scenario was "while an export runs, another Admin's role change does not wait on it". Running the two one after the other proves nothing, because the export's transaction has ended before the role change starts. The repository's race helpers, `whileActionsWaitAt` and `racedAt` (`packages/core/test/suite-postgres.ts:230`, `:280`), hold actions at a `BEFORE INSERT`, `BEFORE UPDATE` or `BEFORE DELETE` trigger. The export's read writes nothing, so a trigger has nothing to hold.
 

@@ -102,7 +102,7 @@ The route spec puts an architecture review before S2 (`docs/specs/v01-route.md`,
 - BA-57 and BA-35 in Linear. The evaluation is `.scratch/ce-evaluation-2026-10-06/architecture-skills.md` in the main checkout.
 - Upstream: `mattpocock-skills` 1.2.3, commit `8b78b531ab965735c5dc74f6f7a219e1e37326df`, MIT. Files: `skills/engineering/improve-codebase-architecture/SKILL.md` and `HTML-REPORT.md`, and `skills/engineering/codebase-design/DEEPENING.md`.
 - `CODING_STANDARDS.md`: *Design a deep module behind a small interface* and its `Reviewer:` line, *Introduce a seam only where something already varies*, *Give a slice its own type for the doors it takes*, *Test through the interface a caller crosses*, and *Run every store the platform runs, for real*. Commit `d1939996` replaced the `DESIGN1`-style ids with these headings.
-- `docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md` gives the slice vocabulary and the shapes it rejected. `adr-0045-coding-rule-is-one-imperative.md` says a finding quotes a rule's heading, and that a missing gate is a ticket.
+- `docs/solutions/architecture-patterns/adr-0029.md` gives the slice vocabulary and the shapes it rejected. `adr-0045.md` says a finding quotes a rule's heading, and that a missing gate is a ticket.
 - `docs/solutions/integration-issues/munch-indexes-stale-across-worktrees.md` says to judge staleness by date. ADR 0043 records that GitNexus gives only a lower bound on callers where dispatch is indirect.
 
 ---

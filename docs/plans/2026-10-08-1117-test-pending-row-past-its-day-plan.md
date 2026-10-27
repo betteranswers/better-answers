@@ -141,5 +141,5 @@ The two cases differ. U9 landed its other two rows and forgot one. U8 changed no
 
 - Linear BA-71, and BA-29's Definition-of-Done comment of 08/10/2026.
 - `bdc7f732` (#616's second commit), which landed the three rows.
-- `docs/solutions/architecture-patterns/adr-0040-clock-is-a-kernel-value.md`.
+- `docs/solutions/architecture-patterns/adr-0040.md`.
 - `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md`.

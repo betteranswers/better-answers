@@ -85,5 +85,5 @@ and one when `"plain/entry.ts"` comes first. A line placed above the first `/**`
 
 ## Related
 
-- `docs/solutions/architecture-patterns/adr-0045-coding-rule-is-one-imperative.md` names the density ceiling as the volume backstop.
+- `docs/solutions/architecture-patterns/adr-0045.md` names the density ceiling as the volume backstop.
 - Found while adding the generated audit action list to the duplication gate's ignore list on branch `feat/audit-log-rebuild-and-words` (BA-49); its pull request was not yet open when this was written.

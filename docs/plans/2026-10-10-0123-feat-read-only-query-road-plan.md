@@ -138,7 +138,7 @@ tRPC sends every `.query()` over GET, and RFC 9110 §9.2.1 says a safe method's 
 - **Requirements:** R5.
 - **Dependencies:** U2, in the same commit.
 - **Files:**
-  - Modify: `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`
+  - Modify: `docs/solutions/architecture-patterns/adr-0043.md`
 - **Approach:** the base procedures' query line says the member is resolved unlocked in a read-only transaction, why (GET promises no change), and why the member is read and never held. The History section gains a line naming this plan.
 - **Test expectation:** none -- a decision record; the words gate reads it.
 - **Verification:** `pnpm check:docs` passes.

@@ -54,7 +54,7 @@ The investigation of 09/10/2026 (`.scratch/research/ui-design-system-conformance
 - No unit edits `AvatarBadge` or the badge's `default` variant. They inherit the accent through `primary`, and no page uses either, so their colour can be settled if a page ever does.
 - Until registration marks exist, the marked `primary` button and the unmarked `accent` fill that the readme gives an action repeated per row look the same. The critique can record that.
 - The coloured left border on the sign-in error (`features/auth/auth-page.tsx`) stays for the critique to record.
-- No decision doc changes: ADR 0033 (`docs/solutions/architecture-patterns/adr-0033-ui-kit-is-tailwind-v4.md`) states neither the primary colour nor a border default.
+- No decision doc changes: ADR 0033 (`docs/solutions/architecture-patterns/adr-0033.md`) states neither the primary colour nor a border default.
 
 ---
 

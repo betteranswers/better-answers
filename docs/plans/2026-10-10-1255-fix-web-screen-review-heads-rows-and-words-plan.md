@@ -114,7 +114,7 @@ The rest is density and repetition. An audit event is about 90px tall and repeat
   - *The frame draws every first heading from the place.* It would double Search's heading in a file this change may not edit, take a detail page's heading away from it, and give a failed page two first headings.
   - *The page draws the tabs.* A tab list inside its own keyed panel loses focus on every arrow key and goes when the page throws, which `apps/web/test/toolbar.test.tsx` and `apps/web/e2e/failed-page.spec.ts` hold against.
 - KTD2. **`ListHead` carries the list's heading, count and primary action, and the toolbar keeps tabs only.** `ListHead`, in the same file, draws the list's second-level heading, a description where the page gives one, then one row holding its count as an `output` and the page's primary action at the far end. Where an open tab already names the list, the heading is visually hidden and stays the region's name and its focus target. `PageToolbar.actions` goes, and *Invite a person* and *Connect a document* move to that row. An action drawn in a tab's row is drawn again when the tab changes, which only resets a closed dialog. The view-state slot stays: Review's parts on Connected sources still share it.
-- KTD3. **The recorded decision moves in the commit that moves the code.** U1's commit rewrites `CONCEPTS.md`'s *toolbar*, *tab*, *top band* and *view-state slot* entries and adds a dated amendment to `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md` for the tabs and the actions. U4's commit adds the amendment's sentence on the passkey offer. The browser-suite skill does not name the toolbar today, so it changes only if a helper's description moves, and then through `ce-skill-work`.
+- KTD3. **The recorded decision moves in the commit that moves the code.** U1's commit rewrites `CONCEPTS.md`'s *toolbar*, *tab*, *top band* and *view-state slot* entries and adds a dated amendment to `docs/solutions/architecture-patterns/adr-0047.md` for the tabs and the actions. U4's commit adds the amendment's sentence on the passkey offer. The browser-suite skill does not name the toolbar today, so it changes only if a helper's description moves, and then through `ce-skill-work`.
 - KTD4. **The offer's "shown" mark is kept on the browser beside the session memory, and each sign-in forgets it.** `apps/web/src/features/auth/session-memory.ts` holds it in `localStorage`, so a second tab of the same sign-in stays quiet. The three places that announce a sign-in clear it. The offer draws only while the address is the one it first drew on, so moving on hides it without a reload. The api's dismissal is unchanged.
 - KTD5. **An event's line is its time, its sentence and an inline *Details* disclosure.** The family pill goes. The actor's address joins the line only where the events shown hold two actors of one display name, and is always in the details through `byLine`. Rejected: an address on every line, which wraps to a second line at 390px and repeats on every row.
 - KTD6. **The Role card and the Groups card are the one place each is shown.** The header's role pill and the Access summary's Role and Groups rows go. Joined and the sign-ins row stay. The Role card's primary reads "Change role" while the picked role is the held one.
@@ -213,7 +213,7 @@ stateDiagram-v2
 - **Files:**
   - create `apps/web/src/shared/page-head.tsx`
   - modify `apps/web/src/app/frame.tsx`, `apps/web/src/app/toolbar.tsx`, `apps/web/src/shared/page-toolbar.tsx`
-  - modify `CONCEPTS.md`, `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`
+  - modify `CONCEPTS.md`, `docs/solutions/architecture-patterns/adr-0047.md`
   - test: create `apps/web/test/page-head.test.tsx`; modify `apps/web/test/toolbar.test.tsx`, `apps/web/test/frame.test.tsx`, `apps/web/e2e/frame.spec.ts`, `apps/web/e2e/failed-page.spec.ts`
 - **Approach:**
   1. `PageHead` and `ListHead` as KTD1 and KTD2 state them. `PageHead` takes the group, and a ref for a page that sends focus to its first heading.
@@ -278,7 +278,7 @@ stateDiagram-v2
 - **Dependencies:** U1, for where the offer sits against the head.
 - **Files:**
   - modify `apps/web/src/features/auth/passkey-offer.tsx`, `session-memory.ts`, `auth-hooks.ts`, `passkey-hooks.ts` (all under `apps/web/src/features/auth/`)
-  - modify `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`
+  - modify `docs/solutions/architecture-patterns/adr-0047.md`
   - test: modify `apps/web/e2e/passkeys.spec.ts`, `apps/web/e2e/frame.spec.ts`, `apps/web/test/pending-gate.test.tsx`
 - **Approach:** as KTD4 states. The mark is written when the offer first draws, not when the frame mounts, so a person whose second-factor read is slow still sees it once.
 - **Test scenarios:**
@@ -452,7 +452,7 @@ A latency-budget or timeout failure is rerun alone on untouched code before it c
 ## Sources
 
 - `docs/dogfood-reports/2026-10-09-ba-36-screen-review.md` and its assets folder: the findings and their screenshots.
-- `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`: the frame's regions, the toolbar and the passkey offer as recorded.
+- `docs/solutions/architecture-patterns/adr-0047.md`: the frame's regions, the toolbar and the passkey offer as recorded.
 - `docs/plans/2026-10-10-0003-feat-design-system-blueprint-layer-plan.md`, `docs/plans/2026-10-10-0029-fix-web-unknown-address-and-account-in-the-shell-plan.md`, `docs/plans/2026-10-10-0305-fix-web-dark-theme-plan.md` and `docs/plans/2026-10-10-0307-fix-web-band-clear-after-skip-link-plan.md`: the four changes that reshaped these pages overnight.
 - `apps/web/src/app/toolbar.tsx`: why the tabs stay outside the keyed panel.
 - `apps/web/e2e/audit-log.spec.ts`, "tells apart two members of one name by their addresses": why an address stays at rest (KTD5).

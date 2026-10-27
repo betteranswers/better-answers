@@ -16,7 +16,7 @@ execution: code
 - **Objective:** Whoever writes S3's concept actions finds one way to admit an action, and the lint and the refusal walk see every gated action in core. An operator whose import loses a race for the bundle's head while it writes the manifest gets an exit code that says to run it again.
 - **Means:** Every action that judged a role by hand is declared and admitted through `admit` (KTD1), and a refused manifest commit keeps the git door's word (KTD7).
 - **Issues:** BA-84 (package WP9 of the origin plan, under the origin's own R4, R5 and R10) and BA-131, landed as one pull request.
-- **Authority:** The two issues' acceptance criteria, then `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`, then the root `CODING_STANDARDS.md`. This plan decides how.
+- **Authority:** The two issues' acceptance criteria, then `docs/solutions/architecture-patterns/adr-0043.md`, then the root `CODING_STANDARDS.md`. This plan decides how.
 - **Execution profile:** One branch, `liam/ba-84-one-admission-declaration`, in its own worktree. The units land in order, and each leaves the tree compiling.
 - **Stop conditions:** Stop and report if a face test's `role-forbids` case has to change its expectation, if a `refuses` list needs a word the catalogue lacks, or if `writeConcept`'s signature has to change.
 - **Who ships:** The implementing agent opens the pull request. The lead queues the merge.
@@ -31,7 +31,7 @@ Core has three ways to judge whether a principal may ask for an action: a declar
 
 ### Problem Frame
 
-`adr-0043-what-an-action-is.md` says an action "is declared beside its hand-written face function". About half of core's gated actions are not: they call `requireAdmin`, or compare `principal.role` themselves. The refusal walk reads a declaration's `refuses` list, so it sees those actions' words only where a `*Refusal` alias happens to name them. An author of a new action has to pick a mechanism, and S3 adds the concept actions next.
+`adr-0043.md` says an action "is declared beside its hand-written face function". About half of core's gated actions are not: they call `requireAdmin`, or compare `principal.role` themselves. The refusal walk reads a declaration's `refuses` list, so it sees those actions' words only where a `*Refusal` alias happens to name them. An author of a new action has to pick a mechanism, and S3 adds the concept actions next.
 
 `ActionDeclaration.effect` is read by nothing but two assertions in `packages/core/test/admission.test.ts`.
 
@@ -56,11 +56,11 @@ BA-131 is a separate defect in the same file. `manifestRefusalOf` in `packages/c
 **The manifest commit (BA-131)**
 
 - R9. A manifest commit the git door refuses as `stale-precondition` reaches `importBundle`'s caller as that word, and `pnpm ops import-bundle` exits with the conflict class's code.
-- R10. `malformed`, `malformed-path` and `malformed-message` on the manifest commit stay an `Error`, and the command exits 1. The usage text and `adr-0043-what-an-action-is.md` name that exception.
+- R10. `malformed`, `malformed-path` and `malformed-message` on the manifest commit stay an `Error`, and the command exits 1. The usage text and `adr-0043.md` name that exception.
 
 **Records**
 
-- R11. `adr-0043-what-an-action-is.md` is edited in the commit that changes the import's exit, and gains a History entry for this plan.
+- R11. `adr-0043.md` is edited in the commit that changes the import's exit, and gains a History entry for this plan.
 
 ### Acceptance Examples
 
@@ -91,7 +91,7 @@ These are defaults taken without the owner's ruling. Each is listed in the build
 - **The malformed manifest commit stays an error (R10).** Only a defect in the import can cause it, and no caller can act on it. The lead's default.
 - **`importBundle` and `writeManifest` are converted too.** They are not `requireAdmin` sites. They compare the role by hand in the files this plan already edits, and leaving them would keep a third mechanism beside `writeConcept`'s declaration.
 - **The lint stops naming `requireAdmin`.** BA-79 added the name this morning. Once the function is deleted, a call to it fails typecheck first.
-- **`holdsEveryGroup` keeps its own gate.** `adr-0043-what-an-action-is.md` says a step judges nothing, and this read runs inside its caller's transaction. Its face test asserts `role-forbids` for an Editor and a Viewer, and R2 holds that test.
+- **`holdsEveryGroup` keeps its own gate.** `adr-0043.md` says a step judges nothing, and this read runs inside its caller's transaction. Its face test asserts `role-forbids` for an Editor and a Viewer, and R2 holds that test.
 
 ### Sources / Research
 
@@ -252,7 +252,7 @@ No other test changes an expectation.
 - **Goal:** R9 and R10.
 - **Requirements:** R9, R10, R11. Covers AE4, AE5.
 - **Dependencies:** U6.
-- **Files:** `packages/core/src/concepts/index.ts`, `apps/api/src/ops/index.ts`, `packages/core/test/import-bundle.test.ts`, `apps/api/tests/ops.test.ts`, `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`.
+- **Files:** `packages/core/src/concepts/index.ts`, `apps/api/src/ops/index.ts`, `packages/core/test/import-bundle.test.ts`, `apps/api/tests/ops.test.ts`, `docs/solutions/architecture-patterns/adr-0043.md`.
 - **Approach:** KTD7. `importReason` gains the sentence for the word: another writer moved the bundle, run the import again. The usage line and the decision doc's `pnpm ops` bullet name the malformed manifest commit beside the runs that exit 1.
 - **Execution note:** Write the core test first and watch it fail on the `Error`. The fixture is a lock file left on the bundle's ref, which makes `git update-ref` fail the way a second writer does.
 - **Test scenarios:**
@@ -267,7 +267,7 @@ No other test changes an expectation.
 - **Goal:** R6.
 - **Requirements:** R6, R11. Covers AE6.
 - **Dependencies:** U2, U3, U4, U5, U6.
-- **Files:** `packages/core/src/kernel/role.ts`, `packages/core/src/kernel/index.ts`, `packages/core/test/kernel.test.ts`, `packages/devtools/lint-rules/rules/action-admits-before-await.ts`, `packages/devtools/test/action-admits-before-await.test.ts`, `docs/solutions/architecture-patterns/adr-0043-what-an-action-is.md`.
+- **Files:** `packages/core/src/kernel/role.ts`, `packages/core/src/kernel/index.ts`, `packages/core/test/kernel.test.ts`, `packages/devtools/lint-rules/rules/action-admits-before-await.ts`, `packages/devtools/test/action-admits-before-await.test.ts`, `docs/solutions/architecture-patterns/adr-0043.md`.
 - **Approach:** Delete the function and its export. `role.ts` keeps the two types. The lint's set of admitting calls keeps `admit` and `requireFreshSignIn`. The decision doc gains its History entry.
 - **Test scenarios:**
   - The lint still reports a `requireFreshSignIn` after an `await` and passes one before it.

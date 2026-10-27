@@ -86,7 +86,7 @@ The density gate measures workspaces, four directories and one named set of root
 - KTD2. **The commit hook's oxlint glob widens to `.mjs` and `.js`, and its run takes `--no-error-on-unmatched-pattern`.** The root lint already walks those files, and the edit hook was the only pre-CI reader of them. Without the flag, a commit whose only staged script sits under a path the lint config ignores is refused with "No files found to lint"; the `oxfmt` command carries the same flag for the same reason.
 - KTD3. **Density loses the directory kind, not just its arguments.** `packages/devtools/src/comment-density.ts` drops the `directory` kind, the config-language set and a unit's `holds` list, and `scripts/comment-density.mjs` drops the two options. A workspace still measures TypeScript and Python only, in a source arm and a test arm.
 - KTD4. **A `comment-lint.test.ts` case goes only when a rule suite holds the same case.** Before deleting a case, find its twin in `comment-only-the-why.test.ts` or `string-cites-nothing.test.ts`. A case with no twin stays.
-- KTD5. **The decision doc on rule form is amended, not rewritten.** `docs/solutions/architecture-patterns/adr-0045-coding-rule-is-one-imperative.md` says the density ceiling is "the only gate on a config file's comments". A dated amendment says density is now a workspace backstop, a config file's comments have no mechanical gate, and the edit hook is gone. The pull request body says this decision doc was edited.
+- KTD5. **The decision doc on rule form is amended, not rewritten.** `docs/solutions/architecture-patterns/adr-0045.md` says the density ceiling is "the only gate on a config file's comments". A dated amendment says density is now a workspace backstop, a config file's comments have no mechanical gate, and the edit hook is gone. The pull request body says this decision doc was edited.
 - KTD6. **The cloc learning is retired unless its trap still bites a workspace.** `docs/solutions/integration-issues/cloc-counts-a-glob-in-a-config-string-as-a-block-comment.md` describes the named root-config unit, which goes. Run the learning's own check on a TypeScript file inside a workspace: if cloc still counts the lines between two glob strings as comments, keep the learning and move its example to that case; otherwise delete it.
 
 ### Assumptions
@@ -198,7 +198,7 @@ The density gate measures workspaces, four directories and one named set of root
 - **Files:**
   - `docs/operations/local-gates.md`
   - `packages/devtools/README.md`
-  - `docs/solutions/architecture-patterns/adr-0045-coding-rule-is-one-imperative.md`
+  - `docs/solutions/architecture-patterns/adr-0045.md`
   - `docs/solutions/integration-issues/cloc-counts-a-glob-in-a-config-string-as-a-block-comment.md`
 - **Approach:**
   1. `local-gates.md`: remove the section on the write-time comment gate and correct the count of scripts the settings wire; add the Python gate and the wider glob to the pre-commit section.
