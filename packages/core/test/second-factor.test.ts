@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
 
@@ -48,8 +48,7 @@ describe("recording an authenticator's setup", () => {
       carried: ITS_OWN_AGE,
     });
 
-    expect(recorded.ok).toBe(true);
-    if (!recorded.ok) return;
+    assert(recorded.ok);
     expect(recorded.value).toMatchObject({
       authenticatorId,
       stamped: true,
@@ -57,9 +56,10 @@ describe("recording an authenticator's setup", () => {
       issued: { madeAt: "2026-10-02T12:00:00.000Z" },
     });
     const codes = recorded.value.issued?.recoveryCodes;
+    assert(codes !== undefined, "the setup issued codes");
     expect(codes).toHaveLength(10);
     expect(new Set(codes).size).toBe(10);
-    for (const code of codes ?? []) expect(code).toMatch(RECOVERY_CODE);
+    for (const code of codes) expect(code).toMatch(RECOVERY_CODE);
     expect(await confirmedAt(sessionId)).toEqual({ confirmed: AT, pending: null });
     expect(await recoveryCodesHeldBy(personId)).toBe(10);
     expect(await identitySetRowsFor(personId)).toEqual([
@@ -84,10 +84,11 @@ describe("recording an authenticator's setup", () => {
       ),
     );
 
-    expect(answers.map((answer) => answer.ok && answer.value.firstRecord).toSorted()).toEqual([
-      false,
-      true,
-    ]);
+    const firstRecords = answers.map((answer) => {
+      assert(answer.ok, "each finish recorded the setup");
+      return answer.value.firstRecord;
+    });
+    expect(firstRecords.toSorted()).toEqual([false, true]);
     for (const sessionId of sessions) {
       expect(await confirmedAt(sessionId)).toEqual({ confirmed: AT, pending: null });
     }
@@ -288,7 +289,8 @@ describe("reading a person's second factor", () => {
         recoveryCodes: { unused: 2, madeAt: "2026-10-02T12:00:00.000Z" },
       },
     });
-    expect(read.ok && read.value.passkeys).toHaveLength(1);
+    assert(read.ok);
+    expect(read.value.passkeys).toHaveLength(1);
   });
 
   it("answers each passkey's name, added and last used times", async () => {
@@ -329,7 +331,8 @@ describe("reading a person's second factor", () => {
 
     const read = await readSecondFactor(bootstrap, door(), { personId, now: AT });
 
-    expect(read.ok && read.value.passkeys[0]?.createdAt).toMatch(/^\d{4}-\d\d-\d\dT/);
+    assert(read.ok);
+    expect(read.value.passkeys[0]?.createdAt).toMatch(/^\d{4}-\d\d-\d\dT/);
   });
 
   it("answers a setup that waits on its code", async () => {
@@ -397,7 +400,8 @@ describe("reading a person's second factor", () => {
     const personId = await seedPerson(db().pool, { email });
     const promotedRead = async () => {
       const read = await readSecondFactor(bootstrap, door(), { personId, now: AT });
-      return read.ok && read.value.promoted;
+      assert(read.ok, "the second factor was read");
+      return read.value.promoted;
     };
     const unmarked = await promotedRead();
 
