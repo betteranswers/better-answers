@@ -30,7 +30,7 @@ type WorkspaceRow = {
 export const listWorkspaces = async (
   _operator: OperatorPrincipal,
   tx: Tx,
-): Promise<Result<readonly WorkspaceListed[], Error>> => {
+): Promise<Result<readonly WorkspaceListed[]>> => {
   const listed = await attempt(() =>
     tx.query<WorkspaceRow>(
       `SELECT w.id, w.name, w.short_name AS "shortName", w.created_at,

@@ -33,7 +33,7 @@ export const openRecord = async (
   asker: UserPrincipal,
   tx: Tx,
   input: RecordOpening,
-): Promise<Result<{ readonly recordId: string }, Error>> =>
+): Promise<Result<{ readonly recordId: string }>> =>
   attempt(async () => {
     const recordId = ulid();
     await tx.query(A_RECORD_WITH_ITS_QUESTION, [
@@ -104,7 +104,7 @@ export const completeRecord = async (
   asker: UserPrincipal,
   tx: Tx,
   input: RecordCompletion,
-): Promise<Result<void, Error>> =>
+): Promise<Result<void>> =>
   attempt(async () => {
     if (input.settled !== undefined) {
       const settled = await settleSpend(asker, tx, { ...input.settled, now: input.completedAt });
@@ -153,7 +153,7 @@ export const keepDraft = async (
   asker: UserPrincipal,
   tx: Tx,
   input: DraftKeeping,
-): Promise<Result<void, Error>> =>
+): Promise<Result<void>> =>
   attempt(async () => {
     const settled = await settleSpend(asker, tx, { ...input.settled, now: input.now });
     if (!settled.ok) throw settled.error;

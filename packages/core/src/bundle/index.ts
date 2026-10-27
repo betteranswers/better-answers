@@ -47,7 +47,7 @@ export const withBundleWrite = async <T extends Result<unknown, unknown>>(
   principal: UserPrincipal,
   doors: BundleDoors,
   work: () => Promise<T>,
-): Promise<T | Result<never, Error>> => {
+): Promise<T | Result<never>> => {
   const fenced = await attempt(() =>
     withRepositoryLock(principal, doors.git, () =>
       withWorkspaceFence(principal, doors.postgres, principal.workspaceId, "shared", work),

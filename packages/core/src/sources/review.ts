@@ -91,7 +91,7 @@ const HOLDS_AN_UNREVIEWED_SPECIAL_CATEGORY = `SELECT EXISTS (
 export const holdsAnUnreviewedSpecialCategory = async (
   acting: ActingOnConnectedSource,
   tx: Tx,
-): Promise<Result<boolean, Error>> => {
+): Promise<Result<boolean>> => {
   const found = await attempt(() =>
     tx.query<{ held: boolean }>(HOLDS_AN_UNREVIEWED_SPECIAL_CATEGORY, [
       acting.workspaceId,
@@ -150,7 +150,7 @@ const UNREADABLE_RUN = new Error(
 
 const overriddenSpansOf = (
   outcome: JobOutcome | null,
-): Result<ReadonlyArray<z.infer<typeof OVERRIDDEN_SPAN>>, Error> => {
+): Result<ReadonlyArray<z.infer<typeof OVERRIDDEN_SPAN>>> => {
   const listed = outcome?.[OVERRIDDEN_KEY];
   if (listed === undefined) return ok([]);
   const spans = z.array(OVERRIDDEN_SPAN).safeParse(listed);

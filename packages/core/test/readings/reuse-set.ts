@@ -80,8 +80,7 @@ const reuseSet = z
 export type ReuseSet = z.infer<typeof reuseSet>;
 type ReuseQuestion = z.infer<typeof reuseQuestion>;
 
-export const readReuseSet = (path: string): Promise<Result<ReuseSet, Error>> =>
-  readAs(path, reuseSet);
+export const readReuseSet = (path: string): Promise<Result<ReuseSet>> => readAs(path, reuseSet);
 
 export const theReuseSet = async (): Promise<ReuseSet> => {
   const read = await readReuseSet(REUSE_SET);

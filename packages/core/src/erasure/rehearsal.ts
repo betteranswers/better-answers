@@ -149,7 +149,7 @@ const principalOf = async (
   workspaceId: string,
   personId: string,
   at: Date,
-): Promise<Result<UserPrincipal, Error>> => {
+): Promise<Result<UserPrincipal>> => {
   const resolved = await withPrincipalRead(
     door,
     { workspaceId, userId: personId, issuedAt: at },
@@ -166,7 +166,7 @@ const conceptSeeded = async (
   writer: UserPrincipal,
   doors: ErasureDoors,
   subject: SyntheticSubject,
-): Promise<Result<undefined, Error>> => {
+): Promise<Result<undefined>> => {
   const at = doors.clock.now();
   const written = await writeConcept(
     writer,
@@ -213,7 +213,7 @@ const documentSeeded = async (
   writer: UserPrincipal,
   doors: ErasureDoors,
   subject: SyntheticSubject,
-): Promise<Result<SeededDocument, Error>> => {
+): Promise<Result<SeededDocument>> => {
   const fileName = documentFileOf(subject);
   const standing = await attempt(() =>
     connectedSourceHolding(platform, doors.postgres, writer.workspaceId, fileName),

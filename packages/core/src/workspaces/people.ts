@@ -124,7 +124,7 @@ export const listPeople = (
   operator: OperatorPrincipal,
   tx: Tx,
   input: ListPeopleInput,
-): Promise<Result<PeoplePage, Error>> =>
+): Promise<Result<PeoplePage>> =>
   attempt(async () => {
     const pattern = containing(input.search.trim());
     const counted = await tx.query<{ total: number }>(

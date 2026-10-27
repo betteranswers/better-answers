@@ -27,9 +27,9 @@ const isSignedOut = (failure: Error): boolean =>
   refusalOf(failure)?.class === "unauthenticated" ||
   (failure instanceof CodeRefused && failure.status === SIGNED_OUT);
 
-const PENDING_PAGES: readonly string[] = [CONFIRM_STEP, RECOVERY_STEP, SETUP_STEP];
+const PENDING_PAGES: ReadonlySet<string> = new Set([CONFIRM_STEP, RECOVERY_STEP, SETUP_STEP]);
 
-const onAPendingPage = (pathname: string): boolean => PENDING_PAGES.includes(pathname);
+const onAPendingPage = (pathname: string): boolean => PENDING_PAGES.has(pathname);
 
 export type HeardAt = LeftFrom & { readonly pathname: string };
 

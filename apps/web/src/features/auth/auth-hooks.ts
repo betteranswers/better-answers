@@ -410,7 +410,7 @@ export const useAcceptInvitation = (): PersonMutation<"acceptInvitation"> => {
 };
 
 const signOutOptions = () =>
-  mutationOptions<unknown, Error, void>({
+  mutationOptions({
     mutationFn: () => unwrapWithTheWait((reading) => authClient.signOut({ fetchOptions: reading })),
   });
 

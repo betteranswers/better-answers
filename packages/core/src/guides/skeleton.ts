@@ -140,6 +140,7 @@ export const writeSkeleton = async (
   if (!author.ok) return err(author.error);
   if (!author.value.ok) return err(author.value.error);
 
+  // oxlint-disable-next-line typescript/no-unnecessary-type-arguments -- without it TypeScript infers Refused as string from the caller return type, not the default never
   const landed = await commitAndLandAsMember<never>(
     principal,
     doors,

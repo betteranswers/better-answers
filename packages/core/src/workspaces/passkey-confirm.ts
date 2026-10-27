@@ -59,7 +59,7 @@ export const takePasskeyChallenge = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: { readonly sessionId: string; readonly now: Date },
-): Promise<Result<string | undefined, Error>> => {
+): Promise<Result<string | undefined>> => {
   const taken = await attempt(() =>
     withIdentityWrite(platform, door, (tx) =>
       tx.query<{ value: string; live: boolean }>(TAKING, [

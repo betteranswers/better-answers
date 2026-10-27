@@ -79,7 +79,7 @@ const idsOfKey = (key: string): KeyIds | undefined => {
 const asDefect = async <Value, Word>(
   what: string,
   work: () => Promise<Result<Value, Word>>,
-): Promise<Result<Value, Error>> => {
+): Promise<Result<Value>> => {
   const ran = await attempt(work);
   if (!ran.ok) return err(ran.error);
   if (ran.value.ok) return ok(ran.value.value);
@@ -91,7 +91,7 @@ const recordTheSweep = async (
   door: PostgresDoor,
   workspaceId: string,
   swept: readonly KeyIds[],
-): Promise<Result<void, Error>> => {
+): Promise<Result<void>> => {
   if (swept.length === 0) return ok(undefined);
   const written = await attempt(() =>
     withScope(platform, door, workspaceId, (tx) =>
@@ -133,7 +133,7 @@ const removeOrphans = async (
   doors: SweepDoors,
   workspaceId: string,
   orphaned: readonly Orphan[],
-): Promise<Result<number, Error>> => {
+): Promise<Result<number>> => {
   const gone: KeyIds[] = [];
   for (const orphan of orphaned) {
     const removed = await asDefect("an orphaned original's key was refused", () =>

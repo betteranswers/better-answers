@@ -130,7 +130,7 @@ export const replayCopiesSince = async (
   platform: PlatformPrincipal,
   door: ObjectDoor,
   since: Date,
-): Promise<Result<readonly ReplayCopy[], Error>> => {
+): Promise<Result<readonly ReplayCopy[]>> => {
   const listed = await attempt(() => listPlatformObjects(platform, door, REPLAY_PREFIX));
   if (!listed.ok) return err(listed.error);
   if (!listed.value.ok) {

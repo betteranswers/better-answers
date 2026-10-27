@@ -190,8 +190,8 @@ export const settleSpend = async (
     readonly calls: readonly CallSpent[];
     readonly now: Date;
   },
-): Promise<Result<void, Error>> =>
-  attemptResult(async (): Promise<Result<void, Error>> => {
+): Promise<Result<void>> =>
+  attemptResult(async (): Promise<Result<void>> => {
     const settled = await tx.query<{ taken: number }>(SETTLED, [
       asker.workspaceId,
       input.reservationId,
@@ -220,7 +220,7 @@ export const settleExpiredSpend = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: { readonly workspaceId: WorkspaceId; readonly now: Date },
-): Promise<Result<number, Error>> =>
+): Promise<Result<number>> =>
   attempt(async () => {
     const settled = await withScope(platform, door, input.workspaceId, (tx) =>
       tx.query(EXPIRED_SETTLED, [input.workspaceId, input.now, LLM_CALL_FAILED]),

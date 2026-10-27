@@ -59,7 +59,7 @@ type WorkspaceSwept = {
   readonly workspaceId: WorkspaceId;
   readonly uploads: Result<SweptUploads, SweepUploadsRefusal>;
   readonly map: Result<readonly SweptGeneration[], MapMaintenanceRefusal | Error>;
-  readonly spend: Result<number, Error>;
+  readonly spend: Result<number>;
 };
 
 type SweepTotals = {
@@ -103,7 +103,7 @@ const recordThePass = async (
   door: PostgresDoor,
   uploadSweep: UploadSweepMode,
   totals: SweepTotals,
-): Promise<Result<void, Error>> => {
+): Promise<Result<void>> => {
   const { workspaces, refused, found, removed, generations } = totals;
   const written = await attempt(() =>
     door.pool.query(RECORD_THE_PASS, [
@@ -150,7 +150,7 @@ export const sweepEveryWorkspace = async (
     platform,
     doors.postgres,
     SWEEP_LOCK,
-    async (): Promise<Result<SweepPass, Error>> => {
+    async (): Promise<Result<SweepPass>> => {
       const listed = await workspaceIds(platform, doors.postgres);
       if (!listed.ok) return err(listed.error);
       const swept: WorkspaceSwept[] = [];
@@ -185,7 +185,7 @@ const firstOfTheMonth = (now: Date, monthsOn: number): string =>
 export const makeQuestionMonths = (
   door: PostgresDoor,
   input: { readonly now: Date },
-): Promise<Result<void, Error>> =>
+): Promise<Result<void>> =>
   attempt(async () => {
     for (const monthsOn of [0, 1]) {
       await door.pool.query("SELECT create_question_content_partition($1)", [
@@ -203,9 +203,9 @@ const EXPIRED_SESSIONS = "DELETE FROM session WHERE expires_at < $1 OR pending_s
 const EXPIRED_VERIFICATIONS = "DELETE FROM verification WHERE expires_at < $1";
 
 export type IdentitySetSwept = {
-  readonly sessions: Result<number, Error>;
-  readonly verifications: Result<number, Error>;
-  readonly ingressWindows: Result<number, Error>;
+  readonly sessions: Result<number>;
+  readonly verifications: Result<number>;
+  readonly ingressWindows: Result<number>;
 };
 
 const before = (now: Date, ms: number): Date => new Date(now.getTime() - ms);
@@ -215,7 +215,7 @@ const countDeleted = (
   door: PostgresDoor,
   statement: string,
   cutoffs: readonly Date[],
-): Promise<Result<number, Error>> =>
+): Promise<Result<number>> =>
   attempt(async () => {
     const dropped = await withIdentityWrite(platform, door, (tx) =>
       tx.query(statement, [...cutoffs]),

@@ -514,7 +514,7 @@ const stampPublished = async (
   tx: Tx,
   publishedAt: Date,
   detail: PublishedDetail,
-): Promise<Result<string, Error>> => {
+): Promise<Result<string>> => {
   const { admin, workspaceId, connectedSourceId } = acting;
   const auditEventId = ulid();
   const published = await attempt(() =>
@@ -636,7 +636,7 @@ type Emptied = Pick<ConnectedSourceReprocessed, "passages" | "findings">;
 const emptyTheConnectedSource = async (
   acting: ActingOnConnectedSource | PlatformOnConnectedSource,
   tx: Tx,
-): Promise<Result<Emptied, Error>> => {
+): Promise<Result<Emptied>> => {
   const { workspaceId, connectedSourceId } = acting;
   const wiped = await attempt(() =>
     tx.query(`DELETE FROM "index".passage WHERE workspace_id = $1 AND connected_source_id = $2`, [

@@ -189,7 +189,7 @@ type Projecting = WaitingReads & {
 const partsOf = async (
   projecting: Projecting,
   concept: StandingRow,
-): Promise<Result<ConceptParts, Error>> => {
+): Promise<Result<ConceptParts>> => {
   const resolved = await resolvedSourcesOf(projecting, concept.frontmatter);
   if (!resolved.ok) return err(resolved.error);
   return ok({
@@ -202,7 +202,7 @@ const partsOf = async (
 const standingOf = async (
   projecting: Projecting,
   target: ConceptIri | null,
-): Promise<Result<ConceptParts | null, Error>> => {
+): Promise<Result<ConceptParts | null>> => {
   if (target === null) return ok(null);
   const { principal, tx } = projecting;
   const found = await attempt(() =>

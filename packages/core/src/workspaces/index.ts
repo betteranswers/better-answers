@@ -359,7 +359,7 @@ export const personIdByEmail = (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   email: string,
-): Promise<Result<UserId | undefined, Error>> =>
+): Promise<Result<UserId | undefined>> =>
   attempt(() =>
     withIdentityRead(platform, door, async (tx) => (await personByEmail(tx, email))?.id),
   );
@@ -611,7 +611,7 @@ export const readWorkspacesHeld = async (
 export const workspaceIds = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-): Promise<Result<readonly WorkspaceId[], Error>> => {
+): Promise<Result<readonly WorkspaceId[]>> => {
   const listed = await attempt(() =>
     withIdentityRead(platform, door, async (tx) => {
       const rows = await tx.query<{ id: string }>("SELECT id FROM workspace ORDER BY id");
@@ -627,7 +627,7 @@ export const workspaceIdByShortName = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   shortName: string,
-): Promise<Result<WorkspaceId | undefined, Error>> => {
+): Promise<Result<WorkspaceId | undefined>> => {
   const wanted = boundarySchemas.workspace.select.shape.shortName.safeParse(shortName);
   if (!wanted.success) return ok(undefined);
 

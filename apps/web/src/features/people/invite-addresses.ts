@@ -15,16 +15,17 @@ const addressesIn = (parts: readonly string[]): readonly string[] =>
 
 type Taken = { readonly held: readonly Held[]; readonly left: readonly string[] };
 
-const takenInto = (held: readonly Held[], addresses: readonly string[]): Taken =>
-  addresses.reduce<Taken>(
-    (taken, address) => {
-      const key = keyOf(address);
-      if (taken.held.some((one) => one.key === key)) return taken;
-      if (taken.held.length >= MOST_AT_ONCE) return { ...taken, left: [...taken.left, address] };
-      return { ...taken, held: [...taken.held, { key, address }] };
-    },
-    { held, left: [] },
-  );
+const takenInto = (held: readonly Held[], addresses: readonly string[]): Taken => {
+  const added: Held[] = [];
+  const left: string[] = [];
+  for (const address of addresses) {
+    const key = keyOf(address);
+    if (held.some((one) => one.key === key) || added.some((one) => one.key === key)) continue;
+    if (held.length + added.length >= MOST_AT_ONCE) left.push(address);
+    else added.push({ key, address });
+  }
+  return { held: added.length === 0 ? held : [...held, ...added], left };
+};
 
 export type Moved = {
   readonly held: readonly Held[];

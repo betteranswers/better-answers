@@ -222,7 +222,7 @@ const sensitivityWritten = async <A extends AuditAction>(
   tx: Tx,
   next: Visibility,
   auditEvent: Pick<AuditEvent<A>, "action" | "detail">,
-): Promise<Result<string, Error>> => {
+): Promise<Result<string>> => {
   const { admin, workspaceId, connectedSourceId } = acting;
   const written = await attempt(() =>
     tx.query(

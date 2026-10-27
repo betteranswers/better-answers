@@ -812,9 +812,9 @@ describe("how the workflows hand a release its commit", () => {
 
   it("declares every secret the caller passes", () => {
     const passed = Object.keys(build().jobs.release.secrets).sort();
-    const declared = Object.keys(release().on.workflow_call.secrets).sort();
+    const declared = new Set(Object.keys(release().on.workflow_call.secrets).sort());
 
-    expect(passed.filter((name) => !declared.includes(name))).toEqual([]);
+    expect(passed.filter((name) => !declared.has(name))).toEqual([]);
   });
 
   it("queues every release in one group, cancelling none", () => {
