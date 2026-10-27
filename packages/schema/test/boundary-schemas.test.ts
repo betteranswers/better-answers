@@ -4,7 +4,11 @@ import { getTableConfig, jsonb, PgDialect, PgTable, pgTable } from "drizzle-orm/
 import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createInsertSchema, createSelectSchema, createUpdateSchema } from "../src/drizzle-zod.ts";
+import {
+  createInsertSchema,
+  createSelectSchema,
+  createUpdateSchema,
+} from "../src/boundary-schemas/drizzle-zod.ts";
 import {
   ACCESS_REQUEST_REASON_MAX,
   boundarySchemas,

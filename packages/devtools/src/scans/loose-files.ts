@@ -58,7 +58,7 @@ export const CAPS: readonly Cap[] = [
   awaiting("packages/core/src/members", 21),
   awaiting("packages/core/src/workspaces", 26),
   awaiting("packages/core/test", 156),
-  awaiting("packages/schema/src", 17),
+  awaiting("packages/schema/src", 16),
 ];
 
 const READ_TREES = /^(?:apps\/[^/]+\/(?:src|test|tests|e2e)|packages\/[^/]+\/(?:src|test))\//u;

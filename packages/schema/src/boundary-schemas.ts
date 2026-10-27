@@ -1,8 +1,12 @@
 import type { PgTable } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
+import {
+  createInsertSchema,
+  createSelectSchema,
+  createUpdateSchema,
+} from "./boundary-schemas/drizzle-zod.ts";
 import { CONTRACT_DIGEST_PATTERN } from "./contract-digest.ts";
-import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
   bundleCommit,
   CONCEPT_BODY_MAX,

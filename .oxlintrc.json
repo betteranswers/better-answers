@@ -160,7 +160,7 @@
             "patterns": [
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
               },
               {
                 "group": [
@@ -178,7 +178,7 @@
       }
     },
     {
-      "files": ["packages/schema/src/drizzle-zod.ts"],
+      "files": ["packages/schema/src/boundary-schemas/drizzle-zod.ts"],
       "rules": {
         "no-restricted-imports": "off"
       }
@@ -192,7 +192,7 @@
             "patterns": [
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
               }
             ]
           }
@@ -236,7 +236,7 @@
               },
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
               },
               {
                 "group": [
@@ -282,7 +282,7 @@
               },
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
               },
               {
                 "group": [
@@ -324,7 +324,7 @@
               },
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
               },
               {
                 "group": [
@@ -367,7 +367,7 @@
               },
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
               },
               {
                 "group": [
@@ -416,7 +416,7 @@
               },
               {
                 "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+                "message": "drizzle-zod is imported only by packages/schema/src/boundary-schemas/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
               }
             ]
           }
@@ -643,7 +643,7 @@
     {
       "files": ["packages/schema/src/boundary-schemas.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 1388, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 1392, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
