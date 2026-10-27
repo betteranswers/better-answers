@@ -118,7 +118,7 @@ describe("one run of check names every failure", () => {
 
   it("names exactly a workspace's gates as its steps", () => {
     const checked = workspacesWith("check");
-    expect(checked.length).toBeGreaterThan(0);
+    expect(checked.length, "a workspace has a check script to read").toBeGreaterThan(0);
 
     for (const { directory, script: check } of checked) {
       const scripts = scriptsOf(directory);

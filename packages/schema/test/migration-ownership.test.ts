@@ -79,7 +79,10 @@ describe("the migration journal", () => {
       CLAIMS_TO_BE_HAND_WRITTEN.test(firstLineOf(sql)),
     );
 
-    expect(claiming.length).toBeGreaterThan(0);
+    expect(
+      claiming.length,
+      "a migration is hand-written, so the marker rule has something to check",
+    ).toBeGreaterThan(0);
     for (const { tag, sql } of claiming) {
       expect
         .soft(
@@ -95,7 +98,10 @@ describe("the migration journal", () => {
       ({ sql }) => firstLineOf(sql) !== CUSTOM_MARKER,
     );
 
-    expect(generated.length).toBeGreaterThan(0);
+    expect(
+      generated.length,
+      "a migration is generated, so the forbidden-table rule has something to check",
+    ).toBeGreaterThan(0);
     for (const { tag, sql } of generated) {
       for (const forbidden of FORBIDDEN_IN_GENERATED) {
         expect
