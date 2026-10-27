@@ -6,7 +6,7 @@ export * from "./rls-exemptions.ts";
 export * from "./table-ownership.ts";
 export * from "./definer-reach.ts";
 export * from "./postgres-image.ts";
-export * from "./boundary-schemas.ts";
+export * from "./boundary-schemas/index.ts";
 export * from "./ids.ts";
 export * from "./people/roles.ts";
 export * from "./ulid.ts";
