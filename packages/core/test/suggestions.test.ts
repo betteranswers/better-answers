@@ -1,5 +1,7 @@
+import { inspect } from "node:util";
+
 import pg from "pg";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { conceptIriOf, ulid, type ConceptIri } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
@@ -72,6 +74,12 @@ const submitted = async (
   return set.value;
 };
 
+const suggestionIdOf = (set: { readonly suggestionIds: readonly string[] }, at = 0): string => {
+  const suggestionId = set.suggestionIds[at];
+  if (suggestionId === undefined) throw new Error(`the set holds no suggestion at ${at}`);
+  return suggestionId;
+};
+
 const summaryOf = async (scenario: Scenario, setId: string) => {
   const read = await readingAs(db().runtimePool, scenario.admin, (principal, tx) =>
     suggestionSetSummary(principal, tx, setId),
@@ -102,8 +110,12 @@ const refusalOf = (outcome: AcceptanceOutcome): unknown =>
 const acceptedOf = (outcome: AcceptanceOutcome | undefined): ConceptWritten | undefined =>
   outcome?.outcome.ok === true ? outcome.outcome.value : undefined;
 
-const acceptedOne = async (scenario: Scenario, setId: string): Promise<ConceptWritten> => {
-  const [outcome] = await acceptAll(scenario, setId);
+const acceptedOne = async (
+  scenario: Scenario,
+  setId: string,
+  principal: UserPrincipal = scenario.admin,
+): Promise<ConceptWritten> => {
+  const [outcome] = await acceptAll(scenario, setId, principal);
   if (outcome === undefined) throw new Error("the acceptance returned no outcome");
   const accepted = acceptedOf(outcome);
   if (accepted === undefined) {
@@ -129,6 +141,16 @@ const suggestionRow = async (suggestionId: string) => {
     [suggestionId],
   );
   return found.rows[0];
+};
+
+const personOf = async (userId: string): Promise<{ name: string; email: string }> => {
+  const found = await db().pool.query<{ name: string; email: string }>(
+    'SELECT name, email FROM "user" WHERE id = $1',
+    [userId],
+  );
+  const [person] = found.rows;
+  if (person === undefined) throw new Error(`no user ${userId}`);
+  return person;
 };
 
 const auditEventsFor = async (workspaceId: string, action: string) => {
@@ -257,7 +279,7 @@ describe("a suggestion set", () => {
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
 
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
-    const row = await suggestionRow(set.suggestionIds[0] ?? "");
+    const row = await suggestionRow(suggestionIdOf(set));
     expect(row).toMatchObject({ status: "waiting", target_iri: null, decider: null });
   });
 
@@ -284,7 +306,7 @@ describe("a suggestion set", () => {
     const scenario = await arrange();
     const request = requestFor();
     const set = await submitted(scenario, scenario.editor, "edit", [request]);
-    const suggestionId = set.suggestionIds[0] ?? "";
+    const suggestionId = suggestionIdOf(set);
     const item = {
       suggestionId,
       kind: "edit",
@@ -369,7 +391,7 @@ describe("accepting a suggestion", () => {
       Suggestion: set.suggestionIds[0],
     });
 
-    const row = await suggestionRow(set.suggestionIds[0] ?? "");
+    const row = await suggestionRow(suggestionIdOf(set));
     expect(row).toMatchObject({
       status: "accepted",
       target_iri: accepted.iri,
@@ -401,7 +423,8 @@ describe("accepting a suggestion", () => {
     const scenario = await arrange();
 
     const { input: cited, written } = await editorWrote(scenario);
-    const filename = cited.path.split("/").at(-1) ?? "";
+    const filename = cited.path.split("/").at(-1);
+    assert(filename !== undefined, "the cited path names a file");
     const set = await submitted(scenario, scenario.editor, "edit", [
       requestFor({ body: `See [the policy](./${filename}) for the rule.` }),
     ]);
@@ -425,45 +448,29 @@ describe("accepting a suggestion", () => {
 
   it("commits an *edit* as the proposer, with the bot committing", async () => {
     const scenario = await arrange();
-    const proposer = await db().pool.query<{ name: string; email: string }>(
-      'SELECT name, email FROM "user" WHERE id = $1',
-      [scenario.editor.userId],
-    );
+    const person = await personOf(scenario.editor.userId);
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
 
-    const [outcome] = await acceptAll(scenario, set.setId);
+    const { sha } = await acceptedOne(scenario, set.setId);
 
-    const facts = await commitFacts(
-      scenario.git,
-      scenario.workspaceId,
-      acceptedOf(outcome)?.sha ?? "",
-    );
-    const person = proposer.rows[0];
-    expect(facts.author).toBe(`${person?.name} <${person?.email}>`);
+    const facts = await commitFacts(scenario.git, scenario.workspaceId, sha);
+    expect(facts.author).toBe(`${person.name} <${person.email}>`);
     expect(facts.committer).toContain("Better Answers");
   });
 
   it("commits an accepted Viewer edit with the Viewer as author", async () => {
     const scenario = await arrange();
-    const viewer = await db().pool.query<{ name: string; email: string }>(
-      'SELECT name, email FROM "user" WHERE id = $1',
-      [scenario.viewer.userId],
-    );
+    const person = await personOf(scenario.viewer.userId);
     const set = await submitted(scenario, scenario.viewer, "edit", [requestFor()]);
 
-    const [outcome] = await acceptAll(scenario, set.setId, scenario.editor);
+    const { sha } = await acceptedOne(scenario, set.setId, scenario.editor);
 
-    const facts = await commitFacts(
-      scenario.git,
-      scenario.workspaceId,
-      acceptedOf(outcome)?.sha ?? "",
-    );
-    const person = viewer.rows[0];
+    const facts = await commitFacts(scenario.git, scenario.workspaceId, sha);
     expect({ author: facts.author, actor: facts.trailers["Actor"] }).toEqual({
-      author: `${person?.name} <${person?.email}>`,
+      author: `${person.name} <${person.email}>`,
       actor: `human:${scenario.editor.userId}`,
     });
-    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({
+    expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({
       status: "accepted",
       decider: `human:${scenario.editor.userId}`,
     });
@@ -477,7 +484,7 @@ describe("accepting a suggestion", () => {
 
     expect(outcomes.map(refusalOf)).toEqual(["owner-forbids"]);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
-    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({
+    expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({
       status: "waiting",
       decider: null,
     });
@@ -518,49 +525,36 @@ describe("accepting a suggestion", () => {
 
   it("commits a run's suggested concept, authored by the accepting Admin", async () => {
     const scenario = await arrange();
-    const admin = await db().pool.query<{ name: string }>('SELECT name FROM "user" WHERE id = $1', [
-      scenario.admin.userId,
-    ]);
+    const admin = await personOf(scenario.admin.userId);
 
     const set = await seededSuggestion(scenario, requestFor(), {
       kind: "suggested-concept",
       proposer: "better-answers-extraction/1.2",
     });
 
-    const [outcome] = await acceptAll(scenario, set.setId);
+    const { sha } = await acceptedOne(scenario, set.setId);
 
-    const facts = await commitFacts(
-      scenario.git,
-      scenario.workspaceId,
-      acceptedOf(outcome)?.sha ?? "",
-    );
-    expect(facts.author).toContain(admin.rows[0]?.name ?? "");
+    const facts = await commitFacts(scenario.git, scenario.workspaceId, sha);
+    expect(facts.author).toContain(admin.name);
   });
 
   it("never names another workspace's person as author, whatever is claimed", async () => {
     const here = await arrange();
     const elsewhere = await arrange();
-    const stranger = await db().pool.query<{ name: string; email: string }>(
-      'SELECT name, email FROM "user" WHERE id = $1',
-      [elsewhere.editor.userId],
-    );
-    const decider = await db().pool.query<{ name: string; email: string }>(
-      'SELECT name, email FROM "user" WHERE id = $1',
-      [here.admin.userId],
-    );
+    const stranger = await personOf(elsewhere.editor.userId);
+    const person = await personOf(here.admin.userId);
 
     const spoofed = await seededSuggestion(here, requestFor(), {
       kind: "edit",
       proposer: `human:${elsewhere.editor.userId}`,
     });
 
-    const [outcome] = await acceptAll(here, spoofed.setId);
+    const { sha } = await acceptedOne(here, spoofed.setId);
 
-    const facts = await commitFacts(here.git, here.workspaceId, acceptedOf(outcome)?.sha ?? "");
-    const person = decider.rows[0];
-    expect(facts.author).toBe(`${person?.name} <${person?.email}>`);
+    const facts = await commitFacts(here.git, here.workspaceId, sha);
+    expect(facts.author).toBe(`${person.name} <${person.email}>`);
 
-    expect(facts.author).not.toContain(stranger.rows[0]?.email ?? "no address");
+    expect(facts.author).not.toContain(stranger.email);
   });
 
   it("commits each item in bulk under one shared batch id", async () => {
@@ -599,7 +593,7 @@ describe("accepting a suggestion", () => {
   it("refuses a Viewer and a non-owning Editor, leaving it waiting", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
-    const suggestionId = set.suggestionIds[0] ?? "";
+    const suggestionId = suggestionIdOf(set);
 
     for (const principal of [scenario.viewer, scenario.unowned]) {
       const refused = await acceptSuggestions(principal, doorsOf(scenario), {
@@ -612,7 +606,7 @@ describe("accepting a suggestion", () => {
     }
 
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
-    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
+    expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({ status: "waiting" });
   });
 
   it("answers another workspace's suggestion as one nobody minted", async () => {
@@ -622,15 +616,13 @@ describe("accepting a suggestion", () => {
 
     const reached = await acceptSuggestions(here.admin, doorsOf(here), {
       decisions: [
-        { suggestionId: theirs.suggestionIds[0] ?? "", expectedTarget: null },
+        { suggestionId: suggestionIdOf(theirs), expectedTarget: null },
         { suggestionId: ulid(), expectedTarget: null },
       ],
     });
 
-    expect(reached.ok && reached.value.map(refusalOf)).toEqual([
-      "no-such-suggestion",
-      "no-such-suggestion",
-    ]);
+    assert(reached.ok, inspect(reached));
+    expect(reached.value.map(refusalOf)).toEqual(["no-such-suggestion", "no-such-suggestion"]);
     expect(await bundleHistory(here.git, here.workspaceId)).toEqual([]);
   });
 });
@@ -644,7 +636,7 @@ describe("an acceptance of a suggestion that changes nothing", () => {
     const stored = parseConceptFile(
       await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path),
     );
-    if (!stored.ok) throw new Error("the stored file does not parse");
+    assert(stored.ok, `the stored file does not parse: ${inspect(stored)}`);
     const set = await submitted(scenario, scenario.viewer, "edit", [
       {
         mergeKey: input.mergeKey,
@@ -660,7 +652,7 @@ describe("an acceptance of a suggestion that changes nothing", () => {
     const [outcome] = await acceptAll(scenario, set.setId, scenario.editor);
 
     expect(outcome?.outcome).toMatchObject({ ok: true });
-    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "accepted" });
+    expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({ status: "accepted" });
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(2);
   });
 });
@@ -677,12 +669,13 @@ describe("an acceptance whose ground moved", () => {
     await editorWrote(scenario, { mergeKey: request.mergeKey, path: request.path });
 
     const accepted = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
-      decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }],
+      decisions: [{ suggestionId: suggestionIdOf(set), expectedTarget: null }],
     });
 
-    expect(accepted.ok && accepted.value.map(refusalOf)).toEqual(["resolution-moved"]);
+    assert(accepted.ok, inspect(accepted));
+    expect(accepted.value.map(refusalOf)).toEqual(["resolution-moved"]);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
-    const row = await suggestionRow(set.suggestionIds[0] ?? "");
+    const row = await suggestionRow(suggestionIdOf(set));
     expect(row).toMatchObject({
       status: "returned",
       decider: `human:${scenario.admin.userId}`,
@@ -710,7 +703,7 @@ describe("an acceptance whose ground moved", () => {
     expect(accepted.map(refusalOf)).toEqual(["stale-precondition"]);
 
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(2);
-    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "returned" });
+    expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({ status: "returned" });
   });
 
   it("refuses a second decision on an already decided suggestion", async () => {
@@ -719,7 +712,7 @@ describe("an acceptance whose ground moved", () => {
     await acceptAll(scenario, set.setId);
 
     const again = await declineSuggestion(scenario.admin, doorsOf(scenario), {
-      suggestionId: set.suggestionIds[0] ?? "",
+      suggestionId: suggestionIdOf(set),
       reason: "on reflection, no",
     });
 
@@ -733,13 +726,14 @@ describe("declining a suggestion", () => {
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
 
     const declined = await declineSuggestion(scenario.admin, doorsOf(scenario), {
-      suggestionId: set.suggestionIds[0] ?? "",
+      suggestionId: suggestionIdOf(set),
       reason: "not the company's word on this",
     });
 
-    expect(declined.ok && declined.value.status).toBe("declined");
+    assert(declined.ok, inspect(declined));
+    expect(declined.value.status).toBe("declined");
 
-    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({
+    expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({
       status: "declined",
       reason: "not the company's word on this",
       decider: `human:${scenario.admin.userId}`,
@@ -761,7 +755,7 @@ describe("declining a suggestion", () => {
   it("declines as owner, recording the owner as decider", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.viewer, "edit", [requestFor()]);
-    const suggestionId = set.suggestionIds[0] ?? "";
+    const suggestionId = suggestionIdOf(set);
 
     const declined = await declineSuggestion(scenario.editor, doorsOf(scenario), {
       suggestionId,
@@ -787,7 +781,7 @@ describe("declining a suggestion", () => {
     ]);
 
     const declined = await declineSuggestion(scenario.editor, doorsOf(scenario), {
-      suggestionId: set.suggestionIds[0] ?? "",
+      suggestionId: suggestionIdOf(set),
       reason: "not the company's word on this",
     });
 
@@ -797,7 +791,7 @@ describe("declining a suggestion", () => {
   it("refuses a non-owning Editor, and a blank reason", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
-    const suggestionId = set.suggestionIds[0] ?? "";
+    const suggestionId = suggestionIdOf(set);
 
     const byEditor = await declineSuggestion(scenario.unowned, doorsOf(scenario), {
       suggestionId,
@@ -818,7 +812,7 @@ describe("declining a suggestion", () => {
   it("refuses a reason the column would hold as nothing", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
-    const suggestionId = set.suggestionIds[0] ?? "";
+    const suggestionId = suggestionIdOf(set);
 
     const nothing = await declineSuggestion(scenario.admin, doorsOf(scenario), {
       suggestionId,
@@ -874,7 +868,7 @@ describe("declining a suggestion", () => {
   ])("answers %s as itself, deciding nothing", async (_why, decide, expected) => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
-    const suggestionId = set.suggestionIds[0] ?? "";
+    const suggestionId = suggestionIdOf(set);
 
     const refused = await decide(scenario, suggestionId);
 
@@ -885,7 +879,7 @@ describe("declining a suggestion", () => {
   it("refuses an overlong reason before opening a transaction", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
-    const suggestionId = set.suggestionIds[0] ?? "";
+    const suggestionId = suggestionIdOf(set);
 
     const refused = await declineSuggestion(scenario.admin, doorsOf(scenario), {
       suggestionId,
@@ -916,7 +910,7 @@ describe("an acceptance at a path another concept holds", () => {
     expect(
       await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.accepted"),
     ).toHaveLength(1);
-    expect(await suggestionRow(set.suggestionIds[1] ?? "")).toMatchObject({
+    expect(await suggestionRow(suggestionIdOf(set, 1))).toMatchObject({
       status: "waiting",
       decider: null,
       target_iri: null,
@@ -954,11 +948,7 @@ describe("the platform's citation fix", () => {
       }),
     );
 
-    const [outcome] = await acceptAll(scenario, set.setId);
-
-    const fixed = acceptedOf(outcome);
-    expect(outcome === undefined ? undefined : refusalOf(outcome)).toBeUndefined();
-    if (fixed === undefined) return;
+    const fixed = await acceptedOne(scenario, set.setId);
     expect(fixed.contentHash).not.toBe(written.contentHash);
     expect(fixed.contentHash).toBe(contentHashOf(cite("p.7"), input.body, input.path));
 
@@ -1024,7 +1014,7 @@ describe("two actions over one suggestion", () => {
   it("lets one of an acceptance and a decline through", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
-    const suggestionId = set.suggestionIds[0] ?? "";
+    const suggestionId = suggestionIdOf(set);
 
     const [accepted, declined] = await Promise.all([
       acceptSuggestions(scenario.admin, doorsOf(scenario), {
@@ -1037,28 +1027,32 @@ describe("two actions over one suggestion", () => {
     ]);
 
     const row = await suggestionRow(suggestionId);
-    const landed = accepted.ok && acceptedOf(accepted.value[0]) !== undefined;
-    expect({
+    assert(accepted.ok, inspect(accepted));
+    expect([
+      {
+        status: "accepted",
+        commits: 1,
+        accepted: [undefined],
+        declined: { ok: false, error: "already-decided" },
+      },
+      {
+        status: "declined",
+        commits: 0,
+        accepted: ["already-decided"],
+        declined: matching.objectContaining({ ok: true }),
+      },
+    ]).toContainEqual({
       status: row?.["status"],
       commits: (await bundleHistory(scenario.git, scenario.workspaceId)).length,
-      loser: landed
-        ? declined.ok
-          ? undefined
-          : declined.error
-        : accepted.ok
-          ? accepted.value.map(refusalOf)
-          : accepted.error,
-    }).toEqual(
-      landed
-        ? { status: "accepted", commits: 1, loser: "already-decided" }
-        : { status: "declined", commits: 0, loser: ["already-decided"] },
-    );
+      accepted: accepted.value.map(refusalOf),
+      declined,
+    });
   });
 
   it("lets one of two Admins accept a new concept", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
-    const decisions = [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }];
+    const decisions = [{ suggestionId: suggestionIdOf(set), expectedTarget: null }];
 
     const [first, second] = await Promise.all([
       acceptSuggestions(scenario.admin, doorsOf(scenario), { decisions }),
@@ -1067,9 +1061,9 @@ describe("two actions over one suggestion", () => {
 
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
     expect(await countOf("concept_index", scenario.workspaceId)).toBe("1");
-    const refusals = [first, second].flatMap((result) =>
-      result.ok ? result.value.map(refusalOf) : [result.error],
-    );
+    assert(first.ok, inspect(first));
+    assert(second.ok, inspect(second));
+    const refusals = [...first.value, ...second.value].map(refusalOf);
     expect(refusals.filter((refusal) => refusal === undefined)).toHaveLength(1);
     expect(refusals.filter((refusal) => refusal === "already-decided")).toHaveLength(1);
   });
@@ -1143,7 +1137,7 @@ describe("an acceptance whose ground moved under its own lock", () => {
       }
     });
 
-    await expectReturned(outcomes, set.suggestionIds[0] ?? "");
+    await expectReturned(outcomes, suggestionIdOf(set));
 
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
     expect(await countOf("concept_index", scenario.workspaceId)).toBe("0");
@@ -1161,14 +1155,14 @@ describe("an acceptance whose ground moved under its own lock", () => {
       );
     });
 
-    await expectReturned(outcomes, set.suggestionIds[0] ?? "");
+    await expectReturned(outcomes, suggestionIdOf(set));
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
   });
 
   it("throws rather than commits a decision another action made", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
-    const suggestionId = set.suggestionIds[0] ?? "";
+    const suggestionId = suggestionIdOf(set);
     const decisions = await decisionsFor(scenario, set.setId);
 
     const outcomes = await acceptingParkedOn(scenario, "audit_event", decisions, async () => {
@@ -1192,9 +1186,13 @@ describe("an acceptance whose ground moved under its own lock", () => {
 
     const outcome = outcomes[0]?.outcome;
     expect(outcome).toEqual({ ok: false, error: matching.any(Error) });
-    expect(outcome?.ok === false && String(outcome.error)).toContain(
-      "decided by somebody else while this action was in flight",
-    );
+    expect(outcome).toMatchObject({
+      error: {
+        message: matching.stringContaining(
+          "decided by somebody else while this action was in flight",
+        ),
+      },
+    });
     expect(await suggestionRow(suggestionId)).toMatchObject({ status: "declined" });
     expect(await countOf("concept_index", scenario.workspaceId)).toBe("0");
     expect(await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.accepted")).toEqual([]);
@@ -1211,11 +1209,12 @@ describe("what an acceptance answers when it cannot be prepared", () => {
     const accepted = await acceptSuggestions(
       scenario.admin,
       { ...doorsOf(scenario), postgres: openPostgres(gone) },
-      { decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }] },
+      { decisions: [{ suggestionId: suggestionIdOf(set), expectedTarget: null }] },
     );
 
-    expect(accepted.ok === true && accepted.value.map(refusalOf)).toEqual([matching.any(Error)]);
-    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
+    assert(accepted.ok, inspect(accepted));
+    expect(accepted.value.map(refusalOf)).toEqual([matching.any(Error)]);
+    expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({ status: "waiting" });
   });
 
   it("refuses an Admin whose credentials were revoked, leaving it waiting", async () => {
@@ -1227,38 +1226,29 @@ describe("what an acceptance answers when it cannot be prepared", () => {
     );
 
     const accepted = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
-      decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }],
+      decisions: [{ suggestionId: suggestionIdOf(set), expectedTarget: null }],
     });
 
-    expect(accepted.ok === true && accepted.value.map(refusalOf)).toEqual(["credentials-revoked"]);
-    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
+    assert(accepted.ok, inspect(accepted));
+    expect(accepted.value.map(refusalOf)).toEqual(["credentials-revoked"]);
+    expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({ status: "waiting" });
   });
 
   it("commits a person's suggested concept, authored by the accepting Admin", async () => {
     const scenario = await arrange();
-    const admin = await db().pool.query<{ name: string; email: string }>(
-      'SELECT name, email FROM "user" WHERE id = $1',
-      [scenario.admin.userId],
-    );
-    const editor = await db().pool.query<{ email: string }>(
-      'SELECT email FROM "user" WHERE id = $1',
-      [scenario.editor.userId],
-    );
+    const admin = await personOf(scenario.admin.userId);
+    const editor = await personOf(scenario.editor.userId);
 
     const raised = await seededSuggestion(scenario, requestFor(), {
       kind: "suggested-concept",
       proposer: `human:${scenario.editor.userId}`,
     });
 
-    const [outcome] = await acceptAll(scenario, raised.setId);
+    const { sha } = await acceptedOne(scenario, raised.setId);
 
-    const facts = await commitFacts(
-      scenario.git,
-      scenario.workspaceId,
-      acceptedOf(outcome)?.sha ?? "",
-    );
-    expect(facts.author).toBe(`${admin.rows[0]?.name} <${admin.rows[0]?.email}>`);
-    expect(facts.author).not.toContain(editor.rows[0]?.email ?? "no address");
+    const facts = await commitFacts(scenario.git, scenario.workspaceId, sha);
+    expect(facts.author).toBe(`${admin.name} <${admin.email}>`);
+    expect(facts.author).not.toContain(editor.email);
   });
 
   it("writes one subject line however the payload's title was spaced", async () => {
@@ -1290,8 +1280,10 @@ describe("who may open a suggestion set", () => {
       opened(scenario.viewer),
     ]);
 
-    expect(byAdmin.ok && byAdmin.value).toHaveLength(1);
-    expect(byProposer.ok && byProposer.value).toHaveLength(1);
+    assert(byAdmin.ok, inspect(byAdmin));
+    expect(byAdmin.value).toHaveLength(1);
+    assert(byProposer.ok, inspect(byProposer));
+    expect(byProposer.value).toHaveLength(1);
     expect(byStranger).toEqual({ ok: false, error: "role-forbids" });
   });
 
@@ -1303,9 +1295,8 @@ describe("who may open a suggestion set", () => {
       suggestionSetSummary(resolved, tx, set.setId),
     );
 
-    expect(opened.ok && opened.value.map((item) => item.proposer)).toEqual([
-      `human:${scenario.viewer.userId}`,
-    ]);
+    assert(opened.ok, inspect(opened));
+    expect(opened.value.map((item) => item.proposer)).toEqual([`human:${scenario.viewer.userId}`]);
   });
 
   it("hides unreadable resolutions from a proposer, not the deciding Admin", async () => {
@@ -1329,11 +1320,11 @@ describe("who may open a suggestion set", () => {
       opened(scenario.admin),
     ]);
 
-    expect(byProposer.ok && byProposer.value.map((item) => [item.target, item.baseMoved])).toEqual([
-      [null, true],
-    ]);
+    assert(byProposer.ok, inspect(byProposer));
+    expect(byProposer.value.map((item) => [item.target, item.baseMoved])).toEqual([[null, true]]);
 
-    expect(byAdmin.ok && byAdmin.value.map((item) => [item.target, item.baseMoved])).toEqual([
+    assert(byAdmin.ok, inspect(byAdmin));
+    expect(byAdmin.value.map((item) => [item.target, item.baseMoved])).toEqual([
       [written.iri, false],
     ]);
   });
@@ -1374,7 +1365,7 @@ describe("an acceptance reached straight through the write path", () => {
       iri: written.iri,
       body: SUGGESTED_BODY,
       expects: { base: written.contentHash },
-      acceptance: { suggestionId: set.suggestionIds[0] ?? "", setId: set.setId, kind: "edit" },
+      acceptance: { suggestionId: suggestionIdOf(set), setId: set.setId, kind: "edit" },
       ...overrides,
     };
   };
@@ -1385,7 +1376,7 @@ describe("an acceptance reached straight through the write path", () => {
     commits: number,
   ): Promise<void> => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(commits);
-    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
+    expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({ status: "waiting" });
   };
 
   it("refuses an acceptance written onto another concept", async () => {
@@ -1421,7 +1412,7 @@ describe("an acceptance reached straight through the write path", () => {
       "suggestion kind",
       (set) => ({
         acceptance: {
-          suggestionId: set.suggestionIds[0] ?? "",
+          suggestionId: suggestionIdOf(set),
           setId: set.setId,
           kind: "citation-fix",
         },
@@ -1460,7 +1451,7 @@ describe("an acceptance reached straight through the write path", () => {
       message: "Accept the suggested change to Expenses",
       author: { name: "Ada Editor", email: "ada@acme.invalid" },
       expects: { base: null },
-      acceptance: { suggestionId: set.suggestionIds[0] ?? "", setId: set.setId, kind: "edit" },
+      acceptance: { suggestionId: suggestionIdOf(set), setId: set.setId, kind: "edit" },
     });
 
     expect(refused).toEqual({ ok: false, error: "malformed" });
@@ -1478,7 +1469,7 @@ describe("an acceptance reached straight through the write path", () => {
     const moved = await rewrittenAgainst(scenario, input, written, {
       body: "Expenses are claimed within ten days.",
     });
-    if (!moved.ok) throw new Error(`the re-write was refused: ${String(moved.error)}`);
+    assert(moved.ok, `the re-write was refused: ${inspect(moved)}`);
 
     const refused = await writeConcept(
       scenario.editor,
@@ -1659,9 +1650,7 @@ describe("what a suggestion set refuses before it does any work", () => {
         decisions: [{ suggestionId: "suggestion-1", expectedTarget: null }],
       }),
       acceptSuggestions(scenario.admin, doorsOf(scenario), {
-        decisions: [
-          { suggestionId: set.suggestionIds[0] ?? "", expectedTarget: "knowledge/expenses.md" },
-        ],
+        decisions: [{ suggestionId: suggestionIdOf(set), expectedTarget: "knowledge/expenses.md" }],
       }),
       acceptSuggestions(scenario.admin, doorsOf(scenario), { decisions: [] }),
     ]);
@@ -1671,7 +1660,7 @@ describe("what a suggestion set refuses before it does any work", () => {
       { ok: false, error: "malformed" },
       { ok: false, error: "malformed" },
     ]);
-    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
+    expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({ status: "waiting" });
   });
 });
 
@@ -1720,7 +1709,7 @@ describe("an accepted edit's identity and state", () => {
 
     expect(outcome?.outcome).toEqual({ ok: false, error: "resolution-moved" });
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
-    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "returned" });
+    expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({ status: "returned" });
     expect(await mergeKeyHeldBy(written.iri)).toBe(input.mergeKey);
   });
 
@@ -1728,10 +1717,7 @@ describe("an accepted edit's identity and state", () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.viewer, "edit", [requestFor()]);
 
-    const [outcome] = await acceptAll(scenario, set.setId, scenario.editor);
-    const accepted = acceptedOf(outcome);
-    if (accepted === undefined)
-      throw new Error(`refused: ${String(outcome && refusalOf(outcome))}`);
+    const accepted = await acceptedOne(scenario, set.setId, scenario.editor);
     const row = await db().pool.query<Record<string, unknown>>(
       "SELECT status, sensitivity, published_at IS NOT NULL AS published FROM concept_index WHERE iri = $1",
       [accepted.iri],
@@ -1757,10 +1743,7 @@ describe("an accepted edit's identity and state", () => {
       { ...request, frontmatter: { ...request.frontmatter, sources: [cited] } },
     ]);
 
-    const [outcome] = await acceptAll(scenario, set.setId, scenario.admin);
-    const accepted = acceptedOf(outcome);
-    if (accepted === undefined)
-      throw new Error(`refused: ${String(outcome && refusalOf(outcome))}`);
+    const accepted = await acceptedOne(scenario, set.setId);
     const row = await db().pool.query(
       "SELECT status, sensitivity FROM concept_index WHERE iri = $1",
       [accepted.iri],

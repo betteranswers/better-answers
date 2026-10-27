@@ -13,6 +13,7 @@ import {
 } from "../src/store/objects/index.ts";
 import { principalOf } from "./platform.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
+import { answered } from "./suite-postgres.ts";
 
 const store = objectStoreForSuite();
 
@@ -40,8 +41,7 @@ describe("the object door keeps a workspace's bytes", () => {
     expect(put).toEqual({ ok: true, value: undefined });
 
     const got = await getObject(workspace, store().door, "documents/notice.txt");
-    if (!got.ok) throw new Error(`the door refused the read: ${got.error}`);
-    expect(await textOf(got.value)).toEqual("Grüße, Ada — €5 𝄞");
+    expect(await textOf(answered(got))).toEqual("Grüße, Ada — €5 𝄞");
   });
 
   it("lists only the keys under the prefix asked for", async () => {
@@ -69,9 +69,8 @@ describe("the object door keeps a workspace's bytes", () => {
 
     const firstRead = await getObject(first, store().door, "notes.txt");
     const secondRead = await getObject(second, store().door, "notes.txt");
-    if (!firstRead.ok || !secondRead.ok) throw new Error("the door refused a read it should not");
-    expect(await textOf(firstRead.value)).toEqual("the first workspace's notes");
-    expect(await textOf(secondRead.value)).toEqual("the second workspace's notes");
+    expect(await textOf(answered(firstRead))).toEqual("the first workspace's notes");
+    expect(await textOf(answered(secondRead))).toEqual("the second workspace's notes");
 
     await putObject(first, store().door, "only-the-first.txt", streamOf("the first's alone"));
     await putObject(second, store().door, "only-the-second.txt", streamOf("the second's alone"));
@@ -104,8 +103,7 @@ describe("the object door keeps platform bytes apart from every workspace's", ()
     expect(put).toEqual({ ok: true, value: undefined });
 
     const got = await getPlatformObject(erasure, store().door, key);
-    if (!got.ok) throw new Error(`the door refused the read: ${got.error}`);
-    expect(await textOf(got.value)).toEqual(
+    expect(await textOf(answered(got))).toEqual(
       '{"pseudonym":"erased-person-01","identifiers":["ada@example.invalid"]}',
     );
 
@@ -124,9 +122,9 @@ describe("the object door keeps platform bytes apart from every workspace's", ()
 
     await putObject(workspace, store().door, "erasures/not-the-platform.json", streamOf("{}"));
     const listed = await listPlatformObjects(erasure, store().door, "erasures/");
-    if (!listed.ok) throw new Error(`the door refused the listing: ${listed.error}`);
-    expect(listed.value).toContain(key);
-    expect(listed.value).not.toContain("erasures/not-the-platform.json");
+    const platformKeys = answered(listed);
+    expect(platformKeys).toContain(key);
+    expect(platformKeys).not.toContain("erasures/not-the-platform.json");
   });
 
   it("keeps a platform key shaped like a workspace's out", async () => {
