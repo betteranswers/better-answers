@@ -156,6 +156,9 @@ const twoCitedDocuments = async (scenario: Scenario) => {
   return { narrowed, onNarrowed, onUntouched };
 };
 
+const finishedOrQueuedBehind = (finished: () => boolean) => async () =>
+  finished() || (await countWaitingOnLocks(db().pool)) > 1;
+
 describe("a sync that narrows a cited document", () => {
   it("narrows the concepts citing it on the next tick", async () => {
     const scenario = await arrange();
@@ -309,7 +312,7 @@ describe("a sync that narrows a cited document", () => {
         ).finally(() => {
           finished = true;
         });
-        await until(async () => finished || (await countWaitingOnLocks(db().pool)) > 1);
+        await until(finishedOrQueuedBehind(() => finished));
         return {
           following: followingPass,
           overriding: overridingWrite,

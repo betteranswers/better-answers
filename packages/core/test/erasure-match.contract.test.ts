@@ -142,14 +142,12 @@ describe("an occurrence as the erasure-match agreement answers it", () => {
   });
 
   it("folds each code point as the agreement's Unicode 15.1 digest", () => {
-    const lines = function* () {
-      for (const character of charactersTheDigestsRead()) {
-        const folded = normalisedIdentifier(character);
-        if (folded !== character) yield `${hexOf(character)} ${hexOf(folded)}\n`;
-      }
-    };
+    const lines = [...charactersTheDigestsRead()]
+      .map((character) => ({ character, folded: normalisedIdentifier(character) }))
+      .filter(({ character, folded }) => folded !== character)
+      .map(({ character, folded }) => `${hexOf(character)} ${hexOf(folded)}\n`);
 
-    expect(digestOf(lines())).toBe(fixture.digests.folding.sha256);
+    expect(digestOf(lines)).toBe(fixture.digests.folding.sha256);
   });
 
   it("is unbounded by exactly the word characters the digest names", () => {
@@ -161,9 +159,9 @@ describe("an occurrence as the erasure-match agreement answers it", () => {
   it("is unbounded for an address by exactly the listed joiners", () => {
     const ofTheAddress = matchesOf("emails", "ab@cd.ef");
     const words = wordCharacters();
-    const joiners = [...charactersTheDigestsRead()].filter(
-      (character) => !words.has(character) && ofTheAddress(`ab@cd.ef${character}g`).length === 0,
-    );
+    const joiners = [...charactersTheDigestsRead()]
+      .filter((character) => !words.has(character))
+      .filter((character) => ofTheAddress(`ab@cd.ef${character}g`).length === 0);
 
     expect(joiners.toSorted()).toEqual(fixture.boundary.address_joiners.toSorted());
   });

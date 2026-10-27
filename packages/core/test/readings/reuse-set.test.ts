@@ -37,6 +37,9 @@ const titlesOf = (set: ReuseSet, keys: readonly string[]): readonly string[] =>
     answers.flatMap(({ key, title }) => (keys.includes(key) ? [title] : [])),
   );
 
+const fitsOf = (set: ReuseSet, asked: string): readonly string[] =>
+  set.questions.find(({ question }) => question === asked)?.fits ?? [];
+
 const judgingAsLabelled: Replying = (body, set) => {
   const asked = set.questions.find(({ question }) => question === questionIn(body));
   return new Response(judgeReplyTo(titlesOf(set, asked?.fits ?? []), body), { status: 200 });
@@ -141,8 +144,7 @@ describe("the reuse reading", () => {
   it("reads a decision model's verdicts at its given threshold", async () => {
     const { client } = clientAnswering(async (body) => {
       const state = z.object({ state: z.string() }).parse(JSON.parse(body)).state;
-      const asked = set.questions.find(({ question }) => question === state);
-      const fits = titlesOf(set, asked?.fits ?? []);
+      const fits = titlesOf(set, fitsOf(set, state));
       const yes = new Map([...decisionCandidatesIn(body).keys()].map((title) => [title, 0.6]));
       for (const title of fits) yes.set(title, 0.8);
       return new Response(decisionReplyTo(yes, body), { status: 200 });

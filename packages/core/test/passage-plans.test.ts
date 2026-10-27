@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MARK_THE_MATCH_LEAKPROOF } from "@better-answers/schema";
 import { UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
 
-import { ok, type UserPrincipal } from "../src/kernel/index.ts";
+import { ok, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import {
   findPassages,
   findPassagesWithOpening,
@@ -31,6 +31,10 @@ const HANDBOOK = {
  * hundred rows, dearer at this many.
  */
 const INVOICE_LINES = 500;
+
+const passagesOf = <P, E>(
+  page: Result<readonly { readonly passage: P }[], E>,
+): Result<readonly P[], E> => (page.ok ? ok(page.value.map(({ passage }) => passage)) : page);
 
 type Arranged = {
   readonly admin: UserPrincipal;
@@ -154,7 +158,7 @@ describe.each(Object.entries(ARMS))(
           limit: 10,
           after: { weight: 3, rank: 3, key: { sourceDocumentId: arranged.handbook, charStart: 0 } },
         });
-        return page.ok ? ok(page.value.map(({ passage }) => passage)) : page;
+        return passagesOf(page);
       });
 
       expect(found.answer).toEqual(handbookFound(arranged));
