@@ -4,7 +4,7 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
@@ -575,8 +575,9 @@ describe("the production restore's record", () => {
     )?.[1];
 
     expect({ code: ran.code, logged }).toEqual({ code: 0, logged: matching.any(String) });
-    await recorded.query(logged ?? "");
-    await recorded.query(logged ?? "");
+    assert(logged !== undefined, "the restore logged the statement to run");
+    await recorded.query(logged);
+    await recorded.query(logged);
     expect((await rowsStartedAt(started)).map((row) => row["store"])).toEqual([
       "git",
       "objectstore",

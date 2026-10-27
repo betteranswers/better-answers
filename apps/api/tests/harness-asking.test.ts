@@ -75,6 +75,19 @@ const draftedOn = async (recordId: string): Promise<readonly unknown[]> => {
   return kept.parse(found.rows[0] ?? { drafted: null }).drafted ?? [];
 };
 
+/** Reads the stream, noting how much of the draft was kept each time a sentence arrives held. */
+const keptAtEachHeldSentence = async (api: Web, workspaceId: string) => {
+  let recordId = "";
+  const keptWhileHeld: number[] = [];
+  for await (const event of await api.ask.question.mutate({ question: QUESTION })) {
+    if (event.kind === "result") recordId = event.result.recordId;
+    if (event.kind !== "sentence") continue;
+    keptWhileHeld.push((await draftedOn(recordId)).length);
+    await released(workspaceId);
+  }
+  return { recordId, keptWhileHeld };
+};
+
 const streamed = async (api: Web) => {
   const events = [];
   for await (const event of await api.ask.question.mutate({ question: QUESTION })) {
@@ -134,15 +147,8 @@ describe("the browser suite's scripted model", () => {
   it("holds the draft after its first sentence until released", async () => {
     const { workspaceId, api } = await anAdminAsking();
     await scripted({ workspaceId, judging: { fits: [] }, drafting: DRAFTING, holds: "draft" });
-    let recordId = "";
-    const keptWhileHeld: number[] = [];
 
-    for await (const event of await api.ask.question.mutate({ question: QUESTION })) {
-      if (event.kind === "result") recordId = event.result.recordId;
-      if (event.kind !== "sentence") continue;
-      keptWhileHeld.push((await draftedOn(recordId)).length);
-      await released(workspaceId);
-    }
+    const { recordId, keptWhileHeld } = await keptAtEachHeldSentence(api, workspaceId);
 
     expect(keptWhileHeld).toEqual([0]);
     expect(await draftedOn(recordId)).toHaveLength(1);

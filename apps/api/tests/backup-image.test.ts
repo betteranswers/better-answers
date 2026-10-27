@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
@@ -159,9 +159,7 @@ describe.skipIf(nothingToProbeHere)("the backup image", () => {
   });
 
   it("schedules exactly the script's jobs, each once", () => {
-    const scheduled = contents.cronEntries
-      .map((entry) => /backup\.sh\s+(\w+)/.exec(entry)?.[1] ?? "")
-      .sort();
+    const scheduled = contents.cronEntries.map(jobScheduledBy).sort();
 
     expect(contents.cronIsThere).toBe(true);
 
@@ -662,7 +660,9 @@ describe.skipIf(nothingToProbeHere)("the backup image's hourly job", () => {
   }, IMAGE_PROBE_ALLOWANCE);
 
   it("records its dump's size, location and expiry", () => {
-    const [location = "", size = ""] = dumps[0]?.split(" ") ?? [];
+    const [dump] = dumps;
+    assert(dump !== undefined, "the run took a dump");
+    const [location, size] = dump.split(" ");
 
     expect({ dumps, log }).toMatchObject({
       dumps: [
@@ -678,6 +678,9 @@ describe.skipIf(nothingToProbeHere)("the backup image's hourly job", () => {
     });
   });
 });
+
+const jobScheduledBy = (cronEntry: string): string =>
+  /backup\.sh\s+(\w+)/.exec(cronEntry)?.[1] ?? "";
 
 const fenced = (script: string, step: string): string => {
   const body = read(script).split(`# >>> ${step}\n`)[1]?.split(`# <<< ${step}`)[0];

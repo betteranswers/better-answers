@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 
 import { writeUnder } from "@better-answers/devtools/throwaway-tree";
 import {
@@ -86,7 +86,8 @@ describe("the production browsing helper", () => {
 
   it("opens a loopback SSH forward to the database, with keepalives", () => {
     expect({ status: opened.status, stderr: opened.stderr }).toEqual({ status: 0, stderr: "" });
-    const argv = opened.sshArgv ?? "";
+    const argv = opened.sshArgv;
+    assert(argv !== undefined, "the script ran ssh");
     expect(argv).toContain(`-L 127.0.0.1:${String(port)}:127.0.0.1:5999`);
     expect(argv).toContain("-N");
     expect(argv).toContain("-o ServerAliveInterval=15 -o ServerAliveCountMax=4");
@@ -142,7 +143,7 @@ describe("the production browsing helper", () => {
         { BROWSE_PORT: String(await freePort()) },
         path.join(tree, "deploy/browse-production.sh"),
       );
-      reached.push({ status: run.status, target: run.sshArgv?.endsWith(` ${TARGET}`) ?? false });
+      reached.push({ status: run.status, target: String(run.sshArgv).endsWith(` ${TARGET}`) });
     }
     expect(reached).toEqual([
       { status: 0, target: true },

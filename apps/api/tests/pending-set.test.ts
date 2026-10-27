@@ -111,13 +111,25 @@ describe("the pending set in the library's endpoints", () => {
     expect([...OPEN_TO_A_PENDING_SESSION].filter((path) => !mounted.has(path))).toEqual([]);
   });
 
-  it.each(ENDPOINTS)("answers %s to a pending session as the set says", async (path, method) => {
-    const answered = await askedOfTheLibrary(await aPendingSession(), path, method);
+  it.each(ENDPOINTS.filter(([path]) => OPEN_TO_A_PENDING_SESSION.has(path)))(
+    "serves %s to a pending session, as the set says",
+    async (path, method) => {
+      const answered = await askedOfTheLibrary(await aPendingSession(), path, method);
 
-    const pending = await refusedAsPending(answered);
-    const absent = answered.status === 404;
-    expect(OPEN_TO_A_PENDING_SESSION.has(path) ? pending : !(pending || absent)).toBe(false);
-  });
+      expect(await refusedAsPending(answered)).toBe(false);
+    },
+  );
+
+  it.each(ENDPOINTS.filter(([path]) => !OPEN_TO_A_PENDING_SESSION.has(path)))(
+    "refuses or hides %s from a pending session",
+    async (path, method) => {
+      const answered = await askedOfTheLibrary(await aPendingSession(), path, method);
+
+      const pending = await refusedAsPending(answered);
+      const absent = answered.status === 404;
+      expect([pending, absent]).toContain(true);
+    },
+  );
 });
 
 const API_ROUTES = {

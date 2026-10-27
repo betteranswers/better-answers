@@ -1,4 +1,4 @@
-import { describe, expect, it, onTestFinished } from "vitest";
+import { assert, describe, expect, it, onTestFinished } from "vitest";
 import { z } from "zod";
 
 import { keyIn } from "@better-answers/schema/testing/authenticator-code";
@@ -127,8 +127,9 @@ describe("setting up an authenticator", () => {
 
     expect(answered.status).toBe(200);
     const { recoveryCodes } = finished.parse(await answered.json());
+    assert(recoveryCodes !== null, "the setup answered its recovery codes");
     expect(recoveryCodes).toHaveLength(10);
-    for (const code of recoveryCodes ?? []) expect(code).toMatch(RECOVERY_CODE);
+    for (const code of recoveryCodes) expect(code).toMatch(RECOVERY_CODE);
     expect(await factorOf(person.id)).toEqual({ enabled: true, verified: true });
   });
 
@@ -215,7 +216,9 @@ describe("setting up an authenticator", () => {
     expect(subjectsTo(person.email)).toEqual([ADDED]);
     const sent = JSON.stringify(noticesTo(person.email));
     expect(sent).not.toContain(keyIn(setupAddress));
-    for (const code of recoveryCodes ?? []) expect(sent).not.toContain(code);
+    assert(recoveryCodes !== null, "the setup answered its recovery codes");
+    expect(recoveryCodes).toHaveLength(10);
+    for (const code of recoveryCodes) expect(sent).not.toContain(code);
   });
 
   it("answers the codes while the notice is still sending", async () => {

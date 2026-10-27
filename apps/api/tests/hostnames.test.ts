@@ -8,6 +8,11 @@ import {
 } from "../src/ingress/hostnames.ts";
 import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME, startApp, type TestApp } from "./harness.ts";
 
+const hostLiteral = (hostname: string): string =>
+  hostname.includes(":") ? `[${hostname}]` : hostname;
+
+const methodFor = (path: string): "GET" | "POST" => (path === "/mcp" ? "POST" : "GET");
+
 describe("each hostname reaches only its documented surface", () => {
   let app: TestApp;
 
@@ -31,8 +36,9 @@ describe("each hostname reaches only its documented surface", () => {
 
   it("answers the health check on loopback for the container's probe", async () => {
     for (const loopback of LOOPBACK_HOSTNAMES) {
-      const host = loopback.includes(":") ? `[${loopback}]` : loopback;
-      const response = await app.server.request(new Request(`http://${host}/health`));
+      const response = await app.server.request(
+        new Request(`http://${hostLiteral(loopback)}/health`),
+      );
 
       expect(response.status).toBe(200);
     }
@@ -109,7 +115,7 @@ describe("each hostname reaches only its documented surface", () => {
       "/sign-in-link/sign-in",
       "/health",
     ]) {
-      const refused = await agent.fetch(path, { method: path === "/mcp" ? "POST" : "GET" });
+      const refused = await agent.fetch(path, { method: methodFor(path) });
       expect(refused.status).toBe(404);
       expect(refusals().at(-1)).toMatchObject({ path, role: "agent" });
     }
