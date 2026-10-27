@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
@@ -303,11 +303,12 @@ describe("the per-address ceiling over tRPC", () => {
     const toBen = await invitedOne(api, anAddress("ben"));
     const statuses = await sentToTheCeiling(api, ana);
     const [toAna] = await api.members.invitations.query({ status: "waiting" });
+    assert(toAna !== undefined, "ana's invitation is waiting");
     const before = await api.members.invitations.query();
 
     const refused = await refusalOfCall(
       api.members.bulkResendInvitations.mutate({
-        invitationIds: [toBen.invitationId, toAna?.invitationId ?? ""],
+        invitationIds: [toBen.invitationId, toAna.invitationId],
       }),
     );
 
@@ -399,17 +400,15 @@ describe("the invitations by status over tRPC", () => {
       expiresAt: new Date(Date.now() - A_DAY_MS),
     });
 
-    const idsOf = async (status?: "waiting" | "accepted" | "expired" | "cancelled") =>
-      (await api.members.invitations.query(status === undefined ? undefined : { status })).map(
-        (row) => [row.invitationId, row.status],
-      );
+    const idsOf = async (asked?: Parameters<typeof api.members.invitations.query>[0]) =>
+      (await api.members.invitations.query(asked)).map((row) => [row.invitationId, row.status]);
 
     expect({
       unasked: await idsOf(),
-      waiting: await idsOf("waiting"),
-      accepted: await idsOf("accepted"),
-      expired: await idsOf("expired"),
-      cancelled: await idsOf("cancelled"),
+      waiting: await idsOf({ status: "waiting" }),
+      accepted: await idsOf({ status: "accepted" }),
+      expired: await idsOf({ status: "expired" }),
+      cancelled: await idsOf({ status: "cancelled" }),
     }).toEqual({
       unasked: [[waiting.invitationId, "waiting"]],
       waiting: [[waiting.invitationId, "waiting"]],
@@ -546,10 +545,12 @@ describe("a set of invitations over tRPC", () => {
     const { api } = await anAdmin();
     const sent = await inviting(api, [anAddress("ana"), anAddress("ben")]);
     const [gone, waiting] = sent.invitations.map((one) => one.invitationId);
-    await api.members.cancelInvitation.mutate({ invitationId: gone ?? "" });
+    assert(gone !== undefined, "the first invitation was sent");
+    assert(waiting !== undefined, "the second invitation was sent");
+    await api.members.cancelInvitation.mutate({ invitationId: gone });
 
     const cancelled = await api.members.bulkCancelInvitations.mutate({
-      invitationIds: [gone ?? "", waiting ?? ""],
+      invitationIds: [gone, waiting],
     });
 
     expect(cancelled).toEqual({ changed: [waiting], skipped: 1 });
@@ -679,7 +680,7 @@ describe("who may act on invitations", () => {
     expect(answered).toMatchObject(NOT_A_MEMBER);
   });
 
-  it.each(VERBS.filter(([verb]) => verb === "resend" || verb === "cancel"))(
+  it.each(VERBS.filter(([verb]) => ["resend", "cancel"].includes(verb)))(
     "refuses an Admin elsewhere the %s verb on this invitation",
     async (_verb, call) => {
       const { invitationId } = await aWaitingInvitation();
