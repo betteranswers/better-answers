@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, describe, expect, it } from "vitest";
 import type { z } from "zod";
 
 import { head } from "@better-answers/core/store/git";
@@ -10,7 +12,7 @@ import {
   conceptIriTakenAgain,
 } from "@better-answers/schema/testing/probes";
 
-import { find, open } from "../src/answering/index.ts";
+import { find, open, type FindMatch } from "../src/answering/index.ts";
 import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
 import {
   cascadingVisibility,
@@ -259,16 +261,15 @@ describe("what a governed write derives from its cited connected sources", () =>
 
   it("intersects their audiences, with everyone as the identity", async () => {
     const scenario = await arrange();
-    const [hr, sales, board] = await Promise.all(
-      ["HR", "Sales", "Board"].map((name) => groupNamed(db(), scenario, name, [])),
-    );
-    const forHrAndSales = await connectedSourceForGroups(db(), scenario.workspaceId, [
-      hr ?? "",
-      sales ?? "",
+    const [hr, sales, board] = await Promise.all([
+      groupNamed(db(), scenario, "HR", []),
+      groupNamed(db(), scenario, "Sales", []),
+      groupNamed(db(), scenario, "Board", []),
     ]);
+    const forHrAndSales = await connectedSourceForGroups(db(), scenario.workspaceId, [hr, sales]);
     const forSalesAndBoard = await connectedSourceForGroups(db(), scenario.workspaceId, [
-      sales ?? "",
-      board ?? "",
+      sales,
+      board,
     ]);
     const forEveryone = await connectedSourceHolding(db(), scenario.workspaceId);
 
@@ -313,7 +314,8 @@ describe("what a governed write derives from its cited connected sources", () =>
     const seen = await reading(scenario.viewer, (viewer, tx) =>
       open(viewer, tx, { iri: written.iri }, now),
     );
-    expect(seen.ok && seen.value.found).toBe(false);
+    assert(seen.ok, inspect(seen));
+    expect(seen.value.found).toBe(false);
   });
 
   it("floors a Person at Restricted whatever its evidence says", async () => {
@@ -454,26 +456,29 @@ describe("what a governed write derives from its cited connected sources", () =>
 
 describe("what an edit keeps of a concept's citations", () => {
   it.each([
-    ["keeps", "still cite it"],
-    ["clears", "cite no document"],
-  ] as const)("%s the citations when the edit's sources %s", async (outcome, _sources) => {
+    {
+      outcome: "keeps",
+      sources: "still cite it",
+      citing: (documentId: string): string[] => [documentId],
+    },
+    {
+      outcome: "clears",
+      sources: "cite no document",
+      citing: (_documentId: string): string[] => [],
+    },
+  ])("$outcome the citations when the edit's sources $sources", async ({ citing }) => {
     const scenario = await arrange();
     const source = await connectedSourceHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [source.documentId]);
 
-    const edited = await rewriteCiting(
-      scenario,
-      scenario.editor,
-      written,
-      outcome === "keeps" ? [source.documentId] : [],
-    );
-    if (!edited.ok) throw new Error(`the edit answered ${String(edited.error)}`);
+    const cited = citing(source.documentId);
+    const edited = await rewriteCiting(scenario, scenario.editor, written, cited);
+    assert(edited.ok, `the edit answered: ${inspect(edited)}`);
     const event = await db().pool.query<{ detail: { evidenceCount: number } }>(
       "SELECT detail FROM audit_event WHERE id = $1",
       [edited.value.auditEventId],
     );
 
-    const cited = outcome === "keeps" ? [source.documentId] : [];
     expect(await documentsCitedBy(scenario.workspaceId, written.iri)).toEqual(cited);
     expect(event.rows[0]?.detail.evidenceCount).toBe(cited.length);
   });
@@ -666,11 +671,12 @@ describe("narrowing a connected source", () => {
     ]);
     await narrowedWriteUpAndUntouchedConcept(scenario.workspaceId, writeUp, untouched.iri);
 
+    assert(narrowed.ok, inspect(narrowed));
     expect(
       await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed"),
     ).toEqual([
       {
-        id: narrowed.ok ? narrowed.value.auditEventId : "",
+        id: narrowed.value.auditEventId,
         actor: `human:${scenario.admin.userId}`,
         subject_id: connectedSource.connectedSourceId,
         detail: {
@@ -826,8 +832,8 @@ describe("narrowing a connected source", () => {
         reading(person, (reader, tx) => open(reader, tx, { iri: written.iri }, now)),
       ),
     );
-    expect(viewer?.ok && viewer.value.found).toBe(false);
-    expect(editor?.ok && editor.value.found).toBe(true);
+    expect(viewer).toMatchObject({ ok: true, value: { found: false } });
+    expect(editor).toMatchObject({ ok: true, value: { found: true } });
   });
 
   it("names a malformed field before weighing role, and moves nothing", async () => {
@@ -923,9 +929,9 @@ describe("narrowing a connected source", () => {
       ].map((move) => reading(scenario.admin, (admin, tx) => narrowingAsked(admin, tx, move))),
     );
 
-    expect(refusals.map((refused) => (refused.ok ? "ok" : refused.error))).toEqual([
-      "no-such-group",
-      "no-such-binding",
+    expect(refusals).toEqual([
+      { ok: false, error: "no-such-group" },
+      { ok: false, error: "no-such-binding" },
     ]);
   });
 
@@ -1368,11 +1374,12 @@ describe("widening a connected source", () => {
     ]);
     expect(await heldRow(scenario.workspaceId, untouched.iri)).toEqual(restrictedToHr);
 
+    assert(widened.ok, inspect(widened));
     expect(
       await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened"),
     ).toEqual([
       {
-        id: widened.ok ? widened.value.auditEventId : "",
+        id: widened.value.auditEventId,
         actor: `human:${scenario.admin.userId}`,
         subject_id: connectedSource.connectedSourceId,
         detail: {
@@ -1555,10 +1562,10 @@ describe("widening a connected source", () => {
       ),
     ]);
 
-    expect(refusals.map((refused) => (refused.ok ? "ok" : refused.error))).toEqual([
-      "role-forbids",
-      "no-such-binding",
-      "no-such-group",
+    expect(refusals).toEqual([
+      { ok: false, error: "role-forbids" },
+      { ok: false, error: "no-such-binding" },
+      { ok: false, error: "no-such-group" },
     ]);
   });
 
@@ -1742,7 +1749,8 @@ describe("an Admin's recorded override", () => {
       "SELECT actor, audit_event_id FROM concept_sensitivity_override WHERE workspace_id = $1 AND iri = $2",
       [scenario.workspaceId, person.iri],
     );
-    const auditEventId = overridden.ok ? overridden.value.auditEventId : "";
+    assert(overridden.ok, inspect(overridden));
+    const { auditEventId } = overridden.value;
     expect(recorded.rows).toEqual([
       { actor: `human:${scenario.admin.userId}`, audit_event_id: auditEventId },
     ]);
@@ -1760,7 +1768,8 @@ describe("an Admin's recorded override", () => {
     const seen = await reading(scenario.viewer, (viewer, tx) =>
       open(viewer, tx, { iri: person.iri }, now),
     );
-    expect(seen.ok && seen.value.found).toBe(true);
+    assert(seen.ok, inspect(seen));
+    expect(seen.value.found).toBe(true);
   });
 
   it("stands when the source is later narrowed, outranking the evidence", async () => {
@@ -1804,11 +1813,11 @@ describe("an Admin's recorded override", () => {
     );
 
     expect(editor).toEqual({ ok: false, error: "role-forbids" });
-    expect(refusals.map((refused) => (refused.ok ? "ok" : refused.error))).toEqual([
-      "no-such-concept",
-      "no-such-group",
-      "malformed",
-      "malformed",
+    expect(refusals).toEqual([
+      { ok: false, error: "no-such-concept" },
+      { ok: false, error: "no-such-group" },
+      { ok: false, error: "malformed" },
+      { ok: false, error: "malformed" },
     ]);
     expect(
       await auditEventRowsOf(db().pool, scenario.workspaceId, "knowledge.concept.class_overridden"),
@@ -1847,6 +1856,9 @@ describe("an Admin's recorded override", () => {
     ).toEqual([]);
   });
 });
+
+const conceptIrisAmong = (matches: readonly FindMatch[]): string[] =>
+  matches.flatMap((match) => (match.layer === "bundles" ? [match.iri] : [])).toSorted();
 
 const expensesNotes = async (scenario: Scenario) => {
   const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
@@ -1902,12 +1914,8 @@ describe("find", () => {
       },
     });
 
-    expect(
-      admin.ok &&
-        admin.value.matches
-          .flatMap((match) => (match.layer === "bundles" ? [match.iri] : []))
-          .toSorted(),
-    ).toEqual([visible.iri, withheld.iri].toSorted());
+    assert(admin.ok, inspect(admin));
+    expect(conceptIrisAmong(admin.value.matches)).toEqual([visible.iri, withheld.iri].toSorted());
   });
 
   it("answers a question with only concepts the reader may see", async () => {
@@ -1915,7 +1923,8 @@ describe("find", () => {
     const { visible, withheld } = await expensesNotes(scenario);
     const relatedTo = async (person: UserPrincipal, question: string) => {
       const answer = await reading(person, (reader, tx) => plannedOn(reader, tx, { question }));
-      return answer.ok ? answer.value.related.map((concept) => concept.iri).toSorted() : answer;
+      assert(answer.ok, inspect(answer));
+      return answer.value.related.map((concept) => concept.iri).toSorted();
     };
 
     expect(await relatedTo(scenario.viewer, "How are expenses claimed?")).toEqual([visible.iri]);
@@ -1940,12 +1949,12 @@ describe("find", () => {
       ].map((input) => reading(scenario.viewer, (reader, tx) => find(reader, tx, input, now))),
     );
 
-    expect(limited?.ok && limited.value.matches.map((match) => match.title)).toEqual([
-      "Alpha note",
-      "Beta note",
-    ]);
-    expect(pattern?.ok && pattern.value.matches).toEqual([]);
-    expect(empty?.ok && empty.value.matches).toEqual([]);
+    expect(limited).toMatchObject({
+      ok: true,
+      value: { matches: [{ title: "Alpha note" }, { title: "Beta note" }] },
+    });
+    expect(pattern).toMatchObject({ ok: true, value: { matches: [] } });
+    expect(empty).toMatchObject({ ok: true, value: { matches: [] } });
   });
 });
 
