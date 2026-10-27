@@ -68,9 +68,3 @@ The audit slice, `packages/core/src/audit/`, has two doors. `record` takes a Pri
 - One global rewrite target on erasure: linkable across controllers.
 - A member status a person is put into and taken out of: a second thing the resolver reads.
 - Marking tokens revoked: it reaches the provider's replay path. A `before` hook on `/oauth2/token` and a patch of the provider were rejected too.
-
-## History
-
-The full record, with its three amendments (T-440, T-458, T-460): `docs/archive/adr/0035-one-id-per-person.md`.
-
-On 22/10/2026 the version tables and `usage` joined the records erasure rewrites (BA-234).

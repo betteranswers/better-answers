@@ -53,7 +53,3 @@ A bundle's identity lives in its manifest, a platform-reserved file at the bundl
 - `id` as the key name: it collides with `sources[].id` and with neo4j-okf's `Concept.id`, which is the path.
 - `okf://` or a `cross_refs:` key for references inside a file: each needs a resolver everywhere or is invisible to link checkers.
 - Bundle metadata in the root `index.md` frontmatter: the spec permits only `okf_version` there.
-
-## History
-
-The full record, with its three amendments (tickets 38, 22 and 79, the last applied by T-001): `docs/archive/adr/0002-concept-and-bundle-identity.md`.

@@ -62,7 +62,3 @@ Only S8 measuring a need for the filter columns on the indexed table reopens thi
 - Copies every writer re-copies through one function: the five-writers problem restated.
 - A guard trigger that refuses a wrong value: every writer still computes the fold, and a race becomes a failed sync.
 - Leaving the re-copy at sync end: the failure is unbounded, and the remedy can itself widen.
-
-## History
-
-The full record, with its one amendment (T-324): `docs/archive/adr/0044-chunk-visibility-is-read-not-copied.md`.

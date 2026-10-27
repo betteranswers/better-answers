@@ -53,7 +53,3 @@ The api is a plain long-running Node process on Hono, Node 24. One process carri
 - Hono with server-rendered React: solves a problem no page has and adds build complexity.
 - Bun as the runtime: Node LTS is what the lifted contracts pin and what the MCP SDK, Vitest and Testcontainers target. Bun stays available for scripts.
 - A generated declaration file for `AppRouter`: a build step that exists to satisfy a sentence.
-
-## History
-
-The full record, with its two amendments (T-022, T-230): `docs/archive/adr/0006-hono-and-vite-not-nextjs.md`.

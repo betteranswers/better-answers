@@ -42,7 +42,3 @@ A concept file carries no `relations` key and no typed link. It carries only the
 - Predicates as a term list in the bundle or a platform table, checked closed-world: a relation schema anywhere is refused.
 - DataBook-style typed fenced blocks (Turtle, SHACL) in the body: a second syntax for every author and agent to learn.
 - Predicates as a fixed platform list: platform vocabulary in every workspace's bundle.
-
-## History
-
-The full record, proposed and rejected the same day (ticket 47) and read strictly on 29/08/2026 (ticket 50, ADR 0026): `docs/archive/adr/0010-typed-relations-on-concepts.md`.

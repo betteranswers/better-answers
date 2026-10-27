@@ -65,9 +65,3 @@ A passage carries no pair of its own. It reads its connected source's through `i
 - Combining by union: a concept minted from HR's document and Sales's would be wider than either piece of evidence.
 - An Admin arm on the audience term: an Admin outside a Restricted connected source's group would see what the connected source withholds.
 - A second table for a connected source's named people: refused by ADR 0038.
-
-## History
-
-The full record, with no amendments: `docs/archive/adr/0039-audience-word-and-group-ids.md`.
-
-Amended 09/10/2026 by the plan for BA-85 (`docs/plans/2026-10-09-1517-fix-sync-narrows-citing-concepts-plan.md`): a narrowing by the worker's sync re-derives on the api's tick, not in a transaction of its own.

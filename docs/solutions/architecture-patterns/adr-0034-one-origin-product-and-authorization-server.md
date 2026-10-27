@@ -64,7 +64,3 @@ One origin, `app.<apex>`, carries the SPA, sign-in, the workspace picker, consen
 
 - `mcp.` kept as a bearer-only resource host: a second document-serving host and a four-hostname fence for one path.
 - Two hosts, with `docs.` moved off the apex: the subdomain exposure stays a promise rather than a mechanism, and consent stays unprovable in the browser suite.
-
-## History
-
-The full record, with its two amendments (T-005, T-119): `docs/archive/adr/0034-one-origin-product-and-authorization-server.md`.

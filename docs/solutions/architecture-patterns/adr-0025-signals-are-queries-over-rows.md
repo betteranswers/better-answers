@@ -57,7 +57,3 @@ These shapes live here, not in the rules. The logging rule in `CODING_STANDARDS.
 - A webhook channel in v0.1: no customer has asked for one.
 - Spend derived from *Questions asked* and the syncs' job rows: it loses enrichment and embedding calls and cannot price a sync mid-flight.
 - Thresholds in code: every tune a release.
-
-## History
-
-The full record, with its one amendment (T-078): `docs/archive/adr/0025-signals-are-queries-over-rows.md`.

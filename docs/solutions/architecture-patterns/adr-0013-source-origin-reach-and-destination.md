@@ -76,7 +76,3 @@ A connected source widens only through an Admin's recorded widen action (`widenC
 - A customer-hosted worker now, a worker-local folder watch, or a platform drop area: the share agent reaches an on-site folder with nothing of the platform on the customer's network.
 - Every lifted connector switched on, an OKF-bundle upload connected source, or source ACL synchronisation: no first-customer case.
 - Docling as the converter for layout: on CPU it wants more than twice the worker's 1.5 GB.
-
-## History
-
-The full record, with its amendments (ticket 24, ticket 50, ticket 79 applied by T-001, T-078, T-055, T-128, T-131, T-130, T-184, T-220, T-370, T-371): `docs/archive/adr/0013-source-origin-reach-and-destination.md`.

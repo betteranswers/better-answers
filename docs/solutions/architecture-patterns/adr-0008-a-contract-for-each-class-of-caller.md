@@ -38,7 +38,7 @@ The authorization server's pages are `/oauth2/*`, the path `@better-auth/oauth-p
 - The MCP surface and `/oauth2/*` answer on the product's origin, `app.<domain>`, beside `/.well-known/*` and `/jwks`, never on `mcp.` (ADR 0034).
 - The host router, `apps/api/src/ingress/hostnames.ts`, holds paths per hostname across three hostnames: `app.`, `agent.` and the apex. It is mounted ahead of every other route. On `agent.` it refuses anything but `/agent/v1/*`, before a body is read.
 
-Business logic lives in `packages/core`. The same function serves every transport because it takes a `Principal` first, as `CODING_STANDARDS.md` requires, and nothing transport-shaped.
+Business logic lives in `packages/core`. The same function serves every transport because it takes a `Principal` first.
 
 - A transport is proven by its own tests: its verifier, its refusals, its mounted routes.
 - A capability's functional test goes through the interface a caller crosses in its tier.
@@ -57,7 +57,3 @@ Business logic lives in `packages/core`. The same function serves every transpor
 - REST and OpenAPI for everything: the SPA loses end-to-end types, and MCP tools would wrap REST calls twice.
 - tRPC only: no API for anyone outside our own TypeScript, and none for agents.
 - GraphQL: a second schema language beside zod and OKF frontmatter, which nothing on the roster speaks.
-
-## History
-
-The full record, with its six amendments (tickets 47, 53 and 41, then T-030, T-045 and T-078): `docs/archive/adr/0008-trpc-inside-openapi-and-mcp-outside.md`.

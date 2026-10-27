@@ -70,11 +70,3 @@ How a model key is kept:
 ## Rejected
 
 - Keeping the class list in the credential-class rule: a specification dressed as a coding rule, which a reader reasonably expects something to run.
-
-## History
-
-The full record, with no amendments; T-184 moved it out of the constitution: `docs/archive/adr/0041-secrets-in-seven-credential-classes.md`.
-
-Amended 14/10/2026 by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, U9 and KTD11): the credentials provider is built for the LLM-provider class, and *The LLM-provider class* answers the three questions the provider's shape left open for it. The two conflicts recorded unsettled are untouched.
-
-Amended 15/10/2026 by the same plan's U15: Cloudflare joins the model providers for Workers AI, and its key carries the account id before the token.

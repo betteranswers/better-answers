@@ -4,37 +4,21 @@ Issues live in Linear: workspace `tw-group`, team `better-answers` (ids `BA-N`),
 
 ---
 
-## What an issue is for
-
-- **The backlog.** Work that is known but not yet planned.
-
-An issue is not the unit of build work: a pull request is. Work that needs more than one owner, or will outlast one session, gets a plan in `docs/plans/` first. The pull request that lands an issue says `Fixes BA-N` in its description.
-
 ## States
 
 | State | Meaning |
 |---|---|
-| Triage | New, and not yet triaged. An agent files a new issue here. The owner or an agent moves it on: to Todo when it is next to build, to Backlog with what it waits on. An issue waiting on an owner ruling stays here, with the question in a comment |
-| Backlog | Held. The description's opening lines say what it waits on: an upstream release, a route block, an owner action |
-| Todo | Ready to build. Unassigned means an agent may take it; assigned to the owner means it is theirs |
+| Triage | New, and not yet triaged. New issues start here. The owner or an agent then moves it through the workflow states |
+| Backlog | Held. The description's opening lines say what it waits on |
+| Todo | Ready to build |
 | In Progress, In Review | Being built; In Review once its pull request is open |
 | Done | Its pull request merged |
 
-## When to file one
-
-Fix what you find in the session where you find it. A test that cannot fail, a stale name, a gap a verdict names or a small defect goes into the open pull request, or into a new one in the same session.
-
-File an issue only when the work cannot land in that session: it needs more than one owner, it waits on something outside the repository, or it needs an owner ruling that the owner cannot give before the session ends.
-
-Settle a design question with pstack's principle skills before you put it to the owner. Read the ones that bear on it, such as `principle-laziness-protocol` or `principle-minimize-reader-load`, and decide. Only a question the principles cannot settle goes to the owner, such as a product or preference call. Ask it in the session. File it, in Triage with the question in a comment, only when the owner cannot answer before the session ends.
-
 ## Filing an issue
 
-Create it with `save_issue`: `team: better-answers`, `project: better-answers`, `state: Triage`, a priority, and one of the workspace's `product` labels: `feature`, `bug` or `improvement`. Where a task relates to a route block at the label e.g., `S1`, `S2`, `S3` etc.
+Create it with `save_issue`: `team: better-answers`, `project: better-answers`, `state: Triage`, a priority, and the relevant team issues `route-block` label e.g., `S1`, `S2`, `S3` etc.
 
-**The title** takes the commit's form (`docs/agents/workflow.md`, *The commit's form*): `type(scope): summary`, 90 characters at most, the summary imperative and lower-case with no full stop. The title names no issue id, and the detail goes in the description. Check one before it is written: `printf '%s\n' "<title>" | pnpm exec commitlint`.
-
-**The description** has these sections:
+**Description format:**
 
 ```markdown
 ## Goal
@@ -49,12 +33,3 @@ Anything that doesn't fit elsewhere.
 ```
 
 Progress goes in comments, one per landing. A dependency is a Linear relation (`blockedBy`), not a line in the description.
-
-## The tasks before Linear
-
-Until 30/09/2026 the tracker was ordna, and code, docs and commits cite its tasks as `T-nnn`. The tasks stay in git as blobs at `refs/ordna/tasks/<id>`. A fresh clone does not fetch them, so read one like this:
-
-```bash
-git fetch origin '+refs/ordna/tasks/*:refs/ordna/tasks/*'
-git cat-file -p refs/ordna/tasks/T-123
-```

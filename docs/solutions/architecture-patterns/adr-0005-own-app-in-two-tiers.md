@@ -74,7 +74,3 @@ The envelope a credential is sealed in has a written format:
 - Track upstream by submodules or long-lived fork branches: a refresh must be a deliberate, tested action.
 - ChaCha20-Poly1305: equal strength and the same nonce discipline, with nothing gained for a second cipher.
 - XChaCha20-Poly1305: the OpenSSL that Node exposes does not carry it, so it would need a lift or a second library.
-
-## History
-
-The full record, with its fourteen amendments (tickets 38, 47, 15, 53, 39, 41, 73, 74, 62 and 79, then T-020, T-078, T-130 and T-274): `docs/archive/adr/0005-own-app-in-two-tiers.md`.

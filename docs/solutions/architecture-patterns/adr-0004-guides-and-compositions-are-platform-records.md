@@ -50,9 +50,3 @@ A guide definition and every write-up are platform records in Postgres, with app
 
 - Narrator concepts in the bundle: prose drifts, the bundle carries per-product UI state, and guides become git workflow for people.
 - Database only, with no skeleton projection: gives up the structural portability no competitor offers.
-
-## History
-
-On 22/10/2026 the skeleton was built (BA-235). This doc gained its path, its role labels and expected facts' names, the template it is seeded from, and the rule that a concept write adds no include.
-
-The full record, with its eight amendments (tickets 38, 45 and 46, 47, 16, 19, 20, 23 and 39): `docs/archive/adr/0004-guides-and-compositions-are-platform-records.md`.

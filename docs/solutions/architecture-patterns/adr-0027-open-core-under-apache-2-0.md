@@ -52,7 +52,3 @@ The repository is public under the Apache License 2.0, one licence over the whol
 - An `ee/` directory for paid features: it doubles every seam, and there is no feature to gate that is not also what makes the product usable.
 - Opening only the share agent and the OKF tooling: two repositories and two release trains.
 - Outside contributions under a DCO or a CLA: the review load is the problem, and every merged outside line is a provenance question.
-
-## History
-
-The full record, with its two amendments (ticket 79's Q10, applied by T-001, and T-078): `docs/archive/adr/0027-open-core-under-apache-2-0.md`.

@@ -83,7 +83,3 @@ A spike measured all of this on cocoindex 1.0.22. Conversion plus the withholdin
 - One memo over conversion and detection returning redacted text: every policy change re-detected, and an erasure had to remove the store.
 - Two nested memos: `landed` is mounted, so an inner memo lives in the connected source's store and dies in every wipe.
 - The `finding` table as the cache: a wipe deletes its unmarked rows, so a partial set reads as complete and a document goes silently un-redacted.
-
-## History
-
-The full record, with its five amendments (T-113, T-129, the architecture review of 21/09/2026, T-285, T-288): `docs/archive/adr/0036-worker-composes-cocoindex-blocks.md`.

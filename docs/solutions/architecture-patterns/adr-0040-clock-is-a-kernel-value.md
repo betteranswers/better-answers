@@ -50,7 +50,3 @@ A test pins a `now: Date` site with a literal `Date`, and a `clock: Clock` site 
 - One mutable process-wide clock patched in tests: the constitution bans mocking our own code, and it is the same ambient state moved.
 - A `Clock` at every site: a bigger interface than the sites that read once need.
 - A Clock for the worker, for symmetry: it would invite a time-based decision in the tier with no harness to pin one.
-
-## History
-
-The full record, with its three amendments (T-109, T-138, T-429): `docs/archive/adr/0040-clock-is-a-kernel-value.md`.

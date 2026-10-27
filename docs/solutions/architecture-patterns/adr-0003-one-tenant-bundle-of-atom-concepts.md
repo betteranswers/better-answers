@@ -51,7 +51,3 @@ The atom-boundary rule:
 
 - A concept per guide subsection (one-to-one with the first customer's requirements, about 100 files): a page hides per-fact trust, and a guide cannot be the unit when every company defines its own.
 - A bundle per collection (ownership for free): every cross-collection reference would need a platform extension, since OKF has no cross-bundle link.
-
-## History
-
-The full record, with its one amendment (ticket 38): `docs/archive/adr/0003-one-tenant-bundle-of-atom-concepts.md`.

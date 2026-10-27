@@ -99,7 +99,3 @@ Better Auth is a stay. Any one of three triggers starts a migration: a licence o
 - Hosted Auth0 in the UK: every sign-in on a third party's uptime and terms.
 - Zitadel, Authentik, Ory, WorkOS, Clerk and Stytch: missing RFC 8414, closed DCR, container count or US-only data.
 - The MCP SDK's own OAuth helpers: Express-only and frozen.
-
-## History
-
-The full record, with its fourteen amendments (tickets 21 and 79, then T-004, T-022, T-045, T-044, T-073, T-078, T-328 and T-329, T-355, the T-027 and T-028 grill, T-420, T-460 and T-474): `docs/archive/adr/0009-better-auth-in-process-identity-provider.md`.

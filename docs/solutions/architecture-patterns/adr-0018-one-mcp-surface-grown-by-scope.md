@@ -63,7 +63,3 @@ The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It 
 - A second server for acting: two of everything for the same person.
 - Groups in the token: stale for up to an hour.
 - An orienting `describe_estate` entry: dropped after the prototype, as above.
-
-## History
-
-The full record, with its amendments (ticket 79 applied by T-001, A26 from prototype 61, T-045, T-134, T-380): `docs/archive/adr/0018-one-mcp-surface-five-entries.md`. Its filename keeps the old count of five so references still resolve.

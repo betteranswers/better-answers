@@ -4,8 +4,6 @@ One skill here comes from https://github.com/jspiro/skills, which is under the M
 
 It carries the owner's edits.
 
-The notice sits in this file, not in each skill's folder. A licence file inside a folder would change that folder's hash in `skills-lock.json`.
-
 The text below is the upstream `LICENSE`, read on 24/09/2026 at commit `5fd16c00ce674cadbe7819514ec78cedd8915eb3`.
 
 ```text
@@ -39,7 +37,7 @@ SOFTWARE.
 
 Upstream ships it as a Factory Droid plugin, with its manifest at `.factory-plugin/plugin.json`. Here the same manifest sits at `.claude-plugin/plugin.json`, so Claude Code loads the folder as `pixel-perfect@skills-dir` and its skills take the `pixel-perfect:` prefix. Four skills carry the owner's edits: `animate`, `colorize` and `typeset` read the project's `.pixel-perfect.md` first, and `frontend-design` works within the project's design system. Every other file matches upstream at that commit.
 
-Its `LICENSE` and `NOTICE.md` sit inside its folder, because the Apache License 2.0 requires both to travel with the files. The rule above about keeping licence files out of a skill's folder protects hashes in `skills-lock.json`. The skills CLI does not install this plugin, so that rule does not apply to it.
+Its `LICENSE` and `NOTICE.md` sit inside its folder, because the Apache License 2.0 requires both to travel with the files.
 
 ## `survey-architecture`
 
@@ -47,7 +45,7 @@ Its `LICENSE` and `NOTICE.md` sit inside its folder, because the Apache License 
 
 It carries the owner's edits throughout:
 - The grilling loop, the edits to the glossary and decision docs, and the report in the temp directory were dropped. The architecture review that follows the report owns those steps.
-- Upstream's design vocabulary, from its `codebase-design` skill, gave way to this repository's `CODING_STANDARDS.md` and decision docs.
+- Upstream's design vocabulary, from its `codebase-design` skill, gave way to this repository's decision docs.
 - The test guidance was rewritten to this repository's rule that every store the platform runs is tested for real.
 - Picking areas from GitNexus, rebuilding each proposal from first principles and drawing with the `diagram-design` plugin were added.
 

@@ -79,7 +79,3 @@ The sign-in and the consent are written after Better Auth's own write. A failed 
 - Month partitioning, as ADR 0014 said: see above.
 - Doors that return a `Result`: a value the action might not read would let its rows commit without their event.
 - Plural roles, dynamic roles, temporal access, request expiry and a Suspended state: none has a v0.1 story.
-
-## History
-
-The full record, with its four amendments (T-355, the T-027 and T-028 grill, T-411, T-460), is `docs/archive/adr/0038-people-data-model-and-ledger.md`.

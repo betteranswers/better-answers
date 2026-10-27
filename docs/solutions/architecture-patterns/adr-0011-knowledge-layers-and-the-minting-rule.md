@@ -55,7 +55,3 @@ What follows from the rule:
 - Records first (everything assembled or answer-shaped a record): makes the customer's answer library unportable and gives one kind of knowledge two trust mechanisms.
 - Bundle first (guides and answers as narrator concepts): prose over atoms drifts by design, and the bundle fills with UI-shaped state.
 - No rule, deciding per unit: the drift this rule ends.
-
-## History
-
-The full record, with its two amendments (ticket 53 on source entities; ticket 79, applied by T-001, on relations as links): `docs/archive/adr/0011-knowledge-layers-and-the-minting-rule.md`.

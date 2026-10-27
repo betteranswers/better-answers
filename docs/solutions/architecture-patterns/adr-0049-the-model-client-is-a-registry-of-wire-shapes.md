@@ -63,13 +63,3 @@ A decision model is measured before any workspace is set to run it. The generati
 - A second key column for the Workers AI account: a migration, and a second secret's handling, for an id that is no secret.
 
 What is given up: two wire shapes are kept in step with their vendors by hand, with no SDK's retries, typed errors or streaming helpers.
-
-## History
-
-Written 13/10/2026 on the owner's decisions of 11/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R29 and KTD10). The route named the wire shape as S2b's decision, leaning towards the Messages API alone (`docs/archive/specs/v01-route-to-2026-10-20.md`, the S2b block as it then read). ADR 0041 holds how a provider's key is kept, and ADR 0025 what an `llm_call` row holds.
-
-Amended 15/10/2026 by the plan's U15, which built the decision shape on Workers AI. It added Cloudflare as a model provider and the window, key and threshold rules above, read from Cloudflare's Clef and Clef-flash model pages that day: windows of 65,536 and 24,576 tokens, a state that is truncated to fit, and no charge for output.
-
-Amended 15/10/2026 by the same plan's U17: the caller's signal, and the streamed form's retries and settling. A Messages attempt its caller ends after sending it is settled at its reserved size; one that times out still records no tokens, as before, and a decision call ended early records none, having no output reserved.
-
-Amended 21/10/2026 by BA-184, which moved the threshold from a map held in the code to the `decision_threshold` table, set by `set-decision-threshold`. The owner's decision reading of 21/10/2026 found no threshold that makes Clef or Clef-flash a judge on the reuse set, so none is seeded.

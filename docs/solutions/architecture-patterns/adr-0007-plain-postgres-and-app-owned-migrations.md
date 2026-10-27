@@ -75,7 +75,3 @@ A migration that bounds a lock or writes a tenant table's rows cites `ADR 0007` 
 - Hosted Neon or Supabase in London: residency, cost and the worker's state volume stay on one private network when self-hosted.
 - The worker owning its own tables with Alembic: two pipelines and two migration stamps, the shape the predecessor ended in.
 - `CREATE TABLE … PARTITION OF` for a workspace's partition: it deadlocks with document writers and queues every passage read.
-
-## History
-
-The full record, with its seven amendments (tickets 38, 53, 39, 41, 73 and 74, then T-367): `docs/archive/adr/0007-plain-postgres-and-app-owned-migrations.md`.

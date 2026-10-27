@@ -73,7 +73,3 @@ The read predicate's logic is api-only. The worker's reads are a producer's read
 - A narrower stamp check, or expand/contract migrations: machinery against a near-zero cost.
 - A more specific directory name, `tier-contract/` or `conformance/`: the bare word is reserved for this seam.
 - One "same commit" stamp for schema and contract: an api-only deploy would idle the worker.
-
-## History
-
-The full record, first written as six agreements, with the amendments that admit and retire agreements and adopt the digest (T-074, T-120, T-127, T-128, T-137, T-165, T-274, T-275, T-283, T-316, T-345, T-376, T-377): `docs/archive/adr/0031-tier-contract-is-six-agreements.md`. S2a's plan admitted `links` (`docs/plans/2026-10-09-1344-feat-s2a-search-and-concept-page-plan.md`, KTD5). BA-85's plan admitted `sync-sensitivity-moves` (`docs/plans/2026-10-09-1517-fix-sync-narrows-citing-concepts-plan.md`), so the api's tick can re-derive the concepts citing a document the worker's sync narrowed or lifted. BA-233 widened `links` to the path references a body leaves unresolved, because the api's delta and the worker's rebuild both write them as rows and must write the same ones.

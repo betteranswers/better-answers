@@ -48,7 +48,3 @@ The decision predates this record and was moved out of the accessibility rule un
 
 - Keeping it in the accessibility rule: it binds no change, and it read as covered by the axe gate.
 - Dropping the sentence until something ships: the commitment is real, and its reason is a legal one no reader would reconstruct from the code.
-
-## History
-
-The full record, with no amendments; T-184 moved it out of the constitution: `docs/archive/adr/0042-product-ships-accessibility-statement.md`.

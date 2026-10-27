@@ -1,10 +1,10 @@
-# Mutation triage: controls both ways, one waiter, staging by path
+# Mutation triage
 
-A mutation report names survivors; a triage session decides which are gaps and which are equivalent, and turns the gaps into tests. Three habits keep that session honest - (i) A verdict in a triage document is a hypothesis, (ii) Read the source before the verdict, and (iii) probe before calling anything.
+A mutation report names survivors; a triage session decides which are gaps and which are equivalent, and turns the gaps into tests. 
 
 ## Controls
 
-A **probe** is one mutation applied by hand, the suite run against it, the file restored. Run it through the script and nothing else:
+A **probe** is one mutation applied by hand, the suite run against it, the file restored. Run it through the script:
 
 ```bash
 pnpm mutant-probe --file packages/core/src/audit/index.ts --line 149 \
@@ -13,7 +13,7 @@ pnpm mutant-probe --file packages/core/src/audit/index.ts --line 149 \
 
 `scripts/mutant-probe.mjs` pins the mutation to the text on the line it names and refuses a line that has moved; refuses a file with an unstaged change, so it never restores over someone's edit; restores in a `finally` that an interrupt, a crashed suite and a thrown error all reach; prints one `verdict:` line — `killed`, `survived`, `timed out` — and then the `src` diff-stat against `HEAD`, exiting non-zero when the tree is not clean. `--suite` is a vitest filter for the file's workspace; without it the whole workspace suite runs.
 
-A harness that answers only one way says nothing. Before any verdict from a probe or a differential harness is written down:
+Before any verdict from a probe or a differential harness is written down:
 
 - **A positive control** — a mutant the report says `Killed` — comes back `killed`. A suite broken for an unrelated reason kills everything, and reads exactly like a working one.
 - **A negative control** — a mutant the report says `Survived` — comes back `survived`. A harness that could not apply its mutation kills nothing and reads exactly like a clean sweep.
@@ -21,8 +21,6 @@ A harness that answers only one way says nothing. Before any verdict from a prob
 - **A whole-suite `killed` is a kill only when the failing test reaches the mutated file.** Read which test failed before writing the verdict, and re-run when it is one the mutation cannot reach.
 - **A constant condition is `killed` by the lint walk, which runs none of it.** `packages/core/test/import-direction.test.ts` lints the committed tree, and its lint refuses a condition that is always true or always false. So a whole-suite probe of a `→ true` or `→ false` mutant fails that one test whatever the code does, where Stryker's own run does not. Read such a verdict from the other tests: when the lint walk is the only failure, the mutant survived.
 - **The same line's opposite** is the best pair: One expression, two verdicts, is a harness that discriminates.
-- **`testsCompleted` is nonzero** before a row is called a survivor. A row with `testsCompleted: 0` was never run — the runner resolved its covering tests to nothing — and the nightly fails the leg that holds one, as a runner fault. Both causes so far were the runner, and the vitest-runner's patch under `patches/` fixes both: a mutant that throws while its module loads — an emptied action family, an emptied MCP entry — fails every test file that imports it before one test runs, which the patch reports as the kill it is; and vitest 5's name filter, which selected no test for any mutant until the patch built names the way it matches them (`docs/operations/CI.md`, *A runner fault fails the leg*).
-- **A nightly `Timeout` is not a kill until a probe says so.** Stryker counts a timed-out mutant as killed, and the nightly's clock stops a slow mutant as readily as one that loops. Between the runs of 9 and 10/10/2026, 67 mutants moved between `Survived` and `Timeout`, and each of the four `Timeout` rows probed then survived the whole suite.
 
 Equivalence has two classes, and only one is a proof. *Behaviourally identical, argued from the code* — the mutant cannot produce a different statement, row or value. *Nothing observable at this seam* — the two functions differ, and no caller, driver or fixture in this tree can reach the difference. Label the second as the second: a test written with a bespoke fixture purely to move the number is the report inverting the rule, and the mutation rule says a falling score is never a gate.
 

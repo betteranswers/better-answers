@@ -10,7 +10,7 @@ The survey produces one report of **opportunities**: places in the code where a 
 
 Nothing measures depth. This survey supplies the judgement that no gate makes, so it reports what the gates and the diff reviewers cannot see and leaves out what they already hold.
 
-Invoking this skill authorizes reading anything in the checkout, running read-only git, GitNexus and code-index queries, dispatching read-only subagents, writing the report's two files and opening the report in `lavish-axi`. It does not authorize editing code, `CONCEPTS.md`, `CODING_STANDARDS.md`, a decision doc or an issue. The review that follows owns those changes.
+Invoking this skill authorizes reading anything in the checkout, running read-only git, GitNexus and code-index queries, dispatching read-only subagents, writing the report's two files and opening the report in `lavish-axi`. It does not authorize editing code, `CONCEPTS.md`, a decision doc or an issue. The review that follows owns those changes.
 
 Each reference below is read at the step that names it. A read made earlier does not count.
 
@@ -60,11 +60,11 @@ Dispatch one read-only subagent per area, all in one response. A walk reads far 
 Apply the deletion test to anything that looks shallow. Ask whether deleting it would concentrate complexity or only move it. Concentrating is the signal.
 
 **The rules to judge against.**
-- The pstack principles `principle-minimize-reader-load` and `principle-laziness-protocol`, the Tests section of `CODING_STANDARDS.md`, and the `AGENTS.md` beside the area. Quote the rule you cite.
-- The decisions in `docs/solutions/architecture-patterns/`. Match an area to its decisions by each doc's `module` and `applies_when` frontmatter instead of reading all of them. `docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md` gives the slice vocabulary and the shapes it rejected. A matching door list in two slices is not duplication: a slice gets its own type for the doors it takes.
+- The pstack principles `principle-minimize-reader-load` and `principle-laziness-protocol`, the Tests section of `AGENTS.md`, and the `AGENTS.md` beside the area.
+- The decisions in `docs/solutions/architecture-patterns/`. Match an area to its decisions by each doc's `module` and `applies_when` frontmatter instead of reading all of them. `docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md` gives the slice vocabulary. A matching door list in two slices is not duplication: a slice gets its own type for the doors it takes.
 - `CONCEPTS.md` for the names. A module named off-glossary is friction worth noting.
 
-**Leave out what a gate already holds for that tier.** The TypeScript gates are the `check:gates` script in the root `package.json` and the rules in `.oxlintrc.json`, which include import direction for `packages/core` only, cycles and the complexity cap. The worker's gates are the ruff settings in `apps/worker/pyproject.toml`. Where a rule could be gated and is not, the opportunity names that gap. The fix for it is a Linear issue, never an edit to `CODING_STANDARDS.md`.
+**Leave out what a gate already holds for that tier.** The TypeScript gates are the `check:gates` script in the root `package.json` and the rules in `.oxlintrc.json`, which include import direction for `packages/core` only, cycles and the complexity cap. The worker's gates are the ruff settings in `apps/worker/pyproject.toml`. Where a rule could be gated and is not, the opportunity names that gap.
 
 **Rebuild each opportunity from first principles.** The proposal is not limited to deepening a module. It may merge, split or delete modules, move a seam, or reopen a decision, whichever shape the facts support.
 - Rebuild each proposal under pstack's `principle-redesign-from-first-principles`: ask what you would build if the area were written from scratch today, from the code, docs and history alone. State the facts, the constraints, the assumptions and the unknowns, then what the module must do, before choosing its shape. Each unknown that reading cannot settle becomes an open question on the opportunity, for the review.

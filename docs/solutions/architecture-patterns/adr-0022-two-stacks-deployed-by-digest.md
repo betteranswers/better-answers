@@ -82,9 +82,3 @@ The edge is one tunnel and three hostnames. `app.` is open, and Better Auth is i
 - SOPS in the repository: one more tool, and Coolify still needs the values pasted.
 - A switch per release phase: the phases never overlap, and one name read in one place cannot contradict another.
 - Signed-in production journeys before go-live: 37 of the last 40 releases ran them and every run held, while 69 of the 1,894 commits since 25/09/2026 went to keeping them up. They return at go-live.
-
-## History
-
-The full record, with its thirteen amendments (among them T-005, T-022, T-030, T-039, T-045, T-119, T-125, T-184 and T-358): `docs/archive/adr/0022-two-stacks-deployed-by-digest.md`.
-
-Amended 19/10/2026 on the owner's ruling of 19/10/2026, by BA-204. The signed-in production journeys, the `JOURNEYS_MODE` variable that staged them, the `rejected/` tag and the test inbox they read are retired until go-live. A release holds on its smoke alone, and the nightly gate walks back to the last `release/*` tag. Git history keeps the journeys for the go-live rebuild.

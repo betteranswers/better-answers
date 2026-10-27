@@ -60,7 +60,3 @@ The worker holds the detector's weights once, mapped from the file. On VPC 1 it 
 - No swap, hard caps only: the first customer's index must not fail.
 - A git library inside the api: a customer-hosted worker cannot mount a shared volume. Read-only git smart HTTP answers that for v1.0.
 - A smaller detector, or step E, for the worker's memory: the weights held once fit the box.
-
-## History
-
-The full record, with its five amendments (T-001, T-105, T-125, T-222 and T-347) and ADR 0025's note on the swap signal: `docs/archive/adr/0024-forge-is-bare-git-repositories.md`.

@@ -58,7 +58,3 @@ The parity test makes five assertions over the registry, against a real Postgres
 - A runtime parity check alone: blind to a retyped column.
 - `drizzle-kit`'s snapshot diff: it watches the migration, not the boundary, and cannot model `index.passage`'s partitioning.
 - `createSchemaFactory({ coerce })`: a boundary parses and never coerces.
-
-## History
-
-The full record, with its one amendment (T-025): `docs/archive/adr/0028-boundary-schemas-generated-from-tables.md`.

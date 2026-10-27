@@ -55,9 +55,3 @@ The interface is Tailwind v4. Its theme is the design system's tokens, read thro
 - MUI, Mantine or Chakra: each owns meaning as well as behaviour.
 - Headless primitives alone, Radix or Base UI: the registries add composed pieces at no coupling cost.
 - better-auth-ui's provider, `localization` and headless hooks: taken on 03/09/2026 and reversed two days later.
-
-## History
-
-The full record, with its three amendments (T-036, T-037, T-046): `docs/archive/adr/0033-ui-kit-is-tailwind-v4.md`.
-
-Amended 13/10/2026 by the web wording plan (`docs/plans/2026-10-13-1101-fix-web-wording-and-stock-refusals-plan.md`, R5 and R7). The platform's meaning took in the wording of each page, written to its own rules. The web's wording now follows Kibo UI's patterns, and the platform keeps the trust words and the glossary's words. The registries still own behaviour, and no component's source changes by this.

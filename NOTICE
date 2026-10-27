@@ -1,13 +1,11 @@
-Better Answers
-Copyright 2026 Better Answers (Liam Jons)
+better-answers
+Copyright 2026 better-answers (Liam Jons)
 
 This product includes software developed by third parties under permissive
 licences. Each lifted snapshot under <tier>/lifts/<name>/ carries its own
 THIRD_PARTY_NOTICES.md with the upstream repository, commit, licence and
 notice text, as does apps/web/src/shared/ui/, where the shadcn,
-Kibo UI and AI Elements registries are taken as source. Ordinary
-dependencies carry their licences in the package registries they are
-installed from, at the versions the lockfiles name.
+Kibo UI and AI Elements registries are taken as source.
 
-"Better Answers" is a name of Better Answers. This licence grants no
+"better-answers" is a name of better-answers. This licence grants no
 permission to use it (Apache License 2.0, section 6).

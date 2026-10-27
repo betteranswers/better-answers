@@ -55,9 +55,3 @@ A kind is an indexed property on the one `Concept` label, never a label of its o
 - Closed-world tags with a platform-written tier tag: a rule with no action.
 - A concept alias as a `concept_identity` row only: the alias leaves with nothing on export.
 - The two bookkeeping edges as properties: a supersession or lineage walk becomes a property scan.
-
-## History
-
-The full record, with its one amendment (ticket 79, applied by T-001): `docs/archive/adr/0026-kinds-emerge-from-the-concepts.md`.
-
-It superseded ADR 0001, which made a per-tenant SKOS-shaped vocabulary file in the bundle authoritative and checked every `type` against it closed-world. It went because OKF registers no kind centrally, and without a second file a rename is already one commit.

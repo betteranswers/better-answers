@@ -52,7 +52,3 @@ Two things reopen the budget: a page added without its budget asserted, and a me
 
 - Keep the numbers in the UX rule: the rule claimed an enforcement it lacked.
 - No budget until the estate is measured: the budget shapes the queries before the estate exists, and measuring first ships the per-row fetch ADR 0015 refused.
-
-## History
-
-The full record, with no amendments: `docs/archive/adr/0037-reader-screen-latency-budget.md`.
