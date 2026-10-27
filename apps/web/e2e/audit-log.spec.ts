@@ -25,6 +25,10 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
+const aSearchForPriya = (url: URL): boolean =>
+  url.pathname.includes("members.auditLog") &&
+  (url.searchParams.get("input") ?? "").includes('"search":"Priya"');
+
 const ONE_LINE_PX = 48;
 
 const AUDIT_LOG_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log").path;
@@ -197,12 +201,7 @@ test.describe("the System group's Audit log page", () => {
     const priyas = linesOf(page).filter({ hasText: BY_PRIYA });
     await expect(priyas).toHaveCount(1);
     await expect(linesOf(page)).not.toHaveCount(1);
-    const typed = await holdingTheFirstAnswer(
-      page,
-      (url) =>
-        url.pathname.includes("members.auditLog") &&
-        (url.searchParams.get("input") ?? "").includes('"search":"Priya"'),
-    );
+    const typed = await holdingTheFirstAnswer(page, aSearchForPriya);
 
     await searchBox(page).fill("Priya");
     await detailsOf(priyas).click();
@@ -219,7 +218,7 @@ test.describe("the System group's Audit log page", () => {
 
   test("tells apart two members of one name by their addresses", async ({ page, request }) => {
     const { workspaceId, priya } = await anAdminAtTheAuditLog(page, request, "Swale Tooling");
-    const addresses = [anAddress("sam"), anAddress("sam")];
+    const addresses = [anAddress("sam"), anAddress("sam")] as const;
     for (const [index, address] of addresses.entries()) {
       const sam = await person(request, address, { displayName: "Sam Okoro" });
       await addMember(request, { workspaceId, userId: sam.id, role: "Admin" });
@@ -235,7 +234,7 @@ test.describe("the System group's Audit log page", () => {
       const line = linesOf(page).nth(at);
       await expect(line).toContainText(new RegExp(`Sam Okoro.*Crew ${String(made)}`));
       await expect(
-        line.getByText(addresses[made] ?? "", { exact: true }),
+        line.getByText(addresses[made], { exact: true }),
         "the address shows before the details open",
       ).toBeVisible();
     }

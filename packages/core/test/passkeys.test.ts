@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { PASSKEY_NAME_MAX_LENGTH } from "@better-answers/schema/second-factor";
 
@@ -93,7 +93,8 @@ describe("recording a passkey added", () => {
       ok: true,
       value: { issued: { madeAt: "2026-10-02T12:00:00.000Z" } },
     });
-    expect(recorded.ok && recorded.value.issued?.recoveryCodes).toHaveLength(10);
+    assert(recorded.ok);
+    expect(recorded.value.issued?.recoveryCodes).toHaveLength(10);
     expect(await recoveryCodesHeldBy(adminUserId)).toBe(10);
     expect((await identitySetRowsFor(adminUserId)).map((row) => row.action)).toEqual([
       "people.person.passkey_added",
@@ -107,7 +108,8 @@ describe("recording a passkey added", () => {
 
     const recorded = await added(operatorId, passkeyId, await aSession(operatorId));
 
-    expect(recorded.ok && recorded.value.issued?.recoveryCodes).toHaveLength(10);
+    assert(recorded.ok);
+    expect(recorded.value.issued?.recoveryCodes).toHaveLength(10);
   });
 
   it("issues no codes to an Admin who holds some", async () => {

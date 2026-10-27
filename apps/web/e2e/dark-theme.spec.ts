@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { Locator, Page } from "@playwright/test";
 
 import { THEME_KEPT_UNDER } from "@/shared/theme-switch.ts";
@@ -136,10 +138,14 @@ test("draws the authenticator's code dark on light in dark", async ({ page, requ
   const code = page.getByRole("img", { name: "QR code for your authenticator" });
   await expect(code).toBeVisible();
 
-  const [modules = "", field = ""] = await Promise.all([
+  const [stroke, fill] = await Promise.all([
     code.locator("path[stroke]").first().getAttribute("stroke"),
     code.locator("path[fill]").first().getAttribute("fill"),
-  ]).then((colours) => colours.map((colour) => paintedHex(colour ?? "")));
+  ]);
+  assert.ok(stroke !== null, "the code's modules name no stroke");
+  assert.ok(fill !== null, "the code's field names no fill");
+  const modules = paintedHex(stroke);
+  const field = paintedHex(fill);
   expect(contrastBetween(modules, field), "a scanner cannot read the code").toBeGreaterThanOrEqual(
     4.5,
   );

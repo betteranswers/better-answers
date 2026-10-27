@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { withRepositoryLock } from "@better-answers/core/store/git";
 import { conceptIriOf, passageLocatorOf, ulid } from "@better-answers/schema";
@@ -268,13 +268,13 @@ describe("ownership judged at the time of the act", () => {
     const scenario = await arrange();
     const taken = conceptAt("knowledge/policy/expenses.md");
     await landedAs(scenario, scenario.editor, taken);
+    const [head] = await bundleHistory(scenario.git, scenario.workspaceId);
+    assert(head !== undefined, "the owner's write committed");
 
     const refused = await writeAs(
       scenario,
       scenario.unowned,
-      conceptAt(taken.path, {
-        expects: { head: (await bundleHistory(scenario.git, scenario.workspaceId))[0] ?? null },
-      }),
+      conceptAt(taken.path, { expects: { head } }),
     );
 
     expect(refused).toEqual({ ok: false, error: "owner-forbids" });

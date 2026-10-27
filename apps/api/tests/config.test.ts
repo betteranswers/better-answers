@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import {
   readBootstrap,
@@ -47,13 +47,15 @@ describe("the bootstrap configuration", () => {
   it("gives the bare repositories' root for the head check's bundles", () => {
     const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x", GIT_STORE_DIR: "/data/git" });
 
-    expect(read.ok && read.value.gitStoreDir).toBe("/data/git");
+    assert(read.ok, "the read was accepted");
+    expect(read.value.gitStoreDir).toBe("/data/git");
   });
 
   it("starts without a repositories' root, as `migrate` opens no bundle", () => {
     const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x" });
 
-    expect(read.ok && read.value.gitStoreDir).toBe(undefined);
+    assert(read.ok, "the read was accepted");
+    expect(read.value.gitStoreDir).toBe(undefined);
   });
 
   it("refuses an empty repositories' root, read as the working directory", () => {
@@ -65,7 +67,8 @@ describe("the bootstrap configuration", () => {
   it("defaults to this repository's SPA build, so dev sets nothing", () => {
     const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x" });
 
-    expect(read.ok && read.value.webRoot.endsWith("/apps/web/dist")).toBe(true);
+    assert(read.ok, "the read was accepted");
+    expect(read.value.webRoot.endsWith("/apps/web/dist")).toBe(true);
   });
 
   it("gives ops the object store's settings, shaped for the door", () => {
@@ -78,7 +81,8 @@ describe("the bootstrap configuration", () => {
       S3_SECRET_KEY: "b892c0665f0ada8a4755dae98baa3b133590e11dae3bcc1f9d769d67f16c3835",
     });
 
-    expect(read.ok && read.value).toEqual({
+    assert(read.ok, "the read was accepted");
+    expect(read.value).toEqual({
       endpoint: "http://objectstore:3900",
       region: "garage",
       bucket: "better-answers",
@@ -96,7 +100,8 @@ describe("the bootstrap configuration", () => {
       S3_SECRET_KEY: "secret",
     });
 
-    expect(read.ok && read.value.region).toBe("eu-west-2");
+    assert(read.ok, "the read was accepted");
+    expect(read.value.region).toBe("eu-west-2");
   });
 
   it("refuses a missing object store, and the process still starts", () => {
@@ -172,13 +177,15 @@ describe("the bootstrap configuration", () => {
       identityEnvironment({ SMTP_URL: "smtps://resend:key@smtp.example.test:465" }),
     );
 
-    expect(read.ok && read.value.smtpUrl).toBe("smtps://resend:key@smtp.example.test:465");
+    assert(read.ok, "the read was accepted");
+    expect(read.value.smtpUrl).toBe("smtps://resend:key@smtp.example.test:465");
   });
 
   it("starts without SMTP, since dev and harness send no email", () => {
     const read = readIdentityBootstrap(identityEnvironment());
 
-    expect(read.ok && read.value.smtpUrl).toBe(undefined);
+    assert(read.ok, "the read was accepted");
+    expect(read.value.smtpUrl).toBe(undefined);
   });
 
   it.each([
@@ -275,8 +282,8 @@ describe("the head check's settings", () => {
   it("names the refused setting, never the value it was given", () => {
     const read = readHeadCheck({ HEALTHCHECKS_PING_URL_SCHEDULER: "hc-ping.com/7c1d9e4a" });
 
-    expect(read.ok).toBe(false);
-    const reason = read.ok ? "" : read.error.message;
+    assert(!read.ok, "the read was refused");
+    const reason = read.error.message;
     expect(reason).toContain("HEALTHCHECKS_PING_URL_SCHEDULER");
     expect(reason).not.toContain("7c1d9e4a");
   });
@@ -307,16 +314,16 @@ describe("the envelope key", () => {
   ])("refuses %s for KEK", (_case, value) => {
     const read = readEnvelopeKey({ KEK: value });
 
-    expect(read.ok).toBe(false);
-    expect(read.ok ? "" : read.error.message).toContain("KEK");
+    assert(!read.ok, "the read was refused");
+    expect(read.error.message).toContain("KEK");
   });
 
   it("names the refused setting, never the value it was given", () => {
     const almost = `${KEY_HEX.slice(0, -1)}g`;
     const read = readEnvelopeKey({ KEK: almost });
 
-    expect(read.ok).toBe(false);
-    const reason = read.ok ? "" : read.error.message;
+    assert(!read.ok, "the read was refused");
+    const reason = read.error.message;
     expect(reason).toContain("KEK");
     expect(reason).not.toContain(almost);
     expect(reason).not.toContain(almost.slice(0, 8));
@@ -353,8 +360,8 @@ describe("the image the api runs", () => {
   ])("refuses %s for API_IMAGE_DIGEST", (_case, value) => {
     const read = readRunningImage({ API_IMAGE_DIGEST: value });
 
-    expect(read.ok, "no pull by digest could have started it").toBe(false);
-    expect(read.ok ? "" : read.error.message).toContain("API_IMAGE_DIGEST");
+    assert(!read.ok, "no pull by digest could have started it");
+    expect(read.error.message).toContain("API_IMAGE_DIGEST");
   });
 });
 
@@ -366,7 +373,8 @@ describe("the three hostnames of the estate", () => {
   it("ignores APP_HOSTNAME, since the app hostname is PUBLIC_URL's host", () => {
     const read = readIdentityBootstrap(identityEnvironment({ APP_HOSTNAME: "elsewhere.test" }));
 
-    expect(read.ok && read.value.hostnames.app).toBe("app.example.test");
+    assert(read.ok, "the read was accepted");
+    expect(read.value.hostnames.app).toBe("app.example.test");
   });
 
   it.each([
@@ -391,7 +399,8 @@ describe("the three hostnames of the estate", () => {
       identityEnvironment({ PUBLIC_URL: "https://product.example.test" }),
     );
 
-    expect(read.ok && read.value.hostnames.app).toBe("product.example.test");
+    assert(read.ok, "the read was accepted");
+    expect(read.value.hostnames.app).toBe("product.example.test");
   });
 
   it("refuses equal hostnames, which hand one surface to the other", () => {
@@ -423,7 +432,8 @@ describe("the three hostnames of the estate", () => {
       identityEnvironment({ AGENT_HOSTNAME: "Agent.Example.Test" }),
     );
 
-    expect(read.ok && read.value.hostnames.agent).toBe("agent.example.test");
+    assert(read.ok, "the read was accepted");
+    expect(read.value.hostnames.agent).toBe("agent.example.test");
   });
 
   it("strips PUBLIC_URL's trailing dot, to match the host browsers send", () => {
@@ -431,8 +441,9 @@ describe("the three hostnames of the estate", () => {
       identityEnvironment({ PUBLIC_URL: "https://app.example.test./" }),
     );
 
-    expect(read.ok && read.value.publicUrl).toBe("https://app.example.test");
-    expect(read.ok && read.value.hostnames.app).toBe("app.example.test");
+    assert(read.ok, "the read was accepted");
+    expect(read.value.publicUrl).toBe("https://app.example.test");
+    expect(read.value.hostnames.app).toBe("app.example.test");
   });
 
   it("keeps a port beside the trailing dot it strips", () => {
@@ -440,7 +451,8 @@ describe("the three hostnames of the estate", () => {
       identityEnvironment({ PUBLIC_URL: "https://app.example.test.:8443" }),
     );
 
-    expect(read.ok && read.value.publicUrl).toBe("https://app.example.test:8443");
-    expect(read.ok && read.value.hostnames.app).toBe("app.example.test");
+    assert(read.ok, "the read was accepted");
+    expect(read.value.publicUrl).toBe("https://app.example.test:8443");
+    expect(read.value.hostnames.app).toBe("app.example.test");
   });
 });

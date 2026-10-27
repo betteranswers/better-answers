@@ -83,15 +83,15 @@ type ActionTiming = {
   readonly clocked: string;
 };
 
-const actionTimingsOf = (test: TestCase): readonly ActionTiming[] =>
-  test.results.flatMap((result) =>
+const actionTimingsOf = (testCase: TestCase): readonly ActionTiming[] =>
+  testCase.results.flatMap((result) =>
     result.annotations.flatMap((annotation) => {
       const action = actionAnnotatedBy(annotation.type);
       return action === undefined
         ? []
         : [
             {
-              title: titleOf(test),
+              title: titleOf(testCase),
               attempt: result.retry + 1,
               action,
               clocked: annotation.description ?? "",

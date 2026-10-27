@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 
 import { HOMES } from "@/shared/navigation.ts";
 
@@ -40,7 +40,8 @@ describe("a bulk role change while the list is read again", () => {
     await list.asked;
 
     const tick = tickOf(GRACE.displayName);
-    if (tick !== null) fireEvent.click(tick);
+    assert(tick !== null, "Grace's row keeps its tick box while the list is read again");
+    fireEvent.click(tick);
     await changeTheTickedToViewer();
     await waitFor(() => expect(gracesRole()).toContain("Viewer"));
 

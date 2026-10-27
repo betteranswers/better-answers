@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { assert, describe, expect, expectTypeOf, it } from "vitest";
 
 import { matching } from "@better-answers/schema/testing/matching";
 
@@ -293,11 +293,12 @@ describe("an approved access request's invitation", () => {
         [workspace.workspaceId],
       )
     ).rows[0]?.id;
+    assert(requestId !== undefined, "the request was recorded");
 
     const approved = answeredValue(
       await as(workspace, workspace.adminUserId, (principal, tx) =>
         approveRequest(principal, tx, {
-          requestId: requestId ?? "",
+          requestId,
           role: "Editor",
           now: INVITED_AT,
         }),
@@ -508,7 +509,8 @@ describe("resending an invitation", () => {
   it("refuses a workspace's 201st email until the next hour", async () => {
     const workspace = await provisionedWorkspace(db(), "ResendWorkspaceCeiling");
     const [invited] = await invitedMany(workspace, 200);
-    const invitationId = invited?.invitationId ?? "";
+    assert(invited !== undefined, "the workspace invited its first person");
+    const { invitationId } = invited;
     const lastAllowed = await invitationsOf(workspace);
     const eventsBefore = await invitationEvents(workspace);
 

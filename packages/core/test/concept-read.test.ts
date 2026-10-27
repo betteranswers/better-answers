@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { citedSourcesOf, conceptIriOf, ids, ulid, type ConceptIri } from "@better-answers/schema";
 import { linksAndMarksOf } from "@better-answers/schema/concept-file";
@@ -376,12 +376,13 @@ describe("the evidence pane", () => {
     );
 
     const read = await readFor(scenario.viewer, written.iri);
-    const projected = citedSourcesOf(read?.frontmatter["sources"]);
+    assert(read !== undefined, "the viewer reads the concept");
+    const projected = citedSourcesOf(read.frontmatter["sources"]);
 
-    expect(linksAndMarksOf(read?.body ?? "", projected).marks).toEqual([
+    expect(linksAndMarksOf(read.body, projected).marks).toEqual([
       { at: 29, mark: "[^b-2]", source: 1 },
     ]);
-    expect(read?.pane.evidence[1]).toEqual({ id: "B-2", source: "The minutes" });
+    expect(read.pane.evidence[1]).toEqual({ id: "B-2", source: "The minutes" });
   });
 
   it("lists the sources its concept read found, across a re-write", async () => {
@@ -390,11 +391,13 @@ describe("the evidence pane", () => {
     const added = await connectedSourceHolding(db(), scenario.workspaceId);
     const { written, locators } = await sourcedNote(scenario, scenario.editor, [kept]);
     const addedAt = await passageIn(scenario, added);
+    const [keptAt] = locators;
+    assert(keptAt !== undefined, "the note cites the kept source");
 
     const { read, wrote } = await readAcross(scenario.admin, written.iri, () =>
       rewrittenWith(scenario, scenario.editor, written, [kept, added], {
         type: "Note",
-        sources: sourcesAt([locators[0] ?? "", addedAt]),
+        sources: sourcesAt([keptAt, addedAt]),
       }),
     );
 
@@ -469,9 +472,9 @@ describe("what a concept read cannot open", () => {
   );
 
   it.each([
-    ["a Viewer", "viewer", [{ title: "Minutes", resource: "Minutes" }]],
-    ["an Admin", "admin", undefined],
-  ] as const)("keeps a page locator in the frontmatter for %s", async (_who, role, withheld) => {
+    ["a Viewer", "viewer", () => [{ title: "Minutes", resource: "Minutes" }]],
+    ["an Admin", "admin", (minutes: object) => [minutes]],
+  ] as const)("keeps a page locator in the frontmatter for %s", async (_who, role, seen) => {
     const scenario = await arrange();
     const { locator } = await restrictedPassage(scenario);
     const minutes = { title: "Minutes", resource: "minutes", locator };
@@ -484,7 +487,7 @@ describe("what a concept read cannot open", () => {
 
     expect(read?.frontmatter["sources"]).toEqual([
       { title: "Bid library", resource: "Bid library", locator: "p.4" },
-      ...(withheld ?? [minutes]),
+      ...seen(minutes),
     ]);
   });
 
@@ -760,8 +763,9 @@ describe("a concept's relations", () => {
 
     const read = await readFor(scenario.admin, entry.iri);
 
-    expect(read?.relations.map(({ title }) => title)).toEqual(titles.slice(0, 25));
-    expect(Object.keys(read ?? {}).toSorted()).toEqual(
+    assert(read !== undefined, "the admin reads the entry");
+    expect(read.relations.map(({ title }) => title)).toEqual(titles.slice(0, 25));
+    expect(Object.keys(read).toSorted()).toEqual(
       [
         "body",
         "bodyLinks",

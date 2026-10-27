@@ -116,9 +116,8 @@ describe("the jCodeMunch index a removed worktree leaves behind", () => {
       expect(await afterRemoval(run, worktree, own)).toEqual(REMOVED_AND_KILLED);
       expect(next.alive()).toBe(true);
     } finally {
-      for (const decoy of [own, next]) {
-        if (decoy.alive()) decoy.stop();
-      }
+      own.stop();
+      next.stop();
     }
   });
 
@@ -132,7 +131,7 @@ describe("the jCodeMunch index a removed worktree leaves behind", () => {
 
       expect(await afterRemoval(run, worktree, own)).toEqual(REMOVED_AND_KILLED);
     } finally {
-      if (own.alive()) own.stop();
+      own.stop();
     }
   });
 

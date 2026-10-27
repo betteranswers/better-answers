@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
@@ -47,7 +47,9 @@ describe("the server's model client", () => {
       "x-api-key": A_MODEL_KEY,
       "anthropic-version": "2023-06-01",
     });
-    expect(JSON.parse(sent[0]?.body ?? "")).toEqual({
+    const [first] = sent;
+    assert(first !== undefined, "the judge was called");
+    expect(JSON.parse(first.body)).toEqual({
       model: SONNET,
       max_tokens: 16_000,
       system: [
@@ -130,7 +132,9 @@ describe("the server's model client", () => {
     expect(logged).not.toContain("thirteen months");
     expect(logged).not.toContain("<question>");
     expect(logged).not.toContain(A_MODEL_KEY);
-    expect(promptSent(wire.sent.at(-1) ?? { body: "" })).toContain("thirteen months");
+    const last = wire.sent.at(-1);
+    assert(last !== undefined, "the model was called");
+    expect(promptSent(last)).toContain("thirteen months");
   });
 
   it("answers a judged fit through the tool", async () => {

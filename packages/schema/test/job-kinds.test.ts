@@ -114,11 +114,28 @@ const admitted = async (client: pg.PoolClient, row: JobProbeRow): Promise<string
   return `${stored.kind} · ${stored.reason ?? "no reason"} · ${stored.subject_id ?? "no subject"}`;
 };
 
+const firstReasonOf = (descriptor: JobKindDescriptor): string | null =>
+  descriptor.reasons[0] ?? null;
+
+const subjectFor = (descriptor: JobKindDescriptor): string | null =>
+  descriptor.namesASubject ? CONNECTED_SOURCE : null;
+
+const theWrongSubjectFor = (descriptor: JobKindDescriptor): string | null =>
+  descriptor.namesASubject ? null : CONNECTED_SOURCE;
+
+const storedSubjectFor = (descriptor: JobKindDescriptor): string =>
+  descriptor.namesASubject ? CONNECTED_SOURCE : "no subject";
+
 const rowFor = (descriptor: JobKindDescriptor): JobProbeRow => ({
   kind: descriptor.kind,
-  reason: descriptor.reasons[0] ?? null,
-  subjectId: descriptor.namesASubject ? CONNECTED_SOURCE : null,
+  reason: firstReasonOf(descriptor),
+  subjectId: subjectFor(descriptor),
 });
+
+const reasonlessProbeOf = (
+  descriptor: JobKindDescriptor,
+): ((client: pg.PoolClient, row: JobProbeRow) => Promise<string>) =>
+  descriptor.reasons.length > 0 ? refusedBy : admitted;
 
 const withWorkspace = async (fn: (client: pg.PoolClient) => Promise<void>): Promise<void> => {
   await withRollback(db.pool, async (client) => {
@@ -199,14 +216,12 @@ describe("the subject CHECK", () => {
   it("requires a subject exactly where the descriptor names one", async () => {
     await withWorkspace(async (client) => {
       for (const descriptor of DESCRIBED) {
-        expect(await admitted(client, rowFor(descriptor))).toContain(
-          descriptor.namesASubject ? CONNECTED_SOURCE : "no subject",
-        );
+        expect(await admitted(client, rowFor(descriptor))).toContain(storedSubjectFor(descriptor));
         expect(
           await refusedBy(client, {
             kind: descriptor.kind,
-            reason: descriptor.reasons[0] ?? null,
-            subjectId: descriptor.namesASubject ? null : CONNECTED_SOURCE,
+            reason: firstReasonOf(descriptor),
+            subjectId: theWrongSubjectFor(descriptor),
           }),
         ).toBe("job_subject_check");
       }
@@ -224,7 +239,7 @@ describe("the reason CHECK", () => {
             await admitted(client, {
               kind: descriptor.kind,
               reason,
-              subjectId: descriptor.namesASubject ? CONNECTED_SOURCE : null,
+              subjectId: subjectFor(descriptor),
             }),
           );
         }
@@ -255,7 +270,7 @@ describe("the reason CHECK", () => {
             await refusedBy(client, {
               kind: descriptor.kind,
               reason,
-              subjectId: descriptor.namesASubject ? CONNECTED_SOURCE : null,
+              subjectId: subjectFor(descriptor),
             }),
           ).toBe("job_reason_check");
         }
@@ -279,16 +294,8 @@ describe("the reason CHECK", () => {
     await withWorkspace(async (client) => {
       const outcomes: string[] = [];
       for (const descriptor of DESCRIBED) {
-        const row = {
-          kind: descriptor.kind,
-          reason: null,
-          subjectId: descriptor.namesASubject ? CONNECTED_SOURCE : null,
-        };
-        outcomes.push(
-          descriptor.reasons.length > 0
-            ? await refusedBy(client, row)
-            : await admitted(client, row),
-        );
+        const row = { kind: descriptor.kind, reason: null, subjectId: subjectFor(descriptor) };
+        outcomes.push(await reasonlessProbeOf(descriptor)(client, row));
       }
       expect(outcomes).toEqual([
         "nightly-audit · no reason · no subject",
@@ -343,7 +350,7 @@ describe("the run key", () => {
     await withWorkspace(async (client) => {
       const landed: string[] = [];
       for (const descriptor of DESCRIBED.filter((one) => !one.namesASubject)) {
-        const row = { kind: descriptor.kind, reason: descriptor.reasons[0] ?? null };
+        const row = { kind: descriptor.kind, reason: firstReasonOf(descriptor) };
         await seedQueuedJob(client, WS, row);
         landed.push(await admitted(client, row));
       }

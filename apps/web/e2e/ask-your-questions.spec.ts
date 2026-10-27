@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { ASK, detailAt, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
@@ -201,7 +203,8 @@ test.describe("Your questions", () => {
     await signedInAt(page, request, at.viewer, YOUR_QUESTIONS);
 
     const refused = refusalAnswering(page, "ask.yourRecord");
-    await page.goto(detailAt(PAGE, theirs ?? ""));
+    assert.ok(theirs !== undefined, "the admin's record was seeded");
+    await page.goto(detailAt(PAGE, theirs));
 
     expect(await refused).toMatchObject({ status: 404, word: "not-found" });
     await notFoundOfferingHome(page, "Viewer");

@@ -327,9 +327,12 @@ describe("the weekly deletion of old BuildKit cache manifests", () => {
   });
 
   it("keeps the three newest caches, however old", async () => {
-    const stale = [40, 41, 42, 43].map((ageDays, index) =>
-      cacheOf(301 + index, ageDays, [BASE], index === 0 ? ["buildcache"] : []),
-    );
+    const stale = [
+      cacheOf(301, 40, [BASE], ["buildcache"]),
+      cacheOf(302, 41, [BASE]),
+      cacheOf(303, 42, [BASE]),
+      cacheOf(304, 43, [BASE]),
+    ];
     const run = await runAgainst(onePackage({ listing: stale }));
 
     expect(deletedIn(run.sent)).toEqual(["api/versions/304"]);
@@ -402,7 +405,7 @@ describe("the weekly deletion of old BuildKit cache manifests", () => {
     const run = await runAgainst(
       onePackage({
         listing: EVERY_KIND,
-        relisting: EVERY_KIND.map((listed) => (listed === OLDEST ? retagged : listed)),
+        relisting: EVERY_KIND.with(EVERY_KIND.indexOf(OLDEST), retagged),
       }),
     );
 
@@ -486,6 +489,13 @@ const cleanupWorkflowSchema = z.object({
 });
 
 const cleanupWorkflow = () => readWorkflow("ghcr-cleanup.yml", cleanupWorkflowSchema);
+const importsOf = (script: string): readonly string[] =>
+  [...script.matchAll(/^import\b[^;]*?\bfrom "(?<from>[^"]+)";$/gms)].map(
+    (found) => found.groups?.["from"] ?? "",
+  );
+
+const installsPackages = (step: ImageStep): boolean => /\b(?:pnpm|npm|yarn) /.test(step.run ?? "");
+
 const cleanupSteps = () => cleanupWorkflow().jobs["cache-manifests"].steps;
 
 const scheduleSchema = z.object({
@@ -564,17 +574,13 @@ describe("the workflow that deletes the cache manifests", () => {
       (step) => step.uses?.startsWith("actions/checkout@") === true,
     );
     const script = readFileSync(path.join(repositoryRoot, SCRIPT), "utf8");
-    const imports = [...script.matchAll(/^import\b[^;]*?\bfrom "(?<from>[^"]+)";$/gms)].map(
-      (found) => found.groups?.["from"] ?? "",
-    );
+    const imports = importsOf(script);
 
     expect(z.string().parse(checkout.with?.["sparse-checkout"]).trim().split("\n")).toContain(
       SCRIPT,
     );
     expect(imports.length).toBeGreaterThan(0);
     expect(imports.filter((from) => !from.startsWith("node:"))).toEqual([]);
-    expect(cleanupSteps().filter((step) => /\b(?:pnpm|npm|yarn) /.test(step.run ?? ""))).toEqual(
-      [],
-    );
+    expect(cleanupSteps().filter(installsPackages)).toEqual([]);
   });
 });

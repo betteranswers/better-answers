@@ -1,4 +1,6 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, beforeAll, describe, expect, it } from "vitest";
 
 import { walkConceptsFromEntries, walkFrom } from "@better-answers/core/store/map";
 import { ids, type ConceptIri } from "@better-answers/schema";
@@ -6,7 +8,7 @@ import { ids, type ConceptIri } from "@better-answers/schema";
 import { writeConcept, type WriteConceptInput } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
-import { inMs, percentile, recordFigures } from "./figures.ts";
+import { alternating, inMs, percentile, recordFigures } from "./figures.ts";
 import { answered, readingAs, runtimePoolFor, seedingWith } from "./suite-postgres.ts";
 import { runWorkerOnce } from "./worker-process.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
@@ -160,8 +162,8 @@ describe("the map under concurrent read load", () => {
     const [, narrowing, collections] = walked;
     const walks: TimedWalk[] = [];
     for (let round = 0; round < ROUNDS; round += 1) {
-      const inFlight = Array.from({ length: IN_FLIGHT }, (_unused, at) =>
-        timedWalk(wide, at % 2 === 0 ? wide.scenario.viewer : wide.scenario.admin, collections),
+      const inFlight = alternating(IN_FLIGHT, wide.scenario.viewer, wide.scenario.admin).map(
+        (reader) => timedWalk(wide, reader, collections),
       );
       walks.push(...(await Promise.all(inFlight)));
     }
@@ -220,7 +222,7 @@ describe("the map under concurrent read load", () => {
 
       reason: "drill",
     });
-    if (!queued.ok) throw new Error(`the rebuild was not queued: ${String(queued.error)}`);
+    assert(queued.ok, `the rebuild was not queued: ${inspect(queued)}`);
 
     const started = performance.now();
     await runWorkerOnce(db().connectionUri, bundles().root, "map-budget");

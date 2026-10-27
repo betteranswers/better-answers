@@ -2,7 +2,7 @@ import { trpcServer } from "@hono/trpc-server";
 import { createTRPCClient, httpBatchStreamLink } from "@trpc/client";
 import { initTRPC } from "@trpc/server";
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
@@ -125,6 +125,12 @@ type Streamed = Awaited<ReturnType<typeof streamed>>;
 
 const isNotKeptAlive = (event: { readonly kind: string }) => event.kind !== "keep-alive";
 
+const phasesIn = (events: Streamed) =>
+  events.flatMap((event) => (event.kind === "phase" ? [event.phase] : []));
+
+const isPhase = (phase: string) => (event: Streamed[number]) =>
+  event.kind === "phase" && event.phase === phase;
+
 const told = (events: Streamed) =>
   events.filter((event) => event.kind !== "phase" && event.kind !== "keep-alive");
 
@@ -159,9 +165,7 @@ describe("ask over tRPC", () => {
 
     const events = await streamed(web, { question: QUESTION });
 
-    expect(events.flatMap((event) => (event.kind === "phase" ? [event.phase] : []))).toEqual([
-      "reading",
-    ]);
+    expect(phasesIn(events)).toEqual(["reading"]);
     expect(resultIn(events).judgeState).toBe("not-judged");
   });
 
@@ -246,7 +250,7 @@ describe("ask over tRPC", () => {
     const folded = askedFrom(await streamed(web, asking));
     const overMcp = await mcp("ask", asking);
 
-    if (folded === undefined) throw new Error("the stream carried no event");
+    assert(folded !== undefined, "the stream carried no event");
     const { recordId: webRecord, prose, ...onTheWeb } = folded;
     const { recordId: mcpRecord, ...overTheWire } = inCoreTerms(overMcp, app().publicUrl);
     expect(onTheWeb).toEqual(overTheWire);
@@ -344,9 +348,7 @@ describe("ask over tRPC", () => {
 
     const events = await streamed(web, { question: QUESTION });
 
-    const judging = events.findIndex(
-      (event) => event.kind === "phase" && event.phase === "judging",
-    );
+    const judging = events.findIndex(isPhase("judging"));
     const opening = events.findIndex((event) => event.kind === "result");
     const between = events.slice(judging + 1, opening);
     expect(between.length).toBeGreaterThanOrEqual(2);
@@ -368,10 +370,35 @@ describe("ask over tRPC", () => {
 const isDrafting = (sent: SentToModel): boolean =>
   z.object({ stream: z.literal(true) }).safeParse(JSON.parse(sent.body)).success;
 
-const judgedNoThenDrafting =
-  (lines: (prompt: string) => readonly string[]) =>
+const judgedNoThen =
+  (drafter: (sent: SentToModel) => Response | Promise<Response>) =>
   (sent: SentToModel): Response | Promise<Response> =>
-    isDrafting(sent) ? drafterWriting(lines)(sent) : judgeSaying([])(sent);
+    isDrafting(sent) ? drafter(sent) : judgeSaying([])(sent);
+
+const judgedNoThenDrafting = (lines: (prompt: string) => readonly string[]) =>
+  judgedNoThen(drafterWriting(lines));
+
+const drafterHeldAfterItsSentence = (sent: SentToModel): Response => {
+  const events = streamedEventsOf([
+    `Buyers use the console.[^${policyIn(promptSent(sent))}]\n`,
+    "More.",
+  ]);
+  const afterTheSentence = events.findIndex((event) => event.includes("text_delta")) + 1;
+  return streamedResponse(events, {
+    signal: sent.signal,
+    before: (at) =>
+      at === afterTheSentence ? endedWith(sent.signal).catch(() => {}) : Promise.resolve(),
+  });
+};
+
+const leaveAtTheFirstSentence = async (
+  asking: Promise<AsyncIterable<{ readonly kind: string }>>,
+  leaving: AbortController,
+): Promise<void> => {
+  for await (const event of await asking) {
+    if (event.kind === "sentence") leaving.abort();
+  }
+};
 
 const policyIn = (prompt: string): string =>
   conceptNumbersIn(prompt).get(ACCESS_POLICY.title) ?? "";
@@ -405,11 +432,7 @@ describe("prose drafted over tRPC", () => {
         concepts: [policyOf(events)],
       },
     ];
-    expect(events.flatMap((event) => (event.kind === "phase" ? [event.phase] : []))).toEqual([
-      "reading",
-      "judging",
-      "drafting",
-    ]);
+    expect(phasesIn(events)).toEqual(["reading", "judging", "drafting"]);
     expect(told(events).map(({ kind }) => kind)).toEqual(["result", "sentence", "part"]);
     expect(askedFrom(events)?.prose).toEqual([
       { collection: "audits", sentences, outcome: "drafted" },
@@ -431,7 +454,9 @@ describe("prose drafted over tRPC", () => {
 
     const events = await streamed(web, { question: QUESTION });
 
-    const prose = askedFrom(events)?.prose ?? [];
+    const asked = askedFrom(events);
+    assert(asked !== undefined, "the stream carried an answer");
+    const { prose } = asked;
     expect(prose.map(({ sentences, outcome }) => [sentences.length, outcome])).toEqual([
       [LINES, "drafted"],
     ]);
@@ -441,29 +466,17 @@ describe("prose drafted over tRPC", () => {
   it("ends the drafter's request when its client leaves", async () => {
     const { workspace, web } = await anAdminAsking({ drafting: true });
     const drafting = Promise.withResolvers<SentToModel>();
-    wire.answerWith((sent) => {
-      if (!isDrafting(sent)) return judgeSaying([])(sent);
-      drafting.resolve(sent);
-      const events = streamedEventsOf([
-        `Buyers use the console.[^${policyIn(promptSent(sent))}]\n`,
-        "More.",
-      ]);
-      const afterTheSentence = events.findIndex((event) => event.includes("text_delta")) + 1;
-      return streamedResponse(events, {
-        signal: sent.signal,
-        before: (at) =>
-          at === afterTheSentence ? endedWith(sent.signal).catch(() => {}) : Promise.resolve(),
-      });
-    });
+    wire.answerWith(
+      judgedNoThen((sent) => {
+        drafting.resolve(sent);
+        return drafterHeldAfterItsSentence(sent);
+      }),
+    );
     const leaving = new AbortController();
-    const reading = (async () => {
-      for await (const event of await web.ask.question.mutate(
-        { question: QUESTION },
-        { signal: leaving.signal },
-      )) {
-        if (event.kind === "sentence") leaving.abort();
-      }
-    })();
+    const reading = leaveAtTheFirstSentence(
+      web.ask.question.mutate({ question: QUESTION }, { signal: leaving.signal }),
+      leaving,
+    );
 
     void refusalOfCall(reading);
     const sent = await drafting.promise;

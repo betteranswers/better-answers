@@ -27,6 +27,15 @@ const aDevice = (dark: boolean) => {
 
 const theme = () => document.documentElement.dataset["theme"];
 
+const keep = (kept: string | null) => {
+  if (kept === null) localStorage.removeItem(THEME_KEPT_UNDER);
+  else localStorage.setItem(THEME_KEPT_UNDER, kept);
+};
+
+const KEPT_ON_EACH_DEVICE = ["light", "dark", "anything else", null].flatMap((kept) =>
+  [true, false].map((deviceDark) => ({ kept, deviceDark })),
+);
+
 const firstPaint = () => {
   // oxlint-disable-next-line typescript/no-implied-eval, typescript/no-unsafe-call -- the head script is a string by design, run as the page runs it; lib types `new Function` as the bare Function
   new Function(FIRST_PAINT)();
@@ -79,19 +88,15 @@ describe("the head script", () => {
     expect(theme()).toBe("dark");
   });
 
-  it("decides as the page does for every kept value", () => {
-    for (const kept of ["light", "dark", "anything else", null]) {
-      for (const deviceDark of [true, false]) {
-        aDevice(deviceDark);
-        if (kept === null) localStorage.removeItem(THEME_KEPT_UNDER);
-        else localStorage.setItem(THEME_KEPT_UNDER, kept);
-        firstPaint();
-        expect(theme(), `kept ${String(kept)}, device dark ${String(deviceDark)}`).toBe(
-          themeShown(kept, deviceDark),
-        );
-      }
-    }
-  });
+  it.each(KEPT_ON_EACH_DEVICE)(
+    "matches the page with kept $kept, dark device $deviceDark",
+    ({ kept, deviceDark }) => {
+      aDevice(deviceDark);
+      keep(kept);
+      firstPaint();
+      expect(theme()).toBe(themeShown(kept, deviceDark));
+    },
+  );
 });
 
 describe("the key a theme is kept under", () => {

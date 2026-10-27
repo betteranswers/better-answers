@@ -20,6 +20,8 @@ const tsc = (() => {
  */
 const LISTING_BUFFER_BYTES = 64 * 1024 * 1024;
 
+const AUTH_FILES_THE_WEB_MAY_PULL = new Set(["verify.ts", "constants.ts"]);
+
 describe("the AppRouter seam", () => {
   it("pulls nothing of the auth server into the web program", () => {
     const listing = execFileSync(process.execPath, [tsc, "--noEmit", "--listFiles"], {
@@ -35,7 +37,7 @@ describe("the AppRouter seam", () => {
 
     expect(authFiles).toContain("verify.ts");
 
-    const intruders = authFiles.filter((file) => file !== "verify.ts" && file !== "constants.ts");
+    const intruders = authFiles.filter((file) => !AUTH_FILES_THE_WEB_MAY_PULL.has(file));
     expect(intruders).toEqual([]);
   }, 60_000);
 });

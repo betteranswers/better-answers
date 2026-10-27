@@ -68,16 +68,14 @@ describe("the redaction agreement's tiers", () => {
       fixture.tiers.filter((tier) => tier.connected_source_key === null).map((tier) => tier.tier),
     ).toEqual([REDACTION_ALWAYS_TIER]);
     expect(
-      fixture.tiers.flatMap((tier) =>
-        tier.connected_source_key === null ? [] : [tier.connected_source_key],
-      ),
+      fixture.tiers.map((tier) => tier.connected_source_key).filter((key) => key !== null),
     ).toEqual([...RULES_IN_FORCE_KEYS]);
   });
 
   it("writes rules in force the boundary takes; always is refused", () => {
-    const switchable = fixture.tiers.flatMap((tier) =>
-      tier.connected_source_key === null ? [] : [tier.connected_source_key],
-    );
+    const switchable = fixture.tiers
+      .map((tier) => tier.connected_source_key)
+      .filter((key) => key !== null);
 
     const connectedSource = {
       workspaceId: "01J6AAAAAAAAAAAAAAAAAAAAAA",
@@ -111,16 +109,15 @@ describe("the redaction agreement's categories", () => {
   });
 
   it("gives the always set, and only it, one neutral placeholder", () => {
-    for (const { category: named, tier, placeholder } of fixture.categories) {
-      expect({ named, placeholder }).toEqual({
-        named,
-        placeholder: tier === REDACTION_ALWAYS_TIER ? fixture.always_placeholder : placeholder,
-      });
-      expect({ named, neutral: placeholder === fixture.always_placeholder }).toEqual({
-        named,
-        neutral: tier === REDACTION_ALWAYS_TIER,
-      });
-    }
+    const always = fixture.categories
+      .filter((entry) => entry.tier === REDACTION_ALWAYS_TIER)
+      .map((entry) => entry.category);
+    const neutral = fixture.categories
+      .filter((entry) => entry.placeholder === fixture.always_placeholder)
+      .map((entry) => entry.category);
+
+    expect(always).not.toEqual([]);
+    expect(neutral).toEqual(always);
   });
 
   it("writes every placeholder as a bracketed word", () => {
@@ -139,12 +136,15 @@ describe("the redaction agreement's categories", () => {
         .success,
     ).toBe(true);
 
-    for (const { category: named, special_category, narrows_to } of fixture.categories) {
-      expect({ named, narrows_to }).toEqual({
-        named,
-        narrows_to: special_category ? fixture.narrows_to : null,
-      });
-    }
+    const special = fixture.categories.filter((entry) => entry.special_category);
+    expect(
+      fixture.categories
+        .filter((entry) => entry.narrows_to !== null)
+        .map((entry) => entry.category),
+    ).toEqual(special.map((entry) => entry.category));
+    expect(new Set(special.map((entry) => entry.narrows_to))).toEqual(
+      new Set([fixture.narrows_to]),
+    );
   });
 });
 
@@ -153,7 +153,7 @@ describe("the category list the api declares and the agreement's own", () => {
     for (const { category: categoryName, tier, special_category } of fixture.categories) {
       const declared = REDACTION_CATEGORIES.find((entry) => entry.category === categoryName);
 
-      expect({ category: categoryName, declared: declared ?? null }).toEqual({
+      expect({ category: categoryName, declared }).toEqual({
         category: categoryName,
         declared: { category: categoryName, tier, specialCategory: special_category },
       });

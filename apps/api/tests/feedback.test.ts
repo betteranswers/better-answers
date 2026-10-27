@@ -9,7 +9,7 @@ import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
 import { feedbackKeptOn as feedbackOf } from "./harness-questions.ts";
 import type { TestClient } from "./harness.ts";
 import { calledTool, rendered, structured, toolAnswered, type Rpc } from "./mcp-call.ts";
-import { seededIn, waitingOnALock } from "./provoke.ts";
+import { landedOrTwoWaitOnALock, seededIn } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 
 const app = appForSuite();
@@ -257,7 +257,7 @@ describe("feedback an assistant sends on a record", () => {
       const revoking = app()
         .endEverySignInAndToken(workspace.admin.id, new Date(Date.now() + 1_000))
         .then(() => landed.push("the revocation"));
-      await until(async () => landed.length > 0 || (await waitingOnALock(app())) === 2);
+      await until(async () => landedOrTwoWaitOnALock(app(), landed));
       return { giving, revoking };
     });
     const said = await held.giving;

@@ -1,5 +1,5 @@
 import type pg from "pg";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { ulid } from "../src/index.ts";
 import { type TestData, testData } from "./factory.ts";
@@ -73,7 +73,7 @@ describe("the version tables", () => {
       const nextVersions: { table: string; next: string; parent: string }[] = [];
       for (const table of tables) {
         const shape = NEXT_VERSION_OF[table];
-        if (shape === undefined) throw new Error(`no next version written for ${table}`);
+        assert(shape !== undefined, `a next version is written for ${table}`);
         nextVersions.push({ table, next: shape.next, parent: await shape.seeded(seed) });
       }
       await scopedAs(client, "app_rt", WS_A);

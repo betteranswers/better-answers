@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { ConceptBody } from "@/shared/knowledge/concept-body.tsx";
@@ -229,12 +229,9 @@ describe("a concept's body", () => {
     fireEvent.click(screen.getByRole("button", { name: "Source 1: Staff handbook" }));
 
     const prose = screen.getByRole("article").firstElementChild;
-    expect([...(prose?.children ?? [])].map((block) => block.tagName)).toEqual([
-      "DIV",
-      "SECTION",
-      "P",
-    ]);
-    expect(prose?.querySelector("table section")).toBeNull();
+    assert(prose !== null, "the article holds its prose");
+    expect([...prose.children].map((block) => block.tagName)).toEqual(["DIV", "SECTION", "P"]);
+    expect(prose.querySelector("table section")).toBeNull();
   });
 
   it.each([
@@ -536,7 +533,8 @@ describe("a body's links to other concepts", () => {
       answering(TO_THE_COMMITTEE),
     );
 
-    const jump = within(article).getByRole("link", { name: "1" }).getAttribute("href") ?? "";
+    const jump = within(article).getByRole("link", { name: "1" }).getAttribute("href");
+    assert(jump !== null, "the footnote mark is a jump");
     const landing = article.querySelector(`[id="${jump.slice(1)}"]`);
 
     expect(addressesIn(article).filter((address) => !address?.startsWith("#"))).toEqual([]);

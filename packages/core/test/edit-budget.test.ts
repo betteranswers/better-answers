@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { head } from "@better-answers/core/store/git";
 
@@ -86,7 +86,8 @@ describe("the governed edit at 250 concepts", () => {
     const saves: number[] = [];
     const counts: number[] = [];
     for (let edit = 0; edit < EDITS; edit += 1) {
-      const iri = iris[EDITS + edit] ?? "";
+      const iri = iris[EDITS + edit];
+      assert(iri !== undefined, "a concept was seeded for each edit");
       counts.push(
         await timed(async () => {
           answered(

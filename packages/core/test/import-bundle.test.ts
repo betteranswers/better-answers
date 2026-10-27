@@ -1,4 +1,6 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, beforeAll, describe, expect, it } from "vitest";
 
 import { head } from "@better-answers/core/store/git";
 import { ids, type ConceptIri } from "@better-answers/schema";
@@ -469,13 +471,16 @@ describe("importing the bundle", () => {
     });
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
     expect(history).toHaveLength(10);
-    const first = await commitFacts(scenario.git, scenario.workspaceId, history[0] ?? "");
+    const [firstSha, secondSha] = history;
+    assert(firstSha !== undefined, "the import committed its manifest");
+    assert(secondSha !== undefined, "the import committed its first concept");
+    const first = await commitFacts(scenario.git, scenario.workspaceId, firstSha);
     expect({ subject: first.subject, files: first.files, parents: first.parents }).toEqual({
       subject: "Write the bundle's manifest",
       files: ["knowledge/manifest.yaml"],
       parents: [],
     });
-    const second = await commitFacts(scenario.git, scenario.workspaceId, history[1] ?? "");
+    const second = await commitFacts(scenario.git, scenario.workspaceId, secondSha);
     expect({ subject: second.subject, author: second.author, trailers: second.trailers }).toEqual({
       subject:
         "Import knowledge/company/answers/data-retention-period.md from Acme Bid Library v1, entry ENTRY-002",
@@ -533,14 +538,16 @@ describe("importing the bundle", () => {
 
     await imported(scenario, soundBundle(verifiers));
 
-    const history = await bundleHistory(scenario.git, scenario.workspaceId);
+    const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1);
+    assert(sha !== undefined, "the import committed");
     const file = await fileAtCommit(
       scenario.git,
       scenario.workspaceId,
-      history.at(-1) ?? "",
+      sha,
       "knowledge/company/answers/data-retention-period.md",
     );
-    const iri = /"iri": "([^"]+)"/.exec(file)?.[1] ?? "";
+    const iri = /"iri": "([^"]+)"/.exec(file)?.[1];
+    assert(iri !== undefined, "the file names its iri");
     expect(iri).toMatch(/^https:\/\/better-answers\.com\/c\/[0-9A-HJKMNP-TV-Z]{26}$/);
     expect(file).toBe(
       [
@@ -596,11 +603,12 @@ describe("importing the bundle", () => {
       }),
     );
 
-    const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1) ?? "";
+    const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1);
+    assert(sha !== undefined, "the import committed");
     const read = parseConceptFile(
       await fileAtCommit(scenario.git, scenario.workspaceId, sha, path),
     );
-    if (!read.ok) throw new Error("the imported file is not a concept file");
+    assert(read.ok, `the imported file is not a concept file: ${inspect(read)}`);
     const { frontmatter } = read.value;
     expect([frontmatter["__proto__"], frontmatter["constructor"], frontmatter["sources"]]).toEqual([
       "x",
@@ -703,8 +711,7 @@ describe("importing the bundle", () => {
       scenario,
       "Answer:can two teams share one account? (advanced plan)",
     );
-    if (!standing.ok)
-      throw new Error(`the standing concept was refused: ${String(standing.error)}`);
+    assert(standing.ok, `the standing concept was refused: ${inspect(standing)}`);
 
     const stopped = await importing(scenario, scenario.admin, { tree: soundBundle(verifiers) });
 
@@ -742,7 +749,7 @@ describe("importing the bundle", () => {
       author: { name: "Ada Editor", email: "ada@acme.invalid" },
       expects: { base: standing.value.contentHash },
     });
-    if (!freed.ok) throw new Error(`the rewrite was refused: ${String(freed.error)}`);
+    assert(freed.ok, `the rewrite was refused: ${inspect(freed)}`);
     const completed = await imported(scenario, soundBundle(verifiers));
 
     expect(completed).toEqual({
@@ -833,7 +840,7 @@ describe("importing the bundle", () => {
       sensitivity: "Restricted",
     });
 
-    if (!run.ok) throw new Error(`the import was refused: ${JSON.stringify(run.error)}`);
+    assert(run.ok, `the import was refused: ${inspect(run)}`);
     expect(run.value.rewritten).toEqual(REWRITTEN_IN_ORDER);
     expect(
       new Set((await indexRows(scenario.workspaceId)).map((row) => row["sensitivity"])),
@@ -865,7 +872,9 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
     }
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
     expect(history).toHaveLength(10);
-    const rewrite = await commitFacts(scenario.git, scenario.workspaceId, history[7] ?? "");
+    const rewriteSha = history[7];
+    assert(rewriteSha !== undefined, "the import committed its link rewrites");
+    const rewrite = await commitFacts(scenario.git, scenario.workspaceId, rewriteSha);
     expect({
       subject: rewrite.subject,
       author: rewrite.author,
@@ -897,7 +906,7 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
     expect(edges.rows).toEqual(
       linked
         .map(([from, to]) => ({ from_uid: iri.get(from), to_uid: iri.get(to) }))
-        .toSorted((one, other) => (one.from_uid ?? "").localeCompare(other.from_uid ?? "")),
+        .toSorted((one, other) => String(one.from_uid).localeCompare(String(other.from_uid))),
     );
   });
 
@@ -951,7 +960,8 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
       const iri = await irisByPath(scenario.workspaceId);
       const expenses = iri.get("knowledge/company/expenses.md");
       const team = iri.get("knowledge/company/roles/équipe.md");
-      const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1) ?? "";
+      const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1);
+      assert(sha !== undefined, "the import committed");
       expect(
         await fileAtCommit(
           scenario.git,
@@ -1007,8 +1017,7 @@ describe("an imported concept, opened", () => {
   it("renders a page locator as the source's place", async () => {
     const opened = await openedImport(TWO_SOURCES);
 
-    expect(opened.ok).toBe(true);
-    if (!opened.ok) return;
+    assert(opened.ok, inspect(opened));
     expect(renderOpen(opened.value).split("\n").slice(-3)).toEqual([
       "Evidence:",
       "- Acme Bid Library v1, entry ENTRY-001, p.4",
@@ -1019,7 +1028,9 @@ describe("an imported concept, opened", () => {
   it("answers each source's id, title and page, opening nothing", async () => {
     const opened = await openedImport(TWO_SOURCES);
 
-    expect(opened.ok && opened.value.found && opened.value.concept?.evidence).toStrictEqual([
+    assert(opened.ok, inspect(opened));
+    assert(opened.value.found, "the imported concept opens");
+    expect(opened.value.concept?.evidence).toStrictEqual([
       { id: "ENTRY-001", source: "Acme Bid Library v1, entry ENTRY-001", at: "p.4" },
       { id: "PROD-005", source: "Acme Product Library v2, entry PROD-005" },
     ]);
@@ -1036,9 +1047,9 @@ describe("an imported concept, opened", () => {
       ].join("\n"),
     );
 
-    expect(opened.ok).toBe(true);
-    if (!opened.ok) return;
-    expect(opened.value.found && opened.value.concept?.evidence).toStrictEqual([
+    assert(opened.ok, inspect(opened));
+    assert(opened.value.found, "the imported concept opens");
+    expect(opened.value.concept?.evidence).toStrictEqual([
       { id: "PROD-005", source: "Acme Product Library v2, entry PROD-005" },
     ]);
     expect(renderOpen(opened.value).split("\n").slice(-2)).toEqual([
@@ -1050,8 +1061,7 @@ describe("an imported concept, opened", () => {
   it("renders a newline-ended body without an extra blank line", async () => {
     const opened = await openedImport(TWO_SOURCES, `${SUPPORT_HOURS}\n`);
 
-    expect(opened.ok).toBe(true);
-    if (!opened.ok) return;
+    assert(opened.ok, inspect(opened));
     expect(renderOpen(opened.value).split("\n").slice(0, 5)).toEqual([
       "# Support hours",
       "",
@@ -1269,7 +1279,7 @@ describe("what the import refuses before it writes anything", () => {
       message: "Write the bundle's manifest",
       author: { name: "Ada Editor", email: "ada@acme.invalid" },
     });
-    if (!other.ok) throw new Error(`the manifest was refused: ${String(other.error)}`);
+    assert(other.ok, `the manifest was refused: ${inspect(other)}`);
 
     const run = await importing(scenario, scenario.admin, { tree: soundBundle(verifiers) });
     const dry = await importing(scenario, scenario.admin, {

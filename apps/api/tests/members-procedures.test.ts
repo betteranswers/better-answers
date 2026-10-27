@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 
 import { until } from "@better-answers/core/testing/postgres";
 import { matching } from "@better-answers/schema/testing/matching";
@@ -476,8 +476,9 @@ describe("removing a member over tRPC", () => {
 
   it("refuses this workspace's refresh token, and still refreshes another's", async () => {
     const { acme, person, inAcme, inBeta } = await aMemberOfTwoOnFourClients();
-    const [endedHere, heldInBeta] = [inAcme.refreshToken ?? "", inBeta.refreshToken ?? ""];
-    expect([endedHere, heldInBeta]).not.toContain("");
+    const [endedHere, heldInBeta] = [inAcme.refreshToken, inBeta.refreshToken];
+    assert(endedHere !== undefined, "Acme's connection issued a refresh token");
+    assert(heldInBeta !== undefined, "Beta's connection issued a refresh token");
     const { api } = await webSignedIn(app, acme.admin.email);
     await api.members.remove.mutate({ personId: person.id });
     const host = app.client();
@@ -695,8 +696,8 @@ describe("bulk actions on members over tRPC", () => {
     const connected = await connectAsHost(app, app.client(), viewer, {
       pick: workspace.workspaceId,
     });
-    const oldToken = connected.refreshToken ?? "";
-    expect(oldToken).not.toBe("");
+    const oldToken = connected.refreshToken;
+    assert(oldToken !== undefined, "the connection issued a refresh token");
     const { api } = await webSignedIn(app, workspace.admin.email);
     await api.members.bulkRemove.mutate({ personIds: [editor.id, viewer.id] });
     const invited = await app.invite({

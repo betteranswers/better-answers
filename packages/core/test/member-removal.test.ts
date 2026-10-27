@@ -258,8 +258,8 @@ describe("the last Admin, removed", () => {
       removing,
     );
 
-    expect(answers.flatMap((answer) => (answer.ok ? [] : [answer.error]))).toEqual([
-      "changed-meanwhile",
+    expect(answers.filter((answer) => !answer.ok)).toEqual([
+      { ok: false, error: "changed-meanwhile" },
     ]);
     expect(await removalsIn(workspace)).toHaveLength(1);
     expect(await adminsOf(workspace)).toHaveLength(1);

@@ -189,9 +189,8 @@ describe("ask, judged over MCP", () => {
     expect(relatedAnswers.map(({ title }) => title).toSorted()).toEqual(
       RELATED_ANSWERS.map(({ title }) => title).toSorted(),
     );
-    expect(answer.related.filter((concept) => "body" in concept || "evidence" in concept)).toEqual(
-      [],
-    );
+    expect(answer.related.filter((concept) => "body" in concept)).toEqual([]);
+    expect(answer.related.filter((concept) => "evidence" in concept)).toEqual([]);
     for (const { body } of RELATED_ANSWERS.slice(0, 2)) expect(text).not.toContain(body);
     for (const { title, iri } of relatedAnswers) {
       expect(text).toContain(`- Answer · ${title} · audits · `);

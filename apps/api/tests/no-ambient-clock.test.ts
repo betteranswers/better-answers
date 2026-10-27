@@ -47,7 +47,7 @@ describe("no ambient clock read outside its two named exemptions", () => {
       ...tsFilesUnder(path.join(repositoryRoot, "packages/core/src")),
       ...tsFilesUnder(path.join(repositoryRoot, "apps/api/src")),
       ...tsFilesUnder(path.join(repositoryRoot, "packages/schema/src")),
-    ].filter((file) => file !== CLOCK_CONSTRUCTOR && file !== ULID_MINTER);
+    ].filter((file) => ![CLOCK_CONSTRUCTOR, ULID_MINTER].includes(file));
 
     const findings = files.flatMap((file) => {
       const source = readFileSync(path.join(repositoryRoot, file), "utf8");

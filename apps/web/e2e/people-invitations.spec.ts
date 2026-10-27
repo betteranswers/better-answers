@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { z } from "zod";
 
@@ -253,9 +255,9 @@ test.describe("the People page's Invitations tab", () => {
     await dialogOpened(page);
     await addressField(page).fill(address);
     const role = inviteDialog(page).getByRole("combobox", { name: "Role" });
-    const meant = await inviteDialog(page)
-      .locator(`[id="${(await role.getAttribute("aria-describedby")) ?? ""}"]`)
-      .innerText();
+    const describedBy = await role.getAttribute("aria-describedby");
+    assert.ok(describedBy !== null, "the Role field is described by its meaning");
+    const meant = await inviteDialog(page).locator(`[id="${describedBy}"]`).innerText();
     await role.click();
     await page.getByRole("option", { name: "Editor" }).click();
     await expect(role).toHaveText("Editor");
@@ -446,7 +448,8 @@ test.describe("the People page's Invitations tab", () => {
     await anAdminAtInvitations(page, request, "Nidd Bridge Tools");
     await openInvitations(page);
     const addresses = Array.from({ length: 51 }, (_, at) => anAddress(`person-${String(at)}`));
-    const late = addresses.at(-1) ?? "";
+    const late = addresses.at(-1);
+    assert.ok(late !== undefined, "51 addresses were made");
 
     await dialogOpened(page);
     await addressField(page).fill(addresses.join(", "));
@@ -827,7 +830,9 @@ test.describe("the People page's Invitations tab", () => {
     const refused = refusalAnswering(page, "members.bulkResendInvitations");
     await selectionAction(page, "Resend").click();
 
-    expect((await refused).items).toEqual({ [ids[0] ?? ""]: "no-such-invitation" });
+    const [refusedId] = ids;
+    assert.ok(refusedId !== undefined, "an invitation was made");
+    expect((await refused).items).toEqual({ [refusedId]: "no-such-invitation" });
     const refusal = invitationsRegion(page).getByRole("alert");
     await expect(refusal.getByRole("paragraph"), "the refusal counts one refused").toHaveText(
       /\b1\b/,
@@ -895,7 +900,9 @@ test.describe("the People page's Invitations tab", () => {
     const refused = refusalAnswering(page, "members.bulkResendInvitations");
     answered.resolve();
 
-    expect((await refused).items).toEqual({ [ids[0] ?? ""]: "no-such-invitation" });
+    const [refusedId] = ids;
+    assert.ok(refusedId !== undefined, "an invitation was made");
+    expect((await refused).items).toEqual({ [refusedId]: "no-such-invitation" });
     await saysARefusal(invitationsRegion(page).getByRole("alert"));
     await expect(tickOf(page, ben), "the tick made meanwhile stays").toBeChecked();
     await expect(selectionSaid(page), "the pressed tick comes back too").toHaveText(/\b2\b/);

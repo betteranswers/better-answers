@@ -42,6 +42,9 @@ describe("a page's head with no frame around it", () => {
   });
 });
 
+const follows = (before: Node, after: Node): boolean =>
+  (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
 describe("a list's head", () => {
   const head = (
     <ListHead
@@ -55,20 +58,12 @@ describe("a list's head", () => {
   it("reads heading, then count, then the primary action", () => {
     render(head);
 
-    const read = [
-      screen.getByRole("heading", { level: 2, name: "Members" }),
-      screen.getByRole("status"),
-      screen.getByRole("button", { name: "Invite a Person" }),
-    ];
-    expect(screen.getByRole("status").textContent).toBe("8 members");
-    for (const [index, part] of read.slice(1).entries()) {
-      const before = read[index];
-      expect(
-        before === undefined
-          ? 0
-          : before.compareDocumentPosition(part) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).not.toBe(0);
-    }
+    const heading = screen.getByRole("heading", { level: 2, name: "Members" });
+    const count = screen.getByRole("status");
+    const action = screen.getByRole("button", { name: "Invite a Person" });
+    expect(count.textContent).toBe("8 members");
+    expect(follows(heading, count), "the count reads after the heading").toBe(true);
+    expect(follows(count, action), "the primary action reads after the count").toBe(true);
   });
 
   it("shows its heading where no tab names the list", () => {

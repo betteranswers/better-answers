@@ -1,7 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import type pg from "pg";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { ulid } from "../src/index.ts";
 import { type TestData, testData } from "./factory.ts";
@@ -515,13 +515,14 @@ describe("a month's partition of the content", () => {
       const seed = testData(client);
       await seed.questionContent({ workspaceId: WS_A });
       const [current] = await contentPartitions(client);
+      assert(current !== undefined, "the seed made this month's partition");
       await as(client, "app_rt", WS_A);
 
       const throughTheParent = await client.query("SELECT workspace_id FROM question_content");
       expect(throughTheParent.rows).toEqual([{ workspace_id: WS_A }]);
       await refusesEach(client, [
-        [`SELECT 1 FROM "${current?.name ?? ""}"`, "a partition carries no policy to scope a read"],
-        [`DELETE FROM "${current?.name ?? ""}"`, "nor a write"],
+        [`SELECT 1 FROM "${current.name}"`, "a partition carries no policy to scope a read"],
+        [`DELETE FROM "${current.name}"`, "nor a write"],
       ]);
     });
   });

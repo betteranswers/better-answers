@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { coverageOf, seedGuide } from "../src/guides/index.ts";
 import { percentile, recordFigures } from "./figures.ts";
@@ -79,7 +79,7 @@ describe("seeding a guide at 3,000 concepts", () => {
 
       const seeds = await timedSeeds(ng);
       const [first] = seeds;
-      if (first === undefined) throw new Error("no guide was seeded");
+      assert(first !== undefined, "no guide was seeded");
       const reads: { readonly ms: number; readonly sections: number }[] = [];
       for (let read = 0; read < COVERAGE_READS; read += 1) {
         reads.push(await coverageReadMs(ng, first.guideId));

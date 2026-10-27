@@ -61,6 +61,11 @@ const conceptsPlanned = (person: UserPrincipal) =>
     return planned.related.map(({ iri }) => iri);
   });
 
+const carryingACollection = (
+  question: RecallQuestion,
+): question is RecallQuestion & { readonly collection: string } =>
+  question.collection !== undefined;
+
 const figuresOf = (
   read: string,
   { byAnswer, everyAnswer, anyAnswer }: Recalls,
@@ -145,36 +150,41 @@ describe("recall over the synthetic set", () => {
 
   it("keeps a narrowed reading inside the collection named", async () => {
     const groupOf = new Map(answersOf(set).map(({ key, group }) => [landed.get(key), group]));
-    const outside: string[] = [];
-    let returned = 0;
-    for (const [, questions] of await bothSets()) {
-      for (const { question, collection } of questions) {
-        if (collection === undefined) continue;
-        const ranking = await planned(question, collection);
-        returned += ranking.length;
-        if (ranking.some((iri) => groupOf.get(iri) !== collection)) outside.push(question);
-      }
+    const narrowed = (await bothSets())
+      .flatMap(([, questions]) => questions)
+      .filter(carryingACollection);
+    const readings: { question: string; returned: number; outside: readonly string[] }[] = [];
+    for (const { question, collection } of narrowed) {
+      const ranking = await planned(question, collection);
+      readings.push({
+        question,
+        returned: ranking.length,
+        outside: ranking.filter((iri) => groupOf.get(iri) !== collection),
+      });
     }
 
-    expect(outside).toEqual([]);
-    expect(returned).toBeGreaterThan(0);
+    expect(readings.filter(({ outside }) => outside.length > 0)).toEqual([]);
+    expect(readings.reduce((sum, { returned }) => sum + returned, 0)).toBeGreaterThan(0);
   }, 300_000);
 
   it("ranks ask's plan step as find ranks", async () => {
     const depth = Math.min(RECALL_DEPTH, ASK_CAPS.entryPoints);
-    const apart: string[] = [];
-    let matching = 0;
+    const readings: { question: string; byFind: string; byAsk: string; found: number }[] = [];
     for (const [, questions] of await bothSets()) {
       for (const { question } of questions) {
         const byFind = (await found(question)).slice(0, depth);
         const byAsk = (await planned(question, undefined)).slice(0, depth);
-        if (byFind.join() !== byAsk.join()) apart.push(question);
-        if (byFind.length > 0) matching += 1;
+        readings.push({
+          question,
+          byFind: byFind.join(),
+          byAsk: byAsk.join(),
+          found: byFind.length,
+        });
       }
     }
 
-    expect(apart).toEqual([]);
-    expect(matching).toBeGreaterThan(0);
+    expect(readings.filter(({ byFind, byAsk }) => byFind !== byAsk)).toEqual([]);
+    expect(readings.filter(({ found: count }) => count > 0).length).toBeGreaterThan(0);
   }, 300_000);
 });
 
@@ -215,6 +225,11 @@ beforeAll(async () => {
 
 afterAll(() => rm(scratch, { recursive: true }));
 
+const placed = async (path: string, text: string | undefined): Promise<string> => {
+  if (text !== undefined) await writeFile(path, text);
+  return path;
+};
+
 describe("the recall set's reader", () => {
   it.each([
     ["a file that is not there", undefined],
@@ -225,8 +240,7 @@ describe("the recall set's reader", () => {
       JSON.stringify({ note: "", groups: [{ group: "empty", answers: [] }] }),
     ],
   ])("refuses %s", async (refused, text) => {
-    const path = join(scratch, `${refused.replaceAll(" ", "-")}.json`);
-    if (text !== undefined) await writeFile(path, text);
+    const path = await placed(join(scratch, `${refused.replaceAll(" ", "-")}.json`), text);
 
     expect((await readRecallSet(path)).ok).toBe(false);
   });
@@ -348,9 +362,9 @@ describe("the synthetic sets' provenance", () => {
     );
     const bundle = await bundleWording(CUSTOMER_BUNDLE);
 
-    const borrowed = (await syntheticTexts()).flatMap(([text, named]) =>
-      borrowedFrom(bundle, text, named) ? [text] : [],
-    );
+    const borrowed = (await syntheticTexts())
+      .filter(([text, named]) => borrowedFrom(bundle, text, named))
+      .map(([text]) => text);
 
     expect(bundle.runs.size).toBeGreaterThan(0);
     expect(borrowed).toEqual([]);
@@ -360,6 +374,9 @@ describe("the synthetic sets' provenance", () => {
 const wordingsOf = ({ title, body, paraphrases }: RecallAnswer): readonly string[] =>
   [title, ...body.split("\n"), ...paraphrases].map(phraseOf);
 
+const wordsItsAnswer = (answer: RecallAnswer | undefined, question: string): boolean =>
+  answer !== undefined && wordingsOf(answer).includes(phraseOf(question));
+
 describe("the buyer-worded set", () => {
   it("words no question as its Answer's title or line", async () => {
     const set = await theRecallSet();
@@ -367,12 +384,9 @@ describe("the buyer-worded set", () => {
     const { questions } = await theBuyerQuestions(set);
 
     const repeating = questions.flatMap(({ question, answers }) =>
-      answers.flatMap((key) => {
-        const answer = byKey.get(key);
-        return answer !== undefined && wordingsOf(answer).includes(phraseOf(question))
-          ? [`${question} (${key})`]
-          : [];
-      }),
+      answers
+        .filter((key) => wordsItsAnswer(byKey.get(key), question))
+        .map((key) => `${question} (${key})`),
     );
 
     expect(repeating).toEqual([]);

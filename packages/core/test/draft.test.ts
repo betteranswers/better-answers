@@ -23,6 +23,7 @@ import {
   streamedResponse,
 } from "./judge-wire.ts";
 import { openReservationsIn, rowsFrom } from "./rows.ts";
+import { abortingAt, holdingAt } from "./stream-pauses.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -239,7 +240,7 @@ describe("the drafter", () => {
         `Kept thirteen months.[^${numberOf(numbers, RETENTION)}]\n`,
         `Then deleted.[^${numberOf(numbers, RETENTION)}]\n`,
       ],
-      { before: (at) => (at === firstSentenceAt + 1 ? held.promise : Promise.resolve()) },
+      { before: holdingAt(firstSentenceAt + 1, held.promise) },
     );
     const drafting = draftAnswer(
       asker,
@@ -315,11 +316,7 @@ describe("the drafter", () => {
     const leaving = new AbortController();
     const drafter = aDrafter(
       (numbers) => [`Kept.[^${[...numbers.values()].join("")}]\n`, "More.\n"],
-      {
-        before: async (at) => {
-          if (at === SECOND_DELTA) leaving.abort();
-        },
-      },
+      { before: abortingAt(SECOND_DELTA, leaving) },
     );
 
     const { events } = await draftOf(asker, result, drafter, { signal: leaving.signal });
@@ -351,9 +348,10 @@ describe("what the drafter reads and keeps", () => {
     const { events } = await draftOf(asker, result, drafter);
 
     expect(titlesSent(drafter)).toEqual([[RETENTION.title]]);
-    expect(
-      events.map((event) => (event.kind === "sentence" ? event.sentence : event.kind)),
-    ).toEqual(["Kept thirteen months.", "part"]);
+    expect(events).toMatchObject([
+      { kind: "sentence", sentence: "Kept thirteen months." },
+      { kind: "part" },
+    ]);
   });
 
   it("drafts nothing where no answering model is chosen", async () => {

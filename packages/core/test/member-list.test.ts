@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, describe, expect, it } from "vitest";
 
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
@@ -121,12 +123,12 @@ describe("the member list", () => {
 
     const listed = await listedAs(ours, ours.adminUserId);
 
+    assert(listed.ok, inspect(listed));
     expect(
-      listed.ok &&
-        listed.value.map(({ personId, credentialsRevokedAt }) => ({
-          personId,
-          credentialsRevokedAt,
-        })),
+      listed.value.map(({ personId, credentialsRevokedAt }) => ({
+        personId,
+        credentialsRevokedAt,
+      })),
     ).toEqual([
       { personId: here, credentialsRevokedAt: revokedHere.toISOString() },
       { personId: there, credentialsRevokedAt: null },
@@ -144,9 +146,8 @@ describe("the member list", () => {
     const byAddress = [first.person, second.person]
       .toSorted((one, other) => one.email.localeCompare(other.email))
       .map((person) => person.id);
-    expect(listed.ok && listed.value.slice(0, 2).map((member) => member.personId)).toEqual(
-      byAddress,
-    );
+    assert(listed.ok, inspect(listed));
+    expect(listed.value.slice(0, 2).map((member) => member.personId)).toEqual(byAddress);
   });
 
   it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
@@ -178,6 +179,7 @@ describe("the member list", () => {
 
     const listed = await listedAs(ours, ours.adminUserId);
 
-    expect(listed.ok && listed.value.map((member) => member.personId)).toEqual([ours.adminUserId]);
+    assert(listed.ok, inspect(listed));
+    expect(listed.value.map((member) => member.personId)).toEqual([ours.adminUserId]);
   });
 });

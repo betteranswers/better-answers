@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { z } from "zod";
 
@@ -18,6 +20,7 @@ import {
   seedConcepts,
   signedInAtHome,
   signIn,
+  requestsSent,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
@@ -79,6 +82,12 @@ const memberRows = (page: Page): Locator =>
 /** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 const theMembersRead = (url: URL) => url.pathname.includes("members.list");
 
+const noteWhetherTheBrowserKeepsK = () => {
+  window.addEventListener("keydown", (pressed) => {
+    if (pressed.key.toLowerCase() === "k") Reflect.set(window, "kept", !pressed.defaultPrevented);
+  });
+};
+
 const signedInOffMembers = async (page: Page, api: APIRequestContext, email: string) => {
   await page.goto("/sign-in");
   await signIn(page, api, email);
@@ -121,10 +130,7 @@ const typed = async (page: Page, words: string) => {
 
 test("hides People from a Viewer, reading no members", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
-  const membersReads: string[] = [];
-  page.on("request", (sent) => {
-    if (theMembersRead(new URL(sent.url()))) membersReads.push(sent.url());
-  });
+  const membersReads = requestsSent(page, theMembersRead);
 
   await opened(page, "Control+k");
   await expect(optionOf(page, /^Ask$/)).toBeVisible();
@@ -135,7 +141,10 @@ test("hides People from a Viewer, reading no members", async ({ page, request })
   await expect(groupOf(page, "Members")).toHaveCount(0);
   await expect(inputOf(page)).toHaveAttribute("placeholder", /page/i);
   await expect(inputOf(page)).not.toHaveAttribute("placeholder", /member|action/i);
-  expect(membersReads, "a Viewer's jump-to asked for the members").toEqual([]);
+  expect(
+    membersReads.map((sent) => sent.url()),
+    "a Viewer's jump-to asked for the members",
+  ).toEqual([]);
 });
 
 test("opens the invite action on Members for an Admin", async ({ page, request }) => {
@@ -160,11 +169,7 @@ test("opens the invite action on Members for an Admin", async ({ page, request }
 test("opens on either chord anywhere, Escape handing focus back", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Ribble Toolmaking");
   // Left on the window, which hears the key after the jump-to's own listener.
-  await page.evaluate(() => {
-    window.addEventListener("keydown", (pressed) => {
-      if (pressed.key.toLowerCase() === "k") Reflect.set(window, "kept", !pressed.defaultPrevented);
-    });
-  });
+  await page.evaluate(noteWhetherTheBrowserKeepsK);
   await expect(triggerOf(page)).toHaveAttribute("aria-keyshortcuts", "Meta+K Control+K");
 
   await opened(page, "Meta+k");
@@ -500,6 +505,7 @@ test("opens from the narrow band, scrolling nothing sideways", async ({ page, re
     room.holds,
   );
   const box = await dialogOf(page).boundingBox();
-  expect(box?.x ?? -1, "the dialog starts off the page").toBeGreaterThanOrEqual(0);
-  expect((box?.x ?? 0) + (box?.width ?? NARROW.width + 1)).toBeLessThanOrEqual(NARROW.width);
+  assert.ok(box !== null, "the dialog drew a box");
+  expect(box.x, "the dialog starts off the page").toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(NARROW.width);
 });

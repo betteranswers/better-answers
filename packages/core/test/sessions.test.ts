@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, describe, expect, it } from "vitest";
 
 import { matching } from "@better-answers/schema/testing/matching";
 
@@ -296,7 +298,8 @@ describe("signing every other session out", () => {
 
     const ended = await signOutOthers(person, 0);
 
-    expect(ended.ok && ended.value.ended).toBe(1);
+    assert(ended.ok, inspect(ended));
+    expect(ended.value.ended).toBe(1);
     const held = await db().pool.query<{ revoked: Date | null }>(
       "SELECT revoked FROM oauth_refresh_token WHERE id = $1",
       [grants.refresh.id],

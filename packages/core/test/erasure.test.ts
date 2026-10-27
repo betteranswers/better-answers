@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, describe, expect, it } from "vitest";
+
+import { matching } from "@better-answers/schema/testing/matching";
 
 import {
   deadlineOf,
@@ -78,7 +82,8 @@ describe("recording a subject request", () => {
   it("lands the request and its audit event, counting the identifiers", async () => {
     const { scenario, subject, recorded, requestId } = await workspaceWithARequest();
 
-    const auditEventId = recorded.ok ? recorded.value.auditEventId : "";
+    assert(recorded.ok, inspect(recorded));
+    const { auditEventId } = recorded.value;
     expect(recorded).toEqual({ ok: true, value: { requestId, auditEventId, dueAt: DUE_AT } });
     expect(await requestRowsIn(scenario.workspaceId)).toEqual([
       {
@@ -252,9 +257,7 @@ describe("recording a subject request", () => {
       requestOf({ receivedAt: CONFIRMED_AT, clockStartedAt: RECEIVED_AT }),
     );
 
-    expect(recorded.ok).toBe(false);
-    if (recorded.ok) return;
-    expect(recorded.error).toBeInstanceOf(Error);
+    expect(recorded).toEqual({ ok: false, error: matching.any(Error) });
     expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
   });
 });
@@ -373,7 +376,8 @@ describe("reading a subject request", () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const theirs = await recordingAs(elsewhere.admin, requestOf());
-    const theirRequestId = theirs.ok ? theirs.value.requestId : "";
+    assert(theirs.ok, inspect(theirs));
+    const theirRequestId = theirs.value.requestId;
 
     expect(await readingRequestAs(scenario.admin, theirRequestId)).toEqual({
       ok: false,

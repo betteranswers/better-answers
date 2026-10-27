@@ -6,7 +6,7 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Frame } from "@/app/frame.tsx";
 import { createAppClients, Providers } from "@/app/providers.tsx";
@@ -102,7 +102,8 @@ describe("a rail of two areas", () => {
   it("opens one tooltip at a time across its entries", async () => {
     await openAt(QUESTIONS.path);
     const [first, second] = railLinks();
-    if (first === undefined || second === undefined) throw new Error("the rail lists no two");
+    assert(first !== undefined, "the rail lists a first area");
+    assert(second !== undefined, "the rail lists a second area");
 
     act(() => first.focus());
     expect(await screen.findByRole("tooltip")).toBeDefined();
@@ -118,7 +119,7 @@ describe("a rail of two areas", () => {
     expect(screen.getByRole("navigation", { name: "First" })).toBeDefined();
 
     const second = railLinks()[1];
-    if (second === undefined) throw new Error("the rail lists no second area");
+    assert(second !== undefined, "the rail lists a second area");
     fireEvent.click(second);
 
     const swapped = await screen.findByRole("navigation", { name: "Second" });

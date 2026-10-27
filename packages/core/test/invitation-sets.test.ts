@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
@@ -143,7 +143,7 @@ describe("inviting several addresses at once", () => {
     const [toBen, toAna] = sent.map((one) => one.invitationId);
     expect((await invitationsOf(workspace)).map((row) => [row.id, row.status])).toEqual([
       [first.invitationId, "canceled"],
-      ...sorted([toBen ?? "", toAna ?? ""]).map((id) => [id, "pending"]),
+      ...sorted(sent.map((one) => one.invitationId)).map((id) => [id, "pending"]),
     ]);
     const events = (await invitationEvents(workspace)).slice(1);
     const batch = events[0]?.batch_id;
@@ -353,9 +353,7 @@ describe("inviting several addresses at once", () => {
     ]);
 
     expect(answers.map((answer) => answer.ok)).toEqual([true, true]);
-    const replaced = answers.flatMap((answer) =>
-      answer.ok ? [answer.value.map((one) => one.replaced)] : [],
-    );
+    const replaced = answers.map((answer) => answeredValue(answer).map((one) => one.replaced));
     expect(replaced.toSorted()).toEqual([
       [false, false],
       [true, true],
@@ -674,6 +672,8 @@ describe("cancelling a set of invitations", () => {
       await sending(workspace, [addressOf("ana"), addressOf("ben")], "Viewer"),
     );
     const [first, second] = sorted(sent.map((one) => one.invitationId));
+    assert(first !== undefined, "the send invited ana");
+    assert(second !== undefined, "the send invited ben");
     const holder = await db().pool.connect();
     const HOLD = "SELECT 1 FROM invitation WHERE id = $1 FOR UPDATE";
     try {
@@ -681,7 +681,7 @@ describe("cancelling a set of invitations", () => {
       // The holder waits first and checks for a deadlock last, so the cancel finds the cycle.
       await holder.query("SET LOCAL deadlock_timeout = '30s'");
       await holder.query(HOLD, [second]);
-      const cancel = cancellingSet(workspace, [first ?? "", second ?? ""]);
+      const cancel = cancellingSet(workspace, [first, second]);
       await until(async () => (await countWaitingOnLocks(db().pool)) > 0);
       const waitingOnTheCancel = holder.query(HOLD, [first]);
 

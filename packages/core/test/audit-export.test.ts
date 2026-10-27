@@ -385,13 +385,14 @@ const waitingOnTheGroupTable = async (): Promise<void> => {
 
 const doorWith = (
   workspace: ProvisionedWorkspace,
-  before: (opened: number) => Promise<void>,
+  onConnection: number,
+  before: () => Promise<void>,
 ): PostgresDoor => {
   const { pool } = workspace.door;
   let opened = 0;
   const connect = async () => {
     opened += 1;
-    await before(opened);
+    if (opened === onConnection) await before();
     return pool.connect();
   };
   return { pool: overriding(pool, { connect }) };
@@ -406,8 +407,8 @@ const exportThrough = async (workspace: ProvisionedWorkspace, door: PostgresDoor
 describe("an export under way", () => {
   it.each([1, 2])("answers the store failing on connection %i", async (failing) => {
     const workspace = await provisionedWorkspace(db(), `ExportFailed${failing}`);
-    const door = doorWith(workspace, async (opened) => {
-      if (opened === failing) throw new Error("the store is gone");
+    const door = doorWith(workspace, failing, async () => {
+      throw new Error("the store is gone");
     });
 
     expect(await exportThrough(workspace, door)).toEqual({ ok: false, error: matching.any(Error) });
@@ -417,8 +418,7 @@ describe("an export under way", () => {
   it("refuses an Admin demoted while it reads, recording nothing", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportDemotedMidway");
     await memberAt(workspace, "Admin", { name: "Bea Admin" });
-    const door = doorWith(workspace, async (opened) => {
-      if (opened !== 2) return;
+    const door = doorWith(workspace, 2, async () => {
       await db().pool.query(
         "UPDATE member SET role = 'Editor' WHERE workspace_id = $1 AND user_id = $2",
         [workspace.workspaceId, workspace.adminUserId],

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { whileWritesAreRefused } from "@better-answers/core/testing/postgres";
@@ -7,6 +7,7 @@ import { matching } from "@better-answers/schema/testing/matching";
 import { confirmedByTheHarness } from "./factor-harness.ts";
 import { authorizeUrl, continueAfterPostLogin, pkce } from "./flow.ts";
 import { PUBLIC_URL, type TestClient } from "./harness.ts";
+import { aWrongCode } from "./provoke.ts";
 import { aStoppableClock, servedApp } from "./suite-app.ts";
 
 const { clock, stopTheClock } = aStoppableClock();
@@ -348,7 +349,7 @@ describe("signing in through a link", () => {
     const person = await app().person();
     const asking = app().client();
     const { code, token } = await askedFor(asking, person.email);
-    const wrong = code === "000000" ? "111111" : "000000";
+    const wrong = aWrongCode(code);
 
     for (let tried = 0; tried < 3; tried += 1) {
       await asking.json("/sign-in/email-otp", { email: person.email, otp: wrong });
@@ -476,7 +477,9 @@ describe("signing in through a link", () => {
       `${PUBLIC_URL}${authorizeUrl({ challenge: pkce().challenge, scope: "knowledge:read" })}`,
       { redirect: "manual" },
     );
-    const query = new URL(started.headers.get("location") ?? "", PUBLIC_URL).search;
+    const sentTo = started.headers.get("location");
+    assert(sentTo !== null, "the authorization redirected");
+    const query = new URL(sentTo, PUBLIC_URL).search;
     const { token } = await askedFor(asking, workspace.admin.email, {
       oauth_query: query.slice(1),
     });

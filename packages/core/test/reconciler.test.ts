@@ -1,5 +1,7 @@
+import { inspect } from "node:util";
+
 import pg from "pg";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { commit, withRepositoryLock } from "@better-answers/core/store/git";
@@ -240,7 +242,8 @@ describe("a commit whose rows were lost", () => {
 
     expect(history).toHaveLength(1);
     expect(await recordedChain(scenario.workspaceId)).toEqual([]);
-    const sha = history[0] ?? "";
+    const [sha] = history;
+    assert(sha !== undefined, "the write committed");
     const facts = await commitFacts(scenario.git, scenario.workspaceId, sha);
 
     const run = await reconciled(scenario);
@@ -286,8 +289,8 @@ describe("a commit whose rows were lost", () => {
 
   it("is audited as the platform's; the commit stays the person's", async () => {
     const scenario = await arrange();
-    const history = await writeInTheWindow(scenario, scenario.editor, guideline("Leave"));
-    const sha = history[0] ?? "";
+    const [sha] = await writeInTheWindow(scenario, scenario.editor, guideline("Leave"));
+    assert(sha !== undefined, "the write committed");
 
     await reconciled(scenario);
 
@@ -361,7 +364,8 @@ describe("a commit whose rows were lost", () => {
       scenario.editor,
       guideline("Mileage", { expects: { head: first.sha } }),
     );
-    const orphan = history[1] ?? "";
+    const orphan = history[1];
+    assert(orphan !== undefined, "the second write committed");
     await reconciled(scenario);
     const before = await rowsOf(scenario.workspaceId);
 
@@ -1038,8 +1042,10 @@ describe("a concept carrying a __proto__ front-matter key", () => {
       decisions: [{ suggestionId: item.suggestionId, expectedTarget: item.target }],
     });
 
-    expect(outcomes.ok && outcomes.value.map((outcome) => outcome.outcome.ok)).toEqual([true]);
-    const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1) ?? "";
+    assert(outcomes.ok, inspect(outcomes));
+    expect(outcomes.value.map((outcome) => outcome.outcome.ok)).toEqual([true]);
+    const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1);
+    assert(sha !== undefined, "the acceptance committed");
     const { row, file } = await rowAgainstFile(scenario, sha, request.path);
     expect(file.frontmatter).toEqual({
       ...request.frontmatter,
@@ -1088,9 +1094,7 @@ describe("what the reconciler refuses", () => {
       { workspaceId: scenario.workspaceId },
     );
 
-    expect(refused.ok).toBe(false);
-    if (refused.ok) return;
-    expect(refused.error).toBeInstanceOf(Error);
+    expect(refused).toEqual({ ok: false, error: matching.any(Error) });
   });
 
   it("skips a bundle another process is rewriting, landing nothing", async () => {
@@ -1151,8 +1155,8 @@ describe("a commit the rows cannot take", () => {
       expectedHead: landing.sha,
       at: new Date(),
     });
-    expect(clash.ok).toBe(true);
-    const orphan = clash.ok ? clash.value.sha : null;
+    assert(clash.ok, inspect(clash));
+    const orphan = clash.value.sha;
 
     const behind = await writeConcept(
       scenario.editor,
@@ -1192,13 +1196,13 @@ describe("a commit the rows cannot take", () => {
       expectedHead: landing.sha,
       at: new Date(),
     });
-    expect(moved.ok).toBe(true);
+    assert(moved.ok, inspect(moved));
 
     const run = await reconciled(scenario);
 
     expect(run).toMatchObject({
       replayed: [],
-      stopped: { sha: moved.ok ? moved.value.sha : "", reason: "rename-refused" },
+      stopped: { sha: moved.value.sha, reason: "rename-refused" },
     });
     expect(await conceptRow(scenario.workspaceId, landing.iri)).toMatchObject({
       path: input.path,
@@ -1335,8 +1339,7 @@ describe("the periodic head check's pass", () => {
 
       const outcomes = await outcomesOfPass(broken);
 
-      const failed = outcomes.get(broken.workspaceId);
-      expect(failed?.ok === false ? failed.error : undefined).toBeInstanceOf(Error);
+      expect(outcomes.get(broken.workspaceId)).toEqual({ ok: false, error: matching.any(Error) });
       expect(outcomes.get(later.workspaceId)).toMatchObject({
         ok: true,
         value: { replayed: history },
@@ -1364,8 +1367,7 @@ describe("reconciler hits", () => {
     await reconciled(scenario);
 
     const hits = await reconcilerHits(RECONCILER, scenario.postgres, scenario);
-    expect(hits.ok).toBe(true);
-    if (!hits.ok) return;
+    assert(hits.ok, inspect(hits));
 
     expect(hits.value.map((hit) => hit.commitSha)).toEqual(history);
     const facts = await commitFacts(scenario.git, scenario.workspaceId, first);

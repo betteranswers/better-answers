@@ -19,6 +19,8 @@ import {
   skipLinkReachesThePage,
   switcherMenuOf,
   switcherOf,
+  answersRead,
+  requestsSent,
 } from "./harness.ts";
 import {
   conceptsSeeded,
@@ -404,11 +406,7 @@ test.describe("the concept page", () => {
   test("shows a source its reader cannot read as words alone", async ({ page, request }) => {
     const seeded = await aWorkspaceOfConcepts(request, "Dales Registry");
     await signedInAsAViewer(page, request, seeded);
-    const answers: string[] = [];
-    page.on("response", (response) => {
-      if (isAnOpen(new URL(response.url())))
-        void response.text().then((text) => answers.push(text));
-    });
+    const answers = answersRead(page, isAnOpen);
     const concept = await atTheConcept(page, seeded, RETENTION);
 
     await expect(sourceLines(page).nth(1)).toHaveText(new RegExp(`^\\[2\\]\\s*${MINUTES}$`));
@@ -428,7 +426,7 @@ test.describe("the concept page", () => {
     await expect
       .poll(() => answers.length, { message: "the page read nothing" })
       .toBeGreaterThan(0);
-    const answered = answers.join("\n");
+    const answered = (await Promise.all(answers)).join("\n");
     expect(answered, "a read answered the withheld document's id").not.toContain(withheld);
     expect(answered, "a read answered the withheld document's title").not.toContain(
       MINUTES_DOCUMENT,
@@ -455,11 +453,7 @@ test.describe("the concept page", () => {
     const sent = opensSentBy(page);
 
     const drawn: string[] = [];
-    const answers: { readonly status: number; readonly body: string }[] = [];
-    page.on("response", (response) => {
-      if (!isAnOpen(new URL(response.url()))) return;
-      void response.text().then((body) => answers.push({ status: response.status(), body }));
-    });
+    const answers = answersRead(page, isAnOpen);
     for (const address of [
       `${SEARCH.path}/not-a-concept`,
       withheld.toLowerCase().replace(SEARCH.path.toLowerCase(), SEARCH.path),
@@ -478,12 +472,9 @@ test.describe("the concept page", () => {
     expect(new Set(drawn).size, "the four addresses drew different pages").toBe(1);
     expect(sent, "a malformed address asked the api about it").toHaveLength(2);
     await expect.poll(() => answers.length).toBe(2);
-    expect(answers[0]?.body, "the api did not refuse the absent concept").toContain(
-      '"httpStatus":404',
-    );
-    expect(answers[0]?.body, "an absent and a withheld concept were answered apart").toBe(
-      answers[1]?.body,
-    );
+    const [absent, notShown] = await Promise.all(answers);
+    expect(absent, "the api did not refuse the absent concept").toContain('"httpStatus":404');
+    expect(absent, "an absent and a withheld concept were answered apart").toBe(notShown);
 
     await wayBack(page).click();
     await expect(
@@ -534,10 +525,7 @@ test.describe("the concept page", () => {
   test("draws raw HTML as text and fetches no image", async ({ page, request }) => {
     const seeded = await aWorkspaceOfConcepts(request, "Aire Registers");
     await signedInAsTheAdmin(page, request, seeded);
-    const fetched: string[] = [];
-    page.on("request", (sent) => {
-      if (new URL(sent.url()).hostname === IMAGE_HOST) fetched.push(sent.url());
-    });
+    const fetched = requestsSent(page, (url) => url.hostname === IMAGE_HOST);
     const concept = await atTheConcept(page, seeded, RETENTION);
 
     await expect(concept).toContainText("<script>window.ranByABody = true</script>");
@@ -547,7 +535,10 @@ test.describe("the concept page", () => {
     await expect(concept.getByRole("link", { name: "script link" })).toHaveCount(0);
     await expect(concept).toContainText(`See also ${COMMITTEE}.`);
     expect(await page.evaluate(() => "ranByABody" in window), "the body's script ran").toBe(false);
-    expect(fetched, "the body's image was fetched").toEqual([]);
+    expect(
+      fetched.map((sent) => sent.url()),
+      "the body's image was fetched",
+    ).toEqual([]);
   });
 
   test("says a failed read with a retry, not not found", async ({ page, request }) => {

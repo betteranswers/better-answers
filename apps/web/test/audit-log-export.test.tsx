@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
 import { adaAnAdmin, heldBack, openAt } from "./two-workspaces.ts";
@@ -23,7 +23,7 @@ describe("an audit log export refused twice in one sentence", () => {
     await openAt("/system/audit-log", api);
     const log = within(await screen.findByRole("region", { name: "Audit Log" }));
     const [alert] = log.getAllByRole("alert");
-    if (alert === undefined) throw new Error("the audit log draws no alert");
+    assert(alert !== undefined, "the audit log draws an alert");
 
     fireEvent.click(log.getByRole("button", { name: "Export Events" }));
     await waitFor(() => expect(alert.textContent).toMatch(/\b2\b/));

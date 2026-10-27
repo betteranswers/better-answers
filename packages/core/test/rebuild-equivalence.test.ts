@@ -285,7 +285,8 @@ describe("the worker's rebuild against the api's own map", () => {
       ]);
       expect(
         linkerEdges
-          .flatMap((edge) => (edge["label"] === "LINKS_TO" ? [edge["uid"]] : []))
+          .filter((edge) => edge["label"] === "LINKS_TO")
+          .map((edge) => edge["uid"])
           .toSorted(),
       ).toEqual(
         [0, 1, 2, 3, 4, 5, 6, 7].map((ordinal) => `links_to:${linker.iri}:${ordinal}`).toSorted(),

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { confirmedByTheHarness, holdAnAuthenticator } from "./factor-harness.ts";
@@ -213,7 +213,9 @@ describe("connecting Claude from a pending session", () => {
     // No prompt: with consent already given, a confirmed session would be handed a code at once.
     asked.searchParams.delete("prompt");
     const start = await client.fetch(asked.href, { redirect: "manual" });
-    const query = new URL(start.headers.get("location") ?? "", PUBLIC_URL).search;
+    const sentTo = start.headers.get("location");
+    assert(sentTo !== null, "the authorization redirected");
+    const query = new URL(sentTo, PUBLIC_URL).search;
     await signInByEmailOnly(app(), client, admin.email);
 
     const resumed = await client.fetch(`${PUBLIC_URL}/oauth2/authorize${query}`, {
@@ -226,7 +228,9 @@ describe("connecting Claude from a pending session", () => {
     await confirmWithTheAuthenticator(client, key);
     const after = await continueAfterPostLogin(client, query);
 
-    const resumedTo = new URL(resumed.headers.get("location") ?? "", PUBLIC_URL);
+    const resumedAt = resumed.headers.get("location");
+    assert(resumedAt !== null, "the resumed authorization redirected");
+    const resumedTo = new URL(resumedAt, PUBLIC_URL);
     expect([resumedTo.pathname, resumedTo.searchParams.has("code")]).toEqual([
       "/choose-workspace",
       false,

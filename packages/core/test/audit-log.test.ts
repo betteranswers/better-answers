@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import type { z } from "zod";
 
 import { ulid } from "@better-answers/schema";
@@ -190,7 +190,9 @@ describe("the audit log", () => {
       searchTooBroad: false,
     });
     const [newest, oldest] = page.events;
-    expect(Date.parse(newest?.at ?? "")).toBeGreaterThan(Date.parse(oldest?.at ?? ""));
+    assert(newest !== undefined, "the page holds the newest event");
+    assert(oldest !== undefined, "the page holds the oldest event");
+    expect(Date.parse(newest.at)).toBeGreaterThan(Date.parse(oldest.at));
   });
 
   it("names an unnamed person by their sign-in address", async () => {

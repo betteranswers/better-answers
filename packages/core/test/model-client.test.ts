@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { ulid } from "@better-answers/schema";
@@ -180,14 +180,15 @@ describe("the Messages shape", () => {
 
     expect(wire.sent).toHaveLength(1);
     const [sent] = wire.sent;
-    expect(sent?.url).toBe("https://api.anthropic.com/v1/messages");
-    expect(sent?.init.method).toBe("POST");
-    expect(sent?.init.headers).toEqual({
+    assert(sent !== undefined, "the call was sent");
+    expect(sent.url).toBe("https://api.anthropic.com/v1/messages");
+    expect(sent.init.method).toBe("POST");
+    expect(sent.init.headers).toEqual({
       "content-type": "application/json",
       "x-api-key": A_KEY,
       "anthropic-version": "2023-06-01",
     });
-    expect(JSON.parse(sent?.body ?? "")).toEqual({
+    expect(JSON.parse(sent.body)).toEqual({
       model: SONNET,
       max_tokens: 2000,
       system: SYSTEM,
@@ -422,15 +423,16 @@ describe("the decision shape", () => {
 
     expect(wire.sent).toHaveLength(1);
     const [sent] = wire.sent;
-    expect(sent?.url).toBe(
+    assert(sent !== undefined, "the call was sent");
+    expect(sent.url).toBe(
       "https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/run/@cf/cloudflare/clef-flash",
     );
-    expect(sent?.init.method).toBe("POST");
-    expect(sent?.init.headers).toEqual({
+    expect(sent.init.method).toBe("POST");
+    expect(sent.init.headers).toEqual({
       "content-type": "application/json",
       authorization: "Bearer invented_Token-u15",
     });
-    expect(JSON.parse(sent?.body ?? "")).toEqual({
+    expect(JSON.parse(sent.body)).toEqual({
       model: "clef-flash",
       state: "How long are audit logs kept?",
       questions: {
@@ -649,18 +651,28 @@ describe("a decision model's window", () => {
 });
 
 describe("a model of the other wire shape", () => {
+  type Client = ReturnType<typeof clientOn>["client"];
   it.each([
-    ["a decision model no Messages call", ANSWERED, "callModel"],
-    ["a Messages model no decision call", DECIDED, "decide"],
-    ["a Messages model no yes-or-no call", DECIDED, "decideYesNo"],
-  ] as const)("sends %s", async (_case, replied, method) => {
+    [
+      "a decision model no Messages call",
+      ANSWERED,
+      (client: Client) => client.callModel(TO_CLEF_FLASH, A_CALL),
+    ],
+    [
+      "a Messages model no decision call",
+      DECIDED,
+      (client: Client) => client.decide(TO_SONNET, A_DECISION),
+    ],
+    [
+      "a Messages model no yes-or-no call",
+      DECIDED,
+      (client: Client) => client.decideYesNo(TO_SONNET, A_DECISION),
+    ],
+  ] as const)("sends %s", async (_case, replied, call) => {
     const wire = theWire(replied);
     const { client, lines } = clientOn(wire);
 
-    const called =
-      method === "callModel"
-        ? await client.callModel(TO_CLEF_FLASH, A_CALL)
-        : await client[method](TO_SONNET, A_DECISION);
+    const called = await call(client);
 
     expect(called).toEqual({ outcome: "failed", spent: [] });
     expect(wire.sent).toEqual([]);
@@ -1066,7 +1078,7 @@ describe("resolving a workspace's model", () => {
     const wire = theWire(ANSWERED);
 
     const to = answered(await resolving(asker));
-    if (to === undefined) throw new Error("the workspace's judging model did not resolve");
+    assert(to !== undefined, "the workspace's judging model did not resolve");
     await clientOn(wire).client.callModel(to, A_CALL);
 
     expect({ ...to, key: to.key.reveal() }).toEqual({
@@ -1076,8 +1088,10 @@ describe("resolving a workspace's model", () => {
       model: SONNET,
       key: A_KEY,
     });
-    expect(wire.sent[0]?.init.headers).toMatchObject({ "x-api-key": A_KEY });
-    expect(JSON.parse(wire.sent[0]?.body ?? "")).toMatchObject({ model: SONNET });
+    const [sent] = wire.sent;
+    assert(sent !== undefined, "the call was sent");
+    expect(sent.init.headers).toMatchObject({ "x-api-key": A_KEY });
+    expect(JSON.parse(sent.body)).toMatchObject({ model: SONNET });
   });
 
   it("answers no model for a purpose with no choice", async () => {

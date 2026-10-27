@@ -105,18 +105,35 @@ const askedOfTheLibrary = async (client: TestClient, path: string, method: strin
   });
 };
 
+const SERVED = ENDPOINTS.filter(([path]) => OPEN_TO_A_PENDING_SESSION.has(path));
+
+const GATED = ENDPOINTS.filter(([path]) => !OPEN_TO_A_PENDING_SESSION.has(path));
+
 describe("the pending set in the library's endpoints", () => {
+  it("leaves endpoints on both sides of the set", () => {
+    expect({ served: SERVED.length > 0, gated: GATED.length > 0 }).toEqual({
+      served: true,
+      gated: true,
+    });
+  });
+
   it("names only paths the library mounts", () => {
     const mounted = new Set(ENDPOINTS.map(([path]) => path));
     expect([...OPEN_TO_A_PENDING_SESSION].filter((path) => !mounted.has(path))).toEqual([]);
   });
 
-  it.each(ENDPOINTS)("answers %s to a pending session as the set says", async (path, method) => {
+  it.each(SERVED)("serves %s to a pending session, as the set says", async (path, method) => {
+    const answered = await askedOfTheLibrary(await aPendingSession(), path, method);
+
+    expect(await refusedAsPending(answered)).toBe(false);
+  });
+
+  it.each(GATED)("refuses or hides %s from a pending session", async (path, method) => {
     const answered = await askedOfTheLibrary(await aPendingSession(), path, method);
 
     const pending = await refusedAsPending(answered);
     const absent = answered.status === 404;
-    expect(OPEN_TO_A_PENDING_SESSION.has(path) ? pending : !(pending || absent)).toBe(false);
+    expect([pending, absent]).toContain(true);
   });
 });
 

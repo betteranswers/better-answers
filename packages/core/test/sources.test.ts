@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
+import { inspect } from "node:util";
 
 import type pg from "pg";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { matching } from "@better-answers/schema/testing/matching";
@@ -210,7 +211,7 @@ describe("an Admin connects an upload", () => {
     const { input } = handbookOffered();
 
     const bound = await connectUpload(scenario.admin, doorsOf(scenario), input);
-    if (!bound.ok) throw new Error(`the connect was refused: ${String(bound.error)}`);
+    assert(bound.ok, `the connect was refused: ${inspect(bound)}`);
     const { connectedSourceId, documentId, jobId, auditEventId, originalKey } = bound.value;
 
     expect(await connectedSourceRowOf(db().pool, scenario.workspaceId, connectedSourceId)).toEqual({
@@ -266,7 +267,7 @@ describe("an Admin connects an upload", () => {
     });
 
     const got = await getObject(scenario.admin, store().door, originalKey);
-    if (!got.ok) throw new Error(`the object door refused the read: ${got.error}`);
+    assert(got.ok, `the object door refused the read: ${inspect(got)}`);
     expect(await textOf(got.value)).toEqual("The handbook says what the company decided.");
     expect(await listObjects(scenario.admin, store().door, "")).toEqual({
       ok: true,
@@ -299,7 +300,7 @@ describe("an Admin connects an upload", () => {
     ).toEqual([]);
 
     const left = await listObjects(scenario.admin, store().door, "");
-    if (!left.ok) throw new Error(`the object door refused the listing: ${left.error}`);
+    assert(left.ok, `the object door refused the listing: ${inspect(left)}`);
     expect(left.value.length).toEqual(1);
   });
 
@@ -360,7 +361,7 @@ describe("an Admin connects an upload", () => {
     const { input } = handbookOffered({ audience: "groups", audienceGroups: [groupId] });
 
     const bound = await connectUpload(scenario.admin, doorsOf(scenario), input);
-    if (!bound.ok) throw new Error(`the connect was refused: ${String(bound.error)}`);
+    assert(bound.ok, `the connect was refused: ${inspect(bound)}`);
 
     const row = await connectedSourceRowOf(
       db().pool,
@@ -419,7 +420,7 @@ describe("an Admin connects an upload", () => {
     const { input } = handbookOffered({ byteSize });
 
     const bound = await connectUpload(scenario.admin, doorsOf(scenario), input);
-    if (!bound.ok) throw new Error(`the connect was refused: ${String(bound.error)}`);
+    assert(bound.ok, `the connect was refused: ${inspect(bound)}`);
 
     const row = await documentRowOf(db().pool, scenario.workspaceId, bound.value.documentId);
     expect(row?.["byte_size"]).toEqual(HANDBOOK_BYTES);
@@ -449,7 +450,7 @@ describe("an Admin connects an upload", () => {
       doorsOf(scenario),
       handbookOffered({ connectedSourceId }).input,
     );
-    if (!first.ok) throw new Error(`the connect was refused: ${String(first.error)}`);
+    assert(first.ok, `the connect was refused: ${inspect(first)}`);
     const repeat = handbookOffered({ connectedSourceId });
     const again = await connectUpload(scenario.admin, doorsOf(scenario), repeat.input);
 
@@ -481,13 +482,13 @@ describe("an Admin connects an upload", () => {
     loser.release();
     const lost = await second;
 
-    if (!won.ok) throw new Error(`the first connect was refused: ${String(won.error)}`);
+    assert(won.ok, `the first connect was refused: ${inspect(won)}`);
     expect(lost).toEqual(won);
     const { documentId, originalKey } = won.value;
     const row = await documentRowOf(db().pool, scenario.workspaceId, documentId);
     expect(row?.["original_key"]).toEqual(originalKey);
     const got = await getObject(scenario.admin, store().door, originalKey);
-    if (!got.ok) throw new Error(`the object door refused the read: ${got.error}`);
+    assert(got.ok, `the object door refused the read: ${inspect(got)}`);
     expect(await textOf(got.value)).toEqual(HANDBOOK);
     expect((await storedFor(scenario.admin)).filter((key) => key !== originalKey)).toEqual([
       matching.stringMatching(
@@ -1207,7 +1208,7 @@ describe("an Admin reprocesses a connected source", () => {
         }),
       ),
     );
-    if (!reprocessed.ok) throw new Error(`the reprocess was refused: ${String(reprocessed.error)}`);
+    assert(reprocessed.ok, `the reprocess was refused: ${inspect(reprocessed)}`);
 
     expect(reprocessed.value.passages).toEqual(2);
     expect(await passageStampsOf(db().pool, scenario.workspaceId, connectedSourceId)).toEqual([]);
@@ -1418,7 +1419,7 @@ describe("the operator's reindex of a workspace's connected sources", () => {
     const reindexed = await reindexEveryConnectedSource(REINDEX, scenario.postgres, {
       workspaceId: scenario.workspaceId,
     });
-    if (!reindexed.ok) throw new Error(`the reindex was refused: ${String(reindexed.error)}`);
+    assert(reindexed.ok, `the reindex was refused: ${inspect(reindexed)}`);
 
     expect(reindexed.value.map((source) => [source.connectedSourceId, source.passages])).toEqual([
       [connectedSourceId, 2],
@@ -1459,7 +1460,7 @@ describe("the erasure reprocesses a connected source as the platform", () => {
       connectedSourceId,
       reason: "wiped",
     });
-    if (!wiped.ok) throw new Error(`the erasure's reprocess was refused: ${String(wiped.error)}`);
+    assert(wiped.ok, `the erasure's reprocess was refused: ${inspect(wiped)}`);
 
     expect(wiped.value.passages).toEqual(2);
     expect(await passagesReadableBy(scenario.admin, documentId)).toEqual([]);

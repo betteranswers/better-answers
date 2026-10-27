@@ -5,7 +5,7 @@ import type { ConceptIri } from "@better-answers/schema";
 import { find, open, type FindResult, type OpenResult } from "../src/answering/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
-import { inMs, percentile, recordFigures } from "./figures.ts";
+import { alternating, inMs, percentile, recordFigures } from "./figures.ts";
 import { landRecallSet, theRecallSet } from "./recall.ts";
 import {
   conceptCiting,
@@ -139,8 +139,8 @@ const underLoad = async <T>(
 ): Promise<readonly Timed<T>[]> => {
   const reads: Timed<T>[] = [];
   for (let round = 0; round < ROUNDS; round += 1) {
-    const inFlight = Array.from({ length: IN_FLIGHT }, (_unused, at) =>
-      read(at % 2 === 0 ? scenario.viewer : scenario.admin),
+    const inFlight = alternating(IN_FLIGHT, scenario.viewer, scenario.admin).map((reader) =>
+      read(reader),
     );
     reads.push(...(await Promise.all(inFlight)));
   }
@@ -244,10 +244,10 @@ describe("find and open under concurrent read load", () => {
 
     expect(readers().totalCount, "the connections the reads ran on").toBe(IN_FLIGHT);
     expect(reads.map(({ value }) => opensOf(value))).toEqual(
-      Array.from({ length: IN_FLIGHT * ROUNDS }, (_unused, at) =>
-        at % 2 === 0
-          ? ["Retention handbook", "Backup Frequency"]
-          : ["Retention handbook", "Board minutes", "Backup Frequency"],
+      alternating(
+        IN_FLIGHT * ROUNDS,
+        ["Retention handbook", "Backup Frequency"],
+        ["Retention handbook", "Board minutes", "Backup Frequency"],
       ),
     );
     expect(reads.map(({ value }) => linksOf(value))).toEqual(

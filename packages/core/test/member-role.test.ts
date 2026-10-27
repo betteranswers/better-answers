@@ -194,8 +194,8 @@ describe("the last Admin", () => {
 
     expect(await adminsOf(workspace)).toHaveLength(1);
     expect(answers.filter((answer) => answer.ok)).toHaveLength(1);
-    expect(answers.flatMap((answer) => (answer.ok ? [] : [answer.error]))).toEqual([
-      matching.any(String),
+    expect(answers.filter((answer) => !answer.ok)).toEqual([
+      { ok: false, error: matching.any(String) },
     ]);
     expect(await roleChangesIn(workspace)).toHaveLength(1);
   });

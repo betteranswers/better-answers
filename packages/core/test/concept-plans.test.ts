@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, describe, expect, it } from "vitest";
 
 import { conceptIriOf, MARK_THE_MATCH_LEAKPROOF, ulid } from "@better-answers/schema";
 import { UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
@@ -67,7 +69,8 @@ describe("the concept arm's plan, as the api under its policy", () => {
         limit: 10,
         after: { weight: 3, rank: 3, key: conceptIriOf(ulid()) },
       });
-      return read.ok ? ok(read.value.map(({ concept }) => concept.title)) : read;
+      assert(read.ok, inspect(read));
+      return ok(read.value.map(({ concept }) => concept.title));
     });
 
     expect(found.answer).toEqual([]);

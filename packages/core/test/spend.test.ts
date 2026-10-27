@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { openRecord } from "../src/answering/index.ts";
 import type { PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
@@ -242,7 +242,8 @@ describe("spend", () => {
 
     const late = await settling(asking, reservationId, [A_CALL]);
 
-    expect(late.ok ? "settled" : String(late.error)).toContain(reservationId);
+    assert(!late.ok, "the sweep's reservation settles no second time");
+    expect(String(late.error)).toContain(reservationId);
     expect(await callsOf(asking)).toMatchObject([{ outcome: "failed", cost_gbp: "0.15" }]);
   });
 
@@ -340,7 +341,9 @@ describe("spend", () => {
       asking.asker.workspaceId,
     ]);
 
-    expect(Object.keys(rowsFrom(read)[0] ?? {}).toSorted()).toEqual([
+    const [row] = rowsFrom(read);
+    assert(row !== undefined, "the call left a row");
+    expect(Object.keys(row).toSorted()).toEqual([
       "answer_id",
       "called_at",
       "cost_gbp",

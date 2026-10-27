@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 
 import {
   endPool,
@@ -78,6 +78,20 @@ const statementsOf = (file: string): readonly string[] => {
     }
   }
   return statements;
+};
+
+const messageOf = (cause: unknown): string =>
+  cause instanceof Error ? cause.message : String(cause);
+
+const firstRefusalOf = async (
+  client: pg.PoolClient,
+  statements: readonly string[],
+): Promise<string> => {
+  for (const statement of statements) {
+    const refusal = await client.query(statement).then(() => "", messageOf);
+    if (refusal !== "") return refusal;
+  }
+  return "";
 };
 
 const grantsOf = async (): Promise<Grants> => {
@@ -171,13 +185,16 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     expect(relations.rows.map((row) => row.relation)).toContain(partition);
     const client = await db.pool.connect();
     try {
-      const wrong: { relation: string; held: Record<string, boolean> }[] = [];
+      const granted: { relation: string; held: Record<string, boolean> }[] = [];
       for (const { relation } of relations.rows) {
-        const held = await privilegesHeld(client, "browse_ro", relation);
-        const owed = { ...NOTHING_BUT_SELECT, SELECT: !withheldTables.includes(relation) };
-        if (JSON.stringify(held) !== JSON.stringify(owed)) wrong.push({ relation, held });
+        granted.push({ relation, held: await privilegesHeld(client, "browse_ro", relation) });
       }
-      expect(wrong).toEqual([]);
+      expect(granted).toEqual(
+        relations.rows.map(({ relation }) => ({
+          relation,
+          held: { ...NOTHING_BUT_SELECT, SELECT: !withheldTables.includes(relation) },
+        })),
+      );
     } finally {
       client.release();
     }
@@ -193,7 +210,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     const refused: string[] = [];
     for (const { relation } of views.rows) {
       await browse.query(`SELECT * FROM ${relation} LIMIT 1`).catch((cause: unknown) => {
-        refused.push(`${relation}: ${cause instanceof Error ? cause.message : String(cause)}`);
+        refused.push(`${relation}: ${messageOf(cause)}`);
       });
     }
     expect(refused).toEqual([]);
@@ -266,7 +283,9 @@ describe("the read-only browsing role, applied over the whole journal", () => {
       await client.query("ROLLBACK");
 
       await client.query("BEGIN READ WRITE");
-      await expect(configProbeWritten(client, workspaces[0] ?? "", "probe")).rejects.toThrow(
+      const [workspaceId] = workspaces;
+      assert(workspaceId !== undefined, "the suite seeded a workspace");
+      await expect(configProbeWritten(client, workspaceId, "probe")).rejects.toThrow(
         /permission denied for table workspace_config/,
       );
       await client.query("ROLLBACK");
@@ -291,14 +310,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     try {
       await client.query('REVOKE ALL ON ALL TABLES IN SCHEMA public, "index" FROM browse_ro');
       await client.query("ALTER TABLE jwks RENAME TO jwks_set_aside");
-      let refusal = "";
-      for (const statement of statementsOf(roleFile)) {
-        refusal = await client.query(statement).then(
-          () => "",
-          (cause: unknown) => (cause instanceof Error ? cause.message : String(cause)),
-        );
-        if (refusal !== "") break;
-      }
+      const refusal = await firstRefusalOf(client, statementsOf(roleFile));
       // psql stops at the error and its session ends, taking an open transaction with it.
       await client.query("ROLLBACK");
       expect(refusal).toMatch(/relation "public.jwks" does not exist/);

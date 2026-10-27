@@ -103,15 +103,16 @@ describe("recording a consent", () => {
   });
 
   it.each([
-    ["person id", { personId: "not-a-person-id", workspaceId: undefined }],
-    ["workspace id", { personId: undefined, workspaceId: "not-a-workspace-id" }],
+    ["person id", { personId: "not-a-person-id" }],
+    ["workspace id", { workspaceId: "not-a-workspace-id" }],
   ])("refuses a malformed %s, writing nothing", async (_case, malformed) => {
     const { door, workspaceId } = await provisionedWorkspace(db(), "Refused");
     const personId = await seedPerson(db().pool);
 
     const recorded = await recordConsent(bootstrap, door, {
-      personId: malformed.personId ?? personId,
-      workspaceId: malformed.workspaceId ?? workspaceId,
+      personId,
+      workspaceId,
+      ...malformed,
       clientId: CLIENT_ID,
     });
 

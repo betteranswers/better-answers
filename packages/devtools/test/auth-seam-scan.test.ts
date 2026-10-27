@@ -40,9 +40,10 @@ const seamed = (source: string, beside: Tree = {}): Tree => ({
 
 const LEAKS = seamed("export const readSession = () => client.getSession();\n");
 
-const MAPPED = seamed(
-  "type SessionHeld = { readonly id: string };\n\nexport const readSession = (): Promise<SessionHeld> =>\n  client.getSession().then((session) => ({ id: session.id }));\n",
-);
+const MAPPED_SOURCE =
+  "type SessionHeld = { readonly id: string };\n\nexport const readSession = (): Promise<SessionHeld> =>\n  client.getSession().then((session) => ({ id: session.id }));\n";
+
+const MAPPED = seamed(MAPPED_SOURCE);
 
 const scan = runsOverThrowawayTree({
   executable: SCAN_EXECUTABLE,
@@ -63,11 +64,9 @@ describe("the auth seam's declarations", () => {
   });
 
   it("refuses the auth client re-exported through the seam", () => {
-    const tree = {
-      ...MAPPED,
+    const tree = seamed(`${MAPPED_SOURCE}\nexport { authClient } from "./auth-client.ts";\n`, {
       "src/auth-client.ts": 'export { client as authClient } from "better-auth";\n',
-      [SEAM]: `${MAPPED[SEAM] ?? ""}\nexport { authClient } from "./auth-client.ts";\n`,
-    };
+    });
 
     expect(scan(tree)).toContain(
       `${SEAM}: the declaration of \`authClient\` names \`./auth-client.ts\`.`,
@@ -83,11 +82,9 @@ describe("the auth seam's declarations", () => {
   });
 
   it("reads past a refusal in a file the seam imports", () => {
-    const tree = {
-      ...MAPPED,
+    const tree = seamed(`${MAPPED_SOURCE}\nexport { count } from "./beside";\n`, {
       "src/beside.ts": 'export const count: number = "one";\n',
-      [SEAM]: `${MAPPED[SEAM] ?? ""}\nexport { count } from "./beside";\n`,
-    };
+    });
 
     expect(scan(tree)).toBe(`${SEAM}: its declarations name no Better Auth type\n`);
   });

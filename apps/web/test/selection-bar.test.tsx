@@ -8,6 +8,8 @@ placedWithoutMeasuring();
 
 const bar = () => screen.queryByRole("toolbar", { name: "Selected Members" });
 
+const shownBar = () => screen.getByRole("toolbar", { name: "Selected Members" });
+
 const countsIn = (shown: HTMLElement | null): readonly string[] =>
   within(shown ?? document.body)
     .getByRole("status")
@@ -70,7 +72,7 @@ describe("the selection bar", () => {
     tick("Cy Twombly");
     fireEvent.click(screen.getByRole("button", { name: "Next Page" }));
     tick("Ed Ruscha");
-    fireEvent.click(within(bar() ?? document.body).getByRole("button", { name: "Change Role" }));
+    fireEvent.click(within(shownBar()).getByRole("button", { name: "Change Role" }));
 
     expect(actions).toEqual(["change the role of cy, ed"]);
   });
@@ -89,8 +91,8 @@ describe("the selection bar", () => {
   it("moves between its buttons by arrow keys, one tab stop", async () => {
     render(<MembersList />);
     tick("Ada Lovelace");
-    const action = within(bar() ?? document.body).getByRole("button", { name: "Change Role" });
-    const clear = within(bar() ?? document.body).getByRole("button", { name: "Clear Selection" });
+    const action = within(shownBar()).getByRole("button", { name: "Change Role" });
+    const clear = within(shownBar()).getByRole("button", { name: "Clear Selection" });
 
     action.focus();
     fireEvent.keyDown(action, { key: "ArrowRight" });
@@ -116,10 +118,10 @@ describe("the selection bar", () => {
     expect(document.activeElement).toBe(search());
 
     tick("Ada Lovelace");
-    within(bar() ?? document.body)
-      .getByRole("button", { name: "Change Role" })
-      .focus();
-    fireEvent.keyDown(document.activeElement ?? document.body, { key: "x" });
+    const changeRole = within(shownBar()).getByRole("button", { name: "Change Role" });
+    changeRole.focus();
+    expect(document.activeElement).toBe(changeRole);
+    fireEvent.keyDown(changeRole, { key: "x" });
     expect(document.activeElement).toBe(search());
   });
 

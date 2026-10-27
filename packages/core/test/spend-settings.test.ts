@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
 
@@ -74,7 +74,8 @@ describe("a workspace's spending limit", () => {
       limiting(workspaceId, "50"),
     );
 
-    expect(refused.ok ? "set" : refused.error).toBeInstanceOf(Error);
+    assert(!refused.ok);
+    expect(refused.error).toBeInstanceOf(Error);
     expect(await limitsStored(workspaceId)).toEqual([]);
   });
 });
@@ -124,7 +125,8 @@ describe("a model's price", () => {
   it("answers the store's failure", async () => {
     const refused = await whileWritesAreRefused(db().pool, "model_price", () => pricing());
 
-    expect(refused.ok ? "set" : refused.error).toBeInstanceOf(Error);
+    assert(!refused.ok);
+    expect(refused.error).toBeInstanceOf(Error);
   });
 });
 
@@ -232,7 +234,8 @@ describe("a decision model's threshold", () => {
       thresholding(model, {}),
     );
 
-    expect(refused.ok ? "set" : refused.error).toBeInstanceOf(Error);
+    assert(!refused.ok);
+    expect(refused.error).toBeInstanceOf(Error);
     expect(await thresholdsHeld(model)).toEqual({ stored: [], recorded: [] });
   });
 });

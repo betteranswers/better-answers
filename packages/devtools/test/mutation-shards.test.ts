@@ -11,7 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
@@ -448,7 +448,8 @@ describe("a leg's results, merged from its shards", () => {
       baseline: undefined,
     });
 
-    expect(Object.keys(merged.checkpoint?.files ?? {})).toEqual(["src/a.ts"]);
+    assert(merged.checkpoint !== undefined, "the merge writes a checkpoint");
+    expect(Object.keys(merged.checkpoint.files)).toEqual(["src/a.ts"]);
   });
 
   it("leaves nothing to write when nothing was left", () => {
@@ -624,7 +625,7 @@ describe("a file too heavy for one shard, cut by line", () => {
   });
 
   it("prices each mutant by its text's cost last run", async () => {
-    const moved = [FOUR[3] ?? "", FOUR[0] ?? "", FOUR[1] ?? "", FOUR[2] ?? ""];
+    const moved = [...FOUR.slice(3), ...FOUR.slice(0, 3)];
     const previous = previousRun(moved, 1);
     const placedNowhere = { id: "nowhere", mutatorName: "StringLiteral", status: "Timeout" };
     previous.files["src/lines.ts"]?.mutants.push(placedNowhere);
@@ -1166,7 +1167,7 @@ describe("a throwaway leg run as shards by Stryker", () => {
   it("reuses a file's results when a new file moves it", async () => {
     const mergedResults = readReportFile(path.join(merged, "stryker-incremental.json"));
     const one = mergedResults.files["src/one.ts"];
-    if (one === undefined) throw new Error("the merged results hold nothing for src/one.ts");
+    assert(one !== undefined, "the merged results hold src/one.ts");
     const marked = {
       ...mergedResults,
       files: {

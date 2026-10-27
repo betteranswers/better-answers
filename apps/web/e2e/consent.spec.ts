@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import { THEME_KEPT_UNDER } from "@/shared/theme-switch.ts";
@@ -59,6 +61,12 @@ const anAdminAtConsent = async (
   return workspace;
 };
 
+const connectOnceRevoked = async (page: Page, api: APIRequestContext, userId: string) => {
+  await endEverySignInAndToken(api, userId);
+  await page.getByRole("button", { name: "Connect" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in again" })).toBeVisible();
+};
+
 const connectedAt = async (page: Page): Promise<URL> => {
   await page.getByRole("button", { name: "Connect" }).click();
   const callback = landedAt(page);
@@ -73,7 +81,8 @@ test("carries sign-in through consent to Claude's code on one origin", async ({
   baseURL,
   passesTheAccessibilityGate,
 }) => {
-  const origin = baseURL ?? "";
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
+  const origin = baseURL;
   const email = anAddress("consenting");
   const workspace = await provision(request, { name: "Consenting Ltd", adminEmail: email });
   await catchClaudesRedirect(page);
@@ -109,17 +118,18 @@ test("draws consent in the sign-in pages' card, faces and tokens", async ({
   request,
   baseURL,
 }) => {
-  await anAdminAtConsent(page, request, baseURL ?? "", "drawn");
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
+  await anAdminAtConsent(page, request, baseURL, "drawn");
 
   expect(await drawnMarks(page), "the card stands for its primary button").toEqual(["card"]);
   const geistLoaded = await page.evaluate(async () => {
     await document.fonts.ready;
-    return (
-      document.fonts.check('16px "Geist Variable"') &&
-      document.fonts.check('16px "Geist Mono Variable"')
-    );
+    return [
+      document.fonts.check('16px "Geist Variable"'),
+      document.fonts.check('16px "Geist Mono Variable"'),
+    ];
   });
-  expect(geistLoaded, "the api serves both faces").toBe(true);
+  expect(geistLoaded, "the api serves both faces").toEqual([true, true]);
   await expect(consentHeading(page)).toHaveCSS("font-family", /^"Geist Variable"/);
 
   const connect = page.getByRole("button", { name: "Connect" });
@@ -150,8 +160,9 @@ test("draws consent, then its refusal, in the dark theme kept", async ({
   baseURL,
   passesTheAccessibilityGate,
 }) => {
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
   await page.emulateMedia({ colorScheme: "light" });
-  const workspace = await anAdminAtConsent(page, request, baseURL ?? "", "keeps-dark");
+  const workspace = await anAdminAtConsent(page, request, baseURL, "keeps-dark");
   expect(await themeOf(page), "a light device opened a dark page").toBe("light");
   const light = await pagePainted(page);
 
@@ -165,10 +176,7 @@ test("draws consent, then its refusal, in the dark theme kept", async ({
   await expect(page.locator("script[src]"), "the consent page loaded the SPA").toHaveCount(0);
   await passesTheAccessibilityGate();
 
-  await endEverySignInAndToken(request, workspace.admin.id);
-  await page.getByRole("button", { name: "Connect" }).click();
-
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in again" })).toBeVisible();
+  await connectOnceRevoked(page, request, workspace.admin.id);
   expect(await paintsTheDarkPage(page), "dark painted the light page").not.toBe(light);
 });
 
@@ -178,9 +186,10 @@ test("follows a dark device on consent when nothing is kept", async ({
   baseURL,
   passesTheAccessibilityGate,
 }) => {
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
   await page.emulateMedia({ colorScheme: "dark" });
   await catchClaudesRedirect(page);
-  await anAdminAtConsent(page, request, baseURL ?? "", "dark-device");
+  await anAdminAtConsent(page, request, baseURL, "dark-device");
 
   expect(await themeOf(page), "a dark device opened a light page").toBe("dark");
   await passesTheAccessibilityGate();
@@ -188,6 +197,7 @@ test("follows a dark device on consent when nothing is kept", async ({
 });
 
 test("draws a cross-site refusal in the dark theme kept", async ({ page, baseURL }) => {
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
   await page.emulateMedia({ colorScheme: "light" });
   await page.addInitScript((key) => {
     localStorage.setItem(key, "dark");
@@ -196,7 +206,7 @@ test("draws a cross-site refusal in the dark theme kept", async ({ page, baseURL
     route.fulfill({
       status: 200,
       contentType: "text/html",
-      body: `<!doctype html><title>Elsewhere</title><form method="post" action="${baseURL ?? ""}/consent"><button>Send</button></form>`,
+      body: `<!doctype html><title>Elsewhere</title><form method="post" action="${baseURL}/consent"><button>Send</button></form>`,
     }),
   );
   await page.goto("https://elsewhere.example/");
@@ -214,7 +224,8 @@ test("asks consent again only when the host asks for it", async ({
   baseURL,
   passesTheAccessibilityGate,
 }) => {
-  const origin = baseURL ?? "";
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
+  const origin = baseURL;
   const email = anAddress("returning");
   await provision(request, { name: "Returning Ltd", adminEmail: email });
   await catchClaudesRedirect(page);
@@ -248,7 +259,8 @@ test("cancelling consent sends the assistant a refusal and no code", async ({
   baseURL,
   passesTheAccessibilityGate,
 }) => {
-  const origin = baseURL ?? "";
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
+  const origin = baseURL;
   const email = anAddress("declining");
   await provision(request, { name: "Declining Ltd", adminEmail: email });
   await catchClaudesRedirect(page);
@@ -271,21 +283,12 @@ test("refuses consent after credentials are revoked, sending no code", async ({
   request,
   baseURL,
 }) => {
-  /* jscpd:ignore-start */
-  const origin = baseURL ?? "";
-  const email = anAddress("revoked");
-  const workspace = await provision(request, { name: "Revoked Ltd", adminEmail: email });
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
+  const origin = baseURL;
   await catchClaudesRedirect(page);
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent" }));
-  await expect(consentHeading(page)).toBeVisible();
-  /* jscpd:ignore-end */
+  const workspace = await anAdminAtConsent(page, request, origin, "revoked");
 
-  await endEverySignInAndToken(request, workspace.admin.id);
-  await page.getByRole("button", { name: "Connect" }).click();
-
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in again" })).toBeVisible();
+  await connectOnceRevoked(page, request, workspace.admin.id);
   expect(landedAt(page).origin).toBe(origin);
   expect(landedAt(page).searchParams.get("code")).toBeNull();
 });
@@ -297,7 +300,8 @@ test("refuses Connect once another tab switched workspace", async ({
   baseURL,
   passesTheAccessibilityGate,
 }) => {
-  const origin = baseURL ?? "";
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
+  const origin = baseURL;
   const { first, second } = await inTwoWorkspaces(page, request, {
     first: "Ouse Consent",
     second: "Foss Consent",
@@ -326,11 +330,12 @@ test("takes a named member from connector sign-in straight to consent", async ({
   baseURL,
   passesTheAccessibilityGate,
 }) => {
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
   const email = anAddress("named-connecting");
   await provision(request, { name: "Named Connecting Ltd", adminEmail: email });
   await catchClaudesRedirect(page);
 
-  await page.goto(claudesAuthorizeUrl(baseURL ?? "", { prompt: "consent" }));
+  await page.goto(claudesAuthorizeUrl(baseURL, { prompt: "consent" }));
   await signIn(page, request, email);
 
   await expect(consentHeading(page)).toBeVisible();
@@ -345,7 +350,8 @@ test("asks an unnamed member's name, then carries on through consent", async ({
   baseURL,
   passesTheAccessibilityGate,
 }) => {
-  const origin = baseURL ?? "";
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
+  const origin = baseURL;
   const email = anAddress("unnamed");
   const workspace = await provision(request, { name: "Unnamed Ltd" });
   const who = await person(request, email, { displayName: "" });
@@ -371,7 +377,8 @@ test("asks an unnamed member's name, then carries on through consent", async ({
 });
 
 test("asks a non-member's name, then says No workspace yet", async ({ page, request, baseURL }) => {
-  await page.goto(claudesAuthorizeUrl(baseURL ?? ""));
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
+  await page.goto(claudesAuthorizeUrl(baseURL));
   await signIn(page, request, anAddress("unplaced"));
 
   await expect(displayNameHeading(page)).toBeVisible();

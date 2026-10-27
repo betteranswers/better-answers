@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 
 import {
   assertNoUndeclaredTables,
@@ -69,8 +69,9 @@ describe("the worker's schema view", () => {
     expect(new Set(entries.map((entry) => entry.when)).size).toBe(entries.length);
 
     const last = entries.at(-1);
+    assert(last !== undefined, "the journal has an entry");
 
-    const later = { idx: 9999, tag: "9999_a-second-at-the-same-instant", when: last?.when ?? 0 };
+    const later = { idx: 9999, tag: "9999_a-second-at-the-same-instant", when: last.when };
     expect(journalEntriesOf({ entries: [...entries, later] })).toEqual({
       ok: false,
       error: { earlier: last, later },

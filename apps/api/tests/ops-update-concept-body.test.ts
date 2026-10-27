@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { open, trustWords } from "@better-answers/core/answering";
 import { contentHashOf, parseConceptFile } from "@better-answers/core/concepts";
@@ -256,8 +256,9 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     const opened = await reading(scene.workspaceId, scene.admin.id, (principal, tx) =>
       open(principal, tx, { iri: ids.conceptIri.parse(scene.held.iri) }, IMPORTED_AT),
     );
-    const trust = opened.found ? opened.concept?.trust : undefined;
-    if (trust === undefined) throw new Error("the updated concept did not open");
+    assert(opened.found, "the updated concept did not open");
+    const trust = opened.concept?.trust;
+    assert(trust !== undefined, "the updated concept carries its trust");
     expect({ words: trustWords(trust), status: trust.status }).toEqual({
       words: "Verified by Theo Approver · 1 June 2026 · imported",
       status: "current",
@@ -344,7 +345,7 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
       expectedHead: await head(scene.principal, git),
       at: IMPORTED_AT,
     });
-    if (!inFlight.ok) throw new Error(`the commit was refused: ${String(inFlight.error)}`);
+    expect(inFlight).toMatchObject({ ok: true });
     const before = await standingOf(scene);
 
     const run = await scene.update();

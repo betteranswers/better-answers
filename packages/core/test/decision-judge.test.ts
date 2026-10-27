@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { ASK_CAPS, decisionJudgeCall } from "../src/answering/index.ts";
 import type { PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
@@ -208,7 +208,9 @@ describe("ask with a decision model", () => {
     expect(wire.sent.map(({ url }) => url)).toEqual([
       "https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/run/@cf/cloudflare/clef-flash",
     ]);
-    expect(JSON.parse(wire.sent[0]?.body ?? "")).toEqual({
+    const [sent] = wire.sent;
+    assert(sent !== undefined, "the decision call was sent");
+    expect(JSON.parse(sent.body)).toEqual({
       model: "clef-flash",
       state: "How do buyers access audit information?",
       questions: {
@@ -310,8 +312,10 @@ describe("ask with a decision model", () => {
     const answer = await askedWith(asker, wire);
 
     expect(answer.judgeState).toBe("judged");
+    const [sent] = wire.sent;
+    assert(sent !== undefined, "the decision call was sent");
     expect(wire.sent).toHaveLength(1);
-    expect(decisionCandidatesIn(wire.sent[0]?.body ?? "").size).toBe(20);
+    expect(decisionCandidatesIn(sent.body).size).toBe(20);
   });
 
   it("reserves the decision call's size, not the Messages call's", async () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { llmPurpose } from "@better-answers/schema";
@@ -55,13 +55,13 @@ describe("the model-choice agreement", () => {
       await client.query("SET LOCAL ROLE app_rt");
       for (const call of fixture.calls) {
         await client.query("SELECT set_config('app.workspace_id', $1, true)", [call.workspace_id]);
-        const resolved = await client.query("SELECT id FROM model_choice_for($1::llm_purpose)", [
-          call.purpose,
-        ]);
-        const modelChoiceId = z
-          .string()
-          .nullable()
-          .parse(rowsFrom(resolved)[0]?.["id"] ?? null);
+        const resolved = await client.query(
+          "SELECT (SELECT id FROM model_choice_for($1::llm_purpose)) AS id",
+          [call.purpose],
+        );
+        const [row] = rowsFrom(resolved);
+        assert(row !== undefined, "the scalar query answers one row");
+        const modelChoiceId = z.string().nullable().parse(row["id"]);
         expect({ ...call, resolved: modelChoiceId }).toEqual({
           ...call,
           resolved: call.expect_model_choice_id,

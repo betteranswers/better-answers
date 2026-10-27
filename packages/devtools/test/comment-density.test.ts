@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import {
   CEILING,
@@ -109,11 +109,13 @@ describe("the ceiling over a throwaway tree", () => {
     const over = overTheCeiling(measure(cloc(OVER), [WORKSPACE]));
 
     expect(over).toHaveLength(1);
-    expect(over[0]?.workspace).toBe(WORKSPACE);
-    expect(over[0]?.arm).toBe("source");
-    expect(
-      reportOf(over[0] ?? { workspace: "", arm: "source", code: 0, comment: 0, ratio: 0 }),
-    ).toContain(`0.500 comment lines per code line, ${OVER_THE_SOURCE_CEILING}`);
+    const [first] = over;
+    assert(first !== undefined, "one arm is over the ceiling");
+    expect(first.workspace).toBe(WORKSPACE);
+    expect(first.arm).toBe("source");
+    expect(reportOf(first)).toContain(
+      `0.500 comment lines per code line, ${OVER_THE_SOURCE_CEILING}`,
+    );
   });
 
   it("stays silent over a tree under both ceilings", () => {

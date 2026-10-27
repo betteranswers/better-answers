@@ -121,12 +121,16 @@ describe("the session-start warning that the cap is gone", () => {
     expect(message).toContain("bash scripts/jdocmunch-watch-cap.sh");
   });
 
-  it.each([
-    ["the cap is in place", true],
-    ["no watcher is installed", false],
-  ] as const)("says nothing when %s", (_, installed) => {
-    const { env } = machine(installed ? INSTALLED : undefined);
-    if (installed) run(script, env);
+  it("says nothing when the cap is in place", () => {
+    const { env } = machine(INSTALLED);
+    run(script, env);
+    const said = run(hook, env);
+    expect(said.status).toBe(0);
+    expect(said.stdout).toBe("");
+  });
+
+  it("says nothing when no watcher is installed", () => {
+    const { env } = machine(undefined);
     const said = run(hook, env);
     expect(said.status).toBe(0);
     expect(said.stdout).toBe("");

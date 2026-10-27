@@ -1,6 +1,6 @@
 import { inspect } from "node:util";
 
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 
 import { boundarySchemas, type ModelProvider } from "@better-answers/schema";
 
@@ -129,10 +129,10 @@ describe("a workspace's model key", () => {
     const [holder, other] = [await aWorkspace(), await aWorkspace()];
     await setting(holder, A_KEY);
 
-    const inItsOwn = await keyReadIn(holder);
+    const inItsOwn = await revealedIn(holder);
     const inAnother = await keyReadIn(other);
 
-    expect(inItsOwn.ok && inItsOwn.value?.reveal()).toBe(A_KEY);
+    expect(inItsOwn).toBe(A_KEY);
     expect(inAnother).toEqual({ ok: true, value: undefined });
   });
 
@@ -144,9 +144,10 @@ describe("a workspace's model key", () => {
       withIdentityRead(bootstrap, door(), (tx) => credentials.readModelKey(tx, "anthropic")),
     );
 
-    expect(read.ok ? "answered" : read.error.message).toBe(
-      "credentials: a model key is read inside its workspace's transaction",
-    );
+    expect(read).toMatchObject({
+      ok: false,
+      error: { message: "credentials: a model key is read inside its workspace's transaction" },
+    });
   });
 
   it("writes one audit event naming the provider, never the key", async () => {
@@ -180,7 +181,10 @@ describe("a workspace's model key", () => {
       ),
     );
 
-    expect(stored.ok ? "stored" : stored.error.message).toBe("the audit log refused the event");
+    expect(stored).toMatchObject({
+      ok: false,
+      error: { message: "the audit log refused the event" },
+    });
     expect(await rowsOf(workspaceId)).toEqual([]);
   });
 
@@ -208,18 +212,16 @@ describe("a workspace's model key", () => {
       setting(workspaceId, A_NEWER_KEY),
     );
 
-    expect(
-      read.ok && read.value?.reveal(),
-      "the key was stored, so its absence means something",
-    ).toBe(A_KEY);
-    expect(refused.ok, "the store's refusal reaches the caller as an error").toBe(false);
+    assert(read.ok, "the key was stored, so its absence means something");
+    expect(read.value?.reveal(), "the key was stored, so its absence means something").toBe(A_KEY);
+    assert(!refused.ok, "the store's refusal reaches the caller as an error");
     const everythingElse = [
       shown(set),
       shown(read),
-      shown(read.ok ? read.value : undefined),
+      shown(read.value),
       shown(underAnother),
       shown(refused),
-      shown(refused.ok ? undefined : refused.error),
+      shown(refused.error),
       shown(await eventsOf(workspaceId)),
       ...rows.map((row) => `${row.provider}\n${row.sealed.toString("latin1")}`),
     ].join("\n");
@@ -254,10 +256,9 @@ describe("a workspace's model key", () => {
   ])("%s names no byte of a short key", async (_side, open) => {
     const opened = await attempt(async () => open());
 
-    expect(opened.ok ? "opened" : opened.error.message).toBe(
-      "credentials: an envelope key is 32 bytes, not 5",
-    );
-    const thrown = shown(opened.ok ? undefined : opened.error);
+    assert(!opened.ok, "a short envelope key opens nothing");
+    expect(opened.error.message).toBe("credentials: an envelope key is 32 bytes, not 5");
+    const thrown = shown(opened.error);
     expect(writtenOut(A_SHORT_ENVELOPE_KEY).filter((form) => thrown.includes(form))).toEqual([]);
   });
 

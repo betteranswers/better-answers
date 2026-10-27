@@ -76,17 +76,17 @@ describe("a workspace's model choices", () => {
 
     const listed = await listAs(seeded);
 
-    expect(listed).toHaveLength(LLM_PURPOSES.length);
-    expect(
-      listed.every(
-        (modelChoice) =>
-          modelChoice.provider === null &&
-          modelChoice.model === null &&
-          modelChoice.dimensions === null &&
-          modelChoice.retentionTail === null &&
-          !modelChoice.fixed,
+    expect(listed).toEqual(
+      LLM_PURPOSES.map(() =>
+        matching.objectContaining({
+          provider: null,
+          model: null,
+          dimensions: null,
+          retentionTail: null,
+          fixed: false,
+        }),
       ),
-    ).toBe(true);
+    );
   });
 
   it("reads a model choice's retention tail in the provider's words", async () => {

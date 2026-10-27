@@ -22,6 +22,17 @@ const ASK_TO_JOIN_ENDPOINT = `/trpc/${ASK_TO_JOIN}`;
 
 const REASON = "I run the estimating desk and need the tender library.";
 
+const floodedUntilRefused = async (page: Page): Promise<number> => {
+  let status = 200;
+  for (let attempt = 0; attempt < 30 && status !== 429; attempt += 1) {
+    const answered = await page.request.post(ASK_TO_JOIN_ENDPOINT, {
+      data: { shortName: `nobody-${attempt}`, reason: REASON },
+    });
+    status = answered.status();
+  }
+  return status;
+};
+
 const A_SHORT_NAME = "acme-joinery";
 
 const OLD_WORD = ["sl", "ug"].join("");
@@ -151,14 +162,7 @@ test("refuses a blank reason, saying what to send", async ({
 test("tells a person past the ceiling when to ask again", async ({ page, request }) => {
   await signedInWithNoWorkspace(page, request, "asker");
 
-  let status = 200;
-  for (let attempt = 0; attempt < 30 && status !== 429; attempt += 1) {
-    const answered = await page.request.post(ASK_TO_JOIN_ENDPOINT, {
-      data: { shortName: `nobody-${attempt}`, reason: REASON },
-    });
-    status = answered.status();
-  }
-  expect(status, "the flood never met the ceiling").toBe(429);
+  expect(await floodedUntilRefused(page), "the flood never met the ceiling").toBe(429);
 
   const refused = refusalAnswering(page, ASK_TO_JOIN);
   await askToJoin(page, A_SHORT_NAME);

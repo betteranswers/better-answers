@@ -1,5 +1,5 @@
 import type pg from "pg";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { REDACTION_ALWAYS_TIER } from "@better-answers/schema";
 
@@ -80,11 +80,12 @@ describe("an Admin's restore of one always-set span", () => {
       stamped: true,
     });
 
-    expect(restored.ok ? restored.value.restoredAt : undefined).toEqual(columns?.restored_at);
+    assert(restored.ok);
+    expect(restored.value.restoredAt).toEqual(columns?.restored_at);
 
     expect(await restoreEventsOf(db().pool, scenario.workspaceId)).toEqual([
       {
-        id: restored.ok ? restored.value.auditEventId : "",
+        id: restored.value.auditEventId,
         action: "sources.finding.restored",
         family: "sources",
         actor: `human:${scenario.admin.userId}`,

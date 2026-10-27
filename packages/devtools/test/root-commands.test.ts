@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { gatesNamed, rootScripts } from "@better-answers/devtools/root-commands";
 
 describe("the gates a root command names", () => {
   it("expands a step that itself calls the runner", () => {
-    const steps = gatesNamed(rootScripts()["check"] ?? "");
+    const check = rootScripts()["check"];
+    assert(check !== undefined, "the root has a check script");
+    const steps = gatesNamed(check);
 
     expect(
       steps,

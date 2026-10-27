@@ -435,10 +435,9 @@ const PASSAGES_CURSOR =
 describe("a failed read", () => {
   it.each([
     ["find from the first run", undefined],
-    ["find from the passage run", PASSAGES_CURSOR],
-  ])("answers %s as an error", async (_case, cursor) => {
+    ["find from the passage run", findCursor.parse(PASSAGES_CURSOR)],
+  ])("answers %s as an error", async (_case, after) => {
     const { viewer } = await arrange();
-    const after = cursor === undefined ? undefined : findCursor.parse(cursor);
 
     const outcome = await afterAFailedStatement(viewer, (reader, tx) =>
       find(reader, tx, { query: QUESTION, limit: 10, cursor: after }, NOW),

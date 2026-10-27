@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { overrideConceptSensitivity, writeConcept } from "@better-answers/core/concepts";
 import { head, initRepository } from "@better-answers/core/store/git";
@@ -40,6 +40,21 @@ const NESTING = "Heron nesting season";
 const FEEDING = "Heron feeding grounds";
 const SURVEY = "Heron survey dates";
 const RINGING = "Heron ringing records";
+
+type ConceptOrDocument =
+  | {
+      readonly layer: "bundles";
+      readonly iri: string;
+      readonly title: string;
+      readonly trustWords: string;
+    }
+  | { readonly layer: "sources"; readonly locator: string };
+
+const addressOf = (match: ConceptOrDocument): string =>
+  match.layer === "bundles" ? match.iri : match.locator;
+
+const conceptTrustOf = (matches: readonly ConceptOrDocument[]) =>
+  matches.flatMap((match) => (match.layer === "bundles" ? [[match.title, match.trustWords]] : []));
 
 const MALFORMED = { data: { httpStatus: 400, refusal: { word: "malformed", class: "malformed" } } };
 
@@ -198,9 +213,9 @@ describe("knowledge.find over tRPC", () => {
 
     expect(last.nextCursor).toBeUndefined();
     expect([...first.matches, ...last.matches]).toEqual(whole.matches);
-    expect(
-      whole.matches.map((match) => (match.layer === "bundles" ? match.iri : match.locator)),
-    ).toEqual(matching.arrayContaining([NESTING, FEEDING, SURVEY, RINGING].map(iriOf)));
+    expect(whole.matches.map(addressOf)).toEqual(
+      matching.arrayContaining([NESTING, FEEDING, SURVEY, RINGING].map(iriOf)),
+    );
     expect(whole.matches).toHaveLength(4);
   });
 
@@ -233,7 +248,7 @@ describe("knowledge.find over tRPC", () => {
 
     const page = await api.knowledge.find.query({ query: QUERY, limit: 20 });
 
-    expect(page.matches.map((match) => (match.layer === "bundles" ? match.iri : ""))).toEqual(
+    expect(page.matches.map(addressOf)).toEqual(
       matching.arrayContaining([NESTING, FEEDING, SURVEY].map(iriOf)),
     );
     expect(JSON.stringify(page)).not.toContain(iriOf(RINGING));
@@ -246,11 +261,7 @@ describe("knowledge.find over tRPC", () => {
 
     const page = await api.knowledge.find.query({ query: QUERY, limit: 20 });
 
-    expect(
-      page.matches.flatMap((match) =>
-        match.layer === "bundles" ? [[match.title, match.trustWords]] : [],
-      ),
-    ).toEqual(
+    expect(conceptTrustOf(page.matches)).toEqual(
       matching.arrayContaining([
         [NESTING, "Verified automatically"],
         [FEEDING, "Unverified"],
@@ -375,7 +386,9 @@ describe("a body's links over both transports", () => {
       structures.push(JSON.stringify(structured(opened)).replaceAll(iri, "this concept"));
       texts.push(rendered(opened));
     }
-    const seen = await mcpOpenedBy(admin, notes[0] ?? "");
+    const [first] = notes;
+    assert(first !== undefined, "the board holds notes");
+    const seen = await mcpOpenedBy(admin, first);
 
     expect(structures[0]).toContain('"bodyLinks":[]');
     expect(structures[1]).toBe(structures[0]);

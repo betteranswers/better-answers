@@ -460,13 +460,14 @@ test.describe("the console's Workspaces page", () => {
     await expect(rowOf(page, workspace.name)).toBeVisible();
 
     await expect(listOf(page).getByRole("columnheader")).toHaveText(["Workspace", "Short Name"]);
-    const room = await page.evaluate(() => {
-      const table = document.querySelector("[data-slot=table-container]");
-      return {
-        page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        table: (table?.scrollWidth ?? 0) - (table?.clientWidth ?? 0),
-      };
-    });
+    const room = {
+      page: await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+      table: await page
+        .locator("[data-slot=table-container]")
+        .evaluate((table) => table.scrollWidth - table.clientWidth),
+    };
     expect(room, "the page or its table scrolls sideways").toEqual({ page: 0, table: 0 });
 
     await listOf(page).getByRole("button", { name: "Columns" }).click();

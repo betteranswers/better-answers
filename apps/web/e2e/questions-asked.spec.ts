@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { QUESTIONS_KEYSTROKES as KEY } from "@/features/questions/questions-state.ts";
@@ -212,13 +214,15 @@ test.describe("Questions asked", () => {
         },
       ],
     });
+    const [concept] = concepts;
+    assert.ok(concept !== undefined, "the harness seeded a concept");
     await seedQuestions(request, {
       workspaceId: at.workspaceId,
       records: [
         {
           question: NEWER_QUESTION,
           verdict: "related",
-          concepts: [{ iri: concepts[0]?.iri ?? "" }],
+          concepts: [{ iri: concept.iri }],
         },
       ],
     });

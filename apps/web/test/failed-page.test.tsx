@@ -56,6 +56,19 @@ const openModelChoicesWithABrokenRead = async () => {
   return rendered;
 };
 
+const aPageBrokenUntilFixed = () => {
+  let broken = true;
+  return {
+    Draws: () => {
+      if (broken) throw new Error("the page's own bug");
+      return <p>The page drew.</p>;
+    },
+    fix: () => {
+      broken = false;
+    },
+  };
+};
+
 describe("a page that throws", () => {
   it("leaves the rail, menu, band and content standing", async () => {
     await openModelChoicesWithABrokenRead();
@@ -121,11 +134,7 @@ describe("a page that throws", () => {
   });
 
   it("draws the page again when the reader asks for it", () => {
-    let broken = true;
-    const DrawsWhenItCan = () => {
-      if (broken) throw new Error("the page's own bug");
-      return <p>The page drew.</p>;
-    };
+    const page = aPageBrokenUntilFixed();
 
     const clients = createAppClients();
     const router = createAppRouter(
@@ -136,7 +145,7 @@ describe("a page that throws", () => {
       <Providers clients={clients}>
         <RouterContextProvider router={router}>
           <CatchBoundary getResetKey={() => "the reader's own retry"} errorComponent={FailedPage}>
-            <DrawsWhenItCan />
+            <page.Draws />
           </CatchBoundary>
         </RouterContextProvider>
       </Providers>,
@@ -144,7 +153,7 @@ describe("a page that throws", () => {
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("This Page Didn’t Load");
 
-    broken = false;
+    page.fix();
     expect(screen.queryByText("The page drew.")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Try Again" }));

@@ -228,6 +228,11 @@ export const waitingOnALock = async (app: TestApp): Promise<number> => {
 export const someoneWaitsOnALock = async (app: TestApp): Promise<boolean> =>
   (await waitingOnALock(app)) > 0;
 
+export const landedOrTwoWaitOnALock = async (
+  app: TestApp,
+  landed: readonly string[],
+): Promise<boolean> => landed.length > 0 || (await waitingOnALock(app)) === 2;
+
 export const sessionsAgedUnderTheApi = async (app: TestApp, userId: string): Promise<void> => {
   await app.database.superuser.query(
     "UPDATE session SET created_at = now() - interval '61 minutes' WHERE user_id = $1",

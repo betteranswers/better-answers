@@ -1,3 +1,4 @@
+import type { Route } from "@playwright/test";
 import { z } from "zod";
 
 import { HOMES } from "@/shared/navigation.ts";
@@ -19,6 +20,26 @@ const MODEL_CHOICES_LIST = "modelChoices.list";
 
 const FAILED_HEADING = "This Page Didn’t Load";
 
+const modelChoicesBroken = async (route: Route) => {
+  const answered = await route.fetch();
+  const procedures = decodeURIComponent(new URL(route.request().url()).pathname)
+    .replace("/trpc/", "")
+    .split(",");
+  if (!procedures.includes(MODEL_CHOICES_LIST)) {
+    await route.fulfill({ response: answered });
+    return;
+  }
+  const answers: unknown = await answered.json();
+
+  const batch = z.array(z.unknown()).safeParse(answers);
+  const broken = batch.success
+    ? batch.data.map((answer, index) =>
+        procedures[index] === MODEL_CHOICES_LIST ? { result: { data: NOT_A_LIST } } : answer,
+      )
+    : { result: { data: NOT_A_LIST } };
+  await route.fulfill({ json: broken });
+};
+
 test("offers a way out, shell intact, when a page throws", async ({
   page,
   request,
@@ -31,25 +52,7 @@ test("offers a way out, shell intact, when a page throws", async ({
     modelChoices: [{ purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" }],
   });
 
-  await page.route("**/trpc/**", async (route) => {
-    const answered = await route.fetch();
-    const procedures = decodeURIComponent(new URL(route.request().url()).pathname)
-      .replace("/trpc/", "")
-      .split(",");
-    if (!procedures.includes(MODEL_CHOICES_LIST)) {
-      await route.fulfill({ response: answered });
-      return;
-    }
-    const answers: unknown = await answered.json();
-
-    const batch = z.array(z.unknown()).safeParse(answers);
-    const broken = batch.success
-      ? batch.data.map((answer, index) =>
-          procedures[index] === MODEL_CHOICES_LIST ? { result: { data: NOT_A_LIST } } : answer,
-        )
-      : { result: { data: NOT_A_LIST } };
-    await route.fulfill({ json: broken });
-  });
+  await page.route("**/trpc/**", modelChoicesBroken);
 
   await page.goto("/sign-in");
   await signIn(page, request, email);

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, assert, describe, expect, it } from "vitest";
 
 import {
   mutationSummary,
@@ -212,7 +212,8 @@ describe("the mutation summary", () => {
     expect(fault).toBe(
       "api runner fault: 1 of its 3 covered mutants ran no test — no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again",
     );
-    expect(summary.startsWith(`### ${fault ?? ""}\n### api mutation score: 66.7%`)).toBe(true);
+    assert(fault !== undefined, "a runner fault is named");
+    expect(summary.startsWith(`### ${fault}\n### api mutation score: 66.7%`)).toBe(true);
   });
 
   it("names a runner fault when a leg killed no mutant", () => {

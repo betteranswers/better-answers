@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import type { ListedConnectedSource } from "@/features/sources/sources-api.ts";
 import {
@@ -199,7 +199,9 @@ describe("the terms a narrowing or widening changes", () => {
 
   it("adds the audience once it moves too", () => {
     const changes = termsThatChange(present, { sensitivity: "Internal", audience: "everyone" });
-    const said = changes[1]?.says.toLowerCase() ?? "";
+    const [, audience] = changes;
+    assert(audience !== undefined, "a second term changes");
+    const said = audience.says.toLowerCase();
     const from = said.indexOf(AUDIENCE_WORDS.groups.toLowerCase());
 
     expect(changes.map((change) => change.term)).toEqual(["Sensitivity", "Audience"]);

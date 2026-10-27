@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { assert, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
@@ -25,7 +25,13 @@ import { connectAsHost } from "./flow.ts";
 import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
 import { actingIn, type TestClient } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
-import { changedWhileItWaitsOn, seededIn, waitingOnALock, whileTheApiLacks } from "./provoke.ts";
+import {
+  changedWhileItWaitsOn,
+  landedOrTwoWaitOnALock,
+  seededIn,
+  waitingOnALock,
+  whileTheApiLacks,
+} from "./provoke.ts";
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
 
 const { clock, stopTheClock } = aStoppableClock();
@@ -316,7 +322,8 @@ describe("era-independent", () => {
         reason: "wrong",
       }),
     );
-    expect(refused.error ?? toolCalled.parse(refused.result).isError).toBeTruthy();
+    expect(refused).toMatchObject({ error: { code: -32602 } });
+    expect(refused).not.toHaveProperty("result");
   });
 
   it("lists give_feedback as naming the record it stores on", async () => {
@@ -330,7 +337,8 @@ describe("era-independent", () => {
     expect(entry?.description).toContain("`recordId`");
     expect(entry?.description).toContain("a call repeated after a timeout stores it twice");
     expect(entry?.description).not.toContain("one write");
-    expect(Object.keys(entry?.inputSchema.properties ?? {})).toEqual([
+    assert(entry !== undefined, "give_feedback is listed");
+    expect(Object.keys({ ...entry.inputSchema.properties })).toEqual([
       "recordId",
       "verdict",
       "reason",
@@ -357,7 +365,7 @@ describe("era-independent", () => {
     const { client, token } = await connect();
 
     for (const entry of await listTools(client, token)) {
-      const keys = Object.keys(entry.inputSchema.properties ?? {});
+      const keys = Object.keys({ ...entry.inputSchema.properties });
       for (const key of keys) {
         expect(key.toLowerCase()).not.toMatch(/workspace|bundle|tenant/);
       }
@@ -405,7 +413,7 @@ describe("era-independent", () => {
     const { client, token } = await connect();
 
     const described = new Map(
-      (await listTools(client, token)).map((entry) => [entry.name, entry.description ?? ""]),
+      (await listTools(client, token)).map((entry) => [entry.name, entry.description]),
     );
 
     expect(described.get("find")).toContain("Not company knowledge");
@@ -503,7 +511,7 @@ describe("era-independent", () => {
       const asked = await result(
         await callTool(client, token, "ask", {
           question: "How long are audit logs kept?",
-          ...(collections === undefined ? {} : { collections }),
+          collections,
         }),
         toolCalled,
       );
@@ -567,7 +575,8 @@ describe("era-independent", () => {
     const refused = await modern(client, token, "tools/list");
     expect(refused.status).toBe(401);
 
-    const challenge = refused.headers.get("www-authenticate") ?? "";
+    const challenge = refused.headers.get("www-authenticate");
+    assert(challenge !== null, "the refusal carries a challenge");
     expect(challenge).toContain('error="invalid_token"');
     expect(challenge).not.toContain("credentials-revoked");
     expect(app().logs.slice(before)).toContainEqual(
@@ -587,7 +596,9 @@ describe("era-independent", () => {
     const refused = await modern(client, token, "tools/list");
 
     expect(refused.status).toBe(401);
-    expect(refused.headers.get("www-authenticate") ?? "").not.toContain("not-a-member");
+    expect(refused.headers.get("www-authenticate")).not.toEqual(
+      expect.stringContaining("not-a-member"),
+    );
     expect(app().logs.slice(before)).toContainEqual(
       matching.objectContaining({
         event: "mcp.refused",
@@ -846,7 +857,7 @@ describe("ask, on the own-transaction road", () => {
       const removing = app()
         .removeMember(workspace.workspaceId, viewer.id)
         .then(() => landed.push("the removal"));
-      await until(async () => landed.length > 0 || (await waitingOnALock(app())) === 2);
+      await until(async () => landedOrTwoWaitOnALock(app(), landed));
       const heldBack = landed.length === 0;
       await release();
       await asking;

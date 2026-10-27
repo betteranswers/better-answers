@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { getTableName, type Table } from "drizzle-orm";
 import { Pool } from "pg";
-import { beforeAll, describe, expect, it } from "vitest";
+import { assert, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { find, open, trustWords } from "@better-answers/core/answering";
@@ -886,8 +886,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
       for (const command of SLICE_COMMANDS) {
         const run = await ops(served(), [command, "--workspace", workspaceId]);
         const said = run.lines.join("\n");
-        const others = SLICE_COMMANDS.filter(
-          (other) => other !== command && said.includes(`${other}:`),
+        const others = SLICE_COMMANDS.filter((other) => other !== command).filter((other) =>
+          said.includes(`${other}:`),
         );
         expect({ command, others }).toEqual({ command, others: [] });
       }
@@ -1099,7 +1099,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const name = `Rehearsal subject ${workspaceId}`;
 
       const seed = await seeded(workspaceId, admin.id);
-      const tokens = (seed.lines.at(-1) ?? "").split(",");
+      const printed = seed.lines.at(-1);
+      assert(printed !== undefined, "the seed printed its tokens");
+      const tokens = printed.split(",");
       const indexedBefore = await tokensThePassagesHold(served(), workspaceId, tokens);
       const run = await opsWith(
         served(),
@@ -1130,11 +1132,12 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await seededBeside(workspaceId, () => theSyncFailed(served(), workspaceId));
 
       const [sync] = await indexJobsIn(served(), workspaceId);
-      const jobs = await jobsOf(served(), workspaceId);
+      const [queued] = await jobsOf(served(), workspaceId);
+      assert(queued !== undefined, "the subject's document was queued");
       expect(run.exitCode).toBe(1);
       expect(sync).toEqual({ reason: "connected", status: "failed" });
       expect(run.lines).toEqual([
-        `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${jobs[0]?.id ?? ""} is failed after 1 attempt; the job's own row says what it found`,
+        `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${queued.id} is failed after 1 attempt; the job's own row says what it found`,
       ]);
     });
 
@@ -1155,10 +1158,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
         {},
       );
 
-      const jobs = await jobsOf(served(), workspaceId);
+      const [queued] = await jobsOf(served(), workspaceId);
+      assert(queued !== undefined, "the subject's document was queued");
       expect(run.exitCode).toBe(1);
       expect(run.lines).toEqual([
-        `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${jobs[0]?.id ?? ""} is still queued after 1 second, so no worker has indexed it`,
+        `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${queued.id} is still queued after 1 second, so no worker has indexed it`,
       ]);
     });
 
@@ -1203,7 +1207,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
 
       const written = await readFile(file, "utf8");
-      expect(written).toContain(`Erasure report for subject request ${request.rows[0]?.id ?? ""}.`);
+      const [requested] = request.rows;
+      assert(requested !== undefined, "the erasure request was recorded");
+      expect(written).toContain(`Erasure report for subject request ${requested.id}.`);
       expect(written).toContain(
         "Backup copies taken before 2026-08-01T12:00:00.000Z are beyond use: restored only in a " +
           "disaster, encrypted at rest, deletable only by the escrowed credential, expiring on " +
@@ -2338,7 +2344,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await addingPerson(served(), flags);
 
       expect(run).toMatchObject({ exitCode: 2, lines: [`add-person: REFUSED — ${said}`] });
-      expect(await personsAt(served(), flags[1] ?? "")).toEqual([]);
+      const [, email] = flags;
+      assert(email !== undefined, "the flags name an address");
+      expect(await personsAt(served(), email)).toEqual([]);
       expect(await addedRowCount(served())).toBe(before);
     });
 
@@ -3767,11 +3775,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const from = await opening(
         await iriOf(served(), workspaceId, "knowledge/company/answers/support-hours.md"),
       );
-      if (!from.found) throw new Error("the linking concept did not open");
-      const target = /\]\((https:\/\/[^)]+)\)/.exec(from.concept?.body ?? "")?.[1] ?? "";
-      const to = await opening(ids.conceptIri.parse(target));
+      assert(from.found, "the linking concept did not open");
+      assert(from.concept !== undefined, "the linking concept did not open");
+      const link = /\]\((https:\/\/[^)]+)\)/.exec(from.concept.body);
+      assert(link !== null, "the concept links to another");
+      const to = await opening(ids.conceptIri.parse(link[1]));
 
-      if (!to.found) throw new Error(`nothing stands at ${target}`);
+      assert(to.found, `nothing stands at ${String(link[1])}`);
       expect(to.concept?.frontmatter["title"]).toBe("Advanced plan");
     });
 
@@ -3816,7 +3826,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
       const [match, ...rest] = found.matches;
       expect(rest).toEqual([]);
-      if (match?.layer !== "bundles") throw new Error("the match is not a concept");
+      assert(match?.layer === "bundles", "the match is not a concept");
       expect({
         kind: match.kind,
         title: match.title,
@@ -3832,7 +3842,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const opened = await reading(served(), workspaceId, admin.id, (principal, tx) =>
         open(principal, tx, { iri: match.iri }, IMPORTED_AT),
       );
-      if (!opened.found) throw new Error("the concept was not found");
+      assert(opened.found, "the concept was not found");
       expect(opened.concept?.trust).toEqual({
         tier: "human-reviewed",
         status: "current",
@@ -4141,7 +4151,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         find(principal, tx, { query: "retention", limit: 10 }, IMPORTED_AT),
       );
       const match = found.matches[0];
-      if (match?.layer !== "bundles") throw new Error("the match is not a concept");
+      assert(match?.layer === "bundles", "the match is not a concept");
       expect(trustWords(match.trust)).toBe("Verified by Theo Approver · 1 June 2026 · imported");
     });
   });

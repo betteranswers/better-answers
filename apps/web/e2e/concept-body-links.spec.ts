@@ -11,6 +11,7 @@ import {
   signIn,
   skipLinkReachesThePage,
   tabUntilFocused,
+  answersRead,
 } from "./harness.ts";
 import { conceptsSeeded, isAnOpen } from "./knowledge.ts";
 
@@ -96,10 +97,7 @@ test.describe("a body's links to other concepts", () => {
     });
     await page.goto("/sign-in");
     await signIn(page, request, email);
-    const opens: Promise<string>[] = [];
-    page.on("response", (response) => {
-      if (isAnOpen(new URL(response.url()))) opens.push(response.text());
-    });
+    const opens = answersRead(page, isAnOpen);
 
     await page.goto(pageOf(seeded.concepts, RETENTION));
 

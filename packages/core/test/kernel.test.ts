@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { assert, describe, expect, expectTypeOf, it } from "vitest";
 
 import { boundarySchemas } from "@better-answers/schema";
 
@@ -77,8 +77,8 @@ describe("the try/catch every slice entry point wraps its library in", () => {
       throw thrown;
     });
 
-    expect(answered.ok).toBe(false);
-    expect(answered.ok ? undefined : answered.error).toBe(thrown);
+    assert(!answered.ok);
+    expect(answered.error).toBe(thrown);
   });
 
   it("turns a thrown string into an Error with that message", async () => {
@@ -118,8 +118,9 @@ describe("attemptResult, for an operation that answers a Result", () => {
       throw "the socket hung up";
     });
 
-    expect(answered.ok ? undefined : answered.error).toEqual(new Error("the socket hung up"));
     expectTypeOf(answered).toEqualTypeOf<Result<string, "held" | Error>>();
+    assert(!answered.ok);
+    expect(answered.error).toEqual(new Error("the socket hung up"));
   });
 });
 

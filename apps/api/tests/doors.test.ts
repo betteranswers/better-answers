@@ -32,7 +32,7 @@ describe("the api's one composition root", () => {
     });
 
     expect(doors.git).toEqual({ ok: true, value: { root: app().gitStoreDir } });
-    expect(doors.objects?.ok === true && doors.objects.value.bucket).toBe("better-answers");
+    expect(doors.objects).toMatchObject({ ok: true, value: { bucket: "better-answers" } });
   });
 
   it("leaves an unconfigured store absent rather than guessing one", () => {

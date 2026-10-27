@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
@@ -10,6 +10,7 @@ import {
   type StreamedOutcome,
 } from "../src/llm/index.ts";
 import { OVERLOADED_EVENT, streamedEventsOf, streamedResponse } from "./judge-wire.ts";
+import { abortingAt, holdingAt } from "./stream-pauses.ts";
 
 const A_KEY = "sk-test-u17-invented-key-0001";
 const SONNET = "claude-sonnet-5-5";
@@ -133,9 +134,10 @@ describe("the streamed Messages shape", () => {
         },
       ],
     ]);
-    expect(
-      JSON.parse(typeof wire.sent[0]?.init.body === "string" ? wire.sent[0].init.body : ""),
-    ).toEqual({
+    const [sent] = wire.sent;
+    assert(sent !== undefined, "the call was sent");
+    assert(typeof sent.init.body === "string", "the body was sent as text");
+    expect(JSON.parse(sent.init.body)).toEqual({
       model: SONNET,
       max_tokens: 16_000,
       system: SYSTEM,
@@ -229,10 +231,10 @@ describe("the streamed Messages shape", () => {
     const wire = theWire((signal) =>
       streamedResponse(events, {
         signal,
-        before: async (at) => {
-          if (at === events.findIndex((event) => event.includes("for thirteen months")))
-            timedOut.abort();
-        },
+        before: abortingAt(
+          events.findIndex((event) => event.includes("for thirteen months")),
+          timedOut,
+        ),
       }),
     );
     const doors = { ...doorsOn(wire).doors, timeout: () => timedOut.signal };
@@ -307,7 +309,7 @@ describe("the streamed Messages shape", () => {
     const wire = theWire((signal) =>
       streamedResponse(events, {
         signal,
-        before: (at) => (at === firstText + 1 ? held.promise : Promise.resolve()),
+        before: holdingAt(firstText + 1, held.promise),
       }),
     );
     const reply = openStreamingClient(doorsOn(wire).doors).streamModel(TO_SONNET, A_CALL);
@@ -399,9 +401,7 @@ describe("a caller's abort", () => {
     const wire = theWire((signal) =>
       streamedResponse(events, {
         signal,
-        before: async (at) => {
-          if (at === firstText + 1) leaving.abort();
-        },
+        before: abortingAt(firstText + 1, leaving),
       }),
     );
 

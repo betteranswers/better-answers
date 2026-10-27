@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import { beforeAll, describe, expect, it } from "vitest";
+import { assert, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { commit, type GitDoor } from "@better-answers/core/store/git";
@@ -758,7 +758,8 @@ describe("the erasure pseudonym", () => {
       );
       await completing(scenario, seeded.id);
       const [row] = await erasureRowsIn(scenario.workspaceId);
-      pseudonyms.push(row?.pseudonym ?? "");
+      assert(row !== undefined, "the erasure row was written");
+      pseudonyms.push(row.pseudonym);
     }
 
     expect(pseudonyms[0]).not.toEqual(pseudonyms[1]);
@@ -979,7 +980,8 @@ describe("the audit log an erasure never rewrites", () => {
     ).toEqual([{ id: done.auditEventId, actor: ERASURE_ACTOR, subject: done.erasureRequestId }]);
 
     const [completion] = completions;
-    expect(Object.keys(completion?.detail ?? {}).sort()).toEqual([
+    assert(completion !== undefined, "the completion was recorded");
+    expect(Object.keys(completion.detail).sort()).toEqual([
       "locations",
       "personId",
       "subjectRequestId",
@@ -1181,7 +1183,8 @@ describe("the git step", () => {
     await completing(scenario, subjectRequestId);
     const [erased] = await erasureRowsIn(scenario.workspaceId);
     const rewritten = await bundleHistory(scenario.git, scenario.workspaceId);
-    const tombstone = `${erased?.pseudonym ?? ""}@erased.better-answers.invalid`;
+    assert(erased !== undefined, "the first erasure was recorded");
+    const tombstone = `${erased.pseudonym}@erased.better-answers.invalid`;
     const second = await erasureRequestAbout(scenario.workspaceId, null, tombstone);
 
     const run = await runningTheRoutine(scenario, second, RAN_AGAIN_AT);
@@ -1264,7 +1267,7 @@ describe("the bundle_commit rows the rewrite moves", () => {
       workspaceId: scenario.workspaceId,
     });
 
-    if (!swept.ok) throw new Error(`the reconciler refused: ${String(swept.error)}`);
+    assert(swept.ok, "the reconciler refused");
 
     expect(swept.value.replayed).toEqual([]);
     expect(swept.value.skipped).toEqual([]);
@@ -1341,9 +1344,8 @@ describe("the verifications the rewrite moved", () => {
       verifiedAt: "2026-04-05T09:00:00.000Z",
       rider: null,
     });
-    expect(trustAfter[0] && trustWords(trustAfter[0])).toBe(
-      "Verified by a former member · 5 April 2026",
-    );
+    assert(trustAfter[0]);
+    expect(trustWords(trustAfter[0])).toBe("Verified by a former member · 5 April 2026");
   });
 
   it("keeps a verification's hash when only unhashed keys were rewritten", async () => {
@@ -1378,7 +1380,7 @@ describe("the verifications the rewrite moved", () => {
     expect(steadyBefore?.frontmatter).toContain(email);
     expect(
       indexedAfter
-        .filter((row) => row.frontmatter.includes(email) || row.body.includes(email))
+        .filter((row) => `${row.frontmatter}\n${row.body}`.includes(email))
         .map((row) => row.iri),
     ).toEqual([]);
     expect(steadyAfter?.content_hash).toEqual(steadyBefore?.content_hash);
@@ -1882,11 +1884,13 @@ describe("the identity set on the person's last workspace", () => {
       const row = (await erasureRowsIn(done.workspaceId)).find(
         (stored) => stored.id === done.erasureRequestId,
       );
+      assert(row !== undefined, "the arm's erasure row was written");
+      assert(row.report !== null, "the arm's run wrote its report");
       return {
         actions: Object.fromEntries(
-          Object.entries(row?.actions ?? {}).filter(([family]) => family.startsWith("identity-")),
+          Object.entries(row.actions).filter(([family]) => family.startsWith("identity-")),
         ),
-        report: (row?.report ?? "").split("\n").filter((line) => line.startsWith("- identity-")),
+        report: row.report.split("\n").filter((line) => line.startsWith("- identity-")),
       };
     };
 
@@ -2327,13 +2331,15 @@ describe("the wipe of every connected source the map found", () => {
 
     await rederivingOver(scenario, found, LOCKED_AT);
 
+    const reasonOf: Record<string, string> = { [shared.id]: left, [apart.id]: "wiped" };
     expect(await queuedIn(scenario.workspaceId)).toEqual(
-      wipesOf([shared, apart]).map((run) =>
-        run.subject_id === shared.id ? { ...run, reason: left } : run,
-      ),
+      wipesOf([shared, apart]).map((run) => ({ ...run, reason: reasonOf[run.subject_id] })),
     );
   });
 });
+
+const settledOrWaitingTwo = (settled: readonly unknown[]) => async () =>
+  settled.length > 0 || (await countWaitingOnLocks(db().pool)) === 2;
 
 const completedForASubjectWithNoUserRow = async () => {
   const scenario = await arrange();
@@ -2484,7 +2490,7 @@ describe("the questions a person asked", () => {
       );
       await until(async () => (await countWaitingOnLocks(db().pool)) === 1);
       const erasing = completing(scenario, subjectRequestId).then(() => ended.push("erasure"));
-      await until(async () => ended.length > 0 || (await countWaitingOnLocks(db().pool)) === 2);
+      await until(settledOrWaitingTwo(ended));
       await release();
       await giving;
       await erasing;
@@ -2756,7 +2762,7 @@ describe("the questions a person asked", () => {
           answers.push(answer);
           return answer;
         });
-        await until(async () => answers.length > 0 || (await countWaitingOnLocks(db().pool)) === 2);
+        await until(settledOrWaitingTwo(answers));
         await release();
         return { done: await erasing, asked: await asking };
       },
@@ -2950,7 +2956,9 @@ describe("the replay copy the restore reads", () => {
 
     expect(copy.map.map((entry) => entry.family)).toEqual([...ERASURE_FAMILIES]);
 
-    const found = copy.map.find((entry) => entry.family === "concept-file")?.locations ?? [];
+    const conceptFiles = copy.map.find((entry) => entry.family === "concept-file");
+    assert(conceptFiles !== undefined, "the copy maps the concept files");
+    const found = conceptFiles.locations;
     const paths = found.filter((at) => at.includes(":")).map((at) => at.slice(at.indexOf(":") + 1));
     expect([...new Set(paths)].sort()).toEqual(["knowledge/expenses.md", "knowledge/travel.md"]);
     expect(found.filter((at) => at.endsWith("(author line)"))).toHaveLength(2);
@@ -3009,7 +3017,7 @@ describe("the replay copy the restore reads", () => {
       accessKeyId: "unreachable",
       secretAccessKey: "unreachable",
     });
-    if (!shut.ok) throw new Error(`the door refused its settings: ${shut.error}`);
+    assert(shut.ok, "the door refused its settings");
 
     const run = await runErasure(
       ERASURE,
@@ -3105,7 +3113,7 @@ describe("the arm the identity step takes", () => {
       ]),
     );
 
-    if (!done.ok) throw new Error(`the routine refused: ${String(done.error)}`);
+    assert(done.ok, "the routine refused");
     expect(operatorLinesAbout(done.value.erasureRequestId).map((line) => line.arm)).toEqual([
       "last-workspace",
     ]);
@@ -3151,7 +3159,8 @@ describe("the person's actor id on the platform's records", () => {
 
     const trust = await trustOf(scenario, iri);
     expect(trust).toMatchObject({ verifiedBy: `human:${await pseudonymIn(scenario.workspaceId)}` });
-    expect(trust && trustWords(trust)).toBe("Verified by a former member · 5 April 2026");
+    assert(trust);
+    expect(trustWords(trust)).toBe("Verified by a former member · 5 April 2026");
   });
 
   it("rewrites rows the person lands before the member ends", async () => {
@@ -3328,7 +3337,8 @@ describe("a commit made as the person while the routine runs", () => {
     const swept = await reconcile(RECONCILER, doorsOf(scenario), {
       workspaceId: scenario.workspaceId,
     });
-    expect(swept.ok && swept.value.replayed).toHaveLength(0);
+    assert(swept.ok);
+    expect(swept.value.replayed).toHaveLength(0);
     const erased = `human:${await pseudonymIn(scenario.workspaceId)}`;
     expect(await actorsIn("bundle_commit", scenario.workspaceId)).toEqual([erased, erased, erased]);
   });
@@ -3340,13 +3350,15 @@ describe("a commit made as the person while the routine runs", () => {
     const writer = await principalFor(db(), scenario.workspaceId, person.id);
     await owningTheLateClaims(scenario, person.id);
     const impatient = { ...doorsOf(scenario), git: { ...scenario.git, commitBudgetMs: 500 } };
+    const tip = before.at(-1);
+    assert(tip !== undefined, "the bundle has a head");
 
     await gate.park();
     const written = await writeConcept(writer, impatient, {
       ...A_LATE_CONCEPT,
       frontmatter: { ...A_LATE_CONCEPT.frontmatter },
       author: { name: "Priya Anand", email },
-      expects: { head: before.at(-1) ?? null },
+      expects: { head: tip },
     });
     const freeWhileGitHangs = await theMemberRowIsFree(scenario, person);
     await gate.unpark();
@@ -3366,6 +3378,8 @@ describe("a commit made as the person while the routine runs", () => {
     const elsewhere = await asAnotherProcess(scenario.git);
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
     await owningTheLateClaims(scenario, scenario.editor.userId);
+    const tip = before.at(-1);
+    assert(tip !== undefined, "the bundle has a head");
 
     await gate.park();
     const writing = writeConcept(
@@ -3375,7 +3389,7 @@ describe("a commit made as the person while the routine runs", () => {
         ...A_LATE_CONCEPT,
         frontmatter: { ...A_LATE_CONCEPT.frontmatter },
         author: { name: "Eli Editor", email: "eli@editor.example" },
-        expects: { head: before.at(-1) ?? null },
+        expects: { head: tip },
       },
     );
     await until(gate.parked);
@@ -3398,15 +3412,12 @@ describe("a commit made as the person while the routine runs", () => {
   });
 
   it.each([
-    { named: "address", byId: false },
-    { named: "id", byId: true },
-  ])("reaches a late commit by $named after a failed run", async ({ byId }) => {
+    { named: "address", naming: (_id: string, email: string) => ({ id: null, email }) },
+    { named: "id", naming: (id: string) => ({ id, email: null }) },
+  ])("reaches a late commit by $named after a failed run", async ({ naming }) => {
     const { scenario, email, person, member } = await aMemberHere();
-    const subjectRequestId = await erasureRequestAbout(
-      scenario.workspaceId,
-      byId ? person.id : null,
-      byId ? null : email,
-    );
+    const named = naming(person.id, email);
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, named.id, named.email);
     const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
 
     const { done: died } = await heldAheadOfTheMembersEnd(
@@ -3490,7 +3501,8 @@ describe("a commit made as the person while the routine runs", () => {
     expect(died.ok).toBe(false);
     expect(lost.ok).toBe(false);
     expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
-    expect(swept.ok && swept.value.replayed).toHaveLength(1);
+    assert(swept.ok);
+    expect(swept.value.replayed).toHaveLength(1);
     const erased = `human:${await pseudonymIn(scenario.workspaceId)}`;
     expect(new Set(await actorsIn("bundle_commit", scenario.workspaceId))).toEqual(
       new Set([erased]),
@@ -3539,12 +3551,14 @@ describe("a commit made as the person while the routine runs", () => {
     const writer = await principalFor(db(), scenario.workspaceId, person.id);
     await completing(scenario, subjectRequestId);
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
+    const tip = before.at(-1);
+    assert(tip !== undefined, "the bundle has a head");
 
     const refused = await writeConcept(writer, doorsOf(scenario), {
       ...A_LATE_CONCEPT,
       frontmatter: { ...A_LATE_CONCEPT.frontmatter },
       author: { name: "Priya Anand", email },
-      expects: { head: before.at(-1) ?? null },
+      expects: { head: tip },
     });
 
     expect(refused).toEqual({ ok: false, error: "not-a-member" });

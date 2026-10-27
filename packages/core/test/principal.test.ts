@@ -1,4 +1,6 @@
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, describe, expect, expectTypeOf, it } from "vitest";
 
 import { NIGHTLY_AUDIT_KIND, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
@@ -486,8 +488,7 @@ describe("the Principal resolver", () => {
       return { principal, scope: scope.rows[0]?.ws };
     });
 
-    expect(resolved.ok).toBe(true);
-    if (!resolved.ok) return;
+    assert(resolved.ok, inspect(resolved));
     expect(resolved.value.principal).toEqual({
       kind: "user",
       workspaceId: seeded.workspaceId,
@@ -861,8 +862,7 @@ describe("the counters", () => {
       await consumeCall(principal, tx, "jti-1", rule, new Date("2026-09-01T10:01:00Z")),
     ]);
 
-    expect(outcomes.ok).toBe(true);
-    if (!outcomes.ok) return;
+    assert(outcomes.ok, inspect(outcomes));
     expect(outcomes.value.map((o) => o.allowed)).toEqual([true, true, false, true, true]);
     expect(outcomes.value[2]?.retryAfterSeconds).toBe(30);
   });
@@ -886,8 +886,7 @@ describe("the counters", () => {
       return rows.rows;
     });
 
-    expect(left.ok).toBe(true);
-    if (!left.ok) return;
+    assert(left.ok, inspect(left));
     expect(left.value).toEqual([
       { token_id: kept, window_start: new Date("2026-09-01T10:00:00Z"), count: 1 },
       { token_id: swept, window_start: new Date("2026-09-01T10:01:00Z"), count: 1 },

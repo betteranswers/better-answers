@@ -25,6 +25,9 @@ const sweep = hookScript("sweep-worktrees");
 
 const scratch = scratchRoot("sweep-worktrees");
 
+const withStubsFirst = (bin: string): string =>
+  `${bin}${path.delimiter}${process.env["PATH"] ?? ""}`;
+
 const LONG_AGO = "2026-01-01T00:00:00Z";
 
 const NAMES = [
@@ -269,7 +272,7 @@ describe("the sweep when jdocmunch-mcp refuses the refresh", () => {
     });
     const run = runHook(sweep, {
       argv: [primary],
-      env: { PATH: `${bin}${path.delimiter}${process.env["PATH"] ?? ""}` },
+      env: { PATH: withStubsFirst(bin) },
     });
     expect(run.status).toBe(0);
     expect(run.stderr).toContain("jdocmunch: could not refresh local/refused-primary");

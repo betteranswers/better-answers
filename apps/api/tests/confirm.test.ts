@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { restoredWithACode } from "@better-answers/core/testing/restore-code";
@@ -281,7 +281,9 @@ describe("confirming with an authenticator", () => {
     for (let signedIn = 0; signedIn < 5; signedIn += 1) {
       clients.push(await signedInClient(app(), person.email));
     }
-    const { setupAddress } = await setUpOn(clients.at(-1) ?? app().client());
+    const last = clients.at(-1);
+    assert(last !== undefined, "five sessions signed in");
+    const { setupAddress } = await setUpOn(last);
 
     const statuses = await wrongCodesFrom(clients, keyIn(setupAddress), 7);
 

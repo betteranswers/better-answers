@@ -14,6 +14,7 @@ import {
   saysARefusal,
   switched,
   switcherOf,
+  requestsSent,
 } from "./harness.ts";
 import { refusalAnswering } from "./refused-read.ts";
 
@@ -103,6 +104,23 @@ const landedHomeSayingWhy = async (page: Page, now: Workspace): Promise<void> =>
 
 const askedIn = (url: string): readonly string[] =>
   new URL(url).pathname.replace("/trpc/", "").split(",");
+
+const asksForTheMember = (url: URL): boolean =>
+  url.pathname.includes("/trpc/") && askedIn(url.href).includes("session.member");
+
+const proceduresRefusedAsSwitched = (page: Page): Set<string> => {
+  const refused = new Set<string>();
+  page.on("response", async (answer) => {
+    if (!answer.url().includes("/trpc/")) return;
+    const asked = askedIn(answer.url());
+    const answers: unknown = await answer.json().catch(() => undefined);
+    if (!Array.isArray(answers)) return;
+    answers.forEach((each: unknown, at) => {
+      if (JSON.stringify(each).includes(`"${SWITCHED.word}"`)) refused.add(asked[at] ?? "");
+    });
+  });
+  return refused;
+};
 
 const atSamsPage = async (page: Page, api: APIRequestContext, two: Two): Promise<Locator> => {
   const sam = await aMemberOfBoth(api, two, "Sam Okoro", { first: "Editor", second: "Viewer" });
@@ -233,22 +251,8 @@ test.describe("an action from a tab left in another workspace", () => {
     await expect(switcherOf(page, two.first.name)).toBeVisible();
     await switchedInAnotherTab(context, page, two);
 
-    const refused = new Set<string>();
-    page.on("response", async (answer) => {
-      if (!answer.url().includes("/trpc/")) return;
-      const asked = askedIn(answer.url());
-      const answers: unknown = await answer.json().catch(() => undefined);
-      if (!Array.isArray(answers)) return;
-      answers.forEach((each: unknown, at) => {
-        if (JSON.stringify(each).includes(`"${SWITCHED.word}"`)) refused.add(asked[at] ?? "");
-      });
-    });
-    let memberReads = 0;
-    page.on("request", (asking) => {
-      if (asking.url().includes("/trpc/") && askedIn(asking.url()).includes("session.member")) {
-        memberReads += 1;
-      }
-    });
+    const refused = proceduresRefusedAsSwitched(page);
+    const memberReads = requestsSent(page, asksForTheMember);
 
     await page
       .getByRole("navigation", { name: "Areas" })
@@ -257,7 +261,7 @@ test.describe("an action from a tab left in another workspace", () => {
 
     await landedHomeSayingWhy(page, two.second);
     expect(refused.size, `only ${[...refused].join(", ")} refused`).toBeGreaterThan(1);
-    expect(memberReads, "the session was followed more than once").toBe(1);
+    expect(memberReads, "the session was followed more than once").toHaveLength(1);
   });
 
   test("asks once when a role change is pressed twice", async ({ page, context, request }) => {

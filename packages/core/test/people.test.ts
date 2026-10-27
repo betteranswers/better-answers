@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, describe, expect, it, vi } from "vitest";
 
 import { ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
@@ -174,7 +176,8 @@ describe("the operator's list of people", () => {
 
     const idsOf = async (search: string) => {
       const answered = await listed(search);
-      return answered.ok ? answered.value.people.map((person) => person.id).toSorted() : [];
+      assert(answered.ok, inspect(answered));
+      return answered.value.people.map((person) => person.id).toSorted();
     };
 
     expect(await idsOf(`  ${tag.toUpperCase()}  `)).toEqual(
@@ -194,9 +197,8 @@ describe("the operator's list of people", () => {
 
     const pageAt = async (offset: number) => {
       const answered = await listed(tag, { offset, limit: 2 });
-      return answered.ok
-        ? { ids: answered.value.people.map((person) => person.id), total: answered.value.total }
-        : answered;
+      assert(answered.ok, inspect(answered));
+      return { ids: answered.value.people.map((person) => person.id), total: answered.value.total };
     };
 
     expect([await pageAt(0), await pageAt(2), await pageAt(3)]).toEqual([
@@ -517,12 +519,13 @@ describe("inspecting a person's ended grants", () => {
 
     const read = await inspected(personId);
 
-    expect(read.ok ? read.value.ended.map((each) => [each.endedAt, each.issuedAt]) : []).toEqual([
+    assert(read.ok, inspect(read));
+    expect(read.value.ended.map((each) => [each.endedAt, each.issuedAt])).toEqual([
       ["2026-09-25T10:00:00.000Z", "2026-09-02T09:00:00.000Z"],
       ["2026-09-25T10:00:00.000Z", "2026-09-01T09:00:00.000Z"],
       ["2026-09-24T10:00:00.000Z", "2026-08-01T09:00:00.000Z"],
     ]);
-    expect(read.ok ? read.value.ended[0] : undefined).toMatchObject({
+    expect(read.value.ended[0]).toMatchObject({
       assistant: {
         id: "https://gone.example.invalid/metadata",
         name: "https://gone.example.invalid/metadata",
@@ -634,7 +637,8 @@ describe("inspecting a person's ended grants", () => {
 
     const read = await inspected(personId);
 
-    expect(read.ok ? read.value.ended.map((each) => [each.endedAt, each.endedBy]) : []).toEqual([
+    assert(read.ok, inspect(read));
+    expect(read.value.ended.map((each) => [each.endedAt, each.endedBy])).toEqual([
       ["2026-09-25T10:00:00.000Z", { kind: "platform" }],
       ["2026-09-24T10:00:00.000Z", { kind: "authorization-server" }],
       ["2026-09-23T10:00:00.000Z", { kind: "platform" }],
@@ -653,9 +657,8 @@ describe("inspecting a person's ended grants", () => {
     await revokedEverywhere(personId);
 
     const read = await inspected(personId);
-    expect(
-      read.ok ? read.value.ended.filter((each) => each.assistant.id === clientId) : [],
-    ).toEqual([]);
+    assert(read.ok, inspect(read));
+    expect(read.value.ended.filter((each) => each.assistant.id === clientId)).toEqual([]);
     const recorded = await db().pool.query<{ detail: unknown }>(
       "SELECT detail FROM identity_audit_event WHERE subject_id = $1 AND action = $2",
       [personId, "people.person.credentials_revoked"],

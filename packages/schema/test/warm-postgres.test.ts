@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import pg from "pg";
-import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
+import { afterAll, assert, beforeAll, describe, expect, inject, it } from "vitest";
 import { z } from "zod";
 
 import { POSTGRES_IMAGE } from "../src/postgres-image.ts";
@@ -499,13 +499,15 @@ const anExitedPid = async (): Promise<number> => {
 describe("the warm harness under TEST_POSTGRES_URI", () => {
   it("provides the shared server's template, starting no container", async () => {
     const started = await startInChild(adminUri());
+    const template = started.templateDatabase;
+    assert(template !== undefined, "the shared harness names its template");
 
     expect({
       source: started.source,
       server: hostOf(started.connectionUri),
       template: started.templateDatabase,
       runId: started.runId,
-      published: await isOnTheServer(started.templateDatabase ?? ""),
+      published: await isOnTheServer(template),
     }).toEqual({
       source: "shared",
       server: hostOf(warmOfThisRun().connectionUri),
@@ -523,13 +525,15 @@ describe("the warm harness under TEST_POSTGRES_URI", () => {
 
   it("reuses the published template on a second start", async () => {
     const first = await startInChild(adminUri());
-    const builtOnce = await oidOf(first.templateDatabase ?? "");
+    assert(first.templateDatabase !== undefined, "the first start names its template");
+    const builtOnce = await oidOf(first.templateDatabase);
     const second = await startInChild(adminUri());
+    assert(second.templateDatabase !== undefined, "the second start names its template");
 
     expect({
       published: builtOnce !== undefined,
       template: second.templateDatabase,
-      oid: await oidOf(second.templateDatabase ?? ""),
+      oid: await oidOf(second.templateDatabase),
     }).toEqual({ published: true, template: first.templateDatabase, oid: builtOnce });
   }, 300_000);
 

@@ -35,6 +35,19 @@ type Pinged = { readonly url: string; readonly body: string };
 
 const answeredOk = async (): Promise<Response> => new Response("OK", { status: 200 });
 
+const firstThenOk =
+  (first: () => Promise<Response>) =>
+  async (nth: number): Promise<Response> =>
+    nth === 0 ? first() : answeredOk();
+
+const releasedOnce = (holder: PoolClient): (() => void) => {
+  let held = true;
+  return () => {
+    if (held) holder.release();
+    held = false;
+  };
+};
+
 const syncThatMovedNothing = (client: PoolClient, workspaceId: string, id: string) => {
   const at = new Date(Date.now() - 60_000);
   return testData(client).job({
@@ -276,11 +289,7 @@ describe("the periodic head check", () => {
     const holder = await pool.connect();
     // pg-pool reads this per connect; set before the hold, it also bounds the holder's own login on a loaded runner.
     pool.options.connectionTimeoutMillis = 250;
-    let held = true;
-    const release = (): void => {
-      if (held) holder.release();
-      held = false;
-    };
+    const release = releasedOnce(holder);
     try {
       const head = watched({
         doors: openDoors({ database: pool, gitStoreDir: app().gitStoreDir }),
@@ -321,10 +330,9 @@ describe("the periodic head check", () => {
 
   it("goes past an unsent ping, logging once without the URL", async () => {
     const head = watched({
-      answer: async (nth) => {
-        if (nth === 0) throw new TypeError("fetch failed");
-        return answeredOk();
-      },
+      answer: firstThenOk(async () => {
+        throw new TypeError("fetch failed");
+      }),
     });
 
     await head.tickTimes(4);
@@ -339,8 +347,7 @@ describe("the periodic head check", () => {
 
   it("logs a refused ping's status once, so a 404 shows", async () => {
     const head = watched({
-      answer: async (nth) =>
-        nth === 0 ? new Response("not found", { status: 404 }) : answeredOk(),
+      answer: firstThenOk(async () => new Response("not found", { status: 404 })),
     });
 
     await head.tickTimes(4);

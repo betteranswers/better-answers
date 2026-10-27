@@ -137,11 +137,14 @@ const bareName = (rule: string): string => rule.slice(rule.lastIndexOf("/") + 1)
 
 const COMMENT_RULE_NAMES = new Set(COMMENT_RULES.map(bareName));
 
+const rulesOverridden = (override: (typeof config.overrides)[number]): readonly string[] =>
+  Object.keys(override.rules ?? {});
+
 describe("the root lint config", () => {
   it("lets no override change a comment rule", () => {
-    const overriding = config.overrides.flatMap((override) =>
-      Object.keys(override.rules ?? {}).filter((rule) => COMMENT_RULE_NAMES.has(bareName(rule))),
-    );
+    const overriding = config.overrides
+      .flatMap(rulesOverridden)
+      .filter((rule) => COMMENT_RULE_NAMES.has(bareName(rule)));
 
     expect(overriding).toEqual([]);
   });

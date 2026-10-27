@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { closeObjects, openObjects } from "@better-answers/core/store/objects";
 
@@ -194,7 +194,7 @@ describe("the set of erasures a restore must replay", () => {
       since: NOTHING_AFTER,
     });
 
-    if (!set.ok) throw new Error(`the set refused: ${String(set.error)}`);
+    assert(set.ok, "the set refused");
     expect(idsFor(set.value, scenario.workspaceId)).toEqual([]);
     expect(replayed).toEqual({ ok: true, value: [] });
 
@@ -206,6 +206,8 @@ describe("the set of erasures a restore must replay", () => {
     const erased = await completedInTheRows(scenario.workspaceId, FROM_THE_ROWS_AT);
 
     const replayed = await replaying(scenario, FROM_THE_ROWS_AT, FROM_THE_ROWS_SINCE);
+    const [replay] = replayed;
+    assert(replay !== undefined, "one erasure was replayed");
 
     expect(replayed).toEqual([
       {
@@ -216,7 +218,7 @@ describe("the set of erasures a restore must replay", () => {
         completedAt: FROM_THE_ROWS_AT,
 
         fromReplayCopy: false,
-        auditEventId: replayed[0]?.auditEventId ?? "",
+        auditEventId: replay.auditEventId,
       },
     ]);
 
@@ -250,7 +252,7 @@ describe("the set of erasures a restore must replay", () => {
       since: IN_ORDER_SINCE,
     });
 
-    if (!set.ok) throw new Error(`the set refused: ${String(set.error)}`);
+    assert(set.ok, "the set refused");
     const named = idsFor(set.value, scenario.workspaceId);
     expect(named.slice(0, 2)).toEqual([FIRST_ID, SECOND_ID]);
     expect(named).toHaveLength(3);
@@ -266,8 +268,8 @@ describe("the set of erasures a restore must replay", () => {
       since: IN_BOTH_SINCE,
     });
 
-    if (!copies.ok) throw new Error(`the copies refused: ${String(copies.error)}`);
-    if (!set.ok) throw new Error(`the set refused: ${String(set.error)}`);
+    assert(copies.ok, "the copies refused");
+    assert(set.ok, "the set refused");
 
     expect(idsFor(copies.value, scenario.workspaceId)).toEqual([erased.erasureRequestId]);
     expect(idsFor(set.value, scenario.workspaceId)).toEqual([erased.erasureRequestId]);
@@ -342,7 +344,7 @@ describe("an object store a restore cannot read", () => {
       accessKeyId: "unreachable",
       secretAccessKey: "unreachable",
     });
-    if (!unreachable.ok) throw new Error(`the door refused its settings: ${unreachable.error}`);
+    assert(unreachable.ok, "the door refused its settings");
 
     try {
       const copies = await replayCopiesSince(ERASURE, unreachable.value, UNREACHABLE_SINCE);
@@ -361,7 +363,7 @@ describe("an object store a restore cannot read", () => {
     }
 
     const found = await replayCopiesSince(ERASURE, objects().door, UNREACHABLE_SINCE);
-    if (!found.ok) throw new Error(`the copies refused: ${String(found.error)}`);
+    assert(found.ok, "the copies refused");
     expect(idsFor(found.value, scenario.workspaceId)).toEqual([erased.erasureRequestId]);
   });
 });
@@ -408,7 +410,7 @@ describe("a request whose routine will not run", () => {
 
     expect(replayed.ok).toBe(false);
 
-    if (replayed.ok) throw new Error("the replay did not stop");
+    assert(!replayed.ok, "the replay did not stop");
     expect(String(replayed.error)).toContain(first.erasureRequestId);
     expect(String(replayed.error)).toContain("after replaying 0");
 
@@ -439,10 +441,10 @@ describe("the replay copy for a request named by address alone", () => {
       workspaceId: scenario.workspaceId,
       subjectRequestId: seeded.id,
     });
-    if (!run.ok) throw new Error(`the routine refused: ${String(run.error)}`);
+    assert(run.ok, "the routine refused");
 
     const copies = await replayCopiesSince(ERASURE, objects().door, BY_ADDRESS_SINCE);
-    if (!copies.ok) throw new Error(`the copies did not read back: ${String(copies.error)}`);
+    assert(copies.ok, "the copies did not read back");
     expect(
       copies.value
         .filter((copy) => copy.workspaceId === scenario.workspaceId)

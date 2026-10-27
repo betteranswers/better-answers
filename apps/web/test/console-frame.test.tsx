@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, renderHook, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { useAsking } from "@/features/console/everyone-search.tsx";
 import {
@@ -171,21 +171,27 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+const linksIn = (region: HTMLElement) =>
+  within(region)
+    .getAllByRole("link")
+    .map((each) => each.textContent);
+
+const groupHeadingsIn = (region: HTMLElement) =>
+  within(region)
+    .getAllByRole("heading", { level: 3 })
+    .map((each) => each.textContent);
+
 describe("the console's shell", () => {
   it("draws the console's area, groups and pages for the operator", async () => {
     vi.stubGlobal("fetch", answering({ result: { data: { operator: true, name: "Ada" } } }));
 
     const { router } = await openApp("/console");
     const nav = await screen.findByRole("navigation", { name: "Console" });
-    const namesIn = (region: HTMLElement, role: "link" | "heading") =>
-      within(region)
-        .getAllByRole(role, role === "heading" ? { level: 3 } : {})
-        .map((each) => each.textContent);
 
     expect(router.state.location.pathname).toBe("/console/workspaces/every-workspace");
-    expect(namesIn(screen.getByRole("navigation", { name: "Areas" }), "link")).toEqual(["Console"]);
-    expect(namesIn(nav, "heading")).toEqual(["People", "Workspaces"]);
-    expect(namesIn(nav, "link")).toEqual(["Everyone", "Names Waiting", "Every Workspace"]);
+    expect(linksIn(screen.getByRole("navigation", { name: "Areas" }))).toEqual(["Console"]);
+    expect(groupHeadingsIn(nav)).toEqual(["People", "Workspaces"]);
+    expect(linksIn(nav)).toEqual(["Everyone", "Names Waiting", "Every Workspace"]);
     expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
   });
 
@@ -251,7 +257,7 @@ describe("the console's lists", () => {
       "Provisioned",
     ]);
     const [acme] = rowsOf(list);
-    if (acme === undefined) throw new Error("no workspace is listed");
+    assert(acme !== undefined, "a workspace is listed");
     expect(within(acme).getAllByRole("cell").slice(1).map(textOf)).toEqual([
       ACME.shortName,
       "2 members",

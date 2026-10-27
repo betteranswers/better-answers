@@ -12,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
@@ -34,6 +34,14 @@ const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");
 
 const LANE_SCRIPT = "scripts/docs-lane.mjs";
+
+const commandOf = (script: string): string => {
+  const command = rootScripts()[script];
+  assert(command !== undefined, `${script} is a root script`);
+  return command;
+};
+
+const groupOf = (match: RegExpMatchArray, name: string): string => match.groups?.[name] ?? "";
 
 type Decision = { readonly lane: string; readonly images: string };
 
@@ -332,6 +340,9 @@ const COPIED_SOURCE: readonly string[] = [
   "packages/schema/src",
 ];
 
+const imagesForACopyOf = (source: string): string =>
+  COPIED_SOURCE.includes(source) ? "no" : "yes";
+
 describe("which paths are an image's inputs", () => {
   it("counts every Dockerfile, ignore file and probe build.yml names", () => {
     const named = imageLegs().flatMap((leg) => [
@@ -356,7 +367,7 @@ describe("which paths are an image's inputs", () => {
   it("counts everything a Dockerfile copies except the source", () => {
     const copied = [...new Set(imageLegs().flatMap(copiedFromTheTree))];
     const misread = copied.filter(
-      (source) => imagesOf([aChangeTo(source)]) !== (COPIED_SOURCE.includes(source) ? "no" : "yes"),
+      (source) => imagesOf([aChangeTo(source)]) !== imagesForACopyOf(source),
     );
 
     expect(copied.length).toBeGreaterThan(10);
@@ -374,9 +385,8 @@ describe("which paths are an image's inputs", () => {
     const list = /const IMAGE_INPUTS = \[(?<list>[^\]]*)\]/.exec(read(LANE_SCRIPT))?.groups?.[
       "list"
     ];
-    const listed = [...(list ?? "").matchAll(/"(?<input>[^"]+)"/g)].map(
-      (found) => found.groups?.["input"] ?? "",
-    );
+    assert(list !== undefined, "the lane script declares IMAGE_INPUTS");
+    const listed = [...list.matchAll(/"(?<input>[^"]+)"/g)].map((found) => groupOf(found, "input"));
 
     expect(listed.length).toBeGreaterThan(10);
     expect(
@@ -466,9 +476,15 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   },
 ];
 
+const SUITES_IN_THE_LANE = PROSE_SUITES.flatMap((suite) =>
+  typeof suite.inTheLane === "string" ? [{ file: suite.file, step: suite.inTheLane }] : [],
+);
+
+const SUITES_OUTSIDE_THE_LANE = PROSE_SUITES.filter((suite) => typeof suite.inTheLane !== "string");
+
 describe("what the docs lane runs", () => {
   it("runs its steps through the root check's runner", () => {
-    const steps = gatesNamed(rootScripts()["check:docs"] ?? "");
+    const steps = gatesNamed(commandOf("check:docs"));
 
     expect(steps.length, "the root check:docs does not call the runner").toBeGreaterThan(1);
     expect(steps).toContain("format:check");
@@ -476,22 +492,16 @@ describe("what the docs lane runs", () => {
   });
 
   it("runs exactly the prose suites this table puts in it", () => {
-    const lane = rootScripts()["check:docs"] ?? "";
-    const commands = gatesNamed(lane)
-      .map((step) => rootScripts()[step] ?? "")
-      .join("\n");
-    const named = (suite: ProseSuite): boolean => commands.includes(path.basename(suite.file));
+    const commands = gatesNamed(commandOf("check:docs")).map(commandOf).join("\n");
+    const named = (suite: { readonly file: string }): boolean =>
+      commands.includes(path.basename(suite.file));
 
     expect(
-      PROSE_SUITES.filter((suite) => typeof suite.inTheLane === "string" && !named(suite)).map(
-        (suite) => suite.file,
-      ),
+      SUITES_IN_THE_LANE.filter((suite) => !named(suite)).map((suite) => suite.file),
       "a suite this table puts in the docs lane is run by no step of check:docs.",
     ).toEqual([]);
     expect(
-      PROSE_SUITES.filter((suite) => typeof suite.inTheLane !== "string" && named(suite)).map(
-        (suite) => suite.file,
-      ),
+      SUITES_OUTSIDE_THE_LANE.filter(named).map((suite) => suite.file),
       "check:docs runs a suite this table says the full lane keeps. Move the row, or take the suite back out.",
     ).toEqual([]);
   });
@@ -500,11 +510,9 @@ describe("what the docs lane runs", () => {
     const absent = PROSE_SUITES.filter(
       (suite) => !existsSync(path.join(repositoryRoot, suite.file)),
     ).map((suite) => suite.file);
-    const unrunnable = PROSE_SUITES.flatMap((suite) =>
-      typeof suite.inTheLane === "string" && rootScripts()[suite.inTheLane] === undefined
-        ? [`${suite.file} is run by ${suite.inTheLane}`]
-        : [],
-    );
+    const unrunnable = SUITES_IN_THE_LANE.filter(
+      ({ step }) => !Object.hasOwn(rootScripts(), step),
+    ).map(({ file, step }) => `${file} is run by ${step}`);
 
     expect(PROSE_SUITES.length).toBeGreaterThan(5);
     expect(absent, "a row names a suite the tree does not have. Correct it, or delete it.").toEqual(
@@ -561,6 +569,10 @@ const stepsOfJob = (job: string): readonly Step[] => checkJobs()[job]?.steps ?? 
 const laneStep = (): Step | undefined => stepsOfJob(LANE).find((one) => one.id === LANE);
 
 const SHARD_ARGUMENT = / --shard="\$\{SHARD\}"$/;
+
+const runsAShard = (step: Step): boolean => SHARD_ARGUMENT.test((step.run ?? "").trim());
+
+const envOf = (step: Step): readonly [string, string][] => Object.entries(step.env ?? {});
 
 const gatesOf = (job: string): readonly string[] =>
   stepsOfJob(job).flatMap((step) =>
@@ -946,16 +958,12 @@ describe("the lane inside check.yml", () => {
 
 describe("the full lane's legs against the one list of gates", () => {
   it("runs exactly the root check's gates across its legs", () => {
-    const ran: string[] = [];
-    for (const gate of legsTheFanInRequires(CODE_LANE).flatMap(gatesOf)) {
-      const whole = wholeGateOf(gate);
-      if (!ran.includes(whole)) ran.push(whole);
-    }
+    const ran = [...new Set(legsTheFanInRequires(CODE_LANE).flatMap(gatesOf).map(wholeGateOf))];
 
     expect(
       ran,
       "the legs and the root check have stopped naming the same gates. Add the gate to a leg, or narrow it in NARROWED: a step no one leg can run is split across the legs, and NARROWED folds the parts back.",
-    ).toEqual(gatesNamed(rootScripts()["check"] ?? ""));
+    ).toEqual(gatesNamed(commandOf("check")));
   });
 
   it("runs each gate on one leg only", () => {
@@ -984,7 +992,7 @@ describe("how the legs narrow check:workspaces", () => {
     const selected = [
       ...Object.values(NARROWED)
         .flat()
-        .flatMap((part) => workspacesChecked(rootScripts()[part] ?? "")),
+        .flatMap((part) => workspacesChecked(commandOf(part))),
       ...Object.keys(RUN_BY_STEP),
     ];
 
@@ -1012,29 +1020,29 @@ describe("how the legs narrow check:workspaces", () => {
 describe("the sharded legs of check.yml", () => {
   it.each(Object.keys(SHARDED_LEGS))("numbers %s's shards 1 to N, one per job", (leg) => {
     const strategy = checkJobs()[leg]?.strategy;
-    const shards = strategy?.matrix["shard"] ?? [];
+    assert(strategy !== undefined, `${leg} has a strategy`);
 
     expect(
-      Object.keys(strategy?.matrix ?? {}),
+      Object.keys(strategy.matrix),
       "a second matrix key multiplies the jobs, so two of them run one shard",
     ).toEqual(["shard"]);
+    const shards = strategy.matrix["shard"];
+    assert(shards !== undefined, `${leg} has a shard matrix`);
     expect(shards.length).toBeGreaterThan(1);
     expect(shards, "a gap or a repeat leaves some files unrun").toEqual(
       shards.map((_, at) => at + 1),
     );
-    expect(stepsOfJob(leg).flatMap((one) => Object.entries(one.env ?? {}))).toEqual([
+    expect(stepsOfJob(leg).flatMap(envOf)).toEqual([
       ["SHARD", "${{ matrix.shard }}/${{ strategy.job-total }}"],
     ]);
     expect(
-      strategy?.["fail-fast"],
+      strategy["fail-fast"],
       "a red shard cancels the others, which then report nothing of their own files",
     ).toBe(false);
   });
 
   it("runs each sharded script alone, and no other leg shards", () => {
-    const slicing = Object.keys(checkJobs()).filter((job) =>
-      stepsOfJob(job).some((one) => SHARD_ARGUMENT.test((one.run ?? "").trim())),
-    );
+    const slicing = Object.keys(checkJobs()).filter((job) => stepsOfJob(job).some(runsAShard));
 
     expect(slicing).toEqual(Object.keys(SHARDED_LEGS));
     for (const [leg, script] of Object.entries(SHARDED_LEGS)) {
@@ -1067,6 +1075,17 @@ type VerdictCase = {
 };
 
 const PROVED_NOTHING = "proved nothing";
+
+const NO_TYPECHECK: { readonly was: string; readonly wanted: string } = {
+  was: "skipped",
+  wanted: "skipped",
+};
+
+const typecheckOf = (scenario: VerdictCase): { readonly was: string; readonly wanted: string } =>
+  scenario.typecheck ?? NO_TYPECHECK;
+
+const verdictOf = (run: SpawnSyncReturns<string>): VerdictCase["verdict"] =>
+  run.status === 0 ? "passes" : "fails";
 
 /** A matrix leg is one entry in `needs`, its result the shards' together. */
 const FULL_LEGS = [
@@ -1215,7 +1234,7 @@ const verdictOn = ({
   ran,
   title,
   wanted,
-  typecheck = { was: "skipped", wanted: "skipped" },
+  typecheck = NO_TYPECHECK,
   withoutItsLegs,
 }: VerdictCase): SpawnSyncReturns<string> => {
   const legs = Object.keys(checkJobs())
@@ -1240,6 +1259,10 @@ const verdictOn = ({
   });
 };
 
+const VERDICTS_THAT_SAY_WHY = VERDICTS.flatMap(({ says, ...scenario }) =>
+  says === undefined ? [] : [{ ...scenario, says }],
+);
+
 describe("the one verdict check.yml reports", () => {
   it("hangs the required context off every leg, whatever they did", () => {
     const jobs = Object.keys(checkJobs());
@@ -1263,30 +1286,33 @@ describe("the one verdict check.yml reports", () => {
     { job: TITLE_JOB, wantedBy: "TITLE_WANTED" },
     { job: TYPECHECK_JOB, wantedBy: "TYPECHECK_WANTED" },
   ])("wants $job's success exactly where it runs", ({ job, wantedBy }) => {
-    const runsOn = /^\$\{\{ (?<condition>.+) \}\}$/.exec(checkJobs()[job]?.if ?? "")?.groups?.[
-      "condition"
-    ];
-    const env = stepsOfJob(FAN_IN).flatMap((step) => Object.entries(step.env ?? {}));
+    const condition = checkJobs()[job]?.if;
+    assert(condition !== undefined, `${job} has an if`);
+    const runsOn = /^\$\{\{ (?<condition>.+) \}\}$/.exec(condition)?.groups?.["condition"];
+    const env = stepsOfJob(FAN_IN).flatMap(envOf);
 
-    expect(runsOn, `${job} runs on no condition this reading can find`).toBeDefined();
+    assert(runsOn !== undefined, `${job} runs on no condition this reading can find`);
     expect(Object.fromEntries(env)[wantedBy]).toEqual(
-      `\${{ (${runsOn ?? ""}) && 'success' || 'skipped' }}`,
+      `\${{ (${runsOn}) && 'success' || 'skipped' }}`,
     );
   });
 
   it.each(VERDICTS)("$verdict on $run", (scenario: VerdictCase) => {
     const ran = verdictOn(scenario);
 
-    expect(ran.status === 0 ? "passes" : "fails", `${ran.stdout}${ran.stderr}`).toEqual(
-      scenario.verdict,
-    );
+    const typecheck = typecheckOf(scenario);
+
+    expect(verdictOf(ran), `${ran.stdout}${ran.stderr}`).toEqual(scenario.verdict);
     expect(ran.stdout).toContain(
       `${TITLE_JOB}: ${scenario.title} (this lane wants ${scenario.wanted})`,
     );
     expect(ran.stdout).toContain(
-      `${TYPECHECK_JOB}: ${scenario.typecheck?.was ?? "skipped"} (this lane wants ${scenario.typecheck?.wanted ?? "skipped"})`,
+      `${TYPECHECK_JOB}: ${typecheck.was} (this lane wants ${typecheck.wanted})`,
     );
-    expect(ran.stdout).toContain(scenario.says ?? "");
+  });
+
+  it.each(VERDICTS_THAT_SAY_WHY)("$run says why", ({ says, ...scenario }) => {
+    expect(verdictOn(scenario).stdout).toContain(says);
   });
 });
 

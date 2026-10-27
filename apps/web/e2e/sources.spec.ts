@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Locator, Page, Response } from "@playwright/test";
 
 import {
@@ -26,6 +28,7 @@ import {
   signIn,
   skipLinkReachesThePage,
   theActionLandedWithinItsBudget,
+  holdingTheFirstAnswer,
 } from "./harness.ts";
 import { heldBack } from "./knowledge.ts";
 import { refusalAnswering } from "./refused-read.ts";
@@ -777,10 +780,10 @@ test.describe("reviewing a connected source's findings", () => {
     await rowAction(page, "Supplier forms", "review").click();
     const review = reviewOf(page, "Supplier forms");
 
-    const describedBy =
-      (await review
-        .getByRole("button", { name: "Keep in Text", exact: true })
-        .getAttribute("aria-describedby")) ?? "";
+    const describedBy = await review
+      .getByRole("button", { name: "Keep in Text", exact: true })
+      .getAttribute("aria-describedby");
+    assert.ok(describedBy !== null, "Keep in Text is described by what enables it");
     const enabling = review.locator(`[id="${describedBy}"]`);
     await expect(enabling).toBeVisible();
     for (const label of [
@@ -1188,7 +1191,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       ],
     });
     const citedBy = seeded.connectedSources[0]?.documents[0]?.citedBy;
-    expect(citedBy, "the harness seeded no citing concept").toBeDefined();
+    assert.ok(citedBy, "the harness seeded no citing concept");
 
     await rowAction(page, "Supplier payments", "narrow").focus();
     await page.keyboard.press("n");
@@ -1209,7 +1212,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(page.getByRole("heading", { level: 3, name: "Supplier payments" })).toBeFocused();
     await expect(sensitivityOf(page, "Supplier payments")).toHaveText("Restricted");
     await expect(saidIn(page)).toHaveText(/Supplier payments\D+Restricted\D+\b1\b\D+\b1\b/);
-    await expect(page.getByText(citedBy?.iri ?? "")).toBeVisible();
+    await expect(page.getByText(citedBy.iri)).toBeVisible();
   });
 
   test("widens by keyboard within 100 ms, listing what changes", async ({
@@ -1228,7 +1231,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       ],
     });
     const citedBy = seeded.connectedSources[0]?.documents[0]?.citedBy;
-    expect(citedBy, "the harness seeded no citing concept").toBeDefined();
+    assert.ok(citedBy, "the harness seeded no citing concept");
 
     await rowAction(page, "Tender answers", "widen").focus();
     await page.keyboard.press("w");
@@ -1277,7 +1280,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await theActionLandedWithinItsBudget(page, "widen");
 
     await expect(saidIn(page)).toHaveText(/Tender answers\D+Internal\D+\b1\b\D+\b1\b/);
-    await expect(page.getByText(citedBy?.iri ?? "")).toBeVisible();
+    await expect(page.getByText(citedBy.iri)).toBeVisible();
     await expect(sensitivityOf(page, "Tender answers")).toHaveText("Internal");
     await expect(panel).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 3, name: "Tender answers" })).toBeFocused();
@@ -1326,7 +1329,8 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await rowAction(page, "Price list", "widen").click();
     const published = panelOf(page, "Price list", "widen");
     await expect(published).toHaveAccessibleDescription(/\S/);
-    const describedBy = (await published.getAttribute("aria-describedby")) ?? "";
+    const describedBy = await published.getAttribute("aria-describedby");
+    assert.ok(describedBy !== null, "the panel is described by its source's standing");
     const ofAPublishedSource = await saidNowIn(published.locator(`[id="${describedBy}"]`));
     await expect(published).toHaveAccessibleDescription(ofAPublishedSource);
 
@@ -1435,23 +1439,11 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       connectedSources: [indexed("Bid library"), indexed("Case studies")],
     });
 
-    const reached = Promise.withResolvers<void>();
-    const answered = Promise.withResolvers<void>();
-    let asked = 0;
-    await page.route(WIDENING, async (route) => {
-      asked += 1;
-      const first = asked === 1;
-      const response = await route.fetch();
-      if (first) {
-        reached.resolve();
-        await answered.promise;
-      }
-      await route.fulfill({ response });
-    });
+    const widening = await holdingTheFirstAnswer(page, WIDENING);
 
     await rowAction(page, "Bid library", "widen").click();
     await commitOf(page, "Bid library", "widen").click();
-    await reached.promise;
+    await widening.reached;
     await expect(sensitivityOf(page, "Bid library")).toHaveText("Public");
 
     await rowAction(page, "Case studies", "widen").click();
@@ -1462,12 +1454,12 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await page.keyboard.press("Enter");
     await expect(panelOf(page, "Case studies", "widen")).toBeVisible();
     await expect(sensitivityOf(page, "Case studies")).toHaveText("Internal");
-    answered.resolve();
+    widening.release();
 
     await expect(saidIn(page)).toHaveText(/Bid library\D+Public/);
     await expect(second).toHaveAttribute("aria-disabled", "false");
     await expect(second).toHaveAccessibleDescription("");
-    expect(asked, "the second press asked the api while the first was pending").toBe(1);
+    expect(widening.asked(), "the second press asked the api while the first was pending").toBe(1);
   });
 
   test("widens a Public source's audience, then says nothing is wider", async ({

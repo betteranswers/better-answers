@@ -54,6 +54,15 @@ const KAYS = {
   invitedBy: ADA.displayName,
 };
 
+const switchedOnceThen = (api: Api, procedure: string, after: unknown) => {
+  let refused = false;
+  api.set(procedure, () => {
+    if (refused) return after;
+    refused = true;
+    return SWITCHED;
+  });
+};
+
 const openGracesPage = async (api: Api) => {
   const router = await openAt(GRACES_PAGE, api);
   await screen.findByRole("radio", { name: "Editor" });
@@ -145,17 +154,8 @@ describe("a tab whose workspace the session has left", () => {
     const api = adaAnAdmin();
     const router = await openGracesPage(api);
     aSwitchInAnotherTab(api, "Admin");
-    for (const [procedure, after] of [
-      ["members.list", read([ADA, HEDY])],
-      ["members.groups", read([])],
-    ] as const) {
-      let refused = false;
-      api.set(procedure, () => {
-        if (refused) return after;
-        refused = true;
-        return SWITCHED;
-      });
-    }
+    switchedOnceThen(api, "members.list", read([ADA, HEDY]));
+    switchedOnceThen(api, "members.groups", read([]));
     const member = heldBack(api, "session.member", adaAt("Admin", HOLME));
     const answer = api.get("session.member");
     let memberReads = 0;

@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, describe, expect, it } from "vitest";
 
 import { SWEEPS, sweepEveryWorkspace, withSweepLock } from "@better-answers/core/sweeps";
 import { ulid } from "@better-answers/schema";
@@ -77,8 +79,7 @@ describe("a sweep pass over every workspace", () => {
 
     const pass = await sweepEveryWorkspace(SWEEPS, doors(), { uploadSweep: "remove" });
 
-    expect(pass.ok).toBe(true);
-    if (!pass.ok) return;
+    assert(pass.ok, inspect(pass));
     expect(pass.value.uploadSweep).toBe("remove");
     expect(pass.value.totals).toEqual({
       workspaces: 3,
@@ -110,8 +111,7 @@ describe("a sweep pass over every workspace", () => {
 
     const pass = await sweepEveryWorkspace(SWEEPS, doors(), { uploadSweep: "list" });
 
-    expect(pass.ok).toBe(true);
-    if (!pass.ok) return;
+    assert(pass.ok, inspect(pass));
     expect(pass.value.uploadSweep).toBe("list");
     expect(pass.value.totals).toEqual({
       workspaces: 1,
@@ -137,8 +137,7 @@ describe("a sweep pass over every workspace", () => {
 
     expect(await generationsOf(stuck.workspaceId)).toEqual([1, 2]);
     expect(await listObjects(admin, store().door, "")).toEqual({ ok: true, value: [] });
-    expect(pass.ok).toBe(true);
-    if (!pass.ok) return;
+    assert(pass.ok, inspect(pass));
     expect(pass.value.totals).toEqual({
       workspaces: 2,
       refused: 1,
@@ -306,9 +305,8 @@ describe("a sweep pass and the spend held", () => {
 
     const pass = await sweepEveryWorkspace(SWEEPS, doors(), { uploadSweep: "list" });
 
-    expect(pass.ok && pass.value.swept.map((swept) => swept.spend)).toEqual([
-      { ok: true, value: 1 },
-    ]);
+    assert(pass.ok, inspect(pass));
+    expect(pass.value.swept.map((swept) => swept.spend)).toEqual([{ ok: true, value: 1 }]);
     const settled = await db().pool.query(
       "SELECT outcome, cost_gbp FROM llm_call WHERE workspace_id = $1",
       [workspace.workspaceId],

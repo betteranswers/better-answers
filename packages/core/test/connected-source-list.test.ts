@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { runsOfSubject, runsOfSubjectInput } from "../src/runs/index.ts";
@@ -150,8 +150,11 @@ describe("the Sources list an Admin reads", () => {
       finishedAt: FINISHED_AT,
       outcome: INDEXED,
     });
-    await passagesUnder(scenario, policies.connectedSourceId, policies.documentIds[0] ?? "", 2);
-    await passagesUnder(scenario, policies.connectedSourceId, policies.documentIds[1] ?? "", 1);
+    const [firstPolicy, secondPolicy] = policies.documentIds;
+    assert(firstPolicy !== undefined, "the first policy document landed");
+    assert(secondPolicy !== undefined, "the second policy document landed");
+    await passagesUnder(scenario, policies.connectedSourceId, firstPolicy, 2);
+    await passagesUnder(scenario, policies.connectedSourceId, secondPolicy, 1);
     const rota = await connectedSourceOf(scenario, "Rota", [{ title: "rota.md" }], PUBLISHED_AT);
     const rotaSync = await syncOver(scenario, rota.connectedSourceId, {
       reason: "connected",

@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
@@ -71,6 +73,7 @@ test("a pending connection to Claude resumes at the workspace picker", async ({
   request,
   baseURL,
 }) => {
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
   const { workspace, key } = await anAdminWaiting(page, request, "Pennine Metalwork");
   const second = await provision(request, { name: "Wharfedale Castings" });
   await addMember(request, {
@@ -80,7 +83,7 @@ test("a pending connection to Claude resumes at the workspace picker", async ({
   });
   await catchClaudesRedirect(page);
 
-  await page.goto(claudesAuthorizeUrl(baseURL ?? "", { prompt: "consent" }));
+  await page.goto(claudesAuthorizeUrl(baseURL, { prompt: "consent" }));
 
   await expect(confirmHeading(page)).toBeVisible();
   expect(

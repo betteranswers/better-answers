@@ -102,6 +102,16 @@ describe("the concept's search column", () => {
   });
 });
 
+const ACCEPTED_CANDIDATES = CANDIDATES.filter(([, accepted]) => accepted).map(
+  ([candidate]) => candidate,
+);
+
+const WHAT_THE_TYPESCRIPT_IRI_SAYS = CANDIDATES.map(([candidate, accepted]) => ({
+  candidate,
+  typescript: accepted,
+  database: accepted ? ADMITTED : "concept_index_iri_check",
+}));
+
 describe("the concept IRI's constraint", () => {
   it("refuses a raw concept row with a malformed IRI", async () => {
     await withACommit(async (client, _seed, sha) => {
@@ -113,9 +123,11 @@ describe("the concept IRI's constraint", () => {
 
   it("accepts and refuses the strings the TypeScript IRI does", async () => {
     await withACommit(async (client, seed, sha) => {
+      for (const candidate of ACCEPTED_CANDIDATES) {
+        await seed.conceptIdentity({ workspaceId: WS_A, iri: candidate });
+      }
       const outcomes = [];
-      for (const [candidate, accepted] of CANDIDATES) {
-        if (accepted) await seed.conceptIdentity({ workspaceId: WS_A, iri: candidate });
+      for (const [candidate] of CANDIDATES) {
         outcomes.push({
           candidate,
           typescript: IRI.test(candidate),
@@ -123,13 +135,7 @@ describe("the concept IRI's constraint", () => {
         });
       }
 
-      expect(outcomes).toEqual(
-        CANDIDATES.map(([candidate, accepted]) => ({
-          candidate,
-          typescript: accepted,
-          database: accepted ? ADMITTED : "concept_index_iri_check",
-        })),
-      );
+      expect(outcomes).toEqual(WHAT_THE_TYPESCRIPT_IRI_SAYS);
     });
   });
 });

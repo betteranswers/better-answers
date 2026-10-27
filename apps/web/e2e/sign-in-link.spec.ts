@@ -20,6 +20,7 @@ import {
   saysTheWait,
   signInHeading,
   theActionLandedWithinItsBudget,
+  requestsSent,
 } from "./harness.ts";
 import { theNextAskMeetsACeiling } from "./refused-read.ts";
 
@@ -195,16 +196,16 @@ test("unknown, spent and superseded links show one dead page", async ({
 });
 
 test("a missing or malformed fragment shows the dead page unasked", async ({ page }) => {
-  const described: string[] = [];
-  page.on("request", (sent) => {
-    if (new URL(sent.url()).pathname === DESCRIBE_PATH) described.push(sent.url());
-  });
+  const described = requestsSent(page, (url) => url.pathname === DESCRIBE_PATH);
 
   await freshlyOpened(page, "/sign-in/link");
   await theDeadPage(page);
   await freshlyOpened(page, "/sign-in/link#not-a-token");
   await theDeadPage(page);
-  expect(described, "a dead fragment still asked the api").toEqual([]);
+  expect(
+    described.map((sent) => sent.url()),
+    "a dead fragment still asked the api",
+  ).toEqual([]);
 });
 
 test("a link spent after its read shows the dead page", async ({ page, context, request }) => {

@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
@@ -481,6 +481,14 @@ const deploymentIs = (status: string): Answer => ({
   body: JSON.stringify({ deployment_uuid: DEPLOYMENT, status, logs: "a deployment's whole log" }),
 });
 
+const orchestratorAnswering =
+  (when: (heard: Heard) => boolean, answer: Answer): ((heard: Heard) => Answer) =>
+  (heard) =>
+    when(heard) ? answer : orchestrator()(heard);
+
+const readsTheApplication = (heard: Heard): boolean =>
+  heard.url === "/api/v1/applications/uuid-1" && heard.method === "GET";
+
 type Orchestrator = {
   readonly pullStep?: string | null;
   readonly listed?: readonly string[];
@@ -625,16 +633,19 @@ describe("the redeploy a release makes", () => {
       orchestrator({ reads: [deploymentIs("in_progress")] }),
       { RELEASE_DEPLOY_WAIT_SECONDS: "2", RELEASE_DEPLOY_DELAY_SECONDS: "0.2" },
     );
+    const elapsed = Date.now() - started;
 
     expect({
       code: redeployed.code,
       read: redeployed.heard.some((heard) => heard.url === DEPLOYMENT_READ),
-      inTime: Date.now() - started >= 2000 && Date.now() - started < 6000,
+      waitedItOut: elapsed >= 2000,
+      gaveUpPromptly: elapsed < 6000,
       err: redeployed.err,
     }).toEqual({
       code: 1,
       read: true,
-      inTime: true,
+      waitedItOut: true,
+      gaveUpPromptly: true,
       err: `::error::deployment ${DEPLOYMENT} had not finished 2 s after it was queued, and its last status read was in_progress. It may still swap production later, so read /health before acting\n`,
     });
   });
@@ -656,11 +667,11 @@ describe("the redeploy a release makes", () => {
   });
 
   it("writes nothing when the deployment list is unreadable", async () => {
-    const valid = orchestrator();
-    const redeployed = await redeployedThrough((heard) =>
-      heard.url === DEPLOYMENTS_LIST
-        ? { status: 200, body: JSON.stringify({ count: 0 }) }
-        : valid(heard),
+    const redeployed = await redeployedThrough(
+      orchestratorAnswering((heard) => heard.url === DEPLOYMENTS_LIST, {
+        status: 200,
+        body: JSON.stringify({ count: 0 }),
+      }),
     );
 
     expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
@@ -696,11 +707,11 @@ describe("the redeploy a release makes", () => {
   });
 
   it("names the read ability when the first read is refused", async () => {
-    const valid = orchestrator();
-    const redeployed = await redeployedThrough((heard) =>
-      heard.url === "/api/v1/applications/uuid-1" && heard.method === "GET"
-        ? { status: 403, body: JSON.stringify({ message: "Missing required permissions: read" }) }
-        : valid(heard),
+    const redeployed = await redeployedThrough(
+      orchestratorAnswering(readsTheApplication, {
+        status: 403,
+        body: JSON.stringify({ message: "Missing required permissions: read" }),
+      }),
     );
 
     expect({ code: redeployed.code, heard: redeployed.heard.length, err: redeployed.err }).toEqual({
@@ -722,9 +733,11 @@ describe("the redeploy a release makes", () => {
   });
 
   it("stops at the edge's redirect to sign-in", async () => {
-    const valid = orchestrator();
-    const redeployed = await redeployedThrough((heard) =>
-      heard.url === "/api/v1/applications/uuid-1" ? { status: 302, body: "" } : valid(heard),
+    const redeployed = await redeployedThrough(
+      orchestratorAnswering((heard) => heard.url === "/api/v1/applications/uuid-1", {
+        status: 302,
+        body: "",
+      }),
     );
 
     expect(redeployed.code).toBe(1);
@@ -785,6 +798,10 @@ describe("the redeploy a release makes", () => {
 type Step = z.infer<typeof workflowStepSchema>;
 
 const running = (text: string) => (step: Step) => step.run?.includes(text) ?? false;
+
+const installs = (step: Step): boolean =>
+  /setup-node|action-setup|setup-uv/.test(step.uses ?? "") ||
+  /\b(pnpm|npm|uv|pip)\b/.test(step.run ?? "");
 
 const jobOf = (name: string): ReleaseJob => {
   const job = release().jobs[name];
@@ -860,7 +877,7 @@ describe("how the workflows hand a release its commit", () => {
     const defaultOf = (script: string, name: string): number => {
       const text = readFileSync(path.join(repositoryRoot, "deploy", script), "utf8");
       const found = new RegExp(`\\$\\{${name}:-(\\d+)\\}`).exec(text)?.[1];
-      if (found === undefined) throw new Error(`${script} gives ${name} no default`);
+      assert(found !== undefined, `${script} gives ${name} no default`);
       return Number(found);
     };
     const smokeReadSeconds = 5;
@@ -919,13 +936,7 @@ describe("the tag a release records", () => {
   it("installs nothing in the job holding write access", () => {
     const { steps } = jobOf("record");
 
-    expect(
-      steps.filter(
-        (step) =>
-          /setup-node|action-setup|setup-uv/.test(step.uses ?? "") ||
-          /\b(pnpm|npm|uv|pip)\b/.test(step.run ?? ""),
-      ),
-    ).toEqual([]);
+    expect(steps.filter(installs)).toEqual([]);
   });
 
   it("records on the smoke", () => {
@@ -938,7 +949,7 @@ describe("the tag a release records", () => {
     const said = [jobOf("promote"), jobOf("record")]
       .flatMap((job) => job.steps)
       .filter((step) => step.if === "failure()")
-      .map((step) => step.run ?? "");
+      .map((step) => step.run);
 
     expect(said.join("\n")).not.toContain("record it by hand");
     expect(said).toHaveLength(2);
@@ -1013,6 +1024,11 @@ describe("the tag the record job makes", () => {
   });
 });
 
+const scheduledTimesOf = (file: string): readonly string[] =>
+  (readWorkflow(file, scheduledSchema).on.schedule ?? []).map((entry) =>
+    entry.cron.split(" ").slice(0, 2).join(" "),
+  );
+
 const cronOf = (spec: string): { readonly minute: number; readonly hour: number } => {
   const [minute = "", hour = ""] = spec.split(" ");
   return { minute: Number(minute), hour: Number(hour) };
@@ -1036,11 +1052,7 @@ describe("when the nightly release runs", () => {
   it("shares its minute with no other scheduled workflow", () => {
     const schedules = readdirSync(path.join(repositoryRoot, ".github", "workflows"))
       .filter((file) => file.endsWith(".yml"))
-      .flatMap((file) =>
-        (readWorkflow(file, scheduledSchema).on.schedule ?? []).map((entry) =>
-          entry.cron.split(" ").slice(0, 2).join(" "),
-        ),
-      );
+      .flatMap(scheduledTimesOf);
 
     expect(schedules.filter((time, index) => schedules.indexOf(time) !== index)).toEqual([]);
     expect(schedules).toContain("35 2");

@@ -81,6 +81,7 @@
       }
     ],
     "vitest/no-identical-title": "error",
+    "vitest/no-conditional-in-test": "error",
     "vitest/valid-title": [
       "error",
       {

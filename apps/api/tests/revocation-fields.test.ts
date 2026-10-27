@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { authAsServerBuildsIt } from "./auth-instance.ts";
 
@@ -38,13 +38,23 @@ describe("the revocation instants the identity provider carries", () => {
   });
 
   it("gives a member its own instant, kept to one workspace", () => {
-    const fields = memberSchema()?.additionalFields ?? {};
+    const schema = memberSchema();
+    assert(
+      schema?.additionalFields !== undefined,
+      "the organisation plugin declares member fields",
+    );
+    const fields = schema.additionalFields;
 
     expect(platformWritten(fields["credentialsRevokedAt"])).toEqual(PLATFORM_DATE);
   });
 
   it("keeps the member's instant from what a colleague sees", () => {
-    const fields = memberSchema()?.additionalFields ?? {};
+    const schema = memberSchema();
+    assert(
+      schema?.additionalFields !== undefined,
+      "the organisation plugin declares member fields",
+    );
+    const fields = schema.additionalFields;
 
     expect(fields["credentialsRevokedAt"]?.returned).toBe(false);
   });

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { byCodeUnit } from "@better-answers/schema/code-unit";
+
 import { acceptSuggestions, submitSuggestionSet, type Frontmatter } from "../src/concepts/index.ts";
 import { ERASURE, runErasure } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type UserPrincipal } from "../src/kernel/index.ts";
@@ -76,7 +78,7 @@ describe("a sensitivity override the person set", () => {
       [
         { iri: theirs.iri, actor: erasedAs },
         { iri: anothers.iri, actor: anothers.actor },
-      ].toSorted((left, right) => (left.iri < right.iri ? -1 : 1)),
+      ].toSorted((left, right) => byCodeUnit(left.iri, right.iri)),
     );
     expect(run.report).toContain("concept-sensitivity-override: actorsRewritten 1, found 1");
   });
@@ -207,7 +209,7 @@ describe("a suggestion the person proposed or decided", () => {
           decider: another,
           reason: "Already in the handbook.",
         },
-      ].toSorted((left, right) => (left.id < right.id ? -1 : 1)),
+      ].toSorted((left, right) => byCodeUnit(left.id, right.id)),
     );
     expect(run.report).toContain("suggestion: actorsRewritten 2, found 2");
   });

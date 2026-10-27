@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { assert, describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
 import {
@@ -513,6 +513,17 @@ describe("the preview's rendering", () => {
   });
 });
 
+const flagged = (reason: FeedbackReason, note?: string): string =>
+  renderFeedback({
+    outcome: "stored",
+    feedback: {
+      recordId: A_RECORD,
+      verdict: "flag",
+      reason,
+      ...(note === undefined ? {} : { note }),
+    },
+  });
+
 describe("open's and feedback's renderings", () => {
   it("quotes a passage with its source, locator and sensitivity word", () => {
     expect(
@@ -668,16 +679,6 @@ describe("open's and feedback's renderings", () => {
   it("renders stored feedback and each flag reason in words", () => {
     const stored = (what: string): string =>
       `Stored on record ${A_RECORD}: ${what}. No one is notified of it.`;
-    const flagged = (reason: FeedbackReason, note?: string): string =>
-      renderFeedback({
-        outcome: "stored",
-        feedback: {
-          recordId: A_RECORD,
-          verdict: "flag",
-          reason,
-          ...(note === undefined ? {} : { note }),
-        },
-      });
 
     expect(
       renderFeedback({ outcome: "stored", feedback: { recordId: A_RECORD, verdict: "helpful" } }),
@@ -1288,7 +1289,9 @@ describe("what ask answers with no model", () => {
       title: "How do buyers access audit information about the supplier's actions?",
       body: "The supplier sends its own audit report on request.\n",
     };
-    const iris = [await seededIn(workspaceId, users), await seededIn(workspaceId, supplier)];
+    const usersIri = await seededIn(workspaceId, users);
+    const supplierIri = await seededIn(workspaceId, supplier);
+    const iris = [usersIri, supplierIri];
 
     const answer = await asked(db(), asker, {
       question: "How do buyers access audit information?",
@@ -1303,9 +1306,12 @@ describe("what ask answers with no model", () => {
     expect(
       answer.related.toSorted((one, other) => iris.indexOf(one.iri) - iris.indexOf(other.iri)),
     ).toEqual(
-      [users, supplier].map(({ collection, kind, title, body }, at) => ({
-        iri: iris[at],
-        url: pageOf(iris[at] ?? ABSENT),
+      [
+        { concept: users, iri: usersIri },
+        { concept: supplier, iri: supplierIri },
+      ].map(({ concept: { collection, kind, title, body }, iri }) => ({
+        iri,
+        url: pageOf(iri),
         kind,
         title,
         collection,
@@ -1347,10 +1353,9 @@ describe("what ask answers with no model", () => {
       },
       expect.objectContaining({ iri: note, kind: "Note" }),
     ]);
-    expect(answer.related.map((concept) => "body" in concept || "evidence" in concept)).toEqual([
-      false,
-      false,
-    ]);
+    expect(
+      answer.related.map((concept) => ["body", "evidence"].filter((key) => key in concept)),
+    ).toEqual([[], []]);
     const [first] = linesOf(renderAnswer(answer));
     expect(first).toBe(RELATED_LINE);
     expect(first).not.toMatch(/answered/i);
@@ -1598,7 +1603,30 @@ describe("what ask answers with no model", () => {
     return { steps: keeping, opened };
   };
 
+  const abortingTheSecondRead = (
+    steps: ReturnType<typeof stepsFor>,
+  ): ReturnType<typeof stepsFor> => {
+    let reads = 0;
+    return {
+      ...steps,
+      read: (work) => {
+        reads += 1;
+        if (reads !== 2) return steps.read(work);
+        return steps.read(async (tx) => {
+          await abortTheTransaction(tx);
+          return work(tx);
+        });
+      },
+    };
+  };
+
   const AN_OPEN_RECORD = { completed: false, verdict: null, judge_state: null, concepts: [] };
+
+  const recordOpenedBy = async (opened: readonly string[]) => {
+    const [recordId] = opened;
+    assert(recordId !== undefined, "the ask opened a record");
+    return recordOf(recordId);
+  };
 
   const RETENTION_ASKED = { question: RETENTION_QUESTION, collections: [] };
 
@@ -1614,7 +1642,7 @@ describe("what ask answers with no model", () => {
     );
 
     expect(answered).toEqual({ ok: false, error: "credentials-revoked" });
-    expect(await recordOf(opened[0] ?? "")).toEqual([
+    expect(await recordOpenedBy(opened)).toEqual([
       expect.objectContaining({ ...AN_OPEN_RECORD, question: RETENTION_QUESTION }),
     ]);
   });
@@ -1634,9 +1662,9 @@ describe("what ask answers with no model", () => {
       new Date(),
     );
 
-    expect(answered.ok).toBe(false);
-    expect(String(answered.ok || answered.error)).toMatch(/no open record \w{26} to complete/);
-    expect(await recordOf(opened[0] ?? "")).toEqual([
+    assert(!answered.ok);
+    expect(String(answered.error)).toMatch(/no open record \w{26} to complete/);
+    expect(await recordOpenedBy(opened)).toEqual([
       expect.objectContaining({ ...AN_OPEN_RECORD, question: RETENTION_QUESTION }),
     ]);
   });
@@ -1644,22 +1672,9 @@ describe("what ask answers with no model", () => {
   it("answers a walk's failure other than a timeout", async () => {
     const { workspaceId, asker } = await anAsker();
     await seededIn(workspaceId, RETENTION_ANSWER);
-    const steps = stepsFor(db().runtimePool, asker);
-    let reads = 0;
-
     const answered = await ask(
       asker,
-      {
-        ...steps,
-        read: (work) => {
-          reads += 1;
-          if (reads !== 2) return steps.read(work);
-          return steps.read(async (tx) => {
-            await abortTheTransaction(tx);
-            return work(tx);
-          });
-        },
-      },
+      abortingTheSecondRead(stepsFor(db().runtimePool, asker)),
       RETENTION_ASKED,
       new Date(),
     );
@@ -1696,6 +1711,13 @@ describe("what ask answers with no model", () => {
     expect(answerOutputWith(trust).parse(answer)).toEqual(answer);
   });
 });
+
+const sourceOpenings = (matches: FindResult["matches"]) =>
+  new Map(
+    matches.flatMap((match) =>
+      match.layer === "sources" ? [[match.title, match.openingLine]] : [],
+    ),
+  );
 
 describe("the two knowledge layers a search and a fetch reach", () => {
   const now = new Date("2026-09-08T12:00:00.000Z");
@@ -1848,7 +1870,8 @@ describe("the two knowledge layers a search and a fetch reach", () => {
         ],
       },
     });
-    expect(found.ok && renderFind(found.value)).toBe(
+    assert(found.ok);
+    expect(renderFind(found.value)).toBe(
       [
         `Policy · ${CONCEPT_TITLE} · No collection · Unverified · ${iri}`,
         `document · ${INVOICE_TITLE} · ${NOT_COMPANY_KNOWLEDGE} · Internal · ${invoice.locator} · "${INVOICE_TEXT}"`,
@@ -1909,11 +1932,8 @@ describe("the two knowledge layers a search and a fetch reach", () => {
 
     const found = await searching(reader, documents.length);
 
-    const openings = new Map(
-      (found.ok ? found.value.matches : []).flatMap((match) =>
-        match.layer === "sources" ? [[match.title, match.openingLine]] : [],
-      ),
-    );
+    assert(found.ok);
+    const openings = sourceOpenings(found.value.matches);
     expect(Array.from(brief), "the brief's line is exactly the opening's length").toHaveLength(160);
     expect(Object.fromEntries(openings)).toEqual(
       Object.fromEntries(documents.map(([title, , documentOpening]) => [title, documentOpening])),
@@ -1926,10 +1946,10 @@ describe("the two knowledge layers a search and a fetch reach", () => {
 
     const [ofOne, ofTwo] = await Promise.all([searching(reader, 1), searching(reader, 2)]);
 
-    expect(ofOne.ok && ofOne.value.matches).toEqual([
-      expect.objectContaining({ layer: "bundles", iri }),
-    ]);
-    expect(ofTwo.ok && ofTwo.value.matches).toEqual([
+    assert(ofOne.ok);
+    expect(ofOne.value.matches).toEqual([expect.objectContaining({ layer: "bundles", iri })]);
+    assert(ofTwo.ok);
+    expect(ofTwo.value.matches).toEqual([
       expect.objectContaining({ layer: "bundles", iri }),
       expect.objectContaining({ layer: "sources", locator: invoice.locator }),
     ]);
@@ -1956,7 +1976,8 @@ describe("the two knowledge layers a search and a fetch reach", () => {
         },
       },
     });
-    expect(opened.ok && renderOpen(opened.value)).toBe(
+    assert(opened.ok);
+    expect(renderOpen(opened.value)).toBe(
       [
         "> The kingfisher invoice was settled in March.",
         "",
@@ -2008,7 +2029,8 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     });
     expect(tooFar).toEqual({ ok: true, value: { found: false, locator: pastTheEnd } });
 
-    expect(found.ok && found.value.matches).toEqual([
+    assert(found.ok);
+    expect(found.value.matches).toEqual([
       {
         layer: "sources",
         kind: "document",
@@ -2030,12 +2052,12 @@ describe("the two knowledge layers a search and a fetch reach", () => {
 
     const concept = await acting(reader, (principal, tx) => open(principal, tx, { iri }, now));
 
-    expect(concept.ok && concept.value.found && concept.value.concept?.evidence).toEqual([
+    assert(concept.ok);
+    assert(concept.value.found);
+    expect(concept.value.concept?.evidence).toEqual([
       { locator: handbook.locator, source: HANDBOOK_TITLE },
     ]);
-    expect(concept.ok && renderOpen(concept.value)).toContain(
-      `- ${HANDBOOK_TITLE} (${handbook.locator})`,
-    );
+    expect(renderOpen(concept.value)).toContain(`- ${HANDBOOK_TITLE} (${handbook.locator})`);
 
     const passage = await opening(reader, handbook.locator);
 
@@ -2075,15 +2097,16 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     }
 
     const found = await searching(reader);
-    const parsed = findOutputWith(trust).safeParse(found.ok && found.value);
+    assert(found.ok);
+    const parsed = findOutputWith(trust).safeParse(found.value);
 
-    expect(
-      parsed.data?.matches.map((match) =>
-        match.layer === "bundles" ? [match.title, match.collection] : [],
-      ),
-    ).toEqual([
-      ["Kingfisher audits", "audits"],
-      ["Kingfisher basics", null],
+    expect(parsed.data?.matches).toEqual([
+      expect.objectContaining({
+        layer: "bundles",
+        title: "Kingfisher audits",
+        collection: "audits",
+      }),
+      expect.objectContaining({ layer: "bundles", title: "Kingfisher basics", collection: null }),
     ]);
   });
 
@@ -2093,7 +2116,8 @@ describe("the two knowledge layers a search and a fetch reach", () => {
 
     const found = await searching(reader);
 
-    expect(findOutputWith(trust).safeParse(found.ok && found.value)).toEqual({
+    assert(found.ok);
+    expect(findOutputWith(trust).safeParse(found.value)).toEqual({
       success: true,
       data: {
         query: "kingfisher",
@@ -2131,12 +2155,14 @@ describe("the two knowledge layers a search and a fetch reach", () => {
 
     const opened = await acting(reader, (principal, tx) => open(principal, tx, { iri }, now));
 
-    expect(opened.ok && opened.value.found && opened.value.concept).toMatchObject({
+    assert(opened.ok);
+    assert(opened.value.found);
+    expect(opened.value.concept).toMatchObject({
       access: "included",
       lead: "Based on your current access, the evidence is included.",
       next: "Open a source to read the passage the concept rests on.",
     });
-    expect(openOutputWith(trust).safeParse(opened.ok && opened.value)).toEqual({
+    expect(openOutputWith(trust).safeParse(opened.value)).toEqual({
       success: true,
       data: {
         found: true,
@@ -2184,7 +2210,8 @@ describe("the two knowledge layers a search and a fetch reach", () => {
       acting(reader, (principal, tx) => open(principal, tx, { iri: ABSENT }, now)),
     ]);
 
-    expect(openOutputWith(trust).safeParse(passage.ok && passage.value)).toEqual({
+    assert(passage.ok);
+    expect(openOutputWith(trust).safeParse(passage.value)).toEqual({
       success: true,
       data: {
         found: true,
@@ -2196,11 +2223,13 @@ describe("the two knowledge layers a search and a fetch reach", () => {
         },
       },
     });
-    expect(openOutputWith(trust).safeParse(noPassage.ok && noPassage.value)).toEqual({
+    assert(noPassage.ok);
+    expect(openOutputWith(trust).safeParse(noPassage.value)).toEqual({
       success: true,
       data: { found: false, locator: "not an address at all" },
     });
-    expect(openOutputWith(trust).safeParse(noConcept.ok && noConcept.value)).toEqual({
+    assert(noConcept.ok);
+    expect(openOutputWith(trust).safeParse(noConcept.value)).toEqual({
       success: true,
       data: { found: false, iri: "https://better-answers.com/c/01J6ZZZZZZZZZZZZZZZZZZZZZZ" },
     });
@@ -2264,7 +2293,8 @@ describe("the links in an opened concept's body", () => {
 
     const answer = await opened(reader, expenses);
 
-    expect(answer.found && answer.concept?.bodyLinks).toEqual([
+    assert(answer.found);
+    expect(answer.concept?.bodyLinks).toEqual([
       { ordinal: 0, address: "./travel.md", target: travel },
       { ordinal: 1, address: "./travel.md", target: travel },
     ]);

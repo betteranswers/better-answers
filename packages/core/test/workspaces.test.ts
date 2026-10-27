@@ -1,5 +1,5 @@
 import pg from "pg";
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { assert, describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
 import { boundarySchemas, ulid } from "@better-answers/schema";
@@ -333,8 +333,7 @@ describe("provisioning a workspace", () => {
       adminUserId: await seedUser(),
     });
 
-    expect(provisioned.ok).toBe(false);
-    if (provisioned.ok) return;
+    assert(!provisioned.ok);
     expect(provisioned.error).toBeInstanceOf(Error);
   });
 });
@@ -367,14 +366,11 @@ describe("ending every sign-in and token everywhere, as the operator", () => {
         later: new Date("2026-09-02T13:00:00Z"),
       },
     });
-    const beforeUpdatedAt =
-      updatedRow
-        .optional()
-        .parse(
-          (await db().pool.query('SELECT updated_at FROM "user" WHERE id = $1', [personId]))
-            .rows[0],
-        )
-        ?.updated_at.getTime() ?? 0;
+    const beforeUpdatedAt = updatedRow
+      .parse(
+        (await db().pool.query('SELECT updated_at FROM "user" WHERE id = $1', [personId])).rows[0],
+      )
+      .updated_at.getTime();
 
     const { operatorId, answered } = await revoking({ personId, at: AT });
 
@@ -423,7 +419,7 @@ describe("ending every sign-in and token everywhere, as the operator", () => {
         authorizationCodeId: string,
         referenceId: string,
         createdAt: string,
-        rotatedAt: string | null,
+        rotatedAt: Date | null,
       ) =>
         seed.oauthRefreshToken({
           clientId: client.clientId,
@@ -431,9 +427,14 @@ describe("ending every sign-in and token everywhere, as the operator", () => {
           authorizationCodeId,
           referenceId,
           createdAt: new Date(createdAt),
-          rotatedAt: rotatedAt === null ? null : new Date(rotatedAt),
+          rotatedAt,
         });
-      await token("code-acme", acme.workspaceId, "2026-09-01T09:00:00Z", "2026-09-01T10:00:00Z");
+      await token(
+        "code-acme",
+        acme.workspaceId,
+        "2026-09-01T09:00:00Z",
+        new Date("2026-09-01T10:00:00Z"),
+      );
       await token("code-acme", acme.workspaceId, "2026-09-01T10:00:00Z", null);
       await token("code-zenith", zenith.workspaceId, "2026-09-02T09:00:00Z", null);
       await token("code-later", zenith.workspaceId, "2026-09-02T13:00:00Z", null);
@@ -1421,7 +1422,8 @@ describe("adding a person before their first sign-in, the platform's action", ()
         displayName: "Matthew Burgess",
       },
     });
-    const personId = added.ok ? added.value.personId : "";
+    assert(added.ok);
+    const personId = added.value.personId;
     expect(await personsAt(email)).toEqual([
       {
         id: personId,
@@ -1444,9 +1446,10 @@ describe("adding a person before their first sign-in, the platform's action", ()
 
     const member = await addMember(bootstrap, door, { workspaceId, email, role: "Admin" });
 
+    assert(added.ok);
     expect(member).toMatchObject({
       ok: true,
-      value: { userId: added.ok ? added.value.personId : "", role: "Admin" },
+      value: { userId: added.value.personId, role: "Admin" },
     });
   });
 
@@ -1505,10 +1508,13 @@ describe("adding a person before their first sign-in, the platform's action", ()
       return Promise.all(racing);
     });
 
-    expect(answers.map((answer) => (answer.ok ? "added" : answer.error)).toSorted()).toEqual([
-      "added",
-      "person-exists",
-    ]);
+    expect(answers).toHaveLength(2);
+    expect(answers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ ok: true }),
+        { ok: false, error: "person-exists" },
+      ]),
+    );
     expect(await personsAt(email)).toHaveLength(1);
     expect(await addedRowCount()).toBe(before + 1);
   });
@@ -1556,7 +1562,8 @@ describe("the operator mark, set and cleared by the platform", () => {
 
     const cleared = await marking(email, "revoke");
 
-    expect(cleared.ok && cleared.value.changed).toBe(true);
+    assert(cleared.ok);
+    expect(cleared.value.changed).toBe(true);
     expect(await markOf(personId)).toBe(false);
     expect(await identityRowsAbout(personId)).toEqual([
       { action: "people.operator.revoked", actor: "process:better-answers-bootstrap", detail: {} },
@@ -1571,7 +1578,10 @@ describe("the operator mark, set and cleared by the platform", () => {
 
     const answers = [await marking(plain, "revoke"), await marking(marked, "grant")];
 
-    expect(answers.map((answer) => answer.ok && answer.value.changed)).toEqual([false, false]);
+    expect(answers).toEqual([
+      { ok: true, value: { personId: plainId, changed: false } },
+      { ok: true, value: { personId: markedId, changed: false } },
+    ]);
     expect([await markOf(plainId), await markOf(markedId)]).toEqual([false, true]);
     expect([...(await identityRowsAbout(plainId)), ...(await identityRowsAbout(markedId))]).toEqual(
       [],
@@ -1596,7 +1606,8 @@ describe("the operator mark, set and cleared by the platform", () => {
 
     const read = await operatorAddresses(bootstrap, openPostgres(db().runtimePool));
 
-    const addresses = read.ok ? read.value : [];
+    assert(read.ok);
+    const addresses = read.value;
     const ours = addresses.filter((email) => [first, second, cleared, plain].includes(email));
     expect(ours).toEqual([first, second]);
   });
@@ -1620,7 +1631,9 @@ describe("the operator's list of every workspace", () => {
       (operator, tx) => listWorkspaces(operator, tx),
     );
 
-    const workspaces = listed.ok && listed.value.ok ? listed.value.value : [];
+    assert(listed.ok);
+    assert(listed.value.ok);
+    const workspaces = listed.value.value;
     expect(workspaces.find((workspace) => workspace.id === acme.workspaceId)).toEqual({
       id: acme.workspaceId,
       name: "Acme",

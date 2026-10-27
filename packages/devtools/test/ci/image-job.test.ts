@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
@@ -108,7 +108,9 @@ describe("the job that probes every image it pushes", () => {
   it("defers probes the caller ran, or whose inputs are unchanged", () => {
     const check = checkWorkflow();
     const read = deferralsRead();
-    const { input: given, answer } = read[0] ?? { input: "", answer: "" };
+    const [first] = read;
+    assert(first !== undefined, "a leg reads the deferral");
+    const { input: given, answer } = first;
 
     expect(read.length).toBeGreaterThan(1);
     expect(
@@ -122,9 +124,9 @@ describe("the job that probes every image it pushes", () => {
 
   it("hands the deferral to exactly the legs reading it", () => {
     const reading = trackedWorkspacesReadingTheDeferral();
-    const wanted = checkLegs().flatMap(([job, steps]) =>
-      workspacesUnder(steps).some((workspace) => reading.has(workspace)) ? [job] : [],
-    );
+    const wanted = checkLegs()
+      .filter(([, steps]) => workspacesUnder(steps).some((workspace) => reading.has(workspace)))
+      .map(([job]) => job);
 
     expect(
       reading.size,
