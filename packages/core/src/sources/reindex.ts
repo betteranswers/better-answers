@@ -55,6 +55,7 @@ export const reindexEveryConnectedSource = async (
   const reindexed: ConnectedSourceReprocessed[] = [];
   for (const { id } of listed.value.rows) {
     const connectedSourceId = CONNECTED_SOURCE_ID.parse(id);
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every connected source's reprocess at once would hold a pool connection each
     const wiped = await withScope(platform, door, workspaceId, (tx) =>
       reprocessConnectedSource(platform, tx, {
         workspaceId,

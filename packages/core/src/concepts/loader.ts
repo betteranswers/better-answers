@@ -442,6 +442,7 @@ export const recordImportedVerifications = async (
     if (present.has(key)) continue;
     present.add(key);
     const verificationId = ulid();
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every verification insert runs on the caller's transaction
     await tx.query(
       `INSERT INTO concept_verification (id, workspace_id, iri, actor, verified_at, content_hash, origin)
        VALUES ($2, ${scopeClause(1)}, $3, $4, $5, NULL, $6)`,
@@ -454,6 +455,7 @@ export const recordImportedVerifications = async (
         VERIFICATION_IMPORTED_ORIGIN,
       ],
     );
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every audit row runs on the caller's transaction, beside the insert it records
     await record(principal, tx, {
       id: ulid(),
       action: IMPORT_ACTIONS.verificationImported,

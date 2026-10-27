@@ -155,6 +155,7 @@ export const sweepEveryWorkspace = async (
       if (!listed.ok) return err(listed.error);
       const swept: WorkspaceSwept[] = [];
       for (const workspaceId of listed.value) {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- every workspace's sweep at once would hold a pool connection each
         swept.push(await sweepOne(platform, doors, workspaceId, input.uploadSweep));
       }
       const totals = totalsOf(swept);
@@ -188,6 +189,7 @@ export const makeQuestionMonths = (
 ): Promise<Result<void>> =>
   attempt(async () => {
     for (const monthsOn of [0, 1]) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- the maker takes one advisory lock with a short lock timeout, so a second call only queues
       await door.pool.query("SELECT create_question_content_partition($1)", [
         firstOfTheMonth(input.now, monthsOn),
       ]);

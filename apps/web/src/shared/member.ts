@@ -118,6 +118,7 @@ export const memberChanged = async (
     // An action's settle may cancel ours with a read of its own; wait out the latest. A paused
     // read leaves the loop.
     while (queryClient.getQueryState(filters.queryKey)?.fetchStatus === "fetching") {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- refetches until no read of the member is still in flight
       await queryClient.refetchQueries(filters, { cancelRefetch: false });
     }
     const read = queryClient.getQueryState(filters.queryKey);

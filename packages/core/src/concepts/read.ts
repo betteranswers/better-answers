@@ -198,6 +198,7 @@ export const resolvedSourcesOf = async (
   const sources = frontmatter["sources"];
   const resolved: Resolved[] = [];
   for (const entry of isList(sources) ? sources : []) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every source check runs on the reader's one transaction
     const one = await resolvedOf(doors, entry);
     if (!one.ok) return err(one.error);
     // Stryker disable next-line ConditionalExpression: the insert boundary refuses an entry naming no resource, so none is undefined here; hides → false, killed in answering.test.ts

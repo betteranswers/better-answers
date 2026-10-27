@@ -136,6 +136,7 @@ const versionsIn = (entries) => {
 const listVersions = async (run, tier) => {
   const entries = [];
   for (let page = 1; page <= MOST_PAGES; page += 1) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- listing stops at the first page that is refused or short
     const read = await pageOf(run, tier, page);
     if (read.refused !== undefined) {
       return {
@@ -217,6 +218,7 @@ const readManifests = async (run, tier, versions, pullToken) => {
   const manifests = new Map();
   for (const version of versions) {
     if (version.tags.length === 0 || version.tags.includes(CACHE_TAG)) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- the registry rate-limits manifest reads, so they go one at a time
       manifests.set(version.digest, await readManifest(run, tier, version.digest, pullToken));
     }
   }
@@ -320,7 +322,9 @@ const deleteAll = async (run, tier, versions, budget) => {
   let state = startOf(budget);
   for (const version of versions) {
     if (blockerOf(state) === undefined) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- the pause between deletes keeps under the packages API's rate limit
       await run.sleep(PAUSE_MS);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- each delete's answer updates the budget the next one checks
       const sent = await send(run, `${versionsUrl(run, tier)}/${version.id}`, {
         method: "DELETE",
         headers: apiHeaders(run),
@@ -478,6 +482,7 @@ export const cleanup = async (run) => {
   const reports = [];
   let budget = { left: MOST_DELETES, stop: undefined };
   for (const tier of run.tiers) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- each package spends from the budget the one before it left
     const report = await cleanPackage(run, tier, budget);
     for (const line of logOf(report)) run.log(line);
     reports.push(report);

@@ -146,6 +146,7 @@ const unmappedPassagesFor = async (
   if (!found.ok) return found;
   const passages: PassageView[] = [];
   for (const { passage } of found.value) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every passage read runs on the one transaction the answer holds
     const read = await passageAt(reader, tx, passage.locator);
     if (read.ok) passages.push(passageViewOf(read.value));
     else if (read.error !== NOT_FOUND) return err(read.error);
@@ -264,6 +265,7 @@ const returnedBy = async (
   };
   const returned: Returned[] = [];
   for (const concept of slots.flatMap((iri) => byIri.get(iri) ?? [])) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every concept read runs on the one transaction the answer holds
     const one = await returnedOf(reader, tx, concept, reads, now);
     if (!one.ok) return one;
     returned.push(one.value);

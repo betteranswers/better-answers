@@ -130,6 +130,7 @@ async function* heardFrom(
   let buffered = "";
   try {
     while (!heard.errored) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- each read of the stream follows the chunk before it
       const chunk = await attempt(() => reader.read());
       if (!chunk.ok || chunk.value.done) break;
       const { data, rest } = sseDataIn(
@@ -236,6 +237,7 @@ export const openStreamingClient = (doors: ModelClientDoors): StreamingClient =>
         outcome: outcome === "answered" ? "succeeded" : "failed",
       });
       if (tried.streamed) return { outcome, spent };
+      // oxlint-disable-next-line eslint/no-await-in-loop -- a retry waits on how the attempt before it ended
       const ended = await afterAttempt(tried.read, attempted, leftMs, call.signal, wait);
       if (ended !== undefined) return { outcome: ended, spent };
     }

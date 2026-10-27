@@ -154,6 +154,7 @@ const emailedEach = async (
   const sent: boolean[] = [];
   for (let start = 0; start < invitations.length; start += EMAILS_PER_SECOND) {
     const round = invitations.slice(start, start + EMAILS_PER_SECOND);
+    // oxlint-disable-next-line eslint/no-await-in-loop -- each round sends at most the provider's per-second email allowance
     sent.push(...(await Promise.all(round.map((invitation) => sentInvitation(ctx, invitation)))));
   }
   return sent;

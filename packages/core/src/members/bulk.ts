@@ -102,6 +102,7 @@ export const bulkChangeRole = async (
     const batchId = batchIdFor(moving.length);
     const promoted: UserId[] = [];
     for (const { personId, role: previousRole } of moving) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- every role change runs on the caller's transaction
       if (await roleWritten(admin, tx, { personId, previousRole, role: role.data }, batchId)) {
         promoted.push(personId);
       }
@@ -152,6 +153,7 @@ export const bulkRemoveMembers = async (
     if (refused !== undefined) return err(refused);
 
     const removedAt = { at: input.at, batchId: batchIdFor(held.rows.length) };
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every removal runs on the caller's transaction
     for (const row of held.rows) await memberRemovedHere(fresh.value, tx, row, removedAt);
     return ok(
       outcomeOf(

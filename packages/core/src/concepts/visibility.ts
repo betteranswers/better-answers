@@ -57,6 +57,7 @@ export const replaceCitations = async (
     [scopeParameter(principal), iri],
   );
   for (const citation of citations) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every evidence insert runs on the caller's transaction
     await tx.query(
       `INSERT INTO concept_evidence (workspace_id, iri, source_document_id, locator)
        VALUES (${scopeClause(1)}, $2, $3, $4) ON CONFLICT DO NOTHING`,
@@ -211,6 +212,7 @@ const recomputeVisibilitySourcedFrom = async (
   );
   const recomputed: string[] = [];
   for (const { iri } of citing.rows) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every recompute runs on the caller's transaction
     const visibility = await recomputeConceptVisibility(principal, tx, iri);
     if (visibility !== undefined) recomputed.push(iri);
   }

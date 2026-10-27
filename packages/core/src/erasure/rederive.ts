@@ -65,6 +65,7 @@ export const rederiveAfterErasure = async (
   );
 
   for (const connectedSourceId of connectedSourcesToReprocess) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- the erasure wipes one connected source at a time and stops at the first that fails
     await wipe(platform, door, input.workspaceId, connectedSourceId);
   }
 

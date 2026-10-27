@@ -265,13 +265,16 @@ const legSlices = async (
   baseline: Results | undefined,
 ): Promise<readonly (readonly Part[])[]> => {
   const files = mutateSet(root, mutate);
-  const pieces: Part[][] = [];
-  for (const [file, count] of split) {
-    if (!files.includes(file)) {
-      throw new Error(`${file} is named to be cut, but the ${name} leg does not mutate it`);
-    }
-    for (const lines of await piecesOf(root, file, count, baseline)) pieces.push([{ file, lines }]);
-  }
+  const cut = await Promise.all(
+    [...split].map(async ([file, count]) => {
+      if (!files.includes(file)) {
+        throw new Error(`${file} is named to be cut, but the ${name} leg does not mutate it`);
+      }
+      const lines = await piecesOf(root, file, count, baseline);
+      return lines.map((piece): Part[] => [{ file, lines: piece }]);
+    }),
+  );
+  const pieces = cut.flat();
   const rest = files.filter((file) => !split.has(file));
   if (rest.length > 0 && of <= pieces.length) {
     throw new Error(

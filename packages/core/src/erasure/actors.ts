@@ -113,6 +113,7 @@ const sweptBy = async (tx: Tx, sweep: ActorSweep, subject: ActorSweepSubject): P
 
 export const sweepTheActors = async (tx: Tx, subject: ActorSweepSubject): Promise<ActorsSwept> => {
   const swept = new Map<ActorFamily, Counts>();
+  // oxlint-disable-next-line eslint/no-await-in-loop -- every actor sweep runs on the erasure's transaction
   for (const sweep of ACTOR_SWEEPS) swept.set(sweep.family, await sweptBy(tx, sweep, subject));
   return swept;
 };

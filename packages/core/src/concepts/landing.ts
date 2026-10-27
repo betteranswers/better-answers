@@ -272,6 +272,7 @@ const landEvidence = async (
   evidence: readonly EvidenceRow[],
 ): Promise<void> => {
   for (const piece of evidence) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every evidence row is written on the caller's transaction
     await tx.query(
       `INSERT INTO evidence (workspace_id, source_document_id, locator, resource, content_version)
        VALUES ($1, $2, $3, $4, $5)
@@ -450,6 +451,7 @@ export const carryVerificationsOntoRewrite = async (
   let concepts = 0;
   let verifications = 0;
   for (const row of indexed.rows) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- each file read feeds an update on the caller's transaction
     const content = await fileAt(platform, door, input.workspaceId, row.commit_sha, row.path);
 
     if (content === null) continue;
@@ -459,6 +461,7 @@ export const carryVerificationsOntoRewrite = async (
     }
     const contentHash = contentHashOf(read.value.frontmatter, read.value.body, row.path);
 
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every reindex runs on the caller's transaction
     const reindexed = await tx.query(
       `UPDATE concept_index SET frontmatter = $3, body = $4, content_hash = $5
         WHERE workspace_id = ${scopeClause(1)} AND iri = $2
@@ -468,6 +471,7 @@ export const carryVerificationsOntoRewrite = async (
     );
     concepts += reindexed.rowCount ?? 0;
     if (contentHash === row.content_hash) continue;
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every verification move runs on the caller's transaction
     const moved = await tx.query(
       `UPDATE concept_verification SET content_hash = $3, origin = $4
         WHERE workspace_id = ${scopeClause(1)} AND iri = $2 AND content_hash IS NOT NULL`,

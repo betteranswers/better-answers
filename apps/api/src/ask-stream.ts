@@ -63,6 +63,7 @@ export async function* eventsOf<Event extends object>(
     if (ended?.threw === true) throw ended.error;
     if (ended !== undefined || stop.aborted) return;
     woken = Promise.withResolvers<void>();
+    // oxlint-disable-next-line eslint/no-await-in-loop -- each wait for the next event starts once the last one was yielded
     const heard = await quietFor(woken.promise, quietMs, stop);
     if (heard === "quiet") yield KEEP_ALIVE;
   }

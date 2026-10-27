@@ -194,6 +194,7 @@ export const followSyncs = async (
   const followed: SyncFollowed[] = [];
   const skipped: SyncSkipped[] = [];
   for (const sync of syncs.value) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- the syncs of a workspace cascade in the order they finished
     const outcome = await followSync(platform, door, workspaceId, sync);
     if (!outcome.ok) skipped.push({ jobId: sync.jobId, reason: outcome.error.message });
     else if (outcome.value !== undefined)
@@ -209,6 +210,7 @@ export const followSyncsInEveryWorkspace = async (
   const held = await workspaceIds(platform, door);
   if (!held.ok) return err(held.error);
   const passes: Result<WorkspaceSyncsFollowed>[] = [];
+  // oxlint-disable-next-line eslint/no-await-in-loop -- every workspace's pass at once would hold a pool connection each
   for (const workspaceId of held.value) passes.push(await followSyncs(platform, door, workspaceId));
   return ok(passes);
 };

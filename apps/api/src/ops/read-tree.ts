@@ -11,6 +11,7 @@ export const readTreeUnder = async (directory: string): Promise<BundleTree> => {
     const file = path.join(entry.parentPath, entry.name);
     tree.set(
       path.relative(directory, file).split(path.sep).join("/"),
+      // oxlint-disable-next-line eslint/no-await-in-loop -- reading every file of a bundle tree at once can run out of file descriptors
       await readFile(file, "utf8"),
     );
   }

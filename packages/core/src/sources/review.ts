@@ -390,6 +390,7 @@ export const keepInText = async (
   const named = spans.map((span) => span.id);
   const batchId = batchIdFor(named.length);
   for (const findingId of named) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every restore runs on the caller's transaction
     const restored = await restoreFinding(admin, tx, {
       findingId,
       reason: input.reason,

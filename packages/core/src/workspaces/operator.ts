@@ -127,6 +127,7 @@ const KEEPING_THE_CODE = `
 const clearingTheFactors = async (tx: Tx, personId: UserId, now: Date): Promise<void> => {
   await tx.query(SESSION_ROWS, [personId, [...SESSION_VERIFICATION_PREFIXES]]);
   for (const table of HELD_BY_THE_PERSON) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every delete runs on the caller's transaction
     await tx.query(`DELETE FROM ${table} WHERE user_id = $1`, [personId]);
   }
   await tx.query(
