@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { check, integer, text, timestamp } from "drizzle-orm/pg-core";
 
-import { ACTOR_ID_PATTERN } from "./actor-id.ts";
+import { ACTOR_ID_PATTERN } from "./people/actor-id.ts";
 
 export const listed = (values: readonly string[]): string =>
   values.map((value) => `'${value.replaceAll("'", "''")}'`).join(", ");

@@ -1,8 +1,8 @@
 import type pg from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { type MigratedPostgres, withRollback } from "./harness.ts";
-import { openMigratedPostgres } from "./warm-postgres.ts";
+import { type MigratedPostgres, withRollback } from "./support/harness.ts";
+import { openMigratedPostgres } from "./support/warm-postgres.ts";
 
 let db: MigratedPostgres;
 

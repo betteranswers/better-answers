@@ -21,10 +21,10 @@ import {
   STAMP_THE_CONTRACT,
   ulid,
 } from "../src/index.ts";
-import { type TestData, testData } from "./factory.ts";
-import { type MigratedPostgres, withRollback } from "./harness.ts";
-import { matching } from "./matching.ts";
-import { ADMITTED, privilegesHeld, refusalOf, refusesEach, sqlstateOf } from "./probes.ts";
+import { type TestData, testData } from "./support/factory.ts";
+import { type MigratedPostgres, withRollback } from "./support/harness.ts";
+import { matching } from "./support/matching.ts";
+import { ADMITTED, privilegesHeld, refusalOf, refusesEach, sqlstateOf } from "./support/probes.ts";
 import {
   A_BACKUP_ROW,
   A_BUNDLE_COMMIT,
@@ -79,8 +79,8 @@ import {
   THE_FAMILY_AND_SUBJECT_IT_LANDS_IN,
   THE_GENERATION_ROW_HELD,
   THREE_INVITATION_EMAILS_COUNTED,
-} from "./rls-probes.ts";
-import { openMigratedPostgres } from "./warm-postgres.ts";
+} from "./support/rls-probes.ts";
+import { openMigratedPostgres } from "./support/warm-postgres.ts";
 
 let db: MigratedPostgres;
 

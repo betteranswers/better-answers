@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { testData } from "./factory.ts";
-import { withRollback } from "./harness.ts";
-import { postgresForSuite } from "./probes.ts";
+import { testData } from "./support/factory.ts";
+import { withRollback } from "./support/harness.ts";
+import { postgresForSuite } from "./support/probes.ts";
 
 const db = postgresForSuite();
 

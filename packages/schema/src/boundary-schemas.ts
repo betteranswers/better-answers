@@ -1,13 +1,8 @@
 import type { PgTable } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
-import {
-  accessRequest,
-  ACCESS_REQUEST_REASON_MAX,
-  ACCESS_REQUEST_STATUSES,
-} from "./access-request-tables.ts";
-import { ACTOR_ID as ACTOR_ID_REGEX } from "./actor-id.ts";
-import { ACTION, auditEvent, FAMILIES, identityAuditEvent } from "./audit-tables.ts";
+import { CONTRACT_DIGEST_PATTERN } from "./contract-digest.ts";
+import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
   bundleCommit,
   CONCEPT_BODY_MAX,
@@ -28,33 +23,7 @@ import {
   GIT_SHA,
   TRUST_TIERS,
   VERIFICATION_ORIGINS,
-} from "./concept-tables.ts";
-import { CONTRACT_DIGEST_PATTERN } from "./contract-digest.ts";
-import {
-  INGRESS_SCOPES,
-  ingressCounter,
-  invitationEmailCounter,
-  mcpCallCounter,
-} from "./counter-tables.ts";
-import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
-import { EMAIL_ADDRESS } from "./email-address.ts";
-import {
-  erasureRequest,
-  type SUBJECT_IDENTIFIER_KINDS,
-  SUBJECT_IDENTIFIER_MAX,
-  SUBJECT_IDENTIFIERS_MAX,
-  SUBJECT_REQUEST_KINDS,
-  subjectRequest,
-  suppression,
-  SUPPRESSION_SIGN_IN_ADDRESSES_MAX,
-} from "./erasure-tables.ts";
-import {
-  finding,
-  FINDING_REASON_MAX,
-  FINDING_REVIEW_STATES,
-  REDACTION_TIERS,
-} from "./finding-tables.ts";
-import { group, GROUP_ORIGINS, groupMember } from "./group-tables.ts";
+} from "./knowledge/concept-tables.ts";
 import {
   GUIDE_LAYERS,
   guideDefinition,
@@ -63,7 +32,57 @@ import {
   guideRole,
   guideSection,
   ROLE_LABELS,
-} from "./guide-tables.ts";
+} from "./knowledge/guide-tables.ts";
+import {
+  MAP_EDGE_LABELS,
+  MAP_NODE_LABELS,
+  mapEdge,
+  mapGeneration,
+  mapNode,
+  mapUnresolvedReference,
+  SOURCE_ENTITY_LABEL_PREFIX,
+  UNRESOLVED_RELATIONS,
+} from "./knowledge/map-tables.ts";
+import {
+  CANDIDATE_VERDICTS,
+  FEEDBACK_REASONS,
+  FEEDBACK_VERDICTS,
+  FLAG_CLOSINGS,
+  JUDGE_STATES,
+  MAP_LIVE,
+  MAP_UNAVAILABLE,
+  QUESTION_TRANSPORTS,
+  QUESTION_VERDICTS,
+  questionAsked,
+  questionContent,
+  questionFeedback,
+} from "./knowledge/question-tables.ts";
+import { AUDIENCES, SENSITIVITIES } from "./knowledge/readable-columns.ts";
+import {
+  conceptWriteRequest,
+  suggestion,
+  SUGGESTION_BODY_MAX,
+  SUGGESTION_KINDS,
+  SUGGESTION_REASON_MAX,
+  SUGGESTION_STATUSES,
+} from "./knowledge/suggestion-tables.ts";
+import { usage, USAGE_ACTS } from "./knowledge/usage-tables.ts";
+import {
+  NEEDS_REVIEW_REASONS,
+  WRITE_UP_HOMES,
+  writeUp,
+  writeUpInclude,
+  writeUpVersion,
+} from "./knowledge/write-up-tables.ts";
+import {
+  accessRequest,
+  ACCESS_REQUEST_REASON_MAX,
+  ACCESS_REQUEST_STATUSES,
+} from "./people/access-request-tables.ts";
+import { ACTOR_ID as ACTOR_ID_REGEX } from "./people/actor-id.ts";
+import { ACTION, auditEvent, FAMILIES, identityAuditEvent } from "./people/audit-tables.ts";
+import { EMAIL_ADDRESS } from "./people/email-address.ts";
+import { group, GROUP_ORIGINS, groupMember } from "./people/group-tables.ts";
 import {
   account,
   authenticator,
@@ -84,10 +103,18 @@ import {
   session,
   user,
   verification,
-} from "./identity-tables.ts";
-import { passage, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
-import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./job-tables.ts";
-import { workspaceLastActive } from "./last-active-tables.ts";
+} from "./people/identity-tables.ts";
+import { workspaceLastActive } from "./people/last-active-tables.ts";
+import { ROLES } from "./people/roles.ts";
+import { testWorkspaceMark } from "./people/test-workspace-tables.ts";
+import { workspace } from "./people/workspace-table.ts";
+import {
+  INGRESS_SCOPES,
+  ingressCounter,
+  invitationEmailCounter,
+  mcpCallCounter,
+} from "./platform/counter-tables.ts";
+import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./platform/job-tables.ts";
 import {
   CALENDAR_DAY,
   DECIMAL_STRING,
@@ -100,17 +127,7 @@ import {
   modelKey,
   modelPrice,
   spendReservation,
-} from "./llm-tables.ts";
-import {
-  MAP_EDGE_LABELS,
-  MAP_NODE_LABELS,
-  mapEdge,
-  mapGeneration,
-  mapNode,
-  mapUnresolvedReference,
-  SOURCE_ENTITY_LABEL_PREFIX,
-  UNRESOLVED_RELATIONS,
-} from "./map-tables.ts";
+} from "./platform/llm-tables.ts";
 import {
   backup,
   BACKUP_KINDS,
@@ -119,24 +136,25 @@ import {
   contractStamp,
   sweepPass,
   UPLOAD_SWEEP_MODES,
-} from "./platform-tables.ts";
-import {
-  CANDIDATE_VERDICTS,
-  FEEDBACK_REASONS,
-  FEEDBACK_VERDICTS,
-  FLAG_CLOSINGS,
-  JUDGE_STATES,
-  MAP_LIVE,
-  MAP_UNAVAILABLE,
-  QUESTION_TRANSPORTS,
-  QUESTION_VERDICTS,
-  questionAsked,
-  questionContent,
-  questionFeedback,
-} from "./question-tables.ts";
-import { AUDIENCES, SENSITIVITIES } from "./readable-columns.ts";
-import { ROLES } from "./roles.ts";
+} from "./platform/platform-tables.ts";
 import { modelChoice, workspaceConfig } from "./schema.ts";
+import {
+  erasureRequest,
+  type SUBJECT_IDENTIFIER_KINDS,
+  SUBJECT_IDENTIFIER_MAX,
+  SUBJECT_IDENTIFIERS_MAX,
+  SUBJECT_REQUEST_KINDS,
+  subjectRequest,
+  suppression,
+  SUPPRESSION_SIGN_IN_ADDRESSES_MAX,
+} from "./sources/erasure-tables.ts";
+import {
+  finding,
+  FINDING_REASON_MAX,
+  FINDING_REVIEW_STATES,
+  REDACTION_TIERS,
+} from "./sources/finding-tables.ts";
+import { passage, EMBEDDING_DIMENSIONS } from "./sources/index-tables.ts";
 import {
   CONNECTED_SOURCE_STATES,
   CONNECTORS,
@@ -147,26 +165,8 @@ import {
   type RULES_IN_FORCE_KEYS,
   connectedSource,
   sourceDocument,
-} from "./source-tables.ts";
-import {
-  conceptWriteRequest,
-  suggestion,
-  SUGGESTION_BODY_MAX,
-  SUGGESTION_KINDS,
-  SUGGESTION_REASON_MAX,
-  SUGGESTION_STATUSES,
-} from "./suggestion-tables.ts";
-import { testWorkspaceMark } from "./test-workspace-tables.ts";
+} from "./sources/source-tables.ts";
 import { ULID } from "./ulid.ts";
-import { usage, USAGE_ACTS } from "./usage-tables.ts";
-import { workspace } from "./workspace-table.ts";
-import {
-  NEEDS_REVIEW_REASONS,
-  WRITE_UP_HOMES,
-  writeUp,
-  writeUpInclude,
-  writeUpVersion,
-} from "./write-up-tables.ts";
 
 const workspaceId = (schema: z.ZodString) => schema.regex(ULID).brand<"WorkspaceId">();
 const userId = (schema: z.ZodString) => schema.regex(ULID).brand<"UserId">();
@@ -471,7 +471,7 @@ const backupSelect = createSelectSchema(backup, backupRefinements);
 const backupInsert = createInsertSchema(backup, backupRefinements);
 const backupUpdate = createUpdateSchema(backup, backupRefinements);
 
-export { ACTOR_ID, PROCESS_PREFIX } from "./actor-id.ts";
+export { ACTOR_ID, PROCESS_PREFIX } from "./people/actor-id.ts";
 
 const detailEntry = z.record(z.string(), z.union([z.string(), z.null()]));
 

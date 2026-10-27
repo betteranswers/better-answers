@@ -22,7 +22,7 @@ CONCEPT_DEPRECATED_STATUS = "deprecated"
 
 
 PORT_OF = (
-    "packages/schema/src/concept-file.ts",
+    "packages/schema/src/knowledge/concept-file.ts",
     "packages/core/src/store/map/index.ts",
 )
 AGREEMENT = "links"

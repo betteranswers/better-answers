@@ -76,8 +76,8 @@ describe("the territory the scan reads", () => {
   });
 
   it("lets only a named module hold one", () => {
-    expect(isFactoryModule("packages/schema/test/probes.ts")).toBe(true);
-    expect(isScanned("packages/schema/test/probes.ts")).toBe(false);
+    expect(isFactoryModule("packages/schema/test/support/probes.ts")).toBe(true);
+    expect(isScanned("packages/schema/test/support/probes.ts")).toBe(false);
   });
 
   it.each([
@@ -150,7 +150,7 @@ describe("the scan over a throwaway tree", () => {
   it("passes over a named factory module that carries one", () => {
     const tree = {
       ...CLEAN,
-      ["packages/schema/test/probes.ts"]: `const q = \`${insert("workspace")}\`;\n`,
+      ["packages/schema/test/support/probes.ts"]: `const q = \`${insert("workspace")}\`;\n`,
     };
 
     expect(scan(tree)).toContain("no raw insert");

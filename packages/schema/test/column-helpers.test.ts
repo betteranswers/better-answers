@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { listed } from "../src/column-helpers.ts";
-import type { MigratedPostgres } from "./harness.ts";
-import { openMigratedPostgres } from "./warm-postgres.ts";
+import type { MigratedPostgres } from "./support/harness.ts";
+import { openMigratedPostgres } from "./support/warm-postgres.ts";
 
 let db: MigratedPostgres;
 

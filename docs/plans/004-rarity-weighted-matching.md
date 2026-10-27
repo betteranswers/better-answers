@@ -119,19 +119,19 @@ The gain is modest, as the owner expected: the buyer-worded set at ten rises 5.2
 
 - **Goal:** R1.
 - **Requirements:** R1.
-- **Files:** `packages/schema/src/concept-tables.ts`, `packages/schema/migrations/0080_the-concept-description.sql` with its snapshot and journal, `apps/worker/src/better_answers_worker/schema_view.py` (generated), `packages/core/test/concept-search.test.ts`.
+- **Files:** `packages/schema/src/knowledge/concept-tables.ts`, `packages/schema/migrations/0080_the-concept-description.sql` with its snapshot and journal, `apps/worker/src/better_answers_worker/schema_view.py` (generated), `packages/core/test/concept-search.test.ts`.
 - **Approach:** KTD4, KTD5. Generate with `pnpm --filter @better-answers/schema run generate --name the-concept-description`, replace the SQL with the hand-written statement under the custom marker, then run `generate:worker-view`, `generate:roles-surface` and `generate:contract-stamp`.
 - **Test scenarios:**
   - A concept written with a `description` holds its words at weight B, beside its title's A, its tag's B and its body's C.
   - The existing cases of a concept with no `description` read as before.
-- **Verification:** `packages/core/test/concept-search.test.ts` and `packages/schema/test/migration-ownership.test.ts` pass.
+- **Verification:** `packages/core/test/concept-search.test.ts` and `packages/schema/test/migrations/migration-ownership.test.ts` pass.
 
 ### U2. The rule's weight
 
 - **Goal:** R2 to R5.
 - **Requirements:** R2, R3, R4, R5.
 - **Dependencies:** none; U1 changes only the vector.
-- **Files:** `packages/schema/src/full-text-match.ts`, `packages/core/src/concepts/index.ts`, `packages/core/src/sources/passages.ts`, `packages/core/src/answering/plan.ts`, `packages/schema/test/full-text-match.test.ts`.
+- **Files:** `packages/schema/src/knowledge/full-text-match.ts`, `packages/core/src/concepts/index.ts`, `packages/core/src/sources/passages.ts`, `packages/core/src/answering/plan.ts`, `packages/schema/test/knowledge/full-text-match.test.ts`.
 - **Approach:** KTD1, KTD2, KTD3. `QUERY_WORDS` and `corpusCounts` count the readable rows in one pass; `anyWordMatch` binds the counts, its `asked` lateral turns them into rarities once per query, and the `ranked` lateral computes the weight. `strength` keeps reading the distinct count.
 - **Test scenarios:**
   - Asked *audit retention* over three titles holding *audit* and one holding *retention*, the rarer word's row ranks first.
@@ -141,7 +141,7 @@ The gain is modest, as the owner expected: the buyer-worded set at ten rises 5.2
   - Strong and weak hold half the words, rounded up, as before.
   - The counts read the corpus and each word in one pass, and the weight follows the counts it is given, not the rows.
   - The concept search column's GIN index is valid, ready and over the column after 0080.
-- **Verification:** `packages/schema/test/full-text-match.test.ts` passes; `packages/core/test/visibility.test.ts` and `packages/core/test/find-matching.test.ts` (*pages past a withheld concept as past an absent one*) pass.
+- **Verification:** `packages/schema/test/knowledge/full-text-match.test.ts` passes; `packages/core/test/visibility.test.ts` and `packages/core/test/find-matching.test.ts` (*pages past a withheld concept as past an absent one*) pass.
 
 ### U3. The cursor and the docs
 

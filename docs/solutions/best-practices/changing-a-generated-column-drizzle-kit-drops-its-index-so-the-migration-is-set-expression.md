@@ -22,7 +22,7 @@ tags: [drizzle-kit, migration, generated-column, set-expression, gin-index, tsve
 
 ## Context
 
-BA-168 added the frontmatter `description` to `concept_index.search`, the stored `tsvector` that full-text search reads. The column is a `generatedAlwaysAs` expression (`CONCEPT_SEARCH` in `packages/schema/src/concept-tables.ts`), and the table declares `index("concept_index_search_gin").using("gin", table.search)` on it.
+BA-168 added the frontmatter `description` to `concept_index.search`, the stored `tsvector` that full-text search reads. The column is a `generatedAlwaysAs` expression (`CONCEPT_SEARCH` in `packages/schema/src/knowledge/concept-tables.ts`), and the table declares `index("concept_index_search_gin").using("gin", table.search)` on it.
 
 drizzle-kit 0.31.11, asked to generate the migration, wrote two statements:
 
@@ -48,9 +48,9 @@ SET LOCAL lock_timeout = DEFAULT;
 ```
 
 - `ALTER COLUMN ... SET EXPRESSION` needs Postgres 17 or later. It rewrites every row and rebuilds the column's indexes, so the index survives without being named.
-- The first line must be the custom marker exactly: `packages/schema/test/migration-ownership.test.ts` refuses a first line that claims a custom migration in any other spelling, though it cannot see a hand-written file that makes no claim.
+- The first line must be the custom marker exactly: `packages/schema/test/migrations/migration-ownership.test.ts` refuses a first line that claims a custom migration in any other spelling, though it cannot see a hand-written file that makes no claim.
 - Copy the expression from the generated `ADD COLUMN`, so it matches the snapshot byte for byte.
-- Prove the index, not just the matches. `packages/schema/test/full-text-match.test.ts` (*is valid, ready and over the column*) reads `pg_index` for `concept_index_search_gin` after every migration has run.
+- Prove the index, not just the matches. `packages/schema/test/knowledge/full-text-match.test.ts` (*is valid, ready and over the column*) reads `pg_index` for `concept_index_search_gin` after every migration has run.
 
 ## Why This Matters
 

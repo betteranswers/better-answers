@@ -219,7 +219,9 @@ def test_shared_address_matches_the_scripts_uri(
 
 
 def test_takes_the_same_build_lock_as_the_typescript_harness() -> None:
-    harness = REPO_ROOT / "packages" / "schema" / "test" / "warm-postgres.ts"
+    harness = (
+        REPO_ROOT / "packages" / "schema" / "test" / "support" / "warm-postgres.ts"
+    )
     keys = re.findall(
         r'^export const BUILD_LOCK = "([^"]*)";$',
         harness.read_text("utf-8"),

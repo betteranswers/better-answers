@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { lastMigration } from "../src/journal.ts";
-import { startMigratedPostgres } from "../test/harness.ts";
+import { startMigratedPostgres } from "../test/support/harness.ts";
 import { assertNoUndeclaredTables, introspect, renderWorkerSchemaView } from "./worker-view.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));

@@ -38,7 +38,7 @@ A body link's path is percent-decoded before it is resolved (BA-146, RFC 3987). 
 
 ## Solution
 
-`_uri_decoded` in `links.py` is a hand-written port of `decodeURI`. It decodes escapes one UTF-8 sequence at a time, keeps a reserved character's escape as written, and returns the address unchanged on any escape `decodeURI` would refuse. The TypeScript side is `uriDecoded` in `packages/schema/src/concept-file.ts`, which `targetOf` and the page's `concept-body.tsx` both call, so the page and the map read one address one way.
+`_uri_decoded` in `links.py` is a hand-written port of `decodeURI`. It decodes escapes one UTF-8 sequence at a time, keeps a reserved character's escape as written, and returns the address unchanged on any escape `decodeURI` would refuse. The TypeScript side is `uriDecoded` in `packages/schema/src/knowledge/concept-file.ts`, which `targetOf` and the page's `concept-body.tsx` both call, so the page and the map read one address one way.
 
 `contracts/links` holds the two differences as cases: *an encoded reserved character stays as written* and *an address that does not decode is read as written*. With `unquote` in place of `_uri_decoded`, those two cases fail and every other case passes.
 

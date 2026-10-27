@@ -2,31 +2,31 @@ import { sql } from "drizzle-orm";
 import { check, integer, primaryKey, text, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { stamp } from "./column-helpers.ts";
-import { llmPurpose } from "./llm-tables.ts";
+import { workspace } from "./people/workspace-table.ts";
+import { llmPurpose } from "./platform/llm-tables.ts";
 import { withRLS } from "./with-rls.ts";
-import { workspace } from "./workspace-table.ts";
 
-export { workspace } from "./workspace-table.ts";
+export { workspace } from "./people/workspace-table.ts";
 
-export * from "./readable-columns.ts";
-export * from "./identity-tables.ts";
-export * from "./audit-tables.ts";
-export * from "./group-tables.ts";
-export * from "./access-request-tables.ts";
-export * from "./last-active-tables.ts";
-export * from "./test-workspace-tables.ts";
-export * from "./concept-tables.ts";
-export * from "./suggestion-tables.ts";
-export * from "./source-tables.ts";
-export * from "./finding-tables.ts";
-export * from "./erasure-tables.ts";
-export * from "./guide-tables.ts";
-export * from "./write-up-tables.ts";
-export * from "./usage-tables.ts";
-export * from "./question-tables.ts";
-export * from "./llm-tables.ts";
-export * from "./job-tables.ts";
-export * from "./platform-tables.ts";
+export * from "./knowledge/readable-columns.ts";
+export * from "./people/identity-tables.ts";
+export * from "./people/audit-tables.ts";
+export * from "./people/group-tables.ts";
+export * from "./people/access-request-tables.ts";
+export * from "./people/last-active-tables.ts";
+export * from "./people/test-workspace-tables.ts";
+export * from "./knowledge/concept-tables.ts";
+export * from "./knowledge/suggestion-tables.ts";
+export * from "./sources/source-tables.ts";
+export * from "./sources/finding-tables.ts";
+export * from "./sources/erasure-tables.ts";
+export * from "./knowledge/guide-tables.ts";
+export * from "./knowledge/write-up-tables.ts";
+export * from "./knowledge/usage-tables.ts";
+export * from "./knowledge/question-tables.ts";
+export * from "./platform/llm-tables.ts";
+export * from "./platform/job-tables.ts";
+export * from "./platform/platform-tables.ts";
 
 export const modelChoice = withRLS(
   "model_choice",
