@@ -5,6 +5,7 @@ import {
   LISTED_MODEL_CHOICES,
   testData,
 } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { attempt, type Claims } from "../src/kernel/index.ts";
 import { listModelChoices, LLM_PURPOSES } from "../src/llm/index.ts";
@@ -171,6 +172,6 @@ describe("a workspace's model choices", () => {
       }),
     ).rejects.toThrow(/did not commit/);
 
-    expect(read).toMatchObject({ ok: false, error: expect.any(Error) });
+    expect(read).toMatchObject({ ok: false, error: matching.any(Error) });
   });
 });

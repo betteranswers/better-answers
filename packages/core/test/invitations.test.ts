@@ -1,5 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import { ok, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import {
   approveRequest,
@@ -75,7 +77,7 @@ describe("inviting a person by address", () => {
     expect(invited).toEqual({
       ok: true,
       value: {
-        invitationId: expect.stringMatching(ULID),
+        invitationId: matching.stringMatching(ULID),
         address,
         role: "Editor",
         invitedAt: "2031-06-15T09:30:00.000Z",
@@ -118,7 +120,7 @@ describe("inviting a person by address", () => {
     const toUnknown = answeredValue(await invite(workspace, unknown, "Viewer"));
 
     expect(toKnown).toEqual({
-      invitationId: expect.stringMatching(ULID),
+      invitationId: matching.stringMatching(ULID),
       address: known.email,
       role: "Viewer",
       invitedAt: "2031-06-15T09:30:00.000Z",
@@ -183,7 +185,7 @@ describe("inviting a person by address", () => {
     ]);
     const events = await invitationEvents(workspace);
     const batch = events.find((event) => event.batch_id !== null)?.batch_id;
-    expect(batch).toEqual(expect.stringMatching(ULID));
+    expect(batch).toEqual(matching.stringMatching(ULID));
     expect(
       events.map(({ action, subject_id, detail, batch_id }) => ({
         action,
@@ -246,8 +248,8 @@ describe("inviting a person by address", () => {
 
     expect(failed).toEqual({
       ok: false,
-      error: expect.objectContaining({
-        message: expect.stringMatching(/the store refused a write to audit_event/),
+      error: matching.objectContaining({
+        message: matching.stringMatching(/the store refused a write to audit_event/),
       }),
     });
 
@@ -313,15 +315,15 @@ describe("an approved access request's invitation", () => {
     ]);
     const events = await invitationEvents(workspace);
     const batch = events.at(-1)?.batch_id;
-    expect(batch).toEqual(expect.stringMatching(ULID));
+    expect(batch).toEqual(matching.stringMatching(ULID));
     expect(events.slice(1)).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         action: "people.invitation.created",
         subject_id: approved.invitationId,
         detail: { role: "Editor" },
         batch_id: batch,
       }),
-      expect.objectContaining({
+      matching.objectContaining({
         action: "people.invitation.cancelled",
         subject_id: direct.invitationId,
         detail: { replacedByInvitationId: approved.invitationId },
@@ -351,8 +353,8 @@ describe("an approved access request's invitation", () => {
 
     expect(failed).toEqual({
       ok: false,
-      error: expect.objectContaining({
-        message: expect.stringMatching(/the store refused a write to audit_event/),
+      error: matching.objectContaining({
+        message: matching.stringMatching(/the store refused a write to audit_event/),
       }),
     });
     expect(await invitationsOf(workspace)).toEqual([]);
@@ -451,8 +453,11 @@ describe("resending an invitation", () => {
       },
     });
     expect(await invitationEvents(workspace)).toEqual([
-      expect.objectContaining({ action: "people.invitation.created", detail: { role: "Editor" } }),
-      expect.objectContaining({
+      matching.objectContaining({
+        action: "people.invitation.created",
+        detail: { role: "Editor" },
+      }),
+      matching.objectContaining({
         action: "people.invitation.resent",
         subject_id: invited.invitationId,
         detail: {},
@@ -913,6 +918,6 @@ describe("who may act on invitations", () => {
       return verb(principal, tx, invited.invitationId);
     });
 
-    expect(failed).toEqual({ ok: false, error: expect.any(Error) });
+    expect(failed).toEqual({ ok: false, error: matching.any(Error) });
   });
 });

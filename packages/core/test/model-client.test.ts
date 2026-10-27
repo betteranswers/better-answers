@@ -28,6 +28,7 @@ import {
   setModelPrice,
 } from "../src/workspaces/index.ts";
 import { bootstrap, provisionedWorkspace } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import { answered, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
 
@@ -1127,22 +1128,22 @@ const choosing = (workspaceId: string, provider: string, model = SONNET, purpose
   });
 
 const choicesOf = async (workspaceId: string) =>
-  (
+  rowsFrom(
     await db().pool.query(
       `SELECT purpose, provider, model, retention_tail AS "retentionTail"
          FROM model_choice WHERE workspace_id = $1 ORDER BY purpose`,
       [workspaceId],
-    )
-  ).rows;
+    ),
+  );
 
 const choiceEventsOf = async (workspaceId: string) =>
-  (
+  rowsFrom(
     await db().pool.query(
       `SELECT actor, subject_id, detail FROM audit_event
         WHERE workspace_id = $1 AND action = 'platform.workspace.model_choice_set' ORDER BY at, id`,
       [workspaceId],
-    )
-  ).rows;
+    ),
+  );
 
 describe("setting a model choice", () => {
   it("stores and records a priced model of a sub-processor", async () => {

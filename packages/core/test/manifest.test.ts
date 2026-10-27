@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { head, PLATFORM_BOT } from "@better-answers/core/store/git";
 import { ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import {
   writeConcept,
@@ -90,8 +91,8 @@ describe("the manifest, the bundle's first commit", () => {
 
     expect(landed).toEqual({
       written: true,
-      sha: expect.any(String),
-      auditEventId: expect.any(String),
+      sha: matching.any(String),
+      auditEventId: matching.any(String),
     });
     if (!landed.written) throw new Error("unreachable: asserted above");
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([landed.sha]);

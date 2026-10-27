@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { ASK_CAPS, decisionJudgeCall } from "../src/answering/index.ts";
 import type { PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
@@ -24,6 +25,7 @@ import {
   decisionReplyTo,
 } from "./judge-wire.ts";
 import { bootstrap, provisionedWorkspace } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import { answered, postgresForSuite, seedingWith } from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
 
@@ -120,6 +122,8 @@ const seededIn = async (workspaceId: string, shapes: readonly SeededConcept[]) =
   for (const shape of shapes) await conceptSeeded(db(), workspaceId, shape);
 };
 
+const openCount = z.number();
+
 const spendOf = async (workspaceId: string) => {
   const reservations = await db().pool.query(
     "SELECT count(*)::integer AS open FROM spend_reservation WHERE workspace_id = $1",
@@ -129,7 +133,7 @@ const spendOf = async (workspaceId: string) => {
     "SELECT outcome, tokens_in, tokens_out, cost_gbp FROM llm_call WHERE workspace_id = $1",
     [workspaceId],
   );
-  return { open: reservations.rows[0]?.open, calls: calls.rows };
+  return { open: openCount.parse(rowsFrom(reservations)[0]?.["open"]), calls: rowsFrom(calls) };
 };
 
 const titlesOf = (concepts: readonly { readonly title: string }[]) =>

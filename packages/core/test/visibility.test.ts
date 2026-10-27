@@ -4,6 +4,7 @@ import type { z } from "zod";
 import { head } from "@better-answers/core/store/git";
 import { conceptIriOf, passageLocatorOf, ulid } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 import {
   connectedSourceIdTakenAgain,
   conceptIriTakenAgain,
@@ -32,6 +33,7 @@ import { withScope, type Folded, type Tx } from "../src/store/postgres/index.ts"
 import { plannedOn } from "./asking.ts";
 import { bundleHistory } from "./bundle.ts";
 import { bootstrap } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import {
   connectedSourceForGroups,
   connectedSourceHolding,
@@ -94,7 +96,7 @@ const passageVisibilityOf = async (workspaceId: string, sourceDocumentId: string
       WHERE workspace_id = $1 AND source_document_id = $2 ORDER BY ordinal`,
     [workspaceId, sourceDocumentId],
   );
-  return read.rows;
+  return rowsFrom(read);
 };
 
 const HOLIDAY = "Holiday is twenty-eight days including bank holidays.";
@@ -580,7 +582,7 @@ describe("what a re-write may not do to a concept's sensitivity", () => {
       reading(scenario.viewer, (viewer, tx) => footnotesOf(viewer, tx, writeUp));
     expect(await footnotes()).toEqual({
       ok: true,
-      value: [{ label: expect.any(String), iri: written.iri, title: written.title }],
+      value: [{ label: matching.any(String), iri: written.iri, title: written.title }],
     });
 
     const narrowed = await rewriteCiting(scenario, scenario.editor, written, [
@@ -1170,9 +1172,9 @@ describe("narrowing a connected source", () => {
         );
         await until(async () => (await countWaitingOnLocks(db().pool)) >= 2);
         expect(await statementsWaitingOnALock(db().pool)).toEqual(
-          expect.arrayContaining([
-            expect.stringContaining("UPDATE concept_index"),
-            expect.stringContaining("pg_advisory_xact_lock(hashtext('visibility-cascade')"),
+          matching.arrayContaining([
+            matching.stringContaining("UPDATE concept_index"),
+            matching.stringContaining("pg_advisory_xact_lock(hashtext('visibility-cascade')"),
           ]),
         );
         await release();
@@ -1617,7 +1619,7 @@ describe("narrowing documents", () => {
         ),
       action,
     );
-    expect(beside.waitingAt).toEqual([expect.stringContaining(waitingAt)]);
+    expect(beside.waitingAt).toEqual([matching.stringContaining(waitingAt)]);
     return beside.outcome;
   };
 
@@ -1650,7 +1652,7 @@ describe("narrowing documents", () => {
       () => rewriteCiting(scenario, scenario.admin, written, [handbook.documentId]),
     );
 
-    expect(rewritten).toEqual({ ok: true, value: expect.objectContaining({ iri: written.iri }) });
+    expect(rewritten).toEqual({ ok: true, value: matching.objectContaining({ iri: written.iri }) });
     expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
       bothAt({ sensitivity: "Restricted", ...EVERYONE }),
     );

@@ -13,6 +13,7 @@ import {
 import { openPostgres } from "../src/store/postgres/index.ts";
 import { setModelPrice, setSpendingLimit } from "../src/workspaces/index.ts";
 import { provisionedWorkspace } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import { answered, postgresForSuite, racedAt, readingAs, seedingWith } from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
 
@@ -109,7 +110,7 @@ const reservationsOf = async ({ asker }: Asker) => {
     "SELECT reserved_gbp, expires_at FROM spend_reservation WHERE workspace_id = $1",
     [asker.workspaceId],
   );
-  return read.rows;
+  return rowsFrom(read);
 };
 
 const callsOf = async ({ asker }: Asker) => {
@@ -118,7 +119,7 @@ const callsOf = async ({ asker }: Asker) => {
        FROM llm_call WHERE workspace_id = $1 ORDER BY tokens_in`,
     [asker.workspaceId],
   );
-  return read.rows;
+  return rowsFrom(read);
 };
 
 const spentAt = ({ asker, recordId }: Asker, calledAt: Date, costGbp: string) =>
@@ -339,7 +340,7 @@ describe("spend", () => {
       asking.asker.workspaceId,
     ]);
 
-    expect(Object.keys(read.rows[0] ?? {}).toSorted()).toEqual([
+    expect(Object.keys(rowsFrom(read)[0] ?? {}).toSorted()).toEqual([
       "answer_id",
       "called_at",
       "cost_gbp",

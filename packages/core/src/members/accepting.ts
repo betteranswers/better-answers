@@ -93,7 +93,7 @@ const invitationHeld = async (
       ${LOCKING[locking]}`,
     [invitationId],
   );
-  const [row] = found.rows;
+  const row: unknown = found.rows[0];
   return row === undefined ? undefined : HELD_INVITATION.parse(row);
 };
 
@@ -109,7 +109,7 @@ const inviteeOf = async (
        FROM "user" u WHERE u.id = $1`,
     [personId, workspaceId],
   );
-  const [row] = found.rows;
+  const row: unknown = found.rows[0];
   return row === undefined ? undefined : INVITEE.parse(row);
 };
 

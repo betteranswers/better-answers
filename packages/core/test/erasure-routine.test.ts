@@ -17,6 +17,7 @@ import {
   type Tx,
 } from "@better-answers/core/store/postgres";
 import { boundarySchemas, IDENTITY_SET, ulid, type ConceptIri } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import {
   completeRecord,
@@ -88,6 +89,7 @@ import {
   questionRowsOf,
   recordAskedBy,
 } from "./question-rows.ts";
+import { rowsFrom } from "./rows.ts";
 import { auditEventRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import {
@@ -582,7 +584,7 @@ const secondFactorHeldBy = async (userId: string, passkeyId: string) => {
        FROM "user" u WHERE u.id = $1`,
     [userId, passkeyId],
   );
-  return read.rows[0];
+  return rowsFrom(read)[0];
 };
 
 const SECOND_FACTOR_HELD = {
@@ -1410,13 +1412,13 @@ const approvedRequestOf = async (scenario: Scenario, requesterId: string) => {
 };
 
 const accessRequestsOf = async (requesterId: string) =>
-  (
+  rowsFrom(
     await db().pool.query(
       `SELECT id, workspace_id, reason, invitation_id FROM access_request
         WHERE requester_id = $1`,
       [requesterId],
-    )
-  ).rows;
+    ),
+  );
 
 describe("the identity set on the person's last workspace", () => {
   it("pseudonymises the user row, keeping its id for audit events", async () => {
@@ -1545,7 +1547,7 @@ describe("the identity set on the person's last workspace", () => {
     });
     expect(await lastActiveWorkspacesOf(person.id)).toEqual([]);
     expect(operatorLinesAbout(done.erasureRequestId)).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         passkeys_deleted: 1,
         authenticators_deleted: 1,
         recovery_codes_deleted: 2,
@@ -1567,7 +1569,7 @@ describe("the identity set on the person's last workspace", () => {
     expect(await secondFactorHeldBy(person.id, held.passkeyId)).toEqual(SECOND_FACTOR_HELD);
     expect(await lastActiveWorkspacesOf(person.id)).toEqual([elsewhere.workspaceId]);
     expect(operatorLinesAbout(done.erasureRequestId)).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         arm: "held-elsewhere",
         passkeys_deleted: 0,
         last_active_deleted: 1,
@@ -3351,7 +3353,7 @@ describe("a commit made as the person while the routine runs", () => {
 
     expect(written).toMatchObject({
       ok: false,
-      error: { message: expect.stringContaining("ran past its 500 ms budget") },
+      error: { message: matching.stringContaining("ran past its 500 ms budget") },
     });
     expect(freeWhileGitHangs).toBe(true);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);

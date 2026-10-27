@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import type { Result, Role, UserPrincipal } from "../src/kernel/index.ts";
 import {
   changeRole,
@@ -18,6 +20,7 @@ import { inputOf } from "./suite-input.ts";
 import {
   answered,
   isBlockedOnTable,
+  overriding,
   postgresForSuite,
   readingAs,
   seedingWith,
@@ -112,12 +115,12 @@ describe("the audit log's export", () => {
 
     expect(linesOf(file)).toEqual([
       `"Time","Family","Action","Actor","Subject","Detail"`,
-      expect.stringMatching(
+      matching.stringMatching(
         new RegExp(
           String.raw`^"${ISO_INSTANT}","people","people\.group\.created","Hannah Wright","Bid writers",""$`,
         ),
       ),
-      expect.stringMatching(
+      matching.stringMatching(
         new RegExp(
           String.raw`^"${ISO_INSTANT}","platform","platform\.workspace\.provisioned","the platform",` +
             `"workspace ${workspace.workspaceId}","role: Admin; adminUserId: ${workspace.adminUserId}"$`,
@@ -136,7 +139,7 @@ describe("the audit log's export", () => {
       await exportAs(workspace, workspace.adminUserId, { family: "people", search: "site" }),
     );
 
-    expect(linesOf(file).slice(1)).toEqual([expect.stringContaining('"Site team"')]);
+    expect(linesOf(file).slice(1)).toEqual([matching.stringContaining('"Site team"')]);
     expect(file.count).toBe(1);
   });
 
@@ -391,7 +394,7 @@ const doorWith = (
     await before(opened);
     return pool.connect();
   };
-  return { pool: Object.assign(Object.create(pool), { connect }) };
+  return { pool: overriding(pool, { connect }) };
 };
 
 const exportThrough = async (workspace: ProvisionedWorkspace, door: PostgresDoor) =>
@@ -407,7 +410,7 @@ describe("an export under way", () => {
       if (opened === failing) throw new Error("the store is gone");
     });
 
-    expect(await exportThrough(workspace, door)).toEqual({ ok: false, error: expect.any(Error) });
+    expect(await exportThrough(workspace, door)).toEqual({ ok: false, error: matching.any(Error) });
     expect(await exportEvents(workspace)).toEqual([]);
   });
 

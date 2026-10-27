@@ -156,7 +156,7 @@ const readAcross = async (
     readingThrough(
       principal,
       new Proxy(tx, {
-        get: (target, key) =>
+        get: (target, key): unknown =>
           key === "query"
             ? async (statement: string, values?: unknown[]) => {
                 const rows = await target.query(statement, values);
@@ -179,7 +179,7 @@ const readFailingAt = (reader: UserPrincipal, iri: ConceptIri, marker: string, f
     readingThrough(
       principal,
       new Proxy(tx, {
-        get: (target, key) =>
+        get: (target, key): unknown =>
           key === "query"
             ? (statement: string, values?: unknown[]) =>
                 statement.includes(marker)

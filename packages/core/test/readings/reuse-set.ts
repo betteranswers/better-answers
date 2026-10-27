@@ -29,6 +29,7 @@ import { asked, conceptSeeded, SUITE_ENVELOPE_KEY, type Told } from "../asking.t
 import { inMs, percentile, recordFigures, type Figure } from "../figures.ts";
 import { bootstrap, provisionedWorkspace } from "../platform.ts";
 import { readAs } from "../recall.ts";
+import { rowsFrom } from "../rows.ts";
 import { answered, seedingWith } from "../suite-postgres.ts";
 import { principalFor } from "../workspace-with-bundle.ts";
 
@@ -209,7 +210,7 @@ const recordedConcepts = z.array(
 
 const verdictsIn = async (db: MigratedPostgres, recordId: string) => {
   const read = await db.pool.query("SELECT concepts FROM question_asked WHERE id = $1", [recordId]);
-  const concepts = recordedConcepts.parse(read.rows[0]?.concepts);
+  const concepts = recordedConcepts.parse(rowsFrom(read)[0]?.["concepts"]);
   return new Map(concepts.map(({ iri, judged }) => [iri, judged]));
 };
 

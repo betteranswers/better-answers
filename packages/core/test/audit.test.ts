@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { FAMILIES, ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import {
   action,
@@ -31,6 +32,7 @@ import {
 } from "../src/store/postgres/index.ts";
 import { loadEveryEntryPoint } from "./entry-points.ts";
 import { asANewOperator, bootstrap, principalOf, provisionedWorkspace } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import { coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
@@ -483,7 +485,7 @@ describe("the first door — record, the actor from the Principal", () => {
     const { id } = await closing("no-fault-in-the-knowledge");
 
     expect(await rowById(id)).toEqual(
-      expect.objectContaining({ detail: { closedAs: "no-fault-in-the-knowledge" } }),
+      matching.objectContaining({ detail: { closedAs: "no-fault-in-the-knowledge" } }),
     );
     await expect(closing("fixed")).rejects.toThrow(/closedAs is not a flagClosing$/);
   });
@@ -544,8 +546,8 @@ describe("the first door — record, the actor from the Principal", () => {
         detail: { confirmed: true },
       }),
     ).rejects.toMatchObject({
-      message: expect.stringContaining("refused at the boundary"),
-      cause: expect.objectContaining({ issues: expect.any(Array) }),
+      message: matching.stringContaining("refused at the boundary"),
+      cause: matching.objectContaining({ issues: matching.any(Array) }),
     });
   });
 });
@@ -586,7 +588,7 @@ const identityRowById = async (id: string) => {
     "SELECT action, family, actor, subject_kind, subject_id, detail, batch_id FROM identity_audit_event WHERE id = $1",
     [id],
   );
-  return found.rows[0];
+  return rowsFrom(found)[0];
 };
 
 describe("the identity-set audit log, reached through either door", () => {

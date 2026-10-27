@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { head } from "@better-answers/core/store/git";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import {
   submitSuggestionSet,
@@ -124,7 +125,7 @@ describe("Waiting on you", () => {
         suggestionId,
         title: "Expenses",
         proposer,
-        proposedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+        proposedAt: matching.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
         target: standing.iri,
         collection: "policy",
         owner,
@@ -156,7 +157,7 @@ describe("Waiting on you", () => {
       unowned: await waitingFor(scenario.unowned),
     }).toEqual({
       admin: [
-        expect.objectContaining({
+        matching.objectContaining({
           suggestionId,
           owner: null,
           collection: "unowned",
@@ -212,7 +213,7 @@ describe("Waiting on you", () => {
     });
 
     expect(await waitingFor(scenario.editor)).toEqual([
-      expect.objectContaining({ suggestionId, collection: "policy" }),
+      matching.objectContaining({ suggestionId, collection: "policy" }),
     ]);
   });
 
@@ -227,7 +228,7 @@ describe("Waiting on you", () => {
     const opened = answered(await openedBy(scenario.editor, suggestionId));
 
     expect(opened).toEqual({
-      item: expect.objectContaining({ suggestionId, target: standing.written.iri }),
+      item: matching.objectContaining({ suggestionId, target: standing.written.iri }),
       current: {
         title: "Expenses",
         body: "Expenses are claimed within thirty days.",
@@ -294,7 +295,7 @@ describe("Waiting on you", () => {
     const opened = answered(await openedBy(scenario.editor, suggestionId));
 
     expect(items).toEqual([
-      expect.objectContaining({ suggestionId, target: null, collection: "policy", places: 0 }),
+      matching.objectContaining({ suggestionId, target: null, collection: "policy", places: 0 }),
     ]);
     expect(opened.current).toBeNull();
   });

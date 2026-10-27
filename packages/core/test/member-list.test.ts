@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import type { Result, Role } from "../src/kernel/index.ts";
 import { listMembers } from "../src/members/index.ts";
@@ -90,10 +91,10 @@ describe("the member list", () => {
         {
           personId: workspace.adminUserId,
           displayName: "Test person",
-          address: expect.any(String),
+          address: matching.any(String),
           role: "Admin",
           groups: [],
-          joinedAt: expect.stringMatching(ISO_INSTANT),
+          joinedAt: matching.stringMatching(ISO_INSTANT),
           credentialsRevokedAt: null,
         },
       ],
@@ -167,7 +168,7 @@ describe("the member list", () => {
       }),
     ).rejects.toThrow(/did not commit/);
 
-    expect(listed).toEqual({ ok: false, error: expect.any(Error) });
+    expect(listed).toEqual({ ok: false, error: matching.any(Error) });
   });
 
   it("never lists a member of another workspace", async () => {

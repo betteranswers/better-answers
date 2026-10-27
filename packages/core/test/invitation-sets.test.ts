@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { parse, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import {
@@ -103,7 +104,7 @@ describe("inviting several addresses at once", () => {
 
     const sent = answeredValue(await sending(workspace, [ana.toUpperCase(), ana], "Viewer"));
 
-    expect(sent).toEqual([expect.objectContaining({ address: ana, replaced: false })]);
+    expect(sent).toEqual([matching.objectContaining({ address: ana, replaced: false })]);
     expect(await statusesOf(workspace)).toEqual([[ana, "pending"]]);
     expect(await emailsCountedTo(workspace, ana)).toBe(1);
   });
@@ -148,19 +149,19 @@ describe("inviting several addresses at once", () => {
     const batch = events[0]?.batch_id;
     expect(batch).toMatch(ULID);
     expect(events).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         action: "people.invitation.created",
         subject_id: toBen,
         detail: { role: "Editor" },
         batch_id: batch,
       }),
-      expect.objectContaining({
+      matching.objectContaining({
         action: "people.invitation.created",
         subject_id: toAna,
         detail: { role: "Editor" },
         batch_id: batch,
       }),
-      expect.objectContaining({
+      matching.objectContaining({
         action: "people.invitation.cancelled",
         subject_id: first.invitationId,
         detail: { replacedByInvitationId: toAna },
@@ -258,7 +259,7 @@ describe("inviting several addresses at once", () => {
     });
     expect(shapeOf(sent[0])).toEqual(shapeOf(sent[1]));
     expect(await statusesOf(workspace)).toEqual(
-      expect.arrayContaining([
+      matching.arrayContaining([
         [known.email, "pending"],
         [unknown, "pending"],
       ]),
@@ -273,7 +274,7 @@ describe("inviting several addresses at once", () => {
 
     const sent = answeredValue(await sending(workspace, [ana], "Editor"));
 
-    expect(sent).toEqual([expect.objectContaining({ replaced: false })]);
+    expect(sent).toEqual([matching.objectContaining({ replaced: false })]);
     expect((await invitationsOf(elsewhere)).map((row) => [row.id, row.status])).toEqual([
       [theirs.invitationId, "pending"],
     ]);
@@ -813,7 +814,7 @@ describe.each(EACH_SET_ACTION)("a set action to %s whose event fails", (_verb, a
       ),
     );
 
-    expect(failed).toEqual({ ok: false, error: expect.any(Error) });
+    expect(failed).toEqual({ ok: false, error: matching.any(Error) });
     expect(await invitationsOf(workspace)).toEqual(before);
     expect(await emailsCountedTo(workspace, ana)).toBe(1);
   });

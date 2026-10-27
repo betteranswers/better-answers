@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import type { OperatorPrincipal, PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
@@ -17,6 +18,7 @@ import {
   provisionedWorkspace,
   seedPerson,
 } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import { inputOf } from "./suite-input.ts";
 import { postgresForSuite, whileWritesAreRefused } from "./suite-postgres.ts";
 
@@ -82,7 +84,7 @@ const identitySetRowsFor = async (personId: string) => {
        FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id`,
     [personId],
   );
-  return found.rows;
+  return rowsFrom(found);
 };
 
 const rowsAnywhereCarrying = async (text: string): Promise<number> => {
@@ -175,7 +177,7 @@ describe("setting one's own display name", () => {
 
     expect(await identitySetRowsFor(adminUserId)).toEqual([
       {
-        id: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+        id: matching.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
         action: "people.person.named",
         family: "people",
         actor: `human:${adminUserId}`,
@@ -212,7 +214,7 @@ describe("setting one's own display name", () => {
       setDisplayName(bootstrap, door, { personId, displayName: "Priya Shah" }),
     );
 
-    expect(set).toMatchObject({ ok: false, error: expect.any(Error) });
+    expect(set).toMatchObject({ ok: false, error: matching.any(Error) });
     expect(await displayNameHeld(personId)).toBe("");
   });
 });
@@ -237,7 +239,7 @@ describe("correcting a display name, as the operator", () => {
     expect(await displayNameHeld(personId)).toBe("Priya Shah");
     expect(await identitySetRowsFor(personId)).toEqual([
       {
-        id: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+        id: matching.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
         action: "people.person.renamed",
         family: "people",
         actor: `human:${operatorId}`,
@@ -266,7 +268,7 @@ describe("correcting a display name, as the operator", () => {
     const { answered } = await correcting({ personId, displayName: "Priya Shah" });
 
     expect(answered).toMatchObject({ ok: true, value: { ok: true } });
-    expect((await identitySetRowsFor(personId)).map((row) => row.action)).toEqual([
+    expect((await identitySetRowsFor(personId)).map((row) => row["action"])).toEqual([
       "people.person.renamed",
     ]);
   });

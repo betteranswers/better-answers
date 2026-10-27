@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import {
   acknowledgeRecoveryCodes,
   replaceRecoveryCodes,
@@ -200,7 +202,7 @@ describe("each recovery-code action", () => {
       replaceRecoveryCodes(bootstrap, door(), { personId, replacing: false, now: MADE_AT }),
     );
 
-    expect(answered).toEqual({ ok: false, error: expect.any(Error) });
+    expect(answered).toEqual({ ok: false, error: matching.any(Error) });
   });
 
   it("answers the store's failure when spending", async () => {
@@ -211,7 +213,7 @@ describe("each recovery-code action", () => {
       spending(personId, code),
     );
 
-    expect(answered).toEqual({ ok: false, error: expect.any(Error) });
+    expect(answered).toEqual({ ok: false, error: matching.any(Error) });
   });
 
   it("answers the store's failure when acknowledging", async () => {
@@ -222,7 +224,7 @@ describe("each recovery-code action", () => {
       acknowledgeRecoveryCodes(bootstrap, door(), { personId, madeAt }),
     );
 
-    expect(answered).toEqual({ ok: false, error: expect.any(Error) });
+    expect(answered).toEqual({ ok: false, error: matching.any(Error) });
   });
 });
 

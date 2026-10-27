@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
 import { REASONS_EMPTYING_THE_CONNECTED_SOURCE } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
 import { parse, type UserPrincipal } from "../src/kernel/index.ts";
@@ -630,8 +631,8 @@ describe("the review read of a connected source's findings", () => {
     });
 
     expect(read.ok ? undefined : read.error).toEqual(
-      expect.objectContaining({
-        message: expect.stringContaining("current transaction is aborted"),
+      matching.objectContaining({
+        message: matching.stringContaining("current transaction is aborted"),
       }),
     );
   });
@@ -693,8 +694,8 @@ describe("an Admin keeping named groups of findings in the text", () => {
       value: {
         connectedSourceId,
         documentIds: [first.documentId, second.documentId].toSorted(),
-        batchId: expect.any(String),
-        jobId: expect.any(String),
+        batchId: matching.any(String),
+        jobId: matching.any(String),
       },
     });
     expect(await restoreOf(scenario.workspaceId, kept)).toEqual({

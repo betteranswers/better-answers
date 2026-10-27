@@ -138,13 +138,26 @@ export const until = async (condition: () => Promise<boolean>): Promise<void> =>
   throw new Error("the condition never held");
 };
 
+/** The target as it is, but with each named member replaced; unlike `Object.create`, nothing is `any`. */
+export const overriding = <T extends object>(
+  target: T,
+  replacements: Readonly<Record<string, unknown>>,
+): T =>
+  new Proxy(target, {
+    get: (held, key): unknown => {
+      if (typeof key === "string" && Object.hasOwn(replacements, key)) return replacements[key];
+      const value: unknown = Reflect.get(held, key);
+      return typeof value === "function" ? value.bind(held) : value;
+    },
+  });
+
 /**
  * Postgres can hand a row to a new FOR SHARE read before a woken UPDATE or DELETE, so connect
  * waits for that change.
  */
 export const lendingOnceSettled = (pool: pg.Pool, settled: () => Promise<unknown>): pg.Pool =>
   new Proxy(pool, {
-    get: (target, key) => {
+    get: (target, key): unknown => {
       if (key === "connect") {
         return async () => {
           await settled();

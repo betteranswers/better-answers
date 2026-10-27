@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { attempt, type Result, type Role, type UserPrincipal } from "../src/kernel/index.ts";
 import {
@@ -126,7 +127,7 @@ describe("asking to join a workspace", () => {
     const rows = await requestRows(workspace.id);
     expect(rows).toEqual([
       {
-        id: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+        id: matching.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
         requester_id: requester,
         reason: "I have joined the bids team and need the answer library.",
         status: "waiting",
@@ -228,7 +229,7 @@ describe("asking to join a workspace", () => {
       }),
     );
 
-    expect(asked).toEqual({ ok: false, error: expect.any(Error) });
+    expect(asked).toEqual({ ok: false, error: matching.any(Error) });
     expect(await requestRows(workspace.id)).toEqual([]);
 
     const events = await db().pool.query("SELECT 1 FROM audit_event WHERE actor = $1", [
@@ -254,7 +255,7 @@ describe("approving a request", () => {
       ok: true,
       value: {
         requestId,
-        invitationId: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+        invitationId: matching.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
         address: "priya.shah@calder.example",
         role: "Editor",
         invitedAt: "2031-06-15T09:30:00.000Z",
@@ -375,7 +376,7 @@ describe("approving a request", () => {
       ),
     ).rejects.toThrow(/did not commit/);
 
-    expect(approved).toEqual({ ok: false, error: expect.any(Error) });
+    expect(approved).toEqual({ ok: false, error: matching.any(Error) });
     expect(await requestRows(workspace.id)).toMatchObject([{ status: "waiting" }]);
   });
 });
@@ -420,7 +421,7 @@ describe("what a decision refuses and what it passes on", () => {
         ),
       ).rejects.toThrow(/did not commit/);
 
-      expect(decided).toEqual({ ok: false, error: expect.any(Error) });
+      expect(decided).toEqual({ ok: false, error: matching.any(Error) });
       expect(await requestRows(workspace.id)).toMatchObject([{ status: "waiting" }]);
       expect((await eventsAbout(requestId)).map((event) => event.action)).toEqual([
         "people.request.asked",
@@ -488,7 +489,7 @@ describe("declining a request", () => {
       ),
     ).rejects.toThrow(/did not commit/);
 
-    expect(declined).toMatchObject({ ok: false, error: expect.any(Error) });
+    expect(declined).toMatchObject({ ok: false, error: matching.any(Error) });
     expect(await requestRows(workspace.id)).toMatchObject([{ status: "waiting" }]);
   });
 });
@@ -536,7 +537,7 @@ describe("the Admin's queue", () => {
           id: rows[1]?.id,
           requester: { id: second, name: person.rows[0]?.name, email: person.rows[0]?.email },
           reason: "I run the framework renewals.",
-          askedAt: expect.any(Date),
+          askedAt: matching.any(Date),
         },
       ],
     });
@@ -553,7 +554,7 @@ describe("the Admin's queue", () => {
       }),
     ).rejects.toThrow(/did not commit/);
 
-    expect(listed).toEqual({ ok: false, error: expect.any(Error) });
+    expect(listed).toEqual({ ok: false, error: matching.any(Error) });
     expect(listed?.ok === false ? String(listed.error) : "").toContain(
       "current transaction is aborted",
     );
@@ -571,7 +572,7 @@ describe("the Admin's queue", () => {
       listWaitingRequests(principal, tx),
     );
 
-    expect(listed).toEqual({ ok: false, error: expect.any(Error) });
+    expect(listed).toEqual({ ok: false, error: matching.any(Error) });
   });
 });
 

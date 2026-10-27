@@ -2,6 +2,7 @@ import {
   citedSourceOf,
   citedSourcesOf,
   ids,
+  isList,
   LINKS_TO_LABEL,
   MAP_EDGE_LABELS,
   ULID_CHARACTERS,
@@ -196,7 +197,7 @@ export const resolvedSourcesOf = async (
 ): Promise<Result<readonly Resolved[], Error>> => {
   const sources = frontmatter["sources"];
   const resolved: Resolved[] = [];
-  for (const entry of Array.isArray(sources) ? sources : []) {
+  for (const entry of isList(sources) ? sources : []) {
     const one = await resolvedOf(doors, entry);
     if (!one.ok) return err(one.error);
     // Stryker disable next-line ConditionalExpression: the insert boundary refuses an entry naming no resource, so none is undefined here; hides → false, killed in answering.test.ts

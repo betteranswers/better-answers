@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import type { Role, UserPrincipal } from "../src/kernel/index.ts";
 import {
   endEverySignInAndTokenHere,
@@ -210,7 +212,7 @@ describe("what ending a member's sign-ins and tokens refuses", () => {
       revokedBy(workspace, workspace.adminUserId, viewer),
     );
 
-    expect(failed).toEqual({ ok: false, error: expect.any(Error) });
+    expect(failed).toEqual({ ok: false, error: matching.any(Error) });
     expect(await instantHeld(workspace, viewer)).toBeNull();
     const held = await db().pool.query<{ revoked: Date | null }>(
       "SELECT revoked FROM oauth_refresh_token WHERE id = $1",

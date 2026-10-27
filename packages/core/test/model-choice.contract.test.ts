@@ -5,6 +5,7 @@ import { llmPurpose } from "@better-answers/schema";
 import { testData, withRollback } from "@better-answers/schema/testing";
 
 import { contractFixture } from "./contract-fixture.ts";
+import { rowsFrom } from "./rows.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
 const purpose = z.enum(llmPurpose.enumValues);
@@ -57,7 +58,10 @@ describe("the model-choice agreement", () => {
         const resolved = await client.query("SELECT id FROM model_choice_for($1::llm_purpose)", [
           call.purpose,
         ]);
-        const modelChoiceId: string | null = resolved.rows[0]?.id ?? null;
+        const modelChoiceId = z
+          .string()
+          .nullable()
+          .parse(rowsFrom(resolved)[0]?.["id"] ?? null);
         expect({ ...call, resolved: modelChoiceId }).toEqual({
           ...call,
           resolved: call.expect_model_choice_id,

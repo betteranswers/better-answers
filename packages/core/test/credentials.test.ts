@@ -9,6 +9,7 @@ import { openCredentials, openModelKeySetting, type Credentials } from "../src/l
 import { openPostgres, withIdentityRead, withScope } from "../src/store/postgres/index.ts";
 import { setModelKey } from "../src/workspaces/index.ts";
 import { bootstrap } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import { postgresForSuite, seedingWith, whileWritesAreRefused } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -69,7 +70,7 @@ const eventsOf = async (workspaceId: string) => {
        FROM audit_event WHERE workspace_id = $1 ORDER BY at, id`,
     [workspaceId],
   );
-  return audited.rows;
+  return rowsFrom(audited);
 };
 
 const shown = (value: unknown): string =>
@@ -268,7 +269,7 @@ describe("a workspace's model key", () => {
 
     expect(await rowsOf(workspaceId)).toHaveLength(1);
     expect(await revealedIn(workspaceId)).toBe(A_NEWER_KEY);
-    expect((await eventsOf(workspaceId)).map((event) => event.action)).toEqual([
+    expect((await eventsOf(workspaceId)).map((event) => event["action"])).toEqual([
       "platform.workspace.model_key_set",
       "platform.workspace.model_key_set",
     ]);

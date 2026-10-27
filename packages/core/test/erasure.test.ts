@@ -13,6 +13,7 @@ import {
   type SubjectRequestRecorded,
 } from "../src/erasure/index.ts";
 import type { PrincipalRefusal, Result, UserPrincipal } from "../src/kernel/index.ts";
+import { rowsFrom } from "./rows.ts";
 import { auditEventRowsOf } from "./sourced-concept.ts";
 import { readingAs, seedingWith, whileWritesAreRefused } from "./suite-postgres.ts";
 import { suiteWithBundles } from "./workspace-with-bundle.ts";
@@ -60,7 +61,7 @@ const requestRowsIn = async (workspaceId: string) => {
        FROM subject_request WHERE workspace_id = $1 ORDER BY id`,
     [workspaceId],
   );
-  return read.rows;
+  return rowsFrom(read);
 };
 
 const personWithALogin = (): Promise<string> =>

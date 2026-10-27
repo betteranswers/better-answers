@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { citedSourcesOf, resolvedResource } from "@better-answers/schema";
+import { citedSourcesOf, isList, resolvedResource } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { err, ok, type Result } from "../kernel/index.ts";
@@ -61,10 +61,10 @@ const canonicalOver = (frontmatter: Frontmatter, sources: readonly HashedSource[
 };
 
 const canonicalText = (value: FrontmatterValue | undefined): string =>
-  Array.isArray(value)
+  isList(value)
     ? `[${value
         .map((item) =>
-          typeof item === "object" && item !== null
+          typeof item === "object"
             ? `{${Object.keys(item)
                 .toSorted(byCodeUnit)
                 .map((key) => `${JSON.stringify(key)}:${JSON.stringify(item[key])}`)
@@ -94,12 +94,10 @@ const yamlEntry = (entry: FrontmatterSource): string =>
     .join("\n");
 
 const yamlValue = (value: FrontmatterValue): string => {
-  if (!Array.isArray(value)) return ` ${JSON.stringify(value)}`;
+  if (!isList(value)) return ` ${JSON.stringify(value)}`;
   if (value.length === 0) return " []";
   return `\n${value
-    .map((item) =>
-      typeof item === "object" && item !== null ? yamlEntry(item) : `  - ${JSON.stringify(item)}`,
-    )
+    .map((item) => (typeof item === "object" ? yamlEntry(item) : `  - ${JSON.stringify(item)}`))
     .join("\n")}`;
 };
 

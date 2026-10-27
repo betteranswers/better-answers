@@ -88,7 +88,7 @@ const flagging = async (
 ): Promise<Result<NameFlagged, MemberRefusal<"no-such-member">>> => {
   const { workspaceId } = admin;
   await holdTheNameOf(tx, personId);
-  const found = (await tx.query(FLAGGED_PERSON, [workspaceId, personId])).rows[0];
+  const found: unknown = (await tx.query(FLAGGED_PERSON, [workspaceId, personId])).rows[0];
   if (found === undefined) return err("no-such-member");
   const person = FLAGGED_ROW.parse(found);
 

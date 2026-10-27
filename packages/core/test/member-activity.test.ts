@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import type { Result, Role, UserPrincipal } from "../src/kernel/index.ts";
 import {
@@ -166,13 +167,13 @@ describe("a person's activity", () => {
     };
     expect(onHannahs).toEqual({
       events: [
-        expect.objectContaining({ ...theChange, direction: "by" }),
-        expect.objectContaining({ action: "platform.workspace.provisioned", direction: "to" }),
+        matching.objectContaining({ ...theChange, direction: "by" }),
+        matching.objectContaining({ action: "platform.workspace.provisioned", direction: "to" }),
       ],
       nextCursor: null,
     });
     expect(onPriyas).toEqual({
-      events: [expect.objectContaining({ ...theChange, direction: "to" })],
+      events: [matching.objectContaining({ ...theChange, direction: "to" })],
       nextCursor: null,
     });
     expect(onPriyas.events[0]?.id).toBe(onHannahs.events[0]?.id);
@@ -475,7 +476,7 @@ describe("who may read a person's activity", () => {
 
     expect(await readAfterTheStoreFailed(workspace, workspace.adminUserId)).toEqual({
       ok: false,
-      error: expect.any(Error),
+      error: matching.any(Error),
     });
   });
 });
@@ -509,7 +510,7 @@ const planOfTheRead = (workspace: ProvisionedWorkspace, priya: string) =>
     async (principal, tx) => {
       const sent: { statement: string; values: unknown[] | undefined }[] = [];
       const spied = new Proxy(tx, {
-        get: (target, key) =>
+        get: (target, key): unknown =>
           key === "query"
             ? (statement: string, values?: unknown[]) => {
                 sent.push({ statement, values });

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import type { OperatorPrincipal } from "../src/kernel/index.ts";
 import {
@@ -219,8 +220,8 @@ describe("the operator's list of people", () => {
       await listPeople(operator, closed, { search: "", offset: 0, limit: 50 }),
       await inspectPerson(operator, closed, { personId: personIdOf(ulid()) }),
     ]).toEqual([
-      { ok: false, error: expect.any(Error) },
-      { ok: false, error: expect.any(Error) },
+      { ok: false, error: matching.any(Error) },
+      { ok: false, error: matching.any(Error) },
     ]);
   });
 });

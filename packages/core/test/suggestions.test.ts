@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { conceptIriOf, ulid, type ConceptIri } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { open } from "../src/answering/index.ts";
 import {
@@ -337,7 +338,7 @@ describe("a suggestion set", () => {
       }),
     ).rejects.toThrow(/did not commit/);
 
-    expect(read).toEqual({ ok: false, error: expect.any(Error) });
+    expect(read).toEqual({ ok: false, error: matching.any(Error) });
   });
 
   it("is invisible to another workspace, whoever asks for it", async () => {
@@ -841,7 +842,7 @@ describe("declining a suggestion", () => {
     expect(await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.declined")).toEqual([]);
   });
 
-  const anError: unknown = expect.any(Error);
+  const anError: unknown = matching.any(Error);
   it.each([
     [
       "the store failing under it",
@@ -1190,7 +1191,7 @@ describe("an acceptance whose ground moved under its own lock", () => {
     });
 
     const outcome = outcomes[0]?.outcome;
-    expect(outcome).toEqual({ ok: false, error: expect.any(Error) });
+    expect(outcome).toEqual({ ok: false, error: matching.any(Error) });
     expect(outcome?.ok === false && String(outcome.error)).toContain(
       "decided by somebody else while this action was in flight",
     );
@@ -1213,7 +1214,7 @@ describe("what an acceptance answers when it cannot be prepared", () => {
       { decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }] },
     );
 
-    expect(accepted.ok === true && accepted.value.map(refusalOf)).toEqual([expect.any(Error)]);
+    expect(accepted.ok === true && accepted.value.map(refusalOf)).toEqual([matching.any(Error)]);
     expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
   });
 
@@ -1626,7 +1627,7 @@ describe("what a suggestion set refuses before it does any work", () => {
       { kind: "edit", requests: [requestFor()] },
     );
 
-    expect(set).toEqual({ ok: false, error: expect.any(Error) });
+    expect(set).toEqual({ ok: false, error: matching.any(Error) });
   });
 
   it("refuses a submitter whose credentials ended, and queues nothing", async () => {

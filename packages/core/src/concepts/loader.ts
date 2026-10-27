@@ -5,6 +5,7 @@ import {
   boundarySchemas,
   bundleManifest,
   CONCEPT_PATH,
+  isList,
   recordKeepingEveryKey,
   resolvedResource,
   VERIFICATION_IMPORTED_ORIGIN,
@@ -168,7 +169,7 @@ const verifiedEventsOf = (
 ): Result<readonly VerifiedEvent[], Unsound> => {
   const verified = frontmatter["verified"];
   if (verified === undefined) return ok([]);
-  if (!Array.isArray(verified)) return err(unsound(file, "does-not-parse", "verified"));
+  if (!isList(verified)) return err(unsound(file, "does-not-parse", "verified"));
   const events: VerifiedEvent[] = [];
   for (const [index, entry] of verified.entries()) {
     const event = verifiedEventOf(file, entry, index);
@@ -224,8 +225,8 @@ export const rewriteLinks = (
 
 const entryLabelOf = (frontmatter: Frontmatter): string => {
   const sources = frontmatter["sources"];
-  const first = Array.isArray(sources) ? sources[0] : undefined;
-  if (typeof first !== "object" || first === null) return "the bundle";
+  const first = isList(sources) ? sources[0] : undefined;
+  if (typeof first !== "object") return "the bundle";
   const title = first["title"];
   if (typeof title === "string" && title.trim() !== "") return title;
   const id = first["id"];

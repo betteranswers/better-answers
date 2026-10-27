@@ -43,7 +43,22 @@ export const refusalsIn = (catalogue: Catalogue): readonly CataloguedRefusal[] =
   return [...held.values()];
 };
 
+const classesEvery = <C extends Catalogue>(
+  classes: Readonly<Record<string, RefusalClass>>,
+  catalogue: C,
+): classes is Readonly<Record<WordIn<C>, RefusalClass>> =>
+  Object.values(catalogue).every((vocabulary) =>
+    Object.keys(vocabulary).every((word) => Object.hasOwn(classes, word)),
+  );
+
 export const classesIn = <const C extends Catalogue>(
   catalogue: C,
-): Readonly<Record<WordIn<C>, RefusalClass>> =>
-  Object.assign({}, ...refusalsIn(catalogue).map(({ word, class: held }) => ({ [word]: held })));
+): Readonly<Record<WordIn<C>, RefusalClass>> => {
+  const classes = Object.fromEntries(
+    refusalsIn(catalogue).map(({ word, class: held }) => [word, held] as const),
+  );
+  if (!classesEvery(classes, catalogue)) {
+    throw new Error("refusal: a catalogued word has no class");
+  }
+  return classes;
+};

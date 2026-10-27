@@ -5,7 +5,7 @@ import type { RecordMapState } from "@better-answers/schema";
 import { ANSWER_MEASURES, unmappedPassageRate } from "../src/answering/index.ts";
 import type { PostgresDoor } from "../src/store/postgres/index.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
-import { postgresForSuite, seedingWith } from "./suite-postgres.ts";
+import { overriding, postgresForSuite, seedingWith } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
@@ -59,9 +59,9 @@ const doorKeepingStatements = (workspace: ProvisionedWorkspace) => {
       statements.push(text);
       return client.query(text, values);
     };
-    return Object.assign(Object.create(client), { query });
+    return overriding(client, { query });
   };
-  const door: PostgresDoor = { pool: Object.assign(Object.create(pool), { connect }) };
+  const door: PostgresDoor = { pool: overriding(pool, { connect }) };
   return { door, statements };
 };
 

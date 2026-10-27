@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import { openModelClient } from "../../src/llm/index.ts";
 import {
   clientAnswering,
@@ -173,11 +175,13 @@ describe("the reuse reading", () => {
       "low",
     );
 
-    expect(sent.map((body) => JSON.parse(body).output_config)).toEqual([
-      { format: expect.objectContaining({ type: "json_schema" }), effort: "low" },
+    expect(sent.map((body) => sentBody.parse(JSON.parse(body)).output_config)).toEqual([
+      { format: matching.objectContaining({ type: "json_schema" }), effort: "low" },
     ]);
   }, 300_000);
 });
+
+const sentBody = z.object({ output_config: z.unknown() });
 
 let scratch: string;
 

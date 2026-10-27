@@ -14,6 +14,7 @@ import {
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
 import { narrowConnectedSource, narrowConnectedSourceInput } from "../src/sources/index.ts";
+import { rowsFrom } from "./rows.ts";
 import { connectedSourceHolding, groupNamed } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
 import { readingAs } from "./suite-postgres.ts";
@@ -102,7 +103,7 @@ const nodesAt = async (workspaceId: string, gen: number) => {
        FROM map_node WHERE workspace_id = $1 AND gen = $2 ORDER BY uid`,
     [workspaceId, gen],
   );
-  return rows.rows;
+  return rowsFrom(rows);
 };
 
 const edgesAt = async (workspaceId: string, gen: number) => {
@@ -112,7 +113,7 @@ const edgesAt = async (workspaceId: string, gen: number) => {
        FROM map_edge WHERE workspace_id = $1 AND gen = $2 ORDER BY uid`,
     [workspaceId, gen],
   );
-  return rows.rows;
+  return rowsFrom(rows);
 };
 
 const unresolvedAt = async (workspaceId: string, gen: number) => {
@@ -122,7 +123,7 @@ const unresolvedAt = async (workspaceId: string, gen: number) => {
       ORDER BY from_uid, relation, ordinal`,
     [workspaceId, gen],
   );
-  return rows.rows;
+  return rowsFrom(rows);
 };
 
 const liveGenerationOf = async (workspaceId: string): Promise<number | undefined> => {

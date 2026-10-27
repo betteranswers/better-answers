@@ -211,7 +211,7 @@ export const subjectRequestFor = async (
     ),
   );
   if (!found.ok) return err(found.error);
-  const row = found.value.rows[0];
+  const row: unknown = found.value.rows[0];
   if (row === undefined) return err("no-such-request");
 
   return ok(boundarySchemas.subjectRequest.select.parse(row));

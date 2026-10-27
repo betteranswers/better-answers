@@ -45,6 +45,7 @@ import {
 } from "../src/store/postgres/index.ts";
 import { setModelKey, setModelPrice, setSpendingLimit } from "../src/workspaces/index.ts";
 import { bootstrap, provisionedWorkspace } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import { conceptCiting, type SourcedConcept } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
 import { answered, seedingWith } from "./suite-postgres.ts";
@@ -132,7 +133,7 @@ export const reservationsRead = (db: MigratedPostgres, workspaceId: string) => {
       "SELECT tokens_out FROM spend_reservation WHERE workspace_id = $1",
       [workspaceId],
     );
-    reserved.push(...open.rows.map((row) => row.tokens_out));
+    reserved.push(...rowsFrom(open).map((row) => row["tokens_out"]));
   };
   return { reserved, read };
 };

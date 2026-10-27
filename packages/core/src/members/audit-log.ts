@@ -319,7 +319,9 @@ const namedDetail = (ids: readonly DetailId[], names: AllNames): ReadAuditEvent[
   const matched = ids
     .filter(([key]) => key === MATCHED)
     .map(([, kind, id]) => namedAs(kind, id, names));
-  return Object.fromEntries(matched.length === 0 ? single : [...single, [MATCHED, matched]]);
+  return Object.fromEntries<ReadAuditEvent["named"][string]>(
+    matched.length === 0 ? single : [...single, [MATCHED, matched]],
+  );
 };
 
 const eventOf = (

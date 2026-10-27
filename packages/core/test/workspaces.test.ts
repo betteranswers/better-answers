@@ -1,8 +1,10 @@
 import pg from "pg";
 import { describe, expect, expectTypeOf, it } from "vitest";
+import { z } from "zod";
 
 import { boundarySchemas, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
 import {
@@ -50,6 +52,7 @@ import {
   provisionedWorkspace,
   seedPerson,
 } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import {
   addressOf,
   countWaitingOnLocks,
@@ -97,7 +100,7 @@ const identityRowsAbout = async (personId: string) => {
     "SELECT action, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
     [personId],
   );
-  return found.rows;
+  return rowsFrom(found);
 };
 
 describe("provisioning a workspace", () => {
@@ -171,7 +174,7 @@ describe("provisioning a workspace", () => {
 
     expect(events.rows).toEqual([
       {
-        id: expect.stringMatching(ULID_SHAPE),
+        id: matching.stringMatching(ULID_SHAPE),
         action: "platform.workspace.provisioned",
         family: "platform",
         actor: "process:better-answers-bootstrap",
@@ -336,6 +339,10 @@ describe("provisioning a workspace", () => {
   });
 });
 
+const updatedRow = z.object({ updated_at: z.date() });
+
+const revokedRow = z.object({ credentials_revoked_at: z.date().nullable(), updated_at: z.date() });
+
 describe("ending every sign-in and token everywhere, as the operator", () => {
   const AT = new Date("2026-09-02T12:00:00.000Z");
 
@@ -345,8 +352,9 @@ describe("ending every sign-in and token everywhere, as the operator", () => {
     );
 
   const revokedAtOf = async (personId: string) =>
-    (await db().pool.query('SELECT credentials_revoked_at FROM "user" WHERE id = $1', [personId]))
-      .rows;
+    rowsFrom(
+      await db().pool.query('SELECT credentials_revoked_at FROM "user" WHERE id = $1', [personId]),
+    );
 
   it("ends the earlier sessions and tokens, recorded under the operator", async () => {
     const personId = await seedUser();
@@ -360,9 +368,13 @@ describe("ending every sign-in and token everywhere, as the operator", () => {
       },
     });
     const beforeUpdatedAt =
-      (
-        await db().pool.query('SELECT updated_at FROM "user" WHERE id = $1', [personId])
-      ).rows[0]?.updated_at.getTime() ?? 0;
+      updatedRow
+        .optional()
+        .parse(
+          (await db().pool.query('SELECT updated_at FROM "user" WHERE id = $1', [personId]))
+            .rows[0],
+        )
+        ?.updated_at.getTime() ?? 0;
 
     const { operatorId, answered } = await revoking({ personId, at: AT });
 
@@ -374,8 +386,9 @@ describe("ending every sign-in and token everywhere, as the operator", () => {
       'SELECT credentials_revoked_at, updated_at FROM "user" WHERE id = $1',
       [personId],
     );
-    expect(after.rows[0]?.credentials_revoked_at).toEqual(AT);
-    expect(after.rows[0]?.updated_at.getTime() ?? 0).toBeGreaterThan(beforeUpdatedAt);
+    const revoked = revokedRow.parse(after.rows[0]);
+    expect(revoked.credentials_revoked_at).toEqual(AT);
+    expect(revoked.updated_at.getTime()).toBeGreaterThan(beforeUpdatedAt);
     const sessions = await db().pool.query(
       "SELECT id FROM session WHERE user_id = $1 ORDER BY id",
       [personId],
@@ -438,7 +451,7 @@ describe("ending every sign-in and token everywhere, as the operator", () => {
     await revoking({ personId, at: AT });
 
     const [row] = await identityRowsAbout(personId);
-    expect(row?.detail).toEqual({
+    expect(row?.["detail"]).toEqual({
       grants: [
         { clientId, workspaceId: acme.workspaceId, issuedAt: "2026-09-01T09:00:00.000Z" },
         { clientId, workspaceId: zenith.workspaceId, issuedAt: "2026-09-02T09:00:00.000Z" },
@@ -451,7 +464,9 @@ describe("ending every sign-in and token everywhere, as the operator", () => {
 
     await revoking({ personId, at: AT });
 
-    expect((await identityRowsAbout(personId)).map((row) => row.detail)).toEqual([{ grants: [] }]);
+    expect((await identityRowsAbout(personId)).map((row) => row["detail"])).toEqual([
+      { grants: [] },
+    ]);
   });
 
   it("ends a token already rotated, with its access tokens", async () => {
@@ -493,7 +508,7 @@ describe("ending every sign-in and token everywhere, as the operator", () => {
       value: { ok: true, value: { personId, revokedAt: "2026-09-02T12:00:00.000Z" } },
     });
     expect(await revokedAtOf(personId)).toEqual([{ credentials_revoked_at: AT }]);
-    expect((await identityRowsAbout(personId)).map((row) => row.action)).toEqual([
+    expect((await identityRowsAbout(personId)).map((row) => row["action"])).toEqual([
       "people.person.credentials_revoked",
       "people.person.credentials_revoked",
     ]);
@@ -638,7 +653,7 @@ describe("reading the session's member", () => {
       }),
     ).rejects.toThrow(/did not commit/);
 
-    expect(read).toMatchObject({ ok: false, error: expect.any(Error) });
+    expect(read).toMatchObject({ ok: false, error: matching.any(Error) });
   });
 
   it("answers a locked person's row as a failure, not person-gone", async () => {
@@ -659,7 +674,7 @@ describe("reading the session's member", () => {
       holder.release();
     }
 
-    expect(read).toMatchObject({ ok: false, error: expect.any(Error) });
+    expect(read).toMatchObject({ ok: false, error: matching.any(Error) });
   });
 });
 
@@ -987,7 +1002,7 @@ describe("what the slice answers when the store cannot be reached", () => {
     for (const [name, answered] of answers) {
       expect({ name, answered }).toEqual({
         name,
-        answered: { ok: false, error: expect.any(Error) },
+        answered: { ok: false, error: matching.any(Error) },
       });
     }
   });
@@ -1018,9 +1033,9 @@ describe("what the slice answers when the store cannot be reached", () => {
         at,
       }),
     ]).toEqual([
-      { ok: false, error: expect.any(Error) },
-      { ok: false, error: expect.any(Error) },
-      { ok: false, error: expect.any(Error) },
+      { ok: false, error: matching.any(Error) },
+      { ok: false, error: matching.any(Error) },
+      { ok: false, error: matching.any(Error) },
     ]);
   });
 
@@ -1078,7 +1093,7 @@ describe("adding a signed-in person as a member, the platform's action", () => {
       "SELECT id, action, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1 AND action = 'people.member.added' ORDER BY at, id",
       [workspaceId],
     );
-    return found.rows;
+    return rowsFrom(found);
   };
 
   const memberCountOf = async (workspaceId: string): Promise<string> => {
@@ -1111,7 +1126,7 @@ describe("adding a signed-in person as a member, the platform's action", () => {
         value: { workspaceId, userId, role, actorId: "process:better-answers-bootstrap" },
       });
       const rows = await membersOf(workspaceId, userId);
-      expect(rows).toEqual([{ id: expect.stringMatching(ULID_SHAPE), role }]);
+      expect(rows).toEqual([{ id: matching.stringMatching(ULID_SHAPE), role }]);
       expect(rows[0]?.id).not.toContain(workspaceId);
       expect(rows[0]?.id).not.toContain(userId);
       const resolved = await withPrincipal(
@@ -1131,7 +1146,7 @@ describe("adding a signed-in person as a member, the platform's action", () => {
 
     expect(await addedRowsOf(workspaceId)).toEqual([
       {
-        id: expect.stringMatching(ULID_SHAPE),
+        id: matching.stringMatching(ULID_SHAPE),
         action: "people.member.added",
         family: "people",
         actor: "process:better-answers-bootstrap",
@@ -1151,7 +1166,7 @@ describe("adding a signed-in person as a member, the platform's action", () => {
       addMember(bootstrap, door, { workspaceId, email, role: "Viewer" }),
     );
 
-    expect(added).toMatchObject({ ok: false, error: expect.any(Error) });
+    expect(added).toMatchObject({ ok: false, error: matching.any(Error) });
     expect(await membersOf(workspaceId, userId)).toEqual([]);
   });
 
@@ -1173,7 +1188,7 @@ describe("adding a signed-in person as a member, the platform's action", () => {
     ]);
     expect(await memberCountOf(workspaceId)).toBe("1");
     expect(await membersOf(workspaceId, adminUserId)).toEqual([
-      { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
+      { id: matching.stringMatching(ULID_SHAPE), role: "Admin" },
     ]);
     expect(await addedRowsOf(workspaceId)).toEqual([]);
   });
@@ -1233,7 +1248,7 @@ describe("renaming a workspace — the platform's action", () => {
       "SELECT id, action, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1 AND action = 'platform.workspace.renamed' ORDER BY at, id",
       [workspaceId],
     );
-    return found.rows;
+    return rowsFrom(found);
   };
 
   it("sets both, answering the standing and recording one row", async () => {
@@ -1258,7 +1273,7 @@ describe("renaming a workspace — the platform's action", () => {
     expect(await standingOf(workspaceId)).toEqual([{ name: "Acme Group", shortName }]);
     expect(await renamedRowsOf(workspaceId)).toEqual([
       {
-        id: expect.stringMatching(ULID_SHAPE),
+        id: matching.stringMatching(ULID_SHAPE),
         action: "platform.workspace.renamed",
         family: "platform",
         actor: "process:better-answers-bootstrap",
@@ -1292,8 +1307,8 @@ describe("renaming a workspace — the platform's action", () => {
       moved: [{ name: "Moved", shortName: newShortName }],
     });
     expect({
-      named: (await renamedRowsOf(named.workspaceId)).map((row) => row.detail),
-      moved: (await renamedRowsOf(moved.workspaceId)).map((row) => row.detail),
+      named: (await renamedRowsOf(named.workspaceId)).map((row) => row["detail"]),
+      moved: (await renamedRowsOf(moved.workspaceId)).map((row) => row["detail"]),
     }).toEqual({
       named: [{ nameChanged: true, [STORED_DETAIL_KEYS.shortNameChanged]: false }],
       moved: [{ nameChanged: false, [STORED_DETAIL_KEYS.shortNameChanged]: true }],
@@ -1344,7 +1359,7 @@ describe("renaming a workspace — the platform's action", () => {
       renameWorkspace(bootstrap, door, { workspaceId, name: "Atomic Again" }),
     );
 
-    expect(renamed).toMatchObject({ ok: false, error: expect.any(Error) });
+    expect(renamed).toMatchObject({ ok: false, error: matching.any(Error) });
     expect(await standingOf(workspaceId)).toEqual([{ name: "Atomic", shortName }]);
   });
 });
@@ -1400,7 +1415,11 @@ describe("adding a person before their first sign-in, the platform's action", ()
 
     expect(added).toEqual({
       ok: true,
-      value: { personId: expect.stringMatching(ULID_SHAPE), email, displayName: "Matthew Burgess" },
+      value: {
+        personId: matching.stringMatching(ULID_SHAPE),
+        email,
+        displayName: "Matthew Burgess",
+      },
     });
     const personId = added.ok ? added.value.personId : "";
     expect(await personsAt(email)).toEqual([
@@ -1501,7 +1520,7 @@ describe("adding a person before their first sign-in, the platform's action", ()
       adding(email, "Matthew Burgess"),
     );
 
-    expect(added).toMatchObject({ ok: false, error: expect.any(Error) });
+    expect(added).toMatchObject({ ok: false, error: matching.any(Error) });
     expect(await personsAt(email)).toEqual([]);
   });
 });
@@ -1607,7 +1626,7 @@ describe("the operator's list of every workspace", () => {
       name: "Acme",
       shortName: `acme-${acme.workspaceId.toLowerCase()}`,
       memberCount: 2,
-      createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
+      createdAt: matching.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
     });
   });
 });

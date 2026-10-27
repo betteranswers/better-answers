@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import { openPostgres } from "../src/store/postgres/index.ts";
 import { recordConsent, recordSignIn } from "../src/workspaces/index.ts";
 import { bootstrap, provisionedWorkspace, seedPerson } from "./platform.ts";
+import { rowsFrom } from "./rows.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -12,22 +15,22 @@ const CLIENT_ID = "https://claude.ai/oauth/mcp-oauth-client-metadata";
 const ULID_SHAPE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 const identitySetRowsFor = async (personId: string) =>
-  (
+  rowsFrom(
     await db().pool.query(
       `SELECT id, action, family, actor, subject_kind, subject_id, detail, batch_id
          FROM identity_audit_event WHERE subject_id = $1`,
       [personId],
-    )
-  ).rows;
+    ),
+  );
 
 const consentRowsBy = async (personId: string) =>
-  (
+  rowsFrom(
     await db().pool.query(
       `SELECT workspace_id, action, family, actor, subject_kind, subject_id, detail
          FROM audit_event WHERE actor = $1`,
       [`human:${personId}`],
-    )
-  ).rows;
+    ),
+  );
 
 describe("recording a sign-in", () => {
   it("writes one identity-set row, the person its actor and subject", async () => {
@@ -39,7 +42,7 @@ describe("recording a sign-in", () => {
     expect(recorded).toEqual({ ok: true, value: undefined });
     expect(await identitySetRowsFor(personId)).toEqual([
       {
-        id: expect.stringMatching(ULID_SHAPE),
+        id: matching.stringMatching(ULID_SHAPE),
         action: "people.person.signed_in",
         family: "people",
         actor: `human:${personId}`,

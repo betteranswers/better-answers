@@ -170,7 +170,7 @@ const openTheRoutine = async (
       WHERE workspace_id = $1 AND id = $2`,
     [workspaceId, subjectRequestId],
   );
-  const row = found.rows[0];
+  const row: unknown = found.rows[0];
   if (row === undefined) return err("no-such-request");
 
   const request = boundarySchemas.subjectRequest.select.parse(row);

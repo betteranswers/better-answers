@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { commit, withRepositoryLock } from "@better-answers/core/store/git";
 import { conceptIriOf, passageLocatorOf, ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import {
   acceptSuggestions,
@@ -20,6 +21,7 @@ import {
   writeConcept,
   writeManifest,
   type Frontmatter,
+  type FrontmatterValue,
   type Reconciled,
   type SuggestionRequest,
   type WorkspaceReconciled,
@@ -980,14 +982,14 @@ describe("an acceptance whose rows were lost", () => {
 
 describe("a concept carrying a __proto__ front-matter key", () => {
   const withProto = (title: string): Frontmatter =>
-    Object.fromEntries([
+    Object.fromEntries<FrontmatterValue>([
       ["title", title],
       ["type", "Guideline"],
       ["__proto__", "x"],
       [
         "sources",
         [
-          Object.fromEntries([
+          Object.fromEntries<string>([
             ["resource", handbook.resource],
             ["__proto__", "y"],
           ]),
@@ -1042,7 +1044,7 @@ describe("a concept carrying a __proto__ front-matter key", () => {
     expect(file.frontmatter).toEqual({
       ...request.frontmatter,
       status: "stable",
-      iri: expect.any(String),
+      iri: matching.any(String),
     });
     expect(row).toEqual(file);
   });

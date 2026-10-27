@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import type { PlatformPrincipal, WorkspaceId } from "../src/kernel/index.ts";
 import {
@@ -14,6 +16,7 @@ import {
   type SyncScan,
 } from "../src/runs/index.ts";
 import { folded, withMember, withScope, type Tx } from "../src/store/postgres/index.ts";
+import { rowsFrom } from "./rows.ts";
 import { seededBy } from "./sourced-concept.ts";
 import { abortTheTransaction, countWaitingOnLocks, readingAs, until } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
@@ -237,12 +240,12 @@ const actionOf = <T>(scenario: Scenario, work: (tx: Tx) => Promise<T>): Promise<
   withScope(mapMaintenance, scenario.postgres, scenario.workspaceId, (tx) => work(tx));
 
 const jobsIn = async (workspaceId: string) =>
-  (
+  rowsFrom(
     await db().pool.query(
       "SELECT id, kind, subject_id, reason, status FROM job WHERE workspace_id = $1 ORDER BY enqueued_at",
       [workspaceId],
-    )
-  ).rows;
+    ),
+  );
 
 const queuedBound = async (scenario: Scenario): Promise<string> => {
   const first = await actionOf(scenario, (tx) =>
@@ -253,7 +256,7 @@ const queuedBound = async (scenario: Scenario): Promise<string> => {
 };
 
 const reasonsIn = async (workspaceId: string): Promise<readonly string[]> =>
-  (await jobsIn(workspaceId)).map((row: { reason: string }) => row.reason);
+  (await jobsIn(workspaceId)).map((row) => z.string().parse(row["reason"]));
 
 describe("an action landing its rows and job in one transaction", () => {
   it("rolls back with the action it rode in, queuing nothing", async () => {
@@ -362,7 +365,7 @@ describe("an action landing its rows and job in one transaction", () => {
       held.resolve(undefined);
     }
 
-    expect(await first).toEqual({ ok: true, value: { jobId: expect.any(String) } });
+    expect(await first).toEqual({ ok: true, value: { jobId: matching.any(String) } });
     expect(await second).toEqual(
       new Error("another action queued this subject while this one was enqueueing it"),
     );
