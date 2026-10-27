@@ -2,8 +2,19 @@ import { getTableName, is } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import type pg from "pg";
+import { z } from "zod";
 
 import * as publicEntry from "../src/index.ts";
+
+const INTROSPECTED = z.array(
+  z.object({
+    schema: z.string(),
+    table: z.string(),
+    column: z.string(),
+    type: z.string(),
+    not_null: z.boolean(),
+  }),
+);
 
 export type ColumnRow = {
   readonly schema: string;
@@ -29,12 +40,12 @@ export const introspect = async (client: pg.Pool | pg.PoolClient): Promise<Colum
         AND c.relname NOT LIKE 'passage\_%'
       ORDER BY n.nspname, c.relname, a.attnum`,
   );
-  return result.rows.map((row) => ({
-    schema: String(row.schema),
-    table: String(row.table),
-    column: String(row.column),
-    type: String(row.type),
-    notNull: Boolean(row.not_null),
+  return INTROSPECTED.parse(result.rows).map(({ schema, table, column, type, not_null }) => ({
+    schema,
+    table,
+    column,
+    type,
+    notNull: not_null,
   }));
 };
 

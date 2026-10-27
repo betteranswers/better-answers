@@ -2,7 +2,6 @@ import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync }
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import type { DrizzleSnapshotJSON } from "drizzle-kit/api";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
 import { afterAll, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -285,16 +284,28 @@ describe("the statement separator the generator writes", () => {
 const THE_ALTER_THAT_LANDED_THE_DEFAULT =
   'ALTER TABLE "account" ALTER COLUMN "updated_at" SET DEFAULT now();';
 
-const theNewestSnapshot = (): DrizzleSnapshotJSON => {
+const snapshotSchema = z.looseObject({
+  id: z.string(),
+  tables: z.record(
+    z.string(),
+    z.looseObject({
+      columns: z.record(z.string(), z.looseObject({ default: z.unknown().optional() })),
+    }),
+  ),
+});
+
+type Snapshot = z.infer<typeof snapshotSchema>;
+
+const theNewestSnapshot = (): Snapshot => {
   const walked = journalSnapshots();
   const newest = walked.ok ? walked.value.at(-1) : undefined;
   if (newest === undefined) throw new Error("there is no newest snapshot to diff against");
   const text = readFileSync(path.join(journalMetaFolder, newest), "utf8");
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- drizzle-kit exports no parser for its own snapshot
-  return JSON.parse(text) as DrizzleSnapshotJSON;
+  return snapshotSchema.parse(JSON.parse(text));
 };
 
-const theDeclarations = (prevId: string): DrizzleSnapshotJSON =>
+/** drizzle-kit's declaration types import zod 3, which it does not install, so its snapshot type does not resolve. */
+const theDeclarations = (prevId: string): unknown =>
   generateDrizzleJson(declarations, prevId, ["public"]);
 
 describe("the declarations and the DDL generated from them", () => {

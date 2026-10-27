@@ -23,6 +23,7 @@ import {
 } from "../src/index.ts";
 import { type TestData, testData } from "./factory.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
+import { matching } from "./matching.ts";
 import { ADMITTED, privilegesHeld, refusalOf, refusesEach, sqlstateOf } from "./probes.ts";
 import {
   A_BACKUP_ROW,
@@ -137,7 +138,7 @@ const noneThenOneEach = (tables: readonly string[]) => ({
 
 const rlsFlags = async (qualified: string) => {
   const [schema, table] = qualified.split(".");
-  const flags = await db.pool.query(
+  const flags = await db.pool.query<{ rls: boolean; forced: boolean }>(
     "SELECT c.relrowsecurity AS rls, c.relforcerowsecurity AS forced FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relname = $2",
     [schema, table],
   );
@@ -147,11 +148,15 @@ const rlsFlags = async (qualified: string) => {
 describe("the seam function", () => {
   it("returns NULL on no scope and on an empty one", async () => {
     await withRollback(db.pool, async (client) => {
-      const unset = await client.query("SELECT current_workspace_id() AS ws");
+      const unset = await client.query<{ ws: string | null }>(
+        "SELECT current_workspace_id() AS ws",
+      );
       expect(unset.rows[0]?.ws).toBeNull();
 
       await client.query("SELECT set_config('app.workspace_id', '', true)");
-      const empty = await client.query("SELECT current_workspace_id() AS ws");
+      const empty = await client.query<{ ws: string | null }>(
+        "SELECT current_workspace_id() AS ws",
+      );
       expect(empty.rows[0]?.ws).toBeNull();
     });
   });
@@ -159,7 +164,7 @@ describe("the seam function", () => {
   it("returns the workspace the transaction set", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      const set = await client.query("SELECT current_workspace_id() AS ws");
+      const set = await client.query<{ ws: string | null }>("SELECT current_workspace_id() AS ws");
       expect(set.rows[0]?.ws).toBe(WS_A);
     });
   });
@@ -202,13 +207,13 @@ describe("every tenant table, a partitioned one by its declared parent", () => {
   it("calls only the seam function in its policy", async () => {
     for (const qualified of tenantTableNames()) {
       const [schema, table] = qualified.split(".");
-      const policy = await db.pool.query(
+      const policy = await db.pool.query<{ qual: string; with_check: string }>(
         "SELECT qual, with_check FROM pg_policies WHERE schemaname = $1 AND tablename = $2",
         [schema, table],
       );
       expect({ table: qualified, qual: policy.rows[0]?.qual }).toEqual({
         table: qualified,
-        qual: expect.stringContaining("current_workspace_id()"),
+        qual: matching.stringContaining("current_workspace_id()"),
       });
       expect(policy.rows[0]?.with_check).toContain("current_workspace_id()");
     }
@@ -1964,7 +1969,7 @@ describe("the erasure of the suggestions", () => {
 
   const requestOf = async (client: pg.PoolClient, suggestionId: string) =>
     (
-      await client.query(
+      await client.query<Record<string, unknown>>(
         `SELECT s.status, s.proposer, s.decider, s.reason, r.body
            FROM suggestion s JOIN concept_write_request r
              ON r.workspace_id = s.workspace_id AND r.suggestion_id = s.id
@@ -1974,7 +1979,7 @@ describe("the erasure of the suggestions", () => {
     ).rows;
 
   const UNTOUCHED = [
-    expect.objectContaining({
+    matching.objectContaining({
       proposer: PROPOSER,
       body: `Ask ${PROPOSER} about expenses, within sixty days.`,
     }),
@@ -2103,7 +2108,7 @@ describe("the erasure of the suggestions", () => {
 
       await client.query("RESET ROLE");
       expect(await requestOf(client, longer.id)).toEqual([
-        expect.objectContaining({ body: `Ask human:a@b.com, human:a@b.co.uk or ${ERASED_AS}.` }),
+        matching.objectContaining({ body: `Ask human:a@b.com, human:a@b.co.uk or ${ERASED_AS}.` }),
       ]);
     });
   });
@@ -2346,7 +2351,7 @@ describe("the workspace-lifecycle function", () => {
       );
       expect(partition.rowCount).toBe(1);
 
-      const index = await client.query(
+      const index = await client.query<{ indexdef: string }>(
         "SELECT indexdef FROM pg_indexes WHERE schemaname = 'index' AND tablename = $1",
         [`passage_${WS_A}`],
       );
@@ -2528,6 +2533,10 @@ describe("the audience pair on every readable unit", () => {
     "audience = 'members', audience_groups = NULL",
   ];
 
+  const isSeeder = (
+    value: unknown,
+  ): value is (input: { workspaceId: string }) => Promise<unknown> => typeof value === "function";
+
   const seedOneRow = async (seed: TestData, schema: string, table: string) => {
     const key = Object.entries(boundarySchemas).find(([, { table: declared }]) => {
       const config = getTableConfig(declared);
@@ -2535,7 +2544,7 @@ describe("the audience pair on every readable unit", () => {
     })?.[0];
     const seeders: Readonly<Record<string, unknown>> = seed;
     const seeder = key === undefined ? undefined : seeders[key];
-    if (typeof seeder !== "function") {
+    if (!isSeeder(seeder)) {
       throw new Error(
         `the factory has no seeder for ${schema}.${table}, so its audience goes unprobed`,
       );

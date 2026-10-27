@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { AUDIENCE_EVERYONE, AUDIENCE_GROUPS, SENSITIVITIES, ulid } from "../src/index.ts";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
+import { matching } from "./matching.ts";
 import { postgresForSuite, privilegesHeld, refusesEach } from "./probes.ts";
 
 const db = postgresForSuite();
@@ -19,7 +20,7 @@ const byId = (one: { readonly id: string }, other: { readonly id: string }): num
 
 const publishedToEveryone = (row: { readonly id: string; readonly sensitivity: string }) => ({
   ...row,
-  published_at: expect.any(Date),
+  published_at: matching.any(Date),
   audience: AUDIENCE_EVERYONE,
   audience_groups: null,
 });
@@ -314,7 +315,7 @@ describe("what the view reports for a passage, as app_rt", () => {
       ).toEqual(
         [
           { id: unpublished.passage.id, published_at: null },
-          { id: published.passage.id, published_at: expect.any(Date) },
+          { id: published.passage.id, published_at: matching.any(Date) },
         ].toSorted(byId),
       );
     });

@@ -531,6 +531,7 @@ const conceptIri = (schema: z.ZodString) => schema.pipe(CONCEPT_IRI);
 
 const PROTO_FAMILY = /^_{2,}proto__$/;
 const ESCAPED_PROTO_FAMILY = /^_{3,}proto__$/;
+const PLAIN_PROTOTYPES: readonly unknown[] = [Object.prototype, null];
 
 const withKeysRenamed = <Value>(
   record: Readonly<Record<string, Value>>,
@@ -545,7 +546,7 @@ export const recordKeepingEveryKey = <Value extends z.ZodType>(value: Value) =>
       (input) =>
         typeof input === "object" &&
         input !== null &&
-        [Object.prototype, null].includes(Object.getPrototypeOf(input))
+        PLAIN_PROTOTYPES.includes(Object.getPrototypeOf(input))
           ? withKeysRenamed({ ...input }, (key) => (PROTO_FAMILY.test(key) ? `_${key}` : key))
           : input,
       z.record(z.string(), value),

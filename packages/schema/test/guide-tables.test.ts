@@ -5,6 +5,7 @@ import { ulid } from "../src/index.ts";
 import { type TestData, testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
 import { asTheMigrationOwnerOf, migrationStatements } from "./journal-statements.ts";
+import { matching } from "./matching.ts";
 import { ADMITTED, postgresForSuite, refusalOf, refusesEach, sqlstateOf } from "./probes.ts";
 import {
   A_GUIDE_ROLE,
@@ -349,7 +350,7 @@ describe("the migration over stored write-ups", () => {
 
     expect({ empty, held }).toEqual({
       empty: ADMITTED,
-      held: expect.stringMatching(/write_up and write_up_include hold rows/),
+      held: matching.stringMatching(/write_up and write_up_include hold rows/),
     });
   });
 });
