@@ -54,7 +54,11 @@ the link.
 
 **Evidence**:
 A locator into a source, a resource read live, or a record the platform generated, which backs a
-concept. A concept resting on another concept is a link, never evidence.
+concept. A concept resting on another concept is a link, except where a successor cites the concept
+it supersedes.
+
+**Evidence pane**:
+What a reader sees of a concept's cited sources, and how many of them the reader's access includes.
 
 **Owner**:
 The person answerable for keeping a concept verified and current: the collection's owner unless the
@@ -100,8 +104,9 @@ Where a promotion is decided, one at a time, beside the closest existing Q&A pai
 ### The map
 
 **Map**:
-The platform's derived, queryable picture of concepts and their relations, sources, actors and
-citations. It is built from the knowledge base and the records, and is never a source of truth.
+The platform's derived, queryable picture of concepts and their relations, sources, people and
+citations. It is built from sources, the knowledge base and the records, and is never a source of
+truth.
 
 **Source entity**:
 A person, a meeting, a task or another node the map derives directly from a source document. It is
@@ -124,7 +129,7 @@ Whose knowledge a source carries: the company's own, an external third party's, 
 Whether the platform holds a copy of a source: copied, or read live when asked and never stored.
 
 **Connected source**:
-An Admin's connection of one source to the workspace, with its connector, scope, collection,
+An Admin's connection of one source to the workspace, with its connector, collection,
 sensitivity, audience and schedule. It is the unit the platform syncs and an Admin publishes.
 
 **Connector**:
@@ -139,8 +144,8 @@ documents to the platform.
 One item a connected source yields, as the platform catalogues it.
 
 **Passage**:
-One unit of a source document's redacted text. It is what a search previews and a locator opens,
-and never the original text.
+One unit of a source document's redacted text. It is what a locator opens, and never the original
+text.
 
 **Locator**:
 The address of a passage within its source document. A citation and the passage it cites carry the
@@ -183,8 +188,8 @@ An Admin's recorded action that moves a connected source to a wider sensitivity,
 both.
 
 **Narrowing**:
-An Admin's action that gives named source documents a sensitivity of their own, narrower than their
-connected source's.
+A source document taking a sensitivity of its own, narrower than its connected source's, by an
+Admin's action or because redaction found special category in it.
 
 **Cascade**:
 The carrying of a visibility change to every concept citing the evidence that moved, and then to
@@ -209,8 +214,8 @@ text, never the value.
 One document's findings of one category, raised by one rule, which is the unit an Admin reviews.
 
 **Special category**:
-Personal data that UK data protection law protects most closely, such as health data. A document
-that holds it is narrowed.
+Personal data such as health data, which redaction withholds sentence by sentence. A document that
+holds it takes a narrowing.
 
 **Cue**:
 A word that marks a sentence as special category, so that redaction withholds the sentence whole.
@@ -220,8 +225,8 @@ An Admin's review of a special-category finding as not special category. It is t
 document's own sensitivity widens.
 
 **Placeholder**:
-The word written in place of withheld text, naming the category of data taken. Text withheld at the
-always tier gets one neutral word, so a reader never learns what it held.
+The word written in place of withheld text, usually naming the category of data taken. Text
+withheld at the always tier gets one neutral word, so a reader never learns what it held.
 
 **Subject request**:
 A person's request to access or erase their personal data, made by a member or recorded for someone
@@ -259,12 +264,6 @@ A note that may follow Verified by without changing the trust tier: imported, or
 An Admin's mapping of a verifier named in imported knowledge to a member, so that Verified by can
 name them.
 
-**Evidence pane**:
-What a reader sees of a concept's cited sources, and how many of them the reader's access includes.
-
-**Evidence panel**:
-Where one cited source opens, beside or beneath the claim it backs.
-
 ### Guides
 
 **Guide**:
@@ -287,8 +286,7 @@ One of the ways a section shows its knowledge: assembled, as prose written over 
 quoted, in the concepts' own words.
 
 **Expectation**:
-A section's statement of which concepts should fill it. Coverage is the expectation less what the
-section includes.
+A section's statement of which concepts should fill it.
 
 **Write-up**:
 Prose the platform keeps as a record, written over the concepts it includes, such as a guide
@@ -300,7 +298,7 @@ One concept a write-up rests on.
 **Footnote**:
 The mark in a write-up's prose that ties one claim to one include.
 
-### Answers
+### Search and answers
 
 **Answer**:
 What the platform returns for a question: every Q&A pair that fits, or else the concepts that bear
@@ -314,8 +312,8 @@ ranks one candidate against another.
 The concepts an answer returns as bearing on a question when no Q&A pair is a judged fit.
 
 **Match**:
-One result of a search: a concept with the sections and documents it appears in, or a section or a
-document that no concept covers.
+One result of a search: a concept with the sections it appears in and the documents it rests on, or
+a section or a document that no concept covers.
 
 **Not company knowledge**:
 The label on a match that is a document no concept rests on.
@@ -343,27 +341,11 @@ retrieval.
 A retrieval correction kept as a test: a question, a role, and the concepts its answer must and must
 not reach.
 
-**Assistant**:
-An AI host, such as Claude or ChatGPT, through which a person reaches the company's knowledge.
-
-**Access**:
-What a person's consent gives an assistant: the company's knowledge in one workspace, until it
-lapses or is ended.
-
-### Models
-
-**Model choice**:
-A workspace's choice of model for one purpose: extraction, enrichment, answering, judging or
-embedding.
-
-**Model provider**:
-The company that hosts the model a model choice names, such as Anthropic or Mistral.
-
 ### People and accountability
 
 **Workspace**:
-The boundary a company occupies: its people, connected sources, knowledge base, map and records.
-Nothing crosses from one workspace to another.
+The boundary a company occupies: its people, connected sources, knowledge base, map and records. A
+person may belong to more than one workspace.
 
 **Member**:
 A person's place in one workspace: the role they hold there and the groups they belong to.
@@ -381,6 +363,13 @@ An Admin's offer of a place as a member, with one role, to one email address.
 **Operator**:
 The person who administers the platform across every workspace. The operator is never a workspace
 role, and a page names them better-answers support.
+
+**Assistant**:
+An AI host, such as Claude or ChatGPT, through which a person reaches the company's knowledge.
+
+**Access**:
+What a person's consent gives an assistant: the company's knowledge in one workspace, until it
+lapses or is ended.
 
 **Principal**:
 Who the platform acts as: a member in one workspace, the platform itself, or the operator.
@@ -400,7 +389,7 @@ The append-only record of every audit event a workspace keeps.
 The append-only record of actions that belong to no workspace because they act on a person's
 identity itself, such as a sign-in. Only the operator reads it.
 
-### The platform's areas
+### The platform
 
 **Area**:
 The top level of the platform's navigation: Ask, Knowledge, Inbox or Control Centre.
@@ -417,3 +406,10 @@ personal data and system are seen and acted on.
 
 **Console**:
 The operator's area over every workspace, outside any one of them.
+
+**Model choice**:
+A workspace's choice of model for one purpose: extraction, enrichment, answering, judging or
+embedding.
+
+**Model provider**:
+The company that hosts the model a model choice names, such as Anthropic or Mistral.
