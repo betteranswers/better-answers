@@ -23,14 +23,12 @@ reviews:
     and a finding that contradicts one of them is wrong.
 
     - `AGENTS.md` — the map: layout, how a task is worked, which skill applies.
-    - `CONCEPTS.md` — the glossary. Every domain word has one settled meaning.
+    - `GLOSSARY.md` — the glossary. Every domain word has one settled meaning.
       A new domain word is defined here in the same change as the code that
       first uses it, or before; a diff that introduces a domain term absent from
       the glossary at its head is a finding.
-    - `CODING_STANDARDS.md` — the rules that bind every workspace and that no gate
-      holds. A gate's failure message states the rest.
-    - `apps/api/AGENTS.md`, `apps/web/AGENTS.md`, `apps/worker/AGENTS.md`,
-      `deploy/AGENTS.md`, `packages/core/AGENTS.md` and `packages/schema/AGENTS.md` —
+    - `apps/web/AGENTS.md`, `apps/worker/AGENTS.md`, `deploy/AGENTS.md`,
+      `packages/core/AGENTS.md` and `packages/schema/AGENTS.md` —
       a directory's own rules. Apply each to changes in its directory.
     - `docs/solutions/architecture-patterns/` — the live architecture decisions, one
       doc each, at `adr-NNNN.md`. Code states a decision in words, never by
