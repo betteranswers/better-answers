@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { head, PLATFORM_BOT } from "@better-answers/core/store/git";
 import { ulid } from "@better-answers/schema";
@@ -94,7 +94,7 @@ describe("the manifest, the bundle's first commit", () => {
       sha: matching.any(String),
       auditEventId: matching.any(String),
     });
-    if (!landed.written) throw new Error("unreachable: asserted above");
+    assert(landed.written, "unreachable: asserted above");
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([landed.sha]);
     const facts = await commitFacts(scenario.git, scenario.workspaceId, landed.sha);
     expect({
@@ -156,10 +156,10 @@ describe("the manifest, the bundle's first commit", () => {
       author: { name: "Ada Editor", email: "ada@acme.invalid" },
       expects: { head: null },
     });
-    if (!first.ok) throw new Error(`the concept was refused: ${String(first.error)}`);
+    assert(first.ok, "the concept was refused");
 
     const landed = await written(scenario);
-    if (!landed.written) throw new Error("the manifest was not written");
+    assert(landed.written, "the manifest was not written");
 
     const facts = await commitFacts(scenario.git, scenario.workspaceId, landed.sha);
     expect(facts.parents).toEqual([first.value.sha]);
@@ -266,7 +266,7 @@ describe("the manifest, the bundle's first commit", () => {
     );
 
     expect(landed).toMatchObject({ ok: true, value: { written: true } });
-    if (!landed.ok) return;
+    assert(landed.ok);
     await onlyTheStandingManifest(scenario, landed.value);
   });
 });

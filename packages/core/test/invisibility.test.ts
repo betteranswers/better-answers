@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { walkFrom, walkFromEntries, walkTo, walkToEntries } from "@better-answers/core/store/map";
 import { conceptIriOf, ulid, type ConceptIri } from "@better-answers/schema";
@@ -238,9 +238,8 @@ describe("a source the reader may not read", () => {
     const admin = await opened(scenario.admin, written.iri);
     const seen = `${JSON.stringify(viewer)}\n${renderOpen(viewer)}`;
 
-    expect(viewer.found && viewer.concept?.evidence).toEqual([
-      { id: "BM-1", source: "The board's minutes" },
-    ]);
+    assert(viewer.found);
+    expect(viewer.concept?.evidence).toEqual([{ id: "BM-1", source: "The board's minutes" }]);
     expect(seen).not.toContain(minutes.locator);
     expect(seen).not.toContain(minutes.documentId);
     expect(seen).not.toContain("Board minutes 2026");
@@ -370,10 +369,8 @@ describe("a Restricted-sourced concept, to a Viewer", () => {
 
     expect(viewerNarrowed).toEqual({ ok: true, value: undefined });
     expect(absent).toEqual(viewerNarrowed);
-    expect(adminBehind.ok && adminBehind.value?.map((footnote) => footnote.label)).toEqual([
-      "i1",
-      "i2",
-    ]);
+    assert(adminBehind.ok);
+    expect(adminBehind.value?.map((footnote) => footnote.label)).toEqual(["i1", "i2"]);
   });
 });
 
@@ -707,8 +704,9 @@ describe("an `Answer` withheld from the asker", () => {
 
   it("spends no walked slot on a withheld concept", async () => {
     const scenario = await arrange();
-    const minted = [conceptIriOf(ulid()), conceptIriOf(ulid())] as const;
-    const [first, second] = minted[0] < minted[1] ? minted : ([minted[1], minted[0]] as const);
+    const [first, second] = [conceptIriOf(ulid()), conceptIriOf(ulid())].toSorted();
+    assert(first !== undefined, "the first iri was minted");
+    assert(second !== undefined, "the second iri was minted");
     const reached = await conceptSeeded(db(), scenario.workspaceId, {
       collection: "audits",
       title: "Console exports",

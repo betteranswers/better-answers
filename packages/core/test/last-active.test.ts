@@ -1,5 +1,5 @@
 import pg from "pg";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import {
   bulkChangeRole,
@@ -101,10 +101,12 @@ describe("stamping a member's last activity", () => {
 
     const read = await resolvedIn(workspace.workspaceId, viewer);
 
-    expect(read.ok ? read.value : read.error).toBe("Viewer");
+    assert(read.ok);
+    expect(read.value).toBe("Viewer");
     const at = await stampedIn(workspace.workspaceId, viewer);
     expect(at, "the request was answered, so a row should be stamped").toBeDefined();
-    expect(at && Date.now() - at.getTime()).toBeLessThan(60_000);
+    assert(at);
+    expect(Date.now() - at.getTime()).toBeLessThan(60_000);
   });
 
   it("stamps once within the hour, and again after it", async () => {
@@ -126,8 +128,10 @@ describe("stamping a member's last activity", () => {
     await resolvedIn(workspace.workspaceId, viewer);
 
     const stampedAgain = await stampedIn(workspace.workspaceId, viewer);
+    assert(backdated, "the request was stamped");
+    assert(stampedAgain, "the later request was stamped");
     expect(
-      stampedAgain && backdated && stampedAgain.getTime() - backdated.getTime(),
+      stampedAgain.getTime() - backdated.getTime(),
       "a request an hour on from the last stamp writes it again",
     ).toBeGreaterThan(HOUR_MS);
   });
@@ -142,7 +146,8 @@ describe("stamping a member's last activity", () => {
 
     const called = await mcpCallIn(first.workspaceId, viewer);
 
-    expect(called.ok ? called.value.role : called.error).toBe("Viewer");
+    assert(called.ok);
+    expect(called.value.role).toBe("Viewer");
     expect(
       await stampedIn(second.workspaceId, viewer),
       "another workspace is untouched",
@@ -166,7 +171,8 @@ describe("stamping a member's last activity", () => {
       resolvedIn(workspace.workspaceId, viewer),
     );
 
-    expect(answered.ok ? answered.value : answered.error).toBe("Viewer");
+    assert(answered.ok);
+    expect(answered.value).toBe("Viewer");
     expect(await stampedIn(workspace.workspaceId, viewer)).toBeUndefined();
   });
 
@@ -185,7 +191,8 @@ describe("stamping a member's last activity", () => {
       ),
     );
 
-    expect(acted.ok ? acted.value.changed : acted.error).toEqual([editor]);
+    assert(acted.ok);
+    expect(acted.value.changed).toEqual([editor]);
     expect(
       await stampedIn(workspace.workspaceId, workspace.adminUserId),
       "the stamp was dropped, not waited on",
@@ -207,7 +214,8 @@ describe("stamping a member's last activity", () => {
       await until(async () => (await countWaitingOnLocks(db().pool)) > 0);
 
       const read = await resolvedIn(workspace.workspaceId, workspace.adminUserId);
-      expect(read.ok ? read.value : read.error).toBe("Admin");
+      assert(read.ok);
+      expect(read.value).toBe("Admin");
       expect(
         await stampedIn(workspace.workspaceId, workspace.adminUserId),
         "the stamp landed while the bulk act held its rows",
@@ -218,7 +226,8 @@ describe("stamping a member's last activity", () => {
     });
 
     const answered = await acted;
-    expect(answered.ok ? answered.value : answered.error).toMatchObject({
+    assert(answered.ok);
+    expect(answered.value).toMatchObject({
       changed: [viewer],
       skipped: 1,
     });
@@ -276,7 +285,8 @@ describe("stamping a member's last activity", () => {
     );
     await ending;
 
-    expect(answered.ok ? answered.value : answered.error).toBe("Viewer");
+    assert(answered.ok);
+    expect(answered.value).toBe("Viewer");
     expect(
       await stampedIn(workspace.workspaceId, viewer),
       "no connection was left for the stamp, and it was let go",
@@ -292,7 +302,8 @@ describe("stamping a member's last activity", () => {
       expect(removed.ok).toBe(true);
     });
 
-    expect(read.ok ? read.value : read.error).toBe("Viewer");
+    assert(read.ok);
+    expect(read.value).toBe("Viewer");
     expect(
       await stampedIn(workspace.workspaceId, viewer),
       "the person had left before the stamp",

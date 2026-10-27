@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { boundarySchemas, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
@@ -198,10 +198,8 @@ describe("renaming a group", () => {
 
     expect(renamed).toEqual({ ok: false, error: "name-taken" });
     const listed = await asAdmin(workspace, listGroups);
-    expect(listed.ok && listed.value.map((group) => group.name)).toEqual([
-      "HR team",
-      "Sales executives",
-    ]);
+    assert(listed.ok);
+    expect(listed.value.map((group) => group.name)).toEqual(["HR team", "Sales executives"]);
   });
 
   it("refuses a group id nobody holds", async () => {
@@ -593,8 +591,7 @@ describe("a role that may not shape who sees what", () => {
         outcomesOf(everyVerb(groupId, person), principal, tx),
       );
 
-      expect(outcomes.ok).toBe(true);
-      if (!outcomes.ok) return;
+      assert(outcomes.ok);
       expect(outcomes.value).toEqual(refusedAlike(everyVerb(groupId, person), "role-forbids"));
 
       expect((await peopleActions(workspace.workspaceId)).map((event) => event.action)).toEqual([
@@ -649,8 +646,8 @@ describe("an action whose transaction fails after it", () => {
     await expect(
       asPerson(workspace, workspace.adminUserId, async (principal, tx) => {
         const made = await createGroup(principal, tx, { name: "HR team" });
-        expect(made.ok).toBe(true);
-        if (made.ok) groupId = made.value.groupId;
+        assert(made.ok, "the first group was made");
+        groupId = made.value.groupId;
 
         await attempt(() => groupNameTakenAgain(tx, workspace.workspaceId, "HR team"));
       }),

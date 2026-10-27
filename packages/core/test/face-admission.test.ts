@@ -57,6 +57,8 @@ const STEPS: Readonly<Record<string, string>> = {
 
 const NO_LISTED_STEP = "takes a person, admits nobody and is no listed step";
 
+const stepLine = (step: string): string => `${step}: ${STEPS[step] ?? NO_LISTED_STEP}`;
+
 const SRC = "./src/";
 
 const exportedFaces = (): readonly string[] => {
@@ -78,17 +80,15 @@ describe("the faces of core, each admitting whoever it takes", () => {
     () => {
       const files = coreSourceFiles();
       const sources = Object.fromEntries(
-        asSliceRelative(files).map((file, index) => [
-          file,
-          readFileSync(files[index] ?? file, "utf8"),
-        ]),
+        files.flatMap((file) =>
+          asSliceRelative([file]).map((relative) => [relative, readFileSync(file, "utf8")]),
+        ),
       );
       const faces = directories().filter((directory) => !HOLDS_NO_ACTION.includes(directory));
 
-      const found = facesAdmittingNobody(sources, faces).map(({ face, name }) => {
-        const step = `${face}/${name}`;
-        return `${step}: ${STEPS[step] ?? NO_LISTED_STEP}`;
-      });
+      const found = facesAdmittingNobody(sources, faces).map(({ face, name }) =>
+        stepLine(`${face}/${name}`),
+      );
 
       expect(found.toSorted()).toEqual(
         Object.entries(STEPS)
@@ -109,7 +109,11 @@ describe("the faces of core, each admitting whoever it takes", () => {
     const leftOut = (face: string): boolean =>
       HOLDS_NO_ACTION.some((directory) => face.startsWith(`${directory}/`));
 
-    expect(exportedFaces().filter((face) => !read(face) && !leftOut(face))).toEqual([]);
+    expect(
+      exportedFaces()
+        .filter((face) => !read(face))
+        .filter((face) => !leftOut(face)),
+    ).toEqual([]);
     expect(exportedFaces()).toContain("answering/index.ts");
   });
 

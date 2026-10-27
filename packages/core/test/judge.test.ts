@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { conceptIriOf, WELL_FORMED_ULID } from "@better-answers/schema";
@@ -381,8 +381,9 @@ describe("ask with a judge", () => {
 
     const failed = await askedOutright(asker, wire);
 
-    expect(failed.ok).toBe(false);
-    expect(!failed.ok && failed.error instanceof Error && failed.error.message).toBe(
+    assert(!failed.ok);
+    assert(failed.error instanceof Error);
+    expect(failed.error.message).toBe(
       "llm: the workspace's model key did not open (envelope-not-authentic)",
     );
     await expectNoCall(workspaceId, wire);
@@ -422,7 +423,9 @@ describe("ask with a judge", () => {
       candidates: 1,
     });
 
-    const sentFor = [...candidatesIn(promptOf(wire.sent[0]?.body ?? ""))];
+    const [request] = wire.sent;
+    assert(request !== undefined, "the judge was called");
+    const sentFor = [...candidatesIn(promptOf(request.body))];
     expect(sentFor).toHaveLength(1);
     expect(titlesOf(answer.answers)).toEqual(sentFor.map(([title]) => title));
     expect(answer.related.map((concept) => [concept.kind, "body" in concept])).toEqual([
@@ -459,8 +462,6 @@ describe("ask with a judge", () => {
 
   it("records the judge's verdict for each candidate sent", async () => {
     const { asker, iris, wire } = await arranged([USERS, SUPPLIER, NOT_AN_ANSWER], [USERS.title]);
-    const [users, supplier, note] = iris;
-
     const answer = await askedWith(asker, { question: QUESTION }, wire);
 
     const record = await recordOf(answer.recordId);
@@ -470,11 +471,7 @@ describe("ask with a judge", () => {
       "judged",
       true,
     ]);
-    expect([judged.get(users ?? ""), judged.get(supplier ?? ""), judged.get(note ?? "")]).toEqual([
-      "yes",
-      "no",
-      undefined,
-    ]);
+    expect(iris.map((iri) => judged.get(iri))).toEqual(["yes", "no", undefined]);
   });
 
   it("sends as max_tokens the tokens out it reserved", async () => {
@@ -484,7 +481,9 @@ describe("ask with a judge", () => {
 
     await askedWith(asker, { question: QUESTION }, wire);
 
-    const sent = z.object({ max_tokens: z.number() }).parse(JSON.parse(wire.sent[0]?.body ?? ""));
+    const [request] = wire.sent;
+    assert(request !== undefined, "the judge was called");
+    const sent = z.object({ max_tokens: z.number() }).parse(JSON.parse(request.body));
     expect(reserved).toEqual([16_000]);
     expect(sent.max_tokens).toBe(16_000);
   });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { parse as parseYaml } from "yaml";
 
 import { head } from "@better-answers/core/store/git";
@@ -332,11 +332,15 @@ describe("seeding a guide from a template", () => {
       'SELECT name, email FROM "user" WHERE id = $1',
       [ng.admin.userId],
     );
+    const [adminRow] = admin.rows;
+    assert(adminRow !== undefined, "the admin has a user row");
 
     const facts = await commitFacts(git, workspaceId, sha);
-    const parent = await commitFacts(git, workspaceId, facts.parents[0] ?? "");
+    const [parentSha] = facts.parents;
+    assert(parentSha !== undefined, "the skeleton commit has a parent");
+    const parent = await commitFacts(git, workspaceId, parentSha);
 
-    expect(facts.author).toBe(`${admin.rows[0]?.name} <${admin.rows[0]?.email}>`);
+    expect(facts.author).toBe(`${adminRow.name} <${adminRow.email}>`);
     expect(facts.trailers).toEqual({
       Actor: `human:${ng.admin.userId}`,
       Audit: auditEventId,
@@ -413,7 +417,7 @@ describe("seeding a guide from a template", () => {
     });
     expect(file.endsWith("}\n")).toBe(true);
     expect(file).not.toContain("Open with the facts");
-    expect(file).not.toContain(admin.rows[0]?.email ?? "");
+    expect(file).not.toContain(adminRow.email);
     expect(insurance.needs_review).toBe("expectation-unmet");
 
     const version = await db().pool.query<{ content: unknown }>(
@@ -475,7 +479,7 @@ describe("including an available concept", () => {
     );
 
     expect(included).toEqual({ included: 1, sha: await head(ng.admin, git) });
-    if (!("sha" in included)) throw new Error("nothing was included");
+    assert("sha" in included, "nothing was included");
     const after = await coverageAs(ng.editor, guideId);
     expect(statesOf(after)[2]).toEqual([
       "Insurance and financial standing",
