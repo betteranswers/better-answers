@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { Page } from "@playwright/test";
 
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
@@ -93,6 +95,8 @@ const inTheDark = (page: Page) =>
     localStorage.setItem(key, "dark");
   }, THEME_KEPT_UNDER);
 
+const withNoThemeKept = (_page: Page): Promise<void> => Promise.resolve();
+
 const walked = async (page: Page): Promise<readonly Drawn[]> => {
   const edge = await inkOf(page);
   const seen: Drawn[] = [];
@@ -124,12 +128,12 @@ const holdsTheRing = async (page: Page, stops: readonly Drawn[]): Promise<void> 
   }
 };
 
-for (const [theme, kept] of [
-  ["", false],
-  [" dark", true],
+for (const [theme, themeKept] of [
+  ["", withNoThemeKept],
+  [" dark", inTheDark],
 ] as const) {
   test(`shows${theme} focus at 3:1 on every sign-in page control`, async ({ page }) => {
-    if (kept) await inTheDark(page);
+    await themeKept(page);
     await page.goto("/sign-in");
     await expect(page.getByRole("button", { name: "Send Code" })).toBeVisible();
 
@@ -137,7 +141,7 @@ for (const [theme, kept] of [
   });
 
   test(`the primary button's${theme} ring holds 3:1 on its fill`, async ({ page }) => {
-    if (kept) await inTheDark(page);
+    await themeKept(page);
     await page.goto("/sign-in");
     const send = page.getByRole("button", { name: "Send Code" });
     await send.focus();
@@ -147,8 +151,7 @@ for (const [theme, kept] of [
     await focusSettled(page);
 
     const drawn = await drawnFocus(page, await inkOf(page));
-    expect(drawn, "the primary button took no focus").toBeDefined();
-    if (drawn === undefined) return;
+    assert.ok(drawn !== undefined, "the primary button took no focus");
     expect(
       contrastBetween(paintedOver(drawn.ring, drawn.behind), drawn.fill),
       "the ring disappears into the primary fill",
@@ -156,7 +159,7 @@ for (const [theme, kept] of [
   });
 
   test(`draws the token's${theme} ring on every shell page control`, async ({ page, request }) => {
-    if (kept) await inTheDark(page);
+    await themeKept(page);
     const email = anAddress("focus");
     await provision(request, { name: "Calder Joinery", adminEmail: email });
     await signedInAtHome(page, request, email);

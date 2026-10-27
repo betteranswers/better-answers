@@ -31,6 +31,12 @@ const HOME_NAMED = {
   Viewer: "New Question",
 } as const satisfies Readonly<Record<Role, string>>;
 
+const CONTROL_CENTRE_MENUS = {
+  Admin: 1,
+  Editor: 0,
+  Viewer: 0,
+} as const satisfies Readonly<Record<Role, number>>;
+
 const signedInAs = async (page: Page, api: APIRequestContext, role: Role) => {
   const email = anAddress(role.toLowerCase());
   const member = await person(api, email, { displayName: `A ${role}` });
@@ -65,7 +71,7 @@ for (const role of ROLES) {
     await signedInAs(page, request, role);
 
     await landedAtHome(page, role);
-    await expect(controlCentreMenu(page)).toHaveCount(role === "Admin" ? 1 : 0);
+    await expect(controlCentreMenu(page)).toHaveCount(CONTROL_CENTRE_MENUS[role]);
   });
 
   test(`offers ${A_ROLE[role]} their own home at an unknown address`, async ({

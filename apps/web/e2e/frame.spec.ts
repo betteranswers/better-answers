@@ -182,6 +182,63 @@ const halfUnderTheBand = (page: Page) =>
       .map((node) => node.getAttribute("aria-label") ?? node.textContent);
   });
 
+const contentIsLastWithNoJumps = () => {
+  const bar = document.querySelector("header");
+  const content = document.querySelector("main");
+  if (bar === null || content === null) return false;
+  const following = bar.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING;
+  const jumped = [...document.querySelectorAll("[tabindex]")].some(
+    (element) => Number(element.getAttribute("tabindex")) > 0,
+  );
+  return following !== 0 && !jumped;
+};
+
+const cutOf = (node: Element) => ({
+  overflows: node.scrollWidth > node.clientWidth,
+  ellipsis: getComputedStyle(node).textOverflow,
+});
+
+const surfaceBehind = (main: Element) => {
+  const nothing = "rgba(0, 0, 0, 0)";
+  const probe = document.createElement("div");
+  probe.style.backgroundColor = "var(--surface-page)";
+  document.body.append(probe);
+  const token = getComputedStyle(probe).backgroundColor;
+  probe.remove();
+
+  let behind = main.parentElement;
+  while (behind !== null && getComputedStyle(behind).backgroundColor === nothing) {
+    behind = behind.parentElement;
+  }
+  return { behind: behind === null ? nothing : getComputedStyle(behind).backgroundColor, token };
+};
+
+const onlyTheOfferAboveThePage = (offer: string) => {
+  const above = document.querySelector("main")?.previousElementSibling;
+  return above === null || above?.getAttribute("aria-label") === offer;
+};
+
+const plantedProse = () => {
+  const content = document.querySelector("[data-page-content]");
+  if (content === null) throw new Error("the page marks no content wrapper");
+  const long = "a sentence long enough to run past the measure, ".repeat(6);
+  const planted = document.createElement("div");
+  planted.innerHTML = `<p>${long}</p><table><tbody><tr><td><p>${long}</p></td></tr></tbody></table><div role="dialog"><h2>${long}</h2></div>`;
+  content.append(planted);
+  const drawn = (selector: string) => {
+    const node = planted.querySelector(selector);
+    if (node === null) throw new Error(`nothing planted matches ${selector}`);
+    return { cap: getComputedStyle(node).maxWidth, width: node.getBoundingClientRect().width };
+  };
+  const read = {
+    alone: drawn(":scope > p"),
+    "a table": drawn("td > p"),
+    "a dialog": drawn("[role='dialog'] > h2"),
+  };
+  planted.remove();
+  return read;
+};
+
 const pageGrownBy = (page: Page, grown: number) =>
   page.evaluate((height) => {
     const id = "grown-by";
@@ -629,16 +686,7 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
   await expect(panel).toBeFocused();
   await expect(panel.getByRole("region", { name: "Model Choices" })).toBeVisible();
 
-  const contentIsLast = await page.evaluate(() => {
-    const bar = document.querySelector("header");
-    const content = document.querySelector("main");
-    if (bar === null || content === null) return false;
-    const following = bar.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING;
-    const jumped = [...document.querySelectorAll("[tabindex]")].some(
-      (element) => Number(element.getAttribute("tabindex")) > 0,
-    );
-    return following !== 0 && !jumped;
-  });
+  const contentIsLast = await page.evaluate(contentIsLastWithNoJumps);
   expect(contentIsLast).toBe(true);
 });
 
@@ -658,9 +706,9 @@ test("leaves no target half under the band after skipping", async ({ page, reque
   await skipLinkReachesThePage(page);
 
   const screen = await page.evaluate(() => innerHeight);
+  expect(await pageGrownBy(page, 0), "the page scrolls before it is grown").toBe(0);
   for (let grown = 0; grown <= screen; grown += 4) {
-    const overflow = await pageGrownBy(page, grown);
-    if (grown === 0) expect(overflow, "the page scrolls before it is grown").toBe(0);
+    await pageGrownBy(page, grown);
     await page.getByRole("link", { name: "Skip to the Page" }).focus();
     await page.keyboard.press("Enter");
     await expect(page.getByRole("main")).toBeFocused();
@@ -708,11 +756,10 @@ test("names all four parts at 320 pixels, clipping none", async ({ page, request
     expect(box.y, `${name} shares the controls' row`).toBeGreaterThanOrEqual(row.y + row.height);
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width, `${name} is clipped`).toBeLessThanOrEqual(NARROW.width);
-    const cut = await part.evaluate(
-      (node) =>
-        node.scrollWidth > node.clientWidth || getComputedStyle(node).textOverflow !== "clip",
-    );
-    expect(cut, `${name} is cut short`).toBe(false);
+    expect(await part.evaluate(cutOf), `${name} is cut short`).toEqual({
+      overflows: false,
+      ellipsis: "clip",
+    });
   }
   await expect(crumbOf(page, "Invitations")).toHaveAttribute("aria-current", "page");
 
@@ -821,20 +868,7 @@ test("paints the shell in the page's own surface token", async ({ page, request 
   await signedIn(page, request, "Southern Castings");
   await page.goto(MODELS_AND_SPEND.path);
 
-  const painted = await page.locator("main").evaluate((main) => {
-    const nothing = "rgba(0, 0, 0, 0)";
-    const probe = document.createElement("div");
-    probe.style.backgroundColor = "var(--surface-page)";
-    document.body.append(probe);
-    const token = getComputedStyle(probe).backgroundColor;
-    probe.remove();
-
-    let behind = main.parentElement;
-    while (behind !== null && getComputedStyle(behind).backgroundColor === nothing) {
-      behind = behind.parentElement;
-    }
-    return { behind: behind === null ? nothing : getComputedStyle(behind).backgroundColor, token };
-  });
+  const painted = await page.locator("main").evaluate(surfaceBehind);
   expect(painted.token).not.toBe("rgba(0, 0, 0, 0)");
   expect(painted.behind).toBe(painted.token);
 });
@@ -873,10 +907,7 @@ test("draws no toolbar over a page without tabs", async ({ page, request }) => {
 
   await expect(page.getByRole("tablist")).toHaveCount(0);
 
-  const met = await page.evaluate((offer) => {
-    const above = document.querySelector("main")?.previousElementSibling;
-    return above === null || above?.getAttribute("aria-label") === offer;
-  }, "Passkeys");
+  const met = await page.evaluate(onlyTheOfferAboveThePage, "Passkeys");
   expect(met, "something other than the passkey offer stands above the page").toBe(true);
 });
 
@@ -1032,26 +1063,7 @@ test("measures a page's prose, but not a table's or dialog's", async ({ page, re
   await page.goto(MEMBERS.path);
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 
-  const prose = await page.evaluate(() => {
-    const content = document.querySelector("[data-page-content]");
-    if (content === null) throw new Error("the page marks no content wrapper");
-    const long = "a sentence long enough to run past the measure, ".repeat(6);
-    const planted = document.createElement("div");
-    planted.innerHTML = `<p>${long}</p><table><tbody><tr><td><p>${long}</p></td></tr></tbody></table><div role="dialog"><h2>${long}</h2></div>`;
-    content.append(planted);
-    const drawn = (selector: string) => {
-      const node = planted.querySelector(selector);
-      if (node === null) throw new Error(`nothing planted matches ${selector}`);
-      return { cap: getComputedStyle(node).maxWidth, width: node.getBoundingClientRect().width };
-    };
-    const read = {
-      alone: drawn(":scope > p"),
-      "a table": drawn("td > p"),
-      "a dialog": drawn("[role='dialog'] > h2"),
-    };
-    planted.remove();
-    return read;
-  });
+  const prose = await page.evaluate(plantedProse);
 
   const { alone, ...lifted } = prose;
   const measure = Number.parseFloat(alone.cap);

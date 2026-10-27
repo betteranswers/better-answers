@@ -2,7 +2,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { KNOWLEDGE_BASE_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
-import { HOMES, KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { HOMES, KNOWLEDGE, menuGroupIn, pageNamed, type Role } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -115,6 +115,17 @@ const rowsOf = (concepts: Locator): Locator =>
 
 const knowledgeBase = (page: Page): Locator =>
   page.getByRole("region", { name: "Knowledge Base", exact: true });
+
+const signedInAtHomeAs = async (page: Page, api: APIRequestContext, role: Role) => {
+  if (role === "Admin") {
+    const email = anAddress("admin");
+    await provision(api, { name: "Usk Valley Admins", adminEmail: email });
+    await signedIn(page, api, email);
+    await page.goto(HOMES.Admin.path);
+  } else {
+    await aMemberSignedInAt(page, api, role, HOMES[role].path);
+  }
+};
 
 const atTheKnowledgeBase = async (page: Page): Promise<void> => {
   await page.goto(KNOWLEDGE_BASE);
@@ -324,14 +335,7 @@ test.describe("Knowledge Base", () => {
       page,
       request,
     }) => {
-      if (role === "Admin") {
-        const email = anAddress("admin");
-        await provision(request, { name: "Usk Valley Admins", adminEmail: email });
-        await signedIn(page, request, email);
-        await page.goto(HOMES.Admin.path);
-      } else {
-        await aMemberSignedInAt(page, request, role, HOMES[role].path);
-      }
+      await signedInAtHomeAs(page, request, role);
 
       const menu = await knowledgeMenuOpened(page);
       await expect(menu.getByRole("heading", { level: 3 }).first()).toHaveText("Browse");

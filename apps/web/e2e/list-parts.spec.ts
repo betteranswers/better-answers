@@ -32,6 +32,23 @@ const backUntilFocused = async (page: Page, target: Locator) => {
   await expect(target, "Shift+Tab never reached it").toBeFocused();
 };
 
+const roomAtTheEdge = () => {
+  const edge = document.documentElement.clientWidth;
+  const table = document.querySelector('[data-slot="table-container"]');
+  const outside = [...document.querySelectorAll("main *")].filter(
+    (node) => table === null || !table.contains(node),
+  );
+  return {
+    scrolls: document.documentElement.scrollWidth,
+    holds: edge,
+    pastTheEdge: outside
+      .filter((node) => node.getBoundingClientRect().right > edge)
+      .map((node) => node.outerHTML.slice(0, 120)),
+    tableScrolls: table?.scrollWidth ?? 0,
+    tableHolds: table?.clientWidth ?? 0,
+  };
+};
+
 const TARGET = 24;
 
 const targetOf = (tick: Locator) =>
@@ -63,22 +80,7 @@ test.describe("the shared list parts, drawn together", () => {
     await expect(bar(page).getByRole("status")).toHaveText(/\b2\b/);
     await expect(page.getByRole("navigation", { name: "Pages of Members" })).toBeVisible();
 
-    const room = await page.evaluate(() => {
-      const edge = document.documentElement.clientWidth;
-      const table = document.querySelector('[data-slot="table-container"]');
-      const outside = [...document.querySelectorAll("main *")].filter(
-        (node) => table === null || !table.contains(node),
-      );
-      return {
-        scrolls: document.documentElement.scrollWidth,
-        holds: edge,
-        pastTheEdge: outside
-          .filter((node) => node.getBoundingClientRect().right > edge)
-          .map((node) => node.outerHTML.slice(0, 120)),
-        tableScrolls: table?.scrollWidth ?? 0,
-        tableHolds: table?.clientWidth ?? 0,
-      };
-    });
+    const room = await page.evaluate(roomAtTheEdge);
     expect(room.scrolls, "the page scrolls sideways").toBeLessThanOrEqual(room.holds);
     expect(room.pastTheEdge, "a part outside the table reaches past the edge").toEqual([]);
     test.info().annotations.push({
