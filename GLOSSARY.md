@@ -188,8 +188,8 @@ An Admin's recorded action that moves a connected source to a wider sensitivity,
 both.
 
 **Narrowing**:
-A source document taking a sensitivity of its own, narrower than its connected source's, by an
-Admin's action or because redaction found special category in it.
+A source document taking a sensitivity of its own, by an Admin's action or because redaction found
+special category in it.
 
 **Cascade**:
 The carrying of a visibility change to every concept citing the evidence that moved, and then to
@@ -216,9 +216,6 @@ One document's findings of one category, raised by one rule, which is the unit a
 **Special category**:
 Personal data such as health data, which redaction withholds sentence by sentence. A document that
 holds it takes a narrowing.
-
-**Cue**:
-A word that marks a sentence as special category, so that redaction withholds the sentence whole.
 
 **Dismissal**:
 An Admin's review of a special-category finding as not special category. It is the only way a
