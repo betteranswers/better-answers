@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import {
   KERNEL_REFUSALS,
@@ -323,8 +323,8 @@ describe("the pending clock a judged session carries", () => {
     try {
       const read = await judged(sessionId, AT);
 
-      expect(read.ok).toBe(false);
-      expect(!read.ok && read.error instanceof Error).toBe(true);
+      assert(!read.ok);
+      expect(read.error).toBeInstanceOf(Error);
     } finally {
       await db().pool.query(
         'ALTER TABLE session RENAME COLUMN "pending_since_gone" TO pending_since',
