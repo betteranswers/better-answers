@@ -1378,7 +1378,7 @@ describe("the pull request's title, read by check.yml", () => {
       named: "[header-names-no-ticket]",
     },
     {
-      shape: "a title over 90 characters",
+      shape: "a title over 100 characters",
       title: `ci: check the title${" and check it again".repeat(4)}`,
       named: "[header-max-length]",
     },
