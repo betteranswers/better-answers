@@ -34,6 +34,12 @@ const scanWorkflowSchema = z.object({
       }),
       steps: z.array(workflowStepSchema),
     }),
+    alerts: z.object({
+      needs: z.string(),
+      if: z.string(),
+      permissions: z.record(z.string(), z.string()),
+      steps: z.array(workflowStepSchema),
+    }),
   }),
 });
 
@@ -213,5 +219,152 @@ describe("the nightly scan of the images build.yml pushes", () => {
 
   it("runs each night after the mutation run has started", () => {
     expect(cronOf("scan.yml")).toBeGreaterThan(cronOf("mutation.yml"));
+  });
+});
+
+const publishedSchema = z.object({
+  run: z.string(),
+  open: z.array(z.object({ number: z.number(), severity: z.string(), message: z.string() })),
+  fixable: z.array(z.object({ number: z.number() })),
+});
+
+type Published = {
+  readonly status: number | null;
+  readonly calls: readonly string[];
+  readonly alerts: z.infer<typeof publishedSchema>;
+  readonly commit: unknown;
+  readonly log: string;
+};
+
+const alert = (
+  number: number,
+  location: string,
+  fixedVersion: string,
+  fixedAt: string | null = null,
+) => ({
+  number,
+  created_at: "2026-10-25T08:42:19Z",
+  state: "dismissed",
+  fixed_at: fixedAt,
+  dismissed_comment: "Unreachable (none): nothing runs it",
+  html_url: `https://github.com/betteranswers/better-answers/security/code-scanning/${number}`,
+  rule: { id: `CVE-2026-${number}`, security_severity_level: "high" },
+  most_recent_instance: {
+    category: "image-api",
+    location: { path: location },
+    message: { text: `Package: openssl\nSeverity: HIGH\nFixed Version: ${fixedVersion}\n` },
+  },
+});
+
+const OPEN = { ...alert(7, "betteranswers/api", ""), state: "open" };
+const FIXABLE_DEBIAN = alert(11, "betteranswers/api", "3.5.4-1~deb13u2");
+const FIXABLE_PIN = alert(12, "app/node_modules/undici/package.json", "7.24.0");
+const NO_FIX = alert(13, "betteranswers/api", "");
+const BINARY = alert(14, "usr/bin/rclone", "1.72.0");
+const ALREADY_FIXED = alert(15, "betteranswers/api", "3.5.4-1~deb13u2", "2026-10-20T03:50:00Z");
+
+const publishWith = (branchExists: boolean): Published => {
+  const [step] = scanWorkflow().jobs.alerts.steps;
+  assert(step !== undefined, "the alerts job has a step");
+  const directory = mkdtempSync(path.join(tmpdir(), "scan-alerts-"));
+  const file = (name: string) => path.join(directory, name);
+  try {
+    writeFileSync(file("open-pages.json"), JSON.stringify([[OPEN]]));
+    writeFileSync(
+      file("dismissed-pages.json"),
+      JSON.stringify([
+        [FIXABLE_DEBIAN, NO_FIX],
+        [FIXABLE_PIN, BINARY, ALREADY_FIXED],
+      ]),
+    );
+    writeFileSync(file("calls"), "");
+    writeFileSync(file("summary"), "");
+    writeFileSync(
+      file("gh"),
+      [
+        "#!/bin/sh",
+        `printf '%s\\n' "$*" >> '${file("calls")}'`,
+        'case "$*" in',
+        `  *state=open*) cat '${file("open-pages.json")}' ;;`,
+        `  *state=dismissed*) cat '${file("dismissed-pages.json")}' ;;`,
+        `  *git/trees*) cat > '${file("tree.json")}'; echo tree-sha ;;`,
+        `  *git/commits*) cat > '${file("commit.json")}'; echo commit-sha ;;`,
+        `  *git/ref/heads/*) ${branchExists ? "exit 0" : "echo 'HTTP 404: Not Found' >&2; exit 1"} ;;`,
+        "esac",
+        "",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+    const ran = spawnSync(
+      "bash",
+      ["--noprofile", "--norc", "-e", "-o", "pipefail", "-c", step.run ?? ""],
+      {
+        cwd: directory,
+        encoding: "utf8",
+        env: {
+          ...step.env,
+          PATH: `${directory}${path.delimiter}${process.env["PATH"] ?? ""}`,
+          REPO: "betteranswers/better-answers",
+          RUN: "https://github.com/betteranswers/better-answers/actions/runs/1",
+          GITHUB_STEP_SUMMARY: file("summary"),
+        },
+      },
+    );
+    expect(ran.error, "bash did not start").toBeUndefined();
+    const tree = z
+      .object({ tree: z.array(z.object({ path: z.string(), content: z.string() })) })
+      .parse(JSON.parse(readFileSync(file("tree.json"), "utf8")));
+    expect(tree.tree.map((entry) => entry.path)).toEqual(["alerts.json"]);
+    return {
+      status: ran.status,
+      calls: readFileSync(file("calls"), "utf8").trim().split("\n"),
+      alerts: publishedSchema.parse(JSON.parse(tree.tree[0]?.content ?? "null")),
+      commit: JSON.parse(readFileSync(file("commit.json"), "utf8")),
+      log: ran.stdout + ran.stderr + readFileSync(file("summary"), "utf8"),
+    };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+};
+
+describe("the alerts branch the weekly triage reads", () => {
+  it("runs after every scan leg, able to read code scanning", () => {
+    const job = scanWorkflow().jobs.alerts;
+
+    expect(job.needs).toEqual("trivy");
+    expect(job.if).toEqual("${{ !cancelled() }}");
+    expect(job.permissions).toEqual({ contents: "write", "security-events": "read" });
+  });
+
+  it("publishes open alerts and dismissed ones a fix now closes", () => {
+    const published = publishWith(false);
+
+    expect(published.status, `the step went red: ${published.log}`).toBe(0);
+    expect(published.alerts.open.map((each) => each.number)).toEqual([7]);
+    expect(published.alerts.open[0]?.severity).toEqual("high");
+    expect(published.alerts.open[0]?.message).toContain("Package: openssl");
+    expect(published.alerts.fixable.map((each) => each.number)).toEqual([11, 12]);
+    expect(published.alerts.run).toEqual(
+      "https://github.com/betteranswers/better-answers/actions/runs/1",
+    );
+    expect(published.commit).toMatchObject({ tree: "tree-sha", parents: [] });
+    expect(published.log).toContain("1 open alerts and 2 dismissed ones");
+  });
+
+  it("creates the branch the first night", () => {
+    const published = publishWith(false);
+
+    expect(published.calls).toContain(
+      "api repos/betteranswers/better-answers/git/refs -f ref=refs/heads/security/alerts -f sha=commit-sha --silent",
+    );
+  });
+
+  it("replaces the branch's one commit every night after", () => {
+    const published = publishWith(true);
+
+    expect(published.status, `the step went red: ${published.log}`).toBe(0);
+    expect(published.calls).toContain(
+      "api -X PATCH repos/betteranswers/better-answers/git/refs/heads/security/alerts -f sha=commit-sha -F force=true --silent",
+    );
   });
 });

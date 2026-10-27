@@ -233,6 +233,8 @@ gh api --paginate 'repos/{owner}/{repo}/code-scanning/alerts?state=dismissed&per
 
 The method is the same at every severity; `IMAGE_VULNERABILITIES.md` says which severities have been through it.
 
+**The alerts branch.** After the scan legs, whatever each did, the `alerts` job writes `alerts.json` to the branch `security/alerts`, as one commit with no parent that replaces the night before's. The file holds the run's URL, every open alert and the alerts the query above names, each cut to its number, dates, severity, rule, category, path, message, dismissal comment and URL. It exists for the weekly triage, a Claude Code routine run in the cloud: a cloud session's GitHub calls carry the Claude GitHub App's token, whatever token the session sets, and that App cannot read code scanning, so from 05/10 to 26/10/2026 the routine got a 403 every week. The routine reads the branch with `git fetch origin security/alerts` instead. The job's token reads code scanning and writes the branch; the ruleset covers `main` alone, and a push made with a run's own token starts no workflow.
+
 **Code scanning on the repository.** The workflow changes no repository setting. If code scanning refuses the upload until one is turned on, turning it on is the owner's call, as the repository's admin.
 
 ## The `docker-hub-login` action

@@ -95,3 +95,48 @@ jobs:
         with:
           sarif_file: ${{ matrix.tier }}.sarif
           category: image-${{ matrix.tier }}
+
+  # A cloud session's GitHub calls carry the Claude GitHub App's token, which cannot read code scanning, so the weekly triage reads this branch.
+  alerts:
+    needs: trivy
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      security-events: read
+    steps:
+      - name: the open alerts and the dismissed ones a fix now closes, on the alerts branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: security/alerts
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHAPE: >-
+            {number, created_at, state, severity: .rule.security_severity_level, rule: .rule.id,
+            category: .most_recent_instance.category, path: .most_recent_instance.location.path,
+            message: .most_recent_instance.message.text, dismissed_comment, url: .html_url}
+          # CI.md's dismissed-but-now-fixable query, per alert.
+          FIXABLE: >-
+            select(.fixed_at == null)
+            | select(.most_recent_instance.location.path | test("^[^/]+/[^/]+$|package\\.json$|METADATA$"))
+            | select(.most_recent_instance.message.text | test("Fixed Version: \\S"))
+        run: |
+          set -euo pipefail
+          list() { gh api --paginate --slurp "repos/${REPO}/code-scanning/alerts?state=$1&per_page=100"; }
+          list open > open.json
+          list dismissed > dismissed.json
+          jq --null-input --slurpfile open open.json --slurpfile dismissed dismissed.json --arg run "${RUN}" \
+            "{run: \$run, open: [\$open[0][][] | ${SHAPE}], fixable: [\$dismissed[0][][] | ${FIXABLE} | ${SHAPE}]}" > alerts.json
+          tree="$(jq --null-input --rawfile content alerts.json \
+            '{tree: [{path: "alerts.json", mode: "100644", type: "blob", content: $content}]}' \
+            | gh api "repos/${REPO}/git/trees" --input - --jq .sha)"
+          commit="$(jq --null-input --arg tree "${tree}" --arg message "chore(scan): the alerts as ${RUN} left them" \
+            '{message: $message, tree: $tree, parents: []}' \
+            | gh api "repos/${REPO}/git/commits" --input - --jq .sha)"
+          if gh api "repos/${REPO}/git/ref/heads/${BRANCH}" --silent 2>/dev/null; then
+            gh api -X PATCH "repos/${REPO}/git/refs/heads/${BRANCH}" -f sha="${commit}" -F force=true --silent
+          else
+            gh api "repos/${REPO}/git/refs" -f ref="refs/heads/${BRANCH}" -f sha="${commit}" --silent
+          fi
+          echo "\`${BRANCH}\` holds $(jq '.open | length' alerts.json) open alerts and $(jq '.fixable | length' alerts.json) dismissed ones a fix now closes." >> "$GITHUB_STEP_SUMMARY"
