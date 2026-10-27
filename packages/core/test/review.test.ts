@@ -1,5 +1,5 @@
 import type pg from "pg";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import type { z } from "zod";
 
 import { REASONS_EMPTYING_THE_CONNECTED_SOURCE } from "@better-answers/schema";
@@ -405,7 +405,10 @@ describe("the review read of a connected source's findings", () => {
 
     const read = await findingsAs(scenario.admin, connectedSourceId);
 
-    expect(read.ok ? Object.keys(read.value[0] ?? {}).toSorted() : []).toEqual([
+    assert(read.ok);
+    const [group] = read.value;
+    assert(group !== undefined, "the finding is grouped");
+    expect(Object.keys(group).toSorted()).toEqual([
       "category",
       "dismissed",
       "documentId",
@@ -439,14 +442,13 @@ describe("the review read of a connected source's findings", () => {
 
     const read = await findingsAs(scenario.admin, connectedSource.connectedSourceId);
 
+    assert(read.ok);
     expect(
-      read.ok
-        ? read.value.map((group) => ({
-            category: group.category,
-            specialCategory: group.specialCategory,
-            sensitivity: group.sensitivity,
-          }))
-        : [],
+      read.value.map((group) => ({
+        category: group.category,
+        specialCategory: group.specialCategory,
+        sensitivity: group.sensitivity,
+      })),
     ).toEqual([
       { category: "bank-details", specialCategory: false, sensitivity: "Internal" },
       { category: "special-category", specialCategory: true, sensitivity: "Restricted" },
@@ -469,14 +471,13 @@ describe("the review read of a connected source's findings", () => {
 
     const read = await findingsAs(scenario.admin, connectedSourceId);
 
+    assert(read.ok);
     expect(
-      read.ok
-        ? read.value.map((group) => ({
-            documentId: group.documentId,
-            found: group.found,
-            dismissed: group.dismissed,
-          }))
-        : [],
+      read.value.map((group) => ({
+        documentId: group.documentId,
+        found: group.found,
+        dismissed: group.dismissed,
+      })),
     ).toEqual([
       { documentId: first.documentId, found: 2, dismissed: 2 },
       { documentId: second.documentId, found: 1, dismissed: 0 },
@@ -492,7 +493,8 @@ describe("the review read of a connected source's findings", () => {
 
     const read = await findingsAs(scenario.admin, connectedSourceId);
 
-    expect(read.ok ? read.value.map((group) => group.sensitivity) : []).toEqual(["Restricted"]);
+    assert(read.ok);
+    expect(read.value.map((group) => group.sensitivity)).toEqual(["Restricted"]);
   });
 
   it("omits spans and groups the last sync no longer raises", async () => {
@@ -507,9 +509,10 @@ describe("the review read of a connected source's findings", () => {
 
     const read = await findingsAs(scenario.admin, connectedSourceId);
 
-    expect(
-      read.ok ? read.value.map((group) => ({ ruleId: group.ruleId, found: group.found })) : [],
-    ).toEqual([{ ruleId: "sort-code-with-account-number", found: 1 }]);
+    assert(read.ok);
+    expect(read.value.map((group) => ({ ruleId: group.ruleId, found: group.found }))).toEqual([
+      { ruleId: "sort-code-with-account-number", found: 1 },
+    ]);
   });
 
   it("counts kept spans the last finished sync withheld for erasure", async () => {
@@ -553,14 +556,13 @@ describe("the review read of a connected source's findings", () => {
 
     const read = await findingsAs(scenario.admin, connectedSourceId);
 
+    assert(read.ok);
     expect(
-      read.ok
-        ? read.value.map((group) => ({
-            documentId: group.documentId,
-            found: group.found,
-            overriddenByErasure: group.overriddenByErasure,
-          }))
-        : [],
+      read.value.map((group) => ({
+        documentId: group.documentId,
+        found: group.found,
+        overriddenByErasure: group.overriddenByErasure,
+      })),
     ).toEqual([
       { documentId: first.documentId, found: 2, overriddenByErasure: 1 },
 
@@ -590,8 +592,8 @@ describe("the review read of a connected source's findings", () => {
 
     const read = await findingsAs(scenario.admin, connectedSourceId);
 
-    expect(read.ok).toBe(false);
-    expect(read.ok ? undefined : read.error).toEqual(
+    assert(!read.ok);
+    expect(read.error).toEqual(
       new Error(
         "the connected source's last sync names the kept spans an erasure overrode in a shape the review cannot read",
       ),
@@ -630,7 +632,8 @@ describe("the review read of a connected source's findings", () => {
       return findingsOf(principal, tx, inputOf(findingsOfInput, { connectedSourceId }));
     });
 
-    expect(read.ok ? undefined : read.error).toEqual(
+    assert(!read.ok);
+    expect(read.error).toEqual(
       matching.objectContaining({
         message: matching.stringContaining("current transaction is aborted"),
       }),
@@ -647,7 +650,8 @@ describe("the review read of a connected source's findings", () => {
 
     const read = await findingsAs(scenario.admin, connectedSourceId);
 
-    expect(read.ok ? read.value.map((group) => group.overriddenByErasure) : []).toEqual([0]);
+    assert(read.ok);
+    expect(read.value.map((group) => group.overriddenByErasure)).toEqual([0]);
   });
 
   it.each([
@@ -718,7 +722,8 @@ describe("an Admin keeping named groups of findings in the text", () => {
       scenario.workspaceId,
       "sources.finding.restored",
     );
-    const batchId = outcome.ok ? outcome.value.batchId : undefined;
+    assert(outcome.ok);
+    const batchId = outcome.value.batchId;
     expect(typeof batchId).toBe("string");
 
     expect(auditEvents).toEqual(
@@ -779,7 +784,8 @@ describe("an Admin keeping named groups of findings in the text", () => {
       groupOfFindingsIn(first.documentId),
     ]);
 
-    const batchId = outcome.ok ? outcome.value.batchId : undefined;
+    assert(outcome.ok);
+    const batchId = outcome.value.batchId;
     expect(typeof batchId).toBe("string");
     expect(
       (await batchedRowsOf(db().pool, scenario.workspaceId, "sources.finding.restored")).map(
@@ -1080,7 +1086,8 @@ describe("an Admin narrowing named documents", () => {
     const keep = await keepAs(scenario.admin, connectedSourceId, [
       groupOfFindingsIn(first.documentId),
     ]);
-    expect(typeof (keep.ok ? keep.value.jobId : undefined)).toBe("string");
+    assert(keep.ok);
+    expect(typeof keep.value.jobId).toBe("string");
 
     const outcome = await narrowAs(scenario.admin, connectedSourceId, [
       groupOfFindingsIn(first.documentId),
@@ -1103,7 +1110,8 @@ describe("an Admin narrowing named documents", () => {
       named.map((documentId) => groupOfFindingsIn(documentId)),
     );
 
-    const batchId = outcome.ok ? outcome.value.batchId : undefined;
+    assert(outcome.ok);
+    const batchId = outcome.value.batchId;
     expect(typeof batchId).toBe("string");
     expect(
       (await batchedRowsOf(db().pool, scenario.workspaceId, "sources.document.narrowed")).map(
@@ -1291,9 +1299,14 @@ describe("an Admin dismissing groups of findings as not special category", () =>
       await dismissingTwoGroupsOfThree(scenario);
 
     const documentIds = [first.documentId, second.documentId].toSorted();
-    const batchId = outcome.ok ? outcome.value.batchId : undefined;
+    assert(outcome.ok);
+    const batchId = outcome.value.batchId;
     expect(outcome).toMatchObject({ ok: true, value: { connectedSourceId, documentIds } });
     expect(typeof batchId).toBe("string");
+    const dismissedPerDocument: Record<string, number> = {
+      [first.documentId]: 2,
+      [second.documentId]: 1,
+    };
     expect(await batchedRowsOf(db().pool, scenario.workspaceId, DISMISSED_ACTION)).toEqual(
       documentIds.map((documentId) => ({
         subject_id: documentId,
@@ -1301,7 +1314,7 @@ describe("an Admin dismissing groups of findings as not special category", () =>
         detail: {
           documentId,
           [STORED_DETAIL_KEYS.connectedSourceId]: connectedSourceId,
-          findingCount: documentId === first.documentId ? 2 : 1,
+          findingCount: dismissedPerDocument[documentId],
         },
       })),
     );
@@ -1364,16 +1377,16 @@ describe("an Admin dismissing groups of findings as not special category", () =>
   });
 
   it.each([
-    ["dismissed, then kept-in-text", ["dismiss", "keep"]],
-    ["kept-in-text, then dismissed", ["keep", "dismiss"]],
+    ["dismissed, then kept-in-text", [dismissAs, keepAs]],
+    ["kept-in-text, then dismissed", [keepAs, dismissAs]],
   ] as const)("leaves a span %s, both dismissed and restored", async (_order, actions) => {
     const scenario = await arrange();
     const { connectedSourceId, first } = await twoDocumentsTheSeamNarrowed(scenario);
     const named = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
     const group = [groupOfFindingsIn(first.documentId, HEALTH)];
 
-    for (const taken of actions) {
-      await (taken === "dismiss" ? dismissAs : keepAs)(scenario.admin, connectedSourceId, group);
+    for (const take of actions) {
+      await take(scenario.admin, connectedSourceId, group);
     }
 
     expect(await reviewOf(scenario.workspaceId, named)).toMatchObject({
