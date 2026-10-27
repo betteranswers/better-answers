@@ -39,7 +39,7 @@ A living company knowledge map for UK SMBs, built on the Open Knowledge Format (
 
 ## Secrets
 
-- `docs/operations/SECRETS.md` documents credential classes. A config module reads the bootstrap class. Never mix classes in one scope, and never log a secret.
+- `docs/operations/SECRETS.md` says where each secret lives (ADR 0052). The tier's config module reads a deployment's secret once. A workspace's or a person's secret is a row in the database and never comes from the environment. Never log a secret.
 
 ## Agent skills
 
