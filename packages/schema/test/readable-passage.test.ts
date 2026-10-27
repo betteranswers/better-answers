@@ -1,5 +1,5 @@
 import type pg from "pg";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { AUDIENCE_EVERYONE, AUDIENCE_GROUPS, SENSITIVITIES, ulid } from "../src/index.ts";
 import { testData } from "./factory.ts";
@@ -210,12 +210,12 @@ describe("the shape the view presents", () => {
     ]);
 
     expect({
-      missing: onThePassage.filter(
-        (column) => !THE_FOUR_TERMS.includes(column) && !onTheView.includes(column),
-      ),
-      unexpected: onTheView.filter(
-        (column) => !THE_FOUR_TERMS.includes(column) && !onThePassage.includes(column),
-      ),
+      missing: onThePassage
+        .filter((column) => !THE_FOUR_TERMS.includes(column))
+        .filter((column) => !onTheView.includes(column)),
+      unexpected: onTheView
+        .filter((column) => !THE_FOUR_TERMS.includes(column))
+        .filter((column) => !onThePassage.includes(column)),
       terms: THE_FOUR_TERMS.filter((column) => onTheView.includes(column)),
     }).toEqual({ missing: [], unexpected: [], terms: THE_FOUR_TERMS });
   });
@@ -226,7 +226,9 @@ describe("the shape the view presents", () => {
     const read = await db().pool.query<{ definition: string }>(
       `SELECT pg_get_viewdef('"index".readable_passage'::regclass, true) AS definition`,
     );
-    const written = (read.rows[0]?.definition ?? "").replaceAll(/\s+/gu, " ");
+    const definition = read.rows[0]?.definition;
+    assert(definition !== undefined, "the view has a definition");
+    const written = definition.replaceAll(/\s+/gu, " ");
 
     expect({
       connectedSource: written.includes(

@@ -1,7 +1,7 @@
 import { getTableColumns, is } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { getTableConfig, jsonb, PgDialect, PgTable, pgTable } from "drizzle-orm/pg-core";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "../src/drizzle-zod.ts";
@@ -1062,6 +1062,19 @@ describe("2 — the key sets agree", () => {
   }
 });
 
+type ColumnShape = { readonly dataType: string; readonly name: string; readonly notNull: boolean };
+
+const admitsNull = (
+  field: z.ZodType,
+  column: ColumnShape | undefined,
+  checks: readonly string[],
+): boolean =>
+  field.safeParse(null).success &&
+  !(
+    column?.notNull === true &&
+    checks.some((check) => check.includes(`jsonb_typeof(${column.name}) = '`))
+  );
+
 describe("3 — optionality and nullability agree, per key, at runtime", () => {
   for (const name of registryNames) {
     for (const form of forms) {
@@ -1069,20 +1082,16 @@ describe("3 — optionality and nullability agree, per key, at runtime", () => {
         const refinedShape = boundarySchemas[name][form].shape;
         const unrefinedShape: Readonly<Record<string, z.ZodType>> = unrefinedOf(name)[form].shape;
         const { table } = boundarySchemas[name];
-        const columns: Readonly<
-          Record<string, { dataType: string; name: string; notNull: boolean }>
-        > = getTableColumns(table);
+        const columns: Readonly<Record<string, ColumnShape>> = getTableColumns(table);
         const checks = getTableConfig(table).checks.map(
           (constraint) => new PgDialect().sqlToQuery(constraint.value).sql,
         );
-        for (const [key, refinedField] of Object.entries<z.ZodType>(refinedShape)) {
-          const column = columns[key];
-          if (column?.dataType === "custom") continue;
+        const typed = Object.entries<z.ZodType>(refinedShape).filter(
+          ([key]) => columns[key]?.dataType !== "custom",
+        );
+        for (const [key, refinedField] of typed) {
           const unrefinedField = unrefinedShape[key];
-          if (unrefinedField === undefined) throw new Error(`no generated field for ${key}`);
-          const jsonNullRefused =
-            column?.notNull === true &&
-            checks.some((check) => check.includes(`jsonb_typeof(${column.name}) = '`));
+          assert(unrefinedField !== undefined, `no generated field for ${key}`);
           expect({
             key,
             undefined: refinedField.safeParse(undefined).success,
@@ -1090,7 +1099,7 @@ describe("3 — optionality and nullability agree, per key, at runtime", () => {
           }).toEqual({
             key,
             undefined: unrefinedField.safeParse(undefined).success,
-            null: unrefinedField.safeParse(null).success && !jsonNullRefused,
+            null: admitsNull(unrefinedField, columns[key], checks),
           });
         }
       });
@@ -1201,17 +1210,19 @@ describe("4 — a refinement only narrows, proved against the column", () => {
       ] as const;
       expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());
 
-      for (const name of insertOrder) {
-        if (name === "passage") {
-          await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_ID]);
-          await client.query("SELECT create_workspace_partition($1)", [WS_ID]);
-        }
+      const insertAccepted = async (name: (typeof insertOrder)[number]): Promise<void> => {
         for (const row of acceptedRows[name]) {
           const parsed = boundarySchemas[name].insert.parse(row);
           await database.insert(boundarySchemas[name].table).values(parsed);
           accepted += 1;
         }
+      };
+      for (const name of insertOrder.filter((one) => one !== "passage")) {
+        await insertAccepted(name);
       }
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_ID]);
+      await client.query("SELECT create_workspace_partition($1)", [WS_ID]);
+      await insertAccepted("passage");
       expect(accepted).toBe(Object.values(acceptedRows).flat().length);
     });
   });
@@ -1704,7 +1715,8 @@ describe("a __proto__ key in a concept's frontmatter", () => {
       '{"title":"T","__proto__":"x","sources":[{"resource":"/s/a.pdf","__proto__":null}]}',
     );
 
-    expect(parsed.success && parsed.data.frontmatter).toEqual(
+    assert(parsed.success, "the frontmatter parses");
+    expect(parsed.data.frontmatter).toEqual(
       Object.fromEntries([
         ["title", "T"],
         ["__proto__", "x"],
@@ -1719,7 +1731,7 @@ describe("a __proto__ key in a concept's frontmatter", () => {
         ],
       ]),
     );
-    expect(parsed.success && Object.getPrototypeOf(parsed.data.frontmatter)).toBe(Object.prototype);
+    expect(Object.getPrototypeOf(parsed.data.frontmatter)).toBe(Object.prototype);
   });
 
   it.each([
@@ -1735,7 +1747,8 @@ describe("a __proto__ key in a concept's frontmatter", () => {
         '"sources":[{"resource":"/s/a.pdf","__proto__":"d","___proto__":"e","____proto__":"f"}]}',
     );
 
-    expect(parsed.success && parsed.data.frontmatter).toEqual(
+    assert(parsed.success, "the frontmatter parses");
+    expect(parsed.data.frontmatter).toEqual(
       Object.fromEntries([
         ["__proto__", "a"],
         ["___proto__", "b"],

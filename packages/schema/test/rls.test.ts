@@ -1,6 +1,6 @@
 import { getTableConfig } from "drizzle-orm/pg-core";
 import type pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 
 import { declaredTableNames } from "../scripts/worker-view.ts";
 import {
@@ -222,11 +222,15 @@ describe("every tenant table, a partitioned one by its declared parent", () => {
 
 describe("the identity set", () => {
   it("names exactly the declared tables that carry no policy", async () => {
-    const unpolicied: string[] = [];
-    for (const qualified of declaredTableNames()) {
-      const flags = await rlsFlags(qualified);
-      if (flags?.rls === false) unpolicied.push(qualified);
-    }
+    const flagged = await Promise.all(
+      [...declaredTableNames()].map(async (qualified) => ({
+        qualified,
+        flags: await rlsFlags(qualified),
+      })),
+    );
+    const unpolicied = flagged
+      .filter(({ flags }) => flags?.rls === false)
+      .map(({ qualified }) => qualified);
     expect(unpolicied.toSorted()).toEqual([...EXEMPT].toSorted());
   });
 
@@ -237,8 +241,7 @@ describe("the identity set", () => {
         .map(([qualified]) => qualified),
     );
     expect([...carrying].toSorted()).toEqual(["public.invitation", "public.member"]);
-    for (const qualified of IDENTITY_SET) {
-      if (qualified === "public.workspace") continue;
+    for (const qualified of IDENTITY_SET.filter((name) => name !== "public.workspace")) {
       const [schema, table] = qualified.split(".");
       const column = await db.pool.query(
         "SELECT 1 FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 AND column_name = 'workspace_id'",
@@ -349,9 +352,9 @@ describe("the role CHECK on the identity set", () => {
     const constraint = await db.pool.query<{ definition: string }>(
       "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'member_role_check'",
     );
-    const inCheck = [...(constraint.rows[0]?.definition ?? "").matchAll(/'([A-Za-z]+)'/g)].map(
-      (match) => match[1],
-    );
+    const definition = constraint.rows[0]?.definition;
+    assert(definition !== undefined, "member_role_check exists");
+    const inCheck = [...definition.matchAll(/'([A-Za-z]+)'/g)].map((match) => match[1]);
     expect(inCheck.toSorted()).toEqual([...ROLES].toSorted());
     const role = boundarySchemas.member.select.shape.role;
     expect(inCheck.map((word) => role.safeParse(word).success)).toEqual(inCheck.map(() => true));
@@ -512,9 +515,9 @@ describe("the audit log under app_rt", () => {
     const constraint = await db.pool.query<{ definition: string }>(
       "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'audit_event_family_check'",
     );
-    const inCheck = [...(constraint.rows[0]?.definition ?? "").matchAll(/'([a-z]+)'/g)].map(
-      (match) => match[1],
-    );
+    const definition = constraint.rows[0]?.definition;
+    assert(definition !== undefined, "audit_event_family_check exists");
+    const inCheck = [...definition.matchAll(/'([a-z]+)'/g)].map((match) => match[1]);
     expect(inCheck.toSorted()).toEqual([...FAMILIES].toSorted());
 
     const family = boundarySchemas.auditEvent.select.shape.family;
@@ -1262,7 +1265,9 @@ describe("the map tables under app_rt", () => {
         "SELECT live_gen FROM map_generation WHERE workspace_id = $1",
         [WS_A],
       );
-      const next = (generation.rows[0]?.live_gen ?? 0) + 1;
+      const [current] = generation.rows;
+      assert(current !== undefined, "workspace A has a map generation");
+      const next = current.live_gen + 1;
       await client.query(A_MAP_NODE_OF_KIND, [WS_A, next, live.uid, "Concept", "Policy"]);
       await client.query(AN_EDGE, [
         WS_A,
@@ -1431,7 +1436,8 @@ describe("the map tables under app_rt", () => {
         await client.query("ROLLBACK TO SAVEPOINT map_row");
       }
 
-      await client.query(A_MAP_NODE, [WS_A, (node.gen ?? 0) + 1, node.uid, "Concept"]);
+      assert(node.gen !== null, "the seeded node sits in a generation");
+      await client.query(A_MAP_NODE, [WS_A, node.gen + 1, node.uid, "Concept"]);
     });
   });
 });
@@ -2194,6 +2200,9 @@ describe("the erasure of the suggestions", () => {
   });
 });
 
+const whatTheConstantsSay = (mayRaise: readonly string[], kind: string): string =>
+  mayRaise.some((named) => named === kind) ? ADMITTED : INSUFFICIENT_PRIVILEGE;
+
 describe("the kinds a caller may raise, asked of the function", () => {
   it("lands a set only of kinds its caller's tier names", async () => {
     await withRollback(db.pool, async (client) => {
@@ -2214,9 +2223,7 @@ describe("the kinds a caller may raise, asked of the function", () => {
         await client.query(`SET LOCAL ROLE ${role}`);
         for (const kind of SUGGESTION_KINDS) {
           answered[`${caller} raising ${kind}`] = await submittingOneRequest(client, kind);
-          theConstantsSay[`${caller} raising ${kind}`] = mayRaise.some((named) => named === kind)
-            ? ADMITTED
-            : INSUFFICIENT_PRIVILEGE;
+          theConstantsSay[`${caller} raising ${kind}`] = whatTheConstantsSay(mayRaise, kind);
         }
       }
 
@@ -2585,7 +2592,7 @@ describe("the audience pair on every readable unit", () => {
         );
         return {
           refusals,
-          narrowed: (narrowed.rowCount ?? 0) > 0,
+          narrowed: Number(narrowed.rowCount) > 0,
           widenedAsMany: widened.rowCount === narrowed.rowCount,
         };
       });

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { foldSeparators } from "../scripts/fold-separators.ts";
@@ -30,6 +30,12 @@ const CLAIMS_TO_BE_HAND_WRITTEN = /custom migration/iu;
 
 const firstLineOf = (sql: string): string => sql.split("\n", 1)[0] ?? "";
 
+const journalledMigrations = (): readonly { readonly tag: string; readonly sql: string }[] =>
+  journalMigrationFiles().map((file, position) => ({
+    tag: journalEntries()[position]?.tag ?? path.basename(file),
+    sql: readFileSync(file, "utf8"),
+  }));
+
 const FORBIDDEN_IN_GENERATED = [
   /"index"/u,
   /\bmap_node\b/u,
@@ -41,7 +47,9 @@ const FORBIDDEN_IN_GENERATED = [
 describe("the migration journal", () => {
   it("names exactly the .sql files in the migrations folder", () => {
     const journalFiles = journalMigrationFiles().map((file) => path.basename(file));
-    const migrationsDir = path.dirname(journalMigrationFiles()[0] ?? "");
+    const [firstFile] = journalMigrationFiles();
+    assert(firstFile !== undefined, "the journal names a migration");
+    const migrationsDir = path.dirname(firstFile);
     const onDisk = readdirSync(migrationsDir).filter((name) => name.endsWith(".sql"));
 
     expect(journalFiles.toSorted()).toEqual(onDisk.toSorted());
@@ -67,22 +75,28 @@ describe("the migration journal", () => {
   });
 
   it("spells the marker exactly wherever a migration claims it", () => {
-    for (const [position, file] of journalMigrationFiles().entries()) {
-      const first = firstLineOf(readFileSync(file, "utf8"));
-      if (!CLAIMS_TO_BE_HAND_WRITTEN.test(first)) continue;
-      const tag = journalEntries()[position]?.tag ?? path.basename(file);
+    const claiming = journalledMigrations().filter(({ sql }) =>
+      CLAIMS_TO_BE_HAND_WRITTEN.test(firstLineOf(sql)),
+    );
 
+    expect(claiming.length).toBeGreaterThan(0);
+    for (const { tag, sql } of claiming) {
       expect
-        .soft(first, `${tag}.sql claims to be hand-written, so its first line must be the marker`)
+        .soft(
+          firstLineOf(sql),
+          `${tag}.sql claims to be hand-written, so its first line must be the marker`,
+        )
         .toBe("-- Custom migration (hand-written SQL; ADR 0032).");
     }
   });
 
   it("never touches `index` or map tables in a generated migration", () => {
-    for (const [position, file] of journalMigrationFiles().entries()) {
-      const sql = readFileSync(file, "utf8");
-      if (firstLineOf(sql) === CUSTOM_MARKER) continue;
-      const tag = journalEntries()[position]?.tag ?? path.basename(file);
+    const generated = journalledMigrations().filter(
+      ({ sql }) => firstLineOf(sql) !== CUSTOM_MARKER,
+    );
+
+    expect(generated.length).toBeGreaterThan(0);
+    for (const { tag, sql } of generated) {
       for (const forbidden of FORBIDDEN_IN_GENERATED) {
         expect
           .soft(sql, `${tag}.sql is generated and must not match ${String(forbidden)}`)
@@ -118,8 +132,9 @@ describe("the journal's meta folder", () => {
   it("pairs entries with snapshots in one unbroken chain", () => {
     const read = journalSnapshots();
 
-    expect(read.ok || read.error).toBe(true);
-    expect(read.ok && read.value.at(0)).toBe("0000_snapshot.json");
+    expect(read).toMatchObject({ ok: true });
+    assert(read.ok);
+    expect(read.value.at(0)).toBe("0000_snapshot.json");
   });
 
   it("refuses a journal entry whose snapshot is missing", () => {
@@ -189,7 +204,8 @@ describe("the journal's meta folder", () => {
       .looseObject({ entries: z.array(z.looseObject({ when: z.number() })) })
       .parse(JSON.parse(readFileSync(journalPath, "utf8")));
     const [first, second, ...rest] = journal.entries;
-    if (first === undefined || second === undefined) throw new Error("the journal has two entries");
+    assert(first !== undefined, "the journal has a first entry");
+    assert(second !== undefined, "the journal has a second entry");
     writeFileSync(
       journalPath,
       JSON.stringify({ ...journal, entries: [first, { ...second, when: first.when }, ...rest] }),
@@ -318,7 +334,7 @@ describe("the declarations and the DDL generated from them", () => {
   it("proposes the ALTER for a default missing from the DDL", async () => {
     const before = structuredClone(theNewestSnapshot());
     const column = before.tables["public.account"]?.columns["updated_at"];
-    if (column === undefined) throw new Error("account.updated_at is not in the newest snapshot");
+    assert(column !== undefined, "account.updated_at is in the newest snapshot");
     delete column.default;
 
     expect(await generateMigration(before, theDeclarations(before.id))).toEqual([
@@ -359,7 +375,7 @@ describe("what the suggestion function copies from the schema package", () => {
 describe("what the audience substrate copies from the schema package", () => {
   it("uses the declared audience CHECK on both map tables", () => {
     const file = journalMigrationFiles().find((name) => name.endsWith("audience-substrate.sql"));
-    if (file === undefined) throw new Error("the audience substrate is not in the journal");
+    assert(file !== undefined, "the audience substrate is in the journal");
     const sql = readFileSync(file, "utf8");
 
     for (const table of ["graph_node", "graph_edge"]) {

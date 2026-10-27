@@ -66,13 +66,14 @@ describe("the table-ownership map", () => {
   });
 });
 
+const opensAsAnOwner = (owner: string, inCore: ReadonlySet<string>): boolean =>
+  OWNERS_OUTSIDE_CORE.some((known) => known === owner) ? isDirectory(owner) : inCore.has(owner);
+
 describe("every owner the map names", () => {
   it("is a core directory, or a listed outside directory", () => {
     const inCore = coreDirectories();
     for (const owner of ownersNamed()) {
-      const opens = OWNERS_OUTSIDE_CORE.some((known) => known === owner)
-        ? isDirectory(owner)
-        : inCore.has(owner);
+      const opens = opensAsAnOwner(owner, inCore);
       expect({ owner, opens }).toEqual({ owner, opens: true });
     }
   });

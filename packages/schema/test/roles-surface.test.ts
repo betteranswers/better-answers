@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import type pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 
 import {
   isRuntimeRole,
@@ -93,6 +93,12 @@ afterAll(async () => {
   await db.stop();
 });
 
+const asCatalogued = (role: string, migrator: string | undefined): string | undefined =>
+  role === MIGRATOR ? migrator : role;
+
+const messageOf = (cause: unknown): string =>
+  cause instanceof Error ? cause.message : String(cause);
+
 describe("the roles' surface", () => {
   it("is byte-identical to a regeneration over a fresh partitioned database", async () => {
     const regenerated = renderRolesSurface(await readRolesSurface(db.pool));
@@ -107,9 +113,7 @@ describe("the roles' surface", () => {
     const migrator = catalogued.rows.map((row) => row.rolname).find((name) => !isRuntimeRole(name));
 
     expect(
-      surfaceReadFromTheDatabase.roles
-        .map((role) => (role.role === MIGRATOR ? migrator : role.role))
-        .toSorted(),
+      surfaceReadFromTheDatabase.roles.map((role) => asCatalogued(role.role, migrator)).toSorted(),
     ).toEqual(catalogued.rows.map((row) => row.rolname).toSorted());
 
     const named = new Set([
@@ -390,8 +394,11 @@ describe("the functions the journal installs", () => {
       "SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'vector_dims'",
     );
 
+    const [count] = shipped.rows;
+    assert(count !== undefined, "count(*) answers one row");
+
     expect({
-      inTheImage: (shipped.rows[0]?.n ?? 0) > 0,
+      inTheImage: count.n > 0,
       inTheSurface: surfaceReadFromTheDatabase.functions.some((row) =>
         row.object.endsWith(".vector_dims"),
       ),
@@ -425,7 +432,7 @@ describe("the functions the journal installs", () => {
         fired[guard] = await client
           .query(statement, [...parameters])
           .then(() => "nothing fired")
-          .catch((cause: unknown) => (cause instanceof Error ? cause.message : String(cause)));
+          .catch(messageOf);
         await client.query("ROLLBACK TO SAVEPOINT guard");
       }
 

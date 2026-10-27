@@ -257,6 +257,12 @@ const SEEDED_IN_EACH: Standing = {
   concept_class_override: 1,
 };
 
+const theCauseOf = (error: unknown): string =>
+  error instanceof Error && error.cause instanceof Error ? error.cause.message : String(error);
+
+const whatTheConstantsSay = (mayRaise: readonly string[], kind: string): string =>
+  mayRaise.some((named) => named === kind) ? ADMITTED : "42501";
+
 describe("migration 0072 over a populated 0071 database, as its owner", () => {
   it("applies 0072 and every later migration before the guide records", async () => {
     const journal = journalMigrationFiles();
@@ -271,11 +277,7 @@ describe("migration 0072 over a populated 0071 database, as its owner", () => {
     const owner = new pg.Pool({ connectionString: uriAs(container, THE_OWNER), max: 1 });
     const refusal = await migrate(drizzle(owner), { migrationsFolder })
       .then(() => "migrated")
-      .catch((error: unknown) =>
-        error instanceof Error && error.cause instanceof Error
-          ? error.cause.message
-          : String(error),
-      );
+      .catch(theCauseOf);
     await endPool(owner);
 
     expect({ refusal, applied: (await migrationRows()).length }).toEqual({
@@ -350,7 +352,7 @@ describe("migration 0072 over a populated 0071 database, as its owner", () => {
           );
           counts.push(
             rows.rows.filter((row) => row.workspace_id === workspaceId).length,
-            rows.rowCount ?? 0,
+            rows.rows.length,
           );
         }
         return counts;
@@ -373,7 +375,7 @@ describe("migration 0072 over a populated 0071 database, as its owner", () => {
         await client.query(`SET LOCAL ROLE ${role}`);
         for (const kind of [...SUGGESTION_KINDS, "candidate", "repair"]) {
           const key = `${role} raising ${kind}`;
-          expected[key] = mayRaise.some((named) => named === kind) ? ADMITTED : "42501";
+          expected[key] = whatTheConstantsSay(mayRaise, kind);
           answered[key] = await raisingOne(client, kind);
         }
       }

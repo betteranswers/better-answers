@@ -4,7 +4,7 @@ import path from "node:path";
 import { is, SQL } from "drizzle-orm";
 import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
 import type pg from "pg";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import {
   anyWordMatch,
@@ -335,7 +335,7 @@ describe("the any-word rule over concept rows", () => {
     const ranked = await matchedOver(concepts, "audit log retention");
     const boundAt = (title: string): NonNullable<Narrowed["after"]> => {
       const row = ranked.find((each) => each.title === title);
-      if (row === undefined) throw new Error(`${title} did not match`);
+      assert(row !== undefined, `${title} matched`);
       return [row.weight, row.rank, row.title];
     };
 
@@ -351,26 +351,26 @@ describe("the any-word rule over concept rows", () => {
       pastTheDenserRow: await after(boundAt("Retention")),
       pastTheKey: await after(audit),
       pastTheLast: await after(log),
-      tiedButForTheKey: audit[0] === log[0] && audit[1] === log[1],
+      weightAndRankOfAudit: audit.slice(0, 2),
     }).toEqual({
       inOrder: ["Audit Logs", "Retention", "Audit", "Log"],
       pastTheHeaviest: ["Retention", "Audit", "Log"],
       pastTheDenserRow: ["Audit", "Log"],
       pastTheKey: ["Log"],
       pastTheLast: [],
-      tiedButForTheKey: true,
+      weightAndRankOfAudit: log.slice(0, 2),
     });
   });
 
   it.each([
-    ["the largest bounds", Number.MAX_VALUE, Number.MAX_VALUE],
-    ["the smallest bounds", 0, Number.MIN_VALUE],
-  ])("compares a bound of %s without error", async (_case, weight, rank) => {
+    ["the largest bounds", Number.MAX_VALUE, Number.MAX_VALUE, ["Audit"]],
+    ["the smallest bounds", 0, Number.MIN_VALUE, []],
+  ])("compares a bound of %s without error", async (_case, weight, rank, past) => {
     const after = await matchedOver([["Audit", UNRELATED]], "audit", {
       after: [weight, rank, "Audit"],
     });
 
-    expect(after.map(({ title }) => title)).toEqual(weight === 0 ? [] : ["Audit"]);
+    expect(after.map(({ title }) => title)).toEqual(past);
   });
 
   it("reads `!`, `:*`, `&`, quotes and parentheses as no syntax", async () => {
@@ -409,11 +409,9 @@ describe("the any-word rule over concept rows", () => {
 
 describe("the language every full-text match is parsed under", () => {
   it("is chosen in source only by the full-text rule", () => {
-    const choosing = sourceFiles().filter(
-      (file) =>
-        file !== THE_RULE &&
-        choosesItsOwnLanguage(readFileSync(path.join(REPO_ROOT, file), "utf8")),
-    );
+    const choosing = sourceFiles()
+      .filter((file) => file !== THE_RULE)
+      .filter((file) => choosesItsOwnLanguage(readFileSync(path.join(REPO_ROOT, file), "utf8")));
 
     expect(choosing).toEqual([]);
   });
