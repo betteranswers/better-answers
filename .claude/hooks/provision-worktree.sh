@@ -100,8 +100,6 @@ else
   echo "  jdocmunch: not on PATH — skipped; doc edits here land in the primary checkout's index" >&2
 fi
 
-bash "$(dirname "${BASH_SOURCE[0]}")/provision-skills.sh" "$WORKTREE_PATH" || STATUS=1
-
 COMMON_DIR="$(git -C "$WORKTREE_PATH" rev-parse --path-format=absolute --git-common-dir)"
 PRIMARY_PATH="$(cd "$(dirname "$COMMON_DIR")" && pwd -P)"
 

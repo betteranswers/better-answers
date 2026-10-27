@@ -57,27 +57,11 @@ deploy/wizard-41.env
 old-suggested-schema.md
 AGENTS.md.bak
 
-# agent tooling installed from third parties
-.claude/skills/*
-!.claude/skills/browser-suite/
-!.claude/skills/renovate-prs/
-!.claude/skills/better-answers-design
-!.claude/skills/mutation-testing/
-!.claude/skills/pixel-perfect/
-!.claude/skills/survey-architecture/
-!.claude/skills/THIRD_PARTY_NOTICES.md
+# Skills a tool writes under .agents/ (the skills CLI's install directory, GitNexus's generated
+# skills). The skills in skills-lock.json are committed in the .claude/skills/ of the tier they serve.
 .agents/*
 !.agents/playbooks/
 tasks/AGENTS.md
-apps/api/.claude/skills/*
-!apps/api/.claude/skills/email-best-practices/
-!apps/api/.claude/skills/resend/
-!apps/api/.claude/skills/THIRD_PARTY_NOTICES.md
-apps/web/.claude/skills/*
-apps/worker/.claude/skills/*
-deploy/.claude/skills/*
-.github/.claude/skills/*
-
 
 # Worktrees created by background agents (Claude Code `isolation: worktree`).
 .claude/worktrees/
