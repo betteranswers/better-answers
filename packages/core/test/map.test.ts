@@ -17,7 +17,7 @@ import type { TestData } from "@better-answers/schema/testing";
 
 import { readConcept } from "../src/concepts/index.ts";
 import { parseLocator, passageAt } from "../src/sources/index.ts";
-import { planned } from "./planned.ts";
+import { planned, type Planned } from "./planned.ts";
 import {
   answered,
   holdingTable,
@@ -97,24 +97,24 @@ const starIn = async (
 describe("a map walk", () => {
   it("reaches everything within four hops of the entry, no further", async () => {
     const scenario = await arrange();
-    const uids = await seeded(async (seed) => {
-      const chain: string[] = [];
-      for (let at = 0; at <= MAP_WALK_DEPTH + 1; at += 1) {
+    const { entry, uids } = await seeded(async (seed) => {
+      const first = await seed.mapNode({ workspaceId: scenario.workspaceId });
+      const chain = [first.uid];
+      let previous = first.uid;
+      for (let at = 1; at <= MAP_WALK_DEPTH + 1; at += 1) {
         const node = await seed.mapNode({ workspaceId: scenario.workspaceId });
-        const previous = chain.at(-1);
-        if (previous !== undefined) {
-          await seed.mapEdge({
-            workspaceId: scenario.workspaceId,
-            fromUid: previous,
-            toUid: node.uid,
-          });
-        }
+        await seed.mapEdge({
+          workspaceId: scenario.workspaceId,
+          fromUid: previous,
+          toUid: node.uid,
+        });
         chain.push(node.uid);
+        previous = node.uid;
       }
-      return chain;
+      return { entry: first.uid, uids: chain };
     });
 
-    const steps = await walked(scenario.viewer, uids[0] ?? "");
+    const steps = await walked(scenario.viewer, entry);
 
     expect(uidsByDepth(steps)).toEqual(
       uids.slice(0, MAP_WALK_DEPTH + 1).map((uid, depth) => [uid, depth]),
@@ -433,15 +433,23 @@ const conceptNode = async (
   return iri;
 };
 
+const cteFilters = (nodes: Planned<unknown>["nodes"], name: string): readonly string[] =>
+  nodes
+    .filter((node) => node["Node Type"] === "CTE Scan" && node["CTE Name"] === name)
+    .map((scan) => scan.Filter ?? "no filter");
+
 const hubOf = async (
   workspaceId: string,
-  spoke: (seed: TestData, uid: string, first: boolean) => Promise<void>,
+  spokes: {
+    readonly first: (seed: TestData, uid: string) => Promise<unknown>;
+    readonly last: (seed: TestData, uid: string) => Promise<unknown>;
+  },
 ): Promise<{ readonly hub: string; readonly last: readonly string[] }> => {
   const made = await seeded(async (seed) => {
     const hub = await conceptNode(seed, workspaceId, "audits");
     const uids = Array.from({ length: 1_003 }, () => conceptIriOf(ulid())).toSorted();
     for (const [at, uid] of uids.entries()) {
-      await spoke(seed, uid, at < 1_001);
+      await (at < 1_001 ? spokes.first : spokes.last)(seed, uid);
       await seed.mapEdge({ workspaceId, fromUid: hub, toUid: uid });
     }
     return { hub, last: uids.slice(1_001) };
@@ -454,8 +462,9 @@ describe("a map walk narrowed to collections", () => {
   it("keeps a collection's neighbours past a hub's thousand others", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
-    const { hub, last: inside } = await hubOf(workspaceId, async (seed, uid, first) => {
-      await conceptNode(seed, workspaceId, first ? "lms" : "audits", uid);
+    const { hub, last: inside } = await hubOf(workspaceId, {
+      first: (seed, uid) => conceptNode(seed, workspaceId, "lms", uid),
+      last: (seed, uid) => conceptNode(seed, workspaceId, "audits", uid),
     });
 
     const narrowed = await walkedFromEntries(scenario.viewer, [hub], ["audits"]);
@@ -547,9 +556,9 @@ describe("a map walk narrowed to collections", () => {
   it("caps concepts alone when no collection is named", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
-    const { hub, last: concepts } = await hubOf(workspaceId, async (seed, uid, first) => {
-      if (first) await seed.mapNode({ workspaceId, uid, label: "Section", kind: null });
-      else await conceptNode(seed, workspaceId, "audits", uid);
+    const { hub, last: concepts } = await hubOf(workspaceId, {
+      first: (seed, uid) => seed.mapNode({ workspaceId, uid, label: "Section", kind: null }),
+      last: (seed, uid) => conceptNode(seed, workspaceId, "audits", uid),
     });
 
     const walkResult = answered(
@@ -573,14 +582,11 @@ describe("a map walk narrowed to collections", () => {
     const narrowed = await planned(db(), scenario.viewer, (principal, tx) =>
       walkConceptsFromEntries(principal, tx, [ids.conceptIri.parse(entry)], collections),
     );
-    const filtersOn = (name: string): readonly string[] =>
-      narrowed.nodes
-        .filter((node) => node["Node Type"] === "CTE Scan" && node["CTE Name"] === name)
-        .map((scan) => scan.Filter ?? "no filter");
-
     expect(uidsByDepth(narrowed.answer)).toEqual([[entry, 0]]);
-    expect(filtersOn("walk"), "what the grouping reads").toEqual(["no filter"]);
-    expect(filtersOn("nearest"), "what reads the groups").toEqual(["(label = 'Concept'::text)"]);
+    expect(cteFilters(narrowed.nodes, "walk"), "what the grouping reads").toEqual(["no filter"]);
+    expect(cteFilters(narrowed.nodes, "nearest"), "what reads the groups").toEqual([
+      "(label = 'Concept'::text)",
+    ]);
   });
 });
 
