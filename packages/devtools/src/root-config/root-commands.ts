@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { repositoryRoot, workspacePackages } from "./paths.ts";
+import { repositoryRoot, workspacePackages } from "../paths.ts";
 
 const manifest = z.looseObject({ scripts: z.record(z.string(), z.string()).default({}) });
 

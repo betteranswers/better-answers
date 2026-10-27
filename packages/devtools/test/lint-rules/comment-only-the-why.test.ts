@@ -4,9 +4,9 @@ import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-import { COUNTED, NOT_COUNTED, commented } from "./caller-counts.ts";
-import { wordsOf } from "./fixture-text.ts";
-import { fixedByOxlint } from "./oxlint-fix.ts";
+import { COUNTED, NOT_COUNTED, commented } from "../support/caller-counts.ts";
+import { wordsOf } from "../support/fixture-text.ts";
+import { fixedByOxlint } from "../support/oxlint-fix.ts";
 
 const RULE = "better-answers/comment-only-the-why";
 const FILE = "probe.ts";

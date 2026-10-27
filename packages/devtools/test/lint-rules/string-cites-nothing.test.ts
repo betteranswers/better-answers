@@ -47,7 +47,7 @@ describe("the string rule refuses a citation a reader cannot open", () => {
   });
 
   it("refuses the same string in a gate's own source", () => {
-    const gate = "packages/devtools/src/insert-scan.ts";
+    const gate = "packages/devtools/src/scans/insert-scan.ts";
     const inAGate = {
       [gate]: 'export const said = "A raw insert lives in a factory ([TEST4]).";\n',
     };

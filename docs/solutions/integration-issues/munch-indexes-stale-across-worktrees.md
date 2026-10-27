@@ -88,7 +88,7 @@ Paths under `jcodemunch_mcp/` and `jdocmunch_mcp/` (and the short forms `cli/…
 
    `.claude/hooks/worktree-lib.sh:30-42` drops the index on removal with `jdocmunch-mcp delete-index --repo local/<basename>`. jDocMunch takes `--repo` (`server.py:3139`). jCodeMunch takes a positional id (`worktree-lib.sh:23`).
 
-5. **Stub every indexer binary in the hook tests.** The worktree removal and sweep tests stubbed `jcodemunch-mcp` only. The new drop call ran the real `jdocmunch-mcp` against the real `~/.doc-index`. Both now stub it: `packages/devtools/test/ci/worktree-remove-hook.test.ts:41` and `packages/devtools/test/ci/sweep-worktrees.test.ts:84` (PR #488).
+5. **Stub every indexer binary in the hook tests.** The worktree removal and sweep tests stubbed `jcodemunch-mcp` only. The new drop call ran the real `jdocmunch-mcp` against the real `~/.doc-index`. Both now stub it: `packages/devtools/test/worktrees/worktree-remove-hook.test.ts:41` and `packages/devtools/test/worktrees/sweep-worktrees.test.ts:84` (PR #488).
 
 6. **Put `~/.local/bin` on the hook's PATH.** jDocMunch's PostToolUse hook spawns `jdocmunch-mcp` by bare name.
 

@@ -5,7 +5,7 @@ import { lintFlags } from "@better-answers/devtools/root-commands";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-import { wordsOf } from "./fixture-text.ts";
+import { wordsOf } from "../support/fixture-text.ts";
 
 const COMMENT_RULES = [
   "typescript/ban-ts-comment",

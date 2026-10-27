@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { knipOver } from "@better-answers/devtools/throwaway-tree";
 import type { KnipFinding, KnipRunner, Tree } from "@better-answers/devtools/throwaway-tree";
 
-import knipConfig from "../../../knip.config.ts";
+import knipConfig from "../../../../knip.config.ts";
 
 const PACKAGE = { name: "throwaway", version: "0.0.0", private: true, type: "module" };
 

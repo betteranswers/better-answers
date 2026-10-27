@@ -10,7 +10,7 @@ import {
   libraryNamed,
   TSC,
   refusalsOf,
-} from "../packages/devtools/src/auth-seam-scan.ts";
+} from "../packages/devtools/src/scans/auth-seam-scan.ts";
 import { executableOf } from "../packages/devtools/src/throwaway-tree.ts";
 
 const ranIn = process.cwd();

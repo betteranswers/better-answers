@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tool, Tree } from "@better-answers/devtools/throwaway-tree";
 
-import { COUNTED, NOT_COUNTED, commented } from "./caller-counts.ts";
-import { wordsOf } from "./fixture-text.ts";
+import { COUNTED, NOT_COUNTED, commented } from "../support/caller-counts.ts";
+import { wordsOf } from "../support/fixture-text.ts";
 
 const FILE = "probe.py";
 

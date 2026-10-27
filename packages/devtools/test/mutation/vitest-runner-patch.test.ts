@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { runStryker, strykerWorkspace } from "./stryker-workspace.ts";
+import { runStryker, strykerWorkspace } from "../support/stryker-workspace.ts";
 
 const SOURCE = `const FAMILIES: readonly string[] = ["knowledge"];
 

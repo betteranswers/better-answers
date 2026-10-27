@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { z } from "zod";
 
-import { flagValues } from "./flags.ts";
+import { flagValues } from "../flags.ts";
 
 const MUTANT_STATUSES = [
   "Killed",

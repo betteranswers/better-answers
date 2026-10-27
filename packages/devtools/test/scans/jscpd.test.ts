@@ -4,7 +4,7 @@ import { z } from "zod";
 import { jscpdArgv, jscpdOver } from "@better-answers/devtools/jscpd";
 import type { JscpdConfig, Tree } from "@better-answers/devtools/jscpd";
 
-import { jscpdConfig as rootConfig } from "../../../jscpd.config.mjs";
+import { jscpdConfig as rootConfig } from "../../../../jscpd.config.mjs";
 
 const jscpdConfig: JscpdConfig = z
   .object({

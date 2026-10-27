@@ -24,7 +24,7 @@ import {
 } from "@better-answers/devtools/mutation-shards";
 import type { Leg, ShardResults } from "@better-answers/devtools/mutation-shards";
 
-import { runStryker, strykerWorkspace, writtenTree } from "./stryker-workspace.ts";
+import { runStryker, strykerWorkspace, writtenTree } from "../support/stryker-workspace.ts";
 
 const scratch = mkdtempSync(path.join(tmpdir(), "mutation-shards-"));
 afterAll(() => {

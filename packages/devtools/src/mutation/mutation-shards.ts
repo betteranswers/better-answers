@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
-import { flagValues } from "./flags.ts";
+import { flagValues } from "../flags.ts";
 
 const position = z.looseObject({ line: z.number(), column: z.number() });
 

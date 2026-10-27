@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ruleBaseline } from "./rule-baseline.ts";
+import { ruleBaseline } from "../support/rule-baseline.ts";
 
 const OFF_THE_LIST = "packages/core/test/probe.test.ts";
 

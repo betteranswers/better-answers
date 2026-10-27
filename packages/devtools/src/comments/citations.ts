@@ -7,7 +7,7 @@ const fixture = z.object({
   patterns: z.array(z.object({ name: z.string(), pattern: z.string() })),
 });
 
-const CASES = path.resolve(import.meta.dirname, "../../../contracts/citation/cases.json");
+const CASES = path.resolve(import.meta.dirname, "../../../../contracts/citation/cases.json");
 
 const read = (): z.infer<typeof fixture> => {
   const parsed: unknown = JSON.parse(readFileSync(CASES, "utf8"));

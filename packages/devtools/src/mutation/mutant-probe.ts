@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { flagValues } from "./flags.ts";
+import { flagValues } from "../flags.ts";
 
 type Verdict = "killed" | "survived" | "timed out";
 

@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { repositoryRoot } from "./paths.ts";
+import { repositoryRoot } from "../paths.ts";
 
 const ruleSetting = z.union([z.string(), z.tuple([z.string()], z.unknown())]);
 

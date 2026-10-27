@@ -14,12 +14,12 @@ import { z } from "zod";
 
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
-import { blocksIn, isExempt, lastOf, proseOf } from "../lint-rules/shared/comment-blocks.ts";
-import type { Block } from "../lint-rules/shared/comment-blocks.ts";
-import { flagValues } from "./flags.ts";
-import { parsedSource } from "./parsed-source.ts";
-import { filesUnderEach, repositoryRoot } from "./paths.ts";
-import { executableOf } from "./throwaway-tree.ts";
+import { blocksIn, isExempt, lastOf, proseOf } from "../../lint-rules/shared/comment-blocks.ts";
+import type { Block } from "../../lint-rules/shared/comment-blocks.ts";
+import { flagValues } from "../flags.ts";
+import { parsedSource } from "../parsed-source.ts";
+import { filesUnderEach, repositoryRoot } from "../paths.ts";
+import { executableOf } from "../throwaway-tree.ts";
 
 const KINDS = ["doc", "line", "trailing", "directive"] as const;
 
@@ -265,7 +265,7 @@ const foundIn = (file: string, source: string): readonly Found[] => {
   });
 };
 
-const LOCATOR = path.join(import.meta.dirname, "../python/comment_locator.py");
+const LOCATOR = path.join(import.meta.dirname, "../../python/comment_locator.py");
 
 const locatedBlocks = z.array(
   z.object({

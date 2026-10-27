@@ -4,7 +4,7 @@ import path from "node:path";
 import { parse } from "yaml";
 import { z } from "zod";
 
-import { repositoryRoot } from "./paths.ts";
+import { repositoryRoot } from "../paths.ts";
 
 export const workflowStepSchema = z.object({
   id: z.string().optional(),

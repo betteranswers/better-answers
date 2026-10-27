@@ -5,8 +5,8 @@ import { type Program, Visitor } from "oxc-parser";
 
 import { NEVER_AN_OWNER } from "@better-answers/schema/table-ownership";
 
-import { parsedSource } from "./parsed-source.ts";
-import { filesUnderEach, isTestPath } from "./paths.ts";
+import { parsedSource } from "../parsed-source.ts";
+import { filesUnderEach, isTestPath } from "../paths.ts";
 
 export const WHERE_THE_MAP_LIVES = "packages/schema/src/table-ownership.ts";
 

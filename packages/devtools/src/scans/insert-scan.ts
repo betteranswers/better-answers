@@ -1,10 +1,10 @@
-import { filesUnderEach, isTestPath } from "./paths.ts";
+import { filesUnderEach, isTestPath } from "../paths.ts";
 
 const RAW_INSERT = /(?:^|["'`])\s*insert\s+into\s+["'`]?[a-z_]/iu;
 
 const SCANNED = /\.(?:tsx?|py)$/u;
 
-export const WHERE_THE_LIST_LIVES = "packages/devtools/src/insert-scan.ts";
+export const WHERE_THE_LIST_LIVES = "packages/devtools/src/scans/insert-scan.ts";
 
 export const FACTORY_MODULES = [
   "apps/worker/tests/factories.py",

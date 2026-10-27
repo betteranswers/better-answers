@@ -61,7 +61,7 @@ The same entry placed after `"apps/worker/src/better_answers_worker/schema_view.
 
 ## Why This Works
 
-Since 12/10/2026 the gate measures workspaces only, so the root tool configuration files are no longer counted. The trap remains for any TypeScript file a workspace holds, as the last point under Prevention shows. When this was found, the gate ran cloc (`clocArgv` in `packages/devtools/src/comment-density.ts`) over the root tool configuration files, which the gates script named as one unit: `commitlint.config.mjs`, `cubic.yaml`, `jscpd.config.mjs`, `knip.config.ts`, `lefthook.yml` and `pnpm-workspace.yaml`. cloc strips C-style comments by pattern, not by parsing the language, so `/**` and `*/` inside string literals count. Run directly, cloc 2.06 reports two comment lines for this file:
+Since 12/10/2026 the gate measures workspaces only, so the root tool configuration files are no longer counted. The trap remains for any TypeScript file a workspace holds, as the last point under Prevention shows. When this was found, the gate ran cloc (`clocArgv` in `packages/devtools/src/comments/comment-density.ts`) over the root tool configuration files, which the gates script named as one unit: `commitlint.config.mjs`, `cubic.yaml`, `jscpd.config.mjs`, `knip.config.ts`, `lefthook.yml` and `pnpm-workspace.yaml`. cloc strips C-style comments by pattern, not by parsing the language, so `/**` and `*/` inside string literals count. Run directly, cloc 2.06 reports two comment lines for this file:
 
 ```js
 export const c = {

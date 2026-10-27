@@ -6,7 +6,7 @@ import {
   Visitor,
 } from "oxc-parser";
 
-import { parsedSource } from "./parsed-source.ts";
+import { parsedSource } from "../parsed-source.ts";
 
 const REFUSAL_TYPE = /Refusal$/u;
 

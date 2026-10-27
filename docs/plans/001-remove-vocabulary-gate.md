@@ -29,7 +29,7 @@ The words test, its word list, its scanner and the three helpers only they impor
 
 `apps/api/tests/avoid-words.test.ts` reads a list of replaced words from `apps/api/tests/old-words.ts` and refuses each one in every tracked text file: docs, code identifiers, product strings and migrations. It refuses ordinary English. On 12/10/2026 it failed the S2b plan and the route spec for "MCP App", "acts on flags" and "the router's composition". Each false positive is cleared by adding a permitted sense to a row, and the two files took 105 file-edits in under three weeks. The Compound Engineering review skills and Cubic's learnings already review vocabulary against `CONCEPTS.md`.
 
-Four of the six tests in the describe block "the skills this repository tracks" in `packages/devtools/test/ci/provision-skills.test.ts` pin the exact set of skill folders git tracks. `.gitignore` already states that set, so each added skill is an edit in two places. The other two check something `.gitignore` does not state: that `.claude/skills/better-answers-design` links to `packages/design-system`, and that the vendored pixel-perfect plugin's licence, notice and manifest are tracked.
+Four of the six tests in the describe block "the skills this repository tracks" in `packages/devtools/test/worktrees/provision-skills.test.ts` pin the exact set of skill folders git tracks. `.gitignore` already states that set, so each added skill is an edit in two places. The other two check something `.gitignore` does not state: that `.claude/skills/better-answers-design` links to `packages/design-system`, and that the vendored pixel-perfect plugin's licence, notice and manifest are tracked.
 
 ### Key Decisions
 
@@ -46,7 +46,7 @@ Four of the six tests in the describe block "the skills this repository tracks" 
 
 **The tracked-skills block**
 
-- R3. The four tests that pin the tracked-skill list are gone from `packages/devtools/test/ci/provision-skills.test.ts`. The tests of `.claude/hooks/provision-skills.sh`, the design-skill link test and the pixel-perfect licence test stay as they are.
+- R3. The four tests that pin the tracked-skill list are gone from `packages/devtools/test/worktrees/provision-skills.test.ts`. The tests of `.claude/hooks/provision-skills.sh`, the design-skill link test and the pixel-perfect licence test stay as they are.
 - R4. The docs lane's table says what each suite it runs reads after the change.
 
 **Docs**
@@ -69,7 +69,7 @@ Four of the six tests in the describe block "the skills this repository tracks" 
 ### Key Technical Decisions
 
 - KTD1. **`check:docs:api` is removed outright, not left pointing at nothing.** The words test was its only suite, and `packages/devtools/test/ci/check-scripts.test.ts` refuses a test step that passes with no tests. The docs lane keeps its core, devtools and web steps.
-- KTD2. **`packages/devtools/test/lefthook-config.test.ts` takes `check:docs:core` as its stand-in failing gate.** It still shows a prose-suite step failing beside a `check:gates` step (`knip`), which is what those four sites were written to show.
+- KTD2. **`packages/devtools/test/root-config/lefthook-config.test.ts` takes `check:docs:core` as its stand-in failing gate.** It still shows a prose-suite step failing beside a `check:gates` step (`knip`), which is what those four sites were written to show.
 - KTD3. **`provision-skills.test.ts` stays in the docs lane.** The design-skill link test still reads `packages/design-system/SKILL.md` through its symlink, so the file keeps its `PROSE_SUITES` row and its place in `check:docs:devtools`. The row's `reads` text is corrected to what the file reads now.
 - KTD4. **One learning is deleted and two are edited.** `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md` describes only the deleted list and is removed. `docs/solutions/best-practices/what-a-rename-prose-pass-gets-wrong-and-the-checks-that-catch-it.md` is about rename passes in general: its passages on the words test and its carve-outs go, its grep-based checks stay, and its link to the deleted learning goes. `docs/solutions/best-practices/renaming-a-table-drizzle-kit-will-not-generate-so-the-migration-and-snapshot-are-written-by-hand.md` loses its link to the deleted learning and any sentence that relies on the words test.
 - KTD5. **The decision doc gets a dated amendment, and its earlier amendments stay.** `docs/solutions/architecture-patterns/adr-0047.md` says an old word leaves the glossary for `old-words.ts`. Its 08/10/2026 amendment says the old word's row refuses it in reader text until a block's rename lands. A new amendment line dated 12/10/2026 says an old word now leaves the glossary, no list of old words is kept in the tree, and no gate refuses an old word: review holds a staged rename. The pull request body says this decision doc was edited.
@@ -86,7 +86,7 @@ Four of the six tests in the describe block "the skills this repository tracks" 
 - `package.json`: `check:docs` and `check:docs:api`, lines 20 and 21 on `origin/main`.
 - `lefthook.yml`: the `check:docs:api` command under `pre-push-gates`.
 - `packages/devtools/test/ci/docs-lane.test.ts`: the `PROSE_SUITES` table, and the tests under "what the docs lane runs" that hold it to `check:docs` in both directions.
-- `packages/devtools/test/lefthook-config.test.ts`: `PUSHED_SCRIPTS` and "runs each step `check:gates` and `check:docs` name, and nothing else", which holds `lefthook.yml` to the two scripts.
+- `packages/devtools/test/root-config/lefthook-config.test.ts`: `PUSHED_SCRIPTS` and "runs each step `check:gates` and `check:docs` name, and nothing else", which holds `lefthook.yml` to the two scripts.
 - `docs/operations/local-gates.md`, *The pre-push hook*: names the four prose suites, says `check:docs:api` is the slowest command, and uses it in a `LEFTHOOK_EXCLUDE` example.
 - `CONCEPTS.md`, the preamble: "the words test holds the old words it refuses".
 - A search of `origin/main` for the three file names and `check:docs:api` found no mention in `AGENTS.md` or in any `CODING_STANDARDS.md`.
@@ -104,7 +104,7 @@ Four of the six tests in the describe block "the skills this repository tracks" 
   - `package.json`
   - `lefthook.yml`
   - `packages/devtools/test/ci/docs-lane.test.ts`
-  - `packages/devtools/test/lefthook-config.test.ts`
+  - `packages/devtools/test/root-config/lefthook-config.test.ts`
 - **Approach:**
   1. Delete the six files.
   2. Remove the `check:docs:api` script and its name from `check:docs` in the root `package.json`.
@@ -126,7 +126,7 @@ Four of the six tests in the describe block "the skills this repository tracks" 
 - **Requirements:** R3, R4, R6. Carries KTD3.
 - **Dependencies:** U1, which edits the same table and script list.
 - **Files:**
-  - `packages/devtools/test/ci/provision-skills.test.ts`
+  - `packages/devtools/test/worktrees/provision-skills.test.ts`
   - `packages/devtools/test/ci/docs-lane.test.ts`
 - **Approach:**
   1. In the describe block "the skills this repository tracks", delete the four list-pin tests: "tracks its own three skills", "tracks seven third-party skills", "tracks nothing else" and "tracks the api's two Resend skills".

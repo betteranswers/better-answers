@@ -1,7 +1,7 @@
-import { runsOverThrowawayTree } from "./throwaway-tree.ts";
-import type { Tree } from "./throwaway-tree.ts";
+import { runsOverThrowawayTree } from "../throwaway-tree.ts";
+import type { Tree } from "../throwaway-tree.ts";
 
-export type { Tree } from "./throwaway-tree.ts";
+export type { Tree } from "../throwaway-tree.ts";
 
 export type JscpdConfig = {
   readonly paths: readonly string[];
