@@ -60,7 +60,7 @@ const aPage = (name: string, built: boolean, owners?: Page["owners"]): Page => (
 });
 
 describe("the one navigation list", () => {
-  it("declares ADR 0047's areas, groups and pages in order", () => {
+  it("declares the navigation list's areas, groups and pages in order", () => {
     expect(outline(AREAS)).toEqual([
       ["Ask", [[null, ["New Question", "Your Questions", "Connect Claude"]]]],
       [

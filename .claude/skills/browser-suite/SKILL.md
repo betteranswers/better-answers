@@ -184,7 +184,7 @@ file for one that already does the job.
   with a keydown listener and a `MutationObserver`, because a matcher's polling is coarser than the
   budget. `clockTheNextKey` also holds every `fetch` the page sends after the key until the page
   reads as landed. When the node has not read its text 2 s after the key while a request is held,
-  `actionClocked` fails by name: an action never waits on a round trip (ADR 0037). That check
+  `actionClocked` fails by name: an action never waits on a round trip. That check
   passes or fails the same way on any runner that draws within 2 s. A request already in flight
   at the key is not held, and nor is an upload, which goes by `XMLHttpRequest`, so a spec that
   samples one action several times waits for each sample's answer before the next key. On CI the
