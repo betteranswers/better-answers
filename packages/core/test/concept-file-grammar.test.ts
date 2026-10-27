@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
@@ -43,7 +45,8 @@ describe("a concept file read back", () => {
       ok: true,
       value: { frontmatter, body: "# Heading\n\nA line.\nAnother.\n" },
     });
-    expect(read.ok && contentHashOf(read.value.frontmatter, read.value.body, "k/a.md")).toBe(
+    assert(read.ok, `the file was refused: ${inspect(read)}`);
+    expect(contentHashOf(read.value.frontmatter, read.value.body, "k/a.md")).toBe(
       contentHashOf(frontmatter, body, "k/a.md"),
     );
   });
@@ -88,7 +91,7 @@ describe("a concept file read back", () => {
 
     const read = parseConceptFile(file);
 
-    if (!read.ok) throw new Error(`the file was refused: ${read.error}`);
+    assert(read.ok, `the file was refused: ${inspect(read)}`);
     const { frontmatter, body } = read.value;
     expect(Object.getPrototypeOf(frontmatter)).toBe(Object.prototype);
     expect(Object.entries(frontmatter)).toEqual([
@@ -105,9 +108,11 @@ describe("a concept file read back", () => {
 
     const read = parseConceptFile(file);
 
-    if (!read.ok) throw new Error(`the file was refused: ${read.error}`);
+    assert(read.ok, `the file was refused: ${inspect(read)}`);
     const [entry] = z.array(z.unknown()).parse(read.value.frontmatter["sources"]);
-    expect(Object.entries(entry ?? {})).toEqual([
+    assert(typeof entry === "object", "the sources list holds an entry");
+    assert(entry !== null, "the sources entry is an object");
+    expect(Object.entries(entry)).toEqual([
       ["resource", "/s/a.pdf"],
       ["__proto__", "x"],
     ]);

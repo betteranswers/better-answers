@@ -242,8 +242,7 @@ describe("a git failure after the precondition passed", () => {
 
     const failed = await commit(bundle.principal, bundle.door, requestFor({ path: ".git/config" }));
 
-    expect(failed.ok).toBe(false);
-    expect(failed.ok ? undefined : failed.error).toBeInstanceOf(Error);
+    expect(failed).toEqual({ ok: false, error: matching.any(Error) });
     expect(await head(bundle.principal, bundle.door)).toBeNull();
   });
 });
@@ -419,7 +418,7 @@ describe("a bundle whose history behind its head is unreadable", () => {
 
     const scanned = await commitsAfter(PLATFORM, bundle.door, bundle.workspaceId, null);
 
-    expect(scanned.ok ? undefined : scanned.error).toBeInstanceOf(Error);
+    expect(scanned).toEqual({ ok: false, error: matching.any(Error) });
   });
 });
 
@@ -465,7 +464,7 @@ describe("a repository whose refs git cannot read", () => {
       requestFor({ path: "knowledge/b.md", expectedHead: ANY_HEAD }),
     );
 
-    expect(failed.ok ? undefined : failed.error).toBeInstanceOf(Error);
+    expect(failed).toEqual({ ok: false, error: matching.any(Error) });
   });
 });
 

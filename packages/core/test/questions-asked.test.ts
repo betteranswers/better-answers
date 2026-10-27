@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import {
   boundarySchemas,
@@ -600,7 +600,8 @@ describe("reading the questions asked", () => {
     const first = answered(await asked(admin, { limit: 1 }));
     answered(await closing(admin, laterFlag.id, "no-fault-in-the-knowledge"));
 
-    const next = answered(await asked(admin, { limit: 1, cursor: first.nextCursor ?? undefined }));
+    assert(first.nextCursor !== null, "the first page names a cursor");
+    const next = answered(await asked(admin, { limit: 1, cursor: first.nextCursor }));
 
     expect([first, next].map((page) => page.records.map(({ id }) => id))).toEqual([
       [later.id],
@@ -735,7 +736,8 @@ describe("reading your questions", () => {
     const newer = await aRecord(admin);
 
     const first = answered(await yours(admin, { limit: 1 }));
-    const next = answered(await yours(admin, { limit: 1, cursor: first.nextCursor ?? undefined }));
+    assert(first.nextCursor !== null, "the first page names a cursor");
+    const next = answered(await yours(admin, { limit: 1, cursor: first.nextCursor }));
 
     expect(
       [first, next].map((page) => [page.records.map(({ id }) => id), page.nextCursor]),

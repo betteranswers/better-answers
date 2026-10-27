@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, describe, expect, it } from "vitest";
 
 import { head } from "@better-answers/core/store/git";
 import { passageLocatorOf, type ConceptIri } from "@better-answers/schema";
@@ -295,13 +297,13 @@ describe("a save seeded from the raw file", () => {
         ]),
       },
     );
-    if (!imported.ok) throw new Error(`the import was refused: ${JSON.stringify(imported.error)}`);
+    assert(imported.ok, `the import was refused: ${inspect(imported)}`);
     const found = await db().pool.query<{ iri: ConceptIri }>(
       "SELECT iri FROM concept_index WHERE workspace_id = $1 AND path = 'knowledge/policy/hand-written.md'",
       [scenario.workspaceId],
     );
     const iri = found.rows[0]?.iri;
-    if (iri === undefined) throw new Error("the import landed no concept");
+    assert(iri !== undefined, "the import landed no concept");
     const before = await historyOf(scenario);
 
     const { answer } = await editedBy(scenario, scenario.admin, iri);
