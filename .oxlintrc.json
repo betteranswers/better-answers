@@ -641,12 +641,6 @@
       }
     },
     {
-      "files": ["packages/schema/src/boundary-schemas.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 1392, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["packages/schema/src/table-ownership.ts"],
       "rules": {
         "max-lines": ["error", { "max": 628, "skipBlankLines": true, "skipComments": true }]

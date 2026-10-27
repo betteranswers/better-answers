@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import { boundarySchemas } from "./boundary-schemas.ts";
+import { boundarySchemas } from "./boundary-schemas/index.ts";
 
 export const ids = {
   workspaceId: boundarySchemas.workspace.select.shape.id,

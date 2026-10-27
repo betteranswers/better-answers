@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { check, foreignKey, index, jsonb, primaryKey, text } from "drizzle-orm/pg-core";
 
-import type { DraftedSentence, RecordConcept, RecordMapState } from "../boundary-schemas.ts";
+import type { DraftedSentence, RecordConcept, RecordMapState } from "../boundary-schemas/index.ts";
 import { listed, stamp } from "../column-helpers.ts";
 import { ACTOR_ID_PATTERN } from "../people/actor-id.ts";
 import { ROLES } from "../people/roles.ts";
