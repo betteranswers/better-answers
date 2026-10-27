@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { ULID } from "@better-answers/schema";
@@ -73,6 +75,28 @@ const fixtureSchema = z.object({
 const fixture = contractFixture("document-passage", fixtureSchema);
 const { document } = fixture;
 
+const spanOf = (wire: string) => {
+  const parsed = parseLocator(wire);
+  if (!parsed.ok) throw new Error(`the fixture's own locator did not parse: ${wire}`);
+  return parsed.value;
+};
+
+const ordinalsOverlapping = (span: { charStart: number; charEnd: number }): number[] =>
+  document.passages
+    .filter((row) => row.char_start < span.charEnd && row.char_end > span.charStart)
+    .map((row) => row.ordinal);
+
+const CITED_PAST_THE_ASTRAL = fixture.open.filter(
+  (each) =>
+    each.expect === "passage" &&
+    each.passage !== undefined &&
+    spanOf(each.wire).charStart > document.astral.at,
+);
+
+const AT_THE_READ = fixture.open.filter((each) => each.refused_by === "the read");
+const OUT_OF_RANGE = AT_THE_READ.filter((each) => each.because === "out of range");
+const IN_ANOTHER_DOCUMENT = AT_THE_READ.filter((each) => each.because !== "out of range");
+
 describe("the passage id derived from a document and an ordinal", () => {
   it("derives the id the agreement names for each case", () => {
     for (const { source_document_id, ordinal, id } of fixture.passage_id.cases) {
@@ -114,36 +138,36 @@ describe("the passage id derived from a document and an ordinal", () => {
 describe("the wire locator", () => {
   it("reads the document and span from every locator that parses", () => {
     for (const { wire, source_document_id, char_start, char_end } of fixture.locator.must_parse) {
-      const parsed = parseLocator(wire);
-
-      expect({ wire, read: parsed.ok ? parsed.value : parsed.error }).toEqual({
+      expect({ wire, read: parseLocator(wire) }).toEqual({
         wire,
-        read: { sourceDocumentId: source_document_id, charStart: char_start, charEnd: char_end },
+        read: {
+          ok: true,
+          value: { sourceDocumentId: source_document_id, charStart: char_start, charEnd: char_end },
+        },
       });
     }
   });
 
   it("answers a malformed locator as it answers a withheld passage", () => {
     for (const { wire, why } of fixture.locator.must_not_parse) {
-      const parsed = parseLocator(wire);
-
-      expect({ why, refusal: parsed.ok ? "parsed" : parsed.error }).toEqual({
+      expect({ why, refusal: parseLocator(wire) }).toEqual({
         why,
-        refusal: fixture.locator.not_found,
+        refusal: { ok: false, error: fixture.locator.not_found },
       });
     }
   });
 
   it("reads each passage row's locator back to the row's span", () => {
     for (const row of document.passages) {
-      const parsed = parseLocator(row.locator);
-
-      expect({ ordinal: row.ordinal, read: parsed.ok ? parsed.value : parsed.error }).toEqual({
+      expect({ ordinal: row.ordinal, read: parseLocator(row.locator) }).toEqual({
         ordinal: row.ordinal,
         read: {
-          sourceDocumentId: document.source_document_id,
-          charStart: row.char_start,
-          charEnd: row.char_end,
+          ok: true,
+          value: {
+            sourceDocumentId: document.source_document_id,
+            charStart: row.char_start,
+            charEnd: row.char_end,
+          },
         },
       });
     }
@@ -186,27 +210,22 @@ describe("the passage a locator opens", () => {
   it("cuts the agreed passage from the text for each locator", () => {
     for (const answered of fixture.open.filter((each) => each.expect === "passage")) {
       const parsed = parseLocator(answered.wire);
-      const passage = parsed.ok ? spanText(document.normalised_text, parsed.value) : parsed;
+      assert(parsed.ok, `${answered.case}: ${inspect(parsed)}`);
 
-      expect({ case: answered.case, passage: passage.ok ? passage.value : passage.error }).toEqual({
+      expect({
         case: answered.case,
-        passage: answered.passage,
+        passage: spanText(document.normalised_text, parsed.value),
+      }).toEqual({
+        case: answered.case,
+        passage: { ok: true, value: answered.passage },
       });
     }
   });
 
   it("cuts by code points, where a UTF-16 slice goes wrong", () => {
-    const cited = fixture.open.filter(
-      (each) => each.expect === "passage" && each.passage !== undefined,
-    );
-
-    expect(cited.length).toBeGreaterThan(0);
-    for (const answered of cited) {
-      const parsed = parseLocator(answered.wire);
-
-      if (!parsed.ok) throw new Error(`the fixture's own locator did not parse: ${answered.wire}`);
-      const { charStart, charEnd } = parsed.value;
-      if (charStart <= document.astral.at) continue;
+    expect(CITED_PAST_THE_ASTRAL.length).toBeGreaterThan(0);
+    for (const answered of CITED_PAST_THE_ASTRAL) {
+      const { charStart, charEnd } = spanOf(answered.wire);
       expect({
         case: answered.case,
         byUnit: document.normalised_text.slice(charStart, charEnd),
@@ -216,16 +235,7 @@ describe("the passage a locator opens", () => {
 
   it("covers exactly the passage rows its span overlaps", () => {
     for (const answered of fixture.open.filter((each) => each.covers_ordinals !== undefined)) {
-      const parsed = parseLocator(answered.wire);
-
-      if (!parsed.ok) throw new Error(`the fixture's own locator did not parse: ${answered.wire}`);
-      const overlapping = document.passages
-        .filter(
-          (row) => row.char_start < parsed.value.charEnd && row.char_end > parsed.value.charStart,
-        )
-        .map((row) => row.ordinal);
-
-      expect({ case: answered.case, rows: overlapping }).toEqual({
+      expect({ case: answered.case, rows: ordinalsOverlapping(spanOf(answered.wire)) }).toEqual({
         case: answered.case,
         rows: answered.covers_ordinals,
       });
@@ -237,36 +247,33 @@ describe("the passage a locator opens", () => {
 
     expect(atTheParser.length).toBeGreaterThan(0);
     for (const refused of atTheParser) {
-      const parsed = parseLocator(refused.wire);
-
-      expect({ case: refused.case, refusal: parsed.ok ? "parsed" : parsed.error }).toEqual({
+      expect({ case: refused.case, refusal: parseLocator(refused.wire) }).toEqual({
         case: refused.case,
-        refusal: fixture.locator.not_found,
+        refusal: { ok: false, error: fixture.locator.not_found },
       });
     }
   });
 
   it("leaves a well-shaped locator for the read to refuse", () => {
-    const atTheRead = fixture.open.filter((each) => each.refused_by === "the read");
+    expect(OUT_OF_RANGE.length).toBeGreaterThan(0);
+    expect(IN_ANOTHER_DOCUMENT.length).toBeGreaterThan(0);
+    for (const refused of OUT_OF_RANGE) {
+      const span = spanOf(refused.wire);
 
-    expect(atTheRead.length).toBeGreaterThan(0);
-    for (const refused of atTheRead) {
-      const parsed = parseLocator(refused.wire);
-
-      if (!parsed.ok)
-        throw new Error(`the parser refused what the read must refuse: ${refused.case}`);
-      const cut = spanText(document.normalised_text, parsed.value);
-      const outcome =
-        parsed.value.sourceDocumentId === document.source_document_id
-          ? cut.ok
-            ? "a passage"
-            : cut.error
-          : "another document";
-
-      expect({ case: refused.case, outcome }).toEqual({
+      expect({
         case: refused.case,
-        outcome:
-          refused.because === "out of range" ? fixture.locator.not_found : "another document",
+        document: span.sourceDocumentId,
+        cut: spanText(document.normalised_text, span),
+      }).toEqual({
+        case: refused.case,
+        document: document.source_document_id,
+        cut: { ok: false, error: fixture.locator.not_found },
+      });
+    }
+    for (const refused of IN_ANOTHER_DOCUMENT) {
+      expect({ case: refused.case, document: spanOf(refused.wire).sourceDocumentId }).not.toEqual({
+        case: refused.case,
+        document: document.source_document_id,
       });
     }
   });
