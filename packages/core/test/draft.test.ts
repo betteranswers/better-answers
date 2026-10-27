@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
 
 import {
   draftAnswer,
@@ -23,7 +22,7 @@ import {
   streamedEventsOf,
   streamedResponse,
 } from "./judge-wire.ts";
-import { rowsFrom } from "./rows.ts";
+import { openReservationsIn, rowsFrom } from "./rows.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -145,18 +144,12 @@ const draftKept = async (recordId: string) => {
   return rowsFrom(read)[0]?.["drafted"];
 };
 
-const openCount = z.number();
-
 const spendOf = async (workspaceId: string) => {
-  const open = await db().pool.query(
-    "SELECT count(*)::integer AS open FROM spend_reservation WHERE workspace_id = $1",
-    [workspaceId],
-  );
   const calls = await db().pool.query(
     "SELECT purpose, outcome FROM llm_call WHERE workspace_id = $1 ORDER BY called_at",
     [workspaceId],
   );
-  return { open: openCount.parse(rowsFrom(open)[0]?.["open"]), calls: rowsFrom(calls) };
+  return { open: await openReservationsIn(db().pool, workspaceId), calls: rowsFrom(calls) };
 };
 
 const arranged = async (

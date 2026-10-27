@@ -29,7 +29,7 @@ import {
   judgeReplyTo,
   promptOf,
 } from "./judge-wire.ts";
-import { rowsFrom } from "./rows.ts";
+import { openReservationsIn, rowsFrom } from "./rows.ts";
 import { inputOf } from "./suite-input.ts";
 import { answered, asksTablesLockedAtOnce, postgresForSuite } from "./suite-postgres.ts";
 
@@ -145,18 +145,12 @@ const recordOf = async (recordId: string) => {
   return recordedJudgement.optional().parse(read.rows[0]);
 };
 
-const openCount = z.number();
-
 const spendOf = async (workspaceId: string) => {
-  const reservations = await db().pool.query(
-    "SELECT count(*)::integer AS open FROM spend_reservation WHERE workspace_id = $1",
-    [workspaceId],
-  );
   const calls = await db().pool.query(
     "SELECT outcome, tokens_in, tokens_out, answer_id FROM llm_call WHERE workspace_id = $1",
     [workspaceId],
   );
-  return { open: openCount.parse(rowsFrom(reservations)[0]?.["open"]), calls: rowsFrom(calls) };
+  return { open: await openReservationsIn(db().pool, workspaceId), calls: rowsFrom(calls) };
 };
 
 const expectNoCall = async (workspaceId: string, wire: Wire) => {
