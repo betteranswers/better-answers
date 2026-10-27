@@ -16,11 +16,11 @@ import {
 } from "../scripts/roles-surface.ts";
 import { declaredTableNames } from "../scripts/worker-view.ts";
 import { identityOf, SECURITY_DEFINER_REACH, ulid } from "../src/index.ts";
-import { testData } from "./factory.ts";
-import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
-import { matching } from "./matching.ts";
-import { privilegesHeld, refusesEach } from "./probes.ts";
-import { A_MAP_NODE } from "./rls-probes.ts";
+import { testData } from "./support/factory.ts";
+import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./support/harness.ts";
+import { matching } from "./support/matching.ts";
+import { privilegesHeld, refusesEach } from "./support/probes.ts";
+import { A_MAP_NODE } from "./support/rls-probes.ts";
 
 let surfaceReadFromTheDatabase: RolesSurface;
 

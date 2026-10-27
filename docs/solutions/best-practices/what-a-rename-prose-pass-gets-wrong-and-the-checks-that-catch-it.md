@@ -94,7 +94,7 @@ The globs leave out the archive, plans and dogfood reports dated before 2026-10-
 
 **10. Leave a fixture under `contracts/` as written.** Both tiers read those fixtures, and the api tier's contract digest is computed from them (`packages/schema/test/contract-digest.test.ts`). Rewording one moves the digest for wording alone, so the old word stays in the fixture. When a fixture must change, regenerate both stamps after the pass, never before it: U11's pass reworded fixture prose after the stamps were generated, and the worker's hand-edited-digest test failed.
 
-**11. A noun that grows a word pushes test titles past their cap.** `MOST_WORDS = 10` (`packages/schema/test/test-title.ts`), and the Python suite holds the same cap. *Binding* to *connected source* put about sixty titles over it. Run every suite's title check before committing.
+**11. A noun that grows a word pushes test titles past their cap.** `MOST_WORDS = 10` (`packages/schema/test/support/test-title.ts`), and the Python suite holds the same cap. *Binding* to *connected source* put about sixty titles over it. Run every suite's title check before committing.
 
 **12. Redirect a renamed page only if it is built.** When the page has `built: true` in `apps/web/src/shared/navigation.ts`, add each old address to its `movedFrom` and to the `MOVED` list in `apps/web/test/navigation.test.ts` in the same commit, and watch the test fail before the address is right. An unbuilt page was never routed, so it gets neither: "routes every moved address, each leading to a built page" (`apps/web/test/frame.test.tsx`) refuses a moved address whose pages are all unbuilt.
 

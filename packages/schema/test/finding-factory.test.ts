@@ -4,9 +4,9 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { type TestData, testData } from "./factory.ts";
-import { type MigratedPostgres, withRollback } from "./harness.ts";
-import { openMigratedPostgres } from "./warm-postgres.ts";
+import { type TestData, testData } from "./support/factory.ts";
+import { type MigratedPostgres, withRollback } from "./support/harness.ts";
+import { openMigratedPostgres } from "./support/warm-postgres.ts";
 
 const contractsDir = path.resolve(import.meta.dirname, "../../../contracts");
 const redactionContract = z.object({ categories: z.array(z.object({ category: z.string() })) });

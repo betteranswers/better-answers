@@ -3,7 +3,7 @@
 
 import { writeFileSync } from "node:fs";
 
-import { startMigratedPostgres } from "../test/harness.ts";
+import { startMigratedPostgres } from "../test/support/harness.ts";
 import {
   readRolesSurface,
   renderRolesSurface,

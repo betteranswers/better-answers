@@ -1,0 +1,73 @@
+import { sql } from "drizzle-orm";
+import { check, index, jsonb, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
+
+import { listed, stamp } from "../column-helpers.ts";
+import { withRLS } from "../with-rls.ts";
+import { workspace } from "./workspace-table.ts";
+
+export const FAMILIES = ["people", "knowledge", "sources", "platform"] as const;
+
+export const ACTION_PATTERN = `^(${FAMILIES.join("|")})\\.[a-z][a-z_]*\\.[a-z][a-z_]*$`;
+
+export const ACTION = new RegExp(ACTION_PATTERN, "u");
+
+const familyList = listed(FAMILIES);
+
+const auditLogColumns = () => ({
+  action: text("action").notNull(),
+
+  family: text("family")
+    .notNull()
+    .generatedAlwaysAs(sql`split_part(action, '.', 1)`),
+
+  actor: text("actor").notNull(),
+
+  subjectKind: text("subject_kind")
+    .notNull()
+    .generatedAlwaysAs(sql`split_part(action, '.', 2)`),
+  subjectId: text("subject_id").notNull(),
+  at: stamp("at").notNull().defaultNow(),
+
+  detail: jsonb("detail").notNull(),
+
+  batchId: text("batch_id"),
+});
+
+const auditLogChecks = (table: string) => [
+  check(`${table}_action_check`, sql.raw(`action ~ '${ACTION_PATTERN}'`)),
+  check(`${table}_family_check`, sql.raw(`family IN (${familyList})`)),
+];
+
+export const auditEvent = withRLS(
+  "audit_event",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id),
+    ...auditLogColumns(),
+  },
+  "workspaceId",
+  (table) => [
+    index("audit_event_workspace_id_idx").on(table.workspaceId),
+
+    index("audit_event_subject_idx").on(table.workspaceId, table.subjectKind, table.subjectId),
+
+    index("audit_event_actor_idx").on(table.workspaceId, table.actor, table.at, table.id),
+
+    uniqueIndex("audit_event_workspace_id_id_uidx").on(table.workspaceId, table.id),
+    ...auditLogChecks("audit_event"),
+  ],
+);
+
+export const identityAuditEvent = pgTable(
+  "identity_audit_event",
+  {
+    id: text("id").primaryKey(),
+    ...auditLogColumns(),
+  },
+  (table) => [
+    index("identity_audit_event_subject_idx").on(table.subjectKind, table.subjectId),
+    ...auditLogChecks("identity_audit_event"),
+  ],
+);

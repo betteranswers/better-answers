@@ -38,7 +38,7 @@ execution: code
 ## Key Technical Decisions
 
 - KTD1. **The check reads as two implications.** A concept stands only on a flag, and a sentence stands only with a concept: `(disputed_concept IS NULL OR verdict = 'flag') AND (disputed_sentence IS NULL OR disputed_concept IS NOT NULL)`. A sentence with no concept, and either field on helpful feedback, stay refused. A concept with no sentence is admitted, which is the erased shape.
-- KTD2. **The migration is generated, not written by hand.** The constraint lives in `packages/schema/src/question-tables.ts`, so drizzle drops and re-adds it.
+- KTD2. **The migration is generated, not written by hand.** The constraint lives in `packages/schema/src/knowledge/question-tables.ts`, so drizzle drops and re-adds it.
 
 ## Implementation Units
 
@@ -46,9 +46,9 @@ execution: code
 
 - **Requirements:** R1 to R4.
 - **Files:**
-  - Modify: `packages/schema/src/question-tables.ts`, `packages/schema/src/table-ownership.ts`, `packages/core/src/erasure/questions.ts`
+  - Modify: `packages/schema/src/knowledge/question-tables.ts`, `packages/schema/src/table-ownership.ts`, `packages/core/src/erasure/questions.ts`
   - Create: `packages/schema/migrations/0081_the-erased-flags-sentence.sql` (generated), with its snapshot and journal entry, and the regenerated worker view
-  - Test: `packages/schema/test/question-tables.test.ts`, `packages/core/test/erasure-routine.test.ts`, `packages/core/test/question-rows.ts`
+  - Test: `packages/schema/test/knowledge/question-tables.test.ts`, `packages/core/test/erasure-routine.test.ts`, `packages/core/test/question-rows.ts`
   - Docs: `docs/solutions/architecture-patterns/adr-0017.md`, `docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`
 - **Test scenarios:**
   - An erased person's flag keeps its reason and concept, and loses its note and disputed sentence.

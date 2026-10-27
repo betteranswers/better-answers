@@ -1,5 +1,5 @@
-import { GLOBAL_TABLE_NAMES_BEYOND_IDENTITY } from "./counter-tables.ts";
-import { IDENTITY_SET } from "./identity-tables.ts";
+import { IDENTITY_SET } from "./people/identity-tables.ts";
+import { GLOBAL_TABLE_NAMES_BEYOND_IDENTITY } from "./platform/counter-tables.ts";
 
 export const RLS_EXEMPTIONS = {
   "public.user": "Read by id or email at sign-in, before any workspace is known.",

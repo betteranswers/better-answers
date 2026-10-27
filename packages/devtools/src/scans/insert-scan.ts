@@ -11,12 +11,12 @@ export const FACTORY_MODULES = [
   "apps/worker/tests/pg_harness.py",
   "packages/core/test/audit-rows.ts",
   "packages/core/test/identity-rows.ts",
-  "packages/schema/test/before-the-action.ts",
-  "packages/schema/test/before-the-knowledge-words.ts",
-  "packages/schema/test/catalogue-statements.ts",
-  "packages/schema/test/concept-index-rows.ts",
-  "packages/schema/test/probes.ts",
-  "packages/schema/test/rls-probes.ts",
+  "packages/schema/test/knowledge/concept-index-rows.ts",
+  "packages/schema/test/migrations/before-the-action.ts",
+  "packages/schema/test/migrations/before-the-knowledge-words.ts",
+  "packages/schema/test/migrations/catalogue-statements.ts",
+  "packages/schema/test/support/probes.ts",
+  "packages/schema/test/support/rls-probes.ts",
 ];
 
 export const SCAN_EXECUTABLE = {

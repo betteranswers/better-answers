@@ -24,8 +24,8 @@ import {
 } from "../src/index.ts";
 import type { ids } from "../src/index.ts";
 import * as publicEntry from "../src/index.ts";
-import { type MigratedPostgres, withRollback } from "./harness.ts";
-import { openMigratedPostgres } from "./warm-postgres.ts";
+import { type MigratedPostgres, withRollback } from "./support/harness.ts";
+import { openMigratedPostgres } from "./support/warm-postgres.ts";
 
 const WS_ID = "01J6AAAAAAAAAAAAAAAAAAAAAA";
 const USER_ID = "01J6CCCCCCCCCCCCCCCCCCCCCC";

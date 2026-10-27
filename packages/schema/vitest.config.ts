@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
 
-import { pathWithAppleGit } from "./test/apple-git.ts";
+import { pathWithAppleGit } from "./test/support/apple-git.ts";
 
 export default defineConfig({
   test: {
@@ -14,7 +14,7 @@ export default defineConfig({
 
     // An absolute path: Vitest imports a globalSetup entry as it is written rather than
     // resolving it against this file.
-    globalSetup: [fileURLToPath(new URL("./test/warm-postgres.ts", import.meta.url))],
+    globalSetup: [fileURLToPath(new URL("./test/support/warm-postgres.ts", import.meta.url))],
 
     testTimeout: 60_000,
 

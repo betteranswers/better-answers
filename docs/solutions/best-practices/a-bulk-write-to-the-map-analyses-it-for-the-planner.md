@@ -47,7 +47,7 @@ Test a new writer the way the existing cases do. Switch autovacuum off on both t
 
 Test the failure too. A second connection holds `SHARE UPDATE EXCLUSIVE` on `map_node`, which blocks the analyse and none of the row writes, so the analyse ends at its lock timeout. `import-bundle.test.ts` has "reports a landed import when the analyse fails" and "keeps the stopped refusal when the analyse fails too". `test_work_loop.py` has `test_a_rebuild_whose_analyse_fails_still_goes_live`.
 
-Never seed the map by SQL and call the function from the test itself. That proves the function works, which `packages/schema/test/analysed-map.test.ts` already holds, and nothing about the writer.
+Never seed the map by SQL and call the function from the test itself. That proves the function works, which `packages/schema/test/knowledge/analysed-map.test.ts` already holds, and nothing about the writer.
 
 ## Examples
 

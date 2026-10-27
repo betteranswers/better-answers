@@ -11,7 +11,7 @@ import type { Tool, Tree } from "@better-answers/devtools/throwaway-tree";
 
 const MODULE = "apps/worker/src/better_answers_worker/probe.py";
 
-const PORTED = "packages/schema/src/concept-file.ts";
+const PORTED = "packages/schema/src/knowledge/concept-file.ts";
 
 const ABSENT = "packages/schema/src/concept.ts";
 
@@ -135,7 +135,7 @@ describe("the port scan over a throwaway tree", () => {
   it.each([
     ["the tree lacks", ABSENT],
     ["given absolute", path.join(repositoryRoot, PORTED)],
-    ["climbing with ..", "packages/schema/../schema/src/concept-file.ts"],
+    ["climbing with ..", "packages/schema/../schema/src/knowledge/concept-file.ts"],
     ["not ending .ts", MANIFEST],
   ])("refuses a ported path %s", (_what, ported) => {
     expect(findings(declaring({ portOf: `PORT_OF = ("${ported}",)` }))).toEqual([

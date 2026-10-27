@@ -11,7 +11,9 @@ from better_answers_worker.ids import ulid
 from bundles import render_concept_file
 from pg_harness import REPO_ROOT
 
-_DIMENSIONS_SOURCE = REPO_ROOT / "packages" / "schema" / "src" / "index-tables.ts"
+_DIMENSIONS_SOURCE = (
+    REPO_ROOT / "packages" / "schema" / "src" / "sources" / "index-tables.ts"
+)
 
 
 def embedding_dimensions() -> int:
