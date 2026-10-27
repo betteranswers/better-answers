@@ -23,10 +23,15 @@ reviews:
     and a finding that contradicts one of them is wrong.
 
     - `AGENTS.md` — the map: layout, how a task is worked, which skill applies.
-    - `GLOSSARY.md` — the glossary. Every domain word has one settled meaning.
-      A new domain word is defined here in the same change as the code that
-      first uses it, or before; a diff that introduces a domain term absent from
-      the glossary at its head is a finding.
+    - `GLOSSARY.md` — the glossary of the product's domain language, in the format
+      `.agents/references/glossary-format.md` gives. Every domain word has one
+      settled meaning. A new domain word is defined here in the same change as the
+      code that first uses it, or before; a diff that introduces a domain term
+      absent from the glossary at its head is a finding. Implementation words (a
+      job, a lease, a table, a function) and general programming terms are not
+      domain words: their absence from the glossary is never a finding, and a diff
+      that adds one to it is. A term of the architecture is defined in its decision
+      under `docs/solutions/architecture-patterns/`, not in the glossary.
     - `apps/web/AGENTS.md`, `apps/worker/AGENTS.md`, `deploy/AGENTS.md`,
       `packages/core/AGENTS.md` and `packages/schema/AGENTS.md` —
       a directory's own rules. Apply each to changes in its directory.
@@ -116,7 +121,7 @@ reviews:
 
         Flag a read that checks the workspace but skips the read predicate, and flag a read predicate tested against a connected source's fields rather than against the `published_at`, `sensitivity` and `audience` columns on the readable unit itself — a concept and a write-up have no connected source (ADR 0023).
 
-        A `Principal` has three kinds — a user principal, the platform principal and the operator (ADR 0009, 2026-09-04) — and a deferred principal (a named person's authority carried into work that outlives their session, expiring with the authority it borrowed) is a glossary word with no type yet. Flag a background job, scheduled run or replay carrying a live user session, and flag a cross-workspace caller threaded through a user principal's role field.
+        A `Principal` has three kinds — a user principal, the platform principal and the operator — and a deferred principal (a named person's authority carried into work that outlives their session, expiring with the authority it borrowed) has no type yet (ADR 0009). Flag a background job, scheduled run or replay carrying a live user session, and flag a cross-workspace caller threaded through a user principal's role field.
 
         RLS is the guarantee and the store door is ergonomics over it, never a substitute: flag a new tenant table created without `withRLS()` or shipped without its zero-rows test, and flag a query aimed at a partition child that leans on the parent's policy.
       include:

@@ -368,13 +368,6 @@ An AI host, such as Claude or ChatGPT, through which a person reaches the compan
 What a person's consent gives an assistant: the company's knowledge in one workspace, until it
 lapses or is ended.
 
-**Principal**:
-Who the platform acts as: a member in one workspace, the platform itself, or the operator.
-
-**Deferred principal**:
-A member's authority carried into work that outlives their session. It expires with the authority it
-borrowed.
-
 **Audit event**:
 The record of one action by an Admin, the platform or a person: what was done, to what, by whom and
 when.
