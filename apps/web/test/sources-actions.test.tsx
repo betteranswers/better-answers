@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { BoundFunctions, queries } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
@@ -328,7 +329,7 @@ const ROW_ACTIONS = {
 };
 
 /** jsdom's accessible name drops the space a browser keeps before the hidden source's name. */
-const rowAction = (row: ReturnType<typeof within>, label: string, name: string) =>
+const rowAction = (row: BoundFunctions<typeof queries>, label: string, name: string) =>
   row.getByRole("button", { name: new RegExp(`^${label} ?${name}$`, "v") });
 
 const PANEL_NAMED = {
@@ -341,14 +342,15 @@ const panelOf = (change: "narrow" | "widen", name: string) =>
 
 const reviewOf = (name: string) => screen.queryByRole("region", { name: `Review of ${name}` });
 
-const widenOpened = (row: ReturnType<typeof within>): HTMLElement => {
+const widenOpened = (row: BoundFunctions<typeof queries>): HTMLElement => {
   const widen = rowAction(row, ROW_ACTIONS.widen, "Staff handbook");
   widen.focus();
   fireEvent.click(widen);
   return widen;
 };
 
-const commitIn = (row: ReturnType<typeof within>) => row.getByRole("button", { name: "Widen" });
+const commitIn = (row: BoundFunctions<typeof queries>) =>
+  row.getByRole("button", { name: "Widen" });
 
 const describedBy = (control: HTMLElement): string | undefined =>
   document.getElementById(control.getAttribute("aria-describedby") ?? "")?.textContent;

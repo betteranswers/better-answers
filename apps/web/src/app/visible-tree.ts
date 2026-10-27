@@ -12,8 +12,9 @@ type Arrival = { readonly hidden?: boolean; readonly unread?: boolean };
 const useArrival = (found: keyof Arrival): boolean =>
   useRouterState({
     select: (state) => {
-      const arrival: Arrival | undefined = state.matches.at(-1)?.context;
-      return arrival?.[found] === true;
+      const context = state.matches.at(-1)?.context;
+      const arrival: Arrival = context !== undefined && "hidden" in context ? context : {};
+      return arrival[found] === true;
     },
   });
 

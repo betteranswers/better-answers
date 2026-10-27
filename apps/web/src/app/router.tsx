@@ -7,7 +7,6 @@ import {
   Outlet,
   redirect,
   useParams,
-  type AnyRoute,
   type RouterHistory,
 } from "@tanstack/react-router";
 import type { ReactElement, ReactNode } from "react";
@@ -434,7 +433,11 @@ type Reading = {
   readonly home?: Page;
 };
 
-const routesOf = (areas: readonly Area[], shell: AnyRoute, reading: Reading): AnyRoute[] => {
+const routesOf = (
+  areas: readonly Area[],
+  shell: typeof shellRoute | typeof consoleRoute,
+  reading: Reading,
+) => {
   const { readerIn, home } = reading;
   const failed = (failure: { readonly reset: () => void }) => (
     <FailedPage reset={failure.reset} home={home} />

@@ -13,7 +13,7 @@ import { createAppClients, Providers } from "@/app/providers.tsx";
 import type { IconName } from "@/shared/icon.tsx";
 import type { Page, VisibleTree } from "@/shared/navigation.ts";
 
-const aPage = (name: string, path: string, icon: IconName): Page => ({
+const aPage = (name: string, path: Page["path"], icon: IconName): Page => ({
   name,
   path,
   icon,

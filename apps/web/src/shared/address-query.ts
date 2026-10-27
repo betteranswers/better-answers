@@ -1,9 +1,10 @@
 import { parseSearchWith, stringifySearchWith } from "@tanstack/react-router";
+import { z } from "zod";
 
 type Json = string | number | boolean | null | readonly Json[] | { readonly [key: string]: Json };
 
 const asJsonWritesIt = (value: string): Json => {
-  const read: Json = JSON.parse(value);
+  const read: Json = z.json().parse(JSON.parse(value));
   if (JSON.stringify(read) !== value) throw new SyntaxError(`${value} is not as JSON writes it`);
   return read;
 };

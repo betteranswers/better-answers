@@ -686,7 +686,7 @@ export const memberUnreadUntil = async (page: Page, landed: Promise<void>): Prom
         return;
       }
       const answered = await route.fetch();
-      const answers: readonly unknown[] = await answered.json();
+      const answers = z.array(z.unknown()).parse(await answered.json());
       await route.fulfill({
         response: answered,
         json: answers.map((answer, at) => (asked[at] === MEMBER_READ ? A_FAILED_READ : answer)),

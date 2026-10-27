@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -40,8 +42,9 @@ test("offers a way out, shell intact, when a page throws", async ({
     }
     const answers: unknown = await answered.json();
 
-    const broken = Array.isArray(answers)
-      ? answers.map((answer, index) =>
+    const batch = z.array(z.unknown()).safeParse(answers);
+    const broken = batch.success
+      ? batch.data.map((answer, index) =>
           procedures[index] === MODEL_CHOICES_LIST ? { result: { data: NOT_A_LIST } } : answer,
         )
       : { result: { data: NOT_A_LIST } };
