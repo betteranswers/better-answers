@@ -137,6 +137,7 @@ const walkInside = async (
   const entries: Entry[] = [];
   let continuationToken: string | undefined;
   do {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- each page is asked for with the continuation token of the page before it
     const page = await door.client.send(
       new ListObjectsV2Command({
         Bucket: door.bucket,

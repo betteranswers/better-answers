@@ -11,7 +11,7 @@ const firstOf = (word: string): string =>
 export const initialsOf = (name: string): string =>
   name
     .trim()
-    .split(/\s+/)
+    .split(/\s+/u)
     .slice(0, 2)
     .map((part) => firstOf(part).toUpperCase())
     .join("");

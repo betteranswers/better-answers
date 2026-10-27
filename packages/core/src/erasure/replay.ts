@@ -137,9 +137,11 @@ export const replayCopiesSince = async (
     return err(new Error(`erasure: the replay prefix was refused (${listed.value.error})`));
   }
 
+  const reads = await Promise.all(
+    listed.value.value.map((key) => attempt(() => copyAt(platform, door, key))),
+  );
   const copies: ReplayCopy[] = [];
-  for (const key of listed.value.value) {
-    const read = await attempt(() => copyAt(platform, door, key));
+  for (const read of reads) {
     if (!read.ok) return err(read.error);
     if (new Date(read.value.completedAt).getTime() > since.getTime()) copies.push(read.value);
   }

@@ -208,7 +208,7 @@ const rowAt = (
   );
   if (found === undefined) {
     throw new Error(
-      `no ${mutatorName} → ${replacement} mutant on line ${String(line)}; the report holds:\n${rows.map((found) => `${String(found.location.start.line)} ${found.mutatorName} ${found.replacement ?? ""} ${found.status}`).join("\n")}`,
+      `no ${mutatorName} → ${replacement} mutant on line ${String(line)}; the report holds:\n${rows.map((row) => `${String(row.location.start.line)} ${row.mutatorName} ${row.replacement ?? ""} ${row.status}`).join("\n")}`,
     );
   }
   return found;

@@ -80,6 +80,7 @@ const answered = async (
   let step = await drafted.next();
   while (step.done !== true) {
     emit(step.value);
+    // oxlint-disable-next-line eslint/no-await-in-loop -- the draft is a generator, so each step follows the one emitted before it
     step = await drafted.next();
   }
   await crossing(ctx, draftAnswer.name, Promise.resolve(step.value)).catch(() => {});

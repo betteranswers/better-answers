@@ -204,12 +204,12 @@ const RESTORE_CODE: CodeKind = { kind: "restore-code", refusal: "restore-code-wr
 
 const GRANTING = "UPDATE session SET setup_granted_at = $3 WHERE id = $1 AND user_id = $2";
 
-const tryingACode = async <Accepted>(
+const tryingACode = async <Checked>(
   tx: Tx,
   held: Held,
   code: CodeKind,
-  check: () => Promise<Accepted | undefined>,
-): Promise<Result<Accepted | Wrong, CeilingMet>> => {
+  check: () => Promise<Checked | undefined>,
+): Promise<Result<Checked | Wrong, CeilingMet>> => {
   const waitSeconds = (await waitsOf(tx, held.personId, held.now))[code.kind];
   if (waitSeconds > 0) return err(new CeilingMet(waitSeconds));
   const accepted = await check();

@@ -23,7 +23,7 @@ const SPENDING_LIMIT_ACTIONS = declareActions("platform", {
 
 const named = z.object({
   workspaceId: boundarySchemas.workspace.select.shape.id,
-  gbp: z.string().regex(/^\d{1,9}(\.\d{1,6})?$/),
+  gbp: z.string().regex(/^\d{1,9}(\.\d{1,6})?$/u),
 });
 
 type SpendingLimit = { readonly workspaceId: string; readonly gbp: string };

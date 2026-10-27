@@ -337,6 +337,7 @@ export const recordEach = async <A extends AuditAction>(
 ): Promise<string | undefined> => {
   const batchId = batchIdFor(events.length);
   for (const { subjectId, detail } of events) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every audit row of the batch is written on the caller's transaction
     await record(principal, tx, { id: ulid(), action, subjectId, detail, batchId });
   }
   return batchId;

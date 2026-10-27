@@ -108,9 +108,9 @@ describe("recall over the synthetic set", () => {
         [`${name} carrying a collection in ${byAsk}, none named`, carrying, unnamed, entryCap],
         [`${name} carrying a collection in ${byAsk}, theirs named`, carrying, named, entryCap],
       ] as const;
-      for (const [reading, asked, ranked, depth] of readings) {
+      for (const [label, asked, ranked, depth] of readings) {
         const recalls = await recallAt(asked, landed, ranked, depth);
-        figures.push(...figuresOf(reading, recalls));
+        figures.push(...figuresOf(label, recalls));
 
         const { byAnswer, everyAnswer, anyAnswer } = recalls;
         expect([byAnswer.asked, everyAnswer.asked, anyAnswer.asked]).toEqual([

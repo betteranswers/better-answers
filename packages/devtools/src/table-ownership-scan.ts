@@ -17,7 +17,7 @@ export const SCAN_EXECUTABLE = {
 
 const CORE = "packages/core/src";
 
-const SCANNED = /\.tsx?$/;
+const SCANNED = /\.tsx?$/u;
 
 export type CrossOwnerEntry = {
   readonly table: string;
@@ -53,19 +53,19 @@ const IDENTIFIER = String.raw`(?:"[^"]+"|[a-z_][a-z0-9_$]*)`;
 
 const TABLE_REFERENCE = new RegExp(
   String.raw`\b(?<verb>DELETE\s+FROM|FROM|JOIN)\s+(?:ONLY\s+)?(?<name>${IDENTIFIER}(?:\.${IDENTIFIER})?)`,
-  "gi",
+  "giu",
 );
 
 const CTE_NAME = new RegExp(
   String.raw`(?:\bWITH(?:\s+RECURSIVE)?|,)\s*(?<name>${IDENTIFIER})\s*(?:\([^()]*\)\s*)?AS\s+(?:(?:NOT\s+)?MATERIALIZED\s+)?\(`,
-  "gi",
+  "giu",
 );
 
 const folded = (identifier: string): string =>
   identifier.startsWith('"') ? identifier.slice(1, -1) : identifier.toLowerCase();
 
 const qualified = (name: string): string => {
-  const parts = (name.match(new RegExp(IDENTIFIER, "gi")) ?? []).map(folded);
+  const parts = (name.match(new RegExp(IDENTIFIER, "giu")) ?? []).map(folded);
   return parts.length === 1 ? `public.${parts.join("")}` : parts.join(".");
 };
 
@@ -127,7 +127,7 @@ export const tablesReadIn = (file: string, source: string): readonly TableRead[]
         file,
         line: lineOf(offset),
         table: qualified(name),
-        reads: !/^DELETE/i.test(verb),
+        reads: !/^DELETE/iu.test(verb),
       }));
   });
 };

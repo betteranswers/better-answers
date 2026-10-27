@@ -150,12 +150,12 @@ describe("the redaction agreement's categories", () => {
 
 describe("the category list the api declares and the agreement's own", () => {
   it("declares each named category at the agreement's tier and flag", () => {
-    for (const { category, tier, special_category } of fixture.categories) {
-      const declared = REDACTION_CATEGORIES.find((entry) => entry.category === category);
+    for (const { category: categoryName, tier, special_category } of fixture.categories) {
+      const declared = REDACTION_CATEGORIES.find((entry) => entry.category === categoryName);
 
-      expect({ category, declared: declared ?? null }).toEqual({
-        category,
-        declared: { category, tier, specialCategory: special_category },
+      expect({ category: categoryName, declared: declared ?? null }).toEqual({
+        category: categoryName,
+        declared: { category: categoryName, tier, specialCategory: special_category },
       });
     }
   });

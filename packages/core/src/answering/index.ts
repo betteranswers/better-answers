@@ -302,6 +302,7 @@ const pageOf = async <Match>(
   const from = after === undefined ? 0 : runs.findIndex(([run]) => run === after.run);
   for (const [, reader] of runs.slice(from)) {
     if (read.length > limit) break;
+    // oxlint-disable-next-line eslint/no-await-in-loop -- each run is asked only for what the runs before it left of the page
     const more = await reader(limit + 1 - read.length, after);
     if (!more.ok) return err(more.error);
     read.push(...more.value);
@@ -554,7 +555,7 @@ export const renderFind = (result: FindResult<string>): string => {
     : [...lines, "", `More follow: call find again with cursor ${result.nextCursor}`].join("\n");
 };
 
-const quoted = (text: string): readonly string[] => text.split(/\r?\n/).map((line) => `> ${line}`);
+const quoted = (text: string): readonly string[] => text.split(/\r?\n/u).map((line) => `> ${line}`);
 
 export const renderOpen = (result: OpenView<string>): string => {
   if (!result.found) {

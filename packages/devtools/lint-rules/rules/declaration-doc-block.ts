@@ -19,7 +19,7 @@ const DECLARATIONS = new Set([
   "TSExportAssignment",
 ]);
 
-const lineOf = (comment: Comment): string => comment.value.replace(/^\/* ?/, "").trimEnd();
+const lineOf = (comment: Comment): string => comment.value.replace(/^\/* ?/u, "").trimEnd();
 
 const docBlockOf = (block: Block): string => {
   if (block.length === 1) return `/** ${lineOf(block[0])} */`;

@@ -370,6 +370,7 @@ export const erasureMapOf = async (
   const entries: ErasureMapEntry[] = [];
   for (const family of ERASURE_FAMILIES) {
     const descriptor = ERASURE_FAMILY_DESCRIPTORS[family];
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every family's search runs on the erasure's transaction
     const found = await descriptor.find(platform, subject, tx, door);
 
     entries.push({

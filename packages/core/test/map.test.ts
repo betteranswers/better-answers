@@ -552,14 +552,14 @@ describe("a map walk narrowed to collections", () => {
       else await conceptNode(seed, workspaceId, "audits", uid);
     });
 
-    const walked = answered(
+    const walkResult = answered(
       await readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
         walkConceptsFromEntries(principal, tx, [ids.conceptIri.parse(hub)]),
       ),
     );
     const whole = await walkedFromEntries(scenario.viewer, [hub]);
 
-    expect(uidsByDepth(walked)).toEqual([[hub, 0], ...concepts.map((uid) => [uid, 1])]);
+    expect(uidsByDepth(walkResult)).toEqual([[hub, 0], ...concepts.map((uid) => [uid, 1])]);
     expect(whole.map((step) => step.uid)).not.toContain(concepts[0]);
   });
 

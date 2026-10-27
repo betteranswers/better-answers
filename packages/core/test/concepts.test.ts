@@ -347,13 +347,13 @@ describe("a governed write", () => {
   it("folds the row's kind, leaving the file's spelling alone", async () => {
     const scenario = await arrange();
 
-    let head: string | null = null;
+    let headSeen: string | null = null;
     let firstFile: { readonly sha: string; readonly path: string } | undefined;
     for (const kind of ["policy", "Policies", "POLICY"]) {
-      const base = writeFor({ kind, expects: { head } });
+      const base = writeFor({ kind, expects: { head: headSeen } });
       const input = { ...base, frontmatter: { ...base.frontmatter, type: kind } };
       const written = await landed(scenario, input);
-      head = written.sha;
+      headSeen = written.sha;
       firstFile ??= { sha: written.sha, path: input.path };
     }
 
@@ -406,12 +406,12 @@ describe("a governed write", () => {
 
   it("keeps recorded commits a prefix of history across many actions", async () => {
     const scenario = await arrange();
-    let head: string | null = null;
+    let headSeen: string | null = null;
     const shas: string[] = [];
     for (const title of ["Expenses", "Travel", "Leave"]) {
-      const written = await landed(scenario, writeFor({ title, expects: { head } }));
+      const written = await landed(scenario, writeFor({ title, expects: { head: headSeen } }));
       shas.push(written.sha);
-      head = written.sha;
+      headSeen = written.sha;
     }
 
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(shas);
@@ -601,7 +601,7 @@ describe("the map a governed write leaves behind", () => {
 
   const linkedPair = async (
     scenario: Scenario,
-    write: (product: Written, filename: string) => Partial<WriteConceptInput>,
+    writeOf: (product: Written, filename: string) => Partial<WriteConceptInput>,
   ) => {
     const input = writeFor({ kind: "Product", status: "stable" });
     const first = await landed(scenario, input);
@@ -609,7 +609,7 @@ describe("the map a governed write leaves behind", () => {
     const policyInput = writeFor({
       status: "stable",
       expects: { head: first.sha },
-      ...write(product, input.path.split("/").at(-1) ?? ""),
+      ...writeOf(product, input.path.split("/").at(-1) ?? ""),
     });
     const second = await landed(scenario, policyInput);
     return { product, policy: { ...policyInput, iri: second.iri } };
@@ -1314,12 +1314,12 @@ describe("authority that moved while the action was in flight", () => {
   it("refuses before committing for a revocation the read cannot see", async () => {
     const scenario = await arrange();
 
-    const landed = await conceptRevokedWhileParked(
+    const revoked = await conceptRevokedWhileParked(
       scenario,
       parkedOnTable(db().pool, "concept_index"),
     );
 
-    expect(landed).toEqual({ ok: false, error: "credentials-revoked" });
+    expect(revoked).toEqual({ ok: false, error: "credentials-revoked" });
 
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
     expect(await recordedCommits(scenario.workspaceId)).toEqual([]);
@@ -1335,12 +1335,12 @@ describe("authority that moved while the action was in flight", () => {
     const gate = await gatingRefUpdates(scenario.git, scenario.workspaceId);
     await gate.park();
 
-    const landed = await conceptRevokedWhileParked(scenario, async (writeThenRevoke) => {
+    const revoked = await conceptRevokedWhileParked(scenario, async (writeThenRevoke) => {
       await writeThenRevoke(gate.parked);
       await gate.unpark();
     });
 
-    expect(landed).toMatchObject({ ok: true });
+    expect(revoked).toMatchObject({ ok: true });
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
     expect(history).toHaveLength(1);
     expect(await recordedCommits(scenario.workspaceId)).toEqual(history);
@@ -1464,8 +1464,8 @@ describe("the per-repository lock", () => {
     const failed = await write(scenario, scenario.editor, writeFor({ expects: { head: null } }));
     expect(failed).toEqual({ ok: false, error: "stale-precondition" });
 
-    const head = await bundleHistory(scenario.git, scenario.workspaceId);
-    const next = await landed(scenario, writeFor({ expects: { head: head[0] ?? null } }));
+    const history = await bundleHistory(scenario.git, scenario.workspaceId);
+    const next = await landed(scenario, writeFor({ expects: { head: history[0] ?? null } }));
 
     expect(next.sha).toMatch(/^[0-9a-f]{40}$/);
   });

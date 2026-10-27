@@ -2780,12 +2780,12 @@ describe("the questions a person asked", () => {
       "question_asked",
       "INSERT",
       async (release) => {
-        const opening = openingARecord(member);
+        const openingRecord = openingARecord(member);
         await until(async () => (await countWaitingOnLocks(db().pool)) === 1);
         const erasing = runningTheRoutine(scenario, subjectRequestId);
         await until(async () => (await countWaitingOnLocks(db().pool)) === 2);
         await release();
-        return { done: await erasing, ...(await opening) };
+        return { done: await erasing, ...(await openingRecord) };
       },
     );
 
@@ -3255,10 +3255,10 @@ const writingAsThePerson = async (
 };
 
 const thePersonIn = async (scenario: Scenario, person: { readonly id: string }, email: string) => {
-  const objects = await everyObjectOf(scenario.git, scenario.workspaceId);
+  const stored = await everyObjectOf(scenario.git, scenario.workspaceId);
   return {
-    address: objects.includes(email),
-    personId: objects.includes(person.id),
+    address: stored.includes(email),
+    personId: stored.includes(person.id),
     authors: (await authorLinesOf(scenario.git, scenario.workspaceId)).filter((line) =>
       line.includes(email),
     ),

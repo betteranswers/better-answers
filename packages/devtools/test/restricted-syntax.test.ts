@@ -54,6 +54,8 @@ describe("the syntax the lint refuses, with what to write instead", () => {
       parsing('  return z.enum(["a", "b"] satisfies readonly string[]);'),
       "as const",
     ],
+    ["`\\v` under the `u` flag", holding("  return /[\\v]/u.test(key);"), "Drop the flag"],
+    ["`\\v` under the `v` flag", holding("  return /[\\v]/v.test(key);"), "Drop the flag"],
   ])("refuses %s, naming the fix", (_shape, tree, instead) => {
     const findings = lint
       .output(tree)
@@ -79,6 +81,9 @@ describe("the syntax the lint refuses, with what to write instead", () => {
       parsing("  return z.union([z.literal(SET[0]), z.literal(SET[1])]);"),
     ],
     ["a list inside another object's `enum`", parsing('  return choices.enum(["a", "b"]);')],
+    ["`\\v` with no flag", holding("  return /[\\v]/.test(key);")],
+    ["`\\s` under the `u` flag", holding("  return /[\\s]/u.test(key);")],
+    ["`\\\\v` under the `u` flag", holding("  return /\\\\v/u.test(key);")],
   ])("stays silent on %s", (_shape, tree) => {
     expect(lint.flagged(tree)).toEqual([]);
   });

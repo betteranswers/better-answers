@@ -49,6 +49,7 @@ export const emailsCounted = async (
   now: Date,
 ): Promise<Result<undefined, CeilingMet>> => {
   for (const { key, rule, amount } of countersOf(admin, addresses)) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- counting stops at the first ceiling met, so later counters stay unspent
     const counted = await consumeInvitationEmails(admin, tx, key, rule, now, amount);
     if (!counted.allowed) return err(new CeilingMet(counted.retryAfterSeconds));
   }
@@ -88,6 +89,7 @@ export const returnUnsentEmails = async (
 ): Promise<void> => {
   const windows = Map.groupBy(unsent, (invitation) => invitation.countedAt.getTime());
   for (const [countedAtMs, invitations] of windows) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every address read runs on the caller's transaction
     const addresses = await tx.query<{ address: string }>(ADDRESSES_OF, [
       principal.workspaceId,
       invitations.map((invitation) => invitation.invitationId),
@@ -97,6 +99,7 @@ export const returnUnsentEmails = async (
       addresses.rows.map((row) => row.address),
     );
     for (const { key, rule, amount } of counters) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- every counter returned runs on the caller's transaction
       await returnInvitationEmails(principal, tx, key, rule, new Date(countedAtMs), amount);
     }
   }

@@ -298,9 +298,9 @@ describe("a sync that narrows a cited document", () => {
       "SELECT 1 FROM job WHERE workspace_id = $1 AND id = $2 FOR KEY SHARE",
       [scenario.workspaceId, jobId],
       async () => {
-        const following = pass(scenario);
+        const followingPass = pass(scenario);
         await until(async () => (await countWaitingOnLocks(db().pool)) > 0);
-        const overriding = reading(scenario.admin, (admin, tx) =>
+        const overridingWrite = reading(scenario.admin, (admin, tx) =>
           overrideConceptSensitivity(admin, tx, {
             iri: onUntouched.iri,
             sensitivity: "Restricted",
@@ -310,7 +310,11 @@ describe("a sync that narrows a cited document", () => {
           finished = true;
         });
         await until(async () => finished || (await countWaitingOnLocks(db().pool)) > 1);
-        return { following, overriding, finishedWhileThePassWaited: finished };
+        return {
+          following: followingPass,
+          overriding: overridingWrite,
+          finishedWhileThePassWaited: finished,
+        };
       },
     );
 

@@ -43,7 +43,7 @@ export type ModelKeySetting = {
 
 const MODEL_KEY_MAX = 1024;
 
-const ONE_HEADER_VALUE = /^[!-~]+$/;
+const ONE_HEADER_VALUE = /^[!-~]+$/u;
 
 const KEY_FORMS: ReadonlyMap<ModelProvider, (key: string) => boolean> = new Map([
   ["cloudflare", isWorkersAiKey],

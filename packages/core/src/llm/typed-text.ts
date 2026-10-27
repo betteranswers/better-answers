@@ -50,7 +50,7 @@ const hitOf = (match: RegExpExecArray): Hit => ({
 });
 
 const passesTheCheckDigit = (written: string): boolean => {
-  const digits = Array.from(written.replaceAll(/[- ]/g, ""), Number);
+  const digits = Array.from(written.replaceAll(/[- ]/gu, ""), Number);
   return digits.reduce((sum, digit, at) => sum + digit * (10 - at), 0) % 11 === 0;
 };
 

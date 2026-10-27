@@ -17,7 +17,7 @@ const read = (): z.infer<typeof fixture> => {
 type Citation = { readonly what: string; readonly cited: string };
 
 const patterns: readonly { readonly what: string; readonly pattern: RegExp }[] =
-  read().patterns.map((one) => ({ what: one.name, pattern: new RegExp(one.pattern) }));
+  read().patterns.map((one) => ({ what: one.name, pattern: new RegExp(one.pattern, "u") }));
 
 export const citationIn = (prose: string): Citation | undefined => {
   for (const { what, pattern } of patterns) {

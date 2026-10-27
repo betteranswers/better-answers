@@ -300,7 +300,7 @@ const atSources = (api: SourcesApi = {}) => {
     "sources.findings": api.findings ?? [],
   };
   const refusals = new Map<string, unknown>([["sources.keepInText", KEEP_REFUSED]]);
-  for (const action of api.forbidden ?? []) refusals.set(action, ROLE_FORBIDS);
+  for (const forbidden of api.forbidden ?? []) refusals.set(forbidden, ROLE_FORBIDS);
   vi.stubGlobal("fetch", async (input: string | URL | Request) => {
     const { pathname } = addressOf(input);
     if (!pathname.startsWith("/trpc/")) return answered({});

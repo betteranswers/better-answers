@@ -27,7 +27,7 @@ const pastClosing = (line: string, end: number): number => {
   return at;
 };
 
-const TERMINAL = /[.!?]/;
+const TERMINAL = /[.!?]/u;
 
 const CLOSING_QUOTE = new Set(['"', "'", "”", "’", ")"]);
 
@@ -111,12 +111,12 @@ export const finishedSentences = (
   return { sentences: written([...done, ...tail.sentences]), rest: tail.rest };
 };
 
-const AN_EARLIER_END = /[.!?]["'”’)]*\s+\S/;
+const AN_EARLIER_END = /[.!?]["'”’)]*\s+\S/u;
 
 const tidied = (text: string): string =>
   text
-    .replaceAll(/\s+/g, " ")
-    .replaceAll(/ ([.,;:!?])/g, "$1")
+    .replaceAll(/\s+/gu, " ")
+    .replaceAll(/ ([.,;:!?])/gu, "$1")
     .trim();
 
 export const checkedSentence = (

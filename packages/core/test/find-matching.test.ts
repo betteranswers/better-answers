@@ -419,14 +419,14 @@ const afterAFailedStatement = async <T, Refused>(
   person: UserPrincipal,
   work: (reader: UserPrincipal, tx: Tx) => Promise<Result<T, Refused>>,
 ): Promise<Result<T, Refused> | undefined> => {
-  let answered: Result<T, Refused> | undefined;
+  let outcome: Result<T, Refused> | undefined;
   await expect(
     reading(person, async (reader, tx) => {
       await tx.query("SELECT 1 / 0").catch(() => undefined);
-      answered = await work(reader, tx);
+      outcome = await work(reader, tx);
     }),
   ).rejects.toThrow("the transaction did not commit");
-  return answered;
+  return outcome;
 };
 
 const PASSAGES_CURSOR =
@@ -440,21 +440,21 @@ describe("a failed read", () => {
     const { viewer } = await arrange();
     const after = cursor === undefined ? undefined : findCursor.parse(cursor);
 
-    const answered = await afterAFailedStatement(viewer, (reader, tx) =>
+    const outcome = await afterAFailedStatement(viewer, (reader, tx) =>
       find(reader, tx, { query: QUESTION, limit: 10, cursor: after }, NOW),
     );
 
-    expect(answered?.ok).toBe(false);
+    expect(outcome?.ok).toBe(false);
   });
 
   it("answers ask's first read as an error", async () => {
     const { viewer } = await arrange();
 
-    const answered = await afterAFailedStatement(viewer, (reader, tx) =>
+    const outcome = await afterAFailedStatement(viewer, (reader, tx) =>
       plannedOn(reader, tx, { question: QUESTION }),
     );
 
-    expect(answered?.ok).toBe(false);
+    expect(outcome?.ok).toBe(false);
   });
 });
 

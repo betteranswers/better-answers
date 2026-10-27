@@ -67,7 +67,7 @@ const saidOfFailure = (
   unanswered: string,
 ): string => (failure instanceof CodeRefused ? saidOf(failure) : unanswered);
 
-const inFours = (key: string): string => key.match(/.{1,4}/g)?.join(" ") ?? key;
+const inFours = (key: string): string => key.match(/.{1,4}/gu)?.join(" ") ?? key;
 
 function TheKey(properties: { readonly started: SetupStarted }) {
   const { started } = properties;

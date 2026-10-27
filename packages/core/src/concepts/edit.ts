@@ -538,9 +538,9 @@ const savingNew = async (
   const fresh = input.base === null && input.withheld.length === 0;
   if (path === undefined || file === undefined || !fresh) return err("malformed");
   const read = await attempt(() =>
-    withMember(principal, doors.postgres, async (fresh, tx) => ({
-      standing: await routeOf(fresh, tx, { iri: null, path }),
-      author: await authorOf(fresh, tx, fresh.userId),
+    withMember(principal, doors.postgres, async (member, tx) => ({
+      standing: await routeOf(member, tx, { iri: null, path }),
+      author: await authorOf(member, tx, member.userId),
     })),
   );
   if (!read.ok) return err(read.error);

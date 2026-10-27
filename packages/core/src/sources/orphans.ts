@@ -40,7 +40,7 @@ export const ORPHANED_UPLOAD_GRACE_HOURS = 24;
 
 const AN_HOUR_MS = 60 * 60 * 1000;
 
-const AN_ORIGINAL = /^uploads\/([^/]+)\/(?:([^/]+)\/)?original$/;
+const AN_ORIGINAL = /^uploads\/([^/]+)\/(?:([^/]+)\/)?original$/u;
 
 const NAMED_ORIGINALS = `SELECT original_key FROM source_document
     WHERE workspace_id = $1 AND original_key IS NOT NULL`;
@@ -136,10 +136,12 @@ const removeOrphans = async (
 ): Promise<Result<number>> => {
   const gone: KeyIds[] = [];
   for (const orphan of orphaned) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- the sweep stops at the first refused key and records what it removed before it
     const removed = await asDefect("an orphaned original's key was refused", () =>
       removeWorkspaceObject(platform, doors.objects, workspaceId, orphan.key),
     );
     if (!removed.ok) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- the sweep stops at the first refused key and records what it removed before it
       const kept = await recordTheSweep(platform, doors.postgres, workspaceId, gone);
       const unrecorded = kept.ok ? "" : `, and its audit events too: ${kept.error.message}`;
       return err(

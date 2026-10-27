@@ -61,6 +61,7 @@ const ANGLE_BRACKETED = (text: string): string => {
 const flattenedLinks = (text: string): string =>
   ANGLE_BRACKETED(BRACKETED(BRACKETED_REFERENCE(BRACKETED_INLINE(text))));
 
+// oxlint-disable-next-line eslint/require-unicode-regexp -- Stryker negates \v to \V, which the u flag refuses at load
 const HEADING = /^#{1,6}[ \t\n\r\f\v]+([^\n]*)/;
 
 export const sectionAt = (body: string, index: number): string | null => {
@@ -72,6 +73,7 @@ export const sectionAt = (body: string, index: number): string | null => {
   return null;
 };
 
+// oxlint-disable-next-line eslint/require-unicode-regexp -- Stryker negates \v to \V, which the u flag refuses at load
 const BLANK = /^[ \t\r\f\v]*$/;
 
 const paragraphAround = (body: string, index: number): readonly [number, number] => {
@@ -97,6 +99,7 @@ export const sentenceAt = (body: string, prose: string, index: number): string =
 
   let start = 0;
   let end = paragraph.length;
+  // oxlint-disable-next-line eslint/require-unicode-regexp -- Stryker negates \v to \V, which the u flag refuses at load
   for (const boundary of paragraph.matchAll(/[.!?](?:\[\^[^[\]]*\])*(?=[ \t\n\r\f\v]|$)/g)) {
     const after = boundary.index + boundary[0].length;
     if (after <= at) start = after;

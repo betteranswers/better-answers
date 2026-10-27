@@ -182,6 +182,7 @@ const waitingCancelled = async (
   addresses: readonly string[],
 ): Promise<ReadonlyMap<string, string>> => {
   for (const address of addresses.toSorted(byCodeUnit)) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- address locks are taken in code-unit order so two invites cannot deadlock
     await tx.query(ADDRESS_LOCK, [admin.workspaceId, address]);
   }
   const held = await tx.query<{ id: string }>(HELD_WAITING_FOR, [
@@ -206,6 +207,7 @@ const mintsRecorded = async (
   const batchId = batchIdFor(minting.invitations.length + replaced.size);
   for (const { invitationId, address } of minting.invitations) {
     const detail = { role: minting.role };
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every audit row runs on the caller's transaction
     await record(admin, tx, {
       id: ulid(),
       action: INVITATION_ACTIONS.created,
@@ -215,6 +217,7 @@ const mintsRecorded = async (
     });
     const cancelledId = replaced.get(address);
     if (cancelledId === undefined) continue;
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every audit row runs on the caller's transaction
     await record(admin, tx, {
       id: ulid(),
       action: INVITATION_ACTIONS.cancelled,

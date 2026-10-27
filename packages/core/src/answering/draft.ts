@@ -139,6 +139,7 @@ async function* sentencesOf(
       yield { kind: "sentence", collection: part.collection, ...passed };
     }
     if (step.done === true) return { sentences, ended: step.value };
+    // oxlint-disable-next-line eslint/no-await-in-loop -- the reply is a generator, so each step follows the sentences already checked
     step = await reply.next();
   }
 }

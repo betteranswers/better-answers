@@ -529,8 +529,8 @@ const accessRequestUpdate = createUpdateSchema(accessRequest, accessRequestRefin
 
 const conceptIri = (schema: z.ZodString) => schema.pipe(CONCEPT_IRI);
 
-const PROTO_FAMILY = /^_{2,}proto__$/;
-const ESCAPED_PROTO_FAMILY = /^_{3,}proto__$/;
+const PROTO_FAMILY = /^_{2,}proto__$/u;
+const ESCAPED_PROTO_FAMILY = /^_{3,}proto__$/u;
 const PLAIN_PROTOTYPES: ReadonlySet<unknown> = new Set([Object.prototype, null]);
 
 const withKeysRenamed = <Value>(

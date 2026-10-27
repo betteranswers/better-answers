@@ -448,8 +448,8 @@ export const readYourRecord = async (
   if (!rows.ok) return err(rows.error);
   const records = await recordsAsRead(reader, tx, rows.value, now);
   if (!records.ok) return err(records.error);
-  const [record] = records.value;
-  return record === undefined ? err(NOT_FOUND) : ok(record);
+  const [found] = records.value;
+  return found === undefined ? err(NOT_FOUND) : ok(found);
 };
 
 export const closeFlagInput = z.object({

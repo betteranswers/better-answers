@@ -13,6 +13,7 @@ export const CONCEPT_IRI_PREFIX = "https://better-answers.com/c/";
 
 export const IRI = new RegExp(
   `^${CONCEPT_IRI_PREFIX.replaceAll(".", String.raw`\.`)}${ULID_CHARACTERS}$`,
+  "u",
 );
 
 export const CONCEPT_IRI = z.string().regex(IRI).brand<"ConceptIri">();
@@ -175,7 +176,8 @@ const fencedBlocksOf = (body: string): readonly { start: number; end: number }[]
   return blocks;
 };
 
-const blanked = (text: string): string => text.replaceAll(/[^\n]/g, " ");
+const blanked = (text: string): string =>
+  text.replaceAll(/[^\n]/gu, (character) => " ".repeat(character.length));
 
 const laterRunsByLength = (
   runs: readonly RegExpExecArray[],
@@ -200,7 +202,7 @@ const headAfter = (queue: readonly number[], from: number, at: number): number =
 };
 
 const blankedSpans = (body: string): string => {
-  const runs = [...body.matchAll(/`+/g)];
+  const runs = [...body.matchAll(/`+/gu)];
   const queued = laterRunsByLength(runs);
   const heads = new Map<number, number>();
 
@@ -281,7 +283,7 @@ const definitionsOf = (prose: string): Definitions => {
     const target = prose.slice(found.start, found.end);
     if (target.startsWith("<")) bracketedTargetSpans.set(found.start, found.end);
     if (!definitions.has(found.key)) {
-      definitions.set(found.key, target.replace(/^</, "").replace(/>$/, ""));
+      definitions.set(found.key, target.replace(/^</u, "").replace(/>$/u, ""));
     }
     at = found.end - 1;
   }
@@ -297,8 +299,9 @@ const sourcesById = (sources: readonly CitedSource[]): ReadonlyMap<string, numbe
   return byId;
 };
 
+// oxlint-disable-next-line eslint/require-unicode-regexp -- Stryker negates \v to \V, which the u flag refuses at load
 const INLINE_TARGET = /\]\([ \t\n\r\f\v]*<?([^) \t\n\r\f\v>]+)/;
-const REFERENCE = /^\[([^\]]*)\]\[([^\]]*)\]$/;
+const REFERENCE = /^\[([^\]]*)\]\[([^\]]*)\]$/u;
 
 const linkTargetOf = (
   found: Found,
@@ -327,7 +330,7 @@ type BodyRefs = {
   readonly sourcesById: ReadonlyMap<string, number>;
 };
 
-const FOOTNOTE = /^\[\^([^\]]*)\]$/;
+const FOOTNOTE = /^\[\^([^\]]*)\]$/u;
 
 const footnoteReading = (found: Found, prose: string, refs: BodyRefs): Reading | undefined => {
   const footnote = FOOTNOTE.exec(found.text);

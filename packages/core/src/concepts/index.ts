@@ -251,6 +251,7 @@ const authorFor = async (
   for (const personId of proposer === undefined
     ? [principal.userId]
     : [proposer, principal.userId]) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- the principal is looked up only when the proposer was not found
     const found = await tx.query<AuthorRow>(
       `SELECT u.name, u.email FROM "user" u
          JOIN member m ON m.user_id = u.id AND m.workspace_id = $2
@@ -299,6 +300,7 @@ export const acceptSuggestions = async (
   const batchId = batchIdFor(decisions.data.length);
   const outcomes: AcceptanceOutcome[] = [];
   for (const decision of decisions.data) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- each acceptance lands as its own commit, in the order the admin decided them
     outcomes.push(await acceptOne(admitted.value, doors, decision, batchId));
   }
   return ok(outcomes);
@@ -683,6 +685,7 @@ const landEach = async (
   for (const concept of opened.resolved) {
     let held = known.get(concept.path);
     if (held === undefined) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- a concept landed earlier in the bundle is known to the ones after it
       const wrote = await landOne(principal, doors, run, concept);
       if (!wrote.ok) return stop(concept.file, wrote.error);
       landed.push(concept.path);
@@ -691,6 +694,7 @@ const landEach = async (
     } else {
       skipped.push(concept.path);
     }
+    // oxlint-disable-next-line eslint/no-await-in-loop -- the import stops at the first concept whose verifications fail to record
     const recorded = await verificationsRecordedOn(principal, doors.postgres, {
       iri: held.iri,
       verifications: concept.verifications,
@@ -714,6 +718,7 @@ const rewriteEach = async (
   for (const [concept, held] of landing.holdings) {
     const linked = rewriteLinks(held.body, concept.path, iriOf);
     if (linked.links === 0) continue;
+    // oxlint-disable-next-line eslint/no-await-in-loop -- each rewrite lands as its own commit, and the import stops at the first refused
     const wrote = await writeConcept(principal, doors, {
       iri: held.iri,
       mergeKey: held.mergeKey,

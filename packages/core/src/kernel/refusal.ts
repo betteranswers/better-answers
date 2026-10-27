@@ -22,7 +22,7 @@ export type CataloguedRefusal = {
   readonly owner: string;
 };
 
-const WORD = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+const WORD = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u;
 
 export const refusalsIn = (catalogue: Catalogue): readonly CataloguedRefusal[] => {
   const held = new Map<string, CataloguedRefusal>();

@@ -132,7 +132,7 @@ const findEntry = defineEntry({
   },
   run: async (principal, tx, args, now) =>
     wired(await find(principal, tx, args, now), foundOnTheWire),
-  render: (found) => renderFind(foundInCore(found)),
+  render: (output) => renderFind(foundInCore(output)),
 });
 
 type WireAnswered = Omit<AnswerResult<string>, "answers" | "related"> & {

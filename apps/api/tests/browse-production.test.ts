@@ -212,11 +212,11 @@ describe("the production browsing helper", () => {
           ],
         ],
       ] as const;
-      const port = await freePort();
+      const unusedPort = await freePort();
       const refused = shapes.map(([named, lines], index) => {
         const run = browse({
           ESTATE_FILE: estateFile(`shape-${String(index)}`, lines),
-          BROWSE_PORT: String(port),
+          BROWSE_PORT: String(unusedPort),
         });
         return { named, status: run.status, ssh: run.sshArgv, names: run.stderr.includes(named) };
       });

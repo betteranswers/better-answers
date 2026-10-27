@@ -137,7 +137,7 @@ const openingNamed = (
 const opensFor = (doors: Doors, opening: Opening): Promise<Result<boolean>> =>
   "locator" in opening ? readsPassage(doors, opening.locator) : readsConcept(doors, opening.iri);
 
-const NAMES_A_DOCUMENT = new RegExp(ULID_CHARACTERS, "i");
+const NAMES_A_DOCUMENT = new RegExp(ULID_CHARACTERS, "iu");
 
 const placeOf = (doors: Doors, locator: string | null): string | undefined =>
   locator === null ||
@@ -198,6 +198,7 @@ export const resolvedSourcesOf = async (
   const sources = frontmatter["sources"];
   const resolved: Resolved[] = [];
   for (const entry of isList(sources) ? sources : []) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every source check runs on the reader's one transaction
     const one = await resolvedOf(doors, entry);
     if (!one.ok) return err(one.error);
     // Stryker disable next-line ConditionalExpression: the insert boundary refuses an entry naming no resource, so none is undefined here; hides → false, killed in answering.test.ts

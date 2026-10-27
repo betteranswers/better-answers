@@ -28,19 +28,19 @@ const SESSION_ACTIONS = declareIdentitySetActions("people", {
 const UNKNOWN_DEVICE = "Unknown device";
 
 const BROWSERS: readonly (readonly [RegExp, string])[] = [
-  [/Edg\//, "Edge"],
-  [/Firefox\//, "Firefox"],
-  [/Chrome\//, "Chrome"],
-  [/Safari\//, "Safari"],
+  [/Edg\//u, "Edge"],
+  [/Firefox\//u, "Firefox"],
+  [/Chrome\//u, "Chrome"],
+  [/Safari\//u, "Safari"],
 ];
 
 const SYSTEMS: readonly (readonly [RegExp, string])[] = [
-  [/iPhone|iPad/, "iOS"],
-  [/Android/, "Android"],
-  [/Mac OS X|Macintosh/, "macOS"],
-  [/Windows/, "Windows"],
-  [/CrOS/, "ChromeOS"],
-  [/Linux/, "Linux"],
+  [/iPhone|iPad/u, "iOS"],
+  [/Android/u, "Android"],
+  [/Mac OS X|Macintosh/u, "macOS"],
+  [/Windows/u, "Windows"],
+  [/CrOS/u, "ChromeOS"],
+  [/Linux/u, "Linux"],
 ];
 
 const wordIn = (

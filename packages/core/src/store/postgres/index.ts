@@ -39,7 +39,7 @@ export const boundValues = () => {
 export type Bind = ReturnType<typeof boundValues>["bind"];
 
 export const containing = (text: string): string =>
-  `%${text.replaceAll(/[\\%_]/g, String.raw`\$&`)}%`;
+  `%${text.replaceAll(/[\\%_]/gu, String.raw`\$&`)}%`;
 
 export type Tx = Pick<pg.PoolClient, "query">;
 

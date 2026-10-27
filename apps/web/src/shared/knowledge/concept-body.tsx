@@ -46,9 +46,9 @@ const CLOSES = "\uE001";
 
 const carrierOf = (mark: number): string => `<${OPENS}${String(mark)}${CLOSES}>`;
 
-const CARRIED = new RegExp(`<${OPENS}(\\d+)${CLOSES}>`);
+const CARRIED = new RegExp(`<${OPENS}(\\d+)${CLOSES}>`, "u");
 
-const FORGED = new RegExp(`[${OPENS}${CLOSES}]|&#(?:x0*e00[01]|0*5734[45]);`, "gi");
+const FORGED = new RegExp(`[${OPENS}${CLOSES}]|&#(?:x0*e00[01]|0*5734[45]);`, "giu");
 
 const unforged = (words: string): string => words.replaceAll(FORGED, "");
 
@@ -67,7 +67,7 @@ const carrying = (body: string, marks: readonly Placed[]): string => {
 
 const CARRIED_IN_AN_ADDRESS = new RegExp(
   `(?:<|%3C)(?:${OPENS}|%EE%80%80)\\d+(?:${CLOSES}|%EE%80%81)(?:>|%3E)`,
-  "gi",
+  "giu",
 );
 
 type Cited = {
@@ -253,7 +253,7 @@ function InlinePanel() {
 
 export const LINK = "text-brand underline underline-offset-4";
 
-const ON_THE_WEB = /^(?:https?:\/\/|mailto:)/i;
+const ON_THE_WEB = /^(?:https?:\/\/|mailto:)/u;
 
 const footnoteJump = (node: Element | undefined): "down" | "back" | undefined => {
   if (node?.properties["dataFootnoteRef"] !== undefined) return "down";
@@ -296,7 +296,7 @@ function BodyLink(properties: ComponentProps<"a"> & ExtraProps) {
       </a>
     );
   }
-  if (!ON_THE_WEB.test(href)) return children;
+  if (!ON_THE_WEB.test(href.toLowerCase())) return children;
   return (
     <a href={href} rel="noreferrer noopener" className={LINK}>
       {children}
@@ -365,7 +365,7 @@ const PROSE = cn(
 );
 
 /** An id is safe in an address's fragment only as letters, digits and dashes. */
-const fragmentSafe = (id: string): string => id.replaceAll(/[^A-Za-z0-9_-]/g, "");
+const fragmentSafe = (id: string): string => id.replaceAll(/[^A-Za-z0-9_-]/gu, "");
 
 export function ConceptBody(properties: {
   readonly body: string;

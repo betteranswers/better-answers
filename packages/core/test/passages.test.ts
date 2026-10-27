@@ -231,12 +231,12 @@ describe("the passage a wire locator opens", () => {
     const scenario = await arrange();
     await seedTheAgreementsDocument(scenario.workspaceId);
 
-    const answered = [];
+    const answers = [];
     for (const opened of fixture.open) {
-      answered.push({ case: opened.case, answer: await opening(scenario.viewer, opened.wire) });
+      answers.push({ case: opened.case, answer: await opening(scenario.viewer, opened.wire) });
     }
 
-    expect(answered).toEqual(
+    expect(answers).toEqual(
       fixture.open.map((opened) => ({
         case: opened.case,
         answer:
@@ -318,12 +318,12 @@ describe("what a passage read refuses", () => {
       malformed: `${document.source_document_id}/chunks:0-1`,
       "out of range": `${document.source_document_id}/chars:150-200`,
     };
-    const answered: Record<string, unknown> = {};
+    const answers: Record<string, unknown> = {};
     for (const [what, wire] of Object.entries(wires)) {
-      answered[what] = await opening(scenario.viewer, wire);
+      answers[what] = await opening(scenario.viewer, wire);
     }
 
-    expect(answered).toEqual({
+    expect(answers).toEqual({
       withheld: NOT_FOUND,
       absent: NOT_FOUND,
       malformed: NOT_FOUND,
@@ -349,7 +349,7 @@ describe("what a passage read refuses", () => {
     const atNarrowedConnectedSource = `${narrowedConnectedSource}/${STRADDLING_SPAN}`;
     const atNarrowedDocument = `${narrowedDocument}/${STRADDLING_SPAN}`;
 
-    const answered = {
+    const answers = {
       "the Viewer, connected source narrowed": await opening(
         scenario.viewer,
         atNarrowedConnectedSource,
@@ -362,7 +362,7 @@ describe("what a passage read refuses", () => {
       "the Admin, document narrowed": await opening(scenario.admin, atNarrowedDocument),
     };
 
-    expect(answered).toEqual({
+    expect(answers).toEqual({
       "the Viewer, connected source narrowed": NOT_FOUND,
       "the Viewer, document narrowed": NOT_FOUND,
       "the Admin, connected source narrowed": {
@@ -417,12 +417,12 @@ describe("what a passage read fails on", () => {
       sensitivity: "Internal",
     });
 
-    const answered = {
+    const answers = {
       "past its span": await opening(scenario.viewer, `${runsPast}/chars:0-28`),
       "short of its span": await opening(scenario.viewer, `${fallsShort}/chars:0-40`),
     };
 
-    expect(answered).toEqual({
+    expect(answers).toEqual({
       "past its span": new Error(`the passage row at ${runsPast}/chars:0-16 holds 28 code points`),
       "short of its span": new Error(
         `the passage row at ${fallsShort}/chars:0-40 holds 28 code points`,
@@ -492,12 +492,12 @@ describe("the passages a search finds", () => {
       publishedAt: null,
     });
 
-    const answered = [];
+    const answers = [];
     for (const reader of [scenario.viewer, scenario.editor, scenario.admin]) {
-      answered.push({ role: reader.role, found: await searching(reader) });
+      answers.push({ role: reader.role, found: await searching(reader) });
     }
 
-    expect(answered).toEqual([
+    expect(answers).toEqual([
       { role: "Viewer", found: [] },
       { role: "Editor", found: [] },
       { role: "Admin", found: [] },

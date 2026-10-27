@@ -1080,15 +1080,15 @@ type Verdict = {
 
 const verdictsIn = (file: string): readonly Verdict[] =>
   Object.entries(readReportFile(file).files)
-    .flatMap(([name, entry]) =>
-      entry.mutants.map((found) => ({
+    .flatMap(([name, fileEntry]) =>
+      fileEntry.mutants.map((found) => ({
         file: name,
         mutant: `${String(found.location.start.line)}:${String(found.location.start.column)} ${found.mutatorName} ${found.replacement ?? ""}`,
         status: found.statusReason === CARRIED ? `${found.status}, carried` : found.status,
       })),
     )
-    .toSorted((left, right) =>
-      `${left.file} ${left.mutant}` < `${right.file} ${right.mutant}` ? -1 : 1,
+    .toSorted((leftEntry, right) =>
+      `${leftEntry.file} ${leftEntry.mutant}` < `${right.file} ${right.mutant}` ? -1 : 1,
     );
 
 const runAsShards = async (
@@ -1164,13 +1164,13 @@ describe("a throwaway leg run as shards by Stryker", () => {
   });
 
   it("reuses a file's results when a new file moves it", async () => {
-    const results = readReportFile(path.join(merged, "stryker-incremental.json"));
-    const one = results.files["src/one.ts"];
+    const mergedResults = readReportFile(path.join(merged, "stryker-incremental.json"));
+    const one = mergedResults.files["src/one.ts"];
     if (one === undefined) throw new Error("the merged results hold nothing for src/one.ts");
     const marked = {
-      ...results,
+      ...mergedResults,
       files: {
-        ...results.files,
+        ...mergedResults.files,
         "src/one.ts": {
           ...one,
           mutants: one.mutants.map((found) => ({ ...found, statusReason: CARRIED })),

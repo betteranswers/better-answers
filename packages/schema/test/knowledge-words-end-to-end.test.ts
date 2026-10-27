@@ -229,11 +229,11 @@ beforeAll(async () => {
     await endPool(owner);
   }
   await superuser.query(MARK_THE_MATCH_LEAKPROOF);
-  after = await withRollback(superuser, (client) =>
-    standing(client, Object.values(RENAMED), nameOf),
+  after = await withRollback(superuser, (txClient) =>
+    standing(txClient, Object.values(RENAMED), nameOf),
   );
-  securityAfter = await withRollback(superuser, (client) =>
-    security(client, Object.values(RENAMED), "narrower_sensitivity", "unreadable_reason"),
+  securityAfter = await withRollback(superuser, (txClient) =>
+    security(txClient, Object.values(RENAMED), "narrower_sensitivity", "unreadable_reason"),
   );
 }, 240_000);
 

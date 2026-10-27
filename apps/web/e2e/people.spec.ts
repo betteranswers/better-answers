@@ -704,8 +704,8 @@ test.describe("a member's own page", () => {
       .poll(
         async () => {
           const header = await personHeading(page, "Priya Shah").boundingBox();
-          const nav = await sections.boundingBox();
-          return (nav?.y ?? 0) - ((header?.y ?? 0) + (header?.height ?? 0));
+          const navBox = await sections.boundingBox();
+          return (navBox?.y ?? 0) - ((header?.y ?? 0) + (header?.height ?? 0));
         },
         { message: "the section nav does not stack below the header" },
       )
@@ -1276,10 +1276,10 @@ test.describe("removing a member from their page", () => {
     passesTheAccessibilityGate,
   }) => {
     const { workspaceId } = await anAdminAtPeople(page, request, "Rye Foundry");
-    const person = membersRegion(page).getByRole("columnheader", { name: "Person" });
-    await person.getByRole("button").click();
-    await person.getByRole("button").click();
-    await expect(person).toHaveAttribute("aria-sort", "descending");
+    const personHeader = membersRegion(page).getByRole("columnheader", { name: "Person" });
+    await personHeader.getByRole("button").click();
+    await personHeader.getByRole("button").click();
+    await expect(personHeader).toHaveAttribute("aria-sort", "descending");
     const sorted = page.url();
 
     await openedByName(page, "Priya Shah");
@@ -1312,7 +1312,7 @@ test.describe("removing a member from their page", () => {
 
     await expect(page).toHaveURL(sorted);
     await expect(memberRows(page)).toHaveCount(2);
-    await expect(person).toHaveAttribute("aria-sort", "descending");
+    await expect(personHeader).toHaveAttribute("aria-sort", "descending");
     await expect(listHeading(page)).toBeFocused();
     await expect(outcomeOf(page)).toContainText("Priya Shah");
     const priyas = await actionClocked(page);
@@ -1868,11 +1868,11 @@ test.describe("bulk actions on the members ticked", () => {
     await page.getByRole("option", { name: "Any Group", exact: true }).click();
     await expect(names).toHaveCount(3);
 
-    const person = membersRegion(page).getByRole("columnheader", { name: "Person" });
-    await person.getByRole("button").click();
-    await expect(person).toHaveAttribute("aria-sort", "ascending");
-    await person.getByRole("button").click();
-    await expect(person).toHaveAttribute("aria-sort", "descending");
+    const personHeader = membersRegion(page).getByRole("columnheader", { name: "Person" });
+    await personHeader.getByRole("button").click();
+    await expect(personHeader).toHaveAttribute("aria-sort", "ascending");
+    await personHeader.getByRole("button").click();
+    await expect(personHeader).toHaveAttribute("aria-sort", "descending");
     await expect(names).toHaveText(["Test person", "Sam Okoro", "Priya Shah"]);
     await page.reload();
     await expect(names).toHaveText(["Test person", "Sam Okoro", "Priya Shah"]);

@@ -43,6 +43,7 @@ export const recomputeWriteUpsIncluding = async (
   );
   const moved: string[] = [];
   for (const writeUp of including.rows) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every write-up read runs on the caller's transaction, under its row locks
     const includes = await tx.query<IncludeRow>(
       `SELECT c.sensitivity, c.audience, c.audience_groups
          FROM write_up_include i
@@ -54,6 +55,7 @@ export const recomputeWriteUpsIncluding = async (
       from: includes.rows.map(visibilityOfInclude),
       fallback: visibilityOf(writeUp),
     });
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every write-up update runs on the caller's transaction, under its row locks
     await tx.query(
       `UPDATE write_up SET sensitivity = $3, audience = $4, audience_groups = $5
         WHERE workspace_id = $1 AND id = $2`,

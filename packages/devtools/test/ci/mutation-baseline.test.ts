@@ -560,9 +560,9 @@ describe("each mutation leg, run as shards and summed once", () => {
   it("knows a shard's leg by the matrix's own names", () => {
     const { stryker } = mutationWorkflow().jobs;
     const [check] = stryker.steps;
-    const legs = /\^\(([a-z|]+)\)-/u.exec(check?.run ?? "")?.[1]?.split("|") ?? [];
+    const checkedLegs = /\^\(([a-z|]+)\)-/u.exec(check?.run ?? "")?.[1]?.split("|") ?? [];
 
-    expect(legs.toSorted()).toEqual(
+    expect(checkedLegs.toSorted()).toEqual(
       [...new Set(stryker.strategy.matrix.include.map((shard) => shard.name))].toSorted(),
     );
   });

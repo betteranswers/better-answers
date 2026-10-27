@@ -156,7 +156,7 @@ export const createMcpSurface = (
 
   const authenticated = async (request: Request): Promise<AuthInfo | Response> => {
     const authorization = request.headers.get("authorization");
-    if (authorization === null || !/^Bearer\s+\S+$/i.test(authorization)) {
+    if (authorization === null || !/^Bearer\s+\S+$/iu.test(authorization)) {
       return (
         (await flooded(request)) ??
         bearerAuthChallengeResponse(

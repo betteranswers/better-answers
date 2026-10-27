@@ -74,6 +74,10 @@
       {
         "selector": "CallExpression[callee.object.name='z'][callee.property.name='enum'] > :matches(ArrayExpression, TSAsExpression[expression.type='ArrayExpression'], TSSatisfiesExpression[expression.type='ArrayExpression'])",
         "message": "A list written inside `z.enum` copies a closed set, and drifts from it. Declare the set once as an `as const` tuple, derive its type from it, and pass the tuple to `z.enum`"
+      },
+      {
+        "selector": "Literal[regex.flags=/[uv]/][regex.pattern=/^(?:[^\\\\]|\\\\.)*\\\\v/]",
+        "message": "Stryker negates `\\v` to `\\V`, which the `u` and `v` flags refuse at load, so the mutation run cannot import this module. Drop the flag and disable `eslint/require-unicode-regexp` on this line with that reason"
       }
     ],
     "vitest/no-identical-title": "error",
@@ -108,6 +112,9 @@
       }
     ],
     "typescript/prefer-ts-expect-error": "error",
+    "eslint/require-unicode-regexp": "error",
+    "eslint/no-shadow": "error",
+    "eslint/no-await-in-loop": "error",
     "eslint/no-warning-comments": ["error", { "decoration": ["*"] }],
     "unicorn/no-abusive-eslint-disable": "error",
     "oxc/no-async-await": "off",

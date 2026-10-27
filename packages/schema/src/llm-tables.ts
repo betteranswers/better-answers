@@ -51,11 +51,11 @@ export const modelKey = withRLS(
   ],
 );
 
-export const MODEL_NAME = /^[a-z0-9][a-z0-9.-]{0,63}$/;
+export const MODEL_NAME = /^[a-z0-9][a-z0-9.-]{0,63}$/u;
 
-export const DECIMAL_STRING = /^\d+(\.\d+)?$/;
+export const DECIMAL_STRING = /^\d+(\.\d+)?$/u;
 
-export const CALENDAR_DAY = /^\d{4}-\d{2}-\d{2}$/;
+export const CALENDAR_DAY = /^\d{4}-\d{2}-\d{2}$/u;
 
 export const LLM_CALL_OUTCOMES = ["succeeded", "failed"] as const;
 export type LlmCallOutcome = (typeof LLM_CALL_OUTCOMES)[number];

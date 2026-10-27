@@ -79,7 +79,7 @@ export type Measured = {
 };
 
 const workspaceOf = (file: string, longestFirst: readonly string[]): string | undefined => {
-  const relative = file.replace(/^\.\//, "");
+  const relative = file.replace(/^\.\//u, "");
   return longestFirst.find((held) => relative === held || relative.startsWith(`${held}/`));
 };
 

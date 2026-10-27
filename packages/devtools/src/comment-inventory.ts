@@ -42,7 +42,7 @@ const KEPT: ReadonlySet<Class> = new Set(["foreign", "contract", "suppression"])
 
 const NEEDS_A_HOLDER: ReadonlySet<Class> = new Set(["held", "structure"]);
 
-const TRACKER_ISSUE = /^BA-\d+$/;
+const TRACKER_ISSUE = /^BA-\d+$/u;
 
 const COLUMNS = [
   "path",
@@ -69,15 +69,15 @@ const ESCAPED = new Map([
 
 const UNESCAPED = new Map([...ESCAPED].map(([one, written]) => [written.slice(1), one]));
 
-const WELL_ESCAPED = /^(?:[^\\]|\\[\\tnr])*$/;
+const WELL_ESCAPED = /^(?:[^\\]|\\[\\tnr])*$/u;
 
 const escaped = (value: string): string =>
-  value.replace(/[\\\t\n\r]/g, (one) => ESCAPED.get(one) ?? one);
+  value.replace(/[\\\t\n\r]/gu, (one) => ESCAPED.get(one) ?? one);
 
 const field = z
   .string()
   .refine((raw) => WELL_ESCAPED.test(raw), "a backslash escapes only \\, t, n or r")
-  .transform((raw) => raw.replace(/\\([\\tnr])/g, (_, one: string) => UNESCAPED.get(one) ?? one));
+  .transform((raw) => raw.replace(/\\([\\tnr])/gu, (_, one: string) => UNESCAPED.get(one) ?? one));
 
 const counted = (least: number) => field.pipe(z.coerce.number<string>().int().min(least));
 
@@ -115,7 +115,7 @@ const rowAt = (line: string, number: number): Outcome<Row> => {
 };
 
 const rowsIn = (tsv: string): Outcome<readonly Row[]> => {
-  const [header, ...lines] = tsv.replace(/\n$/, "").split("\n");
+  const [header, ...lines] = tsv.replace(/\n$/u, "").split("\n");
   if (header !== HEADER) return { refused: [`line 1: the header is not ${COLUMNS.join(", ")}`] };
   const rows: Row[] = [];
   for (const [index, line] of lines.entries()) {
@@ -180,7 +180,7 @@ const cutOf = (source: string, block: Block, containers: readonly Span[]): Cut =
   return { start: span.start, end: span.end, replacement: "" };
 };
 
-const BUNDLER_DIRECTIVE = /^@vite-ignore\b/;
+const BUNDLER_DIRECTIVE = /^@vite-ignore\b/u;
 
 const kindOf = (source: string, block: Block, cut: Cut): Kind => {
   if (isExempt(block[0]) || BUNDLER_DIRECTIVE.test(proseOf(block[0]))) return "directive";
@@ -230,11 +230,11 @@ const declaredAt = (program: Program): ReadonlyMap<number, string> => {
 };
 
 const attachedTo = (source: string, cut: Cut, declared: ReadonlyMap<number, string>): string => {
-  const gap = /^[ \t]*(?:\r?\n)?[ \t]*/.exec(source.slice(cut.end))?.[0].length ?? 0;
+  const gap = /^[ \t]*(?:\r?\n)?[ \t]*/u.exec(source.slice(cut.end))?.[0].length ?? 0;
   return declared.get(cut.end + gap) ?? "";
 };
 
-const wordsIn = (prose: string): number => prose.match(/\S+/g)?.length ?? 0;
+const wordsIn = (prose: string): number => prose.match(/\S+/gu)?.length ?? 0;
 
 const foundIn = (file: string, source: string): readonly Found[] => {
   const { program, comments, lineOf } = parsedSource(file, source);
@@ -312,7 +312,7 @@ type Language = {
 
 const LANGUAGES: readonly Language[] = [
   {
-    source: /\.[cm]?tsx?$/,
+    source: /\.[cm]?tsx?$/u,
     generated: "// Generated, never edited",
     foundIn,
     formatter: "oxfmt",
@@ -322,7 +322,7 @@ const LANGUAGES: readonly Language[] = [
     ],
   },
   {
-    source: /\.py$/,
+    source: /\.py$/u,
     generated: "# Generated, never edited",
     foundIn: pythonFoundIn,
     formatter: "ruff format",
@@ -365,7 +365,7 @@ const sourceAt = (root: string, file: string): string | undefined => {
   return existsSync(at) && statSync(at).isFile() ? readFileSync(at, "utf8") : undefined;
 };
 
-const HOLDER = /^(?<file>.+?) › (?<text>.+)$/;
+const HOLDER = /^(?<file>.+?) › (?<text>.+)$/u;
 
 const timesIn = (source: string, text: string): number => {
   let times = 0;
@@ -467,9 +467,9 @@ const planFor = (root: string, rows: readonly Row[], unit: string): Outcome<read
   return { value: planned.flatMap((one) => ("value" in one ? [one.value] : [])) };
 };
 
-const OPENS = /[{[(:]\s*$/;
+const OPENS = /[{[(:]\s*$/u;
 
-const CLOSES = /^\s*[}\])]/;
+const CLOSES = /^\s*[}\])]/u;
 
 const lastLineOf = (head: string): string =>
   head.slice(head.lastIndexOf("\n", head.length - 2) + 1, -1);

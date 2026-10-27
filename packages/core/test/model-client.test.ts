@@ -653,8 +653,8 @@ describe("a model of the other wire shape", () => {
     ["a decision model no Messages call", ANSWERED, "callModel"],
     ["a Messages model no decision call", DECIDED, "decide"],
     ["a Messages model no yes-or-no call", DECIDED, "decideYesNo"],
-  ] as const)("sends %s", async (_case, reply, method) => {
-    const wire = theWire(reply);
+  ] as const)("sends %s", async (_case, replied, method) => {
+    const wire = theWire(replied);
     const { client, lines } = clientOn(wire);
 
     const called =

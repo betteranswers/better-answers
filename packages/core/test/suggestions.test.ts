@@ -1368,9 +1368,9 @@ describe("an acceptance reached straight through the write path", () => {
     set: { readonly setId: string; readonly suggestionIds: readonly string[] },
     overrides: Partial<WriteConceptInput> = {},
   ): WriteConceptInput => {
-    const { status: _status, sensitivity: _sensitivity, ...proposed } = input;
+    const { status: _status, sensitivity: _sensitivity, ...proposal } = input;
     return {
-      ...proposed,
+      ...proposal,
       iri: written.iri,
       body: SUGGESTED_BODY,
       expects: { base: written.contentHash },

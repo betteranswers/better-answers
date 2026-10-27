@@ -122,7 +122,7 @@ describe("what Better Auth mounts behind the fence's catch-all", () => {
 
     expect(mounted.length).toBeGreaterThan(0);
     expect(readSnapshot().length).toBeGreaterThan(0);
-    for (const path of DRIVEN_BY_THE_FLOW) expect(mounted).toContain(path);
+    for (const drivenPath of DRIVEN_BY_THE_FLOW) expect(mounted).toContain(drivenPath);
   });
 
   it("mounts nothing under the share agent's surface", () => {

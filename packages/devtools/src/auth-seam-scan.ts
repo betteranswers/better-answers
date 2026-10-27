@@ -1,11 +1,11 @@
 import path from "node:path";
 
-const LIBRARY_NAMED = /@?better-(?:auth|fetch)\b[\w./-]*|[\w./-]*\bauth-client(?:\.ts)?\b/;
+const LIBRARY_NAMED = /@?better-(?:auth|fetch)\b[\w./-]*|[\w./-]*\bauth-client(?:\.ts)?\b/u;
 
 const EXPORTED =
-  /^export (?:declare )?(?:(?:const|function|class|type|interface) (\w+)|(?:type )?\{ (\w+))/;
+  /^export (?:declare )?(?:(?:const|function|class|type|interface) (\w+)|(?:type )?\{ (\w+))/u;
 
-const DIAGNOSTIC = /^(?<file>.+?)\((?<line>\d+),\d+\): error (?<code>TS\d+): (?<said>.*)$/;
+const DIAGNOSTIC = /^(?<file>.+?)\((?<line>\d+),\d+\): error (?<code>TS\d+): (?<said>.*)$/u;
 
 export const TSC = { package: "typescript", path: ["bin", "tsc"] } as const;
 
@@ -38,7 +38,7 @@ export const declarationPath = (root: string, seam: Seam, emitted: string): stri
     emitted,
     path
       .relative(path.dirname(path.resolve(root, seam.config)), path.resolve(root, seam.file))
-      .replace(/\.tsx?$/, ".d.ts"),
+      .replace(/\.tsx?$/u, ".d.ts"),
   );
 
 export const refusalsOf = (root: string, seam: Seam, tscOutput: string): readonly string[] =>
@@ -65,7 +65,7 @@ export const libraryNamed = (seam: Seam, declaration: string): readonly string[]
     if (named !== undefined && !leaks.has(exported)) leaks.set(exported, named);
   }
   return [...leaks].map(
-    ([exported, named]) =>
-      `${seam.file}: the declaration of \`${exported}\` names \`${named}\`. Map Better Auth's answer to the platform's own type inside this file, and give \`${exported}\` that type.`,
+    ([exportName, named]) =>
+      `${seam.file}: the declaration of \`${exportName}\` names \`${named}\`. Map Better Auth's answer to the platform's own type inside this file, and give \`${exportName}\` that type.`,
   );
 };

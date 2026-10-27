@@ -1137,7 +1137,7 @@ describe("a commit the rows cannot take", () => {
   it("stops the replay, its audit event rolled back, landing nothing", async () => {
     const scenario = await arrange();
     const first = guideline("Fuel");
-    const written = await landed(scenario, scenario.editor, first);
+    const landing = await landed(scenario, scenario.editor, first);
 
     const clash = await commit(scenario.editor, scenario.git, {
       path: first.path,
@@ -1148,7 +1148,7 @@ describe("a commit the rows cannot take", () => {
       message: "Record a second fuel guideline by hand",
       author: first.author,
       trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
-      expectedHead: written.sha,
+      expectedHead: landing.sha,
       at: new Date(),
     });
     expect(clash.ok).toBe(true);
@@ -1169,7 +1169,7 @@ describe("a commit the rows cannot take", () => {
     expect(run).toEqual({
       workspaceId: scenario.workspaceId,
       head: history[2],
-      watermark: written.sha,
+      watermark: landing.sha,
       replayed: [],
       skipped: [],
       stopped: { sha: history[1], reason: "path-taken" },
@@ -1181,15 +1181,15 @@ describe("a commit the rows cannot take", () => {
   it("stops at a moved concept, leaving its row in place", async () => {
     const scenario = await arrange();
     const input = guideline("Bridges");
-    const written = await landed(scenario, scenario.editor, input);
+    const landing = await landed(scenario, scenario.editor, input);
 
     const moved = await commit(scenario.editor, scenario.git, {
       path: "knowledge/guidelines/bridges-moved.md",
-      content: await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path),
+      content: await fileAtCommit(scenario.git, scenario.workspaceId, landing.sha, input.path),
       message: "Move the bridges guideline by hand",
       author: { name: "Grace Editor", email: "grace@acme.invalid" },
       trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
-      expectedHead: written.sha,
+      expectedHead: landing.sha,
       at: new Date(),
     });
     expect(moved.ok).toBe(true);
@@ -1200,11 +1200,11 @@ describe("a commit the rows cannot take", () => {
       replayed: [],
       stopped: { sha: moved.ok ? moved.value.sha : "", reason: "rename-refused" },
     });
-    expect(await conceptRow(scenario.workspaceId, written.iri)).toMatchObject({
+    expect(await conceptRow(scenario.workspaceId, landing.iri)).toMatchObject({
       path: input.path,
-      commit_sha: written.sha,
+      commit_sha: landing.sha,
     });
-    expect(await recordedChain(scenario.workspaceId)).toEqual([[written.sha, null]]);
+    expect(await recordedChain(scenario.workspaceId)).toEqual([[landing.sha, null]]);
   });
 
   it("stops at a hand-made commit rather than guessing its meaning", async () => {

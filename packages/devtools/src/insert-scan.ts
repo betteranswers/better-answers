@@ -1,8 +1,8 @@
 import { filesUnderEach, isTestPath } from "./paths.ts";
 
-const RAW_INSERT = /(?:^|["'`])\s*insert\s+into\s+["'`]?[a-z_]/i;
+const RAW_INSERT = /(?:^|["'`])\s*insert\s+into\s+["'`]?[a-z_]/iu;
 
-const SCANNED = /\.(?:tsx?|py)$/;
+const SCANNED = /\.(?:tsx?|py)$/u;
 
 export const WHERE_THE_LIST_LIVES = "packages/devtools/src/insert-scan.ts";
 

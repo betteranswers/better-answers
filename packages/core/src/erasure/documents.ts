@@ -53,10 +53,12 @@ export const documentsNaming = async (
   const { workspaceId, identifiers } = subject;
   const candidates = new Set<string>();
   for (const identifier of identifiers) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every candidate query runs on the erasure's transaction
     for (const id of await candidatesFor(tx, workspaceId, identifier)) candidates.add(id);
   }
   const named: string[] = [];
   for (const id of candidates) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every text read runs on the erasure's transaction
     const text = await indexedTextOf(tx, workspaceId, id);
     if (erasureMatchesIn(text, identifiers).length > 0) named.push(id);
   }

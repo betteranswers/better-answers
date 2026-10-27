@@ -42,9 +42,9 @@ const declared = (name: keyof Lefthook) => {
 const commands = (): Record<string, Command> => declared("pre-commit").commands ?? {};
 
 const runOf = (name: string): string => {
-  const command = commands()[name];
-  if (command?.run === undefined) throw new Error(`no \`${name}\` command in lefthook.yml`);
-  return command.run;
+  const declaredCommand = commands()[name];
+  if (declaredCommand?.run === undefined) throw new Error(`no \`${name}\` command in lefthook.yml`);
+  return declaredCommand.run;
 };
 
 const extensionsOf = (name: string): readonly string[] =>
@@ -167,23 +167,26 @@ describe("the hook's typecheck commands refuse a staged type error", () => {
 describe("the pre-commit hook", () => {
   it.each(npmCommands())(
     "runs `%s` from a binary this repository's own packages declare",
-    (command, packageName, binaryName, via) => {
-      const naming = via === undefined ? runOf(command) : reachedFrom(via, runOf(command));
+    (commandLine, packageName, binaryName, via) => {
+      const naming = via === undefined ? runOf(commandLine) : reachedFrom(via, runOf(commandLine));
       expect(naming).toContain(binaryName);
       expect(existsSync(declaredBinary(packageName, binaryName))).toBe(true);
     },
   );
 
-  it.each(uvCommands())("runs `%s` through uv inside the worker", (command) => {
-    expect(runOf(command)).toContain("uv run --frozen --only-group dev ruff");
-    expect(commands()[command]?.root).toBe("apps/worker/");
+  it.each(uvCommands())("runs `%s` through uv inside the worker", (commandLine) => {
+    expect(runOf(commandLine)).toContain("uv run --frozen --only-group dev ruff");
+    expect(commands()[commandLine]?.root).toBe("apps/worker/");
 
     expect(() => execFileSync("uv", ["--version"], { stdio: "pipe" })).not.toThrow();
   });
 
-  it.each(rootScriptCommands())("runs `%s` as the root script %s runs it", (command, script) => {
-    expect(runOf(command)).toBe(`${rootScripts()[script] ?? ""} {staged_files}`);
-  });
+  it.each(rootScriptCommands())(
+    "runs `%s` as the root script %s runs it",
+    (commandLine, script) => {
+      expect(runOf(commandLine)).toBe(`${rootScripts()[script] ?? ""} {staged_files}`);
+    },
+  );
 
   it("runs the Python gate's checker over the staged files", () => {
     expect(runOf("comment-gate-python")).toBe(`python3 ${pythonGateChecker()} {staged_files}`);

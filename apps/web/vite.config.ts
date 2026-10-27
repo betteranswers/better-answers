@@ -14,10 +14,10 @@ import { PRODUCT_NAME } from "./src/shared/words.ts";
  * at that boundary.
  */
 const LIBRARY_GROUPS = [
-  { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 40 },
-  { name: "tanstack", test: /node_modules[\\/]@tanstack[\\/]/, priority: 30 },
-  { name: "trpc", test: /node_modules[\\/]@trpc[\\/]/, priority: 30 },
-  { name: "vendor", test: /node_modules[\\/]/, priority: 10 },
+  { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/u, priority: 40 },
+  { name: "tanstack", test: /node_modules[\\/]@tanstack[\\/]/u, priority: 30 },
+  { name: "trpc", test: /node_modules[\\/]@trpc[\\/]/u, priority: 30 },
+  { name: "vendor", test: /node_modules[\\/]/u, priority: 10 },
 ];
 
 const designSystem = (file: string): string =>
@@ -29,20 +29,20 @@ const designSystem = (file: string): string =>
 /** In the order `styles.css` imports them, so a later rule wins as it does in the browser. */
 const TOKEN_FILES = ["tokens/colors.css", "tokens/semantic.css"];
 
-const COMMENT = /\/\*[\s\S]*?\*\//g;
+const COMMENT = /\/\*[\s\S]*?\*\//gu;
 
-const RULE = /([^{};]+)\{([^{}]*)\}/g;
+const RULE = /([^{};]+)\{([^{}]*)\}/gu;
 
-const DECLARATION = /(--[\w-]+)\s*:\s*([^;]+)/g;
+const DECLARATION = /(--[\w-]+)\s*:\s*([^;]+)/gu;
 
-const REFERENCE = /^var\(\s*(--[\w-]+)\s*\)$/;
+const REFERENCE = /^var\(\s*(--[\w-]+)\s*\)$/u;
 
 /** A rule inside an at-rule is read as if it stood alone. */
 const tokensUnder = (selectors: readonly string[]): ReadonlyMap<string, string> => {
   const css = TOKEN_FILES.map(designSystem).join("\n").replaceAll(COMMENT, "");
   const tokens = new Map<string, string>();
   for (const [, selector = "", body = ""] of css.matchAll(RULE)) {
-    const named = selector.split(",").map((one) => one.replaceAll(/\s+/g, " ").trim());
+    const named = selector.split(",").map((one) => one.replaceAll(/\s+/gu, " ").trim());
     if (!named.some((one) => selectors.includes(one))) continue;
     for (const [, name = "", value = ""] of body.matchAll(DECLARATION)) {
       tokens.set(name, value.trim());
@@ -69,7 +69,7 @@ const tabIcon = (): string => {
   const dark = textColourOf([":root", '[data-theme="dark"]']);
   const style = `<style>svg{color:${light}}@media (prefers-color-scheme:dark){svg{color:${dark}}}</style>`;
   const logo = designSystem("assets/logo.svg");
-  const icon = logo.replace(/<svg\b[^>]*>/, (opened) => `${opened}${style}`);
+  const icon = logo.replace(/<svg\b[^>]*>/u, (opened) => `${opened}${style}`);
   if (icon === logo) throw new Error("the design system's logo has no <svg> to style");
   return `data:image/svg+xml,${encodeURIComponent(icon)}`;
 };

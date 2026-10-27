@@ -238,13 +238,13 @@ find / -xdev -path "${JOB_PROBE_DIRECTORY}" -prune -o -type f -print0 \
 
 const SCHEDULE = /^(?:[\d*,/-]+\s+){5}/;
 
-const everyMinuteThroughTheProbe = (crontab: string, script: string, probe: string): string =>
+const everyMinuteThroughTheProbe = (crontab: string, script: string, probeScript: string): string =>
   crontab
     .split("\n")
     .map((line) => {
       if (!SCHEDULE.test(line)) return line;
       if (!line.includes(script)) throw new Error(`a scheduled line starts no ${script}: ${line}`);
-      return line.replace(SCHEDULE, "* * * * * ").replace(script, probe);
+      return line.replace(SCHEDULE, "* * * * * ").replace(script, probeScript);
     })
     .join("\n");
 

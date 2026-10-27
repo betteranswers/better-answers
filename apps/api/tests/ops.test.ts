@@ -584,7 +584,7 @@ const lostInTheWindow = async (
 };
 
 describe("pnpm ops — the restore scripts' commands", () => {
-  const app = servedApp();
+  const served = servedApp();
 
   it("reads a dump stamp and an ISO instant alike", () => {
     expect(parseSince("20260903T020500Z")?.toISOString()).toBe("2026-09-03T02:05:00.000Z");
@@ -593,16 +593,16 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   it("answers usage to a missing or unknown command, never guessing", async () => {
-    expect((await ops(app(), [])).exitCode).toBe(2);
-    expect((await ops(app(), ["make-it-so"])).exitCode).toBe(2);
-    expect((await ops(app(), ["map-counts"])).exitCode).toBe(2);
-    expect((await ops(app(), ["replay-erasures"])).exitCode).toBe(2);
+    expect((await ops(served(), [])).exitCode).toBe(2);
+    expect((await ops(served(), ["make-it-so"])).exitCode).toBe(2);
+    expect((await ops(served(), ["map-counts"])).exitCode).toBe(2);
+    expect((await ops(served(), ["replay-erasures"])).exitCode).toBe(2);
   });
 
   it.each(["toString", "__proto__"])(
     "answers %s, a name every object inherits, as unknown",
     async (command) => {
-      const run = await ops(app(), [command, "--workspace", ulid()]);
+      const run = await ops(served(), [command, "--workspace", ulid()]);
 
       expect(run.exitCode).toBe(2);
       expect(run.lines.join("\n")).toContain(`unknown command: ${command}`);
@@ -610,14 +610,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
   );
 
   it("prints a refusal's word and exits with its class's code", async () => {
-    const run = await ops(app(), ["map-counts", "--workspace", "not-a-workspace-id"]);
+    const run = await ops(served(), ["map-counts", "--workspace", "not-a-workspace-id"]);
 
     expect(run.exitCode).toBe(2);
     expect(run.lines.join("\n")).toContain("REFUSED — malformed");
   });
 
   it("says which runs exit 1 whatever word they name", async () => {
-    const run = await ops(app(), ["help"]);
+    const run = await ops(served(), ["help"]);
 
     expect(run.lines.join("\n")).toContain(
       "a run that names the file or commit it stopped at exits 1, whatever word it names: import-bundle's unsound tree and stopped import, reconcile-watermark's stopped replay",
@@ -644,7 +644,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   it("skips pnpm's -- separator, which is not a command", async () => {
-    const run = await opsBeforeTheJournal(app(), [
+    const run = await opsBeforeTheJournal(served(), [
       "--",
       "replay-erasures",
       "--since",
@@ -653,12 +653,12 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     expect(run.exitCode).toBe(0);
     expect(run.lines.join("\n")).toContain("replayed 0 erasures");
-    expect((await ops(app(), ["--"])).exitCode).toBe(2);
+    expect((await ops(served(), ["--"])).exitCode).toBe(2);
   });
 
   describe("replay-erasures — mandatory in every restore, never quietly a no-op", () => {
     it("proves there is nothing to replay on a pre-journal database", async () => {
-      const run = await opsBeforeTheJournal(app(), [
+      const run = await opsBeforeTheJournal(served(), [
         "replay-erasures",
         "--since",
         "20260901T020500Z",
@@ -670,7 +670,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("is done, replaying nothing, when no erasure followed the dump", async () => {
-      const run = await opsWith(app(), ["replay-erasures", "--since", "2026-12-01T00:00:00Z"], {});
+      const run = await opsWith(
+        served(),
+        ["replay-erasures", "--since", "2026-12-01T00:00:00Z"],
+        {},
+      );
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
@@ -679,9 +683,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("re-applies an erasure the dump undid, from the restored rows", async () => {
-      const erased = await erasedAt(app(), FROM_THE_ROWS_AT);
+      const erased = await erasedAt(served(), FROM_THE_ROWS_AT);
 
-      const run = await opsWith(app(), ["replay-erasures", "--since", FROM_THE_ROWS_SINCE], {});
+      const run = await opsWith(served(), ["replay-erasures", "--since", FROM_THE_ROWS_SINCE], {});
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
@@ -690,7 +694,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "replay-erasures: done — replayed 1 erasure since 2026-05-31T00:00:00.000Z",
       ]);
 
-      expect(await auditLogOf(app(), erased.workspaceId)).toContainEqual({
+      expect(await auditLogOf(served(), erased.workspaceId)).toContainEqual({
         action: "platform.erasure.replayed",
         actor: "process:better-answers-erasure",
         subject_id: erased.erasureRequestId,
@@ -698,16 +702,18 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("re-applies an erasure the rows lack, from its replay copy", async () => {
-      const erased = await erasedAt(app(), FROM_THE_COPY_AT);
+      const erased = await erasedAt(served(), FROM_THE_COPY_AT);
 
-      await app().database.superuser.query("DELETE FROM erasure_request WHERE workspace_id = $1", [
-        erased.workspaceId,
-      ]);
-      await app().database.superuser.query("DELETE FROM subject_request WHERE workspace_id = $1", [
-        erased.workspaceId,
-      ]);
+      await served().database.superuser.query(
+        "DELETE FROM erasure_request WHERE workspace_id = $1",
+        [erased.workspaceId],
+      );
+      await served().database.superuser.query(
+        "DELETE FROM subject_request WHERE workspace_id = $1",
+        [erased.workspaceId],
+      );
 
-      const run = await opsWith(app(), ["replay-erasures", "--since", FROM_THE_COPY_SINCE], {
+      const run = await opsWith(served(), ["replay-erasures", "--since", FROM_THE_COPY_SINCE], {
         doors: { clock: { now: () => REPLAYED_AT } },
       });
 
@@ -718,7 +724,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "completed 2026-07-15T09:00:00.000Z, re-created from its replay copy",
         "replay-erasures: done — replayed 1 erasure since 2026-06-15T00:00:00.000Z",
       ]);
-      const restored = await app().database.superuser.query<{ id: string; pseudonym: string }>(
+      const restored = await served().database.superuser.query<{ id: string; pseudonym: string }>(
         "SELECT id, pseudonym FROM erasure_request WHERE workspace_id = $1",
         [erased.workspaceId],
       );
@@ -729,35 +735,35 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("wipes and requeues the subject's source; a rerun only logs", async () => {
-      const { workspaceId, admin } = await app().provision();
-      await initRepository(openTestGit(app()), workspaceId);
+      const { workspaceId, admin } = await served().provision();
+      await initRepository(openTestGit(served()), workspaceId);
       const identifiers: SubjectIdentifiers = {
         emails: ["sam.okafor@meridianfenland.co.uk"],
         names: ["Sam Okafor"],
         other: [],
       };
       await boundAndIndexed(
-        app(),
+        served(),
         workspaceId,
         admin.id,
         "Expense claims go to Sam Okafor at sam.okafor@meridianfenland.co.uk by Friday.\n",
       );
-      const indexedBefore = await whatAReplayReaches(app(), workspaceId);
+      const indexedBefore = await whatAReplayReaches(served(), workspaceId);
       const erasureRequestId = await completedBeforeTheFinder(
-        app(),
+        served(),
         workspaceId,
         BEFORE_THE_FINDER_AT,
         identifiers,
       );
 
       const first = await opsWith(
-        app(),
+        served(),
         ["replay-erasures", "--since", BEFORE_THE_FINDER_SINCE],
         {},
       );
-      const afterTheFirst = await whatAReplayReaches(app(), workspaceId);
+      const afterTheFirst = await whatAReplayReaches(served(), workspaceId);
       const second = await opsWith(
-        app(),
+        served(),
         ["replay-erasures", "--since", BEFORE_THE_FINDER_SINCE],
         {},
       );
@@ -785,16 +791,16 @@ describe("pnpm ops — the restore scripts' commands", () => {
         suppressions: [{ identifiers }],
       });
       expect([second.exitCode, second.lines]).toEqual([0, replayedOnce]);
-      expect(await whatAReplayReaches(app(), workspaceId)).toEqual(afterTheFirst);
+      expect(await whatAReplayReaches(served(), workspaceId)).toEqual(afterTheFirst);
       expect(
-        (await auditLogOf(app(), workspaceId)).filter(
+        (await auditLogOf(served(), workspaceId)).filter(
           (row) => row.action === "platform.erasure.replayed",
         ),
       ).toHaveLength(2);
     });
 
     it("refuses without a repositories' root, which the rewrite needs", async () => {
-      const run = await opsWith(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
+      const run = await opsWith(served(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
         doors: { git: undefined },
       });
 
@@ -804,7 +810,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("refuses when the image names no object store", async () => {
-      const run = await opsWith(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
+      const run = await opsWith(served(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
         doors: { objects: undefined },
       });
 
@@ -814,7 +820,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("refuses an unreachable object store, not assuming nothing is owed", async () => {
-      const unreachable = doorsFor(app().database.pool, {
+      const unreachable = doorsFor(served().database.pool, {
         objectStore: {
           endpoint: "http://127.0.0.1:1",
           region: "garage",
@@ -824,7 +830,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         },
       });
 
-      const run = await opsWith(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
+      const run = await opsWith(served(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
         doors: { objects: unreachable.objects },
       });
 
@@ -838,7 +844,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it.each(["erasure-rehearsal", "object-store-orphans", "import-bundle"])(
       "%s says `not built`, exit 3, without its slice's tables",
       async (command) => {
-        const run = await opsBeforeTheJournal(app(), [
+        const run = await opsBeforeTheJournal(served(), [
           command,
           "--workspace",
           "ws_synthetic",
@@ -855,7 +861,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect([...SLICE_COMMANDS].toSorted()).toEqual(Object.keys(SLICE_TABLES).toSorted());
 
       for (const [command, tables] of Object.entries(SLICE_TABLES)) {
-        const run = await opsBeforeTheJournal(app(), [
+        const run = await opsBeforeTheJournal(served(), [
           command,
           "--workspace",
           "ws_synthetic",
@@ -875,10 +881,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("answers in its own name, never another command's", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
       for (const command of SLICE_COMMANDS) {
-        const run = await ops(app(), [command, "--workspace", workspaceId]);
+        const run = await ops(served(), [command, "--workspace", workspaceId]);
         const said = run.lines.join("\n");
         const others = SLICE_COMMANDS.filter(
           (other) => other !== command && said.includes(`${other}:`),
@@ -891,13 +897,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const synthetic = "01M2SYNTHET1CAAAAAAAAAAAAA";
 
       beforeAll(async () => {
-        const client = await app().database.superuser.connect();
+        const client = await served().database.superuser.connect();
         try {
           await testData(client).workspace({ id: synthetic });
         } finally {
           client.release();
         }
-        await initRepository(openTestGit(app()), synthetic);
+        await initRepository(openTestGit(served()), synthetic);
       });
 
       it.each([
@@ -943,7 +949,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ])(
         "$command, run as the drill does, takes the synthetic id",
         async ({ command, flags, exitCode, first }) => {
-          const run = await ops(app(), [command, "--workspace", synthetic, ...flags]);
+          const run = await ops(served(), [command, "--workspace", synthetic, ...flags]);
 
           expect({ exitCode: run.exitCode, first: run.lines[0] }).toEqual({ exitCode, first });
         },
@@ -970,13 +976,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     const connectedSourcesOf = async (workspaceId: string, userId: string) => {
-      const admin = await principalOf(app(), workspaceId, userId);
-      const doors = { postgres: openPostgres(app().database.pool), objects: objects().door };
+      const admin = await principalOf(served(), workspaceId, userId);
+      const doors = { postgres: openPostgres(served().database.pool), objects: objects().door };
 
       const bound = await connectUpload(admin, doors, handbook());
       if (!bound.ok) throw new Error(`the connect was refused: ${String(bound.error)}`);
 
-      const failed = await whileWritesAreRefused(app().database.superuser, "job", () =>
+      const failed = await whileWritesAreRefused(served().database.superuser, "job", () =>
         connectUpload(admin, doors, handbook()),
       );
       if (failed.ok) throw new Error("the connect landed where the queue was refused");
@@ -984,11 +990,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
     };
 
     it("removes only the original no document names, once past grace", async () => {
-      const { workspaceId, admin: person } = await app().provision();
+      const { workspaceId, admin: person } = await served().provision();
       const { admin, named } = await connectedSourcesOf(workspaceId, person.id);
 
       const looked = await opsWith(
-        app(),
+        served(),
         ["object-store-orphans", "--workspace", workspaceId, "--list"],
         { doors: { clock: { now: aDayOn } } },
       );
@@ -997,7 +1003,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "object-store-orphans: done — 1 object past the 24-hour grace no document names, removed none",
       ]);
 
-      const run = await opsWith(app(), ["object-store-orphans", "--workspace", workspaceId], {
+      const run = await opsWith(served(), ["object-store-orphans", "--workspace", workspaceId], {
         doors: { clock: { now: aDayOn } },
       });
 
@@ -1009,10 +1015,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("removes nothing while the grace still holds over both", async () => {
-      const { workspaceId, admin: person } = await app().provision();
+      const { workspaceId, admin: person } = await served().provision();
       await connectedSourcesOf(workspaceId, person.id);
 
-      const run = await ops(app(), ["object-store-orphans", "--workspace", workspaceId]);
+      const run = await ops(served(), ["object-store-orphans", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
@@ -1021,7 +1027,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("crosses its refusal as word and class code, removing nothing", async () => {
-      const run = await ops(app(), ["object-store-orphans", "--workspace", "ws_synthetic"]);
+      const run = await ops(served(), ["object-store-orphans", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.malformed);
       expect(run.lines).toEqual([
@@ -1030,13 +1036,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("refuses when the image has no object store to sweep", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
       const run = await opsWith(
-        app(),
+        served(),
         ["object-store-orphans", "--workspace", workspaceId],
         { doors: { objects: undefined } },
-        app().database.superuser,
+        served().database.superuser,
       );
 
       expect(run.exitCode).toBe(1);
@@ -1048,15 +1054,15 @@ describe("pnpm ops — the restore scripts' commands", () => {
     const pinned = { doors: { clock: { now: () => REHEARSED_AT } } };
 
     const aWorkspaceToDrillIn = async () => {
-      const provisioned = await app().provision();
-      await initRepository(openTestGit(app()), provisioned.workspaceId);
+      const provisioned = await served().provision();
+      await initRepository(openTestGit(served()), provisioned.workspaceId);
       return provisioned;
     };
 
     const seededBeside = async (workspaceId: string, worker: () => Promise<void>) => {
       const [seed] = await Promise.all([
         opsWith(
-          app(),
+          served(),
           ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
           pinned,
         ),
@@ -1066,7 +1072,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     };
 
     const seeded = (workspaceId: string, readerId: string) =>
-      seededBeside(workspaceId, () => theSyncLanded(app(), workspaceId, readerId));
+      seededBeside(workspaceId, () => theSyncLanded(served(), workspaceId, readerId));
 
     it("seeds the subject, answers once indexed, prints their tokens last", async () => {
       const { workspaceId, admin } = await aWorkspaceToDrillIn();
@@ -1080,7 +1086,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         `erasure-rehearsal: done — the synthetic subject of ${workspaceId} is seeded (a user row, an Admin member, one concept file and one indexed document naming them); take the dump, then run phase two`,
         `${email},human:${email},Rehearsal subject ${workspaceId}`,
       ]);
-      const seededRow = await app().database.superuser.query(
+      const seededRow = await served().database.superuser.query(
         'SELECT 1 FROM "user" WHERE lower(email) = lower($1)',
         [email],
       );
@@ -1094,9 +1100,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const seed = await seeded(workspaceId, admin.id);
       const tokens = (seed.lines.at(-1) ?? "").split(",");
-      const indexedBefore = await tokensThePassagesHold(app(), workspaceId, tokens);
+      const indexedBefore = await tokensThePassagesHold(served(), workspaceId, tokens);
       const run = await opsWith(
-        app(),
+        served(),
         [
           "erasure-rehearsal",
           "--workspace",
@@ -1111,8 +1117,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(indexedBefore).toEqual([email, name]);
       expect(run.exitCode).toBe(0);
-      expect(await tokensThePassagesHold(app(), workspaceId, tokens)).toEqual([]);
-      expect(await indexJobsIn(app(), workspaceId)).toEqual([
+      expect(await tokensThePassagesHold(served(), workspaceId, tokens)).toEqual([]);
+      expect(await indexJobsIn(served(), workspaceId)).toEqual([
         { reason: "connected", status: "done" },
         { reason: "wiped", status: "queued" },
       ]);
@@ -1121,10 +1127,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("refuses phase one when indexing the subject's document fails", async () => {
       const { workspaceId } = await aWorkspaceToDrillIn();
 
-      const run = await seededBeside(workspaceId, () => theSyncFailed(app(), workspaceId));
+      const run = await seededBeside(workspaceId, () => theSyncFailed(served(), workspaceId));
 
-      const [sync] = await indexJobsIn(app(), workspaceId);
-      const jobs = await jobsOf(app(), workspaceId);
+      const [sync] = await indexJobsIn(served(), workspaceId);
+      const jobs = await jobsOf(served(), workspaceId);
       expect(run.exitCode).toBe(1);
       expect(sync).toEqual({ reason: "connected", status: "failed" });
       expect(run.lines).toEqual([
@@ -1136,7 +1142,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const { workspaceId } = await aWorkspaceToDrillIn();
 
       const run = await opsWith(
-        app(),
+        served(),
         [
           "erasure-rehearsal",
           "--workspace",
@@ -1149,7 +1155,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         {},
       );
 
-      const jobs = await jobsOf(app(), workspaceId);
+      const jobs = await jobsOf(served(), workspaceId);
       expect(run.exitCode).toBe(1);
       expect(run.lines).toEqual([
         `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${jobs[0]?.id ?? ""} is still queued after 1 second, so no worker has indexed it`,
@@ -1160,7 +1166,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ["--seed", []],
       ["--run", ["--report", "report.md"]],
     ])("answers usage to %s with a wait not in seconds", async (phase, report) => {
-      const run = await ops(app(), [
+      const run = await ops(served(), [
         "erasure-rehearsal",
         "--workspace",
         "ws_synthetic",
@@ -1184,14 +1190,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const seed = await seeded(workspaceId, admin.id);
 
       const run = await opsWith(
-        app(),
+        served(),
         ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--run", "--report", file],
         pinned,
       );
 
       expect(run.exitCode).toBe(0);
       expect(run.lines.at(-1)).toBe(seed.lines.at(-1));
-      const request = await app().database.superuser.query<{ id: string }>(
+      const request = await served().database.superuser.query<{ id: string }>(
         "SELECT id FROM subject_request WHERE workspace_id = $1",
         [workspaceId],
       );
@@ -1204,7 +1210,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           `${BEYOND_USE}.`,
       );
       expect(written).toContain("Exports already issued are not recalled.");
-      expect(await auditLogOf(app(), workspaceId)).toContainEqual({
+      expect(await auditLogOf(served(), workspaceId)).toContainEqual({
         action: "platform.erasure.rehearsed",
         actor: "process:better-answers-erasure",
         subject_id: matching.any(String),
@@ -1216,7 +1222,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       await seeded(workspaceId, admin.id);
 
       const run = await opsWith(
-        app(),
+        served(),
         [
           "erasure-rehearsal",
           "--workspace",
@@ -1229,7 +1235,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         pinned,
       );
 
-      const erasure = await app().database.superuser.query<{ id: string }>(
+      const erasure = await served().database.superuser.query<{ id: string }>(
         "SELECT id FROM erasure_request WHERE workspace_id = $1",
         [workspaceId],
       );
@@ -1253,12 +1259,12 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("refuses phase two where phase one never ran, erasing nobody", async () => {
-      const { workspaceId } = await app().provision();
-      await initRepository(openTestGit(app()), workspaceId);
+      const { workspaceId } = await served().provision();
+      await initRepository(openTestGit(served()), workspaceId);
       const file = await reportPath();
 
       const run = await opsWith(
-        app(),
+        served(),
         ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--run", "--report", file],
         {},
       );
@@ -1268,14 +1274,19 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("answers usage without --synthetic, the caller's consent to run here", async () => {
-      const run = await ops(app(), ["erasure-rehearsal", "--workspace", "ws_synthetic", "--seed"]);
+      const run = await ops(served(), [
+        "erasure-rehearsal",
+        "--workspace",
+        "ws_synthetic",
+        "--seed",
+      ]);
 
       expect(run.exitCode).toBe(2);
       expect(run.lines.join("\n")).toContain("--synthetic is required");
     });
 
     it("answers usage to neither or both phases at once", async () => {
-      const both = await ops(app(), [
+      const both = await ops(served(), [
         "erasure-rehearsal",
         "--workspace",
         "ws_synthetic",
@@ -1283,7 +1294,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "--seed",
         "--run",
       ]);
-      const neither = await ops(app(), [
+      const neither = await ops(served(), [
         "erasure-rehearsal",
         "--workspace",
         "ws_synthetic",
@@ -1295,7 +1306,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("answers usage to a reportless run, which would prove nothing", async () => {
-      const run = await ops(app(), [
+      const run = await ops(served(), [
         "erasure-rehearsal",
         "--workspace",
         "ws_synthetic",
@@ -1310,12 +1321,12 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
   describe("map-rebuild — the map made again, on the worker's queue", () => {
     it("queues a drill's full rebuild and answers the job's id", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await ops(app(), ["map-rebuild", "--workspace", workspaceId]);
+      const run = await ops(served(), ["map-rebuild", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(0);
-      const queued = await jobsOf(app(), workspaceId);
+      const queued = await jobsOf(served(), workspaceId);
 
       expect(queued).toEqual([
         { id: matching.any(String), kind: "full-rebuild", reason: "drill", status: "queued" },
@@ -1324,9 +1335,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("takes the caller's reason from among the six", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await ops(app(), [
+      const run = await ops(served(), [
         "map-rebuild",
         "--workspace",
         workspaceId,
@@ -1335,13 +1346,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
 
       expect(run.exitCode).toBe(0);
-      expect((await jobsOf(app(), workspaceId))[0]?.reason).toBe("upgrade");
+      expect((await jobsOf(served(), workspaceId))[0]?.reason).toBe("upgrade");
     });
 
     it("answers usage to a reason outside the six, queueing nothing", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await ops(app(), [
+      const run = await ops(served(), [
         "map-rebuild",
         "--workspace",
         workspaceId,
@@ -1350,11 +1361,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
 
       expect(run.exitCode).toBe(2);
-      expect(await jobsOf(app(), workspaceId)).toEqual([]);
+      expect(await jobsOf(served(), workspaceId)).toEqual([]);
     });
 
     it("refuses a non-id workspace as malformed, naming its flag", async () => {
-      const run = await ops(app(), ["map-rebuild", "--workspace", "ws_synthetic"]);
+      const run = await ops(served(), ["map-rebuild", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual([
@@ -1367,16 +1378,16 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ["a non-numeric --wait-seconds", ["--wait-seconds", "soon"]],
       ["a --wait-seconds of zero", ["--wait-seconds", "0"]],
     ])("answers usage to %s, queueing nothing", async (_shape, flags) => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await ops(app(), ["map-rebuild", "--workspace", workspaceId, ...flags]);
+      const run = await ops(served(), ["map-rebuild", "--workspace", workspaceId, ...flags]);
 
       expect(run.exitCode).toBe(2);
-      expect(await jobsOf(app(), workspaceId)).toEqual([]);
+      expect(await jobsOf(served(), workspaceId)).toEqual([]);
     });
 
     it("waits two minutes by default, as its usage says", async () => {
-      const run = await ops(app(), ["help"]);
+      const run = await ops(served(), ["help"]);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines.join("\n")).toContain(
@@ -1386,10 +1397,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("waits for its job, done once the worker finishes it", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const waiting = ops(app(), ["map-rebuild", "--workspace", workspaceId, "--wait"]);
-      await finishTheJob(app(), workspaceId, "done");
+      const waiting = ops(served(), ["map-rebuild", "--workspace", workspaceId, "--wait"]);
+      await finishTheJob(served(), workspaceId, "done");
       const run = await waiting;
 
       expect(run.exitCode).toBe(0);
@@ -1399,10 +1410,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it.each(["failed", "poisoned"])(
       "refuses, stopping the restore, when the awaited job is %s",
       async (status) => {
-        const { workspaceId } = await app().provision();
+        const { workspaceId } = await served().provision();
 
-        const waiting = ops(app(), ["map-rebuild", "--workspace", workspaceId, "--wait"]);
-        await finishTheJob(app(), workspaceId, status);
+        const waiting = ops(served(), ["map-rebuild", "--workspace", workspaceId, "--wait"]);
+        await finishTheJob(served(), workspaceId, status);
         const run = await waiting;
 
         expect(run.exitCode).toBe(1);
@@ -1412,9 +1423,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     );
 
     it("refuses when the job is still queued after the wait", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await ops(app(), [
+      const run = await ops(served(), [
         "map-rebuild",
         "--workspace",
         workspaceId,
@@ -1424,16 +1435,16 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(1);
       expect(run.lines.join("\n")).toContain("still queued");
-      expect((await jobsOf(app(), workspaceId))[0]?.status).toBe("queued");
+      expect((await jobsOf(served(), workspaceId))[0]?.status).toBe("queued");
     });
   });
 
   describe("map-counts — nodes per label and edges, as JSON", () => {
     it("answers the live generation's counts on one diffable line", async () => {
-      const { workspaceId } = await app().provision();
-      await mapped(app(), workspaceId);
+      const { workspaceId } = await served().provision();
+      await mapped(served(), workspaceId);
 
-      const run = await ops(app(), ["map-counts", "--workspace", workspaceId]);
+      const run = await ops(served(), ["map-counts", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(0);
 
@@ -1446,16 +1457,16 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("answers zero of everything for an unmapped workspace, never refusing", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await ops(app(), ["map-counts", "--workspace", workspaceId]);
+      const run = await ops(served(), ["map-counts", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(0);
       expect(answered(run)).toEqual({ live_gen: null, nodes: {}, edges: {} });
     });
 
     it("answers usage to a non-id workspace before reading anything", async () => {
-      const run = await ops(app(), ["map-counts", "--workspace", "ws_synthetic"]);
+      const run = await ops(served(), ["map-counts", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
     });
@@ -1491,13 +1502,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
     };
 
     it("reports two of three mapped records showing unmapped passages", async () => {
-      const { workspaceId } = await app().provision();
-      await flaggedIncomplete(app(), workspaceId, ["documents/handbook.pdf#page=4"]);
-      await flaggedIncomplete(app(), workspaceId, ["documents/handbook.pdf#page=9"]);
-      await flaggedIncomplete(app(), workspaceId, []);
-      await flaggedIncomplete(app(), workspaceId, ["documents/handbook.pdf#page=2"], null);
+      const { workspaceId } = await served().provision();
+      await flaggedIncomplete(served(), workspaceId, ["documents/handbook.pdf#page=4"]);
+      await flaggedIncomplete(served(), workspaceId, ["documents/handbook.pdf#page=9"]);
+      await flaggedIncomplete(served(), workspaceId, []);
+      await flaggedIncomplete(served(), workspaceId, ["documents/handbook.pdf#page=2"], null);
 
-      const run = await ops(app(), ["unmapped-passage-rate", "--workspace", workspaceId]);
+      const run = await ops(served(), ["unmapped-passage-rate", "--workspace", workspaceId]);
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 0,
@@ -1512,7 +1523,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("answers usage to a non-id workspace before reading anything", async () => {
-      const run = await ops(app(), ["unmapped-passage-rate", "--workspace", "ws_synthetic"]);
+      const run = await ops(served(), ["unmapped-passage-rate", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
     });
@@ -1520,17 +1531,17 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
   describe("map-sweep — the generations a finished rebuild left behind", () => {
     it("sweeps all but the live generation, saying what each held", async () => {
-      const { workspaceId } = await app().provision();
-      await mapped(app(), workspaceId);
+      const { workspaceId } = await served().provision();
+      await mapped(served(), workspaceId);
 
-      const run = await ops(app(), ["map-sweep", "--workspace", workspaceId, "--wait"]);
+      const run = await ops(served(), ["map-sweep", "--workspace", workspaceId, "--wait"]);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
         "map-sweep: done — swept generation 2 (2 nodes, 1 edge, 1 unresolved reference)",
       ]);
 
-      const counted = await ops(app(), ["map-counts", "--workspace", workspaceId]);
+      const counted = await ops(served(), ["map-counts", "--workspace", workspaceId]);
       expect(answered(counted)).toEqual({
         live_gen: 1,
         nodes: { Concept: 2 },
@@ -1539,16 +1550,16 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("sweeps nothing when only the live generation stands", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await ops(app(), ["map-sweep", "--workspace", workspaceId]);
+      const run = await ops(served(), ["map-sweep", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual(["map-sweep: done — nothing to sweep"]);
     });
 
     it("answers usage to a non-id workspace before deleting anything", async () => {
-      const run = await ops(app(), ["map-sweep", "--workspace", "ws_synthetic"]);
+      const run = await ops(served(), ["map-sweep", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
     });
@@ -1556,11 +1567,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
   describe("reindex-connected-sources — every source wiped and queued again", () => {
     it("wipes an indexed source and queues its wiped sync", async () => {
-      const { workspaceId, admin } = await app().provision();
-      await boundAndIndexed(app(), workspaceId, admin.id, "Expense claims are paid monthly.\n");
+      const { workspaceId, admin } = await served().provision();
+      await boundAndIndexed(served(), workspaceId, admin.id, "Expense claims are paid monthly.\n");
 
-      const run = await ops(app(), ["reindex-connected-sources", "--workspace", workspaceId]);
-      const after = await whatAReplayReaches(app(), workspaceId);
+      const run = await ops(served(), ["reindex-connected-sources", "--workspace", workspaceId]);
+      const after = await whatAReplayReaches(served(), workspaceId);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
@@ -1571,9 +1582,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("says so when the workspace holds no connected source", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await ops(app(), ["reindex-connected-sources", "--workspace", workspaceId]);
+      const run = await ops(served(), ["reindex-connected-sources", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
@@ -1582,7 +1593,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("answers usage to a non-id workspace before wiping anything", async () => {
-      const run = await ops(app(), ["reindex-connected-sources", "--workspace", "ws_synthetic"]);
+      const run = await ops(served(), ["reindex-connected-sources", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
     });
@@ -1596,23 +1607,23 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "object-store-orphans: done — removed 0 objects past the 24-hour grace no document names",
       ],
     ])("%s waits for the pass's sweep lock, then runs", async (command, done) => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
       let letGo = (): void => undefined;
       const holding = new Promise<void>((resolve) => {
         letGo = resolve;
       });
       let taken = false;
-      const pass = withSweepLock(SWEEPS, openPostgres(app().database.pool), async () => {
+      const pass = withSweepLock(SWEEPS, openPostgres(served().database.pool), async () => {
         taken = true;
         await holding;
       });
       await until(async () => taken);
 
       let settled = false;
-      const run = ops(app(), [command, "--workspace", workspaceId]).finally(() => {
+      const run = ops(served(), [command, "--workspace", workspaceId]).finally(() => {
         settled = true;
       });
-      await until(async () => (await countWaitingOnLocks(app().database.superuser)) > 0);
+      await until(async () => (await countWaitingOnLocks(served().database.superuser)) > 0);
       expect(settled).toBe(false);
 
       letGo();
@@ -1624,13 +1635,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
   describe("reconcile-watermark — the reconciler on demand, the restore's path", () => {
     it("refuses without a repositories' root, having no bundle to reconcile", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
       const run = await opsWith(
-        app(),
+        served(),
         ["reconcile-watermark", "--workspace", workspaceId],
         { doors: { git: undefined } },
-        app().database.superuser,
+        served().database.superuser,
       );
 
       expect(run.exitCode).toBe(1);
@@ -1640,14 +1651,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("refuses a missing repositories' root directory, naming it", async () => {
-      const { workspaceId } = await app().provision();
-      const missing = `${app().gitStoreDir}/does-not-exist`;
+      const { workspaceId } = await served().provision();
+      const missing = `${served().gitStoreDir}/does-not-exist`;
 
       const run = await opsWith(
-        app(),
+        served(),
         ["reconcile-watermark", "--workspace", workspaceId],
-        { doors: doorsFor(app().database.superuser, { gitStoreDir: missing }) },
-        app().database.superuser,
+        { doors: doorsFor(served().database.superuser, { gitStoreDir: missing }) },
+        served().database.superuser,
       );
 
       expect(run.exitCode).toBe(1);
@@ -1657,25 +1668,25 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("answers usage to a non-id workspace before opening anything", async () => {
-      const run = await ops(app(), ["reconcile-watermark", "--workspace", "ws_synthetic"]);
+      const run = await ops(served(), ["reconcile-watermark", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
     });
 
     it("refuses a missing repository, which means an unrestored store", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await ops(app(), ["reconcile-watermark", "--workspace", workspaceId]);
+      const run = await ops(served(), ["reconcile-watermark", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.precondition);
       expect(run.lines).toEqual(["reconcile-watermark: REFUSED — no-such-repository"]);
     });
 
     it("exits 0 when rows and bundle agree, reporting its findings", async () => {
-      const { workspaceId } = await app().provision();
-      await initRepository(openTestGit(app()), workspaceId);
+      const { workspaceId } = await served().provision();
+      await initRepository(openTestGit(served()), workspaceId);
 
-      const run = await ops(app(), ["reconcile-watermark", "--workspace", workspaceId]);
+      const run = await ops(served(), ["reconcile-watermark", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
@@ -1684,9 +1695,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("replays a missed commit and lands its concept's row", async () => {
-      const { workspaceId, sha } = await replayedAfterTheWindow(app(), restoreDrillNote);
+      const { workspaceId, sha } = await replayedAfterTheWindow(served(), restoreDrillNote);
 
-      const landed = await app().database.superuser.query<{ path: string; commit_sha: string }>(
+      const landed = await served().database.superuser.query<{ path: string; commit_sha: string }>(
         "SELECT path, commit_sha FROM concept_index WHERE workspace_id = $1",
         [workspaceId],
       );
@@ -1694,10 +1705,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("refuses a diverged history, exiting as a precondition", async () => {
-      const { workspaceId } = await replayedAfterTheWindow(app(), restoreDrillNote);
-      await divergeHistory(openTestGit(app()), workspaceId);
+      const { workspaceId } = await replayedAfterTheWindow(served(), restoreDrillNote);
+      await divergeHistory(openTestGit(served()), workspaceId);
 
-      const run = await ops(app(), ["reconcile-watermark", "--workspace", workspaceId]);
+      const run = await ops(served(), ["reconcile-watermark", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.precondition);
       expect(run.lines).toEqual(["reconcile-watermark: REFUSED — history-diverged"]);
@@ -1705,7 +1716,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("replays a missed manifest commit, landing its row, no concept", async () => {
       const { workspaceId, admin, sha } = await replayedAfterTheWindow(
-        app(),
+        served(),
         (principal, doors, author) =>
           writeManifest(principal, doors, {
             manifest: {
@@ -1720,7 +1731,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           }),
       );
 
-      const rows = await app().database.superuser.query<Record<string, unknown>>(
+      const rows = await served().database.superuser.query<Record<string, unknown>>(
         `SELECT c.sha, c.parent_sha, c.actor, e.action, e.detail,
                 (SELECT count(*)::int FROM concept_index i WHERE i.workspace_id = c.workspace_id) AS concepts
            FROM bundle_commit c
@@ -1743,7 +1754,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
   describe("smoke — the platform answers through its interface", () => {
     it("passes against the running api's health, metadata, challenge and shell", async () => {
-      const run = await ops(app(), ["smoke", "--url", PUBLIC_URL, "--find", "--guide", "--ask"]);
+      const run = await ops(served(), ["smoke", "--url", PUBLIC_URL, "--find", "--guide", "--ask"]);
 
       expect(run.lines.filter((line) => line.startsWith("FAIL"))).toEqual([]);
       expect(run.exitCode).toBe(0);
@@ -1755,19 +1766,23 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("passes on the loopback, sending the app hostname as Host", async () => {
       let listener: ReturnType<typeof serve> | undefined;
       const port = await new Promise<number>((resolve) => {
-        listener = serve({ fetch: app().server.fetch, port: 0, hostname: "127.0.0.1" }, (info) =>
+        listener = serve({ fetch: served().server.fetch, port: 0, hostname: "127.0.0.1" }, (info) =>
           resolve(info.port),
         );
       });
       const url = `http://127.0.0.1:${port}`;
       try {
-        const io = ioFor(app());
+        const io = ioFor(served());
         const withHost: OpsIo = { ...io, fetch: fetchHonouringHost };
-        const doors = doorsFrom(app(), app().database.pool);
+        const doors = doorsFrom(served(), served().database.pool);
         expect(await runOps(["smoke", "--url", url], doors, withHost)).toBe(0);
         expect(io.lines.filter((line) => line.startsWith("FAIL"))).toEqual([]);
 
-        const bare: OpsIo = { ...ioFor(app()), fetch: fetchHonouringHost, appHostname: undefined };
+        const bare: OpsIo = {
+          ...ioFor(served()),
+          fetch: fetchHonouringHost,
+          appHostname: undefined,
+        };
         expect(await runOps(["smoke", "--url", url], doors, bare)).toBe(1);
       } finally {
         await new Promise<void>((resolve) => listener?.close(() => resolve()));
@@ -1775,7 +1790,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("fails when the surface does not answer", async () => {
-      const run = await ops(app(), ["smoke", "--url", "https://nowhere.example.test"]);
+      const run = await ops(served(), ["smoke", "--url", "https://nowhere.example.test"]);
 
       expect(run.exitCode).toBe(1);
     });
@@ -1800,7 +1815,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("names each table holding a token, with counts, or absent", async () => {
       const run = await ops(
-        app(),
+        served(),
         ["dump-grep", "--tokens", "jane@example.test,nobody@example.test"],
         dump,
       );
@@ -1826,7 +1841,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "",
       ].join("\n");
 
-      const run = await ops(app(), ["dump-grep", "--tokens", "jane@example.test"], outside);
+      const run = await ops(served(), ["dump-grep", "--tokens", "jane@example.test"], outside);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual(["jane…st: present in 1 line(s) outside any COPY section"]);
@@ -1840,7 +1855,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "",
       ].join("\n");
 
-      const run = await ops(app(), ["dump-grep", "--tokens", "jane@example.test"], partitioned);
+      const run = await ops(served(), ["dump-grep", "--tokens", "jane@example.test"], partitioned);
 
       expect(run.lines).toEqual([
         'jane…st: present in 1 line(s) of table index."passage_01K5ZQ8WJ6T3M4N7P9R2S0V1X"',
@@ -1849,7 +1864,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("counts and reports a token named twice only once", async () => {
       const run = await ops(
-        app(),
+        served(),
         ["dump-grep", "--tokens", "other@example.test,other@example.test"],
         dump,
       );
@@ -1860,7 +1875,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("reports each distinct token once, in the order first named", async () => {
       const run = await ops(
-        app(),
+        served(),
         ["dump-grep", "--tokens", "other@example.test,nobody@example.test,other@example.test"],
         dump,
       );
@@ -1873,7 +1888,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("never counts the COPY header's column names as a row", async () => {
-      const run = await ops(app(), ["dump-grep", "--tokens", "id"], dump);
+      const run = await ops(served(), ["dump-grep", "--tokens", "id"], dump);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual(["id: absent"]);
@@ -1895,10 +1910,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
     };
 
     it("stands up workspace, partition, member, config, audit log and repository", async () => {
-      const admin = await app().person(undefined, "Priya Shah");
+      const admin = await served().person(undefined, "Priya Shah");
       const shortName = aShortName();
 
-      const run = await provisioning(app(), [
+      const run = await provisioning(served(), [
         "--name",
         "Acme",
         "--short-name",
@@ -1912,29 +1927,29 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         `provision-workspace: done — ${id}, short name ${shortName}, Admin ${admin.email}`,
       ]);
-      expect(await standingOf(app(), id)).toEqual([
+      expect(await standingOf(served(), id)).toEqual([
         { name: "Acme", shortName, partition: true, ttl: "300000" },
       ]);
-      expect(await membersOf(app(), id, admin.id)).toEqual([
+      expect(await membersOf(served(), id, admin.id)).toEqual([
         { id: matching.stringMatching(ULID_SHAPE), role: "Admin" },
       ]);
-      expect(await rowsOfAction(app(), id, "platform.workspace.provisioned")).toEqual([
+      expect(await rowsOfAction(served(), id, "platform.workspace.provisioned")).toEqual([
         {
           actor: BOOTSTRAP_ACTOR,
           subject_id: id,
           detail: { adminUserId: admin.id, role: "Admin" },
         },
       ]);
-      const reconciled = await ops(app(), ["reconcile-watermark", "--workspace", id]);
+      const reconciled = await ops(served(), ["reconcile-watermark", "--workspace", id]);
       expect(reconciled.lines).toEqual([
         "reconcile-watermark: done — head none, watermark none, replayed 0, already landed 0",
       ]);
     });
 
     it("resolves the Admin's email regardless of case, as sign-in does", async () => {
-      const admin = await app().person("Priya.Shah@Acme.Invalid");
+      const admin = await served().person("Priya.Shah@Acme.Invalid");
 
-      const run = await provisioning(app(), [
+      const run = await provisioning(served(), [
         "--name",
         "Acme",
         "--short-name",
@@ -1944,7 +1959,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
 
       expect(run.exitCode).toBe(0);
-      expect(await membersOf(app(), idOnTheDoneLine(run), admin.id)).toEqual([
+      expect(await membersOf(served(), idOnTheDoneLine(run), admin.id)).toEqual([
         { id: matching.stringMatching(ULID_SHAPE), role: "Admin" },
       ]);
     });
@@ -1952,7 +1967,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("refuses no-such-user, says what to do next, writes nothing", async () => {
       const shortName = aShortName();
 
-      const run = await provisioning(app(), [
+      const run = await provisioning(served(), [
         "--name",
         "Acme",
         "--short-name",
@@ -1965,14 +1980,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         "provision-workspace: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
       ]);
-      expect(await workspacesWithShortName(app(), shortName)).toBe(0);
+      expect(await workspacesWithShortName(served(), shortName)).toBe(0);
     });
 
     it("refuses no-display-name, says what to do next, writes nothing", async () => {
-      const admin = await app().person(undefined, "");
+      const admin = await served().person(undefined, "");
       const shortName = aShortName();
 
-      const run = await provisioning(app(), [
+      const run = await provisioning(served(), [
         "--name",
         "Acme",
         "--short-name",
@@ -1985,15 +2000,15 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         `provision-workspace: REFUSED — no-display-name: ${admin.email} has given no display name; have them sign in and give one, then run this again`,
       ]);
-      expect(await workspacesWithShortName(app(), shortName)).toBe(0);
-      expect(await workspaceCountOf(app(), admin.id)).toBe(0);
+      expect(await workspacesWithShortName(served(), shortName)).toBe(0);
+      expect(await workspaceCountOf(served(), admin.id)).toBe(0);
     });
 
     it("refuses slug-taken for a held short name, writing nothing", async () => {
-      const first = await app().person();
-      const second = await app().person();
+      const first = await served().person();
+      const second = await served().person();
       const shortName = aShortName();
-      const held = await provisioning(app(), [
+      const held = await provisioning(served(), [
         "--name",
         "One",
         "--short-name",
@@ -2003,7 +2018,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
       expect(held.exitCode).toBe(0);
 
-      const run = await provisioning(app(), [
+      const run = await provisioning(served(), [
         "--name",
         "Two",
         "--short-name",
@@ -2016,14 +2031,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         `provision-workspace: REFUSED — slug-taken: another workspace already holds the short name ${shortName}`,
       ]);
-      expect(await workspacesWithShortName(app(), shortName)).toBe(1);
-      expect(await workspaceCountOf(app(), second.id)).toBe(0);
+      expect(await workspacesWithShortName(served(), shortName)).toBe(1);
+      expect(await workspaceCountOf(served(), second.id)).toBe(0);
     });
 
     it("refuses malformed for a blank name or short name", async () => {
-      const admin = await app().person();
+      const admin = await served().person();
 
-      const run = await provisioning(app(), [
+      const run = await provisioning(served(), [
         "--name",
         "   ",
         "--short-name",
@@ -2036,15 +2051,15 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         "provision-workspace: REFUSED — malformed: the name and the short name must each carry at least one character",
       ]);
-      expect(await workspaceCountOf(app(), admin.id)).toBe(0);
+      expect(await workspaceCountOf(served(), admin.id)).toBe(0);
     });
 
     it("refuses without a repositories' root, before writing anything", async () => {
-      const admin = await app().person();
+      const admin = await served().person();
       const shortName = aShortName();
 
       const run = await opsWith(
-        app(),
+        served(),
         [
           "provision-workspace",
           "--name",
@@ -2059,7 +2074,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(1);
       expect(run.lines.join("\n")).toContain("GIT_STORE_DIR");
-      expect(await workspacesWithShortName(app(), shortName)).toBe(0);
+      expect(await workspacesWithShortName(served(), shortName)).toBe(0);
     });
 
     it.each([
@@ -2068,7 +2083,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ["no --short-name", ["--name", "Acme", "--admin", "a@b.c"]],
       ["no --name", ["--short-name", "acme", "--admin", "a@b.c"]],
     ])("answers usage to %s, reading nothing", async (_shape, flags) => {
-      const run = await ops(app(), ["provision-workspace", ...flags]);
+      const run = await ops(served(), ["provision-workspace", ...flags]);
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual([
@@ -2077,7 +2092,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("names both commands in the usage", async () => {
-      const run = await ops(app(), ["help"]);
+      const run = await ops(served(), ["help"]);
 
       expect(run.lines.join("\n")).toContain(
         "provision-workspace --name <name> --short-name <short name> --admin <email>",
@@ -2092,110 +2107,110 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it.each(["Admin", "Editor", "Viewer"])(
       "makes a person a %s member, with audit events",
       async (role) => {
-        const { workspaceId } = await app().provision();
-        const person = await app().person();
+        const { workspaceId } = await served().provision();
+        const person = await served().person();
 
-        const run = await adding(app(), workspaceId, person.email, role);
+        const run = await adding(served(), workspaceId, person.email, role);
 
         expect(run.exitCode).toBe(0);
         expect(run.lines).toEqual([
           `add-member: done — ${person.email} added to workspace ${workspaceId} as ${role}`,
         ]);
-        expect(await membersOf(app(), workspaceId, person.id)).toEqual([
+        expect(await membersOf(served(), workspaceId, person.id)).toEqual([
           { id: matching.stringMatching(ULID_SHAPE), role },
         ]);
-        expect(await rowsOfAction(app(), workspaceId, "people.member.added")).toEqual([
+        expect(await rowsOfAction(served(), workspaceId, "people.member.added")).toEqual([
           { actor: BOOTSTRAP_ACTOR, subject_id: person.id, detail: { userId: person.id, role } },
         ]);
       },
     );
 
     it("resolves the email without regard to case, as sign-in does", async () => {
-      const { workspaceId } = await app().provision();
-      const person = await app().person("Sam.Okoro@Acme.Invalid");
+      const { workspaceId } = await served().provision();
+      const person = await served().person("Sam.Okoro@Acme.Invalid");
 
-      const run = await adding(app(), workspaceId, "sam.okoro@acme.invalid", "Viewer");
+      const run = await adding(served(), workspaceId, "sam.okoro@acme.invalid", "Viewer");
 
       expect(run.exitCode).toBe(0);
-      expect(await membersOf(app(), workspaceId, person.id)).toEqual([
+      expect(await membersOf(served(), workspaceId, person.id)).toEqual([
         { id: matching.stringMatching(ULID_SHAPE), role: "Viewer" },
       ]);
     });
 
     it("refuses no-such-user, says what to do next, writes nothing", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await adding(app(), workspaceId, "nobody@acme.invalid", "Editor");
+      const run = await adding(served(), workspaceId, "nobody@acme.invalid", "Editor");
 
       expect(run.exitCode).toBe(6);
       expect(run.lines).toEqual([
         "add-member: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
       ]);
-      expect(await rowsOfAction(app(), workspaceId, "people.member.added")).toEqual([]);
+      expect(await rowsOfAction(served(), workspaceId, "people.member.added")).toEqual([]);
     });
 
     it("refuses no-display-name, says what to do next, writes nothing", async () => {
-      const { workspaceId } = await app().provision();
-      const person = await app().person(undefined, "");
+      const { workspaceId } = await served().provision();
+      const person = await served().person(undefined, "");
 
-      const run = await adding(app(), workspaceId, person.email, "Editor");
+      const run = await adding(served(), workspaceId, person.email, "Editor");
 
       expect(run.exitCode).toBe(9);
       expect(run.lines).toEqual([
         `add-member: REFUSED — no-display-name: ${person.email} has given no display name; have them sign in and give one, then run this again`,
       ]);
-      expect(await workspaceCountOf(app(), person.id)).toBe(0);
-      expect(await rowsOfAction(app(), workspaceId, "people.member.added")).toEqual([]);
+      expect(await workspaceCountOf(served(), person.id)).toBe(0);
+      expect(await rowsOfAction(served(), workspaceId, "people.member.added")).toEqual([]);
     });
 
     it("refuses no-such-workspace for an unknown id, and writes nothing", async () => {
-      const person = await app().person();
+      const person = await served().person();
       const nowhere = ulid();
 
-      const run = await adding(app(), nowhere, person.email, "Editor");
+      const run = await adding(served(), nowhere, person.email, "Editor");
 
       expect(run.exitCode).toBe(6);
       expect(run.lines).toEqual([
         `add-member: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
       ]);
-      expect(await workspaceCountOf(app(), person.id)).toBe(0);
-      expect(await auditLogOf(app(), nowhere)).toEqual([]);
+      expect(await workspaceCountOf(served(), person.id)).toBe(0);
+      expect(await auditLogOf(served(), nowhere)).toEqual([]);
     });
 
     it("refuses already-a-member on any repeat, never changing a role", async () => {
-      const { workspaceId, admin } = await app().provision();
-      const person = await app().person();
-      expect((await adding(app(), workspaceId, person.email, "Editor")).exitCode).toBe(0);
+      const { workspaceId, admin } = await served().provision();
+      const person = await served().person();
+      expect((await adding(served(), workspaceId, person.email, "Editor")).exitCode).toBe(0);
 
-      const again = await adding(app(), workspaceId, person.email, "Admin");
-      const theAdmin = await adding(app(), workspaceId, admin.email, "Viewer");
+      const again = await adding(served(), workspaceId, person.email, "Admin");
+      const theAdmin = await adding(served(), workspaceId, admin.email, "Viewer");
 
       expect([again.exitCode, theAdmin.exitCode]).toEqual([8, 8]);
       expect(again.lines).toEqual([
         `add-member: REFUSED — already-a-member: ${person.email} is already a member of workspace ${workspaceId}; a role change is the Admin's action on the People page`,
       ]);
-      expect((await membersOf(app(), workspaceId, person.id)).map((row) => row.role)).toEqual([
+      expect((await membersOf(served(), workspaceId, person.id)).map((row) => row.role)).toEqual([
         "Editor",
       ]);
-      expect((await membersOf(app(), workspaceId, admin.id)).map((row) => row.role)).toEqual([
+      expect((await membersOf(served(), workspaceId, admin.id)).map((row) => row.role)).toEqual([
         "Admin",
       ]);
-      expect(await rowsOfAction(app(), workspaceId, "people.member.added")).toHaveLength(1);
+      expect(await rowsOfAction(served(), workspaceId, "people.member.added")).toHaveLength(1);
     });
 
     it("answers usage to a fourth role word, and writes nothing", async () => {
-      const { workspaceId } = await app().provision();
-      const person = await app().person();
+      const { workspaceId } = await served().provision();
+      const person = await served().person();
 
-      const run = await adding(app(), workspaceId, person.email, "Owner");
+      const run = await adding(served(), workspaceId, person.email, "Owner");
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual(["add-member: --role must be one of Admin, Editor, Viewer"]);
-      expect(await membersOf(app(), workspaceId, person.id)).toEqual([]);
+      expect(await membersOf(served(), workspaceId, person.id)).toEqual([]);
     });
 
     it("answers usage to a non-id workspace or a missing flag", async () => {
-      const notAnId = await ops(app(), [
+      const notAnId = await ops(served(), [
         "add-member",
         "--workspace",
         "ws_synthetic",
@@ -2204,7 +2219,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "--role",
         "Editor",
       ]);
-      const noEmail = await ops(app(), ["add-member", "--workspace", ulid(), "--role", "Editor"]);
+      const noEmail = await ops(served(), [
+        "add-member",
+        "--workspace",
+        ulid(),
+        "--role",
+        "Editor",
+      ]);
 
       expect([notAnId.exitCode, noEmail.exitCode]).toEqual([2, 2]);
       expect(noEmail.lines).toEqual([
@@ -2254,7 +2275,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("writes the person and its row, its id first", async () => {
       const email = aVerifier();
 
-      const run = await addingPerson(app(), [
+      const run = await addingPerson(served(), [
         "--email",
         email.toUpperCase(),
         "--name",
@@ -2266,31 +2287,31 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         `add-person: done — ${personId}, ${email}, named Matthew Burgess; unverified until their first email-code sign-in`,
       ]);
-      expect(await personsAt(app(), email)).toEqual([
+      expect(await personsAt(served(), email)).toEqual([
         { id: personId, name: "Matthew Burgess", email, email_verified: false },
       ]);
-      expect(await addedRowsAbout(app(), personId)).toEqual([
+      expect(await addedRowsAbout(served(), personId)).toEqual([
         { actor: "process:better-answers-identity", subject_id: personId, detail: {} },
       ]);
     });
 
     it("lets add-member take them, and their sign-in finds them", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
       const email = aVerifier();
-      const added = await addingPerson(app(), ["--email", email, "--name", "Matthew Burgess"]);
+      const added = await addingPerson(served(), ["--email", email, "--name", "Matthew Burgess"]);
       const personId = idOnTheDoneLine(added);
 
-      const member = await adding(app(), workspaceId, email, "Admin");
-      const client = app().client();
-      await signIn(app(), client, email);
+      const member = await adding(served(), workspaceId, email, "Admin");
+      const client = served().client();
+      await signIn(served(), client, email);
 
       expect(member.exitCode).toBe(0);
-      expect(await membersOf(app(), workspaceId, personId)).toEqual([
+      expect(await membersOf(served(), workspaceId, personId)).toEqual([
         { id: matching.stringMatching(ULID_SHAPE), role: "Admin" },
       ]);
       const session = sessionHolder.parse(await (await client.fetch("/get-session")).json());
       expect(session.user).toEqual({ id: personId, name: "Matthew Burgess", emailVerified: true });
-      expect(await personsAt(app(), email)).toEqual([
+      expect(await personsAt(served(), email)).toEqual([
         { id: personId, name: "Matthew Burgess", email, email_verified: true },
       ]);
     });
@@ -2312,23 +2333,23 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "display-name-angle-bracket: a display name is one line of 1 to 100 characters, with no angle brackets or control characters",
       ],
     ])("refuses %s in the malformed class, writing nothing", async (_shape, flags, said) => {
-      const before = await addedRowCount(app());
+      const before = await addedRowCount(served());
 
-      const run = await addingPerson(app(), flags);
+      const run = await addingPerson(served(), flags);
 
       expect(run).toMatchObject({ exitCode: 2, lines: [`add-person: REFUSED — ${said}`] });
-      expect(await personsAt(app(), flags[1] ?? "")).toEqual([]);
-      expect(await addedRowCount(app())).toBe(before);
+      expect(await personsAt(served(), flags[1] ?? "")).toEqual([]);
+      expect(await addedRowCount(served())).toBe(before);
     });
 
     it("refuses person-exists on a repeat or a signed-in address", async () => {
       const email = aVerifier();
-      await addingPerson(app(), ["--email", email, "--name", "Matthew Burgess"]);
-      const signedIn = await app().person(undefined, "Priya Shah");
-      const before = await addedRowCount(app());
+      await addingPerson(served(), ["--email", email, "--name", "Matthew Burgess"]);
+      const signedIn = await served().person(undefined, "Priya Shah");
+      const before = await addedRowCount(served());
 
-      const again = await addingPerson(app(), ["--email", email, "--name", "Matt Burgess"]);
-      const held = await addingPerson(app(), [
+      const again = await addingPerson(served(), ["--email", email, "--name", "Matt Burgess"]);
+      const held = await addingPerson(served(), [
         "--email",
         signedIn.email.toUpperCase(),
         "--name",
@@ -2340,19 +2361,21 @@ describe("pnpm ops — the restore scripts' commands", () => {
         `add-person: REFUSED — person-exists: ${email} is already a person; add-member takes them as they stand`,
         `add-person: REFUSED — person-exists: ${signedIn.email.toUpperCase()} is already a person; add-member takes them as they stand`,
       ]);
-      expect((await personsAt(app(), email)).map((row) => row.name)).toEqual(["Matthew Burgess"]);
-      expect((await personsAt(app(), signedIn.email)).map((row) => row.name)).toEqual([
+      expect((await personsAt(served(), email)).map((row) => row.name)).toEqual([
+        "Matthew Burgess",
+      ]);
+      expect((await personsAt(served(), signedIn.email)).map((row) => row.name)).toEqual([
         "Priya Shah",
       ]);
-      expect(await addedRowCount(app())).toBe(before);
+      expect(await addedRowCount(served())).toBe(before);
     });
 
     it("exits refused, in no word, when the store is unreachable", async () => {
-      const gone = new Pool({ connectionString: app().database.connectionUri, max: 1 });
+      const gone = new Pool({ connectionString: served().database.connectionUri, max: 1 });
       await gone.end();
 
       const run = await opsWith(
-        app(),
+        served(),
         ["add-person", "--email", aVerifier(), "--name", "Matthew Burgess"],
         { doors: { postgres: openPostgres(gone) } },
       );
@@ -2365,7 +2388,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ["no --name", ["--email", "matthew@phew.invalid"]],
       ["no --email", ["--name", "Matthew Burgess"]],
     ])("answers usage to %s", async (_shape, flags) => {
-      const run = await ops(app(), ["add-person", ...flags]);
+      const run = await ops(served(), ["add-person", ...flags]);
 
       expect(run).toMatchObject({
         exitCode: 2,
@@ -2374,7 +2397,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("names the command in the usage", async () => {
-      const run = await ops(app(), ["help"]);
+      const run = await ops(served(), ["help"]);
 
       expect(run.lines.join("\n")).toContain("add-person --email <address> --name <display name>");
     });
@@ -2407,13 +2430,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       "rename-workspace: REFUSED — malformed: give --workspace a workspace id, and --name, --short-name or both a value that is not blank";
 
     it("renames the name, short name or both, recording each change", async () => {
-      const { workspaceId, shortName } = await app().provision({ name: "Acme" });
+      const { workspaceId, shortName } = await served().provision({ name: "Acme" });
       const [first, second] = [aShortName(), aShortName()];
 
       const runs = [
-        await renaming(app(), workspaceId, ["--name", "Acme Group"]),
-        await renaming(app(), workspaceId, ["--short-name", first]),
-        await renaming(app(), workspaceId, ["--name", "Acme Ltd", "--short-name", second]),
+        await renaming(served(), workspaceId, ["--name", "Acme Group"]),
+        await renaming(served(), workspaceId, ["--short-name", first]),
+        await renaming(served(), workspaceId, ["--name", "Acme Ltd", "--short-name", second]),
       ];
 
       expect(runs.map((run) => run.exitCode)).toEqual([0, 0, 0]);
@@ -2428,7 +2451,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           `rename-workspace: done — workspace ${workspaceId} is named Acme Ltd, short name ${second}`,
         ],
       ]);
-      expect(await outcomeOf(app(), workspaceId)).toEqual({
+      expect(await outcomeOf(served(), workspaceId)).toEqual({
         standing: [{ name: "Acme Ltd", shortName: second }],
         renamed: [
           renamedEvent(workspaceId, {
@@ -2448,25 +2471,30 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("takes back its own short name without refusing, writing nothing", async () => {
-      const { workspaceId, shortName } = await app().provision({ name: "Acme" });
+      const { workspaceId, shortName } = await served().provision({ name: "Acme" });
 
-      const run = await renaming(app(), workspaceId, ["--name", "Acme", "--short-name", shortName]);
+      const run = await renaming(served(), workspaceId, [
+        "--name",
+        "Acme",
+        "--short-name",
+        shortName,
+      ]);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
         `rename-workspace: done — workspace ${workspaceId} is named Acme, short name ${shortName}`,
       ]);
-      expect(await outcomeOf(app(), workspaceId)).toEqual({
+      expect(await outcomeOf(served(), workspaceId)).toEqual({
         standing: [{ name: "Acme", shortName }],
         renamed: [],
       });
     });
 
     it("refuses slug-taken for another workspace's short name", async () => {
-      const taken = (await app().provision()).shortName;
-      const { workspaceId, shortName } = await app().provision({ name: "Acme" });
+      const taken = (await served().provision()).shortName;
+      const { workspaceId, shortName } = await served().provision({ name: "Acme" });
 
-      const run = await renaming(app(), workspaceId, [
+      const run = await renaming(served(), workspaceId, [
         "--name",
         "Acme Group",
         "--short-name",
@@ -2477,7 +2505,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         "rename-workspace: REFUSED — slug-taken: another workspace already holds that short name",
       ]);
-      expect(await outcomeOf(app(), workspaceId)).toEqual({
+      expect(await outcomeOf(served(), workspaceId)).toEqual({
         standing: [{ name: "Acme", shortName }],
         renamed: [],
       });
@@ -2486,13 +2514,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("refuses no-such-workspace for an unknown id, and writes nothing", async () => {
       const nowhere = ulid();
 
-      const run = await renaming(app(), nowhere, ["--name", "Acme Group"]);
+      const run = await renaming(served(), nowhere, ["--name", "Acme Group"]);
 
       expect(run.exitCode).toBe(6);
       expect(run.lines).toEqual([
         `rename-workspace: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
       ]);
-      expect(await auditLogOf(app(), nowhere)).toEqual([]);
+      expect(await auditLogOf(served(), nowhere)).toEqual([]);
     });
 
     it.each([
@@ -2500,22 +2528,22 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ["a blank short name", ["--name", "Acme Group", "--short-name", " "]],
       ["neither --name nor --short-name", []],
     ])("refuses malformed for %s, changing nothing", async (_shape, flags) => {
-      const { workspaceId, shortName } = await app().provision({ name: "Acme" });
+      const { workspaceId, shortName } = await served().provision({ name: "Acme" });
 
-      const run = await renaming(app(), workspaceId, flags);
+      const run = await renaming(served(), workspaceId, flags);
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 2,
         lines: [MALFORMED],
       });
-      expect(await outcomeOf(app(), workspaceId)).toEqual({
+      expect(await outcomeOf(served(), workspaceId)).toEqual({
         standing: [{ name: "Acme", shortName }],
         renamed: [],
       });
     });
 
     it("refuses malformed for a workspace that is not an id", async () => {
-      const run = await renaming(app(), "ws_synthetic", ["--name", "Acme Group"]);
+      const run = await renaming(served(), "ws_synthetic", ["--name", "Acme Group"]);
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 2,
@@ -2527,7 +2555,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ["no flags at all", []],
       ["no --workspace", ["--name", "Acme Group", "--short-name", "acme"]],
     ])("answers usage to %s, reading nothing", async (_shape, flags) => {
-      const run = await ops(app(), ["rename-workspace", ...flags]);
+      const run = await ops(served(), ["rename-workspace", ...flags]);
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual([
@@ -2536,7 +2564,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("names the command in the usage", async () => {
-      const run = await ops(app(), ["help"]);
+      const run = await ops(served(), ["help"]);
 
       expect(run.lines.join("\n")).toContain(
         "rename-workspace --workspace <id> [--name <name>] [--short-name <short name>]",
@@ -2595,69 +2623,69 @@ describe("pnpm ops — the restore scripts' commands", () => {
       "set-model-key: REFUSED — malformed: give --workspace a workspace id, --provider one of anthropic · mistral · cloudflare, and on standard input one key with no space or line break in it, for cloudflare the account id, a colon, then the API token";
 
     it("seals the key typed on standard input, recording the provider", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await setting(app(), workspaceId, `${A_KEY}\n`);
+      const run = await setting(served(), workspaceId, `${A_KEY}\n`);
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 0,
         lines: [`set-model-key: done — workspace ${workspaceId} holds a new key for anthropic`],
       });
-      expect(await keyHeld(app(), workspaceId, "anthropic")).toBe(A_KEY);
-      expect(await rowsOfAction(app(), workspaceId, ACTION)).toEqual([
+      expect(await keyHeld(served(), workspaceId, "anthropic")).toBe(A_KEY);
+      expect(await rowsOfAction(served(), workspaceId, ACTION)).toEqual([
         setEvent(workspaceId, "anthropic"),
       ]);
     });
 
     it("replaces the key on a second run, keeping one", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      await setting(app(), workspaceId, A_KEY, ["--provider", "mistral"]);
-      const again = await setting(app(), workspaceId, `${A_NEWER_KEY}\r\n`, [
+      await setting(served(), workspaceId, A_KEY, ["--provider", "mistral"]);
+      const again = await setting(served(), workspaceId, `${A_NEWER_KEY}\r\n`, [
         "--provider",
         "mistral",
       ]);
 
       expect(again.exitCode).toBe(0);
-      expect(await rowsHeld(app(), workspaceId)).toHaveLength(1);
-      expect(await keyHeld(app(), workspaceId, "mistral")).toBe(A_NEWER_KEY);
-      expect(await rowsOfAction(app(), workspaceId, ACTION)).toEqual([
+      expect(await rowsHeld(served(), workspaceId)).toHaveLength(1);
+      expect(await keyHeld(served(), workspaceId, "mistral")).toBe(A_NEWER_KEY);
+      expect(await rowsOfAction(served(), workspaceId, ACTION)).toEqual([
         setEvent(workspaceId, "mistral"),
         setEvent(workspaceId, "mistral"),
       ]);
     });
 
     it("says the key in no line, log or row", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const set = await setting(app(), workspaceId, A_KEY);
+      const set = await setting(served(), workspaceId, A_KEY);
       const refusedByTheStore = await whileWritesAreRefused(
-        app().database.superuser,
+        served().database.superuser,
         "model_key",
-        () => setting(app(), workspaceId, A_NEWER_KEY),
+        () => setting(served(), workspaceId, A_NEWER_KEY),
       );
-      const malformed = await setting(app(), workspaceId, `${A_NEWER_KEY} ${A_NEWER_KEY}`);
-      const unsealed = await setting(app(), workspaceId, A_NEWER_KEY, ANTHROPIC, {
+      const malformed = await setting(served(), workspaceId, `${A_NEWER_KEY} ${A_NEWER_KEY}`);
+      const unsealed = await setting(served(), workspaceId, A_NEWER_KEY, ANTHROPIC, {
         modelKeySetting: err("KEK must be set to the envelope key"),
       });
 
-      expect(await keyHeld(app(), workspaceId, "anthropic"), "the key was stored").toBe(A_KEY);
+      expect(await keyHeld(served(), workspaceId, "anthropic"), "the key was stored").toBe(A_KEY);
       expect([set, refusedByTheStore, malformed, unsealed].map((run) => run.exitCode)).toEqual([
         0, 1, 2, 1,
       ]);
       const everythingSaid = [
         JSON.stringify([set, refusedByTheStore, malformed, unsealed]),
-        JSON.stringify(await rowsOfAction(app(), workspaceId, ACTION)),
-        ...(await rowsHeld(app(), workspaceId)).map((row) => row.sealed.toString("latin1")),
+        JSON.stringify(await rowsOfAction(served(), workspaceId, ACTION)),
+        ...(await rowsHeld(served(), workspaceId)).map((row) => row.sealed.toString("latin1")),
       ].join("\n");
       const secrets = [A_KEY, A_NEWER_KEY, KEK, Buffer.from(ENVELOPE_KEY).toString("base64")];
       expect(secrets.filter((secret) => everythingSaid.includes(secret))).toEqual([]);
     });
 
     it("refuses without an envelope key, sealing nothing", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const refused = await setting(app(), workspaceId, A_KEY, ANTHROPIC, {
+      const refused = await setting(served(), workspaceId, A_KEY, ANTHROPIC, {
         modelKeySetting: err("KEK must be set to the envelope key"),
       });
 
@@ -2665,16 +2693,19 @@ describe("pnpm ops — the restore scripts' commands", () => {
         exitCode: 1,
         lines: ["set-model-key: REFUSED — KEK must be set to the envelope key; nothing changed"],
       });
-      expect(await rowsHeld(app(), workspaceId)).toEqual([]);
+      expect(await rowsHeld(served(), workspaceId)).toEqual([]);
     });
 
     it("refuses a Workers AI key lacking its account id, unsaid", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
       const tokenAlone = "invented_Token-u15";
 
-      const refused = await setting(app(), workspaceId, tokenAlone, ["--provider", "cloudflare"]);
+      const refused = await setting(served(), workspaceId, tokenAlone, [
+        "--provider",
+        "cloudflare",
+      ]);
       const accepted = await setting(
-        app(),
+        served(),
         workspaceId,
         `0123456789abcdef0123456789abcdef:${tokenAlone}`,
         ["--provider", "cloudflare"],
@@ -2686,7 +2717,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
       expect(JSON.stringify(refused)).not.toContain(tokenAlone);
       expect(accepted.exitCode).toBe(0);
-      expect(await rowsOfAction(app(), workspaceId, ACTION)).toEqual([
+      expect(await rowsOfAction(served(), workspaceId, ACTION)).toEqual([
         setEvent(workspaceId, "cloudflare"),
       ]);
     });
@@ -2702,7 +2733,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           input: typed,
           env: {
             ...Object.fromEntries(inherited),
-            DATABASE_URL: app().database.connectionUri,
+            DATABASE_URL: served().database.connectionUri,
             ...(kek === undefined ? {} : { KEK: kek }),
           },
         },
@@ -2711,7 +2742,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     };
 
     it("seals through the entrypoint, printing neither key", { timeout: 60_000 }, async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
       const run = throughTheEntrypoint(workspaceId, A_KEY, KEK);
 
@@ -2721,7 +2752,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           `set-model-key: done — workspace ${workspaceId} holds a new key for anthropic`,
         ),
       });
-      expect(await keyHeld(app(), workspaceId, "anthropic")).toBe(A_KEY);
+      expect(await keyHeld(served(), workspaceId, "anthropic")).toBe(A_KEY);
       expect([A_KEY, KEK].filter((secret) => run.printed.includes(secret))).toEqual([]);
     });
 
@@ -2729,7 +2760,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ["no `KEK`", undefined],
       ["a malformed `KEK`", "not-an-envelope-key-u9"],
     ])("refuses at the entrypoint with %s", { timeout: 60_000 }, async (_shape, kek) => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
       const run = throughTheEntrypoint(workspaceId, A_KEY, kek);
 
@@ -2742,7 +2773,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(
         [A_KEY, "not-an-envelope-key-u9"].filter((said) => run.printed.includes(said)),
       ).toEqual([]);
-      expect(await rowsHeld(app(), workspaceId)).toEqual([]);
+      expect(await rowsHeld(served(), workspaceId)).toEqual([]);
     });
 
     it.each([
@@ -2751,44 +2782,44 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ["a key over two lines", "sk-test\nu9", ["--provider", "anthropic"]],
       ["an unknown model provider", A_KEY, ["--provider", "openai"]],
     ])("refuses malformed for %s, changing nothing", async (_shape, typed, flags) => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await setting(app(), workspaceId, typed, flags);
+      const run = await setting(served(), workspaceId, typed, flags);
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 2,
         lines: [MALFORMED],
       });
-      expect(await rowsHeld(app(), workspaceId)).toEqual([]);
-      expect(await rowsOfAction(app(), workspaceId, ACTION)).toEqual([]);
+      expect(await rowsHeld(served(), workspaceId)).toEqual([]);
+      expect(await rowsOfAction(served(), workspaceId, ACTION)).toEqual([]);
     });
 
     it("refuses no-such-workspace for an unknown id, writing nothing", async () => {
       const nowhere = ulid();
 
-      const run = await setting(app(), nowhere, A_KEY);
+      const run = await setting(served(), nowhere, A_KEY);
 
       expect(run.exitCode).toBe(6);
       expect(run.lines).toEqual([
         `set-model-key: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
       ]);
-      expect(await auditLogOf(app(), nowhere)).toEqual([]);
+      expect(await auditLogOf(served(), nowhere)).toEqual([]);
     });
 
     it("answers usage with no --provider, reading nothing", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await setting(app(), workspaceId, A_KEY, []);
+      const run = await setting(served(), workspaceId, A_KEY, []);
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual([
         "set-model-key: --workspace <id> and --provider <anthropic|mistral|cloudflare> are required, with the key on standard input",
       ]);
-      expect(await rowsHeld(app(), workspaceId)).toEqual([]);
+      expect(await rowsHeld(served(), workspaceId)).toEqual([]);
     });
 
     it("names the command in the usage", async () => {
-      const run = await ops(app(), ["help"]);
+      const run = await ops(served(), ["help"]);
 
       expect(run.lines.join("\n")).toContain(
         "set-model-key --workspace <id> --provider <anthropic|mistral|cloudflare>",
@@ -2809,10 +2840,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ops(app, ["set-spending-limit", "--workspace", workspaceId, "--gbp", gbp]);
 
     it("sets the limit, and a second run replaces it", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const first = await limiting(app(), workspaceId, "50");
-      const again = await limiting(app(), workspaceId, "12.50");
+      const first = await limiting(served(), workspaceId, "50");
+      const again = await limiting(served(), workspaceId, "12.50");
 
       expect({ exitCode: first.exitCode, lines: first.lines }).toEqual({
         exitCode: 0,
@@ -2821,17 +2852,17 @@ describe("pnpm ops — the restore scripts' commands", () => {
         ],
       });
       expect(again.exitCode).toBe(0);
-      expect(await limitHeld(app(), workspaceId)).toEqual(["12.50"]);
+      expect(await limitHeld(served(), workspaceId)).toEqual(["12.50"]);
       const set = { actor: BOOTSTRAP_ACTOR, subject_id: workspaceId, detail: {} };
       expect(
-        await rowsOfAction(app(), workspaceId, "platform.workspace.spending_limit_set"),
+        await rowsOfAction(served(), workspaceId, "platform.workspace.spending_limit_set"),
       ).toEqual([set, set]);
     });
 
     it("refuses malformed for a sum that is not pounds", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await limiting(app(), workspaceId, "fifty");
+      const run = await limiting(served(), workspaceId, "fifty");
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 2,
@@ -2839,13 +2870,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "set-spending-limit: REFUSED — malformed: give --workspace a workspace id and --gbp a sum in pounds, such as 50 or 12.50",
         ],
       });
-      expect(await limitHeld(app(), workspaceId)).toEqual([]);
+      expect(await limitHeld(served(), workspaceId)).toEqual([]);
     });
 
     it("refuses no-such-workspace for an unknown id", async () => {
       const nowhere = ulid();
 
-      const run = await limiting(app(), nowhere, "50");
+      const run = await limiting(served(), nowhere, "50");
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 6,
@@ -2882,35 +2913,35 @@ describe("pnpm ops — the restore scripts' commands", () => {
     };
 
     it("sets the price, and a same-day run replaces it", async () => {
-      const first = await pricing(app(), "2026-10-14");
-      const again = await pricing(app(), "2026-10-14", "2.5", "12");
+      const first = await pricing(served(), "2026-10-14");
+      const again = await pricing(served(), "2026-10-14", "2.5", "12");
 
       expect({ exitCode: first.exitCode, lines: first.lines }).toEqual({
         exitCode: 0,
         lines: [`set-model-price: done — anthropic ${SONNET} is priced from 2026-10-14`],
       });
       expect(again.exitCode).toBe(0);
-      expect(await pricesHeld(app())).toEqual([
+      expect(await pricesHeld(served())).toEqual([
         { from: "2026-10-14", gbp_per_million_in: "2.5", gbp_per_million_out: "12" },
       ]);
     });
 
     it("refuses malformed for a day the calendar lacks", async () => {
-      const before = await pricesHeld(app());
+      const before = await pricesHeld(served());
 
-      const run = await pricing(app(), "2026-02-30");
+      const run = await pricing(served(), "2026-02-30");
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual([
         matching.stringMatching(/^set-model-price: REFUSED — malformed: /),
       ]);
-      expect(await pricesHeld(app())).toEqual(before);
+      expect(await pricesHeld(served())).toEqual(before);
     });
 
     it("answers usage with a rate missing, writing nothing", async () => {
-      const before = await pricesHeld(app());
+      const before = await pricesHeld(served());
 
-      const run = await ops(app(), [
+      const run = await ops(served(), [
         "set-model-price",
         "--provider",
         "anthropic",
@@ -2919,11 +2950,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
 
       expect(run.exitCode).toBe(2);
-      expect(await pricesHeld(app())).toEqual(before);
+      expect(await pricesHeld(served())).toEqual(before);
     });
 
     it("names both spend commands in the usage", async () => {
-      const run = await ops(app(), ["help"]);
+      const run = await ops(served(), ["help"]);
 
       expect(run.lines.join("\n")).toContain("set-spending-limit --workspace <id> --gbp <pounds>");
       expect(run.lines.join("\n")).toContain(
@@ -2962,8 +2993,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("sets the threshold, and a second run replaces it", async () => {
       const model = aModel();
 
-      const first = await thresholding(app(), "cloudflare", model, "0.7");
-      const again = await thresholding(app(), "cloudflare", model, "0.65");
+      const first = await thresholding(served(), "cloudflare", model, "0.7");
+      const again = await thresholding(served(), "cloudflare", model, "0.65");
 
       expect([first, again].map(({ exitCode, lines }) => ({ exitCode, lines }))).toEqual([
         {
@@ -2975,7 +3006,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           lines: [`set-decision-threshold: done — cloudflare ${model} judges at 0.65`],
         },
       ]);
-      expect(await thresholdsHeld(app(), model)).toEqual([
+      expect(await thresholdsHeld(served(), model)).toEqual([
         { provider: "cloudflare", threshold: 0.65 },
       ]);
     });
@@ -2983,7 +3014,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("refuses a threshold outside nought and one, writing nothing", async () => {
       const model = aModel();
 
-      const run = await thresholding(app(), "cloudflare", model, "1");
+      const run = await thresholding(served(), "cloudflare", model, "1");
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 2,
@@ -2991,13 +3022,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "set-decision-threshold: REFUSED — malformed: --provider <cloudflare>, --model <model> and --threshold <probability>, the model lower case letters, digits, dots and hyphens and the threshold a decimal between 0 and 1, such as 0.7",
         ],
       });
-      expect(await thresholdsHeld(app(), model)).toEqual([]);
+      expect(await thresholdsHeld(served(), model)).toEqual([]);
     });
 
     it("refuses anthropic as not a decision model", async () => {
       const model = aModel();
 
-      const run = await thresholding(app(), "anthropic", model, "0.7");
+      const run = await thresholding(served(), "anthropic", model, "0.7");
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 7,
@@ -3005,20 +3036,20 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "set-decision-threshold: REFUSED — not-a-decision-model: anthropic speaks no decision shape; only cloudflare take a threshold; nothing changed",
         ],
       });
-      expect(await thresholdsHeld(app(), model)).toEqual([]);
+      expect(await thresholdsHeld(served(), model)).toEqual([]);
     });
 
     it("answers usage with the threshold missing, as help names it", async () => {
       const model = aModel();
 
-      const run = await ops(app(), [
+      const run = await ops(served(), [
         "set-decision-threshold",
         "--provider",
         "cloudflare",
         "--model",
         model,
       ]);
-      const help = await ops(app(), ["help"]);
+      const help = await ops(served(), ["help"]);
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 2,
@@ -3026,7 +3057,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "set-decision-threshold: --provider <cloudflare>, --model <model> and --threshold <probability> are required",
         ],
       });
-      expect(await thresholdsHeld(app(), model)).toEqual([]);
+      expect(await thresholdsHeld(served(), model)).toEqual([]);
       expect(help.lines.join("\n")).toContain(
         "set-decision-threshold --provider <cloudflare> --model <model> --threshold <probability>",
       );
@@ -3078,10 +3109,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
 
     it("stores a priced model of a named sub-processor", async () => {
-      const { workspaceId } = await app().provision();
-      expect((await priced(app())).exitCode).toBe(0);
+      const { workspaceId } = await served().provision();
+      expect((await priced(served())).exitCode).toBe(0);
 
-      const run = await choosing(app(), workspaceId, "anthropic");
+      const run = await choosing(served(), workspaceId, "anthropic");
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 0,
@@ -3089,24 +3120,24 @@ describe("pnpm ops — the restore scripts' commands", () => {
           `set-model-choice: done — workspace ${workspaceId} calls anthropic ${HAIKU} for judging`,
         ],
       });
-      expect(await choicesHeld(app(), workspaceId)).toEqual([
+      expect(await choicesHeld(served(), workspaceId)).toEqual([
         { purpose: "judging", provider: "anthropic", model: HAIKU },
       ]);
-      expect(await rowsOfAction(app(), workspaceId, "platform.workspace.model_choice_set")).toEqual(
-        [
-          {
-            actor: BOOTSTRAP_ACTOR,
-            subject_id: workspaceId,
-            detail: { purpose: "judging", provider: "anthropic", model: HAIKU },
-          },
-        ],
-      );
+      expect(
+        await rowsOfAction(served(), workspaceId, "platform.workspace.model_choice_set"),
+      ).toEqual([
+        {
+          actor: BOOTSTRAP_ACTOR,
+          subject_id: workspaceId,
+          detail: { purpose: "judging", provider: "anthropic", model: HAIKU },
+        },
+      ]);
     });
 
     it("refuses a provider with no sub-processor entry", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await choosing(app(), workspaceId, "openai");
+      const run = await choosing(served(), workspaceId, "openai");
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 9,
@@ -3114,13 +3145,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "set-model-choice: REFUSED — no-sub-processor: openai is no model provider the DPIA names as a sub-processor (anthropic · mistral); nothing changed",
         ],
       });
-      expect(await choicesHeld(app(), workspaceId)).toEqual([]);
+      expect(await choicesHeld(served(), workspaceId)).toEqual([]);
     });
 
     it("refuses local, which no price can name", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await choosing(app(), workspaceId, "local");
+      const run = await choosing(served(), workspaceId, "local");
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 9,
@@ -3128,13 +3159,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "set-model-choice: REFUSED — no-sub-processor: local is no model provider the DPIA names as a sub-processor (anthropic · mistral); nothing changed",
         ],
       });
-      expect(await choicesHeld(app(), workspaceId)).toEqual([]);
+      expect(await choicesHeld(served(), workspaceId)).toEqual([]);
     });
 
     it("refuses cloudflare with no threshold, naming the command", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await choosing(app(), workspaceId, "cloudflare");
+      const run = await choosing(served(), workspaceId, "cloudflare");
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 9,
@@ -3142,13 +3173,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
           `set-model-choice: REFUSED — no-decision-threshold: cloudflare ${HAIKU} is a decision model with no threshold; set one with set-decision-threshold first; nothing changed`,
         ],
       });
-      expect(await choicesHeld(app(), workspaceId)).toEqual([]);
+      expect(await choicesHeld(served(), workspaceId)).toEqual([]);
     });
 
     it("refuses a model with no price in effect", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await choosing(app(), workspaceId, "mistral");
+      const run = await choosing(served(), workspaceId, "mistral");
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 9,
@@ -3159,9 +3190,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("refuses a choice for the embedding purpose", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await choosing(app(), workspaceId, "anthropic", "embedding");
+      const run = await choosing(served(), workspaceId, "anthropic", "embedding");
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 7,
@@ -3173,11 +3204,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("refuses malformed and no-such-workspace", async () => {
       const nowhere = ulid();
-      const { workspaceId } = await app().provision();
-      expect((await priced(app())).exitCode).toBe(0);
+      const { workspaceId } = await served().provision();
+      expect((await priced(served())).exitCode).toBe(0);
 
-      const malformed = await choosing(app(), workspaceId, "anthropic", "guessing");
-      const absent = await choosing(app(), nowhere, "anthropic");
+      const malformed = await choosing(served(), workspaceId, "anthropic", "guessing");
+      const absent = await choosing(served(), nowhere, "anthropic");
 
       expect([malformed.exitCode, absent.exitCode]).toEqual([2, 6]);
       expect(malformed.lines).toEqual([
@@ -3189,10 +3220,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("answers usage with the model missing, as help names it", async () => {
-      const { workspaceId } = await app().provision();
+      const { workspaceId } = await served().provision();
 
-      const run = await ops(app(), ["set-model-choice", "--workspace", workspaceId]);
-      const help = await ops(app(), ["help"]);
+      const run = await ops(served(), ["set-model-choice", "--workspace", workspaceId]);
+      const help = await ops(served(), ["help"]);
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 2,
@@ -3200,7 +3231,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "set-model-choice: --workspace <id>, --purpose <extraction|enrichment|answering|judging>, --provider <provider> and --model <model> are required",
         ],
       });
-      expect(await choicesHeld(app(), workspaceId)).toEqual([]);
+      expect(await choicesHeld(served(), workspaceId)).toEqual([]);
       expect(help.lines.join("\n")).toContain(
         "set-model-choice --workspace <id> --purpose <extraction|enrichment|answering|judging> --provider <anthropic|mistral> --model <model>",
       );
@@ -3231,7 +3262,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     };
 
     const restoring = (email: string, io: Partial<OpsIo> = {}, doors: Partial<Doors> = {}) =>
-      opsWith(app(), ["restore-sign-in", "--email", email], {
+      opsWith(served(), ["restore-sign-in", "--email", email], {
         io: { mail: capturingMail().mail, ...io },
         doors,
       });
@@ -3246,7 +3277,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     const heldBy = async (personId: string) =>
       (
-        await app().database.superuser.query<Record<string, unknown>>(
+        await served().database.superuser.query<Record<string, unknown>>(
           `SELECT (SELECT count(*)::int FROM passkey WHERE user_id = u.id) AS passkeys,
                   (SELECT count(*)::int FROM authenticator WHERE user_id = u.id) AS authenticators,
                   (SELECT count(*)::int FROM recovery_code WHERE user_id = u.id) AS "recoveryCodes",
@@ -3260,7 +3291,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     const identityRowsOf = async (personId: string) =>
       (
-        await app().database.superuser.query<Record<string, unknown>>(
+        await served().database.superuser.query<Record<string, unknown>>(
           "SELECT action, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
           [personId],
         )
@@ -3268,14 +3299,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     const restoreRowsOf = async (email: string) =>
       (
-        await app().database.superuser.query<{ value: string; expiresAt: Date }>(
+        await served().database.superuser.query<{ value: string; expiresAt: Date }>(
           'SELECT value, expires_at AS "expiresAt" FROM verification WHERE identifier = $1',
           [`operator-restore-${email.toLowerCase()}`],
         )
       ).rows;
 
     it("clears the person's factors and codes, and ends their sessions", async () => {
-      const { person, client } = await aPersonHoldingEverything(app());
+      const { person, client } = await aPersonHoldingEverything(served());
       const before = await heldBy(person.id);
 
       const run = await restoring(person.email, {}, { clock: { now: () => RESTORED_AT } });
@@ -3301,13 +3332,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("drops the rows kept under the sessions it ends", async () => {
-      const { person, client } = await aPersonHoldingEverything(app());
+      const { person, client } = await aPersonHoldingEverything(served());
       const { session } = sessionRead.parse(await (await client.fetch("/get-session")).json());
       const asked = await client.json("/second-factor/confirm/passkey-options", {});
       const challenge = `second-factor-challenge:${session.id}`;
       const kept = async () =>
         (
-          await app().database.superuser.query<Record<string, unknown>>(
+          await served().database.superuser.query<Record<string, unknown>>(
             "SELECT identifier FROM verification WHERE identifier = $1",
             [challenge],
           )
@@ -3322,7 +3353,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("writes one record and sends one notice", async () => {
-      const person = await app().person();
+      const person = await served().person();
       const before = await identityRowsOf(person.id);
       const { sent, mail } = capturingMail();
 
@@ -3353,7 +3384,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("says it must follow an identity check by another channel", async () => {
-      const person = await app().person();
+      const person = await served().person();
 
       const run = await restoring(person.email, {}, { clock: { now: () => RESTORED_AT } });
 
@@ -3380,7 +3411,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("refuses with no email transport, changing nothing", async () => {
-      const { person } = await aPersonHoldingEverything(app());
+      const { person } = await aPersonHoldingEverything(served());
       const before = await heldBy(person.id);
 
       const run = await restoring(person.email, { mail: undefined });
@@ -3396,7 +3427,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("keeps the restore when its notice does not go", async () => {
-      const person = await app().person();
+      const person = await served().person();
       const { mail } = capturingMail(async () => {
         throw new Error("the relay refused the message");
       });
@@ -3412,9 +3443,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("sends the next sign-in to setup, which needs the code", async () => {
-      const { person } = await aPersonHoldingEverything(app());
+      const { person } = await aPersonHoldingEverything(served());
       const code = codeIn(await restoring(person.email));
-      const client = await signedInClient(app(), person.email);
+      const client = await signedInClient(served(), person.email);
 
       const held = await webClientOf(client).api.person.secondFactor.query();
       const adds = [
@@ -3434,9 +3465,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("accepts the code once, however the address was typed", async () => {
-      const person = await app().person();
+      const person = await served().person();
       const code = codeIn(await restoring(person.email.toUpperCase()));
-      const client = await signedInClient(app(), person.email);
+      const client = await signedInClient(served(), person.email);
 
       const first = await client.json("/second-factor/restore", { code });
       const again = await client.json("/second-factor/restore", { code });
@@ -3447,10 +3478,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("refuses the code once a day has passed", async () => {
       const restoredAgo = async (ageMs: number) => {
-        const person = await app().person();
+        const person = await served().person();
         const restoredAt = new Date(Date.now() - ageMs);
         const run = await restoring(person.email, {}, { clock: { now: () => restoredAt } });
-        const client = await signedInClient(app(), person.email);
+        const client = await signedInClient(served(), person.email);
         return (await client.json("/second-factor/restore", { code: codeIn(run) })).status;
       };
 
@@ -3460,7 +3491,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("keeps the code out of every email and log line", async () => {
-      const person = await app().person();
+      const person = await served().person();
       const { sent, mail } = capturingMail();
 
       const run = await restoring(person.email, { mail });
@@ -3475,10 +3506,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("voids an earlier restore code with a new restore", async () => {
-      const person = await app().person();
+      const person = await served().person();
       const earlier = codeIn(await restoring(person.email));
       const later = codeIn(await restoring(person.email));
-      const client = await signedInClient(app(), person.email);
+      const client = await signedInClient(served(), person.email);
 
       const statuses = [
         (await client.json("/second-factor/restore", { code: earlier })).status,
@@ -3490,7 +3521,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("answers usage without --email", async () => {
-      const run = await opsWith(app(), ["restore-sign-in"], {});
+      const run = await opsWith(served(), ["restore-sign-in"], {});
 
       expect(run).toMatchObject({
         exitCode: 2,
@@ -3499,7 +3530,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("names the command in the usage", async () => {
-      const run = await ops(app(), ["help"]);
+      const run = await ops(served(), ["help"]);
 
       expect(run.lines.join("\n")).toContain("restore-sign-in --email <email>");
     });
@@ -3602,9 +3633,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return found.rows;
     };
 
-    const iriOf = async (app: TestApp, workspaceId: string, path: string): Promise<ConceptIri> => {
-      const row = (await indexRowsOf(app, workspaceId)).find((each) => each.path === path);
-      if (row === undefined) throw new Error(`no concept stands at ${path}`);
+    const iriOf = async (
+      app: TestApp,
+      workspaceId: string,
+      conceptPath: string,
+    ): Promise<ConceptIri> => {
+      const row = (await indexRowsOf(app, workspaceId)).find((each) => each.path === conceptPath);
+      if (row === undefined) throw new Error(`no concept stands at ${conceptPath}`);
       return ids.conceptIri.parse(row.iri);
     };
 
@@ -3647,9 +3682,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     };
 
     it("lands the fixture, saying each concept, then each rewritten file", async () => {
-      const { workspaceId, admin } = await bundleWorkspace(app());
+      const { workspaceId, admin } = await bundleWorkspace(served());
 
-      const run = await importing(app(), workspaceId, admin.email);
+      const run = await importing(served(), workspaceId, admin.email);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
@@ -3661,11 +3696,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("commits the manifest first, then each concept, landing their rows", async () => {
-      const { workspaceId, admin } = await bundleWorkspace(app());
+      const { workspaceId, admin } = await bundleWorkspace(served());
 
-      await importing(app(), workspaceId, admin.email);
+      await importing(served(), workspaceId, admin.email);
 
-      const commits = await commitsOf(app(), workspaceId);
+      const commits = await commitsOf(served(), workspaceId);
       expect(commits).toHaveLength(10);
       expect(commits[0]).toEqual({
         sha: matching.any(String),
@@ -3675,7 +3710,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(commits.slice(1).map((row) => [row["action"], row["parent_sha"]])).toEqual(
         commits.slice(0, -1).map((row) => ["knowledge.concept.committed", row["sha"]]),
       );
-      const rows = await indexRowsOf(app(), workspaceId);
+      const rows = await indexRowsOf(served(), workspaceId);
       expect(rows.map((row) => row.path)).toEqual(IMPORTED_PATHS);
       expect(rows.map((row) => `${row.kind}: ${row.title}`)).toEqual([
         "Answer: Data retention period",
@@ -3691,11 +3726,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("normalises the manifest, rewrites links as IRIs, leaves no email", async () => {
-      const { workspaceId, admin, mona } = await bundleWorkspace(app());
+      const { workspaceId, admin, mona } = await bundleWorkspace(served());
 
-      await importing(app(), workspaceId, admin.email);
+      await importing(served(), workspaceId, admin.email);
 
-      const files = await filesAtHead(app(), workspaceId, admin.id);
+      const files = await filesAtHead(served(), workspaceId, admin.id);
       expect(files.get("knowledge/manifest.yaml")).toBe(
         [
           `"id": "${BUNDLE_ID}"`,
@@ -3712,25 +3747,25 @@ describe("pnpm ops — the restore scripts' commands", () => {
         expect(files.get(file)).toContain(`"by": "human:${mona}"`);
       }
       expect(files.get("knowledge/company/answers/support-hours.md")).toContain(
-        `[Advanced plan](${await iriOf(app(), workspaceId, "knowledge/product/tiers/advanced-plan.md")}) customers reach an engineer out of hours`,
+        `[Advanced plan](${await iriOf(served(), workspaceId, "knowledge/product/tiers/advanced-plan.md")}) customers reach an engineer out of hours`,
       );
       expect(
         files.get("knowledge/product/answers/can-two-teams-share-one-account-advanced-plan.md"),
       ).toContain(
-        `The [Standard plan's answer](${await iriOf(app(), workspaceId, "knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md")}) describes the looser default`,
+        `The [Standard plan's answer](${await iriOf(served(), workspaceId, "knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md")}) describes the looser default`,
       );
     });
 
     it("open follows a rewritten link to the concept it names", async () => {
-      const { workspaceId, admin } = await bundleWorkspace(app());
-      await importing(app(), workspaceId, admin.email);
+      const { workspaceId, admin } = await bundleWorkspace(served());
+      await importing(served(), workspaceId, admin.email);
       const opening = (iri: ConceptIri) =>
-        reading(app(), workspaceId, admin.id, (principal, tx) =>
+        reading(served(), workspaceId, admin.id, (principal, tx) =>
           open(principal, tx, { iri }, IMPORTED_AT),
         );
 
       const from = await opening(
-        await iriOf(app(), workspaceId, "knowledge/company/answers/support-hours.md"),
+        await iriOf(served(), workspaceId, "knowledge/company/answers/support-hours.md"),
       );
       if (!from.found) throw new Error("the linking concept did not open");
       const target = /\]\((https:\/\/[^)]+)\)/.exec(from.concept?.body ?? "")?.[1] ?? "";
@@ -3741,11 +3776,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("imports verified events as checks that find and open show", async () => {
-      const { workspaceId, admin, mona, theo } = await bundleWorkspace(app());
+      const { workspaceId, admin, mona, theo } = await bundleWorkspace(served());
 
-      await importing(app(), workspaceId, admin.email);
+      await importing(served(), workspaceId, admin.email);
 
-      const verifications = await verificationRowsOf(app(), workspaceId);
+      const verifications = await verificationRowsOf(served(), workspaceId);
       expect(verifications).toHaveLength(7);
       expect(verifications.slice(0, 3)).toEqual([
         {
@@ -3770,13 +3805,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
           origin: "imported",
         },
       ]);
-      expect(await actionsOf(app(), workspaceId)).toEqual([
+      expect(await actionsOf(served(), workspaceId)).toEqual([
         { action: "knowledge.check.imported", events: 7 },
         { action: "knowledge.concept.committed", events: 9 },
         { action: "knowledge.manifest.written", events: 1 },
       ]);
 
-      const found = await reading(app(), workspaceId, admin.id, (principal, tx) =>
+      const found = await reading(served(), workspaceId, admin.id, (principal, tx) =>
         find(principal, tx, { query: "retention", limit: 10 }, IMPORTED_AT),
       );
       const [match, ...rest] = found.matches;
@@ -3794,7 +3829,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         words: "Verified by Theo Approver · 1 June 2026 · imported",
       });
 
-      const opened = await reading(app(), workspaceId, admin.id, (principal, tx) =>
+      const opened = await reading(served(), workspaceId, admin.id, (principal, tx) =>
         open(principal, tx, { iri: match.iri }, IMPORTED_AT),
       );
       if (!opened.found) throw new Error("the concept was not found");
@@ -3824,7 +3859,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     ];
 
     const openedOverMcp = async (sources: readonly string[], body = SUPPORT_HOURS) => {
-      const { workspaceId, admin } = await bundleWorkspace(app());
+      const { workspaceId, admin } = await bundleWorkspace(served());
       const from = await mkdtemp(path.join(tmpdir(), "bundle-"));
       await mkdir(path.join(from, "company", "answers"), { recursive: true });
       await writeFile(
@@ -3849,12 +3884,12 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "",
         ].join("\n"),
       );
-      await importing(app(), workspaceId, admin.email, { from });
-      const iri = await iriOf(app(), workspaceId, "knowledge/company/answers/support-hours.md");
-      const { accessToken } = await connectAsHost(app(), app().client(), admin, {
+      await importing(served(), workspaceId, admin.email, { from });
+      const iri = await iriOf(served(), workspaceId, "knowledge/company/answers/support-hours.md");
+      const { accessToken } = await connectAsHost(served(), served().client(), admin, {
         scope: "knowledge:read offline_access",
       });
-      return calledTool(app().client(), accessToken, "open", { iri });
+      return calledTool(served().client(), accessToken, "open", { iri });
     };
 
     it("renders imported evidence over MCP, a page as its place", async () => {
@@ -3902,10 +3937,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("skips what already landed on a rerun, and says so", async () => {
-      const { workspaceId, admin } = await bundleWorkspace(app());
-      await importing(app(), workspaceId, admin.email);
+      const { workspaceId, admin } = await bundleWorkspace(served());
+      await importing(served(), workspaceId, admin.email);
 
-      const again = await importing(app(), workspaceId, admin.email);
+      const again = await importing(served(), workspaceId, admin.email);
 
       expect(again.exitCode).toBe(0);
       expect(again.lines).toEqual([
@@ -3913,16 +3948,19 @@ describe("pnpm ops — the restore scripts' commands", () => {
         ...IMPORTED_PATHS.map((file) => `import-bundle: skipped ${file} — already landed`),
         "import-bundle: done — landed 0, skipped 6, 0 verifications recorded (7 already present), 0 links rewritten, 0.0 seconds",
       ]);
-      expect(await commitsOf(app(), workspaceId)).toHaveLength(10);
-      expect(await verificationRowsOf(app(), workspaceId)).toHaveLength(7);
+      expect(await commitsOf(served(), workspaceId)).toHaveLength(10);
+      expect(await verificationRowsOf(served(), workspaceId)).toHaveLength(7);
     });
 
     it("leaves the watermark at the head, with nothing to replay", async () => {
-      const { workspaceId, admin } = await bundleWorkspace(app());
-      await importing(app(), workspaceId, admin.email);
-      const sha = await head(await principalOf(app(), workspaceId, admin.id), openTestGit(app()));
+      const { workspaceId, admin } = await bundleWorkspace(served());
+      await importing(served(), workspaceId, admin.email);
+      const sha = await head(
+        await principalOf(served(), workspaceId, admin.id),
+        openTestGit(served()),
+      );
 
-      const run = await ops(app(), ["reconcile-watermark", "--workspace", workspaceId]);
+      const run = await ops(served(), ["reconcile-watermark", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
@@ -3931,61 +3969,61 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("reports what a dry run would do, writing nothing", async () => {
-      const { workspaceId, admin } = await bundleWorkspace(app());
+      const { workspaceId, admin } = await bundleWorkspace(served());
 
-      const run = await importing(app(), workspaceId, admin.email, { flags: ["--dry-run"] });
+      const run = await importing(served(), workspaceId, admin.email, { flags: ["--dry-run"] });
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
         `import-bundle: dry run — the tree is sound: 6 concepts, of which 6 would land and 0 already stand; 7 verifications would be recorded (0 already present); 4 links in 3 concepts would be rewritten; manifest ${BUNDLE_ID} would be written first; nothing was written`,
       ]);
-      expect(await commitsOf(app(), workspaceId)).toEqual([]);
-      expect(await indexRowsOf(app(), workspaceId)).toEqual([]);
+      expect(await commitsOf(served(), workspaceId)).toEqual([]);
+      expect(await indexRowsOf(served(), workspaceId)).toEqual([]);
     });
 
     it("lands the bundle at the class the flag names", async () => {
-      const { workspaceId, admin } = await bundleWorkspace(app());
+      const { workspaceId, admin } = await bundleWorkspace(served());
 
-      const run = await importing(app(), workspaceId, admin.email, {
+      const run = await importing(served(), workspaceId, admin.email, {
         flags: ["--sensitivity", "Restricted"],
       });
 
       expect(run.exitCode).toBe(0);
       expect(
-        new Set((await indexRowsOf(app(), workspaceId)).map((row) => row.sensitivity)),
+        new Set((await indexRowsOf(served(), workspaceId)).map((row) => row.sensitivity)),
       ).toEqual(new Set(["Restricted"]));
     });
 
     it("refuses to run as a Viewer, and writes nothing", async () => {
-      const { workspaceId } = await bundleWorkspace(app());
-      const viewer = await app().person();
-      await app().addMember(workspaceId, viewer.id, "Viewer");
+      const { workspaceId } = await bundleWorkspace(served());
+      const viewer = await served().person();
+      await served().addMember(workspaceId, viewer.id, "Viewer");
 
-      const run = await importing(app(), workspaceId, viewer.email);
+      const run = await importing(served(), workspaceId, viewer.email);
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.forbidden);
       expect(run.lines).toEqual([
         `import-bundle: REFUSED — ${viewer.email} is not an Admin of this workspace; the import runs as an Admin`,
       ]);
-      expect(await commitsOf(app(), workspaceId)).toEqual([]);
+      expect(await commitsOf(served(), workspaceId)).toEqual([]);
     });
 
     it("refuses to run as an Editor, and writes nothing", async () => {
-      const { workspaceId } = await bundleWorkspace(app());
+      const { workspaceId } = await bundleWorkspace(served());
 
-      const run = await importing(app(), workspaceId, MONA);
+      const run = await importing(served(), workspaceId, MONA);
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.forbidden);
       expect(run.lines).toEqual([
         `import-bundle: REFUSED — ${MONA} is not an Admin of this workspace; the import runs as an Admin`,
       ]);
-      expect(await commitsOf(app(), workspaceId)).toEqual([]);
+      expect(await commitsOf(served(), workspaceId)).toEqual([]);
     });
 
     it("refuses a workspace with no bundle repository as a precondition", async () => {
-      const { workspaceId, admin } = await bundleWorkspace(app(), { repository: false });
+      const { workspaceId, admin } = await bundleWorkspace(served(), { repository: false });
 
-      const run = await importing(app(), workspaceId, admin.email);
+      const run = await importing(served(), workspaceId, admin.email);
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.precondition);
       expect(run.lines).toEqual([
@@ -3994,36 +4032,36 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("exits as a conflict when another writer holds the bundle", async () => {
-      const { workspaceId, admin } = await bundleWorkspace(app());
-      const release = await holdMainRef(openTestGit(app()), workspaceId);
+      const { workspaceId, admin } = await bundleWorkspace(served());
+      const release = await holdMainRef(openTestGit(served()), workspaceId);
 
-      const run = await importing(app(), workspaceId, admin.email);
+      const run = await importing(served(), workspaceId, admin.email);
       await release();
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.conflict);
       expect(run.lines).toEqual([
         "import-bundle: REFUSED — this workspace's bundle could not be moved while the import was writing its manifest, because another writer moved it or holds its lock; nothing was written, so run the import again, and if it is refused the same way a lock was left on refs/heads/main",
       ]);
-      expect(await commitsOf(app(), workspaceId)).toEqual([]);
+      expect(await commitsOf(served(), workspaceId)).toEqual([]);
     });
 
     it("exits 1 for an unsound tree, classed by no word", async () => {
-      const { workspaceId, admin } = await bundleWorkspace(app());
+      const { workspaceId, admin } = await bundleWorkspace(served());
       const from = await mkdtemp(path.join(tmpdir(), "bundle-"));
 
-      const run = await importing(app(), workspaceId, admin.email, { from });
+      const run = await importing(served(), workspaceId, admin.email, { from });
 
       expect(run.exitCode).toBe(1);
       expect(run.lines).toEqual([
         "import-bundle: REFUSED — manifest.yaml: the tree has no manifest.yaml at its root; nothing was written",
       ]);
-      expect(await commitsOf(app(), workspaceId)).toEqual([]);
+      expect(await commitsOf(served(), workspaceId)).toEqual([]);
     });
 
     it("refuses a non-member's email, telling the operator to invite them", async () => {
-      const { workspaceId } = await bundleWorkspace(app());
+      const { workspaceId } = await bundleWorkspace(served());
 
-      const run = await importing(app(), workspaceId, "nobody@acme.invalid");
+      const run = await importing(served(), workspaceId, "nobody@acme.invalid");
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.unauthenticated);
       expect(run.lines).toEqual([
@@ -4032,10 +4070,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("refuses a directory it cannot read, naming it", async () => {
-      const { workspaceId, admin } = await bundleWorkspace(app());
+      const { workspaceId, admin } = await bundleWorkspace(served());
 
       const run = await opsWith(
-        app(),
+        served(),
         [
           "import-bundle",
           "--workspace",
@@ -4065,16 +4103,16 @@ describe("pnpm ops — the restore scripts' commands", () => {
         ["--from", "/tmp/bundle", "--as", "a@b.c", "--dry-run", "yes"],
       ],
     ])("answers usage to %s, reading nothing", async (_shape, flags) => {
-      const { workspaceId } = await bundleWorkspace(app());
+      const { workspaceId } = await bundleWorkspace(served());
 
-      const run = await ops(app(), ["import-bundle", "--workspace", workspaceId, ...flags]);
+      const run = await ops(served(), ["import-bundle", "--workspace", workspaceId, ...flags]);
 
       expect(run.exitCode).toBe(2);
     });
 
     it("lands in a workspace provision-workspace and add-member stood up", async () => {
-      const owner = await app().person(undefined, "Liam Owner");
-      const provisioned = await provisioning(app(), [
+      const owner = await served().person(undefined, "Liam Owner");
+      const provisioned = await provisioning(served(), [
         "--name",
         "Acme",
         "--short-name",
@@ -4084,22 +4122,22 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
       expect(provisioned.exitCode).toBe(0);
       const workspaceId = idOnTheDoneLine(provisioned);
-      await verifierOf(app(), MONA, "Mona Reviewer");
-      await verifierOf(app(), THEO, "Theo Approver");
+      await verifierOf(served(), MONA, "Mona Reviewer");
+      await verifierOf(served(), THEO, "Theo Approver");
       for (const verifier of [MONA, THEO]) {
-        const added = await adding(app(), workspaceId, verifier, "Editor");
+        const added = await adding(served(), workspaceId, verifier, "Editor");
         expect(added.lines).toEqual([
           `add-member: done — ${verifier} added to workspace ${workspaceId} as Editor`,
         ]);
       }
 
-      const run = await importing(app(), workspaceId, owner.email);
+      const run = await importing(served(), workspaceId, owner.email);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines.at(-1)).toBe(
         "import-bundle: done — landed 6, skipped 0, 7 verifications recorded (0 already present), 4 links rewritten, 0.0 seconds",
       );
-      const found = await reading(app(), workspaceId, owner.id, (principal, tx) =>
+      const found = await reading(served(), workspaceId, owner.id, (principal, tx) =>
         find(principal, tx, { query: "retention", limit: 10 }, IMPORTED_AT),
       );
       const match = found.matches[0];

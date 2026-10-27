@@ -31,7 +31,7 @@ type RuleSetting = z.infer<typeof ruleSetting>;
 
 type JsPlugin = OxlintConfig["jsPlugins"][number];
 
-const WHOLE_LINE_COMMENT = /^\s*\/\/.*$/gm;
+const WHOLE_LINE_COMMENT = /^\s*\/\/.*$/gmu;
 
 export const parsedOxlintConfig = (text: string): OxlintConfig =>
   oxlintConfig.parse(JSON.parse(text.replaceAll(WHOLE_LINE_COMMENT, "")));

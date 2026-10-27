@@ -614,12 +614,12 @@ describe("a streamed mutation through the Hono mount", () => {
     mount.use(`${TRPC_ENDPOINT}/*`, trpcServer({ router: streaming, endpoint: TRPC_ENDPOINT }));
 
     await servedOnLoopback(mount, async (origin) => {
-      const streamed = createTRPCClient<typeof streaming>({
+      const streamingClient = createTRPCClient<typeof streaming>({
         links: [httpBatchStreamLink({ url: `${origin}${TRPC_ENDPOINT}` })],
       });
       const waited = Promise.withResolvers<"still held">();
       const timer = setTimeout(() => waited.resolve("still held"), 5_000);
-      const events = (async () => (await streamed.twice.mutate())[Symbol.asyncIterator]())();
+      const events = (async () => (await streamingClient.twice.mutate())[Symbol.asyncIterator]())();
       const first = await Promise.race([events.then((stream) => stream.next()), waited.promise]);
       clearTimeout(timer);
       held.resolve();

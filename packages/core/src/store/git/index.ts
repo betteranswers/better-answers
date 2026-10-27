@@ -210,7 +210,7 @@ const headOf = async (gitDir: string): Promise<string | null> => {
   return standing.ok ? standing.value : null;
 };
 
-const isSubjectLine = (message: string): boolean => message.length > 0 && !/[\r\n]/.test(message);
+const isSubjectLine = (message: string): boolean => message.length > 0 && !/[\r\n]/u.test(message);
 
 const trailerLines = (trailers: CommitTrailers): readonly string[] | undefined => {
   const named: readonly (readonly [string, string | undefined])[] = [
@@ -281,7 +281,7 @@ const meetsExpectedHead = (
 
 const commitFailure = (cause: unknown): "stale-precondition" | Error => {
   const message = cause instanceof Error ? cause.message : String(cause);
-  if (/cannot lock ref|reference already exists|but expected/i.test(message)) {
+  if (/cannot lock ref|reference already exists|but expected/iu.test(message)) {
     return "stale-precondition";
   }
   return cause instanceof Error ? cause : new Error(message);
@@ -390,8 +390,9 @@ export const commitsAfter = async (
   const gitDir = repositoryPath(door, workspaceId);
   const standing = await standingHead(gitDir);
   if (!standing.ok) return err(standing.error);
-  const head = standing.value;
-  if (head === null) return since === null ? ok({ head, missed: [] }) : err("history-diverged");
+  const headCommit = standing.value;
+  if (headCommit === null)
+    return since === null ? ok({ head: headCommit, missed: [] }) : err("history-diverged");
   if (since !== null) {
     try {
       await git(gitDir, ["merge-base", "--is-ancestor", since, BUNDLE_REF]);
@@ -405,7 +406,7 @@ export const commitsAfter = async (
       "--reverse",
       since === null ? BUNDLE_REF : `${since}..${BUNDLE_REF}`,
     ]);
-    return ok({ head, missed: listed.split("\n").filter((sha) => sha !== "") });
+    return ok({ head: headCommit, missed: listed.split("\n").filter((sha) => sha !== "") });
   } catch (cause) {
     return err(normalizeError(cause));
   }
@@ -490,7 +491,7 @@ export type CommitRead = {
   readonly change: { readonly path: string; readonly content: string } | undefined;
 };
 
-const TRAILER_LINE = /^([A-Za-z][A-Za-z-]*): (.+)$/;
+const TRAILER_LINE = /^([A-Za-z][A-Za-z-]*): (.+)$/u;
 
 const trailersOf = (message: string) => {
   const block = message.trimEnd().split("\n\n").at(-1) ?? "";
@@ -607,6 +608,7 @@ const NOTHING_MOVED: HistoryRewritten = { moved: [], paths: [] };
 
 export const ERASED_DOMAIN = "erased.better-answers.invalid";
 
+// oxlint-disable-next-line eslint/require-unicode-regexp -- Stryker negates \v to \V, which the u flag refuses at load
 const PYTHON_SPECIAL = /[()[\]{}?*+\-|^$\\.&~# \t\n\r\v\f]/g;
 
 const escapedForPython = (literal: string): string =>
@@ -672,7 +674,7 @@ const filterRepo = async (gitDir: string, arguments_: readonly string[]): Promis
 
 const DROPPED = "0".repeat(40);
 
-const COMMIT_MAP_LINE = /^([0-9a-f]{40})\s+([0-9a-f]{40})$/;
+const COMMIT_MAP_LINE = /^([0-9a-f]{40})\s+([0-9a-f]{40})$/u;
 
 const commitMapPairs = (mapped: string): readonly (readonly [string, string])[] =>
   mapped.split("\n").flatMap((line) => {

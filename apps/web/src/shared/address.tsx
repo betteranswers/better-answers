@@ -7,7 +7,7 @@ type Part = { readonly from: number; readonly text: string };
 const partsOf = (address: string): readonly Part[] => {
   const parts: Part[] = [];
   let from = 0;
-  for (const text of address.match(/[^@.]*[@.]|[^@.]+$/g) ?? []) {
+  for (const text of address.match(/[^@.]*[@.]|[^@.]+$/gu) ?? []) {
     parts.push({ from, text });
     from += text.length;
   }

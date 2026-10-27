@@ -237,7 +237,7 @@ export const provisionWorkspace = async (
   const admin = boundarySchemas.user.select.shape.id.safeParse(input.adminUserId);
   if (!row.success || !admin.success) return err("malformed");
 
-  const action = await attempt(() =>
+  const provisioned = await attempt(() =>
     withScope(platform, door, row.data.id, async (tx): Promise<Credited> => {
       const person = credited(await personById(tx, admin.data));
       if (!person.ok) return person;
@@ -265,8 +265,8 @@ export const provisionWorkspace = async (
     }),
   );
 
-  if (!action.ok) return err(refusalFor(action.error, PROVISION_CONSTRAINTS));
-  if (!action.value.ok) return err(action.value.error);
+  if (!provisioned.ok) return err(refusalFor(provisioned.error, PROVISION_CONSTRAINTS));
+  if (!provisioned.value.ok) return err(provisioned.value.error);
   return ok({ workspaceId: row.data.id, actorId: platform.actorId });
 };
 

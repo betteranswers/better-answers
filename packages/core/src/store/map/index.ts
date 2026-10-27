@@ -251,6 +251,7 @@ const replaceOutgoingEdges = async (gen: number, tx: Tx, concept: EdgeSource): P
     );
   }
   for (const edge of edges) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every edge insert runs on the caller's transaction
     await tx.query(
       `INSERT INTO map_edge (workspace_id, gen, uid, label, from_uid, to_uid, from_kind,
                                to_kind, section, sentence, published_at, sensitivity, audience,
@@ -356,6 +357,7 @@ export const writeConceptDelta = async (
   );
 
   for (const { frontmatter, ...row } of citing.rows) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every edge replacement runs on the caller's transaction
     await replaceOutgoingEdges(gen, tx, {
       ...row,
       sources: citedSourcesOf(frontmatter["sources"]),

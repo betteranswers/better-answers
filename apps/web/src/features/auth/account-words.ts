@@ -65,20 +65,20 @@ export const removePasskeyTitle = (name: string): string => `Remove Passkey “$
 
 /** In the order a user agent is read: Edge names Chrome, and Chrome names Safari. */
 const BROWSERS = [
-  { pattern: /Edg\//, browser: "Edge" },
-  { pattern: /Firefox\//, browser: "Firefox" },
-  { pattern: /Chrome\//, browser: "Chrome" },
-  { pattern: /Safari\//, browser: "Safari" },
+  { pattern: /Edg\//u, browser: "Edge" },
+  { pattern: /Firefox\//u, browser: "Firefox" },
+  { pattern: /Chrome\//u, browser: "Chrome" },
+  { pattern: /Safari\//u, browser: "Safari" },
 ] as const;
 
 /** An iPhone names Mac OS X and Android names Linux, so each is read first. */
 const SYSTEMS = [
-  { pattern: /iPhone|iPad/, system: "iOS" },
-  { pattern: /Android/, system: "Android" },
-  { pattern: /Mac OS X|Macintosh/, system: "macOS" },
-  { pattern: /Windows/, system: "Windows" },
-  { pattern: /CrOS/, system: "ChromeOS" },
-  { pattern: /Linux/, system: "Linux" },
+  { pattern: /iPhone|iPad/u, system: "iOS" },
+  { pattern: /Android/u, system: "Android" },
+  { pattern: /Mac OS X|Macintosh/u, system: "macOS" },
+  { pattern: /Windows/u, system: "Windows" },
+  { pattern: /CrOS/u, system: "ChromeOS" },
+  { pattern: /Linux/u, system: "Linux" },
 ] as const;
 
 export const passkeyNameFor = (userAgent: string): string => {

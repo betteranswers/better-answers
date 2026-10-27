@@ -55,6 +55,7 @@ const erasureRequestsSince = async (
 
   const found: ReplayableErasure[] = [];
   for (const workspaceId of held.value) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every workspace at once would hold a pool connection each
     const read = await attempt(() =>
       withScope(platform, door, workspaceId, (tx: Tx) =>
         tx.query<CompletedRow>(
@@ -203,16 +204,19 @@ export const replayErasures = async (
       );
 
     if (erasure.copy !== undefined) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- erasures replay in the order they completed and stop at the first that fails
       const restored = await restoreFromReplayCopy(platform, doors.postgres, erasure.copy);
       if (!restored.ok) return err(stopped(restored.error));
     }
 
+    // oxlint-disable-next-line eslint/no-await-in-loop -- erasures replay in the order they completed and stop at the first that fails
     const run = await runErasure(platform, doors, {
       workspaceId: erasure.workspaceId,
       subjectRequestId: erasure.subjectRequestId,
     });
     if (!run.ok) return err(stopped(run.error));
 
+    // oxlint-disable-next-line eslint/no-await-in-loop -- each replay is recorded before the next erasure runs
     const recorded = await attempt(() => recordTheReplay(platform, doors.postgres, erasure));
     if (!recorded.ok) return err(stopped(recorded.error));
 

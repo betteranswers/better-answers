@@ -32,7 +32,7 @@ export const MEMBERS_FIELDS = {
 type Sorted = { readonly id: string; readonly desc: boolean };
 
 export const sortedOf = (sort: (typeof SORTS)[number] | undefined): Sorted | undefined =>
-  sort === undefined ? undefined : { id: sort.replace(/^-/, ""), desc: sort.startsWith("-") };
+  sort === undefined ? undefined : { id: sort.replace(/^-/u, ""), desc: sort.startsWith("-") };
 
 export const sortOf = (sorted: Sorted): (typeof SORTS)[number] | undefined =>
   SORTS.find((sort) => sort === `${sorted.desc ? "-" : ""}${sorted.id}`);

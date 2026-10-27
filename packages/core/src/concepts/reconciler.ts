@@ -376,6 +376,7 @@ const replayMissed = async (
   const skipped: string[] = [];
   let stopped: Reconciled["stopped"];
   for (const sha of scanned.value.missed) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- missed commits replay in history order and stop at the first that fails
     const outcome = await replayCommit(platform, doors, workspaceId, sha, batchId);
     if (!outcome.ok) {
       stopped = { sha, reason: outcome.error };
@@ -460,6 +461,7 @@ export const reconcileEveryWorkspace = async (
   if (!held.ok) return err(held.error);
   const outcomes: WorkspaceReconciled[] = [];
   for (const workspaceId of held.value) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- every workspace at once would hold a pool connection and a repository each
     outcomes.push({ workspaceId, outcome: await reconcile(platform, doors, { workspaceId }) });
   }
   return ok(outcomes);

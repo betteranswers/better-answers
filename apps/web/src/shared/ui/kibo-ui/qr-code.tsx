@@ -14,7 +14,7 @@ export type QRCodeProps = Omit<
 };
 
 /** The encoder writes a colour into its SVG unescaped, and the SVG is set as HTML. */
-const HEX_COLOUR = /^#(?:[\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/i;
+const HEX_COLOUR = /^#(?:[\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/iu;
 
 const tokenOf = (name: string): string =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();

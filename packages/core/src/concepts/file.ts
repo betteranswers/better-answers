@@ -29,9 +29,9 @@ export const normalisedBody = (body: string): string =>
   `${body
     .replaceAll("\r\n", "\n")
     .split("\n")
-    .map((line) => line.replace(/[ \t]+$/, ""))
+    .map((line) => line.replace(/[ \t]+$/u, ""))
     .join("\n")
-    .replace(/\n+$/, "")}\n`;
+    .replace(/\n+$/u, "")}\n`;
 
 export type HashedSource = readonly [string, string | null];
 
@@ -108,7 +108,7 @@ export const renderConceptFile = (frontmatter: Frontmatter, body: string): strin
   return `---\n${lines.join("\n")}\n---\n\n${normalisedBody(body)}`;
 };
 
-const FRONTMATTER_LINE = /^("(?:[^"\\]|\\.)*"):(?: (.*))?$/;
+const FRONTMATTER_LINE = /^("(?:[^"\\]|\\.)*"):(?: (.*))?$/u;
 
 const scalarOf = (text: string | undefined): string | number | boolean | null | undefined => {
   if (text === undefined) return undefined;
