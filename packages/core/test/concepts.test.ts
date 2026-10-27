@@ -1,5 +1,5 @@
 import pg from "pg";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
 import { walkFrom } from "@better-answers/core/store/map";
@@ -247,13 +247,14 @@ describe("a governed write", () => {
 
     const { written, read } = await landedAndRead(scenario, input);
 
-    expect(read.ok && read.value.frontmatter).toMatchObject({
+    assert(read.ok);
+    expect(read.value.frontmatter).toMatchObject({
       type: "Policy",
       title: "Expenses",
       tags: ["finance"],
     });
 
-    expect(read.ok && contentHashOf(read.value.frontmatter, read.value.body, input.path)).toBe(
+    expect(contentHashOf(read.value.frontmatter, read.value.body, input.path)).toBe(
       written.contentHash,
     );
     const row = await db().pool.query<{ content_hash: string }>(
@@ -293,8 +294,9 @@ describe("a governed write", () => {
 
     const { read } = await landedAndRead(scenario, input);
 
-    expect(read.ok && read.value.frontmatter["title"]).toBe("Expense claims");
-    expect(read.ok && read.value.frontmatter["type"]).toBe("Procedure");
+    assert(read.ok);
+    expect(read.value.frontmatter["title"]).toBe("Expense claims");
+    expect(read.value.frontmatter["type"]).toBe("Procedure");
   });
 
   it("records concept, identity, commit and evidence in one transaction", async () => {
@@ -363,7 +365,7 @@ describe("a governed write", () => {
     );
     expect(kinds.rows).toEqual([{ kind: "Policy" }]);
 
-    if (firstFile === undefined) return;
+    assert(firstFile !== undefined, "the first spelling landed");
     const file = await fileAtCommit(
       scenario.git,
       scenario.workspaceId,
@@ -1063,8 +1065,7 @@ describe("what a governed write refuses", () => {
       writeFor(),
     );
 
-    expect(refused.ok).toBe(false);
-    if (refused.ok) return;
+    assert(!refused.ok);
     expect(refused.error).toBeInstanceOf(Error);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
   });
@@ -1151,7 +1152,7 @@ describe("what a re-write of an existing concept may not move", () => {
       { git: scenario.git, postgres: scenario.postgres, clock: { now: () => pinned } },
       input,
     );
-    if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
+    assert(written.ok, "the write was refused");
 
     const held = await db().pool.query<{ published_at: Date | null }>(
       "SELECT published_at FROM concept_index WHERE workspace_id = $1 AND iri = $2",
@@ -1361,8 +1362,7 @@ describe("the read a concept's trust is derived from", () => {
       conceptByIri(principal, tx, written.iri),
     );
 
-    expect(opened.ok).toBe(true);
-    if (!opened.ok) return;
+    assert(opened.ok);
     expect(opened.value?.verification).toBeUndefined();
     expect(opened.value?.contentHash).toBe(written.contentHash);
   });
@@ -1397,7 +1397,7 @@ describe("a failure after the commit", () => {
       expectedHead: written.sha,
       at: new Date(),
     });
-    if (!forged.ok) throw new Error(`the forged commit was refused: ${String(forged.error)}`);
+    assert(forged.ok, "the forged commit was refused");
     const before = await rowsFor(scenario.workspaceId);
 
     const behind = await write(
@@ -1450,8 +1450,7 @@ describe("the per-repository lock", () => {
     ]);
 
     expect([first.ok, second.ok].toSorted()).toEqual([false, true]);
-    const refused = first.ok === false ? first : second;
-    expect(refused).toEqual({ ok: false, error: "stale-precondition" });
+    expect([first, second]).toContainEqual({ ok: false, error: "stale-precondition" });
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
     expect(history).toHaveLength(1);
     expect(await recordedCommits(scenario.workspaceId)).toEqual(history);
@@ -1465,7 +1464,9 @@ describe("the per-repository lock", () => {
     expect(failed).toEqual({ ok: false, error: "stale-precondition" });
 
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
-    const next = await landed(scenario, writeFor({ expects: { head: history[0] ?? null } }));
+    const [tip] = history;
+    assert(tip !== undefined, "the first write landed");
+    const next = await landed(scenario, writeFor({ expects: { head: tip } }));
 
     expect(next.sha).toMatch(/^[0-9a-f]{40}$/);
   });
@@ -1483,8 +1484,8 @@ describe("opening a concept by IRI", () => {
       open(principal, tx, { iri: written.iri }, now),
     );
 
-    expect(opened.ok).toBe(true);
-    if (!opened.ok || !opened.value.found) return;
+    assert(opened.ok);
+    assert(opened.value.found, "the stable concept was found");
     expect(opened.value.concept).toEqual({
       iri: written.iri,
 
@@ -1525,7 +1526,8 @@ describe("opening a concept by IRI", () => {
       ),
     );
 
-    expect(seen.map((result) => result.ok && result.value.found)).toEqual([false, false, false]);
+    const withheld = { ok: true, value: { found: false } };
+    expect(seen).toMatchObject([withheld, withheld, withheld]);
     const stored = await db().pool.query<{ published_at: Date | null }>(
       "SELECT published_at FROM concept_index WHERE workspace_id = $1 AND iri = $2",
       [scenario.workspaceId, written.iri],
@@ -1556,7 +1558,9 @@ describe("opening a concept by IRI", () => {
     const opened = await reading(scenario.viewer, (principal, tx) =>
       open(principal, tx, { iri: written.iri }, now),
     );
-    expect(opened.ok && opened.value.found && opened.value.concept?.trust).toMatchObject({
+    assert(opened.ok);
+    assert(opened.value.found);
+    expect(opened.value.concept?.trust).toMatchObject({
       tier: "human-reviewed",
       status: "current",
       verifiedBy: "Test person",
@@ -1569,9 +1573,9 @@ describe("opening a concept by IRI", () => {
     const moved = await reading(scenario.viewer, (principal, tx) =>
       open(principal, tx, { iri: written.iri }, now),
     );
-    expect(moved.ok && moved.value.found && moved.value.concept?.trust.status).toBe(
-      "changed-since-checked",
-    );
+    assert(moved.ok);
+    assert(moved.value.found);
+    expect(moved.value.concept?.trust.status).toBe("changed-since-checked");
   });
 
   it("names the verifier from their person row, after removal too", async () => {
@@ -1589,14 +1593,14 @@ describe("opening a concept by IRI", () => {
     } finally {
       client.release();
     }
-    const verifiedBy = async () => {
-      const opened = await reading(scenario.viewer, (principal, tx) =>
-        open(principal, tx, { iri: written.iri }, now),
-      );
-      return opened.ok && opened.value.found ? opened.value.concept?.trust.verifiedBy : undefined;
+    const opened = async () =>
+      reading(scenario.viewer, (principal, tx) => open(principal, tx, { iri: written.iri }, now));
+    const verifiedByPriya = {
+      ok: true,
+      value: { found: true, concept: { trust: { verifiedBy: "Priya Anand" } } },
     };
 
-    expect(await verifiedBy()).toBe("Priya Anand");
+    expect(await opened()).toMatchObject(verifiedByPriya);
 
     const removed = await reading(
       {
@@ -1607,7 +1611,7 @@ describe("opening a concept by IRI", () => {
     );
 
     expect(removed).toMatchObject({ ok: true });
-    expect(await verifiedBy()).toBe("Priya Anand");
+    expect(await opened()).toMatchObject(verifiedByPriya);
   });
 
   it("shows a deprecated concept to every reader as deprecated", async () => {
@@ -1619,9 +1623,9 @@ describe("opening a concept by IRI", () => {
       open(principal, tx, { iri: written.iri }, now),
     );
 
-    expect(opened.ok && opened.value.found && opened.value.concept?.trust.status).toBe(
-      "deprecated",
-    );
+    assert(opened.ok);
+    assert(opened.value.found);
+    expect(opened.value.concept?.trust.status).toBe("deprecated");
   });
 
   it("names a platform verification by its process and its rider", async () => {
@@ -1645,7 +1649,9 @@ describe("opening a concept by IRI", () => {
       open(principal, tx, { iri: written.iri }, now),
     );
 
-    expect(opened.ok && opened.value.found && opened.value.concept?.trust).toEqual({
+    assert(opened.ok);
+    assert(opened.value.found);
+    expect(opened.value.concept?.trust).toEqual({
       tier: "machine-confirmed",
       status: "current",
       verifiedBy: "process:better-answers-importer",
@@ -1686,12 +1692,16 @@ describe("opening a concept by IRI", () => {
       reading(scenario.viewer, (principal, tx) => open(principal, tx, { iri: bare.iri }, now)),
     ]);
 
-    expect(cited.ok && cited.value.found && cited.value.concept?.evidence).toStrictEqual([
+    assert(cited.ok);
+    assert(cited.value.found);
+    expect(cited.value.concept?.evidence).toStrictEqual([
       { source: "Handbook", at: "p.4" },
       { source: "/sources/travel.pdf", at: "p.9" },
       { source: "/sources/rates.csv" },
     ]);
-    expect(uncited.ok && uncited.value.found && uncited.value.concept?.evidence).toEqual([]);
+    assert(uncited.ok);
+    assert(uncited.value.found);
+    expect(uncited.value.concept?.evidence).toEqual([]);
   });
 
   const SHELF_LIVES: readonly (readonly [string, FrontmatterValue | undefined, TrustStatus])[] = [
@@ -1719,23 +1729,24 @@ describe("opening a concept by IRI", () => {
     ["a list where a date belongs", ["2020-01-01"], "current"],
   ];
 
+  const expensesPolicyLasting = (staleAfter: FrontmatterValue | undefined) => ({
+    title: "Expenses",
+    type: "Policy",
+    ...(staleAfter === undefined ? {} : { stale_after: staleAfter }),
+  });
+
   it.each(SHELF_LIVES)("reads $0 as $2", async (_why, staleAfter, expected) => {
     const scenario = await arrange();
-    const input = writeFor({
-      status: "stable",
-      frontmatter: {
-        title: "Expenses",
-        type: "Policy",
-        ...(staleAfter === undefined ? {} : { stale_after: staleAfter }),
-      },
-    });
+    const input = writeFor({ status: "stable", frontmatter: expensesPolicyLasting(staleAfter) });
     const written = await landed(scenario, input);
 
     const read = await reading(scenario.viewer, (principal, tx) =>
       open(principal, tx, { iri: written.iri }, now),
     );
 
-    expect(read.ok && read.value.found && read.value.concept?.trust.status).toBe(expected);
+    assert(read.ok);
+    assert(read.value.found);
+    expect(read.value.concept?.trust.status).toBe(expected);
   });
 
   it("expires at the end of a date-only shelf life's day", async () => {
@@ -1756,14 +1767,12 @@ describe("opening a concept by IRI", () => {
       open(principal, tx, { iri: written.iri }, new Date(boundary.getTime() - 1)),
     );
 
-    expect(
-      atTheBoundary.ok && atTheBoundary.value.found && atTheBoundary.value.concept?.trust.status,
-    ).toBe("out-of-date");
-    expect(
-      aMillisecondBefore.ok &&
-        aMillisecondBefore.value.found &&
-        aMillisecondBefore.value.concept?.trust.status,
-    ).toBe("current");
+    assert(atTheBoundary.ok);
+    assert(atTheBoundary.value.found);
+    expect(atTheBoundary.value.concept?.trust.status).toBe("out-of-date");
+    assert(aMillisecondBefore.ok);
+    assert(aMillisecondBefore.value.found);
+    expect(aMillisecondBefore.value.concept?.trust.status).toBe("current");
   });
 
   it("is current at an offset-datetime shelf life's exact instant", async () => {
@@ -1784,14 +1793,12 @@ describe("opening a concept by IRI", () => {
       open(principal, tx, { iri: written.iri }, new Date(instant.getTime() + 1)),
     );
 
-    expect(
-      atTheInstant.ok && atTheInstant.value.found && atTheInstant.value.concept?.trust.status,
-    ).toBe("current");
-    expect(
-      aMillisecondAfter.ok &&
-        aMillisecondAfter.value.found &&
-        aMillisecondAfter.value.concept?.trust.status,
-    ).toBe("out-of-date");
+    assert(atTheInstant.ok);
+    assert(atTheInstant.value.found);
+    expect(atTheInstant.value.concept?.trust.status).toBe("current");
+    assert(aMillisecondAfter.ok);
+    assert(aMillisecondAfter.value.found);
+    expect(aMillisecondAfter.value.concept?.trust.status).toBe("out-of-date");
   });
 
   it("withholds a Restricted concept from a Viewer as if unminted", async () => {
@@ -1813,7 +1820,8 @@ describe("opening a concept by IRI", () => {
     const seen = await reading(scenario.admin, (principal, tx) =>
       open(principal, tx, { iri: written.iri }, now),
     );
-    expect(seen.ok && seen.value.found).toBe(true);
+    assert(seen.ok);
+    expect(seen.value.found).toBe(true);
   });
 
   it("never reaches another workspace's concept, whoever asks", async () => {
@@ -1856,10 +1864,10 @@ describe("a concept's collection", () => {
       ),
     );
 
-    expect(read.map((concept) => concept.ok && concept.value?.collection)).toEqual([
-      "audits",
-      "audits",
-      null,
+    expect(read).toMatchObject([
+      { ok: true, value: { collection: "audits" } },
+      { ok: true, value: { collection: "audits" } },
+      { ok: true, value: { collection: null } },
     ]);
   });
 
@@ -1895,12 +1903,15 @@ describe("a concept's collection", () => {
       );
 
     const first = await page();
-    const second = await page(first.ok ? first.value[0]?.bound : undefined);
-    const third = await page(second.ok ? second.value[0]?.bound : undefined);
+    assert(first.ok);
+    const second = await page(first.value[0]?.bound);
+    assert(second.ok);
+    const third = await page(second.value[0]?.bound);
+    assert(third.ok);
 
     expect(
       [first, second, third]
-        .flatMap((read) => (read.ok ? read.value.map(({ concept }) => concept.path) : []))
+        .flatMap((read) => read.value.map(({ concept }) => concept.path))
         .toSorted(),
     ).toEqual(["knowledge/audits/retention.md", "knowledge/website/retention.md"]);
     expect(third).toEqual({ ok: true, value: [] });
