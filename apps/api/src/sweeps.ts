@@ -50,11 +50,11 @@ const refusalsOf = (pass: SweepPass) =>
 const reservationsSettledIn = (pass: SweepPass): number =>
   pass.swept.reduce((settled, { spend }) => settled + (spend.ok ? spend.value : 0), 0);
 
-type Deletion = Result<number, Error>;
+type Deletion = Result<number>;
 
 const countOf = (deletion: Deletion): number => (deletion.ok ? deletion.value : 0);
 
-const refusalOf = (sweep: string, swept: Result<unknown, Error>) =>
+const refusalOf = (sweep: string, swept: Result<unknown>) =>
   swept.ok ? [] : [{ sweep, reason: reasonOf(swept.error) }];
 
 const sweptOutsideAnyWorkspace = async (postgres: PostgresDoor, now: Date) => {

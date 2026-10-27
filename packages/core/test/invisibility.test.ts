@@ -51,7 +51,7 @@ const { db, arrange, reading } = visibilitySuite();
 
 const reaches = async (person: UserPrincipal, iri: ConceptIri): Promise<boolean> => {
   const read = await reading(person, (reader, tx) => conceptByIri(reader, tx, iri));
-  if (!read.ok) throw read.error;
+  if (!read.ok) throw new Error(String(read.error));
   return read.value !== undefined;
 };
 
@@ -580,7 +580,7 @@ const irisReadBy = async (
   iris: readonly ConceptIri[],
 ): Promise<readonly ConceptIri[]> => {
   const read = await reading(person, (reader, tx) => conceptsByIris(reader, tx, iris));
-  if (!read.ok) throw read.error;
+  if (!read.ok) throw new Error(String(read.error));
   return read.value.map((concept) => concept.iri);
 };
 

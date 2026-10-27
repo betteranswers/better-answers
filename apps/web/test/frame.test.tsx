@@ -230,7 +230,7 @@ describe("jump to, while no role is held", () => {
   });
 });
 
-const OUTSIDE_THE_LIST = [
+const OUTSIDE_THE_LIST = new Set([
   "/",
   "/console",
   "/sign-in",
@@ -244,13 +244,13 @@ const OUTSIDE_THE_LIST = [
   "/choose-workspace",
   "/no-workspace",
   "/invitations/$invitationId",
-];
+]);
 
 const routedPaths = (): readonly string[] =>
   Object.keys(
     createAppRouter(createAppClients(), createMemoryHistory({ initialEntries: ["/"] }))
       .routesByPath,
-  ).filter((path) => !OUTSIDE_THE_LIST.includes(path));
+  ).filter((path) => !OUTSIDE_THE_LIST.has(path));
 
 const detailRouteOf = (each: Page): readonly string[] =>
   each.detail === undefined ? [] : [`${each.path}/$${each.detail.param}`];
@@ -294,9 +294,9 @@ describe("the routes and navigation built from the one list", () => {
   });
 
   it("routes nothing but built pages, details, homes and moves", () => {
-    const known = [...destinations, ...moved.map((each) => each.from)];
+    const known = new Set([...destinations, ...moved.map((each) => each.from)]);
 
-    expect(routedPaths().filter((path) => !known.includes(path))).toEqual([]);
+    expect(routedPaths().filter((path) => !known.has(path))).toEqual([]);
   });
 
   it("routes every moved address, each leading to a built page", () => {

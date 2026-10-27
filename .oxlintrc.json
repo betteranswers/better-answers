@@ -1,6 +1,16 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "vitest", "import", "node"],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc",
+    "react",
+    "jsx-a11y",
+    "vitest",
+    "import",
+    "node",
+    "promise"
+  ],
   "jsPlugins": [
     {
       "name": "anti-slop",
@@ -26,6 +36,22 @@
   },
   "rules": {
     "no-console": "error",
+    "typescript/no-unnecessary-type-arguments": "error",
+    "unicorn/prefer-set-has": "error",
+    "oxc/no-accumulating-spread": "error",
+    "typescript/no-deprecated": "error",
+    "promise/always-return": ["error", { "ignoreLastCallback": true }],
+    "promise/no-callback-in-promise": "error",
+    "promise/no-multiple-resolved": "error",
+    "typescript/only-throw-error": [
+      "error",
+      { "allow": [{ "from": "package", "package": "@tanstack/router-core", "name": "Redirect" }] }
+    ],
+    "typescript/no-misused-promises": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/no-unsafe-type-assertion": "error",
+    "react/no-array-index-key": "error",
+    "react/jsx-no-constructed-context-values": "error",
     "complexity": ["error", { "max": 8 }],
     "node/no-process-env": "error",
     "import/no-cycle": "error",

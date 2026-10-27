@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
   type ClipboardEvent,
-  type FormEvent,
+  type SubmitEvent,
   type RefObject,
 } from "react";
 import { flushSync } from "react-dom";
@@ -417,7 +417,7 @@ function InviteForm(properties: {
     );
   };
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (sending) return;
     const held = addresses.placedNow(allInto(addresses.held, addresses.field));

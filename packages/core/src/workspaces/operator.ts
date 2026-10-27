@@ -187,7 +187,7 @@ export const restoreSignIn = async (
 export const operatorAddresses = (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-): Promise<Result<readonly string[], Error>> =>
+): Promise<Result<readonly string[]>> =>
   attempt(() =>
     withIdentityRead(platform, door, async (tx) => {
       const found = await tx.query<{ email: string }>(
@@ -208,7 +208,7 @@ type OperatorStanding =
 export const standingAsOperator = async (
   door: PostgresDoor,
   claims: Pick<Claims, "userId" | "issuedAt" | "sessionId">,
-): Promise<Result<OperatorStanding, Error>> => {
+): Promise<Result<OperatorStanding>> => {
   const resolved = await attempt(() =>
     withOperatorRead(door, claims, async (operator, tx) => {
       const found = await tx.query<{ name: string }>('SELECT name FROM "user" WHERE id = $1', [

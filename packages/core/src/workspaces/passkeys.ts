@@ -219,7 +219,7 @@ export const recordPasskeyUse = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: { readonly credentialId: string; readonly at: Date },
-): Promise<Result<{ readonly recorded: boolean }, Error>> => {
+): Promise<Result<{ readonly recorded: boolean }>> => {
   const used = await attempt(() =>
     withIdentityWrite(platform, door, (tx) => tx.query(USING, [input.credentialId, input.at])),
   );

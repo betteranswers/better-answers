@@ -968,13 +968,13 @@ describe("the full lane's legs against the one list of gates", () => {
 
 describe("how the legs narrow check:workspaces", () => {
   it("narrows a step only into root scripts the legs run", () => {
-    const ran = legsTheFanInRequires(CODE_LANE).flatMap(gatesOf);
+    const ran = new Set(legsTheFanInRequires(CODE_LANE).flatMap(gatesOf));
 
     for (const [whole, parts] of Object.entries(NARROWED)) {
       expect(rootScripts()[whole], `${whole} is not a root script`).toBeDefined();
       expect(parts.filter((part) => rootScripts()[part] === undefined)).toEqual([]);
       expect(
-        parts.filter((part) => !ran.includes(part)),
+        parts.filter((part) => !ran.has(part)),
         `${whole} is narrowed past the legs`,
       ).toEqual([]);
     }

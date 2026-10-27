@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useState, type SubmitEvent } from "react";
 
 import { refusalOf, type Refusal } from "@/shared/api/trpc.ts";
 import { DISPLAY_NAME_REFUSED, DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
@@ -27,7 +27,7 @@ export function DisplayNamePage() {
   const failure = setDisplayName.error;
   const refusedAs = failure === null ? undefined : refusalOf(failure)?.class;
 
-  const save = (event: FormEvent) => {
+  const save = (event: SubmitEvent) => {
     event.preventDefault();
     setDisplayName.mutate(
       { displayName: asked },

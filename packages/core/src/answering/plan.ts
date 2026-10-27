@@ -120,7 +120,7 @@ type Asked = {
 const entryPoints = async (
   { reader, question, collections, caps }: Asked,
   tx: Tx,
-): Promise<Result<readonly OpenedConcept[], Error>> => {
+): Promise<Result<readonly OpenedConcept[]>> => {
   const counts = await conceptCountsOf(reader, tx, question);
   if (!counts.ok) return counts;
   const search = { query: question, collections, counts: counts.value };
@@ -141,7 +141,7 @@ const entryPoints = async (
 const unmappedPassagesFor = async (
   { reader, question, caps }: Asked,
   tx: Tx,
-): Promise<Result<readonly PassageView[], Error>> => {
+): Promise<Result<readonly PassageView[]>> => {
   const found = await findPassages(reader, tx, { query: question, limit: caps.unmappedPassages });
   if (!found.ok) return found;
   const passages: PassageView[] = [];

@@ -123,6 +123,6 @@ export const admit = <D extends ActionDeclaration>(
     ? ok(principal)
     : err("operator" in wanted ? NOT_THE_OPERATOR : ROLE_FORBIDS);
 
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- both sides turn on a `D` still open here, which no runtime check narrows
+  // oxlint-disable-next-line typescript/consistent-type-assertions, typescript/no-unsafe-type-assertion -- both sides turn on a `D` still open here, which no runtime check narrows
   return answered as Result<AdmittedOf<D>, AdmissionRefusedOf<D>>;
 };

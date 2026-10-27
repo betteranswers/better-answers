@@ -183,7 +183,7 @@ const byPerson = (rows: readonly z.output<typeof WAITING_ROW>[]): readonly NameW
 export const listNamesWaiting = (
   _operator: OperatorPrincipal,
   tx: Tx,
-): Promise<Result<readonly NameWaiting[], Error>> =>
+): Promise<Result<readonly NameWaiting[]>> =>
   attempt(async () => {
     const found = await tx.query(FLAGS_WAITING, [...WAITING_ACTIONS]);
     return byPerson(found.rows.map((row) => WAITING_ROW.parse(row)));

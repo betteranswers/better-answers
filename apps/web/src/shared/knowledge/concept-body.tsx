@@ -387,18 +387,21 @@ export function ConceptBody(properties: {
 
   const pages = useMemo(() => pagesByAddress(bodyLinks ?? []), [bodyLinks]);
 
-  const held: Held = {
-    pages,
-    cited: read.marks.map(({ source }) => ({
-      source,
-      label: evidence[source]?.source ?? "",
-      opens: opening !== undefined && openingOf(evidence[source]) !== undefined,
-    })),
-    idOf: (mark) => `${baseId}-mark-${String(mark)}`,
-    opening,
-    headingsFrom,
-    footnotesId: `${baseId}-footnotes`,
-  };
+  const held = useMemo<Held>(
+    () => ({
+      pages,
+      cited: read.marks.map(({ source }) => ({
+        source,
+        label: evidence[source]?.source ?? "",
+        opens: opening !== undefined && openingOf(evidence[source]) !== undefined,
+      })),
+      idOf: (mark) => `${baseId}-mark-${String(mark)}`,
+      opening,
+      headingsFrom,
+      footnotesId: `${baseId}-footnotes`,
+    }),
+    [pages, read.marks, evidence, opening, headingsFrom, baseId],
+  );
 
   const opened = held.cited.findIndex((_, mark) => opening?.openerId === held.idOf(mark));
   const drawing: Drawing = {

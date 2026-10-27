@@ -455,7 +455,7 @@ export type WorkspaceReconciled = {
 export const reconcileEveryWorkspace = async (
   platform: ReconcilerPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
-): Promise<Result<readonly WorkspaceReconciled[], Error>> => {
+): Promise<Result<readonly WorkspaceReconciled[]>> => {
   const held = await workspaceIds(platform, doors.postgres);
   if (!held.ok) return err(held.error);
   const outcomes: WorkspaceReconciled[] = [];

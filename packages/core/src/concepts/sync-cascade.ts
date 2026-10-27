@@ -106,44 +106,39 @@ const followSync = async (
   door: PostgresDoor,
   workspaceId: WorkspaceId,
   sync: EndedSync,
-): Promise<Result<number | undefined, Error>> =>
+): Promise<Result<number | undefined>> =>
   attemptResult(() =>
-    withScope(
-      platform,
-      door,
-      workspaceId,
-      async (tx): Promise<Result<number | undefined, Error>> => {
-        if (sync.status === "claimed") {
-          const locked = await lockSyncIn(platform, tx, {
-            workspaceId,
-            jobId: sync.jobId,
-            attempts: sync.attempts,
-          });
-          if (!locked.ok) return err(normalizeError(locked.error));
-        }
-        const cascaded = await cascadingVisibility(
-          platform,
-          tx,
-          targetOf(sync),
-          unlessFollowed(platform, sync),
-        );
-        if (!cascaded.ok)
-          return cascaded.error === ALREADY_FOLLOWED ? ok(undefined) : err(cascaded.error);
-        await record(platform, tx, {
-          id: ulid(),
-          action: SYNC_CASCADE_ACTIONS.followed,
-          subjectId: sync.jobId,
-          detail: {
-            [STORED_DETAIL_KEYS.connectedSourceId]: sync.connectedSourceId,
-            attempts: sync.attempts,
-            documents: sync.moved.kind === "documents" ? sync.moved.documentIds.length : 0,
-            concepts: cascaded.value.concepts.length,
-            writeUps: cascaded.value.writeUps.length,
-          },
+    withScope(platform, door, workspaceId, async (tx): Promise<Result<number | undefined>> => {
+      if (sync.status === "claimed") {
+        const locked = await lockSyncIn(platform, tx, {
+          workspaceId,
+          jobId: sync.jobId,
+          attempts: sync.attempts,
         });
-        return ok(cascaded.value.concepts.length);
-      },
-    ),
+        if (!locked.ok) return err(normalizeError(locked.error));
+      }
+      const cascaded = await cascadingVisibility(
+        platform,
+        tx,
+        targetOf(sync),
+        unlessFollowed(platform, sync),
+      );
+      if (!cascaded.ok)
+        return cascaded.error === ALREADY_FOLLOWED ? ok(undefined) : err(cascaded.error);
+      await record(platform, tx, {
+        id: ulid(),
+        action: SYNC_CASCADE_ACTIONS.followed,
+        subjectId: sync.jobId,
+        detail: {
+          [STORED_DETAIL_KEYS.connectedSourceId]: sync.connectedSourceId,
+          attempts: sync.attempts,
+          documents: sync.moved.kind === "documents" ? sync.moved.documentIds.length : 0,
+          concepts: cascaded.value.concepts.length,
+          writeUps: cascaded.value.writeUps.length,
+        },
+      });
+      return ok(cascaded.value.concepts.length);
+    }),
   );
 
 const listedSyncs = async (
@@ -151,7 +146,7 @@ const listedSyncs = async (
   door: PostgresDoor,
   workspaceId: WorkspaceId,
   firstFollowed: Date | null,
-): Promise<Result<readonly EndedSync[], Error>> => {
+): Promise<Result<readonly EndedSync[]>> => {
   const newest = await endedSyncs(platform, door, {
     workspaceId,
     scan: { kind: "newest-per-source" },
@@ -175,7 +170,7 @@ const syncsToFollow = async (
   platform: SyncCascadePrincipal,
   door: PostgresDoor,
   workspaceId: WorkspaceId,
-): Promise<Result<readonly EndedSync[], Error>> => {
+): Promise<Result<readonly EndedSync[]>> => {
   const first = await attempt(() =>
     withScope(platform, door, workspaceId, (tx) => firstFollowedAt(platform, tx)),
   );
@@ -193,7 +188,7 @@ export const followSyncs = async (
   platform: SyncCascadePrincipal,
   door: PostgresDoor,
   workspaceId: WorkspaceId,
-): Promise<Result<WorkspaceSyncsFollowed, Error>> => {
+): Promise<Result<WorkspaceSyncsFollowed>> => {
   const syncs = await syncsToFollow(platform, door, workspaceId);
   if (!syncs.ok) return err(syncs.error);
   const followed: SyncFollowed[] = [];
@@ -210,10 +205,10 @@ export const followSyncs = async (
 export const followSyncsInEveryWorkspace = async (
   platform: SyncCascadePrincipal,
   door: PostgresDoor,
-): Promise<Result<readonly Result<WorkspaceSyncsFollowed, Error>[], Error>> => {
+): Promise<Result<readonly Result<WorkspaceSyncsFollowed>[]>> => {
   const held = await workspaceIds(platform, door);
   if (!held.ok) return err(held.error);
-  const passes: Result<WorkspaceSyncsFollowed, Error>[] = [];
+  const passes: Result<WorkspaceSyncsFollowed>[] = [];
   for (const workspaceId of held.value) passes.push(await followSyncs(platform, door, workspaceId));
   return ok(passes);
 };

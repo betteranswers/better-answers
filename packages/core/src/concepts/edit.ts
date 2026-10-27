@@ -126,7 +126,7 @@ const openedSourcesOf = async (
   tx: Tx,
   frontmatter: Frontmatter,
   passageAt: PassageReader,
-): Promise<Result<readonly Opened[], Error>> => {
+): Promise<Result<readonly Opened[]>> => {
   const resolved = await resolvedSourcesOf(
     {
       principal,

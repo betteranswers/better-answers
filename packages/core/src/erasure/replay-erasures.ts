@@ -49,7 +49,7 @@ const erasureRequestsSince = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   since: Date,
-): Promise<Result<readonly ReplayableErasure[], Error>> => {
+): Promise<Result<readonly ReplayableErasure[]>> => {
   const held = await workspaceIds(platform, door);
   if (!held.ok) return err(held.error);
 
@@ -85,7 +85,7 @@ export const replayableErasures = async (
   platform: PlatformPrincipal,
   doors: Pick<ErasureDoors, "postgres" | "objects">,
   input: { readonly since: Date },
-): Promise<Result<readonly ReplayableErasure[], Error>> => {
+): Promise<Result<readonly ReplayableErasure[]>> => {
   const rows = await erasureRequestsSince(platform, doors.postgres, input.since);
   if (!rows.ok) return err(rows.error);
   const copies = await replayCopiesSince(platform, doors.objects, input.since);
@@ -119,7 +119,7 @@ const restoreFromReplayCopy = async (
   platform: ErasurePrincipal,
   door: PostgresDoor,
   copy: ReplayCopy,
-): Promise<Result<void, Error>> => {
+): Promise<Result<void>> => {
   const receivedAt = new Date(copy.completedAt);
   const beyondUse = beyondUseFrom(receivedAt);
   const restored = await attempt(() =>
@@ -190,7 +190,7 @@ export const replayErasures = async (
   platform: ErasurePrincipal,
   doors: ErasureDoors,
   input: { readonly since: Date },
-): Promise<Result<readonly ReplayedErasure[], Error>> => {
+): Promise<Result<readonly ReplayedErasure[]>> => {
   const owed = await replayableErasures(platform, doors, input);
   if (!owed.ok) return err(owed.error);
 

@@ -70,7 +70,7 @@ const summaryOf = (outcomes: readonly WorkspaceReconciled[]) => {
   };
 };
 
-const followedSummaryOf = (passes: readonly Result<WorkspaceSyncsFollowed, Error>[]) => {
+const followedSummaryOf = (passes: readonly Result<WorkspaceSyncsFollowed>[]) => {
   let followed = 0;
   let concepts = 0;
   const skipped: { workspace_id: string; job_id: string; reason: string }[] = [];

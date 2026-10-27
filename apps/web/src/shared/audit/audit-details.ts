@@ -142,6 +142,7 @@ const VALUE_WORDS: ReadonlyMap<unknown, string> = new Map([
 type Said = { readonly value: string; readonly address?: string };
 
 const saidOf = (named: Named): Said => {
+  if ("name" in named) return { value: named.name };
   switch (named.kind) {
     case "person":
       return personSaid(named.displayName, named.address);
@@ -154,7 +155,7 @@ const saidOf = (named: Named): Said => {
     case "erased-invitation":
       return { value: GONE_WORDS[named.kind] };
     default:
-      return { value: named.name };
+      return named satisfies never;
   }
 };
 

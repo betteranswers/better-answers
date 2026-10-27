@@ -1,4 +1,4 @@
-import { CaretLeft, CaretRight } from "@phosphor-icons/react";
+import { CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react";
 import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils.ts";
@@ -62,7 +62,7 @@ export const PaginationCounter = ({
     <PaginationContent className="flex-wrap gap-2">
       <PaginationItem>
         <PaginationTurn {...previous}>
-          <CaretLeft aria-hidden />
+          <CaretLeftIcon aria-hidden />
           Previous
         </PaginationTurn>
       </PaginationItem>
@@ -77,7 +77,7 @@ export const PaginationCounter = ({
       <PaginationItem>
         <PaginationTurn {...next}>
           Next
-          <CaretRight aria-hidden />
+          <CaretRightIcon aria-hidden />
         </PaginationTurn>
       </PaginationItem>
     </PaginationContent>

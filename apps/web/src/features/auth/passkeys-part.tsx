@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useId, useRef, useState, type SubmitEvent, type KeyboardEvent } from "react";
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
@@ -105,7 +105,7 @@ export function AddAPasskey(properties: {
   const pending = adding.isPending || adding.isSuccess;
   const said = blank ? blankName : saidOfAdding(adding.error);
 
-  const add = (event: FormEvent) => {
+  const add = (event: SubmitEvent) => {
     event.preventDefault();
     const asked = name.trim();
     setBlank(asked === "");
@@ -159,7 +159,7 @@ function RenameAPasskey(properties: {
   const [blank, setBlank] = useState(false);
   const said = blank ? blankName : saidOfRenaming(renaming.error);
 
-  const save = (event: FormEvent) => {
+  const save = (event: SubmitEvent) => {
     event.preventDefault();
     const asked = name.trim();
     setBlank(asked === "");

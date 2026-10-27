@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from "react";
+import { useId, useState, type SubmitEvent } from "react";
 
 import { ulid } from "@better-answers/schema/ulid";
 
@@ -78,7 +78,7 @@ export function ConnectAction() {
   };
   useKeystroke(SOURCES_KEYSTROKES.connect, show);
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const file = form.get("file");

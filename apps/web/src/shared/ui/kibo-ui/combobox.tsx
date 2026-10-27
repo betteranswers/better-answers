@@ -6,6 +6,7 @@ import {
   type ReactNode,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -88,21 +89,24 @@ export const Combobox = ({
   const [width, setWidth] = useState(200);
   const [inputValue, setInputValue] = useState("");
 
+  const held = useMemo(
+    () => ({
+      type,
+      value,
+      onValueChange,
+      open,
+      onOpenChange,
+      data,
+      width,
+      setWidth,
+      inputValue,
+      setInputValue,
+    }),
+    [type, value, onValueChange, open, onOpenChange, data, width, inputValue],
+  );
+
   return (
-    <ComboboxContext.Provider
-      value={{
-        type,
-        value,
-        onValueChange,
-        open,
-        onOpenChange,
-        data,
-        width,
-        setWidth,
-        inputValue,
-        setInputValue,
-      }}
-    >
+    <ComboboxContext.Provider value={held}>
       <Popover {...props} onOpenChange={onOpenChange} open={open} />
     </ComboboxContext.Provider>
   );

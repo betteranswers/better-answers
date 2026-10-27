@@ -221,7 +221,7 @@ const claimsInTheTabsWorkspace = async (
 const settled = <Ran>(
   ctx: TrpcContext,
   resolver: string,
-  resolved: Result<Result<Ran, RefusalAnswer>, Error>,
+  resolved: Result<Result<Ran, RefusalAnswer>>,
 ): Ran => {
   if (!resolved.ok) {
     if (resolved.error instanceof TRPCError) throw resolved.error;

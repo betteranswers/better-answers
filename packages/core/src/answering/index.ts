@@ -223,7 +223,7 @@ type Positioned<Match> = { readonly match: Match; readonly position: FindPositio
 type RunReader<Match> = (
   limit: number,
   after: FindPosition | undefined,
-) => Promise<Result<readonly Positioned<Match>[], Error>>;
+) => Promise<Result<readonly Positioned<Match>[]>>;
 
 type Search = {
   readonly principal: UserPrincipal;
@@ -231,14 +231,14 @@ type Search = {
   readonly query: string;
 };
 
-type Counted = () => Promise<Result<CorpusCounts, Error>>;
+type Counted = () => Promise<Result<CorpusCounts>>;
 
 const countedOnce = (
   runs: readonly FindRun[],
   after: FindPosition | undefined,
   count: Counted,
 ): Counted => {
-  let held: Promise<Result<CorpusCounts, Error>> | undefined;
+  let held: Promise<Result<CorpusCounts>> | undefined;
   return () => {
     held ??=
       after !== undefined && runs.includes(after.run) ? Promise.resolve(ok(after.counts)) : count();
@@ -297,7 +297,7 @@ const pageOf = async <Match>(
   runs: readonly (readonly [FindRun, RunReader<Match>])[],
   limit: number,
   after: FindPosition | undefined,
-): Promise<Result<Page<Match>, Error>> => {
+): Promise<Result<Page<Match>>> => {
   const read: Positioned<Match>[] = [];
   const from = after === undefined ? 0 : runs.findIndex(([run]) => run === after.run);
   for (const [, reader] of runs.slice(from)) {
@@ -400,7 +400,7 @@ const passageOpened = async (
   reader: UserPrincipal,
   tx: Tx,
   asked: string,
-): Promise<Result<OpenResult, Error>> => {
+): Promise<Result<OpenResult>> => {
   const passage = await passageAt(reader, tx, asked);
   if (!passage.ok) {
     return passage.error === NOT_FOUND ? ok({ found: false, locator: asked }) : err(passage.error);
@@ -413,7 +413,7 @@ const conceptOpened = async (
   tx: Tx,
   named: ConceptIri,
   now: Date,
-): Promise<Result<OpenResult, Error>> => {
+): Promise<Result<OpenResult>> => {
   const concept = await readConcept(reader, tx, named, {
     passageAt: (locator) => passageAt(reader, tx, locator),
     namesPassage: (locator) => parseLocator(locator).ok,

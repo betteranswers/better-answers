@@ -1,4 +1,4 @@
-import { DotsThreeVertical } from "@phosphor-icons/react";
+import { DotsThreeVerticalIcon } from "@phosphor-icons/react";
 import { useRef } from "react";
 
 import { Button } from "@/shared/ui/button.tsx";
@@ -53,7 +53,7 @@ export const RowActions = ({ label, actions, triggerId }: RowActionsProps) => {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button id={triggerId} className="size-8" size="icon" variant="ghost" aria-label={label}>
-          <DotsThreeVertical aria-hidden className="size-4" />
+          <DotsThreeVerticalIcon aria-hidden className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-40" onCloseAutoFocus={focusAfterShutting}>

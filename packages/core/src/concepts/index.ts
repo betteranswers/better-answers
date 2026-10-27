@@ -472,18 +472,18 @@ const plus = (sum: VerificationsRecorded, more: VerificationsRecorded): Verifica
   present: sum.present + more.present,
 });
 
+const MALFORMED_MANIFEST = ["malformed", "malformed-path", "malformed-message"] as const;
+
+const isMalformedManifest = (refusal: string): refusal is (typeof MALFORMED_MANIFEST)[number] =>
+  MALFORMED_MANIFEST.some((word) => word === refusal);
+
 const manifestRefusalOf = (refusal: WriteManifestRefusal | Error): ImportBundleRefusal | Error => {
   if (refusal instanceof Error) return refusal;
-  switch (refusal) {
-    case "path-taken":
-      return "manifest-taken";
-    case "malformed":
-    case "malformed-path":
-    case "malformed-message":
-      return new Error(`the manifest commit was refused: ${refusal}`);
-    default:
-      return refusal;
+  if (refusal === "path-taken") return "manifest-taken";
+  if (isMalformedManifest(refusal)) {
+    return new Error(`the manifest commit was refused: ${refusal}`);
   }
+  return refusal;
 };
 
 const dryRunOf = (
@@ -933,7 +933,7 @@ export const readConcept = async (
     readonly namesPassage: PassageNamer;
     readonly now: Date;
   },
-): Promise<Result<ConceptRead | undefined, Error>> => {
+): Promise<Result<ConceptRead | undefined>> => {
   const read = await attempt(() =>
     tx.query<ReadRow>(CONCEPT_READ, [principal.workspaceId, ...readableParameters(principal), iri]),
   );
@@ -968,7 +968,7 @@ export const evidenceOf = async (
   tx: Tx,
   frontmatter: Frontmatter,
   reads: { readonly passageAt: PassageReader; readonly namesPassage: PassageNamer },
-): Promise<Result<EvidencePane["evidence"], Error>> => {
+): Promise<Result<EvidencePane["evidence"]>> => {
   const sources = await resolvedSourcesOf({ principal, tx, ...reads }, frontmatter);
   return sources.ok ? ok(sources.value.map((source) => source.item)) : err(sources.error);
 };
@@ -978,7 +978,7 @@ export const corpusCountsOf = (
   documents: string,
   parameters: readonly unknown[],
   query: string,
-): Promise<Result<CorpusCounts, Error>> =>
+): Promise<Result<CorpusCounts>> =>
   attempt(async () => {
     const words = await tx.query<{ readonly word: string }>(QUERY_WORDS, [query]);
     if (words.rows.length === 0) return { size: 0, frequencies: [] };
@@ -995,7 +995,7 @@ export const conceptCountsOf = (
   principal: UserPrincipal,
   tx: Tx,
   query: string,
-): Promise<Result<CorpusCounts, Error>> =>
+): Promise<Result<CorpusCounts>> =>
   corpusCountsOf(
     tx,
     `SELECT d.search FROM concept_index d WHERE d.workspace_id = $1 AND ${readableClause("d", 2)}`,
@@ -1027,7 +1027,7 @@ export const findConcepts = async (
   principal: UserPrincipal,
   tx: Tx,
   input: ConceptSearch & { readonly counts?: CorpusCounts | undefined },
-): Promise<Result<readonly ConceptFound[], Error>> => {
+): Promise<Result<readonly ConceptFound[]>> => {
   const counts =
     input.counts === undefined
       ? await conceptCountsOf(principal, tx, input.query)
@@ -1048,7 +1048,7 @@ const conceptsWeighed = (
   tx: Tx,
   input: ConceptSearch,
   counts: CorpusCounts,
-): Promise<Result<readonly ConceptFound[], Error>> =>
+): Promise<Result<readonly ConceptFound[]>> =>
   attempt(async () => {
     const { after, collections } = input;
     const { rows } = await tx.query<MatchingConceptRow>(

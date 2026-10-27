@@ -29,9 +29,9 @@ const fixture = contractFixture("cost-ledger", fixtureSchema, "rows.json");
 
 const recordedColumns = fixture.fields.map(({ field }) => field).toSorted();
 const recordedOutcomes = fixture.outcomes.map(({ outcome }) => outcome).toSorted();
-const failureOutcomes = fixture.outcomes
-  .filter(({ failure }) => failure)
-  .map(({ outcome }) => outcome);
+const failureOutcomes = new Set(
+  fixture.outcomes.filter(({ failure }) => failure).map(({ outcome }) => outcome),
+);
 const purposesTheRowsUse = [...new Set(fixture.rows.map((row) => row.purpose))].toSorted();
 
 const WORDS_A_PROMPT_OR_A_COMPLETION_SITS_UNDER = [
@@ -80,9 +80,9 @@ describe("cost-ledger, golden rows for the cost ledger of model calls", () => {
     const wordsTheRowsUse = [...new Set(fixture.rows.map((row) => row.outcome))].toSorted();
 
     expect(wordsTheRowsUse).toEqual(recordedOutcomes);
-    expect(
-      fixture.rows.filter((row) => failureOutcomes.includes(row.outcome)).length,
-    ).toBeGreaterThan(0);
+    expect(fixture.rows.filter((row) => failureOutcomes.has(row.outcome)).length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("names exactly one of the run or the answer served", () => {

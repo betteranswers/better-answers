@@ -43,14 +43,14 @@ const isAnImageInput = (changed) =>
 /** Unsure means `yes`: a probe run needlessly costs minutes; one skipped ships an image unread. */
 const imagesOf = (paths) => (paths.length === 0 || paths.some(isAnImageInput) ? "yes" : "no");
 
-const DEPENDENCY_INPUTS = [
+const DEPENDENCY_INPUTS = new Set([
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
   "apps/worker/pyproject.toml",
   "apps/worker/uv.lock",
-];
+]);
 
-const isADependencyInput = (changed) => isAManifest(changed) || DEPENDENCY_INPUTS.includes(changed);
+const isADependencyInput = (changed) => isAManifest(changed) || DEPENDENCY_INPUTS.has(changed);
 
 /** Unsure means `yes`: a typecheck run needlessly costs minutes; one skipped reaches the queue. */
 const dependenciesOf = (paths) =>

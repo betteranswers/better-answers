@@ -355,18 +355,17 @@ const middlewaresOf = (procedure: object) => definitionOf.parse(Reflect.get(proc
 
 describe("every query the router serves", () => {
   it("runs on a road that opens no read-write transaction itself", () => {
-    const roads = [
-      queryProcedure,
-      knowledgeReadProcedure,
-      personProcedure,
-      operatorQueryProcedure,
-    ].map((road) => middlewaresOf(road).middlewares[0]);
+    const roads = new Set(
+      [queryProcedure, knowledgeReadProcedure, personProcedure, operatorQueryProcedure].map(
+        (road) => middlewaresOf(road).middlewares[0],
+      ),
+    );
 
     const queries = Object.entries(appRouter._def.procedures).filter(
       ([, procedure]) => middlewaresOf(procedure).type === "query",
     );
     const elsewhere = queries
-      .filter(([, procedure]) => !roads.includes(middlewaresOf(procedure).middlewares[0]))
+      .filter(([, procedure]) => !roads.has(middlewaresOf(procedure).middlewares[0]))
       .map(([path]) => path);
 
     expect(queries.map(([path]) => path)).toEqual(
@@ -394,14 +393,14 @@ const QUERIES = Object.entries(appRouter._def.procedures).filter(
   ([, procedure]) => middlewaresOf(procedure).type === "query",
 );
 
-const ROADS_NAMING_NO_WORKSPACE = [
-  personProcedure,
-  operatorMutationProcedure,
-  operatorQueryProcedure,
-].map((road) => middlewaresOf(road).middlewares[0]);
+const ROADS_NAMING_NO_WORKSPACE = new Set(
+  [personProcedure, operatorMutationProcedure, operatorQueryProcedure].map(
+    (road) => middlewaresOf(road).middlewares[0],
+  ),
+);
 
 const namesNoWorkspace = (procedure: object): boolean =>
-  ROADS_NAMING_NO_WORKSPACE.includes(middlewaresOf(procedure).middlewares[0]);
+  ROADS_NAMING_NO_WORKSPACE.has(middlewaresOf(procedure).middlewares[0]);
 
 const answeredWord = z.object({
   error: z
@@ -501,12 +500,12 @@ describe("every query the router serves on a workspace road", () => {
 
 describe("every mutation on an own-transaction road", () => {
   it("is one this list names", () => {
-    const roads = [ownTransactionProcedure, askingProcedure].map(
-      (road) => middlewaresOf(road).middlewares[0],
+    const roads = new Set(
+      [ownTransactionProcedure, askingProcedure].map((road) => middlewaresOf(road).middlewares[0]),
     );
 
     const paths = MUTATIONS.filter(([, procedure]) =>
-      roads.includes(middlewaresOf(procedure).middlewares[0]),
+      roads.has(middlewaresOf(procedure).middlewares[0]),
     ).map(([path]) => path);
 
     expect(paths.toSorted()).toEqual([

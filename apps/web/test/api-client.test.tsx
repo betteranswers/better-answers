@@ -103,9 +103,7 @@ const anApiHearingActions = () => {
 };
 
 const memberRead = (clients: AppClients) =>
-  clients.queryClient.fetchQuery(
-    memberOptions(createApiProxy(clients.apiClient, clients.queryClient)),
-  );
+  clients.queryClient.query(memberOptions(createApiProxy(clients.apiClient, clients.queryClient)));
 
 const memberKeyOf = (clients: AppClients) =>
   memberOptions(createApiProxy(clients.apiClient, clients.queryClient)).queryKey;

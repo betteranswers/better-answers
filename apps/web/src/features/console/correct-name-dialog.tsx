@@ -1,4 +1,4 @@
-import { useId, useRef, type FormEvent } from "react";
+import { useId, useRef, type SubmitEvent } from "react";
 
 import { MountedActionDialog } from "@/shared/action-dialog.tsx";
 import { DISPLAY_NAME_MAX_CHARACTERS } from "@/shared/display-name-words.ts";
@@ -22,7 +22,7 @@ export function CorrectNameDialog(properties: {
   const saved = useRef(false);
   const byTheRule = refused?.byTheRule;
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const asked = new FormData(event.currentTarget).get("displayName");
     if (typeof asked !== "string") return;

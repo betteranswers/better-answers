@@ -246,7 +246,7 @@ const workspaceOfInvitation = (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   invitationId: InvitationId,
-): Promise<Result<WorkspaceId | undefined, Error>> =>
+): Promise<Result<WorkspaceId | undefined>> =>
   attempt(() =>
     withIdentityRead(platform, door, async (tx) => {
       const found = await tx.query<{ workspace_id: string }>(

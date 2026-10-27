@@ -323,7 +323,7 @@ export const readParkedAuthenticatorSecret = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: { readonly sessionId: string; readonly now: Date },
-): Promise<Result<string | undefined, Error>> => {
+): Promise<Result<string | undefined>> => {
   const read = await attempt(() =>
     withIdentityRead(platform, door, (tx) =>
       tx.query<{ value: string }>(

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { inferOutput } from "@trpc/tanstack-react-query";
-import { useState, type FormEvent } from "react";
+import { useState, type SubmitEvent } from "react";
 
 import {
   refusalOf,
@@ -239,7 +239,7 @@ function InvitationToJoin(properties: {
   };
   useKeystroke(JOIN, join);
 
-  const submitted = (event: FormEvent) => {
+  const submitted = (event: SubmitEvent) => {
     event.preventDefault();
     join();
   };

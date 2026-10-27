@@ -43,24 +43,29 @@ const doors = openDoors({
 
 const stdin = (): Promise<string> => text(process.stdin);
 
-const exitCode = await runOps(process.argv.slice(2), doors, {
-  fetch: fetchHonouringHost,
-  stdin,
-  say: (line) => {
-    process.stdout.write(`${line}\n`);
-  },
-  logger,
-  appHostname: identity.ok ? identity.value.hostnames.app : undefined,
+let exitCode: number;
+try {
+  exitCode = await runOps(process.argv.slice(2), doors, {
+    fetch: fetchHonouringHost,
+    stdin,
+    say: (line) => {
+      process.stdout.write(`${line}\n`);
+    },
+    logger,
+    appHostname: identity.ok ? identity.value.hostnames.app : undefined,
 
-  writeReport: async (path, body) => {
-    await writeFile(path, body, "utf8");
-  },
+    writeReport: async (path, body) => {
+      await writeFile(path, body, "utf8");
+    },
 
-  readTree: readTreeUnder,
-  mail,
-  modelKeySetting: envelopeKey.ok
-    ? ok(openModelKeySetting(envelopeKey.value))
-    : err(envelopeKey.error.message),
-}).finally(() => closeDoors(doors));
+    readTree: readTreeUnder,
+    mail,
+    modelKeySetting: envelopeKey.ok
+      ? ok(openModelKeySetting(envelopeKey.value))
+      : err(envelopeKey.error.message),
+  });
+} finally {
+  await closeDoors(doors);
+}
 
 process.exit(exitCode);

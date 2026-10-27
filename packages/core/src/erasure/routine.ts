@@ -276,18 +276,18 @@ const withTheVerificationsMoved = (
   [CONCEPT_VERIFICATION]: { ...actions[CONCEPT_VERIFICATION], rehashed: carried.verifications },
 });
 
-const withTheActorsStep = (actions: ErasureActions, swept: ActorsSwept): ErasureActions =>
-  [...swept].reduce<ErasureActions>(
-    (taken, [family, counts]) => ({ ...taken, [family]: { ...taken[family], ...counts } }),
-    actions,
-  );
+const withTheActorsStep = (actions: ErasureActions, swept: ActorsSwept): ErasureActions => {
+  const taken = { ...actions };
+  for (const [family, counts] of swept) taken[family] = { ...taken[family], ...counts };
+  return taken;
+};
 
 const rewritingTheBundle = (
   platform: ErasurePrincipal,
   doors: ErasureDoors,
   workspaceId: string,
   who: Pseudonymisation & { readonly paths: readonly string[] },
-): Promise<Result<GitStep, Error>> =>
+): Promise<Result<GitStep>> =>
   attempt(() =>
     withBundleFenceAs(platform, doors, workspaceId, "exclusive", async () => {
       const { moved, paths } = await rewriteHistory(platform, doors.git, workspaceId, who);
@@ -309,7 +309,7 @@ const afterTheMembersEnd = async (
     readonly workspaceId: string;
     readonly paths: readonly string[];
   },
-): Promise<Result<{ readonly git: GitStep; readonly actors: ActorsSwept }, Error>> => {
+): Promise<Result<{ readonly git: GitStep; readonly actors: ActorsSwept }>> => {
   const { workspaceId, addresses, people, pseudonym } = subject;
   const git = await rewritingTheBundle(platform, doors, workspaceId, subject);
   if (!git.ok) return err(git.error);
@@ -462,7 +462,7 @@ const completeTheRequest = async (
   workspaceId: string,
   opened: ErasureOpened,
   actions: ErasureActions,
-): Promise<Result<ErasureRun, Error>> => {
+): Promise<Result<ErasureRun>> => {
   const { request, erasure, pseudonym, standingCompletion, map, concepts } = opened;
   const report = erasureReportOf({ request, erasure, actions, map, concepts });
   const completedAt = doors.clock.now();

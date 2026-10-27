@@ -3,6 +3,7 @@ import { createContext, useContext, useId, useState, type ReactNode } from "reac
 import type { JudgeState, QuestionVerdict } from "@better-answers/schema";
 
 import type { ProsePart } from "@/shared/api/ask-stream.ts";
+import { keyed } from "@/shared/keyed.ts";
 import { ConceptBody, type MarkOpening } from "@/shared/knowledge/concept-body.tsx";
 import {
   EvidenceInline,
@@ -272,8 +273,8 @@ function Prose(properties: {
   const unwritten = part.outcome === undefined || part.outcome === "drafted" ? null : part.outcome;
   return (
     <div className="grid gap-2">
-      {part.sentences.map((sentence, at) => (
-        <DraftedSentence key={at} sentence={sentence} concepts={concepts} recordId={recordId} />
+      {keyed(part.sentences, ({ sentence }) => sentence).map(({ key, item: sentence }) => (
+        <DraftedSentence key={key} sentence={sentence} concepts={concepts} recordId={recordId} />
       ))}
       {unwritten === null ? null : (
         <p className="text-muted-foreground">{WORDS.unwritten[unwritten]}</p>

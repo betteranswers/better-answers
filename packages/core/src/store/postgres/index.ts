@@ -80,7 +80,7 @@ const answersARefusal = <T>(answer: T): boolean => answersAResult(answer) && !an
 export const folded = <T>(opened: Opened<Foldable<T>>): Folded<T> => {
   if (!opened.ok) return err(opened.error);
   const answer = opened.value;
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- `Folded<T>` turns on a `T` still open here, which no runtime check narrows
+  // oxlint-disable-next-line typescript/consistent-type-assertions, typescript/no-unsafe-type-assertion -- `Folded<T>` turns on a `T` still open here, which no runtime check narrows
   return (answersAResult(answer) ? answer : ok(answer)) as Folded<T>;
 };
 

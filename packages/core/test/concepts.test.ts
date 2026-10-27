@@ -1288,9 +1288,10 @@ describe("authority that moved while the action was in flight", () => {
       try {
         const pid = await backendPidOf(revoker);
         await withMember(scenario.editor, scenario.postgres, async () => {
-          waiting = revoke(revoker, scenario, scope).then(() => {
+          waiting = (async () => {
+            await revoke(revoker, scenario, scope);
             settled = true;
-          });
+          })();
 
           await until(() => isBlockedOnALock(db().pool, pid));
 

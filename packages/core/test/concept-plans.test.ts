@@ -78,7 +78,12 @@ describe("the concept arm's plan, as the api under its policy", () => {
     const { admin } = await arrangedWithInvoices();
 
     await db().pool.query(UNMARK_THE_MATCH);
-    const found = await matching(admin).finally(() => db().pool.query(MARK_THE_MATCH_LEAKPROOF));
+    let found: Awaited<ReturnType<typeof matching>>;
+    try {
+      found = await matching(admin);
+    } finally {
+      await db().pool.query(MARK_THE_MATCH_LEAKPROOF);
+    }
 
     expect(found.answer).toEqual([HOLIDAY]);
     expect(found.indexes).not.toContain("concept_index_search_gin");

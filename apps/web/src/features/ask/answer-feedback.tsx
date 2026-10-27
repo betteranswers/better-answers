@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from "react";
+import { useId, useState, type SubmitEvent } from "react";
 
 import { FLAG_REASONS, type FlagReason as Reason } from "@/shared/answer-words.ts";
 import { Icon } from "@/shared/icon.tsx";
@@ -39,7 +39,7 @@ function FlagForm(properties: {
   const { draft, onDraft } = properties;
   const { reason, note } = draft;
   const [unchosen, setUnchosen] = useState(false);
-  const send = (event: FormEvent) => {
+  const send = (event: SubmitEvent) => {
     event.preventDefault();
     if (reason === undefined) {
       setUnchosen(true);

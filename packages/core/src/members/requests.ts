@@ -158,7 +158,7 @@ const landDecision = async <A extends AuditAction>(
 
     readonly invitationId: string | null;
   },
-): Promise<Result<undefined, Error>> => {
+): Promise<Result<undefined>> => {
   await record(admin, tx, {
     id: ulid(),
     action: decision.action,

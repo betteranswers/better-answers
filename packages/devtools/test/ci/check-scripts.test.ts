@@ -150,7 +150,7 @@ describe("the gates a branch never narrows", () => {
   });
 });
 
-const SHIMMED_RUNNERS: readonly string[] = ["vitest", "stryker"];
+const SHIMMED_RUNNERS: ReadonlySet<string> = new Set(["vitest", "stryker"]);
 
 const RUNNER_SCRIPTS: Readonly<Record<string, string>> = {
   test: "vitest",
@@ -192,7 +192,7 @@ const runnerEntries = (): readonly RunnerEntry[] =>
 describe("the runners start through node", () => {
   it("starts no runner through its bin shim", () => {
     const shimmed = everyScript()
-      .filter(({ script }) => script.split(/\s+/).some((word) => SHIMMED_RUNNERS.includes(word)))
+      .filter(({ script }) => script.split(/\s+/).some((word) => SHIMMED_RUNNERS.has(word)))
       .map(({ directory, name, script }) => `${directory} ${name}: ${script}`);
 
     expect(

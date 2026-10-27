@@ -775,7 +775,7 @@ describe("what the slice's four actions answer", () => {
 
   it("answers a failed read as an error, never a concept", async () => {
     const reader = await arrange();
-    let answered: Result<OpenResult, Error> | undefined;
+    let answered: Result<OpenResult> | undefined;
 
     await expect(
       acting(reader, async (principal, tx) => {

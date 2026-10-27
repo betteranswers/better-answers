@@ -144,7 +144,7 @@ export const passageCountsOf = (
   principal: UserPrincipal,
   tx: Tx,
   query: string,
-): Promise<Result<CorpusCounts, Error>> =>
+): Promise<Result<CorpusCounts>> =>
   corpusCountsOf(
     tx,
     `SELECT d.search FROM "index".readable_passage d
@@ -288,13 +288,13 @@ export const findPassages = (
   principal: UserPrincipal,
   tx: Tx,
   input: PassageSearch,
-): Promise<Result<readonly PassageFound[], Error>> => passagesFound(principal, tx, input, LOCATED);
+): Promise<Result<readonly PassageFound[]>> => passagesFound(principal, tx, input, LOCATED);
 
 export const findPassagesWithOpening = (
   principal: UserPrincipal,
   tx: Tx,
   input: PassageSearch,
-): Promise<Result<readonly PassageFound<PassageMatchWithOpening>[], Error>> =>
+): Promise<Result<readonly PassageFound<PassageMatchWithOpening>[]>> =>
   passagesFound(principal, tx, input, WITH_OPENING);
 
 const passagesFound = async <Row extends MatchRow, Match>(
@@ -302,7 +302,7 @@ const passagesFound = async <Row extends MatchRow, Match>(
   tx: Tx,
   input: PassageSearch,
   reading: Reading<Row, Match>,
-): Promise<Result<readonly PassageFound<Match>[], Error>> => {
+): Promise<Result<readonly PassageFound<Match>[]>> => {
   const counts =
     input.counts === undefined
       ? await passageCountsOf(principal, tx, input.query)
@@ -316,7 +316,7 @@ const passagesWeighed = <Row extends MatchRow, Match>(
   input: PassageSearch,
   counts: CorpusCounts,
   reading: Reading<Row, Match>,
-): Promise<Result<readonly PassageFound<Match>[], Error>> => {
+): Promise<Result<readonly PassageFound<Match>[]>> => {
   const parameters = readableParameters(principal);
   return attempt(async () => {
     const read = await tx.query<Row>(input.after === undefined ? reading.first : reading.after, [

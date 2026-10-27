@@ -109,7 +109,7 @@ describe("what the web hears of a failure", () => {
     const { heard, client } = hearing();
 
     await client
-      .fetchQuery({
+      .query({
         queryKey: ["a-read"],
         queryFn: () => Promise.reject(NOT_ANSWERED),
         retry: false,

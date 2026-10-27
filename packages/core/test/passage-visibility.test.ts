@@ -201,7 +201,7 @@ const sourceMatches = async (person: UserPrincipal): Promise<readonly string[]> 
   answered(
     await reading(person, async (reader, tx) => {
       const found = await find(reader, tx, { query: QUERY, limit: 10 }, NOW);
-      if (!found.ok) throw found.error;
+      if (!found.ok) throw new Error(String(found.error));
       return found.value.matches.flatMap((match) =>
         match.layer === "sources" ? [match.locator] : [],
       );
@@ -217,7 +217,7 @@ const reaches = async (person: UserPrincipal, where: Landing): Promise<Reach> =>
   const opened = answered(
     await reading(person, async (reader, tx) => {
       const read = await open(reader, tx, { locator: wire }, NOW);
-      if (!read.ok) throw read.error;
+      if (!read.ok) throw new Error(String(read.error));
       return read.value;
     }),
   );

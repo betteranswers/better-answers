@@ -100,7 +100,7 @@ type Doors = {
 const READABLE_CONCEPT = `SELECT 1 FROM concept_index c
   WHERE c.workspace_id = $1 AND c.iri = $4 AND ${readableClause("c", 2)}`;
 
-const readsConcept = (doors: Doors, iri: ConceptIri): Promise<Result<boolean, Error>> =>
+const readsConcept = (doors: Doors, iri: ConceptIri): Promise<Result<boolean>> =>
   attempt(async () => {
     const read = await doors.tx.query(READABLE_CONCEPT, [
       doors.principal.workspaceId,
@@ -110,7 +110,7 @@ const readsConcept = (doors: Doors, iri: ConceptIri): Promise<Result<boolean, Er
     return read.rows.length > 0;
   });
 
-const readsPassage = async (doors: Doors, locator: string): Promise<Result<boolean, Error>> => {
+const readsPassage = async (doors: Doors, locator: string): Promise<Result<boolean>> => {
   const read = await doors.passageAt(locator);
   if (read.ok) return ok(true);
   return read.error === NOT_FOUND ? ok(false) : err(read.error);
@@ -134,7 +134,7 @@ const openingNamed = (
   return iri.success ? { iri: iri.data } : undefined;
 };
 
-const opensFor = (doors: Doors, opening: Opening): Promise<Result<boolean, Error>> =>
+const opensFor = (doors: Doors, opening: Opening): Promise<Result<boolean>> =>
   "locator" in opening ? readsPassage(doors, opening.locator) : readsConcept(doors, opening.iri);
 
 const NAMES_A_DOCUMENT = new RegExp(ULID_CHARACTERS, "i");
@@ -155,7 +155,7 @@ const namedItem = (id: string | null, source: string, place: string | undefined)
 const resolvedOf = async (
   doors: Doors,
   entry: SourceEntry,
-): Promise<Result<Resolved | undefined, Error>> => {
+): Promise<Result<Resolved | undefined>> => {
   const cited = citedSourceOf(entry);
   // Stryker disable next-line ConditionalExpression: the insert boundary refuses an entry naming no resource, so none reaches this; hides → true, killed in import-bundle.test.ts
   if (cited === undefined) return ok(undefined);
@@ -185,7 +185,7 @@ const WITHHELD_CONCEPT = "A concept you cannot open";
 
 const MINTED_CONCEPT = "SELECT 1 FROM concept_identity WHERE workspace_id = $1 AND iri = $2";
 
-const mintedConcept = (doors: Doors, iri: ConceptIri): Promise<Result<boolean, Error>> =>
+const mintedConcept = (doors: Doors, iri: ConceptIri): Promise<Result<boolean>> =>
   attempt(async () => {
     const minted = await doors.tx.query(MINTED_CONCEPT, [doors.principal.workspaceId, iri]);
     return minted.rows.length > 0;
@@ -194,7 +194,7 @@ const mintedConcept = (doors: Doors, iri: ConceptIri): Promise<Result<boolean, E
 export const resolvedSourcesOf = async (
   doors: Doors,
   frontmatter: Frontmatter,
-): Promise<Result<readonly Resolved[], Error>> => {
+): Promise<Result<readonly Resolved[]>> => {
   const sources = frontmatter["sources"];
   const resolved: Resolved[] = [];
   for (const entry of isList(sources) ? sources : []) {
@@ -301,7 +301,7 @@ export const relationsOf = (
   principal: UserPrincipal,
   tx: Tx,
   iri: ConceptIri,
-): Promise<Result<readonly Relation[], Error>> =>
+): Promise<Result<readonly Relation[]>> =>
   attempt(async () => {
     const read = await tx.query<{ kind: string; target: string; title: string }>(RELATIONS, [
       principal.workspaceId,
@@ -352,7 +352,7 @@ export const bodyLinksOf = (
     readonly body: string;
     readonly frontmatter: Frontmatter;
   },
-): Promise<Result<readonly BodyLink[], Error>> =>
+): Promise<Result<readonly BodyLink[]>> =>
   attempt(async () => {
     const read = await tx.query<{ iri: string; path: string }>(LINKED, [
       principal.workspaceId,

@@ -76,8 +76,11 @@ const hearing = (heard: Hearing, event: StreamEventRead): Hearing => {
       return { ...heard, stopped: true };
     case "error":
       return { ...heard, errored: true };
-    default:
+    case "text":
+    case "other":
       return heard;
+    default:
+      return event satisfies never;
   }
 };
 

@@ -1,5 +1,6 @@
 import { useId } from "react";
 
+import { keyed } from "@/shared/keyed.ts";
 import { SummaryRow as Row } from "@/shared/summary-row.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
@@ -34,8 +35,8 @@ function Version(properties: {
         <p className="mt-2">{WORDS.noText}</p>
       ) : (
         <div className="mt-2 grid gap-3">
-          {paragraphs.map((paragraph, at) => (
-            <p key={at} className="whitespace-pre-wrap wrap-anywhere">
+          {keyed(paragraphs, ({ text }) => text).map(({ key, item: paragraph }) => (
+            <p key={key} className="whitespace-pre-wrap wrap-anywhere">
               {paragraph.changed ? <ChangedTag /> : null}
               {paragraph.text}
             </p>
@@ -94,8 +95,8 @@ export function SuggestedSources(properties: { readonly sources: ConceptParts["s
         <p className="mt-2">{WORDS.noSources}</p>
       ) : (
         <ul className="mt-2 grid list-disc gap-1 pl-5">
-          {lines.map((line, at) => (
-            <li key={at} className="wrap-anywhere">
+          {keyed(lines, (line) => line).map(({ key, item: line }) => (
+            <li key={key} className="wrap-anywhere">
               {line}
             </li>
           ))}

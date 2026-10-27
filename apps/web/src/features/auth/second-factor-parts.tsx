@@ -6,7 +6,7 @@ import {
   useId,
   useRef,
   useState,
-  type FormEvent,
+  type SubmitEvent,
   type ReactNode,
 } from "react";
 
@@ -274,7 +274,7 @@ export function OneTimeCodeForm(properties: {
     (failure) => saidOfSending(failure, wrong),
   );
 
-  const send = (event: FormEvent) => {
+  const send = (event: SubmitEvent) => {
     event.preventDefault();
     const asked = code.trim();
     if (asked === "" || held) return;

@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type Ref } from "react";
+import { useState, type SubmitEvent, type Ref } from "react";
 import { flushSync } from "react-dom";
 
 import { AUTHENTICATOR_CODE_LENGTH } from "@better-answers/schema/second-factor";
@@ -44,7 +44,7 @@ export const useSixDigits = (fieldId: string, waiting: boolean, send: SendTheCod
       setCode(digits);
       sendWith(digits);
     },
-    submit: (event: FormEvent) => {
+    submit: (event: SubmitEvent) => {
       event.preventDefault();
       sendWith(code);
     },

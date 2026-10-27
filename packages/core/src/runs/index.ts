@@ -75,7 +75,7 @@ export type JobOutcome = NonNullable<z.infer<typeof OUTCOME>>;
 
 type OutcomeColumn = z.input<typeof OUTCOME>;
 
-const outcomeOf = (raw: OutcomeColumn): Result<JobOutcome | null, Error> => {
+const outcomeOf = (raw: OutcomeColumn): Result<JobOutcome | null> => {
   const parsed = OUTCOME.safeParse(raw);
   return parsed.success
     ? ok(parsed.data)
@@ -287,7 +287,7 @@ export const latestIndexOutcomeIn = async (
   admin: AdminUserPrincipal,
   tx: Tx,
   input: { readonly connectedSourceId: string },
-): Promise<Result<JobOutcome | null, Error>> => {
+): Promise<Result<JobOutcome | null>> => {
   const read = await attempt(() =>
     tx.query<OutcomeRow>(
       `SELECT outcome FROM job
@@ -521,7 +521,7 @@ export const latestRunsOf = async (
   admin: AdminUserPrincipal,
   tx: Tx,
   input: { readonly subjectIds: readonly string[] },
-): Promise<Result<ReadonlyMap<string, SubjectRun>, Error>> => {
+): Promise<Result<ReadonlyMap<string, SubjectRun>>> => {
   const read = await attempt(() =>
     tx.query<SubjectRunRow>(
       `SELECT DISTINCT ON (subject_id) ${SUBJECT_RUN_COLUMNS} FROM job

@@ -50,7 +50,7 @@ export const descriptorOf = (headers: Headers): Result<ConnectUploadFields, Malf
 
 export type UploadDoors = { readonly postgres: PostgresDoor; readonly objects: ObjectDoor };
 
-export const uploadDoorsOf = (doors: Doors): Result<UploadDoors, Error> => {
+export const uploadDoorsOf = (doors: Doors): Result<UploadDoors> => {
   const objects = doorTold(doors.objects, "no object store is configured");
   return objects.ok
     ? ok({ postgres: doors.postgres, objects: objects.value })

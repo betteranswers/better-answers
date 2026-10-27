@@ -750,20 +750,21 @@ const UNSOUND_WORDS = {
 const linksOf = (rewritten: readonly ConceptRewritten[]): number =>
   rewritten.reduce((sum, concept) => sum + concept.links, 0);
 
-const importWordSaid = (word: Extract<ImportBundleRefusal, string>, email: string): string => {
-  switch (word) {
-    case "role-forbids":
-      return `${email} is not an Admin of this workspace; the import runs as an Admin`;
-    case "manifest-taken":
-      return "a manifest with another bundle id already stands in this workspace's bundle";
-    case "no-such-repository":
-      return "this workspace has no bundle repository; provision it first";
-    case "stale-precondition":
-      return "this workspace's bundle could not be moved while the import was writing its manifest, because another writer moved it or holds its lock; nothing was written, so run the import again, and if it is refused the same way a lock was left on refs/heads/main";
-    default:
-      return word;
-  }
+const IMPORT_WORDS = {
+  "role-forbids": (email: string) =>
+    `${email} is not an Admin of this workspace; the import runs as an Admin`,
+  "manifest-taken": () =>
+    "a manifest with another bundle id already stands in this workspace's bundle",
+  "no-such-repository": () => "this workspace has no bundle repository; provision it first",
+  "stale-precondition": () =>
+    "this workspace's bundle could not be moved while the import was writing its manifest, because another writer moved it or holds its lock; nothing was written, so run the import again, and if it is refused the same way a lock was left on refs/heads/main",
 };
+
+const isWorded = (word: string): word is keyof typeof IMPORT_WORDS =>
+  Object.hasOwn(IMPORT_WORDS, word);
+
+const importWordSaid = (word: Extract<ImportBundleRefusal, string>, email: string): string =>
+  isWorded(word) ? IMPORT_WORDS[word](email) : word;
 
 const importReason = (refusal: ImportBundleRefusal | Error, email: string): string => {
   if (refusal instanceof Error) return refusal.message;
@@ -1180,6 +1181,8 @@ const provisionReason = (
       return noDisplayName(email);
     case "slug-taken":
       return `slug-taken: another workspace already holds the short name ${shortName}`;
+    case "workspace-exists":
+      return "workspace-exists: a workspace already holds the id this run drew; run it again";
     case "malformed":
       return "malformed: the name and the short name must each carry at least one character";
     default:
@@ -1299,8 +1302,14 @@ const personReason = (refusal: AddPersonRefusal, email: string): string => {
       return `malformed: ${email} is not an email address`;
     case "person-exists":
       return `person-exists: ${email} is already a person; add-member takes them as they stand`;
-    default:
+    case "display-name-angle-bracket":
+    case "display-name-control-character":
+    case "display-name-empty":
+    case "display-name-not-one-line":
+    case "display-name-too-long":
       return `${refusal}: a display name is one line of 1 to 100 characters, with no angle brackets or control characters`;
+    default:
+      return refusal;
   }
 };
 

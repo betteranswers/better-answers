@@ -69,7 +69,7 @@ const ticking = async (count: number, readable = true) => {
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false } });
   vi.stubGlobal("fetch", answeringAs("Admin"));
-  await clients.queryClient.fetchQuery(
+  await clients.queryClient.query(
     memberOptions(createApiProxy(clients.apiClient, clients.queryClient)),
   );
   await openPages(

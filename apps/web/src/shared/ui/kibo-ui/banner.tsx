@@ -6,6 +6,7 @@ import {
   type HTMLAttributes,
   type MouseEventHandler,
   useContext,
+  useMemo,
 } from "react";
 
 import { cn } from "@/shared/lib/utils.ts";
@@ -45,12 +46,14 @@ export const Banner = ({
     },
   });
 
+  const held = useMemo(() => ({ show, setShow }), [show, setShow]);
+
   if (!show) {
     return null;
   }
 
   return (
-    <BannerContext.Provider value={{ show, setShow }}>
+    <BannerContext.Provider value={held}>
       <div
         className={cn(
           "flex w-full items-center justify-between gap-2 border border-border bg-transparent px-4 py-2 text-foreground",

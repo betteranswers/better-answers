@@ -149,7 +149,7 @@ const nextSort = (sorted: ColumnSort | undefined, id: string): ColumnSort => ({
 });
 
 function ColumnHead<Features extends TableFeatures, Data extends RowData>(properties: {
-  readonly header: Header<Features, Data, unknown>;
+  readonly header: Header<Features, Data>;
   readonly sorting: SortHeads | undefined;
 }) {
   const { header, sorting } = properties;

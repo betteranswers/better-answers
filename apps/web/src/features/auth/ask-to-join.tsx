@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useState, type SubmitEvent } from "react";
 import { flushSync } from "react-dom";
 
 import { ceilingLiftsIn, refusalOf, useTRPC, type ApiError } from "@/shared/api/trpc.ts";
@@ -84,7 +84,7 @@ export function AskToJoin() {
   const failure = requestAccess.error;
   const refusedAs = failure === null ? undefined : refusalOf(failure)?.class;
 
-  const ask = (event: FormEvent) => {
+  const ask = (event: SubmitEvent) => {
     event.preventDefault();
     if (requestAccess.isPending) return;
     setSent(false);

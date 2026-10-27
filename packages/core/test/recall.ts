@@ -61,10 +61,7 @@ export type RecallSet = z.infer<typeof recallSet>;
 export const answersOf = (set: RecallSet): readonly (RecallAnswer & { group: string })[] =>
   set.groups.flatMap(({ group, answers }) => answers.map((answer) => ({ ...answer, group })));
 
-export const readAs = async <Held>(
-  path: string,
-  shape: z.ZodType<Held>,
-): Promise<Result<Held, Error>> => {
+export const readAs = async <Held>(path: string, shape: z.ZodType<Held>): Promise<Result<Held>> => {
   const text = await attempt(() => readFile(path, "utf8"));
   if (!text.ok) return text;
   const json = await attempt(async (): Promise<unknown> => JSON.parse(text.value));
@@ -73,8 +70,7 @@ export const readAs = async <Held>(
   return parsed.success ? ok(parsed.data) : err(new Error(z.prettifyError(parsed.error)));
 };
 
-export const readRecallSet = (path: string): Promise<Result<RecallSet, Error>> =>
-  readAs(path, recallSet);
+export const readRecallSet = (path: string): Promise<Result<RecallSet>> => readAs(path, recallSet);
 
 export const theRecallSet = async (): Promise<RecallSet> => {
   const read = await readRecallSet(RECALL_SET);
@@ -131,7 +127,7 @@ const buyerQuestions = z
 
 export type BuyerQuestions = z.infer<typeof buyerQuestions>;
 
-export const readBuyerQuestions = (path: string): Promise<Result<BuyerQuestions, Error>> =>
+export const readBuyerQuestions = (path: string): Promise<Result<BuyerQuestions>> =>
   readAs(path, buyerQuestions);
 
 const oneGroupOf = (

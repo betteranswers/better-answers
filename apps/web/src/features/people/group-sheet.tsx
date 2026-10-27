@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type FormEvent, type RefObject } from "react";
+import { useId, useRef, useState, type SubmitEvent, type RefObject } from "react";
 
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
@@ -81,7 +81,7 @@ function RenameGroup(properties: {
   const renameGroup = useRenameGroup();
   const ids = { field: useId(), hint: useId() };
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setOutcome(undefined);
     submitRename({ group, form: event.currentTarget, renameGroup, say: setOutcome });

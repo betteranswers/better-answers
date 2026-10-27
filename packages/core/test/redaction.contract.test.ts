@@ -100,10 +100,10 @@ describe("the redaction agreement's tiers", () => {
 
 describe("the redaction agreement's categories", () => {
   it("gives each category a named tier, and names it once", () => {
-    const tiers = fixture.tiers.map((tier) => tier.tier);
+    const tiers = new Set(fixture.tiers.map((tier) => tier.tier));
 
     for (const { category: named, tier } of fixture.categories) {
-      expect({ named, known: tiers.includes(tier) }).toEqual({ named, known: true });
+      expect({ named, known: tiers.has(tier) }).toEqual({ named, known: true });
     }
     expect(fixture.categories.map((entry) => entry.category).toSorted()).toEqual(
       [...new Set(fixture.categories.map((entry) => entry.category))].toSorted(),

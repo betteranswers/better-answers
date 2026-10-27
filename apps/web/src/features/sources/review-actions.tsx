@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useId, useRef, useState, type SubmitEvent, type ReactNode } from "react";
 
 import { ActionDialog } from "@/shared/action-dialog.tsx";
 import type { ApiError } from "@/shared/api/trpc.ts";
@@ -177,7 +177,7 @@ function ReasonedDialog(properties: {
   const reasonId = useId();
   const formId = useId();
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const reason = new FormData(event.currentTarget).get("reason");
     if (typeof reason === "string") properties.onReason(reason.trim());

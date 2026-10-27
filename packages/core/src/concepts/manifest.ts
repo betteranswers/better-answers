@@ -71,7 +71,7 @@ export const manifestAtHead = async (
   principal: UserPrincipal,
   git: GitDoor,
   manifest: BundleManifest,
-): Promise<Result<"absent" | "standing" | "taken", Error>> => {
+): Promise<Result<"absent" | "standing" | "taken">> => {
   const standing = await attempt(() => fileAtHead(principal, git, BUNDLE_MANIFEST_PATH));
   if (!standing.ok) return err(standing.error);
   if (standing.value === null) return ok("absent");
@@ -101,6 +101,7 @@ export const writeManifest = async (
     if (atHead.value === "standing") return ok({ written: false });
     if (atHead.value === "taken") return err("path-taken");
 
+    // oxlint-disable-next-line typescript/no-unnecessary-type-arguments -- without it TypeScript infers Refused as string from the caller return type, not the default never
     const landed = await commitAndLandAsMember<never>(
       principal,
       doors,

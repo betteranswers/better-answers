@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from "react";
+import { useId, useState, type SubmitEvent } from "react";
 
 import { MountedActionDialog } from "@/shared/action-dialog.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
@@ -22,7 +22,7 @@ export function RenameGroupDialog(properties: {
   const ids = { field: useId() };
   const [line, setLine] = useState<Outcome>();
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLine(undefined);
     submitRename({
