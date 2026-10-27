@@ -739,12 +739,16 @@ const downloaded = (files: Readonly<Record<string, string>>): string => {
   return directory;
 };
 
+const incrementalSchema = z.object({ files: z.record(z.string(), z.unknown()) });
+
 const writtenTo = (
   out: string,
 ): { readonly files: readonly string[]; readonly report: boolean } => ({
   files: existsSync(path.join(out, "stryker-incremental.json"))
     ? Object.keys(
-        JSON.parse(readFileSync(path.join(out, "stryker-incremental.json"), "utf8")).files,
+        incrementalSchema.parse(
+          JSON.parse(readFileSync(path.join(out, "stryker-incremental.json"), "utf8")),
+        ).files,
       )
     : [],
   report: existsSync(path.join(out, "mutation.json")),

@@ -1,9 +1,21 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { jscpdArgv, jscpdOver } from "@better-answers/devtools/jscpd";
 import type { JscpdConfig, Tree } from "@better-answers/devtools/jscpd";
 
-import { jscpdConfig } from "../../../jscpd.config.mjs";
+import { jscpdConfig as rootConfig } from "../../../jscpd.config.mjs";
+
+const jscpdConfig: JscpdConfig = z
+  .object({
+    paths: z.array(z.string()),
+    formats: z.array(z.string()),
+    minLines: z.number(),
+    minTokens: z.number(),
+    threshold: z.number(),
+    ignore: z.array(z.string()),
+  })
+  .parse(rootConfig);
 
 const CLONE = `export const shape = (input: string): string => {
   const trimmed = input.trim();

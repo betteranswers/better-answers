@@ -9,6 +9,7 @@ import { z } from "zod";
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { readWorkflow, workflowStepSchema } from "@better-answers/devtools/workflows";
 import { boundarySchemas, POSTGRES_IMAGE, ULID_PATTERN } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");
@@ -334,7 +335,7 @@ describe("the deploy tree", () => {
 
       expect({ file, line }).toEqual({
         file,
-        line: expect.stringContaining("run --rm --no-deps api pnpm"),
+        line: matching.stringContaining("run --rm --no-deps api pnpm"),
       });
     }
   });
@@ -838,7 +839,7 @@ describe("the deploy tree", () => {
       floating: groupsOf("pg18"),
       otherBase: groupsOf("0.8.6-pg18-bookworm")?.["compatibility"],
     }).toEqual({
-      pinned: expect.objectContaining({ major: "18", compatibility: "trixie" }),
+      pinned: matching.objectContaining({ major: "18", compatibility: "trixie" }),
       nextMajor: "19",
       floating: undefined,
       otherBase: "bookworm",
