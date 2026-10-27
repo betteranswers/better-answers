@@ -71,7 +71,7 @@ This file holds the stories a finished v0.1 satisfies, numbered as plans cite th
 <!-- The numbering skips story 49, as the note at the end says. -->
 
 50. [S2b] The owner sets a workspace's model choice, local or hosted, for each of extraction, enrichment, answering, judging and embedding. The embedding model choice is fixed once vectors exist, and every model call is a row, so spend, residency and the spending limit are facts.
-51. [none] Every reader-facing page meets its latency budget, with lists under a second, actions applied under 100 milliseconds and answers streamed, and the browser suite asserts it as the page lands (ADR 0037). A missed budget is a bug, never a sweep.
+51. [none] Every reader-facing page meets its latency budget, with lists under a second, actions applied under 100 milliseconds and answers streamed, and the browser suite asserts it as the page lands. A missed budget is a bug, never a sweep.
 52. [C1] The first customer's four bid libraries become `Answer` concepts through one normalising pass, their cross-file contradictions become conflicts, and its website is enumerated before any cost estimate is priced. Onboarding runs on the product's own path, not a migration script.
 
 Story 49 and stories 53 to 58 are left out. Story 49 was withdrawn, and stories 53 to 58 described how the route itself is run, which its session rules now say, so the heading for the builder and the reviewer went with them.

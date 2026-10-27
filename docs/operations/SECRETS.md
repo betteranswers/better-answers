@@ -8,7 +8,7 @@ No secret is ever in git. Bootstrap secrets live in the orchestrator's per-resou
 
 ## The classes
 
-ADR 0041 fixes the seven classes and the secrets-seam rule keeps the rule that they are never mixed in one scope. What each is for and where it is read is written here today, which record should own that gloss being unsettled (ADR 0041):
+There are seven classes, and the secrets-seam rule keeps the rule that they are never mixed in one scope. What each is for and where it is read is written here today, which record should own that gloss being unsettled:
 
 | Class | What it is for | Where it is read |
 | --- | --- | --- |
@@ -31,14 +31,14 @@ Every class has a rotation path, and every path is written down before the crede
 - **A secret appears in exactly one env per box.** The config module's key list *is* the inventory's first column, and a missing key **fails the boot** — a secret that is quietly absent is worse than one that is loudly missing.
 - **Nothing here is ever logged** — not by the logger, not by the exporter, not on an `llm_call` row.
 - **Every credential class has a documented rotation** — reissue at the provider, swap, redeploy, revoke the old — and a rotation that requires downtime says so.
-- **Rotation on compromise is a runbook page, not a decision.** Host compromise rotates every host-side credential; a database compromise rotates the envelope key, after which every model key is set again (§ A workspace's model key). No data key per workspace stands between the two yet (ADR 0041).
+- **Rotation on compromise is a runbook page, not a decision.** Host compromise rotates every host-side credential; a database compromise rotates the envelope key, after which every model key is set again (§ A workspace's model key). No data key per workspace stands between the two yet.
 - **Backups are encrypted client-side with `age`**; the private half is escrowed and resident on VPC 2 (§ The backup identity). Rotating that identity mints a new keypair and re-encrypts nothing: existing copies expire on their own lifecycle (`BACKUPS.md`).
 - **Escrow has two holders before the first customer goes live**, under a written instruction, and the recovery path is exercised in the first drill. Who they are is estate detail and is not published.
-- **Access decisions are audit-logged** (ADR 0041), and tokens are stored hashed with a lookup prefix, expire, and are revocable. A model key is sealed and never hashed, because it is sent.
+- **Access decisions are audit-logged**, and tokens are stored hashed with a lookup prefix, expire, and are revocable. A model key is sealed and never hashed, because it is sent.
 
 ## A workspace's model key
 
-A model key is a workspace's API key for one model provider. It is a row sealed under the envelope key, one per workspace and provider, which the api tier opens at the moment of a model call (ADR 0041). The worker tier holds no grant on the table.
+A model key is a workspace's API key for one model provider. It is a row sealed under the envelope key, one per workspace and provider, which the api tier opens at the moment of a model call (ADR 0050). The worker tier holds no grant on the table.
 
 - **The envelope key is `KEK` on the api service:** 32 random bytes written as 64 hexadecimal characters, as `openssl rand -hex 32` prints them. It is a bootstrap secret, held in escrow. `pnpm ops set-model-key` reads it through the typed config module and refuses without it. The api's server reads it the same way when it starts, to open a workspace's model key at the moment of a call. Without it the server still starts, logs `no model will be called`, and `ask` calls no model.
 - **Setting a key** is `pnpm ops set-model-key`, with the key on standard input (`RUNBOOK.md` § Set a workspace's model key). The key is never a command-line argument, so it reaches no shell history and no process list. Each run writes one audit event naming the model provider.

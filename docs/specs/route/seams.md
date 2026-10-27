@@ -20,7 +20,7 @@ The general test rules are in `CODING_STANDARDS.md`, under Tests.
 
 **api harness.** The MCP surface, tRPC and the authorization server, driven through the server's own requests, for every block a transport reaches. The suites are in `apps/api/tests/`.
 
-**browser suite.** One spec per page a block builds, over a served build, with the page's latency budget (ADR 0037) and the accessibility gate. The specs are in `apps/web/e2e/`.
+**browser suite.** One spec per page a block builds, over a served build, with the page's latency budget and the accessibility gate. The specs are in `apps/web/e2e/`.
 
 **worker harness.** The worker's pipeline steps through pytest, over real Postgres, in `apps/worker/tests/`.
 

@@ -136,4 +136,4 @@ const KEPT_UNDER = "better-answers.secondary-nav";
 ## Related
 
 - `docs/solutions/best-practices/renaming-a-table-drizzle-kit-will-not-generate-so-the-migration-and-snapshot-are-written-by-hand.md`: the migration a rename of a stored name needs.
-- `docs/solutions/architecture-patterns/adr-0047.md`: what a moved or unbuilt address shows.
+- `docs/solutions/architecture-patterns/adr-0051.md`: what an unbuilt address shows.

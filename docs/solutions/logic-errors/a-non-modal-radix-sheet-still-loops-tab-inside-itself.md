@@ -97,5 +97,4 @@ The handler runs before `FocusScope`'s. `FocusScope` renders `asChild`, so Radix
 ## Related Issues
 
 - `docs/solutions/architecture-patterns/adr-0033.md`: the registries own keyboard and focus behaviour. This is a case where the registry's default contradicts the variant the platform needs, and the platform overrides it at the call site, not in the vendored file.
-- `docs/solutions/architecture-patterns/adr-0042.md`: the WCAG 2.2 AA bar and its keyboard test. This doc reads the 28rem sheet covering the list at `md` as a case of 2.4.11 Focus Not Obscured; the ADR does not name that criterion.
 - The plan's KTD10 carries the rule, and U12's approach draws the concept page's panel and its keyboard path by it.
