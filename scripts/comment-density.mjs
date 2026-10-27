@@ -8,7 +8,7 @@ import {
   measure,
   overTheCeiling,
   reportOf,
-} from "../packages/devtools/src/comment-density.ts";
+} from "../packages/devtools/src/comments/comment-density.ts";
 
 /** The tree it is run in, not the tree it lives in, so a suite can spawn it over a throwaway. */
 const root = process.cwd();

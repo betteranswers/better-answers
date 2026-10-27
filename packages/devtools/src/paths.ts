@@ -1,9 +1,12 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 export const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
+
+const GIT_OUTPUT_LIMIT_BYTES = 256 * 1024 * 1024;
 
 const TEST_DIRECTORIES: ReadonlySet<string> = new Set(["e2e", "test", "tests"]);
 
@@ -33,6 +36,14 @@ const filesUnder = (root: string, directory: string): readonly string[] =>
 
 export const filesUnderEach = (root: string, roots: readonly string[]): readonly string[] =>
   [...new Set(roots.flatMap((directory) => filesUnder(root, directory)))].sort(byCodeUnit);
+
+export const trackedFiles = (root: string): readonly string[] =>
+  execFileSync("git", ["-C", root, "ls-files", "-z"], {
+    encoding: "utf8",
+    maxBuffer: GIT_OUTPUT_LIMIT_BYTES,
+  })
+    .split("\0")
+    .filter((file) => file !== "" && existsSync(path.join(root, file)));
 
 export const markdownUnder = (root: string, folder: string): readonly string[] =>
   readdirSync(path.join(root, folder), { recursive: true, encoding: "utf8" })

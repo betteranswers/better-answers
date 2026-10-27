@@ -16,7 +16,7 @@ import {
   type Ran,
   ran,
   scratchDirectory,
-} from "./script-stand-ins.ts";
+} from "../support/script-stand-ins.ts";
 
 const releaseJobSchema = z.object({
   needs: z.union([z.string(), z.array(z.string())]).optional(),

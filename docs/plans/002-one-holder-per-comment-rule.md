@@ -33,7 +33,7 @@ The edit hook, `.claude/hooks/comment-gate-hook.sh`, re-runs the lint and the Py
 
 The density gate measures workspaces, four directories and one named set of root config files, `the-root-tool-configuration`. All seven commits it has forced in three weeks were on a directory or the named set, and three of those were cloc reading a glob string as a block comment. No workspace has ever gone over its ceiling.
 
-`packages/devtools/test/comment-lint.test.ts` holds 22 cases, and about 12 repeat cases the custom rules' own suites already hold.
+`packages/devtools/test/comments/comment-lint.test.ts` holds 22 cases, and about 12 repeat cases the custom rules' own suites already hold.
 
 ### Key Decisions
 
@@ -60,7 +60,7 @@ The density gate measures workspaces, four directories and one named set of root
 
 **The lint config's test**
 
-- R5. `packages/devtools/test/comment-lint.test.ts` holds the refusing cases for each stock rule setting with their accepting twins, one refusing and one accepting pin for each of the three custom rules, and the case that proves the config reaches a root script.
+- R5. `packages/devtools/test/comments/comment-lint.test.ts` holds the refusing cases for each stock rule setting with their accepting twins, one refusing and one accepting pin for each of the three custom rules, and the case that proves the config reaches a root script.
 
 **What stays**
 
@@ -82,9 +82,9 @@ The density gate measures workspaces, four directories and one named set of root
 
 ### Key Technical Decisions
 
-- KTD1. **The commit hook's Python command runs the same script the root gate runs, over staged files.** The root `comment-gate:python` script names `packages/devtools/python/comment_gate.py` with its roots; the hook names the same file with `{staged_files}` and a `*.py` glob. It runs from the repository root with no `root:` key, because the gate reads `apps/worker/src/` and test directories from the path it is handed. `packages/devtools/test/lefthook-config.test.ts` proves each pre-commit command against what the root runs, so the new command gets a proof there that holds the two to one script.
+- KTD1. **The commit hook's Python command runs the same script the root gate runs, over staged files.** The root `comment-gate:python` script names `packages/devtools/python/comment_gate.py` with its roots; the hook names the same file with `{staged_files}` and a `*.py` glob. It runs from the repository root with no `root:` key, because the gate reads `apps/worker/src/` and test directories from the path it is handed. `packages/devtools/test/root-config/lefthook-config.test.ts` proves each pre-commit command against what the root runs, so the new command gets a proof there that holds the two to one script.
 - KTD2. **The commit hook's oxlint glob widens to `.mjs` and `.js`, and its run takes `--no-error-on-unmatched-pattern`.** The root lint already walks those files, and the edit hook was the only pre-CI reader of them. Without the flag, a commit whose only staged script sits under a path the lint config ignores is refused with "No files found to lint"; the `oxfmt` command carries the same flag for the same reason.
-- KTD3. **Density loses the directory kind, not just its arguments.** `packages/devtools/src/comment-density.ts` drops the `directory` kind, the config-language set and a unit's `holds` list, and `scripts/comment-density.mjs` drops the two options. A workspace still measures TypeScript and Python only, in a source arm and a test arm.
+- KTD3. **Density loses the directory kind, not just its arguments.** `packages/devtools/src/comments/comment-density.ts` drops the `directory` kind, the config-language set and a unit's `holds` list, and `scripts/comment-density.mjs` drops the two options. A workspace still measures TypeScript and Python only, in a source arm and a test arm.
 - KTD4. **A `comment-lint.test.ts` case goes only when a rule suite holds the same case.** Before deleting a case, find its twin in `comment-only-the-why.test.ts` or `string-cites-nothing.test.ts`. A case with no twin stays.
 - KTD5. **The decision doc on rule form is amended, not rewritten.** `docs/solutions/architecture-patterns/adr-0045.md` says the density ceiling is "the only gate on a config file's comments". A dated amendment says density is now a workspace backstop, a config file's comments have no mechanical gate, and the edit hook is gone. The pull request body says this decision doc was edited.
 - KTD6. **The cloc learning is retired unless its trap still bites a workspace.** `docs/solutions/integration-issues/cloc-counts-a-glob-in-a-config-string-as-a-block-comment.md` describes the named root-config unit, which goes. Run the learning's own check on a TypeScript file inside a workspace: if cloc still counts the lines between two glob strings as comments, keep the learning and move its example to that case; otherwise delete it.
@@ -105,8 +105,8 @@ The density gate measures workspaces, four directories and one named set of root
 - `.claude/settings.json`: the `PostToolUse` entry with matcher `Edit|Write`.
 - `lefthook.yml`: `pre-commit` commands `oxlint`, `ruff-format` and `ruff-check`; `pre-push-gates` commands `comment-gate:python` and `comment-density`.
 - `package.json`: `comment-gate:python` and `comment-density`.
-- `packages/devtools/test/lefthook-config.test.ts`: the `HOOK` map of pre-commit proofs and the tests under "the pre-commit hook".
-- `packages/devtools/src/comment-density.ts`: `MEASURED_LANGUAGES`, `Unit`, `heldBy`, `measure`.
+- `packages/devtools/test/root-config/lefthook-config.test.ts`: the `HOOK` map of pre-commit proofs and the tests under "the pre-commit hook".
+- `packages/devtools/src/comments/comment-density.ts`: `MEASURED_LANGUAGES`, `Unit`, `heldBy`, `measure`.
 - `scripts/comment-density.mjs`: the `directory` and `unit` options and the checks that serve them.
 - `docs/operations/local-gates.md`, *The Claude Code hooks*: the section on the write-time comment gate.
 - `packages/devtools/README.md`: the lines on the edit hook and on what the density ceiling holds.
@@ -137,7 +137,7 @@ The density gate measures workspaces, four directories and one named set of root
 - **Dependencies:** U1.
 - **Files:**
   - `lefthook.yml`
-  - `packages/devtools/test/lefthook-config.test.ts`
+  - `packages/devtools/test/root-config/lefthook-config.test.ts`
 - **Approach:**
   1. Add a `pre-commit` command for the Python gate with a `*.py` glob, under KTD1.
   2. Widen the `oxlint` command's glob and add the flag, under KTD2.
@@ -158,8 +158,8 @@ The density gate measures workspaces, four directories and one named set of root
 - **Files:**
   - `package.json`
   - `scripts/comment-density.mjs`
-  - `packages/devtools/src/comment-density.ts`
-  - `packages/devtools/test/comment-density.test.ts`
+  - `packages/devtools/src/comments/comment-density.ts`
+  - `packages/devtools/test/comments/comment-density.test.ts`
 - **Approach:**
   1. Cut the root script's arguments to the two workspace roots.
   2. Remove the `directory` and `unit` options and the checks that serve them from the script.
@@ -178,7 +178,7 @@ The density gate measures workspaces, four directories and one named set of root
 - **Requirements:** R5, R6. Carries KTD4.
 - **Dependencies:** U1, which deletes the proof step 3 replaces.
 - **Files:**
-  - `packages/devtools/test/comment-lint.test.ts`
+  - `packages/devtools/test/comments/comment-lint.test.ts`
 - **Approach:**
   1. Keep the stock-rule cases: both `@ts-ignore` cases, `@ts-expect-error` with no reason, the TODO, the FIXME, the blanket disable and the unused disable, with their accepting twins.
   2. Keep one refusing and one accepting pin for `comment-only-the-why` and for `string-cites-nothing`.

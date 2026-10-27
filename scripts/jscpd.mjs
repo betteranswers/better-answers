@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 
 import { jscpdConfig } from "../jscpd.config.mjs";
-import { jscpdArgv } from "../packages/devtools/src/jscpd.ts";
+import { jscpdArgv } from "../packages/devtools/src/scans/jscpd.ts";
 
 const require = createRequire(import.meta.url);
 /** Where pnpm puts jscpd's executable for this package; a wrong path would pass as a clean gate. */

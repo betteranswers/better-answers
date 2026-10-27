@@ -10,7 +10,7 @@ import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 import { pathWithAppleGit } from "@better-answers/schema/testing/apple-git";
 
-import { wordsOf } from "./fixture-text.ts";
+import { wordsOf } from "./support/fixture-text.ts";
 
 const SPECIFIER = "@better-answers/schema/testing/test-title-setup";
 

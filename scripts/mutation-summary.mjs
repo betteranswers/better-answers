@@ -1,4 +1,4 @@
-import { mutationSummaryFromArgv } from "../packages/devtools/src/mutation-summary.ts";
+import { mutationSummaryFromArgv } from "../packages/devtools/src/mutation/mutation-summary.ts";
 
 const { summary, fault } = mutationSummaryFromArgv(process.argv.slice(2));
 process.stdout.write(summary);

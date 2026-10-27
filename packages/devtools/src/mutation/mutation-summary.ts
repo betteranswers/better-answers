@@ -1,0 +1,269 @@
+import { existsSync, readFileSync } from "node:fs";
+
+import { z } from "zod";
+
+import { flagValues } from "../flags.ts";
+
+const MUTANT_STATUSES = [
+  "Killed",
+  "Survived",
+  "NoCoverage",
+  "Timeout",
+  "Ignored",
+  "CompileError",
+  "RuntimeError",
+  "Pending",
+] as const;
+
+const mutantStatus = z.enum(MUTANT_STATUSES);
+
+const position = z.object({ line: z.number(), column: z.number() });
+
+const reportMutant = z.object({
+  mutatorName: z.string(),
+  replacement: z.string().optional(),
+  status: mutantStatus,
+
+  testsCompleted: z.number().optional(),
+  location: z.object({ start: position, end: position }),
+});
+export type ReportMutant = z.infer<typeof reportMutant>;
+
+const reportSchema = z.object({
+  files: z
+    .record(z.string(), z.object({ source: z.string(), mutants: z.array(reportMutant).readonly() }))
+    .readonly(),
+});
+export type Report = z.infer<typeof reportSchema>;
+
+const USAGE =
+  "usage: mutation-summary --leg <name> --report <path> [--baseline <path>] [--checkpoint <path>]";
+
+const MAX_REPLACEMENT = 80;
+
+type Placed = {
+  readonly file: string;
+  readonly mutant: ReportMutant;
+  readonly text: string;
+};
+
+const spanText = (source: string, location: ReportMutant["location"]): string => {
+  const lines = source.split("\n");
+  const { start, end } = location;
+  if (start.line === end.line) {
+    return (lines[start.line - 1] ?? "").slice(start.column - 1, end.column - 1);
+  }
+  const first = (lines[start.line - 1] ?? "").slice(start.column - 1);
+  const middle = lines.slice(start.line, end.line - 1);
+  const last = (lines[end.line - 1] ?? "").slice(0, end.column - 1);
+  return [first, ...middle, last].join("\n");
+};
+
+const identity = (placed: Placed): string =>
+  JSON.stringify([
+    placed.file,
+    placed.mutant.mutatorName,
+    placed.mutant.replacement ?? "",
+    placed.text,
+  ]);
+
+const placedIn = (report: Report): readonly Placed[] =>
+  Object.entries(report.files).flatMap(([file, entry]) =>
+    entry.mutants.map((mutant) => ({
+      file,
+      mutant,
+      text: spanText(entry.source, mutant.location),
+    })),
+  );
+
+const byIdentity = (report: Report): ReadonlyMap<string, readonly Placed[]> => {
+  const groups = new Map<string, Placed[]>();
+  for (const placed of placedIn(report)) {
+    const key = identity(placed);
+    const group = groups.get(key);
+    if (group === undefined) groups.set(key, [placed]);
+    else group.push(placed);
+  }
+  for (const group of groups.values()) group.sort(byPlace);
+  return groups;
+};
+
+const ranNoTest = (mutant: ReportMutant): boolean =>
+  mutant.status === "Survived" && mutant.testsCompleted === 0;
+
+const survives = (mutant: ReportMutant): boolean =>
+  mutant.status === "NoCoverage" || (mutant.status === "Survived" && !ranNoTest(mutant));
+
+const killed = (mutant: ReportMutant): boolean =>
+  mutant.status === "Killed" || mutant.status === "Timeout";
+
+const scored = (mutant: ReportMutant): boolean =>
+  killed(mutant) || mutant.status === "Survived" || mutant.status === "NoCoverage";
+
+const oneLine = (replacement: string): string => {
+  const flat = replacement.replaceAll(/\s*\n\s*/gu, " ");
+  return flat.length > MAX_REPLACEMENT ? `${flat.slice(0, MAX_REPLACEMENT - 1)}…` : flat;
+};
+
+const row = (placed: Placed, note = ""): string =>
+  `- \`${placed.file}:${String(placed.mutant.location.start.line)}\` — ${placed.mutant.mutatorName} — \`${oneLine(placed.mutant.replacement ?? "")}\`${note}`;
+
+const byPlace = (left: Placed, right: Placed): number =>
+  left.file.localeCompare(right.file) ||
+  left.mutant.location.start.line - right.mutant.location.start.line ||
+  left.mutant.location.start.column - right.mutant.location.start.column;
+
+const mutantsOf = (report: Report): readonly ReportMutant[] =>
+  placedIn(report).map((placed) => placed.mutant);
+
+const scoreLine = (leg: string, report: Report): string => {
+  const mutants = mutantsOf(report);
+  const total = mutants.filter(scored).length;
+  if (total === 0) return `### ${leg} mutation score: no mutants`;
+  const kills = mutants.filter(killed).length;
+  const score = Math.round((kills * 1000) / total) / 10;
+  return `### ${leg} mutation score: ${String(score)}% (${String(kills)}/${String(total)} mutants killed)`;
+};
+
+type NewSurvivor = {
+  readonly placed: Placed;
+  readonly before: "killed" | "absent" | "no verdict";
+};
+
+const before = (match: Placed | undefined): NewSurvivor["before"] | "survived" => {
+  if (match === undefined) return "absent";
+  if (survives(match.mutant)) return "survived";
+  return killed(match.mutant) ? "killed" : "no verdict";
+};
+
+const newSurvivors = (report: Report, baseline: Report): readonly NewSurvivor[] => {
+  const held = byIdentity(baseline);
+  const found: NewSurvivor[] = [];
+  for (const [key, group] of byIdentity(report)) {
+    const previous = held.get(key) ?? [];
+    group.forEach((placed, index) => {
+      if (!survives(placed.mutant)) return;
+      const was = before(previous[index]);
+      if (was !== "survived") found.push({ placed, before: was });
+    });
+  }
+  return found.sort((left, right) => byPlace(left.placed, right.placed));
+};
+
+const NO_BASELINE =
+  "no baseline — nothing was restored to compare against, so this run's report is the next run's baseline";
+
+const NOTE = {
+  killed: "",
+  absent: " (not in the baseline)",
+  "no verdict": " (no verdict in the baseline)",
+} as const satisfies Record<NewSurvivor["before"], string>;
+
+const MATCHING =
+  "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by their order in the file.";
+
+const newSurvivorLines = (
+  leg: string,
+  report: Report,
+  baseline: Report | undefined,
+): readonly string[] => {
+  if (baseline === undefined) return [`### ${leg} new survivors: ${NO_BASELINE}`];
+  const found = newSurvivors(report, baseline);
+  if (found.length === 0) return [`### ${leg} new survivors: none`];
+  return [
+    `### ${leg} new survivors: ${String(found.length)}`,
+    MATCHING,
+    ...found.map(({ placed, before: was }) => row(placed, NOTE[was])),
+  ];
+};
+
+const ranNoTestLines = (leg: string, report: Report): readonly string[] => {
+  const rows = placedIn(report)
+    .filter((placed) => ranNoTest(placed.mutant))
+    .sort(byPlace);
+  if (rows.length === 0) return [`### ${leg} mutants that ran no test: none`];
+  return [
+    `### ${leg} mutants that ran no test: ${String(rows.length)} — the runner ran none of the tests that cover them, which is a runner fault to fix (the vitest-runner patch under \`patches/\`), never a survivor to triage`,
+    ...rows.map((placed) => row(placed)),
+  ];
+};
+
+const FAULT_CONSEQUENCE =
+  "no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again";
+
+const FROM_CHECKPOINT = ", read from the checkpoint since the run wrote no report";
+
+const runnerFault = (report: Report): string | undefined => {
+  const mutants = mutantsOf(report);
+  const covered = mutants.filter((mutant) => killed(mutant) || mutant.status === "Survived");
+  const untested = mutants.filter(ranNoTest).length;
+  if (untested > 0) {
+    return `${String(untested)} of its ${String(covered.length)} covered mutants ran no test`;
+  }
+  const total = mutants.filter(scored).length;
+  if (total > 0 && !mutants.some(killed)) return `it killed none of its ${String(total)} mutants`;
+  return undefined;
+};
+
+const faultOf = (
+  leg: string,
+  report: Report | undefined,
+  checkpoint: Report | undefined,
+): string | undefined => {
+  const read = report ?? checkpoint;
+  const fault = read === undefined ? undefined : runnerFault(read);
+  if (fault === undefined) return undefined;
+  return `${leg} runner fault: ${fault}${report === undefined ? FROM_CHECKPOINT : ""} — ${FAULT_CONSEQUENCE}`;
+};
+
+type SummaryRun = {
+  readonly summary: string;
+  readonly fault: string | undefined;
+};
+
+export const mutationSummary = (
+  leg: string,
+  report: Report | undefined,
+  baseline: Report | undefined,
+  checkpoint?: Report,
+): SummaryRun => {
+  const fault = faultOf(leg, report, checkpoint);
+  const faultLines = fault === undefined ? [] : [`### ${fault}`];
+  const lines =
+    report === undefined
+      ? [`### ${leg} mutation score: no report`]
+      : [
+          scoreLine(leg, report),
+          ...newSurvivorLines(leg, report, baseline),
+          ...ranNoTestLines(leg, report),
+        ];
+  return { summary: `${[...faultLines, ...lines].join("\n")}\n`, fault };
+};
+
+const readReport = (file: string): Report | undefined => {
+  if (!existsSync(file)) return undefined;
+  try {
+    const read = reportSchema.safeParse(JSON.parse(readFileSync(file, "utf8")));
+    return read.success ? read.data : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const readOptional = (file: string | undefined): Report | undefined =>
+  file === undefined ? undefined : readReport(file);
+
+export const mutationSummaryFromArgv = (argv: readonly string[]): SummaryRun => {
+  const values = flagValues(argv);
+  const leg = values?.get("leg");
+  const reportFile = values?.get("report");
+  if (values === undefined || leg === undefined || reportFile === undefined) {
+    throw new Error(USAGE);
+  }
+  return mutationSummary(
+    leg,
+    readReport(reportFile),
+    readOptional(values.get("baseline")),
+    readOptional(values.get("checkpoint")),
+  );
+};

@@ -11,7 +11,7 @@ import {
   undeclaredIn,
   unreadIn,
   WHERE_THE_MAP_LIVES,
-} from "../packages/devtools/src/table-ownership-scan.ts";
+} from "../packages/devtools/src/scans/table-ownership-scan.ts";
 
 /** The tree it is run in, not the tree it lives in, so a suite can spawn it over a throwaway. */
 const root = process.cwd();

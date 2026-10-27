@@ -1,0 +1,150 @@
+import { execFileSync } from "node:child_process";
+
+import { z } from "zod";
+
+import { isTestPath } from "../paths.ts";
+import { executableOf, runsOverThrowawayTree } from "../throwaway-tree.ts";
+import type { Tree } from "../throwaway-tree.ts";
+
+export const CEILING = { source: 0.075, test: 0.05 } as const;
+
+export type Arm = keyof typeof CEILING;
+
+const MEASURED_LANGUAGES = new Set<string>(["TypeScript", "Python"]);
+
+const NEVER_WALKED = [
+  ".venv",
+  "__pycache__",
+  "build",
+  "coverage",
+  "dist",
+  "lifts",
+  "node_modules",
+  "playwright-report",
+  "skills",
+  "test-results",
+];
+
+const CLOC_EXECUTABLE = { package: "cloc", path: ["lib", "cloc"] } as const;
+
+export const clocArgv = (paths: readonly string[]): readonly string[] => [
+  "--json",
+  "--by-file",
+  "--quiet",
+
+  "--skip-uniqueness",
+
+  "--timeout",
+  "0",
+  `--exclude-dir=${NEVER_WALKED.join(",")}`,
+  ...paths,
+];
+
+export type Counted = {
+  readonly file: string;
+  readonly language: string;
+  readonly code: number;
+  readonly comment: number;
+};
+
+const clocReport = z.record(
+  z.string(),
+  z.looseObject({
+    language: z.string().optional(),
+    code: z.number().optional(),
+    comment: z.number().optional(),
+  }),
+);
+
+const countedIn = (output: string): readonly Counted[] =>
+  Object.entries(clocReport.parse(JSON.parse(output)))
+    .filter(([file]) => file !== "header" && file !== "SUM")
+    .map(([file, entry]) => ({
+      file,
+      language: entry.language ?? "",
+      code: entry.code ?? 0,
+      comment: entry.comment ?? 0,
+    }))
+    .filter((counted) => MEASURED_LANGUAGES.has(counted.language))
+    .sort((left, right) => left.file.localeCompare(right.file));
+
+export const armOf = (file: string): Arm => (isTestPath(file) ? "test" : "source");
+
+export type Measured = {
+  readonly workspace: string;
+  readonly arm: Arm;
+  readonly code: number;
+  readonly comment: number;
+  readonly ratio: number;
+};
+
+const workspaceOf = (file: string, longestFirst: readonly string[]): string | undefined => {
+  const relative = file.replace(/^\.\//u, "");
+  return longestFirst.find((held) => relative === held || relative.startsWith(`${held}/`));
+};
+
+type Total = { code: number; comment: number };
+
+export const measure = (
+  counted: readonly Counted[],
+  workspaces: readonly string[],
+): readonly Measured[] => {
+  const totals = new Map<string, Map<Arm, Total>>();
+
+  const longestFirst = [...workspaces].sort((left, right) => right.length - left.length);
+  for (const row of counted) {
+    const workspace = workspaceOf(row.file, longestFirst);
+    if (workspace === undefined) continue;
+    const arms = totals.get(workspace) ?? new Map<Arm, Total>();
+    const arm = armOf(row.file);
+    const running = arms.get(arm) ?? { code: 0, comment: 0 };
+    arms.set(arm, { code: running.code + row.code, comment: running.comment + row.comment });
+    totals.set(workspace, arms);
+  }
+  return [...totals.entries()]
+    .flatMap(([workspace, arms]) =>
+      [...arms.entries()].map(([arm, total]) => ({
+        workspace,
+        arm,
+        code: total.code,
+        comment: total.comment,
+        ratio: total.code === 0 ? 0 : total.comment / total.code,
+      })),
+    )
+    .sort((left, right) =>
+      `${left.workspace}${left.arm}`.localeCompare(`${right.workspace}${right.arm}`),
+    );
+};
+
+export const overTheCeiling = (measured: readonly Measured[]): readonly Measured[] =>
+  measured.filter((one) => one.code > 0 && one.ratio > CEILING[one.arm]);
+
+export const reportOf = (one: Measured): string =>
+  `${one.workspace} ${one.arm}: ${one.ratio.toFixed(3)} comment lines per code line, over the ${CEILING[one.arm].toFixed(3)} ceiling. A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason. Any other comment is deleted: hold its reason in a name, a type, a test, a grant or a lint, or report it open in the tracker.`;
+
+export const countOver = (cwd: string, paths: readonly string[]): readonly Counted[] =>
+  countedIn(
+    execFileSync(executableOf(CLOC_EXECUTABLE), [...clocArgv(paths)], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }),
+  );
+
+export const WRAPPER_EXECUTABLE = {
+  package: "@better-answers/devtools",
+  path: ["..", "..", "scripts", "comment-density.mjs"],
+} as const;
+
+export const clocOver = (
+  paths: readonly string[],
+  smoke: { readonly tree: Tree; readonly counted: number },
+): ((tree: Tree) => readonly Counted[]) => {
+  const run = runsOverThrowawayTree({
+    executable: CLOC_EXECUTABLE,
+    argv: clocArgv(paths),
+    foundSomething: [],
+    smoke: { tree: smoke.tree, reports: (output) => countedIn(output).length === smoke.counted },
+  });
+  return (tree) => countedIn(run(tree));
+};

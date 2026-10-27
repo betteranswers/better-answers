@@ -1,7 +1,7 @@
 import { defineRule } from "@oxlint/plugins";
 import type { Node } from "@oxlint/plugins";
 
-import { citationIn } from "../../src/citations.ts";
+import { citationIn } from "../../src/comments/citations.ts";
 
 const A_SPACE = /\s/u;
 

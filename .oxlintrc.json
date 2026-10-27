@@ -626,7 +626,7 @@
       }
     },
     {
-      "files": ["packages/devtools/src/comment-inventory.ts"],
+      "files": ["packages/devtools/src/comments/comment-inventory.ts"],
       "rules": {
         "max-lines": ["error", { "max": 567, "skipBlankLines": true, "skipComments": true }]
       }

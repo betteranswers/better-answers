@@ -1,0 +1,435 @@
+import { describe, expect, it } from "vitest";
+
+import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
+import type { Tool, Tree } from "@better-answers/devtools/throwaway-tree";
+
+import { COUNTED, NOT_COUNTED, commented } from "../support/caller-counts.ts";
+import { wordsOf } from "../support/fixture-text.ts";
+
+const FILE = "probe.py";
+
+const holding = (comment: string): Tree => ({ [FILE]: `${comment}KEEP = 1\n` });
+
+const OVER_THE_CEILING =
+  "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty then ten more words after that one here now";
+
+const FORTY_WORDS =
+  "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twentyone twentytwo twentythree twentyfour twentyfive twentysix twentyseven twentyeight twentynine thirty thirtyone thirtytwo thirtythree thirtyfour thirtyfive thirtysix thirtyseven thirtyeight thirtynine forty";
+
+const A_WHY_OF_TWENTY =
+  "Deleting this line changes what the engine memoises, and every caller below then reads a value the store never wrote";
+
+const A_WHY_AT_THE_CEILING = `${A_WHY_OF_TWENTY} until the next release lands`;
+
+const TOO_LONG = `# ${OVER_THE_CEILING}\n`;
+
+const COUNTING = "# Two specs open a member and remove one.\n";
+
+const WORKER_MODULE = "apps/worker/src/better_answers_worker/probe.py";
+
+const documented = (signature: string, count: number): string =>
+  `${signature}\n    """${wordsOf(count)}"""\n    return 1\n`;
+
+const gate: Tool = {
+  executable: { package: "@better-answers/devtools", path: ["python", "comment_gate.py"] },
+  argv: ["."],
+  foundSomething: [1],
+  smoke: { tree: holding(TOO_LONG), reports: (output) => /^probe\.py:\d+: /m.test(output) },
+};
+
+const run = runsOverThrowawayTree(gate);
+
+const findings = (tree: Tree): readonly string[] =>
+  run(tree)
+    .split("\n")
+    .filter((line) => line !== "");
+
+describe("the Python check fires on a long or citing comment", () => {
+  it("refuses a long comment, naming its count and the fix", () => {
+    const output = run(holding(TOO_LONG));
+
+    expect(output).toContain("runs to 29 words");
+    expect(output).toContain(
+      "A comment stays only for a constraint outside this repository (a library, platform or protocol), a public contract, a generated-file marker, a license, or a suppression's reason.",
+    );
+    expect(output).toContain(
+      "Any other comment is deleted: hold its reason in a name, a type, a test, a grant or a lint, or report it open in the tracker.",
+    );
+  });
+
+  it("counts a docstring as a comment, unlike any ruff rule", () => {
+    const module = { [FILE]: `"""${OVER_THE_CEILING}"""\n\nKEEP = 1\n` };
+
+    expect(findings(module)).toHaveLength(1);
+  });
+
+  it("reads a function's docstring as well as the module's", () => {
+    const both = {
+      [FILE]: `"""${OVER_THE_CEILING}"""\n\n\ndef g() -> int:\n    """${OVER_THE_CEILING}"""\n    return 1\n`,
+    };
+
+    expect(findings(both)).toHaveLength(2);
+  });
+
+  it.each([
+    ["a ticket id", "# Kept because the claim protocol changed under T-243.\n"],
+    ["an ADR number", "# Kept because the map is Postgres under ADR 0021.\n"],
+    ["a rule tag", "# Kept because a raw insert lives in a factory ([TEST4]).\n"],
+    ["a tag from a digit-bearing family", "# Kept because the outcome is announced ([A11Y1]).\n"],
+    ["an ISO date", "# Kept because the reading of the registry moved on 2026-09-21.\n"],
+    ["a slashed date", "# Kept because the reading of the registry moved on 21/09/2026.\n"],
+  ])("refuses a comment citing %s", (_what, comment) => {
+    expect(findings(holding(comment))).toHaveLength(1);
+  });
+
+  it("counts a run of touching hash lines as one block", () => {
+    const eightShortLines = Array.from({ length: 8 }, () => "# four more words here\n").join("");
+
+    expect(findings(holding(eightShortLines))).toHaveLength(1);
+  });
+
+  it("reads a bare `#` line as part of its paragraph", () => {
+    const broken = `# ${wordsOf(13)}\n#\n# ${wordsOf(13)}\n`;
+
+    expect(run(holding(broken))).toContain("runs to 26 words");
+  });
+
+  it("keeps a trailing comment out of the block above it", () => {
+    const above = `# ${A_WHY_OF_TWENTY}\nKEEP = 1  # ${A_WHY_OF_TWENTY}\n`;
+
+    expect(findings({ [FILE]: above })).toEqual([]);
+  });
+
+  it("keeps a trailing comment apart after a form feed", () => {
+    const above = `\f\f\n# ${A_WHY_OF_TWENTY}\nKEEP = 1  # ${A_WHY_OF_TWENTY}\n`;
+
+    expect(findings({ [FILE]: above })).toEqual([]);
+  });
+
+  it("keeps a trailing comment out of the block below it", () => {
+    const below = `KEEP = 1  # ${A_WHY_OF_TWENTY}\n# ${A_WHY_OF_TWENTY}\nMORE = 2\n`;
+
+    expect(findings({ [FILE]: below })).toEqual([]);
+  });
+
+  it("reports a long, citing comment once, for the citation", () => {
+    const output = run(holding(`# ${OVER_THE_CEILING} under T-243\n`));
+
+    expect(output.trim().split("\n")).toHaveLength(1);
+    expect(output).toContain("cites a ticket id");
+  });
+});
+
+describe("the Python check refuses a comment that counts its callers", () => {
+  it("refuses a comment counting its specs, naming the fix", () => {
+    const output = run(holding(COUNTING));
+
+    expect(output).toContain("this comment counts the code that uses it (`Two specs`).");
+    expect(output).toContain(
+      "Delete it: hold a reason the callers share in a name or a test title.",
+    );
+  });
+
+  it.each(COUNTED)("quotes the count of %s on one line", (_what, prose, counted) => {
+    expect(findings(holding(commented("#", prose)))).toEqual([
+      expect.stringContaining(`uses it (\`${counted}\`).`),
+    ]);
+  });
+
+  it.each(NOT_COUNTED)("walks past %s", (_what, prose) => {
+    expect(findings(holding(commented("#", prose)))).toEqual([]);
+  });
+
+  it("refuses a docstring counting its callers", () => {
+    const module = { [FILE]: '"""Both callers hand the trimmed name."""\n\nKEEP = 1\n' };
+
+    expect(findings(module)).toHaveLength(1);
+  });
+
+  it("walks past a docstring naming the one caller", () => {
+    const module = { [FILE]: '"""The one caller hands the trimmed name."""\n\nKEEP = 1\n' };
+
+    expect(findings(module)).toEqual([]);
+  });
+
+  it("refuses a directive's reason that counts its callers", () => {
+    const reason = "import os  # noqa: F401  # both callers hand the wrong shape\n";
+
+    expect(run({ [FILE]: reason })).toContain("counts the code that uses it");
+  });
+
+  it("reports a long count once, for the count", () => {
+    const output = run(holding(`# ${wordsOf(26)} for both callers\n`));
+
+    expect(output.trim().split("\n")).toHaveLength(1);
+    expect(output).toContain("counts the code that uses it (`both callers`)");
+  });
+});
+
+describe("the Python check's exemptions", () => {
+  it.each([
+    ["a why inside the ceiling", "# Deleting this changes what the engine memoises.\n"],
+    ["a type-checker escape", "# type: ignore[attr-defined]  # the stub lags the runtime\n"],
+    ["a linter escape", "# noqa: E501  # a URL cannot wrap\n"],
+    ["a coverage pragma", "# pragma: no cover\n"],
+    ["a copy-detection fence", "# jscpd:ignore-start\n# jscpd:ignore-end\n"],
+    ["a licence notice", "# SPDX-License-Identifier: MIT\n"],
+  ])("walks past %s", (_what, comment) => {
+    expect(findings(holding(comment))).toEqual([]);
+  });
+
+  it("walks past a licence notice held in a module docstring", () => {
+    const notice = `"""Copyright 2026 the authors. ${OVER_THE_CEILING}"""\n\nKEEP = 1\n`;
+
+    expect(findings({ [FILE]: notice })).toEqual([]);
+  });
+
+  it("holds a docstring opening with `noqa` to the ceiling", () => {
+    const opening = `"""noqa ${OVER_THE_CEILING}"""\n\nKEEP = 1\n`;
+
+    expect(findings({ [FILE]: opening })).toHaveLength(1);
+  });
+
+  it("walks past a hashbang, which deleting would break a command", () => {
+    expect(findings({ [FILE]: "#!/usr/bin/env python3\nKEEP = 1\n" })).toEqual([]);
+  });
+
+  it("keeps a directive's words out of the paragraph under it", () => {
+    expect(findings(holding(`# fmt: off\n# ${A_WHY_AT_THE_CEILING}\n`))).toEqual([]);
+  });
+
+  it("keeps a directive's exemption off the paragraph under it", () => {
+    const below = `# type: ignore[attr-defined]  # the stub lags the runtime\n${TOO_LONG}`;
+
+    expect(findings(holding(below))).toHaveLength(1);
+  });
+
+  it("stays silent over short comments that cite nothing", () => {
+    expect(findings(holding("# Deleting this changes what the engine memoises.\n"))).toEqual([]);
+  });
+
+  it("counts the words after a marker of any length", () => {
+    expect(findings(holding(`## ${A_WHY_AT_THE_CEILING}\n`))).toEqual([]);
+  });
+
+  it("reads a `#` inside a string as a string", () => {
+    expect(findings({ [FILE]: `KEEP = "# ${OVER_THE_CEILING}"\n` })).toEqual([]);
+  });
+});
+
+describe("a directive's reason counts against the twenty-five words", () => {
+  it.each([
+    ["a noqa", "import os  # noqa: F401"],
+    ["a type-checker escape", "KEEP: int = 1  # type: ignore[assignment]"],
+  ])("refuses %s's twenty-six-word reason, naming the fix", (_what, line) => {
+    const output = run({ [FILE]: `${line}  # ${wordsOf(26)}\n` });
+
+    expect(output).toContain("reason runs to 26 words");
+    expect(output).toContain("Say the constraint alone.");
+  });
+
+  it("counts a reason apart from the comment above it", () => {
+    const source = `# ${wordsOf(20)}\n# type: ignore  # ${wordsOf(20)}\nKEEP = 1\n`;
+
+    expect(findings({ [FILE]: source })).toEqual([]);
+  });
+
+  it.each([
+    ["a noqa", "import os  # noqa: F401, E501"],
+    ["a type-checker escape", "KEEP: int = 1  # type: ignore[assignment]"],
+  ])("refuses %s whose reason lacks a second marker", (_what, line) => {
+    const output = run({ [FILE]: `${line} - ${wordsOf(26)}\n` });
+
+    expect(output).toContain("runs to 26 words");
+  });
+
+  it("counts none of the directive's own words", () => {
+    const codes = Array.from({ length: 30 }, (_, index) => `E${String(index + 100)}`).join(", ");
+
+    expect(findings({ [FILE]: `KEEP = 1  # noqa: ${codes}  # a generated table\n` })).toEqual([]);
+  });
+
+  it("accepts a noqa whose reason fits the ceiling", () => {
+    expect(findings({ [FILE]: `import os  # noqa: F401  # ${A_WHY_AT_THE_CEILING}\n` })).toEqual(
+      [],
+    );
+  });
+
+  it("refuses a directive's reason that cites a ticket", () => {
+    const citing = "import os  # noqa: F401  # the loader changed under T-243\n";
+
+    expect(findings({ [FILE]: citing })).toHaveLength(1);
+  });
+});
+
+describe("a suppression gives its reason on the same line", () => {
+  it.each([
+    ["a bare noqa", "KEEP = 1  # noqa: E501"],
+    ["a bare type-checker escape", "KEEP = 1  # type: ignore[attr-defined]"],
+    ["a blanket noqa", "KEEP = 1  # noqa"],
+    ["a bare noqa then a directive", "KEEP = 1  # noqa: E501  # fmt: skip"],
+  ])("refuses %s, naming the fix", (_what, line) => {
+    const output = run({ [FILE]: `${line}\n` });
+
+    expect(output).toMatch(/^probe\.py:1: this suppression gives no reason; /m);
+    expect(output).toContain("Add the reason after a second `#`.");
+  });
+
+  it.each([
+    ["a noqa", "import os  # noqa: F401  # pytest finds the fixture by import"],
+    [
+      "a type-checker escape",
+      "KEEP = 1  # type: ignore[attr-defined]  # torch installs `patch` at runtime",
+    ],
+    ["a reason after the codes", "import os  # noqa: F401 - pytest finds it"],
+  ])("accepts %s", (_what, line) => {
+    expect(findings({ [FILE]: `${line}\n` })).toEqual([]);
+  });
+});
+
+describe("a docstring holds to twenty-five words wherever it sits", () => {
+  it.each([
+    ["a public worker function", WORKER_MODULE, documented("def reads() -> int:", 26)],
+    ["a public async worker function", WORKER_MODULE, documented("async def reads() -> int:", 26)],
+    ["an internal worker function", WORKER_MODULE, documented("def _reads() -> int:", 26)],
+    [
+      "a method, which is a member",
+      WORKER_MODULE,
+      `class Reader:\n    def reads(self) -> int:\n        """${wordsOf(26)}"""\n        return 1\n`,
+    ],
+    [
+      "a function inside a public one",
+      WORKER_MODULE,
+      `def reads() -> int:\n    def inner() -> int:\n        """${wordsOf(26)}"""\n        return 1\n    return inner()\n`,
+    ],
+    ["the worker module itself", WORKER_MODULE, `"""${wordsOf(26)}"""\n\nKEEP = 1\n`],
+    [
+      "a comment above a public function",
+      WORKER_MODULE,
+      `# ${wordsOf(26)}\ndef reads() -> int:\n    return 1\n`,
+    ],
+    [
+      "a public function in worker tests",
+      "apps/worker/tests/test_probe.py",
+      documented("def test_reads() -> int:", 26),
+    ],
+    [
+      "a public function outside the worker",
+      "packages/devtools/python/probe.py",
+      documented("def reads() -> int:", 26),
+    ],
+  ])("holds %s to twenty-five words", (_what, file, source) => {
+    const output = run({ [file]: source });
+
+    expect(output).toContain("runs to 26 words");
+    expect(output).toContain("over the cap of 25");
+  });
+});
+
+describe("the Python check reads Python files and nothing else", () => {
+  it.each([
+    ["YAML", "probe.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
+    ["shell", "probe.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
+    ["TOML", "probe.toml", `# ${FORTY_WORDS}\nkeep = 1\n`],
+    ["SQL", "probe.sql", `-- ${FORTY_WORDS}\nSELECT 1;\n`],
+    [
+      "a workspace's tool configuration",
+      "apps/worker/pyproject.toml",
+      `# ${FORTY_WORDS}\nkeep = 1\n`,
+    ],
+    ["markdown", "probe.md", `# ${FORTY_WORDS}\n`],
+  ])("walks past a forty-word comment in %s", (_what, file, source) => {
+    expect(findings({ [file]: source })).toEqual([]);
+  });
+
+  it("walks past a config file named on its command line", () => {
+    const named = runsOverThrowawayTree({
+      ...gate,
+      argv: ["probe.toml", FILE],
+      smoke: {
+        tree: { ...holding(TOO_LONG), "probe.toml": "keep = 1\n" },
+        reports: (output) => output.includes(`${FILE}:`),
+      },
+    });
+
+    const output = named({ ...holding(TOO_LONG), "probe.toml": `# ${FORTY_WORDS}\nkeep = 1\n` });
+
+    expect(output).not.toContain("probe.toml");
+  });
+
+  it("walks past a skill, which is prose no gate reads", () => {
+    const skill = { "packages/devtools/.claude/skills/probe/example.py": TOO_LONG };
+
+    expect(findings(skill)).toEqual([]);
+  });
+});
+
+describe("the Python check refuses a citation a reader cannot open", () => {
+  const saying = (text: string): Tree => ({ [FILE]: `USAGE = "${text}"\n` });
+
+  it.each([
+    ["a ticket id", "Ask the owner about T-243 first."],
+    ["an ADR number", "The map is Postgres under ADR 0021."],
+    ["an ISO date", "The registry moved on 2026-09-21."],
+    ["a slashed date", "The registry moved on 21/09/2026."],
+  ])("refuses a string citing %s", (_what, text) => {
+    expect(findings(saying(text))).toHaveLength(1);
+  });
+
+  it("refuses a rule tag in a string too", () => {
+    expect(findings(saying("A raw insert lives in a factory ([TEST4])."))).toHaveLength(1);
+  });
+
+  it("counts a docstring citing a ticket once, not twice", () => {
+    expect(findings({ [FILE]: `"""Kept under T-243."""\n\nKEEP = 1\n` })).toHaveLength(1);
+  });
+
+  it("stays silent over a string saying what to do", () => {
+    expect(findings(saying("Name a workspace this person belongs to."))).toEqual([]);
+  });
+
+  it("walks past a value with no prose in it", () => {
+    expect(findings({ [FILE]: 'READ_ON = "2026-09-11"\n' })).toEqual([]);
+  });
+
+  it("walks past the same string in a test", () => {
+    const inATest = { "tests/test_probe.py": 'USAGE = "The map is Postgres under ADR 0021."\n' };
+
+    expect(findings(inATest)).toEqual([]);
+  });
+
+  it("refuses the same string in a gate's own source", () => {
+    const inAGate = {
+      "packages/devtools/python/comment_gate.py":
+        'SAID = "A raw insert lives in a factory ([TEST4])."\n',
+    };
+
+    expect(findings(inAGate)).toHaveLength(1);
+  });
+});
+
+describe("the check refuses to judge a file it cannot read", () => {
+  it("exits on an unparseable file rather than reporting it clean", () => {
+    expect(() => run({ [FILE]: "def broken(\n" })).toThrow(/could not be read/);
+  });
+
+  it("refuses a directory named like a module, never skipping it", () => {
+    const aDirectory = { "pkg.py/inner.txt": "not a module\n" };
+
+    expect(() => run(aDirectory)).toThrow(/exit 2\n\ncomment_gate: pkg\.py could not be read: /);
+  });
+});
+
+describe("the check refuses a named path that does not exist", () => {
+  it("refuses a named path the tree does not hold", () => {
+    const namingAnAbsentPath: Tool = {
+      ...gate,
+      argv: [".", "absent"],
+      smoke: { tree: {}, reports: () => true },
+    };
+
+    expect(() => runsOverThrowawayTree(namingAnAbsentPath)).toThrow(
+      /exit 2\n\ncomment_gate: no path at absent\n/,
+    );
+  });
+});

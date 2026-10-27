@@ -3,7 +3,13 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { deployScript, PATH_ONLY, type Ran, ran, scratchDirectory } from "./script-stand-ins.ts";
+import {
+  deployScript,
+  PATH_ONLY,
+  type Ran,
+  ran,
+  scratchDirectory,
+} from "../support/script-stand-ins.ts";
 
 const scratch = scratchDirectory("prune-images-");
 

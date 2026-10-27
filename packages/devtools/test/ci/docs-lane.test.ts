@@ -412,7 +412,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     inTheLane: "check:docs:devtools",
   },
   {
-    file: "packages/devtools/test/ci/provision-skills.test.ts",
+    file: "packages/devtools/test/worktrees/provision-skills.test.ts",
     reads:
       "packages/design-system/SKILL.md through its symlink, and which of the pixel-perfect plugin's files git tracks",
     inTheLane: "check:docs:devtools",
