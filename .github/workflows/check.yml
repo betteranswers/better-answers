@@ -79,7 +79,6 @@ jobs:
           else
             echo "::notice::no diff against a base (event ${EVENT}, base '${base}'), so this run takes every path as changed"
           fi
-          # Every leg is gated on these words, so a third is a run that requires nothing.
           case "${lane}" in
             docs | full) ;;
             *)
@@ -381,8 +380,7 @@ jobs:
         with:
           node-version-file: .node-version
       # Read when it runs, not from the event, so a re-run reads a retitle. A merge group's ref
-      # names its pull request. commitlint comes from the root manifest's pins rather than an
-      # install, so a stale lockfile fails the legs' installs and not this job.
+      # names its pull request.
       - name: the pull request's title, through commitlint
         env:
           GH_TOKEN: ${{ github.token }}
@@ -400,6 +398,33 @@ jobs:
           printf '%s\n' "${title}" |
             pnpm dlx --package="@commitlint/cli@${cli}" --package="@commitlint/config-conventional@${preset}" commitlint
 
+  verdict:
+    if: ${{ github.event_name == 'merge_group' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: read
+    steps:
+      - name: the pull request's head carries a successful verdict status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUEUED_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          number="$(printf '%s\n' "${QUEUED_REF}" | sed -n 's|^refs/heads/gh-readonly-queue/.*/pr-\([0-9][0-9]*\)-[0-9a-f]*$|\1|p')"
+          if [ -z "${number}" ]; then
+            echo "::error::no pull request number in this event (ref '${QUEUED_REF}')"
+            exit 1
+          fi
+          sha="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${number}" --jq .head.sha)"
+          state="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${sha}/status" --jq '.statuses[] | select(.context == "verdict") | .state')"
+          if [ "${state}" != "success" ]; then
+            echo "::error::the verdict on pull request #${number} at ${sha} is ${state:-missing}, and the queue wants success"
+            exit 1
+          fi
+          echo "pull request #${number} at ${sha} carries a successful verdict"
+
   check:
     needs:
       [
@@ -412,6 +437,7 @@ jobs:
         full-web-browser,
         full-worker,
         pr-title,
+        verdict,
       ]
     # A skipped required check never reports, so this runs whatever the legs did.
     if: ${{ always() }}
@@ -423,6 +449,7 @@ jobs:
           LANE: ${{ needs.lane.outputs.lane }}
           LEGS: ${{ toJSON(needs) }}
           TITLE_WANTED: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'success' || 'skipped' }}
+          VERDICT_WANTED: ${{ (github.event_name == 'merge_group') && 'success' || 'skipped' }}
         run: |
           named=0
           required=0
@@ -433,13 +460,13 @@ jobs:
             case "${leg}" in
               lane) wanted=success ;;
               pr-title) wanted="${TITLE_WANTED}" ;;
+              verdict) wanted="${VERDICT_WANTED}" ;;
               "${LANE}-"*) wanted=success; required=$((required + 1)) ;;
               *) wanted=skipped ;;
             esac
             echo "${leg}: ${was} (this lane wants ${wanted})"
             [ "${was}" = "${wanted}" ] || wrong="${wrong} ${leg}=${was}"
           done
-          # A floor, not a count to keep current: a verdict requiring nothing of anybody passes.
           if [ "${named}" -lt 2 ] || [ "${required}" -lt 1 ]; then
             echo "::error::this verdict read ${named} jobs and required ${required} of them, so it proved nothing"
             exit 1
