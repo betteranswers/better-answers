@@ -98,7 +98,6 @@ const adasApi =
     return answered(names.map((name) => answerTo(name, replace, read)));
   };
 
-/** Another tab made a set first: the replace is refused, and every read after it shows that set. */
 const anotherTabMadeASet = () => {
   let refused = false;
   return adasApi(

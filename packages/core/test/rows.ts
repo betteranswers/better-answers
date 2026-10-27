@@ -8,7 +8,6 @@ export const rowsFrom = (result: { readonly rows: unknown }) => records.parse(re
 
 const counted = z.tuple([z.object({ open: z.number() })]);
 
-/** The spend reservations a workspace still holds open. */
 export const openReservationsIn = async (pool: pg.Pool, workspaceId: string): Promise<number> => {
   const read = await pool.query(
     "SELECT count(*)::integer AS open FROM spend_reservation WHERE workspace_id = $1",

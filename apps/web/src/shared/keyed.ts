@@ -1,6 +1,5 @@
 type Keyed<T> = { readonly key: string; readonly item: T };
 
-/** Keys a list by what each item says, counting repeats, so a key follows its item when the list shifts. */
 export const keyed = <T>(
   items: readonly T[],
   identity: (item: T) => string,
