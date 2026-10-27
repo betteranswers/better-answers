@@ -1,5 +1,5 @@
 import type { inferProcedureBuilderResolverOptions } from "@trpc/server";
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { assert, describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
 import { err, type OperatorPrincipal, type Principal } from "@better-answers/core/kernel";
@@ -437,11 +437,13 @@ describe("ending every sign-in and token everywhere, from the console", () => {
     });
     expect(await sessionsHeldBy(person.id)).toBe(0);
     expect(await refreshTokensOf(person.id)).toEqual([]);
+    assert(inAcme.refreshToken !== undefined, "Acme's connection issued a refresh token");
+    assert(inBeta.refreshToken !== undefined, "Beta's connection issued a refresh token");
     expect([
       (await callMcp(host, inAcme.accessToken, "tools/list")).status,
       (await callMcp(host, inBeta.accessToken, "tools/list")).status,
-      (await refresh(host, inAcme.refreshToken ?? "")).status,
-      (await refresh(host, inBeta.refreshToken ?? "")).status,
+      (await refresh(host, inAcme.refreshToken)).status,
+      (await refresh(host, inBeta.refreshToken)).status,
     ]).toEqual([401, 401, 400, 400]);
     expect(await revocationRowsOf(person.id)).toEqual([
       {
@@ -817,7 +819,8 @@ describe("the console's list and inspection of people", () => {
     const { api } = await theOperatorOnTheWeb();
     const workspace = await app().provision({ name: "Acme" });
     const connected = await connectAsHost(app(), app().client(), workspace.admin);
-    const refreshed = await refresh(app().client(), connected.refreshToken ?? "");
+    assert(connected.refreshToken !== undefined, "the connection issued a refresh token");
+    const refreshed = await refresh(app().client(), connected.refreshToken);
     expect(refreshed.status).toBe(200);
 
     const inspected = await api.console.people.inspect.query({ personId: workspace.admin.id });
@@ -879,9 +882,9 @@ describe("the console's list and inspection of people", () => {
       ],
     });
     const [everywhere, here] = inspected.ended;
-    expect(Date.parse(everywhere?.endedAt ?? "")).toBeGreaterThanOrEqual(
-      Date.parse(here?.endedAt ?? ""),
-    );
+    assert(everywhere !== undefined, "the sign-out everywhere is listed");
+    assert(here !== undefined, "the sign-out here is listed");
+    expect(Date.parse(everywhere.endedAt)).toBeGreaterThanOrEqual(Date.parse(here.endedAt));
   });
 
   const endedByTheServer = (workspaceId: string) => [
