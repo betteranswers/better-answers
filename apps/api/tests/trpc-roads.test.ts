@@ -17,6 +17,7 @@ import {
   ANSWERING_WORKSPACE_HEADER,
   TAB_WORKSPACE_HEADER,
 } from "@better-answers/schema/tab-workspace";
+import { matching } from "@better-answers/schema/testing/matching";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
 
 import type { ModelDoors } from "../src/ask-steps.ts";
@@ -337,7 +338,7 @@ describe.each([
     expect([status, rows]).toEqual([500, 0]);
     expect(
       logs.filter((line) => line["event"] === "trpc.failed").map((line) => failedLine.parse(line)),
-    ).toEqual([{ action: "probeWrite", err: expect.objectContaining({ code: "25006" }) }]);
+    ).toEqual([{ action: "probeWrite", err: matching.objectContaining({ code: "25006" }) }]);
   });
 
   it("lands on the mutation road", async () => {
@@ -369,7 +370,7 @@ describe("every query the router serves", () => {
       .map(([path]) => path);
 
     expect(queries.map(([path]) => path)).toEqual(
-      expect.arrayContaining(["members.list", "console.workspaces.list"]),
+      matching.arrayContaining(["members.list", "console.workspaces.list"]),
     );
     expect(elsewhere).toEqual([]);
   });
@@ -443,7 +444,7 @@ describe("every query the router serves on a workspace road", () => {
       words.push([path, await wordOf(await queriedFromATab(client, path, left.workspaceId))]);
     }
 
-    expect(paths).toEqual(expect.arrayContaining(["members.list", "knowledge.find"]));
+    expect(paths).toEqual(matching.arrayContaining(["members.list", "knowledge.find"]));
     expect(words).toEqual(paths.map((path) => [path, "workspace-switched"]));
   });
 
@@ -493,7 +494,7 @@ describe("every query the router serves on a workspace road", () => {
       answering.push((await queriedFromATab(client, path)).headers.get(ANSWERING_WORKSPACE_HEADER));
     }
 
-    expect(paths).toEqual(expect.arrayContaining(["person.workspaces"]));
+    expect(paths).toEqual(matching.arrayContaining(["person.workspaces"]));
     expect(answering).toEqual(paths.map(() => null));
   });
 });
@@ -551,7 +552,7 @@ describe("every mutation the router serves", () => {
     );
 
     expect(WORKSPACE_MUTATIONS).toEqual(
-      expect.arrayContaining(["members.remove", "members.invite", "sources.connect"]),
+      matching.arrayContaining(["members.remove", "members.invite", "sources.connect"]),
     );
     expect(words).toEqual(WORKSPACE_MUTATIONS.map((path) => [path, "workspace-switched"]));
   });
@@ -577,7 +578,7 @@ describe("every mutation the router serves", () => {
     }
 
     expect(paths).toEqual(
-      expect.arrayContaining(["person.setDisplayName", "console.people.correctDisplayName"]),
+      matching.arrayContaining(["person.setDisplayName", "console.people.correctDisplayName"]),
     );
     expect(words).not.toContain("workspace-switched");
   });

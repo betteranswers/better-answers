@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { dropAnExpiredPromotionLock, PROMOTION_LOCK_PREFIX } from "../src/auth/promotion-lock.ts";
 import { signIn } from "./flow.ts";
@@ -194,7 +195,7 @@ describe("a sign-in after a promotion left its lock behind", () => {
       {
         level: 40,
         msg: "auth.promotion_lock_not_cleared",
-        reason: expect.stringContaining("the store refused the first lock delete"),
+        reason: matching.stringContaining("the store refused the first lock delete"),
       },
     ]);
     expect(await accessOf(person.id)).toEqual({ verified: false, sessions: 2, accounts: 1 });

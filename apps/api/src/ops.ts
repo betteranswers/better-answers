@@ -1,4 +1,5 @@
 import { writeFile } from "node:fs/promises";
+import { text } from "node:stream/consumers";
 
 import { err, ok } from "@better-answers/core/kernel";
 import { openModelKeySetting } from "@better-answers/core/llm";
@@ -40,11 +41,7 @@ const doors = openDoors({
   objectStore: objectStore.ok ? objectStore.value : undefined,
 });
 
-const stdin = async (): Promise<string> => {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
-  return Buffer.concat(chunks).toString("utf8");
-};
+const stdin = (): Promise<string> => text(process.stdin);
 
 const exitCode = await runOps(process.argv.slice(2), doors, {
   fetch: fetchHonouringHost,

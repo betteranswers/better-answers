@@ -9,6 +9,7 @@ import { z } from "zod";
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { CONTRACT_DIGEST, POSTGRES_IMAGE } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import {
   containersOf,
@@ -307,7 +308,7 @@ describe("the local database", () => {
     const again = localDatabase(port, ["up"]);
     expect({ status: again.status, stderr: again.stderr }).toEqual({
       status: 1,
-      stderr: expect.stringContaining(
+      stderr: matching.stringContaining(
         `local-database: REFUSED — this database holds the synthetic fixture under ${earlier}, and its workspace is ${SYNTHETIC_WORKSPACE} now — deploy/local-database.sh down --wipe, then up`,
       ),
     });

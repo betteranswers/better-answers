@@ -5,6 +5,7 @@ import { z } from "zod";
 import { err, type OperatorPrincipal, type Principal } from "@better-answers/core/kernel";
 import type { Tx } from "@better-answers/core/store/postgres";
 import { ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { runOps } from "../src/ops/index.ts";
 import type { operatorMutationProcedure, operatorQueryProcedure } from "../src/trpc/base.ts";
@@ -89,7 +90,7 @@ const ops = async (argv: readonly string[]): Promise<Run> => {
 };
 
 const operatorRowsOf = async (personId: string) => {
-  const found = await app().database.superuser.query(
+  const found = await app().database.superuser.query<Record<string, unknown>>(
     `SELECT action, actor, subject_id, detail FROM identity_audit_event
       WHERE subject_id = $1 AND action LIKE 'people.operator.%' ORDER BY at, id`,
     [personId],
@@ -176,7 +177,7 @@ describe("operator — the mark an ops command sets and clears", () => {
       lines: [`operator: done — ${person.email.toUpperCase()} is no longer the operator`],
     });
     expect(await markHeldBy(person.id)).toBe(false);
-    expect((await operatorRowsOf(person.id)).map((row) => [row.action, row.actor])).toEqual([
+    expect((await operatorRowsOf(person.id)).map((row) => [row["action"], row["actor"]])).toEqual([
       ["people.operator.granted", IDENTITY_ACTOR],
       ["people.operator.revoked", IDENTITY_ACTOR],
     ]);
@@ -291,7 +292,7 @@ const sessionsHeldBy = async (personId: string): Promise<number | undefined> => 
 describe("the console, the operator's alone", () => {
   const auditRowsHeld = async () =>
     (
-      await app().database.superuser.query(
+      await app().database.superuser.query<Record<string, unknown>>(
         `SELECT (SELECT count(*)::int FROM identity_audit_event) AS identity_set,
                 (SELECT count(*)::int FROM audit_event) AS workspaces`,
       )
@@ -319,7 +320,7 @@ describe("the console, the operator's alone", () => {
       name: "Acme Holdings",
       shortName: `ws-${acme.workspaceId.toLowerCase()}`,
       memberCount: 2,
-      createdAt: expect.stringMatching(ISO_INSTANT),
+      createdAt: matching.stringMatching(ISO_INSTANT),
     });
   });
 
@@ -340,8 +341,8 @@ describe("the console, the operator's alone", () => {
 
     expect(refusals).toEqual(
       Array.from({ length: 3 }, () =>
-        expect.objectContaining({
-          data: expect.objectContaining({
+        matching.objectContaining({
+          data: matching.objectContaining({
             httpStatus: 403,
             refusal: { word: "not-the-operator", class: "forbidden" },
           }),
@@ -389,7 +390,7 @@ describe("the console, the operator's alone", () => {
 
 describe("ending every sign-in and token everywhere, from the console", () => {
   const revocationRowsOf = async (personId: string) => {
-    const found = await app().database.superuser.query(
+    const found = await app().database.superuser.query<Record<string, unknown>>(
       `SELECT action, actor, subject_id, detail FROM identity_audit_event
         WHERE subject_id = $1 AND action = 'people.person.credentials_revoked'`,
       [personId],
@@ -398,7 +399,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
   };
 
   const refreshTokensOf = async (personId: string) => {
-    const found = await app().database.superuser.query(
+    const found = await app().database.superuser.query<Record<string, unknown>>(
       "SELECT id FROM oauth_refresh_token WHERE user_id = $1",
       [personId],
     );
@@ -406,7 +407,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
   };
 
   const revokedAtOf = async (personId: string) => {
-    const found = await app().database.superuser.query(
+    const found = await app().database.superuser.query<Record<string, unknown>>(
       'SELECT credentials_revoked_at FROM "user" WHERE id = $1',
       [personId],
     );
@@ -430,7 +431,10 @@ describe("ending every sign-in and token everywhere, from the console", () => {
 
     const revoked = await api.console.people.endEverySignInAndToken.mutate({ personId: person.id });
 
-    expect(revoked).toEqual({ personId: person.id, revokedAt: expect.stringMatching(ISO_INSTANT) });
+    expect(revoked).toEqual({
+      personId: person.id,
+      revokedAt: matching.stringMatching(ISO_INSTANT),
+    });
     expect(await sessionsHeldBy(person.id)).toBe(0);
     expect(await refreshTokensOf(person.id)).toEqual([]);
     expect([
@@ -448,7 +452,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
           grants: [acme, beta].map(({ workspaceId }) => ({
             clientId: CLAUDE_CLIENT_ID,
             workspaceId,
-            issuedAt: expect.stringMatching(ISO_INSTANT),
+            issuedAt: matching.stringMatching(ISO_INSTANT),
           })),
         },
       },
@@ -559,7 +563,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
     expect(refused).toMatchObject({
       data: {
         httpStatus: 400,
-        refusal: { word: "malformed", fields: { personId: expect.any(String) } },
+        refusal: { word: "malformed", fields: { personId: matching.any(String) } },
       },
     });
     expect(await revocationRowsOf("not-a-person")).toEqual([]);
@@ -570,7 +574,7 @@ describe("correcting a flagged display name, from the console", () => {
   const RUDE_NAME = "Rude Name";
 
   const correctionRowsOf = async (personId: string) => {
-    const found = await app().database.superuser.query(
+    const found = await app().database.superuser.query<Record<string, unknown>>(
       `SELECT action, actor, subject_id, detail FROM identity_audit_event
         WHERE subject_id = $1 AND action = 'people.person.renamed'`,
       [personId],
@@ -602,7 +606,7 @@ describe("correcting a flagged display name, from the console", () => {
         flags: [
           {
             workspace: { id: acme.workspaceId, name: "Acme Flagging" },
-            raisedAt: expect.stringMatching(ISO_INSTANT),
+            raisedAt: matching.stringMatching(ISO_INSTANT),
           },
         ],
       },
@@ -697,7 +701,7 @@ describe("correcting a flagged display name, from the console", () => {
     expect(refused).toMatchObject({
       data: {
         httpStatus: 400,
-        refusal: { word: "malformed", fields: { personId: expect.any(String) } },
+        refusal: { word: "malformed", fields: { personId: matching.any(String) } },
       },
     });
     expect(await correctionRowsOf("not-a-person")).toEqual([]);
@@ -787,7 +791,7 @@ describe("the console's list and inspection of people", () => {
     const listed = await api.console.people.list.query({ search: person.email });
 
     expect(listed.people).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         id: person.id,
         lastSignedInAt: (await signInsOf(person.id))[0],
         credentialsRevokedAt: revokedAt.toISOString(),
@@ -818,7 +822,7 @@ describe("the console's list and inspection of people", () => {
 
     const inspected = await api.console.people.inspect.query({ personId: workspace.admin.id });
 
-    const instant = expect.stringMatching(ISO_INSTANT);
+    const instant = matching.stringMatching(ISO_INSTANT);
     expect(inspected).toEqual({
       sessions: [{ createdAt: instant, lastUsedAt: instant, expiresAt: instant }],
       grants: [
@@ -850,7 +854,7 @@ describe("the console's list and inspection of people", () => {
 
     const inspected = await api.console.people.inspect.query({ personId: person.id });
 
-    const instant = expect.stringMatching(ISO_INSTANT);
+    const instant = matching.stringMatching(ISO_INSTANT);
     const claude = { id: CLAUDE_CLIENT_ID, name: "Claude" };
     expect(inspected).toEqual({
       sessions: [],
@@ -884,8 +888,8 @@ describe("the console's list and inspection of people", () => {
     {
       assistant: { id: CLAUDE_CLIENT_ID, name: "Claude" },
       workspace: { id: workspaceId, name: "Acme" },
-      issuedAt: expect.stringMatching(ISO_INSTANT),
-      endedAt: expect.stringMatching(ISO_INSTANT),
+      issuedAt: matching.stringMatching(ISO_INSTANT),
+      endedAt: matching.stringMatching(ISO_INSTANT),
       scope: "grant",
       endedBy: { kind: "authorization-server" },
     },
@@ -957,13 +961,13 @@ describe("the console's list and inspection of people", () => {
       {
         data: {
           httpStatus: 400,
-          refusal: { word: "malformed", fields: { personId: expect.any(String) } },
+          refusal: { word: "malformed", fields: { personId: matching.any(String) } },
         },
       },
       {
         data: {
           httpStatus: 400,
-          refusal: { word: "malformed", fields: { limit: expect.any(String) } },
+          refusal: { word: "malformed", fields: { limit: matching.any(String) } },
         },
       },
     ]);

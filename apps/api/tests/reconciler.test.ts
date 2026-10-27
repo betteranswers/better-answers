@@ -5,6 +5,7 @@ import { initRepository } from "@better-answers/core/store/git";
 import { until } from "@better-answers/core/testing/postgres";
 import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { openDoors, type Doors } from "../src/doors.ts";
 import { RECONCILER_INTERVAL_MS, startReconciler } from "../src/reconciler.ts";
@@ -131,7 +132,7 @@ describe("the periodic head check", () => {
     const { lines, heldId } = await aTickBesideARewrite();
 
     expect(lines).toEqual([
-      expect.objectContaining({
+      matching.objectContaining({
         level: 30,
         held: [{ workspace_id: heldId }],
         refused: [],
@@ -170,7 +171,7 @@ describe("the periodic head check", () => {
     expect(lines[0]).toMatchObject({
       level: 40,
       held: [{ workspace_id: heldId }],
-      refused: expect.arrayContaining([
+      refused: matching.arrayContaining([
         { workspace_id: bare.workspaceId, reason: "no-such-repository" },
       ]),
     });
@@ -191,12 +192,12 @@ describe("the periodic head check", () => {
 
     expect(ticks(head.logs)[0]).toMatchObject({
       level: 40,
-      refused: expect.arrayContaining([
+      refused: matching.arrayContaining([
         { workspace_id: bare.workspaceId, reason: "no-such-repository" },
       ]),
     });
     expect(saying(head.logs, "sync cascade tick")).toEqual([
-      expect.objectContaining({ level: 30, followed: 1, concepts: 0, skipped: [], refused: [] }),
+      matching.objectContaining({ level: 30, followed: 1, concepts: 0, skipped: [], refused: [] }),
     ]);
   });
 
@@ -286,8 +287,10 @@ describe("the periodic head check", () => {
       });
 
       await head.tick();
-      expect(saying(head.logs, TICK_FAILED)).toEqual([expect.objectContaining({ level: 50 })]);
-      expect(saying(head.logs, FOLLOWING_FAILED)).toEqual([expect.objectContaining({ level: 50 })]);
+      expect(saying(head.logs, TICK_FAILED)).toEqual([matching.objectContaining({ level: 50 })]);
+      expect(saying(head.logs, FOLLOWING_FAILED)).toEqual([
+        matching.objectContaining({ level: 50 }),
+      ]);
       release();
       await head.tickTimes(3);
       await head.stop();
@@ -329,7 +332,7 @@ describe("the periodic head check", () => {
 
     expect(head.pinged).toHaveLength(2);
     expect(saying(head.logs, "a dead-man ping could not be sent")).toEqual([
-      expect.objectContaining({ level: 40, check: "scheduler", reason: "fetch failed" }),
+      matching.objectContaining({ level: 40, check: "scheduler", reason: "fetch failed" }),
     ]);
     expect(JSON.stringify(head.logs)).not.toContain(CHECK_UUID);
   });
@@ -345,7 +348,7 @@ describe("the periodic head check", () => {
 
     expect(head.pinged).toHaveLength(2);
     expect(saying(head.logs, "a dead-man ping was refused")).toEqual([
-      expect.objectContaining({ level: 40, check: "scheduler", status: 404 }),
+      matching.objectContaining({ level: 40, check: "scheduler", status: 404 }),
     ]);
     expect(JSON.stringify(head.logs)).not.toContain(CHECK_UUID);
   });

@@ -129,7 +129,8 @@ const aKeptScene = async (): Promise<KeptScene> => {
 };
 
 const identityRows = async () => {
-  const read = async (sql: string) => (await app().database.superuser.query(sql)).rows;
+  const read = async (sql: string) =>
+    (await app().database.superuser.query<Record<string, unknown>>(sql)).rows;
   return {
     workspaces: await read("SELECT id, name, short_name FROM workspace ORDER BY id"),
     members: await read("SELECT workspace_id, user_id, role FROM member ORDER BY id"),

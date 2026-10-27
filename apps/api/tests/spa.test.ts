@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME } from "./harness.ts";
 import { servedApp } from "./suite-app.ts";
@@ -120,7 +122,7 @@ describe("the api serves the shell on app.", () => {
       .fetch("/.well-known/oauth-protected-resource", asABrowserNavigates);
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ resource: expect.any(String) });
+    await expect(response.json()).resolves.toMatchObject({ resource: matching.any(String) });
   });
 
   it("keeps the shell under /.well-known/ from being kept as discovery", async () => {

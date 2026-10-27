@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { confirmedByTheHarness } from "./factor-harness.ts";
 import { whileCommitsAreRefused } from "./provoke.ts";
@@ -127,7 +129,7 @@ describe("accepting an invitation over tRPC", () => {
       workspaceName: "Calder Joinery",
       role: "Editor",
       invitedBy: "Test person",
-      expiresAt: expect.stringMatching(ISO_INSTANT),
+      expiresAt: matching.stringMatching(ISO_INSTANT),
     });
   });
 
@@ -203,14 +205,14 @@ describe("reading a person's own invitations over tRPC", () => {
         workspaceName: "Ryedale Metalwork",
         role: "Viewer",
         invitedBy: "Test person",
-        expiresAt: expect.stringMatching(ISO_INSTANT),
+        expiresAt: matching.stringMatching(ISO_INSTANT),
       },
       {
         invitationId,
         workspaceName: "Calder Joinery",
         role: "Editor",
         invitedBy: "Test person",
-        expiresAt: expect.stringMatching(ISO_INSTANT),
+        expiresAt: matching.stringMatching(ISO_INSTANT),
       },
     ]);
   });

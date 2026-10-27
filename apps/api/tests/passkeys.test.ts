@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { matching } from "@better-answers/schema/testing/matching";
+
 import type { TestClient } from "./harness.ts";
 import { aPasskeyDevice, type PasskeyDevice } from "./passkey-device.ts";
 import { aPersonSignedIn, anAdminSignedIn } from "./provoke.ts";
@@ -115,7 +117,7 @@ describe("adding a passkey", () => {
     expect(recoveryCodes).toBeNull();
     expect(await passkeysOf(person.id)).toEqual([{ id: passkeyId, name: "Work laptop" }]);
     expect(await sessionsOf(person.id)).toEqual([
-      { id: expect.any(String), confirmed: expect.any(Date) },
+      { id: matching.any(String), confirmed: matching.any(Date) },
     ]);
     expect(subjectsTo(person.email)).toEqual([ADDED]);
   });

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { matching } from "@better-answers/schema/testing/matching";
 import { ulid } from "@better-answers/schema/ulid";
 
 import { confirmWithTheAuthenticator } from "./flow.ts";
@@ -41,7 +42,7 @@ describe("the browser suite's second-factor harness", () => {
     await confirmWithTheAuthenticator(client, key);
     expect((await webClientOf(client).api.person.secondFactor.query()).thisSession).toEqual({
       confirmed: true,
-      confirmedAt: expect.any(String),
+      confirmedAt: matching.any(String),
       setupGranted: false,
       adminOf: null,
       standing: "not-required",
@@ -133,7 +134,7 @@ describe("a seed the browser suite's harness cannot write", () => {
         fields: [
           {
             field: "connectedSources.0.documents.0.findings.0.kept",
-            rule: expect.stringContaining("finding_restore_check"),
+            rule: matching.stringContaining("finding_restore_check"),
           },
         ],
       },
@@ -196,7 +197,7 @@ describe("a seed the browser suite's harness cannot write", () => {
         fields: [
           {
             field: "connectedSources.0.documents.0.unreadableReason",
-            rule: expect.stringContaining("no space"),
+            rule: matching.stringContaining("no space"),
           },
         ],
       },
@@ -214,7 +215,7 @@ describe("a seed the browser suite's harness cannot write", () => {
     const answered = await asked("/__harness/connected-sources", aSeedOf(ulid(), {}));
 
     expect(answered.status).toBe(400);
-    expect(answered.said).toMatchObject({ constraint: expect.stringMatching(/_fk$/) });
+    expect(answered.said).toMatchObject({ constraint: matching.stringMatching(/_fk$/) });
   });
 
   it("leaves a fault of the harness's own a 500", async () => {

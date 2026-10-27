@@ -6,6 +6,7 @@ import { getObject } from "@better-answers/core/store/objects";
 import { objectStoreForSuite, textOf } from "@better-answers/core/testing/objects";
 import { until } from "@better-answers/core/testing/postgres";
 import { ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { POSTGRES_POOL_MAX } from "../src/doors.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
@@ -236,10 +237,10 @@ describe("the upload, one mutation over the split link", () => {
 
     expect(bound).toEqual({
       connectedSourceId: described.connectedSourceId,
-      documentId: expect.any(String),
-      jobId: expect.any(String),
-      auditEventId: expect.any(String),
-      originalKey: expect.any(String),
+      documentId: matching.any(String),
+      jobId: matching.any(String),
+      auditEventId: matching.any(String),
+      originalKey: matching.any(String),
     });
     expect(bound.originalKey).toEqual(
       `uploads/${described.connectedSourceId.toLowerCase()}/${bound.documentId.toLowerCase()}/original`,
@@ -501,7 +502,7 @@ describe("the Sources procedures over the wire", () => {
           reason: "connected",
           status: "queued",
           attempts: 0,
-          enqueuedAt: expect.stringMatching(ISO_INSTANT),
+          enqueuedAt: matching.stringMatching(ISO_INSTANT),
           finishedAt: null,
         },
         unreadable: [],
@@ -524,7 +525,7 @@ describe("the Sources procedures over the wire", () => {
         reason: "connected",
         status: "queued",
         attempts: 0,
-        enqueuedAt: expect.stringMatching(ISO_INSTANT),
+        enqueuedAt: matching.stringMatching(ISO_INSTANT),
         finishedAt: null,
       },
     ]);
@@ -543,7 +544,7 @@ describe("the Sources procedures over the wire", () => {
         reason: "connected",
         status: "done",
         attempts: 1,
-        enqueuedAt: expect.stringMatching(ISO_INSTANT),
+        enqueuedAt: matching.stringMatching(ISO_INSTANT),
         finishedAt: PINNED_AT.toISOString(),
       },
     ]);
@@ -637,8 +638,8 @@ describe("the Sources procedures over the wire", () => {
     expect(kept).toEqual({
       connectedSourceId,
       documentIds: [documentId],
-      batchId: expect.any(String),
-      jobId: expect.any(String),
+      batchId: matching.any(String),
+      jobId: matching.any(String),
     });
     const answered = JSON.stringify(kept);
     expect(answered).not.toContain(one.id);
@@ -662,7 +663,7 @@ describe("the Sources procedures over the wire", () => {
     expect(dismissed).toEqual({
       connectedSourceId,
       documentIds: [documentId],
-      jobId: expect.any(String),
+      jobId: matching.any(String),
     });
     const runs = await api.runs.ofSubject.query({ subjectId: connectedSourceId });
     expect(runs.map((run) => [run.jobId, run.reason, run.status])).toEqual([
@@ -739,8 +740,8 @@ describe("the Sources procedures over the wire", () => {
 
     expect(published).toEqual({
       connectedSourceId,
-      auditEventId: expect.any(String),
-      dpiaHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      auditEventId: matching.any(String),
+      dpiaHash: matching.stringMatching(/^[0-9a-f]{64}$/),
     });
     const [listed] = await api.sources.list.query();
     expect([listed?.state, listed?.publishedAt]).toEqual(["published", "2026-09-23T09:00:00.000Z"]);
@@ -758,7 +759,7 @@ describe("the Sources procedures over the wire", () => {
 
     expect(narrowed).toEqual({
       connectedSourceId,
-      auditEventId: expect.any(String),
+      auditEventId: matching.any(String),
       visibility: { sensitivity: "Restricted", audience: "everyone", audienceGroups: null },
       concepts: [],
       writeUps: [],
@@ -784,7 +785,7 @@ describe("the Sources procedures over the wire", () => {
 
     expect(widened).toEqual({
       connectedSourceId,
-      auditEventId: expect.any(String),
+      auditEventId: matching.any(String),
       visibility: { sensitivity: "Public", audience: "everyone", audienceGroups: null },
       concepts: [],
       writeUps: [],

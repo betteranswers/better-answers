@@ -43,7 +43,7 @@ export const webClientOf = (client: TestClient, held?: string) => {
           forAWrite: () => held,
           answeredIn: () => undefined,
         },
-        fetch: async (url, init) => {
+        fetch: async (url: string | URL, init) => {
           const asked = new URL(url);
           sent.push({
             path: asked.pathname,

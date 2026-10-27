@@ -8,6 +8,7 @@ import { actorIdOf, err, type UserPrincipal } from "@better-answers/core/kernel"
 import { commit, fileAtHead, head, initRepository } from "@better-answers/core/store/git";
 import type { Foldable, Tx } from "@better-answers/core/store/postgres";
 import { CONCEPT_BODY_MAX, conceptIriOf, ids, ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { runOps } from "../src/ops/index.ts";
 import { readTreeUnder } from "../src/ops/read-tree.ts";
@@ -163,7 +164,7 @@ const imported = async () => {
 };
 
 const verificationsOf = async (workspaceId: string, iri: string) => {
-  const found = await app().database.superuser.query(
+  const found = await app().database.superuser.query<Record<string, unknown>>(
     `SELECT actor, verified_at, content_hash, origin FROM concept_verification
       WHERE workspace_id = $1 AND iri = $2 ORDER BY verified_at`,
     [workspaceId, iri],
@@ -275,7 +276,7 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     const row = await conceptAt(scene.workspaceId, RETENTION);
     expect(added).toEqual([
       {
-        id: expect.any(String),
+        id: matching.any(String),
         actor: `human:${scene.admin.id}`,
         detail: {
           iri: scene.held.iri,

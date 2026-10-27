@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { whileWritesAreRefused } from "@better-answers/core/testing/postgres";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { confirmedByTheHarness } from "./factor-harness.ts";
 import { authorizeUrl, continueAfterPostLogin, pkce } from "./flow.ts";
@@ -194,7 +195,7 @@ describe("reading a link", () => {
 
     const read = await describedAs(phone, token);
 
-    expect(read).toEqual({ state: "elsewhere", code, until: expect.any(String) });
+    expect(read).toEqual({ state: "elsewhere", code, until: matching.any(String) });
     expect(await signedInAs(phone)).toBeUndefined();
     const typed = await asking.json("/sign-in/email-otp", { email: person.email, otp: code });
     expect(typed.status).toBe(200);

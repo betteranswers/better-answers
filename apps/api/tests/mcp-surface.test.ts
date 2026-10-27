@@ -18,6 +18,7 @@ import {
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "@better-answers/core/workspaces";
 import { CONCEPT_BODY_MAX, JUDGE_STATES, QUESTION_VERDICTS, ULID } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { MCP_TOKEN_RULE, MCP_UNAUTHENTICATED_IP_RULE } from "../src/auth/constants.ts";
 import { connectAsHost } from "./flow.ts";
@@ -203,7 +204,7 @@ const REFUSED_AT_THE_CEILING = {
   refusedBefore: 0,
   status: 429,
   hasRetryAfter: true,
-  sentence: expect.stringContaining("an Admin can raise the ceiling in System"),
+  sentence: matching.stringContaining("an Admin can raise the ceiling in System"),
 };
 
 /**
@@ -260,7 +261,7 @@ const recordsKeptIn = async (workspaceId: string) => {
 };
 
 const AN_OPEN_RECORD = {
-  id: expect.stringMatching(ULID),
+  id: matching.stringMatching(ULID),
   transport: "mcp",
   groups: [],
   verdict: null,
@@ -563,7 +564,7 @@ describe("era-independent", () => {
     expect(challenge).toContain('error="invalid_token"');
     expect(challenge).not.toContain("credentials-revoked");
     expect(app().logs.slice(before)).toContainEqual(
-      expect.objectContaining({
+      matching.objectContaining({
         event: "mcp.refused",
         refusal: "credentials-revoked",
         class: "unauthenticated",
@@ -581,7 +582,7 @@ describe("era-independent", () => {
     expect(refused.status).toBe(401);
     expect(refused.headers.get("www-authenticate") ?? "").not.toContain("not-a-member");
     expect(app().logs.slice(before)).toContainEqual(
-      expect.objectContaining({
+      matching.objectContaining({
         event: "mcp.refused",
         refusal: "not-a-member",
         class: "unauthenticated",
@@ -1060,7 +1061,7 @@ describe("the 2026-07-28 leg", () => {
     await modern(client, token, "tools/list", {}, { headers: { "mcp-method": "" } });
 
     expect(app().logs.slice(before)).toContainEqual(
-      expect.objectContaining({
+      matching.objectContaining({
         level: 40,
         module: "mcp",
         event: "mcp.handler_error",

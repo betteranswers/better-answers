@@ -12,6 +12,7 @@ import {
 } from "@better-answers/core/testing/judge-wire";
 import { until } from "@better-answers/core/testing/postgres";
 import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { askedFrom } from "../../web/src/shared/api/ask-stream.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
@@ -136,7 +137,7 @@ const resultIn = (events: Streamed) => {
 const recordsIn = (workspaceId: string) => recordsOf(app(), workspaceId);
 
 const spendIn = async (workspaceId: string) => {
-  const counted = await app().database.superuser.query(
+  const counted = await app().database.superuser.query<Record<string, unknown>>(
     `SELECT (SELECT count(*)::int FROM spend_reservation WHERE workspace_id = $1) AS reserved,
             (SELECT count(*)::int FROM llm_call WHERE workspace_id = $1) AS called`,
     [workspaceId],
@@ -149,7 +150,7 @@ const feedbackKeptOn = (recordId: string) => feedbackOf(app(), recordId);
 const ANSWERED_IN_FULL = {
   verdict: "ok",
   judgeState: "judged",
-  answers: [expect.objectContaining({ title: USERS.title, body: `${USERS.body}\n` })],
+  answers: [matching.objectContaining({ title: USERS.title, body: `${USERS.body}\n` })],
 };
 
 describe("ask over tRPC", () => {
@@ -173,7 +174,7 @@ describe("ask over tRPC", () => {
     expect(events.filter(isNotKeptAlive)).toEqual([
       { kind: "phase", phase: "reading" },
       { kind: "phase", phase: "judging" },
-      { kind: "result", result: expect.objectContaining(ANSWERED_IN_FULL) },
+      { kind: "result", result: matching.objectContaining(ANSWERED_IN_FULL) },
     ]);
     expect(await recordsIn(workspace.workspaceId)).toEqual([
       {
@@ -226,14 +227,14 @@ describe("ask over tRPC", () => {
     expect(refused).toMatchObject({
       data: {
         code: "TOO_MANY_REQUESTS",
-        retryAfterSeconds: expect.any(Number),
+        retryAfterSeconds: matching.any(Number),
       },
     });
     expect([onTheWire.status, onTheWire.headers.get("retry-after")]).toEqual([200, null]);
     expect(await onTheWire.text()).toContain('"retryAfterSeconds"');
     expect(resultIn(answered).verdict).toBe("ok");
     expect(await recordsIn(workspace.workspaceId)).toEqual([
-      expect.objectContaining({ transport: "trpc", completed: true }),
+      matching.objectContaining({ transport: "trpc", completed: true }),
     ]);
   });
 
@@ -376,7 +377,7 @@ const policyIn = (prompt: string): string =>
   conceptNumbersIn(prompt).get(ACCESS_POLICY.title) ?? "";
 
 const draftedOn = async (recordId: string) => {
-  const kept = await app().database.superuser.query(
+  const kept = await app().database.superuser.query<Record<string, unknown>>(
     "SELECT drafted FROM question_content WHERE record_id = $1",
     [recordId],
   );

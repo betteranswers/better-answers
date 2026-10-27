@@ -2,6 +2,7 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import { z } from "zod";
 
 import { keyIn } from "@better-answers/schema/testing/authenticator-code";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import { setActiveWorkspace } from "./flow.ts";
 import {
@@ -138,7 +139,7 @@ describe("setting up an authenticator", () => {
     await setUpOn(client);
 
     const held = await sessionsOf(person.id);
-    expect(held).toEqual([{ id: expect.any(String), confirmed: expect.any(Date) }]);
+    expect(held).toEqual([{ id: matching.any(String), confirmed: matching.any(Date) }]);
     expect(await sessionIdOf(client.cookies())).toBe(held[0]?.id);
     expect(await sessionIdOf(before)).toBeUndefined();
   });
@@ -169,7 +170,7 @@ describe("setting up an authenticator", () => {
 
     const after = await agesOf(person.id);
     expect(after).toEqual([
-      { id: expect.any(String), createdAt: before?.createdAt, expiresAt: before?.expiresAt },
+      { id: matching.any(String), createdAt: before?.createdAt, expiresAt: before?.expiresAt },
     ]);
     expect(after[0]?.id).not.toBe(before?.id);
   });

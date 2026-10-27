@@ -71,6 +71,7 @@ import {
   type RecordMapState,
 } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import type { Doors } from "../src/doors.ts";
 import type { EmailMessage, Mail } from "../src/email.ts";
@@ -723,7 +724,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
 
       expect(restored.rows).toEqual([
-        { id: erased.erasureRequestId, pseudonym: expect.any(String) },
+        { id: erased.erasureRequestId, pseudonym: matching.any(String) },
       ]);
     });
 
@@ -911,7 +912,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           command: "map-rebuild",
           flags: [],
           exitCode: 0,
-          first: expect.stringMatching(/^map-rebuild: done — enqueued [0-9A-HJKMNP-TV-Z]{26}$/),
+          first: matching.stringMatching(/^map-rebuild: done — enqueued [0-9A-HJKMNP-TV-Z]{26}$/),
         },
         {
           command: "map-sweep",
@@ -1206,7 +1207,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await auditLogOf(app(), workspaceId)).toContainEqual({
         action: "platform.erasure.rehearsed",
         actor: "process:better-answers-erasure",
-        subject_id: expect.any(String),
+        subject_id: matching.any(String),
       });
     });
 
@@ -1234,7 +1235,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
       expect(run.exitCode).toBe(0);
       expect(run.logs).toEqual([
-        expect.objectContaining({
+        matching.objectContaining({
           level: 30,
           actor: "process:better-answers-erasure",
           erasure_request_id: erasure.rows[0]?.id,
@@ -1317,7 +1318,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const queued = await jobsOf(app(), workspaceId);
 
       expect(queued).toEqual([
-        { id: expect.any(String), kind: "full-rebuild", reason: "drill", status: "queued" },
+        { id: matching.any(String), kind: "full-rebuild", reason: "drill", status: "queued" },
       ]);
       expect(run.lines).toEqual([`map-rebuild: done — enqueued ${queued[0]?.id}`]);
     });
@@ -1915,7 +1916,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         { name: "Acme", shortName, partition: true, ttl: "300000" },
       ]);
       expect(await membersOf(app(), id, admin.id)).toEqual([
-        { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
+        { id: matching.stringMatching(ULID_SHAPE), role: "Admin" },
       ]);
       expect(await rowsOfAction(app(), id, "platform.workspace.provisioned")).toEqual([
         {
@@ -1944,7 +1945,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(0);
       expect(await membersOf(app(), idOnTheDoneLine(run), admin.id)).toEqual([
-        { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
+        { id: matching.stringMatching(ULID_SHAPE), role: "Admin" },
       ]);
     });
 
@@ -2101,7 +2102,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           `add-member: done — ${person.email} added to workspace ${workspaceId} as ${role}`,
         ]);
         expect(await membersOf(app(), workspaceId, person.id)).toEqual([
-          { id: expect.stringMatching(ULID_SHAPE), role },
+          { id: matching.stringMatching(ULID_SHAPE), role },
         ]);
         expect(await rowsOfAction(app(), workspaceId, "people.member.added")).toEqual([
           { actor: BOOTSTRAP_ACTOR, subject_id: person.id, detail: { userId: person.id, role } },
@@ -2117,7 +2118,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(0);
       expect(await membersOf(app(), workspaceId, person.id)).toEqual([
-        { id: expect.stringMatching(ULID_SHAPE), role: "Viewer" },
+        { id: matching.stringMatching(ULID_SHAPE), role: "Viewer" },
       ]);
     });
 
@@ -2285,7 +2286,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(member.exitCode).toBe(0);
       expect(await membersOf(app(), workspaceId, personId)).toEqual([
-        { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
+        { id: matching.stringMatching(ULID_SHAPE), role: "Admin" },
       ]);
       const session = sessionHolder.parse(await (await client.fetch("/get-session")).json());
       expect(session.user).toEqual({ id: personId, name: "Matthew Burgess", emailVerified: true });
@@ -2357,7 +2358,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
 
       expect(run.exitCode).toBe(1);
-      expect(run.lines).toEqual([expect.stringMatching(/^add-person: REFUSED — .*pool/i)]);
+      expect(run.lines).toEqual([matching.stringMatching(/^add-person: REFUSED — .*pool/i)]);
     });
 
     it.each([
@@ -2716,7 +2717,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run).toEqual({
         status: 0,
-        printed: expect.stringContaining(
+        printed: matching.stringContaining(
           `set-model-key: done — workspace ${workspaceId} holds a new key for anthropic`,
         ),
       });
@@ -2734,7 +2735,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run).toEqual({
         status: 1,
-        printed: expect.stringContaining(
+        printed: matching.stringContaining(
           "set-model-key: REFUSED — KEK must be set to the envelope key: 64 hexadecimal characters, its 32 bytes; nothing changed",
         ),
       });
@@ -2872,7 +2873,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
 
     const pricesHeld = async (app: TestApp) => {
-      const held = await app.database.superuser.query(
+      const held = await app.database.superuser.query<Record<string, unknown>>(
         `SELECT effective_from::text AS "from", gbp_per_million_in, gbp_per_million_out
            FROM model_price WHERE provider = 'anthropic' AND model = $1 ORDER BY effective_from`,
         [SONNET],
@@ -2900,7 +2901,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await pricing(app(), "2026-02-30");
 
       expect(run.exitCode).toBe(2);
-      expect(run.lines).toEqual([expect.stringMatching(/^set-model-price: REFUSED — malformed: /)]);
+      expect(run.lines).toEqual([
+        matching.stringMatching(/^set-model-price: REFUSED — malformed: /),
+      ]);
       expect(await pricesHeld(app())).toEqual(before);
     });
 
@@ -2947,7 +2950,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
 
     const thresholdsHeld = async (app: TestApp, model: string) => {
-      const held = await app.database.superuser.query(
+      const held = await app.database.superuser.query<Record<string, unknown>>(
         "SELECT provider, threshold FROM decision_threshold WHERE model = $1",
         [model],
       );
@@ -3052,7 +3055,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
 
     const choicesHeld = async (app: TestApp, workspaceId: string) => {
-      const held = await app.database.superuser.query(
+      const held = await app.database.superuser.query<Record<string, unknown>>(
         "SELECT purpose, provider, model FROM model_choice WHERE workspace_id = $1",
         [workspaceId],
       );
@@ -3243,7 +3246,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     const heldBy = async (personId: string) =>
       (
-        await app().database.superuser.query(
+        await app().database.superuser.query<Record<string, unknown>>(
           `SELECT (SELECT count(*)::int FROM passkey WHERE user_id = u.id) AS passkeys,
                   (SELECT count(*)::int FROM authenticator WHERE user_id = u.id) AS authenticators,
                   (SELECT count(*)::int FROM recovery_code WHERE user_id = u.id) AS "recoveryCodes",
@@ -3257,7 +3260,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     const identityRowsOf = async (personId: string) =>
       (
-        await app().database.superuser.query(
+        await app().database.superuser.query<Record<string, unknown>>(
           "SELECT action, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
           [personId],
         )
@@ -3304,7 +3307,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const challenge = `second-factor-challenge:${session.id}`;
       const kept = async () =>
         (
-          await app().database.superuser.query(
+          await app().database.superuser.query<Record<string, unknown>>(
             "SELECT identifier FROM verification WHERE identifier = $1",
             [challenge],
           )
@@ -3405,7 +3408,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         `restore-sign-in: the notice to ${person.email} did not go; tell them of the restore yourself`,
       );
       expect(codeIn(run)).toMatch(RESTORE_CODE);
-      expect((await heldBy(person.id))?.restoreRequiredAt).not.toBeNull();
+      expect((await heldBy(person.id))?.["restoreRequiredAt"]).not.toBeNull();
     });
 
     it("sends the next sign-in to setup, which needs the code", async () => {
@@ -3467,7 +3470,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(JSON.stringify(sent)).not.toContain(code);
       expect(JSON.stringify(run.logs)).not.toContain(code);
       expect(await restoreRowsOf(person.email)).toEqual([
-        { value: expect.stringMatching(/^[0-9a-f]{64}$/), expiresAt: expect.any(Date) },
+        { value: matching.stringMatching(/^[0-9a-f]{64}$/), expiresAt: matching.any(Date) },
       ]);
     });
 
@@ -3665,7 +3668,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const commits = await commitsOf(app(), workspaceId);
       expect(commits).toHaveLength(10);
       expect(commits[0]).toEqual({
-        sha: expect.any(String),
+        sha: matching.any(String),
         parent_sha: null,
         action: "knowledge.manifest.written",
       });

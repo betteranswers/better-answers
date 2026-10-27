@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
 
 import {
   answeredBelowAdmin,
@@ -46,16 +47,16 @@ describe("the waiting access requests over tRPC", () => {
 
     expect(listed).toEqual([
       {
-        id: expect.stringMatching(ULID),
+        id: matching.stringMatching(ULID),
         requester: { id: priya.id, name: "Priya", email: priya.email },
         reason: "I run the framework renewals.",
-        askedAt: expect.stringMatching(ISO_INSTANT),
+        askedAt: matching.stringMatching(ISO_INSTANT),
       },
       {
-        id: expect.stringMatching(ULID),
+        id: matching.stringMatching(ULID),
         requester: { id: sam.id, name: "Sam", email: sam.email },
         reason: "I am on the bid team.",
-        askedAt: expect.stringMatching(ISO_INSTANT),
+        askedAt: matching.stringMatching(ISO_INSTANT),
       },
     ]);
   });
@@ -76,11 +77,11 @@ describe("approving an access request over tRPC", () => {
     const approved = await api.members.approveRequest.mutate({ requestId, role: "Editor" });
 
     expect(approved).toEqual({
-      invitationId: expect.stringMatching(ULID),
+      invitationId: matching.stringMatching(ULID),
       address: requester.email,
       role: "Editor",
-      invitedAt: expect.stringMatching(ISO_INSTANT),
-      expiresAt: expect.stringMatching(ISO_INSTANT),
+      invitedAt: matching.stringMatching(ISO_INSTANT),
+      expiresAt: matching.stringMatching(ISO_INSTANT),
       emailSent: true,
     });
     expect(Date.parse(approved.expiresAt) - Date.parse(approved.invitedAt)).toBe(SEVEN_DAYS_MS);
@@ -88,7 +89,7 @@ describe("approving an access request over tRPC", () => {
       {
         to: requester.email,
         subject: "Join Calder Joinery on better-answers",
-        text: expect.stringContaining(
+        text: matching.stringContaining(
           `https://app.example.test/invitations/${approved.invitationId}`,
         ),
       },
