@@ -5,7 +5,7 @@ A living company knowledge map for UK SMBs, built on the Open Knowledge Format (
 ## Repository context
 
 - `VISION.md` — the destination this repo builds towards.
-- `CONCEPTS.md` — the glossary.
+- `GLOSSARY.md` — the glossary.
 - `docs/specs/` — `v01-route.md` with `route/` is the route spec. `v01-stories.md` holds the v0.1 user stories.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open, and where each lands here. Read it before adding a key, convention or feature which impacts to the knowledge layer (bundles, concepts, search).
 - `docs/plans/` — unified plan artifacts.

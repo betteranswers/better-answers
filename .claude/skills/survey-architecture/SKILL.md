@@ -58,7 +58,7 @@ Apply the deletion test to anything that looks shallow. Ask whether deleting it 
 **The rules to judge against.**
 - The pstack principles `principle-minimize-reader-load` and `principle-laziness-protocol`, the Tests section of `AGENTS.md`, and the `AGENTS.md` beside the area.
 - The decisions in `docs/solutions/architecture-patterns/`. Match an area to its decisions by each doc's `module` and `applies_when` frontmatter instead of reading all of them. `docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md` gives the slice vocabulary. A matching door list in two slices is not duplication: a slice gets its own type for the doors it takes.
-- `CONCEPTS.md` for the names. A module named off-glossary is friction worth noting.
+- `GLOSSARY.md` for the names. A module named off-glossary is friction worth noting.
 
 **Leave out what a gate already holds for that tier.** The TypeScript gates are the `check:gates` script in the root `package.json` and the rules in `.oxlintrc.json`, which include import direction for `packages/core` only, cycles and the complexity cap. The worker's gates are the ruff settings in `apps/worker/pyproject.toml`. Where a rule could be gated and is not, the opportunity names that gap.
 

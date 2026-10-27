@@ -24,11 +24,11 @@ Caller counts are lower bounds; say so wherever one appears.
 
 ## One card per opportunity
 
-Use the words in `CONCEPTS.md` for the product's concepts, and the slice and door words of the capability-slices decision (`docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md`) for structure. Write "the concepts slice's face", not "the ConceptsService".
+Use the words in `GLOSSARY.md` for the product's concepts, and the slice and door words of the capability-slices decision (`docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md`) for structure. Write "the concepts slice's face", not "the ConceptsService".
 
 - **Files:** the files and modules involved.
 - **Problem:** the friction, in terms of what is hard to change or to test.
-- **Rule:** the rule or principle it breaks, quoted from `CODING_STANDARDS.md`, the `AGENTS.md` beside the area, or a pstack principle.
+- **Rule:** the rule or principle it breaks.
 - **Proposal:** the shape it would take, in plain words.
 - **Before and after:** a diagram of each, side by side, wherever a picture helps the decision.
 - **Test note:** from the walk.
