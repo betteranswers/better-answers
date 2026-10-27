@@ -30,6 +30,7 @@ import {
   tabUntilFocused,
   theActionLandedWithinItsBudget,
   type AskingScript,
+  requestsSent,
 } from "./harness.ts";
 import { scrolledSideways, windowRefocused } from "./knowledge.ts";
 
@@ -228,12 +229,12 @@ test.describe("Ask › New question", () => {
     await expect(answered(page, "Answered")).toHaveCount(0);
   });
 
-  for (const [judging, word] of [
-    [undefined, "Not judged"],
-    ["fails", "Judging failed"],
+  for (const [script, word] of [
+    [{}, "Not judged"],
+    [{ judging: "fails" }, "Judging failed"],
   ] as const) {
     test(`says ${word}, showing each Answer in full`, async ({ page, request }) => {
-      await aViewerAsking(page, request, judging === undefined ? {} : { judging });
+      await aViewerAsking(page, request, script);
 
       await asked(page);
 
@@ -356,10 +357,7 @@ test.describe("Ask › New question", () => {
     await aViewerAsking(page, request, { judging: { fits: [USERS.title] } });
     await asked(page);
     const result = answered(page, "Answered");
-    const sent: string[] = [];
-    page.on("request", (each) => {
-      if (each.url().includes("ask.giveFeedback")) sent.push(each.url());
-    });
+    const sent = requestsSent(page, (url) => url.pathname.includes("ask.giveFeedback"));
 
     await result.getByRole("button", { name: "Flag This Answer" }).click();
     const flagging = page.getByRole("dialog", { name: "Flag This Answer" });
@@ -369,7 +367,10 @@ test.describe("Ask › New question", () => {
     await expect(flagging.getByRole("radiogroup")).toHaveAttribute("aria-invalid", "true");
     await flagging.getByRole("radio", { name: "Wrong" }).check();
     await expect(flagging.getByRole("alert")).toHaveCount(0);
-    expect(sent, "a flag with no reason was sent").toEqual([]);
+    expect(
+      sent.map((each) => each.url()),
+      "a flag with no reason was sent",
+    ).toEqual([]);
   });
 
   test("shows an Answer in no collection under that word", async ({ page, request }) => {

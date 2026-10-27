@@ -19,6 +19,7 @@ import {
   switched,
   switcherMenuOf,
   switcherOf,
+  requestsSent,
 } from "./harness.ts";
 import { authAnswering } from "./refused-read.ts";
 
@@ -330,10 +331,7 @@ test("says a pending switch's refusal, holding others until it answers", async (
   await markTheOperator(request, email);
   await page.reload();
   await expect(switcherOf(page, first.name)).toBeVisible();
-  const switches: string[] = [];
-  page.on("request", (sent) => {
-    if (sent.url().includes("/organization/set-active")) switches.push(sent.url());
-  });
+  const switches = requestsSent(page, (url) => url.pathname.includes("/organization/set-active"));
   const release = await heldBack(page, "**/organization/set-active");
 
   const refused = authAnswering(page, "/organization/set-active");

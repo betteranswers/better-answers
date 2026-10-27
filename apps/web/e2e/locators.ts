@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Request } from "@playwright/test";
 import { z } from "zod";
 
 import type { CarriedOn } from "@/features/auth/sign-in-words.ts";
@@ -481,3 +481,20 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
       .filter(seen)
       .map(measured);
   });
+
+export const requestsSent = (page: Page, matches: (url: URL) => boolean): Request[] => {
+  const sent: Request[] = [];
+  page.on("request", (request) => {
+    if (matches(new URL(request.url()))) sent.push(request);
+  });
+  return sent;
+};
+
+/** Each body is read as its answer lands: the page's next navigation discards it. */
+export const answersRead = (page: Page, matches: (url: URL) => boolean): Promise<string>[] => {
+  const read: Promise<string>[] = [];
+  page.on("response", (response) => {
+    if (matches(new URL(response.url()))) read.push(response.text());
+  });
+  return read;
+};

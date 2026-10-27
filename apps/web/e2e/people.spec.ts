@@ -1,4 +1,6 @@
-import type { APIRequestContext, Locator, Page } from "@playwright/test";
+import assert from "node:assert/strict";
+
+import type { APIRequestContext, Locator, Page, Route } from "@playwright/test";
 
 import {
   MEMBER_PAGE_KEYSTROKES,
@@ -45,6 +47,7 @@ import {
   tabUntilFocused,
   theActionLandedWithinItsBudget,
   theActionsLandedWithinTheirBudget,
+  requestsSent,
 } from "./harness.ts";
 import { refusalAnswering } from "./refused-read.ts";
 
@@ -60,6 +63,26 @@ const GROUPS_PAGE = pageNamed(people, "Groups").path;
 
 /** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 const MEMBER_READ = (url: URL): boolean => url.pathname.includes("session.member");
+
+const droppingTheFirst = () => {
+  let dropped = false;
+  return (route: Route) => {
+    if (dropped) return route.continue();
+    dropped = true;
+    return route.abort();
+  };
+};
+
+const roomBetween = async (above: Locator, below: Locator): Promise<number> => {
+  const upper = await above.boundingBox();
+  const lower = await below.boundingBox();
+  return (lower?.y ?? 0) - ((upper?.y ?? 0) + (upper?.height ?? 0));
+};
+
+const pageRoom = () => ({
+  scrolls: document.documentElement.scrollWidth,
+  holds: document.documentElement.clientWidth,
+});
 
 const MEMBERS_READ = (url: URL): boolean => url.pathname.includes("members.list");
 
@@ -429,7 +452,7 @@ test.describe("the People group's Members page", () => {
   }) => {
     const { joined } = await anAdminAtPeople(page, request, "Wharfe Fabrication");
     const sam = joined.find((member) => member.displayName === "Sam Okoro");
-    if (sam === undefined) throw new Error("Sam Okoro was joined");
+    assert.ok(sam !== undefined, "Sam Okoro was joined");
 
     await searchBox(page).fill("PRIY");
     await clockTheNextKey(page, { at: THE_COUNT, reads: "PRIYA" });
@@ -577,7 +600,7 @@ test.describe("a member's own page", () => {
   test("opens by name, row menu and link, crumbed by name", async ({ page, request }) => {
     const { joined } = await anAdminAtPeople(page, request, "Swale Ironmongers");
     const priya = joined.find((member) => member.displayName === "Priya Shah");
-    if (priya === undefined) throw new Error("Priya Shah was joined");
+    assert.ok(priya !== undefined, "Priya Shah was joined");
     const priyasPage = new RegExp(`${memberPageAt(priya.id)}$`);
 
     await memberLink(page, "Priya Shah").click();
@@ -605,7 +628,7 @@ test.describe("a member's own page", () => {
   }) => {
     const { joined } = await anAdminAtPeople(page, request, "Swale Forge");
     const priya = joined.find((member) => member.displayName === "Priya Shah");
-    if (priya === undefined) throw new Error("Priya Shah was joined");
+    assert.ok(priya !== undefined, "Priya Shah was joined");
 
     await memberLink(page, "Priya Shah").focus();
     await page.keyboard.press(PEOPLE_KEYSTROKES.open.key);
@@ -701,20 +724,12 @@ test.describe("a member's own page", () => {
 
     const sections = thePage(page).getByRole("navigation", { name: "On This Page" });
     await expect
-      .poll(
-        async () => {
-          const header = await personHeading(page, "Priya Shah").boundingBox();
-          const navBox = await sections.boundingBox();
-          return (navBox?.y ?? 0) - ((header?.y ?? 0) + (header?.height ?? 0));
-        },
-        { message: "the section nav does not stack below the header" },
-      )
+      .poll(() => roomBetween(personHeading(page, "Priya Shah"), sections), {
+        message: "the section nav does not stack below the header",
+      })
       .toBeGreaterThan(0);
-    const room = await page.evaluate(() => [
-      document.documentElement.scrollWidth,
-      document.documentElement.clientWidth,
-    ]);
-    expect(room[0], "the page scrolls sideways").toBeLessThanOrEqual(room[1] ?? 0);
+    const room = await page.evaluate(pageRoom);
+    expect(room.scrolls, "the page scrolls sideways").toBeLessThanOrEqual(room.holds);
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
@@ -745,18 +760,20 @@ test.describe("a member's own page", () => {
   test("names no one at a malformed address, asking nothing", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Swale Lockmakers");
     const malformed = "not-a-person";
-    const asked: string[] = [];
-    page.on("request", (sent) => {
-      if (sent.url().includes("/trpc/")) asked.push(`${sent.url()} ${sent.postData() ?? ""}`);
-    });
+    const sent = requestsSent(page, (url) => url.pathname.includes("/trpc/"));
 
     await page.goto(memberPageAt(malformed));
 
     await namesNoMember(page);
     await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
+    const asked = sent.map((each) => `${each.url()} ${String(each.postData())}`);
     expect(
-      asked.filter((sent) => sent.includes(malformed) || sent.includes("members.")),
+      asked.filter((each) => each.includes(malformed)),
       "a query asked about a malformed address",
+    ).toEqual([]);
+    expect(
+      asked.filter((each) => each.includes("members.")),
+      "a page read a member at a malformed address",
     ).toEqual([]);
   });
 
@@ -873,12 +890,7 @@ test.describe("a member's own page", () => {
   }) => {
     await anAdminBesideAnotherAtPeople(page, request, "Ure Presswork");
     await openedByName(page, "Test person");
-    let dropped = false;
-    await page.route(MEMBER_READ, (route) => {
-      if (dropped) return route.continue();
-      dropped = true;
-      return route.abort();
-    });
+    await page.route(MEMBER_READ, droppingTheFirst());
     await page.reload();
     await expect(personHeading(page, "Test person")).toBeVisible();
 
@@ -1010,7 +1022,9 @@ test.describe("a member's Activity", () => {
     const byHannahToPriya = /Hannah Wright.*Priya Shah.*Editor/;
     await expect(linesOf(page)).toHaveCount(1);
     await expect(linesOf(page)).toContainText(byHannahToPriya);
-    const saidOnPriyas = ((await linesOf(page).textContent()) ?? "").replace(/^\d{2}:\d{2}/, "");
+    const lineOnPriyas = await linesOf(page).textContent();
+    assert.ok(lineOnPriyas !== null, "Priya's activity holds a line");
+    const saidOnPriyas = lineOnPriyas.replace(/^\d{2}:\d{2}/, "");
 
     await page.goto(memberPageAt(hannah.id));
     await expect(personHeading(page, "Hannah Wright")).toBeVisible();
@@ -1497,7 +1511,7 @@ test.describe("a member's display name, flagged to better-answers support", () =
   }) => {
     const { workspaceId, joined } = await anAdminAtPeople(page, request, "Swale Stonecraft");
     const sam = joined.find((member) => member.displayName === "Sam Okoro");
-    if (sam === undefined) throw new Error("Sam Okoro was joined");
+    assert.ok(sam !== undefined, "Sam Okoro was joined");
     await page.route(MEMBERS_READ, () => Promise.withResolvers<void>().promise);
     await openedByName(page, "Sam Okoro");
     await removeMember(request, { workspaceId, userId: sam.id });
@@ -1799,7 +1813,9 @@ test.describe("bulk actions on the members ticked", () => {
     const answered = refusalAnswering(page, BULK_ROLE_CHANGE_ASKED);
     await dialog.getByRole("button", { name: "Change Role", exact: true }).click();
 
-    expect(Object.values((await answered).items ?? {})).toEqual(["last-admin", "last-admin"]);
+    const { items } = await answered;
+    assert.ok(items !== undefined, "the refusal names each member it refused");
+    expect(Object.values(items)).toEqual(["last-admin", "last-admin"]);
     const refusal = membersRegion(page).getByRole("alert");
     await expect(refusal.getByRole("paragraph"), "the refusal counts two refused").toHaveText(
       /\b2\b/,
@@ -2183,7 +2199,7 @@ test.describe("bulk actions on the members ticked", () => {
   }) => {
     const { workspaceId, joined } = await anAdminAtPeople(page, request, "Wharfe Spinning");
     const sam = joined.find((member) => member.displayName === "Sam Okoro");
-    if (sam === undefined) throw new Error("Sam Okoro was joined");
+    assert.ok(sam !== undefined, "Sam Okoro was joined");
     await tickOf(page, "Priya Shah").check();
     await tickOf(page, "Sam Okoro").check();
     await removeMember(request, { workspaceId, userId: sam.id });
@@ -2310,7 +2326,9 @@ test.describe("bulk actions on the members ticked", () => {
 
   test("a removal's late refusal clears a bulk refusal's row marks", async ({ page, request }) => {
     const { joined, release } = await priyasRemovalHeld(page, request, "Wharfe Marks");
-    const samId = joined.find((one) => one.displayName === "Sam Okoro")?.id ?? "";
+    const sam = joined.find((one) => one.displayName === "Sam Okoro");
+    assert.ok(sam !== undefined, "Sam Okoro was joined");
+    const samId = sam.id;
     await answeredChangedMeanwhile(page, BULK_ROLE_CHANGE, undefined, {
       [samId]: "no-such-member",
     });
@@ -2393,15 +2411,12 @@ test.describe("bulk actions on the members ticked", () => {
     const heads = membersRegion(page).getByRole("columnheader");
     await expect(heads.filter({ hasText: /^(Person|Role)$/ })).toHaveCount(2);
     await expect(heads.filter({ hasText: /^(Groups|Joined)$/ })).toHaveCount(0);
-    const room = await page.evaluate(() => {
-      const table = document.querySelector('[data-slot="table-container"]');
-      return {
-        page: [document.documentElement.scrollWidth, document.documentElement.clientWidth],
-        table: [table?.scrollWidth ?? 0, table?.clientWidth ?? 0],
-      };
-    });
-    expect(room.page[0], "the page scrolls sideways").toBeLessThanOrEqual(room.page[1] ?? 0);
-    expect(room.table[0], "the table scrolls sideways").toBeLessThanOrEqual(room.table[1] ?? 0);
+    const room = await page.evaluate(pageRoom);
+    const tableRoom = await page
+      .locator('[data-slot="table-container"]')
+      .evaluate((table) => ({ scrolls: table.scrollWidth, holds: table.clientWidth }));
+    expect(room.scrolls, "the page scrolls sideways").toBeLessThanOrEqual(room.holds);
+    expect(tableRoom.scrolls, "the table scrolls sideways").toBeLessThanOrEqual(tableRoom.holds);
 
     await membersRegion(page).getByRole("button", { name: "Columns" }).click();
     await page.getByRole("menuitemcheckbox", { name: "Groups" }).click();

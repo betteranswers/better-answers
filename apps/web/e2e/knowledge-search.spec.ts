@@ -1,4 +1,6 @@
-import type { APIRequestContext, Locator, Page, Request, Route } from "@playwright/test";
+import assert from "node:assert/strict";
+
+import type { APIRequestContext, Locator, Page, Route } from "@playwright/test";
 
 import {
   MATCHES_A_PAGE,
@@ -22,6 +24,9 @@ import {
   seedConnectedSources,
   signIn,
   skipLinkReachesThePage,
+  A_ROLE,
+  answersRead,
+  requestsSent,
 } from "./harness.ts";
 import {
   heldBack,
@@ -80,10 +85,12 @@ const isAFindPastTheFirstPage = (url: URL): boolean =>
 
 const HANDBOOK = "Warehouse handbook";
 
-const PALLET_PASSAGES = Array.from(
-  { length: A_PAGE + 5 },
-  (_, index) => `Pallet bay ${index + 1} takes stock wrapped and labelled before it is racked.`,
-);
+const palletPassage = (index: number) =>
+  `Pallet bay ${index + 1} takes stock wrapped and labelled before it is racked.`;
+
+const PALLET_PASSAGES = Array.from({ length: A_PAGE + 5 }, (_, index) => palletPassage(index));
+
+const FIRST_PALLET_PASSAGE = palletPassage(0);
 
 type Seeded = { readonly workspaceId: string; readonly adminId: string };
 
@@ -280,10 +287,7 @@ test.describe("the Knowledge Search page", () => {
     await page.goto("/sign-in");
     await signIn(page, request, email);
 
-    const finds: Request[] = [];
-    page.on("request", (sent) => {
-      if (isAFind(new URL(sent.url()))) finds.push(sent);
-    });
+    const finds = requestsSent(page, isAFind);
     await page.goto(SEARCH.path);
 
     await expect(said(page)).toHaveText(/\S/);
@@ -373,7 +377,7 @@ test.describe("the Knowledge Search page", () => {
     const first = page.waitForResponse((answered) => isAFind(new URL(answered.url())));
     await searched(page, "pallet");
     const [repeated] = await matchesAnswered(await first);
-    if (repeated === undefined) throw new Error("the first page answered no match");
+    assert.ok(repeated !== undefined, "the first page answered a match");
     await page.route(
       isAFindPastTheFirstPage,
       matchesBecome((matches) => [repeated, ...matches.slice(1)]),
@@ -412,10 +416,7 @@ test.describe("the Knowledge Search page", () => {
     const seeded = { workspaceId: workspace.workspaceId, adminId: workspace.admin.id };
     await conceptsSeeded(request, seeded);
     await payReviewSeeded(request, seeded);
-    const answers: string[] = [];
-    page.on("response", (answered) => {
-      if (isAFind(new URL(answered.url()))) void answered.text().then((body) => answers.push(body));
-    });
+    const answers = answersRead(page, isAFind);
 
     await page.goto(asked("audit"));
     await expect(said(page)).toContainText("audit");
@@ -427,9 +428,10 @@ test.describe("the Knowledge Search page", () => {
     await expect(page.locator("body"), "the page shows a number").not.toContainText(/\d/);
     expect(await page.content(), "the page draws the withheld document").not.toContain(PAY_REVIEW);
     await expect.poll(() => answers.length).toBe(2);
-    expect(answers.join("\n"), "the read answered with a withheld title").not.toMatch(
-      new RegExp(`${PAY_REVIEW}|Audit Salary Bands`),
-    );
+    expect(
+      (await Promise.all(answers)).join("\n"),
+      "the read answered with a withheld title",
+    ).not.toMatch(new RegExp(`${PAY_REVIEW}|Audit Salary Bands`));
   });
 
   test("finds an Admin what a Viewer's search withholds", async ({ page, request }) => {
@@ -485,7 +487,7 @@ test.describe("the Knowledge Search page", () => {
     await opener.click();
 
     const panel = passagePanel(page, HANDBOOK);
-    await expect(panel).toContainText(PALLET_PASSAGES[0] ?? "");
+    await expect(panel).toContainText(FIRST_PALLET_PASSAGE);
     await expect(panel.getByRole("heading", { name: HANDBOOK })).toBeFocused();
     await expect(opener).toHaveAttribute("aria-expanded", "true");
     const panelLeft = await panel.evaluate((drawn) => drawn.getBoundingClientRect().left);
@@ -740,7 +742,7 @@ test.describe("the Knowledge Search page", () => {
     await saysARefusal(panel.getByRole("alert"));
     await page.unroute(isAnOpen);
     await panel.getByRole("button", { name: "Retry" }).click();
-    await expect(panel).toContainText(PALLET_PASSAGES[0] ?? "");
+    await expect(panel).toContainText(FIRST_PALLET_PASSAGE);
     await expect(panel.getByRole("heading", { name: HANDBOOK })).toBeFocused();
   });
 
@@ -754,7 +756,7 @@ test.describe("the Knowledge Search page", () => {
     expect(await refused).toMatchObject({ word: "not-found" });
     const panel = passagePanel(page, HANDBOOK);
     await saysARefusal(panel.getByRole("alert"));
-    await expect(panel).not.toContainText(PALLET_PASSAGES[0] ?? "");
+    await expect(panel).not.toContainText(FIRST_PALLET_PASSAGE);
   });
 
   test("names and tags the panel from the passage's own read", async ({ page, request }) => {
@@ -793,7 +795,7 @@ test.describe("the Knowledge Search page", () => {
       await expect(heading).toBeFocused();
       await expect(
         passagePanel(page, HANDBOOK).or(matchesOf(page).getByRole("region", { name: HANDBOOK })),
-      ).toContainText(PALLET_PASSAGES[0] ?? "");
+      ).toContainText(FIRST_PALLET_PASSAGE);
 
       let withheld = 1;
       await page.route(
@@ -878,7 +880,8 @@ test.describe("the Knowledge Search page", () => {
       const panel = await passagePanel(page, HANDBOOK).boundingBox();
       const offer = await dismiss.boundingBox();
 
-      if (panel === null || offer === null) throw new Error("the panel or the offer drew no box");
+      assert.ok(panel !== null, "the panel drew a box");
+      assert.ok(offer !== null, "the passkey offer drew a box");
       expect(
         offer.x + offer.width,
         "the panel covers the passkey offer's Dismiss",
@@ -899,7 +902,7 @@ test.describe("the Knowledge Search page", () => {
       const opener = first.getByRole("button", { name: HANDBOOK });
       await opener.click();
       const inline = first.getByRole("region", { name: HANDBOOK });
-      await expect(inline).toContainText(PALLET_PASSAGES[0] ?? "");
+      await expect(inline).toContainText(FIRST_PALLET_PASSAGE);
       await expect(inline.getByRole("heading", { name: HANDBOOK })).toBeFocused();
       await expect(passagePanel(page, HANDBOOK)).toHaveCount(0);
       expect(await scrolledSideways(page), `the page scrolls sideways at ${String(width)} px`).toBe(
@@ -931,18 +934,17 @@ test.describe("the Knowledge Search page", () => {
     await searched(page, "pallet");
     await readsCeilingFilled(page, (await first).url());
 
-    const askedQueries: string[] = [];
-    page.on("request", (sent) => {
-      if (isAFind(new URL(sent.url())) && sent.url().includes("forklift"))
-        askedQueries.push(sent.url());
-    });
+    const finds = requestsSent(page, isAFind);
     const refused = refusalAnswering(page, "knowledge.find");
     await searchBox(page).fill("forklift");
     const { status, waitSeconds } = await refused;
     expect(status, "the search met no ceiling").toBe(429);
     await saysTheWait(alerted(page), waitSeconds);
     await windowRefocused(page);
-    expect(askedQueries, "the page asked again past the ceiling").toHaveLength(1);
+    expect(
+      finds.filter((sent) => sent.url().includes("forklift")),
+      "the page asked again past the ceiling",
+    ).toHaveLength(1);
   });
 
   test("asks a passage at its ceiling again only when pressed", async ({ page, request }) => {
@@ -958,10 +960,7 @@ test.describe("the Knowledge Search page", () => {
     await read.click();
     await expect(panel.getByRole("blockquote")).toContainText("Pallet bay");
     await closed();
-    const opens: string[] = [];
-    page.on("request", (sent) => {
-      if (isAnOpen(new URL(sent.url()))) opens.push(sent.url());
-    });
+    const opens = requestsSent(page, isAnOpen);
     await page.route(isAnOpen, refusedAtACeiling);
 
     for (const opener of [unread, read]) {
@@ -1093,10 +1092,7 @@ test.describe("the Knowledge Search page", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`takes ${role === "Editor" ? "an Editor" : "a Viewer"} to Search from the rail`, async ({
-      page,
-      request,
-    }) => {
+    test(`takes ${A_ROLE[role]} to Search from the rail`, async ({ page, request }) => {
       await aMemberSignedInAt(page, request, role, HOMES[role].path);
       await landedAtHome(page, role);
 
