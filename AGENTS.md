@@ -65,7 +65,7 @@ The backlog lives in **Linear** - accessed via the `linear-server` MCP.  See `do
 
 A mutation survivor is a hypothesis until a probe verifies it. See `docs/agents/mutation-triage.md`.
 
-### Cloude sessions
+### Cloud sessions
 
 When a session runs in a cloud environment, see `docs/agents/cloud-sessions.md`.
 

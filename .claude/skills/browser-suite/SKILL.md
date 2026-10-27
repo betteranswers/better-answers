@@ -1,4 +1,4 @@
----
+ ---
 name: browser-suite
 description: How this repository drives a browser: the served-build seam, the client-address fixtures, the harness's actions and helpers, locators, waiting and the accessibility gate. Use when writing, debugging or running a Playwright spec under apps/web/e2e, when a spec fails, flakes or hangs, when the gate refuses a page, when a spec needs state no harness action makes, or when a change renames a page's label, heading or accessible name.
 ---

@@ -1,6 +1,6 @@
 # The v0.1 route
 
-The route is the way from the foundation to a finished v0.1, cut into blocks. This file holds the status table, which is the one home of each block's strand, status, next marker, waits and plan, and the rules a session follows to pick a block and to keep the table true. Each live block's brief is `docs/specs/route/<id>.md`, and `docs/specs/route/seams.md` names the test seams a brief cites.
+The route is the way from the foundation to a finished v0.1, cut into blocks. This file holds the status table, which is the one home of each block's strand, status, next marker, waits and plan, and the rules a session follows to pick a block and to keep the table accurate. Each live block's brief is `docs/specs/route/<id>.md`, and `docs/specs/route/seams.md` names the test seams cited by a brief.
 
 ## Where each block stands
 
@@ -34,7 +34,6 @@ Every block gates v0.1 except S8, in reserve. Rows are in build order within a s
 4. If your strand has no next, take the first row in table order that is planned or unplanned and whose Blocked by entries are all met. Build a planned row from its plan.
 5. A parallel session may take a second row on a strand by rule 4. Two sessions never take one block.
 6. Read the block's brief, `docs/specs/route/<id>.md`. List the open Linear issues that carry the block's label, from the Route Block label group.
-7. If one owner can build the block in one session, take it to `/poteto-mode`. Otherwise plan it first with `/poteto-mode plan <id> in docs/plans/`.
 
 ### Read the Blocked by cell
 
@@ -56,12 +55,6 @@ Change a row in the pull request that makes the change true. Each fact has one c
 
 Before a row turns done, file what the block still owes as Linear issues under its label. A block is done when its Done when checks hold, not when every issue on its label has closed. Work that lands ahead of its block, with the owner's agreement, leaves the status alone. The same pull request moves the line from the brief's Must carry to its Builds on.
 
-### Set next
-
-- The owner sets Next. A session writes it only on the owner's word in that session, in a pull request that changes the table.
-- A strand has one Next at most, on an unplanned or planned row. It never sits on a building, done or reserve row. The pull request that starts building clears it.
-- With no marker on a strand, rule 4 picks.
-
 ### Keep a brief current
 
 - A brief states what is true now and what the block still owes. It holds no date, no struck text and no account of who ruled when.
@@ -78,15 +71,13 @@ Before a row turns done, file what the block still owes as Linear issues under i
 | Work not yet planned, or a finding put off for later | A Linear issue, with a block's label where it belongs to one |
 | A decision that is hard to reverse | Its ADR under `docs/solutions/architecture-patterns/` |
 | A user story | `docs/specs/v01-stories.md` |
-| What happened, and when | git, and `docs/archive/` |
+| What happened, and when | git, and `docs/plans/archive/` (when a plan is complete) |
 
 ## Not in v0.1
 
 - The bids-and-proposals stage and the Then and Later stages of `VISION.md`. S5 and S6 fix the knowledge-side contract the next stage consumes.
-- Sources read live and the share agent (ADR 0013), and the HubSpot and Asana connectors.
-- Agent capabilities beyond the four read entries: `action:*` scopes, Agent Auth, the approval layer, the packaged client-side plugin. An MCP App that shows a concept file inside Claude is built from its own plan when one is written, and takes a row then.
+- Agent capabilities beyond the four read entries: `action:*` scopes, Agent Auth, the approval layer, the packaged client-side plugin. An MCP App that shows a concept file inside Claude, built from its own plan.
 - Imported and vendor bundles, the sensitivity-filtered bundle export, a read-only clone endpoint, and scheduled exports.
-- A `.docx` response set with real footnotes, JavaScript-rendered pages in the website connector, and local embedding on the first estate (ADR 0024). No embedding at all until S8's trigger fires (ADR 0016, ADR 0020).
+- A `.docx` response set with real footnotes, JavaScript-rendered pages in the website connector, and local embedding on the first estate.
 - A metrics store, SLOs, tracing, a status page. Ontology curation beyond the Kinds list. Multi-process repository locking, a second api process, a resize of the estate.
 - Desktop Safari and Firefox. v0.1 supports Chromium on the desktop, which is Chrome and Microsoft Edge, and WebKit on the iPhone, which is every iOS browser. The browser suite proves Chromium today, and C1 adds the iPhone run.
-- Tagline and positioning copy, and trade-mark work.
