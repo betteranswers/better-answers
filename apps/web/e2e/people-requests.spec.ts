@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Locator, Page, Route } from "@playwright/test";
 
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
@@ -161,7 +163,8 @@ test.describe("the People page's Requests tab", () => {
     const { asked } = await anAdminAtRequests(page, request, "Calder Joinery", [
       { displayName: "Priya Shah" },
     ]);
-    const priya = asked[0]?.email ?? "";
+    const priya = asked[0]?.email;
+    assert.ok(priya !== undefined, "Priya asked to join");
     await openRequests(page);
 
     await expect(requestRows(page)).toHaveCount(1);
@@ -320,7 +323,8 @@ test.describe("the People page's Requests tab", () => {
       { displayName: "Dropped Ray", reason: "Let me in." },
       { displayName: "Approved Kay", reason: "I run the renewals." },
     ]);
-    const kay = asked[2]?.email ?? "";
+    const kay = asked[2]?.email;
+    assert.ok(kay !== undefined, "Kay asked to join");
     await tabOpenedByKeyboard(page, MEMBERS_PAGE, "Requests");
     await expect(requestRows(page)).toHaveCount(3);
 

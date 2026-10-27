@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import {
@@ -335,8 +337,10 @@ test.describe("Waiting on You", () => {
     await expect(sources.getByRole("listitem")).toHaveText([new RegExp(MINUTES)]);
     await expect(sources.getByRole("link")).toHaveCount(0);
 
-    const [withheld] = at.concepts.get(RETENTION)?.documents.map((cited) => cited.documentId) ?? [];
-    expect(withheld, "the harness named no Restricted document").toEqual(expect.any(String));
+    const cited = at.concepts.get(RETENTION)?.documents;
+    assert.ok(cited !== undefined, "the harness seeded no retention concept");
+    const [withheld] = cited.map((document) => document.documentId);
+    assert.ok(withheld !== undefined, "the harness named no Restricted document");
     const drawn = await page.content();
     for (const hidden of [withheld, MINUTES_DOCUMENT, MINUTES_PASSAGE]) {
       expect(drawn, `the page holds ${String(hidden)}`).not.toContain(hidden);
@@ -406,12 +410,12 @@ test.describe("Waiting on You", () => {
       ),
     });
     const titles = [...concepts.keys()];
-    for (const title of titles) {
+    for (const [title, { iri }] of concepts) {
       for (const draft of [1, 2, 3, 4, 5]) {
         await seedEditSuggestion(request, {
           workspaceId,
           userId: proposer.id,
-          iri: concepts.get(title)?.iri ?? "",
+          iri,
           body: `Draft ${String(draft)} of ${title}.`,
         });
       }
@@ -425,7 +429,8 @@ test.describe("Waiting on You", () => {
       await expect(rowTitles(page)).toHaveCount(50);
       rendered.push(Date.now() - started);
     }
-    const median = rendered.toSorted((one, other) => one - other)[1] ?? Infinity;
+    const [, median] = rendered.toSorted((one, other) => one - other);
+    assert.ok(median !== undefined, "the list was drawn fewer than twice");
     test.info().annotations.push({
       type: "waiting on you",
       description: `${rendered.map((elapsed) => `${String(elapsed)} ms`).join(", ")}; median ${String(median)} ms`,

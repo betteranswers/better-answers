@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import {
@@ -210,8 +212,10 @@ test("a recovery code's setup swaps in a new authenticator", async ({
   passesTheAccessibilityGate,
 }) => {
   const { email, key, codes } = await anAdminWithAnAuthenticator(page, request);
+  const [code] = codes;
+  assert.ok(code !== undefined, "the admin holds a recovery code");
 
-  await recoveryCodeSpent(page, codes[0] ?? "");
+  await recoveryCodeSpent(page, code);
   await passesTheAccessibilityGate();
   const newKey = await authenticatorSetUpThere(page);
 
@@ -230,7 +234,9 @@ test("a recovery code's setup swaps in a new authenticator", async ({
 
 test("after a recovery code, another email sign-in must confirm", async ({ page, request }) => {
   const { email, key, codes } = await anAdminWithAnAuthenticator(page, request);
-  await recoveryCodeSpent(page, codes[0] ?? "");
+  const [code] = codes;
+  assert.ok(code !== undefined, "the admin holds a recovery code");
+  await recoveryCodeSpent(page, code);
 
   await signedInAgain(page, request, email);
   await page.goto("/setup");
@@ -316,11 +322,15 @@ test("unticked codes come back as a new set at sign-in", async ({
   await signedInAgain(page, request, email);
   await page.goto("/recovery");
   const refused = authAnswering(page, "/second-factor/recovery");
-  await codeUsed(recoveryField(page), first[0] ?? "");
+  const [replaced] = first;
+  assert.ok(replaced !== undefined, "the first set listed a code");
+  await codeUsed(recoveryField(page), replaced);
   expect(await refused).toMatchObject({ status: 400, word: "recovery-code-wrong" });
   await expect(theRefusal(page)).toBeVisible();
   await keepsItsWordOffThePage(page, "recovery-code-wrong");
   await passesTheAccessibilityGate();
-  await codeUsed(recoveryField(page), second[0] ?? "");
+  const [current] = second;
+  assert.ok(current !== undefined, "the second set listed a code");
+  await codeUsed(recoveryField(page), current);
   await expect(heading(page, "Set Up a New Second Factor")).toBeVisible();
 });

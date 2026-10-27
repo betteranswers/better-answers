@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
@@ -109,9 +111,10 @@ test("a refused sign-out keeps the connection the page carries", async ({
   request,
   baseURL,
 }) => {
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
   const email = anAddress("carrying");
   await person(request, email, { displayName: "Sam Okoro" });
-  await page.goto(claudesAuthorizeUrl(baseURL ?? ""));
+  await page.goto(claudesAuthorizeUrl(baseURL));
   await signIn(page, request, email);
   await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
   const carrying = new URL(page.url()).search;

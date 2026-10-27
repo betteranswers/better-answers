@@ -1,4 +1,6 @@
-import type { APIRequestContext, Locator, Page } from "@playwright/test";
+import assert from "node:assert/strict";
+
+import type { APIRequestContext, Locator, Page, Route } from "@playwright/test";
 import { z } from "zod";
 
 import type { CarriedOn } from "@/features/auth/sign-in-words.ts";
@@ -344,10 +346,11 @@ test("names the product in tab and banner, beside its logo", async ({ page }) =>
   await page.goto("/sign-in");
 
   await expect(page).toHaveTitle("better-answers");
-  const icon = (await page.locator('head link[rel="icon"]').getAttribute("href")) ?? "";
+  const icon = await page.locator('head link[rel="icon"]').getAttribute("href");
+  assert.ok(icon !== null, "the page names no tab icon");
   const inline = /^data:image\/svg\+xml,(?<drawn>.*)$/.exec(icon)?.groups?.["drawn"];
-  expect(inline, "the tab icon is not an inline SVG").toBeDefined();
-  const drawn = decodeURIComponent(inline ?? "");
+  assert.ok(inline !== undefined, "the tab icon is not an inline SVG");
+  const drawn = decodeURIComponent(inline);
   expect(drawn, "the tab icon is not the logo").toContain("<title>better-answers</title>");
   expect(drawn, "the logo no longer takes the icon's colour").toContain('fill="currentColor"');
   expect(drawn, "a dark tab strip would hide the icon").toMatch(
@@ -476,7 +479,8 @@ test("names joining a workspace when sign-in carries an invitation", async ({ pa
 });
 
 test("names connecting Claude when sign-in carries Claude's request", async ({ page, baseURL }) => {
-  await page.goto(claudesAuthorizeUrl(baseURL ?? "", { prompt: "consent" }));
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
+  await page.goto(claudesAuthorizeUrl(baseURL, { prompt: "consent" }));
 
   await namesWhereItCarries(page, "connecting");
 });
@@ -725,6 +729,19 @@ test("a tab waiting on one address ignores another's sign-in", async ({
 
 const READ_ATTEMPTS = 3;
 
+const failingEveryRead = (times: number) => {
+  const failed = Promise.withResolvers<void>();
+  let refused = 0;
+  return {
+    failed: failed.promise,
+    route: async (route: Route) => {
+      await route.fulfill({ status: 503 });
+      refused += 1;
+      if (refused === times) failed.resolve();
+    },
+  };
+};
+
 test("a tab whose first read failed still follows a sign-in", async ({
   page,
   context,
@@ -732,15 +749,10 @@ test("a tab whose first read failed still follows a sign-in", async ({
 }) => {
   const email = await anEditorOf(request, "Unread Ltd");
   await page.goto("/sign-in");
-  const unread = Promise.withResolvers<void>();
-  let refused = 0;
-  await page.route(SESSION_READ, async (route) => {
-    await route.fulfill({ status: 503 });
-    refused += 1;
-    if (refused === READ_ATTEMPTS) unread.resolve();
-  });
+  const unread = failingEveryRead(READ_ATTEMPTS);
+  await page.route(SESSION_READ, unread.route);
   await sendTheFirstCode(page, email);
-  await unread.promise;
+  await unread.failed;
   await page.unroute(SESSION_READ);
 
   await shownAs(page, "hidden");

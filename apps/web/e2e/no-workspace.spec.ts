@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Page, Response } from "@playwright/test";
 
 import type { Role } from "@/shared/navigation.ts";
@@ -93,11 +95,12 @@ test("tells a person from Claude it connects once they join", async ({
   request,
   baseURL,
 }) => {
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
   const email = anAddress("connecting");
   await person(request, email);
   const answered = invitationsAnswered(page);
 
-  await landedConnecting(page, request, baseURL ?? "", email);
+  await landedConnecting(page, request, baseURL, email);
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading "No Workspace Yet" [level=1]
@@ -116,12 +119,13 @@ test("keeps an operator connecting Claude on the no-workspace page", async ({
   request,
   baseURL,
 }) => {
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
   const email = anAddress("operator");
   await person(request, email);
   await markTheOperator(request, email);
   await withAnAuthenticator(request, email);
 
-  await landedConnecting(page, request, baseURL ?? "", email);
+  await landedConnecting(page, request, baseURL, email);
   await expect(claudeLine(page)).toBeVisible();
 });
 
@@ -242,10 +246,11 @@ test("carries Claude's request through a join to consent", async ({
   baseURL,
   passesTheAccessibilityGate,
 }) => {
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
   const { workspace, address } = await anInvitation(request, "Ryedale Metalwork", "Viewer");
   await catchClaudesRedirect(page);
 
-  await page.goto(claudesAuthorizeUrl(baseURL ?? "", { prompt: "consent", state: "joined-first" }));
+  await page.goto(claudesAuthorizeUrl(baseURL, { prompt: "consent", state: "joined-first" }));
   await signIn(page, request, address);
 
   await expect(noWorkspaceHeading(page)).toBeVisible();
@@ -293,8 +298,9 @@ test("lands a join at home once Claude's request has lapsed", async ({
   request,
   baseURL,
 }) => {
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
   const { workspace, address } = await anInvitation(request, "Harrow Glazing", "Viewer");
-  await page.goto(claudesAuthorizeUrl(baseURL ?? ""));
+  await page.goto(claudesAuthorizeUrl(baseURL));
   await signIn(page, request, address);
   await expect(noWorkspaceHeading(page)).toBeVisible();
 
@@ -308,9 +314,10 @@ test("lands a join at home once Claude's request has lapsed", async ({
 });
 
 test("signs out for good once Claude's request has lapsed", async ({ page, request, baseURL }) => {
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
   const email = anAddress("leaving");
   await person(request, email);
-  await page.goto(claudesAuthorizeUrl(baseURL ?? ""));
+  await page.goto(claudesAuthorizeUrl(baseURL));
   await signIn(page, request, email);
   await expect(noWorkspaceHeading(page)).toBeVisible();
 

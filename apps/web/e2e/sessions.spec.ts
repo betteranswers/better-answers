@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { expect, test } from "./browser.ts";
@@ -154,7 +156,8 @@ test("everywhere else asks first and keeps a personal token working", async ({
   request,
   baseURL,
 }) => {
-  const origin = baseURL ?? "";
+  assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
+  const origin = baseURL;
   const email = anAddress("everywhere");
   const { admin } = await provision(request, { name: "Everywhere Ltd", adminEmail: email });
   await page.goto("/sign-in");
@@ -164,7 +167,8 @@ test("everywhere else asks first and keeps a personal token working", async ({
   await catchClaudesRedirect(page);
   await page.goto(claudesAuthorizeUrl(origin, { challenge, prompt: "consent" }));
   await page.getByRole("button", { name: "Connect" }).click();
-  const code = new URL(page.url()).searchParams.get("code") ?? "";
+  const code = new URL(page.url()).searchParams.get("code");
+  assert.ok(code !== null, "Claude's redirect carries a code");
   const { refreshToken } = await claudeExchanges(request, { origin, code, verifier });
   await aSessionOn(
     request,
