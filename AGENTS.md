@@ -53,6 +53,8 @@ The project playbooks in `.agents/playbooks/` add this repository's steps to pst
 
 Until v0.1 the session lands its own pull request, with no press from the owner, once the verdict is `PASS`.
 
+The verifier records its Shipping verdict as a commit status on the verified head, context `verdict`: `success` for PASS or PASS+NOTES, `failure` for FAIL, and a description naming the verdict and the verifier, for example `gh api repos/{owner}/{repo}/statuses/<sha> -f state=success -f context=verdict -f description='PASS by <verifier>'`. The merge queue refuses a head without it.
+
 ### Issue tracker
 
 The backlog lives in **Linear** - accessed via the `linear-server` MCP.  See `docs/agents/issue-tracker.md`.
