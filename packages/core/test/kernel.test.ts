@@ -114,6 +114,7 @@ describe("attemptResult, for an operation that answers a Result", () => {
 
   it("answers a rejection as the normalised Error, beside the refusals", async () => {
     const answered = await attemptResult(async (): Promise<Result<string, "held">> => {
+      // oxlint-disable-next-line typescript/only-throw-error -- the test throws a non-Error to prove attemptResult normalises it
       throw "the socket hung up";
     });
 

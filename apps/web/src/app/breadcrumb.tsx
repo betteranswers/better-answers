@@ -1,6 +1,7 @@
 import { useLinkProps } from "@tanstack/react-router";
 
 import { Icon } from "@/shared/icon.tsx";
+import { keyed } from "@/shared/keyed.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import type { Place, VisibleArea } from "@/shared/navigation.ts";
 import {
@@ -73,16 +74,16 @@ export function BandBreadcrumb(properties: {
   return (
     <Breadcrumb aria-label={BREADCRUMB} className={cn("min-w-0", properties.className)}>
       <BreadcrumbList className={cn("sm:gap-1.5", wide && "flex-nowrap")}>
-        {parts.map((part, at) => {
+        {keyed(parts, (part) => part.name).map(({ key, item: part }, at) => {
           const middle = at > 0 && at < parts.length - 1;
 
           return [
             at === 0 ? null : (
-              <BreadcrumbSeparator key={`${String(at)} after`} className="shrink-0">
+              <BreadcrumbSeparator key={`${key} after`} className="shrink-0">
                 <Icon name="caret-right" />
               </BreadcrumbSeparator>
             ),
-            <BreadcrumbItem key={String(at)} className={itemClass(wide, middle)}>
+            <BreadcrumbItem key={key} className={itemClass(wide, middle)}>
               {part.to === undefined ? (
                 <BreadcrumbPage>{part.name}</BreadcrumbPage>
               ) : (

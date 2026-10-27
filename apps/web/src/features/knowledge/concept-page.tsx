@@ -4,6 +4,7 @@ import { useId, useRef, useState } from "react";
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
 import { RowLink } from "@/shared/grid-table.tsx";
+import { keyed } from "@/shared/keyed.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import {
   BROWSE,
@@ -183,8 +184,8 @@ function Sources(properties: {
         </div>
         {concept.evidence.length === 0 ? null : (
           <ol className="divide-y divide-border border-t border-border">
-            {concept.evidence.map((item, source) => (
-              <SourceLine key={source} item={item} source={source} opening={opening} />
+            {keyed(concept.evidence, ({ source }) => source).map(({ key, item }, source) => (
+              <SourceLine key={key} item={item} source={source} opening={opening} />
             ))}
           </ol>
         )}
@@ -208,8 +209,8 @@ function Verification(properties: { readonly concept: Concept }) {
         <p className="mt-2 text-muted-foreground">{WORDS.neverVerified}</p>
       ) : (
         <ul className="mt-2 grid gap-1">
-          {events.map((event, at) => (
-            <li key={at}>{WORDS.verifiedOn(dayOf(event), event.byAPerson)}</li>
+          {keyed(events, ({ at }) => at).map(({ key, item: event }) => (
+            <li key={key}>{WORDS.verifiedOn(dayOf(event), event.byAPerson)}</li>
           ))}
         </ul>
       )}

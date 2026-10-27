@@ -145,17 +145,20 @@ function GroupsList(properties: { readonly headingId: string }) {
   const narrowed = useNarrowedGroups(rows);
   const { search, data } = narrowed;
 
-  const actions: GroupActions = {
-    open: (groupId) => {
-      setOpened({ groupId, at: "group" });
-    },
-    landOn,
-    landed: (button) => {
-      if (button === null) return;
-      button.focus();
-      setLandOn(undefined);
-    },
-  };
+  const actions = useMemo<GroupActions>(
+    () => ({
+      open: (groupId) => {
+        setOpened({ groupId, at: "group" });
+      },
+      landOn,
+      landed: (button) => {
+        if (button === null) return;
+        button.focus();
+        setLandOn(undefined);
+      },
+    }),
+    [landOn],
+  );
 
   const table = useTable({
     features,

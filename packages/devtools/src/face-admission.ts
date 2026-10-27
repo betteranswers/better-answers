@@ -95,18 +95,17 @@ const marksOf = (program: Program): Marks => {
 };
 
 const functionOf = (init: Expression | null): FunctionShape | undefined => {
-  switch (init?.type) {
-    case "ArrowFunctionExpression":
-    case "FunctionExpression":
-      return init;
-    case "ParenthesizedExpression":
-    case "TSAsExpression":
-    case "TSNonNullExpression":
-    case "TSSatisfiesExpression":
-      return functionOf(init.expression);
-    default:
-      return undefined;
+  if (init === null) return undefined;
+  if (init.type === "ArrowFunctionExpression" || init.type === "FunctionExpression") return init;
+  if (
+    init.type === "ParenthesizedExpression" ||
+    init.type === "TSAsExpression" ||
+    init.type === "TSNonNullExpression" ||
+    init.type === "TSSatisfiesExpression"
+  ) {
+    return functionOf(init.expression);
   }
+  return undefined;
 };
 
 const declaredBy = (declaration: Declaration | Statement | Directive): readonly Declared[] => {
@@ -205,21 +204,16 @@ const exportWhole = (reading: Reading, statement: ExportAllDeclaration): void =>
 };
 
 const readStatement = (reading: Reading, statement: Statement | Directive): void => {
-  switch (statement.type) {
-    case "ImportDeclaration":
-      for (const [local, imported] of importedBy(statement)) reading.imports.set(local, imported);
-      break;
-    case "ExportNamedDeclaration":
-      exportNamed(reading, statement);
-      break;
-    case "ExportDefaultDeclaration":
-      unread(reading.file, "a default export");
-      break;
-    case "ExportAllDeclaration":
-      exportWhole(reading, statement);
-      break;
-    default:
-      declare(reading, statement, false);
+  if (statement.type === "ImportDeclaration") {
+    for (const [local, imported] of importedBy(statement)) reading.imports.set(local, imported);
+  } else if (statement.type === "ExportNamedDeclaration") {
+    exportNamed(reading, statement);
+  } else if (statement.type === "ExportDefaultDeclaration") {
+    unread(reading.file, "a default export");
+  } else if (statement.type === "ExportAllDeclaration") {
+    exportWhole(reading, statement);
+  } else {
+    declare(reading, statement, false);
   }
 };
 

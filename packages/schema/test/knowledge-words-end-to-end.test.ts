@@ -275,8 +275,8 @@ describe("migration 0072 over a populated 0071 database, as its owner", () => {
         error instanceof Error && error.cause instanceof Error
           ? error.cause.message
           : String(error),
-      )
-      .finally(() => endPool(owner));
+      );
+    await endPool(owner);
 
     expect({ refusal, applied: (await migrationRows()).length }).toEqual({
       refusal: matching.stringMatching(/^write_up and write_up_include hold rows/),

@@ -472,18 +472,18 @@ const plus = (sum: VerificationsRecorded, more: VerificationsRecorded): Verifica
   present: sum.present + more.present,
 });
 
+const MALFORMED_MANIFEST = ["malformed", "malformed-path", "malformed-message"] as const;
+
+const isMalformedManifest = (refusal: string): refusal is (typeof MALFORMED_MANIFEST)[number] =>
+  MALFORMED_MANIFEST.some((word) => word === refusal);
+
 const manifestRefusalOf = (refusal: WriteManifestRefusal | Error): ImportBundleRefusal | Error => {
   if (refusal instanceof Error) return refusal;
-  switch (refusal) {
-    case "path-taken":
-      return "manifest-taken";
-    case "malformed":
-    case "malformed-path":
-    case "malformed-message":
-      return new Error(`the manifest commit was refused: ${refusal}`);
-    default:
-      return refusal;
+  if (refusal === "path-taken") return "manifest-taken";
+  if (isMalformedManifest(refusal)) {
+    return new Error(`the manifest commit was refused: ${refusal}`);
   }
+  return refusal;
 };
 
 const dryRunOf = (

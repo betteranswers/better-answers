@@ -302,6 +302,7 @@ const afterDelete = (state, version, sent, where) => {
       return { ...state, notSent: [...state.notSent, version], stop: RATE_LIMITED };
     case "refused":
       return { ...state, failed: [...state.failed, version], failure: where.refused };
+    case "failed":
     default:
       return {
         ...state,

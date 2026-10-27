@@ -27,19 +27,13 @@ const argumentWords = ({ typeName, typeArguments }: TSTypeReference): readonly F
     : (typeArguments?.params ?? []).flatMap(wordsOf);
 
 const wordsOf = (type: TSType): readonly Found[] => {
-  switch (type.type) {
-    case "TSLiteralType":
-      return wordOf(type);
-    case "TSUnionType":
-    case "TSIntersectionType":
-      return type.types.flatMap(wordsOf);
-    case "TSParenthesizedType":
-      return wordsOf(type.typeAnnotation);
-    case "TSTypeReference":
-      return argumentWords(type);
-    default:
-      return [];
+  if (type.type === "TSLiteralType") return wordOf(type);
+  if (type.type === "TSUnionType" || type.type === "TSIntersectionType") {
+    return type.types.flatMap(wordsOf);
   }
+  if (type.type === "TSParenthesizedType") return wordsOf(type.typeAnnotation);
+  if (type.type === "TSTypeReference") return argumentWords(type);
+  return [];
 };
 
 const refusesWords = ({ callee, arguments: [declaration] }: CallExpression): readonly Found[] => {

@@ -165,9 +165,12 @@ describe.each(Object.entries(ARMS))(
       const arranged = await arrangedWithInvoices();
 
       await db().pool.query(UNMARK_THE_MATCH);
-      const found = await searching(arranged.admin).finally(() =>
-        db().pool.query(MARK_THE_MATCH_LEAKPROOF),
-      );
+      let found: Awaited<ReturnType<typeof searching>>;
+      try {
+        found = await searching(arranged.admin);
+      } finally {
+        await db().pool.query(MARK_THE_MATCH_LEAKPROOF);
+      }
 
       expect(found.answer).toEqual(handbookFound(arranged));
       expect(found.indexes).not.toContain(`passage_${arranged.workspaceId}_search_gin`);

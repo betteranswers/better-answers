@@ -15,7 +15,6 @@ import {
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
-import type { BetterFetchError } from "better-auth/client";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -51,14 +50,6 @@ const AUTH_KEYS = {
   all: ["auth"],
   session: ["auth", "session"],
 } as const;
-
-const unwrap = async <TData, TError>(
-  call: Promise<{ data: TData; error: TError | null }>,
-): Promise<TData> => {
-  const { data, error } = await call;
-  if (error !== null) throw error;
-  return data;
-};
 
 const theWorkspaceList = (api: ApiProxy) => api.person.workspaces.pathFilter();
 
@@ -456,11 +447,20 @@ export class SwitchRefused extends Error {
   }
 }
 
+const switchRefused = (refused: unknown): SwitchRefused =>
+  new SwitchRefused(
+    notAMember.safeParse(refused).success,
+    libraryCode.safeParse(refused).data?.code,
+  );
+
 const setActiveWorkspace = (organizationId: string) =>
-  unwrap(authClient.organization.setActive({ organizationId })).catch(
-    (refused: BetterFetchError) => {
-      const { success: noLongerAMember } = notAMember.safeParse(refused);
-      throw new SwitchRefused(noLongerAMember, libraryCode.safeParse(refused).data?.code);
+  authClient.organization.setActive({ organizationId }).then(
+    ({ data, error }) => {
+      if (error !== null) throw switchRefused(error);
+      return data;
+    },
+    (failure: unknown) => {
+      throw switchRefused(failure);
     },
   );
 

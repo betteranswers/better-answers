@@ -271,7 +271,7 @@ const insertRow = async <TName extends keyof Registry>(
     fields[key] = typeof value === "string" && value.startsWith("[") ? JSON.parse(value) : value;
   }
 
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- TypeScript cannot correlate `select` with `TName` through a generic indexed access
+  // oxlint-disable-next-line typescript/consistent-type-assertions, typescript/no-unsafe-type-assertion -- TypeScript cannot correlate `select` with `TName` through a generic indexed access
   return select.parse(fields) as Row<TName>;
 };
 
