@@ -41,7 +41,6 @@ import { type CommitAuthor, type GitDoor } from "../store/git/index.ts";
 import { analyseMap } from "../store/map/index.ts";
 import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { type Frontmatter, type FrontmatterSource } from "./file.ts";
-import { latestVerificationOf } from "./latest-verification.ts";
 import {
   countVerifications,
   IMPORT_SENSITIVITY_DEFAULT,
@@ -57,8 +56,9 @@ import {
   type LoadedConcept,
   type StandingConcept,
   type Unsound,
-} from "./loader.ts";
-import { manifestAtHead, writeManifest, type WriteManifestRefusal } from "./manifest.ts";
+} from "./import/loader.ts";
+import { manifestAtHead, writeManifest, type WriteManifestRefusal } from "./import/manifest.ts";
+import { latestVerificationOf } from "./reading/latest-verification.ts";
 import {
   bodyLinksOf,
   paneOf,
@@ -70,13 +70,7 @@ import {
   type PassageNamer,
   type PassageReader,
   type Relation,
-} from "./read.ts";
-import {
-  payloadFor,
-  returnToProposer,
-  targetOfMergeKey,
-  type SuggestionPayload,
-} from "./suggestions.ts";
+} from "./reading/read.ts";
 import {
   trustOf,
   trustWords,
@@ -86,11 +80,17 @@ import {
   type VerificationRow,
 } from "./trust.ts";
 import {
+  payloadFor,
+  returnToProposer,
+  targetOfMergeKey,
+  type SuggestionPayload,
+} from "./writes/suggestions.ts";
+import {
   writeConcept,
   type ConceptWritten,
   type WriteConceptRefusal,
   type WriteDoors,
-} from "./write.ts";
+} from "./writes/write.ts";
 
 export {
   canonicalFrontmatter,
@@ -106,7 +106,7 @@ export {
   readKindConcepts,
   readKnowledgeTree,
   type KindConceptsInput,
-} from "./browse.ts";
+} from "./reading/browse.ts";
 export {
   conceptToEdit,
   conceptToEditInput,
@@ -119,18 +119,18 @@ export {
   type ConceptToEdit,
   type SaveConceptInput,
   type UpdateConceptBodyRefusal,
-} from "./edit.ts";
+} from "./writes/edit.ts";
 /** @public S3 */
-export type { ConceptParts, ConceptSaved, SaveConceptRefusal } from "./edit.ts";
+export type { ConceptParts, ConceptSaved, SaveConceptRefusal } from "./writes/edit.ts";
 export { foldKind } from "../bundle/index.ts";
-export { carryVerificationsOntoRewrite, mergeKeyOf, moveBundleCommits } from "./landing.ts";
+export { carryVerificationsOntoRewrite, mergeKeyOf, moveBundleCommits } from "./import/landing.ts";
 export {
   ERASURE_REHEARSAL_PATH,
   IMPORT_SENSITIVITY_DEFAULT,
   type BundleTree,
   type UnsoundReason,
-} from "./loader.ts";
-export { writeManifest, type ManifestWritten, type WriteManifestInput } from "./manifest.ts";
+} from "./import/loader.ts";
+export { writeManifest, type ManifestWritten, type WriteManifestInput } from "./import/manifest.ts";
 export {
   collectionsAndOwners,
   nameOwner,
@@ -148,16 +148,16 @@ export {
   reconcilerHits,
   type Reconciled,
   type WorkspaceReconciled,
-} from "./reconciler.ts";
+} from "./writes/reconciler.ts";
 /** @public S5 */
-export type { ReconcilerHit } from "./reconciler.ts";
+export type { ReconcilerHit } from "./writes/reconciler.ts";
 export {
   declineSuggestion,
   submitSuggestionSet,
   suggestionSetSummary,
   type SuggestionKind,
   type SuggestionRequest,
-} from "./suggestions.ts";
+} from "./writes/suggestions.ts";
 /** @public S3 */
 export type {
   DecideSuggestionInput,
@@ -166,9 +166,9 @@ export type {
   SubmitSuggestionSetRefusal,
   SuggestionDecided,
   SuggestionSetSubmitted,
-} from "./suggestions.ts";
+} from "./writes/suggestions.ts";
 /** @public S5 */
-export type { SuggestionSummaryItem } from "./suggestions.ts";
+export type { SuggestionSummaryItem } from "./writes/suggestions.ts";
 export { cascadingVisibility, overrideConceptSensitivity } from "./visibility.ts";
 export {
   followSyncs,
@@ -183,7 +183,7 @@ export type {
   OverrideConceptSensitivityInput,
   OverrideConceptSensitivityRefusal,
 } from "./visibility.ts";
-export { conceptPageOf } from "./read.ts";
+export { conceptPageOf } from "./reading/read.ts";
 export {
   MAP_MAINTENANCE,
   mapCounts,
@@ -211,7 +211,7 @@ export {
   type ConceptWritten,
   type WriteConceptInput,
   type WriteConceptRefusal,
-} from "./write.ts";
+} from "./writes/write.ts";
 
 export type AcceptanceDecision = {
   readonly suggestionId: string;

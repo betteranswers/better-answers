@@ -26,8 +26,8 @@ export {
   declareAction,
   EVERY_PURPOSE,
   OPERATOR_ALONE,
-} from "./admission.ts";
-export type { AdmissionRefusal, AdmittedOf, InputOf, RefusalOf } from "./admission.ts";
+} from "./principal/admission.ts";
+export type { AdmissionRefusal, AdmittedOf, InputOf, RefusalOf } from "./principal/admission.ts";
 export { ISSUE_WORDS, parse, ROOT_PATH } from "./parse.ts";
 export type { FieldIssues, IssueWord, Malformed } from "./parse.ts";
 export type { RefusedItems } from "./refused-items.ts";
@@ -42,11 +42,11 @@ export {
   personOfActor,
   PERSON_PREFIX,
   processActorId,
-} from "./actor.ts";
-export type { ActorId, ProcessPurpose } from "./actor.ts";
-export type { AdminUserPrincipal } from "./role.ts";
-export { requireFreshConfirmation } from "./freshness.ts";
-export type { FreshnessRefusal } from "./freshness.ts";
+} from "./principal/actor.ts";
+export type { ActorId, ProcessPurpose } from "./principal/actor.ts";
+export type { AdminUserPrincipal } from "./principal/role.ts";
+export { requireFreshConfirmation } from "./principal/freshness.ts";
+export type { FreshnessRefusal } from "./principal/freshness.ts";
 export {
   isPending,
   mayTake,
@@ -54,14 +54,14 @@ export {
   PENDING_STEPS,
   pendingClockOf,
   standingOf,
-} from "./second-factor.ts";
+} from "./principal/second-factor.ts";
 export type {
   PendingClock,
   PendingStep,
   SecondFactorFacts,
   SecondFactorRefusal,
   SecondFactorStanding,
-} from "./second-factor.ts";
+} from "./principal/second-factor.ts";
 export type {
   AccessRequestId,
   AuditEventId,
@@ -76,4 +76,4 @@ export type {
   UserId,
   UserPrincipal,
   WorkspaceId,
-} from "./principal.ts";
+} from "./principal/principal.ts";

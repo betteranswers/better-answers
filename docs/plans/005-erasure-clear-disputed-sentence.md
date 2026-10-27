@@ -33,7 +33,7 @@ execution: code
 
 - No backfill. No erasure has run in production (owner, 14/10/2026), so no erased person's flag holds a sentence.
 - The api's input is unchanged: a flag sent over MCP still names a disputed sentence and its concept together, or neither.
-- #734 changes the erasure modules too. This change stays inside `REWRITE_THE_FEEDBACK` in `packages/core/src/erasure/questions.ts`, so whichever lands second rebases with no overlap in the statement.
+- #734 changes the erasure modules too. This change stays inside `REWRITE_THE_FEEDBACK` in `packages/core/src/erasure/routine/questions.ts`, so whichever lands second rebases with no overlap in the statement.
 
 ## Key Technical Decisions
 
@@ -46,9 +46,9 @@ execution: code
 
 - **Requirements:** R1 to R4.
 - **Files:**
-  - Modify: `packages/schema/src/knowledge/question-tables.ts`, `packages/schema/src/table-ownership.ts`, `packages/core/src/erasure/questions.ts`
+  - Modify: `packages/schema/src/knowledge/question-tables.ts`, `packages/schema/src/table-ownership.ts`, `packages/core/src/erasure/routine/questions.ts`
   - Create: `packages/schema/migrations/0081_the-erased-flags-sentence.sql` (generated), with its snapshot and journal entry, and the regenerated worker view
-  - Test: `packages/schema/test/knowledge/question-tables.test.ts`, `packages/core/test/erasure-routine.test.ts`, `packages/core/test/question-rows.ts`
+  - Test: `packages/schema/test/knowledge/question-tables.test.ts`, `packages/core/test/erasure/routine/erasure-routine.test.ts`, `packages/core/test/erasure/question-rows.ts`
   - Docs: `docs/solutions/architecture-patterns/adr-0017.md`, `docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`
 - **Test scenarios:**
   - An erased person's flag keeps its reason and concept, and loses its note and disputed sentence.

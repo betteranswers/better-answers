@@ -22,7 +22,7 @@ import {
   type PostgresDoor,
 } from "../store/postgres/index.ts";
 import { recordSubjectRequest, type RecordSubjectRequestRefusal } from "./requests.ts";
-import { runErasure, type ErasureDoors, type ErasurePrincipal } from "./routine.ts";
+import { runErasure, type ErasureDoors, type ErasurePrincipal } from "./routine/routine.ts";
 
 const REHEARSAL_ACTIONS = declareActions("platform", {
   rehearsed: action("platform.erasure.rehearsed", {

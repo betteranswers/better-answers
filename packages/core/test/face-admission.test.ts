@@ -6,7 +6,11 @@ import { z } from "zod";
 
 import { facesAdmittingNobody } from "@better-answers/devtools/face-admission";
 
-import { asSliceRelative, coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
+import {
+  asSliceRelative,
+  coreSourceFiles,
+  sourceTreeIsInstrumented,
+} from "./support/source-tree.ts";
 
 const HOLDS_NO_ACTION = ["access", "kernel", "refusals", "store"];
 

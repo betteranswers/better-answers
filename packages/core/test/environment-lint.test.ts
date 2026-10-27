@@ -16,7 +16,7 @@ const excused = config.overrides.filter((override) => override.rules?.[RULE] ===
 
 const READS_A_SETTING = `export const dsn = process.env["DATABASE_URL"] ?? "";\n`;
 
-const SOURCE = "packages/core/src/concepts/landing.ts";
+const SOURCE = "packages/core/src/concepts/import/landing.ts";
 
 const lint = oxlintOver(
   JSON.stringify({
@@ -47,9 +47,9 @@ const EXCUSED: readonly (readonly [string, string])[] = [
   ["the git store door's pass-through", "packages/core/src/store/git/index.ts"],
   ["a repository script", "scripts/check.mjs"],
   ["the gate tooling", "packages/devtools/src/throwaway-tree.ts"],
-  ["a test", "packages/core/test/git.test.ts"],
+  ["a test", "packages/core/test/store/git/git.test.ts"],
   ["a test that renders", "apps/web/test/frame.test.tsx"],
-  ["a test helper beside it", "packages/core/test/bundle.ts"],
+  ["a test helper beside it", "packages/core/test/fixtures/bundle.ts"],
   ["a suite under a plural directory", "apps/api/tests/image-probe.ts"],
   ["a browser spec", "apps/web/e2e/models-and-spend.spec.ts"],
 ];

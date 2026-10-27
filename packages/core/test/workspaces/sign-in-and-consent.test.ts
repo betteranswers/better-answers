@@ -1,0 +1,122 @@
+import { describe, expect, it } from "vitest";
+
+import { matching } from "@better-answers/schema/testing/matching";
+
+import { openPostgres } from "../../src/store/postgres/index.ts";
+import { recordConsent, recordSignIn } from "../../src/workspaces/index.ts";
+import { bootstrap, provisionedWorkspace, seedPerson } from "../support/platform.ts";
+import { rowsFrom } from "../support/rows.ts";
+import { postgresForSuite } from "../support/suite-postgres.ts";
+
+const db = postgresForSuite();
+
+const CLIENT_ID = "https://claude.ai/oauth/mcp-oauth-client-metadata";
+
+const ULID_SHAPE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
+const identitySetRowsFor = async (personId: string) =>
+  rowsFrom(
+    await db().pool.query(
+      `SELECT id, action, family, actor, subject_kind, subject_id, detail, batch_id
+         FROM identity_audit_event WHERE subject_id = $1`,
+      [personId],
+    ),
+  );
+
+const consentRowsBy = async (personId: string) =>
+  rowsFrom(
+    await db().pool.query(
+      `SELECT workspace_id, action, family, actor, subject_kind, subject_id, detail
+         FROM audit_event WHERE actor = $1`,
+      [`human:${personId}`],
+    ),
+  );
+
+describe("recording a sign-in", () => {
+  it("writes one identity-set row, the person its actor and subject", async () => {
+    const personId = await seedPerson(db().pool);
+    const door = openPostgres(db().runtimePool);
+
+    const recorded = await recordSignIn(bootstrap, door, personId, "email_code");
+
+    expect(recorded).toEqual({ ok: true, value: undefined });
+    expect(await identitySetRowsFor(personId)).toEqual([
+      {
+        id: matching.stringMatching(ULID_SHAPE),
+        action: "people.person.signed_in",
+        family: "people",
+        actor: `human:${personId}`,
+        subject_kind: "person",
+        subject_id: personId,
+        detail: { method: "email_code" },
+        batch_id: null,
+      },
+    ]);
+    expect(await consentRowsBy(personId)).toEqual([]);
+  });
+
+  it("names a sign-in through the link by its method", async () => {
+    const personId = await seedPerson(db().pool);
+    const door = openPostgres(db().runtimePool);
+
+    await recordSignIn(bootstrap, door, personId, "email_link");
+
+    expect(await identitySetRowsFor(personId)).toMatchObject([
+      { action: "people.person.signed_in", detail: { method: "email_link" } },
+    ]);
+  });
+
+  it("refuses a malformed person id, writing nothing", async () => {
+    const door = openPostgres(db().runtimePool);
+
+    const recorded = await recordSignIn(bootstrap, door, "not-a-person-id", "email_code");
+
+    expect(recorded).toEqual({ ok: false, error: "malformed" });
+    expect(await identitySetRowsFor("not-a-person-id")).toEqual([]);
+  });
+});
+
+describe("recording a consent", () => {
+  it("writes one row to the workspace, the assistant its subject", async () => {
+    const named = await provisionedWorkspace(db(), "Consented");
+    const personId = await seedPerson(db().pool);
+
+    const recorded = await recordConsent(bootstrap, named.door, {
+      personId,
+      workspaceId: named.workspaceId,
+      clientId: CLIENT_ID,
+    });
+
+    expect(recorded).toEqual({ ok: true, value: undefined });
+    expect(await consentRowsBy(personId)).toEqual([
+      {
+        workspace_id: named.workspaceId,
+        action: "people.client.consented",
+        family: "people",
+        actor: `human:${personId}`,
+        subject_kind: "client",
+        subject_id: CLIENT_ID,
+        detail: {},
+      },
+    ]);
+    expect(await identitySetRowsFor(personId)).toEqual([]);
+  });
+
+  it.each([
+    ["person id", { personId: "not-a-person-id" }],
+    ["workspace id", { workspaceId: "not-a-workspace-id" }],
+  ])("refuses a malformed %s, writing nothing", async (_case, malformed) => {
+    const { door, workspaceId } = await provisionedWorkspace(db(), "Refused");
+    const personId = await seedPerson(db().pool);
+
+    const recorded = await recordConsent(bootstrap, door, {
+      personId,
+      workspaceId,
+      ...malformed,
+      clientId: CLIENT_ID,
+    });
+
+    expect(recorded).toEqual({ ok: false, error: "malformed" });
+    expect(await consentRowsBy(personId)).toEqual([]);
+  });
+});

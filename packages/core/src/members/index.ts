@@ -1,7 +1,7 @@
-export * from "./accepting.ts";
-export * from "./activity.ts";
-export * from "./audit-export.ts";
-export * from "./audit-log.ts";
+export * from "./invitations/accepting.ts";
+export * from "./audit-log/activity.ts";
+export * from "./audit-log/audit-export.ts";
+export * from "./audit-log/audit-log.ts";
 export * from "./bulk.ts";
 export * from "./credentials.ts";
 export type * from "./groups.ts";
@@ -24,14 +24,14 @@ export {
   bulkResendInvitations,
   type BulkCancelInvitationsRefusal,
   type BulkResendInvitationsRefusal,
-} from "./invitation-bulk.ts";
-export { returnUnsentEmails, type Counted } from "./invitation-ceilings.ts";
+} from "./invitations/invitation-bulk.ts";
+export { returnUnsentEmails, type Counted } from "./invitations/invitation-ceilings.ts";
 export {
   countInvitations,
   listInvitations,
   listInvitationsInput,
   type ListInvitationsRefusal,
-} from "./invitation-statuses.ts";
+} from "./invitations/invitation-statuses.ts";
 export {
   cancelInvitation,
   invitationInput,
@@ -43,7 +43,7 @@ export {
   type InvitationToSend,
   type InviteMembersRefusal,
   type ResendInvitationRefusal,
-} from "./invitations.ts";
+} from "./invitations/invitations.ts";
 export * from "./member-list.ts";
 export * from "./name-flags.ts";
 export type * from "./removal.ts";

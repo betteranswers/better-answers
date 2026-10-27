@@ -8,12 +8,12 @@ component: testing-framework
 severity: medium
 applies_when:
   - "Writing a test that proves concurrent actions take shared locks or rows in one order (sorted counter keys, rows locked in key order), so crossing actions cannot deadlock"
-  - "Using whileActionsWaitAt or racedAt from packages/core/test/suite-postgres.ts to hold racing actions at a BEFORE INSERT or BEFORE UPDATE trigger"
+  - "Using whileActionsWaitAt or racedAt from packages/core/test/support/suite-postgres.ts to hold racing actions at a BEFORE INSERT or BEFORE UPDATE trigger"
   - "Choosing which table's insert or update a race holds its actions at"
   - "Adding a lock, counter or row write ahead of the statement an existing race test holds at"
   - "Triaging a surviving mutant on a sort, comparator or key order in code that takes locks"
 symptoms:
-  - "A Stryker run on 2026-10-02 left the ArrowFunction mutant on the counter-key sort comparator in emailsCounted (packages/core/src/members/invitation-ceilings.ts) surviving"
+  - "A Stryker run on 2026-10-02 left the ArrowFunction mutant on the counter-key sort comparator in emailsCounted (packages/core/src/members/invitations/invitation-ceilings.ts) surviving"
   - "The crossing-sends race test in invitation-sets.test.ts passed with the counter keys taken in any order, because it held its actions at the invitation insert, after the counters, and its trigger let them through one at a time"
 root_cause: concurrency
 resolution_type: test_fix
@@ -41,7 +41,7 @@ This came up on the invitation send. `emailsCounted` takes one `invitation_email
 
 ### The helpers
 
-`whileActionsWaitAt` (`packages/core/test/suite-postgres.ts:230-267`) holds actions at a table. A holder connection takes a session-level `pg_advisory_lock` on a fixed key (line 245). A `BEFORE INSERT`, `BEFORE UPDATE` or `BEFORE DELETE` row trigger on the table, as its `event` argument names, then takes the same key again (247-258). Every action that writes the table blocks inside the trigger until the test calls `release`, which runs `pg_advisory_unlock` (240-244). `racedAt` (280-297) holds at `INSERT`, starts every action, waits with `until` until `countWaitingOnLocks` (276-277) counts one waiter per action, releases, and answers each action.
+`whileActionsWaitAt` (`packages/core/test/support/suite-postgres.ts:230-267`) holds actions at a table. A holder connection takes a session-level `pg_advisory_lock` on a fixed key (line 245). A `BEFORE INSERT`, `BEFORE UPDATE` or `BEFORE DELETE` row trigger on the table, as its `event` argument names, then takes the same key again (247-258). Every action that writes the table blocks inside the trigger until the test calls `release`, which runs `pg_advisory_unlock` (240-244). `racedAt` (280-297) holds at `INSERT`, starts every action, waits with `until` until `countWaitingOnLocks` (276-277) counts one waiter per action, releases, and answers each action.
 
 Before PR #511 the trigger always took `pg_advisory_xact_lock`, which is exclusive and held until the transaction ends:
 
@@ -53,7 +53,7 @@ So after `release` one action won the lock and kept it until its commit, and the
 
 ### The send and its counters
 
-`sentUnderLocks` (in `packages/core/src/members/invitations.ts`) counts first, through `emailsCounted`, then reads the members among the addresses, then mints through `mintedEach`, which writes the `invitation` rows. In `packages/core/src/members/invitation-ceilings.ts`, `countersOf` lists one counter per address in the order sent, then the workspace's counter with `amount: addresses.length`, and `emailsCounted` sorts them by key before taking any:
+`sentUnderLocks` (in `packages/core/src/members/invitations/invitations.ts`) counts first, through `emailsCounted`, then reads the members among the addresses, then mints through `mintedEach`, which writes the `invitation` rows. In `packages/core/src/members/invitations/invitation-ceilings.ts`, `countersOf` lists one counter per address in the order sent, then the workspace's counter with `amount: addresses.length`, and `emailsCounted` sorts them by key before taking any:
 
 ```ts
   const counters = countersOf(admin, addresses).toSorted((one, other) =>
@@ -65,7 +65,7 @@ Each counter is taken by `consumeInvitationEmails` (`packages/core/src/store/pos
 
 Stryker's ArrowFunction mutator replaces the comparator with `() => undefined`. A comparator that answers `undefined` treats every pair as equal, and `toSorted` is stable, so the order falls back to `countersOf`'s: the addresses as sent, then the workspace. That is exactly the crossing the test arranges.
 
-The old test (`packages/core/test/invitation-sets.test.ts:344-370`) raced those two sends at the `invitation` table's `INSERT`, released in turn (the default):
+The old test (`packages/core/test/members/invitations/invitation-sets.test.ts:344-370`) raced those two sends at the `invitation` table's `INSERT`, released in turn (the default):
 
 ```ts
     const answers = await racedAt(db().pool, "invitation", [
@@ -110,7 +110,7 @@ One more trap: `countWaitingOnLocks` counts every statement in the database wait
 
 ### Reading the failure
 
-When the order is missing, Postgres finds the cycle after `deadlock_timeout` (1 s by default) and aborts one action with SQLSTATE `40P01`, "deadlock detected". In this send that error does not come back as a throw. `inviteMembers`, in `packages/core/src/members/invitations.ts`, runs `sentUnderLocks` under `attempt` and maps the error through `refusalOfDeadlock` (`packages/core/src/store/postgres/index.ts:172`, 174-179), so the aborted send answers the refusal `changed-meanwhile` rather than throwing. The test then fails at `expect(answers.map((answer) => answer.ok)).toEqual([true, true])` (`invitation-sets.test.ts:387`). In this session's run, with the sort removed, the test failed at about 1,050 ms. A race test that fails a little over a second in, with a `40P01` or the refusal it maps to, is reporting a missing lock order.
+When the order is missing, Postgres finds the cycle after `deadlock_timeout` (1 s by default) and aborts one action with SQLSTATE `40P01`, "deadlock detected". In this send that error does not come back as a throw. `inviteMembers`, in `packages/core/src/members/invitations/invitations.ts`, runs `sentUnderLocks` under `attempt` and maps the error through `refusalOfDeadlock` (`packages/core/src/store/postgres/index.ts:172`, 174-179), so the aborted send answers the refusal `changed-meanwhile` rather than throwing. The test then fails at `expect(answers.map((answer) => answer.ok)).toEqual([true, true])` (`invitation-sets.test.ts:387`). In this session's run, with the sort removed, the test failed at about 1,050 ms. A race test that fails a little over a second in, with a `40P01` or the refusal it maps to, is reporting a missing lock order.
 
 To confirm the test now constrains the code, use the controls in `docs/agents/mutation-triage.md`. It holds that "A harness that answers only one way says nothing", and that "The same line's opposite is the best pair: One expression, two verdicts, is a harness that discriminates." Here the pair was one probe on the comparator, run before and after the new test: per this session's runs, `pnpm mutant-probe` answered `survived` before and `killed` after.
 
@@ -126,7 +126,7 @@ The tree after PR #511 carries what `"together"` does (the comment on `Released`
 - A sort, an ordering or a lock acquisition that a mutation run reports as surviving a race test: check where the race holds and how it releases before calling the mutant equivalent.
 - A new lock or counter added ahead of an existing hold point: the hold may no longer be at the first contended statement.
 
-`"in turn"` remains right for a different claim: that a later action sees, and respects, the rows an earlier action committed. "leaves one waiting of two concurrent invitations to one address" (`packages/core/test/invitations.test.ts:210-230`) and "adds one of two concurrent adds of one address" (`packages/core/test/workspaces.test.ts:1481-1498`) race that way, and are correct as written: the second action must commit after the first and find its row. The old crossing test proves the same kind of thing, that the second send replaces the first's waiting invitations (`invitation-sets.test.ts:355-369`), and it stays. In `packages/core/test` the two helpers have eighteen call sites, fifteen of `whileActionsWaitAt` and three of `racedAt`, and three pass `"together"` (`invitation-sets.test.ts:384`, `spend.test.ts:189`, `visibility.test.ts:1163`). That is no reason to switch the others.
+`"in turn"` remains right for a different claim: that a later action sees, and respects, the rows an earlier action committed. "leaves one waiting of two concurrent invitations to one address" (`packages/core/test/members/invitations/invitations.test.ts:210-230`) and "adds one of two concurrent adds of one address" (`packages/core/test/workspaces/workspaces.test.ts:1481-1498`) race that way, and are correct as written: the second action must commit after the first and find its row. The old crossing test proves the same kind of thing, that the second send replaces the first's waiting invitations (`invitation-sets.test.ts:355-369`), and it stays. In `packages/core/test` the two helpers have eighteen call sites, fifteen of `whileActionsWaitAt` and three of `racedAt`, and three pass `"together"` (`invitation-sets.test.ts:384`, `spend.test.ts:189`, `visibility.test.ts:1163`). That is no reason to switch the others.
 
 ## Examples
 
@@ -149,7 +149,7 @@ After: a second test, "takes two crossing sends' counters in one order", holds t
     expect(await emailsCountedFrom(workspace)).toBe(4);
 ```
 
-With the sort, both actions want the same first key. One inserts it, and the other's `INSERT ... ON CONFLICT` waits on that uncommitted row until the first commits, then counts on top. Both land, and the workspace counter reads 4: two sends of two addresses (the workspace's counter in `countersOf` counts `addresses.length`; `emailsCountedFrom` reads the workspace's counter, `packages/core/test/invitations-suite.ts:197-198`). Without the sort, each action inserts a different first row and then wants the other's, and one is aborted as a deadlock.
+With the sort, both actions want the same first key. One inserts it, and the other's `INSERT ... ON CONFLICT` waits on that uncommitted row until the first commits, then counts on top. Both land, and the workspace counter reads 4: two sends of two addresses (the workspace's counter in `countersOf` counts `addresses.length`; `emailsCountedFrom` reads the workspace's counter, `packages/core/test/members/invitations/invitations-suite.ts:197-198`). Without the sort, each action inserts a different first row and then wants the other's, and one is aborted as a deadlock.
 
 ## Related
 

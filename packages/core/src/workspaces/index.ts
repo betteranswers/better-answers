@@ -67,15 +67,15 @@ export {
 } from "./display-name.ts";
 export type { SetDisplayNameRefusal } from "./display-name.ts";
 export { listWorkspaces } from "./listing.ts";
-export { setModelChoice } from "./model-choice.ts";
-export type { SetModelChoiceRefusal } from "./model-choice.ts";
-export { setModelKey } from "./model-key.ts";
-export type { SetModelKeyRefusal } from "./model-key.ts";
-export { setModelPrice } from "./model-price.ts";
-export { setDecisionThreshold } from "./decision-threshold.ts";
-export type { SetDecisionThresholdRefusal } from "./decision-threshold.ts";
-export { setSpendingLimit } from "./spending-limit.ts";
-export type { SetSpendingLimitRefusal } from "./spending-limit.ts";
+export { setModelChoice } from "./models/model-choice.ts";
+export type { SetModelChoiceRefusal } from "./models/model-choice.ts";
+export { setModelKey } from "./models/model-key.ts";
+export type { SetModelKeyRefusal } from "./models/model-key.ts";
+export { setModelPrice } from "./models/model-price.ts";
+export { setDecisionThreshold } from "./models/decision-threshold.ts";
+export type { SetDecisionThresholdRefusal } from "./models/decision-threshold.ts";
+export { setSpendingLimit } from "./models/spending-limit.ts";
+export type { SetSpendingLimitRefusal } from "./models/spending-limit.ts";
 export {
   operatorAddresses,
   restoreSignIn,
@@ -93,15 +93,15 @@ export {
   removePasskeyInput,
   renamePasskey,
   renamePasskeyInput,
-} from "./passkeys.ts";
+} from "./second-factor/passkeys.ts";
 export {
   acknowledgeRecoveryCodes,
   acknowledgeRecoveryCodesInput,
   hashOfTyped,
   replaceRecoveryCodes,
   replaceRecoveryCodesInput,
-} from "./recovery-codes.ts";
-export { reserveAuthenticatorTry } from "./confirm-throttle.ts";
+} from "./second-factor/recovery-codes.ts";
+export { reserveAuthenticatorTry } from "./second-factor/confirm-throttle.ts";
 export {
   acceptRestoreCode,
   confirmByAuthenticator,
@@ -111,24 +111,29 @@ export {
   replaceFactorsByAuthenticator,
   replaceFactorsByPasskey,
   spendRecoveryCode,
-} from "./confirming.ts";
+} from "./second-factor/confirming.ts";
 export {
   keepPasskeyChallenge,
   readPasskeyCredentials,
   takePasskeyChallenge,
-} from "./passkey-confirm.ts";
+} from "./second-factor/passkey-confirm.ts";
 export {
   factorChangeStale,
   readCredentialsHeld,
   readSecondFactor,
   recordAuthenticatorSetUp,
   removeAuthenticator,
-} from "./second-factor.ts";
-export type { CredentialsHeld, SecondFactorHeld } from "./second-factor.ts";
+} from "./second-factor/second-factor.ts";
+export type { CredentialsHeld, SecondFactorHeld } from "./second-factor/second-factor.ts";
 export { promoting } from "./promotion.ts";
-export { judgeTheSession } from "./session-standing.ts";
-export type { SessionNamed, SessionStanding } from "./session-standing.ts";
-export { endOneSession, endOneSessionInput, endOtherSessions, readSessions } from "./sessions.ts";
+export { judgeTheSession } from "./second-factor/session-standing.ts";
+export type { SessionNamed, SessionStanding } from "./second-factor/session-standing.ts";
+export {
+  endOneSession,
+  endOneSessionInput,
+  endOtherSessions,
+  readSessions,
+} from "./second-factor/sessions.ts";
 export {
   recordConsent,
   recordSignIn,

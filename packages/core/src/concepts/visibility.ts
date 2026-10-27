@@ -31,7 +31,7 @@ import {
 import { holdsEveryGroup } from "../members/index.ts";
 import { writeConceptVisibility } from "../store/map/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
-import { restsAlsoOnItsReconcilerHit } from "./reconciler-hit.ts";
+import { restsAlsoOnItsReconcilerHit } from "./writes/reconciler-hit.ts";
 
 const VISIBILITY_ACTIONS = declareActions("knowledge", {
   sensitivityOverridden: action("knowledge.concept.class_overridden", {

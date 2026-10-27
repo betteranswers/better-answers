@@ -572,7 +572,7 @@
       }
     },
     {
-      "files": ["packages/core/src/concepts/edit.ts"],
+      "files": ["packages/core/src/concepts/writes/edit.ts"],
       "rules": {
         "max-lines": ["error", { "max": 674, "skipBlankLines": true, "skipComments": true }]
       }
@@ -584,9 +584,9 @@
       }
     },
     {
-      "files": ["packages/core/src/erasure/routine.ts"],
+      "files": ["packages/core/src/erasure/routine/routine.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 551, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 556, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -622,7 +622,7 @@
     {
       "files": ["packages/core/src/workspaces/index.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 621, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 626, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

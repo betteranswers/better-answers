@@ -1,0 +1,343 @@
+import { assert, describe, expect, expectTypeOf, it } from "vitest";
+import { z } from "zod";
+
+import { boundarySchemas } from "@better-answers/schema";
+
+import type { writeConceptAction } from "../../../src/concepts/index.ts";
+import {
+  admit,
+  declareAction,
+  EVERY_PURPOSE,
+  KERNEL_REFUSALS,
+  OPERATOR_ALONE,
+  type AdmissionRefusal,
+  type AdmittedOf,
+  type InputOf,
+  type OperatorPrincipal,
+  type PlatformPrincipal,
+  type ProcessPurpose,
+  type RefusalOf,
+  type Result,
+  type Role,
+  type UserPrincipal,
+} from "../../../src/kernel/index.ts";
+import { enqueueJobAction, enqueueJobInput } from "../../../src/runs/index.ts";
+import {
+  reprocessConnectedSourceAction,
+  reprocessConnectedSourceInput,
+  type adminOnConnectedSource,
+  type dpiaInputFor,
+  type previewPassages,
+  type publishConnectedSource,
+  type reprocessConnectedSource,
+  type ReprocessConnectedSourceInput,
+  type ReprocessConnectedSourceRefusal,
+} from "../../../src/sources/index.ts";
+
+const person = (role: Role): UserPrincipal => ({
+  kind: "user",
+  workspaceId: boundarySchemas.workspace.select.shape.id.parse("01JQ0000000000000000000WSP"),
+  userId: boundarySchemas.user.select.shape.id.parse("01JQ0000000000000000000PER"),
+  role,
+  groups: [],
+  credentialIssuedAtMs: Date.now(),
+  secondFactorConfirmedAtMs: Date.now(),
+});
+
+const processActor = (purpose: string): PlatformPrincipal => ({
+  kind: "platform",
+  actorId: `process:better-answers-${purpose}`,
+});
+
+const theOperator = (): OperatorPrincipal => ({
+  kind: "operator",
+  userId: boundarySchemas.user.select.shape.id.parse("01JQ0000000000000000000ZED"),
+  credentialIssuedAtMs: Date.now(),
+  secondFactorConfirmedAtMs: Date.now(),
+});
+
+const nothing = z.object({});
+
+const adminsOnly = declareAction({
+  admits: { role: "Admin", purposes: [] },
+  input: nothing,
+  refuses: ["role-forbids"],
+});
+
+const everyone = declareAction({
+  admits: { role: "Viewer", purposes: EVERY_PURPOSE },
+  input: nothing,
+  refuses: ["role-forbids"],
+});
+
+const erasureOnly = declareAction({
+  admits: { role: "Admin", purposes: ["erasure"] },
+  input: nothing,
+  refuses: ["role-forbids"],
+});
+
+const operatorsOnly = declareAction({
+  admits: OPERATOR_ALONE,
+  input: nothing,
+  refuses: ["not-the-operator"],
+});
+
+describe("what an action admits, from the principal and input alone", () => {
+  it("admits only an Admin where the level is Admin", () => {
+    const answered = (["Admin", "Editor", "Viewer"] as const).map(
+      (role) => admit(adminsOnly, person(role), {}).ok,
+    );
+
+    expect(answered).toEqual([true, false, false]);
+  });
+
+  it("reads a role as a level admitting every role above", () => {
+    const answered = (["Admin", "Editor", "Viewer"] as const).map(
+      (role) => admit(everyone, person(role), {}).ok,
+    );
+
+    expect(answered).toEqual([true, true, true]);
+  });
+
+  it("keys a platform principal off its actor id's purpose", () => {
+    expect([
+      admit(erasureOnly, processActor("erasure"), {}).ok,
+      admit(erasureOnly, processActor("reconciler"), {}).ok,
+      admit(everyone, processActor("reconciler"), {}).ok,
+    ]).toEqual([true, false, true]);
+  });
+
+  it("refuses a platform principal where an action names no purpose", () => {
+    expect(admit(adminsOnly, processActor("erasure"), {}).ok).toBe(false);
+  });
+
+  it("hands back the principal narrowed to the admitted role", () => {
+    const admitted = admit(adminsOnly, person("Admin"), {});
+
+    assert(admitted.ok, "an Admin was refused");
+    expect(admitted.value.role).toBe("Admin");
+    expectTypeOf(admitted.value).toExtend<UserPrincipal & { role: "Admin" }>();
+  });
+
+  it("refuses a role outside the three, whatever level is asked", () => {
+    // @ts-expect-error — a role no resolver hands out is the value the gate must still refuse.
+    const stranger: UserPrincipal = { ...person("Admin"), role: "Owner" };
+
+    expect([admit(adminsOnly, stranger, {}), admit(everyone, stranger, {})]).toEqual([
+      { ok: false, error: "role-forbids" },
+      { ok: false, error: "role-forbids" },
+    ]);
+  });
+
+  it("refuses in role-forbids, a word of the forbidden class", () => {
+    const refused = admit(adminsOnly, person("Viewer"), {});
+
+    expect(refused).toEqual({ ok: false, error: "role-forbids" });
+    expect(KERNEL_REFUSALS["role-forbids"]).toBe("forbidden");
+    expectTypeOf<"role-forbids">().toExtend<AdmissionRefusal>();
+  });
+
+  it("holds an admission's word to the forbidden and unauthenticated classes", () => {
+    expectTypeOf<"role-forbids">().toExtend<AdmissionRefusal>();
+    expectTypeOf<"credentials-revoked">().toExtend<AdmissionRefusal>();
+    expectTypeOf<"malformed">().not.toExtend<AdmissionRefusal>();
+    expectTypeOf<"not-found">().not.toExtend<AdmissionRefusal>();
+
+    expect(KERNEL_REFUSALS["malformed"]).toBe("malformed");
+  });
+});
+
+describe("what an action admits of the operator", () => {
+  it("admits the operator alone to an operator's action", () => {
+    const operator = theOperator();
+
+    expect([
+      admit(operatorsOnly, operator, {}),
+      admit(operatorsOnly, person("Admin"), {}),
+      admit(operatorsOnly, processActor("bootstrap"), {}),
+    ]).toEqual([
+      { ok: true, value: operator },
+      { ok: false, error: "not-the-operator" },
+      { ok: false, error: "not-the-operator" },
+    ]);
+  });
+
+  it("refuses the operator every action a role or purpose admits", () => {
+    expect([
+      admit(everyone, theOperator(), {}),
+      admit(adminsOnly, theOperator(), {}),
+      admit(erasureOnly, theOperator(), {}),
+    ]).toEqual([
+      { ok: false, error: "role-forbids" },
+      { ok: false, error: "role-forbids" },
+      { ok: false, error: "role-forbids" },
+    ]);
+  });
+
+  it("hands back the operator, and refuses in a forbidden word", () => {
+    expectTypeOf<AdmittedOf<typeof operatorsOnly>>().toEqualTypeOf<OperatorPrincipal>();
+    expectTypeOf<OperatorPrincipal>().not.toExtend<AdmittedOf<typeof everyone>>();
+    expectTypeOf<ReturnType<typeof admit<typeof operatorsOnly>>>().toEqualTypeOf<
+      Result<OperatorPrincipal, "not-the-operator">
+    >();
+    expect(KERNEL_REFUSALS["not-the-operator"]).toBe("forbidden");
+  });
+});
+
+describe("the concept write, which ownership decides", () => {
+  it("types a concept's writer as a person of any role", () => {
+    type Writer = AdmittedOf<typeof writeConceptAction>;
+
+    expectTypeOf<Writer["role"]>().toEqualTypeOf<Role>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Writer>();
+  });
+});
+
+const viewerWhenOpenElseEditor = (input: { readonly open: boolean }) =>
+  ({ role: input.open ? "Viewer" : "Editor", purposes: [] }) as const;
+
+const editorWhenOpenElseAdmin = (input: { readonly open: boolean }) =>
+  ({ role: input.open ? "Editor" : "Admin", purposes: [] }) as const;
+
+describe("an action whose level is read from its input", () => {
+  it("types the enqueue's person at any role", () => {
+    type Enqueuer = AdmittedOf<typeof enqueueJobAction>;
+
+    expectTypeOf<Extract<Enqueuer, UserPrincipal>["role"]>().toEqualTypeOf<Role>();
+    expectTypeOf<UserPrincipal & { readonly role: "Viewer" }>().toExtend<Enqueuer>();
+    expectTypeOf<PlatformPrincipal>().toExtend<Enqueuer>();
+  });
+
+  it("types a union of roles by the lowest it names", () => {
+    const lowerTwo = declareAction({
+      admits: viewerWhenOpenElseEditor,
+      input: z.custom<{ readonly open: boolean }>(),
+      refuses: ["role-forbids"],
+    });
+    const higherTwo = declareAction({
+      admits: editorWhenOpenElseAdmin,
+      input: z.custom<{ readonly open: boolean }>(),
+      refuses: ["role-forbids"],
+    });
+
+    expectTypeOf<AdmittedOf<typeof lowerTwo>["role"]>().toEqualTypeOf<Role>();
+    expectTypeOf<AdmittedOf<typeof higherTwo>["role"]>().toEqualTypeOf<"Admin" | "Editor">();
+    expect([
+      admit(lowerTwo, person("Viewer"), { open: false }).ok,
+      admit(higherTwo, person("Editor"), { open: true }).ok,
+    ]).toEqual([false, true]);
+  });
+});
+
+describe("what a declaration will not let an action say", () => {
+  it("refuses an action declaring one word twice", () => {
+    expect(() =>
+      declareAction({
+        admits: { role: "Admin", purposes: [] },
+        input: nothing,
+        refuses: ["role-forbids", "role-forbids"],
+      }),
+    ).toThrow("listed twice");
+  });
+
+  it("refuses a purpose no platform process has", () => {
+    expectTypeOf<"erasure">().toExtend<ProcessPurpose>();
+    expectTypeOf<"erasrue">().not.toExtend<ProcessPurpose>();
+
+    const misspelt = declareAction({
+      // @ts-expect-error — a misspelt purpose would admit no process and refuse none by name.
+      admits: { role: "Admin", purposes: ["erasrue"] },
+      input: nothing,
+      refuses: ["role-forbids"],
+    });
+
+    expect(admit(misspelt, processActor("erasure"), {}).ok).toBe(false);
+  });
+});
+
+describe("what two declared actions state, read from outside their slices", () => {
+  it("states what reprocessing a source admits and answers", () => {
+    expect({
+      admits: reprocessConnectedSourceAction.admits,
+      refuses: reprocessConnectedSourceAction.refuses,
+    }).toEqual({
+      admits: { role: "Admin", purposes: ["erasure", "reindex"] },
+      refuses: ["role-forbids", "no-such-binding"],
+    });
+  });
+
+  it("admits an Admin, erasure and reindex to reprocess, nobody else", () => {
+    const wipe = reprocessConnectedSourceInput.parse({
+      workspaceId: "01JQ0000000000000000000WSP",
+      connectedSourceId: "01J6NNNNNNNNNNNNNNNNNNNNN1",
+      reason: "wiped",
+    });
+
+    expect({
+      admitted: [
+        processActor("erasure"),
+        processActor("reindex"),
+        processActor("reconciler"),
+        processActor("upload-sweep"),
+        person("Admin"),
+        person("Editor"),
+        person("Viewer"),
+      ].map((principal) => admit(reprocessConnectedSourceAction, principal, wipe).ok),
+      refused: admit(reprocessConnectedSourceAction, processActor("reconciler"), wipe),
+      itsClass: KERNEL_REFUSALS["role-forbids"],
+    }).toEqual({
+      admitted: [true, true, false, false, true, false, false],
+      refused: { ok: false, error: "role-forbids" },
+      itsClass: "forbidden",
+    });
+  });
+
+  it("derives the action's input and refusal types from its declaration", () => {
+    expectTypeOf<
+      InputOf<typeof reprocessConnectedSourceAction>
+    >().toEqualTypeOf<ReprocessConnectedSourceInput>();
+    expectTypeOf<RefusalOf<typeof reprocessConnectedSourceAction>>().toEqualTypeOf<
+      "role-forbids" | "no-such-binding"
+    >();
+    expectTypeOf<"no-such-binding">().toExtend<ReprocessConnectedSourceRefusal>();
+    expectTypeOf<AdmittedOf<typeof reprocessConnectedSourceAction>>().toExtend<
+      UserPrincipal | PlatformPrincipal
+    >();
+    expectTypeOf<PlatformPrincipal>().toExtend<AdmittedOf<typeof reprocessConnectedSourceAction>>();
+  });
+
+  it("lets the platform reprocess but not publish, preview or administer", () => {
+    expectTypeOf<PlatformPrincipal>().toExtend<Parameters<typeof reprocessConnectedSource>[0]>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof publishConnectedSource>[0]>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof dpiaInputFor>[0]>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof previewPassages>[0]>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof adminOnConnectedSource>[0]>();
+  });
+
+  it("reads the enqueue's level off the kind's descriptor", () => {
+    const audit = enqueueJobInput.parse({
+      workspaceId: "01JQ0000000000000000000WSP",
+      kind: "nightly-audit",
+    });
+    const asked = enqueueJobAction.admits;
+
+    assert(typeof asked === "function", "the enqueue reads its level from the input");
+    expect(asked(audit)).toEqual({
+      role: "Admin",
+      purposes: EVERY_PURPOSE,
+    });
+  });
+
+  it("admits the platform to the enqueue for any purpose", () => {
+    const audit = enqueueJobInput.parse({
+      workspaceId: "01JQ0000000000000000000WSP",
+      kind: "nightly-audit",
+    });
+
+    expect([
+      admit(enqueueJobAction, processActor("reconciler"), audit).ok,
+      admit(enqueueJobAction, person("Admin"), audit).ok,
+      admit(enqueueJobAction, person("Editor"), audit).ok,
+    ]).toEqual([true, true, false]);
+  });
+});

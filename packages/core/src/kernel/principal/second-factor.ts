@@ -1,0 +1,73 @@
+import type { KernelRefusal } from "../vocabulary.ts";
+
+export const PENDING_SESSION_LIFETIME_MS = 60 * 60 * 1000;
+
+export type SecondFactorFacts = {
+  readonly mustHoldOne: boolean;
+
+  readonly holdsAFactor: boolean;
+
+  readonly confirmed: boolean;
+
+  readonly setupGranted: boolean;
+};
+
+const SECOND_FACTOR_STANDINGS = ["not-required", "confirmed", "confirm", "setup"] as const;
+
+export type SecondFactorStanding = (typeof SECOND_FACTOR_STANDINGS)[number];
+
+type PendingStanding = Extract<SecondFactorStanding, "confirm" | "setup">;
+
+export const standingOf = (facts: SecondFactorFacts): SecondFactorStanding => {
+  if (!facts.mustHoldOne) return "not-required";
+  if (facts.holdsAFactor && facts.confirmed) return "confirmed";
+  return facts.holdsAFactor && !facts.setupGranted ? "confirm" : "setup";
+};
+
+export type SecondFactorRefusal = KernelRefusal<"second-factor-pending">;
+
+export const isPending = (standing: SecondFactorStanding): standing is PendingStanding =>
+  standing === "confirm" || standing === "setup";
+
+export const PENDING_STEPS = [
+  "read-the-session",
+  "sign-out",
+  "read-the-second-factor",
+  "read-the-operator-standing",
+  "confirm",
+  "spend-a-recovery-code",
+  "give-the-restore-code",
+  "set-up-a-factor",
+] as const;
+
+export type PendingStep = (typeof PENDING_STEPS)[number];
+
+const BOTH: readonly PendingStanding[] = ["confirm", "setup"];
+
+const SETUP_ONLY: readonly PendingStanding[] = ["setup"];
+
+const PENDING_SET = {
+  "read-the-session": BOTH,
+  "sign-out": BOTH,
+  "read-the-second-factor": BOTH,
+  "read-the-operator-standing": BOTH,
+  confirm: BOTH,
+  "spend-a-recovery-code": BOTH,
+  "give-the-restore-code": BOTH,
+  "set-up-a-factor": SETUP_ONLY,
+} as const satisfies Record<PendingStep, readonly PendingStanding[]>;
+
+export const mayTake = (standing: SecondFactorStanding, step: PendingStep | undefined): boolean =>
+  !isPending(standing) || (step !== undefined && PENDING_SET[step].includes(standing));
+
+export type PendingClock = "none" | "start" | "run" | "stop" | "end";
+
+export const pendingClockOf = (
+  standing: SecondFactorStanding,
+  pendingSince: Date | null,
+  now: Date,
+): PendingClock => {
+  if (!isPending(standing)) return pendingSince === null ? "none" : "stop";
+  if (pendingSince === null) return "start";
+  return now.getTime() - pendingSince.getTime() > PENDING_SESSION_LIFETIME_MS ? "end" : "run";
+};

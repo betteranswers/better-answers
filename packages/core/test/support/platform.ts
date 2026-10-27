@@ -1,0 +1,124 @@
+import type pg from "pg";
+
+import { boundarySchemas, ulid } from "@better-answers/schema";
+import { type MigratedPostgres, testData } from "@better-answers/schema/testing";
+
+import type {
+  OperatorPrincipal,
+  PlatformPrincipal,
+  UserPrincipal,
+  WorkspaceId,
+} from "../../src/kernel/index.ts";
+import { ERASED_DOMAIN } from "../../src/store/git/index.ts";
+import {
+  openPostgres,
+  type PostgresDoor,
+  type Tx,
+  withOperator,
+} from "../../src/store/postgres/index.ts";
+import { provisionWorkspace } from "../../src/workspaces/index.ts";
+import { sessionFor } from "./identity-rows.ts";
+
+export const personIdOf = (id: string) => boundarySchemas.user.select.shape.id.parse(id);
+
+export const bootstrap: PlatformPrincipal = {
+  kind: "platform",
+  actorId: "process:better-answers-bootstrap",
+};
+
+export const principalOf = (
+  workspaceId: string,
+  userId: string,
+  role: UserPrincipal["role"],
+): UserPrincipal => ({
+  kind: "user",
+  workspaceId: boundarySchemas.workspace.select.shape.id.parse(workspaceId),
+  userId: boundarySchemas.user.select.shape.id.parse(userId),
+  role,
+  groups: [],
+  credentialIssuedAtMs: Date.now(),
+  secondFactorConfirmedAtMs: Date.now(),
+});
+
+export type ProvisionedWorkspace = {
+  readonly door: PostgresDoor;
+  readonly workspaceId: WorkspaceId;
+  readonly name: string;
+  readonly shortName: string;
+  readonly adminUserId: string;
+};
+
+export const provisionedWorkspace = async (
+  db: MigratedPostgres,
+  name: string,
+  admin?: PersonOverrides,
+): Promise<ProvisionedWorkspace> => {
+  const adminUserId = await seedPerson(db.pool, admin);
+  const door = openPostgres(db.runtimePool);
+  const mintedId = ulid();
+  const shortName = `${name.toLowerCase()}-${mintedId.toLowerCase()}`;
+  const made = await provisionWorkspace(bootstrap, door, {
+    id: mintedId,
+    name,
+    shortName,
+    adminUserId,
+  });
+  if (!made.ok) throw new Error(`the workspace was not provisioned: ${made.error}`);
+  return { door, workspaceId: made.value.workspaceId, name, shortName, adminUserId };
+};
+
+export type PersonOverrides = Parameters<ReturnType<typeof testData>["user"]>[0];
+
+export const seedPerson = async (pool: pg.Pool, overrides?: PersonOverrides): Promise<string> => {
+  const client = await pool.connect();
+  try {
+    return (await testData(client).user(overrides)).id;
+  } finally {
+    client.release();
+  }
+};
+
+export const asANewOperator = async <T>(
+  db: MigratedPostgres,
+  signedInAt: Date,
+  work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
+) => {
+  const operatorId = await seedPerson(db.pool, { operator: true });
+  const sessionId = await sessionFor(db.pool, operatorId, {
+    createdAt: signedInAt,
+    lastUsedAt: signedInAt,
+    expiresAt: new Date(signedInAt.getTime() + 30 * 24 * 60 * 60_000),
+    confirmedAt: signedInAt,
+  });
+  const answered = await withOperator(
+    openPostgres(db.runtimePool),
+    { userId: operatorId, issuedAt: signedInAt, sessionId },
+    work,
+  );
+  return { operatorId, answered };
+};
+
+export const asTheOperator = async <T>(
+  db: MigratedPostgres,
+  work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
+): Promise<T> => {
+  const { answered } = await asANewOperator(db, new Date(), work);
+  if (!answered.ok) throw new Error(`the operator was refused: ${answered.error}`);
+  return answered.value;
+};
+
+export const erasedFromTheSet = async (
+  db: MigratedPostgres,
+  workspaceId: string,
+  personId: string,
+): Promise<void> => {
+  await db.pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+    workspaceId,
+    personId,
+  ]);
+  await db.pool.query(
+    `UPDATE "user" SET email = $2, email_verified = false, name = '', image = NULL, operator = false
+      WHERE id = $1`,
+    [personId, `erased-${ulid().toLowerCase()}@${ERASED_DOMAIN}`],
+  );
+};

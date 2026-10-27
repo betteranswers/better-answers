@@ -44,7 +44,11 @@ import type {
   ProvisionRefusal,
   SetDisplayNameRefusal,
 } from "../src/workspaces/index.ts";
-import { asSliceRelative, coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
+import {
+  asSliceRelative,
+  coreSourceFiles,
+  sourceTreeIsInstrumented,
+} from "./support/source-tree.ts";
 
 const SEVEN_CLASSES = [
   "unauthenticated",

@@ -48,9 +48,9 @@ execution: code
 
 - **Requirements:** R1 to R5.
 - **Files:**
-  - Modify: `packages/core/src/store/postgres/index.ts`, `packages/core/src/concepts/index.ts`, `packages/core/src/concepts/manifest.ts`, `packages/core/src/concepts/reconciler.ts`, `packages/core/src/concepts/vocabulary.ts`, `packages/core/src/erasure/routine.ts`
+  - Modify: `packages/core/src/store/postgres/index.ts`, `packages/core/src/concepts/index.ts`, `packages/core/src/concepts/import/manifest.ts`, `packages/core/src/concepts/writes/reconciler.ts`, `packages/core/src/concepts/vocabulary.ts`, `packages/core/src/erasure/routine/routine.ts`
   - Create: `packages/core/src/concepts/fence.ts`
-  - Test: `packages/core/test/bundle-fence.test.ts`, `packages/core/test/bundle-fence.ts`, `packages/core/test/erasure-routine.test.ts`, `packages/core/test/reconciler.test.ts`, `packages/core/test/refusal-words.test.ts`
+  - Test: `packages/core/test/concepts/bundle-fence.test.ts`, `packages/core/test/concepts/bundle-fence.ts`, `packages/core/test/erasure/routine/erasure-routine.test.ts`, `packages/core/test/concepts/writes/reconciler.test.ts`, `packages/core/test/refusal-words.test.ts`
 - **Test scenarios:**
   - A rewrite waits for another process's write, then both land, and the reconciler finds nothing to replay. Before the fence, the rewrite's `filter-repo` failed against the write.
   - A member's write waits while another process rewrites the bundle.

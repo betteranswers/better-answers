@@ -1,0 +1,339 @@
+import { z } from "zod";
+
+import {
+  boundarySchemas,
+  INVITATION_ACCEPTED_STATUS,
+  INVITATION_WAITING_STATUS,
+} from "@better-answers/schema";
+
+import { action, declareActions, recordFor } from "../../audit/index.ts";
+import {
+  actorIdOfPerson,
+  attempt,
+  err,
+  ok,
+  refusalFor,
+  type PlatformPrincipal,
+  type Result,
+  type Role,
+  type UserId,
+  type WorkspaceId,
+  ulid,
+} from "../../kernel/index.ts";
+import {
+  type PostgresDoor,
+  type Tx,
+  withIdentityRead,
+  withScope,
+} from "../../store/postgres/index.ts";
+import { hasNoDisplayName, promoting, type WORKSPACE_REFUSALS } from "../../workspaces/index.ts";
+import type { MemberRefusal } from "../vocabulary.ts";
+
+const JOINING_ACTIONS = declareActions("people", {
+  joined: action("people.member.joined", { invitationId: "id", role: "role" }),
+});
+
+type Borrowed = Extract<
+  keyof typeof WORKSPACE_REFUSALS,
+  "already-a-member" | "no-display-name" | "person-gone"
+>;
+
+export type AcceptInvitationRefusal =
+  | MemberRefusal<
+      "malformed" | "no-such-invitation" | "invitation-expired" | "invitation-for-another-address"
+    >
+  | Borrowed;
+
+const INVITATION_ID = boundarySchemas.invitation.select.shape.id;
+
+type InvitationId = z.output<typeof INVITATION_ID>;
+
+const HELD_INVITATION = z.object({
+  workspaceId: boundarySchemas.workspace.select.shape.id,
+  address: boundarySchemas.invitation.select.shape.email,
+  role: boundarySchemas.member.select.shape.role,
+  status: boundarySchemas.invitation.select.shape.status,
+  expiresAt: boundarySchemas.invitation.select.shape.expiresAt,
+  workspaceName: boundarySchemas.workspace.select.shape.name,
+  invitedBy: boundarySchemas.user.select.shape.name,
+});
+
+type HeldInvitation = z.output<typeof HELD_INVITATION>;
+
+const INVITEE = z.object({
+  address: boundarySchemas.user.select.shape.email,
+  emailVerified: boundarySchemas.user.select.shape.emailVerified,
+  name: boundarySchemas.user.select.shape.name,
+  alreadyAMember: z.boolean(),
+});
+
+type Invitee = z.output<typeof INVITEE>;
+
+type Held = { readonly invitation: HeldInvitation; readonly invitee: Invitee };
+
+type Asked = { readonly invitationId: InvitationId; readonly personId: UserId; readonly now: Date };
+
+const LOCKING = {
+  read: "",
+  lock: "FOR UPDATE OF i",
+} as const;
+
+const invitationHeld = async (
+  tx: Tx,
+  invitationId: InvitationId,
+  locking: keyof typeof LOCKING,
+): Promise<HeldInvitation | undefined> => {
+  const found = await tx.query(
+    `SELECT i.workspace_id AS "workspaceId", i.email AS address, i.role, i.status,
+            i.expires_at AS "expiresAt", w.name AS "workspaceName", inviter.name AS "invitedBy"
+       FROM invitation i
+       JOIN workspace w ON w.id = i.workspace_id
+       JOIN "user" inviter ON inviter.id = i.inviter_id
+      WHERE i.id = $1
+      ${LOCKING[locking]}`,
+    [invitationId],
+  );
+  const row: unknown = found.rows[0];
+  return row === undefined ? undefined : HELD_INVITATION.parse(row);
+};
+
+const inviteeOf = async (
+  tx: Tx,
+  personId: UserId,
+  workspaceId: WorkspaceId,
+): Promise<Invitee | undefined> => {
+  const found = await tx.query(
+    `SELECT u.email AS address, u.email_verified AS "emailVerified", u.name,
+            EXISTS (SELECT 1 FROM member m WHERE m.workspace_id = $2 AND m.user_id = u.id)
+              AS "alreadyAMember"
+       FROM "user" u WHERE u.id = $1`,
+    [personId, workspaceId],
+  );
+  const row: unknown = found.rows[0];
+  return row === undefined ? undefined : INVITEE.parse(row);
+};
+
+const refusalAgainst = (
+  { invitation, invitee }: Held,
+  now: Date,
+): AcceptInvitationRefusal | undefined => {
+  const invited = invitation.address.toLowerCase() === invitee.address.toLowerCase();
+  if (!invitee.emailVerified || !invited) return "invitation-for-another-address";
+  if (invitee.alreadyAMember) return "already-a-member";
+  if (invitation.status !== INVITATION_WAITING_STATUS) return "no-such-invitation";
+  if (invitation.expiresAt <= now) return "invitation-expired";
+  return undefined;
+};
+
+const judged = async (
+  tx: Tx,
+  asked: Asked,
+  locking: keyof typeof LOCKING,
+): Promise<Result<Held, AcceptInvitationRefusal>> => {
+  const invitation = await invitationHeld(tx, asked.invitationId, locking);
+  if (invitation === undefined) return err("no-such-invitation");
+  const invitee = await inviteeOf(tx, asked.personId, invitation.workspaceId);
+  if (invitee === undefined) return err("person-gone");
+  const refused = refusalAgainst({ invitation, invitee }, asked.now);
+  return refused === undefined ? ok({ invitation, invitee }) : err(refused);
+};
+
+export type ReadInvitationInput = {
+  readonly invitationId: string;
+
+  readonly personId: string;
+  readonly now: Date;
+};
+
+const askedOf = (
+  input: ReadInvitationInput,
+): Result<Asked, MemberRefusal<"malformed" | "no-such-invitation">> => {
+  const invitationId = INVITATION_ID.safeParse(input.invitationId);
+  const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
+  if (!personId.success) return err("malformed");
+  if (!invitationId.success) return err("no-such-invitation");
+  return ok({ invitationId: invitationId.data, personId: personId.data, now: input.now });
+};
+
+export type InvitationRead = {
+  readonly invitationId: string;
+  readonly workspaceName: string;
+  readonly role: Role;
+
+  readonly invitedBy: string;
+  readonly expiresAt: string;
+};
+
+const readOf = (invitationId: InvitationId, invitation: HeldInvitation): InvitationRead => ({
+  invitationId,
+  workspaceName: invitation.workspaceName,
+  role: invitation.role,
+  invitedBy: invitation.invitedBy,
+  expiresAt: invitation.expiresAt.toISOString(),
+});
+
+/**
+ * What accepting would join, for the person the invitation is addressed to. Refuses as accepting
+ * would, save a missing display name.
+ */
+export const readInvitation = async (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  input: ReadInvitationInput,
+): Promise<Result<InvitationRead, AcceptInvitationRefusal | Error>> => {
+  const asked = askedOf(input);
+  if (!asked.ok) return err(asked.error);
+
+  const read = await attempt(() =>
+    withIdentityRead(platform, door, (tx) => judged(tx, asked.value, "read")),
+  );
+  if (!read.ok) return err(read.error);
+  if (!read.value.ok) return err(read.value.error);
+  return ok(readOf(asked.value.invitationId, read.value.value.invitation));
+};
+
+const WAITING_ID = z.object({ id: INVITATION_ID });
+
+const waitingTo = async (tx: Tx, personId: UserId): Promise<readonly InvitationId[]> =>
+  z
+    .array(WAITING_ID)
+    .parse(
+      (
+        await tx.query(
+          `SELECT i.id FROM invitation i
+             JOIN "user" invitee ON lower(i.email) = lower(invitee.email)
+            WHERE invitee.id = $1 AND i.status = $2
+            ORDER BY i.created_at DESC, i.id DESC`,
+          [personId, INVITATION_WAITING_STATUS],
+        )
+      ).rows,
+    )
+    .map((waiting) => waiting.id);
+
+const openTo = async (tx: Tx, personId: UserId, now: Date): Promise<readonly InvitationRead[]> => {
+  const waiting = await waitingTo(tx, personId);
+  const judgedEach = await Promise.all(
+    waiting.map(async (invitationId) => ({
+      invitationId,
+      held: await judged(tx, { invitationId, personId, now }, "read"),
+    })),
+  );
+  return judgedEach.flatMap(({ invitationId, held }) =>
+    held.ok ? [readOf(invitationId, held.value.invitation)] : [],
+  );
+};
+
+export type ReadOpenInvitationsInput = {
+  readonly personId: string;
+  readonly now: Date;
+};
+
+/** Every invitation `readInvitation` would read to this person rather than refuse, newest first. */
+export const readOpenInvitations = async (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  input: ReadOpenInvitationsInput,
+): Promise<Result<readonly InvitationRead[], MemberRefusal<"malformed"> | Error>> => {
+  const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
+  if (!personId.success) return err("malformed");
+
+  return attempt(() =>
+    withIdentityRead(platform, door, (tx) => openTo(tx, personId.data, input.now)),
+  );
+};
+
+const workspaceOfInvitation = (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  invitationId: InvitationId,
+): Promise<Result<WorkspaceId | undefined>> =>
+  attempt(() =>
+    withIdentityRead(platform, door, async (tx) => {
+      const found = await tx.query<{ workspace_id: string }>(
+        "SELECT workspace_id FROM invitation WHERE id = $1",
+        [invitationId],
+      );
+      const id = found.rows[0]?.workspace_id;
+      return id === undefined ? undefined : boundarySchemas.workspace.select.shape.id.parse(id);
+    }),
+  );
+
+export type Joined = {
+  readonly workspaceId: WorkspaceId;
+  readonly workspaceName: string;
+  readonly role: Role;
+
+  readonly promoted: boolean;
+};
+
+type Joining = Asked & { readonly sessionId: string };
+
+const join = async (
+  platform: PlatformPrincipal,
+  tx: Tx,
+  joining: Joining,
+): Promise<Result<Joined, AcceptInvitationRefusal>> => {
+  const held = await judged(tx, joining, "lock");
+  if (!held.ok) return held;
+  if (hasNoDisplayName(held.value.invitee.name)) return err("no-display-name");
+  const { workspaceId, workspaceName, role } = held.value.invitation;
+
+  await tx.query("UPDATE invitation SET status = $2 WHERE id = $1", [
+    joining.invitationId,
+    INVITATION_ACCEPTED_STATUS,
+  ]);
+  const promoted = role === "Admin" && (await promoting(tx, joining.personId));
+  await tx.query(
+    "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, $4, now())",
+    [ulid(), workspaceId, joining.personId, role],
+  );
+  await tx.query(
+    `UPDATE session SET active_workspace_id = $1, updated_at = now()
+      WHERE id = $2 AND user_id = $3`,
+    [workspaceId, joining.sessionId, joining.personId],
+  );
+  await recordFor(platform, tx, {
+    id: ulid(),
+    actor: actorIdOfPerson(joining.personId),
+    action: JOINING_ACTIONS.joined,
+    subjectId: joining.personId,
+    detail: { invitationId: joining.invitationId, role },
+  });
+  return ok({ workspaceId, workspaceName, role, promoted });
+};
+
+const JOIN_CONSTRAINTS = {
+  member_workspace_id_user_id_uidx: "already-a-member",
+} as const satisfies Record<string, AcceptInvitationRefusal>;
+
+export type AcceptInvitationInput = ReadInvitationInput & {
+  readonly sessionId: string;
+};
+
+/**
+ * Makes the invited person a member at the invitation's role, points their session at the
+ * workspace and records `people.member.joined` as theirs, all in one transaction.
+ */
+export const acceptInvitation = async (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  input: AcceptInvitationInput,
+): Promise<Result<Joined, AcceptInvitationRefusal | Error>> => {
+  const asked = askedOf(input);
+  if (!asked.ok) return err(asked.error);
+  const sessionId = boundarySchemas.session.select.shape.id.safeParse(input.sessionId);
+  if (!sessionId.success) return err("malformed");
+
+  const workspace = await workspaceOfInvitation(platform, door, asked.value.invitationId);
+  if (!workspace.ok) return err(workspace.error);
+  const workspaceId = workspace.value;
+  if (workspaceId === undefined) return err("no-such-invitation");
+
+  const joined = await attempt(() =>
+    withScope(platform, door, workspaceId, (tx) =>
+      join(platform, tx, { ...asked.value, sessionId: sessionId.data }),
+    ),
+  );
+  if (!joined.ok) return err(refusalFor(joined.error, JOIN_CONSTRAINTS));
+  return joined.value;
+};

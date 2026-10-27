@@ -93,7 +93,7 @@ const LANES: readonly LaneCase[] = [
       "the api image carries the SPA's build, but it is source the suites read on every run, and build.yml probes the image it pushes",
   },
   {
-    changed: ["packages/core/src/kernel/actor.ts"],
+    changed: ["packages/core/src/kernel/principal/actor.ts"],
     lane: "full",
     images: "no",
     diff: "a core change",
@@ -239,7 +239,9 @@ describe("which lane a change runs in", () => {
   });
 
   it("takes the full lane when anything but markdown changes", () => {
-    expect(laneOf(["docs/vision.md", "packages/core/src/kernel/actor.ts"])).toEqual("full");
+    expect(laneOf(["docs/vision.md", "packages/core/src/kernel/principal/actor.ts"])).toEqual(
+      "full",
+    );
     expect(laneOf(["docs/vision.md", "apps/worker/pyproject.toml"])).toEqual("full");
 
     expect(laneOf(["docs/notes.md", "scripts/notes.ts"])).toEqual("full");
@@ -782,7 +784,7 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     run: "a called run changing source",
     github: { "github.event_name": "workflow_call", "github.event.before": A_BASE },
     fetched: true,
-    changedSince: { [A_BASE]: ["packages/core/src/kernel/actor.ts"] },
+    changedSince: { [A_BASE]: ["packages/core/src/kernel/principal/actor.ts"] },
     lane: "full",
     images: "no",
     dependencies: "no",

@@ -58,10 +58,10 @@ const findings = (tree: Tree): readonly string[] =>
 
 describe("the territory the scan reads", () => {
   it.each([
-    ["packages/core/test/workspaces.test.ts", true],
+    ["packages/core/test/workspaces/workspaces.test.ts", true],
     ["apps/web/e2e/page.spec.ts", true],
     ["apps/worker/tests/test_work_loop.py", true],
-    ["packages/core/test/platform.ts", true],
+    ["packages/core/test/support/platform.ts", true],
     ["apps/worker/tests/factories.py", true],
     ["packages/core/src/workspaces/index.ts", false],
     ["apps/worker/tests/fixtures/rows.sql", false],

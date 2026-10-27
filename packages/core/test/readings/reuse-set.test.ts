@@ -14,8 +14,8 @@ import {
   decisionReplyTo,
   judgeReplyTo,
   promptOf,
-} from "../judge-wire.ts";
-import { postgresForSuite } from "../suite-postgres.ts";
+} from "../support/judge-wire.ts";
+import { postgresForSuite } from "../support/suite-postgres.ts";
 import {
   readReuse,
   readReuseSet,
