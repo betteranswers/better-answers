@@ -19,7 +19,8 @@ export const isAsciiWhitespace = (ch: string): boolean => ASCII_WHITESPACE.inclu
 
 export const collapsedWhitespace = (text: string): string =>
   text
-    .split(/[ \t\n\r\f\v]+/u)
+    // oxlint-disable-next-line eslint/require-unicode-regexp -- Stryker negates \v to \V, which the u flag refuses at load
+    .split(/[ \t\n\r\f\v]+/)
     .filter((word) => word !== "")
     .join(" ");
 

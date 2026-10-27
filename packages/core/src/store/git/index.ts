@@ -608,7 +608,8 @@ const NOTHING_MOVED: HistoryRewritten = { moved: [], paths: [] };
 
 export const ERASED_DOMAIN = "erased.better-answers.invalid";
 
-const PYTHON_SPECIAL = /[()[\]{}?*+\-|^$\\.&~# \t\n\r\v\f]/gu;
+// oxlint-disable-next-line eslint/require-unicode-regexp -- Stryker negates \v to \V, which the u flag refuses at load
+const PYTHON_SPECIAL = /[()[\]{}?*+\-|^$\\.&~# \t\n\r\v\f]/g;
 
 const escapedForPython = (literal: string): string =>
   literal.replace(PYTHON_SPECIAL, (character) => `\\${character}`);

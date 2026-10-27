@@ -37,10 +37,10 @@ export type DisplayNameRefusal = WorkspaceRefusal<
 >;
 
 /**
- * Trimming leaves U+0085, so it is named here. No `u` flag: the mutation run negates `\v` to
- * `\V`, which `u` refuses at load.
+ * Trimming leaves U+0085, so it is named here.
  */
-const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/u;
+// oxlint-disable-next-line eslint/require-unicode-regexp -- Stryker negates \v to \V, which the u flag refuses at load
+const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/;
 
 const CONTROL_CHARACTER = /\p{Cc}/u;
 

@@ -299,7 +299,8 @@ const sourcesById = (sources: readonly CitedSource[]): ReadonlyMap<string, numbe
   return byId;
 };
 
-const INLINE_TARGET = /\]\([ \t\n\r\f\v]*<?([^) \t\n\r\f\v>]+)/u;
+// oxlint-disable-next-line eslint/require-unicode-regexp -- Stryker negates \v to \V, which the u flag refuses at load
+const INLINE_TARGET = /\]\([ \t\n\r\f\v]*<?([^) \t\n\r\f\v>]+)/;
 const REFERENCE = /^\[([^\]]*)\]\[([^\]]*)\]$/u;
 
 const linkTargetOf = (
