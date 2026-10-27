@@ -75,7 +75,6 @@ const draftedOn = async (recordId: string): Promise<readonly unknown[]> => {
   return kept.parse(found.rows[0] ?? { drafted: null }).drafted ?? [];
 };
 
-/** Reads the stream, noting how much of the draft was kept each time a sentence arrives held. */
 const keptAtEachHeldSentence = async (api: Web, workspaceId: string) => {
   let recordId = "";
   const keptWhileHeld: number[] = [];

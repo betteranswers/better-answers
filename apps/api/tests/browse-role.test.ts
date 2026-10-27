@@ -83,7 +83,6 @@ const statementsOf = (file: string): readonly string[] => {
 const messageOf = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);
 
-/** Runs statements in order and stops at the first refusal, as psql does; "" when none refused. */
 const firstRefusalOf = async (
   client: pg.PoolClient,
   statements: readonly string[],
