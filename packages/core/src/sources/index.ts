@@ -252,7 +252,7 @@ const sensitivitySet = async <A extends AuditAction, E>(
     admin,
     tx,
     { connectedSourceId },
-    async (tx): Promise<Result<string, SensitivityHeldRefusal | E | Error>> => {
+    async (): Promise<Result<string, SensitivityHeldRefusal | E | Error>> => {
       const asked = await sensitivityAskedOf(acting, tx, next);
       if (!asked.ok) return err(asked.error);
       const auditEvent = await checked(asked.value, tx);

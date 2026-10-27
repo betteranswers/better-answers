@@ -63,7 +63,7 @@ export const previewed = <Iri extends string>({
   title,
   collection,
   trust,
-  trustWords,
+  trustWords: words,
 }: RelatedConcept<Iri>): PreviewedConcept<Iri> => ({
   iri,
   url,
@@ -71,7 +71,7 @@ export const previewed = <Iri extends string>({
   title,
   collection,
   trust,
-  trustWords,
+  trustWords: words,
 });
 
 export type PlannedAnswer<Iri extends string = ConceptIri> = {

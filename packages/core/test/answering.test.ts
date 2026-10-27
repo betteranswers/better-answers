@@ -137,7 +137,7 @@ const returned = (overrides: Partial<ReturnedConcept<string>> = {}): ReturnedCon
   ...overrides,
 });
 
-const answer = (overrides: Partial<AnswerResult<string>> = {}): AnswerResult<string> => ({
+const anAnswer = (overrides: Partial<AnswerResult<string>> = {}): AnswerResult<string> => ({
   verdict: "related",
   recordId: A_RECORD,
   judgeState: "not-judged",
@@ -155,7 +155,7 @@ const linesOf = (rendered: string): readonly string[] => rendered.split("\n");
 
 describe("the answer's rendering", () => {
   it("heads related knowledge with what to do, never as answered", () => {
-    const [first, ...rest] = linesOf(renderAnswer(answer()));
+    const [first, ...rest] = linesOf(renderAnswer(anAnswer()));
 
     expect(first).toBe(RELATED_LINE);
     expect(first).not.toMatch(/answered/i);
@@ -173,7 +173,7 @@ describe("the answer's rendering", () => {
     ["refuse", "**Not answered from the company's knowledge.**"],
     ["related", RELATED_LINE],
   ] as const)("heads a %s answer with its own line", (verdict, line) => {
-    expect(linesOf(renderAnswer(answer({ verdict })))[0]).toBe(line);
+    expect(linesOf(renderAnswer(anAnswer({ verdict })))[0]).toBe(line);
   });
 
   it("gives every verdict a record keeps a line", () => {
@@ -185,7 +185,7 @@ describe("the answer's rendering", () => {
     ["judged", "_Judged · map as of now_"],
     ["judging-failed", "_Judging failed · map as of now_"],
   ] as const)("says a %s judge in words beside the map", (judgeState, line) => {
-    expect(linesOf(renderAnswer(answer({ judgeState })))[2]).toBe(line);
+    expect(linesOf(renderAnswer(anAnswer({ judgeState })))[2]).toBe(line);
     expect(JUDGE_STATES).toContain(judgeState);
   });
 
@@ -196,7 +196,7 @@ describe("the answer's rendering", () => {
     );
     expect(
       linesOf(
-        renderAnswer(answer({ map: { state: "unavailable_since", since: "2026-09-01" } })),
+        renderAnswer(anAnswer({ map: { state: "unavailable_since", since: "2026-09-01" } })),
       )[2],
     ).toBe("_Not judged · map unavailable since 1 September 2026_");
   });
@@ -210,7 +210,7 @@ describe("the answer's rendering", () => {
       ],
     });
 
-    expect(linesOf(renderAnswer(answer({ related: [verified] }))).slice(5)).toEqual([
+    expect(linesOf(renderAnswer(anAnswer({ related: [verified] }))).slice(5)).toEqual([
       "",
       "## Related knowledge · Answer · audits",
       "Question: How long are audit logs kept?",
@@ -233,7 +233,7 @@ describe("the answer's rendering", () => {
       trustWords: "Verified by Priya Anand · 2 May 2026",
     });
     const rendered = renderAnswer(
-      answer({ verdict: "ok", judgeState: "judged", answers: [fit], related: [] }),
+      anAnswer({ verdict: "ok", judgeState: "judged", answers: [fit], related: [] }),
     );
 
     expect(linesOf(rendered).slice(7)).toEqual([
@@ -252,7 +252,7 @@ describe("the answer's rendering", () => {
     const users = returned({ iri: "https://better-answers.com/c/01U", title: "Who exports it?" });
     const unfiled = returned({ title: "Who reads it?", collection: null });
     const rendered = renderAnswer(
-      answer({ verdict: "ok", judgeState: "judged", answers: [users, unfiled] }),
+      anAnswer({ verdict: "ok", judgeState: "judged", answers: [users, unfiled] }),
     );
 
     expect(linesOf(rendered).slice(0, 5)).toEqual([
@@ -267,7 +267,7 @@ describe("the answer's rendering", () => {
   it("never heads a related `Answer` as a fit", () => {
     const headings = (rendered: string) =>
       linesOf(rendered).filter((line) => line.startsWith("## "));
-    const fitted = answer({
+    const fitted = anAnswer({
       verdict: "ok",
       judgeState: "judged",
       answers: [returned()],
@@ -275,7 +275,7 @@ describe("the answer's rendering", () => {
     });
 
     expect(headings(renderAnswer(fitted))).toEqual(["## Answer · audits"]);
-    expect(headings(renderAnswer(answer()))).toEqual(["## Related knowledge · Answer · audits"]);
+    expect(headings(renderAnswer(anAnswer()))).toEqual(["## Related knowledge · Answer · audits"]);
   });
 
   it("names each concept in the text by its iri alone", () => {
@@ -289,7 +289,7 @@ describe("the answer's rendering", () => {
       trustWords: "Unverified",
     };
     const rendered = renderAnswer(
-      answer({ verdict: "ok", judgeState: "judged", answers: [returned()], related: [policy] }),
+      anAnswer({ verdict: "ok", judgeState: "judged", answers: [returned()], related: [policy] }),
     );
 
     expect(rendered).not.toContain("https://app.example/");
@@ -307,7 +307,7 @@ describe("the answer's rendering", () => {
       trustWords: "Unverified",
     };
 
-    const rendered = linesOf(renderAnswer(answer({ related: [policy, returned()] })));
+    const rendered = linesOf(renderAnswer(anAnswer({ related: [policy, returned()] })));
 
     expect(rendered[6]).toBe("## Related knowledge · Answer · audits");
     expect(rendered.slice(-3)).toEqual([
@@ -319,7 +319,7 @@ describe("the answer's rendering", () => {
 
   it("quotes every line of an unmapped passage", () => {
     const rendered = renderAnswer(
-      answer({
+      anAnswer({
         verdict: "refuse",
         related: [],
         unmappedPassages: [
@@ -346,7 +346,7 @@ describe("the answer's rendering", () => {
   it("renders a refusal as the one sentence plus unmapped passages", () => {
     expect(
       renderAnswer(
-        answer({
+        anAnswer({
           verdict: "refuse",
           related: [],
           collections: [],
@@ -1916,7 +1916,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     );
     expect(Array.from(brief), "the brief's line is exactly the opening's length").toHaveLength(160);
     expect(Object.fromEntries(openings)).toEqual(
-      Object.fromEntries(documents.map(([title, , opening]) => [title, opening])),
+      Object.fromEntries(documents.map(([title, , documentOpening]) => [title, documentOpening])),
     );
   });
 

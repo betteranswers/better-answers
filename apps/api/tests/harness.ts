@@ -520,7 +520,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
       }
     };
     const cookies = () => [...jar.entries()].map(([name, value]) => `${name}=${value}`).join("; ");
-    const request = async (path: string, init: RequestInit = {}): Promise<Response> => {
+    const request = async (urlPath: string, init: RequestInit = {}): Promise<Response> => {
       const headers = new Headers(init.headers);
       headers.set(CLIENT_IP_HEADER, ip);
 
@@ -529,7 +529,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
       }
       if (jar.size > 0) headers.set("cookie", cookies());
 
-      const url = path.startsWith("http") ? path : `${origin}${path}`;
+      const url = urlPath.startsWith("http") ? urlPath : `${origin}${urlPath}`;
       const response = await server.request(new Request(url, { ...init, headers }));
       remember(response);
       return response;
@@ -538,8 +538,8 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
       ip,
       origin,
       fetch: request,
-      form: (path, fields) =>
-        request(path, {
+      form: (urlPath, fields) =>
+        request(urlPath, {
           method: "POST",
 
           headers: {
@@ -551,8 +551,8 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
           },
           body: new URLSearchParams(fields).toString(),
         }),
-      json: (path, body) =>
-        request(path, {
+      json: (urlPath, body) =>
+        request(urlPath, {
           method: "POST",
 
           headers: { "content-type": "application/json", origin, accept: "application/json" },

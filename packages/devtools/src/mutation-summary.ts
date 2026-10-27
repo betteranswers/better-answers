@@ -29,12 +29,12 @@ const reportMutant = z.object({
 });
 export type ReportMutant = z.infer<typeof reportMutant>;
 
-const report = z.object({
+const reportSchema = z.object({
   files: z
     .record(z.string(), z.object({ source: z.string(), mutants: z.array(reportMutant).readonly() }))
     .readonly(),
 });
-export type Report = z.infer<typeof report>;
+export type Report = z.infer<typeof reportSchema>;
 
 const USAGE =
   "usage: mutation-summary --leg <name> --report <path> [--baseline <path>] [--checkpoint <path>]";
@@ -243,7 +243,7 @@ export const mutationSummary = (
 const readReport = (file: string): Report | undefined => {
   if (!existsSync(file)) return undefined;
   try {
-    const read = report.safeParse(JSON.parse(readFileSync(file, "utf8")));
+    const read = reportSchema.safeParse(JSON.parse(readFileSync(file, "utf8")));
     return read.success ? read.data : undefined;
   } catch {
     return undefined;

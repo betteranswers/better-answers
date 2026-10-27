@@ -2912,11 +2912,6 @@ describe("the concept owners under app_rt", () => {
   const memberOf = async (seed: TestData, workspaceId: string) =>
     (await seed.member({ workspaceId, userId: (await seed.user()).id })).userId;
 
-  const asTheApiIn = async (client: pg.PoolClient, workspaceId: string): Promise<void> => {
-    await client.query("SET LOCAL ROLE app_rt");
-    await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
-  };
-
   it("returns none unscoped and only the tenant's owners", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);

@@ -304,7 +304,7 @@ export const overrideConceptSensitivity = async (
   const visibility = visibilityFrom(input);
   if (!iri.success || visibility === undefined) return err("malformed");
 
-  const cascaded = await cascadingVisibility(admin.value, tx, { iri: iri.data }, (tx) =>
+  const cascaded = await cascadingVisibility(admin.value, tx, { iri: iri.data }, () =>
     writeOverride(admin.value, tx, iri.data, visibility),
   );
   if (!cascaded.ok) return err(cascaded.error);

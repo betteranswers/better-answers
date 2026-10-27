@@ -931,9 +931,10 @@ test.describe("the Knowledge Search page", () => {
     await searched(page, "pallet");
     await readsCeilingFilled(page, (await first).url());
 
-    const asked: string[] = [];
+    const askedQueries: string[] = [];
     page.on("request", (sent) => {
-      if (isAFind(new URL(sent.url())) && sent.url().includes("forklift")) asked.push(sent.url());
+      if (isAFind(new URL(sent.url())) && sent.url().includes("forklift"))
+        askedQueries.push(sent.url());
     });
     const refused = refusalAnswering(page, "knowledge.find");
     await searchBox(page).fill("forklift");
@@ -941,7 +942,7 @@ test.describe("the Knowledge Search page", () => {
     expect(status, "the search met no ceiling").toBe(429);
     await saysTheWait(alerted(page), waitSeconds);
     await windowRefocused(page);
-    expect(asked, "the page asked again past the ceiling").toHaveLength(1);
+    expect(askedQueries, "the page asked again past the ceiling").toHaveLength(1);
   });
 
   test("asks a passage at its ceiling again only when pressed", async ({ page, request }) => {

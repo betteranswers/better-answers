@@ -275,12 +275,12 @@ const threeNotesAskingTheBoard = async () => {
   const { admin, viewer, git, writer, doors } = await aWorkspaceBeingWritten();
   const written = async (
     name: string,
-    path: string,
+    conceptPath: string,
     concept: { readonly title: string; readonly body: string; readonly sensitivity: string },
   ): Promise<string> => {
     const landed = await writeConcept(writer, doors, {
       mergeKey: `note:${name}`,
-      path,
+      path: conceptPath,
       kind: "Note",
       title: concept.title,
       frontmatter: { title: concept.title, type: "Note" },

@@ -563,7 +563,7 @@ export const narrowDocuments = async (
     admin,
     tx,
     { connectedSourceId, documentIds: named },
-    (tx) => documentsNarrowedBy(acting, tx, groupsOfFindings, named, next),
+    () => documentsNarrowedBy(acting, tx, groupsOfFindings, named, next),
   );
   if (!cascaded.ok) return err(cascaded.error);
   const { written, concepts, writeUps } = cascaded.value;

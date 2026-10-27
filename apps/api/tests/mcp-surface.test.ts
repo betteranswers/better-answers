@@ -293,7 +293,12 @@ describe("era-independent", () => {
 
     const lists = await Promise.all([1, 2, 3].map(() => listTools(client, token)));
 
-    expect(lists[0]?.map((tool) => tool.name)).toEqual(["find", "ask", "open", "give_feedback"]);
+    expect(lists[0]?.map((listed) => listed.name)).toEqual([
+      "find",
+      "ask",
+      "open",
+      "give_feedback",
+    ]);
     expect(lists[1]).toEqual(lists[0]);
     expect(lists[2]).toEqual(lists[0]);
   });
@@ -301,7 +306,7 @@ describe("era-independent", () => {
   it("hides give_feedback from a read-only token and refuses its call", async () => {
     const { client, token } = await connect("knowledge:read offline_access");
 
-    const names = (await listTools(client, token)).map((tool) => tool.name);
+    const names = (await listTools(client, token)).map((listed) => listed.name);
     expect(names).toEqual(["find", "ask", "open"]);
 
     const refused = await rpc(
@@ -317,7 +322,9 @@ describe("era-independent", () => {
   it("lists give_feedback as naming the record it stores on", async () => {
     const { client, token } = await connect();
 
-    const entry = (await listTools(client, token)).find((tool) => tool.name === "give_feedback");
+    const entry = (await listTools(client, token)).find(
+      (listed) => listed.name === "give_feedback",
+    );
 
     expect(entry?.description).toContain("on the record of that question");
     expect(entry?.description).toContain("`recordId`");
@@ -337,7 +344,7 @@ describe("era-independent", () => {
 
     const tools = await listTools(client, token);
 
-    for (const tool of tools) expect(tool.annotations).toBeDefined();
+    for (const listed of tools) expect(listed.annotations).toBeDefined();
     expect(tools.map((entry) => [entry.name, entry.annotations?.readOnlyHint])).toEqual([
       ["find", true],
       ["ask", true],
@@ -866,7 +873,7 @@ describe("ask, on the own-transaction road", () => {
       kind: "Policy",
       body: aSizedBodyOf("Audit logs are kept for thirteen months. ", NEAR_THE_BODY_CAP),
       linksTo: reached
-        .filter((_, place) => place % ASK_CAPS.entryPoints === nth)
+        .filter((_entryPoint, place) => place % ASK_CAPS.entryPoints === nth)
         .map((concept) => concept.title),
     }));
     await seedConcepts(

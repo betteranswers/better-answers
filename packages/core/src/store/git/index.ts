@@ -390,8 +390,9 @@ export const commitsAfter = async (
   const gitDir = repositoryPath(door, workspaceId);
   const standing = await standingHead(gitDir);
   if (!standing.ok) return err(standing.error);
-  const head = standing.value;
-  if (head === null) return since === null ? ok({ head, missed: [] }) : err("history-diverged");
+  const headCommit = standing.value;
+  if (headCommit === null)
+    return since === null ? ok({ head: headCommit, missed: [] }) : err("history-diverged");
   if (since !== null) {
     try {
       await git(gitDir, ["merge-base", "--is-ancestor", since, BUNDLE_REF]);
@@ -405,7 +406,7 @@ export const commitsAfter = async (
       "--reverse",
       since === null ? BUNDLE_REF : `${since}..${BUNDLE_REF}`,
     ]);
-    return ok({ head, missed: listed.split("\n").filter((sha) => sha !== "") });
+    return ok({ head: headCommit, missed: listed.split("\n").filter((sha) => sha !== "") });
   } catch (cause) {
     return err(normalizeError(cause));
   }

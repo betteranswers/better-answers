@@ -166,11 +166,11 @@ describe("the map under concurrent read load", () => {
       walks.push(...(await Promise.all(inFlight)));
     }
     const inOneRowWalks = percentile(
-      walks.map((walked) => walked.walkMs / walked.oneRowMs),
+      walks.map((walk) => walk.walkMs / walk.oneRowMs),
       0.5,
     );
-    const waitedMs = walks.map((walked) => walked.waitedMs);
-    const walkMs = walks.map((walked) => walked.walkMs);
+    const waitedMs = walks.map((walk) => walk.waitedMs);
+    const walkMs = walks.map((walk) => walk.walkMs);
 
     const heading = `The map walk from forty entries under concurrent read load${narrowing}`;
     await recordFigures(heading, [
@@ -191,7 +191,7 @@ describe("the map under concurrent read load", () => {
 
     expect(readers().totalCount, "the connections the walks ran on").toBe(IN_FLIGHT);
     expect(wide.entries, "the entries each walk starts from").toHaveLength(40);
-    expect(walks.map((walked) => [walked.oneRowSteps, walked.walkSteps])).toEqual(
+    expect(walks.map((walk) => [walk.oneRowSteps, walk.walkSteps])).toEqual(
       Array.from({ length: IN_FLIGHT * ROUNDS }, () => [1, CONCEPTS_UNDER_THE_CAP]),
     );
     expect(

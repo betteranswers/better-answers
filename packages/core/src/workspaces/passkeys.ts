@@ -70,9 +70,9 @@ const recording = (
   platform: PlatformPrincipal,
   tx: Tx,
   ids: Ids,
-  action: (typeof PASSKEY_ACTIONS)[keyof typeof PASSKEY_ACTIONS],
+  passkeyAction: (typeof PASSKEY_ACTIONS)[keyof typeof PASSKEY_ACTIONS],
 ): Promise<void> =>
-  recordingTheirOwn(platform, tx, ids.personId, action, { passkeyId: ids.passkeyId });
+  recordingTheirOwn(platform, tx, ids.personId, passkeyAction, { passkeyId: ids.passkeyId });
 
 type PasskeyAdded = {
   readonly passkeyId: string;

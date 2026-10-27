@@ -67,11 +67,11 @@ const withAPasskey = async (
   who: string,
 ) => {
   const device = await aVirtualAuthenticator(page);
-  const person = await signedInWithNoWorkspace(page, api, who);
+  const signedIn = await signedInWithNoWorkspace(page, api, who);
   await accountOpened(page);
   const name = await passkeyAdded(page);
   await expect(rowOf(page, name)).toBeFocused();
-  return { device, person, name };
+  return { device, person: signedIn, name };
 };
 
 const renameTyped = async (page: Page, name: string, typed: string): Promise<void> => {
@@ -81,7 +81,7 @@ const renameTyped = async (page: Page, name: string, typed: string): Promise<voi
 
 test("a person adds a passkey, then signs in without email", async ({ page, request }) => {
   await aVirtualAuthenticator(page);
-  const person = await signedInWithNoWorkspace(page, request, "passkey");
+  const signedIn = await signedInWithNoWorkspace(page, request, "passkey");
   await accountOpened(page);
 
   const name = await passkeyAdded(page);
@@ -91,12 +91,12 @@ test("a person adds a passkey, then signs in without email", async ({ page, requ
   await expect(rowOf(page, name), "an unused passkey shows a time of use").not.toContainText(
     A_TIME_OF_USE,
   );
-  const emailsBefore = await emailsSentTo(request, person.email);
+  const emailsBefore = await emailsSentTo(request, signedIn.email);
 
   await signedOut(page);
 
   await expect(theNoWorkspacePage(page)).toBeVisible();
-  expect(await emailsSentTo(request, person.email), "the passkey sign-in sent an email").toBe(
+  expect(await emailsSentTo(request, signedIn.email), "the passkey sign-in sent an email").toBe(
     emailsBefore,
   );
 });

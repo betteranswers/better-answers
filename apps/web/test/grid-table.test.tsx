@@ -478,7 +478,7 @@ describe("the filter row", () => {
               { value: "any", label: "Any colour at all" },
               { value: "red", label: "Red" },
             ],
-            onChange: (picked) => chose.push(picked),
+            onChange: (choice) => chose.push(choice),
           },
         ]}
       />
@@ -497,7 +497,7 @@ describe("the filter row", () => {
   });
 
   it("switches status, saying each status's count", () => {
-    const picked: string[] = [];
+    const chosen: string[] = [];
     render(
       <FilterRow
         search={{ label: "Search by address", value: "", onChange: () => undefined }}
@@ -508,7 +508,7 @@ describe("the filter row", () => {
             { value: "waiting", label: "Waiting", count: 3 },
             { value: "expired", label: "Expired", count: 1 },
           ],
-          onChange: (value) => picked.push(value),
+          onChange: (value) => chosen.push(value),
         }}
       />,
     );
@@ -518,7 +518,7 @@ describe("the filter row", () => {
       within(statuses).getByRole("radio", { name: "Waiting 3" }).getAttribute("aria-checked"),
     ).toBe("true");
     fireEvent.click(within(statuses).getByRole("radio", { name: "Expired 1" }));
-    expect(picked).toEqual(["expired"]);
+    expect(chosen).toEqual(["expired"]);
   });
 });
 

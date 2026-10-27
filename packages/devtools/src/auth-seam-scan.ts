@@ -65,7 +65,7 @@ export const libraryNamed = (seam: Seam, declaration: string): readonly string[]
     if (named !== undefined && !leaks.has(exported)) leaks.set(exported, named);
   }
   return [...leaks].map(
-    ([exported, named]) =>
-      `${seam.file}: the declaration of \`${exported}\` names \`${named}\`. Map Better Auth's answer to the platform's own type inside this file, and give \`${exported}\` that type.`,
+    ([exportName, named]) =>
+      `${seam.file}: the declaration of \`${exportName}\` names \`${named}\`. Map Better Auth's answer to the platform's own type inside this file, and give \`${exportName}\` that type.`,
   );
 };

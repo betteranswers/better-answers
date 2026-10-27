@@ -47,13 +47,13 @@ export const recordingTheirOwn = async <A extends AuditAction>(
   platform: PlatformPrincipal,
   tx: Tx,
   personId: UserId,
-  action: A,
+  auditAction: A,
   detail: AuditEvent<A>["detail"],
 ): Promise<void> => {
   await recordFor(platform, tx, {
     id: ulid(),
     actor: actorIdOfPerson(personId),
-    action,
+    action: auditAction,
     subjectId: personId,
     detail,
   });

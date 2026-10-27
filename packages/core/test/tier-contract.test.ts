@@ -176,26 +176,26 @@ const materialiseBrokenContracts = (root: string) => {
 
 describe("the tier contract", () => {
   it("names exactly the agreements this tier speaks, in their forms", () => {
-    const manifest = readManifest();
+    const contract = readManifest();
 
-    expect(Object.keys(manifest.agreements).toSorted()).toEqual(
+    expect(Object.keys(contract.agreements).toSorted()).toEqual(
       Object.keys(SPOKEN_AGREEMENTS).toSorted(),
     );
     for (const [id, form] of Object.entries(SPOKEN_AGREEMENTS)) {
-      expect(manifest.agreements[id]?.form).toBe(form);
+      expect(contract.agreements[id]?.form).toBe(form);
     }
   });
 
   it("lists exactly the fixtures on disk, under agreements it names", () => {
-    const manifest = readManifest();
+    const contract = readManifest();
 
-    for (const fixture of manifest.fixtures) {
+    for (const fixture of contract.fixtures) {
       expect(Object.keys(SPOKEN_AGREEMENTS)).toContain(fixture.agreement);
       expect(existsSync(path.join(contractsDir, fixture.path))).toBe(true);
     }
 
     expect(fixturesOnDisk(contractsDir)).toEqual(
-      manifest.fixtures.map((fixture) => fixture.path).toSorted(),
+      contract.fixtures.map((fixture) => fixture.path).toSorted(),
     );
   });
 

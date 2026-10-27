@@ -579,7 +579,7 @@ export const publishConnectedSource = async (
     return err("confirmation-missing");
   }
 
-  const cascaded = await cascadingVisibility(admin, tx, { connectedSourceId }, (tx) =>
+  const cascaded = await cascadingVisibility(admin, tx, { connectedSourceId }, () =>
     publishWritten(acting, tx, input),
   );
   if (!cascaded.ok) return err(cascaded.error);

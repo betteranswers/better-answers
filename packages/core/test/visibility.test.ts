@@ -240,7 +240,7 @@ const platformCascade = (
       platform,
       tx,
       { connectedSourceId: sourced.connectedSourceId },
-      async (tx) => {
+      async () => {
         await write(tx);
         return ok("written");
       },
@@ -1080,10 +1080,10 @@ describe("narrowing a connected source", () => {
     const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
     const sales = await groupNamed(db(), scenario, "Sales", [scenario.viewer]);
     const forHr = await connectedSourceForGroups(db(), scenario.workspaceId, [hr]);
-    const open = await connectedSourceHolding(db(), scenario.workspaceId);
+    const connected = await connectedSourceHolding(db(), scenario.workspaceId);
     const other = await connectedSourceHolding(db(), scenario.workspaceId);
     const narrowing = await conceptCiting(scenario, scenario.editor, [other.documentId]);
-    const cited = await conceptCiting(scenario, scenario.editor, [open.documentId]);
+    const cited = await conceptCiting(scenario, scenario.editor, [connected.documentId]);
     const writeUp = await writeUpIncluding(db(), scenario.workspaceId, [narrowing.iri, cited.iri]);
 
     await narrowingBesideAParkedWrite(
@@ -1092,7 +1092,7 @@ describe("narrowing a connected source", () => {
       "UPDATE",
       () => rewriteCiting(scenario, scenario.editor, narrowing, [forHr.documentId]),
       {
-        connectedSourceId: open.connectedSourceId,
+        connectedSourceId: connected.connectedSourceId,
         sensitivity: "Internal",
         audience: "groups",
         audienceGroups: [sales],

@@ -1070,7 +1070,7 @@ describe("the limits", () => {
     refusedOnlyAtTheLast(await onePast(() => flooded.ask(client), flooded.max));
 
     const others: number[] = [];
-    for (const route of ROUTES.filter((route) => route !== flooded)) {
+    for (const route of ROUTES.filter((candidate) => candidate !== flooded)) {
       others.push((await route.ask(client)).status);
     }
     expect(others).not.toContain(429);
@@ -1299,14 +1299,14 @@ describe("the limits", () => {
   it("refuses no page, however often it is loaded", async () => {
     const client = app.client();
 
-    const signIn = await onePast(() => client.fetch("/sign-in"), 4);
+    const signInPage = await onePast(() => client.fetch("/sign-in"), 4);
     const another = await onePast(() => client.fetch("/sources"), 100);
     const besideAnEndpoint = [
       await client.fetch("/email-otp/no-such-path"),
       await client.fetch("/forget-password/no-such-path"),
     ].map((answer) => answer.status);
 
-    expect([...signIn, ...another, ...besideAnEndpoint]).not.toContain(429);
+    expect([...signInPage, ...another, ...besideAnEndpoint]).not.toContain(429);
     expect(await countedByTheApi(client.ip)).toEqual([]);
   });
 

@@ -44,9 +44,9 @@ import {
   oauthRefreshToken,
   oauthResource,
   passkey,
-  session,
+  session as sessionTable,
   user,
-  verification,
+  verification as verificationTable,
   workspace,
 } from "@better-answers/schema";
 import { EMAIL_CODE_ATTEMPTS, EMAIL_CODE_LENGTH } from "@better-answers/schema/email-code";
@@ -112,9 +112,9 @@ type AuthDependencies = {
 
 const identitySchema = {
   user,
-  session,
+  session: sessionTable,
   account,
-  verification,
+  verification: verificationTable,
   jwks,
   workspace,
   member,

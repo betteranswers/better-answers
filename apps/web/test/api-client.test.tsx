@@ -85,7 +85,9 @@ const anApiHearingActions = () => {
     if (pathname.endsWith("/members.createGroup")) {
       named.push(new Headers(init?.headers).get(TAB_WORKSPACE_HEADER));
     }
-    const reading = ["/members.groups", "/session.member"].find((path) => pathname.endsWith(path));
+    const reading = ["/members.groups", "/session.member"].find((suffix) =>
+      pathname.endsWith(suffix),
+    );
     if (reading === undefined) return answered([read(null)]);
     if (reading === "/session.member") session.memberReads += 1;
     if (session.in === undefined) {

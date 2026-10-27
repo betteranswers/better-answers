@@ -357,9 +357,9 @@ const smoke = async (flags: Flags, io: OpsIo): Promise<number> => {
   ): Promise<void> => {
     try {
       const response = await request();
-      const ok = await expect(response);
-      io.say(`${ok ? "ok  " : "FAIL"} ${name} → ${response.status}`);
-      if (!ok) failed += 1;
+      const passed = await expect(response);
+      io.say(`${passed ? "ok  " : "FAIL"} ${name} → ${response.status}`);
+      if (!passed) failed += 1;
     } catch (cause) {
       io.say(`FAIL ${name} → ${cause instanceof Error ? cause.message : String(cause)}`);
       failed += 1;
@@ -559,31 +559,31 @@ const after = (ms: number): Promise<void> =>
 const jobAfterWaiting = async (
   platform: PlatformPrincipal,
   doors: Doors,
-  job: { readonly workspaceId: string; readonly jobId: string },
+  jobKey: { readonly workspaceId: string; readonly jobId: string },
   seconds: number,
 ) => {
   const deadline = doors.clock.now().getTime() + seconds * 1_000;
   const pollMs = Math.min(WAIT_POLL_MS, seconds * 1_000);
-  let read = await jobById(platform, doors.postgres, job);
+  let read = await jobById(platform, doors.postgres, jobKey);
   while (
     read.ok &&
     !JOB_IS_OVER.includes(read.value.status) &&
     doors.clock.now().getTime() < deadline
   ) {
     await after(Math.min(pollMs, Math.max(deadline - doors.clock.now().getTime(), 0)));
-    read = await jobById(platform, doors.postgres, job);
+    read = await jobById(platform, doors.postgres, jobKey);
   }
   return read;
 };
 
 const unfinished = (
-  job: { readonly status: JobStatus; readonly attempts: number },
+  jobState: { readonly status: JobStatus; readonly attempts: number },
   seconds: number,
   consequence: string,
 ): string =>
-  JOB_IS_OVER.includes(job.status)
-    ? `${job.status} after ${counted(job.attempts, "attempt")}; the job's own row says what it found`
-    : `still ${job.status} after ${counted(seconds, "second")}, so ${consequence}`;
+  JOB_IS_OVER.includes(jobState.status)
+    ? `${jobState.status} after ${counted(jobState.attempts, "attempt")}; the job's own row says what it found`
+    : `still ${jobState.status} after ${counted(seconds, "second")}, so ${consequence}`;
 
 const waitForJob = async (
   doors: Doors,
@@ -592,16 +592,16 @@ const waitForJob = async (
   seconds: number,
   io: OpsIo,
 ): Promise<number> => {
-  const job = await jobAfterWaiting(MAP_MAINTENANCE, doors, { workspaceId, jobId }, seconds);
-  if (!job.ok) return refused("map-rebuild", workspaceId, job.error, io);
-  if (job.value.status === "done") {
+  const waited = await jobAfterWaiting(MAP_MAINTENANCE, doors, { workspaceId, jobId }, seconds);
+  if (!waited.ok) return refused("map-rebuild", workspaceId, waited.error, io);
+  if (waited.value.status === "done") {
     io.say(
-      `map-rebuild: done — job ${jobId} rebuilt the map on ${counted(job.value.attempts, "attempt")}`,
+      `map-rebuild: done — job ${jobId} rebuilt the map on ${counted(waited.value.attempts, "attempt")}`,
     );
     return DONE;
   }
   io.say(
-    `map-rebuild: REFUSED — job ${jobId} is ${unfinished(job.value, seconds, "nothing has rebuilt this map")}`,
+    `map-rebuild: REFUSED — job ${jobId} is ${unfinished(waited.value, seconds, "nothing has rebuilt this map")}`,
   );
   return REFUSED;
 };
@@ -1683,9 +1683,9 @@ const unmappedPassageRateCommand = async (
   workspaceId: string,
   io: OpsIo,
 ): Promise<number> => {
-  const counted = await unmappedPassageRate(ANSWER_MEASURES, doors.postgres, { workspaceId });
-  if (!counted.ok) return refused("unmapped-passage-rate", workspaceId, counted.error, io);
-  const { withTheMap, mapUnavailable, mapUnknown } = counted.value;
+  const rate = await unmappedPassageRate(ANSWER_MEASURES, doors.postgres, { workspaceId });
+  if (!rate.ok) return refused("unmapped-passage-rate", workspaceId, rate.error, io);
+  const { withTheMap, mapUnavailable, mapUnknown } = rate.value;
   io.say(
     JSON.stringify({
       with_the_map: twoCountsSaid(withTheMap),

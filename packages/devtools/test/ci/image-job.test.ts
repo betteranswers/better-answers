@@ -108,15 +108,15 @@ describe("the job that probes every image it pushes", () => {
   it("defers probes the caller ran, or whose inputs are unchanged", () => {
     const check = checkWorkflow();
     const read = deferralsRead();
-    const { input, answer } = read[0] ?? { input: "", answer: "" };
+    const { input: given, answer } = read[0] ?? { input: "", answer: "" };
 
     expect(read.length).toBeGreaterThan(1);
     expect(
       read,
       "a leg reads the deferral another way, so the caller's input no longer wins or a changed input no longer probes",
-    ).toEqual(read.map(() => ({ input, answer })));
-    expect(check.on.workflow_call.inputs[input]?.["default"]).toBe(false);
-    expect(buildWorkflow().jobs.check.with?.[input]).toBe(true);
+    ).toEqual(read.map(() => ({ input: given, answer })));
+    expect(check.on.workflow_call.inputs[given]?.["default"]).toBe(false);
+    expect(buildWorkflow().jobs.check.with?.[given]).toBe(true);
     expect(check.jobs["lane"]?.outputs?.[answer]).toEqual("${{ steps.lane.outputs.images }}");
   });
 
