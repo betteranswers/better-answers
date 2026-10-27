@@ -234,9 +234,7 @@ describe("a kind's concepts", () => {
     expect([first, second, third].map((page) => page.concepts.length)).toEqual([50, 50, 20]);
     expect(third.nextCursor).toBeNull();
     expect(new Set(listed.map(({ iri }) => iri))).toEqual(new Set(iris.slice(0, POLICIES)));
-    expect(listed.map(({ title }) => title)).toEqual(
-      listed.map(({ title }) => title).toSorted((one, other) => (one < other ? -1 : 1)),
-    );
+    expect(listed.map(({ title }) => title)).toEqual(listed.map(({ title }) => title).toSorted());
     expect(listed.every(({ kind }) => kind === "Policy")).toBe(true);
   });
 });

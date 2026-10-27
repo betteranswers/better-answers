@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { assert, describe, expect, expectTypeOf, it } from "vitest";
 
 import { FAMILIES, ulid } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
@@ -99,9 +99,11 @@ describe("the declared-actions walk", () => {
       const inThisSuite = actionLiteralsIn([path.resolve(import.meta.dirname, "audit.test.ts")]);
 
       expect([...inTree].filter((name) => !registered.has(name))).toEqual([]);
-      expect([...registered].filter((name) => !inTree.has(name) && !inThisSuite.has(name))).toEqual(
-        [],
-      );
+      expect(
+        [...registered]
+          .filter((name) => !inTree.has(name))
+          .filter((name) => !inThisSuite.has(name)),
+      ).toEqual([]);
       expect(inTree.size).toBeGreaterThan(0);
     },
   );
@@ -722,8 +724,9 @@ describe("the identity-set audit log, reached through either door", () => {
       [[unstamped, stamped]],
     );
     const atOf = (id: string) => found.rows.find((row) => row.id === id)?.at.getTime();
-    expect(atOf(unstamped)).toBe(began?.getTime());
-    expect(atOf(stamped)).toBeGreaterThanOrEqual((began?.getTime() ?? 0) + 10);
+    assert(began !== undefined, "the transaction read its clock");
+    expect(atOf(unstamped)).toBe(began.getTime());
+    expect(atOf(stamped)).toBeGreaterThanOrEqual(began.getTime() + 10);
   });
 
   it("registers an identity-set action once, among the declared actions", () => {

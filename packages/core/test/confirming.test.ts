@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import pg from "pg";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { matching } from "@better-answers/schema/testing/matching";
 
@@ -291,9 +291,10 @@ describe("the authenticator's failures", () => {
     let now = AT;
     for (let failure = 0; failure < 12; failure += 1) {
       const [counted] = await failingTimes(personId, 1, now);
-      const waitSeconds = counted?.ok === true ? counted.value.waitSeconds : -1;
-      waits.push(waitSeconds);
-      now = new Date(now.getTime() + waitSeconds * 1000);
+      assert(counted !== undefined, "one failure was counted");
+      assert(counted.ok, "the failure was counted");
+      waits.push(counted.value.waitSeconds);
+      now = new Date(now.getTime() + counted.value.waitSeconds * 1000);
     }
 
     expect(waits).toEqual([0, 0, 0, 0, 0, 30, 60, 120, 240, 480, 900, 900]);
@@ -338,19 +339,29 @@ describe("the authenticator's failures", () => {
   it("make one notice due, and another only after a confirm", async () => {
     const personId = await seedPerson(db().pool);
     await authenticatorFor(db().pool, personId, { verified: true });
-    const noticesDue = async (times: number) =>
-      (await failingTimes(personId, times)).map((counted) => counted.ok && counted.value.noticeDue);
-
-    const first = await noticesDue(7);
+    const first = await failingTimes(personId, 7);
     await confirmByAuthenticator(bootstrap, door(), {
       personId,
       sessionId: await aSession(personId),
       now: AT,
     });
-    const second = await noticesDue(5);
+    const second = await failingTimes(personId, 5);
 
-    expect(first).toEqual([false, false, false, false, true, false, false]);
-    expect(second).toEqual([false, false, false, false, true]);
+    const counted = (noticeDue: boolean, waitSeconds = 0) => ({
+      ok: true,
+      value: { noticeDue, waitSeconds },
+    });
+    const free = counted(false);
+    expect(first).toEqual([
+      free,
+      free,
+      free,
+      free,
+      counted(true),
+      counted(false, 30),
+      { ok: false, error: new CeilingMet(30) },
+    ]);
+    expect(second).toEqual([free, free, free, free, counted(true)]);
   });
 
   it("leave a recovery code and a passkey working meanwhile", async () => {
@@ -434,9 +445,9 @@ describe("spending a recovery code", () => {
       },
     ]);
     expect(waited).toEqual({ ok: false, error: new CeilingMet(20) });
-    expect(!waited.ok && waited.error instanceof CeilingMet && waited.error.retryAfterSeconds).toBe(
-      20,
-    );
+    assert(!waited.ok);
+    assert(waited.error instanceof CeilingMet);
+    expect(waited.error.retryAfterSeconds).toBe(20);
     expect(await recoveryCodesHeldBy(personId)).toBe(10);
     expect(await grantOf(sessionId)).toBeNull();
   });
@@ -511,7 +522,8 @@ describe("spending a recovery code", () => {
       ok: true,
       value: { authenticator: "set-up", recoveryCodes: { unused: 9 } },
     });
-    expect(read.ok && read.value.passkeys).toHaveLength(1);
+    assert(read.ok);
+    expect(read.value.passkeys).toHaveLength(1);
   });
 });
 
@@ -531,7 +543,8 @@ describe("replacing the factors", () => {
       ok: true,
       value: { issued: { madeAt: "2026-10-02T12:01:00.000Z" } },
     });
-    expect(replaced.ok && replaced.value.issued.recoveryCodes).toHaveLength(10);
+    assert(replaced.ok);
+    expect(replaced.value.issued.recoveryCodes).toHaveLength(10);
     expect(await factorsOf(personId)).toEqual({
       passkeys: [keptPasskeyId],
       secret: null,
@@ -545,7 +558,9 @@ describe("replacing the factors", () => {
       { action: "people.person.recovery_codes_issued", detail: { replaced: true } },
       { action: "people.person.factors_replaced", detail: { by: "passkey" } },
     ]);
-    expect(await spending(personId, sessionId, left[0] ?? "")).toMatchObject({
+    const [oldCode] = left;
+    assert(oldCode !== undefined, "a code was left before the replacement");
+    expect(await spending(personId, sessionId, oldCode)).toMatchObject({
       ok: true,
       value: { granted: false },
     });
@@ -576,7 +591,8 @@ describe("replacing the factors", () => {
       { ok: true, value: undefined },
       { ok: true, value: encryptedSecret },
     ]);
-    expect(replaced.ok && replaced.value.issued.recoveryCodes).toHaveLength(10);
+    assert(replaced.ok);
+    expect(replaced.value.issued.recoveryCodes).toHaveLength(10);
     expect(await factorsOf(personId)).toEqual({
       passkeys: null,
       secret: encryptedSecret,

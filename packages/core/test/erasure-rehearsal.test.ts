@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import { writeConcept } from "../src/concepts/index.ts";
 import {
@@ -159,7 +159,8 @@ describe("the seed", () => {
     await seeding(scenario);
 
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
-    const sha = history.at(-1) ?? "";
+    const sha = history.at(-1);
+    assert(sha !== undefined, "the seeding committed");
     const file = await fileAtCommit(scenario.git, scenario.workspaceId, sha, CONCEPT_PATH);
     expect(file).toContain(named);
   });
@@ -193,7 +194,7 @@ describe("the seed", () => {
       author: { name: "Ada Editor", email: "ada@acme.invalid" },
       expects: { head: null },
     });
-    if (!other.ok) throw new Error(`the note was refused: ${String(other.error)}`);
+    assert(other.ok, "the note was refused");
 
     const seeded = await seedSyntheticSubject(ERASURE, doorsFor(scenario), {
       workspaceId: scenario.workspaceId,
@@ -227,8 +228,9 @@ describe("the rehearsal", () => {
     const { answered } = await asANewOperator(db(), REVOKED_AFTER_THE_SEED, (operator, tx) =>
       endEverySignInAndToken(operator, tx, { personId, at: REVOKED_AFTER_THE_SEED }),
     );
-    const revoked = answered.ok ? answered.value : answered;
-    if (!revoked.ok) throw new Error(`the revocation refused: ${String(revoked.error)}`);
+    assert(answered.ok);
+    const revoked = answered.value;
+    assert(revoked.ok, "the revocation refused");
 
     const rehearsed = await rehearseErasure(ERASURE, doorsFor(scenario), {
       workspaceId: scenario.workspaceId,
@@ -249,8 +251,8 @@ describe("the rehearsal", () => {
       workspaceId: scenario.workspaceId,
     });
 
-    expect(rehearsed.ok).toBe(false);
-    expect(rehearsed.ok ? undefined : rehearsed.error).toBe("not-seeded");
+    assert(!rehearsed.ok);
+    expect(rehearsed.error).toBe("not-seeded");
   });
 
   it("answers with the routine's own report, word for word", async () => {
