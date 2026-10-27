@@ -138,7 +138,6 @@ export const until = async (condition: () => Promise<boolean>): Promise<void> =>
   throw new Error("the condition never held");
 };
 
-/** The target as it is, but with each named member replaced; unlike `Object.create`, nothing is `any`. */
 export const overriding = <T extends object>(
   target: T,
   replacements: Readonly<Record<string, unknown>>,
