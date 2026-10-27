@@ -142,7 +142,12 @@
     "better-answers/import-direction": "error",
     "better-answers/parameter-never-mutated": "error",
     "react/react-in-jsx-scope": "off",
-    "typescript/prefer-readonly-parameter-types": "off"
+    "typescript/prefer-readonly-parameter-types": "off",
+    "max-lines": ["error", { "max": 500, "skipBlankLines": true, "skipComments": true }],
+    "max-lines-per-function": [
+      "error",
+      { "max": 150, "skipBlankLines": true, "skipComments": true, "IIFEs": true }
+    ]
   },
   "overrides": [
     {
@@ -442,7 +447,9 @@
         "anti-slop/no-unsafe-dictionary-type": "off",
         "anti-slop/no-widen-then-assert": "off",
         "eslint/no-await-in-loop": "off",
-        "eslint/require-unicode-regexp": "off"
+        "eslint/require-unicode-regexp": "off",
+        "max-lines": "off",
+        "max-lines-per-function": "off"
       }
     },
     {
@@ -490,6 +497,158 @@
       ],
       "rules": {
         "better-answers/import-statically": "off"
+      }
+    },
+    {
+      "files": ["apps/api/src/auth/auth.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 674, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": [
+          "error",
+          { "max": 364, "skipBlankLines": true, "skipComments": true, "IIFEs": true }
+        ]
+      }
+    },
+    {
+      "files": ["apps/api/src/auth/confirm.ts"],
+      "rules": {
+        "max-lines-per-function": [
+          "error",
+          { "max": 245, "skipBlankLines": true, "skipComments": true, "IIFEs": true }
+        ]
+      }
+    },
+    {
+      "files": ["apps/api/src/auth/routes.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 533, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": [
+          "error",
+          { "max": 153, "skipBlankLines": true, "skipComments": true, "IIFEs": true }
+        ]
+      }
+    },
+    {
+      "files": ["apps/api/src/ops/index.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 1620, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["apps/web/src/app/router.tsx"],
+      "rules": {
+        "max-lines": ["error", { "max": 522, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["apps/web/src/features/people/groups-page.tsx"],
+      "rules": {
+        "max-lines-per-function": [
+          "error",
+          { "max": 197, "skipBlankLines": true, "skipComments": true, "IIFEs": true }
+        ]
+      }
+    },
+    {
+      "files": ["apps/web/src/features/sources/connect-action.tsx"],
+      "rules": {
+        "max-lines-per-function": [
+          "error",
+          { "max": 155, "skipBlankLines": true, "skipComments": true, "IIFEs": true }
+        ]
+      }
+    },
+    {
+      "files": ["apps/web/src/shared/navigation.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 572, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/core/src/answering/index.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 612, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/core/src/concepts/edit.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 674, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/core/src/concepts/index.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 1012, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/core/src/erasure/routine.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 551, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/core/src/sources/connected-source.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 599, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/core/src/sources/review.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 543, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/core/src/store/git/index.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 633, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/core/src/store/map/index.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 539, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/core/src/store/postgres/index.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 699, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/core/src/workspaces/index.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 621, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/devtools/src/comment-inventory.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 567, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/schema/scripts/roles-surface.ts"],
+      "rules": {
+        "max-lines-per-function": [
+          "error",
+          { "max": 200, "skipBlankLines": true, "skipComments": true, "IIFEs": true }
+        ]
+      }
+    },
+    {
+      "files": ["packages/schema/src/boundary-schemas.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 1388, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/schema/src/table-ownership.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 628, "skipBlankLines": true, "skipComments": true }]
       }
     }
   ],
