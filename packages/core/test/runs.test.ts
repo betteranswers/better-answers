@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { testData } from "@better-answers/schema/testing";
@@ -97,7 +97,7 @@ describe("what the api puts on the worker's queue", () => {
       reason: "drill",
     });
 
-    if (!queued.ok) throw new Error(`the job was not queued: ${String(queued.error)}`);
+    assert(queued.ok, "the job was not queued");
     const rows = await db().pool.query(
       "SELECT id, kind, reason, status, attempts, claimed_by FROM job WHERE workspace_id = $1",
       [scenario.workspaceId],
@@ -139,7 +139,7 @@ describe("what the api puts on the worker's queue", () => {
       reason: "reconciler",
     });
 
-    if (!queued.ok) throw new Error(`the job was not queued: ${String(queued.error)}`);
+    assert(queued.ok, "the job was not queued");
     const rows = await db().pool.query<{ id: string; reason: string }>(
       "SELECT id, reason FROM job WHERE workspace_id = $1",
       [scenario.workspaceId],
@@ -336,7 +336,8 @@ describe("an action landing its rows and job in one transaction", () => {
       enqueueJobIn(mapMaintenance, tx, { ...boundJob(scenario.workspaceId), reason: "wiped" }),
     );
 
-    expect(fresh.ok && fresh.value.jobId).not.toBe(retrying);
+    assert(fresh.ok);
+    expect(fresh.value.jobId).not.toBe(retrying);
     expect(fresh.ok).toBe(true);
     expect(await reasonsIn(scenario.workspaceId)).toEqual(["connected", "wiped"]);
   });
@@ -383,7 +384,7 @@ describe("an action landing its rows and job in one transaction", () => {
       }),
     );
 
-    if (!other.ok) throw new Error("a job was not queued");
+    assert(other.ok, "a job was not queued");
     expect(await jobsIn(scenario.workspaceId)).toEqual([
       {
         id: firstJobId,
@@ -458,7 +459,7 @@ describe("an action landing its rows and job in one transaction", () => {
       boundJob(scenario.workspaceId),
     );
 
-    if (!queued.ok) throw new Error(`the job was not queued: ${String(queued.error)}`);
+    assert(queued.ok, "the job was not queued");
     expect(await jobsIn(scenario.workspaceId)).toEqual([
       {
         id: queued.value.jobId,
@@ -479,7 +480,7 @@ describe("waiting on a job somebody queued", () => {
       kind: "full-rebuild",
       reason: "drill",
     });
-    if (!queued.ok) throw new Error(`the job was not queued: ${String(queued.error)}`);
+    assert(queued.ok, "the job was not queued");
 
     const waiting = await jobById(mapMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
@@ -498,7 +499,8 @@ describe("waiting on a job somebody queued", () => {
       },
     });
 
-    expect(JOB_IS_OVER).not.toContain(waiting.ok ? waiting.value.status : "queued");
+    assert(waiting.ok);
+    expect(JOB_IS_OVER).not.toContain(waiting.value.status);
 
     await finishedAudit(
       scenario.workspaceId,
@@ -510,8 +512,9 @@ describe("waiting on a job somebody queued", () => {
       workspaceId: scenario.workspaceId,
       jobId: queued.value.jobId,
     });
-    expect(over.ok && over.value.status).toBe("done");
-    expect(over.ok && over.value.outcome).toEqual({ checked: 2, mismatched: [] });
+    assert(over.ok);
+    expect(over.value.status).toBe("done");
+    expect(over.value.outcome).toEqual({ checked: 2, mismatched: [] });
   });
 
   it("answers a failure for an outcome outside the queue agreement", async () => {
@@ -533,8 +536,8 @@ describe("waiting on a job somebody queued", () => {
       jobId,
     });
 
-    expect(read.ok).toBe(false);
-    expect(read.ok ? "" : String(read.error)).toContain("queue agreement");
+    assert(!read.ok);
+    expect(String(read.error)).toContain("queue agreement");
   });
 
   it("answers a person polling their own workspace, whoever queued it", async () => {
@@ -546,7 +549,8 @@ describe("waiting on a job somebody queued", () => {
       jobId,
     });
 
-    expect(asked.ok && asked.value).toEqual({
+    assert(asked.ok);
+    expect(asked.value).toEqual({
       jobId,
       kind: "nightly-audit",
       reason: null,
@@ -579,7 +583,7 @@ describe("waiting on a job somebody queued", () => {
       workspaceId: elsewhere.workspaceId,
       kind: "nightly-audit",
     });
-    if (!queued.ok) throw new Error(`the job was not queued: ${String(queued.error)}`);
+    assert(queued.ok, "the job was not queued");
 
     expect(
       await jobById(mapMaintenance, scenario.postgres, {
@@ -917,7 +921,8 @@ describe("the syncs a workspace's step has still to consider", () => {
 
     const read = await syncsIn(scenario);
 
-    expect(read.ok && read.value.map((sync) => sync.jobId)).toEqual([done]);
+    assert(read.ok);
+    expect(read.value.map((sync) => sync.jobId)).toEqual([done]);
   });
 
   it("answers only syncs that ended at or after the instant", async () => {
@@ -940,11 +945,8 @@ describe("the syncs a workspace's step has still to consider", () => {
       at: minutesIn(20),
     });
 
-    expect(read.ok && read.value.map((sync) => sync.jobId)).toEqual([
-      atTheInstant,
-      lapsedAfter,
-      after,
-    ]);
+    assert(read.ok);
+    expect(read.value.map((sync) => sync.jobId)).toEqual([atTheInstant, lapsedAfter, after]);
   });
 
   it("answers each source's newest ended sync and every lapsed claim", async () => {
@@ -973,7 +975,8 @@ describe("the syncs a workspace's step has still to consider", () => {
 
     const read = await syncsIn(scenario, { kind: "newest-per-source" });
 
-    expect(read.ok && read.value.map((sync) => sync.jobId)).toEqual([
+    assert(read.ok);
+    expect(read.value.map((sync) => sync.jobId)).toEqual([
       lapsedBefore,
       another,
       newest,
@@ -997,7 +1000,8 @@ describe("the syncs a workspace's step has still to consider", () => {
 
     const read = await syncsIn(scenario);
 
-    expect(read.ok && read.value.map((sync) => sync.jobId)).toEqual([ours]);
+    assert(read.ok);
+    expect(read.value.map((sync) => sync.jobId)).toEqual([ours]);
   });
 
   it("refuses an Editor the syncs and the lock", async () => {

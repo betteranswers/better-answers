@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { assert, describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
 import { boundarySchemas } from "@better-answers/schema";
@@ -114,7 +114,7 @@ describe("what an action admits, from the principal and input alone", () => {
   it("hands back the principal narrowed to the admitted role", () => {
     const admitted = admit(adminsOnly, person("Admin"), {});
 
-    if (!admitted.ok) throw new Error(`an Admin was refused: ${admitted.error}`);
+    assert(admitted.ok, "an Admin was refused");
     expect(admitted.value.role).toBe("Admin");
     expectTypeOf(admitted.value).toExtend<UserPrincipal & { role: "Admin" }>();
   });
@@ -193,6 +193,12 @@ describe("the concept write, which ownership decides", () => {
   });
 });
 
+const viewerWhenOpenElseEditor = (input: { readonly open: boolean }) =>
+  ({ role: input.open ? "Viewer" : "Editor", purposes: [] }) as const;
+
+const editorWhenOpenElseAdmin = (input: { readonly open: boolean }) =>
+  ({ role: input.open ? "Editor" : "Admin", purposes: [] }) as const;
+
 describe("an action whose level is read from its input", () => {
   it("types the enqueue's person at any role", () => {
     type Enqueuer = AdmittedOf<typeof enqueueJobAction>;
@@ -204,18 +210,12 @@ describe("an action whose level is read from its input", () => {
 
   it("types a union of roles by the lowest it names", () => {
     const lowerTwo = declareAction({
-      admits: (input: { readonly open: boolean }) => ({
-        role: input.open ? "Viewer" : "Editor",
-        purposes: [],
-      }),
+      admits: viewerWhenOpenElseEditor,
       input: z.custom<{ readonly open: boolean }>(),
       refuses: ["role-forbids"],
     });
     const higherTwo = declareAction({
-      admits: (input: { readonly open: boolean }) => ({
-        role: input.open ? "Editor" : "Admin",
-        purposes: [],
-      }),
+      admits: editorWhenOpenElseAdmin,
       input: z.custom<{ readonly open: boolean }>(),
       refuses: ["role-forbids"],
     });
@@ -321,7 +321,8 @@ describe("what two declared actions state, read from outside their slices", () =
     });
     const asked = enqueueJobAction.admits;
 
-    expect(typeof asked === "function" ? asked(audit) : asked).toEqual({
+    assert(typeof asked === "function", "the enqueue reads its level from the input");
+    expect(asked(audit)).toEqual({
       role: "Admin",
       purposes: EVERY_PURPOSE,
     });
