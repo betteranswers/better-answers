@@ -1,6 +1,7 @@
 {
   "env": {
-    "JCODEMUNCH_ENFORCE": "strict"
+    "JCODEMUNCH_ENFORCE": "strict",
+    "CLAUDE_CODE_ENABLE_TODO_TOOLS": "1"
   },
   "hooks": {
     "SessionStart": [
