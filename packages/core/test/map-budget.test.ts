@@ -1,4 +1,6 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, beforeAll, describe, expect, it } from "vitest";
 
 import { walkConceptsFromEntries, walkFrom } from "@better-answers/core/store/map";
 import { ids, type ConceptIri } from "@better-answers/schema";
@@ -144,6 +146,9 @@ const timedWalk = async (
   return { ...timed, waitedMs: performance.now() - started };
 };
 
+const alternating = <T>(length: number, even: T, odd: T): T[] =>
+  Array.from({ length }, (_unused, at) => (at % 2 === 0 ? even : odd));
+
 describe("the map under concurrent read load", () => {
   let dense: Scenario;
   let wide: WideMap;
@@ -160,8 +165,8 @@ describe("the map under concurrent read load", () => {
     const [, narrowing, collections] = walked;
     const walks: TimedWalk[] = [];
     for (let round = 0; round < ROUNDS; round += 1) {
-      const inFlight = Array.from({ length: IN_FLIGHT }, (_unused, at) =>
-        timedWalk(wide, at % 2 === 0 ? wide.scenario.viewer : wide.scenario.admin, collections),
+      const inFlight = alternating(IN_FLIGHT, wide.scenario.viewer, wide.scenario.admin).map(
+        (reader) => timedWalk(wide, reader, collections),
       );
       walks.push(...(await Promise.all(inFlight)));
     }
@@ -220,7 +225,7 @@ describe("the map under concurrent read load", () => {
 
       reason: "drill",
     });
-    if (!queued.ok) throw new Error(`the rebuild was not queued: ${String(queued.error)}`);
+    assert(queued.ok, `the rebuild was not queued: ${inspect(queued)}`);
 
     const started = performance.now();
     await runWorkerOnce(db().connectionUri, bundles().root, "map-budget");

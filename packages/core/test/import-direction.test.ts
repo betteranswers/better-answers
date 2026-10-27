@@ -39,6 +39,9 @@ const MANIFEST = JSON.stringify({
   },
 });
 
+const globsOf = (override: { readonly files?: readonly string[] | undefined }): readonly string[] =>
+  override.files ?? [];
+
 const coreTree = (files: Tree): Tree => ({ [`${CORE}/package.json`]: MANIFEST, ...files });
 
 const importOf = (specifier: string): string =>
@@ -282,6 +285,12 @@ const zoneOf = (dir: string): string => {
   return "slice";
 };
 
+const crossZoneSpecifierFrom = (dir: string): string => {
+  const target = dir.startsWith("kernel") ? "src/access/predicate.ts" : "src/kernel/actor.ts";
+  const specifier = path.posix.relative(`src/${dir}`, target);
+  return specifier.startsWith(".") ? specifier : `./${specifier}`;
+};
+
 describe("the zones and the real tree", () => {
   const directories = sourceDirectories();
 
@@ -290,12 +299,8 @@ describe("the zones and the real tree", () => {
   });
 
   it.each(directories)("places src/%s in its zone", (dir) => {
-    const target = dir.startsWith("kernel") ? "src/access/predicate.ts" : "src/kernel/actor.ts";
-    const specifier = path.posix.relative(`src/${dir}`, target);
     const file = `${CORE}/src/${dir}/probe.ts`;
-    const output = lint.output(
-      importing(file, specifier.startsWith(".") ? specifier : `./${specifier}`),
-    );
+    const output = lint.output(importing(file, crossZoneSpecifierFrom(dir)));
 
     expect(output).toContain(file);
     expect(output).toContain(`(${zoneOf(dir)})`);
@@ -331,7 +336,7 @@ describe("the base import bans reach packages/core unrestated", () => {
   it("has no override in .oxlintrc.json setting no-restricted-imports over packages/core", () => {
     const over = config.overrides
       .filter((override) => override.rules?.["no-restricted-imports"] !== undefined)
-      .flatMap((override) => override.files ?? [])
+      .flatMap(globsOf)
       .filter((glob) => glob.startsWith("packages/core"));
 
     expect(over).toEqual([]);

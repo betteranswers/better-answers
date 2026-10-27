@@ -127,13 +127,11 @@ describe("the suggestions agreement", () => {
           .then(() => undefined)
           .catch((cause: unknown) => cause);
 
-        expect({
+        expect({ why: refusal.why, refused }).toMatchObject({
           why: refusal.why,
-          code:
-            refused instanceof Error && "code" in refused && typeof refused.code === "string"
-              ? refused.code
-              : undefined,
-        }).toEqual({ why: refusal.why, code: refusal.sqlstate });
+          refused: { code: refusal.sqlstate },
+        });
+        expect(refused).toBeInstanceOf(Error);
       });
     }
   });

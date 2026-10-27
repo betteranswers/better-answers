@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { inspect } from "node:util";
+
+import { assert, describe, expect, it } from "vitest";
 
 import { head } from "@better-answers/core/store/git";
 import { matching } from "@better-answers/schema/testing/matching";
@@ -260,8 +262,9 @@ describe("Waiting on you", () => {
       { postgres: scenario.postgres },
       { kind: "edit", requests: [requestOn(one), requestOn(other)] },
     );
-    if (!set.ok) throw new Error(`the set was not submitted: ${String(set.error)}`);
-    const asked = set.value.suggestionIds[1] ?? "";
+    assert(set.ok, `the set was not submitted: ${inspect(set)}`);
+    const asked = set.value.suggestionIds[1];
+    assert(asked !== undefined, "the set holds the second suggestion");
 
     const opened = answered(await openedBy(scenario.editor, asked));
 
@@ -288,7 +291,7 @@ describe("Waiting on you", () => {
         ],
       },
     );
-    if (!set.ok) throw new Error(`the set was not submitted: ${String(set.error)}`);
+    assert(set.ok, `the set was not submitted: ${inspect(set)}`);
     const [suggestionId = ""] = set.value.suggestionIds;
 
     const items = await waitingFor(scenario.editor);
@@ -393,18 +396,23 @@ describe("Waiting on you at volume", () => {
         sets.push((await proposedBy(scenario, scenario.viewer, concept)).setId);
       }
     }
-    const oneSet = sets[0] ?? "";
+    const [oneSet] = sets;
+    assert(oneSet !== undefined, "a set is waiting");
 
     const listMs: number[] = [];
     const summaryMs: number[] = [];
     let listed = 0;
-    for (let run = 0; run < WARMING_RUNS + RUNS; run += 1) {
+    const timedRun = async () => {
       const list = await timedOver(scenario.editor, waitingOnYou);
       listed = answered(list.value).items.length;
       const summary = await timedOver(scenario.admin, (principal, tx) =>
         suggestionSetSummary(principal, tx, oneSet),
       );
-      if (run < WARMING_RUNS) continue;
+      return { list, summary };
+    };
+    for (let run = 0; run < WARMING_RUNS; run += 1) await timedRun();
+    for (let run = 0; run < RUNS; run += 1) {
+      const { list, summary } = await timedRun();
       listMs.push(list.readMs);
       summaryMs.push(summary.readMs);
     }

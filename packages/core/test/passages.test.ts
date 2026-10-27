@@ -226,6 +226,11 @@ const opening = async (
     }),
   );
 
+const agreedOpening = (opened: (typeof fixture.open)[number]) =>
+  opened.expect === "passage"
+    ? { locator: opened.wire, title: INVOICE_TITLE, text: opened.passage, sensitivity: "Internal" }
+    : NOT_FOUND;
+
 describe("the passage a wire locator opens", () => {
   it("answers every case the agreement states, the astral character included", async () => {
     const scenario = await arrange();
@@ -237,18 +242,7 @@ describe("the passage a wire locator opens", () => {
     }
 
     expect(answers).toEqual(
-      fixture.open.map((opened) => ({
-        case: opened.case,
-        answer:
-          opened.expect === "passage"
-            ? {
-                locator: opened.wire,
-                title: INVOICE_TITLE,
-                text: opened.passage,
-                sensitivity: "Internal",
-              }
-            : NOT_FOUND,
-      })),
+      fixture.open.map((opened) => ({ case: opened.case, answer: agreedOpening(opened) })),
     );
   });
 

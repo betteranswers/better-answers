@@ -219,6 +219,12 @@ const finding = (who: UserPrincipal, query: string) =>
 const opening = (who: UserPrincipal, locator: string) =>
   acting(who, (principal, tx) => open(principal, tx, { locator }, READ_AT));
 
+const addressOf = (
+  match:
+    | { readonly layer: "sources"; readonly locator: string }
+    | { readonly layer: "bundles"; readonly iri: string },
+): string => (match.layer === "sources" ? match.locator : match.iri);
+
 describe("one uploaded document, read back through both tiers", () => {
   it(
     "finds and opens the passage, sort code withheld, once published",
@@ -433,9 +439,7 @@ describe("one uploaded document, read back through both tiers", () => {
       expect(withheld.map((passage) => passage.content)).toEqual([THE_PASSAGE]);
       expect(kept.map((passage) => passage.content)).toEqual([THE_HANDBOOK]);
       expect(spanOf(kept)).toEqual(THE_RESTORED_SPAN);
-      expect(
-        found.matches.map((match) => (match.layer === "sources" ? match.locator : match.iri)),
-      ).toEqual([restored]);
+      expect(found.matches.map(addressOf)).toEqual([restored]);
       expect(opened).toEqual({
         found: true,
         passage: {
@@ -530,21 +534,17 @@ describe("one uploaded document, read back through both tiers", () => {
         ["Restricted", "everyone"],
       ]);
       expect(racedByTheViewer.matches).toEqual([]);
-      expect(
-        racedByTheAdmin.matches.map((match) =>
-          match.layer === "sources" ? match.locator : match.iri,
-        ),
-      ).toEqual([locatorOf(bound.documentId, THE_WITHHELD_SPAN)]);
+      expect(racedByTheAdmin.matches.map(addressOf)).toEqual([
+        locatorOf(bound.documentId, THE_WITHHELD_SPAN),
+      ]);
 
       expect(afterwards.map((passage) => passage.content)).toEqual([THE_PASSAGE]);
       expect(afterwardsClass.map((passage) => [passage.sensitivity, passage.audience])).toEqual([
         ["Internal", "groups"],
       ]);
-      expect(
-        seenByTheGroup.matches.map((match) =>
-          match.layer === "sources" ? match.locator : match.iri,
-        ),
-      ).toEqual([locatorOf(later.documentId, THE_WITHHELD_SPAN)]);
+      expect(seenByTheGroup.matches.map(addressOf)).toEqual([
+        locatorOf(later.documentId, THE_WITHHELD_SPAN),
+      ]);
       expect(seenByTheRest.matches).toEqual([]);
     },
     A_CROSS_TIER_ALLOWANCE_MS,
@@ -764,9 +764,7 @@ describe("a special-category verdict, followed through both tiers", () => {
       expect(heldAfterTheLift).toBe("Restricted");
       expect(await sensitivityHeld()).toBe("Internal");
       expect(
-        answered(await finding(scenario.editor, written.title)).matches.map((match) =>
-          match.layer === "bundles" ? match.iri : match.locator,
-        ),
+        answered(await finding(scenario.editor, written.title)).matches.map(addressOf),
       ).toEqual([written.iri]);
     },
     A_CROSS_TIER_ALLOWANCE_MS,
