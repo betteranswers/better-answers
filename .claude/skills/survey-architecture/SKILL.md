@@ -70,7 +70,7 @@ Apply the deletion test to anything that looks shallow. Ask whether deleting it 
 **What each walker returns,** per opportunity:
 - the files involved
 - the problem
-- the rule heading it breaks
+- the rule or principle it breaks
 - the proposed shape, before and after
 - the test note
 - a recommendation strength: Strong, Worth exploring or Speculative
