@@ -1,1562 +1,419 @@
 # better-answers
 
-A living company knowledge map for UK SMBs, built on the Open Knowledge Format (OKF).
+A living company knowledge map for UK SMBs, built on the Open Knowledge Format (OKF). This glossary
+settles the one word the product uses for each concept in its domain.
 
-## Knowledge model
+## Language
 
-Three knowledge layers, named and never aggregated: **sources** (evidence — copied and indexed, or
-read live) → **bundles** (OKF concepts, curated) → the **map** (derived from the bundles and
-records; queryable). **Records** are what the platform itself keeps — guides, write-ups, usage,
-connected sources, audit — citing concepts, never restating them. Where a unit lives is decided by
-**minting**.
+### Knowledge
 
-### knowledge layer
+**Knowledge layer**:
+One of the three places company knowledge lives: sources, the knowledge base and the map. Records
+are not a knowledge layer.
 
-_Internal._ one of sources, bundles, the map.
+**Minting**:
+The rule that decides where a unit of knowledge lives: a concept when a company with no platform
+would keep it as knowledge, and a record when it exists only because the platform runs a use case.
 
-Records are not a layer.
+**Concept**:
+One unit of knowledge the company keeps, carried as one OKF concept document. It is sized by trust:
+an entity or a fact that can be verified, go stale or change owner on its own.
 
-### minting
+**Knowledge base**:
+A company's curated concepts and the links between them, held as one OKF bundle. It is the knowledge
+a reader is told a concept belongs to, and where an accepted suggestion is written.
 
-_Internal._ deciding where a unit of knowledge lives: a concept when a company with no platform
-would keep it as knowledge; a record when it exists only because the platform runs a use case; both
-only as a concept's derived index row plus records attached to it by its IRI.
-
-### source
-
-The underlying thing knowledge is extracted from: a document, a system, a web page, a company wiki.
-
-A source is never itself a concept; it backs concepts as a resource.
-
-### concept
-
-One unit of knowledge the company keeps (the minting rule) — extracted from a source, promoted from
-an answer, or brought in from what the company already holds — carried as one OKF concept document,
-sized by trust: an entity or a fact that can be verified, go stale, or change owner on its own.
-
-Split when trust state can differ; mint a separate concept only when it is nameable, citable in one
-sentence, and reused in two or more places — otherwise it is a section of its parent. Some concepts
-align to the company's existing ontology, intentionally or not.
-
-### company language
-
-_Internal._ the kinds, names and links a company's concepts reveal.
-
-Never a file or a registry — it is read off the knowledge base. Inferred during extraction,
-corrected by the company's people through the ordinary write.
-
-### kind
-
-The reader's word for a concept's `type`: the short string its producer chose, folded for case and
-plural at write.
-
-A new kind arrives with the concepts that carry it and is named in the suggestion set's summary;
-nobody pre-declares one. The kinds in use, derived from the concept index with counts per kind and
-per collection, are the **Kinds** list on Knowledge, where an Admin renames or merges a kind by one
-bulk commit. Never a file, never held to a closed set.
-
-### Also known as
-
-A conventional body line naming a concept's other names, written `Also known as: <name>, <name>`.
-Search weights it with the concept's tags.
-
-A confirmed alias lands there through an edit suggestion. The merge key never reads it.
-
-### collection
-
+**Collection**:
 A top-level division of a company's knowledge by ownership: the company itself, one product or
-service, one sector, listed with its owners on Knowledge › Collections and owners.
+service, or one sector. Each collection has its owners.
 
-The knowledge base is organised collection-first, and a collection is a future bundle boundary. Not
-an email domain.
+**Kind**:
+The type of a concept, in the word its producer chose rather than one drawn from a closed set.
 
-A concept's collection is the folder directly under `knowledge/` that its file sits in, compared
-exactly as the folder is spelled. A concept directly under `knowledge/` is in none and reads *No
-collection*. `ask` takes the collections a question concerns as its `collections` argument, and
-labels each `Answer` it returns with its collection.
+**Company language**:
+The kinds, names and links a company's concepts reveal. It is read off the knowledge base, never
+kept as a file or a registry.
 
-### knowledge base
+**Term**:
+A concept that defines what a word means in this company, kept in a glossary collection.
 
-What a page calls a company's knowledge, held as one OKF *bundle*: what a reader is told a concept
-belongs to, and where an accepted suggestion is written.
+**Q&A pair**:
+A concept of kind Answer: a question as its title and the company's answer as its body. It is
+knowledge the company reuses, such as an entry in a bid library.
 
-A company's knowledge is one knowledge base in v0.1. Knowledge › Knowledge base lists it by
-collection and kind, counting only the concepts the reader may read.
+**IRI**:
+A concept's stable identity, minted by the platform when the concept is created. It survives every
+rename and is never edited by hand.
 
-### bundle
+**Link**:
+What a page shows wherever it names a concept or a passage: its title, leading there.
 
-OKF's own noun for a knowledge base: a directory tree of concept documents with its own manifest,
-whose links join its concepts (the directory is only its storage shape).
+**Relation**:
+A link from one concept to another as the map holds it, whose kind is read from the sentence around
+the link.
 
-Code, concept files and the MCP wire keep the word; a page says *knowledge base*.
+**Evidence**:
+A locator into a source, a resource read live, or a record the platform generated, which backs a
+concept. A concept resting on another concept is a link, never evidence.
 
-### map
-
-The platform's derived, queryable map over the knowledge base and the records: concepts, their links
-and relations, sources, actors and citations.
-
-Held inside the platform Postgres as ordinary workspace-scoped rows. Derived again from the
-knowledge base on every commit and from the records as they change; never a source of truth.
-**Two** fixed phrases tell its state: **map as of <time>** (the ordinary case — the map agrees with
-the knowledge base, stamped) and **map unavailable since <time>** (the panel is replaced by the
-phrase and one sentence of what still works). Because the map lives inside the same Postgres the api
-commits to, it is unavailable when the database itself is, at which point nothing else works
-either, and for one answer whose walk outruns its timeout, which then rests on its entry points
-alone. There is no third phrase: an edit's delta joins the api's commit transaction, so the map is
-never behind for an edit, and a full rebuild writes beside the live generation and flips in one row
-update, so it is never behind during a rebuild either. Never a verdict; an answer carries the phrase
-in its context header line.
-
-### bundle manifest
-
-The bundle's self-description carried inside it: identity, origin, what it was made from, owner,
-content version.
-
-### api
-
-_Internal._ the TypeScript deployable: one directory, one compose service and one process, carrying
-tRPC, the MCP surface, the authorization server and the SPA's build on one origin.
-
-The word for that tier in prose, in code and on a job's *claimant*. The Postgres runtime role the
-api connects as is an identifier rather than a second word for the tier.
-
-### agreement
-
-_Internal._ one thing the api and the worker must do alike, named by a key of
-`contracts/manifest.json`'s `agreements` and settled by the fixtures, SQL functions or generated
-rows its form declares.
-
-Both tiers' suites read it, so a change to an agreement moves both tiers in one change.
-
-### port
-
-_Internal._ a worker module that carries TypeScript logic into Python, naming the TypeScript modules
-it ports in `PORT_OF` and the agreement that holds the two alike in `AGREEMENT`.
-
-The port scan refuses a port whose agreement the manifest does not hold. A module that declares
-neither constant is not a port to the scan, however closely it follows a TypeScript module.
-
-### estate
-
-_Internal._ the running deployment: the boxes, the stores, the stacks and the copies kept off them.
-
-The word every deploy document uses ("the estate is two 4 GB boxes").
-
-### bundle estate
-
-_Internal._ every bundle in a company's repository: its own knowledge bundle(s), the platform
-bundle, and any imported bundles.
-
-The knowledge sense of *estate*, always said with the word *bundle* so the two never collide.
-
-### producer
-
-_Internal._ an agent or a person that **makes** knowledge: an extraction or enrichment job, a person
-typing a concept, an Admin accepting a suggestion set.
-
-A producer mints a concept precisely so it need not fit anywhere yet, and everything a producer
-prepares waits at the accept gate. Not a connector, which carries documents rather than making
-knowledge.
-
-### consumer
-
-_Internal._ an agent or a person that **reads** knowledge and must tolerate what it did not expect:
-an unknown kind, a concept it cannot see, a map that is a moment behind.
-
-Every consumer reads through the same predicate and the same audit as any other. Not an
-*assistant*, which is the host a consumer arrives through.
-
-### Term
-
-A concept whose subject is *what a word means in this company*, kept in a glossary collection: how a
-kind, a product name or a piece of company language is defined, read by the extraction and judging
-prompts.
-
-A definition is knowledge by the minting rule, which is why there is no vocabulary file to hold it.
-
-### link
-
-What a page shows wherever it names a concept or a passage: the concept's title, or the document's
-title and place in it, leading there.
-
-A person never reads the identity beneath it: a concept's IRI and a passage's locator, which code,
-concept files and the MCP wire keep.
-
-### IRI (of a concept)
-
-A concept's stable identity, minted by the platform when the concept is created and never edited by
-hand.
-
-It survives renames and is how one bundle refers to a concept in another. OKF's key, written into
-concept files as `iri` and kept; a page shows it as a *link*.
-
-### verify (a concept)
-
-A human or an agent confirming a concept against its sources in the platform, recorded on the
-concept as a spec `verified` event (`by`, `at`).
-
-The content it confirmed is kept platform-side on the *verification*, never as a key in the file. A
-human verifier earns *human-reviewed*; an agent earns *machine-confirmed*. A platform capability,
-not a repository workflow.
-
-### Q&A pair
-
-A concept (`type: Answer`): a question as its title, the answer as its body, alternate phrasings of
-the question in the body, its sources the entry it came from and the concepts the answer rests on.
-
-Knowledge a company keeps with no platform — the first customer's bid libraries are Q&A pairs today.
-Usage, submissions and outcomes are records attached to it.
-
-### suggested concept
-
-A concept the worker suggests (from extraction or enrichment) and the platform has not yet written
-to the knowledge base.
-
-It becomes a concept only when an Admin accepts the suggestion and the governed write commits it.
-
-### governed write
-
-_Internal._ the platform's only way of changing a bundle: an actor, a precondition on what it
-expects to find, one commit, one audit entry.
-
-Every bundle commit is one.
-
-### bundle commit
-
-_Internal._ one change to a bundle, by whatever path; what the map is derived from.
-
-### watermark
-
-_Internal._ the last commit a workspace's rows know about: its newest *bundle commit*, or none for a
-bundle whose rows know no commit yet.
-
-The governed write holds the bundle lock (a queue in the process, then a Postgres advisory lock on the workspace) through its Postgres COMMIT, so recorded history is
-a prefix of git history: everything after the watermark is missed and nothing before it is. A
-watermark the ref's history does not contain is *history diverged*, which no replay can put right.
-
-### head check
-
-_Internal._ the reconciler's periodic pass in the api process: every workspace's bundle head read
-against its *watermark*, and the commits between replayed oldest-first through the live handler
-under the reconciler's platform principal.
-
-Every thirty seconds, one tick at a time, quiet when it finds nothing; the same pass on demand is
-the restore path.
-
-### reconciler hit
-
-_Internal._ one commit the reconciler replayed: the audit event written under the commit's own audit
-id, a bulk replay's rows sharing one batch id.
-
-It is a *signal*: a query over those rows, never a metric. One is a crash window that was recovered,
-so a series of them is a fact worth reading.
-
-### sweep pass
-
-_Internal._ the platform's daily pass of the *upload sweep* and the *map sweep* over every
-workspace, one pass at a time, a sweep by hand included, then the deletion of expired sign-in rows:
-*sessions* past their end or their pending hour, the identity set's short-lived tokens a day past
-their expiry (sign-in codes and links, and Better Auth's others), and the rate-limit counts no
-workspace holds, a day old.
-
-Every pass is recorded, a pass that removed nothing too.
-
-### upload sweep
-
-_Internal._ the removal of the originals no document names, once past their grace: what a failed
-connect left, and what a concurrent repeat left when it lost the race to the first connect.
-
-**List-only** until the operator switches removal on, seven days after the first upload is
-connected in a customer's workspace on production: it counts what it would remove and removes
-nothing.
-
-### map sweep
-
-_Internal._ the removal of every generation of a workspace's map but the live one.
-
-### unresolved reference
-
-_Internal._ a link or a `sources` entry in a concept that names a path no concept holds yet, kept so
-the concept that lands there settles it.
-
-It is a row of `map_unresolved_reference`: the citing concept, the relation, the ordinal and the
-path, decoded. A concept that lands at the path, new or moved, turns every row naming it into an
-edge in the same transaction.
-
-### concept index
-
-_Internal._ the platform's derived row for every concept, written when the concept's commit is made,
-never edited.
-
-The only "both" of the minting rule. Carries the text `find` and `ask` match against, so a concept
-is searchable at its commit.
-
-### merge key
-
-_Internal._ what a concept is recognised by when its IRI is not yet known: its folded kind and its
-normalised title as one key (`mergeKeyOf`), which an acceptance resolves the target from at the
-moment it commits, never before.
-
-One concept per merge key in a workspace, so a concept whose identity moved between proposal and
-decision refuses the acceptance rather than landing on the wrong concept. The kind is inside the
-key, so renaming or merging a kind re-keys every concept of that kind.
-
-### suggestion
-
-A change to the company's knowledge or its configuration — prepared by the platform (suggested
-concepts from an extraction, a platform-bundle or template update, an alias merge, a write-up
-rewrite), or by a person who may not commit it (kind *edit*: a concept's text, a Brief, a missing
-fact, a new concept raised from unmapped passages; kind *promotion*: an answer proposed as an
-`Answer`, decided singly at the gate) — which the target's owner or an Admin accepts or declines
-before it is applied.
-
-Nothing platform-prepared enters a knowledge base without acceptance; every kind but *edit* and *promotion*
-is an Admin's to decide, in Control Centre. An *edit* is the target's owner's or an Admin's to decide, and a
-*promotion* the `Answer` collection's owner's or an Admin's. A suggestion the platform refused mid-acceptance is
-**returned**: handed back to its proposer with the reason, recording who was deciding it, because
-what it was written against moved.
-
-### concept write request
-
-_Internal._ a suggestion's payload: the concept file it would write and the merge key it means it
-for, committed on acceptance and never on validation.
-
-It carries no IRI, because identity is the acceptance's to resolve.
-
-### export
-
-The company taking its knowledge out of the platform: a *bundle snapshot* (the bundle's files at one
-commit, readable by any OKF tool), a *repository export* (the whole workspace repository with its
-history), a *records export* (the records about its concepts — verifications, owners, usage,
-conflicts — with the audit log and the publish confirmations) or a *guide snapshot* (a guide's prose
-as markdown, labelled with its date and "not maintained").
-
-An Admin action with an audit row. The only way anyone but the platform reaches the repository.
-
-### evidence
-
-A locator into a source — a document or a span of it; a resource read live; a record the platform
-generated — with the content's version, that backs a concept.
-
-Recorded when the concept is committed and kept until nothing cites it. It is derived from the
-concept file's `sources`, the one list: a source whose locator addresses a passage cites that
-passage's document. A concept resting on another concept is a link, never evidence — except a
-successor's `sources[]` entry naming the concept it supersedes (lineage).
-
-### sensitivity
-
-How confidential a connected source is, carried onto every document and source entity it yields,
-read from the connected source and the document for a passage, and sitting on the concept row,
-deciding who may view them: **Restricted** (Admins and named members; the default), **Internal**
-(the workspace, narrowed by audience), **Public** (already published by the company; still narrowed
-by audience).
-
-Only *Restricted* reaches a reader. Independent of trust: trust never gates viewing, sensitivity
-does. *Public* is not *published*. A page names it *Sensitivity* and nothing else, and *Restricted*
-is a sensitivity value, never a trust word.
-
-### effective class
-
-_Internal._ the sensitivity a source document is actually read at: the narrower of its connected
-source's and the document's own, where it has one — the seam's special-category verdict or an
-Admin's narrowing.
-
-Every passage of the document is read at it and a narrowing is compared against it, so a document's
-own sensitivity only ever takes visibility away. The document's own goes back only when a
-*dismissal* lifts the verdict, and then no further than the Admin's narrowing, or the connected
-source's if there is none.
-
-### finding
-
-What the pre-scan found in one source document: a category (bank details, date of birth, home
-address, personal contact, special category, …), offsets into the normalised text, the rule and
-detector version that fired.
-
-Counted per category; never a sensitivity, never a value. Born **unreviewed**; a review leaves it
-*kept in text*, *narrowed* or *dismissed*, with the acting Admin and the instant. **Marked** once an
-Admin has reviewed or restored it, *unmarked* until then. **The same finding on every sync that
-finds it**: the document, the rule and the offsets are what it is, for as long as the document's
-content stands, so what an Admin decided about it stands on every later sync. Its category, tier,
-score and version are a sync's **reading** of it — the last sync's — never part of what it is. Its
-tier is the tier it is withheld at on its connected source now: its rule's, raised to *always* by
-the officer-block rule or by an erasure request that names it. A finding the last sync did not
-raise, because the rules moved on, is no longer shown to a reviewer, acted on or counted at a
-publish.
-
-### group of findings
-
-The unit of the review: one document's *findings* of one category, raised by one rule at one tier,
-with how many there are.
-
-It is what the review lists and what the three bulk actions below are taken over; it names no span
-and carries no value, so a reviewer acts on what was found without ever being shown it. Not a
-*group*, which is members.
-
-### narrow these documents
-
-An Admin's bulk action over named *groups of findings* of one connected source, taken on the *source
-documents* they sit in: each document takes a sensitivity of its own; the named groups' unreviewed
-findings are reviewed as *narrowed* — and no finding the Admin was not shown — and the
-*cascade* runs from the concepts citing the documents.
-
-One audit event per document; it never widens.
-
-### dismiss as not special category
-
-An Admin's bulk action over named special-category *groups of findings* of one connected source:
-every span of each group is reviewed as **dismissed** under one reason, because what the *cue*
-caught is not health data.
-
-Each such review is a **dismissal**. The sync that reads the dismissals is queued with them. The
-action changes what the finding is taken to be and does not let the span be shown: the span stays
-withheld unless it is also *kept in text*, and a later keep leaves the dismissal standing. On that
-sync, a document whose every special-category finding is dismissed has its **verdict lifted**, and
-the document's own sensitivity goes back to the Admin's narrowing, or to the connected source's if
-there is none. One audit event per document. It is the one road by which a document's sensitivity
-widens. (Not *keep in text*, which lets a span back into the text and lifts no sensitivity.)
-
-### cue
-
-_Internal._ a word which, found in a sentence in any of its forms, withholds that sentence whole as
-special category and narrows its document.
-
-It is how the special-category rule finds what it withholds, and it never makes another rule surer
-of what that rule found.
-
-### redaction seam
-
-_Internal._ the one place a document's text is read for what must be withheld and the placeholders
-are written in, ahead of splitting into passages, extraction and every model call, so that no
-derived store and no model ever holds the value.
-
-### redaction rule
-
-One of three tiers of what the seam withholds: **always** (policy no connected source switches off;
-a span restorable with a reason), **default on** per connected source, **default off** per connected
-source.
-
-The officer-block rule always wins.
-
-### consumer-domain list
-
-_Internal._ the email domains this repository judges a consumer provider's, dated and sourced.
-
-An address on one is a person's own and is personal contact; an address on any other domain is a
-company's and stays in the text. A judgement, never a complete register.
-
-### withheld
-
-The placeholder word: `[withheld]` for the always set, `[home address withheld]` and the like for
-the rest, `[person A]` for a pseudonymised name.
-
-The latter two are **typed placeholders** — each names the category of data taken, one word per
-category — where the always set has the one neutral word for everything in it, so that a reader is
-never told what category of data the document held. It is the word written over a *written span*.
-
-### withholding
-
-_Internal._ what one connected source does with one *finding* on one sync: *withheld* or *left in
-the text*, at a tier, for one **reason**, the first of these that holds — *overridden by the
-erasure* (a request names it and an Admin had kept it) · *erasure* (a request names it) ·
-*restored* · *switched off* · *in force*.
-
-It says nothing of where a placeholder lands; the *written spans* do. A finding is never rewritten
-by a withholding. An *erasure match* is the one withholding with no finding: always withheld, at
-the always tier.
-
-### written span
-
-_Internal._ the run of characters one placeholder is written over, naming the *withholding* it
-writes for.
-
-Every character of a withheld finding or an *erasure match* lies under exactly one, so a finding
-that loses part of its run to another keeps its own word over the rest. How a finding was
-**written** is read off the spans: under its own placeholder where one names it, under another
-finding's where others cover every character of it, not at all otherwise.
-
-### relation
-
-A link from one concept to another as the map holds it: the two kinds, the section and the sentence
-around the link.
-
-The kind of a relation is read from the sentence, never from a predicate list. *Supersedes*, a
-write-up's citation and a source entity's *is concept* are the only named edges.
-
-### connected source
-
-An Admin's connection of one source to the workspace: its connector, credential, scope, collection,
-sensitivity, audience, cadence, destination and retention class; the unit the scheduler syncs and
-the unit that is published.
-
-Every source an Admin adds is one, listed on Control Centre › Sources › Connected sources and added
-by *Connect a Document*. One collection per connected source — a website is connected per URL
-prefix. It wears one state word: **received** (its documents are in the object store),
-**indexing** (a sync is turning them into passages), **indexed** (the sync has finished and there
-is something to review) and **published**. An upload's connected source id is minted by its
-caller, and the first connect under it wins: a repeat answers the first outcome, whatever file it
-carries.
-
-### connector
-
-The lifted or written code that reaches one kind of source system and yields its documents: upload,
-website, SharePoint, HubSpot, Asana, the share agent's file share, the read-live tool.
-
-A connected source names one connector; a connector serves many connected sources.
-
-### origin (of a source)
-
-Whose knowledge a source carries: the **company**'s own, a third party's (**external** — Companies
-House, a sector feed) or the **platform**'s (what the platform itself generated, cited as evidence;
-never a connected source).
-
-### reach (of a source)
-
-Whether the platform holds a copy.
-
-A **copied** source is connected, enumerated and indexed by syncs; a source **read live** is
-connected with a credential and read by a tool when a producer or a reader asks — never enumerated,
-never indexed, never cached. A source type is its origin and its reach.
-
-### source document
-
-The platform's row for one item a connected source yields: source-system id, title,
-`last_modified` (recorded absent when the source has none), content hash, first and last seen, when
-gone, sensitivity, and the object-store key of each of its two landed copies.
-
-The catalogue every sync reconciles. A locator is a span into its normalised redacted text and
-never one of those keys.
-
-### landed copy
-
-_Internal._ a source document's bytes as the platform holds them in the object store: the original
-and the normalised redacted text.
-
-The normalised copy is keyed by the document; an upload's original by its *connected source*, the
-id its caller minted, and its document. A page says *Received*.
-
-### converter
-
-_Internal._ what turns a landed copy's bytes into the document's normalised text, before the
-redaction seam sees a word of it.
-
-One per media type, chosen once, because the text it writes is the address space every locator and
-every content hash is read against.
-
-### passage
-
-One unit of a source document's normalised redacted text that the passage index holds, keyed by its
-document and its ordinal, read at the visibility its connected source and its document give it —
-its *effective class*, its audience and whether it is published.
-
-Served, it is the text a *locator* resolves to, with its source document's title and its
-sensitivity word: the unit `open` returns and a match marked *Not company knowledge* previews.
-A match previews it by its *opening line*: its first line with words, less any heading marks, cut
-short past 160 characters.
-Never the original text.
-
-### detection key
-
-_Internal._ what the detector reads and nothing else, carried as one digest: the recognisers and
-their pins, the thresholds, the context lemmas, the *consumer-domain list* and the window rule.
-
-It moves only when a document's findings could move, and a move of it implies a move of the rule
-version. Not the rule version itself, which a *finding* row and a document's redaction version
-carry, and which also moves for a category's tier, its placeholder word and what it narrows to.
-
-### locator
-
-The address of a passage inside a source document, written whole as
-`<source document id>/chars:<start>-<end>`: the document it is in, then the span, whose offsets are
-counted in Unicode code points into the document's normalised redacted text and versioned by the
-redaction string that text carries.
-
-The one string a citation's evidence and a passage both carry, so a citation and a passage are one
-address. Written into concept files as `sources[].locator` and kept; a page shows it as a *link*.
-
-### sync
-
-One execution of a connected source by the scheduler (enumerate, index, extract, prune or reindex).
-
-It is claimed under a lease, keyed by its run key, checkpointed per batch, one per connected source
-at a time, parked after repeated failure; its outcome rows record what changed per document.
-A page reads *Last Synced*, *Not synced yet* or *Sync failed*.
-
-### job
-
-_Internal._ one unit of background work, as a row on the queue: what to do (its *kind* — the
-nightly audit or the full rebuild today), for which workspace, **about which subject** — the
-connected source an index job is for, the concept a catch-up job is for, named on the row by a typed
-column a kind's CHECK requires — and the facts the claim protocol needs.
-
-Queued until a *claimant* takes it under a *lease*; ends *done* or *failed* with an *outcome*, or
-*poisoned* after its last lost claim. The api enqueues; a job's kind names the tier that claims it —
-the worker for every kind but the one only the api can do (the question-set job, whose answer path
-is the api's) — both through the same queue SQL functions (the queue agreement, which already admits
-the api as a claimant; the control plane is rows). A job is its own record and never an *audit
-event*. A *sync* or a *map rebuild* is one job being done.
-
-### lease
-
-_Internal._ the scheduler's grip on a claimed job: held only while its claimant keeps confirming it
-is alive and the job is inside its deadline (36 hours from the claim), expiring otherwise, so a job
-whose claimant died or hangs is handed back for another claim rather than lost.
-
-Nothing waits on it.
-
-### claimant
-
-_Internal._ the process holding a job's claim — the worker, or the api for a kind only it can do:
-the only one that may keep its lease alive, finish it, fail it or hand it back — and no longer the
-claimant once the lease has lapsed, whether or not the job has been claimed again since.
-
-A job has no owner.
-
-### extraction template
-
-The instruction for extracting concepts from one *kind of document*: which kinds a document of that
-kind evidences, and how a claim, its evidence and its locator are written for the file.
-
-Chosen per document kind in the cost estimate, versioned, and written for the concept file and never
-for the page that will read it. There is no design-time test against a vocabulary, because there is
-no vocabulary file. Not a *template* (a platform-shipped guide definition).
-
-### publish (a connected source)
-
-The recorded Admin action that lets a connected source's passages and source entities reach anyone
-beyond Control Centre; separate from sensitivity, from audience and from accepting suggestions.
-
-Its audit row carries the Admin's confirmations (lawful basis recorded, privacy information updated,
-DPIA reference). Unpublished content is seen by Admins, in Control Centre only, and a concept citing
-it counts as Restricted until the publish releases the connected source's sensitivity.
-
-### widen (a connected source)
-
-An Admin's recorded action that moves a connected source to a wider sensitivity, a wider audience
-or both, published or not, with the *cascade* run inside the same action.
-
-Its audit row carries the sensitivity and audience it moved from and to. A request that widens no
-term, or narrows any, is refused, and so is any widening while a special-category *finding* the
-last sync raised is unreviewed. A document's own sensitivity stays where it is, since the
-*effective class* is the narrower of the two. The one road by which a connected source's
-sensitivity widens.
-
-### audience
-
-Who a connected source's content is for: everyone in the workspace, or named groups.
-
-The named people of a Restricted connected source are a group too, minted for that source, never a
-list of people beside the groups.
-
-Set on the connected source, carried with sensitivity onto every source entity and read from the
-connected source for a passage, and applied with *published* on every read and traversal hop.
-Distinct from sensitivity (how confidential) and from trust (how reliable).
-
-### cascade
-
-_Internal._ the re-derivation an Admin's narrowing of a connected source or of named documents of
-one, widening or publish of a connected source, or sensitivity override of a concept sets off
-inside the same action: first every concept citing the evidence that moved, then every write-up
-including one of those concepts — two levels, the second reading what the first wrote, never a
-third — so a guide never reaches a reader its includes would not.
-
-A sync that narrows or lifts a document sets the same re-derivation off on the platform's next tick
-instead, because the sync runs outside any action: until that tick a concept citing the document
-keeps its old sensitivity.
-
-### group
-
-A named set of members of one workspace: the one grouping concept, and the unit an *audience* names
-when a connected source is not for everyone.
-
-Groups are flat, and a person may belong to several. A group may represent a team ("HR team",
-"Sales executives") — that is its name, not a second concept. Belonging to a group never changes
-what a person may do — that is their *role*; a group only ever changes what they may see, via
-audiences. Everything is a group, with one lookup per visibility check (aligned to the Entra access
-model); nesting would be an additive migration, never a reversal.
-
-### retention class
-
-What the platform keeps of a connected source's documents, and for how long: **mirror** (the source
-holds the record; a document gone at source keeps its passages through a grace period, then loses
-them), **keep** (the platform holds the record — uploads; nothing leaves without an Admin action),
-**transient** (original bytes deleted after processing, the normalised redacted text kept; map-only
-connected sources).
-
-In every class cited evidence outlives its source: the evidence row stays until nothing cites it.
-
-### destination (of a connected source)
-
-Which derived stores a connected source's documents feed: the passage index (searchable), the
-knowledge base (as suggestions an Admin accepts), the map (as source entities); at least one.
-
-The object store is where every document is received first, not a destination.
-
-### source entity
-
-A typed node or edge the map derives directly from a source document (a person, a meeting, a
-task), keyed to that document; never a concept and never a record.
-
-The map is derived from sources, bundles and records.
-
-### share agent
-
-The platform's small on-site program that watches a company's file share and sends changed
-documents out to the platform; a caller of the public API, never the worker.
-
-### run key
-
-_Internal._ the key that makes two requests to sync the same connected source for the same period
-one sync.
-
-It holds one place per subject for a job not yet tried, so a failed job waiting out its backoff
-leaves room for a fresh request, which waits behind it.
-
-### model choice
-
-A workspace's choice of model, local or hosted, for one purpose (extraction, enrichment, answering,
-judging, embedding).
-
-One model choice per purpose, listed on Control Centre › Models › Models and spend. It names the
-model it calls. The embedding model choice is **fixed** — the word a reader sees on it — from the
-start, before any vector exists, and never changes once vectors exist.
-
-### model client
-
-_Internal._ the one seam a *model choice* is called through; it names the model, never who hosts
-it.
-
-Fetch-shaped, so a local model and a hosted one take one code path, and a test fakes the seam at
-its wire while our own code is never mocked.
-
-### wire shape
-
-_Internal._ how one family of model APIs takes a call and answers it: the request the *model
-client* sends, and how it reads the reply as an outcome.
-
-Kept per *model provider*; a provider no wire shape speaks has no model to call.
-
-### model provider
-
-The company that hosts the model a *model choice* names (Anthropic, Mistral, Cloudflare), whose
-API the *model client* calls.
-
-One of a closed set, and never the *provider* of a connected source.
-
-### model key
-
-_Internal._ a workspace's key for one *model provider*, which the *model client* sends with a call.
-
-One per workspace and model provider, kept in an *envelope* and opened by the api tier alone at the
-moment of a call. The platform's own tooling sets and replaces it, never a page. A workspace with
-none has no model available from that provider.
-
-### DPIA input
-
-What one connected source contributes to a data protection impact assessment, as a document and its
-hash: the personal data categories its rules in force can raise, its scope, sensitivity, model
-choices, *retention class* and audience.
-
-The hash rides on the publish audit row.
-
-## Trust words the reader sees
-
-The platform's trust tiers (unverified, machine-confirmed, human-reviewed) and states are shown to
-readers in these words and no others, on a page and in what `find` and `open` return; each is a
-text tag, never a colour. The tier and status values on the MCP wire keep their names, which are
-for code and never for a reader: tier `human-reviewed` reads *Verified by*, `machine-confirmed`
-*Verified automatically* and `unverified` *Unverified*; status `changed-since-checked` reads
-*Changed since verified*; `checkedBy` and `checkedAt` carry who verified it and when.
-
-Two **riders** may follow *Verified by* and never change the tier: **· imported** (a verification
-recorded before the platform, kept as written) and **· source moved on** (its source changed or is
-gone since the verification; the verification stands; the reason is on the row). No other rider
-exists.
-
-### evidence pane
-
-What a reader sees of a concept's cited evidence: one of three states off two counts —
-*included*, *partly included* or *not included* in their access.
-
-It leads with the reader's access, lists every source the concept cites — those the reader may open
-as links, the rest in the file's own words with no link — names the Admin whose
-*sensitivity override* put them in *shared beyond its evidence* where one has, and always says
-where to go next, so it is never a dead end. Never a trust signal.
-
-## Guides and answers
-
-Guides are platform functionality over the knowledge base and the map; nothing in this section
-lives in a bundle (Q&A pairs do — they are concepts).
-The platform exports a guide's *structure* into the company's repository so it can be rebuilt
-from concepts elsewhere; the prose stays a platform record.
-
-### guide
-
-A set of pages that gives the company's people, by role, its knowledge about one subject (a
-product, a service, a sector, the company itself), configurable per company.
-
-A guide is never the unit of trust: every fact it shows is a concept. A guide has no publish
-state: it is seen from the moment it exists, every section wearing its trust badge. Its readers
-are roles, never an audience.
-
-### guide definition
-
-The company-owned description of a guide: its kind, subject, the roles it serves (each with a
-default layer and an action threshold), its layers and its tree of sections.
-
-Seeded from a template, then owned outright.
-
-### template
-
-A platform-shipped guide definition a company seeds from (a bid-library product guide, a sector
-guide, a sales play, a battlecard, a documentation set).
-
-Later template changes arrive as suggestions, never applied.
-
-### section
-
-One node of a guide definition's tree: a prompt, a role label (know / say / show / do), a usage
-note, the layers it renders, and an expectation of which concepts should populate it.
-
-A section inside a section is still a section (the draft's "subsection"). A **hidden** section is
-a definition setting: Admins see it marked hidden, readers do not, coverage still counts it.
-
-### layer (of a section)
-
-One of the ways a section shows its knowledge: *assembled* (prose written over the concepts it
-includes — the first customer's Brief) or *quoted* (the included concepts' own words — its
-Detail).
-
-A reader switches layers; the definition says which a section renders and which a role opens on.
-
-### skeleton projection
-
-The guide's structure the platform writes into the company's repository (kind, subject, roles,
-sections with their prompts and included concepts; no prose), regenerated when the guide
-definition changes.
-
-### evidence panel
-
-_Internal._ where a *citation*'s source opens: beside the page where that leaves the page's own
-content in view, and otherwise beneath the claim or the *match* that opened it.
-
-The page behind it stays live and in the keyboard's order. Choosing what opened it again returns
-to it, and closing it returns the reader to what opened it.
-
-### footnote
-
-The mark in a write-up's prose that ties one claim to one include: a footnote reference labelled
-by the include.
-
-What the reader sees as the passage beside the claim, and what the copied text carries as a
-numbered footnote; its text is never stored, always rendered from the include.
-
-### expectation
-
-A section's statement of which concepts should populate it (by type, relation to the subject, tag
-or feed); coverage is expectation minus what is included.
-
-### expected fact
-
-_Internal._ one named part of a section's *expectation*: the kind, tags and collection it selects,
-and how many concepts it wants. A gap names it.
-
-### response
-
-A write-up scoped to one question put to the company: a question-set question in v0.1, an
-opportunity's question once the opportunity layer arrives.
-
-A record like every write-up; the opportunity, when there is one, attaches to it later. Empty,
-carrying its unmapped passages, when nothing on the map answers.
-
-### answer
-
-What the platform returns for a question: its verdict for the caller's role, every `Answer` that
-fits as it stands, shown with the question it answered, or else the concepts that bear on the
-question, and what it could not answer — found by traversal first.
-
-Prose asserts concepts only, with a passage per claim: an assistant writes it over MCP, and the
-platform drafts it on Ask. Not the `Answer` concept (a Q&A pair), which an answer may reuse or
-cite.
-
-### answer contract
-
-_Internal._ the one shape an answer takes for the UI, MCP and the response record: an event
-stream that gives the verdict before any prose, folded into one object.
-
-### related knowledge
-
-The verdict of an answer that holds the concepts bearing on a question when no `Answer` is a judged
-fit; its key on the wire is `related`.
-
-A concept bears on a question when it is an entry point or the walk reaches it from one. The
-verdict's first line never says the question was answered. An `Answer` with no judge's yes is
-related knowledge and is never shown as a fit, nor under a fit's heading. Where no judge ran, or
-judging failed, an `Answer` comes back as it stands. Any other concept, and every `Answer` the
-judge did not pass once it has run, comes back as a preview, its line as `find` gives it, for
-`open` to read in full. A fit always comes back as it stands.
-
-### judge
-
-The one typed judgement that decides, for each candidate `Answer`, whether it answers the question
-as asked: yes or no, never a ranking of one candidate against another.
-
-It runs on the judging model choice. A *Deprecated* or *Draft* `Answer` is never a candidate; a
-*Deprecated* one stays in related knowledge with its word. Every answer says how its judge stood, in
-one of three words: *Not judged*, where the workspace has no judging model choice or no spending
-limit, or no `Answer` was a candidate; *Judged*; and *Judging failed*, where the call failed and its
-candidates are returned as related knowledge. Their keys on the wire are `not-judged`, `judged` and
-`judging-failed`.
-
-### decision model
-
-_Internal._ a model that answers a typed question with a probability for each allowed answer, and
-writes no text. The *judge* may run on one, asking it of each candidate whether it answers the
-question.
-
-A probability at or above the model's *decision threshold* is a yes. A decision model with none
-cannot judge, and its judging fails.
-
-### decision threshold
-
-The probability at or above which a *decision model*'s answer counts as a yes, one for each *model
-provider* and model.
-
-It is strictly between 0 and 1. The platform's tooling sets and replaces it, never a page, and the
-audit log keeps each setting. `set-model-choice` refuses a decision model that has none.
-
-### match
-
-One unit a search returns, typed by its knowledge layer: a concept, with the guide sections it
-appears in and the documents it rests on nested under it; a guide section or a document on its own
-only when no concept covers it.
-
-Every match wears its trust or sensitivity word; a document nothing rests on reads *Not company
-knowledge*. The MCP wire's key for them stays `hits`.
-
-## Records the platform keeps
-
-Records exist because the platform runs a use case; every record about a concept refers to it by IRI
-and never restates it.
-
-### actor id
-
-_Internal._ who a `generated.by` or `verified[].by` names: a person as `human:<email>` (as Google's
-samples), the platform's agents by their purpose and version, a process by its purpose.
-
-Verifier and generator must differ on the producer part. On a record the platform keeps — the *audit
-log*, a commit trailer, a suggestion's proposer — a person is `human:<person id>`; the file forms
-stand. A page shows the person's name.
-
-### actor alias
-
-An Admin's mapping of an imported actor id to a member, so *Verified by* can name them; the file is
-never rewritten.
-
-### person id
-
-_Internal._ the platform's one stable id for a person: minted by the platform at their first sign-in,
-or earlier when the platform adds them by name, carried on the identity set's user row and on every
-Principal, and what every record names a person by as `human:<person id>`.
-
-It is never written into a concept file, which keeps `human:<email>`. The member row's key names
-nothing. A page shows the person's name.
-
-### minter
-
-_Internal._ the kernel's one function that mints every id the platform writes, a time-ordered ULID.
-
-Better Auth is handed it too, so every identity id has the same shape. Not the *minting* rule, which
-decides where a unit of knowledge lives.
-
-### owner (of a concept)
-
+**Owner**:
 The person answerable for keeping a concept verified and current: the collection's owner unless the
 concept names its own.
 
-The owner may edit it directly and decides *edit* suggestions on it, whatever their role; an Admin
-may too. With no owner, only an Admin does, and a person who leaves the workspace owns nothing.
-Distinct from a connected source's owner and from the bundle manifest's owner.
+**Conflict**:
+Two values for one claim found across sources, recorded with both values and their evidence until a
+person resolves it.
 
-### usage
+**Producer**:
+A person or an agent that makes knowledge, such as an extraction, a person writing a concept or an
+Admin accepting suggestions.
 
-One recorded action that takes a concept or a write-up out of the platform: copied into a document,
-exported in a document (a response-set document is one usage per response), later submitted.
+**Consumer**:
+A person or an agent that reads knowledge and must tolerate what it did not expect, such as an
+unknown kind or a concept it may not see.
 
-Being in a section is not usage; a citation in an answer is counted from *Questions asked*. (Not
-OKF's `usage_count`, which is a source's use by a concept.)
+**Record**:
+Something the platform keeps because it runs a use case, such as a guide, a write-up, usage or an
+audit event. A record refers to the concepts it is about and never restates them.
 
-### conflict
+**Export**:
+The company taking its knowledge out of the platform: a snapshot of its knowledge base, its whole
+repository with history, its records, or a guide's prose.
 
-Two values for one claim found across sources, recorded with both values and their evidence.
+### Suggestions
 
-It is raised by the pipeline, resolved only by a person (supersede, deprecate, split by tier,
-dismiss).
+**Suggestion**:
+A proposed change to the company's knowledge or configuration, prepared by the platform or by a
+person who may not make the change. It waits for the target's owner or an Admin to accept or decline
+it.
 
-### question set
+**Returned**:
+The state of a suggestion the platform refused while accepting it, because what it was written
+against had moved. It goes back to its proposer with the reason.
 
-The ordered questions a document put to the company, which responses answer.
+**Promotion**:
+A suggestion that an answer or a response become a Q&A pair.
 
-It is extracted as a suggestion and confirmed by the person before any response is drafted; an input
-to a use case, never a source and never company knowledge. Not a pack, not an opportunity.
+**Promotion gate**:
+Where a promotion is decided, one at a time, beside the closest existing Q&A pair.
 
-### Questions asked
+### The map
 
-The retained record of every answer the platform gave, and the page an Admin reads it on, flagged
-first: who asked, where, what was answered, what it cited and how trusted that was at the time, the
-predicate that applied and, on reuse, the matched `Answer` and the judge's verdict; the map's state
-the answer carried; with the feedback and corrections it received.
+**Map**:
+The platform's derived, queryable picture of concepts and their relations, sources, actors and
+citations. It is built from the knowledge base and the records, and is never a source of truth.
 
-A record kept before the platform kept the map's state reads as unknown, never as live.
+**Source entity**:
+A person, a meeting, a task or another node the map derives directly from a source document. It is
+never a concept and never a record.
 
-A reader reads their own records on Ask › Your questions. Both pages show each cited concept as the
-reader can read it now, with its trust as it is now; the record itself keeps the trust at the time.
+**Canonical entity**:
+The one node an Admin's confirmed merge of aliases makes from several source entities. It is never a
+concept.
 
-Not part of the audit log. Content is kept twelve months by default, then thinned to the skeleton —
-citations, trust then, verdicts, feedback and corrections — kept for good.
+### Sources
 
-### correction
+**Source**:
+The thing knowledge is extracted from, such as a document, a system, a web page or a company wiki. A
+source backs concepts and is never itself one.
 
-An Admin's or owner's action on one answer in *Questions asked* that records the level it went wrong
-at — concept, source or retrieval — and links the action that fixed it.
+**Origin**:
+Whose knowledge a source carries: the company's own, an external third party's, or the platform's.
 
-It is never a text edit.
+**Reach**:
+Whether the platform holds a copy of a source: copied, or read live when asked and never stored.
 
-### answer test
+**Connected source**:
+An Admin's connection of one source to the workspace, with its connector, scope, collection,
+sensitivity, audience and schedule. It is the unit the platform syncs and an Admin publishes.
 
-A retrieval correction kept as a test: a question, a role, the concepts the answer must reach and must
-not, the `Answer` it must or must not reuse, the expected verdict.
+**Connector**:
+The means of reaching one kind of source system, such as an upload, a website, SharePoint or
+HubSpot, and of taking its documents.
 
-The workspace's tests are replayed retrieval-only when the answer path changes and weekly; a test is
-*stale* when a concept it names is deprecated.
+**Share agent**:
+The platform's small on-site program that watches a company's file share and sends changed
+documents to the platform.
 
-### audit event
+**Source document**:
+One item a connected source yields, as the platform catalogues it.
 
-The record of one action by an Admin, the platform or a person acting on their own identity — what was
-done, to what, by whom, when, with what confirmations — in the one append-only *audit log* a workspace
-keeps, or in the *identity-set audit log* when the action belongs to no workspace.
+**Passage**:
+One unit of a source document's redacted text. It is what a search previews and a locator opens,
+and never the original text.
 
-Every event belongs to one of four families — **people**, **knowledge**, **sources**, **platform** —
-named as the first word of its *audit action*, `family.subject.verb`; jobs, *Questions asked*,
-*signals* and spend are their own records and never audit events.
+**Locator**:
+The address of a passage within its source document. A citation and the passage it cites carry the
+same locator.
 
-### audit action
+**Sync**:
+One run of a connected source that brings its documents and passages up to date.
 
-The name an *audit event* is recorded under, `family.subject.verb`, declared by the part of the
-platform that performs it and never a free string.
+**Destination**:
+What a connected source's documents feed: searchable passages, suggestions for the knowledge base,
+source entities on the map, or more than one of these.
 
-One *action* may write more than one, and a read writes none. A stored name stays as it was written,
-and the Audit log shows it in today's words.
+**Retention class**:
+What the platform keeps of a connected source's documents and for how long: mirror, keep or
+transient. In every class, evidence a concept cites outlives its source.
 
-### audit log
+**Extraction template**:
+The instruction for extracting concepts from one kind of document: which kinds such a document
+evidences, and how a claim and its evidence are written.
 
-The one append-only record of every *audit event* a workspace keeps, written in the same action it
-records.
+### Visibility
 
-An Admin reads their workspace's own on System › Audit log, and never another's. Not *Questions
-asked*, which records answers.
+**Sensitivity**:
+How confidential a connected source or a document is, which decides who may view what it yields:
+Restricted, Internal or Public. Sensitivity gates viewing and trust never does.
 
-### audit export
+**Audience**:
+Who a connected source's content is for: everyone in the workspace, or named groups.
 
-A file of the *audit events* an Admin's search and family matched, itself recorded as an audit event
-that names the people and groups matched but never the words searched for.
+**Effective class**:
+The sensitivity a source document is actually read at: the narrower of its connected source's and
+its own.
 
-Not an *export* of knowledge.
+**Publish**:
+The recorded Admin action that lets a connected source's content reach anyone beyond Control Centre.
+It is separate from sensitivity, from audience and from accepting suggestions.
 
-### identity-set audit log
+**Widen**:
+An Admin's recorded action that moves a connected source to a wider sensitivity, a wider audience or
+both.
 
-The append-only record of the actions that belong to no workspace because they act on a person's
-identity itself: a person giving their own *display name*, an Admin's flag on one, a sign-in, a
-person's own second-factor actions, a person ending their own sessions, every write the *operator*
-makes, and an Admin's action that ends a person's access.
+**Narrowing**:
+An Admin's action that gives named source documents a sensitivity of their own, narrower than their
+connected source's.
 
-It sits beside the *audit log* and uses the same *audit actions*. A person appears in it by *person
-id*, never by name or address, and no row is ever rewritten. Only the operator reads it; no
-workspace's Admin ever does.
+**Cascade**:
+The carrying of a visibility change to every concept citing the evidence that moved, and then to
+every write-up that includes one of those concepts. It is why a guide never reaches a reader its
+concepts would not.
 
-### log line
+### Personal data
 
-_Internal._ one line the running platform writes to its operational log for whoever runs it: a token
-refresh, a workspace picked, a failure.
+**Redaction**:
+The withholding of personal data from a document's text before anything is derived from it or any
+model reads it.
 
-Never a record: nothing reads it back as evidence of an action, and an action that must be answerable
-for is an *audit event*, not a log line.
+**Redaction rule**:
+One rule redaction applies, at one of three tiers: always, default on or default off for each
+connected source.
 
-### erasure request
+**Finding**:
+What redaction found in one source document that may be personal data: a category and a place in the
+text, never the value.
 
-A person's request that their personal data leave the platform: what was done in every store, when,
-and when the backups are beyond use.
+**Group of findings**:
+One document's findings of one category, raised by one rule, which is the unit an Admin reviews.
 
-A valid one reaching the bundle runs the history-rewrite routine and carries the *erasure pseudonym*
-it minted.
+**Special category**:
+Personal data that UK data protection law protects most closely, such as health data. A document
+that holds it is narrowed.
 
-### erasure pseudonym
+**Cue**:
+A word that marks a sentence as special category, so that redaction withholds the sentence whole.
 
-_Internal._ the per-workspace opaque id, minted at erasure and kept on the erasure request, that
-`human:<email>` becomes across that workspace's files and history on a valid erasure request.
+**Dismissal**:
+An Admin's review of a special-category finding as not special category. It is the only way a
+document's own sensitivity widens.
 
-Never the person id, so two workspaces' rewritten histories cannot be joined on one person.
+**Placeholder**:
+The word written in place of withheld text, naming the category of data taken. Text withheld at the
+always tier gets one neutral word, so a reader never learns what it held.
 
-### subject request
+**Subject request**:
+A person's request to access or erase their personal data, made by a member or recorded for someone
+the company's files name.
 
-A person's access or erasure request — a member's, or one recorded on behalf of a person the company's
-files name who never signed in.
+**Erasure request**:
+A subject request that a person's personal data leave the platform, with a record of what was done
+in every store and when.
 
-Each has the same per-store finder over the request's identifier set, the one-month clock from its
-start; access answers with where the platform holds the person and under which categories, never a
-passage.
+**Suppression**:
+A workspace's standing entry that keeps one person's identifiers out of everything the platform
+derives, on every sync from then on.
 
-### suppression
+**DPIA input**:
+What one connected source contributes to a data protection impact assessment: the personal data it
+can raise, its scope, sensitivity, models, retention class and audience.
 
-The workspace's entry that keeps a person's identifiers out of every derived store.
+### Trust
 
-It is one per *erasure request*, holding the request's identifier set, applied to every document of
-the workspace on every sync, now and later.
+**Trust tier**:
+How far a concept has been confirmed: human-reviewed, machine-confirmed or unverified. A reader sees
+these as Verified by, Verified automatically and Unverified.
 
-### erasure match
+**Verify**:
+A person or an agent confirming a concept against its sources. A person earns it human-reviewed, and
+an agent earns it machine-confirmed.
 
-_Internal._ a bounded, case-folded occurrence of a *suppression*'s identifier in a document's
-normalised text, which the *redaction seam* withholds.
+**Changed since verified**:
+The state of a verified concept whose content has changed since it was confirmed.
 
-It is a withholding and never a *finding*: no finding row holds it, no review reaches it and no *keep
-in text* releases it. An identifier below the **identifier floor** — under three characters once
-normalised, or a name of one word — raises none, and recording a *subject request* refuses it as too
-broad to withhold.
+**Rider**:
+A note that may follow Verified by without changing the trust tier: imported, or source moved on.
 
-### erasure map
+**Actor alias**:
+An Admin's mapping of a verifier named in imported knowledge to a member, so that Verified by can
+name them.
 
-_Internal._ the per-store finder's answer for one *subject request*: every store family the platform
-holds and what in each of them names the person, found over the request's identifier set.
+**Evidence pane**:
+What a reader sees of a concept's cited sources, and how many of them the reader's access includes.
 
-Its documents entry names the live documents whose indexed text holds an identifier, and those choose
-which connected sources are wiped now; the *suppression* is written from the request's identifier
-set, not from the map.
+**Evidence panel**:
+Where one cited source opens, beside or beneath the claim it backs.
 
-### backup
+### Guides
 
-One scheduled copy of one store, one restore drill, or one store restored to production, as a row:
-what, when, outcome, size, where it went, whether it holds personal data, when it expires, and, for a
-drill or a restore, how long the restore took.
+**Guide**:
+A set of pages that gives the company's people, by role, its knowledge about one subject: a product,
+a service, a sector or the company itself. Every fact a guide shows is a concept.
 
-### tier (of a backup)
+**Guide definition**:
+The company-owned description of a guide: its subject, the roles it serves, its layers and its tree
+of sections.
 
-_Internal._ where a database dump is filed by when it was taken, which sets how long it is kept:
-hourly, daily, weekly or monthly.
+**Template**:
+A guide definition the platform ships for a company to start from, such as a product guide, a sales
+play or a battlecard.
 
-It is not a *retention class*, which is a connected source's.
+**Section**:
+One node of a guide definition's tree, with its prompt and the concepts expected to fill it.
 
-### restore drill
+**Layer**:
+One of the ways a section shows its knowledge: assembled, as prose written over its concepts, or
+quoted, in the concepts' own words.
 
-_Internal._ the monthly rehearsal that restores the platform from its copies into staging, proves it
-answers, records the recovery time, and wipes staging afterwards.
+**Expectation**:
+A section's statement of which concepts should fill it. Coverage is the expectation less what the
+section includes.
 
-### staging
+**Write-up**:
+Prose the platform keeps as a record, written over the concepts it includes, such as a guide
+section's assembled layer or a response.
 
-_Internal._ a second copy of the platform on VPC 2 holding synthetic data only, brought up on demand
-for a drill or a rehearsal and wiped after; it never stands between them.
+**Include**:
+One concept a write-up rests on.
 
-### local database
+**Footnote**:
+The mark in a write-up's prose that ties one claim to one include.
 
-_Internal._ a developer's own Postgres on the pinned image, migrated and holding the synthetic
-fixture, kept across restarts: what a GUI browses day to day.
+### Answers
 
-Nothing a customer wrote is in it.
+**Answer**:
+What the platform returns for a question: every Q&A pair that fits, or else the concepts that bear
+on the question, and what it could not answer. It is not a Q&A pair, though it may reuse one.
 
-### browsing role
+**Judge**:
+The yes-or-no judgement of whether a candidate Q&A pair answers the question as asked. It never
+ranks one candidate against another.
 
-_Internal._ the read-only login every GUI profile signs in as, on the *local database* and on
-production: every workspace's rows in every table and view, no credential column, no write to a
-platform table.
+**Related knowledge**:
+The concepts an answer returns as bearing on a question when no Q&A pair is a judged fit.
 
-Made by an operator action, never by the journal.
+**Match**:
+One result of a search: a concept with the sections and documents it appears in, or a section or a
+document that no concept covers.
 
-### git store
+**Not company knowledge**:
+The label on a match that is a document no concept rests on.
 
-_Internal._ one of the platform's four shared stores: the bare git repositories, one per workspace,
-holding the bundle.
+**Question set**:
+The ordered questions a document put to the company, which responses answer. It is an input to a
+use case, never a source and never company knowledge.
 
-The api is its only writer and the worker mounts it read-only at a commit; it is backed up as a
-verified `git bundle` per workspace and mirrored to the second box.
+**Response**:
+A write-up that answers one question put to the company.
 
-### forge
+**Usage**:
+One recorded action that takes a concept or a write-up out of the platform, such as copying it into
+a document.
 
-_Internal._ the same thing named from the outside: the bare git repository per workspace that the api
-writes and the worker reads at a commit.
+**Questions asked**:
+The record of every answer the platform gave, with what it cited, how trusted that was at the time
+and the feedback it received.
 
-**No forge *service* runs** — no UI, no SSH server, no user model, no second schema.
+**Correction**:
+An Admin's or an owner's record of the level at which one answer went wrong: concept, source or
+retrieval.
 
-### release
+**Answer test**:
+A retrieval correction kept as a test: a question, a role, and the concepts its answer must and must
+not reach.
 
-_Internal._ the recorded promotion of a built image digest to production, on its own or by an Admin's
-dispatch, as the *release mode* says.
+**Assistant**:
+An AI host, such as Claude or ChatGPT, through which a person reaches the company's knowledge.
 
-A release is recorded, as a tag, only once it has held: its smoke passed. A release whose smoke
-fails is not recorded.
+**Access**:
+What a person's consent gives an assistant: the company's knowledge in one workspace, until it
+lapses or is ended.
 
-### release mode
+### Models
 
-_Internal._ how releases happen: **per-merge**, every green build on `main` released; **nightly**,
-one release a night just after a verified backup; **drill**, only a dispatched release riding a drill
-or a hotfix.
+**Model choice**:
+A workspace's choice of model for one purpose: extraction, enrichment, answering, judging or
+embedding.
 
-The phases run in that order: per-merge until the first customer's bundle lands, nightly until
-*go-live*, drill after it.
+**Model provider**:
+The company that hosts the model a model choice names, such as Anthropic or Mistral.
 
-## People
+### People and accountability
 
-### workspace
+**Workspace**:
+The boundary a company occupies: its people, connected sources, knowledge base, map and records.
+Nothing crosses from one workspace to another.
 
-the tenancy boundary and the unit a company occupies: one company's people, connected sources,
-bundle repository, index, map and records.
+**Member**:
+A person's place in one workspace: the role they hold there and the groups they belong to.
 
-**Every tenant row, every object-store prefix, every map node and edge carries its workspace id**,
-and every query reaches its store through a store door, over row-level security. Better Auth's
-identity set is not tenant data: read by key before a workspace is known, it is what a workspace id
-is resolved from. One deployment holds many; a person may belong to more than one and picks before
-consent. Workspaces are provisioned by the platform, never created by a person. Better Auth's own
-name for it stays inside its API and is mapped to *workspace* in our code and on every page.
+**Role**:
+What a member may do in a workspace: Admin, Editor or Viewer. A role is a level, never a job title.
 
-### tenant
+**Group**:
+A named set of members of one workspace, which an audience names when a connected source is not for
+everyone. A group changes what a person may see, never what they may do.
 
-_Internal._ the same boundary said from the platform's side, used only where the sentence is about
-isolation rather than about a company: *tenanted by rule*, *multi-tenant-ready*.
+**Invitation**:
+An Admin's offer of a place as a member, with one role, to one email address.
 
-There is one boundary and it is the workspace; *tenant* never appears on a page and is never a
-second concept.
+**Operator**:
+The person who administers the platform across every workspace. The operator is never a workspace
+role, and a page names them better-answers support.
 
-### principal
+**Principal**:
+Who the platform acts as: a member in one workspace, the platform itself, or the operator.
 
-_Internal._ who a call is made as: a workspace id, a user id and a role, built by the transport from
-a verified bearer and passed as the first parameter of every function of the core package that
-touches tenant data.
+**Deferred principal**:
+A member's authority carried into work that outlives their session. It expires with the authority it
+borrowed.
 
-It has **three kinds**: the **user principal**, a signed-in person in one workspace, with the role
-they hold there as a member; the **platform principal**, the platform acting as itself, with its own
-actor id and no person behind it (the erasure routine, the nightly audit, the reconciler); and the
-**operator principal**, the *operator* (its own entry below). A platform principal's actions are
-audited under that identity and never under a person's.
+**Audit event**:
+The record of one action by an Admin, the platform or a person: what was done, to what, by whom and
+when.
 
-One more word has no type yet — **deferred principal**: a named person's authority carried into
-work that outlives their session (a background job, a scheduled sync, a replay). It records the
-person it borrowed from and **expires with the authority it borrowed**, so a job cannot outlive the
-access that started it. Work that outlives a session runs under a deferred or a platform principal,
-never under a live user session. The *actor id* is the id on a file, not the principal.
+**Audit log**:
+The append-only record of every audit event a workspace keeps.
 
-### operator
+**Identity-set audit log**:
+The append-only record of actions that belong to no workspace because they act on a person's
+identity itself, such as a sign-in. Only the operator reads it.
 
-_Internal._ the platform's own administrator over every workspace: a real person on the identity
-set, made the operator by a **mark** on their person that only the platform's own tooling grants or
-takes away, never a page, and that erasure clears with the rest of their identity; a third principal
-kind beside a user and the platform, audited under their own id.
+### The platform's areas
 
-Never a workspace *role*; *Admin* is the highest role a workspace has.
-A page names them *better-answers support*.
+**Area**:
+The top level of the platform's navigation: Ask, Knowledge, Inbox or Control Centre.
 
-### action
+**Page**:
+One place in an area where a person reads or acts.
 
-what an entry — a page's call, an MCP entry, an ops command, the reconciler's tick — may ask the
-platform to do as a *principal*: one thing, a **read** or a **write**, answered with its value or
-with a *refusal*.
+**Home**:
+The page a member lands on after signing in, which depends on their role.
 
-Reading a connected source's findings is an action as much as publishing the connected source is.
-Where the *audit log* records an action, its *audit event* lands with it, under its *audit action*.
-An endpoint or a procedure is a transport's way of reaching an action, never the action itself.
+**Control Centre**:
+The area for Admins alone, where a workspace's sources, suggestions, models, answers, people,
+personal data and system are seen and acted on.
 
-### step (of an action)
-
-_Internal._ a part of an action that runs only inside the action that called it and never on its
-own: writing the *audit event*, queueing a *job*, reading whether a person holds every audience
-group.
-
-It is handed the principal its action admitted, judges no *admission* and has no *refusal* of its
-own — a step that cannot do its part fails the whole action, and nothing of the action lands.
-
-### admission
-
-_Internal._ the judgement of whether a *principal* may perform an *action* at all, made before the
-action does anything: from the principal's kind, a person's role, the purpose a
-*platform principal* acts for, and what was asked — never from a stored row.
-
-Whether the thing named exists, or is in a state to be acted on, is the action's own question, and
-its answer is a *refusal* of another class.
-
-### refusal
-
-an action's answer when it will not do what was asked: one hyphenated **refusal word** naming what
-refused (`role-forbids`, `no-such-binding`, `already-published`) — something the caller can act
-on, where a failure is something to log and try again.
-
-A word means one thing wherever it appears and belongs to one of seven **classes**, by what the
-caller can do about it: *unauthenticated* (sign in again), *forbidden* (someone with the authority
-must do it), *absent* (name something that exists), *malformed* (fix the shape of what was sent),
-*inapplicable* (well-formed, but not something this action applies to), *conflict* (the state
-moved: read again and decide again), *precondition* (something else comes first). A word reaches an
-agent, the operator and the web app as itself; a person reads a sentence, which is the refusal's
-own where it has one and its class's stock sentence otherwise. Once shipped, a word is never
-removed and never changes class, so a caller that has never met a word can still act on its class.
-
-### refused items
-
-_Internal._ what a *refusal* adds when an action refuses a whole set: a refusal's **items**, one
-*refusal word* per refused item, keyed by the id the caller sent for it or by an address's position
-in what was sent — never by an address or a name.
-
-Nothing of the set lands. The refusal's own word is the first refused item's word in id order. Only
-tRPC carries the items, to the web app; MCP and an ops command answer the set's word alone.
-
-### share agent token
-
-a **share agent's** credential: scoped to one connected source, minted and ended by an Admin,
-validated in the api before any request body is read, and good only for the routes a share agent
-uses to push documents in from a company's own network (the *agent* class).
-
-Listed on Control Centre › Sources › Share agents. Not a personal token (a person's own bearer for
-Claude Code and scripts) and not an OAuth access token.
-
-### role (of a person)
-
-what a person may do in every area, a **level** never a job title: **Admin**, **Editor** or
-**Viewer** in v0.1 (the Principal every call carries; the platform is agnostic about who a bid
-writer is).
-
-Editors and Admins verify concepts, answer question sets and save Answers from history; Viewers
-ask, flag and suggest. Owning a *collection* grants actions on it to a person of any role, so a
-Viewer may own one. A guide definition sets, per role, the default layer and the action threshold;
-a connected source's *audience* is who may see, never a role. Not a section's role label.
-
-### member
-
-a person's place in one workspace: the one *role* they hold there, the *groups* they belong to in
-it, and the instant every sign-in and token they held there was last ended.
-
-It begins when the person accepts an *invitation*, or when the platform provisions the workspace or
-adds them; it ends when an Admin removes the member, which leaves the person and their
-*display name* as they were, or when an *erasure request* is carried out; either way every
-*audit event* naming the person stands. A workspace keeps at least one Admin: no role change or
-removal may leave it with none — erasure alone may, since the right outranks the rule, and the
-operator then adds an Admin. A person is a **member** of each workspace they hold such a place in.
-
-### invitation
-
-an Admin's offer of a place as a *member*, with one *role*, to one email address, sent to that
-address and good for seven days; accepted only by a person signed in with that address, whatever its
-letter case, which is when they become a member.
-
-Approving an *access request* mints one; a new invitation to an address with one waiting replaces
-it. Whether the address already belongs to a person on the platform never changes what the Admin is
-told. Its **status** is one of four: **waiting** until it is accepted, cancelled, replaced, or its
-seven days pass into **expired**; **expired** once its seven days pass unaccepted, until a resend
-renews it or an Admin cancels it; **accepted**; or **cancelled**, as a replaced one is. Its email
-goes after the invitation is made, so an invitation can wait with its email **unsent**; a resend
-sends it again.
-
-## The platform's areas and tools
-
-### Control Centre
-
-The one Admin *area*, shown to Admins alone, where the workspace's sources, suggestions, agents and
-spend, the answers it gave, its people, its personal data and its system are seen and acted on.
-
-Its *menu* has eight groups: **Overview** (where to focus), **Suggestions** (*To decide*: every
-waiting suggestion, promotions included), **Sources** (Connected sources, Publishing rules, Cost
-estimates, Backlogs, Removed at source, Share agents), **Models** (Models and spend, the spending
-limit), **Questions** (*Questions asked*, flagged first; the answer tests), **People** (members,
-groups, Personal tokens), **Personal data** (erasure and suppression) and **System** (the audit
-log, signals, health, backups).
-
-### console
-
-The *operator*'s area over every workspace, outside any one of them and never part of Control
-Centre, drawn in the same frame as a workspace and reached from the *workspace switcher*.
-
-It has two groups of its own: **People** (Everyone: every person, the workspaces they belong to and
-their role in each, their sessions and access; end every sign-in and token everywhere. Names
-waiting: correct a display name) and **Workspaces** (Every workspace: each with its member count,
-read-only). Shown to the operator alone and reached only from a signed-in session, never from a
-token.
-
-### area
-
-The top level of the platform's navigation, one entry in the *icon rail*.
-
-The areas are **Ask** (every role; the *home* of an Editor or a Viewer), **Knowledge** (every role;
-its Curation group for Admins and owners), **Inbox** (Admins and owners: what waits on the person,
-deciding *edit* suggestions in *Waiting on you* and pointing into *To decide* for the rest) and **Control Centre** (Admins), with an area for produced work (named
-with S6) and **Briefings** (Then) to come. A person sees only the areas holding a *page* they may
-see. The *console* is the operator's area, reached from the *workspace switcher* and never the rail.
-
-### member page
-
-One *member*'s page, at the *detail address* beneath Members, opened from their row, its *row
-menu*, a Members keystroke or *Jump to*.
-
-A header names them and their address, over three sections: **Access** (when they joined, when
-every sign-in and *personal token* they held here was last ended, their role and their groups, each
-shown once, where it is changed, and the *display name* flag), their *Activity*, and **Remove and
-end every sign-in**, set apart last. A section has no address. A page naming no member says so and
-leads to Members.
-
-### home (of a role)
-
-The *page* a member lands on after signing in, and the one offered back when a page fails or an
-address names nothing they may see.
-
-It is Ask › New question for an Editor or a Viewer, and People › Members for an Admin until Control Centre ›
-Overview is built. A role's home shows in the *icon rail* even before it is built, and then says
-plainly that it is on its way. The *console* has one home for everyone, Workspaces › Every
-workspace, which is where the *operator* lands while they belong to no workspace.
-
-### promotion
-
-An Editor's proposal that an answer or a response become an `Answer` concept — the button is *Save
-as an Answer* — kept as a suggestion of kind *promotion* until decided at the promotion gate.
-
-### promotion gate
-
-Where the `Answer` collection's owner or an Admin decides a promotion, one at a time: the proposed
-Answer beside the closest existing one (found when opened, judged same · variant · different) —
-update the existing, add as new, or decline; customer-specific wording stripped first.
-
-One governed write, the decider as author; a trim makes the decider the generator.
-
-### MCP surface
-
-_Internal._ the platform's one tools-only MCP server at `app.<apex>/mcp`, on the product's own
-origin.
-
-It has four entries in v0.1 — `find`, `ask`, `open`, `give_feedback` — the principal from the
-token, the same predicate and audit as the api, grown later by token scope, never by a second
-server. Guides and the question set are not on it. Never named on a page; the System card says
-*Connected assistants*.
-
-### MCP tool
-
-One of the MCP surface's entries: a named, described, typed function that never takes a workspace
-and returns structured content with its human rendering.
-
-Not a connector's read-live tool.
-
-### open (an MCP entry)
-
-The verbatim step of two-step retrieval: a concept by its IRI, or the passage a citation rests on by
-its locator; `find` is the preview step.
-
-### MCP App
-
-A view the platform serves for an assistant to render inside the conversation: an HTML page
-addressed by a `ui://` URI, named in an entry's metadata, drawn in a sandbox the host controls, able
-to call the same entries the assistant can.
-
-It shows a concept, an answer or a set of matches; it is never a second way in.
-
-### view (of an MCP App)
-
-The rendering half of an MCP App: one `ui://` resource bound to one entry.
-
-Every one has a **human rendering** behind it — the text form of the same result — and not every
-human rendering has one. Not a *page*.
-
-### `ui://`
-
-_Internal._ the wire URI scheme for a view of an MCP App.
-
-Beside `okf://` and meaning something different: `okf://` identifies a **concept**, `ui://`
-identifies a **view (of an MCP App)**. On the wire only, never in a file.
-
-### token scope
-
-_Internal._ what a token may do on the MCP surface: `knowledge:read`, `feedback:write`; `action:*`
-later.
-
-Shown at consent in the person's words, never as an id. Not a connected source's scope.
-
-### personal token
-
-A person's own bearer credential for Claude Code and scripts: the same principal and scopes as an
-OAuth token, ninety days by default, shown once, minted on the Account page, listed to Admins in
-People › Personal tokens.
-
-### assistant
-
-A host a person has given access to the MCP surface by OAuth and has used: Claude on the web, Claude
-Code, ChatGPT.
-
-Under client-ID-metadata documents there is **no registration**, but the platform caches each
-assistant's metadata document as a row, with the scopes it may request, refreshed from the document
-on a schedule: the System card lists the distinct `client_id` URLs seen on issued access, each named
-from its own metadata document, with who has connected through it. OAuth's own names for it stay.
-
-### access (of an assistant)
-
-What a person's consent gives an assistant: the MCP surface in one workspace, or in none, lasting
-through the assistant's refreshes.
-
-It is open until it lapses or an action ends it: ending every sign-in and token, here or
-everywhere, or removing a member. That action's audit event records each access it ended, so ended
-access stays on record after its tokens are gone. The authorization server can end it too, when the
-person's session ends or the assistant disconnects. Nothing records that end, so it stands only
-while its tokens do.
-
-### generation
-
-_Internal._ the stamp every bundle-and-record node and edge in the map carries.
-
-A workspace has one live generation, flipped by one row update after a full rebuild, and every read
-binds it. Generations exist **for full rebuilds only** — an ordinary edit's delta lands in the api's
-own commit transaction and writes no new generation. Source entities carry none: they are
-reconciled per document.
-
-### map rebuild
-
-The job that **rebuilds** one workspace's map in full as a new generation, for one of six reasons —
-first build · model choice change · reconciler · erasure · upgrade · drill — and flips it live in
-one row update.
-
-It is not how an ordinary edit reaches the map: that delta is written by the api in the same
-transaction as the concept index row, the bundle commit and the audit event.
-
-### entity merge
-
-_Internal._ the rule an Admin's confirmed alias-merge suggestion writes: an audit event, never a
-commit; undone by deleting it and re-deriving.
-
-### canonical entity
-
-The node an entity merge produces: keyed by the rule, carrying no connected source, with every
-contribution hanging off it under its own connected source, sensitivity and audience.
-
-Never shown when no contribution is visible to the reader; never a concept.
-
-## Flagged ambiguities
-
-- *Knowledge base* and *bundle* name one thing from two sides: a page says *knowledge base*, and
-  *bundle* is OKF's noun, kept in code, concept files and the MCP wire.
-- *Estate* and *bundle estate* are distinct: the *estate* is the running deployment, and the
-  knowledge sense is always said with *bundle*.
-- A *link* and an *IRI (of a concept)* are distinct: a page shows a *link*, and the IRI is the
-  identity beneath it.
-- *Left* and *Deprecated* are distinct: a person who has left is *Left*, never *Deprecated*, because
-  a person has no successor.
-- *Land (the verb)* and a *landed copy* are distinct: to land is to take a change to `main`, and a
-  landed copy is a state of the knowledge layer.
-- A *page* and a *menu group* are distinct: a page is one place a person reads or acts on, and a
-  menu group is a heading in the menu over some of one area's pages.
-- A *page* and a *view (of an MCP App)* are distinct: a view is the rendering half of an MCP App,
-  never a page.
-- A *menu group* and a *group* are distinct: a menu group heads pages in the menu, and a group is
-  one of members.
-- The *evidence pane* and the *evidence panel* are distinct: the pane lists a concept's sources and
-  the reader's access to them, and the panel is where one source opens beside its claim.
-- *Evidence* and *related knowledge* are distinct: evidence is a locator into a source that backs a
-  concept, and related knowledge is the concepts an answer returns when no `Answer` is a judged fit.
-- *Tenant* and *workspace* name one boundary: a page says *workspace*, and *tenant* is the same
-  boundary said from the platform's side, never a second concept.
-- A *provider* and a *model provider* are distinct: a provider is the system a connected source's
-  documents came from, and a model provider is the company that hosts a model.
-- A *promotion*, a promotion to a role and a *release* are distinct: a promotion is an Editor's
-  proposal that an answer or a response become an `Answer`, a promotion to a role makes a person
-  an Admin or the operator and so asks a *second factor* of them, and a release promotes a built
-  image digest.
-- A *tab* and a browser tab are distinct: a tab divides one page, and a browser tab holds the whole
-  app. The `x-tab-workspace` header names the workspace a browser tab shows.
-- A *window* and a ceiling's window are distinct: a window is a run of a document's text put to
-  the detector's model, and a ceiling's window is the fixed span of time it counts within.
+**Console**:
+The operator's area over every workspace, outside any one of them.
