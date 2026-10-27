@@ -5,7 +5,7 @@ import type { ConceptIri } from "@better-answers/schema";
 import { find, open, type FindResult, type OpenResult } from "../src/answering/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
-import { inMs, percentile, recordFigures } from "./figures.ts";
+import { alternating, inMs, percentile, recordFigures } from "./figures.ts";
 import { landRecallSet, theRecallSet } from "./recall.ts";
 import {
   conceptCiting,
@@ -132,9 +132,6 @@ const timed = async <T>(
   );
   return { ...timing, waitedMs: performance.now() - started };
 };
-
-const alternating = <T>(length: number, even: T, odd: T): T[] =>
-  Array.from({ length }, (_unused, at) => (at % 2 === 0 ? even : odd));
 
 const underLoad = async <T>(
   scenario: Scenario,

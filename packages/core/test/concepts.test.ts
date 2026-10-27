@@ -3,7 +3,13 @@ import { assert, describe, expect, it } from "vitest";
 
 import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
 import { walkFrom } from "@better-answers/core/store/map";
-import { conceptIriOf, CONCEPT_BODY_MAX, passageLocatorOf, ulid } from "@better-answers/schema";
+import {
+  conceptIriOf,
+  CONCEPT_BODY_MAX,
+  passageLocatorOf,
+  ulid,
+  type ConceptIri,
+} from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
 
@@ -1475,18 +1481,21 @@ describe("the per-repository lock", () => {
 describe("opening a concept by IRI", () => {
   const now = new Date("2026-09-08T12:00:00.000Z");
 
+  const openedConcept = async (scenario: Scenario, iri: ConceptIri) => {
+    const opened = await reading(scenario.viewer, (principal, tx) =>
+      open(principal, tx, { iri }, now),
+    );
+    assert(opened.ok);
+    assert(opened.value.found, "the concept was found");
+    return opened.value.concept;
+  };
+
   it("hands back the committed concept, unverified until somebody verifies it", async () => {
     const scenario = await arrange();
     const input = writeFor({ status: "stable" });
     const written = await landed(scenario, input);
 
-    const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }, now),
-    );
-
-    assert(opened.ok);
-    assert(opened.value.found, "the stable concept was found");
-    expect(opened.value.concept).toEqual({
+    expect(await openedConcept(scenario, written.iri)).toEqual({
       iri: written.iri,
 
       frontmatter: {
@@ -1555,12 +1564,7 @@ describe("opening a concept by IRI", () => {
       conceptByIri(principal, tx, written.iri),
     );
     expect(read).toMatchObject({ ok: true });
-    const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }, now),
-    );
-    assert(opened.ok);
-    assert(opened.value.found);
-    expect(opened.value.concept?.trust).toMatchObject({
+    expect((await openedConcept(scenario, written.iri))?.trust).toMatchObject({
       tier: "human-reviewed",
       status: "current",
       verifiedBy: "Test person",
@@ -1619,13 +1623,7 @@ describe("opening a concept by IRI", () => {
 
     const written = await landed(scenario, writeFor({ status: "deprecated" }));
 
-    const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }, now),
-    );
-
-    assert(opened.ok);
-    assert(opened.value.found);
-    expect(opened.value.concept?.trust.status).toBe("deprecated");
+    expect((await openedConcept(scenario, written.iri))?.trust.status).toBe("deprecated");
   });
 
   it("names a platform verification by its process and its rider", async () => {
@@ -1645,13 +1643,7 @@ describe("opening a concept by IRI", () => {
       client.release();
     }
 
-    const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }, now),
-    );
-
-    assert(opened.ok);
-    assert(opened.value.found);
-    expect(opened.value.concept?.trust).toEqual({
+    expect((await openedConcept(scenario, written.iri))?.trust).toEqual({
       tier: "machine-confirmed",
       status: "current",
       verifiedBy: "process:better-answers-importer",

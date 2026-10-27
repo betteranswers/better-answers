@@ -61,6 +61,12 @@ const anAdminAtConsent = async (
   return workspace;
 };
 
+const connectOnceRevoked = async (page: Page, api: APIRequestContext, userId: string) => {
+  await endEverySignInAndToken(api, userId);
+  await page.getByRole("button", { name: "Connect" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in again" })).toBeVisible();
+};
+
 const connectedAt = async (page: Page): Promise<URL> => {
   await page.getByRole("button", { name: "Connect" }).click();
   const callback = landedAt(page);
@@ -170,10 +176,7 @@ test("draws consent, then its refusal, in the dark theme kept", async ({
   await expect(page.locator("script[src]"), "the consent page loaded the SPA").toHaveCount(0);
   await passesTheAccessibilityGate();
 
-  await endEverySignInAndToken(request, workspace.admin.id);
-  await page.getByRole("button", { name: "Connect" }).click();
-
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in again" })).toBeVisible();
+  await connectOnceRevoked(page, request, workspace.admin.id);
   expect(await paintsTheDarkPage(page), "dark painted the light page").not.toBe(light);
 });
 
@@ -281,21 +284,11 @@ test("refuses consent after credentials are revoked, sending no code", async ({
   baseURL,
 }) => {
   assert.ok(baseURL !== undefined, "playwright.config.ts gives the suite a baseURL");
-  /* jscpd:ignore-start */
   const origin = baseURL;
-  const email = anAddress("revoked");
-  const workspace = await provision(request, { name: "Revoked Ltd", adminEmail: email });
   await catchClaudesRedirect(page);
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent" }));
-  await expect(consentHeading(page)).toBeVisible();
-  /* jscpd:ignore-end */
+  const workspace = await anAdminAtConsent(page, request, origin, "revoked");
 
-  await endEverySignInAndToken(request, workspace.admin.id);
-  await page.getByRole("button", { name: "Connect" }).click();
-
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in again" })).toBeVisible();
+  await connectOnceRevoked(page, request, workspace.admin.id);
   expect(landedAt(page).origin).toBe(origin);
   expect(landedAt(page).searchParams.get("code")).toBeNull();
 });

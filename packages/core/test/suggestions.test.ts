@@ -80,6 +80,17 @@ const suggestionIdOf = (set: { readonly suggestionIds: readonly string[] }, at =
   return suggestionId;
 };
 
+const refusalsToAcceptingAsAdmin = async (
+  scenario: Scenario,
+  set: { readonly suggestionIds: readonly string[] },
+) => {
+  const accepted = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+    decisions: [{ suggestionId: suggestionIdOf(set), expectedTarget: null }],
+  });
+  assert(accepted.ok, inspect(accepted));
+  return accepted.value.map(refusalOf);
+};
+
 const summaryOf = async (scenario: Scenario, setId: string) => {
   const read = await readingAs(db().runtimePool, scenario.admin, (principal, tx) =>
     suggestionSetSummary(principal, tx, setId),
@@ -668,12 +679,7 @@ describe("an acceptance whose ground moved", () => {
 
     await editorWrote(scenario, { mergeKey: request.mergeKey, path: request.path });
 
-    const accepted = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
-      decisions: [{ suggestionId: suggestionIdOf(set), expectedTarget: null }],
-    });
-
-    assert(accepted.ok, inspect(accepted));
-    expect(accepted.value.map(refusalOf)).toEqual(["resolution-moved"]);
+    expect(await refusalsToAcceptingAsAdmin(scenario, set)).toEqual(["resolution-moved"]);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
     const row = await suggestionRow(suggestionIdOf(set));
     expect(row).toMatchObject({
@@ -1225,12 +1231,7 @@ describe("what an acceptance answers when it cannot be prepared", () => {
       [scenario.workspaceId, scenario.admin.userId, new Date()],
     );
 
-    const accepted = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
-      decisions: [{ suggestionId: suggestionIdOf(set), expectedTarget: null }],
-    });
-
-    assert(accepted.ok, inspect(accepted));
-    expect(accepted.value.map(refusalOf)).toEqual(["credentials-revoked"]);
+    expect(await refusalsToAcceptingAsAdmin(scenario, set)).toEqual(["credentials-revoked"]);
     expect(await suggestionRow(suggestionIdOf(set))).toMatchObject({ status: "waiting" });
   });
 

@@ -270,6 +270,20 @@ const findingsAs = (who: UserPrincipal, connectedSourceId: string) =>
     findingsOf(principal, tx, inputOf(findingsOfInput, { connectedSourceId })),
   );
 
+const findingCounts = async <Count extends "dismissed" | "overriddenByErasure">(
+  who: UserPrincipal,
+  connectedSourceId: string,
+  count: Count,
+) => {
+  const read = await findingsAs(who, connectedSourceId);
+  assert(read.ok);
+  return read.value.map((group) => ({
+    documentId: group.documentId,
+    found: group.found,
+    [count]: group[count],
+  }));
+};
+
 const documentHeldAboveItsConnectedSource = async (workspaceId: string) => {
   const connectedSource = await connectedSourceHolding(db(), workspaceId, {
     sensitivity: "Restricted",
@@ -469,16 +483,7 @@ describe("the review read of a connected source's findings", () => {
       groupOfFindingsIn(first.documentId, HEALTH),
     ]);
 
-    const read = await findingsAs(scenario.admin, connectedSourceId);
-
-    assert(read.ok);
-    expect(
-      read.value.map((group) => ({
-        documentId: group.documentId,
-        found: group.found,
-        dismissed: group.dismissed,
-      })),
-    ).toEqual([
+    expect(await findingCounts(scenario.admin, connectedSourceId, "dismissed")).toEqual([
       { documentId: first.documentId, found: 2, dismissed: 2 },
       { documentId: second.documentId, found: 1, dismissed: 0 },
     ]);
@@ -554,16 +559,7 @@ describe("the review read of a connected source's findings", () => {
       groupOfFindingsIn(second.documentId),
     ]);
 
-    const read = await findingsAs(scenario.admin, connectedSourceId);
-
-    assert(read.ok);
-    expect(
-      read.value.map((group) => ({
-        documentId: group.documentId,
-        found: group.found,
-        overriddenByErasure: group.overriddenByErasure,
-      })),
-    ).toEqual([
+    expect(await findingCounts(scenario.admin, connectedSourceId, "overriddenByErasure")).toEqual([
       { documentId: first.documentId, found: 2, overriddenByErasure: 1 },
 
       { documentId: second.documentId, found: 1, overriddenByErasure: 0 },

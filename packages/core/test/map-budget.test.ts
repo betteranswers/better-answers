@@ -8,7 +8,7 @@ import { ids, type ConceptIri } from "@better-answers/schema";
 import { writeConcept, type WriteConceptInput } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
-import { inMs, percentile, recordFigures } from "./figures.ts";
+import { alternating, inMs, percentile, recordFigures } from "./figures.ts";
 import { answered, readingAs, runtimePoolFor, seedingWith } from "./suite-postgres.ts";
 import { runWorkerOnce } from "./worker-process.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
@@ -145,9 +145,6 @@ const timedWalk = async (
   );
   return { ...timed, waitedMs: performance.now() - started };
 };
-
-const alternating = <T>(length: number, even: T, odd: T): T[] =>
-  Array.from({ length }, (_unused, at) => (at % 2 === 0 ? even : odd));
 
 describe("the map under concurrent read load", () => {
   let dense: Scenario;

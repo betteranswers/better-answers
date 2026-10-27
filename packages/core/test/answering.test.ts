@@ -1622,6 +1622,12 @@ describe("what ask answers with no model", () => {
 
   const AN_OPEN_RECORD = { completed: false, verdict: null, judge_state: null, concepts: [] };
 
+  const recordOpenedBy = async (opened: readonly string[]) => {
+    const [recordId] = opened;
+    assert(recordId !== undefined, "the ask opened a record");
+    return recordOf(recordId);
+  };
+
   const RETENTION_ASKED = { question: RETENTION_QUESTION, collections: [] };
 
   it("answers what a step refuses, its record left open", async () => {
@@ -1636,9 +1642,7 @@ describe("what ask answers with no model", () => {
     );
 
     expect(answered).toEqual({ ok: false, error: "credentials-revoked" });
-    const [recordId] = opened;
-    assert(recordId !== undefined, "the ask opened a record");
-    expect(await recordOf(recordId)).toEqual([
+    expect(await recordOpenedBy(opened)).toEqual([
       expect.objectContaining({ ...AN_OPEN_RECORD, question: RETENTION_QUESTION }),
     ]);
   });
@@ -1660,9 +1664,7 @@ describe("what ask answers with no model", () => {
 
     assert(!answered.ok);
     expect(String(answered.error)).toMatch(/no open record \w{26} to complete/);
-    const [recordId] = opened;
-    assert(recordId !== undefined, "the ask opened a record");
-    expect(await recordOf(recordId)).toEqual([
+    expect(await recordOpenedBy(opened)).toEqual([
       expect.objectContaining({ ...AN_OPEN_RECORD, question: RETENTION_QUESTION }),
     ]);
   });
