@@ -6,11 +6,7 @@ disable-model-invocation: true
 
 # Survey the architecture
 
-The survey produces one report of **opportunities**: places in the code where a different shape would make the next route block easier to build and to test. The owner reads and annotates the report. Then the architecture review starts from it, run through `/poteto-mode` as `docs/agents/workflow.md` sets out. The run is done when the report and its markdown copy exist with every field of every opportunity filled, or when a stop names what was missing. The report says what the run did without, so a thin result is never mistaken for a full one.
-
-Nothing measures depth. This survey supplies the judgement that no gate makes, so it reports what the gates and the diff reviewers cannot see and leaves out what they already hold.
-
-Invoking this skill authorizes reading anything in the checkout, running read-only git, GitNexus and code-index queries, dispatching read-only subagents, writing the report's two files and opening the report in `lavish-axi`. It does not authorize editing code, `CONCEPTS.md`, a decision doc or an issue. The review that follows owns those changes.
+The survey produces one report of **opportunities**: places in the code where a different shape would make the next route block easier to build and to test. The owner reads and annotates the report. Then the architecture review starts from it, run through `/poteto-mode`. The run is done when the report and its markdown copy exist with every field of every opportunity filled, or when a stop names what was missing.
 
 Each reference below is read at the step that names it. A read made earlier does not count.
 
