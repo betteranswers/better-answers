@@ -12,6 +12,8 @@
     "./face-admission": "./src/scans/face-admission.ts",
     "./insert-scan": "./src/scans/insert-scan.ts",
     "./jscpd": "./src/scans/jscpd.ts",
+    "./loose-files": "./src/scans/loose-files.ts",
+    "./move-files": "./src/moves/move-files.ts",
     "./mutant-probe": "./src/mutation/mutant-probe.ts",
     "./mutation-shards": "./src/mutation/mutation-shards.ts",
     "./mutation-summary": "./src/mutation/mutation-summary.ts",
