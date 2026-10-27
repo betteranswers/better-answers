@@ -1,6 +1,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useEffectEvent, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  type SubmitEvent,
+  type ReactNode,
+} from "react";
 import { flushSync } from "react-dom";
 
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
@@ -212,7 +219,7 @@ type EmailStep = {
   readonly sending: boolean;
   readonly described: string | undefined;
   readonly onAddress: (address: string) => void;
-  readonly onAsk: (event: FormEvent) => void;
+  readonly onAsk: (event: SubmitEvent) => void;
   readonly actions: ReactNode;
 };
 
@@ -251,7 +258,7 @@ type CodeStep = {
   readonly wrong: boolean;
   readonly described: string | undefined;
   readonly onCode: (entered: string) => void;
-  readonly onSubmit: (event: FormEvent) => void;
+  readonly onSubmit: (event: SubmitEvent) => void;
   readonly actions: ReactNode;
 };
 
@@ -316,7 +323,7 @@ export function SignInPage() {
   const passkey = usePasskeySignIn(sentTo === undefined, moveOnAfterSignIn);
   const [offersAPasskey] = useState(passkeysHere);
 
-  const askForCode = (event: FormEvent) => {
+  const askForCode = (event: SubmitEvent) => {
     event.preventDefault();
     const asked = address.trim();
     if (asked === "") return;
@@ -390,7 +397,7 @@ export function SignInPage() {
     signInWith(digits);
   };
 
-  const submitCode = (event: FormEvent) => {
+  const submitCode = (event: SubmitEvent) => {
     event.preventDefault();
     signInWith(code);
   };

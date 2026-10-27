@@ -48,9 +48,9 @@ export const stepAfterTheFactors = (held: Held, query: string): string =>
 
 const secondFactorOrUnread = async (queryClient: QueryClient, api: ApiProxy, fresh = true) => {
   const asked = { ...api.person.secondFactor.queryOptions(), retry: false };
-  const held = await (
-    fresh ? queryClient.fetchQuery(asked) : queryClient.ensureQueryData(asked)
-  ).catch(() => undefined);
+  const held = await queryClient
+    .query(fresh ? asked : { ...asked, staleTime: "static" })
+    .catch(() => undefined);
   rememberTheStanding(held);
   return held;
 };

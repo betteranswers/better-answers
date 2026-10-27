@@ -330,7 +330,7 @@ export const useArrival = (): Arrival | undefined => {
 };
 
 const sessionOrUnread = (queryClient: QueryClient) =>
-  queryClient.fetchQuery(sessionOptions()).catch(() => undefined);
+  queryClient.query(sessionOptions()).catch(() => undefined);
 
 export const displayNameDetour = async (
   queryClient: QueryClient,

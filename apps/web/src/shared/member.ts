@@ -90,7 +90,7 @@ export const memberRefusal = async (
   onRead: () => void,
 ): Promise<RefusalWord | undefined> => {
   try {
-    await queryClient.ensureQueryData({ ...memberOptions(api), retry: false });
+    await queryClient.query({ ...memberOptions(api), retry: false, staleTime: "static" });
     onRead();
     return undefined;
   } catch (error) {

@@ -17,7 +17,7 @@ export const mustSignInForTheConsole = async (
 ): Promise<boolean> => {
   const asked = { ...standingOptions(api), retry: false };
   try {
-    await (afresh ? queryClient.fetchQuery(asked) : queryClient.ensureQueryData(asked));
+    await queryClient.query(afresh ? asked : { ...asked, staleTime: "static" });
     return false;
   } catch (error) {
     return error instanceof Error && refusalOf(error)?.class === "unauthenticated";
@@ -31,9 +31,7 @@ export const isTheOperator = async (
 ): Promise<boolean> => {
   const asked = { ...standingOptions(api), retry: false };
   try {
-    const standing = await (afresh
-      ? queryClient.fetchQuery(asked)
-      : queryClient.ensureQueryData(asked));
+    const standing = await queryClient.query(afresh ? asked : { ...asked, staleTime: "static" });
     return standing.operator;
   } catch {
     return false;

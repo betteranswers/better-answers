@@ -36,7 +36,7 @@ export type ClientMetadataFetcherOptions = {
 };
 
 const nodeLookup: Lookup = async (hostname) => {
-  const answers = await dnsLookup(hostname, { all: true, verbatim: true });
+  const answers = await dnsLookup(hostname, { all: true, order: "verbatim" });
   return answers.map((answer) => ({
     address: answer.address,
     family: answer.family === 6 ? 6 : 4,
