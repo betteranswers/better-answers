@@ -1,7 +1,6 @@
 {
   "env": {
-    "JCODEMUNCH_ENFORCE": "strict",
-    "CLAUDE_CODE_ENABLE_TODO_TOOLS": "1"
+    "JCODEMUNCH_ENFORCE": "strict"
   },
   "hooks": {
     "SessionStart": [
@@ -40,18 +39,8 @@
   "enabledPlugins": {
     "mattpocock-skills@mattpocock": false,
     "mattpocock-skills@claude-plugins-official": false,
-    "mattpocock-skills@synced": false,
-    "pstack@pstack-claude": true
+    "mattpocock-skills@synced": false
   },
-  "extraKnownMarketplaces": {
-    "pstack-claude": {
-      "source": {
-        "source": "github",
-        "repo": "michael-denyer/pstack-claude",
-        "ref": "v0.9.102"
-      },
-      "autoUpdate": true
-    }
-  },
+  "extraKnownMarketplaces": {},
   "subagentPromptCacheTtl": "1h"
 }
