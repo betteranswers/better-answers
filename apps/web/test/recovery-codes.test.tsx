@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, assert, describe, expect, it } from "vitest";
 
 import { RECOVERY_CODE_WORDS } from "@/features/auth/account-words.ts";
 import { RecoveryCodes } from "@/features/auth/recovery-codes.tsx";
@@ -95,7 +95,8 @@ describe("the recovery codes block", () => {
     drawn();
 
     const download = screen.getByRole("link", { name: "Download" });
-    const href = download.getAttribute("href") ?? "";
+    const href = download.getAttribute("href");
+    assert(href !== null, "Download links to the codes");
     const [kind, text = ""] = href.split(",", 2);
 
     expect(kind).toBe("data:text/plain;charset=utf-8");

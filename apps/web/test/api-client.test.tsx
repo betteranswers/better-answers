@@ -4,7 +4,7 @@ import path from "node:path";
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
-import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
   ANSWERING_WORKSPACE_HEADER,
@@ -281,9 +281,10 @@ describe("an ask the web sends", () => {
 
     expect(heard.map(({ method, named }) => [method, named])).toEqual([["POST", "w"]]);
     const [sent] = heard;
-    expect(sent?.address.href).not.toMatch(/audit|logs|kept/i);
-    expect(decodeURIComponent(sent?.address.href ?? "")).not.toContain(A_QUESTION);
-    expect(sent?.body).toContain(A_QUESTION);
+    assert(sent !== undefined, "the ask was heard");
+    expect(sent.address.href).not.toMatch(/audit|logs|kept/i);
+    expect(decodeURIComponent(sent.address.href)).not.toContain(A_QUESTION);
+    expect(sent.body).toContain(A_QUESTION);
   });
 
   it("is sent alone, though another action leaves with it", async () => {

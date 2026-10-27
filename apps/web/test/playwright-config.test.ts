@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import type { PlaywrightTestConfig } from "@playwright/test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 const SETTINGS = ["CI", "E2E_PORT"] as const;
 type Settings = Partial<Record<(typeof SETTINGS)[number], string>>;
@@ -93,10 +93,12 @@ describe("the browser suite's port", () => {
 
   it("is the port the server starts on and answers", async () => {
     const config = await configUnder(undefined);
-    const server = Array.isArray(config.webServer) ? config.webServer[0] : config.webServer;
+    const server = config.webServer;
     const port = portOf(config);
 
-    expect(server?.command).toMatch(new RegExp(` ${port}$`));
-    expect(server?.url).toBe(`http://localhost:${port}/health`);
+    assert(!Array.isArray(server), "the config starts one web server");
+    assert(server !== undefined, "the config starts a web server");
+    expect(server.command).toMatch(new RegExp(` ${port}$`));
+    expect(server.url).toBe(`http://localhost:${port}/health`);
   });
 });

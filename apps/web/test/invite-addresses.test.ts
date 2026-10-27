@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import {
   addressesCounted,
@@ -78,24 +78,24 @@ describe("the addresses the invite dialog holds", () => {
 
 describe("what flags an address the dialog holds", () => {
   const [ana, bad] = allInto(NONE, "ana@example.com, not-an-address").held;
+  assert(ana !== undefined, "the dialog holds ana's address");
+  assert(bad !== undefined, "the dialog holds the address that is no address");
 
   it("flags an address that is no address", () => {
-    expect(bad === undefined ? "missing" : flagOf(bad, new Set(), NO_FLAGS)).toBe("malformed");
+    expect(flagOf(bad, new Set(), NO_FLAGS)).toBe("malformed");
   });
 
   it("flags a member's address, however it is cased", () => {
     const members = membersOf(["ANA@example.com"]);
 
-    expect(ana === undefined ? "missing" : flagOf(ana, members, NO_FLAGS)).toBe("already-a-member");
+    expect(flagOf(ana, members, NO_FLAGS)).toBe("already-a-member");
   });
 
   it("flags what the api refused, and nothing else", () => {
     const refused = new Map([["ana@example.com", "already-a-member" as const]]);
 
-    expect(ana === undefined ? "missing" : flagOf(ana, new Set(), refused)).toBe(
-      "already-a-member",
-    );
-    expect(ana === undefined ? "missing" : flagOf(ana, new Set(), NO_FLAGS)).toBeUndefined();
+    expect(flagOf(ana, new Set(), refused)).toBe("already-a-member");
+    expect(flagOf(ana, new Set(), NO_FLAGS)).toBeUndefined();
   });
 
   it("maps the api's refused places back onto the addresses sent", () => {
