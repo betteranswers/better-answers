@@ -6,7 +6,6 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
 
-    // `vitest.images.config.ts` selects them for the images job.
     exclude: [...configDefaults.exclude, "tests/images/**"],
 
     env: { PATH: pathWithAppleGit() },

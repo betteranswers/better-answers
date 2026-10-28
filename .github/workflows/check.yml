@@ -324,9 +324,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      # The four pytest workers would each start a Postgres of their own. This is the server
-      # `docs/operations/local-gates.md` gives a laptop, started after the login above and from
-      # the pin in `packages/schema/src/postgres-image.ts`, which a `services:` entry cannot read.
       - name: one Postgres for the suite's workers
         run: deploy/test-postgres.sh up
       - run: pnpm check:worker
@@ -336,14 +333,11 @@ jobs:
           # per document.
           COCOINDEX_DISABLE_USAGE_TRACKING: "1"
 
-  # The suites that start a container or a process of their own: the three images' contents,
-  # the compose scripts and the api's stop. `check` leaves them out of every other leg.
   full-images:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'full' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 30
-    # The image tests read the layer cache `build.yml` writes to the private packages.
     permissions:
       contents: read
       packages: read
