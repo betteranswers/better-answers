@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -535,9 +536,7 @@ const FAN_IN = "check";
 
 const TITLE_JOB = "pr-title";
 
-const VERDICT_JOB = "verdict";
-
-const JOBS_ON_NO_LANE: readonly string[] = [TITLE_JOB, VERDICT_JOB];
+const JOBS_ON_NO_LANE: readonly string[] = [TITLE_JOB];
 
 const checkJobs = (): Readonly<Record<string, Job>> => workflow("check.yml").jobs;
 
@@ -597,23 +596,10 @@ const CODE_LANE = "full";
 
 const A_BASE = "0123456789abcdef0123456789abcdef01234567";
 
-const TARGET = "refs/heads/main";
-
 const TARGET_TIP = "1111111111111111111111111111111111111111";
-
-/** The head of the group queued ahead, which GitHub gives the group behind it as `base_sha`. */
-const AHEAD = "2222222222222222222222222222222222222222";
 
 /** A run's `github` context by the path an expression names; GitHub reads an absent path as "". */
 type Context = Readonly<Record<string, string>>;
-
-const aGroupOn = (parent: string): Context => ({
-  "github.event_name": "merge_group",
-  "github.event.merge_group.base_sha": parent,
-  "github.event.merge_group.base_ref": TARGET,
-});
-
-const AN_IMAGE_CHANGE = ["apps/worker/pyproject.toml", "apps/worker/uv.lock"];
 
 type LaneStepCase = {
   readonly run: string;
@@ -668,62 +654,8 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     images: "yes",
   },
   {
-    run: "a docs-only merge group",
-    github: aGroupOn(TARGET_TIP),
-    fetched: true,
-    changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
-    lane: "docs",
-    images: "no",
-  },
-  {
-    run: "a merge group changing source",
-    github: aGroupOn(TARGET_TIP),
-    fetched: true,
-    changedSince: { [TARGET_TIP]: ["apps/api/src/main.ts"] },
-    lane: "full",
-    images: "no",
-  },
-  {
-    run: "a merge group changing a lockfile",
-    github: aGroupOn(TARGET_TIP),
-    fetched: true,
-    changedSince: { [TARGET_TIP]: ["apps/api/src/main.ts", "pnpm-lock.yaml"] },
-    lane: "full",
-    images: "yes",
-  },
-  {
-    run: "a docs group behind an image change",
-    github: aGroupOn(AHEAD),
-    fetched: true,
-    changedSince: {
-      [AHEAD]: ["docs/vision.md"],
-      [TARGET_TIP]: [...AN_IMAGE_CHANGE, "docs/vision.md"],
-    },
-    lane: "full",
-    images: "yes",
-  },
-  {
-    run: "a test-only group behind an image change",
-    github: aGroupOn(AHEAD),
-    fetched: true,
-    changedSince: {
-      [AHEAD]: ["apps/worker/tests/pipeline/test_pipeline_landed.py"],
-      [TARGET_TIP]: [...AN_IMAGE_CHANGE, "apps/worker/tests/pipeline/test_pipeline_landed.py"],
-    },
-    lane: "full",
-    images: "yes",
-  },
-  {
-    run: "an unfetched merge group base",
-    github: aGroupOn(TARGET_TIP),
-    fetched: false,
-    changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
-    lane: "full",
-    images: "yes",
-  },
-  {
-    run: "a merge group with no base",
-    github: { "github.event_name": "merge_group" },
+    run: "a manual dispatch, which names no base",
+    github: { "github.event_name": "workflow_dispatch" },
     fetched: true,
     changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
     lane: "full",
@@ -788,9 +720,7 @@ const gitOver = ({ asked, fetched, since, fetchHead }: Scratch): string =>
     `echo "$1" >> '${asked}'`,
     'for word in "$@"; do before="$last"; last="$word"; done',
     'case "$1" in',
-    fetched
-      ? `  fetch) if [ "$last" = '${TARGET}' ]; then echo ${TARGET_TIP}; else echo "$last"; fi > '${fetchHead}' ;;`
-      : "  fetch) exit 128 ;;",
+    fetched ? `  fetch) echo "$last" > '${fetchHead}' ;;` : "  fetch) exit 128 ;;",
     `  rev-parse) [ "$last" = FETCH_HEAD ] && cat '${fetchHead}' ;;`,
     `  diff) [ "$last" = HEAD ] && cat '${since}/'"$before" ;;`,
     "  *) exit 3 ;;",
@@ -872,7 +802,7 @@ describe("the lane inside check.yml", () => {
   it.each([
     {
       word: "the retired affected lane",
-      github: aGroupOn(TARGET_TIP),
+      github: aPullRequestOn(TARGET_TIP),
       answered: "lane=affected\\nimages=no\\n",
       says: "no lane",
     },
@@ -884,7 +814,7 @@ describe("the lane inside check.yml", () => {
     },
     {
       word: "an images answer of maybe",
-      github: aGroupOn(TARGET_TIP),
+      github: aPullRequestOn(TARGET_TIP),
       answered: "lane=full\\nimages=maybe\\n",
       says: "neither",
     },
@@ -1018,21 +948,12 @@ type VerdictCase = {
 
   readonly wanted: string;
 
-  readonly queued?: { readonly was: string; readonly wanted: string };
-
   readonly withoutItsLegs?: boolean;
 
   readonly says?: string;
 };
 
 const PROVED_NOTHING = "proved nothing";
-
-const NOT_QUEUED = { was: "skipped", wanted: "skipped" };
-
-const A_PASSING_VERDICT = { was: "success", wanted: "success" };
-
-const queuedOf = (scenario: VerdictCase): { readonly was: string; readonly wanted: string } =>
-  scenario.queued ?? NOT_QUEUED;
 
 const verdictOf = (run: SpawnSyncReturns<string>): VerdictCase["verdict"] =>
   run.status === 0 ? "passes" : "fails";
@@ -1073,58 +994,20 @@ const VERDICTS: readonly VerdictCase[] = [
     wanted: "success",
   },
   {
-    verdict: "fails",
-    run: "a full pull request that ran the verdict",
-    lane: "full",
-    ran: FULL_LEGS,
-    title: "success",
-    wanted: "success",
-    queued: { was: "success", wanted: "skipped" },
-  },
-  {
     verdict: "passes",
-    run: "a full merge group",
-    lane: "full",
-    ran: FULL_LEGS,
-    title: "success",
-    wanted: "success",
-    queued: A_PASSING_VERDICT,
-  },
-  {
-    verdict: "fails",
-    run: "a merge group whose verdict failed",
-    lane: "full",
-    ran: FULL_LEGS,
-    title: "success",
-    wanted: "success",
-    queued: { was: "failure", wanted: "success" },
-  },
-  {
-    verdict: "fails",
-    run: "a merge group that skipped its verdict",
-    lane: "full",
-    ran: FULL_LEGS,
-    title: "success",
-    wanted: "success",
-    queued: { was: "skipped", wanted: "success" },
-  },
-  {
-    verdict: "passes",
-    run: "a docs merge group",
+    run: "a docs pull request",
     lane: "docs",
     ran: ["docs-gates"],
     title: "success",
     wanted: "success",
-    queued: A_PASSING_VERDICT,
   },
   {
     verdict: "fails",
-    run: "a merge group whose title failed",
+    run: "a docs pull request whose title failed",
     lane: "docs",
     ran: ["docs-gates"],
     title: "failure",
     wanted: "success",
-    queued: A_PASSING_VERDICT,
   },
   {
     verdict: "passes",
@@ -1136,12 +1019,11 @@ const VERDICTS: readonly VerdictCase[] = [
   },
   {
     verdict: "fails",
-    run: "a full merge group missing a leg",
+    run: "a full pull request missing a leg",
     lane: "full",
     ran: FULL_LEGS.slice(1),
     title: "success",
     wanted: "success",
-    queued: A_PASSING_VERDICT,
   },
   {
     verdict: "fails",
@@ -1150,7 +1032,6 @@ const VERDICTS: readonly VerdictCase[] = [
     ran: [],
     title: "success",
     wanted: "success",
-    queued: A_PASSING_VERDICT,
     withoutItsLegs: true,
     says: PROVED_NOTHING,
   },
@@ -1171,7 +1052,6 @@ const verdictOn = ({
   ran,
   title,
   wanted,
-  queued = NOT_QUEUED,
   withoutItsLegs,
 }: VerdictCase): SpawnSyncReturns<string> => {
   const legs = Object.keys(checkJobs())
@@ -1188,10 +1068,8 @@ const verdictOn = ({
         ...Object.fromEntries(legs),
         [LANE]: { result: "success" },
         [TITLE_JOB]: { result: title },
-        [VERDICT_JOB]: { result: queued.was },
       }),
       TITLE_WANTED: wanted,
-      VERDICT_WANTED: queued.wanted,
     },
   });
 };
@@ -1219,17 +1097,14 @@ describe("the one verdict check.yml reports", () => {
     ).toEqual("${{ always() }}");
   });
 
-  it.each([
-    { job: TITLE_JOB, wantedBy: "TITLE_WANTED" },
-    { job: VERDICT_JOB, wantedBy: "VERDICT_WANTED" },
-  ])("wants $job's success exactly where it runs", ({ job, wantedBy }) => {
-    const condition = checkJobs()[job]?.if;
-    assert(condition !== undefined, `${job} has an if`);
+  it("wants the title's success exactly where it runs", () => {
+    const condition = checkJobs()[TITLE_JOB]?.if;
+    assert(condition !== undefined, `${TITLE_JOB} has an if`);
     const runsOn = /^\$\{\{ (?<condition>.+) \}\}$/.exec(condition)?.groups?.["condition"];
     const env = stepsOfJob(FAN_IN).flatMap(envOf);
 
-    assert(runsOn !== undefined, `${job} runs on no condition this reading can find`);
-    expect(Object.fromEntries(env)[wantedBy]).toEqual(
+    assert(runsOn !== undefined, `${TITLE_JOB} runs on no condition this reading can find`);
+    expect(Object.fromEntries(env)["TITLE_WANTED"]).toEqual(
       `\${{ (${runsOn}) && 'success' || 'skipped' }}`,
     );
   });
@@ -1237,14 +1112,9 @@ describe("the one verdict check.yml reports", () => {
   it.each(VERDICTS)("$verdict on $run", (scenario: VerdictCase) => {
     const ran = verdictOn(scenario);
 
-    const queued = queuedOf(scenario);
-
     expect(verdictOf(ran), `${ran.stdout}${ran.stderr}`).toEqual(scenario.verdict);
     expect(ran.stdout).toContain(
       `${TITLE_JOB}: ${scenario.title} (this lane wants ${scenario.wanted})`,
-    );
-    expect(ran.stdout).toContain(
-      `${VERDICT_JOB}: ${queued.was} (this lane wants ${queued.wanted})`,
     );
   });
 
@@ -1258,7 +1128,7 @@ describe("the pull request's title, read by check.yml", () => {
   const PULL_REQUEST = "7";
   const REPOSITORY = "betteranswers/better-answers";
   const CONVENTIONAL = "ci: check the pull request's title with commitlint";
-  const FROM_A_PULL_REQUEST = { PULL_REQUEST, QUEUED_REF: "" };
+  const FROM_A_PULL_REQUEST = { PULL_REQUEST };
 
   const COMMITLINT = ["@commitlint/cli", "@commitlint/config-conventional"];
 
@@ -1283,7 +1153,7 @@ describe("the pull request's title, read by check.yml", () => {
 
   const titleStepWith = (
     title: string,
-    event: { readonly PULL_REQUEST: string; readonly QUEUED_REF: string },
+    event: { readonly PULL_REQUEST: string },
   ): SpawnSyncReturns<string> => {
     const bin = mkdtempSync(path.join(tmpdir(), "pr-title-"));
     writeFileSync(
@@ -1318,17 +1188,8 @@ describe("the pull request's title, read by check.yml", () => {
     expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
   });
 
-  it("reads the pull request's number off a merge group's ref", () => {
-    const run = titleStepWith(CONVENTIONAL, {
-      PULL_REQUEST: "",
-      QUEUED_REF: `refs/heads/gh-readonly-queue/main/pr-${PULL_REQUEST}-0123456789abcdef`,
-    });
-
-    expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
-  });
-
   it("fails an event that names no pull request", () => {
-    const run = titleStepWith(CONVENTIONAL, { PULL_REQUEST: "", QUEUED_REF: "refs/heads/main" });
+    const run = titleStepWith(CONVENTIONAL, { PULL_REQUEST: "" });
 
     expect(run.status).not.toBe(0);
     expect(run.stdout).toContain("no pull request number in this event");
@@ -1349,90 +1210,30 @@ describe("the pull request's title, read by check.yml", () => {
   });
 });
 
-describe("the verdict status, read by check.yml", () => {
-  const PULL_REQUEST = "7";
-  const REPOSITORY = "betteranswers/better-answers";
-  const HEAD = "0123456789abcdef0123456789abcdef01234567";
-  const QUEUED_REF = `refs/heads/gh-readonly-queue/main/pr-${PULL_REQUEST}-89abcdef01234567`;
+describe("the workflows with no merge queue", () => {
+  const workflowDirectory = path.join(repositoryRoot, ".github", "workflows");
+  const workflowFiles = readdirSync(workflowDirectory).filter((file) => file.endsWith(".yml"));
+  const textOf = (file: string): string => readFileSync(path.join(workflowDirectory, file), "utf8");
 
-  type Status = { readonly context: string; readonly state: string };
+  it("name no merge group, whose runs only a queue starts", () => {
+    const queueEvent = ["merge", "group"].join("_");
 
-  const OTHER_PASSING: Status = { context: "cubic", state: "success" };
+    expect(
+      workflowFiles.filter((file) => textOf(file).includes(queueEvent)),
+      `a ${queueEvent} trigger or condition has come back into these workflows`,
+    ).toEqual([]);
+  });
 
-  const verdictStepWith = (statuses: readonly Status[], ref: string): SpawnSyncReturns<string> => {
-    const scratch = mkdtempSync(path.join(tmpdir(), "verdict-"));
-    writeFileSync(
-      path.join(scratch, "status.json"),
-      JSON.stringify({ state: "pending", statuses }),
-    );
-    writeFileSync(
-      path.join(scratch, "gh"),
-      [
-        "#!/bin/sh",
-        'case "$*" in',
-        `  "api repos/${REPOSITORY}/pulls/${PULL_REQUEST} --jq .head.sha") printf '%s\\n' '${HEAD}' ;;`,
-        `  "api --paginate repos/${REPOSITORY}/commits/${HEAD}/status --jq "*) for filter; do :; done; jq -r "$filter" '${scratch}/status.json' ;;`,
-        '  *) echo "gh was asked: $*" >&2; exit 3 ;;',
-        "esac",
-        "",
-      ].join("\n"),
-    );
-    chmodSync(path.join(scratch, "gh"), 0o755);
-    const ran = spawnSync("bash", ["-e", "-c", stepsOfJob(VERDICT_JOB)[0]?.run ?? "exit 9"], {
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        PATH: `${scratch}:${process.env["PATH"] ?? ""}`,
-        GITHUB_REPOSITORY: REPOSITORY,
-        QUEUED_REF: ref,
-      },
+  it("name no job verdict, which a skipped run satisfies", () => {
+    const jobsNamed = z.object({
+      jobs: z.record(z.string(), z.object({ name: z.string().optional() })),
     });
-    rmSync(scratch, { recursive: true, force: true });
-    return ran;
-  };
-
-  it("runs in a merge group and reads with least privilege", () => {
-    const job = checkJobs()[VERDICT_JOB];
-
-    expect(job?.if).toEqual("${{ github.event_name == 'merge_group' }}");
-    expect(job?.permissions).toEqual({
-      contents: "read",
-      "pull-requests": "read",
-      statuses: "read",
-    });
-  });
-
-  it("passes a head whose verdict status is success", () => {
-    const run = verdictStepWith(
-      [OTHER_PASSING, { context: "verdict", state: "success" }],
-      QUEUED_REF,
+    const named = workflowFiles.flatMap((file) =>
+      Object.entries(jobsNamed.parse(parse(textOf(file))).jobs)
+        .filter(([id, job]) => [id, job.name].includes("verdict"))
+        .map(([id]) => `${file}: ${id}`),
     );
 
-    expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
-    expect(run.stdout).toContain(`pull request #${PULL_REQUEST} at ${HEAD}`);
-  });
-
-  it.each(["failure", "pending", "error"])("fails a verdict of %s, naming the head", (state) => {
-    const run = verdictStepWith([OTHER_PASSING, { context: "verdict", state }], QUEUED_REF);
-
-    expect(run.status).not.toBe(0);
-    expect(run.stdout).toContain(`at ${HEAD} is ${state}`);
-  });
-
-  it.each([
-    { head: "no status", statuses: [] },
-    { head: "no verdict", statuses: [OTHER_PASSING] },
-  ])("fails a head with $head, naming the head", ({ statuses }) => {
-    const run = verdictStepWith(statuses, QUEUED_REF);
-
-    expect(run.status).not.toBe(0);
-    expect(run.stdout).toContain(`at ${HEAD} is missing`);
-  });
-
-  it("fails a ref that names no pull request", () => {
-    const run = verdictStepWith([{ context: "verdict", state: "success" }], "refs/heads/main");
-
-    expect(run.status).not.toBe(0);
-    expect(run.stdout).toContain("no pull request number in this event");
+    expect(named).toEqual([]);
   });
 });
