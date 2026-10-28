@@ -7,7 +7,7 @@ Each proposal says how the reshaped module would be tested, and which existing t
 The kind of each dependency decides how the reshaped module is tested across its seam.
 
 - **In-process.** Pure computation and in-memory state, with no I/O. The modules can always merge, and the result is tested directly through its new interface.
-- **A store this platform runs.** Postgres, the object store, a workspace's git repository and the map. Tests run against the real store, never a stand-in. The seam stays inside the module, with no port at its interface for the store.
+- **A store this platform runs.** Postgres, the object store, a workspace's git repository and the map. A test whose claim is the store runs against the real store, never a stand-in. A decision over rows already read is a pure function on its slice, tested in-process. The seam stays inside the module, with no port at its interface for the store.
 - **A service someone else runs.** An LLM provider or a SaaS API. The module takes the service as a parameter behind that service's own adapter. Tests pass an in-memory adapter, and production passes the real one. That makes two adapters, so the seam is real.
 
 Never propose a port with one adapter, and never mock this repository's own code.
