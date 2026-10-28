@@ -806,7 +806,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Create `packages/core/src/erasure/records.ts`.
 - [ ] Edit `packages/core/test/erasure/erasure-map.test.ts`.
 - [ ] Edit `packages/core/test/erasure/routine/erasure-routine.test.ts`.
-- [ ] Create `packages/core/test/guides/guide-read-budget.test.ts`.
+- [ ] Create `packages/core/test/budgets/guide-read-budget.budget.ts`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0014.md`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0015.md`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0035.md`.
@@ -814,7 +814,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 
 **Build.**
 
-- [ ] Commit `packages/core/test/guides/guide-read-budget.test.ts` first, alone, so the perf lane's trunk is `main` plus that commit. It uses only `footnotesOf`, `erasureMapOf` and factory entries that trunk has.
+- [ ] Commit `packages/core/test/budgets/guide-read-budget.budget.ts` first, alone, so the perf lane's trunk is `main` plus that commit. It uses only `footnotesOf`, `erasureMapOf` and factory entries that trunk has.
 - [ ] Add `versionColumns()` to `packages/schema/src/column-helpers.ts`. It returns `version` (an integer of 1 or more), `actor` (an `ActorId`, not null), `at` (`stamp`, not null, default now) and `note` (nullable). Each version table declares its own key and its typed content beside it.
 - [ ] Every version table carries no status and no current flag. The latest `version` is the current one (ADR 0014, *a version table with a mutable flag is not append-only*).
 - [ ] The migration revokes `UPDATE` and `DELETE` on `write_up_version` and `guide_definition_version` from `app_rt`, and all privileges on every new table from `worker_rt`, on the precedent of `0009_ledger-substrate.sql`.
@@ -879,7 +879,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 - [ ] Metric. Two figures at trunk and head. The first is the median time of `footnotesOf` as the scenario's Viewer, for one write-up with 25 includes over 3,000 seeded concepts, over 50 calls per run. The include row grows by three columns, so this is the read the change can slow. The second is the median time of `erasureMapOf` for a subject who holds nothing in the new families, over 20 calls per run. That isolates the three finders the diff adds.
-- [ ] Probe. `packages/core/test/guides/guide-read-budget.test.ts`, case "records the footnote read and the erasure map". Run `pnpm --filter @better-answers/core exec vitest run test/guides/guide-read-budget.test.ts` in a trunk worktree at `main` plus the probe commit and in the head worktree, alternately, trunk first, five runs each. Each run records through `recordFigures` and asserts `footnotesOf` returned 25 footnotes.
+- [ ] Probe. `packages/core/test/budgets/guide-read-budget.budget.ts`, case "records the footnote read and the erasure map". Run `pnpm --filter @better-answers/core exec vitest run test/guides/guide-read-budget.test.ts` in a trunk worktree at `main` plus the probe commit and in the head worktree, alternately, trunk first, five runs each. Each run records through `recordFigures` and asserts `footnotesOf` returned 25 footnotes.
 - [ ] Baseline. The five trunk runs, measured first.
 - [ ] Rule. Fail when head's median `footnotesOf` exceeds trunk's by more than 10%, or head's median `erasureMapOf` exceeds trunk's by more than 5 ms. Vet the figures with `pstack:benchmark-checklist`.
 
@@ -1381,7 +1381,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Create `packages/core/src/concepts/reading/browse.ts`.
 - [ ] Edit `packages/core/src/concepts/index.ts`.
 - [ ] Create `packages/core/test/concepts/reading/browse.test.ts`.
-- [ ] Create `packages/core/test/concepts/reading/browse-budget.test.ts`.
+- [ ] Create `packages/core/test/budgets/browse-budget.budget.ts`.
 - [ ] Edit `apps/api/tests/trpc/knowledge-procedures.test.ts`.
 - [ ] Edit `apps/api/tests/support/harness/harness-knowledge.ts`.
 - [ ] Edit `apps/web/e2e/harness.ts`.
@@ -1438,7 +1438,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. In the new `packages/core/test/concepts/reading/browse-budget.test.ts`, the time in ms for `readKnowledgeTree` and for one page of `readKnowledgeBranch` at 3,000 concepts, seeded as `seedWideMap` does and written by `recordFigures`. The page's render time in the browser at 3,000 concepts. The web build's gzipped JavaScript size at trunk and head, which proves composition added no dependency weight.
+- [ ] Metric. In the new `packages/core/test/budgets/browse-budget.budget.ts`, the time in ms for `readKnowledgeTree` and for one page of `readKnowledgeBranch` at 3,000 concepts, seeded as `seedWideMap` does and written by `recordFigures`. The page's render time in the browser at 3,000 concepts. The web build's gzipped JavaScript size at trunk and head, which proves composition added no dependency weight.
 - [ ] Probe. Run `pnpm --filter @better-answers/core exec vitest run test/concepts/map-budget.test.ts test/concepts/reading/browse-budget.test.ts` in a trunk and a head lane worktree, five rounds, alternating. Run `pnpm --filter @better-answers/web run build` at trunk and at head and sum the gzipped sizes of `apps/web/dist/assets/*.js`. Run `pnpm --filter @better-answers/web exec playwright test e2e/knowledge/knowledge-base.spec.ts -g "within its budget" --project chromium` at head, five rounds.
 - [ ] Baseline. Measure trunk first. The controls are `map-budget.test.ts`'s figures and the build's gzipped size at trunk. Trunk lacks the page and its reads, so they carry absolute budgets.
 - [ ] Rule. Fail when `readKnowledgeTree` or a branch page reaches 200 ms at 3,000 concepts, when the page's render median reaches 1,000 ms, when the build grows by more than 15 kB gzipped, or when any `map-budget.test.ts` figure at head exceeds trunk's by more than 10%.
