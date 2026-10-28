@@ -136,7 +136,8 @@ const testPlaceOf = (
   depth: number,
 ): Place => {
   const place: Place = { zone: "test", dir: "test", top: "test" };
-  return first === undefined ? place : { ...place, mirror: srcPlaceOf(first, second, depth).dir };
+  if (first === undefined || depth < 3) return place;
+  return { ...place, mirror: srcPlaceOf(first, second, depth).dir };
 };
 
 const placeOf = (pkg: CorePackage, absolute: string): Place | undefined => {
