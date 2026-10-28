@@ -65,14 +65,12 @@ Treat a selector that feeds a destructive command as two deliverables, proved in
    ```
 
 3. **Give the destroyer its own refusals.** It takes only what a selector can legitimately produce:
-   plain numbers above 1 that are not the shell running it. `.claude/hooks/worktree-lib.sh:113` and
-   the lines after it hold the current form.
+   plain numbers above 1 that are not the shell running it.
 4. **Give the selector a refusal for an empty pattern**, since an empty pattern is the shape of
-   every match-all failure. `.claude/hooks/worktree-lib.sh:97` and `:101` refuse one, in the shell
-   and again in awk.
+   every match-all failure. The snippet below refuses one, in the shell and again in awk.
 5. **Pass patterns to awk through an exported subshell environment**, never as a prefix assignment
    on the pipeline, so every pipeline process sees them and no process's own arguments carry the
-   pattern that would make it match itself. `.claude/hooks/worktree-lib.sh:99` is the form.
+   pattern that would make it match itself. The snippet below is the form.
 6. **Prefer `ps -axwwo`** when the selector reads command lines. A vitest worker's arguments run
    long, with the marker at the end, and a width-limited `ps` would cut it off silently.
 
@@ -106,8 +104,7 @@ WORKERS_UNDER="$1" WORKERS_MARK="vitest/dist/workers/" \
     index($0, ENVIRON["WORKERS_UNDER"]) && index($0, ENVIRON["WORKERS_MARK"]) { print $1 }'
 ```
 
-After, the selector that is exported to the whole pipeline and refuses an empty pattern, as at
-`.claude/hooks/worktree-lib.sh:96`:
+After, the selector that is exported to the whole pipeline and refuses an empty pattern:
 
 ```bash
 test_workers_under() {
@@ -122,10 +119,9 @@ test_workers_under() {
 }
 ```
 
-The repository's tests prove the same thing the smoke script did: `decoyWorker` in
-`packages/devtools/src/worktree-hooks.ts:130` starts an idle node process whose arguments mirror a
-worker's, orphaned or attached, and the sweep test asserts the orphan dies while the attached one
-survives.
+The repository's tests once proved the same thing with a decoy: an idle node process whose arguments
+mirror a worker's, orphaned or attached. The orphan had to die and the attached one had to survive.
+The worktree sweep that ran this selector, and those tests, have since been deleted.
 
 ## Related
 
