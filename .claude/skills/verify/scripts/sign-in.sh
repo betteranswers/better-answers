@@ -56,4 +56,19 @@ if [[ "$pathname" =~ ^/(confirm|setup)$ ]]; then
   settled_off "/^\\/(sign-in|confirm|setup)?$/"
 fi
 
+landed="$("${browse[@]}" get url)"
+steady=0
+for _ in $(seq 40); do
+  sleep 0.5
+  now="$("${browse[@]}" get url)"
+  if [[ "$now" == "$landed" ]]; then
+    steady=$((steady + 1))
+    ((steady >= 4)) && break
+  else
+    landed="$now"
+    steady=0
+  fi
+done
+settled_off "/^\\/(sign-in|confirm|setup)?$/"
+
 echo "signed in as $email from client address $client; the page is at $("${browse[@]}" get url)"
