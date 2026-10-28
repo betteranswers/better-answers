@@ -7,6 +7,7 @@ import {
   readIdentityBootstrap,
   readObjectStore,
   readRunningImage,
+  readStop,
   readSweeps,
 } from "../src/config.ts";
 
@@ -287,6 +288,26 @@ describe("the head check's settings", () => {
     expect(reason).toContain("HEALTHCHECKS_PING_URL_SCHEDULER");
     expect(reason).not.toContain("7c1d9e4a");
   });
+});
+
+describe("the stop's settings", () => {
+  it("waits 10 s for a stop unless told otherwise", () => {
+    expect(readStop({})).toEqual({ ok: true, value: { deadlineMs: 10_000 } });
+  });
+
+  it("takes the deadline STOP_DEADLINE_MS names", () => {
+    expect(readStop({ STOP_DEADLINE_MS: "500" })).toEqual({
+      ok: true,
+      value: { deadlineMs: 500 },
+    });
+  });
+
+  it.each(["0", "-1", "1.5", "soon", ""])(
+    "refuses a deadline of '%s', which no stop could keep",
+    (value) => {
+      expect(readStop({ STOP_DEADLINE_MS: value }).ok).toBe(false);
+    },
+  );
 });
 
 describe("the envelope key", () => {

@@ -21,7 +21,7 @@ import { startTestDatabase, type TestDatabase } from "../support/postgres.ts";
 
 const apiRoot = path.resolve(import.meta.dirname, "../..");
 
-const STOP_DEADLINE_MS = 10_000;
+const STOP_DEADLINE_MS = 500;
 
 const HEADERS_READ_MS = 250;
 
@@ -66,6 +66,7 @@ const startApi = async (): Promise<Running> => {
       AGENT_HOSTNAME,
       APEX_HOSTNAME,
       GIT_STORE_DIR: gitStoreDir,
+      STOP_DEADLINE_MS: String(STOP_DEADLINE_MS),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -147,7 +148,7 @@ it("exits 1 at the deadline, cutting a request still open", async () => {
   const stop = await stopped(api, "SIGTERM");
 
   expect(stop).toEqual(exitedWith(1, stop));
-  expect(stop.afterMs).toBeGreaterThanOrEqual(STOP_DEADLINE_MS - 500);
+  expect(stop.afterMs).toBeGreaterThanOrEqual(STOP_DEADLINE_MS - 50);
   expect(stop.afterMs).toBeLessThan(STOP_DEADLINE_MS + 5_000);
   expect(await reply).toBe("");
 });
