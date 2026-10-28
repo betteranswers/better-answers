@@ -11,6 +11,9 @@ const config: KnipConfig = {
 
   workspaces: {
     ".": {
+      // A plan's measurement script is run by hand, so nothing imports it.
+      entry: ["docs/plans/*/*.mjs"],
+
       // A skill's reference files are samples for other projects, so nothing here imports them.
       ignore: [".claude/skills/*/references/**"],
     },
