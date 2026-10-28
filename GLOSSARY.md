@@ -387,6 +387,9 @@ The top level of the platform's navigation: Ask, Knowledge, Inbox or Control Cen
 **Page**:
 One place in an area where a person reads or acts.
 
+**Shell**:
+The frame around every page, which stays in place while the page inside it changes.
+
 **Home**:
 The page a member lands on after signing in, which depends on their role.
 

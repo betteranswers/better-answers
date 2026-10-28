@@ -10,7 +10,7 @@ applies_when:
   - "Writing or changing a test that sends N+1 requests and expects the last one refused by a rate ceiling"
   - "A ceiling test fails now and then in CI with expected 200 to be 429 on its last request"
   - "Changing a ceiling test #621 moved onto a stopped clock for BA-53 (ask-to-join, confirm, members-invitations, oauth-flow, mcp-surface, sign-in-link)"
-  - "Changing consumeIngress or the fixed-window flooring in packages/core/src/store/postgres/index.ts"
+  - "Changing consumeIngress or the fixed-window flooring in packages/core/src/store/postgres/counters.ts"
 symptoms:
   - "passkeys.test.ts 'answers 429 at /passkeys/sign-in-options past thirty a minute' failed in a merge-queue run with expected 200 to be 429 on the 31st request"
   - "The failure came and went, was unrelated to the pull request under test, and passed on the pull request's own check"
@@ -55,7 +55,7 @@ What did not explain it:
 
 ## Why This Matters
 
-`windowStart` floors `now` to the rule's window: `new Date(Math.floor(now.getTime() / rule.windowMs) * rule.windowMs)` (`packages/core/src/store/postgres/index.ts:761-762`). `consumeIngress` counts each attempt in the window `now` falls in, and drops the pair's earlier windows (`packages/core/src/store/postgres/index.ts:784-803`). So 30 requests before a minute's edge and 1 after it are counts of 30 and 1, and the 31st answers 200.
+`windowStart` floors `now` to the rule's window: `new Date(Math.floor(now.getTime() / rule.windowMs) * rule.windowMs)` (`windowStart` in `packages/core/src/store/postgres/counters.ts`). `consumeIngress` counts each attempt in the window `now` falls in, and drops the pair's earlier windows (`consumeIngress` in the same module). So 30 requests before a minute's edge and 1 after it are counts of 30 and 1, and the 31st answers 200.
 
 The fixed window is right for the product: 30 requests either side of an edge are two windows' worth of traffic. The test was wrong to read the wall clock while it counted.
 

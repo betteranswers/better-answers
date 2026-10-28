@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
 
+import { WorkspaceFrame } from "@/app/shell/frame.tsx";
+import { UNKNOWN_PAGE } from "@/app/words.ts";
 import { AuthPage } from "@/features/auth/auth-page.tsx";
 import { refusalOf } from "@/shared/api/trpc.ts";
 import { NO_SESSION, useMemberAskedOnce } from "@/shared/member/member.ts";
@@ -8,9 +10,7 @@ import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
 import { PageHead } from "@/shared/page/page-head.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
-import { WorkspaceFrame } from "./frame.tsx";
 import { GoHome } from "./go-home.tsx";
-import { UNKNOWN_PAGE } from "./words.ts";
 
 export function UnknownPage(properties: { readonly home?: Page | undefined }) {
   useBreadcrumbLastPart(UNKNOWN_PAGE.heading);

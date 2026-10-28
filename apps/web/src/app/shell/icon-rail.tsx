@@ -1,12 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
+import { RAIL } from "@/app/words.ts";
 import { Icon } from "@/shared/icon.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import type { VisibleArea } from "@/shared/navigation.ts";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui/tooltip.tsx";
-
-import { RAIL } from "./words.ts";
 
 const HOVER_DELAY_MS = 200;
 

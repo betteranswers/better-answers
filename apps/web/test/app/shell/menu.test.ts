@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { describe, expectTypeOf, it } from "vitest";
 
-import type { Menu } from "@/app/menu.tsx";
+import type { Menu } from "@/app/shell/menu.tsx";
 import type { CONTROL_CENTRE, VisibleArea } from "@/shared/navigation.ts";
 
 type Listed = ComponentProps<typeof Menu>["area"];

@@ -1,10 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 
+import { goHome } from "@/app/words.ts";
 import { useRole } from "@/shared/member/member.ts";
 import { HOMES, type Page } from "@/shared/navigation.ts";
 import { Button } from "@/shared/ui/button.tsx";
-
-import { goHome } from "./words.ts";
 
 export function GoHome(properties: {
   readonly home?: Page | undefined;

@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { ALL_WORKSPACES } from "@/app/words.ts";
 import {
   useSwitchWorkspace,
   useWorkspacesHeld,
@@ -24,8 +25,6 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-
-import { ALL_WORKSPACES } from "./words.ts";
 
 export type Here = {
   readonly name: string;

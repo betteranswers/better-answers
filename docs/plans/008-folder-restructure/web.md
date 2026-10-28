@@ -1,5 +1,7 @@
 # Folder restructure: `apps/web` explorer report
 
+> **Note, 28/10/2026.** This map records the tree at `d6fc08ee6`. PR #928 carried it out, and BA-267 grouped `src/app/` into `shell/` and `pages/` afterwards. The tests of `app/pages/*` now mirror their source in `test/app/pages/`, so the sub-rule that put them in `test/app/` no longer holds. Paths and line numbers here can differ from `main`.
+
 Read-only investigation on branch `refactor/folder-restructure`. Every count and every move row below was generated from the import graph (`/tmp/web-explore/edges.tsv`, 2159 import edges parsed from `src/`, `test/`, `e2e/`) and a mapping file, then checked by a script that (a) confirms every file on disk is placed exactly once and (b) recomputes every rewritten specifier and rejects any relative one the lint forbids. Result: 257 files move, 0 lint violations, 774 import specifiers change.
 
 ## 0. The constraint that shapes everything: the web's relative-import lint

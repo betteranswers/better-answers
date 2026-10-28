@@ -4,3 +4,4 @@
 - Give every common action a keystroke, and list them under `?`. Bulk work is select-then-command.
 - Write UI text in the glossary's reader words: see `CONCEPTS.md`.
 - Read `packages/design-system/readme.md` when updating/implementing the UI.
+- `test/` mirrors `src/` without the `features/` level. The test of `src/features/<feature>/x.tsx` is `test/<feature>/x.test.tsx`, and the tests of `src/app/` and `src/shared/` are under `test/app/` and `test/shared/`. Helpers are in `test/support/`, imported as `@test/<file>`. A spec is in `e2e/<feature>/`, the shell's in `e2e/app/`, and the suite's own modules stay at the `e2e/` root.

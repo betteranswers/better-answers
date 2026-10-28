@@ -51,8 +51,8 @@ Library lines below are from `@tanstack/query-core` 5.103.2, installed at `node_
 
 - After a switch whose member read failed, the band still named workspace A. The failed read raised no error to the switch: `rereadMember` returned normally.
 - The same happened offline. The pick landed, the network dropped, the band kept A's name while the switch waited.
-- The role stayed A's. The frame derives the visible areas and the person's role from the one member it holds (`apps/web/src/app/frame.tsx:171-183`), so A's role was applied over B's data.
-- The frame draws the page under `key={here?.workspaceId}` so that a switch redraws it afresh (`apps/web/src/app/frame.tsx:153-155`). With A's member held, that key never changed.
+- The role stayed A's. The frame derives the visible areas and the person's role from the one member it holds (`visibleTo(readerOf(role, owns), AREAS)` in `apps/web/src/app/shell/frame.tsx`), so A's role was applied over B's data.
+- The frame draws the page under `key={here?.workspaceId}` so that a switch redraws it afresh (in `apps/web/src/app/shell/frame.tsx` at the time; the frame now keys it on `switches`). With A's member held, that key never changed.
 - Navigation followed the stale answer. The index route redirects to the home of whatever role the cache holds (`apps/web/src/app/router.tsx:175-178`), and `roleHeld` reads the cache directly (`member.ts:20-21`).
 - A switch through All workspaces drew the left workspace's member rows on the Members page and in jump-to until the new list arrived. `members.list` is asked with no input, so its key names no workspace (`apps/web/src/features/people/people-api.ts:23-26`). The web app sets no `gcTime` (`apps/web/src/shared/api/query-client.ts:13-20`), so the query-core default of five minutes applies (`removable.ts:24-29`).
 

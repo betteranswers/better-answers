@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { partsOf } from "@/app/breadcrumb.tsx";
+import { partsOf } from "@/app/shell/breadcrumb.tsx";
 import {
   CONSOLE,
   placeAt,

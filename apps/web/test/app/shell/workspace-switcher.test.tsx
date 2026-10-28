@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
-import { WorkspaceSwitcher } from "@/app/workspace-switcher.tsx";
+import { WorkspaceSwitcher } from "@/app/shell/workspace-switcher.tsx";
 import {
   SwitchRefused,
   useAcceptInvitation,

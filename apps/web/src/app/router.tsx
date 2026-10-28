@@ -101,14 +101,14 @@ import {
 } from "@/shared/navigation.ts";
 import type { PageToolbar } from "@/shared/page/page-toolbar.tsx";
 
-import { ConsoleFrame } from "./console-frame.tsx";
-import { FailedPage } from "./failed-page.tsx";
-import { WorkspaceFrame } from "./frame.tsx";
 import { ConnectClaudePage } from "./pages/connect-assistant.tsx";
+import { FailedPage } from "./pages/failed-page.tsx";
 import { MODELS_AND_SPEND_TOOLBAR, ModelsAndSpendPage } from "./pages/models-and-spend-page.tsx";
 import { UnbuiltPage } from "./pages/unbuilt-page.tsx";
+import { UnknownAddress, UnknownPage } from "./pages/unknown-page.tsx";
 import type { AppClients } from "./providers.tsx";
-import { UnknownAddress, UnknownPage } from "./unknown-page.tsx";
+import { ConsoleFrame } from "./shell/console-frame.tsx";
+import { WorkspaceFrame } from "./shell/frame.tsx";
 import { useHidden, useVisibleTree } from "./visible-tree.ts";
 import { ROLE_UNREAD } from "./words.ts";
 

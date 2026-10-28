@@ -5,7 +5,7 @@ import {
   NavigationButton,
   NavigationSheet,
   useNavigationSheet,
-} from "@/app/navigation-control.tsx";
+} from "@/app/shell/navigation-control.tsx";
 
 afterEach(cleanup);
 

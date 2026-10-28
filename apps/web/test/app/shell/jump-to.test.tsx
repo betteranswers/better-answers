@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { jumpsIn, linesOf, matching, searchGroup, type JumpGroup } from "@/app/jump-to.tsx";
+import { jumpsIn, linesOf, matching, searchGroup, type JumpGroup } from "@/app/shell/jump-to.tsx";
 import { findWhat, JUMP_TO } from "@/app/words.ts";
 import { CONSOLE, readerOf, AREAS, visibleTo, type Role, type Area } from "@/shared/navigation.ts";
 import { nothingMatches } from "@/shared/words.ts";

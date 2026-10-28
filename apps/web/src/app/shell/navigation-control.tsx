@@ -1,5 +1,6 @@
 import { useRef, useState, type RefObject } from "react";
 
+import { NAVIGATION_SHEET, TOGGLE } from "@/app/words.ts";
 import { Icon } from "@/shared/icon.tsx";
 import type { Place, VisibleArea } from "@/shared/navigation.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -7,7 +8,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/shared/ui/sheet.
 
 import { IconRail } from "./icon-rail.tsx";
 import { Menu } from "./menu.tsx";
-import { NAVIGATION_SHEET, TOGGLE } from "./words.ts";
 
 type Sheeting = {
   readonly asked: boolean;

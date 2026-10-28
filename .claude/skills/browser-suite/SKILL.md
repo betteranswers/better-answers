@@ -103,6 +103,10 @@ file for one that already does the job.
 
 ## Writing a spec
 
+- **Put a spec in the folder of the feature it drives**, `apps/web/e2e/<feature>/`, named as
+  under `apps/web/src/features/`. The shell's specs are in `apps/web/e2e/app/` and the specs
+  of a shared part in `apps/web/e2e/shared/`. The suite's modules stay at the `e2e/` root, and
+  no folder there holds more than 15 files.
 - **Locate by role and accessible name, and write the name in the spec.** `getByRole`,
   `getByLabel`, `getByText`. A control, a heading, a region, a dialog and a field are each found by
   the name the page gives them, written as a literal where the spec uses it. A name built from

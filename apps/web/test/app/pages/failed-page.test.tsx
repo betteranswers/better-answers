@@ -2,7 +2,7 @@ import { CatchBoundary, RouterContextProvider, createMemoryHistory } from "@tans
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FailedPage } from "@/app/failed-page.tsx";
+import { FailedPage } from "@/app/pages/failed-page.tsx";
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 import { FAILED_PAGE } from "@/app/words.ts";

@@ -8,8 +8,8 @@ import {
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Frame } from "@/app/frame.tsx";
 import { createAppClients, Providers } from "@/app/providers.tsx";
+import { Frame } from "@/app/shell/frame.tsx";
 import type { IconName } from "@/shared/icon.tsx";
 import type { Page, VisibleTree } from "@/shared/navigation.ts";
 

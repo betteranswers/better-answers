@@ -1,8 +1,8 @@
+import { FAILED_PAGE } from "@/app/words.ts";
 import type { Page } from "@/shared/navigation.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import { GoHome } from "./go-home.tsx";
-import { FAILED_PAGE } from "./words.ts";
 
 export function FailedPage(properties: {
   readonly reset: () => void;

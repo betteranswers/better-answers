@@ -1,5 +1,6 @@
 import { useLinkProps } from "@tanstack/react-router";
 
+import { BREADCRUMB } from "@/app/words.ts";
 import { Icon } from "@/shared/icon.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { keyed } from "@/shared/list/keyed.ts";
@@ -12,8 +13,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/shared/ui/breadcrumb.tsx";
-
-import { BREADCRUMB } from "./words.ts";
 
 export type Part = { readonly name: string; readonly to: string | undefined };
 

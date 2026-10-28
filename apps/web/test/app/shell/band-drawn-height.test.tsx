@@ -7,7 +7,7 @@ import {
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { Band } from "@/app/band.tsx";
+import { Band } from "@/app/shell/band.tsx";
 
 const MEASURED = 84;
 
