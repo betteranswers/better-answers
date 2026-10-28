@@ -602,11 +602,11 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Lane 5. Compare the erasure-match digest at trunk and head. Save `digest.log`. Pass when the digests are equal.
 - [ ] Lane 6. Run the worker's erasure-match contract test. Save `worker-contract.log`. Pass when it passes.
 - [ ] Lane 7. Run `pnpm lint` on the repository at trunk and head. Save `repo-lint.log`. Pass when both give the same findings.
-- [ ] Lane 8. Grep each lint test for a real spawn. Save `spawns.log`. Pass when each file keeps one batched run, plus only the runs a case's tool mode requires (a `--fix` run, or a tree whose `.git/info/exclude` cannot sit inside a batch).
+- [ ] Lane 8. Grep each lint test for a real spawn. Save `spawns.log`. Pass when each file keeps one batched run, plus only the runs a case's tool mode requires (a `--fix` run, or a tree whose `.git/info/exclude` cannot sit inside a batch, and the self-tests of the runner such a tree uses).
 - [ ] Lane 9. Run each file with `--reporter=verbose` and record per-file wall. Save `per-file.log`. Pass when each is below its trunk wall.
 - [ ] Lane 10. Audit that the batched tree cannot let one case's finding mask another's. Save `audit.md`. Pass when findings are keyed by case folder.
 
-Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` case reads back the file oxlint rewrote, and knip ignores a `.git/info/exclude` nested inside a batch case, so those cases keep their own run.
+Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` case reads back the file oxlint rewrote, and knip ignores a `.git/info/exclude` nested inside a batch case, so those cases keep their own run, and the runner those cases use keeps its own self-tests, which run knip too.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
