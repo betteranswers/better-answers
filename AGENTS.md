@@ -29,7 +29,7 @@ A living company knowledge map for UK SMBs, built on the Open Knowledge Format (
 ## Where a file goes
 
 - Source groups by capability: `src/<capability>/`, named in the glossary's words. A capability over 15 files gets subfolders by sub-capability. A file that something other than an import names by path stays where it is.
-- Tests mirror source. The test of `src/a/b/x.ts` is `test/a/b/x.test.ts`, and `tests/a/b/test_x.py` in `apps/worker`. A web spec goes in `e2e/<feature>/`. A test that checks the repository itself stays at the test root.
+- Tests mirror source. The test of `src/a/b/x.ts` is `test/a/b/x.test.ts`, or `tests/a/b/x.test.ts` in `apps/api` and `tests/a/b/test_x.py` in `apps/worker`. A web spec goes in `e2e/<feature>/`. A test that checks the repository itself stays at the test root.
 - Shared test helpers live in `support/`.
 - A folder in a `src`, `test`, `tests` or `e2e` tree holds at most 15 tracked files directly. `pnpm run loose-files` holds the limit. Its table in `packages/devtools/src/scans/loose-files.ts` lists the folders a tool pins over it, and why.
 - Move files with `node scripts/move-files.mjs <table.tsv>`, one `<old>\t<new>` row per file. It rewrites the imports and path mentions, then runs `git mv`. Run `scripts/test-inventory.sh <dir>` before and after the move and `diff -r` the two directories. A move changes no test file's name or title.
