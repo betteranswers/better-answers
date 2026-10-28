@@ -10,7 +10,7 @@ execution: code
 
 This plan is not on the v0.1 route. It serves the owner's decision of 27/10/2026 that testing should match a standard repository. Most behaviour gets fast in-process unit tests. A test runs on real Postgres, git, the object store or an image only where that boundary is the claim. The browser layer stays thin.
 
-Today 9,117 tests run in the merge queue. The longest leg is a browser shard at a median of 474s, and one merge-group run uses about 2,721 runner-seconds (n=11). The measurements found that the container is not the cost. The cost is in readings that assert nothing, in serial process launches, in seeding loops and in browser test count. So the program subtracts first and extracts pure functions after that.
+Today 9,117 tests run on every pull request and again in the merge queue. The longest leg is a browser shard at a median of 474s. The nine suite jobs' medians sum to 2,721 runner-seconds, and the median merge-group run took 2,815 runner-seconds over all its jobs (n=11). The measurements found that the container is not the cost. The cost is in readings that assert nothing, in serial process launches, in seeding loops and in browser test count. So the program subtracts first and extracts pure functions after that.
 
 The PRs, in order, are BA-268, BA-269, BA-270, BA-271, BA-272, BA-273, BA-274, BA-275, BA-276, BA-277 and BA-278.
 
@@ -20,7 +20,7 @@ One box is one unit of work. Every box names the evidence that checks it. A nest
 
 Appendix E holds the measurements, with each number's run count and limiter. Appendix F holds the target layering, the seams and the Testing rule as AGENTS.md should read afterwards. Read both before the first PR.
 
-The program runs `skills/poteto-mode/playbooks/orchestrate.md` from the installed plugin. It is eleven PRs over several days, and most of them wait on a plan 008 PR that moves the same test tree. One coordinator holds the ledger, and a later session takes it up through `.agents/playbooks/session-pickup.md`. The coordinator merges every PR through the merge queue once an agent that did not write it posts `PASS` at its head SHA. No PR stops at merge-ready for the operator, and no PR changes an interaction.
+The program runs `skills/poteto-mode/playbooks/orchestrate.md` from the installed plugin. It is eleven PRs over several days, and most of them wait on a plan 008 PR that moves the same test tree. One coordinator holds the ledger, and a later session takes it up through `.agents/playbooks/session-pickup.md`. The coordinator merges every PR through the merge queue once an agent that did not write it posts a `PASS` verdict at its head SHA, as AGENTS.md says. No PR stops at merge-ready for the operator, and no PR changes an interaction.
 
 Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -31,7 +31,7 @@ Plan 008 owns the folder restructure and is moving files under `packages/*` and 
 ### Arm the program
 
 - [ ] State the protocol and this plan to the operator, then stop. Start execution only on the operator's explicit go.
-- [ ] On the operator's go, write this exact text into the standing orders and restate it in your todolist. "Plan `docs/plans/009-test-pyramid.md`. PRs in order BA-268, BA-269, BA-270, BA-271, BA-272, BA-273, BA-274, BA-275, BA-276, BA-277, BA-278. Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. The coordinator merges each PR through the merge queue after an agent that did not write it posts `PASS` at its head SHA. A PR starts only after the plan 008 PR that moves its test tree has merged. Done when every PR has merged and Appendix E's after-table is filled from merge-group runs."
+- [ ] On the operator's go, write this exact text into the standing orders and restate it in your todolist. "Plan `docs/plans/009-test-pyramid.md`. PRs in order BA-268, BA-269, BA-270, BA-271, BA-272, BA-273, BA-274, BA-275, BA-276, BA-277, BA-278. Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. The coordinator merges each PR through the merge queue after an agent that did not write it posts a `PASS` verdict at its head SHA, as AGENTS.md says. A PR starts only after the plan 008 PR that moves its test tree has merged. Done when every PR has merged and Appendix E's after-table is filled from merge-group runs."
 - [ ] Read these from the installed plugin at program start. Re-read them at every tick.
   - [ ] `skills/poteto-mode/playbooks/orchestrate.md`
   - [ ] `skills/swarm/SKILL.md`
@@ -78,6 +78,7 @@ Plan 008 owns the folder restructure and is moving files under `packages/*` and 
 - [ ] A full swarm runs once, at the code-ready head. Another full swarm runs only for new behavior, a redesign, or a large new diff. A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head. Run each full swarm per `skills/swarm/SKILL.md`. One gates lane. The ten live lanes from the PR's **Verify, live** block. The perf lane from its **Verify, perf** block. Two or more audit lanes, each with its own focus, that read the diff and the receipts and distrust the PR body. The root audits the receipts in the merge-ready report before the verdict.
 - [ ] Clean only when every lane is `PASS`. Findings go back to the owner, including a defect that a lane filed as a note. A new head gets a fresh verdict, except for results that stay valid under the patch-id rule in `playbooks/shipping.md`.
 - [ ] The coordinator queues a clean PR with `gh pr merge <n> --match-head-commit <sha>`. A verdict carries over a rebase only when the patch-id rule in `playbooks/shipping.md` holds.
+- [ ] Queue one PR of this program at a time, and queue the next only after the last has merged. The queue groups up to five entries, and its `verdict` job reads only the group head's pull request.
 - [ ] After each merge, read the next merge-group run's job walls with `gh run view <id> --json jobs` and add a row to Appendix E's after-table.
 
 ### Boot recipe, for every live lane
@@ -270,6 +271,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Edit `apps/api/vitest.config.ts` to exclude that folder from `check`.
 - [ ] Edit the worker's check script, today `apps/worker/src/better_answers_worker/check.py`, to deselect `test_image.py` by marker, and add a script that selects it.
 - [ ] Edit the api's config module, today `apps/api/src/config.ts`, to read the stop deadline.
+- [ ] Edit `IMAGE_INPUTS` in `scripts/docs-lane.mjs` to name the moved files. It matches a file path exactly, so without the edit a change to a moved image test reads `images=no`.
 
 **Build.**
 
@@ -279,7 +281,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 **You see.**
 
-- [ ] A merge-group run on the branch lists `full-images` as its own job, and `full-api`'s log has no backup-image or image line.
+- [ ] The PR's own `check` run lists `full-images` as its own job, and `full-api`'s log has no backup-image or image line.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -295,16 +297,16 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Lane 5. Run `pnpm lint:workflows`. Save `workflows.log`. Pass when it exits 0.
 - [ ] Lane 6. Run `pnpm check:worker` with `TEST_POSTGRES_URI` set and count Postgres containers started with `docker ps -a`. Save `worker-shared.log`. Pass when no container starts.
 - [ ] Lane 7. Start `node apps/api/src/main.ts` with no `STOP_DEADLINE_MS` and send SIGTERM while a request is held. Save `stop-default.log`. Pass when it waits up to 10s as trunk does.
-- [ ] Lane 8. Dispatch `check.yml` on the branch through `workflow_call` or a test merge group. Save `ci-run.json`. Pass when `full-images` and the `check` job are green.
-- [ ] Lane 9. On a throwaway branch, make one image test fail and dispatch again. Save `ci-red.json`. Pass when the `check` job is red.
+- [ ] Lane 8. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Save `ci-run.json`. Pass when the lane reads `images=yes`, and `full-images` and the `check` job are green.
+- [ ] Lane 9. Open a throwaway pull request from a branch off the head that makes one moved image test fail, and read its `check` run. Save `ci-red.json`. Pass when `full-images` and the `check` job are red. Close the throwaway pull request.
 - [ ] Lane 10. Audit that no image or compose behaviour lost its test. Save `audit.md`. Pass when every moved case title appears in the images run.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Job wall seconds of `full-api` and `full-worker` in merge-group runs.
-- [ ] Probe. Read the five merge-group runs before the merge and the first five after it with `gh run view <id> --json jobs`. Before merge, time `pnpm check:api` locally at trunk and head, interleaved, three times each.
-- [ ] Baseline. Record the trunk medians first. Merge-group medians were 287s for `full-api` and 272s for `full-worker`, n=11.
-- [ ] Rule. Fails if the local `pnpm check:api` head median is not at least 60s below trunk's. Fails if `full-images` becomes the run's longest job.
+- [ ] Metric. Job wall seconds of `full-api` and `full-worker` on CI runners.
+- [ ] Probe. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Rerun it with `gh run rerun <id>` until it has three full-lane attempts, each after the last has finished. After merge, read the first five merge-group runs for Appendix E.
+- [ ] Baseline. Record first the medians of the five latest merge-group runs on `main`. Over the eleven runs in Appendix E, `full-api` had a median of 287s (239 to 320s) and `full-worker` 272s (226 to 328s).
+- [ ] Rule. Fails if the head's `full-api` median over three attempts is not at least 60s below the baseline median. Fails if `full-images` is the longest job in any head attempt.
 
 **Review gate.** None. BA-271 is not review-gated.
 
@@ -425,7 +427,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
 - [ ] The coordinator queues it with `gh pr merge <n> --match-head-commit <sha>`.
 
-## Test the ops parse, the pending-session table and the MCP listing in-process (BA-274)
+## Test the ops parse and the MCP listing in-process, and share one pending session across the pending-set cases (BA-274)
 
 **Depends on.** BA-265 and BA-270.
 
@@ -433,30 +435,31 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 - [ ] Edit the api's ops module, today `apps/api/src/ops/`, to expose a pure argv-to-command parse.
 - [ ] Edit the ops tests, today `apps/api/tests/ops*.test.ts`.
-- [ ] Edit the api's pending-set test and the second-factor gate's tables, today `apps/api/src/second-factor-gate.ts`.
+- [ ] Edit the api's pending-set test, today `apps/api/tests/pending-set.test.ts`.
 - [ ] Edit `apps/api/tests/mcp-surface.test.ts` and `apps/api/tests/ask.test.ts`.
 
 **Build.**
 
 - [ ] Expose `parseOpsArgs(argv)` returning a command or a usage refusal. Move flag, usage and exit-code cases to it. Keep one real `runOps` case per command group, and every erasure and lock case.
-- [ ] Assert in-process that every router procedure is in `PENDING_PROCEDURES` or named as refused while pending. Keep one HTTP case per second-factor step.
+- [ ] Keep a real refusal per procedure in `pending-set.test.ts`, and cut only its setup. Sign in one pending session in `beforeAll` and send every gated case through it over HTTP, in place of a workspace provisioned per case. A gated case is refused before its procedure runs, so it cannot change the session. A case the set serves, such as sign-out, keeps a session of its own.
+  - [ ] The shared session is chosen over `appRouter.createCaller` because it still fails when a procedure stops going through the gate anywhere on the path. The gate is `sessionOf` in `apps/api/src/trpc/base.ts`, and a caller reaches it only through a context the test builds. A caller would miss a bypass in the mount's `createContext` or its session reader. The library-endpoint and api-route cases in the same file have no caller, so they need HTTP anyway.
 - [ ] Test MCP listing and annotations through `createMcpSurface` with no session. Keep the lock and cap cases on the app.
 - [ ] Test ask's verdict and preview rendering through `answerOutputWith` in core's answering boundary. Keep one end-to-end ask.
 
 **You see.**
 
-- [ ] `vitest list` for the api shows the pending-set file with one in-process table case and one HTTP case per step, where trunk shows 220 HTTP cases.
+- [ ] `vitest list` for the api shows the pending-set file with the same per-procedure, per-endpoint and per-route case titles as trunk, and the file provisions one workspace for its gated cases where trunk provisions one per case.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] The parse, table and listing cases pass. Run `pnpm check:api`.
+- [ ] The parse, pending-set and listing cases pass. Run `pnpm check:api`.
 - [ ] Mutants in `parseOpsArgs` are killed. Run `pnpm mutant-probe` scoped to the ops parse.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on the configured `swarm workers` model at the PR head, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Run `pnpm check:api` at trunk and head. Save `api-trunk-head.log`. Pass when both pass.
 - [ ] Lane 2. Run `pnpm ops -- --help` and three bad invocations at trunk and head. Save `ops-cli.log`. Pass when output and exit codes match.
-- [ ] Lane 3. In a scratch edit, add a router procedure without listing it. Save `pending-breaks.log`. Pass when the table case fails naming it.
+- [ ] Lane 3. In a scratch edit, build one procedure on a base that skips `sessionOf`'s pending check. In a second scratch edit, make the mount's `createContext` read a session that is not pending. Save `pending-breaks.log`. Pass when each edit fails a procedure's refusal case, naming the procedure.
 - [ ] Lane 4. Sign in with a pending second factor through the browser-suite skill and open a gated page. Save `pending.png`. Pass when the page refuses as trunk does.
 - [ ] Lane 5. List MCP tools from a real client against the served app. Save `mcp-list.log`. Pass when the list equals the in-process case's expectation.
 - [ ] Lane 6. Run the lock and cap cases of mcp-surface ten times. Save `mcp-locks.log`. Pass when all pass.
@@ -681,16 +684,16 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Lane 5. Slow one page's procedure past its budget in a scratch edit. Save `budget-breaks.log`. Pass when that page's spec fails.
 - [ ] Lane 6. Add a contrast fault to one page in a scratch edit. Save `gate-breaks.log`. Pass when the gate fails.
 - [ ] Lane 7. Run `pnpm lint:workflows`. Save `workflows.log`. Pass when it passes.
-- [ ] Lane 8. Dispatch `check.yml` on the branch. Save `ci-run.json`. Pass when `full-web-browser` runs as one job and is green.
+- [ ] Lane 8. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Save `ci-run.json`. Pass when `full-web-browser` runs as one job and is green.
 - [ ] Lane 9. Run `pnpm check:docs`. Save `docs.log`. Pass when it passes.
 - [ ] Lane 10. Audit that each deleted or moved case is named with the test that keeps its claim. Save `audit.md`. Pass when none is unaccounted for.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 - [ ] Metric. Job wall seconds of `full-web-browser`, the slowest shard at trunk and the single job at head.
-- [ ] Probe. Locally, time `pnpm check:web:e2e` at trunk with `--shard=3/3` and at head unsharded, interleaved, twice each. After merge, read five merge-group runs.
-- [ ] Baseline. Record the trunk value first. The merge-group median of the slowest shard was 474s, n=11.
-- [ ] Rule. Fails if the head wall exceeds 240s.
+- [ ] Probe. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Rerun it with `gh run rerun <id>` until it has three full-lane attempts, each after the last has finished. After merge, read five merge-group runs.
+- [ ] Baseline. Record first the slowest shard's median over the five latest merge-group runs on `main`. Over the eleven runs in Appendix E it was 474s, and shard 3 ranged from 332 to 805s.
+- [ ] Rule. Fails if the head's `full-web-browser` median over three attempts exceeds 240s.
 
 **Review gate.** None. BA-278 is not review-gated.
 
@@ -704,8 +707,8 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 ## Close the program
 
 - [ ] Every box above is checked with its evidence.
-- [ ] Appendix E's after-table holds five merge-group runs after BA-278, with the critical-path job and runner-seconds.
-- [ ] Rerun `/tmp/tp009/classify.mjs` or its successor and fill Appendix E's after-row for in-process share.
+- [ ] Appendix E's after-table holds five merge-group runs after BA-278, with the critical-path job and the sum of the suite-job medians.
+- [ ] Run `node docs/plans/009-test-pyramid/classify.mjs .` at `main` and fill Appendix E's after-row for in-process share. First add to its `TESTING_EXPORTS` any `testing` export that plan 008 moved. At `f59a9da35` it prints Appendix E's table exactly.
 - [ ] Reply to the operator with the report the execution playbook names.
 
 ## Appendix A. Prototype evidence
@@ -740,7 +743,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - **A budget regression lands before the nightly run sees it** (BA-269). The scheduled run opens an issue. An owner who touches a budgeted path dispatches `budgets.yml` on the branch.
 - **The worker's tick mode reaches production** (BA-270). The audit lane checks the daemon's path is unchanged.
 - **A deleted browser case was the only guard** (BA-272, BA-277, BA-278). Each deletion names its twin, and lane 2 breaks the behaviour to prove the twin fails.
-- **No pull-request CI runs suites.** `check.yml` runs suites only in the merge queue. The brief describes a sibling PR moving the full suites onto pull-request CI. None was open at `f59a9da35`. This plan does not depend on it, and its perf rules measure locally and in the merge queue.
+- **The suites run twice per change.** Since PR #917, `check.yml` runs the full suites on every pull request and again in the merge group. A change costs about twice the per-run runner-seconds, about 5,400 today on Appendix E's basis, and more when a push cancels a PR run or a perf probe reruns one. The runner-seconds target stays per run, so the per-change target is about 3,200. A new push cancels the PR's run in progress, so only the final head's run is whole, and Appendix E's after-table keeps merge-group runs as its source.
 - **`insert-scan`'s factory list moves in plan 008.** A PR that adds a seeding helper adds it to that list in the tree it starts from.
 
 ## Appendix D. Links and reading list
@@ -748,11 +751,11 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - Read before editing. `AGENTS.md` Testing, `docs/okf-v02.md`, ADRs 0007, 0012, 0024, 0028, 0029, 0031, 0032 and 0049, `.claude/skills/survey-architecture/references/deepening.md`, `.agents/playbooks/verification.md`, `.claude/skills/browser-suite/SKILL.md`, `docs/specs/route/seams.md`, `docs/plans/008-folder-restructure.md` and its maps.
 - BA-270, BA-274 and BA-275 get `skills/how/SKILL.md` before code and `skills/interrogate/SKILL.md` before merge-ready, since each changes a seam another tier or transport crosses.
 - Keep the trail per `skills/show-me-your-work/SKILL.md` in `.audit/test-pyramid.tsv`.
-- Measurement scripts are in `/tmp/tp009/`. `jobs.mjs` and `steps.mjs` read job and step walls, `files.mjs` and `specs.mjs` read per-file and per-spec times from a run log, and `classify.mjs` classifies test files by the infrastructure they reach.
+- `docs/plans/009-test-pyramid/classify.mjs` classifies test files by the infrastructure they reach. Run it as `node docs/plans/009-test-pyramid/classify.mjs <repository root>`. The one-off scripts that read job, step, file and spec times from run logs stayed in `/tmp/tp009/`. The after-table needs only `gh run view <id> --json jobs`.
 
 ## Appendix E. What the suites cost today
 
-All CI numbers come from the merge queue on `main`, the `full` lane of `.github/workflows/check.yml`. Job medians use the eleven successful runs from 40532633967 to 40599189016. Per-file and per-spec times come from run 40599189016, and the slowest-file order was checked against runs 40570111529 and 40544684929.
+All CI numbers come from the merge queue on `main`, the `full` lane of `.github/workflows/check.yml`. Job medians use the eleven successful full-lane runs from 40532633967 to 40599189016. Run 40544684929 in that span took the docs lane and is left out. Per-file and per-spec times come from run 40599189016, and the slowest-file order was checked against run 40570111529.
 
 **Tests and walls per job.**
 
@@ -766,11 +769,11 @@ All CI numbers come from the merge queue on `main`, the `full` lane of `.github/
 | full-core, shard 1 | packages/core | 975 | 63 | 184s | 142s | tests 73%, import 24% |
 | full-web-unit | apps/web jsdom | 932 | 98 | 139s | 121s | import 45%, environment 21% |
 
-9,117 tests in all. The critical path is browser shard 3 at 474s, and one run costs about 2,721 runner-seconds. Spread is wide. Shard 1 ranged from 345s to 928s.
+9,117 tests in all. The critical path is browser shard 3 at 474s. The nine suite jobs' medians sum to 2,721 runner-seconds, a figure no single run totals. The median run took 2,815 runner-seconds over all its jobs, with a range of 2,543 to 3,234s. Of that, `lane`, `pr-title` and `check` take about 26s. Spread is wide. Shard 1 ranged from 345s to 928s.
 
 **Why not half.** Each job runs on a 4 vCPU runner. Vitest's summed file time is about 3.2 times the core shard's wall, so six workers share four cores with the Postgres container. A core shard is bounded by its longest file. cross-tier-document took 185s of shard 2's 239s. The browser shards are bounded by test count. full-api and full-worker carry image builds on their critical paths.
 
-**Files per infrastructure reached.** This is a static estimate from each test file's import closure, made by `/tmp/tp009/classify.mjs`. It over-counts in places. `config.test.ts` matches the object store on string mentions, and `test_pipeline_landed.py` names a Postgres URI it never reaches.
+**Files per infrastructure reached.** This is a static estimate from each test file's import closure, made by `docs/plans/009-test-pyramid/classify.mjs` at `f59a9da35`. It over-counts in places. `config.test.ts` matches the object store on string mentions, and `test_pipeline_landed.py` names a Postgres URI it never reaches.
 
 | Workspace | In-process | Postgres | Object store only | Git only | Worker process | Docker image | Browser |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -820,7 +823,7 @@ The table places each file in one column. Seven more files in the worker-process
 | api stop | 28 | a fixed 10s deadline | BOUNDARY | BA-271 |
 | devtools comment-only-the-why | 27 | 74 oxlint spawns | INCIDENTAL | BA-273 |
 | api restore | 26 | pg_restore in docker | BOUNDARY | BA-271 |
-| api pending-set | 20 | 220 HTTP cases | INCIDENTAL | BA-274 |
+| api pending-set | 20 | a workspace provisioned per case, 220 cases | INCIDENTAL | BA-274 |
 | devtools knip | 19 | knip per case | INCIDENTAL | BA-273 |
 
 **Slowest browser specs, summed seconds and triage.** The triage classed each case from its title and a sampled body, so the counts are estimates.
@@ -842,11 +845,11 @@ The triage's named duplicates include people's "refuses demoting both Admins" ag
 
 **After-table.** Each merged PR adds a row with the five merge-group runs that follow it.
 
-| After | Runs | Critical-path job and wall | Runner-seconds | In-process file share |
+| After | Runs | Critical-path job and wall | Runner-seconds, sum of suite-job medians | In-process file share |
 | --- | --- | --- | --- | --- |
-| trunk, `f59a9da35` | 11 | full-web-browser shard 3, 474s | about 2,721 | 45% |
+| trunk, `f59a9da35` | 11 | full-web-browser shard 3, 474s | 2,721 | 45% |
 
-**Targets.** The critical path falls to 240s or less, set by BA-278's rule. Runner-seconds fall to 1,600 or less. The in-process share of test files rises to 65% or more. These targets are estimates from the file times above. Each PR's perf rule checks its own share.
+**Targets.** The critical path falls to 240s or less, set by BA-278's rule. Runner-seconds per run fall to 1,600 or less, as the sum of the suite-job medians like the 2,721 above. On the all-jobs basis of the 2,815 median run, that is about 1,650. A change runs the suites twice, on its pull request and in the queue, so per change the target is about 3,200. The in-process share of test files rises to 65% or more. These targets are estimates from the file times above. Each PR's perf rule checks its own share.
 
 ## Appendix F. The target layering, the seams and the rule
 

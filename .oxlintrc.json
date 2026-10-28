@@ -472,7 +472,7 @@
       }
     },
     {
-      "files": ["scripts/**"],
+      "files": ["scripts/**", "docs/plans/**/*.mjs"],
       "rules": {
         "typescript/no-unsafe-assignment": "off",
         "typescript/no-unsafe-member-access": "off",
