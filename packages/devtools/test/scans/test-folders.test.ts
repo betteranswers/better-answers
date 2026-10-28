@@ -58,6 +58,16 @@ describe("a folder that mirrors a source folder", () => {
     expect(findingsOf(files, [], [WEB])).toEqual([]);
   });
 
+  it("fails a test in the strip's own folder", () => {
+    const files = [
+      "apps/probe/src/features/people/page.tsx",
+      "apps/probe/test/people/page.test.tsx",
+      "apps/probe/test/features/x.test.ts",
+    ];
+
+    expect(findingsOf(files, [], [WEB])).toEqual([strayLine("apps/probe/test/features")]);
+  });
+
   it("reads a file at the test root as no folder", () => {
     expect(reportFor(["packages/probe/test/loose.test.ts"], [], [PROBE])).toEqual({
       read: 0,

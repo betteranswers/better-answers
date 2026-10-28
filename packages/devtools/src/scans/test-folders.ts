@@ -75,12 +75,18 @@ const foldersUnder = (files: readonly string[], root: string): ReadonlySet<strin
   return folders;
 };
 
-const sourceFoldersOf = (files: readonly string[], { source, strip }: Tree): ReadonlySet<string> =>
-  new Set(
-    [...foldersUnder(files, source)].map((folder) =>
-      strip !== undefined && folder.startsWith(strip) ? folder.slice(strip.length) : folder,
-    ),
+const sourceFoldersOf = (
+  files: readonly string[],
+  { source, strip }: Tree,
+): ReadonlySet<string> => {
+  const folders = [...foldersUnder(files, source)];
+  if (strip === undefined) return new Set(folders);
+  return new Set(
+    folders
+      .filter((folder) => `${folder}/` !== strip)
+      .map((folder) => (folder.startsWith(strip) ? folder.slice(strip.length) : folder)),
   );
+};
 
 const isNamedKind = (tests: string, folder: string, pins: readonly Pin[]): boolean => {
   const segments = folder.split("/");
