@@ -8,11 +8,13 @@ severity: medium
 applies_when:
   - "Searching code or docs with jCodeMunch or jDocMunch from a worktree and finding edited or deleted lines"
   - "Setting up or debugging the jCodeMunch and jDocMunch watchers or the PostToolUse reindex hook"
+  - "A new Agent-tool worktree's resolve_repo names the main checkout instead of the worktree"
 symptoms:
   - jCodeMunch's main-checkout index was four days stale after merges to main
   - jCodeMunch search in a worktree returned lines already edited or deleted
   - jDocMunch's main index held 91 deleted paths and 73 worktree paths
   - The jCodeMunch watcher crashed on every linked worktree with IdentityModeAmbiguous
+  - 37 of the 48 surviving Agent-tool worktree branches made after 21/10 had no index of their own and resolved to the main checkout's
 root_cause: missing_tooling
 resolution_type: tooling_addition
 framework_version: jcodemunch-mcp 1.108.319
@@ -25,7 +27,7 @@ tags:
   - file-watcher
   - posttooluse-hook
   - launchd
-retire_when: "a released jcodemunch-mcp carries upstream #893 (IdentityModeAmbiguous on linked worktrees), and a watcher runs on a worktree under the default identity mode"
+retire_when: "the jDocMunch CLI can index a worktree branch-local, and no installed tool's WorktreeCreate hook creates a worktree without indexing it"
 ---
 
 # jCodeMunch and jDocMunch indexes go stale across the main checkout and Claude Code worktrees
@@ -36,7 +38,9 @@ The jCodeMunch and jDocMunch indexes went stale without saying so. Neither serve
 
 The fix was a login watcher for each server. Turning the watchers on exposed three more faults: a missing install extra, a crash loop on every linked worktree, and doc edits in worktrees landing in the main checkout's doc index.
 
-Paths under `jcodemunch_mcp/` and `jdocmunch_mcp/` (and the short forms `cli/…`, `storage/…`, `tools/…`, `server.py`, `config.py`) are inside the installed packages, jcodemunch-mcp 1.108.319 and jdocmunch-mcp 1.145.0, under `~/.local/share/uv/tools/<package>/lib/python3.*/site-packages/`. They are not in this repository, and their line numbers are for those versions.
+On 28/10/2026 a second fault turned up. A user-level `WorktreeCreate` hook from jCodeMunch raced the project's own hook. When it won, the new worktree got no index, and both servers answered from the main checkout's index without saying so.
+
+Paths under `jcodemunch_mcp/` and `jdocmunch_mcp/` (and the short forms `cli/…`, `storage/…`, `tools/…`, `server.py`, `config.py`) are inside the installed packages, jcodemunch-mcp 1.108.319 and jdocmunch-mcp 1.145.0, under `~/.local/share/uv/tools/<package>/lib/python3.*/site-packages/`. They are not in this repository, and their line numbers are for those versions. The 28/10 findings were read from jcodemunch-mcp 1.108.370 and jdocmunch-mcp 1.146.0, and cite path and symbol only.
 
 ## Symptoms
 
@@ -47,6 +51,7 @@ Paths under `jcodemunch_mcp/` and `jdocmunch_mcp/` (and the short forms `cli/…
 - `jdocmunch-mcp index-local --path <worktree>` refused with `multiple_equivalent_candidates`, and later `equivalent_corpus_stale`.
 - The main doc index held 91 deleted paths and 73 paths under `.claude/worktrees/…` before a `--rebuild`.
 - The worktree removal and sweep tests left empty `*.json.lock` files in the real `~/.doc-index`.
+- In an Agent-tool worktree, `order resolve_repo` returned `betteranswers/better-answers` with the main checkout as `source_root`, and `doc_resolve_repo` returned `local/better-answers` with `match: source_root_containment`. Both reported `found: true`, so searches returned main's content with no warning. The branch's reflog read `Created from HEAD`, not `Created from origin/main`.
 
 ## What Didn't Work
 
@@ -74,13 +79,11 @@ Paths under `jcodemunch_mcp/` and `jdocmunch_mcp/` (and the short forms `cli/…
    launchctl kickstart -k gui/$(id -u)/us.gravelle.jcodemunch-watch
    ```
 
-3. **Stop the worktree crash loop with local identity.** Add `"identity_mode": "local"` to `~/.code-index/config.jsonc`. Then, for each worktree, run `jcodemunch-mcp delete-index <repo>` and `jcodemunch-mcp index <path>`. The setting affects new indexes only, so the old ones must go.
+3. **Local identity stopped the worktree crash loop until 21/10.** This step is history. Do not repeat it.
 
-   The cause is in the defaults. `git_root_identity` defaults to `True` (`jcodemunch_mcp/config.py:485`), and that alone makes the effective mode `git` (`storage/git_root.py:118`). The config template's comment calls `"local"` the default (`config.py:2211`), which is misleading. In git mode a linked worktree is keyed `local/<name>-<sha8>` but keeps `git_root` set to the worktree path (`storage/git_root.py:349-356`). The same index then matches both the local lookup and the git lookup by `git_root` (`storage/git_root.py:95-107`). `resolve_index_identity` raises `IdentityModeAmbiguous` when both match (`storage/git_root.py:179-183`). The watcher hits this on every tick. Indexes built in local mode have an empty `git_root` (`storage/git_root.py:209-215`) and watch cleanly.
+   On 30/09 the fix was `"identity_mode": "local"` in `~/.code-index/config.jsonc`, then `jcodemunch-mcp delete-index <repo>` and `jcodemunch-mcp index <path>` for each worktree, because the setting affects new indexes only. The cause was in the defaults of jcodemunch-mcp 1.108.319. `git_root_identity` defaulted to `True` in `config.py`, which made the effective mode `git`. In git mode a linked worktree was keyed `local/<name>-<sha8>` but kept `git_root` set to the worktree path, so the same index matched both the local lookup and the git lookup in `storage/git_root.py`. `resolve_index_identity` then raised `IdentityModeAmbiguous`, and the watcher hit it on every tick. An index built in local mode has an empty `git_root` and watched cleanly.
 
-   Upstream fixed this in jcodemunch-mcp #893, merged to its `main` on 26/09/2026. It reimplements the report and diagnosis in #882, which was closed unmerged. PyPI's 1.108.319 predates it. Revert `identity_mode` once a release carries #893.
-
-   A running Claude Code session keeps its in-memory server from before the config change. That session's own worktree index got re-created with `git_root` set and kept crashing until the session ended.
+   Upstream fixed this in jcodemunch-mcp #893, merged to its `main` on 26/09/2026 and released in 1.108.364. On 21/10/2026, on 1.108.370, the setting was commented out with a note naming #882 and #893. The retire condition held on 28/10 (measured). Nine worktrees were watched under the default mode with `index_freshness: fresh` in `watch-status`. Worktree indexes are keyed `local/<name>-<hash>`, and the main checkout is keyed `betteranswers/better-answers`. `~/.code-index/logs/watch.err` has no timestamps, so its line numbers stand in for time. It holds 18234 `Both local and git identity indexes already match` lines: 18192 `WatcherManager: task crashed` lines, the crash loop, the last at line 293990, and 42 `WARNING: re-index failed` lines. The 24 lines after line 300000 are all `re-index failed`. The four of them that were checked each name a worktree that was being deleted at that moment, so they are noise during removal, not the crash loop.
 
 4. **Give each worktree its own doc index, named after its folder.** jDocMunch keeps one index per worktree lineage by default: `worktree_mode="reuse_equivalent"` (`jdocmunch_mcp/tools/index_local.py:1641`). A per-worktree index needs `worktree_mode="branch_local"`. The MCP tool exposes it (`server.py:499-503`, passed through at `:2261`). The `index-local` CLI does not (`server.py:3049-3060` has `--path` and `--name` and no worktree flag). So `.claude/hooks/worktree-create-hook.sh` calls the Python API through the uv tool's own `python3`, with `worktree_mode="branch_local"`.
 
@@ -92,19 +95,27 @@ Paths under `jcodemunch_mcp/` and `jdocmunch_mcp/` (and the short forms `cli/…
 
 6. **Put `~/.local/bin` on the hook's PATH.** jDocMunch's PostToolUse hook spawns `jdocmunch-mcp` by bare name.
 
+7. **Keep one `WorktreeCreate` hook: the project's.** `jcodemunch-mcp init` installs `WorktreeCreate: jcodemunch-mcp hook-event create` and `WorktreeRemove: jcodemunch-mcp hook-event remove` in `~/.claude/settings.json`. The jCodeMunch create hook runs `git worktree add` on the same `.claude/worktrees/<name>` folder as `.claude/hooks/worktree-create-hook.sh`, with no start point and no indexing. Claude Code takes the path from the first hook that succeeds and prints one. When the jCodeMunch hook won, the project hook either found the folder taken or failed its own `git worktree add`, and it exited before its indexers ran.
+
+   From 21/10 22:24 to 28/10 the jCodeMunch hook won 37 of the 48 surviving `worktree-agent-*` branches (measured from each branch's reflog and `~/.code-index/jcodemunch-worktrees.jsonl`). The tipping point is probably commit 76513a867 on 21/10. It added `git fetch origin main` before the project hook's `git worktree add`, which made the project hook slower than the jCodeMunch hook's start. That the hooks run at the same time and race is inferred from timing and the reflog split. Their effect is measured.
+
+   The `hook-event create` entry was removed from `~/.claude/settings.json` on 28/10/2026 at 15:07. The `hook-event remove` entry stays, because it is now the only `WorktreeRemove` hook and it only runs `git worktree remove --force` and `git branch -D`.
+
 One related find: for this project, two unpinned "Local config" entries in `~/.claude.json` overrode `.mcp.json`'s version pins (`jcodemunch-mcp==1.108.319`, `jdocmunch-mcp==1.145.0`). The pins were dropped later on 30/09/2026, so `.mcp.json` now runs each server's latest release through `uvx`, as those entries do.
 
 ## Why This Works
 
 A watcher sees every change on disk, whatever made it: Bash, git, a merge, a delete. The Edit/Write hook sees only its own tool's writes, and jCodeMunch's version sees only code files. The watcher is the refresh. The hook only closes the gap between an edit and the next watch tick.
 
-Local identity gives each worktree one index key with an empty `git_root`, so only one lookup can match it. A branch-local doc index named after the worktree folder is the first ancestor the edit hook finds, so a worktree's doc edits stay in its own index. The main index stays clean.
+Since #893, jCodeMunch resolves a linked worktree's index to that worktree alone, so the watcher no longer meets two matching indexes. One `WorktreeCreate` hook means every Agent-tool worktree goes through the project hook, which indexes it. A branch-local doc index named after the worktree folder is the first ancestor the edit hook finds, so a worktree's doc edits stay in its own index. The main index stays clean.
 
 ## Prevention
 
 - After any install or upgrade of either server, run `watch-status` and read both `watch.err` logs. A healthy status line does not prove the watcher runs. Look for `FATAL` and `task crashed`.
 - Install jCodeMunch as `jcodemunch-mcp[watch]`, never bare.
-- Keep `"identity_mode": "local"` until a jcodemunch-mcp release carries #893. Then revert it, delete the worktree indexes, and re-index. 1.108.364 carries it (its `storage/git_root.py` resolves a linked worktree's index to itself, citing #882).
+- Leave `identity_mode` unset. The default mode works on worktrees from jcodemunch-mcp 1.108.364.
+- Do not rerun `jcodemunch-mcp init`. It merges the `WorktreeCreate` `hook-event create` entry back into `~/.claude/settings.json`. After any change to user-level hooks, confirm that `~/.claude/settings.json` has no `WorktreeCreate` entry.
+- In a new worktree, check that `order resolve_repo` on `.` names the worktree as `source_root`. If it names the main checkout, the worktree has no index, and every jCodeMunch and jDocMunch answer describes `main`.
 - Never `index-local` a worktree through the jDocMunch CLI. Use `worktree-create-hook.sh`, or the MCP tool with `worktree_mode="branch_local"`. Never name a worktree index anything but its folder name.
 - In any hook test, stub every indexer binary the hook can call. An unstubbed one runs against the real home directory.
 - Check staleness by date, not by the "fresh" label. Compare `resolve_repo`'s `indexed_at` with `git log -1 --format=%cd`. If the index is older than the last commit, it is stale.
@@ -112,4 +123,5 @@ Local identity gives each worktree one index key with an empty `git_root`, so on
 ## Related Issues
 
 - PR #488: the per-worktree doc index and its removal, the hook tests stubbing both indexers, and AGENTS.md's "After editing files" note.
-- Upstream jcodemunch-mcp #893: the IdentityModeAmbiguous fix, merged to its `main` on 26/09/2026 and unreleased as of 30/09/2026. #882 is the original report and PR, closed unmerged.
+- Upstream jcodemunch-mcp #893: the IdentityModeAmbiguous fix, merged to its `main` on 26/09/2026 and released in 1.108.364. #882 is the original report and PR, closed unmerged.
+- PR #921: cut the worktree hooks down to `.claude/hooks/worktree-create-hook.sh`.
