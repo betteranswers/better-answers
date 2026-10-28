@@ -86,7 +86,7 @@ const worker = workerForSuite("cross-tier", () => ({
   objects: store(),
 }));
 
-const runTheWorker = (): Promise<void> => worker().tick();
+const runTheWorker = (): Promise<void> => worker.tick();
 
 const boundHandbook = (scenario: Scenario, called?: string, text?: string) =>
   connectTheHandbook(scenario.admin, doorsOf(scenario), called, text);

@@ -75,12 +75,45 @@ const workerEnvironment = (
   S3_REGION: objects.region,
 });
 
+/** The worker runs offline, so this runs the worker's own fetch first, and only on a cache miss. */
+const THE_DETECTORS_WEIGHTS_CACHED = `
+import sys
+from better_answers_worker.redaction.weights import WEIGHTS, carried_repositories, fetch
+try:
+    carried_repositories()
+except Exception:
+    try:
+        fetch()
+        carried_repositories()
+    except Exception as failure:
+        sys.exit(f"{', '.join(WEIGHTS)}, or the encoder it names, is missing from the Hugging Face cache and did not download: {failure}")
+`;
+
+let detectorsWeights: Promise<void> | undefined;
+
+const detectorsWeightsCached = (): Promise<void> =>
+  (detectorsWeights ??= run(
+    "uv",
+    ["run", "--frozen", "python", "-c", THE_DETECTORS_WEIGHTS_CACHED],
+    {
+      cwd: workerDirectory,
+    },
+  ).then(
+    () => undefined,
+    (cause: unknown) => {
+      const failure = execFailure.safeParse(cause);
+      const { stderr = "" } = failure.success ? failure.data : {};
+      throw new Error(`the worker cannot detect offline: ${stderr}`);
+    },
+  ));
+
 export const runWorkerOnce = async (
   connectionUri: string,
   bundleRoot: string,
   workerId: string,
   objects: WorkerObjectStore = AN_UNREACHABLE_STORE,
 ): Promise<void> => {
+  await detectorsWeightsCached();
   await stampTheContract(connectionUri);
 
   const outcome = await run("uv", ["run", "--frozen", "better-answers-worker", "--once"], {
@@ -264,15 +297,18 @@ const startTickingWorker = (workerId: string, where: Where) => {
   };
 };
 
-export const workerForSuite = (workerId: string, where: () => Where): (() => TickingWorker) => {
+export const workerForSuite = (workerId: string, where: () => Where): TickingWorker => {
   let started: ReturnType<typeof startTickingWorker> | undefined;
 
   afterAll(async () => {
     await started?.stop();
   });
 
-  return () => {
-    started ??= startTickingWorker(workerId, where());
-    return started;
+  return {
+    tick: async (): Promise<void> => {
+      await detectorsWeightsCached();
+      started ??= startTickingWorker(workerId, where());
+      await started.tick();
+    },
   };
 };
