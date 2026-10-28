@@ -690,7 +690,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Edit core's concepts slice write path, today `packages/core/src/concepts/write.ts` and `edit.ts`, and the concepts test.
 - [ ] Edit core's guides slice and its test.
 - [ ] Edit core's bundle import, today under `packages/core/src/concepts/import/`, and the import-bundle test. Leave the fence wrappers in `packages/core/src/bundle/index.ts` as they are.
-- [ ] Leave `packages/core/package.json` `exports` and every face as they are. A face names what a sibling or a transport calls, and an extracted function's test imports its module from its slice's mirror folder.
+- [ ] Add no name to a face or to `packages/core/package.json` `exports` for a test's sake; a face names what a sibling or a transport calls.
 
 **Build.**
 
