@@ -5,9 +5,11 @@ description: How this repository drives a browser: the served-build seam, the cl
 
 # The browser suite
 
-`apps/web`'s interface is the **served build driven by a browser**, so a fact about a
-page is read here and a page is never asserted against its source. Everything below is what
-the suite already is; `apps/web/e2e/model-choices/models-and-spend.spec.ts` is the fullest worked example.
+The browser suite drives `apps/web`'s **served build in a browser**. A spec here covers what
+only the served build shows: a page, with its latency budget, the accessibility gate and
+keyboard reach, or a journey that crosses pages through the real api. A page's single-screen
+behaviour is a component test through Testing Library, not a spec (AGENTS.md, *Testing*).
+Everything below is what the suite already is; `apps/web/e2e/model-choices/models-and-spend.spec.ts` is the fullest worked example.
 
 Two reference files hold the detail. Open the one a task needs:
 
@@ -22,8 +24,11 @@ Two reference files hold the detail. Open the one a task needs:
 
 ## The seam
 
-The server under the browser is the api's own test harness, `startApp` in
-`apps/api/tests/support/harness/harness.ts`, over a Testcontainers Postgres and a Garage object store. The email
+The server under the browser is the api's own integration harness, `startApp` in
+`apps/api/tests/support/harness/harness.ts`, over the Testcontainers Postgres and the Garage
+object store that the api's integration tests use. A claim about a store itself, such as
+row-level security, a migration or a lock, is proven in those integration tests, never in a
+spec. The email
 transport captures codes, Claude's client metadata document is served in process, and a model wire
 answers each workspace's model calls as its spec scripted them and fails any call no script
 answers. Playwright starts it as a **process**, not an import: `apps/web` imports nothing from
