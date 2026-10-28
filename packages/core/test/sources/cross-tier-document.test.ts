@@ -489,6 +489,7 @@ describe("one uploaded document, read back through both tiers", () => {
       const bound = await boundHandbook(scenario);
 
       const running = runTheWorker();
+      // BA-298: on a dead worker this still waits out `until` before `running` names the cause.
       await until(async () => (await statusOf(scenario.workspaceId, bound.jobId)) === "claimed");
       answered(
         await acting(scenario.admin, (admin, tx) =>
