@@ -116,9 +116,9 @@ Every browser command goes through `scripts/browse.sh <port> <agent-browser comm
 
    With no path, signing in lands on:
 
-   - An Admin of one workspace: `/people/members`.
+   - A new Admin of one workspace: `/people/members`.
    - An Editor or a Viewer of one workspace: `/ask/new-question`.
-   - A person in several workspaces: the workspace picker. A person in none: *No Workspace Yet*.
+   - A person in several workspaces: the workspace picker.
 
    With the path `/console`, the operator lands on `/console/workspaces/every-workspace`.
 

@@ -17,9 +17,7 @@ Control Centre is where an Admin runs the workspace. An Admin manages members, t
 ## How to get to it (user POV)
 
 - Sign in as an Admin of one workspace. The person lands on `/people/members`.
-- Choose a page in the menu, the `navigation` named *Control Centre*. It lists only the built pages, under the headings *SOURCES*, *MODELS*, *QUESTIONS*, *PEOPLE* and *SYSTEM*.
 - Choose a member's name in the Members table. The member's page opens.
-- Choose a link in the breadcrumb, the `navigation` named *Breadcrumb*, such as *People* or *Members* on a member's page.
 
 ## Driving it with agent-browser
 
@@ -117,6 +115,6 @@ Pages not built, as the Admin. Each address draws the heading *Page Not Found* o
 - A flag that disputes a sentence must also name the concept it disputes. A seed with `disputedSentence` and no `disputedConcept` answers 400 naming `question_feedback_flag_check`. The setup's flag leaves out `disputedSentence` for that reason.
 - `wait --text` matches a field's own text too. After filling *Email Addresses* or *New Group Name*, wait on the status sentence, never on the value just typed.
 - Wait for the record's dialog before pressing *Fixed in the Knowledge*. Pressed while the dialog still opens, the click lands on the overlay and agent-browser refuses it.
-- Two controls can share a name. *Publish Staff handbook* sits on the row and *Publish* in its dialog, *Members* sits in the menu and the breadcrumb, and *Site leads* names both a row's button and its sheet. Keep `--exact` where a recipe gives it.
+- Two controls can share a name. *Publish Staff handbook* sits on the row and *Publish* in its dialog, while *Site leads* names both a row's button and its sheet. Keep `--exact` where a recipe gives it.
 - The Control Centre menu leaves out every page not built, so a not-found page proves only that its address is not served yet. Never report it as a broken page.
 - The seeded questions name no asker, so each reads *A former member*. That is the erased-asker wording, not a fault.

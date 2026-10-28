@@ -42,8 +42,8 @@ Keep implementation detail out of the map. Name only what a person reaches, the 
 ## Features
 
 - [Ask](./ask.md) covers asking a new question, the asker's own questions and connecting Claude.
-- [Knowledge](./knowledge.md) covers search, guides, the knowledge base and Knowledge's curation pages.
+- [Knowledge](./knowledge.md) covers search, the knowledge base, the collections and owners page and the Knowledge pages not built.
 - [Inbox](./inbox.md) covers the suggestions waiting on the signed-in person.
-- [Control Centre](./control-centre.md) covers an Admin's pages for suggestions, sources, models, questions, people, personal data and system.
+- [Control Centre](./control-centre.md) covers an Admin's members, groups, audit log, connected sources, models, questions and answer tests, and the Control Centre addresses not built yet.
 - [Console](./console.md) covers the operator's pages across every workspace.
 - [Outside the shell](./outside-the-shell.md) covers sign-in, the second-factor steps, the account page, choosing a workspace, accepting an invitation and Claude's consent page.

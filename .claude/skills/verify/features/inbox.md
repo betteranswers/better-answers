@@ -11,7 +11,6 @@ Inbox is where a person decides the changes other members suggest to concepts. A
 
 - As the Admin the setup signs in, choose *Inbox* in the rail, the `navigation` named *Areas*. It opens `/inbox/waiting-on-you`.
 - Choose a suggestion's title in the list. Its page opens.
-- Choose *Back to Waiting on You* on a suggestion's page.
 
 ## Driving it with agent-browser
 
@@ -50,5 +49,5 @@ A waiting suggestion, at `/inbox/waiting-on-you/<suggestionId>`, as the Admin:
 - `POST /suggestions` takes the concept's whole IRI, and a concept's page takes only its last part. A concept the workspace does not hold answers 400 naming `iri`.
 - A suggestion is made against the concept as it stood. Accept one, and a second suggestion waiting on the same concept goes back to its proposer instead of committing. Seed each recipe's suggestions on different concepts.
 - Seed the suggestions as a member other than the one signed in, so *Suggested By* proves who proposed them.
-- Several names nest. *Accept* sits inside *Accept Selected*, *Decline* inside *Decline Suggestion*, and *Inbox* names the rail's link and a heading. Keep `--exact` where a recipe gives it.
+- Keep `--exact` where a recipe gives it.
 - `wait --text` matches a substring, so `wait --text "2 suggestions waiting"` also matches *12 suggestions waiting*. Seed few enough suggestions that the count cannot nest.

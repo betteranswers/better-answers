@@ -10,9 +10,9 @@ A person signs in by email code or by an emailed link, names themselves, sets up
 - `no-workspace` tells a person in no workspace so at `/no-workspace` and lets them ask to join one.
 - `account` shows the signed-in person's factors, sessions and theme at `/account`, and sets up an authenticator there.
 - `setup` makes an Admin with no second factor set one up at `/setup`, and shows their first recovery codes.
-- `confirm` asks a person holding a second factor to confirm it at `/confirm`.
+- `confirm` asks an Admin holding a second factor to confirm it at `/confirm`.
 - `recovery` takes a recovery code in place of the second factor at `/recovery`.
-- `recovery-codes` shows a new set of recovery codes to a person who never saved one at `/recovery-codes`.
+- `recovery-codes` shows a new set of recovery codes to an Admin whose codes were never saved at `/recovery-codes`.
 - `choose-workspace` lets a member of more than one workspace pick where to go at `/choose-workspace`.
 - `invitation` lets an invited person join a workspace at `/invitations/$invitationId`, with the invitation's id in place of `$invitationId`.
 - `consent` asks the person to let Claude act for them at `/consent`, the page the api serves in Claude's OAuth flow.
@@ -21,16 +21,16 @@ A person signs in by email code or by an emailed link, names themselves, sets up
 ## How to get to it (user POV)
 
 - Open `/sign-in`.
-- Choose the link in the sign-in email, which opens `/sign-in/link` in the browser.
+- Open `/sign-in/link` with the token of an emailed link.
 - Sign in for the first time with no display name, which opens `/display-name`.
 - Sign in as a person in no workspace, which opens `/no-workspace`.
 - Choose the `Account` link on `/no-workspace`.
 - Sign in as an Admin with no second factor, which opens `/setup`.
-- Sign in by email as a person holding a second factor, which opens `/confirm`. Choose `Use a Recovery Code` there for `/recovery`.
-- Confirm a second factor when no recovery codes were saved, which opens `/recovery-codes`.
+- Sign in by email as an Admin holding a second factor, which opens `/confirm`. Choose `Use a Recovery Code` there for `/recovery`.
+- As that Admin, confirm a second factor when no recovery codes were saved, which opens `/recovery-codes`.
 - Sign in as a member of two workspaces, which opens `/choose-workspace`.
-- Choose the link in an invitation email, which opens `/invitations/<invitationId>`.
-- Choose `Connect` for better-answers in Claude, which opens `/oauth2/authorize` and then `/consent`.
+- Open `/invitations/<invitationId>`, signed in as the invited person.
+- Open `/oauth2/authorize` with Claude's parameters, which opens `/consent`.
 - Open an address no page answers, such as `/no-such-page`.
 
 ## Driving it with agent-browser
@@ -96,9 +96,6 @@ An invited Editor drives the invitation, consent and the sign-in link.
 - One client address may send five email codes in ten minutes, and one address may receive five. A sixth `Send Code` says `Too many attempts`. `sign-in.sh` sets a client address of its own each time. A sign-in by hand needs its own `set headers` with a number this run has not used.
 - Switch person by hand with `cookies clear`, not `close`. After `close`, the first command that relaunches the browser leaves it at `about:blank`, and any headers and routes set before are gone.
 - An authenticator code lasts about half a minute. Make it just before you type it. Six digits submit the field on their own, so `Finish Setup` is pressed only for the recovery codes.
-- An Admin's first setup shows the recovery codes on `/setup` itself. `/recovery-codes` opens only for a person whose codes were never saved, which `"codes":"none"` on `POST /authenticators` gives.
+- An Admin's first setup shows the recovery codes on `/setup` itself. `"codes":"none"` on `POST /authenticators` opens `/recovery-codes` for the Admin in its place.
 - A recovery code works once. Note one from the codes page before you finish, because the page never shows them again. Once spent, `/recovery` sends the person on to `/setup`.
-- `Request sent` shows whether or not the short name exists. Prove the request on the workspace Admin's Requests tab, in Control Centre.
-- The sign-in link signs in only the browser that asked for the code. Another browser sees `Enter This Code Where You Started` in place of the `Sign In` button.
 - Without the route on Claude's callback, `Connect` sends the browser and a live code to claude.ai.
-- `Account` lists no Claude grant after consent. The code is spent only when Claude exchanges it, and the browser never does.

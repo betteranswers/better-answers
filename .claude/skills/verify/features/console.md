@@ -1,6 +1,6 @@
 # Console
 
-The Console is the platform operator's view across every workspace. The operator finds any person and what they hold, corrects a display name an Admin flagged, and lists every workspace with its short name and id. Only a person holding the operator mark sees it.
+The Console is the platform operator's view across every workspace. The operator finds any person and what they hold, corrects a display name an Admin flagged, and lists every workspace with its short name and id.
 
 ## Sub-features
 
@@ -37,8 +37,8 @@ Preconditions:
 
 ## Gotchas
 
-- Every list holds what the whole instance holds, from every recipe run on it. Give each seeded name the stamp, search for it, and wait for the status to say `matches` before you read the table.
+- Every list holds what the whole instance holds, from every recipe run on it. Give each seeded name the stamp, search for it, and wait for the status to give the count, such as `1 person matches`, before you read the table.
 - The correct button's full name is `Correct Priya Shah <stamp>’s Display Name` with a curly apostrophe. Match it by the substring `Correct Priya Shah <stamp>`.
-- A person's sheet draws its headings before its facts, with one region `Sessions and Assistant Access` while it reads. Wait for a fact such as `No open sessions` before you capture it.
+- While a person's sheet reads, it draws one region, `Sessions and Assistant Access`. Wait for a fact such as `No open sessions` before you capture it.
 - Leave `End Every Sign-In and Token` alone in this recipe. It ends every sign-in and token the person holds, behind a confirmation of its own.
 - A correction needs a second-factor confirmation under an hour old. The sign-in gives one, so a long pause before `Save Changes` brings up the `Confirm It’s You` dialog.
