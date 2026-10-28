@@ -33,7 +33,7 @@ Appendix B's key technical decisions bind wherever an earlier note differs from 
 ### Arm the program
 
 - [ ] State the protocol and this plan to the operator, then stop. Start execution only on the operator's explicit go.
-- [ ] On the operator's go, write this exact text into the standing orders and restate it in your todolist. "Plan `docs/plans/2026-10-21-1721-feat-s3-concepts-and-guides-plan.md`. PRs in order BA-230, BA-231, BA-12, BA-95, BA-144, BA-232, BA-233, BA-234, BA-235, BA-236, BA-237, BA-238, BA-239. Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. The coordinator merges each PR through the merge queue after an agent that did not write it posts `PASS` at its head SHA. A PR that adds a migration or edits `contracts/` runs alone until it merges. Done when every PR has merged, every Done when check in `docs/specs/route/s3.md` holds, and S3's row reads `done`."
+- [ ] On the operator's go, write this exact text into the standing orders and restate it in your todolist. "Plan `docs/plans/2026-10-21-1721-feat-s3-concepts-and-guides-plan.md`. PRs in order BA-230, BA-231, BA-12, BA-95, BA-144, BA-232, BA-233, BA-234, BA-235, BA-236, BA-237, BA-238, BA-239. Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. The coordinator lands each PR with `gh pr merge <n> --squash --match-head-commit <sha>` after an agent that did not write it posts `PASS` at its head SHA. A PR that adds a migration or edits `contracts/` runs alone until it merges. Done when every PR has merged, every Done when check in `docs/specs/route/s3.md` holds, and S3's row reads `done`."
 - [ ] Read these from the installed plugin at program start. Re-read them at every tick.
   - [ ] `skills/poteto-mode/playbooks/orchestrate.md`
   - [ ] `skills/swarm/SKILL.md`
@@ -78,7 +78,7 @@ Appendix B's key technical decisions bind wherever an earlier note differs from 
 
 - [ ] A full swarm runs once, at the code-ready head. Another full swarm runs only for new behaviour, a redesign, or a large new diff. A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head. Run each full swarm per `skills/swarm/SKILL.md`. One gates lane. The ten live lanes from the PR's **Verify, live** block. The perf lane from its **Verify, perf** block. Two or more audit lanes, each with its own focus, that read the diff and the receipts and distrust the PR body. The root audits the receipts in the merge-ready report before the verdict.
 - [ ] Clean only when every lane is `PASS`. Findings go back to the PR owner, including a defect that a lane filed as a note. A new head gets a fresh verdict, except for results that stay valid under the patch-id rule in `playbooks/shipping.md`.
-- [ ] An agent that did not write the PR posts `PASS` at the head SHA. Once the PR's own `check` is green, the coordinator queues it through the merge queue with `gh pr merge <n> --match-head-commit <sha>`. A push after the verdict needs a new verdict. Queued is not merged, so the coordinator reads the PR back with `gh pr view <n> --json state,mergedAt` and watches it with `skills/poteto-mode/scripts/watch-pr/watch-pr --queued-stack --stack-prs <n>` under the installed plugin. After each merge, run `node .gitnexus/run.cjs analyze` in the main checkout.
+- [ ] An agent that did not write the PR posts `PASS` at the head SHA. Once the PR's own `check` is green, the coordinator lands it with `gh pr merge <n> --squash --match-head-commit <sha>`. A push after the verdict needs a new verdict. The coordinator reads the PR back with `gh pr view <n> --json state,mergedAt`, then reads `main`'s next `build` run (`gh run list --workflow build.yml --branch main --limit 1`), where `check` tests the landed tree. After each merge, run `node .gitnexus/run.cjs analyze` in the main checkout.
 
 ### Boot recipe, for every live lane
 
@@ -156,7 +156,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
-- [ ] The coordinator queues the PR with `gh pr merge <n> --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
+- [ ] The coordinator lands the PR with `gh pr merge <n> --squash --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
 
 ## Record a concept's owner, and let the owner or an Admin write and decide (BA-231)
 
@@ -280,7 +280,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
-- [ ] The coordinator queues the PR with `gh pr merge <n> --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
+- [ ] The coordinator lands the PR with `gh pr merge <n> --squash --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
 
 ## Open the owner-visible pages from the recorded ownership, with Collections and Owners (BA-12)
 
@@ -376,7 +376,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
-- [ ] The coordinator queues the PR with `gh pr merge <n> --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
+- [ ] The coordinator lands the PR with `gh pr merge <n> --squash --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
 
 ## Edit a concept from its raw file through one write route (BA-95)
 
@@ -480,7 +480,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
-- [ ] The coordinator queues the PR with `gh pr merge <n> --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
+- [ ] The coordinator lands the PR with `gh pr merge <n> --squash --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
 
 ## Edit a concept on its own page (BA-144)
 
@@ -567,7 +567,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
-- [ ] The coordinator queues the PR with `gh pr merge <n> --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
+- [ ] The coordinator lands the PR with `gh pr merge <n> --squash --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
 
 ## Decide an edit suggestion in Inbox › Waiting on You (BA-232)
 
@@ -666,7 +666,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
-- [ ] The coordinator queues the PR with `gh pr merge <n> --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
+- [ ] The coordinator lands the PR with `gh pr merge <n> --squash --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
 
 ## Create a concept without scanning the workspace (BA-233)
 
@@ -775,7 +775,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
-- [ ] The coordinator queues the PR with `gh pr merge <n> --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
+- [ ] The coordinator lands the PR with `gh pr merge <n> --squash --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
 
 ## Declare the guide schema in one migration (BA-234)
 
@@ -890,7 +890,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
-- [ ] The coordinator queues the PR with `gh pr merge <n> --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
+- [ ] The coordinator lands the PR with `gh pr merge <n> --squash --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
 
 ## Seed a guide from a template and project its skeleton (BA-235)
 
@@ -1043,7 +1043,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
-- [ ] The coordinator queues the PR with `gh pr merge <n> --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
+- [ ] The coordinator lands the PR with `gh pr merge <n> --squash --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
 
 ## Read and edit a guide on Knowledge › Guides (BA-236)
 
@@ -1158,7 +1158,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
-- [ ] The coordinator queues the PR with `gh pr merge <n> --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
+- [ ] The coordinator lands the PR with `gh pr merge <n> --squash --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
 
 ## Copy a section's Brief with resolvable footnotes and record its usage (BA-237)
 
@@ -1253,7 +1253,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
-- [ ] The coordinator queues the PR with `gh pr merge <n> --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
+- [ ] The coordinator lands the PR with `gh pr merge <n> --squash --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
 
 ## Build All Knowledge, Kinds and Exports on Knowledge's Curation pages (BA-238)
 
@@ -1360,7 +1360,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
-- [ ] The coordinator queues the PR with `gh pr merge <n> --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
+- [ ] The coordinator lands the PR with `gh pr merge <n> --squash --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
 
 ## Browse the knowledge base beside Search (BA-239)
 
@@ -1454,7 +1454,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
-- [ ] The coordinator queues the PR with `gh pr merge <n> --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
+- [ ] The coordinator lands the PR with `gh pr merge <n> --squash --match-head-commit <sha>` once its own `check` is green, and reads it back with `gh pr view <n> --json state,mergedAt`.
 
 ## Close the program
 

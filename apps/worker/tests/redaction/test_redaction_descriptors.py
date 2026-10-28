@@ -313,7 +313,7 @@ def _weights_keys(workflow: str) -> set[str]:
 
 
 def test_main_saves_the_weights_under_the_key_check_restores() -> None:
-    # GitHub scopes a merge group's cache entry to its queue ref, which no later
+    # GitHub scopes a pull request's cache entry to its own ref, which no later
     # run reads.
     check = CHECK_WORKFLOW.read_text(encoding="utf-8")
     build = BUILD_WORKFLOW.read_text(encoding="utf-8")
