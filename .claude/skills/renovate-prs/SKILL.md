@@ -80,7 +80,7 @@ What a fix owes, whichever path:
 
 ## 5. Land and watch
 
-Land each pull request as pstack's Shipping playbook says: after its verdict, `gh pr merge <n> --squash --match-head-commit <verified-head>`, then read it back with `gh pr view <n> --json state,mergedAt,baseRefName`. Arm no auto-merge, and never merge without that verdict. A cloud session stops at merge-ready (`docs/agents/cloud-sessions.md`). A new head voids the verdict, Renovate's force-push included: verify the new head again before landing it.
+Land each pull request under pstack's Shipping playbook. Renovate's force-push is a new head, so redo the verdict on it before landing. A cloud session stops at merge-ready (`docs/agents/cloud-sessions.md`).
 
 The queue's state is a GraphQL read:
 
@@ -89,7 +89,7 @@ gh api graphql -F owner='{owner}' -F name='{repo}' -F number=<n> -f query='
   query($owner: String!, $name: String!, $number: Int!) {
     repository(owner: $owner, name: $name) {
       pullRequest(number: $number) {
-        id state isInMergeQueue mergeQueueEntry { position state }
+        id state isInMergeQueue autoMergeRequest { enabledAt } mergeQueueEntry { position state }
         timelineItems(itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT], last: 1) {
           nodes { ... on RemovedFromMergeQueueEvent { createdAt reason } }
         }

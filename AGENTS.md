@@ -51,7 +51,7 @@ Day-to-day workflow: `/poteto-mode <goal and definition of done>` - name the goa
 
 The project playbooks in `.agents/playbooks/` add this repository's steps to pstack's.
 
-Until v0.1 the session lands its own pull request, with no press from the owner, once the verdict is `PASS`.
+Until v0.1 the session lands its own pull request, with no press from the owner, once the verdict is `PASS` or `PASS+NOTES`.
 
 The verifier records its Shipping verdict as a commit status on the verified head, context `verdict`: `success` for PASS or PASS+NOTES, `failure` for FAIL, and a description naming the verdict and the verifier, for example `gh api repos/{owner}/{repo}/statuses/<sha> -f state=success -f context=verdict -f description='PASS by <verifier>'`. The merge queue refuses a head without it.
 
