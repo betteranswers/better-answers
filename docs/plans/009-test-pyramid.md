@@ -750,18 +750,20 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 **Files.**
 
-- [ ] Edit the worker's loop module, today `apps/worker/src/better_answers_worker/loop.py`, to take a clock.
+- [ ] Edit the worker's loop module, today `apps/worker/src/better_answers_worker/loop.py`, to take an injectable sleep.
 - [ ] Edit `apps/worker/tests/test_work_loop.py`.
-- [ ] Edit `apps/worker/tests/test_tier_contract.py` and `test_cost_ledger_contract.py`.
+- [ ] Edit `apps/worker/tests/test_cost_ledger_contract.py`.
+- [ ] Edit `apps/worker/tests/gates/test_monkeypatch_guard.py`.
+- [ ] Edit `apps/worker/tests/redaction/test_the_detector_is_paid_for_late.py`.
 
 **Build.**
 
-- [ ] Give the loop an injectable `sleep`, defaulting to the stop-event wait. The loop reads no time, so it takes no `now`. The work-loop cases that sleep on the loop's clock pass a `sleep` that returns at once.
+- [ ] Give the loop an injectable `sleep`, defaulting to the stop-event wait. The loop reads no time, so it takes no `now`. The refusal case, `test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes`, passes a stepped sleep, which blocks until the test steps it, so the case waits on no real time.
 - [ ] Read the `llm_call` column set from the generated `schema_view` in-process. Keep the CHECK-constraint cases on Postgres.
 
 **You see.**
 
-- [ ] `uv run pytest tests/test_work_loop.py --durations=5` shows no case above 2s, where trunk shows 11.6s, 11.0s and 9.3s.
+- [ ] `uv run pytest tests/test_work_loop.py --durations=5` shows no case above 2s, where trunk shows a slowest case of 20.35s and a file of 51s.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
