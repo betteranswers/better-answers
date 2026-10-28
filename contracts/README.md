@@ -14,4 +14,6 @@ Two conformance tests read this directory and assert the same expectations — `
 
 Adding a fixture: put the file under `<agreement>/`, list it in `manifest.json`'s `fixtures` array as `{ "agreement": "<id>", "path": "<agreement>/<file>" }`, and teach both suites what it means in the same PR. A fixture on disk but not in the manifest — or listed but absent — fails both suites. Both generated digests move in that same commit, and a deploy that lands one tier and not the other is a worker that says so rather than one that works on a contract it does't hold.
 
+Every repository path this directory names, in a fixture or on this page, must exist. The move codemod never rewrites `contracts/`, so `packages/devtools/test/scans/contract-paths.test.ts` fails on a path whose file has moved. Point the mention at the file's new path, then regenerate both stamps, because a fixture edit moves the digest.
+
 The form an entry declares is a claim about this directory. A **fixtured** agreement lists at least one fixture, each under its own `<agreement>/` and each on disk; a **generated** agreement has rows on disk under it; a **sql-function** agreement is asked nothing about files.

@@ -9,6 +9,7 @@
     "./auth-seam-scan": "./src/scans/auth-seam-scan.ts",
     "./comment-density": "./src/comments/comment-density.ts",
     "./comment-inventory": "./src/comments/comment-inventory.ts",
+    "./contract-paths": "./src/scans/contract-paths.ts",
     "./face-admission": "./src/scans/face-admission.ts",
     "./insert-scan": "./src/scans/insert-scan.ts",
     "./jscpd": "./src/scans/jscpd.ts",
