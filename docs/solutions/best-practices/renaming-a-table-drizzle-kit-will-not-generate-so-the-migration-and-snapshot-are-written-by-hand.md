@@ -68,10 +68,10 @@ A column rename has to reach every raw SQL string that names the column. drizzle
 
 | Site | What would have failed |
 |---|---|
-| `packages/core/src/members/name-flags.ts:40` and `:43`, in `STILL_WAITING` | an Admin flagging a member's display name, which first checks whether a flag already waits, and the operator's list of waiting flags |
-| `packages/core/src/members/audit-log/audit-log.ts:177`, in `namedInDetail` | the Audit log's search for a person named in an event's detail |
-| `packages/core/src/concepts/writes/reconciler-hit.ts:37`, in `restsAlsoOnItsReconcilerHit` | `recomputeConceptVisibility`, which re-derives a concept's visibility in a cascade and reads the reconciler's replay event to do it |
-| `packages/core/src/sources/connected-source.ts:209`, in `FIRST_OUTCOME` | every upload connect, which first reads whether a committed connect already stands; a bind retried with the same id (AE7) is one of them |
+| `packages/core/src/members/name-flags.ts`, twice in `STILL_WAITING` | an Admin flagging a member's display name, which first checks whether a flag already waits, and the operator's list of waiting flags |
+| `packages/core/src/members/audit-log/audit-log.ts`, in `namedInDetail` | the Audit log's search for a person named in an event's detail |
+| `packages/core/src/concepts/writes/reconciler-hit.ts`, in `restsAlsoOnItsReconcilerHit` | `recomputeConceptVisibility`, which re-derives a concept's visibility in a cascade and reads the reconciler's replay event to do it |
+| `packages/core/src/sources/connected-source.ts`, in `FIRST_OUTCOME` | every upload connect, which first reads whether a committed connect already stands; a bind retried with the same id (AE7) is one of them |
 
 Where TypeScript still reads the old result key, a select list names the new column under the old alias (`action AS act`) until the code itself is renamed. A statement that names both a renamed table and one the rename leaves alone is edited by hand: list the old word's code senses first, as step 1 of `what-a-rename-prose-pass-gets-wrong-and-the-checks-that-catch-it.md` says.
 

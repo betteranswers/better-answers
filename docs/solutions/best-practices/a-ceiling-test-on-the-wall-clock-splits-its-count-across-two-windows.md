@@ -77,7 +77,7 @@ const { clock, stopTheClock } = aStoppableClock();
 const app = appForSuite({ clock });
 ```
 
-`appForSuite` passes its options to `startApp`, and `TestAppOptions` takes a `clock` (`apps/api/tests/support/harness/harness.ts:335`). Each ceiling test calls `stopTheClock()` before its loop (`passkeys.test.ts:211`, `:299`; `confirm.test.ts:587`).
+`appForSuite` passes its options to `startApp`, and `TestAppOptions` takes a `clock` (`apps/api/tests/support/harness/harness.ts`). Each ceiling test calls `stopTheClock()` before its loop ("answers 429 at %s past ten in ten minutes" and "answers 429 at %s past thirty a minute" in `apps/api/tests/auth/second-factor/passkeys.test.ts`; "answers 429 at %s past ten tries" in `apps/api/tests/auth/second-factor/confirm.test.ts`).
 
 The last answer of a split count is whatever the path answers under its ceiling, not always 200. The confirm and recovery paths are sent `{}`, so a split count answers 400 or 409. BA-68 (merge-queue run 37626160905 for #605, 07/10/2026) failed with `expected 400 to be 429` at `/second-factor/replace/authenticator-finish`, the last of the seven to run, which the log puts at 13:10:00, a ten-minute edge. The edge probe reproduced it with a 5 ms and a 20 ms lead.
 
@@ -85,9 +85,9 @@ The tests it fixed:
 
 | Test | Requests | Rule |
 | --- | --- | --- |
-| "answers 429 at /passkeys/add-options past ten in ten minutes", and the same at `/passkeys/add` (`passkeys.test.ts:208`) | 11 | `PASSKEY_PERSON_RULE`, 10 in 10 minutes (`apps/api/src/auth/constants.ts:119`) |
-| "answers 429 at /passkeys/sign-in-options past thirty a minute", and the same at `/passkeys/sign-in` (`passkeys.test.ts:296`) | 31 | `PASSKEY_SIGN_IN_IP_RULE`, 30 a minute (`apps/api/src/auth/constants.ts:122`) |
-| "answers 429 at %s past ten tries", at each of the seven confirm and recovery paths (`confirm.test.ts:583`) | 11 | `CONFIRM_PERSON_RULE` and `AUTHENTICATOR_PERSON_RULE`, 10 in 10 minutes; `SPEND_A_CODE_PERSON_RULE`, 10 an hour (`apps/api/src/auth/constants.ts:101`, `:75`, `:104`) |
+| "answers 429 at /passkeys/add-options past ten in ten minutes", and the same at `/passkeys/add` (`passkeys.test.ts`) | 11 | `PASSKEY_PERSON_RULE`, 10 in 10 minutes (`apps/api/src/auth/constants.ts`) |
+| "answers 429 at /passkeys/sign-in-options past thirty a minute", and the same at `/passkeys/sign-in` (`passkeys.test.ts`) | 31 | `PASSKEY_SIGN_IN_IP_RULE`, 30 a minute (`apps/api/src/auth/constants.ts`) |
+| "answers 429 at %s past ten tries", at each of the seven confirm and recovery paths (`confirm.test.ts`) | 11 | `CONFIRM_PERSON_RULE` and `AUTHENTICATOR_PERSON_RULE`, 10 in 10 minutes; `SPEND_A_CODE_PERSON_RULE`, 10 an hour (`apps/api/src/auth/constants.ts`) |
 
 ## Related
 
