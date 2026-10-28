@@ -63,7 +63,7 @@ file for one that already does the job, and before adding a helper, search
 
 ## Launch
 
-Docker must be running, because the harness starts a Testcontainers Postgres and a Garage object store of its own. agent-browser drives the browser. Install it once with `npm install -g agent-browser && agent-browser install`.
+Docker must be running, because the harness starts a Testcontainers Postgres and a Garage object store of its own. agent-browser drives the browser. Install it once with `npm install -g agent-browser && agent-browser install`. A fresh checkout or worktree has no `node_modules`, so run `pnpm install --frozen-lockfile` at its root first. launch.sh refuses a checkout without them.
 
 ```bash
 .claude/skills/verify/scripts/launch.sh 4610             # builds the SPA, then starts the server
@@ -87,6 +87,8 @@ It reads and changes nothing. It prints `worth driving:` with the origin and the
 - The port's listener is that process.
 - `/health` answers 200 and `/__harness` answers.
 - No page source changed after the SPA was built, and no api, core, schema or harness source changed after the server started.
+
+When the server has exited, the reason quotes the last three lines of its log. Those lines may predate the exit, such as a trace from an earlier refused request, so read `server.log` in full before you name a cause.
 
 Run it before the first drive, after any drive that failed, and whenever a page looks wrong. When it refuses, run cleanup.sh and launch again. Never drive an instance the doctor refused.
 
@@ -128,7 +130,7 @@ Every browser command goes through `scripts/browse.sh <port> <agent-browser comm
 
    `snapshot -c` prints the accessibility tree with refs. A name matches as a case-insensitive substring unless the command adds `--exact`. Add it where one name sits inside another on the same page. Never locate by CSS class, coordinates or tab order. Wait on a condition, never for a fixed time.
 
-   Move between pages as a person does. The rail is the `navigation` named *Areas*. The menu is the `navigation` named for the open area. The breadcrumb is the `navigation` named *Breadcrumb*. To open a page by its address, run `.claude/skills/verify/scripts/browse.sh 4610 open http://localhost:4610<path>`.
+   Move between pages as a person does. The rail is the `navigation` named *Areas*. The menu is the `navigation` named for the open area. The breadcrumb is the `navigation` named *Breadcrumb*. To open a page by its address, run `.claude/skills/verify/scripts/browse.sh 4610 open http://localhost:4610<path>`. `open` returns before the page's data arrives, so `wait` for a text or a condition the loaded page draws before the next `find`. A `find` that runs first fails on a page that has not drawn its rows yet.
 
 ## Evidence
 

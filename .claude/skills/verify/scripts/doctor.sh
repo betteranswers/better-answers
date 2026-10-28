@@ -20,7 +20,7 @@ command -v agent-browser >/dev/null \
 [[ -f "$state/server.pid" ]] || refuse "this skill launched nothing on port $port; run launch.sh $port"
 pid="$(cat "$state/server.pid")"
 kill -0 "$pid" 2>/dev/null \
-  || refuse "server pid $pid has exited; its log ends: $(tail -n 3 "$state/server.log" | tr '\n' ' ')"
+  || refuse "server pid $pid has exited; the last lines of $state/server.log, which may predate the exit: $(tail -n 3 "$state/server.log" | tr '\n' ' ')"
 listener="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true)"
 [[ "$listener" == "$pid" ]] \
   || refuse "port $port is held by pid ${listener:-nobody}, not by pid $pid, which launch.sh started"

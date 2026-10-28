@@ -19,6 +19,8 @@ fi
 for tool in lsof curl node pnpm docker; do
   command -v "$tool" >/dev/null || { echo "launch: $tool is not on PATH" >&2; exit 1; }
 done
+[[ -d "$root/node_modules" ]] \
+  || { echo "launch: $root has no node_modules; run pnpm install --frozen-lockfile there first" >&2; exit 1; }
 held="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true)"
 if [[ -n "$held" ]]; then
   echo "launch: port $port is held by pid $held, which this skill did not start. Pick another port." >&2
