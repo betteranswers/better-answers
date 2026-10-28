@@ -78,7 +78,6 @@ Plan 008 owns the folder restructure and is moving files under `packages/*` and 
 - [ ] A full swarm runs once, at the code-ready head. Another full swarm runs only for new behavior, a redesign, or a large new diff. A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head. Run each full swarm per `skills/swarm/SKILL.md`. One gates lane. The ten live lanes from the PR's **Verify, live** block. The perf lane from its **Verify, perf** block. Two or more audit lanes, each with its own focus, that read the diff and the receipts and distrust the PR body. The root audits the receipts in the merge-ready report before the verdict.
 - [ ] Clean only when every lane is `PASS`. Findings go back to the owner, including a defect that a lane filed as a note. A new head gets a fresh verdict, except for results that stay valid under the patch-id rule in `playbooks/shipping.md`.
 - [ ] The coordinator queues a clean PR with `gh pr merge <n> --match-head-commit <sha>`. A verdict carries over a rebase only when the patch-id rule in `playbooks/shipping.md` holds.
-- [ ] Queue one PR of this program at a time, and queue the next only after the last has merged. The queue groups up to five entries, and its `verdict` job reads only the group head's pull request.
 - [ ] After each merge, read the next merge-group run's job walls with `gh run view <id> --json jobs` and add a row to Appendix E's after-table.
 
 ### Boot recipe, for every live lane
