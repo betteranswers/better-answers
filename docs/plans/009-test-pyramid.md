@@ -756,7 +756,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 **Build.**
 
-- [ ] Give the loop a clock with `sleep` and `now`, defaulting to the system clock. The three slowest work-loop cases pass a clock that advances on demand.
+- [ ] Give the loop an injectable `sleep`, defaulting to the stop-event wait. The loop reads no time, so it takes no `now`. The work-loop cases that sleep on the loop's clock pass a `sleep` that returns at once.
 - [ ] Read the `llm_call` column set from the generated `schema_view` in-process. Keep the CHECK-constraint cases on Postgres.
 
 **You see.**
@@ -775,17 +775,19 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Lane 4. In a scratch edit, drop a column from `schema_view`'s `llm_call`. Save `schema-breaks.log`. Pass when the column-set case fails.
 - [ ] Lane 5. Run the CHECK-constraint cases. Save `check-constraint.log`. Pass when they pass on Postgres.
 - [ ] Lane 6. Run `pnpm port-scan`. Save `port-scan.log`. Pass when it passes.
-- [ ] Lane 7. Run ruff and pyright through the check script. Save `static.log`. Pass when both pass.
+- [ ] Lane 7. Run ruff and mypy through the check script. Save `static.log`. Pass when both pass.
 - [ ] Lane 8. Run cross-tier-document from core. Save `cross-tier.log`. Pass when it passes.
 - [ ] Lane 9. Run the work-loop file twenty times. Save `repeat.log`. Pass when all pass.
 - [ ] Lane 10. Audit that the default clock is the only one production code builds. Save `audit.md`. Pass when no production path passes a stepped clock.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Wall seconds of `pnpm check:worker` with image tests excluded.
-- [ ] Probe. Run at trunk and head, interleaved, three times each, against one shared Postgres.
+- [ ] Metric. Wall seconds of `uv run pytest tests/test_work_loop.py` in `apps/worker`.
+- [ ] Probe. Run at trunk and head, interleaved, five times each, against one shared Postgres.
 - [ ] Baseline. Record the trunk median first.
-- [ ] Rule. Fails if the head median is not at least 20s below trunk's.
+- [ ] Rule. Fails unless every head round is faster than every trunk round. Record the median of each side, and record `pnpm check:worker`'s wall at trunk and head as a figure.
+
+On 28/10/2026 the first rule, a 20s drop in `pnpm check:worker`, summed case time across four pytest workers, so it ignored that the suite runs in parallel. Only one of the six slow work-loop cases slept on the loop's clock. Three wait for the detector warm-up inside a worker subprocess, one waits out `analyse_map`'s `lock_timeout`, and one waits its job deadline. The work-loop file went from 51s to 15.6s and its slowest case from 20.35s to 1.83s. The suite's median wall went from 54.2s at trunk (53.0 to 60.5) to 57.3s at head (45.1 to 58.0).
 
 **Review gate.** None. BA-276 is not review-gated.
 
