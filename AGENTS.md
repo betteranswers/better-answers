@@ -81,7 +81,7 @@ When a session runs in a cloud environment, see `docs/agents/cloud-sessions.md`.
 
 ## Code and doc exploration
 
-The jCodeMunch policy, its front-door tools and how to read their results are here: `~/.claude/CLAUDE.md`. A global hook refuses raw reads of code.
+The jCodeMunch policy, its front-door tools and how to read their results are here: `~/.claude/CLAUDE.md`. A global hook refuses raw reads of code. Its strict mode lets a `Read` of a code file over 4 KB through only with `offset` and `limit`, so pass both, the read before an Edit included.
 
 ### After editing files
 
@@ -122,6 +122,7 @@ This project is indexed by GitNexus as **better-answers**. Use the GitNexus MCP 
 GitNexus `analyze` runs after every merge to `main`; the runner is absent from a worktree.
 
 - `detect_changes` takes `worktree: <the worktree's absolute path>`.
+- `impact`, `context` and `query` read the main checkout's index, so they answer about `main`, not the worktree's edits.
 - An `impact` that answers *ambiguous* is re-run by `target_uid` before its risk counts.
 - `rename` stays a dry run. It reads **and writes** the main checkout's files.
 
