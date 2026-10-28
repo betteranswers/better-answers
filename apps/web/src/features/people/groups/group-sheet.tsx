@@ -1,0 +1,184 @@
+import { useId, useRef, useState, type SubmitEvent, type RefObject } from "react";
+
+import { RowSheet } from "@/shared/list/row-sheet.tsx";
+import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { SheetPart } from "@/shared/page/sheet-part.tsx";
+import { useReadSaid } from "@/shared/read-said.ts";
+import { AlertDialog, AlertDialogTrigger } from "@/shared/ui/alert-dialog.tsx";
+import { Button } from "@/shared/ui/button.tsx";
+import { Input } from "@/shared/ui/input.tsx";
+import { Label } from "@/shared/ui/label.tsx";
+import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
+
+import { GroupChecklist } from "../group-checklist.tsx";
+import { useRenameGroup, type ListedGroup } from "../groups-api.ts";
+import { MEMBERS_LOADING } from "../member-action-words.ts";
+import { useMembers } from "../people-api.ts";
+import { outcomeOfFailure } from "../refusal.tsx";
+import { nameOf } from "../words.tsx";
+import { DeleteGroupWarning } from "./delete-group-warning.tsx";
+import { consequenceOfDeleting, membersWord } from "./group-words.ts";
+import { submitRename } from "./rename-group-form.ts";
+
+export type GroupOpenedAt = "group" | "members" | "rename" | "delete";
+
+export const groupButtonId = (groupId: string): string => `group-${groupId}`;
+
+export const groupMenuId = (groupId: string): string => `group-actions-${groupId}`;
+
+function GroupMembers(properties: {
+  readonly group: ListedGroup;
+  readonly listRef: RefObject<HTMLFieldSetElement | null>;
+}) {
+  const { group, listRef } = properties;
+  const members = useMembers();
+  const said = useReadSaid(members);
+  const everyone = members.data ?? [];
+
+  return (
+    <SheetPart title="Members">
+      <OutcomeLine
+        outcome={said.error === null ? undefined : outcomeOfFailure(said.error, "read")}
+        className="contents"
+      />
+      {/* Not `empty:hidden`: a region out of the accessibility tree is not tracked, so its fill would go unread. */}
+      <div aria-live="polite" className="empty:sr-only">
+        {said.isPending ? <p>{MEMBERS_LOADING}</p> : null}
+      </div>
+      {members.data === undefined ? null : (
+        <GroupChecklist
+          legend={`Members of ${group.name}`}
+          hint="Changes are saved immediately."
+          listRef={listRef}
+          choices={everyone.map((member) => ({
+            id: member.personId,
+            label: nameOf(member),
+            detail: member.displayName === "" ? undefined : member.address,
+            checked: member.groups.some((held) => held.groupId === group.id),
+          }))}
+          pairOf={(personId) => {
+            const member = everyone.find((candidate) => candidate.personId === personId);
+            return member === undefined
+              ? undefined
+              : {
+                  inGroup: { groupId: group.id, userId: personId },
+                  person: nameOf(member),
+                  group: group.name,
+                };
+          }}
+        />
+      )}
+    </SheetPart>
+  );
+}
+
+function RenameGroup(properties: {
+  readonly group: ListedGroup;
+  readonly fieldRef: RefObject<HTMLInputElement | null>;
+}) {
+  const { group, fieldRef } = properties;
+  const [outcome, setOutcome] = useState<Outcome>();
+  const renameGroup = useRenameGroup();
+  const ids = { field: useId(), hint: useId() };
+
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setOutcome(undefined);
+    submitRename({ group, form: event.currentTarget, renameGroup, say: setOutcome });
+  };
+
+  return (
+    <SheetPart title="Rename">
+      <OutcomeLine outcome={outcome} className="contents" />
+      <form onSubmit={submit} className="grid gap-3">
+        <div className="grid gap-2">
+          <Label htmlFor={ids.field}>Name</Label>
+          <Input
+            ref={fieldRef}
+            id={ids.field}
+            name="name"
+            defaultValue={group.name}
+            required
+            autoComplete="off"
+            aria-describedby={ids.hint}
+          />
+          <p id={ids.hint} className="text-sm text-muted-foreground">
+            Members stay in the group.
+          </p>
+        </div>
+        <Button type="submit" className="justify-self-start">
+          Rename Group
+        </Button>
+      </form>
+    </SheetPart>
+  );
+}
+
+function DeleteGroup(properties: {
+  readonly group: ListedGroup;
+  readonly buttonRef: RefObject<HTMLButtonElement | null>;
+  readonly onDelete: (group: ListedGroup) => void;
+}) {
+  const { group, buttonRef, onDelete } = properties;
+
+  return (
+    <SheetPart title="Delete">
+      <p className="text-sm">{consequenceOfDeleting(group)}</p>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button ref={buttonRef} variant="outline" className="justify-self-start">
+            Delete Group
+          </Button>
+        </AlertDialogTrigger>
+        <DeleteGroupWarning group={group} onDelete={onDelete} />
+      </AlertDialog>
+    </SheetPart>
+  );
+}
+
+export function GroupSheet(properties: {
+  readonly group: ListedGroup;
+  readonly openedAt: GroupOpenedAt;
+  readonly onClose: () => void;
+
+  readonly returnFocus: () => void;
+  readonly onDelete: (group: ListedGroup) => void;
+}) {
+  const { group, openedAt, onClose, returnFocus, onDelete } = properties;
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const listRef = useRef<HTMLFieldSetElement>(null);
+  const fieldRef = useRef<HTMLInputElement>(null);
+  const deleteRef = useRef<HTMLButtonElement>(null);
+
+  const landOn = {
+    group: () => titleRef.current,
+    members: () => listRef.current?.querySelector<HTMLElement>('[role="checkbox"]'),
+    rename: () => fieldRef.current,
+    delete: () => deleteRef.current,
+  } satisfies Readonly<Record<GroupOpenedAt, () => HTMLElement | null | undefined>>;
+
+  return (
+    <RowSheet
+      rowButtonId={groupButtonId(group.id)}
+      onOpen={() => {
+        (landOn[openedAt]() ?? titleRef.current)?.focus();
+      }}
+      onClose={onClose}
+      returnFocus={returnFocus}
+    >
+      <SheetHeader className="border-b border-border">
+        <SheetTitle asChild>
+          <h2 ref={titleRef} tabIndex={-1} className="pr-8 wrap-anywhere">
+            {group.name}
+          </h2>
+        </SheetTitle>
+        <SheetDescription>{membersWord(group)}</SheetDescription>
+      </SheetHeader>
+      <div className="grid gap-4 px-4 pb-4">
+        <GroupMembers group={group} listRef={listRef} />
+        <RenameGroup group={group} fieldRef={fieldRef} />
+        <DeleteGroup group={group} buttonRef={deleteRef} onDelete={onDelete} />
+      </div>
+    </RowSheet>
+  );
+}

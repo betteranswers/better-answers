@@ -7,7 +7,7 @@ description: How this repository drives a browser: the served-build seam, the cl
 
 `apps/web`'s interface is the **served build driven by a browser**, so a fact about a
 page is read here and a page is never asserted against its source. Everything below is what
-the suite already is; `apps/web/e2e/models-and-spend.spec.ts` is the fullest worked example.
+the suite already is; `apps/web/e2e/model-choices/models-and-spend.spec.ts` is the fullest worked example.
 
 Two reference files hold the detail. Open the one a task needs:
 
@@ -42,8 +42,8 @@ WebAuthn domain over the DevTools protocol. It verifies its user and answers eve
 prompt shown, the email field's autofill included: a page opening the sign-in page while the
 device holds a passkey the platform keeps is signed in at once. Its `leftUnattended` leaves every
 prompt waiting, so that page signs in by email, and `attendedAgain` answers prompts again.
-`withoutWebAuthn` is a browser with none. `apps/web/e2e/passkeys.spec.ts` is the worked example,
-and `apps/web/e2e/confirm-recovery.spec.ts` signs in by email while the device holds a passkey.
+`withoutWebAuthn` is a browser with none. `apps/web/e2e/auth/passkeys.spec.ts` is the worked example,
+and `apps/web/e2e/auth/confirm-recovery.spec.ts` signs in by email while the device holds a passkey.
 
 `apps/web/playwright.config.ts` holds the port, the `webServer` command (`node tests/serve.ts`
 run in `apps/api`, handed that port) and `/health` as the readiness URL. `/health` answers only
@@ -70,12 +70,12 @@ fixtures and adds a fourth:
 | `request` | An `APIRequestContext` on the config's `baseURL`, carrying a `cf-connecting-ip` header of its **own**; disposed after the test |
 | `passesTheAccessibilityGate` | The audit below, declared `auto`, so it runs whether a spec names it or not |
 
-A spec asks for the ones it uses and gets the rest anyway: `apps/web/e2e/sign-out.spec.ts` takes
+A spec asks for the ones it uses and gets the rest anyway: `apps/web/e2e/auth/sign-out.spec.ts` takes
 `context` to clear cookies mid-test, and every spec that builds state takes `request`.
 
 The two addresses are **different on purpose**. The browser is one client and the set-up traffic
 is another, so a spec that floods a path through `request` leaves the page's own bucket untouched.
-`apps/web/e2e/sign-in.spec.ts` is the case: it posts six codes for one address through `request`,
+`apps/web/e2e/auth/sign-in.spec.ts` is the case: it posts six codes for one address through `request`,
 then asks for one more in the browser, and what refuses it is the per-email ceiling rather than
 a per-address one the flood would have filled for the page as well. Without an
 address of its own, a caller shares one bucket with every other caller in the run, and a long run
@@ -115,7 +115,7 @@ file for one that already does the job.
 - **Import none of the web's text.** A spec imports from the SPA only what is not text:
   a page's address, a wire word, a limit, a count, a key's letter, a type, a function that
   formats seeded data. A changed label then fails the tests that name that control, at run time,
-  and nothing else. `apps/web/e2e/models-and-spend.spec.ts` reads its page's address off
+  and nothing else. `apps/web/e2e/model-choices/models-and-spend.spec.ts` reads its page's address off
   `apps/web/src/shared/navigation.ts` and writes each name itself.
 - **Find the shell by its landmarks:**
   - The top band is the `banner`.
@@ -132,8 +132,8 @@ file for one that already does the job.
   - At a narrow width the navigation control opens a `dialog` named *Menu*, holding
     the rail and the menu.
 
-  `apps/web/e2e/frame.spec.ts` holds the shell. `apps/web/e2e/jump-to.spec.ts` and
-  `apps/web/e2e/workspace-switcher.spec.ts` are the worked examples for jump-to and the switcher.
+  `apps/web/e2e/app/frame.spec.ts` holds the shell. `apps/web/e2e/app/jump-to.spec.ts` and
+  `apps/web/e2e/app/workspace-switcher.spec.ts` are the worked examples for jump-to and the switcher.
 - **Wait with auto-retrying matchers.** `await expect(…).toBeVisible()`, `.toHaveURL()`,
   `.toHaveCount(0)`. Where a navigation must complete before the next action, assert the thing that
   proves the page was left. Never a fixed sleep, and never a load state.
@@ -150,13 +150,13 @@ file for one that already does the job.
   is asserted nowhere, so rewording a page breaks no spec. Assert what the sentence stood for: the
   region and its role, the data or the state that changed, the next action. A region that stands
   empty until it has something to say is checked for holding words, with `toHaveText(/\S/)` or
-  `filter({ hasText: /\S/ })`. `apps/web/e2e/outcome-regions.spec.ts` finds such a region while it
+  `filter({ hasText: /\S/ })`. `apps/web/e2e/shared/outcome-regions.spec.ts` finds such a region while it
   is still empty, with `filter({ hasNotText: /\S/ })`, and checks the outcome lands in that same
   region. An aria snapshot keeps roles, names, levels, states and order, and no prose line of any
   kind, `- text:` lines included. A name in one is a literal, and a name from seeded data goes in
   through `JSON.stringify`, which quotes it as the snapshot takes it.
 - **Tell which refusal happened from where it was decided.** Where the api answered, read its
-  answer with `refusalAnswering` or `authAnswering` from `./refused-read.ts`
+  answer with `refusalAnswering` or `authAnswering` from `../refused-read.ts`
   (`references/harness.md` says what each answers), then check the alert with `saysARefusal`.
   Ask for the answer before the action that calls and await it afterwards, because an answer can
   land before anything waits for it. A streamed answer is the exception, `ask.question`'s today
@@ -174,9 +174,9 @@ file for one that already does the job.
   Where the page decided (a request dropped, a refusal the page raises before it calls, the tries
   left for a code), no answer says which refusal it was, so `saysARefusal` is the whole check and
   a number the alert shows is matched by pattern. No spec imports a refusal's sentence, and the
-  page gains no marker for a test's sake. `apps/web/e2e/people.spec.ts` reads a batched answer,
-  `apps/web/e2e/sources.spec.ts` one sent alone and a refusal the page raises itself,
-  `apps/web/e2e/sign-in.spec.ts` Better Auth's, and `apps/web/e2e/knowledge-search.spec.ts` a
+  page gains no marker for a test's sake. `apps/web/e2e/people/people.spec.ts` reads a batched answer,
+  `apps/web/e2e/sources/sources.spec.ts` one sent alone and a refusal the page raises itself,
+  `apps/web/e2e/auth/sign-in.spec.ts` Better Auth's, and `apps/web/e2e/knowledge/knowledge-search.spec.ts` a
   dropped request.
 - **A latency budget is measured, annotated and asserted**: `test.info().annotations.push(…)`
   beside the comparison, so a run that passes still says how close it came. A list's second is
@@ -190,16 +190,16 @@ file for one that already does the job.
   samples one action several times waits for each sample's answer before the next key. On CI the
   100 ms is only recorded, because there the shared runner's processor sets the number. A timed
   draw that does wait on the server, such as jump-to's list, uses `clockTheNextDraw`, which holds
-  nothing. `apps/web/e2e/sources.spec.ts` times both, with `clockTheNextKey` and
+  nothing. `apps/web/e2e/sources/sources.spec.ts` times both, with `clockTheNextKey` and
   `theActionLandedWithinItsBudget`. Most specs time one sample;
-  `apps/web/e2e/people.spec.ts` and `apps/web/e2e/people-groups.spec.ts` take the median of
+  `apps/web/e2e/people/people.spec.ts` and `apps/web/e2e/people/people-groups.spec.ts` take the median of
   `ACTION_SAMPLES` through `theActionsLandedWithinTheirBudget`.
 - **A shared part no page draws yet is bundled with Vite, not imported.** Playwright compiles
   every `.tsx` it loads with its own JSX runtime, so React cannot render a component a spec imports.
   `apps/web/e2e/drawn-parts.ts` builds a unit-suite harness through Vite from a virtual entry
   with `bundledHarness`, once per file, and `harnessDrawn` draws it on the SPA's origin under the
-  served stylesheets; `apps/web/e2e/list-parts.spec.ts` and
-  `apps/web/e2e/blueprint-parts.spec.ts` use it. The page carries only the served build's
+  served stylesheets; `apps/web/e2e/shared/list-parts.spec.ts` and
+  `apps/web/e2e/shared/blueprint-parts.spec.ts` use it. The page carries only the served build's
   stylesheet, so a class that appears in the harness alone is missing from it, with no error.
 
 ## The accessibility gate
@@ -215,21 +215,21 @@ carries that as three things, of which automated rules are only one:
   both sit under 3:1 against what is behind it, and a page with more than three registration marks.
   `references/accessibility-gate.md` says what the audit sets aside and how it measures.
 - **A keyboard traversal** reaching the page and each of its actions without a pointer:
-  `apps/web/e2e/sign-in.spec.ts` for the three pages outside the shell,
-  `apps/web/e2e/frame.spec.ts` for the band, the rail and the menu, and
-  `apps/web/e2e/models-and-spend.spec.ts` and `apps/web/e2e/failed-page.spec.ts` for theirs. It is
+  `apps/web/e2e/auth/sign-in.spec.ts` for the three pages outside the shell,
+  `apps/web/e2e/app/frame.spec.ts` for the band, the rail and the menu, and
+  `apps/web/e2e/model-choices/models-and-spend.spec.ts` and `apps/web/e2e/app/failed-page.spec.ts` for theirs. It is
   the floor, not the extra.
 - **An aria snapshot**, written inline with `toMatchAriaSnapshot`, where what a page *sounds
   like* is the thing under test: a row that lost its heading or a list that stopped being a list
-  fails it though the pixels are unchanged. `apps/web/e2e/models-and-spend.spec.ts` holds one and
-  `apps/web/e2e/frame.spec.ts` two.
+  fails it though the pixels are unchanged. `apps/web/e2e/model-choices/models-and-spend.spec.ts` holds one and
+  `apps/web/e2e/app/frame.spec.ts` two.
 
 Ask for the `passesTheAccessibilityGate` fixture, called with no arguments, where the test does
 not end on the page it is about. The models-and-spend and failed-page specs walk on to other pages
-afterwards; most tests in `apps/web/e2e/consent.spec.ts` end at the assistant's own redirect, which
+afterwards; most tests in `apps/web/e2e/auth/consent.spec.ts` end at the assistant's own redirect, which
 is another origin and no page of ours. A test that ends somewhere this product did not serve and
 audited nothing is refused by name, so an absence is a failure rather than a silence.
-`apps/web/e2e/models-and-spend.spec.ts` carries all three and is the model to copy.
+`apps/web/e2e/model-choices/models-and-spend.spec.ts` carries all three and is the model to copy.
 
 ## Running it
 
@@ -242,10 +242,10 @@ pnpm --filter @better-answers/web run e2e
 
 # one spec, one project
 pnpm --filter @better-answers/web run build && \
-  pnpm --filter @better-answers/web exec playwright test e2e/models-and-spend.spec.ts --project chromium
+  pnpm --filter @better-answers/web exec playwright test e2e/model-choices/models-and-spend.spec.ts --project chromium
 
 # one test in it, by title
-pnpm --filter @better-answers/web exec playwright test e2e/models-and-spend.spec.ts -g "latency budget"
+pnpm --filter @better-answers/web exec playwright test e2e/model-choices/models-and-spend.spec.ts -g "latency budget"
 
 # what would run, starting no server
 pnpm --filter @better-answers/web exec playwright test --list
@@ -279,9 +279,9 @@ The suite started from Onyx's Playwright skill and leaves these of its practices
   of its own.
 - **The Page Object Model.** A page is located by role and accessible name where it is used, so
   the spec says the words a person would hear rather than a name only the suite knows.
-- **An import alias for the suite.** A spec imports its sibling modules by relative path:
-  `./browser.ts`, `./harness.ts`, `./refused-read.ts`, `./knowledge.ts`, `./drawn-parts.ts` and
-  `./virtual-authenticator.ts`.
+- **An import alias for the suite.** A spec sits one folder below the suite's modules and imports
+  them by relative path: `../browser.ts`, `../harness.ts`, `../refused-read.ts`, `../knowledge.ts`,
+  `../drawn-parts.ts` and `../virtual-authenticator.ts`.
 - **Visual regression.** Out of scope for v0.1; the aria snapshot is the structural record.
 - **Long-running dev servers.** Playwright starts the one process and stops it, so a run reads the
   build the same way CI does.

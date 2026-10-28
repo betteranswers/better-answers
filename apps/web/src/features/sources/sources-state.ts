@@ -1,5 +1,5 @@
 import type { Keystroke } from "@/shared/keystrokes.tsx";
-import { viewStateOf } from "@/shared/page-toolbar.tsx";
+import { viewStateOf } from "@/shared/page/page-toolbar.tsx";
 
 import type { GroupOfFindings } from "./sources-api.ts";
 

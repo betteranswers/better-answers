@@ -1,0 +1,299 @@
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import type { inferOutput } from "@trpc/tanstack-react-query";
+import { useState, type SubmitEvent } from "react";
+
+import {
+  refusalOf,
+  useTRPC,
+  type ApiError,
+  type Refusal,
+  type RefusalWord,
+} from "@/shared/api/trpc.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { DISPLAY_NAME_REFUSED, DISPLAY_NAME_WORDS } from "@/shared/member/display-name-words.ts";
+import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
+import { Button } from "@/shared/ui/button.tsx";
+import { Input } from "@/shared/ui/input.tsx";
+import { Label } from "@/shared/ui/label.tsx";
+
+import { useAcceptInvitation, useSession, useSetDisplayName, useSignOut } from "../auth-hooks.ts";
+import { AuthPage, Outcome, ReadAgain, Refused } from "../auth-page.tsx";
+import { carriedFlow, invitationAt, leavingFor, pageQuery } from "../carried-flow.ts";
+import { SAID_OF_ACCEPTING } from "../refusal-words.ts";
+import { SignOutButton, SignOutRefused } from "../sign-out-button.tsx";
+import { INVITATION_ACTIONS, INVITATION_WORDS } from "./invitation-words.ts";
+
+type Invitation = inferOutput<ReturnType<typeof useTRPC>["person"]["invitation"]>;
+
+const JOIN: Keystroke = { key: "j", action: INVITATION_ACTIONS.join };
+
+const READ_AGAIN: Keystroke = { key: "r", action: INVITATION_ACTIONS.readAgain };
+
+const READ_REFUSED = "invitation-refused";
+
+const JOIN_REFUSED = "join-refused";
+
+const NAME_FIELD = "display-name";
+
+const NAME_HINT = "display-name-hint";
+
+const NAME_REFUSED = "display-name-refused";
+
+type WayOn = {
+  readonly keystroke: Keystroke;
+  readonly to: (here: string) => string;
+
+  readonly signingOutFirst?: true;
+};
+
+const WAY_OF_WORD = {
+  "invitation-for-another-address": {
+    keystroke: { key: "s", action: INVITATION_ACTIONS.anotherAddress },
+    to: (here) => here,
+    signingOutFirst: true,
+  },
+  "already-a-member": {
+    keystroke: { key: "w", action: INVITATION_ACTIONS.yourWorkspaces },
+    to: () => `/choose-workspace${carriedFlow(pageQuery())}`,
+  },
+} satisfies Partial<Record<RefusalWord, WayOn>>;
+
+const WAYS = new Map<string, WayOn>(Object.entries(WAY_OF_WORD));
+
+const saidOf = (refusal: Refusal): string =>
+  refusalSentence(SAID_OF_ACCEPTING, refusal.word, refusal.class);
+
+const nameSaidOf = (refusal: Refusal): string =>
+  refusalSentence(DISPLAY_NAME_REFUSED, refusal.word, refusal.class);
+
+const wayOf = (failure: Error | ApiError | null): WayOn | undefined => {
+  const word = failure === null ? undefined : refusalOf(failure)?.word;
+  return word === undefined ? undefined : WAYS.get(word);
+};
+
+function WayOnAction(properties: { readonly way: WayOn; readonly here: string }) {
+  const { way, here } = properties;
+  const navigate = useNavigate();
+  const { signOut, signingOut, failure } = useSignOut(way.to(here));
+
+  const go = () => {
+    if (signingOut) return;
+    if (way.signingOutFirst === true) signOut();
+    else void navigate(leavingFor(way.to(here)));
+  };
+  useKeystroke(way.keystroke, go);
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        className="aria-disabled:opacity-50"
+        aria-disabled={signingOut}
+        aria-keyshortcuts={way.keystroke.key}
+        onClick={go}
+      >
+        {way.keystroke.action}
+      </Button>
+      <SignOutRefused failure={failure} />
+    </>
+  );
+}
+
+function Leaving(properties: { readonly keystrokes: readonly Keystroke[] }) {
+  return (
+    <div className="mt-8 flex flex-wrap items-center gap-2">
+      <SignOutButton />
+      <KeystrokesAction page={KEYSTROKE_WORDS.thisPage} keystrokes={properties.keystrokes} />
+    </div>
+  );
+}
+
+function InvitationUnread(properties: {
+  readonly failure: Error | ApiError;
+  readonly here: string;
+  readonly reading: boolean;
+  readonly onReadAgain: () => void;
+}) {
+  const unanswered = refusalOf(properties.failure) === undefined;
+  const way = wayOf(properties.failure);
+  const keystrokes = unanswered ? [READ_AGAIN] : way === undefined ? [] : [way.keystroke];
+  return (
+    <AuthPage title={INVITATION_WORDS.untitled}>
+      <Refused
+        id={READ_REFUSED}
+        failure={properties.failure}
+        saidOf={saidOf}
+        unanswered={STOCK.notLoaded}
+        signInAt={properties.here}
+      />
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        {unanswered ? (
+          <ReadAgain
+            keystroke={READ_AGAIN}
+            reading={properties.reading}
+            words={INVITATION_WORDS}
+            onReadAgain={properties.onReadAgain}
+          />
+        ) : null}
+        {way === undefined ? null : <WayOnAction way={way} here={properties.here} />}
+      </div>
+      <Leaving keystrokes={keystrokes} />
+    </AuthPage>
+  );
+}
+
+function NameAsked(properties: {
+  readonly name: string;
+  readonly onName: (name: string) => void;
+  readonly failure: Error | ApiError | null;
+  readonly here: string;
+}) {
+  const { failure } = properties;
+  const refusedAs = failure === null ? undefined : refusalOf(failure)?.class;
+  return (
+    <div className="mb-4">
+      <Label htmlFor={NAME_FIELD}>{DISPLAY_NAME_WORDS.label}</Label>
+      <p id={NAME_HINT} className="mt-1 text-muted-foreground">
+        {DISPLAY_NAME_WORDS.hint}
+      </p>
+      <Input
+        id={NAME_FIELD}
+        name="displayName"
+        autoComplete="name"
+        required
+        aria-describedby={failure === null ? NAME_HINT : `${NAME_HINT} ${NAME_REFUSED}`}
+        aria-invalid={refusedAs === "malformed"}
+        className="mt-2"
+        value={properties.name}
+        onChange={(event) => properties.onName(event.target.value)}
+      />
+      {failure === null ? null : (
+        <Refused
+          id={NAME_REFUSED}
+          failure={failure}
+          saidOf={nameSaidOf}
+          signInAt={properties.here}
+        />
+      )}
+    </div>
+  );
+}
+
+function JoinRefused(properties: {
+  readonly failure: Error | ApiError;
+  readonly way: WayOn | undefined;
+  readonly here: string;
+}) {
+  const { way, here } = properties;
+  return (
+    <>
+      <Refused id={JOIN_REFUSED} failure={properties.failure} saidOf={saidOf} signInAt={here} />
+      {way === undefined ? null : (
+        <div className="mt-4">
+          <WayOnAction way={way} here={here} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function InvitationToJoin(properties: {
+  readonly invitationId: string;
+  readonly invitation: Invitation;
+  readonly here: string;
+}) {
+  const { invitation, invitationId, here } = properties;
+  const read = useSession();
+  const [asksAName, setAsksAName] = useState(
+    () => read.state === "signed-in" && read.person.displayName === undefined,
+  );
+  const [name, setName] = useState("");
+  const naming = useSetDisplayName();
+  const accept = useAcceptInvitation();
+  const way = wayOf(accept.error);
+  const joining = naming.isPending || accept.isPending;
+
+  const acceptIt = () => {
+    accept.mutate(
+      { invitationId },
+      {
+        onError: (failure) => {
+          if (refusalOf(failure)?.word === "no-display-name") setAsksAName(true);
+        },
+      },
+    );
+  };
+
+  const join = () => {
+    if (joining) return;
+    const named = !asksAName || (naming.isSuccess && naming.variables.displayName === name);
+    if (named) {
+      acceptIt();
+      return;
+    }
+    accept.reset();
+    naming.mutate({ displayName: name }, { onSuccess: acceptIt });
+  };
+  useKeystroke(JOIN, join);
+
+  const submitted = (event: SubmitEvent) => {
+    event.preventDefault();
+    join();
+  };
+
+  return (
+    <AuthPage title={INVITATION_WORDS.heading(invitation.workspaceName)}>
+      <p className="mt-2">{INVITATION_WORDS.body(invitation.invitedBy, invitation.role)}</p>
+
+      <form onSubmit={submitted} className="mt-6">
+        {asksAName ? (
+          <NameAsked name={name} onName={setName} failure={naming.error} here={here} />
+        ) : null}
+        <Button
+          type="submit"
+          className="aria-disabled:opacity-50"
+          aria-disabled={joining}
+          aria-describedby={accept.error === null ? undefined : JOIN_REFUSED}
+          aria-keyshortcuts={JOIN.key}
+        >
+          {joining ? INVITATION_WORDS.joining : INVITATION_WORDS.join}
+        </Button>
+      </form>
+
+      {accept.error === null ? null : <JoinRefused failure={accept.error} way={way} here={here} />}
+
+      <Leaving keystrokes={way === undefined ? [JOIN] : [JOIN, way.keystroke]} />
+    </AuthPage>
+  );
+}
+
+export function AcceptInvitationPage(properties: { readonly invitationId: string }) {
+  const api = useTRPC();
+  const { invitationId } = properties;
+  const here = invitationAt(invitationId);
+  const invitation = useQuery(api.person.invitation.queryOptions({ invitationId }));
+
+  if (invitation.isPending) {
+    return (
+      <AuthPage title={INVITATION_WORDS.untitled}>
+        <Outcome tone="said">{INVITATION_WORDS.reading}</Outcome>
+      </AuthPage>
+    );
+  }
+  if (invitation.isError) {
+    return (
+      <InvitationUnread
+        failure={invitation.error}
+        here={here}
+        reading={invitation.isFetching}
+        onReadAgain={() => {
+          void invitation.refetch();
+        }}
+      />
+    );
+  }
+  return <InvitationToJoin invitationId={invitationId} invitation={invitation.data} here={here} />;
+}

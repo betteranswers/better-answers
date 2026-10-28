@@ -1,8 +1,8 @@
 import { useId, useRef, useState, type Ref } from "react";
 
-import { ActionDialog } from "@/shared/action-dialog.tsx";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { cn } from "@/shared/lib/utils.ts";
+import { ActionDialog } from "@/shared/page/action-dialog.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
 import {
@@ -11,15 +11,15 @@ import {
   codesLeft,
   RECOVERY_CODE_WORDS,
 } from "./account-words.ts";
-import { AuthenticatorSetup } from "./authenticator-part.tsx";
-import { RecoveryCodes, type CodesInHand } from "./recovery-codes.tsx";
 import { SAID_OF_SECOND_FACTOR } from "./refusal-words.ts";
+import { AuthenticatorSetup } from "./second-factor/authenticator-part.tsx";
+import { RecoveryCodes, type CodesInHand } from "./second-factor/recovery-codes.tsx";
 import type {
   AuthenticatorRoutes,
   CodesIssued,
   SecondFactor,
   StartingTheSetup,
-} from "./second-factor-hooks.ts";
+} from "./second-factor/second-factor-hooks.ts";
 
 export const SET_UP: Keystroke = { key: "s", action: ACCOUNT_ACTIONS.setUp };
 

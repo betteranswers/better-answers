@@ -31,7 +31,7 @@ stands aside where the test has already failed so the real error is the one repo
   `<html>` to the other theme, audits again and puts the page's theme back, so every state a test
   leaves is held in dark as well as light. A failure names the theme it was found in. A spec about
   one theme keeps it on the browser under `THEME_KEPT_UNDER` from
-  `apps/web/src/shared/theme-switch.ts`, as `apps/web/e2e/dark-theme.spec.ts` does.
+  `apps/web/src/shared/theme/theme-switch.ts`, as `apps/web/e2e/app/dark-theme.spec.ts` does.
 
 ## The gate's own proof
 

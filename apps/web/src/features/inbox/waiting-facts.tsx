@@ -1,4 +1,4 @@
-import { SummaryRow as Row } from "@/shared/summary-row.tsx";
+import { SummaryRow as Row } from "@/shared/list/summary-row.tsx";
 import { dayWords } from "@/shared/words.ts";
 
 import type { WaitingItem } from "./inbox-api.ts";

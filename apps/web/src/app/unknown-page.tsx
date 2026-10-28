@@ -2,10 +2,10 @@ import { Link } from "@tanstack/react-router";
 
 import { AuthPage } from "@/features/auth/auth-page.tsx";
 import { refusalOf } from "@/shared/api/trpc.ts";
-import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
-import { NO_SESSION, useMemberAskedOnce } from "@/shared/member.ts";
+import { NO_SESSION, useMemberAskedOnce } from "@/shared/member/member.ts";
 import type { Page } from "@/shared/navigation.ts";
-import { PageHead } from "@/shared/page-head.tsx";
+import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
+import { PageHead } from "@/shared/page/page-head.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
 import { WorkspaceFrame } from "./frame.tsx";

@@ -2,16 +2,19 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 import { useId, useMemo, useState, type ReactNode } from "react";
 
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
-import { PasskeyOffer, useOfferPlace, type OfferPlace } from "@/features/auth/passkey-offer.tsx";
 import { saidOfASignOutRefused } from "@/features/auth/refusal-words.ts";
-import { useSwitchedElsewhereSaid } from "@/features/auth/switched-elsewhere.ts";
-import { useUnsavedChangeSaid } from "@/features/auth/unsaved-change.ts";
+import {
+  PasskeyOffer,
+  useOfferPlace,
+  type OfferPlace,
+} from "@/features/auth/second-factor/passkey-offer.tsx";
+import { useUnsavedChangeSaid } from "@/features/auth/second-factor/unsaved-change.ts";
+import { useSwitchedElsewhereSaid } from "@/features/auth/workspace/switched-elsewhere.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
-import { HomeLine } from "@/features/people/self-action.tsx";
+import { HomeLine } from "@/features/people/members/self-action.tsx";
 import { GridPattern } from "@/shared/blueprint.tsx";
-import { BreadcrumbLastPartSlot } from "@/shared/breadcrumb-last-part.ts";
 import { ShellKeystrokes, ShellKeystrokesAction, type Keystroke } from "@/shared/keystrokes.tsx";
-import { leftFor, useMember } from "@/shared/member.ts";
+import { leftFor, useMember } from "@/shared/member/member.ts";
 import {
   EVERY_AREA,
   placeAt,
@@ -23,10 +26,11 @@ import {
   type VisibleTree,
 } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
-import { PageHeadSlot } from "@/shared/page-head.tsx";
-import { isFilled, type PageTab, type PageToolbar } from "@/shared/page-toolbar.tsx";
+import { BreadcrumbLastPartSlot } from "@/shared/page/breadcrumb-last-part.ts";
+import { PageHeadSlot } from "@/shared/page/page-head.tsx";
+import { isFilled, type PageTab, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
+import { useWideLayout } from "@/shared/page/wide-layout.ts";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
-import { useWideLayout } from "@/shared/wide-layout.ts";
 
 import { Band, type Person } from "./band.tsx";
 import { partsOf } from "./breadcrumb.tsx";

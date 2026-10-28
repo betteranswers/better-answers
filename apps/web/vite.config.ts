@@ -6,7 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 
-import { FIRST_PAINT } from "./src/shared/theme-switch.ts";
+import { FIRST_PAINT } from "./src/shared/theme/theme-switch.ts";
 import { PRODUCT_NAME } from "./src/shared/words.ts";
 
 /**

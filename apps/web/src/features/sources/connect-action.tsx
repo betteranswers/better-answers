@@ -2,10 +2,10 @@ import { useId, useState, type SubmitEvent } from "react";
 
 import { ulid } from "@better-answers/schema/ulid";
 
-import { ActionDialog } from "@/shared/action-dialog.tsx";
 import { watchUpload, type UploadProgress } from "@/shared/api/upload-progress.ts";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { ActionDialog } from "@/shared/page/action-dialog.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";

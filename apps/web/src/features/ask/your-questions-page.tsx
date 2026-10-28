@@ -3,16 +3,16 @@ import { useId, useMemo, useRef, type ReactElement, type RefObject } from "react
 
 import { flaggedWords, questionWords, RECORD_WORDS, verdictWords } from "@/shared/answer-words.ts";
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
-import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
-import { RowLink } from "@/shared/grid-table.tsx";
 import { usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { useLanding, useLandingLine, type Landing } from "@/shared/landing.ts";
 import { cn } from "@/shared/lib/utils.ts";
-import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
+import { RowLink } from "@/shared/list/grid-table.tsx";
+import { ListPages, ListRead, ListState } from "@/shared/list/list-pages.tsx";
+import { SummaryRow as Row } from "@/shared/list/summary-row.tsx";
 import { ASK, detailAt, headingOf, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
-import { ListHead, PageHead } from "@/shared/page-head.tsx";
+import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
+import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
-import { SummaryRow as Row } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";

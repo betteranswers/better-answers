@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page, type Request } from "@playwright/test";
 import { z } from "zod";
 
-import type { CarriedOn } from "@/features/auth/sign-in-words.ts";
+import type { CarriedOn } from "@/features/auth/sign-in/sign-in-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
 import { HOMES, type Role } from "@/shared/navigation.ts";
 

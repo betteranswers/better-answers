@@ -2,9 +2,9 @@ import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
-import { initialsOf } from "@/shared/initials.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { Logo } from "@/shared/logo.tsx";
+import { initialsOf } from "@/shared/member/initials.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
 import { Button } from "@/shared/ui/button.tsx";

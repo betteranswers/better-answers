@@ -1,0 +1,138 @@
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+
+import { placedWithoutMeasuring } from "@test/measuring.ts";
+import { MembersList } from "@test/members-list.tsx";
+
+placedWithoutMeasuring();
+
+const bar = () => screen.queryByRole("toolbar", { name: "Selected Members" });
+
+const shownBar = () => screen.getByRole("toolbar", { name: "Selected Members" });
+
+const countsIn = (shown: HTMLElement | null): readonly string[] =>
+  within(shown ?? document.body)
+    .getByRole("status")
+    .textContent.match(/\d+/g) ?? [];
+
+const tick = (name: string) => {
+  fireEvent.click(screen.getByRole("checkbox", { name: `Select ${name}` }));
+};
+
+const search = () => screen.getByRole("searchbox", { name: "Search by name or address" });
+
+const searchFor = (value: string) => {
+  fireEvent.change(search(), { target: { value } });
+};
+
+describe("the selection bar", () => {
+  it("stands hidden until a row is ticked", () => {
+    render(<MembersList />);
+
+    expect(bar()).toBeNull();
+    const standing = screen.getByRole("toolbar", { hidden: true });
+    expect(standing.getAttribute("aria-label")).toBe("Selected Members");
+    expect(within(standing).getByRole("status", { hidden: true }).textContent).toBe("");
+  });
+
+  it("counts two ticked rows, and clearing hides it", () => {
+    render(<MembersList />);
+
+    tick("Ada Lovelace");
+    tick("Bo Diddley");
+    const shown = bar();
+    expect(shown).not.toBeNull();
+    expect(countsIn(shown)).toEqual(["2"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear Selection" }));
+    expect(bar()).toBeNull();
+    expect(
+      screen.getByRole("checkbox", { name: "Select Ada Lovelace" }).getAttribute("aria-checked"),
+    ).toBe("false");
+  });
+
+  it("keeps a ticked row a search hides, and says so", () => {
+    render(<MembersList />);
+
+    tick("Ada Lovelace");
+    tick("Bo Diddley");
+    searchFor("Bo");
+    expect(countsIn(bar())).toEqual(["2", "1"]);
+
+    searchFor("");
+    expect(
+      screen.getByRole("checkbox", { name: "Select Ada Lovelace" }).getAttribute("aria-checked"),
+    ).toBe("true");
+  });
+
+  it("hosts the page's bulk actions over every ticked row", () => {
+    const actions: string[] = [];
+    render(<MembersList pageSize={2} onAction={(action) => actions.push(action)} />);
+
+    tick("Cy Twombly");
+    fireEvent.click(screen.getByRole("button", { name: "Next Page" }));
+    tick("Ed Ruscha");
+    fireEvent.click(within(shownBar()).getByRole("button", { name: "Change Role" }));
+
+    expect(actions).toEqual(["change the role of cy, ed"]);
+  });
+
+  it("clears on the page's keystroke", () => {
+    render(<MembersList />);
+
+    tick("Ada Lovelace");
+    const clear = screen.getByRole("button", { name: "Clear Selection" });
+    expect(clear.getAttribute("aria-keyshortcuts")).toBe("x");
+
+    fireEvent.keyDown(document.body, { key: "x" });
+    expect(bar()).toBeNull();
+  });
+
+  it("moves between its buttons by arrow keys, one tab stop", async () => {
+    render(<MembersList />);
+    tick("Ada Lovelace");
+    const action = within(shownBar()).getByRole("button", { name: "Change Role" });
+    const clear = within(shownBar()).getByRole("button", { name: "Clear Selection" });
+
+    action.focus();
+    fireEvent.keyDown(action, { key: "ArrowRight" });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(clear);
+    });
+    expect([action.tabIndex, clear.tabIndex]).toEqual([-1, 0]);
+
+    fireEvent.keyDown(clear, { key: "ArrowRight" });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(action);
+    });
+  });
+
+  it("hands focus inside it to the search when it clears", () => {
+    render(<MembersList />);
+    tick("Ada Lovelace");
+
+    const clear = screen.getByRole("button", { name: "Clear Selection" });
+    clear.focus();
+    fireEvent.click(clear);
+    expect(bar()).toBeNull();
+    expect(document.activeElement).toBe(search());
+
+    tick("Ada Lovelace");
+    const changeRole = within(shownBar()).getByRole("button", { name: "Change Role" });
+    changeRole.focus();
+    expect(document.activeElement).toBe(changeRole);
+    fireEvent.keyDown(changeRole, { key: "x" });
+    expect(document.activeElement).toBe(search());
+  });
+
+  it("leaves focus outside it where it was", () => {
+    render(<MembersList />);
+    const ada = screen.getByRole("checkbox", { name: "Select Ada Lovelace" });
+    fireEvent.click(ada);
+
+    ada.focus();
+    fireEvent.keyDown(ada, { key: "x" });
+    expect(bar()).toBeNull();
+    expect(document.activeElement).toBe(ada);
+  });
+});

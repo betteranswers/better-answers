@@ -2,9 +2,6 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useId, useRef, useState } from "react";
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
-import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
-import { RowLink } from "@/shared/grid-table.tsx";
-import { keyed } from "@/shared/keyed.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import {
   BROWSE,
@@ -39,14 +36,17 @@ import {
 import { SAID_OF_KNOWLEDGE } from "@/shared/knowledge/refusal-words.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { cn } from "@/shared/lib/utils.ts";
-import { ListState } from "@/shared/list-pages.tsx";
-import { PageHead } from "@/shared/page-head.tsx";
-import { SummaryRow } from "@/shared/summary-row.tsx";
+import { RowLink } from "@/shared/list/grid-table.tsx";
+import { keyed } from "@/shared/list/keyed.ts";
+import { ListState } from "@/shared/list/list-pages.tsx";
+import { SummaryRow } from "@/shared/list/summary-row.tsx";
+import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
+import { PageHead } from "@/shared/page/page-head.tsx";
+import { useRoomBeside } from "@/shared/page/wide-layout.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { useRoomBeside } from "@/shared/wide-layout.ts";
 
 import { CONCEPT_KEYSTROKES as KEY } from "./knowledge-state.ts";
 import { RELATION_WORDS } from "./knowledge-words.ts";

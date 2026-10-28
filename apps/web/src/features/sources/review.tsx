@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from "react";
 
 import { useKeystroke } from "@/shared/keystrokes.tsx";
+import { keyedRow, rowInFocus } from "@/shared/list/row-focus.ts";
 import { useReadSaid } from "@/shared/read-said.ts";
-import { keyedRow, rowInFocus } from "@/shared/row-focus.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";

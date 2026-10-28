@@ -36,7 +36,7 @@ A browser scenario wanted to prove that an optimistic removal is undone by the a
 
 ## Symptoms
 
-- `apps/web/e2e/people-requests.spec.ts`, "brings a request back when the api refuses its decline": `saysARefusal(requestsRegion(page).getByRole("alert"))` timed out with no alert in the region, while `rowOf(page, "Priya Shah")` was back.
+- `apps/web/e2e/people/people-requests.spec.ts`, "brings a request back when the api refuses its decline": `saysARefusal(requestsRegion(page).getByRole("alert"))` timed out with no alert in the region, while `rowOf(page, "Priya Shah")` was back.
 - A probe with console markers showed the mutation-level `onError` from `useLeavesAtOnce` running and the per-call `onError` in `requests-tab.tsx` never running, with no unmount of the list in between.
 
 ## What Didn't Work

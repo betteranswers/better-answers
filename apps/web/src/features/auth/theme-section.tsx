@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-import { chooseTheme, useThemeChoice, type ThemeChoice } from "@/shared/theme.ts";
+import { chooseTheme, useThemeChoice, type ThemeChoice } from "@/shared/theme/theme.ts";
 import { Label } from "@/shared/ui/label.tsx";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group.tsx";
 

@@ -2,7 +2,7 @@ import { useRouterState } from "@tanstack/react-router";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
 import { useCallback, useId, useMemo, useRef, useState, type RefObject } from "react";
 
-import { GridTable, RowLink } from "@/shared/grid-table.tsx";
+import { useListAddress } from "@/shared/address/list-address.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import {
   BROWSE,
@@ -13,13 +13,13 @@ import {
 import { useOpenMatch } from "@/shared/knowledge/open-match.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { useLanding, useLandingLine } from "@/shared/landing.ts";
-import { useListAddress } from "@/shared/list-address.ts";
-import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
+import { GridTable, RowLink } from "@/shared/list/grid-table.tsx";
+import { ListPages, ListRead, ListState } from "@/shared/list/list-pages.tsx";
 import { pageNamed } from "@/shared/navigation.ts";
-import { ListHead, PageHead } from "@/shared/page-head.tsx";
+import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
+import { useHiddenColumns } from "@/shared/page/wide-layout.ts";
 import { Card } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { useHiddenColumns } from "@/shared/wide-layout.ts";
 
 import {
   useKindConcepts,

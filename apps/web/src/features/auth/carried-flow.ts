@@ -1,4 +1,4 @@
-import type { CarriedOn } from "./sign-in-words.ts";
+import type { CarriedOn } from "./sign-in/sign-in-words.ts";
 
 const SIGNATURE = "sig";
 

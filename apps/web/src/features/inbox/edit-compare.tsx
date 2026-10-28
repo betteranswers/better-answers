@@ -1,7 +1,7 @@
 import { useId } from "react";
 
-import { keyed } from "@/shared/keyed.ts";
-import { SummaryRow as Row } from "@/shared/summary-row.tsx";
+import { keyed } from "@/shared/list/keyed.ts";
+import { SummaryRow as Row } from "@/shared/list/summary-row.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { paragraphsCompared, sourceLinesOf, type Paragraph } from "./edit-compared.ts";

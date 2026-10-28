@@ -4,16 +4,16 @@ import type { inferOutput } from "@trpc/tanstack-react-query";
 import { useId } from "react";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
-import { FilterRow } from "@/shared/filter-row.tsx";
-import { GridTable } from "@/shared/grid-table.tsx";
 import { usePageKeystrokes } from "@/shared/keystrokes.tsx";
-import { NothingListed } from "@/shared/list-pages.tsx";
+import { FilterRow } from "@/shared/list/filter-row.tsx";
+import { GridTable } from "@/shared/list/grid-table.tsx";
+import { NothingListed } from "@/shared/list/list-pages.tsx";
 import { CONSOLE, menuGroupIn } from "@/shared/navigation.ts";
-import { ListHead, PageHead } from "@/shared/page-head.tsx";
+import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
+import { useHiddenColumns } from "@/shared/page/wide-layout.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
-import { useHiddenColumns } from "@/shared/wide-layout.ts";
 import { counted, dayWords } from "@/shared/words.ts";
 
 import { Facts } from "./facts.tsx";

@@ -1,6 +1,6 @@
 import { useId, useState, type RefObject } from "react";
 
-import { Address } from "@/shared/address.tsx";
+import { Address } from "@/shared/member/address.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Label } from "@/shared/ui/label.tsx";

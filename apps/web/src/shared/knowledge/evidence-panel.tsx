@@ -9,7 +9,7 @@ import {
   type RefObject,
 } from "react";
 
-import { ListRead } from "@/shared/list-pages.tsx";
+import { ListRead } from "@/shared/list/list-pages.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet.tsx";

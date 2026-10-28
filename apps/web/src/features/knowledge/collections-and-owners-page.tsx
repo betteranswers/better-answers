@@ -1,15 +1,15 @@
 import { useId, useRef, useState } from "react";
 
 import { useKeystroke, usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
-import { ListRead, ListState } from "@/shared/list-pages.tsx";
-import { useRole } from "@/shared/member.ts";
+import { ListRead, ListState } from "@/shared/list/list-pages.tsx";
+import { keyedRow, rowInFocus } from "@/shared/list/row-focus.ts";
+import { SummaryRow as Row } from "@/shared/list/summary-row.tsx";
+import { useRole } from "@/shared/member/member.ts";
+import { ownsNoLonger, useArrivalDecidedAgainOnceUnowned } from "@/shared/member/ownership.ts";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
-import { ownsNoLonger, useArrivalDecidedAgainOnceUnowned } from "@/shared/ownership.ts";
-import { ListHead, PageHead } from "@/shared/page-head.tsx";
+import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
-import { keyedRow, rowInFocus } from "@/shared/row-focus.ts";
-import { SummaryRow as Row } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Label } from "@/shared/ui/label.tsx";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { sourceFiles } from "./source-files.ts";
+import { sourceFiles } from "@test/source-files.ts";
 
 const files = sourceFiles(/\.tsx?$/);
 

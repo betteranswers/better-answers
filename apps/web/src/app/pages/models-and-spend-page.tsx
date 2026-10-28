@@ -1,7 +1,7 @@
 import { ModelChoicesCard } from "@/features/model-choices/model-choices-card.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
-import { PageHead } from "@/shared/page-head.tsx";
-import { useOpenTab, type PageToolbar } from "@/shared/page-toolbar.tsx";
+import { PageHead } from "@/shared/page/page-head.tsx";
+import { useOpenTab, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 
 const models = menuGroupIn(CONTROL_CENTRE, "models");

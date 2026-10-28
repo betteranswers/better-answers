@@ -25,7 +25,7 @@ import {
   memberChanged,
   memberOptions,
   workspaceHeld,
-} from "@/shared/member.ts";
+} from "@/shared/member/member.ts";
 
 import { authClient } from "./auth-client.ts";
 import {
@@ -44,7 +44,7 @@ import {
   sessionRemembered,
   signedInHere,
 } from "./session-memory.ts";
-import type { Arrival } from "./sign-in-words.ts";
+import type { Arrival } from "./sign-in/sign-in-words.ts";
 
 const AUTH_KEYS = {
   all: ["auth"],

@@ -1,0 +1,247 @@
+import { Link, useNavigate } from "@tanstack/react-router";
+import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
+import { useId, useMemo, useRef, useState } from "react";
+
+/* jscpd:ignore-start */
+import { useKeystroke } from "@/shared/keystrokes.tsx";
+import { FilterRow } from "@/shared/list/filter-row.tsx";
+import { GridTable } from "@/shared/list/grid-table.tsx";
+/* jscpd:ignore-end */
+import { NothingListed } from "@/shared/list/list-pages.tsx";
+import { rowInFocus } from "@/shared/list/row-focus.ts";
+import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { ListHead } from "@/shared/page/page-head.tsx";
+import { Button } from "@/shared/ui/button.tsx";
+import { Card } from "@/shared/ui/card.tsx";
+
+import { countOf, ReadSaid, useNarrowedRows } from "../list-parts.tsx";
+import { NAMES_WAITING_WORDS as WORDS } from "../list-words.ts";
+import { arrival, EVERYONE_PATH, NAMES_WAITING_PATH } from "../people-address.ts";
+import { useNamesWaiting, type NameWaiting } from "../people-api.ts";
+import { NAMES_WAITING_KEYSTROKES } from "../people-keystrokes.ts";
+import { At } from "../person-words.tsx";
+import { NO_NAME_IN_FOCUS } from "../words.ts";
+import { CorrectNameDialog } from "./correct-name-dialog.tsx";
+import { correctWords } from "./correcting-words.ts";
+import { useCorrecting } from "./use-correcting.ts";
+
+const features = tableFeatures({});
+
+const column = createColumnHelper<typeof features, NameWaiting>();
+
+const correctButtonId = (personId: string): string => `correct-${personId}`;
+
+/** Module-level, so React calls it once as the node mounts, never on a re-render. */
+const focusOnArrival = (node: HTMLElement | null) => {
+  node?.focus();
+};
+
+type NameActions = {
+  readonly correct: (personId: string) => void;
+  readonly personToFocus: string | undefined;
+};
+
+function FlaggedName(properties: { readonly waiting: NameWaiting }) {
+  const { displayName } = properties.waiting;
+  if (displayName === "") return <span className="text-muted-foreground">No display name</span>;
+  return <span className="font-medium wrap-anywhere">{displayName}</span>;
+}
+
+function Flags(properties: { readonly waiting: NameWaiting }) {
+  return (
+    <ul className="grid gap-1">
+      {properties.waiting.flags.map((flag) => (
+        <li key={flag.workspace.id} className="flex flex-wrap gap-x-2">
+          <span className="wrap-anywhere">{flag.workspace.name}</span>{" "}
+          <span className="text-muted-foreground">
+            <At iso={flag.raisedAt} />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CorrectAction(properties: {
+  readonly waiting: NameWaiting;
+  readonly actions: NameActions;
+}) {
+  const { waiting, actions } = properties;
+  const { personId } = waiting;
+  return (
+    <Button
+      ref={personId === actions.personToFocus ? focusOnArrival : undefined}
+      id={correctButtonId(personId)}
+      variant="outline"
+      size="sm"
+      aria-haspopup="dialog"
+      aria-label={correctWords(waiting.displayName)}
+      aria-keyshortcuts={NAMES_WAITING_KEYSTROKES.correct.key}
+      onClick={() => {
+        actions.correct(personId);
+      }}
+    >
+      Correct
+    </Button>
+  );
+}
+
+const columnsFor = (actions: NameActions) =>
+  column.columns([
+    column.display({
+      id: "person",
+      header: "Person",
+      cell: ({ row }) => <FlaggedName waiting={row.original} />,
+    }),
+    column.display({
+      id: "flags",
+      header: "Flagged By",
+      cell: ({ row }) => <Flags waiting={row.original} />,
+    }),
+    column.display({
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => <CorrectAction waiting={row.original} actions={actions} />,
+    }),
+  ]);
+
+const wordsOf = (waiting: NameWaiting): string =>
+  [waiting.displayName, ...waiting.flags.map((flag) => flag.workspace.name)].join("\n");
+
+function NothingWaits() {
+  return (
+    <div className="grid justify-items-start gap-1 px-4 py-10">
+      <p className="font-medium">{WORDS.noneWaiting}</p>
+      <p className="text-muted-foreground">{WORDS.whatWaits}</p>
+      <Button asChild variant="outline" className="mt-3">
+        <Link to={EVERYONE_PATH}>Go to Everyone</Link>
+      </Button>
+    </div>
+  );
+}
+
+type Correcting = ReturnType<typeof useCorrecting>;
+
+function DialogFor(properties: {
+  readonly picked: NameWaiting | undefined;
+  readonly correcting: Correcting;
+  readonly onSave: (asked: NameWaiting, displayName: string) => void;
+  readonly onClose: () => void;
+  readonly onFocusBack: (personId: string, saved: boolean) => void;
+}) {
+  const { picked } = properties;
+  if (picked === undefined) return null;
+  return (
+    <CorrectNameDialog
+      key={picked.personId}
+      name={picked.displayName}
+      displayName={picked.displayName}
+      refused={properties.correcting.refusedAt(picked.personId)}
+      onSave={(displayName) => {
+        properties.onSave(picked, displayName);
+      }}
+      onClose={properties.onClose}
+      onFocusBack={(saved) => {
+        properties.onFocusBack(picked.personId, saved);
+      }}
+    />
+  );
+}
+
+const NO_NAME: readonly NameWaiting[] = [];
+
+export function NamesWaitingList() {
+  const headingId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const listed = useNamesWaiting();
+  const correcting = useCorrecting();
+  const navigate = useNavigate();
+  const [arrivedFor] = useState(() => arrival().personId);
+  const [openFor, setOpenFor] = useState<string>();
+  const [said, setSaid] = useState<Outcome>();
+  const waiting = listed.error === null ? listed.data : undefined;
+  const names = waiting ?? NO_NAME;
+  const narrowed = useNarrowedRows(names, wordsOf);
+  const personToFocus = correcting.otherwiseRefusedFor ?? arrivedFor;
+
+  const columns = useMemo(
+    () => columnsFor({ correct: setOpenFor, personToFocus }),
+    [personToFocus],
+  );
+  const table = useTable({
+    features,
+    columns,
+    data: narrowed.shown,
+    getRowId: (each) => each.personId,
+  });
+
+  useKeystroke(NAMES_WAITING_KEYSTROKES.correct, () => {
+    const held = rowInFocus(narrowed.shown, (each) => each.personId);
+    setSaid(held === undefined ? NO_NAME_IN_FOCUS : undefined);
+    if (held !== undefined) setOpenFor(held.personId);
+  });
+
+  const save = (asked: NameWaiting, displayName: string) => {
+    setOpenFor(undefined);
+    setSaid(undefined);
+    if (asked.personId === arrivedFor) void navigate({ to: NAMES_WAITING_PATH, replace: true });
+    correcting.save({ personId: asked.personId, was: asked.displayName, displayName });
+  };
+
+  const focusBack = (personId: string, saved: boolean) => {
+    const row = saved ? null : document.getElementById(correctButtonId(personId));
+    (row ?? headingRef.current)?.focus();
+  };
+
+  return (
+    <section aria-labelledby={headingId} className="mt-6">
+      <ListHead
+        heading={WORDS.heading}
+        headingId={headingId}
+        headingRef={headingRef}
+        description={WORDS.description}
+        count={waiting === undefined ? "" : countOf(WORDS, names.length, narrowed)}
+      />
+      <ReadSaid read={listed} loading={WORDS.loading} />
+      <OutcomeLine outcome={said ?? correcting.outcome} className="mt-2" />
+
+      <Card className="mt-4">
+        <FilterRow
+          search={{
+            label: WORDS.search,
+            value: narrowed.typed,
+            onChange: narrowed.setTyped,
+            keystroke: NAMES_WAITING_KEYSTROKES.search,
+            inputRef: narrowed.searchRef,
+          }}
+        />
+        {waiting === undefined ? null : (
+          <GridTable
+            table={table}
+            caption={WORDS.caption}
+            empty={
+              <NothingListed
+                search={narrowed.search}
+                noneMatch={WORDS.noneMatch}
+                onClear={narrowed.clear}
+                searchRef={narrowed.searchRef}
+              >
+                <NothingWaits />
+              </NothingListed>
+            }
+          />
+        )}
+      </Card>
+
+      <DialogFor
+        picked={names.find((each) => each.personId === openFor)}
+        correcting={correcting}
+        onSave={save}
+        onClose={() => {
+          setOpenFor(undefined);
+        }}
+        onFocusBack={focusBack}
+      />
+    </section>
+  );
+}

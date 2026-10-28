@@ -7,7 +7,7 @@ import {
   type SwitchedTo,
 } from "@/features/auth/auth-hooks.ts";
 import { noLongerAMemberOf } from "@/features/auth/refusal-words.ts";
-import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
+import { PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
 import { Icon } from "@/shared/icon.tsx";
 import { CONSOLE } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";

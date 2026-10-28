@@ -1,8 +1,8 @@
 import { useCallback, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
 
 import { useKeystroke } from "@/shared/keystrokes.tsx";
+import { ownsNoLonger, useArrivalDecidedAgainOnceUnowned } from "@/shared/member/ownership.ts";
 import { selectFirst, type Outcome } from "@/shared/outcome.tsx";
-import { ownsNoLonger, useArrivalDecidedAgainOnceUnowned } from "@/shared/ownership.ts";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 

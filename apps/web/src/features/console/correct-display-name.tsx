@@ -1,14 +1,14 @@
 import { useId, useState, type RefObject } from "react";
 
 import { OutcomeLine } from "@/shared/outcome.tsx";
-import { SheetPart } from "@/shared/sheet-part.tsx";
+import { SheetPart } from "@/shared/page/sheet-part.tsx";
 
-import { CorrectNameDialog } from "./correct-name-dialog.tsx";
-import { CORRECT_DISPLAY_NAME } from "./correcting-words.ts";
+import { CorrectNameDialog } from "./names-waiting/correct-name-dialog.tsx";
+import { CORRECT_DISPLAY_NAME } from "./names-waiting/correcting-words.ts";
+import { useCorrecting } from "./names-waiting/use-correcting.ts";
 import type { ListedPerson } from "./people-api.ts";
 import { nameOf } from "./person-words.tsx";
 import { SheetActionButton } from "./sheet-action.tsx";
-import { useCorrecting } from "./use-correcting.ts";
 
 export function CorrectDisplayName(properties: {
   readonly person: ListedPerson;
