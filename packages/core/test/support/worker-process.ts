@@ -1,9 +1,10 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import path from "node:path";
+import readline from "node:readline";
 import { promisify } from "node:util";
 
 import pg from "pg";
-import { expect } from "vitest";
+import { afterAll, expect } from "vitest";
 import { z } from "zod";
 
 import { CONTRACT_DIGEST, STAMP_THE_CONTRACT } from "@better-answers/schema";
@@ -54,6 +55,26 @@ const AN_UNREACHABLE_STORE: WorkerObjectStore = {
 
 export const lmdbRootUnder = (bundleRoot: string): string => path.join(bundleRoot, "lmdb");
 
+const workerEnvironment = (
+  connectionUri: string,
+  bundleRoot: string,
+  workerId: string,
+  objects: WorkerObjectStore,
+): NodeJS.ProcessEnv => ({
+  ...process.env,
+  DATABASE_URL: workerDsn(connectionUri),
+  GIT_STORE_DIR: bundleRoot,
+  WORKER_ID: workerId,
+
+  HF_HUB_OFFLINE: "1",
+  LMDB_DIR: lmdbRootUnder(bundleRoot),
+  S3_ENDPOINT: objects.endpoint,
+  S3_ACCESS_KEY: objects.accessKeyId,
+  S3_SECRET_KEY: objects.secretAccessKey,
+  S3_BUCKET: objects.bucket,
+  S3_REGION: objects.region,
+});
+
 export const runWorkerOnce = async (
   connectionUri: string,
   bundleRoot: string,
@@ -64,19 +85,7 @@ export const runWorkerOnce = async (
 
   const outcome = await run("uv", ["run", "--frozen", "better-answers-worker", "--once"], {
     cwd: workerDirectory,
-    env: {
-      ...process.env,
-      DATABASE_URL: workerDsn(connectionUri),
-      GIT_STORE_DIR: bundleRoot,
-      WORKER_ID: workerId,
-
-      LMDB_DIR: lmdbRootUnder(bundleRoot),
-      S3_ENDPOINT: objects.endpoint,
-      S3_ACCESS_KEY: objects.accessKeyId,
-      S3_SECRET_KEY: objects.secretAccessKey,
-      S3_BUCKET: objects.bucket,
-      S3_REGION: objects.region,
-    },
+    env: workerEnvironment(connectionUri, bundleRoot, workerId, objects),
   }).catch((cause: unknown) => {
     const failure = execFailure.safeParse(cause);
     const { message = "", stderr = "", stdout = "" } = failure.success ? failure.data : {};
@@ -99,3 +108,127 @@ const errorsLoggedIn = (stdout: string): readonly string[] =>
     const read = errorLine.safeParse(JSON.parse(line));
     return read.success ? [read.data.event] : [];
   });
+
+const A_STAMP_THAT_MATCHES = "matches";
+
+const tickDone = z.object({
+  event: z.literal("tick done"),
+  schema_stamp: z.string(),
+  contract_stamp: z.string(),
+});
+
+type Answer = {
+  readonly logged: string;
+  readonly raised: string;
+  readonly stamps: readonly string[];
+};
+
+type Waiting = {
+  readonly answer: (answer: Answer) => void;
+  readonly fail: (failure: Error) => void;
+};
+
+const STOP_GRACE_MS = 30_000;
+
+type TickingWorker = {
+  readonly tick: () => Promise<void>;
+};
+
+type Where = {
+  readonly connectionUri: string;
+  readonly bundleRoot: string;
+  readonly objects: WorkerObjectStore;
+};
+
+const startTickingWorker = (workerId: string, where: Where) => {
+  const child = spawn("uv", ["run", "--frozen", "better-answers-worker", "--ticks"], {
+    cwd: workerDirectory,
+    env: workerEnvironment(where.connectionUri, where.bundleRoot, workerId, where.objects),
+  });
+  let stderr = "";
+  let gone: Error | undefined;
+  const heard: string[] = [];
+  const waiting: Waiting[] = [];
+
+  const goneWith = (reason: string): void => {
+    gone = new Error(`the worker ${workerId} ${reason}\n${stderr}`);
+    for (const { fail } of waiting.splice(0)) fail(gone);
+  };
+
+  const ended = new Promise<void>((resolve) => {
+    child.once("exit", (code, signal) => {
+      // The last of its stderr is still in the pipe when the exit arrives.
+      setImmediate(() => {
+        goneWith(`exited (code ${String(code)}, signal ${String(signal)}) before it answered`);
+        resolve();
+      });
+    });
+    child.once("error", (cause) => {
+      goneWith(`did not start: ${cause.message}`);
+      resolve();
+    });
+  });
+
+  child.stdin.on("error", () => undefined);
+  child.stderr.on("data", (chunk: Buffer) => {
+    stderr += chunk.toString();
+  });
+  readline.createInterface({ input: child.stdout }).on("line", (line) => {
+    heard.push(line);
+    const done = line.startsWith("{") ? tickDone.safeParse(JSON.parse(line)) : undefined;
+    if (done === undefined || !done.success) return;
+
+    const answer = {
+      logged: heard.splice(0).join("\n"),
+      raised: stderr,
+      stamps: [done.data.schema_stamp, done.data.contract_stamp],
+    };
+    stderr = "";
+    waiting.shift()?.answer(answer);
+  });
+
+  const answered = (): Promise<Answer> =>
+    new Promise((answer, fail) => {
+      if (gone !== undefined) {
+        fail(gone);
+        return;
+      }
+      waiting.push({ answer, fail });
+      child.stdin.write("tick\n");
+    });
+
+  return {
+    tick: async (): Promise<void> => {
+      await stampTheContract(where.connectionUri);
+      const { logged, raised, stamps } = await answered();
+
+      expect(raised).not.toMatch(/Traceback/);
+      const errors = errorsLoggedIn(logged);
+      if (errors.length > 0) {
+        throw new Error(`the worker logged an error: ${errors.join("; ")}\n${logged}`);
+      }
+      if (stamps.some((stamp) => stamp !== A_STAMP_THAT_MATCHES)) {
+        throw new Error(`the worker ${workerId} refused the tick, a deploy stamp differs`);
+      }
+    },
+    stop: async (): Promise<void> => {
+      child.stdin.end();
+      const killer = setTimeout(() => child.kill("SIGKILL"), STOP_GRACE_MS);
+      await ended;
+      clearTimeout(killer);
+    },
+  };
+};
+
+export const workerForSuite = (workerId: string, where: () => Where): (() => TickingWorker) => {
+  let started: ReturnType<typeof startTickingWorker> | undefined;
+
+  afterAll(async () => {
+    await started?.stop();
+  });
+
+  return () => {
+    started ??= startTickingWorker(workerId, where());
+    return started;
+  };
+};
