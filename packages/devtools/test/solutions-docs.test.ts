@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
+import { lineReferencesIn } from "@better-answers/devtools/line-references";
 import { markdownUnder, repositoryRoot } from "@better-answers/devtools/paths";
 
 const SOLUTIONS = "docs/solutions";
@@ -36,6 +37,11 @@ const read = (relative: string): { readonly frontmatter: unknown; readonly body:
 const lacksAppliesWhen = (relative: string): boolean =>
   !frontmatterSchema.safeParse(read(relative).frontmatter).success;
 
+const citingALine = (relative: string): readonly string[] =>
+  lineReferencesIn(readFileSync(path.join(repositoryRoot, relative), "utf8")).map(
+    ({ line, text }) => `${relative}, line ${String(line)}: ${text}`,
+  );
+
 const breaksDecisionFormat = (relative: string): boolean => {
   const { frontmatter, body } = read(relative);
   return (
@@ -53,6 +59,16 @@ describe("docs/solutions", () => {
     expect(
       docs.filter(lacksAppliesWhen),
       "each doc listed lacks a non-empty applies_when. Add an applies_when list to its frontmatter, one quoted line per situation in which an agent should read the doc.",
+    ).toEqual([]);
+  });
+
+  it("cites code by path and symbol, not by line number", () => {
+    const docs = markdownUnder(repositoryRoot, SOLUTIONS);
+
+    expect(docs.length).toBeGreaterThan(0);
+    expect(
+      docs.flatMap(citingALine),
+      "each reference listed names a line, and a line number names other code after the next edit above it. Cite the path and the symbol that holds the code, or a test by its title.",
     ).toEqual([]);
   });
 
