@@ -2,8 +2,6 @@ name: check
 
 on:
   pull_request:
-  # Without this the queue waits on a run that never starts.
-  merge_group:
   # `build.yml` calls this on main, so a push runs `check` once rather than twice.
   workflow_call:
     inputs:
@@ -12,8 +10,8 @@ on:
           Set by a caller whose own job builds the images, loads each one that has a
           contents test and runs that test against the build it is about to push (`T-043`).
           The suites here then leave those tests to that job, so a push to main builds a
-          probed image once rather than once on this runner and once on that one. A merge
-          group has no such job and passes nothing, so it probes when an image's inputs changed.
+          probed image once rather than once on this runner and once on that one. A pull
+          request has no such job and passes nothing, so it probes when an image's inputs changed.
           It reaches every leg whose suites read it — the api's and the worker's — and no
           other; `packages/devtools/test/ci/image-job.test.ts` holds that both ways.
         type: boolean
@@ -53,14 +51,10 @@ jobs:
         id: lane
         env:
           EVENT: ${{ github.event_name }}
-          MERGE_GROUP_TARGET: ${{ github.event.merge_group.base_ref }}
           PULL_REQUEST_BASE: ${{ github.event.pull_request.base.sha }}
           PUSHED_FROM: ${{ github.event.before }}
         run: |
-          # `base_sha` is the head of the group queued ahead, whose changes merge with this one, so
-          # the diff starts at the target branch.
           case "${EVENT}" in
-            merge_group) base="${MERGE_GROUP_TARGET}" ;;
             pull_request) base="${PULL_REQUEST_BASE}" ;;
             push | workflow_call) base="${PUSHED_FROM}" ;;
             *) base="" ;;
@@ -362,10 +356,9 @@ jobs:
           # per document.
           COCOINDEX_DISABLE_USAGE_TRACKING: "1"
 
-  # The title becomes the merge commit's subject, so the queue reads it again: a retitle after
-  # a green run reaches the queue unread otherwise.
+  # The title becomes the squash commit's subject.
   pr-title:
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
@@ -379,51 +372,21 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
-      # Read when it runs, not from the event, so a re-run reads a retitle. A merge group's ref
-      # names its pull request.
+      # Read when it runs, not from the event, so a re-run reads a retitle.
       - name: the pull request's title, through commitlint
         env:
           GH_TOKEN: ${{ github.token }}
           PULL_REQUEST: ${{ github.event.pull_request.number }}
-          QUEUED_REF: ${{ github.event.merge_group.head_ref }}
         run: |
-          number="${PULL_REQUEST:-$(printf '%s\n' "${QUEUED_REF}" | sed -n 's|^refs/heads/gh-readonly-queue/.*/pr-\([0-9][0-9]*\)-[0-9a-f]*$|\1|p')}"
-          if [ -z "${number}" ]; then
-            echo "::error::no pull request number in this event (ref '${QUEUED_REF}')"
+          if [ -z "${PULL_REQUEST}" ]; then
+            echo "::error::no pull request number in this event"
             exit 1
           fi
           cli="$(jq -re '.devDependencies["@commitlint/cli"]' package.json)"
           preset="$(jq -re '.devDependencies["@commitlint/config-conventional"]' package.json)"
-          title="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${number}" --jq .title)"
+          title="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PULL_REQUEST}" --jq .title)"
           printf '%s\n' "${title}" |
             pnpm dlx --package="@commitlint/cli@${cli}" --package="@commitlint/config-conventional@${preset}" commitlint
-
-  verdict:
-    if: ${{ github.event_name == 'merge_group' }}
-    runs-on: ubuntu-26.04
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      pull-requests: read
-      statuses: read
-    steps:
-      - name: the pull request's head carries a successful verdict status
-        env:
-          GH_TOKEN: ${{ github.token }}
-          QUEUED_REF: ${{ github.event.merge_group.head_ref }}
-        run: |
-          number="$(printf '%s\n' "${QUEUED_REF}" | sed -n 's|^refs/heads/gh-readonly-queue/.*/pr-\([0-9][0-9]*\)-[0-9a-f]*$|\1|p')"
-          if [ -z "${number}" ]; then
-            echo "::error::no pull request number in this event (ref '${QUEUED_REF}')"
-            exit 1
-          fi
-          sha="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${number}" --jq .head.sha)"
-          state="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${sha}/status" --jq '.statuses[] | select(.context == "verdict") | .state')"
-          if [ "${state}" != "success" ]; then
-            echo "::error::the verdict on pull request #${number} at ${sha} is ${state:-missing}, and the queue wants success"
-            exit 1
-          fi
-          echo "pull request #${number} at ${sha} carries a successful verdict"
 
   check:
     needs:
@@ -437,7 +400,6 @@ jobs:
         full-web-browser,
         full-worker,
         pr-title,
-        verdict,
       ]
     # A skipped required check never reports, so this runs whatever the legs did.
     if: ${{ always() }}
@@ -448,8 +410,7 @@ jobs:
         env:
           LANE: ${{ needs.lane.outputs.lane }}
           LEGS: ${{ toJSON(needs) }}
-          TITLE_WANTED: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'success' || 'skipped' }}
-          VERDICT_WANTED: ${{ (github.event_name == 'merge_group') && 'success' || 'skipped' }}
+          TITLE_WANTED: ${{ (github.event_name == 'pull_request') && 'success' || 'skipped' }}
         run: |
           named=0
           required=0
@@ -460,7 +421,6 @@ jobs:
             case "${leg}" in
               lane) wanted=success ;;
               pr-title) wanted="${TITLE_WANTED}" ;;
-              verdict) wanted="${VERDICT_WANTED}" ;;
               "${LANE}-"*) wanted=success; required=$((required + 1)) ;;
               *) wanted=skipped ;;
             esac
