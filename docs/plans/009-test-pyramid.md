@@ -304,7 +304,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 - [ ] Metric. Job wall seconds of `full-api` and `full-worker` on CI runners.
 - [ ] Probe. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Rerun it with `gh run rerun <id>` until it has three full-lane attempts, each after the last has finished, and read each with `gh run view <id> --attempt <n> --json jobs`. After merge, read the first five merge-group runs for Appendix E.
-- [ ] Baseline. Record first the medians of the five latest merge-group runs on `main`. Over the eleven runs in Appendix E, `full-api` had a median of 287s (239 to 320s) and `full-worker` 272s (226 to 328s).
+- [ ] Baseline. Record first the medians of the latest five full-lane merge-group runs on `main` where the image tests ran. A run ran them when its `lane` job log says `an image's inputs changed: yes`. A run that says `no` skipped them through `IMAGE_PROBE_DEFERRED`, and `backup-image.test.ts` alone took 94s and 104s in runs 40599189016 and 40570111529 and was skipped in 40532633967, so leave those runs out. Over the eleven runs in Appendix E, which mix both, `full-api` had a median of 287s (239 to 320s) and `full-worker` 272s (226 to 328s).
 - [ ] Rule. Fails if the head's `full-api` median over three attempts is not at least 60s below the baseline median. Fails if `full-images` is the longest job in any head attempt.
 
 **Review gate.** None. BA-271 is not review-gated.
@@ -440,14 +440,14 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 **Build.**
 
 - [ ] Expose `parseOpsArgs(argv)` returning a command or a usage refusal. Move flag, usage and exit-code cases to it. Keep one real `runOps` case per command group, and every erasure and lock case.
-- [ ] Keep a real refusal per procedure in `pending-set.test.ts`, and cut only its setup. Sign in one pending session in `beforeAll` and send every gated case through it over HTTP, in place of a workspace provisioned per case. A gated case is refused before its procedure runs, so it cannot change the session. A case the set serves, such as sign-out, keeps a session of its own.
+- [ ] Keep a real refusal per procedure in `pending-set.test.ts`, and cut only its setup. Sign in one pending session in `beforeAll` and send every gated case through it over HTTP, in place of a workspace provisioned per case. A gated case is refused before its procedure runs, so it cannot change the session. The hazard is the per-address limits. Six gated library endpoints under `/email-otp/` and `/forget-password/` send or take a code, and `limitSends` in `apps/api/src/auth/routes.ts` counts their POSTs under `EMAIL_CODE_SEND_IP_RULE` in `apps/api/src/auth/constants.ts`, at 5 per client address per 10 minutes. It runs as middleware before the pending gate, so a refused case still counts, and the session's own sign-in already used one of the five. Send each gated library case as a fresh `app().client()` that carries the shared session's `cookies()` string as its `cookie` header. `apps/api/tests/harness.ts` sets the client address in `client`, which writes `CLIENT_IP_HEADER` from its `ip` argument and otherwise takes the next of 254 default addresses per `TestApp`, and a client with an empty jar sends a `cookie` header it is given. The tRPC and api-route cases stay on the session's own address, under `TRPC_IP_RULE`'s 120 per minute. A case the set serves, such as sign-out, keeps a session of its own.
   - [ ] The shared session is chosen over `appRouter.createCaller` because it still fails when a procedure stops going through the gate anywhere on the path. The gate is `sessionOf` in `apps/api/src/trpc/base.ts`, and a caller reaches it only through a context the test builds. A caller would miss a bypass in the mount's `createContext` or its session reader. The library-endpoint and api-route cases in the same file have no caller, so they need HTTP anyway.
 - [ ] Test MCP listing and annotations through `createMcpSurface` with no session. Keep the lock and cap cases on the app.
 - [ ] Test ask's verdict and preview rendering through `answerOutputWith` in core's answering boundary. Keep one end-to-end ask.
 
 **You see.**
 
-- [ ] `vitest list` for the api shows the pending-set file with the same per-procedure, per-endpoint and per-route case titles as trunk, and the file provisions one workspace for its gated cases where trunk provisions one per case.
+- [ ] `vitest list` for the api shows the pending-set file with the same per-procedure, per-endpoint and per-route case titles as trunk, and the file provisions one workspace for its gated cases where trunk provisions one per case, with each gated library case sent from its own client address.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
