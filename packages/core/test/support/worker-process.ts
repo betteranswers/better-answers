@@ -75,7 +75,6 @@ const workerEnvironment = (
   S3_REGION: objects.region,
 });
 
-/** The worker runs offline, so this runs the worker's own fetch first, and only on a cache miss. */
 const THE_DETECTORS_WEIGHTS_CACHED = `
 import sys
 from better_answers_worker.redaction.weights import WEIGHTS, carried_repositories, fetch
@@ -135,8 +134,7 @@ export const runWorkerOnce = async (
 /** The engine logs a component's exception on stdout and carries on, so the pass exits 0. */
 const errorLine = z.object({ level: z.literal("error"), event: z.string() });
 
-/** A worker killed mid-line leaves half a JSON object, which reads as nothing. */
-const readLogLine = (line: string): unknown => {
+const jsonOrNothing = (line: string): unknown => {
   try {
     return JSON.parse(line);
   } catch {
@@ -147,7 +145,7 @@ const readLogLine = (line: string): unknown => {
 const errorsLoggedIn = (stdout: string): readonly string[] =>
   stdout.split("\n").flatMap((line) => {
     if (!line.startsWith("{")) return [];
-    const read = errorLine.safeParse(readLogLine(line));
+    const read = errorLine.safeParse(jsonOrNothing(line));
     return read.success ? [read.data.event] : [];
   });
 
@@ -173,7 +171,6 @@ type Waiting = {
 
 const STOP_GRACE_MS = 30_000;
 
-/** A warm tick answers in about a second and a cold one under 45 s; a case allows 300 s. */
 const A_TICK_ALLOWANCE_MS = 120_000;
 
 type TickingWorker = {
@@ -186,13 +183,15 @@ type Where = {
   readonly objects: WorkerObjectStore;
 };
 
+const aGroupAlreadyGone = z.object({ code: z.literal("ESRCH") });
+
 /** `uv run` keeps the worker as its child, so a kill must reach the process group. */
 const killTheGroup = (child: ChildProcess): void => {
   if (child.pid === undefined) return;
   try {
     process.kill(-child.pid, "SIGKILL");
-  } catch {
-    // Every process in the group has already exited.
+  } catch (cause) {
+    if (!aGroupAlreadyGone.safeParse(cause).success) throw cause;
   }
 };
 
@@ -234,7 +233,7 @@ const startTickingWorker = (workerId: string, where: Where) => {
   readline.createInterface({ input: child.stdout }).on("line", (line) => {
     heard.push(line);
     if (!line.startsWith("{")) return;
-    const read = readLogLine(line);
+    const read = jsonOrNothing(line);
     if (read !== undefined && !saysTickDone.safeParse(read).success) return;
     const done = tickDone.safeParse(read);
     if (!done.success) {
