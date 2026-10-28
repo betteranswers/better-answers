@@ -27,7 +27,7 @@
     "check:docs": "node scripts/check.mjs format:check check:docs:core check:docs:devtools check:docs:web",
     "check:docs:core": "pnpm --filter @better-answers/core run test test/tier-contract.test.ts",
     "check:docs:devtools": "pnpm --filter @better-answers/devtools run test test/ci/deploy-tree.test.ts test/ci/docs-lane.test.ts test/ci/tracked-skills.test.ts test/scans/contract-paths.test.ts test/gates/solutions-docs.test.ts",
-    "check:docs:web": "pnpm --filter @better-answers/web run test test/gates/browser-suite-skill.test.ts",
+    "check:docs:web": "pnpm --filter @better-answers/web run test test/gates/web-skills.test.ts",
     "jscpd": "node scripts/jscpd.mjs",
     "comment-gate:python": "python3 packages/devtools/python/comment_gate.py apps packages .github deploy .claude/hooks scripts cubic.yaml lefthook.yml pnpm-workspace.yaml",
     "comment-density": "node scripts/comment-density.mjs apps packages",

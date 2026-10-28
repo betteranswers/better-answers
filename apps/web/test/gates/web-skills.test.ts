@@ -7,7 +7,11 @@ import { describe, expect, it } from "vitest";
 
 import { repositoryRoot } from "@test/roots.ts";
 
-const skillDirectory = ".claude/skills/browser-suite";
+import { EVERY_AREA, pagesOf } from "@/shared/navigation.ts";
+
+const verifyDirectory = ".claude/skills/verify";
+const specsDirectory = "apps/web/.claude/skills/playwright-specs";
+const featuresDirectory = `${verifyDirectory}/features`;
 const suiteDirectory = "apps/web/e2e";
 
 const NAMED_PATH = /`(?<file>apps\/[\w./-]+\.(?:tsx?|json))`/g;
@@ -27,26 +31,29 @@ const read = (file: string): string => readFileSync(path.join(repositoryRoot, fi
 const namesIn = (text: string, pattern: RegExp): string[] =>
   [...text.matchAll(pattern)].map((match) => match.groups?.["name"] ?? "");
 
-const skillFiles = [
-  `${skillDirectory}/SKILL.md`,
-  ...filesIn(`${skillDirectory}/references`).filter((file) => file.endsWith(".md")),
-];
-const skill = skillFiles.map(read).join("\n");
-const named = [...skill.matchAll(NAMED_PATH)].map((match) => match.groups?.["file"] ?? "");
+const markdownIn = (directory: string): string[] =>
+  filesIn(directory).filter((file) => file.endsWith(".md"));
+
+const skills = [...markdownIn(verifyDirectory), ...markdownIn(specsDirectory)].map(read).join("\n");
+const named = [...skills.matchAll(NAMED_PATH)].map((match) => match.groups?.["file"] ?? "");
 
 const suiteFiles = filesIn(suiteDirectory).filter((file) => file.endsWith(".ts"));
 const specs = suiteFiles.filter((file) => file.endsWith(".spec.ts")).map(read);
 const modules = suiteFiles.filter((file) => !file.endsWith(".spec.ts"));
 
-describe("the browser-suite skill", () => {
-  it("points at files that are in the tree", () => {
+const verifyFrontmatter = read(`${verifyDirectory}/SKILL.md`).split("---")[1] ?? "";
+
+const escaped = (text: string): string => text.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+describe("the verify and playwright-specs skills", () => {
+  it("point at files that are in the tree", () => {
     const missing = [...new Set(named)].filter(
       (file) => !existsSync(path.join(repositoryRoot, file)),
     );
-    expect(missing, `${skillDirectory} names files that do not exist`).toEqual([]);
+    expect(missing, "the web's skills name files that do not exist").toEqual([]);
   });
 
-  it("names the suite's own modules, so the check holds something", () => {
+  it("name the suite's own modules, so the check holds something", () => {
     expect(named).toEqual(
       expect.arrayContaining([
         "apps/web/e2e/browser.ts",
@@ -57,7 +64,7 @@ describe("the browser-suite skill", () => {
     );
   });
 
-  it("names every helper that two or more specs share", () => {
+  it("name every helper that two or more specs share", () => {
     const shared = modules.flatMap((module) =>
       namesIn(read(module), EXPORTED_NAME)
         .filter(
@@ -68,17 +75,30 @@ describe("the browser-suite skill", () => {
     expect(shared.length, "no shared helper was found, so the check holds nothing").toBeGreaterThan(
       0,
     );
-    const unnamed = shared.filter(({ name }) => !skill.includes(`\`${name}\``));
-    expect(unnamed, `${skillDirectory} leaves out helpers the specs share`).toEqual([]);
+    const unnamed = shared.filter(({ name }) => !skills.includes(`\`${name}\``));
+    expect(unnamed, "the web's skills leave out helpers the specs share").toEqual([]);
   });
 
-  it("gives rows only to helpers the suite still exports", () => {
+  it("give rows only to helpers the suite still exports", () => {
     const exported = new Set(modules.flatMap((module) => namesIn(read(module), EXPORTED_NAME)));
-    const rows = namesIn(skill, TABLE_ROW_NAME);
+    const rows = namesIn(skills, TABLE_ROW_NAME);
     const stale = rows
       .filter((name) => !exported.has(name))
       .filter((name) => !PLAYWRIGHT_FIXTURES.has(name));
     expect(rows.length, "no table row was found, so the check holds nothing").toBeGreaterThan(0);
-    expect(stale, `${skillDirectory} has rows for helpers the suite no longer exports`).toEqual([]);
+    expect(stale, "the web's skills have rows for helpers the suite no longer exports").toEqual([]);
+  });
+
+  it("give every page in the navigation list a feature file", () => {
+    const features = markdownIn(featuresDirectory).map(read).join("\n");
+    const unmapped = pagesOf(EVERY_AREA)
+      .map((page) => page.path)
+      .filter((address) => !new RegExp(`${escaped(address)}(?![\\w/-])`).test(features));
+    expect(unmapped, `no file under ${featuresDirectory} names these pages`).toEqual([]);
+  });
+
+  it("register the verify skill for the model to call", () => {
+    expect(verifyFrontmatter).toMatch(/^name: verify$/m);
+    expect(verifyFrontmatter).not.toMatch(/disable-model-invocation/);
   });
 });
