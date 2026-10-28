@@ -8,7 +8,7 @@ component: tier-contract
 severity: medium
 applies_when:
   - "Decoding a percent-encoded address in the worker that the api or the page also decodes"
-  - "Changing `targetOf` in `packages/core/src/store/map/index.ts` or `_target_of` in `apps/worker/src/better_answers_worker/concepts/links.py`"
+  - "Changing `targetOf` in `packages/core/src/store/map/index.ts` or `_target_of` in `apps/worker/src/better_answers_worker/concepts/links/targets.py`"
   - "Adding a percent-encoded case to `contracts/links/cases.json`"
 symptoms:
   - "One body link makes a LINKS_TO edge in the api's live map and none in the worker's rebuild, or the reverse"
@@ -38,7 +38,7 @@ A body link's path is percent-decoded before it is resolved (BA-146, RFC 3987). 
 
 ## Solution
 
-`_uri_decoded` in `links.py` is a hand-written port of `decodeURI`. It decodes escapes one UTF-8 sequence at a time, keeps a reserved character's escape as written, and returns the address unchanged on any escape `decodeURI` would refuse. The TypeScript side is `uriDecoded` in `packages/schema/src/knowledge/concept-file.ts`, which `targetOf` and the page's `concept-body.tsx` both call, so the page and the map read one address one way.
+`_uri_decoded` in `links/targets.py` is a hand-written port of `decodeURI`. It decodes escapes one UTF-8 sequence at a time, keeps a reserved character's escape as written, and returns the address unchanged on any escape `decodeURI` would refuse. The TypeScript side is `uriDecoded` in `packages/schema/src/knowledge/concept-file.ts`, which `targetOf` and the page's `concept-body.tsx` both call, so the page and the map read one address one way.
 
 `contracts/links` holds the two differences as cases: *an encoded reserved character stays as written* and *an address that does not decode is read as written*. With `unquote` in place of `_uri_decoded`, those two cases fail and every other case passes.
 
