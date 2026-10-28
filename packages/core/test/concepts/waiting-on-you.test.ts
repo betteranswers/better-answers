@@ -7,7 +7,6 @@ import { matching } from "@better-answers/schema/testing/matching";
 
 import {
   submitSuggestionSet,
-  suggestionSetSummary,
   waitingEdit,
   waitingOnYou,
   writeConcept,
@@ -16,7 +15,6 @@ import {
 } from "../../src/concepts/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { parseLocator, passageAt } from "../../src/sources/index.ts";
-import type { Tx } from "../../src/store/postgres/index.ts";
 import {
   connectedSourceHolding,
   passageUnder,
@@ -373,17 +371,19 @@ const WAITING_SETS = 50;
 const WARMING_RUNS = 5;
 const RUNS = 40;
 const WAITING_BUDGET_MS = 100;
-const BASELINE_MULTIPLE = 50;
+/** One statement answers 50 items in about one item's time; a round trip per item takes about six. */
+const BUDGET_IN_ONE_ITEM_LISTS = 3;
 
-const timedOver = async <T>(
-  reader: UserPrincipal,
-  read: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<{ readonly readMs: number; readonly value: T }> =>
+type Listed = { readonly readMs: number; readonly items: number };
+
+type PairedRead = { readonly oneItem: Listed; readonly fifty: Listed };
+
+const listedFor = async (reader: UserPrincipal): Promise<Listed> =>
   answered(
     await readingAs(db().runtimePool, reader, async (principal, tx) => {
       const started = performance.now();
-      const value = await read(principal, tx);
-      return { readMs: performance.now() - started, value };
+      const list = answered(await waitingOnYou(principal, tx));
+      return { readMs: performance.now() - started, items: list.items.length };
     }),
   );
 
@@ -399,44 +399,54 @@ describe("Waiting on you at volume", () => {
         }),
       );
     }
-    const sets: string[] = [];
     for (let round = 0; round < WAITING_SETS / BUDGET_COLLECTIONS.length; round += 1) {
-      for (const concept of standing) {
-        sets.push((await proposedBy(scenario, scenario.viewer, concept)).setId);
-      }
+      for (const concept of standing) await proposedBy(scenario, scenario.viewer, concept);
     }
-    const [oneSet] = sets;
-    assert(oneSet !== undefined, "a set is waiting");
+    const theirs = await conceptProposedBy(scenario, scenario.unowned);
+    await nameOwnerAs(scenario.admin, scenario.postgres, {
+      iri: theirs.written.iri,
+      personId: scenario.viewer.userId,
+    });
 
-    const listMs: number[] = [];
-    const summaryMs: number[] = [];
-    let listed = 0;
-    const timedRun = async () => {
-      const list = await timedOver(scenario.editor, waitingOnYou);
-      listed = answered(list.value).items.length;
-      const summary = await timedOver(scenario.admin, (principal, tx) =>
-        suggestionSetSummary(principal, tx, oneSet),
-      );
-      return { list, summary };
-    };
-    for (let run = 0; run < WARMING_RUNS; run += 1) await timedRun();
-    for (let run = 0; run < RUNS; run += 1) {
-      const { list, summary } = await timedRun();
-      listMs.push(list.readMs);
-      summaryMs.push(summary.readMs);
-    }
-    const p95 = percentile(listMs, 0.95);
-    const baseline = percentile(summaryMs, 0.5);
+    const pairedRead = async (): Promise<PairedRead> => ({
+      oneItem: await listedFor(scenario.viewer),
+      fifty: await listedFor(scenario.editor),
+    });
+    for (let run = 0; run < WARMING_RUNS; run += 1) await pairedRead();
+    const reads: PairedRead[] = [];
+    for (let run = 0; run < RUNS; run += 1) reads.push(await pairedRead());
+    const fiftyMs = reads.map((read) => read.fifty.readMs);
+    const inOneItemLists = percentile(
+      reads.map((read) => read.fifty.readMs / read.oneItem.readMs),
+      0.5,
+    );
     await recordFigures("Waiting on you over 50 waiting suggestions in five collections", [
-      ["waitingOnYou at the median", inMs(percentile(listMs, 0.5))],
-      ["waitingOnYou at p95", `${inMs(p95)}, against a budget of ${WAITING_BUDGET_MS} ms`],
-      ["one set's suggestionSetSummary at the median, the trunk baseline", inMs(baseline)],
-      ["p95 in baseline medians", `${(p95 / baseline).toFixed(1)}, against ${BASELINE_MULTIPLE}`],
+      [
+        "the list of 50, in one-item lists read just before it, at the median",
+        `${inOneItemLists.toFixed(1)}, against a budget of ${BUDGET_IN_ONE_ITEM_LISTS}`,
+      ],
+      ["the list of 50 at the median", inMs(percentile(fiftyMs, 0.5))],
+      [
+        "the list of 50 at p95",
+        `${inMs(percentile(fiftyMs, 0.95))}, against ${WAITING_BUDGET_MS} ms`,
+      ],
+      [
+        "the one-item list at the median",
+        inMs(
+          percentile(
+            reads.map((read) => read.oneItem.readMs),
+            0.5,
+          ),
+        ),
+      ],
     ]);
 
-    expect(listed, "the suggestions the owner's list holds").toBe(WAITING_SETS);
-    expect(p95 / baseline, "waitingOnYou at p95, in one-set summary medians").toBeLessThanOrEqual(
-      BASELINE_MULTIPLE,
+    expect(
+      reads.map((read) => [read.oneItem.items, read.fifty.items]),
+      "the suggestions each owner's list holds",
+    ).toEqual(Array.from({ length: RUNS }, () => [1, WAITING_SETS]));
+    expect(inOneItemLists, "the list of 50, in one-item lists, at the median").toBeLessThan(
+      BUDGET_IN_ONE_ITEM_LISTS,
     );
   }, 120_000);
 });

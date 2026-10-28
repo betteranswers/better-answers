@@ -37,12 +37,24 @@ const app = appForSuite(unreachable, clock);
 
 const INVITE = `${TRPC_ENDPOINT}/members.invite`;
 
-const SEND_BUDGET_MS = 1000;
+const SEND_ROUNDS = 11;
+
+/** Fifty addresses answer in about six one-address sends; twelve fails once each address costs about three times what it does now. */
+const SEND_BUDGET_IN_ONE_ADDRESS_SENDS = 12;
 
 const A_DAY_MS = 24 * 60 * 60 * 1000;
 
 const inviting = (api: Api, addresses: readonly string[], role = "Viewer") =>
   api.members.invite.mutate({ addresses: [...addresses], role });
+
+const timedSend = async (api: Api, addresses: readonly string[]) => {
+  const started = performance.now();
+  const sent = await inviting(api, addresses);
+  return {
+    ms: performance.now() - started,
+    emailed: sent.invitations.filter((one) => one.emailSent).length,
+  };
+};
 
 const invitedOne = async (api: Api, address: string, role = "Viewer") => {
   const [one] = (await inviting(api, [address], role)).invitations;
@@ -258,15 +270,32 @@ describe("inviting several addresses over tRPC", () => {
   });
 
   it("answers fifty addresses within the list's budget", async () => {
-    const { api } = await anAdmin();
-    const addresses = Array.from({ length: 50 }, (_unused, at) => anAddress(`fifty${at}`));
+    const rounds: { readonly emailed: readonly number[]; readonly inOneAddressSends: number }[] =
+      [];
+    for (let round = 0; round < SEND_ROUNDS; round += 1) {
+      const { api } = await anAdmin();
+      const before = await timedSend(api, [anAddress(`before${round}`)]);
+      const fifty = await timedSend(
+        api,
+        Array.from({ length: 50 }, (_unused, at) => anAddress(`fifty${round}-${at}`)),
+      );
+      const after = await timedSend(api, [anAddress(`after${round}`)]);
+      rounds.push({
+        emailed: [before, fifty, after].map(({ emailed }) => emailed),
+        inOneAddressSends: fifty.ms / ((before.ms + after.ms) / 2),
+      });
+    }
+    const [median] = rounds
+      .map(({ inOneAddressSends }) => inOneAddressSends)
+      .toSorted((one, other) => one - other)
+      .slice(Math.floor(SEND_ROUNDS / 2));
 
-    const started = performance.now();
-    const sent = await inviting(api, addresses);
-    const elapsed = performance.now() - started;
-
-    expect(sent.invitations.filter((one) => one.emailSent)).toHaveLength(50);
-    expect(elapsed, "fifty invitations answered past their budget").toBeLessThan(SEND_BUDGET_MS);
+    expect(rounds.map(({ emailed }) => emailed)).toEqual(
+      Array.from({ length: SEND_ROUNDS }, () => [1, 50, 1]),
+    );
+    expect(median, "fifty addresses, in one-address sends, at the median").toBeLessThan(
+      SEND_BUDGET_IN_ONE_ADDRESS_SENDS,
+    );
   });
 });
 
