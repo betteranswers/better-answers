@@ -36,7 +36,7 @@ tags:
 
 ## Context
 
-**Retired until go-live.** The test inbox and the journeys that read it were retired on 19/10/2026 (BA-204), and the go-live rebuild starts from this doc. The files it cites left the tree then: read each with `git show a3c19ec8:<path>`. Its `RUNBOOK.md` and `SECRETS.md` line numbers are from 03/10/2026, when `RUNBOOK.md` page 13 set the inbox up.
+**Retired until go-live.** The test inbox and the journeys that read it were retired on 19/10/2026 (BA-204), and the go-live rebuild starts from this doc. The files it cites left the tree then: read each with `git show a3c19ec8:<path>`. Its `RUNBOOK.md` and `SECRETS.md` headings are as `a3c19ec8` holds them, from when `RUNBOOK.md` page 13 set the inbox up.
 
 The journeys' test inbox is a free Cloudflare Email Worker on a testing domain of its own, chosen over a second, paid Resend team. The nightly sign-in journeys must read an email sign-in code through an API. A Resend key that reads received mail must be a full-access key, and a full-access key can also list and retrieve the team's sent mail, so a key in production's team could read any person's sign-in code (`docs/plans/2026-10-02-1625-feat-signed-in-journeys-in-production-plan.md`, Sources / Research).
 
@@ -52,19 +52,19 @@ Email Routing could not go on a subdomain of the product's zone without switchin
 
 A catch-all works only on an apex: "Catch-all entries support apex domains only" (https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/). On a subdomain each address of the test workspace's 54 people would need a rule of its own.
 
-So the testing domain was bought at Cloudflare Registrar, which makes it a zone of its own. Email Routing is on at its apex, with one catch-all rule whose action is "Send to a Worker" `test-inbox`, and no rule per address (`docs/operations/RUNBOOK.md:186`, `:203`). The product's zone is untouched.
+So the testing domain was bought at Cloudflare Registrar, which makes it a zone of its own. Email Routing is on at its apex, with one catch-all rule whose action is "Send to a Worker" `test-inbox`, and no rule per address (step 1 of "13. The test workspace and its nightly journeys" in `docs/operations/RUNBOOK.md`). The product's zone is untouched.
 
 ### Never delete the Worker a catch-all last pointed at until mail reaches the new one
 
 A change to the catch-all takes about a minute to reach Email Routing. In PR #530 the rule was switched from the spike Worker to `test-inbox`, and the spike Worker was deleted about 20 seconds later. A check message sent about 40 seconds after the switch read "Delivery failed" in the zone's Email Routing activity log, and `test-inbox`'s logs held no email invocation for it. The sending relay (Amazon SES, under Resend) retried, and the message arrived about six minutes after it was sent. Resend still showed it as sent, with no bounce.
 
-The rule is now in `RUNBOOK.md:203`: after repointing the rule, send a message, see the new Worker list it, and only then delete the old Worker. A bounce costs more than a delay. A sign-in email that bounces puts the test address on production's Resend suppression list, and every later night reads `no-mail` (`RUNBOOK.md:213`).
+The rule is now in step 1 of "13. The test workspace and its nightly journeys" in `RUNBOOK.md`: after repointing the rule, send a message, see the new Worker list it, and only then delete the old Worker. A bounce costs more than a delay. A sign-in email that bounces puts the test address on production's Resend suppression list, and every later night reads `no-mail` (the same step).
 
 ### Store the raw bytes in the Worker; judge them in the reader
 
-The Worker keeps `message.raw` whole and judges nothing. `receive` (`apps/test-inbox/src/index.ts:39-62`) drops any message whose `rawSize` is over 256 KiB (`RAW_MOST_BYTES`, `:15`), then reads the raw stream once. It inserts the message, prunes rows more than a day old (`RETENTION_MS`, `apps/test-inbox/src/store.ts:46`), and on any failure logs it and returns. It never calls `setReject` or `forward`, because "a bounce would put the test address on the sender's suppression list" (`index.ts:35-38`). From `message.headers` it reads only `From` and `Subject`, for the list (`index.ts:27-33`).
+The Worker keeps `message.raw` whole and judges nothing. `receive` (`apps/test-inbox/src/index.ts`) drops any message whose `rawSize` is over 256 KiB (`RAW_MOST_BYTES`), then reads the raw stream once. It inserts the message, prunes rows more than a day old (`RETENTION_MS`, `apps/test-inbox/src/store.ts`), and on any failure logs it and returns. It never calls `setReject` or `forward`, because "a bounce would put the test address on the sender's suppression list" (the doc comment on `receive` in `index.ts`). From `message.headers` it reads only `From` and `Subject`, for the list (`receivedOf` in `index.ts`).
 
-The journeys' reader verifies DKIM itself, in Node in CI, with mailauth's `dkimVerify` on the raw bytes (`apps/web/journeys/inbox.ts:5`, `:234`; mailauth 7.2.0, `apps/web/package.json:58`). Its resolver answers only for keys under the sender's own `_domainkey` and refuses every other name with `ENODATA`. Otherwise a forger's extra signatures could keep it waiting on DNS until the deadline passed (`sendersOwn`, `inbox.ts:132-141`). A signature counts only if it passes, its `d=` is the sender's domain, it covers the whole body with no `l=`, and its signed headers include `To` (`vouches`, `inbox.ts:191-195`). A message with more than one `From` or `To` is set aside (`singlyAddressed`, `inbox.ts:201-202`).
+The journeys' reader verifies DKIM itself, in Node in CI, with mailauth's `dkimVerify` on the raw bytes (the `import` of `dkimVerify` and its call in `judged`, `apps/web/journeys/inbox.ts`; mailauth 7.2.0, the `mailauth` dev dependency in `apps/web/package.json`). Its resolver answers only for keys under the sender's own `_domainkey` and refuses every other name with `ENODATA`. Otherwise a forger's extra signatures could keep it waiting on DNS until the deadline passed (`sendersOwn`, `inbox.ts`). A signature counts only if it passes, its `d=` is the sender's domain, it covers the whole body with no `l=`, and its signed headers include `To` (`vouches`, `inbox.ts`). A message with more than one `From` or `To` is set aside (`singlyAddressed`, `inbox.ts`).
 
 The spike in PR #530 showed that the bytes survive the trip. A throwaway Worker on the catch-all logged the names in `message.headers` and the whole `message.raw`, base64, through `wrangler tail`. A message sent through production's Resend account arrived byte for byte: 5,328 bytes, delivered in under a second, using 1 ms of CPU and 3 ms of wall time. It carried two `DKIM-Signature` headers. Resend's has `d=` set to the product's apex and an `h=` of `From:To:Subject:Message-ID:Date:MIME-Version:Content-Type`. Amazon SES's has `d=amazonses.com`. Cloudflare's own `Authentication-Results` read DKIM pass for both, with DMARC and SPF passing too. Offline, mailauth verified the product's signature, aligned with `From`, and DMARC passed. Because Resend's `h=` includes `To`, `vouches` can require it.
 
@@ -72,31 +72,31 @@ cloudflare/workerd#6740 (https://github.com/cloudflare/workerd/issues/6740, open
 
 ### Treat the deploy token as a credential to the product's hostnames
 
-The deploy token is an account-owned API token. It has Workers Scripts edit, D1 edit, Workers Tail read and Account Settings read, and no zone permission (`RUNBOOK.md:188`).
+The deploy token is an account-owned API token. It has Workers Scripts edit, D1 edit, Workers Tail read and Account Settings read, and no zone permission (step 1 of "13. The test workspace and its nightly journeys" in `RUNBOOK.md`).
 
 Having no zone permission does not keep it off the product's zone. Attaching a Worker to a custom domain is `PUT /accounts/{account_id}/workers/domains`, and Cloudflare's API reference gives "Workers Scripts Write" as its only permission (https://developers.cloudflare.com/api/resources/workers/subresources/domains/methods/update/). The token can therefore put a Worker on a new hostname under any zone in the account, the product's included.
 
-`docs/operations/SECRETS.md:33` holds the token at that weight. After a leak, the owner lists every Worker's domains and routes and deletes any they did not make (`RUNBOOK.md:308`). `wrangler login` is never used, because its default grant can write Worker routes across the account (`RUNBOOK.md:188`). A Cloudflare account holding the testing zone alone would close the gap. That choice is the owner's, and it is still open.
+`docs/operations/SECRETS.md`, under "The classes", holds the token at that weight. After a leak, the owner lists every Worker's domains and routes and deletes any they did not make (step 8 of the leak bullet on page 13 of `RUNBOOK.md`). `wrangler login` is never used, because its default grant can write Worker routes across the account (page 13, step 1, in `RUNBOOK.md`). A Cloudflare account holding the testing zone alone would close the gap. That choice is the owner's, and it is still open.
 
 ### Build the Worker without `@cloudflare/workers-types` and without a `wrangler` dependency
 
-Adding `@cloudflare/workers-types` as a dev dependency made pnpm resolve it as an optional peer of `drizzle-orm` in `apps/api` and `packages/schema`, which put it in the api image. An override only widened the peer range. So the workspace has no such dependency (`apps/test-inbox/package.json:15-20`). Instead it declares the few shapes it uses: the part of `ForwardableEmailMessage` it reads (`apps/test-inbox/src/index.ts:7-13`) and the D1 calls the store makes (`apps/test-inbox/src/store.ts:3-17`).
+Adding `@cloudflare/workers-types` as a dev dependency made pnpm resolve it as an optional peer of `drizzle-orm` in `apps/api` and `packages/schema`, which put it in the api image. An override only widened the peer range. So the workspace has no such dependency (the `devDependencies` of `apps/test-inbox/package.json`). Instead it declares the few shapes it uses: the part of `ForwardableEmailMessage` it reads (`ReceivedEmail` in `apps/test-inbox/src/index.ts`) and the D1 calls the store makes (from `Column` to `Database` in `apps/test-inbox/src/store.ts`).
 
-`wrangler` is not a dependency either. One script pins it, and `deploy` runs through that script, so the version is stated once (`apps/test-inbox/package.json:12-13`). Run it as `pnpm --filter @better-answers/test-inbox run deploy`. A bare `pnpm deploy` is pnpm's own command, which copies a workspace package to a target directory (https://pnpm.io/cli/deploy; `RUNBOOK.md:201`).
+`wrangler` is not a dependency either. One script pins it, and `deploy` runs through that script, so the version is stated once (the `wrangler` and `deploy` scripts in `apps/test-inbox/package.json`). Run it as `pnpm --filter @better-answers/test-inbox run deploy`. A bare `pnpm deploy` is pnpm's own command, which copies a workspace package to a target directory (https://pnpm.io/cli/deploy; step 1 of "13. The test workspace and its nightly journeys" in `RUNBOOK.md`).
 
-The config names the D1 database and carries no `database_id` (`apps/test-inbox/wrangler.jsonc:9-15`). wrangler 4.147.0 made the database by that name on the first deploy. In PR #530 it did not write the id back to `wrangler.jsonc`, although Cloudflare's docs say a local deploy does (https://developers.cloudflare.com/workers/wrangler/configuration/, Automatic provisioning). The deploy applies no migration, so `wrangler d1 migrations apply test-inbox --remote` runs after it (`RUNBOOK.md:196`). Until it runs, the Worker logs each message as unstored and its API answers 503 (`RUNBOOK.md:190`).
+The config names the D1 database and carries no `database_id` (the `d1_databases` entry in `apps/test-inbox/wrangler.jsonc`). wrangler 4.147.0 made the database by that name on the first deploy. In PR #530 it did not write the id back to `wrangler.jsonc`, although Cloudflare's docs say a local deploy does (https://developers.cloudflare.com/workers/wrangler/configuration/, Automatic provisioning). The deploy applies no migration, so `wrangler d1 migrations apply test-inbox --remote` runs after it (page 13, step 1, in `RUNBOOK.md`). Until it runs, the Worker logs each message as unstored and its API answers 503 (the same step).
 
 ### Write Worker code that also runs under Node's vitest
 
-The suites run in Node 24, not workerd, so the Worker uses only APIs both runtimes have. Workers offer `crypto.subtle.timingSafeEqual` as a non-standard extension (https://developers.cloudflare.com/workers/runtime-apis/web-crypto/), and Node 24's `crypto.subtle` lacks it. The token check therefore hashes the offered and the expected token with SHA-256 and XOR-folds the two 32-byte digests, admitting only an all-zero result (`admits`, `apps/test-inbox/src/read-api.ts:52-62`). Tokens of different lengths neither throw nor reveal their length.
+The suites run in Node 24, not workerd, so the Worker uses only APIs both runtimes have. Workers offer `crypto.subtle.timingSafeEqual` as a non-standard extension (https://developers.cloudflare.com/workers/runtime-apis/web-crypto/), and Node 24's `crypto.subtle` lacks it. The token check therefore hashes the offered and the expected token with SHA-256 and XOR-folds the two 32-byte digests, admitting only an all-zero result (`admits`, `apps/test-inbox/src/read-api.ts`). Tokens of different lengths neither throw nor reveal their length.
 
-D1 returns a BLOB as a JavaScript Array made with `Array.from` (https://developers.cloudflare.com/d1/worker-api/, type conversion), while `node:sqlite` returns a `Uint8Array`. The D1 stand-in converts as D1 does, so the suites meet the shape production returns (`columnOf`, `apps/test-inbox/test/d1.ts:8-12`). The store accepts all three byte shapes (`Column`, `apps/test-inbox/src/store.ts:3-4`; `bytesOf`, `:70-74`). If the stand-in passed a `Uint8Array` straight through, a store that handled only `Uint8Array` would pass every test and fail on its first real read.
+D1 returns a BLOB as a JavaScript Array made with `Array.from` (https://developers.cloudflare.com/d1/worker-api/, type conversion), while `node:sqlite` returns a `Uint8Array`. The D1 stand-in converts as D1 does, so the suites meet the shape production returns (`columnOf`, `apps/test-inbox/test/d1.ts`). The store accepts all three byte shapes (`Column` and `bytesOf`, `apps/test-inbox/src/store.ts`). If the stand-in passed a `Uint8Array` straight through, a store that handled only `Uint8Array` would pass every test and fail on its first real read.
 
 ## Why This Matters
 
-- With a Resend key that could read the inbox, the journeys could read every person's sign-in code. The Worker's key reads one inbox, which holds a day of test mail (`SECRETS.md:27`).
+- With a Resend key that could read the inbox, the journeys could read every person's sign-in code. The Worker's key reads one inbox, which holds a day of test mail (`JOURNEYS_INBOX_KEY` under "The classes" in `SECRETS.md`).
 - Email Routing on the product's apex would have replaced the owner's mail.
-- One bounce puts a test address on production's suppression list, and every night reads `no-mail` until someone removes it (`RUNBOOK.md:213`, `:275`). A Worker deleted while the catch-all is still changing causes that bounce, and so does a Worker that rejects.
+- One bounce puts a test address on production's suppression list, and every night reads `no-mail` until someone removes it (steps 1 and 5 of "13. The test workspace and its nightly journeys" in `RUNBOOK.md`). A Worker deleted while the catch-all is still changing causes that bounce, and so does a Worker that rejects.
 - A trust decision in the Worker would rest on headers that workerd#6740 shows can be missing. The reader's DKIM check rests on the bytes the sender signed.
 - A token with no zone permission still reaches the product's hostnames. If a leak of it is treated as narrower than that, nobody checks those hostnames for a planted Worker.
 - `@cloudflare/workers-types` in one workspace changed what the api image installs, by way of another package's optional peer.
@@ -113,7 +113,7 @@ D1 returns a BLOB as a JavaScript Array made with `Array.from` (https://develope
 
 ## Examples
 
-The token check, which runs the same in the Worker and in Node (`apps/test-inbox/src/read-api.ts:52-62`):
+The token check, which runs the same in the Worker and in Node (`digestOf` and `admits` in `apps/test-inbox/src/read-api.ts`):
 
 ```ts
 const digestOf = async (text: string): Promise<Uint8Array> =>
@@ -128,7 +128,7 @@ const admits = async (authorization: string | null, token: string): Promise<bool
 };
 ```
 
-The stand-in returns a BLOB as D1 does (`apps/test-inbox/test/d1.ts:8-12`), and the store reads any of the shapes (`apps/test-inbox/src/store.ts:70-74`):
+The stand-in returns a BLOB as D1 does (`columnOf` in `apps/test-inbox/test/d1.ts`), and the store reads any of the shapes (`bytesOf` in `apps/test-inbox/src/store.ts`):
 
 ```ts
 // test/d1.ts
@@ -145,14 +145,14 @@ const bytesOf = (column: Column | undefined): Uint8Array | undefined => {
 };
 ```
 
-The pinned `wrangler`, and a `deploy` that must be run through `run` (`apps/test-inbox/package.json:12-13`):
+The pinned `wrangler`, and a `deploy` that must be run through `run` (the `wrangler` and `deploy` scripts in `apps/test-inbox/package.json`):
 
 ```json
 "wrangler": "pnpm dlx wrangler@4.149.0",
 "deploy": "pnpm run wrangler deploy"
 ```
 
-The D1 connected source by name, with no `database_id` (`apps/test-inbox/wrangler.jsonc:9-15`):
+The D1 connected source by name, with no `database_id` (the `d1_databases` entry in `apps/test-inbox/wrangler.jsonc`):
 
 ```jsonc
 "d1_databases": [
@@ -164,7 +164,7 @@ The D1 connected source by name, with no `database_id` (`apps/test-inbox/wrangle
 ],
 ```
 
-The first deploy, in order, with the token and account id exported first as `RUNBOOK.md:193-194` does (`RUNBOOK.md:195-198`, abridged):
+The first deploy, in order, with the token and account id exported first as step 1 of "13. The test workspace and its nightly journeys" in `RUNBOOK.md` does (the same step, abridged):
 
 ```sh
 pnpm --filter @better-answers/test-inbox run deploy
