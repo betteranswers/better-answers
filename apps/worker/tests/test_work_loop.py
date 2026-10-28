@@ -840,10 +840,16 @@ def test_a_rebuild_analyses_the_map_for_the_planner(
     assert planners_row_estimates(database) == {"map_node": 1, "map_edge": 0}
 
 
+def an_analyse_that_gives_up_at_once(database: psycopg.Connection) -> None:
+    database.execute("ALTER FUNCTION analyse_map() SET lock_timeout = '100ms'")
+    database.commit()
+
+
 def test_a_rebuild_whose_analyse_fails_still_goes_live(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = a_rebuild_queued_on_an_unanalysed_map(database, tmp_path)
+    an_analyse_that_gives_up_at_once(database)
     bootstrap = bootstrap_for(database, tmp_path)
 
     with (
@@ -895,9 +901,6 @@ def refusals_in(
 
 
 REFUSES = "a deploy stamp does not match; claiming nothing"
-
-IDLE_SLEEPS_THE_DETECTORS_IMPORT_MAY_TAKE = 4
-IDLE_SLEEPS_THE_LIFTED_AUDIT_MAY_TAKE = 4
 
 
 def test_a_mismatched_schema_stamp_claims_nothing_and_exits_one(
@@ -1049,22 +1052,57 @@ def stamped_as_deploy_leaves_it(database: psycopg.Connection, digest: str) -> No
     database.commit()
 
 
-def a_daemon(bootstrap: Bootstrap) -> threading.Thread:
+DAEMON_ANSWERS_WITHIN_SECONDS = 30
+
+
+class SteppedSleep:
+    def __init__(self) -> None:
+        self._moved = threading.Condition()
+        self._elapsed = 0.0
+        self._slept: list[float] = []
+
+    def __call__(self, seconds: float) -> None:
+        with self._moved:
+            wakes_at = self._elapsed + seconds
+            self._slept.append(seconds)
+            self._moved.notify_all()
+            self._moved.wait_for(
+                lambda: self._elapsed >= wakes_at, timeout=DAEMON_ANSWERS_WITHIN_SECONDS
+            )
+
+    def step(self, seconds: float) -> None:
+        with self._moved:
+            self._elapsed += seconds
+            self._moved.notify_all()
+
+    def slept(self, times: int) -> list[float]:
+        with self._moved:
+            assert self._moved.wait_for(
+                lambda: len(self._slept) >= times,
+                timeout=DAEMON_ANSWERS_WITHIN_SECONDS,
+            ), f"the daemon never slept {times} times"
+            return list(self._slept)
+
+
+def a_daemon(bootstrap: Bootstrap, sleep: SteppedSleep) -> threading.Thread:
     def serve() -> None:
         with contextlib.suppress(psycopg.OperationalError):
-            loop.run(bootstrap, once=False)
+            loop.run(bootstrap, once=False, sleep=sleep)
 
     return threading.Thread(target=serve, daemon=True)
 
 
-def stop(daemon: threading.Thread, database: psycopg.Connection) -> None:
+def stop(
+    daemon: threading.Thread, sleep: SteppedSleep, database: psycopg.Connection
+) -> None:
     with database.cursor() as cursor:
         cursor.execute(
             "SELECT pg_terminate_backend(pid) FROM pg_stat_activity"
             " WHERE datname = current_database() AND pid <> pg_backend_pid()"
         )
     database.commit()
-    daemon.join(timeout=loop.IDLE_SLEEP_SECONDS * 2)
+    sleep.step(loop.IDLE_SLEEP_SECONDS)
+    daemon.join(timeout=DAEMON_ANSWERS_WITHIN_SECONDS)
     assert not daemon.is_alive(), "the daemon outlived its test"
 
 
@@ -1075,31 +1113,28 @@ def test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes(
     with database.cursor() as cursor:
         stamp_contract_as_migrate_does(cursor, digest="b" * 64)
     database.commit()
+    sleep = SteppedSleep()
 
     with capture_logs() as written:
-        running = a_daemon(bootstrap_for(database, tmp_path))
+        running = a_daemon(bootstrap_for(database, tmp_path), sleep)
         running.start()
-        refused_by = time.monotonic() + (
-            loop.IDLE_SLEEP_SECONDS * IDLE_SLEEPS_THE_DETECTORS_IMPORT_MAY_TAKE
-        )
-        while not refusals_in(written) and time.monotonic() < refused_by:
-            time.sleep(0.05)
+        sleep.slept(1)
+        assert audit_job(database, workspace) == ("queued", None)
+        sleep.step(loop.IDLE_SLEEP_SECONDS)
+        sleep.slept(2)
         with (
             psycopg.connect(_WHERE[database], autocommit=True) as deploying,
             deploying.cursor() as cursor,
         ):
             stamp_contract_as_migrate_does(cursor, digest=CONTRACT_DIGEST)
-        deadline = time.monotonic() + (
-            loop.IDLE_SLEEP_SECONDS * IDLE_SLEEPS_THE_LIFTED_AUDIT_MAY_TAKE
-        )
-        while time.monotonic() < deadline:
-            if audit_job(database, workspace)[0] == "done":
-                break
-            time.sleep(0.1)
-    stop(running, database)
+        sleep.step(loop.IDLE_SLEEP_SECONDS)
+        slept = sleep.slept(3)
+        done = audit_job(database, workspace)
+    stop(running, sleep, database)
 
-    assert audit_job(database, workspace) == ("done", WORKER)
+    assert done == ("done", WORKER)
     assert refusals_in(written) == [(REFUSES, "matches", "differs")]
+    assert slept == [loop.IDLE_SLEEP_SECONDS] * 3
 
 
 def test_healthy_with_a_fresh_lease_unhealthy_with_a_waiting_queue(
@@ -1477,7 +1512,7 @@ def test_a_lost_claim_still_ends_the_worker_at_its_deadline(
             assert _within(10, taken), "the worker never claimed its job"
 
     written, _ = a_worker_hung_on_its_audit(
-        database, tmp_path, deadline_seconds=2.0, while_hung=take_the_claim
+        database, tmp_path, deadline_seconds=1.0, while_hung=take_the_claim
     )
 
     events = [line["event"] for line in written]
@@ -1487,11 +1522,13 @@ def test_a_lost_claim_still_ends_the_worker_at_its_deadline(
 A_WORKER_PROCESS = """
 import sys
 from better_answers_worker import loop
+from better_answers_worker.config import read_bootstrap
 
-sys.exit(loop.serve(finish_within_seconds=float(sys.argv[1])))
+loop.STOP.install(float(sys.argv[1]))
+sys.exit(loop.run(read_bootstrap(), once=False))
 """
 
-WARM_UP_SECONDS = loop.IDLE_SLEEP_SECONDS * IDLE_SLEEPS_THE_DETECTORS_IMPORT_MAY_TAKE
+WORKER_STARTS_WITHIN_SECONDS = 20
 
 EXIT_AFTER_STOP_SECONDS = 5
 
@@ -1536,7 +1573,10 @@ def concept_index_locked(database: psycopg.Connection) -> Iterator[psycopg.Conne
 
 def claimed_by_the_worker(database: psycopg.Connection, workspace: str) -> bool:
     return bool(
-        _within(WARM_UP_SECONDS, lambda: audit_job(database, workspace)[0] == "claimed")
+        _within(
+            WORKER_STARTS_WITHIN_SECONDS,
+            lambda: audit_job(database, workspace)[0] == "claimed",
+        )
     )
 
 
@@ -1548,7 +1588,8 @@ def test_an_idle_worker_exits_cleanly_on_sigterm(
         queue.connected(_WHERE[database]) as onlooker,
     ):
         connected = _within(
-            WARM_UP_SECONDS, lambda: _heartbeat_sessions(onlooker, database)
+            WORKER_STARTS_WITHIN_SECONDS,
+            lambda: _heartbeat_sessions(onlooker, database),
         )
         assert connected, "the worker never reached its loop"
 

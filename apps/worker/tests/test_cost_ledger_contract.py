@@ -3,6 +3,8 @@ import re
 from pathlib import Path
 from typing import Any, cast
 
+from better_answers_worker.schema_view import TABLES
+
 CONTRACTS_DIR = Path(__file__).resolve().parents[3] / "contracts"
 
 WORDS_A_PROMPT_OR_A_COMPLETION_SITS_UNDER = (
@@ -38,18 +40,16 @@ def test_every_row_carries_exactly_the_recorded_columns() -> None:
         assert sorted(row) == columns, row
 
 
-def test_records_exactly_the_columns_and_outcomes_the_table_has() -> None:
+def test_records_exactly_the_columns_the_table_has() -> None:
+    assert sorted(TABLES["public.llm_call"]) == recorded_columns()
+
+
+def test_records_exactly_the_outcomes_the_table_admits() -> None:
     from support.pg_harness import migrated_postgres
 
     fixture = read_cost_ledger()
 
     with migrated_postgres() as connection, connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT column_name FROM information_schema.columns"
-            " WHERE table_schema = 'public' AND table_name = 'llm_call'"
-        )
-        assert sorted(name for (name,) in cursor.fetchall()) == recorded_columns()
-
         cursor.execute(
             "SELECT pg_get_constraintdef(oid) FROM pg_constraint"
             " WHERE conname = 'llm_call_outcome_check'"
