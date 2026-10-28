@@ -15,11 +15,11 @@ import {
   APP_HOSTNAME,
   AUTH_SECRET,
   PUBLIC_URL,
-} from "./support/harness/harness.ts";
-import { freePort } from "./support/loopback-port.ts";
-import { startTestDatabase, type TestDatabase } from "./support/postgres.ts";
+} from "../support/harness/harness.ts";
+import { freePort } from "../support/loopback-port.ts";
+import { startTestDatabase, type TestDatabase } from "../support/postgres.ts";
 
-const apiRoot = path.resolve(import.meta.dirname, "..");
+const apiRoot = path.resolve(import.meta.dirname, "../..");
 
 const STOP_DEADLINE_MS = 10_000;
 
