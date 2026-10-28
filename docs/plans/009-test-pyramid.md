@@ -782,11 +782,11 @@ All CI numbers come from the merge queue on `main`, the `full` lane of `.github/
 | packages/schema | 12 | 34 | 0 | 0 | 0 | 0 | 0 |
 | **all 499** | **224, 45%** | **208** | **3** | **3** | **7** | **6** | **48** |
 
-Of the 215 files that reach Postgres, 126 also reach git through the api harness or core's arrange helpers.
+The table places each file in one column. Seven more files in the worker-process and Docker columns also reach Postgres, so 215 files reach it in all. Of those, 126 also reach git through the api harness or core's arrange helpers.
 
 **Where the time goes.** A migrated database per file is not the cost. The template clone measured 86 ms (n=5), and no slow file makes a database per case. Four things are.
 
-1. Readings that assert no threshold, or budgets that belong on a schedule. Write-budget 88s, recall 65s, map-budget 59s, analysed-map 47s, find-budget 43s, edit-budget 37s and guide-seed-budget 18s, 326s of core file time in all.
+1. Readings that assert no threshold, or budgets that belong on a schedule. Write-budget 88s, map-budget 59s, analysed-map 47s, find-budget 43s, edit-budget 37s and guide-seed-budget 18s. Recall's file took 65s, but only its report case, about 34s, moves. That is 326s of core file time in all.
 2. Process launches in series. cross-tier-document 185s for 16 worker launches. backup-image 94s and image 82s for image builds. Four lint-rule files, 164s, for one oxlint or knip process per case. `test_image.py` 291s locally in one xdist group.
 3. Seeding loops. erasure-routine 58s at about 0.5s per case for an arrange and a git rewrite. guides 29s for a northgate import per case. ops 53s over 199 cases through the real app.
 4. Browser test count. 710 tests at a mean of 4.05s, of which the triage marks about 70 as duplicates and about 150 in the ten slowest specs as single-screen.
