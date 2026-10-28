@@ -18,7 +18,7 @@ import pytest
 from psycopg.sql import SQL, Identifier, Literal
 from testcontainers.community.postgres import PostgresContainer
 
-from pg_harness import (
+from support.pg_harness import (
     _BUILD_LOCK_KEY,
     LOCATOR,
     PORT_OVERRIDE,
@@ -236,7 +236,7 @@ import sys
 
 sys.path.insert(0, {tests!r})
 
-from pg_harness import pinned_postgres_image, shared_address
+from support.pg_harness import pinned_postgres_image, shared_address
 
 print(pinned_postgres_image())
 print(shared_address())
@@ -513,7 +513,7 @@ import sys
 
 sys.path.insert(0, {tests!r})
 
-from pg_harness import migrated_postgres_at
+from support.pg_harness import migrated_postgres_at
 
 with migrated_postgres_at() as (connection, _conninfo):
     row = connection.execute("SELECT current_database()").fetchone()

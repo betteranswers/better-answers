@@ -64,7 +64,7 @@ dependencies = [
     # A process none of the three started — this tier's gate on a laptop — is covered by
     # the pipeline package setting it ahead of its import of the engine, because the
     # core looks once, as it is imported, and reads `RUST_LOG` the same way;
-    # `apps/worker/tests/test_pipeline_engine_environment.py` holds *when*.
+    # `apps/worker/tests/pipeline/test_pipeline_engine_environment.py` holds *when*.
     # Bumping this pin re-runs that probe and that suite and re-dates this record in the
     # same commit.
     "cocoindex==1.0.25",
@@ -237,7 +237,7 @@ max-complexity = 8
 # beneath this directory is the module that composes the engine (ADR 0036), whose public
 # interface takes and answers plain types so no cocoindex type crosses a seam. One
 # pattern, over that rule alone — a second exemption, or a wider pattern, is what
-# `tests/test_cocoindex_ban.py` refuses, because the ban means nothing once more than one
+# `tests/gates/test_cocoindex_ban.py` refuses, because the ban means nothing once more than one
 # directory can lift it.
 "src/better_answers_worker/pipeline/**" = ["TID251"]
 
@@ -273,6 +273,9 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The helpers import as `support.<name>`: declare `tests/` rather than lean on the root
+# conftest's folder being inserted.
+pythonpath = ["tests"]
 # `--strict-markers`: a mistyped marker marks nothing and skips nothing, so it must be an
 # error rather than a warning nobody reads.
 addopts = "-q --strict-markers"

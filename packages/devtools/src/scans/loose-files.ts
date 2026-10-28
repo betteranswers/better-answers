@@ -45,13 +45,11 @@ export const CAPS: readonly Cap[] = [
     "the shadcn CLI's target, named in apps/web/components.json",
   ),
   awaiting("apps/web/test", 111),
-  awaiting("apps/worker/src/better_answers_worker", 19),
   pinned(
     "apps/worker/src/better_answers_worker/redaction",
     16,
     "the image's early COPY and the CI cache keys name it",
   ),
-  awaiting("apps/worker/tests", 48),
 ];
 
 const READ_TREES = /^(?:apps\/[^/]+\/(?:src|test|tests|e2e)|packages\/[^/]+\/(?:src|test))\//u;

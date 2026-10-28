@@ -15,21 +15,21 @@ import pytest
 from structlog.testing import capture_logs
 
 from better_answers_worker import health, loop, queue
-from better_answers_worker.audit import run_audit
-from better_answers_worker.bundle import (
+from better_answers_worker.concepts.audit import run_audit
+from better_answers_worker.concepts.bundle import (
     NotAWorkspaceIdError,
     concepts_at_head,
     repository_path,
 )
+from better_answers_worker.concepts.rebuild import run_rebuild
 from better_answers_worker.config import Bootstrap, Engine, ObjectStore
 from better_answers_worker.contract_stamp import CONTRACT_DIGEST
 from better_answers_worker.ids import ulid
 from better_answers_worker.kinds import KINDS
 from better_answers_worker.queue import scoped
-from better_answers_worker.rebuild import run_rebuild
 from better_answers_worker.schema_view import MIGRATION_WHEN
-from bundles import write_bundle
-from factories import (
+from support.bundles import write_bundle
+from support.factories import (
     hold_map_generation,
     seed_concept,
     seed_job,
@@ -37,7 +37,7 @@ from factories import (
     seed_map_node,
     seed_workspace,
 )
-from pg_harness import (
+from support.pg_harness import (
     migrated_postgres_at,
     stamp_contract_as_migrate_does,
     stamp_migration,

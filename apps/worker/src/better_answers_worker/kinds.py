@@ -2,10 +2,10 @@ from collections.abc import Callable
 from typing import Any
 
 from . import queue
-from .audit import run_audit
+from .concepts.audit import run_audit
+from .concepts.rebuild import analyse_map, run_rebuild
 from .config import Bootstrap
 from .pipeline import Sync, index_connected_source
-from .rebuild import analyse_map, run_rebuild
 
 type Handler = Callable[[Bootstrap, queue.ClaimedJob], dict[str, Any]]
 

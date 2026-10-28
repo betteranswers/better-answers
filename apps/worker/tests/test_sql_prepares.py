@@ -11,7 +11,7 @@ import psycopg
 import pytest
 
 from better_answers_worker.pipeline import PASSAGE_TABLE, Table
-from pg_harness import migrated_postgres
+from support.pg_harness import migrated_postgres
 
 WORKER_PACKAGE = Path(__file__).resolve().parents[1] / "src" / "better_answers_worker"
 
@@ -46,11 +46,11 @@ UNPREPARABLE: Mapping[str, str] = {}
 TARGET_TABLES: Mapping[str, Table] = {"pipeline.rows:PASSAGE_TABLE": PASSAGE_TABLE}
 
 SENDING_MODULES = {
-    "audit",
+    "concepts.audit",
+    "concepts.rebuild",
     "health",
     "loop",
     "queue",
-    "rebuild",
     "pipeline.catalogue",
     "pipeline.host",
     "pipeline.rows",

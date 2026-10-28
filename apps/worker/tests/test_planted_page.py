@@ -1,6 +1,6 @@
 import pytest
 
-from planted_page import (
+from support.planted_page import (
     A_CONSUMER_ADDRESS,
     A_HEALTH_AND_SAFETY_SENTENCE,
     A_PLANTED_JOB_TITLE,
