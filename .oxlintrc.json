@@ -530,12 +530,6 @@
       }
     },
     {
-      "files": ["apps/api/src/ops/index.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 1620, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["apps/web/src/app/router.tsx"],
       "rules": {
         "max-lines": ["error", { "max": 522, "skipBlankLines": true, "skipComments": true }]
