@@ -117,6 +117,8 @@ dependencies = [
 [project.scripts]
 # The gate the root `check` runs: `uv run --frozen check` (AGENTS.md).
 check = "better_answers_worker.check:main"
+# What `check` leaves out: the image tests, which the images job runs.
+images = "better_answers_worker.check:images"
 # The work loop — the image's default command, and what a test runs with `--once`.
 better-answers-worker = "better_answers_worker.loop:main"
 # This tier's own reading of `contracts/`, written to a module the image carries because it
@@ -279,10 +281,11 @@ pythonpath = ["tests"]
 # `--strict-markers`: a mistyped marker marks nothing and skips nothing, so it must be an
 # error rather than a warning nobody reads.
 addopts = "-q --strict-markers"
-# pytest-xdist declares this marker itself, but only where it is installed; `build.yml`
-# runs the image probe from an environment that may not carry it.
+# `check` deselects this marker and `images` selects it. `build.yml` runs the image probe by
+# file, from an environment with pytest alone, so the marker is declared here and not left to
+# a plugin.
 markers = [
-    "xdist_group(name): runs every test of the group in one xdist worker",
+    "image: builds the worker image or reads the workflows that build it; `uv run --frozen images` runs it, `check` does not",
 ]
 # An expected failure that passes is a bug that was fixed and an `xfail` that outlived it.
 xfail_strict = true

@@ -13,8 +13,16 @@ CI_RUNNER_VCPUS = 4
 
 SUITE: Step = (
     "pytest",
-    ("pytest", "-n", str(CI_RUNNER_VCPUS), "--dist", "loadgroup"),
+    ("pytest", "-n", str(CI_RUNNER_VCPUS), "--dist", "loadgroup", "-m", "not image"),
 )
+
+IMAGES: Step = ("pytest image", ("pytest", "-m", "image"))
+
+
+def images() -> int:
+    name, command = IMAGES
+    print(f"\n== {name} ==", flush=True)
+    return subprocess.run(command, check=False).returncode
 
 
 def main() -> int:
