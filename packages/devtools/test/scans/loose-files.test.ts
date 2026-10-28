@@ -35,11 +35,7 @@ const filesIn = (folder: string, count: number): readonly string[] =>
   Array.from({ length: count }, (_, index) => `${folder}/file-${String(index)}.ts`);
 
 const probeCap = (cap: number): readonly Cap[] => [
-  { folder: PROBE, cap, kind: "awaiting", reason: "a probe awaits" },
-];
-
-const pinnedProbeCap = (cap: number): readonly Cap[] => [
-  { folder: PROBE, cap, kind: "pinned", reason: "a tool writes there" },
+  { folder: PROBE, cap, reason: "a tool writes there" },
 ];
 
 const findings = (files: readonly string[], caps: readonly Cap[] = []): readonly string[] =>
@@ -117,8 +113,9 @@ describe("a folder with a cap", () => {
     expect(report).toContain(`${PROBE}: 21 files`);
     expect(report).toContain("cap of 20");
     expect(report).toContain(WHERE_THE_CAPS_LIVE);
-    expect(report).toContain("Move files into a subfolder by capability; never raise the cap");
-    expect(report).not.toContain("pinned");
+    expect(report).toContain("pinned (a tool writes there)");
+    expect(report).toContain("Raise the cap to 21 in the same change");
+    expect(report).not.toContain("Move files into a subfolder");
   });
 
   it("fails as stale once the folder holds fewer", () => {
@@ -159,36 +156,6 @@ describe("a folder with a cap", () => {
   });
 });
 
-describe("a folder with a pinned cap", () => {
-  it("passes at its cap", () => {
-    expect(findings(filesIn(PROBE, 20), pinnedProbeCap(20))).toEqual([]);
-  });
-
-  it("fails one file over, saying to raise the cap", () => {
-    const [report, ...rest] = findings(filesIn(PROBE, 21), pinnedProbeCap(20));
-
-    expect(rest).toEqual([]);
-    expect(report).toContain(`${PROBE}: 21 files`);
-    expect(report).toContain("cap of 20");
-    expect(report).toContain("pinned (a tool writes there)");
-    expect(report).toContain("Raise the cap to 21 in the same change");
-    expect(report).not.toContain("never raise the cap");
-    expect(report).not.toContain("Move files into a subfolder");
-  });
-
-  it("fails as stale once the folder holds fewer", () => {
-    expect(findings(filesIn(PROBE, 19), pinnedProbeCap(20))).toEqual([
-      expect.stringContaining("Lower the cap to 19"),
-    ]);
-  });
-
-  it("fails as stale within the limit, asking to delete", () => {
-    expect(findings(filesIn(PROBE, 10), pinnedProbeCap(20))).toEqual([
-      expect.stringContaining("Delete the entry"),
-    ]);
-  });
-});
-
 describe("the table of caps", () => {
   const folders = CAPS.map(({ folder }) => folder);
 
@@ -208,8 +175,8 @@ describe("the table of caps", () => {
     expect(CAPS.filter(({ reason }) => reason.trim() === "")).toEqual([]);
   });
 
-  it("pins the two folders a tool fixes in place", () => {
-    expect(CAPS.filter(({ kind }) => kind === "pinned").map(({ folder }) => folder)).toEqual([
+  it("caps only the two folders a tool fixes in place", () => {
+    expect(folders).toEqual([
       "apps/web/src/shared/ui",
       "apps/worker/src/better_answers_worker/redaction",
     ]);
@@ -230,13 +197,13 @@ const repositoryOf = (tracked: readonly string[], untracked: readonly string[] =
 
 const linesOf = (stdout: string): readonly string[] => stdout.split("\n");
 
-const pinnedCap = (folder: string): Cap => {
-  const found = CAPS.find((one) => one.folder === folder && one.kind === "pinned");
-  if (found === undefined) throw new Error(`no pinned cap for ${folder}`);
+const capOf = (folder: string): Cap => {
+  const found = CAPS.find((one) => one.folder === folder);
+  if (found === undefined) throw new Error(`no cap for ${folder}`);
   return found;
 };
 
-const REDACTION = pinnedCap("apps/worker/src/better_answers_worker/redaction");
+const REDACTION = capOf("apps/worker/src/better_answers_worker/redaction");
 
 describe("the gate over a throwaway repository", () => {
   it("fails a folder over the limit, naming it", () => {

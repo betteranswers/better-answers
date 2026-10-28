@@ -9,28 +9,20 @@ export const WHERE_THE_CAPS_LIVE = "packages/devtools/src/scans/loose-files.ts";
 export type Cap = {
   readonly folder: string;
   readonly cap: number;
-  readonly kind: "awaiting" | "pinned";
   readonly reason: string;
 };
 
-const pinned = (folder: string, cap: number, reason: string): Cap => ({
-  folder,
-  cap,
-  kind: "pinned",
-  reason,
-});
-
 export const CAPS: readonly Cap[] = [
-  pinned(
-    "apps/web/src/shared/ui",
-    29,
-    "the shadcn CLI's target, named in apps/web/components.json",
-  ),
-  pinned(
-    "apps/worker/src/better_answers_worker/redaction",
-    16,
-    "the image's early COPY and the CI cache keys name it",
-  ),
+  {
+    folder: "apps/web/src/shared/ui",
+    cap: 29,
+    reason: "the shadcn CLI's target, named in apps/web/components.json",
+  },
+  {
+    folder: "apps/worker/src/better_answers_worker/redaction",
+    cap: 16,
+    reason: "the image's early COPY and the CI cache keys name it",
+  },
 ];
 
 const READ_TREES = /^(?:apps\/[^/]+\/(?:src|test|tests|e2e)|packages\/[^/]+\/(?:src|test))\//u;
@@ -58,11 +50,7 @@ const overReport = (folder: string, count: number, cap: Cap | undefined): string
   if (cap === undefined) {
     return `${held} the limit of ${String(LOOSE_FILE_LIMIT)}. Move files into a subfolder by capability.`;
   }
-  const overCap = `${held} its cap of ${String(cap.cap)} in ${WHERE_THE_CAPS_LIVE}.`;
-  if (cap.kind === "pinned") {
-    return `${overCap} The folder is pinned (${cap.reason}), so it cannot be split by capability. Raise the cap to ${String(count)} in the same change.`;
-  }
-  return `${overCap} Move files into a subfolder by capability; never raise the cap.`;
+  return `${held} its cap of ${String(cap.cap)} in ${WHERE_THE_CAPS_LIVE}. The folder is pinned (${cap.reason}), so it cannot be split by capability. Raise the cap to ${String(count)} in the same change.`;
 };
 
 const staleReport = ({ folder, cap }: Cap, count: number): string => {
