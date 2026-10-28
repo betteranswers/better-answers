@@ -26,8 +26,7 @@ from support.planted_page import (
     typed_placeholders_under,
 )
 
-# The image fixture is per module, and per worker under xdist: one group, one build.
-pytestmark = pytest.mark.xdist_group("worker-image")
+pytestmark = pytest.mark.image
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKSPACE = REPO_ROOT / "apps" / "worker"
@@ -1510,6 +1509,8 @@ def test_the_image_leaves_this_tiers_tests_out_of_the_runtime(
 JOB_OPENS = re.compile(r"^ {2}(?P<job>[\w-]+):\s*$")
 RUNS_A_ROOT_SCRIPT = re.compile(r"^ +(?:- )?run: pnpm (?P<script>[\w:.-]+)\s*$")
 THIS_TIERS_GATE = "check:worker"
+THIS_TIERS_IMAGE_GATE = "check:images:worker"
+RUNNER = "node scripts/check.mjs "
 
 
 def _legs_of_check() -> dict[str, list[str]]:
@@ -1544,6 +1545,18 @@ def _root_scripts() -> dict[str, str]:
     return manifest.get("scripts", {})
 
 
+def _steps_of(gates: list[str], scripts: dict[str, str]) -> list[str]:
+    steps: list[str] = []
+    for gate in gates:
+        command = scripts.get(gate, "")
+        steps += (
+            command.removeprefix(RUNNER).split()
+            if command.startswith(RUNNER)
+            else [gate]
+        )
+    return steps
+
+
 def test_reads_a_run_line_with_or_without_its_dash() -> None:
     a_step_of_its_own = "      - run: pnpm check:worker"
     a_step_whose_if_comes_first = "        run: pnpm check:worker"
@@ -1567,24 +1580,23 @@ def test_this_tier_reads_the_names_the_workflows_actually_hand_it() -> None:
         for job, lines in legs.items()
         if any(f"{PROBE_DEFERRAL_VARIABLE}:" in line for line in lines)
     }
-    mine = {job for job, lines in legs.items() if THIS_TIERS_GATE in _gates_of(lines)}
-    misread = {
+    mine = {
         job
-        for job in deferred
-        if not any(
-            scripts.get(gate, "").rstrip().endswith("check")
-            for gate in _gates_of(legs[job])
-        )
+        for job, lines in legs.items()
+        if THIS_TIERS_IMAGE_GATE in _steps_of(_gates_of(lines), scripts)
     }
 
     assert len(handed) == 1, BUILD_WORKFLOW
     assert mine, CHECK_WORKFLOW
     assert len(mine) == len({job.split("-", 1)[0] for job in mine}), (
-        f"{CHECK_WORKFLOW}: one leg per lane runs this tier's gates"
+        f"{CHECK_WORKFLOW}: one leg per lane runs this tier's image suite"
     )
-    assert mine <= deferred, CHECK_WORKFLOW
-    assert misread == set(), (
-        f"{CHECK_WORKFLOW}: a leg running named files builds no image"
+    assert mine == deferred, (
+        f"{CHECK_WORKFLOW}: the leg that runs this tier's image suite is handed the "
+        "deferral, and no other leg is"
+    )
+    assert scripts[THIS_TIERS_IMAGE_GATE].rstrip().endswith("images"), (
+        f"{THIS_TIERS_IMAGE_GATE} runs more than the image suite"
     )
 
 

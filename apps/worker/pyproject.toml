@@ -117,6 +117,7 @@ dependencies = [
 [project.scripts]
 # The gate the root `check` runs: `uv run --frozen check` (AGENTS.md).
 check = "better_answers_worker.check:main"
+images = "better_answers_worker.check:images"
 # The work loop — the image's default command, and what a test runs with `--once`.
 better-answers-worker = "better_answers_worker.loop:main"
 # This tier's own reading of `contracts/`, written to a module the image carries because it
@@ -279,10 +280,8 @@ pythonpath = ["tests"]
 # `--strict-markers`: a mistyped marker marks nothing and skips nothing, so it must be an
 # error rather than a warning nobody reads.
 addopts = "-q --strict-markers"
-# pytest-xdist declares this marker itself, but only where it is installed; `build.yml`
-# runs the image probe from an environment that may not carry it.
 markers = [
-    "xdist_group(name): runs every test of the group in one xdist worker",
+    "image: builds the worker image or reads the workflows that build it; `uv run --frozen images` runs it, `check` does not",
 ]
 # An expected failure that passes is a bug that was fixed and an `xfail` that outlived it.
 xfail_strict = true
@@ -319,8 +318,7 @@ filterwarnings = [
 # a mutant runs only the tests that pass recorded against its function, and one no test
 # reached is reported "no tests". So `tests/test_image.py`, which builds the worker image,
 # costs one build per `mutmut run` — for as long as it imports nothing from
-# `src/better_answers_worker` in-process, which is the same constraint
-# `apps/api/tests/deploy/image-probe.ts` states for Stryker's static-mutant filter.
+# `src/better_answers_worker` in-process.
 [tool.mutmut]
 source_paths = ["src/better_answers_worker"]
 do_not_mutate = ["src/better_answers_worker/check.py"]

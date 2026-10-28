@@ -92,7 +92,7 @@ RUN pnpm --filter @better-answers/web run build
 # optional peer in place, and the Renovate app locks with `--ignore-pnpmfile`, so a hook would
 # come undone in every pull request it opens. Every optional peer the api loads is one its own
 # dependencies also reach, so a link to a package deleted here is one nothing follows. A required
-# peer is kept all the same, since its package may load it; `tests/deploy/image.test.ts` follows no peer,
+# peer is kept all the same, since its package may load it; `tests/images/image.test.ts` follows no peer,
 # so one kept that way turns it red for a person to declare or override away, as TypeScript was.
 FROM manifests AS prod-deps
 RUN pnpm install --frozen-lockfile --prod --filter @better-answers/api...
@@ -168,7 +168,7 @@ FROM base AS runtime
 # packages — this install lands under /usr/local, which apt owns nothing under, and an image
 # has no system Python application to break. pip is purged in the same layer, because what
 # this image should carry is the tool and not the means of getting it, and
-# `apps/api/tests/deploy/image.test.ts` reads the version back out of the built image, so a purge
+# `apps/api/tests/images/image.test.ts` reads the version back out of the built image, so a purge
 # that took the tool with it is red rather than quiet.
 #
 # The `# renovate:` line is read by `renovate.json`'s custom manager and sits directly above
@@ -216,7 +216,7 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=prod-deps /app/packages/core/node_modules ./packages/core/node_modules
 # The design system's dependencies are its two faces, which `src/auth/page-style.ts` serves to
-# the api's own pages. This is also the link `tests/deploy/image.test.ts` follows.
+# the api's own pages. This is also the link `tests/images/image.test.ts` follows.
 COPY --from=prod-deps /app/packages/design-system/node_modules ./packages/design-system/node_modules
 COPY --from=prod-deps /app/packages/schema/node_modules ./packages/schema/node_modules
 

@@ -10,6 +10,7 @@ import {
   requireBootstrap,
   requireIdentityBootstrap,
   requireRunningImage,
+  requireStop,
 } from "./config.ts";
 import { closeDoors, openDoors } from "./doors.ts";
 import type { EmailSender } from "./email/email.ts";
@@ -23,6 +24,7 @@ import { startSweeps, SWEEP_FIRST_PASS_MS, SWEEP_INTERVAL_MS } from "./timers/sw
 const bootstrap = requireBootstrap("the api");
 const identity = requireIdentityBootstrap("the api");
 const image = requireRunningImage("the api");
+const stopSettings = requireStop("the api");
 const objectStore = readObjectStore();
 const envelopeKey = readEnvelopeKey();
 if (!envelopeKey.ok) {
@@ -130,9 +132,6 @@ if (!sweepSettings.ok) {
   }
 }
 
-/** Coolify kills the container 30 s after the signal, so a stop still waiting on a client or a query is cut well before. */
-const STOP_DEADLINE_MS = 10_000;
-
 const drain = async (): Promise<void> => {
   await Promise.all([
     new Promise((closed) => server.close(closed)),
@@ -146,13 +145,13 @@ const stop = async (signal: NodeJS.Signals): Promise<never> => {
   logger.info({ signal }, "the api is stopping");
   const drained = await Promise.race([
     drain().then(() => true),
-    delay(STOP_DEADLINE_MS).then(() => false),
+    delay(stopSettings.deadlineMs).then(() => false),
   ]);
   if (drained) {
     logger.info("the api has stopped");
   } else {
     logger.warn(
-      { deadline_ms: STOP_DEADLINE_MS },
+      { deadline_ms: stopSettings.deadlineMs },
       "the stop reached its deadline, so what was still open is cut",
     );
   }

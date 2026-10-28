@@ -97,6 +97,13 @@ const headCheckSchema = z.object({
   HEALTHCHECKS_PING_URL_SCHEDULER: deadManPingUrl,
 });
 
+/** Coolify kills the container 30 s after the signal, so a stop still waiting on a client or a query is cut well before. */
+const DEFAULT_STOP_DEADLINE_MS = 10_000;
+
+const stopSchema = z.object({
+  STOP_DEADLINE_MS: z.coerce.number().int().min(1).default(DEFAULT_STOP_DEADLINE_MS),
+});
+
 const runningImageSchema = z.object({
   API_IMAGE_DIGEST: z
     .string()
@@ -134,6 +141,10 @@ export type SweepSettings = {
 
 export type HeadCheckSettings = {
   readonly pingUrl: string | undefined;
+};
+
+type StopSettings = {
+  readonly deadlineMs: number;
 };
 
 export type RunningImage = {
@@ -206,6 +217,14 @@ export function readHeadCheck(
   return ok({ pingUrl: parsed.data.HEALTHCHECKS_PING_URL_SCHEDULER });
 }
 
+export function readStop(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Result<StopSettings> {
+  const parsed = stopSchema.safeParse(environment);
+  if (!parsed.success) return err(invalid(parsed.error, "the stop's settings"));
+  return ok({ deadlineMs: parsed.data.STOP_DEADLINE_MS });
+}
+
 export function readRunningImage(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): Result<RunningImage> {
@@ -228,6 +247,10 @@ export function requireBootstrap(processName: string): Bootstrap {
 
 export function requireIdentityBootstrap(processName: string): IdentityBootstrap {
   return orExit(processName, readIdentityBootstrap());
+}
+
+export function requireStop(processName: string): StopSettings {
+  return orExit(processName, readStop());
 }
 
 export function requireRunningImage(processName: string): RunningImage {

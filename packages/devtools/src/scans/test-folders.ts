@@ -26,6 +26,11 @@ export type Tree = {
 
 export const PINS: readonly Pin[] = [
   { folder: "apps/api/tests/deploy", kind: "mirror", reason: "deploy" },
+  {
+    folder: "apps/api/tests/images",
+    kind: "run",
+    reason: "the images script and the full-images job select it; check excludes it",
+  },
   { folder: "apps/api/tests/trpc/members", kind: "split", reason: "apps/api/src/trpc/members.ts" },
   {
     folder: "packages/core/test/readings",

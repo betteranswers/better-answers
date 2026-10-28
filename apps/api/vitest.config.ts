@@ -1,10 +1,12 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 import { pathWithAppleGit } from "@better-answers/schema/testing/apple-git";
 
 export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
+
+    exclude: [...configDefaults.exclude, "tests/images/**"],
 
     env: { PATH: pathWithAppleGit() },
 

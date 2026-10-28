@@ -169,7 +169,7 @@ const LANES: readonly LaneCase[] = [
     because: "the worker image's uv must be the uv the runner resolves the lockfile with",
   },
   {
-    changed: ["apps/api/tests/deploy/image.test.ts"],
+    changed: ["apps/api/tests/images/image.test.ts"],
     lane: "full",
     images: "yes",
     diff: "an image probe",
@@ -837,14 +837,30 @@ describe("the lane inside check.yml", () => {
   });
 });
 
+const IMAGE_GATES = "check:images";
+
 describe("the full lane's legs against the one list of gates", () => {
-  it("runs exactly the root check's gates across its legs", () => {
+  it("runs the root check's gates and the image gates", () => {
     const ran = [...new Set(legsTheFanInRequires(CODE_LANE).flatMap(gatesOf).map(wholeGateOf))];
 
     expect(
       ran,
       "the legs and the root check have stopped naming the same gates. Add the gate to a leg, or narrow it in NARROWED: a step no one leg can run is split across the legs, and NARROWED folds the parts back.",
-    ).toEqual(gatesNamed(commandOf("check")));
+    ).toEqual([...gatesNamed(commandOf("check")), ...gatesNamed(commandOf(IMAGE_GATES))]);
+  });
+
+  it("runs the image gates on one leg only", () => {
+    const imageGates = gatesNamed(commandOf(IMAGE_GATES));
+    const legs = legsTheFanInRequires(CODE_LANE).filter((job) =>
+      gatesOf(job).some((gate) => imageGates.includes(gate)),
+    );
+
+    expect(imageGates.length).toBeGreaterThan(1);
+    expect(legs).toEqual(["full-images"]);
+    expect(
+      imageGates.filter((gate) => gatesNamed(commandOf("check")).includes(gate)),
+      "the root check runs an image gate, so every laptop run builds the images again",
+    ).toEqual([]);
   });
 
   it("runs each gate on one leg only", () => {
@@ -966,6 +982,7 @@ const FULL_LEGS = [
   "full-web-unit",
   "full-web-browser",
   "full-worker",
+  "full-images",
 ];
 
 const VERDICTS: readonly VerdictCase[] = [

@@ -2,7 +2,7 @@ import tomllib
 from pathlib import Path
 
 import test_image
-from better_answers_worker.check import CI_RUNNER_VCPUS, SUITE
+from better_answers_worker.check import CI_RUNNER_VCPUS, IMAGES, SUITE
 
 WORKER_ROOT = Path(__file__).resolve().parents[2]
 
@@ -39,8 +39,16 @@ def test_only_the_gate_spreads_the_suite_over_workers() -> None:
     assert not {"-n", "--numprocesses"} & set(addopts.split())
 
 
-def test_the_image_builds_in_one_worker_of_the_gates_run() -> None:
+def test_the_gate_keeps_a_group_in_one_worker() -> None:
     _, command = SUITE
 
     assert command[command.index("--dist") + 1] == "loadgroup"
-    assert test_image.pytestmark.name == "xdist_group"
+
+
+def test_the_gate_leaves_the_image_tests_to_the_images_script() -> None:
+    _, gate = SUITE
+    _, images = IMAGES
+
+    assert test_image.pytestmark.name == "image"
+    assert gate[gate.index("-m") + 1] == "not image"
+    assert images[images.index("-m") + 1] == "image"

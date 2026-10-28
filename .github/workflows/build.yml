@@ -94,7 +94,7 @@ jobs:
           - tier: api
             context: .
             dockerfile: apps/api/Dockerfile
-            probe: pnpm --filter @better-answers/api exec vitest run tests/deploy/image.test.ts
+            probe: pnpm --filter @better-answers/api run images tests/images/image.test.ts
             probe-toolchain: node
           - tier: worker
             context: apps/worker
@@ -104,7 +104,7 @@ jobs:
           - tier: backup
             context: deploy
             dockerfile: deploy/backup.Dockerfile
-            probe: pnpm --filter @better-answers/api exec vitest run tests/deploy/backup-image.test.ts
+            probe: pnpm --filter @better-answers/api run images tests/images/backup-image.test.ts
             probe-toolchain: node
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

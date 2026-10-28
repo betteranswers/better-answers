@@ -15,13 +15,15 @@ import {
   APP_HOSTNAME,
   AUTH_SECRET,
   PUBLIC_URL,
-} from "./support/harness/harness.ts";
-import { freePort } from "./support/loopback-port.ts";
-import { startTestDatabase, type TestDatabase } from "./support/postgres.ts";
+} from "../support/harness/harness.ts";
+import { freePort } from "../support/loopback-port.ts";
+import { startTestDatabase, type TestDatabase } from "../support/postgres.ts";
 
-const apiRoot = path.resolve(import.meta.dirname, "..");
+const apiRoot = path.resolve(import.meta.dirname, "../..");
 
-const STOP_DEADLINE_MS = 10_000;
+const DEFAULT_STOP_DEADLINE_MS = 10_000;
+
+const SHORT_STOP_DEADLINE_MS = 500;
 
 const HEADERS_READ_MS = 250;
 
@@ -52,7 +54,7 @@ afterAll(async () => {
   await rm(gitStoreDir, { recursive: true, force: true });
 });
 
-const startApi = async (): Promise<Running> => {
+const startApi = async (stopDeadlineMs?: number): Promise<Running> => {
   const port = await freePort();
   const child = spawn(process.execPath, ["src/main.ts"], {
     cwd: apiRoot,
@@ -66,6 +68,7 @@ const startApi = async (): Promise<Running> => {
       AGENT_HOSTNAME,
       APEX_HOSTNAME,
       GIT_STORE_DIR: gitStoreDir,
+      ...(stopDeadlineMs === undefined ? {} : { STOP_DEADLINE_MS: String(stopDeadlineMs) }),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -119,7 +122,7 @@ it.each(["SIGTERM", "SIGINT"] as const)("exits 0 at once on %s", async (signal) 
   const stop = await stopped(api, signal);
 
   expect(stop).toEqual(exitedWith(0, stop));
-  expect(stop.afterMs).toBeLessThan(STOP_DEADLINE_MS / 2);
+  expect(stop.afterMs).toBeLessThan(DEFAULT_STOP_DEADLINE_MS / 2);
 });
 
 it("answers a request in flight at the stop", async () => {
@@ -136,18 +139,18 @@ it("answers a request in flight at the stop", async () => {
   );
   const stop = await stopping;
   expect(stop).toEqual(exitedWith(0, stop));
-  expect(stop.afterMs).toBeLessThan(STOP_DEADLINE_MS / 2);
+  expect(stop.afterMs).toBeLessThan(DEFAULT_STOP_DEADLINE_MS / 2);
 });
 
 it("exits 1 at the deadline, cutting a request still open", async () => {
-  const api = await startApi();
+  const api = await startApi(SHORT_STOP_DEADLINE_MS);
   const socket = await heldRequest(api.port);
   const reply = received(socket);
 
   const stop = await stopped(api, "SIGTERM");
 
   expect(stop).toEqual(exitedWith(1, stop));
-  expect(stop.afterMs).toBeGreaterThanOrEqual(STOP_DEADLINE_MS - 500);
-  expect(stop.afterMs).toBeLessThan(STOP_DEADLINE_MS + 5_000);
+  expect(stop.afterMs).toBeGreaterThanOrEqual(SHORT_STOP_DEADLINE_MS - 50);
+  expect(stop.afterMs).toBeLessThan(SHORT_STOP_DEADLINE_MS + 5_000);
   expect(await reply).toBe("");
 });
