@@ -1,6 +1,6 @@
 ---
 name: playwright-specs
-description: This skill should be used when asked to "write a browser spec", "add a Playwright test", "run the e2e suite", "debug a flaky spec", or "fix the accessibility gate", when a spec under apps/web/e2e fails, flakes or hangs, when the gate refuses a page, or when a change renames a page's label, heading or accessible name. It holds how this repository writes and runs a Playwright spec, covering the client-address fixtures, locators, waiting, refusals, latency budgets, the helpers the specs share, the accessibility gate and the run commands.
+description: This skill should be used when asked to "write a browser spec", "add a Playwright test", "run the e2e suite", "debug a flaky spec" or "test a passkey in the browser", when a spec under apps/web/e2e fails, flakes or hangs, when the accessibility gate refuses a page, or when a change renames a page's label, heading or accessible name. It covers the client-address fixtures, the virtual authenticator, locators, waiting, refusals, latency budgets, the shared helpers, the gate and the run commands.
 ---
 
 # Playwright specs
@@ -8,12 +8,12 @@ description: This skill should be used when asked to "write a browser spec", "ad
 The browser suite drives `apps/web`'s **served build in a browser**. A spec here covers what
 only the served build shows: a page, with its latency budget, the accessibility gate and
 keyboard reach, or a journey that crosses pages through the real api. A page's single-screen
-behaviour is a component test through Testing Library, not a spec (AGENTS.md, *Testing*).
+behaviour is a component test through Testing Library, not a spec (the root `AGENTS.md`, *Testing*).
 Everything below is what the suite already is; `apps/web/e2e/model-choices/models-and-spend.spec.ts` is the fullest worked example.
 
 Two reference files hold the detail. Open the one a task needs:
 
-- **`references/helpers.md`**: every helper in the suite's modules and the readers of the api's
+- **`references/helpers.md`**: the helpers the specs share, and the readers of the api's
   answers. Open it before reaching for a helper (sign-in, shell locators, keyboard, latency clocks,
   Claude's part in OAuth, the knowledge pages' module), and before adding a helper, which may
   already exist.
@@ -21,11 +21,11 @@ Two reference files hold the detail. Open the one a task needs:
   Open it when the gate refuses a page, when a spec is about one theme, or when a change touches
   the gate.
 
-The server under the browser and how a spec builds its state are in the verify skill:
-`.claude/skills/verify/SKILL.md`, *The seam* and *Building state*. Every harness action, the
-ceilings a spec runs into and what a refused seed leaves are in
-`.claude/skills/verify/references/harness.md`. Open it before writing set-up, and before adding an
-action, which may already exist.
+The verify skill holds the server under the browser and how a spec builds its state, under
+*The seam* and *Building state* in `.claude/skills/verify/SKILL.md`, at the repository root.
+*The seam* also says why a run can hang. The harness's actions, the ceilings a spec runs into and
+what a refused seed leaves are in `.claude/skills/verify/references/harness.md`. Open it before
+writing set-up, and before adding an action, which may already exist.
 
 ## The fixture module
 

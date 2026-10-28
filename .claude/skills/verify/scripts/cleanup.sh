@@ -11,7 +11,7 @@ fi
 
 if [[ -f "$state/server.pid" ]]; then
   pid="$(cat "$state/server.pid")"
-  if kill -0 "$pid" 2>/dev/null; then
+  if ps -p "$pid" -o command= 2>/dev/null | grep -q 'tests/serve.ts'; then
     kill -TERM "$pid"
     for _ in $(seq 30); do
       kill -0 "$pid" 2>/dev/null || break
@@ -20,6 +20,10 @@ if [[ -f "$state/server.pid" ]]; then
     if kill -0 "$pid" 2>/dev/null; then
       echo "cleanup: pid $pid outlived SIGTERM by 30 s; sending SIGKILL" >&2
       kill -KILL "$pid"
+      for _ in $(seq 5); do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 1
+      done
     fi
   fi
   rm -f "$state/server.pid"

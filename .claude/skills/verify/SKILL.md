@@ -1,6 +1,6 @@
 ---
 name: verify
-description: This skill should be used when asked to "verify this on the running app", "drive the people page", "reproduce this web bug live", "check the page in a browser", "launch the app", or "run the doctor", or when a playbook names the driver skill for a change to a page, to what the api serves a page, or to the sign-in and consent flow. It drives better-answers' served app in a real browser the way a person does. It launches the api's test harness on a port of its own, checks it with a doctor, builds state through the harness's actions, signs in through the product's own page, drives each page its features/ files name by role and accessible name, keeps the evidence and stops what it started.
+description: This skill should be used when asked to "verify this on the running app", "drive the people page", "reproduce this web bug live", "check the page in a browser", "launch the app", or "run the doctor", or when a playbook names the driver skill for a change to a page, to what a page reads from the api, or to sign-in and consent. It drives better-answers' served app in a real browser as a person does, with a feature file for every page.
 ---
 
 # Verify the served app
@@ -8,6 +8,8 @@ description: This skill should be used when asked to "verify this on the running
 This skill drives the SPA's built pages through the api that serves them, so a drive sees what a person sees. The scripts in `scripts/` launch, check, sign in and clean up. `features/README.md` indexes one feature file for each area of the navigation and one for the pages outside the shell. Each file says how to reach every page in it and what end state proves the page works. `references/harness.md` holds the harness's actions, the ceilings a drive runs into and what a refused seed leaves.
 
 A spec under `apps/web/e2e/` is written and run per `apps/web/.claude/skills/playwright-specs/SKILL.md`. This skill drives the app live.
+
+*The seam* and *Building state* describe the server and the harness that the spec suite and a live drive share. They name the spec suite's fixtures and helpers. A drive reaches the same server and actions only through `scripts/`, and `E2E_PORT` applies only to the spec runner.
 
 ## The seam
 
@@ -80,7 +82,7 @@ Every instance starts with no workspace and no person. A drive seeds what it nee
 
 It reads and changes nothing. It prints `worth driving` and exits 0, or prints `not worth driving:` with the reason and exits 1. It checks these, in order:
 
-- agent-browser is on `PATH`.
+- `lsof`, `curl`, `node` and agent-browser are on `PATH`.
 - launch.sh started a server on that port, and that process is still alive.
 - The port's listener is that process.
 - `/health` answers 200 and `/__harness` answers.
@@ -90,52 +92,56 @@ Run it before the first drive, after any drive that failed, and whenever a page 
 
 ## Drive
 
-Every browser command names the session `verify-<port>`, so two drives never share a browser.
+Drive the path a person takes. Build state only through the harness's actions, and act only through the page.
 
-```bash
-B="agent-browser --session verify-4610"
-```
+Every browser command goes through `scripts/browse.sh <port> <agent-browser command>`, which runs agent-browser in the session `verify-<port>`, so two drives never share a browser. Write each command out in full. A worktree-isolated agent's hook refuses a command assembled from a shell variable or a `$(...)`.
 
-1. **Build state through the harness.** `scripts/harness.sh <port> <METHOD> <path> [json body]` calls `/__harness<path>` and prints the answer. On a refusal it prints the status and the reasons and exits 1. Write no row and set no cookie any other way. Mint a fresh address for each person, such as `admin-$(date +%s)@example.test`, and provision a workspace for the drive:
+1. **Build state through the harness.** `scripts/harness.sh <port> <METHOD> <path> [json body]` calls `/__harness<path>` and prints the answer. On a refusal it prints the status and the reasons and exits 1. Write no row and set no cookie any other way. Provision a workspace for the drive. With no `adminEmail`, the harness mints a fresh Admin with an address nobody else in the run holds:
 
    ```bash
-   .claude/skills/verify/scripts/harness.sh 4610 POST /workspaces '{"name":"Verify people","adminEmail":"admin-1793210000@example.test"}'
+   .claude/skills/verify/scripts/harness.sh 4610 POST /workspaces '{"name":"Verify people"}'
    ```
 
-   It answers the workspace's `workspaceId`, `name` and `shortName`, and the Admin's `id`, `email` and `name`. `references/harness.md` lists every action, and each feature file names the actions its pages need. Each action's route is in `apps/api/tests/support/harness/harness-control.ts`, and the body it takes is in the matching function in `apps/web/e2e/harness.ts`.
+   It answers the workspace's `workspaceId`, `name` and `shortName`, and the Admin's `id`, `email` and `name`. Sign in with that `email`. `references/harness.md` lists every action by the name of its function in `apps/web/e2e/harness.ts`. An action's route is the path that function passes to `/__harness`. The body a route takes is the schema it parses, in `apps/api/tests/support/harness/harness-control.ts` or in the area's `harness-*.ts` file beside it. The function in `apps/web/e2e/harness.ts` may reshape its arguments before it sends them. Each feature file names the routes its pages need.
 
 2. **Sign in through the product's own page.**
 
    ```bash
-   .claude/skills/verify/scripts/sign-in.sh 4610 admin-1793210000@example.test [path]
+   .claude/skills/verify/scripts/sign-in.sh 4610 <email> [path]
    ```
 
-   It opens `path`, `/sign-in` by default, fills *Email Address*, presses *Send Code*, reads the code back from the captured email transport and fills *Verification Code*. An Admin or the operator then meets the confirm or setup page. The script gives that person the harness's authenticator, opens `/confirm` with the page's own query and types the six digits the authenticator shows. It prints where the person landed. An Admin of one workspace lands on `/people/members`. An Editor or a Viewer lands on `/ask/new-question`.
+   It closes the session's browser first, so it also switches from one person to another. It opens a fresh browser that sends a client address of its own in `cf-connecting-ip`, so sign-ins on one instance do not share the per-address ceiling. It opens `path`, `/sign-in` by default, waits for *Email Address*, fills it and presses *Send Code*. It waits for the new email to reach the captured transport and for *Verification Code* to draw, then fills the code. An Admin or the operator then meets the confirm or setup page. The script gives that person the harness's authenticator, opens `/confirm` with the page's own query and types the six digits the authenticator shows. It waits for the landing page's heading, then prints the address.
+
+   - An Admin of one workspace lands on `/people/members`.
+   - An Editor or a Viewer lands on `/ask/new-question`.
+   - The operator lands on `/console/workspaces/every-workspace`.
+   - A person in several workspaces meets the workspace picker, and a person in none meets *No Workspace Yet*.
 
 3. **Locate by role and accessible name.** Read the page, then act on the names it gives:
 
    ```bash
-   $B snapshot -c                                   # the accessibility tree, with refs
-   $B find role link click --name "Groups"
-   $B find role button click --name "Invite a Person"
-   $B find label "Email Address" fill "member-1793210000@example.test"
-   $B wait --fn "location.pathname === '/people/groups'"
+   .claude/skills/verify/scripts/browse.sh 4610 snapshot -c
+   .claude/skills/verify/scripts/browse.sh 4610 find role link click --name "Groups"
+   .claude/skills/verify/scripts/browse.sh 4610 find role button click --name "Invite a Person"
+   .claude/skills/verify/scripts/browse.sh 4610 wait --fn "location.pathname === '/people/groups'"
    ```
 
-   A name matches as a case-insensitive substring unless the command adds `--exact`. Add it where one name sits inside another on the same page. Never locate by CSS class, coordinates or tab order. Wait on a condition, never for a fixed time. Move between pages as a person does, through the rail (the `navigation` named *Areas*), the menu (the `navigation` named for the open area) and the breadcrumb, or open a page's address with `$B open http://localhost:4610<path>`.
+   `snapshot -c` prints the accessibility tree with refs. A name matches as a case-insensitive substring unless the command adds `--exact`. Add it where one name sits inside another on the same page. Never locate by CSS class, coordinates or tab order. Wait on a condition, never for a fixed time.
+
+   Move between pages as a person does. The rail is the `navigation` named *Areas*. The menu is the `navigation` named for the open area. The breadcrumb is the `navigation` named *Breadcrumb*. To open a page by its address, run `.claude/skills/verify/scripts/browse.sh 4610 open http://localhost:4610<path>`.
 
 ## Evidence
 
-Save each artifact under `/tmp/better-answers-verify/<port>/evidence/`, named for the feature file and the page, such as `control-centre-members.png` and `control-centre-members.aria.txt`.
+Save each artifact in the `evidence` directory launch.sh prints, `/tmp/better-answers-verify/<port>/evidence/` unless `VERIFY_HOME` is set. Name it for the feature file and the page, such as `control-centre-members.png` and `control-centre-members.aria.txt`.
 
 ```bash
-$B screenshot /tmp/better-answers-verify/4610/evidence/control-centre-members.png
-$B snapshot -c > /tmp/better-answers-verify/4610/evidence/control-centre-members.aria.txt
+.claude/skills/verify/scripts/browse.sh 4610 screenshot /tmp/better-answers-verify/4610/evidence/control-centre-members.png
+.claude/skills/verify/scripts/browse.sh 4610 snapshot -c > /tmp/better-answers-verify/4610/evidence/control-centre-members.aria.txt
 ```
 
-- Drive the path a person takes. Build state only through the harness's actions, and act only through the page.
 - Capture each action and the state it leaves, not only the last screen. Take a snapshot before and after an action that changes something.
 - Prove a write from a second view. Reload the page, or open the page that lists what was written, and read it there.
+- Check a side effect the page cannot show through a harness read, such as `GET /emails?to=<address>` for a sent email or `GET /commit-authors` for a commit.
 - Beside each artifact, report the feature file, the page's address and the role signed in.
 - Report a page the drive cannot reach as `verified-unreachable`, with the prerequisite it lacks and the command it tried. Never report one entry point as proven through another.
 
@@ -145,7 +151,7 @@ $B snapshot -c > /tmp/better-answers-verify/4610/evidence/control-centre-members
 .claude/skills/verify/scripts/cleanup.sh 4610
 ```
 
-It closes the session's browser, sends SIGTERM to the pid launch.sh recorded, waits up to 30 s, then sends SIGKILL, and confirms the port is free. It never kills by process name. On SIGTERM the server stops its own Postgres and object store containers. After a SIGKILL, Testcontainers' Ryuk container removes them once the process is gone. It deletes the pid file and keeps `server.log`, `build.log` and `evidence/`. Run it after the last drive, and after every failed launch or drive.
+It closes the session's browser, sends SIGTERM to the pid launch.sh recorded, waits up to 30 s, then sends SIGKILL, and confirms the port is free. If another process holds the port, it names that pid and exits 1. It signals the recorded pid only while that pid still runs `tests/serve.ts`, and it never kills by process name. On SIGTERM the server stops its own Postgres and object store containers. After a SIGKILL, Testcontainers' Ryuk container removes them once the process is gone. It deletes the pid file and keeps `server.log`, `build.log` and `evidence/`. Run it after the last drive, and after every failed launch or drive.
 
 ## Two drives side by side
 
@@ -156,4 +162,4 @@ Launch each on its own port. Each instance has its own Postgres and object store
 .claude/skills/verify/scripts/launch.sh 4611 --no-build
 ```
 
-Build once. A second build while an instance serves `apps/web/dist` rewrites the files under it.
+Build once. A second build while an instance serves `apps/web/dist` rewrites the files under it, so launch.sh refuses to build while another of its instances runs.

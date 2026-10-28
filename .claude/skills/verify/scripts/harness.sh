@@ -9,10 +9,14 @@ body="${4:-}"
 
 answer="$(mktemp)"
 trap 'rm -f "$answer"' EXIT
-args=(-s -o "$answer" -w '%{http_code}' -X "$method" "http://localhost:$port/__harness$path")
+args=(-s --max-time 30 -o "$answer" -w '%{http_code}' -X "$method" "http://localhost:$port/__harness$path")
 [[ -z "$body" ]] || args+=(-H 'content-type: application/json' --data "$body")
-status="$(curl "${args[@]}")"
+status="$(curl "${args[@]}" || true)"
 
+if [[ "$status" == "000" || -z "$status" ]]; then
+  echo "nothing answered on port $port; run doctor.sh $port" >&2
+  exit 1
+fi
 if [[ "$status" != 2* ]]; then
   echo "/__harness$path answered $status: $(cat "$answer")" >&2
   exit 1

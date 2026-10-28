@@ -1,6 +1,6 @@
 # The suite's helpers
 
-The helpers in the suite's modules, the helpers that play Claude's part in OAuth, the readers of the api's answers and the knowledge pages' module. `SKILL.md` gives the rules for using them. The harness's actions and the ceilings a spec runs into are in `.claude/skills/verify/references/harness.md`.
+The helpers in the suite's modules, the helpers that play Claude's part in OAuth, the readers of the api's answers and the knowledge pages' module. `SKILL.md` gives the rules for using them. The harness's actions, the ceilings a spec runs into and what a refused seed leaves are in `.claude/skills/verify/references/harness.md`.
 
 ## The browser helpers
 
