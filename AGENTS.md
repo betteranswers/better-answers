@@ -81,7 +81,7 @@ When a session runs in a cloud environment, see `docs/agents/cloud-sessions.md`.
 
 ## Code and doc exploration
 
-The jCodeMunch policy, its front-door tools and how to read their results are here: `~/.claude/CLAUDE.md`. A global hook refuses raw reads of code. Its strict mode lets a `Read` of a code file over 4 KB through only with `offset` and `limit`, so pass both, the read before an Edit included.
+The jCodeMunch policy, its front-door tools and how to read their results are here: `~/.claude/CLAUDE.md`. A global hook refuses raw reads of code. Its strict mode refuses a `Read` of a code file of 4 KB (4096 bytes) or more unless the call passes `offset` or `limit`. Pass both, the read before an Edit included.
 
 ### After editing files
 
