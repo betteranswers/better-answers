@@ -425,11 +425,11 @@ describe("Waiting on you at volume", () => {
         "the list of 50, in one-item lists read just before it, at the median",
         `${inOneItemLists.toFixed(1)}, against a budget of ${BUDGET_IN_ONE_ITEM_LISTS}`,
       ],
-      ["the list of 50 at the median", inMs(percentile(fiftyMs, 0.5))],
       [
-        "the list of 50 at p95",
-        `${inMs(percentile(fiftyMs, 0.95))}, against ${WAITING_BUDGET_MS} ms`,
+        "the list of 50 at the median",
+        `${inMs(percentile(fiftyMs, 0.5))}, against ${WAITING_BUDGET_MS} ms`,
       ],
+      ["the list of 50 at p95", inMs(percentile(fiftyMs, 0.95))],
       [
         "the one-item list at the median",
         inMs(
@@ -447,6 +447,9 @@ describe("Waiting on you at volume", () => {
     ).toEqual(Array.from({ length: RUNS }, () => [1, WAITING_SETS]));
     expect(inOneItemLists, "the list of 50, in one-item lists, at the median").toBeLessThan(
       BUDGET_IN_ONE_ITEM_LISTS,
+    );
+    expect(percentile(fiftyMs, 0.5), "the list of 50 at the median, in ms").toBeLessThan(
+      WAITING_BUDGET_MS,
     );
   }, 120_000);
 });
