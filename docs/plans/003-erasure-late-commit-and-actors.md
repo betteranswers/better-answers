@@ -72,11 +72,11 @@ ADR 0020 says every actor id the platform wrote becomes the pseudonym, `bundle_c
 
 ### Sources / Research
 
-- `packages/core/src/erasure/routine.ts` (`runErasure`): the step order and the git step under `withRepositoryLockAs`.
-- `packages/core/src/erasure/identity.ts`: `workspacesHeldBy` read before the identity transaction; the questions sweep inside it after the member delete (#726's pattern).
-- `packages/core/src/concepts/index.ts` (`writeUnderLock`: `existingOf`, `commitWrite`, `landWrite`) and `packages/core/src/concepts/manifest.ts` (`writeManifest`, which commits with no membership read).
+- `packages/core/src/erasure/routine/routine.ts` (`runErasure`): the step order and the git step under `withRepositoryLockAs`.
+- `packages/core/src/erasure/routine/identity.ts`: `workspacesHeldBy` read before the identity transaction; the questions sweep inside it after the member delete (#726's pattern).
+- `packages/core/src/concepts/index.ts` (`writeUnderLock`: `existingOf`, `commitWrite`, `landWrite`) and `packages/core/src/concepts/import/manifest.ts` (`writeManifest`, which commits with no membership read).
 - `packages/core/src/store/postgres/index.ts`: `withMember` holds `FOR SHARE OF m, u`.
-- `packages/core/src/concepts/reconciler.ts` (`trailerFactsOf`, `replayCommit`): a replay takes its actor from the trailer.
+- `packages/core/src/concepts/writes/reconciler.ts` (`trailerFactsOf`, `replayCommit`): a replay takes its actor from the trailer.
 - `packages/core/src/store/git/index.ts` (`rewriteHistory`, `replacementsFor`): text and message replacements are `human:<address>` alone.
 - `packages/schema/src/knowledge/question-tables.ts` (`question_feedback_flag_check`).
 - `docs/solutions/best-practices/a-race-test-held-late-or-released-in-turn-cannot-prove-a-lock-order.md`: hold at the first contended statement.
@@ -121,7 +121,7 @@ sequenceDiagram
 - **Goal:** A member's commit to the bundle cannot land after their member row is deleted.
 - **Requirements:** R1; KTD1.
 - **Dependencies:** none.
-- **Files:** `packages/core/src/concepts/landing.ts`, `packages/core/src/concepts/index.ts`, `packages/core/src/concepts/manifest.ts`, `packages/core/test/concepts.test.ts`, `packages/core/test/manifest.test.ts`.
+- **Files:** `packages/core/src/concepts/import/landing.ts`, `packages/core/src/concepts/index.ts`, `packages/core/src/concepts/import/manifest.ts`, `packages/core/test/concepts/concepts.test.ts`, `packages/core/test/concepts/import/manifest.test.ts`.
 - **Approach:** One helper in `landing.ts` runs the git commit inside `withMember`, refusing as the principal refusal when the member is gone; `commitWrite` and `writeManifest` call it. `existingOf` and `landWrite` are unchanged.
 - **Test scenarios:**
   - A write whose credentials are revoked after its first read is refused before it commits (the existing revocation test, which expected the commit and no rows).
@@ -133,7 +133,7 @@ sequenceDiagram
 - **Goal:** `rewriteHistory` rewrites `human:<person id>` to `human:<pseudonym>` in files and commit messages, and answers the paths whose files it found naming the person.
 - **Requirements:** R2, R4; KTD3.
 - **Dependencies:** none.
-- **Files:** `packages/core/src/store/git/index.ts`, `packages/core/test/erasure-routine.test.ts` (the only caller is the routine, so the routine's suite holds it).
+- **Files:** `packages/core/src/store/git/index.ts`, `packages/core/test/erasure/routine/erasure-routine.test.ts` (the only caller is the routine, so the routine's suite holds it).
 - **Approach:**
   1. `Pseudonymisation` gains the person ids.
   2. The replacements file adds one line per person id.
@@ -150,14 +150,14 @@ sequenceDiagram
 - **Goal:** Erasure rewrites `bundle_commit.actor` and `concept_verification.actor` to the pseudonym and reports the counts.
 - **Requirements:** R6, R7; KTD4.
 - **Dependencies:** none.
-- **Files:** `packages/core/src/erasure/actors.ts` (new), `packages/core/src/erasure/identity.ts`, `packages/core/src/erasure/map.ts`, `packages/core/src/erasure/routine.ts`, `packages/core/test/erasure-routine.test.ts`, `packages/core/test/erasure-map.test.ts`.
+- **Files:** `packages/core/src/erasure/routine/actors.ts` (new), `packages/core/src/erasure/routine/identity.ts`, `packages/core/src/erasure/map.ts`, `packages/core/src/erasure/routine/routine.ts`, `packages/core/test/erasure/routine/erasure-routine.test.ts`, `packages/core/test/erasure/erasure-map.test.ts`.
 - **Approach:**
   1. A sweep in the caller's transaction, keyed by `askersOf` ids, answering the two counts.
   2. A standalone step after the questions step, with the map's person and the request's.
   3. A call inside the identity transaction after the member delete.
   4. The two map finders use `askersOf([subject.actor, subject.memberId])`.
   5. The two families' actions gain an `actorsRewritten` count.
-- **Patterns to follow:** `sweepTheQuestions` and `eraseFromTheQuestions` in `packages/core/src/erasure/questions.ts`.
+- **Patterns to follow:** `sweepTheQuestions` and `eraseFromTheQuestions` in `packages/core/src/erasure/routine/questions.ts`.
 - **Test scenarios:**
   - After a run, every `bundle_commit` and `concept_verification` row that named the person names `human:<pseudonym>`, and another member's rows are unchanged.
   - The verified concept reads "Verified by a former member" on the last-workspace arm.
@@ -172,7 +172,7 @@ sequenceDiagram
 - **Goal:** A commit made as the person between pass 1 and the member's end is rewritten before the run completes.
 - **Requirements:** R2, R3, R4; KTD2, KTD4.
 - **Dependencies:** U1, U2, U3.
-- **Files:** `packages/core/src/erasure/routine.ts`, `packages/core/test/erasure-routine.test.ts`.
+- **Files:** `packages/core/src/erasure/routine/routine.ts`, `packages/core/test/erasure/routine/erasure-routine.test.ts`.
 - **Approach:**
   1. Factor the git step so it runs twice: rewrite, move `bundle_commit` rows, carry verifications over the map's paths and the paths the rewrite found.
   2. Pass 2 runs after the identity step, with the open addresses and the suppression row's emails. The person ids include any user row this request's tombstone names, and any its addresses or its suppression's addresses name, so a rerun after the identity step still rewrites the trailers of a person held elsewhere or a former member.
@@ -192,7 +192,7 @@ sequenceDiagram
 - **Goal:** The arm reflects the memberships held when the member ends.
 - **Requirements:** R5; KTD5.
 - **Dependencies:** U3.
-- **Files:** `packages/core/src/erasure/identity.ts`, `packages/core/test/erasure-routine.test.ts`.
+- **Files:** `packages/core/src/erasure/routine/identity.ts`, `packages/core/test/erasure/routine/erasure-routine.test.ts`.
 - **Approach:** Drop the `workspacesHeldBy` pre-read. After the member delete, read the person's other memberships `FOR KEY SHARE` and pick the arm from them.
 - **Test scenarios:**
   - A person removed from their other workspace after the run opens is erased on the last-workspace arm.

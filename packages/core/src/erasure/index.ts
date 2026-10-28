@@ -1,5 +1,5 @@
-export { eraseFromTheIdentitySet } from "./identity.ts";
-export type { IdentityArm } from "./identity.ts";
+export { eraseFromTheIdentitySet } from "./routine/identity.ts";
+export type { IdentityArm } from "./routine/identity.ts";
 export {
   erasureMatchesIn,
   floorNotCleared,
@@ -9,13 +9,13 @@ export {
 export { accessAnswerOf, ERASURE_FAMILIES, erasureMapOf } from "./map.ts";
 export type { AccessAnswer, ErasureFamily, ErasureFamilyDescriptor, ErasureMap } from "./map.ts";
 export { subjectNamedBy } from "./needles.ts";
-export { rederiveAfterErasure } from "./rederive.ts";
+export { rederiveAfterErasure } from "./routine/rederive.ts";
 export { rehearseErasure, seedSyntheticSubject } from "./rehearsal.ts";
 export type { ErasureRehearsed, RehearsalRefusal } from "./rehearsal.ts";
 export { replayCopiesSince } from "./replay.ts";
 export { replayableErasures, replayErasures } from "./replay-erasures.ts";
 export type { ReplayedErasure } from "./replay-erasures.ts";
-export { beyondUseFrom, ERASURE, runErasure } from "./routine.ts";
+export { beyondUseFrom, ERASURE, runErasure } from "./routine/routine.ts";
 export type {
   ErasureDoors,
   ErasureLog,
@@ -23,7 +23,7 @@ export type {
   QuestionsLogLine,
   ErasureRun,
   RunErasureRefusal,
-} from "./routine.ts";
+} from "./routine/routine.ts";
 export { deadlineOf, dueDateOf, recordSubjectRequest, subjectRequestFor } from "./requests.ts";
 export { suppressInTheWorkspace } from "./suppressions.ts";
 export { ERASURE_REFUSALS } from "./vocabulary.ts";

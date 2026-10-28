@@ -1,6 +1,6 @@
 import type { DecisionModelCall, ModelOutcome, Probabilities } from "../../src/llm/index.ts";
-import { percentile } from "../figures.ts";
-import { recallAt, type RecallQuestion, type Recalls } from "../recall.ts";
+import { recallAt, type RecallQuestion, type Recalls } from "../answering/recall.ts";
+import { percentile } from "../support/figures.ts";
 
 export type EntryPoint = { readonly iri: string; readonly title: string; readonly body?: string };
 

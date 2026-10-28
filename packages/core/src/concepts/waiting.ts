@@ -33,8 +33,8 @@ import {
   resolvedSourcesOf,
   type PassageNamer,
   type PassageReader,
-} from "./read.ts";
-import { payloadFor } from "./suggestions.ts";
+} from "./reading/read.ts";
+import { payloadFor } from "./writes/suggestions.ts";
 
 type WaitingPerson = { readonly id: UserId; readonly name: string };
 

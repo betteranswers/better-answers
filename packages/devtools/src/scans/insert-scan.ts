@@ -9,8 +9,8 @@ export const WHERE_THE_LIST_LIVES = "packages/devtools/src/scans/insert-scan.ts"
 export const FACTORY_MODULES = [
   "apps/worker/tests/factories.py",
   "apps/worker/tests/pg_harness.py",
-  "packages/core/test/audit-rows.ts",
-  "packages/core/test/identity-rows.ts",
+  "packages/core/test/members/audit-log/audit-rows.ts",
+  "packages/core/test/support/identity-rows.ts",
   "packages/schema/test/knowledge/concept-index-rows.ts",
   "packages/schema/test/migrations/before-the-action.ts",
   "packages/schema/test/migrations/before-the-knowledge-words.ts",

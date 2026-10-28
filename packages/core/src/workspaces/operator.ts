@@ -19,7 +19,7 @@ import {
   withOperatorRead,
 } from "../store/postgres/index.ts";
 import { promoting } from "./promotion.ts";
-import { hashOfTyped, mintOneTimeCode } from "./recovery-codes.ts";
+import { hashOfTyped, mintOneTimeCode } from "./second-factor/recovery-codes.ts";
 import { OPERATOR_RESTORE_PREFIX, SESSION_VERIFICATION_PREFIXES } from "./sign-in-and-consent.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 

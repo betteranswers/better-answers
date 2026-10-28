@@ -69,7 +69,7 @@ execFileSync("docker", ["exec", box, "kill", "-CONT", pid]);
 
 ## Gate the reader on the state
 
-Do not let the racing read start until the change it must see has settled. `lendingOnceSettled` in `packages/core/test/suite-postgres.ts` wraps a pool so that `connect` first awaits a promise. Give the write the wrapped pool, and point the promise at the state, not at a lock wait:
+Do not let the racing read start until the change it must see has settled. `lendingOnceSettled` in `packages/core/test/support/suite-postgres.ts` wraps a pool so that `connect` first awaits a promise. Give the write the wrapped pool, and point the promise at the state, not at a lock wait:
 
 ```ts
 let revoking: Promise<unknown> = Promise.resolve();

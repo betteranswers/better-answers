@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { openModelClient } from "../../src/llm/index.ts";
-import { postgresForSuite } from "../suite-postgres.ts";
+import { postgresForSuite } from "../support/suite-postgres.ts";
 import {
   poundsOf,
   readReuse,

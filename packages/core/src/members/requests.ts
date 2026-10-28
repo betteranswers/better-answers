@@ -25,7 +25,7 @@ import {
 } from "../kernel/index.ts";
 import { type PostgresDoor, type Tx, withScope } from "../store/postgres/index.ts";
 import { workspaceIdByShortName } from "../workspaces/index.ts";
-import { mintInvitation, type InvitationToSend } from "./invitations.ts";
+import { mintInvitation, type InvitationToSend } from "./invitations/invitations.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const REQUEST_ACTIONS = declareActions("people", {

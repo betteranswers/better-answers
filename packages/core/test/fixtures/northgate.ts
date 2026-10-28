@@ -8,9 +8,9 @@ import {
   type ConceptWritten,
 } from "../../src/concepts/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
-import { groupNamed } from "../sourced-concept.ts";
-import { addressOf, answered, readingAs } from "../suite-postgres.ts";
-import { doorsOf, memberOf, principalFor, type Scenario } from "../workspace-with-bundle.ts";
+import { addressOf, answered, readingAs } from "../support/suite-postgres.ts";
+import { groupNamed } from "./sourced-concept.ts";
+import { doorsOf, memberOf, principalFor, type Scenario } from "./workspace-with-bundle.ts";
 
 export const NORTHGATE = {
   collection: "company",

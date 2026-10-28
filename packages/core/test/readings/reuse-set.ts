@@ -25,13 +25,13 @@ import {
   setModelPrice,
   setSpendingLimit,
 } from "../../src/workspaces/index.ts";
-import { asked, conceptSeeded, SUITE_ENVELOPE_KEY, type Told } from "../asking.ts";
-import { inMs, percentile, recordFigures, type Figure } from "../figures.ts";
-import { bootstrap, provisionedWorkspace } from "../platform.ts";
-import { readAs } from "../recall.ts";
-import { rowsFrom } from "../rows.ts";
-import { answered, seedingWith } from "../suite-postgres.ts";
-import { principalFor } from "../workspace-with-bundle.ts";
+import { asked, conceptSeeded, SUITE_ENVELOPE_KEY, type Told } from "../answering/asking.ts";
+import { readAs } from "../answering/recall.ts";
+import { principalFor } from "../fixtures/workspace-with-bundle.ts";
+import { inMs, percentile, recordFigures, type Figure } from "../support/figures.ts";
+import { bootstrap, provisionedWorkspace } from "../support/platform.ts";
+import { rowsFrom } from "../support/rows.ts";
+import { answered, seedingWith } from "../support/suite-postgres.ts";
 
 const REUSE_SET = fileURLToPath(new URL("../fixtures/reuse-set.json", import.meta.url));
 

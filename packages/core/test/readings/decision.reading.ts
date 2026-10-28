@@ -4,7 +4,6 @@ import { z } from "zod";
 import { ASK_CAPS, askInput, planAnswer } from "../../src/answering/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
 import { openModelClient, type ModelClient, type ModelToCall } from "../../src/llm/index.ts";
-import { inMs, recordFigures, type Figure } from "../figures.ts";
 import {
   conceptsFoundBy,
   landRecallSet,
@@ -14,10 +13,11 @@ import {
   theRecallSet,
   worded,
   type RecallSet,
-} from "../recall.ts";
-import { visibilitySuite } from "../sourced-concept.ts";
-import { inputOf } from "../suite-input.ts";
-import { answered } from "../suite-postgres.ts";
+} from "../answering/recall.ts";
+import { visibilitySuite } from "../fixtures/sourced-concept.ts";
+import { inMs, recordFigures, type Figure } from "../support/figures.ts";
+import { inputOf } from "../support/suite-input.ts";
+import { answered } from "../support/suite-postgres.ts";
 import { readEntryScoring, type EntryPoint, type EntryScoring } from "./entry-scoring.ts";
 import {
   poundsOf,

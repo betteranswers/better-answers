@@ -1,0 +1,1387 @@
+import { inspect } from "node:util";
+
+import pg from "pg";
+import { assert, describe, expect, it } from "vitest";
+import { z } from "zod";
+
+import { commit, withRepositoryLock } from "@better-answers/core/store/git";
+import { conceptIriOf, passageLocatorOf, ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
+
+import {
+  acceptSuggestions,
+  contentHashOf,
+  declineSuggestion,
+  parseConceptFile,
+  reconcile,
+  reconcileEveryWorkspace,
+  RECONCILER,
+  reconcilerHits,
+  renderConceptFile,
+  submitSuggestionSet,
+  suggestionSetSummary,
+  writeConcept,
+  writeManifest,
+  type Frontmatter,
+  type FrontmatterValue,
+  type Reconciled,
+  type SuggestionRequest,
+  type WorkspaceReconciled,
+  type WriteConceptInput,
+} from "../../../src/concepts/index.ts";
+import { actorIdOf, type Result, type UserPrincipal } from "../../../src/kernel/index.ts";
+import { narrowConnectedSource, narrowConnectedSourceInput } from "../../../src/sources/index.ts";
+import { openPostgres } from "../../../src/store/postgres/index.ts";
+import {
+  bundleHistory,
+  commitFacts,
+  divergeHistory,
+  emptyRootCommit,
+  fileAtCommit,
+  objectRemovedFrom,
+  removeRepository,
+} from "../../fixtures/bundle.ts";
+import { connectedSourceHolding, publishedOnceIndexed } from "../../fixtures/sourced-concept.ts";
+import { doorsOf, suiteWithBundles, type Scenario } from "../../fixtures/workspace-with-bundle.ts";
+import { inputOf } from "../../support/suite-input.ts";
+import { readingAs } from "../../support/suite-postgres.ts";
+import { rewritingElsewhere } from "../bundle-fence.ts";
+
+const { db, arrange } = suiteWithBundles();
+
+let written = 0;
+
+const guideline = (
+  title: string,
+  overrides: Partial<WriteConceptInput> = {},
+): WriteConceptInput => {
+  written += 1;
+  return {
+    mergeKey: `guideline:${title.toLowerCase()}-${written}`,
+    path: `knowledge/guidelines/${title.toLowerCase()}-${written}.md`,
+    kind: "Guideline",
+    title,
+    frontmatter: { title, type: "Guideline", tags: ["finance", "travel"] },
+    body: `# ${title}\n\nBook through the platform, and claim within a month.`,
+    message: `Record the ${title.toLowerCase()} guideline`,
+    author: { name: "Grace Editor", email: "grace@acme.invalid" },
+    expects: { head: null },
+    status: "stable",
+    sensitivity: "Internal",
+    ...overrides,
+  };
+};
+
+const landed = async (scenario: Scenario, principal: UserPrincipal, input: WriteConceptInput) => {
+  const result = await writeConcept(principal, doorsOf(scenario), input);
+  if (!result.ok) throw new Error(`the write was refused: ${String(result.error)}`);
+  return result.value;
+};
+
+const openTheWindow = async (): Promise<() => Promise<void>> => {
+  await db().pool.query(
+    `CREATE FUNCTION crash_in_the_window() RETURNS trigger LANGUAGE plpgsql AS $$
+       BEGIN RAISE EXCEPTION 'the process died between the commit and its rows'; END $$`,
+  );
+  await db().pool.query(
+    "CREATE TRIGGER crash_in_the_window BEFORE INSERT ON bundle_commit FOR EACH ROW EXECUTE FUNCTION crash_in_the_window()",
+  );
+  return async () => {
+    await db().pool.query("DROP TRIGGER crash_in_the_window ON bundle_commit");
+    await db().pool.query("DROP FUNCTION crash_in_the_window()");
+  };
+};
+
+const inTheWindow = async <T extends { readonly ok: boolean }>(
+  action: () => Promise<T>,
+): Promise<T> => {
+  const close = await openTheWindow();
+  try {
+    return await action();
+  } finally {
+    await close();
+  }
+};
+
+const writeInTheWindow = async (
+  scenario: Scenario,
+  principal: UserPrincipal,
+  input: WriteConceptInput,
+): Promise<readonly string[]> => {
+  const refused = await inTheWindow(() => writeConcept(principal, doorsOf(scenario), input));
+  expect(refused.ok).toBe(false);
+  return bundleHistory(scenario.git, scenario.workspaceId);
+};
+
+const reconciled = async (scenario: Scenario): Promise<Reconciled> => {
+  const result = await reconcile(RECONCILER, doorsOf(scenario), {
+    workspaceId: scenario.workspaceId,
+  });
+  if (!result.ok) throw new Error(`the reconciler refused: ${String(result.error)}`);
+  return result.value;
+};
+
+const recordedChain = async (
+  workspaceId: string,
+): Promise<readonly (readonly [string, string | null])[]> => {
+  const rows = await db().pool.query<{ sha: string; parent_sha: string | null }>(
+    "SELECT sha, parent_sha FROM bundle_commit WHERE workspace_id = $1 ORDER BY committed_at, sha",
+    [workspaceId],
+  );
+  return rows.rows.map((row) => [row.sha, row.parent_sha] as const);
+};
+
+const bothReplayedInOrder = async (
+  scenario: Scenario,
+  behind: Result<unknown, unknown>,
+): Promise<readonly string[]> => {
+  expect(behind.ok === false && behind.error instanceof Error).toBe(true);
+  const history = await bundleHistory(scenario.git, scenario.workspaceId);
+  expect(history).toHaveLength(2);
+  expect(await recordedChain(scenario.workspaceId)).toEqual([]);
+
+  const run = await reconciled(scenario);
+
+  expect(run).toMatchObject({
+    watermark: null,
+    replayed: history,
+    skipped: [],
+    stopped: undefined,
+  });
+  expect(await recordedChain(scenario.workspaceId)).toEqual([
+    [history[0], null],
+    [history[1], history[0]],
+  ]);
+  return history;
+};
+
+const rowsOf = async (workspaceId: string) => {
+  const read = await db().pool.query<{ kind: string; key: string; value: string }>(
+    `SELECT 'identity' AS kind, iri AS key, merge_key AS value
+       FROM concept_identity WHERE workspace_id = $1
+     UNION ALL
+     SELECT 'concept', iri, concat_ws(' ', content_hash, commit_sha, status, sensitivity, path)
+       FROM concept_index WHERE workspace_id = $1
+     UNION ALL
+     SELECT 'commit', sha, concat_ws(' ', parent_sha, audit_event_id, actor)
+       FROM bundle_commit WHERE workspace_id = $1
+     UNION ALL
+     SELECT 'event', id, concat_ws(' ', action, actor, subject_id, detail::text)
+       FROM audit_event WHERE workspace_id = $1
+     UNION ALL
+     SELECT 'node', uid, concat_ws(' ', kind, gen::text) FROM map_node WHERE workspace_id = $1
+     UNION ALL
+     SELECT 'edge', uid, concat_ws(' ', from_uid, to_uid) FROM map_edge WHERE workspace_id = $1
+     UNION ALL
+     SELECT 'suggestion', id, concat_ws(' ', status, decider, target_iri)
+       FROM suggestion WHERE workspace_id = $1
+     ORDER BY 1, 2`,
+    [workspaceId],
+  );
+  return read.rows;
+};
+
+const replayDetail = z.object({ evidenceAgrees: z.boolean().optional() });
+
+const replayedEvents = async (workspaceId: string) => {
+  const found = await db().pool.query<Record<string, unknown>>(
+    "SELECT id, actor, subject_id, subject_kind, batch_id, detail FROM audit_event WHERE workspace_id = $1 AND action = 'platform.reconciler.replayed' ORDER BY id",
+    [workspaceId],
+  );
+  return found.rows;
+};
+
+const iriOfFile = async (scenario: Scenario, sha: string, path: string): Promise<string> => {
+  const parsed = parseConceptFile(
+    await fileAtCommit(scenario.git, scenario.workspaceId, sha, path),
+  );
+  if (!parsed.ok) throw new Error("the file at the commit is not a concept file");
+  const iri = parsed.value.frontmatter["iri"];
+  if (typeof iri !== "string") throw new Error("the file carries no IRI");
+  return iri;
+};
+
+const conceptRow = async (workspaceId: string, iri: string) => {
+  const found = await db().pool.query<Record<string, unknown>>(
+    `SELECT c.path, c.kind, c.title, c.content_hash, c.commit_sha, c.status, c.sensitivity,
+            c.audience, i.merge_key
+       FROM concept_index c
+       JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
+      WHERE c.workspace_id = $1 AND c.iri = $2`,
+    [workspaceId, iri],
+  );
+  return found.rows[0];
+};
+
+const sensitivitiesOf = async (workspaceId: string, iris: readonly string[]) => {
+  const rows = await Promise.all(iris.map((iri) => conceptRow(workspaceId, iri)));
+  return rows.map((row) => row?.["sensitivity"]);
+};
+
+const handbook = { resource: "/sources/handbook.pdf", locator: "p.1" };
+const minutes = { resource: "/sources/board-minutes.pdf", locator: "p.2" };
+
+const citing = (source: { readonly resource: string }, documentId: string) => ({
+  resource: source.resource,
+  locator: passageLocatorOf(documentId, 0, 1),
+});
+
+const decisionOf = async (suggestionId: string) => {
+  const found = await db().pool.query<Record<string, unknown>>(
+    "SELECT status, decider, reason, target_iri FROM suggestion WHERE id = $1",
+    [suggestionId],
+  );
+  return found.rows[0];
+};
+
+describe("a commit whose rows were lost", () => {
+  it("is replayed through the live handler, catching the rows up", async () => {
+    const scenario = await arrange();
+    const input = guideline("Travel");
+    const history = await writeInTheWindow(scenario, scenario.editor, input);
+
+    expect(history).toHaveLength(1);
+    expect(await recordedChain(scenario.workspaceId)).toEqual([]);
+    const [sha] = history;
+    assert(sha !== undefined, "the write committed");
+    const facts = await commitFacts(scenario.git, scenario.workspaceId, sha);
+
+    const run = await reconciled(scenario);
+
+    expect(run).toEqual({
+      workspaceId: scenario.workspaceId,
+      head: sha,
+      watermark: null,
+      replayed: [sha],
+      skipped: [],
+      stopped: undefined,
+    });
+
+    expect(await recordedChain(scenario.workspaceId)).toEqual([[sha, null]]);
+    const iri = await iriOfFile(scenario, sha, input.path);
+    expect(await conceptRow(scenario.workspaceId, iri)).toEqual({
+      path: input.path,
+      kind: "Guideline",
+      title: "Travel",
+      content_hash: contentHashOf(input.frontmatter, input.body, input.path),
+      commit_sha: sha,
+
+      status: "stable",
+
+      sensitivity: "Restricted",
+      audience: "everyone",
+
+      merge_key: "Guideline:travel",
+    });
+    const commitRow = await db().pool.query<Record<string, unknown>>(
+      "SELECT parent_sha, audit_event_id, actor FROM bundle_commit WHERE workspace_id = $1 AND sha = $2",
+      [scenario.workspaceId, sha],
+    );
+    expect(commitRow.rows).toEqual([
+      { parent_sha: null, audit_event_id: facts.trailers["Audit"], actor: facts.trailers["Actor"] },
+    ]);
+    const nodes = await db().pool.query<{ uid: string }>(
+      "SELECT uid FROM map_node WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(nodes.rows).toEqual([{ uid: iri }]);
+  });
+
+  it("is audited as the platform's; the commit stays the person's", async () => {
+    const scenario = await arrange();
+    const [sha] = await writeInTheWindow(scenario, scenario.editor, guideline("Leave"));
+    assert(sha !== undefined, "the write committed");
+
+    await reconciled(scenario);
+
+    const facts = await commitFacts(scenario.git, scenario.workspaceId, sha);
+    expect(facts.author).toBe("Grace Editor <grace@acme.invalid>");
+    expect(facts.trailers["Actor"]).toBe(actorIdOf(scenario.editor));
+    const iri = await iriOfFile(scenario, sha, "knowledge/guidelines/leave-2.md");
+    expect(await replayedEvents(scenario.workspaceId)).toEqual([
+      {
+        id: facts.trailers["Audit"],
+        actor: "process:better-answers-reconciler",
+        subject_id: sha,
+        subject_kind: "reconciler",
+        batch_id: null,
+        detail: {
+          iri,
+          commitSha: sha,
+          contentHash: contentHashOf(
+            { title: "Leave", type: "Guideline", tags: ["finance", "travel"] },
+            "# Leave\n\nBook through the platform, and claim within a month.",
+            "knowledge/guidelines/leave-2.md",
+          ),
+
+          evidenceAgrees: true,
+        },
+      },
+    ]);
+    const joined = await db().pool.query<{ action: string; actor: string }>(
+      `SELECT e.action, e.actor FROM bundle_commit c
+         JOIN audit_event e ON e.workspace_id = c.workspace_id AND e.id = c.audit_event_id
+        WHERE c.workspace_id = $1 AND c.sha = $2`,
+      [scenario.workspaceId, sha],
+    );
+    expect(joined.rows).toEqual([
+      { action: "platform.reconciler.replayed", actor: "process:better-answers-reconciler" },
+    ]);
+    const booked = await db().pool.query(
+      "SELECT 1 FROM audit_event WHERE workspace_id = $1 AND actor = $2 AND action LIKE 'knowledge.%'",
+      [scenario.workspaceId, actorIdOf(scenario.editor)],
+    );
+    expect(booked.rowCount).toBe(0);
+  });
+
+  it("is replayed oldest first, along with the writes behind it", async () => {
+    const scenario = await arrange();
+    const [orphan = null] = await writeInTheWindow(
+      scenario,
+      scenario.editor,
+      guideline("Sickness"),
+    );
+
+    const behind = await writeConcept(
+      scenario.editor,
+      doorsOf(scenario),
+      guideline("Overtime", { expects: { head: orphan } }),
+    );
+
+    const history = await bothReplayedInOrder(scenario, behind);
+
+    const events = await replayedEvents(scenario.workspaceId);
+    expect(events.map((event) => event["subject_id"])).toEqual(history);
+    expect(new Set(events.map((event) => event["batch_id"])).size).toBe(1);
+    expect(events[0]?.["batch_id"]).not.toBeNull();
+  });
+
+  it("changes nothing once replayed, whatever the watermark says", async () => {
+    const scenario = await arrange();
+    const first = await landed(scenario, scenario.editor, guideline("Expenses"));
+    const history = await writeInTheWindow(
+      scenario,
+      scenario.editor,
+      guideline("Mileage", { expects: { head: first.sha } }),
+    );
+    const orphan = history[1];
+    assert(orphan !== undefined, "the second write committed");
+    await reconciled(scenario);
+    const before = await rowsOf(scenario.workspaceId);
+
+    const again = await reconciled(scenario);
+
+    expect(again).toMatchObject({ watermark: orphan, replayed: [], skipped: [] });
+    expect(await rowsOf(scenario.workspaceId)).toEqual(before);
+
+    await db().pool.query(
+      "UPDATE bundle_commit SET committed_at = committed_at - interval '1 day' WHERE workspace_id = $1 AND sha = $2",
+      [scenario.workspaceId, orphan],
+    );
+    const misled = await reconciled(scenario);
+
+    expect(misled).toMatchObject({ watermark: first.sha, replayed: [], skipped: [orphan] });
+    expect(await rowsOf(scenario.workspaceId)).toEqual(before);
+  });
+});
+
+describe("a commit with lost rows, carrying what the replay reads", () => {
+  it("is replayed with the file's title when none was given", async () => {
+    const scenario = await arrange();
+    const input = guideline("Parking", { frontmatter: { type: "Guideline" } });
+    const [sha = ""] = await writeInTheWindow(scenario, scenario.editor, input);
+
+    const run = await reconciled(scenario);
+
+    expect(run.stopped).toBeUndefined();
+    expect(run.replayed).toEqual([sha]);
+    const iri = await iriOfFile(scenario, sha, input.path);
+    expect(await conceptRow(scenario.workspaceId, iri)).toMatchObject({
+      title: "Parking",
+      kind: "Guideline",
+      merge_key: "Guideline:parking",
+    });
+  });
+
+  it("is replayed from a non-ASCII file name git would quote", async () => {
+    const scenario = await arrange();
+    const input = guideline("Café", { path: "knowledge/guidelines/café.md" });
+    const [sha = ""] = await writeInTheWindow(scenario, scenario.editor, input);
+
+    const run = await reconciled(scenario);
+
+    expect(run.stopped).toBeUndefined();
+    const iri = await iriOfFile(scenario, sha, input.path);
+    expect(await conceptRow(scenario.workspaceId, iri)).toMatchObject({
+      path: "knowledge/guidelines/café.md",
+      commit_sha: sha,
+    });
+  });
+});
+
+const handMadeFirstAndReplayed = async (
+  scenario: Scenario,
+  change: { readonly path: string; readonly content: string; readonly message: string },
+) => {
+  const made = await commit(scenario.editor, scenario.git, {
+    ...change,
+    author: { name: "Grace Editor", email: "grace@acme.invalid" },
+    trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
+    expectedHead: null,
+    at: new Date(),
+  });
+  if (!made.ok) throw new Error(`the hand-made commit was refused: ${String(made.error)}`);
+
+  const { replayed, skipped, stopped } = await reconciled(scenario);
+  return {
+    made: made.value.sha,
+    replay: {
+      replayed,
+      skipped,
+      stopped,
+      chain: await recordedChain(scenario.workspaceId),
+      events: await replayedEvents(scenario.workspaceId),
+    },
+  };
+};
+
+const stoppedUnreadableAt = (sha: string) => ({
+  replayed: [],
+  skipped: [],
+  stopped: { sha, reason: "unreadable-commit" },
+  chain: [],
+  events: [],
+});
+
+describe("a manifest commit whose rows were lost", () => {
+  const manifest = {
+    id: "01J6BBBBBBBBBBBBBBBBBBBBBB",
+    origin: "company",
+    ref: "Four bid libraries, reviewed 22 September 2026",
+    owner: "Acme",
+    content_version: "2026-09-22",
+  } as const;
+
+  it("lands its commit row alone, then the concept behind it", async () => {
+    const scenario = await arrange();
+    const lost = await inTheWindow(() =>
+      writeManifest(scenario.admin, doorsOf(scenario), {
+        manifest,
+        message: "Write the bundle's manifest",
+        author: { name: "Grace Editor", email: "grace@acme.invalid" },
+      }),
+    );
+    expect(lost.ok).toBe(false);
+    const [first = ""] = await bundleHistory(scenario.git, scenario.workspaceId);
+    const input = guideline("Travel", { expects: { head: first } });
+    const behind = await writeConcept(scenario.editor, doorsOf(scenario), input);
+
+    const history = await bothReplayedInOrder(scenario, behind);
+
+    const facts = await commitFacts(scenario.git, scenario.workspaceId, first);
+    const events = await replayedEvents(scenario.workspaceId);
+    expect(events[0]).toEqual({
+      id: facts.trailers["Audit"],
+      actor: "process:better-answers-reconciler",
+      subject_id: first,
+      subject_kind: "reconciler",
+      batch_id: events[1]?.["batch_id"],
+      detail: { commitSha: first, bundleId: "01J6BBBBBBBBBBBBBBBBBBBBBB" },
+    });
+    const concepts = await db().pool.query<{ path: string; commit_sha: string }>(
+      "SELECT path, commit_sha FROM concept_index WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(concepts.rows).toEqual([{ path: input.path, commit_sha: history[1] }]);
+  });
+
+  it("stops at an unparsable hand-made manifest, landing nothing", async () => {
+    const { made, replay } = await handMadeFirstAndReplayed(await arrange(), {
+      path: "knowledge/manifest.yaml",
+      content: '"id": "acme-2026"\n"origin": "company"\n',
+      message: "Write a manifest by hand",
+    });
+
+    expect(replay).toEqual(stoppedUnreadableAt(made));
+  });
+
+  it.each([
+    ["a constructor key", '"constructor": "x"\n'],
+    ["a __proto__ key", '"__proto__": "x"\n'],
+    ["a null __proto__", '"__proto__": null\n'],
+    ["a __proto__ key twice", '"__proto__": "x"\n"__proto__": "y"\n'],
+  ])("stops at a hand-made manifest with %s", async (_shape, extra) => {
+    const fields = Object.entries(manifest).map(
+      ([key, value]) => `${JSON.stringify(key)}: ${JSON.stringify(value)}\n`,
+    );
+    const { made, replay } = await handMadeFirstAndReplayed(await arrange(), {
+      path: "knowledge/manifest.yaml",
+      content: `${fields.join("")}${extra}`,
+      message: "Write a manifest by hand",
+    });
+
+    expect(replay).toEqual(stoppedUnreadableAt(made));
+  });
+});
+
+const committedByHand = async (
+  scenario: Scenario,
+  change: { readonly path: string; readonly content: string; readonly projection?: string },
+  expectedHead: string | null,
+): Promise<string> => {
+  const made = await commit(scenario.admin, scenario.git, {
+    path: change.path,
+    content: change.content,
+    message: `Commit ${change.path} by hand`,
+    author: { name: "Grace Admin", email: "grace@acme.invalid" },
+    trailers: { actor: actorIdOf(scenario.admin), audit: ulid(), projection: change.projection },
+    expectedHead,
+    at: new Date(),
+  });
+  if (!made.ok) throw new Error(`the hand-made commit was refused: ${String(made.error)}`);
+  return made.value.sha;
+};
+
+const A_SKELETON = {
+  path: `guides/${ulid()}.yaml`,
+  content: '{\n  "sections": []\n}\n',
+  projection: "guides",
+} as const;
+
+describe("a skeleton commit whose rows were lost", () => {
+  it("replays a projection commit its rows never reached", async () => {
+    const scenario = await arrange();
+    const sha = await committedByHand(scenario, A_SKELETON, null);
+
+    const { replayed, stopped } = await reconciled(scenario);
+
+    expect(stopped).toBeUndefined();
+    expect(replayed).toEqual([sha]);
+    expect(await recordedChain(scenario.workspaceId)).toEqual([[sha, null]]);
+    expect((await replayedEvents(scenario.workspaceId)).map((event) => event["detail"])).toEqual([
+      { commitSha: sha },
+    ]);
+  });
+
+  it("replays concept commits past a projection commit", async () => {
+    const scenario = await arrange();
+    const iri = conceptIriOf(ulid());
+    const skeleton = await committedByHand(scenario, A_SKELETON, null);
+    const concept = await committedByHand(
+      scenario,
+      {
+        path: "knowledge/guidelines/fuel.md",
+        content: renderConceptFile(
+          { title: "Fuel", type: "Guideline", iri },
+          "# Fuel\n\nClaim fuel at the published rate per mile.",
+        ),
+      },
+      skeleton,
+    );
+
+    const { replayed, stopped } = await reconciled(scenario);
+
+    expect(stopped).toBeUndefined();
+    expect(replayed).toEqual([skeleton, concept]);
+    expect(await recordedChain(scenario.workspaceId)).toEqual([
+      [skeleton, null],
+      [concept, skeleton],
+    ]);
+    expect(await conceptRow(scenario.workspaceId, iri)).toMatchObject({
+      path: "knowledge/guidelines/fuel.md",
+      commit_sha: concept,
+    });
+  });
+});
+
+describe("a re-write whose rows were lost", () => {
+  it("keeps identity, class and status while sources match the citations", async () => {
+    const scenario = await arrange();
+    const input = guideline("Parking");
+    const first = await landed(scenario, scenario.editor, input);
+    const body = "# Parking\n\nClaim the station car park, and nothing else.";
+    const history = await writeInTheWindow(scenario, scenario.editor, {
+      ...input,
+      iri: first.iri,
+      body,
+      expects: { head: first.sha },
+    });
+
+    const run = await reconciled(scenario);
+
+    expect(run).toMatchObject({ watermark: first.sha, replayed: [history[1]] });
+
+    expect(await conceptRow(scenario.workspaceId, first.iri)).toEqual({
+      path: input.path,
+      kind: "Guideline",
+      title: "Parking",
+      content_hash: contentHashOf(input.frontmatter, body, input.path),
+      commit_sha: history[1],
+      status: "stable",
+      sensitivity: "Internal",
+      audience: "everyone",
+      merge_key: input.mergeKey,
+    });
+    const counted = await db().pool.query<{ concepts: string; identities: string }>(
+      `SELECT (SELECT count(*) FROM concept_index WHERE workspace_id = $1)::text AS concepts,
+              (SELECT count(*) FROM concept_identity WHERE workspace_id = $1)::text AS identities`,
+      [scenario.workspaceId],
+    );
+    expect(counted.rows).toEqual([{ concepts: "1", identities: "1" }]);
+  });
+
+  const allowancesCitingTheHandbook = async (scenario: Scenario) => {
+    const internal = await connectedSourceHolding(db(), scenario.workspaceId);
+    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, {
+      sensitivity: "Restricted",
+    });
+    const input = guideline("Allowances", {
+      frontmatter: {
+        title: "Allowances",
+        type: "Guideline",
+        sources: [citing(handbook, internal.documentId)],
+      },
+    });
+    const first = await landed(scenario, scenario.editor, input);
+    const minuted = (head: string | null): WriteConceptInput => ({
+      ...input,
+      iri: first.iri,
+      frontmatter: {
+        title: "Allowances",
+        type: "Guideline",
+        sources: [citing(handbook, internal.documentId), citing(minutes, restricted.documentId)],
+      },
+      body: "# Allowances\n\nWhat the board minuted.",
+      expects: { head },
+    });
+    return { internal, restricted, input, first, minuted };
+  };
+
+  const citedDocuments = async (workspaceId: string, iri: string) => {
+    const cited = await db().pool.query<{ source_document_id: string; locator: string }>(
+      `SELECT source_document_id, locator FROM concept_evidence
+        WHERE workspace_id = $1 AND iri = $2 ORDER BY locator`,
+      [workspaceId, iri],
+    );
+    return cited.rows;
+  };
+
+  it("replays a commit's evidence rows from its file", async () => {
+    const scenario = await arrange();
+    const { internal, restricted, first, minuted } = await allowancesCitingTheHandbook(scenario);
+
+    const history = await writeInTheWindow(scenario, scenario.editor, minuted(first.sha));
+    const run = await reconciled(scenario);
+
+    expect(run).toMatchObject({ replayed: [history[1]], stopped: undefined });
+    expect(await citedDocuments(scenario.workspaceId, first.iri)).toEqual(
+      [citing(handbook, internal.documentId), citing(minutes, restricted.documentId)]
+        .map(({ locator }) => ({ source_document_id: locator.split("/")[0], locator }))
+        .toSorted((one, other) => one.locator.localeCompare(other.locator)),
+    );
+    expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
+      commit_sha: history[1],
+      sensitivity: "Restricted",
+    });
+    const events = await replayedEvents(scenario.workspaceId);
+    expect(events.map((event) => replayDetail.parse(event["detail"]).evidenceAgrees)).toEqual([
+      true,
+    ]);
+  });
+
+  const uncatalogued = (scenario: Scenario, documentId: string) =>
+    db().pool.query("DELETE FROM source_document WHERE workspace_id = $1 AND id = $2", [
+      scenario.workspaceId,
+      documentId,
+    ]);
+
+  const minutedThenUncatalogued = async (scenario: Scenario) => {
+    const cited = await allowancesCitingTheHandbook(scenario);
+    const history = await writeInTheWindow(
+      scenario,
+      scenario.editor,
+      cited.minuted(cited.first.sha),
+    );
+    await uncatalogued(scenario, cited.restricted.documentId);
+    return { ...cited, history };
+  };
+
+  it("lands Restricted, flagged, when its file cites an uncatalogued document", async () => {
+    const scenario = await arrange();
+    const { internal, first, history } = await minutedThenUncatalogued(scenario);
+
+    expect(await reconciled(scenario)).toMatchObject({ replayed: history.slice(1) });
+    expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
+      sensitivity: "Restricted",
+      audience: "everyone",
+      commit_sha: history.at(-1),
+    });
+    expect(await citedDocuments(scenario.workspaceId, first.iri)).toEqual([
+      {
+        source_document_id: internal.documentId,
+        locator: citing(handbook, internal.documentId).locator,
+      },
+    ]);
+    const events = await replayedEvents(scenario.workspaceId);
+    expect(events.map((event) => replayDetail.parse(event["detail"]).evidenceAgrees)).toEqual([
+      false,
+    ]);
+  });
+
+  it("refuses an edit widening a concept a replay held Restricted", async () => {
+    const scenario = await arrange();
+    const { internal, input, first, history } = await minutedThenUncatalogued(scenario);
+    await reconciled(scenario);
+    const quarantined = await conceptRow(scenario.workspaceId, first.iri);
+
+    const edited = await writeConcept(scenario.admin, doorsOf(scenario), {
+      iri: first.iri,
+      mergeKey: input.mergeKey,
+      path: input.path,
+      kind: input.kind,
+      title: input.title,
+      frontmatter: input.frontmatter,
+      body: "# Allowances\n\nWhat the board minuted, reworded.",
+      message: "Reword the allowances guideline",
+      author: input.author,
+      expects: { base: String(quarantined?.["content_hash"]) },
+      status: "stable",
+    });
+
+    expect(edited).toEqual({ ok: false, error: "widening-refused" });
+    expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
+      commit_sha: history.at(-1),
+      sensitivity: "Restricted",
+    });
+    expect(await citedDocuments(scenario.workspaceId, first.iri)).toEqual([
+      {
+        source_document_id: internal.documentId,
+        locator: citing(handbook, internal.documentId).locator,
+      },
+    ]);
+  });
+
+  it("stays Restricted through publish and narrowing cascades, unlike its neighbour", async () => {
+    const scenario = await arrange();
+    const website = await connectedSourceHolding(db(), scenario.workspaceId, {
+      sensitivity: "Public",
+      publishedAt: null,
+    });
+    const minutesSource = await connectedSourceHolding(db(), scenario.workspaceId);
+    const citingTheWebsite = (title: string) =>
+      guideline(title, {
+        frontmatter: { title, type: "Guideline", sources: [citing(handbook, website.documentId)] },
+        sensitivity: "Restricted",
+      });
+    const input = citingTheWebsite("Allowances");
+    const first = await landed(scenario, scenario.admin, input);
+    const beside = await landed(scenario, scenario.admin, {
+      ...citingTheWebsite("Mileage"),
+      expects: { head: first.sha },
+    });
+    await writeInTheWindow(scenario, scenario.admin, {
+      ...input,
+      iri: first.iri,
+      frontmatter: {
+        title: "Allowances",
+        type: "Guideline",
+        sources: [citing(handbook, website.documentId), citing(minutes, minutesSource.documentId)],
+      },
+      body: "# Allowances\n\nWhat the board minuted.",
+      expects: { head: beside.sha },
+    });
+    await uncatalogued(scenario, minutesSource.documentId);
+    expect(await reconciled(scenario)).toMatchObject({ stopped: undefined });
+    expect(
+      (await replayedEvents(scenario.workspaceId)).map(
+        (event) => replayDetail.parse(event["detail"]).evidenceAgrees,
+      ),
+    ).toEqual([false]);
+
+    const published = await publishedOnceIndexed(db(), scenario.admin, website.connectedSourceId);
+
+    expect(published.ok).toBe(true);
+    expect(await sensitivitiesOf(scenario.workspaceId, [first.iri, beside.iri])).toEqual([
+      "Restricted",
+      "Public",
+    ]);
+
+    const narrowed = await readingAs(db().runtimePool, scenario.admin, (admin, tx) =>
+      narrowConnectedSource(
+        admin,
+        tx,
+        inputOf(narrowConnectedSourceInput, {
+          connectedSourceId: website.connectedSourceId,
+          sensitivity: "Internal",
+          audience: "everyone",
+        }),
+      ),
+    );
+
+    expect(narrowed.ok).toBe(true);
+    expect(await sensitivitiesOf(scenario.workspaceId, [first.iri, beside.iri])).toEqual([
+      "Restricted",
+      "Internal",
+    ]);
+  });
+
+  it("is replayed though its author may no longer read it", async () => {
+    const scenario = await arrange();
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
+    const input = guideline("Hospitality", {
+      frontmatter: {
+        title: "Hospitality",
+        type: "Guideline",
+        sources: [citing(handbook, connectedSource.documentId)],
+      },
+    });
+    const first = await landed(scenario, scenario.editor, input);
+    const body = "# Hospitality\n\nA meal a day, receipted.";
+    const history = await writeInTheWindow(scenario, scenario.editor, {
+      ...input,
+      iri: first.iri,
+      body,
+      expects: { head: first.sha },
+    });
+
+    const narrowed = await readingAs(db().runtimePool, scenario.admin, (admin, tx) =>
+      narrowConnectedSource(
+        admin,
+        tx,
+        inputOf(narrowConnectedSourceInput, {
+          connectedSourceId: connectedSource.connectedSourceId,
+          sensitivity: "Restricted",
+          audience: "everyone",
+        }),
+      ),
+    );
+    expect(narrowed.ok).toBe(true);
+
+    const run = await reconciled(scenario);
+
+    expect(run).toMatchObject({ replayed: [history[1]], stopped: undefined });
+    expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
+      content_hash: contentHashOf(input.frontmatter, body, input.path),
+      commit_sha: history[1],
+      sensitivity: "Restricted",
+    });
+  });
+});
+
+let proposed = 0;
+
+const requestFor = (
+  title: string,
+  overrides: Partial<SuggestionRequest> = {},
+): SuggestionRequest => {
+  proposed += 1;
+  return {
+    mergeKey: `guideline:proposed-${proposed}`,
+    path: `knowledge/guidelines/proposed-${proposed}.md`,
+    conceptKind: "Guideline",
+    title,
+    frontmatter: { title, type: "Guideline" },
+    body: `# ${title}\n\nProposed by a colleague, decided by an Admin.`,
+    ...overrides,
+  };
+};
+
+const raised = async (scenario: Scenario, request: SuggestionRequest) => {
+  const set = await submitSuggestionSet(
+    scenario.editor,
+    { postgres: scenario.postgres },
+    { kind: "edit", requests: [request] },
+  );
+  if (!set.ok) throw new Error(`the set was not submitted: ${String(set.error)}`);
+  const summary = await readingAs(db().runtimePool, scenario.admin, (principal, tx) =>
+    suggestionSetSummary(principal, tx, set.value.setId),
+  );
+  if (!summary.ok) throw new Error(`the set did not render: ${String(summary.error)}`);
+  const item = summary.value[0];
+  if (item === undefined) throw new Error("the set rendered no item");
+  return { suggestionId: item.suggestionId, target: item.target };
+};
+
+const acceptInTheWindow = async (
+  scenario: Scenario,
+  item: { readonly suggestionId: string; readonly target: string | null },
+): Promise<string> => {
+  const outcomes = await inTheWindow(() =>
+    acceptSuggestions(scenario.admin, doorsOf(scenario), {
+      decisions: [{ suggestionId: item.suggestionId, expectedTarget: item.target }],
+    }),
+  );
+  expect(outcomes.ok && outcomes.value.map((outcome) => outcome.outcome.ok)).toEqual([false]);
+
+  const history = await bundleHistory(scenario.git, scenario.workspaceId);
+  const sha = history.at(-1) ?? "";
+  const facts = await commitFacts(scenario.git, scenario.workspaceId, sha);
+  expect(facts.trailers["Suggestion"]).toBe(item.suggestionId);
+  expect(await decisionOf(item.suggestionId)).toMatchObject({ status: "waiting" });
+  return sha;
+};
+
+describe("an acceptance whose rows were lost", () => {
+  it("lands the concept and records the accepting Admin's decision", async () => {
+    const scenario = await arrange();
+    const request = requestFor("Remote working");
+    const item = await raised(scenario, request);
+    const sha = await acceptInTheWindow(scenario, item);
+
+    const run = await reconciled(scenario);
+
+    expect(run).toMatchObject({ replayed: [sha], stopped: undefined });
+
+    const iri = await iriOfFile(scenario, sha, request.path);
+    expect(await decisionOf(item.suggestionId)).toEqual({
+      status: "accepted",
+      decider: actorIdOf(scenario.admin),
+      reason: null,
+      target_iri: iri,
+    });
+    expect(await conceptRow(scenario.workspaceId, iri)).toMatchObject({
+      path: request.path,
+      kind: "Guideline",
+      title: "Remote working",
+      merge_key: request.mergeKey,
+      content_hash: contentHashOf(request.frontmatter, request.body, request.path),
+    });
+
+    expect(await replayedEvents(scenario.workspaceId)).toHaveLength(1);
+    const accepted = await db().pool.query(
+      "SELECT 1 FROM audit_event WHERE workspace_id = $1 AND action = 'knowledge.suggestion.accepted'",
+      [scenario.workspaceId],
+    );
+    expect(accepted.rowCount).toBe(0);
+  });
+
+  it("lands the commit, keeping a decline made in the meantime", async () => {
+    const scenario = await arrange();
+    const request = requestFor("Hot desking");
+    const item = await raised(scenario, request);
+    const sha = await acceptInTheWindow(scenario, item);
+
+    const declined = await declineSuggestion(scenario.admin, doorsOf(scenario), {
+      suggestionId: item.suggestionId,
+      reason: "decided again after the outage",
+    });
+    expect(declined.ok).toBe(true);
+
+    const run = await reconciled(scenario);
+
+    expect(run).toMatchObject({ replayed: [sha], stopped: undefined });
+    expect(await decisionOf(item.suggestionId)).toMatchObject({
+      status: "declined",
+      reason: "decided again after the outage",
+      target_iri: null,
+    });
+    const iri = await iriOfFile(scenario, sha, request.path);
+    expect(await conceptRow(scenario.workspaceId, iri)).toMatchObject({
+      title: "Hot desking",
+
+      merge_key: "Guideline:hot desking",
+    });
+  });
+});
+
+describe("a concept carrying a __proto__ front-matter key", () => {
+  const withProto = (title: string): Frontmatter =>
+    Object.fromEntries<FrontmatterValue>([
+      ["title", title],
+      ["type", "Guideline"],
+      ["__proto__", "x"],
+      [
+        "sources",
+        [
+          Object.fromEntries<string>([
+            ["resource", handbook.resource],
+            ["__proto__", "y"],
+          ]),
+        ],
+      ],
+    ]);
+
+  const rowAgainstFile = async (scenario: Scenario, sha: string, path: string) => {
+    const read = parseConceptFile(
+      await fileAtCommit(scenario.git, scenario.workspaceId, sha, path),
+    );
+    if (!read.ok) throw new Error("the landed file is not a concept file");
+    const found = await db().pool.query<{ frontmatter: unknown; content_hash: string }>(
+      "SELECT frontmatter, content_hash FROM concept_index WHERE workspace_id = $1 AND path = $2",
+      [scenario.workspaceId, path],
+    );
+    return {
+      row: found.rows[0],
+      file: {
+        frontmatter: read.value.frontmatter,
+        content_hash: contentHashOf(read.value.frontmatter, read.value.body, path),
+      },
+    };
+  };
+
+  it("replays a lost write, keeping the key in the row", async () => {
+    const scenario = await arrange();
+    const input = guideline("Prototypes", { frontmatter: withProto("Prototypes") });
+    const [sha = ""] = await writeInTheWindow(scenario, scenario.editor, input);
+
+    await reconciled(scenario);
+
+    const { row, file } = await rowAgainstFile(scenario, sha, input.path);
+    expect(Object.hasOwn(file.frontmatter, "__proto__")).toBe(true);
+    expect(row).toEqual(file);
+  });
+
+  it("lands an accepted suggestion, keeping the key in the row", async () => {
+    const scenario = await arrange();
+    const request = requestFor("Proposed prototypes", {
+      frontmatter: withProto("Proposed prototypes"),
+    });
+    const item = await raised(scenario, request);
+
+    const outcomes = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+      decisions: [{ suggestionId: item.suggestionId, expectedTarget: item.target }],
+    });
+
+    assert(outcomes.ok, inspect(outcomes));
+    expect(outcomes.value.map((outcome) => outcome.outcome.ok)).toEqual([true]);
+    const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1);
+    assert(sha !== undefined, "the acceptance committed");
+    const { row, file } = await rowAgainstFile(scenario, sha, request.path);
+    expect(file.frontmatter).toEqual({
+      ...request.frontmatter,
+      status: "stable",
+      iri: matching.any(String),
+    });
+    expect(row).toEqual(file);
+  });
+});
+
+describe("what the reconciler refuses", () => {
+  it("refuses a bundle whose recorded history diverged, landing nothing", async () => {
+    const scenario = await arrange();
+    await landed(scenario, scenario.editor, guideline("Uniform"));
+    const before = await rowsOf(scenario.workspaceId);
+    await divergeHistory(scenario.git, scenario.workspaceId);
+
+    const refused = await reconcile(RECONCILER, doorsOf(scenario), {
+      workspaceId: scenario.workspaceId,
+    });
+
+    expect(refused).toEqual({ ok: false, error: "history-diverged" });
+    expect(await rowsOf(scenario.workspaceId)).toEqual(before);
+  });
+
+  it("refuses a workspace with no repository, as an unrestored store", async () => {
+    const scenario = await arrange();
+    await removeRepository(scenario.git, scenario.workspaceId);
+
+    const refused = await reconcile(RECONCILER, doorsOf(scenario), {
+      workspaceId: scenario.workspaceId,
+    });
+
+    expect(refused).toEqual({ ok: false, error: "no-such-repository" });
+  });
+
+  it("hands back the store's own failure from reading the watermark", async () => {
+    const scenario = await arrange();
+    await landed(scenario, scenario.editor, guideline("Umbrellas"));
+    const gone = new pg.Pool(db().runtimePool.options);
+    await gone.end();
+
+    const refused = await reconcile(
+      RECONCILER,
+      { ...doorsOf(scenario), postgres: openPostgres(gone) },
+      { workspaceId: scenario.workspaceId },
+    );
+
+    expect(refused).toEqual({ ok: false, error: matching.any(Error) });
+  });
+
+  it("skips a bundle another process is rewriting, landing nothing", async () => {
+    const scenario = await arrange();
+    await landed(scenario, scenario.editor, guideline("Kettles"));
+    const before = await rowsOf(scenario.workspaceId);
+    const rewriting = await rewritingElsewhere(db().pool, scenario.workspaceId);
+
+    const skipped = await reconcile(RECONCILER, doorsOf(scenario), {
+      workspaceId: scenario.workspaceId,
+    });
+    await rewriting.release();
+
+    expect(skipped).toEqual({ ok: false, error: "held" });
+    expect(await rowsOf(scenario.workspaceId)).toEqual(before);
+  });
+
+  it("refuses a malformed workspace id before opening anything", async () => {
+    const scenario = await arrange();
+
+    const refused = await reconcile(RECONCILER, doorsOf(scenario), { workspaceId: "acme" });
+
+    expect(refused).toEqual({ ok: false, error: "malformed" });
+  });
+
+  it("finds nothing to do for an empty or up-to-date bundle", async () => {
+    const scenario = await arrange();
+
+    const empty = await reconciled(scenario);
+    const first = await landed(scenario, scenario.editor, guideline("Bicycles"));
+    const current = await reconciled(scenario);
+
+    expect(empty).toMatchObject({ head: null, watermark: null, replayed: [], skipped: [] });
+    expect(current).toMatchObject({
+      head: first.sha,
+      watermark: first.sha,
+      replayed: [],
+      skipped: [],
+    });
+  });
+});
+
+describe("a commit the rows cannot take", () => {
+  it("stops the replay, its audit event rolled back, landing nothing", async () => {
+    const scenario = await arrange();
+    const first = guideline("Fuel");
+    const landing = await landed(scenario, scenario.editor, first);
+
+    const clash = await commit(scenario.editor, scenario.git, {
+      path: first.path,
+      content: renderConceptFile(
+        { title: "Fuel again", type: "Guideline", iri: conceptIriOf(ulid()) },
+        first.body,
+      ),
+      message: "Record a second fuel guideline by hand",
+      author: first.author,
+      trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
+      expectedHead: landing.sha,
+      at: new Date(),
+    });
+    assert(clash.ok, inspect(clash));
+    const orphan = clash.value.sha;
+
+    const behind = await writeConcept(
+      scenario.editor,
+      doorsOf(scenario),
+      guideline("Tolls", { expects: { head: orphan } }),
+    );
+    expect(behind.ok).toBe(false);
+    const history = await bundleHistory(scenario.git, scenario.workspaceId);
+    expect(history).toHaveLength(3);
+    const before = await rowsOf(scenario.workspaceId);
+
+    const run = await reconciled(scenario);
+
+    expect(run).toEqual({
+      workspaceId: scenario.workspaceId,
+      head: history[2],
+      watermark: landing.sha,
+      replayed: [],
+      skipped: [],
+      stopped: { sha: history[1], reason: "path-taken" },
+    });
+    expect(await rowsOf(scenario.workspaceId)).toEqual(before);
+    expect(await replayedEvents(scenario.workspaceId)).toEqual([]);
+  });
+
+  it("stops at a moved concept, leaving its row in place", async () => {
+    const scenario = await arrange();
+    const input = guideline("Bridges");
+    const landing = await landed(scenario, scenario.editor, input);
+
+    const moved = await commit(scenario.editor, scenario.git, {
+      path: "knowledge/guidelines/bridges-moved.md",
+      content: await fileAtCommit(scenario.git, scenario.workspaceId, landing.sha, input.path),
+      message: "Move the bridges guideline by hand",
+      author: { name: "Grace Editor", email: "grace@acme.invalid" },
+      trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
+      expectedHead: landing.sha,
+      at: new Date(),
+    });
+    assert(moved.ok, inspect(moved));
+
+    const run = await reconciled(scenario);
+
+    expect(run).toMatchObject({
+      replayed: [],
+      stopped: { sha: moved.value.sha, reason: "rename-refused" },
+    });
+    expect(await conceptRow(scenario.workspaceId, landing.iri)).toMatchObject({
+      path: input.path,
+      commit_sha: landing.sha,
+    });
+    expect(await recordedChain(scenario.workspaceId)).toEqual([[landing.sha, null]]);
+  });
+
+  it("stops at a hand-made commit rather than guessing its meaning", async () => {
+    const { made, replay } = await handMadeFirstAndReplayed(await arrange(), {
+      path: "knowledge/manifest.yaml",
+      content: "name: acme\n",
+      message: "Seed the manifest by hand",
+    });
+
+    expect(replay).toEqual(stoppedUnreadableAt(made));
+  });
+
+  it("stops at a hand-made concept file with no IRI", async () => {
+    const { made, replay } = await handMadeFirstAndReplayed(await arrange(), {
+      path: "knowledge/guidelines/unnamed.md",
+      content: renderConceptFile({ type: "Guideline", title: "Unnamed" }, "# Unnamed\n\nNo IRI."),
+      message: "Record a concept by hand, lacking its IRI",
+    });
+
+    expect(replay).toEqual(stoppedUnreadableAt(made));
+  });
+
+  it("stops at a hand-made commit that changes no file", async () => {
+    const scenario = await arrange();
+    const made = await emptyRootCommit(
+      scenario.git,
+      scenario.workspaceId,
+      `Record nothing by hand\n\nActor: ${actorIdOf(scenario.editor)}\nAudit: ${ulid()}`,
+    );
+
+    const { replayed, skipped, stopped } = await reconciled(scenario);
+
+    expect({ replayed, skipped, stopped }).toEqual({
+      replayed: [],
+      skipped: [],
+      stopped: { sha: made, reason: "unreadable-commit" },
+    });
+    expect(await recordedChain(scenario.workspaceId)).toEqual([]);
+  });
+
+  it.each([
+    ["no type or title", {}],
+    ["a title, no type", { title: "Untitled" }],
+    ["a type, no title", { type: "Guideline" }],
+  ] as const)("stops at an unheld concept with %s", async (_lacking, named) => {
+    const { made, replay } = await handMadeFirstAndReplayed(await arrange(), {
+      path: "knowledge/guidelines/untitled.md",
+      content: renderConceptFile({ ...named, iri: conceptIriOf(ulid()) }, "# Untitled\n\nNo name."),
+      message: "Record a concept by hand, lacking its type or its title",
+    });
+
+    expect(replay).toEqual(stoppedUnreadableAt(made));
+  });
+});
+
+describe("the fence", () => {
+  it("skips a bundle a live action holds, never waiting", async () => {
+    const scenario = await arrange();
+    const order: string[] = [];
+    const action = withRepositoryLock(scenario.editor, scenario.git, async () => {
+      order.push("action in");
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      order.push("action out");
+    });
+    const run = reconcile(RECONCILER, doorsOf(scenario), {
+      workspaceId: scenario.workspaceId,
+    }).then((answered) => {
+      order.push("reconciler out");
+      return answered;
+    });
+
+    const [, answered] = await Promise.all([action, run]);
+
+    expect(answered).toEqual({ ok: false, error: "held" });
+    expect(order).toEqual(["action in", "reconciler out", "action out"]);
+  });
+});
+
+const PERIODIC_HEAD_CHECK_ALLOWANCE_MS = 90_000;
+
+const outcomesOfPass = async (
+  scenario: Scenario,
+): Promise<ReadonlyMap<string, WorkspaceReconciled["outcome"]>> => {
+  const pass = await reconcileEveryWorkspace(RECONCILER, doorsOf(scenario));
+  if (!pass.ok) throw new Error(`the pass was refused: ${pass.error.message}`);
+  return new Map(pass.value.map((outcome) => [outcome.workspaceId, outcome.outcome]));
+};
+
+describe("the periodic head check's pass", () => {
+  it(
+    "reconciles every workspace, each on its own outcome",
+    async () => {
+      const behind = await arrange();
+      const current = await arrange();
+      const missing = await arrange();
+      await removeRepository(missing.git, missing.workspaceId);
+      const history = await writeInTheWindow(behind, behind.editor, guideline("Lunch"));
+
+      const outcomes = await outcomesOfPass(behind);
+
+      expect(outcomes.get(behind.workspaceId)).toMatchObject({
+        ok: true,
+        value: { replayed: history },
+      });
+      expect(outcomes.get(current.workspaceId)).toMatchObject({
+        ok: true,
+        value: { head: null, replayed: [] },
+      });
+
+      expect(outcomes.get(missing.workspaceId)).toEqual({ ok: false, error: "no-such-repository" });
+    },
+    PERIODIC_HEAD_CHECK_ALLOWANCE_MS,
+  );
+
+  it(
+    "keeps one workspace's unwalkable history to that workspace's outcome",
+    async () => {
+      const broken = await arrange();
+      const later = await arrange();
+      const [first = ""] = await writeInTheWindow(broken, broken.editor, guideline("Parking"));
+      await writeInTheWindow(
+        broken,
+        broken.editor,
+        guideline("Taxis", { expects: { head: first } }),
+      );
+      await objectRemovedFrom(broken.git, broken.workspaceId, first);
+      const history = await writeInTheWindow(later, later.editor, guideline("Hotels"));
+
+      const outcomes = await outcomesOfPass(broken);
+
+      expect(outcomes.get(broken.workspaceId)).toEqual({ ok: false, error: matching.any(Error) });
+      expect(outcomes.get(later.workspaceId)).toMatchObject({
+        ok: true,
+        value: { replayed: history },
+      });
+    },
+    PERIODIC_HEAD_CHECK_ALLOWANCE_MS,
+  );
+});
+
+describe("reconciler hits", () => {
+  it("are the replay's audit events, oldest first, never a counter", async () => {
+    const scenario = await arrange();
+    const [first = ""] = await writeInTheWindow(scenario, scenario.editor, guideline("Bikes"));
+    const history = await writeInTheWindow(
+      scenario,
+      scenario.editor,
+      guideline("Trains", { expects: { head: first } }),
+    );
+
+    expect(await reconcilerHits(RECONCILER, scenario.postgres, scenario)).toEqual({
+      ok: true,
+      value: [],
+    });
+
+    await reconciled(scenario);
+
+    const hits = await reconcilerHits(RECONCILER, scenario.postgres, scenario);
+    assert(hits.ok, inspect(hits));
+
+    expect(hits.value.map((hit) => hit.commitSha)).toEqual(history);
+    const facts = await commitFacts(scenario.git, scenario.workspaceId, first);
+    expect(hits.value[0]?.auditEventId).toBe(facts.trailers["Audit"]);
+    expect(hits.value[0]?.batchId).not.toBeNull();
+    expect(hits.value[1]?.batchId).toBe(hits.value[0]?.batchId);
+
+    const later = new Date(Date.now() + 60_000);
+    expect(
+      await reconcilerHits(RECONCILER, scenario.postgres, { ...scenario, since: later }),
+    ).toEqual({ ok: true, value: [] });
+    expect(await reconcilerHits(RECONCILER, scenario.postgres, { workspaceId: "nope" })).toEqual({
+      ok: false,
+      error: "malformed",
+    });
+  });
+});

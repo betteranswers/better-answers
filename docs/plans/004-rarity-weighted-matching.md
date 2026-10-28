@@ -54,7 +54,7 @@ The vector leaves out the `description`, which every one of the 243 concepts in 
 
 ### Measured recall
 
-Read with `packages/core/test/recall.test.ts` on 14/10/2026, before and after, on the same corpus of 240 synthetic `Answer`s. The synthetic set carries no `description`, so these figures measure the ranking alone; the description's effect is shown by a test (U1), and on the customer's rows by the fixed list once BA-152 maps it.
+Read with `packages/core/test/answering/recall.test.ts` on 14/10/2026, before and after, on the same corpus of 240 synthetic `Answer`s. The synthetic set carries no `description`, so these figures measure the ranking alone; the description's effect is shown by a test (U1), and on the customer's rows by the fixed list once BA-152 maps it.
 
 | Set | Read through | Counted by | Before | After |
 | --- | --- | --- | --- | --- |
@@ -109,7 +109,7 @@ The gain is modest, as the owner expected: the buyer-worded set at ten rises 5.2
 
 ### Risks
 
-- **Cost.** `find`'s budget test (`packages/core/test/find-budget.test.ts`) read 4.6 one-row reads at the median before, and between 8.6 and 17.7 over three readings after, against a budget of 60; the recall figures above are unchanged by freezing the counts. EXPLAIN ANALYZE of the counts for a 104-word query over the 240 synthetic `Answer`s: one `Bitmap Heap Scan on concept_index d (actual rows=240.00 loops=1)`, 1.6 ms; in the match, the rarities are an InitPlan that runs `loops=1`. The passage run reads every readable passage once a request, so its cost grows with the passage table (BA-169).
+- **Cost.** `find`'s budget test (`packages/core/test/answering/find-budget.test.ts`) read 4.6 one-row reads at the median before, and between 8.6 and 17.7 over three readings after, against a budget of 60; the recall figures above are unchanged by freezing the counts. EXPLAIN ANALYZE of the counts for a 104-word query over the 240 synthetic `Answer`s: one `Bitmap Heap Scan on concept_index d (actual rows=240.00 loops=1)`, 1.6 ms; in the match, the rarities are an InitPlan that runs `loops=1`. The passage run reads every readable passage once a request, so its cost grows with the passage table (BA-169).
 - **Cursor length.** The cap was 512 characters. The three longest buyer-worded rows (431 to 477 characters, 26 to 31 words) gave cursors of 312 to 323 over the synthetic `Answer`s; the same counts scaled to 10^5 passages give at most 404. A 500-character query of 64 distinct words held widely gave 602 characters at 240 rows and 776 at 10^5, so its next page was refused as a cursor `find` did not hand out. The owner raised the cap to 1,024 on 14/10/2026, and a test pages a 500-character query of 120 common words to its second page. A query of about 120 words each held by 1,000 rows or more can still pass 1,024.
 - **A lexeme with no positions** (past position 16,383, or a stripped vector) counts toward strength but adds nothing to the weight. The body cap of 100,000 characters keeps a concept short of that; a passage is a chunk.
 
@@ -119,12 +119,12 @@ The gain is modest, as the owner expected: the buyer-worded set at ten rises 5.2
 
 - **Goal:** R1.
 - **Requirements:** R1.
-- **Files:** `packages/schema/src/knowledge/concept-tables.ts`, `packages/schema/migrations/0080_the-concept-description.sql` with its snapshot and journal, `apps/worker/src/better_answers_worker/schema_view.py` (generated), `packages/core/test/concept-search.test.ts`.
+- **Files:** `packages/schema/src/knowledge/concept-tables.ts`, `packages/schema/migrations/0080_the-concept-description.sql` with its snapshot and journal, `apps/worker/src/better_answers_worker/schema_view.py` (generated), `packages/core/test/concepts/writes/concept-search.test.ts`.
 - **Approach:** KTD4, KTD5. Generate with `pnpm --filter @better-answers/schema run generate --name the-concept-description`, replace the SQL with the hand-written statement under the custom marker, then run `generate:worker-view`, `generate:roles-surface` and `generate:contract-stamp`.
 - **Test scenarios:**
   - A concept written with a `description` holds its words at weight B, beside its title's A, its tag's B and its body's C.
   - The existing cases of a concept with no `description` read as before.
-- **Verification:** `packages/core/test/concept-search.test.ts` and `packages/schema/test/migrations/migration-ownership.test.ts` pass.
+- **Verification:** `packages/core/test/concepts/writes/concept-search.test.ts` and `packages/schema/test/migrations/migration-ownership.test.ts` pass.
 
 ### U2. The rule's weight
 
@@ -141,13 +141,13 @@ The gain is modest, as the owner expected: the buyer-worded set at ten rises 5.2
   - Strong and weak hold half the words, rounded up, as before.
   - The counts read the corpus and each word in one pass, and the weight follows the counts it is given, not the rows.
   - The concept search column's GIN index is valid, ready and over the column after 0080.
-- **Verification:** `packages/schema/test/knowledge/full-text-match.test.ts` passes; `packages/core/test/visibility.test.ts` and `packages/core/test/find-matching.test.ts` (*pages past a withheld concept as past an absent one*) pass.
+- **Verification:** `packages/schema/test/knowledge/full-text-match.test.ts` passes; `packages/core/test/concepts/visibility.test.ts` and `packages/core/test/answering/find-matching.test.ts` (*pages past a withheld concept as past an absent one*) pass.
 
 ### U3. The cursor and the docs
 
 - **Goal:** R6, and the docs this overrides.
 - **Requirements:** R6.
-- **Files:** `packages/core/src/answering/cursor.ts`, `packages/core/src/answering/index.ts`, `packages/core/test/find-matching.test.ts`, `packages/core/test/answering.test.ts`, `packages/core/test/concept-plans.test.ts`, `packages/core/test/passage-plans.test.ts`, `docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, `docs/specs/v01-route.md`, `docs/solutions/architecture-patterns/adr-0018.md`.
+- **Files:** `packages/core/src/answering/cursor.ts`, `packages/core/src/answering/index.ts`, `packages/core/test/answering/find-matching.test.ts`, `packages/core/test/answering/answering.test.ts`, `packages/core/test/concepts/reading/concept-plans.test.ts`, `packages/core/test/sources/passage-plans.test.ts`, `docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, `docs/specs/v01-route.md`, `docs/solutions/architecture-patterns/adr-0018.md`.
 - **Approach:** KTD3. Re-encode the base64 cursors the tests hold.
 - **Test scenarios:**
   - A page's cursor names the run, the row's weight (`ln 2.4` for the case built), its density and its key.
@@ -157,14 +157,14 @@ The gain is modest, as the owner expected: the buyer-worded set at ten rises 5.2
   - A Viewer's concepts, and a Viewer's passages, page and order as before a Restricted row holding a query word lands.
   - The largest and smallest bounds read without error.
   - Pages over three runs continue each run and end with no cursor.
-- **Verification:** `packages/core/test/find-matching.test.ts` and `packages/core/test/answering.test.ts` pass; the recall measure reports the figures above.
+- **Verification:** `packages/core/test/answering/find-matching.test.ts` and `packages/core/test/answering/answering.test.ts` pass; the recall measure reports the figures above.
 
 ## Verification Contract
 
 - `pnpm --filter @better-answers/schema run check` and `pnpm --filter @better-answers/core run check`.
 - `pnpm run check:worker`, for the regenerated schema view.
 - The root `pnpm run check:gates`.
-- `packages/core/test/recall.test.ts` prints the figures; it asserts none.
+- `packages/core/test/answering/recall.test.ts` prints the figures; it asserts none.
 
 ## Definition of Done
 

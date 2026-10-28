@@ -52,12 +52,6 @@ export const CAPS: readonly Cap[] = [
     "the image's early COPY and the CI cache keys name it",
   ),
   awaiting("apps/worker/tests", 48),
-  awaiting("packages/core/src/concepts", 20),
-  awaiting("packages/core/src/erasure", 17),
-  awaiting("packages/core/src/kernel", 18),
-  awaiting("packages/core/src/members", 21),
-  awaiting("packages/core/src/workspaces", 26),
-  awaiting("packages/core/test", 156),
 ];
 
 const READ_TREES = /^(?:apps\/[^/]+\/(?:src|test|tests|e2e)|packages\/[^/]+\/(?:src|test))\//u;

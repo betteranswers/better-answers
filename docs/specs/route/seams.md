@@ -28,17 +28,17 @@ The general test rules are in `CODING_STANDARDS.md`, under Tests.
 
 **ops seam.** Each `pnpm ops` command answers done, refused or not built, each with its own exit code, through `runOps`.
 
-**rebuild equivalence.** The worker's full map rebuild matches the map the api's own writes left (`packages/core/test/rebuild-equivalence.test.ts`). A block that touches the map keeps it green.
+**rebuild equivalence.** The worker's full map rebuild matches the map the api's own writes left (`packages/core/test/concepts/rebuild-equivalence.test.ts`). A block that touches the map keeps it green.
 
-**cross-tier document test.** The api's actions connect, review and publish a document, the worker runs as a real process against the same stores, and the api reads the passage back as a literal through `find` and `open` (`packages/core/test/cross-tier-document.test.ts`). A block that adds a connector or an extraction step extends this test.
+**cross-tier document test.** The api's actions connect, review and publish a document, the worker runs as a real process against the same stores, and the api reads the passage back as a literal through `find` and `open` (`packages/core/test/sources/cross-tier-document.test.ts`). A block that adds a connector or an extraction step extends this test.
 
-**invisibility suite.** A concept, passage or `Answer` the reader may not read is absent through every entry, with no count and no different refusal. The suites are `packages/core/test/invisibility.test.ts` and `apps/api/tests/invisibility.test.ts`.
+**invisibility suite.** A concept, passage or `Answer` the reader may not read is absent through every entry, with no count and no different refusal. The suites are `packages/core/test/access/invisibility.test.ts` and `apps/api/tests/invisibility.test.ts`.
 
 ## Third-party doubles
 
 A double stands only at the wire of a service someone else runs.
 
-- **The model client's wire.** A fetch-shaped fake passed in place of the real fetch (ADR 0049), in `packages/core/test/judge-wire.ts` and `apps/api/tests/harness-model.ts`. S7 reuses it.
+- **The model client's wire.** A fetch-shaped fake passed in place of the real fetch (ADR 0049), in `packages/core/test/support/judge-wire.ts` and `apps/api/tests/harness-model.ts`. S7 reuses it.
 - **The Graph API.** A SharePoint fake at the Graph API arrives with S4.
 - **The embeddings endpoint.** A fake arrives with S8, the one block that embeds.
 

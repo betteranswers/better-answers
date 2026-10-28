@@ -1,6 +1,6 @@
 import type { UserId } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { ADMIN, mustHoldOneOf } from "./second-factor.ts";
+import { ADMIN, mustHoldOneOf } from "./second-factor/second-factor.ts";
 
 const REQUIRED = `SELECT ${mustHoldOneOf("u")} AS required FROM "user" u WHERE u.id = $1`;
 

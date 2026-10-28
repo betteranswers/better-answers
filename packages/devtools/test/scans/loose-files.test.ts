@@ -51,7 +51,7 @@ describe("the files the gate counts", () => {
     ["apps/web/e2e/page.spec.ts", true],
     ["apps/worker/tests/test_work_loop.py", true],
     ["apps/worker/src/better_answers_worker/redaction/pins.py", true],
-    ["packages/core/test/workspaces.test.ts", true],
+    ["packages/core/test/workspaces/workspaces.test.ts", true],
     ["packages/core/src/members/index.ts", true],
     ["packages/core/tests/workspaces.test.ts", false],
     ["packages/core/e2e/page.spec.ts", false],
@@ -257,11 +257,11 @@ describe("the gate over a throwaway repository", () => {
   });
 
   it("fails a cap its folder has fallen below", () => {
-    const ran = spawned(repositoryOf(filesIn("packages/core/test", 100)));
+    const ran = spawned(repositoryOf(filesIn("apps/web/src/shared/ui", 20)));
 
     expect(ran.status).toBe(1);
-    expect(ran.stdout).toContain("packages/core/test: its cap of 156");
-    expect(ran.stdout).toContain("Lower the cap to 100");
+    expect(ran.stdout).toContain("apps/web/src/shared/ui: its cap of 29");
+    expect(ran.stdout).toContain("Lower the cap to 20");
   });
 
   it("fails a cap whose folder is within the limit", () => {

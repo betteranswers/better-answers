@@ -1,0 +1,1320 @@
+import { inspect } from "node:util";
+
+import { assert, beforeAll, describe, expect, it } from "vitest";
+
+import { head } from "@better-answers/core/store/git";
+import { ids, type ConceptIri } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
+
+import { open, renderOpen } from "../../../src/answering/index.ts";
+import {
+  importBundle,
+  parseConceptFile,
+  writeConcept,
+  writeManifest,
+  type BundleImported,
+  type BundleTree,
+  type ImportBundleInput,
+  type ImportLog,
+  type ImportProgress,
+  type MapNotAnalysedLine,
+  type WriteConceptInput,
+} from "../../../src/concepts/index.ts";
+import type { UserPrincipal } from "../../../src/kernel/index.ts";
+import { bundleHistory, commitFacts, fileAtCommit, holdMainRef } from "../../fixtures/bundle.ts";
+import {
+  doorsOf,
+  memberOf,
+  suiteWithBundles,
+  type Scenario,
+} from "../../fixtures/workspace-with-bundle.ts";
+import {
+  addressOf,
+  holdingTable,
+  isBlockedOnTable,
+  mapAutovacuumOff,
+  readingAs,
+  until,
+} from "../../support/suite-postgres.ts";
+
+const { db, arrange } = suiteWithBundles();
+
+const BUNDLE_ID = "01J6CCCCCCCCCCCCCCCCCCCCCC";
+
+const MANIFEST = `id: ${BUNDLE_ID}
+origin: company
+ref: Two answer libraries, reviewed 22 September 2026
+owner: Acme Software Ltd
+content_version: 2026-09-22
+`;
+
+const VERIFIED_AT = "2026-04-16T00:00:00Z";
+const CHECKED_AGAIN_AT = "2026-06-01T09:30:00Z";
+
+type Event = { readonly by: string; readonly at: string };
+
+type Concept = {
+  readonly title: string;
+  readonly body: string;
+  readonly type?: string;
+  readonly tags?: string;
+  readonly entry?: string;
+  readonly verified?: readonly Event[];
+  readonly frontmatter?: string;
+  readonly sources?: string;
+};
+
+const conceptFile = (concept: Concept): string => {
+  const entry = concept.entry ?? "ENTRY-001";
+  const verified =
+    concept.verified === undefined
+      ? ""
+      : `verified:\n${concept.verified.map((event) => `  - { by: ${event.by}, at: ${event.at} }`).join("\n")}\n`;
+  const sources =
+    concept.sources ??
+    `  - id: ${entry}
+    resource: ../sources/Acme_Bid_Library_v1.md
+    title: Acme Bid Library v1, entry ${entry}
+    last_modified: 2026-03-01
+`;
+  return `---
+type: ${concept.type ?? "Answer"}
+title: ${concept.title}
+description: One sentence a listing shows.
+tags: [${concept.tags ?? "company"}]
+generated: { by: claude-code/claude-fable-5-1, at: 2026-09-22T00:30:00Z }
+${verified}${concept.frontmatter ?? ""}sources:
+${sources}---
+
+${concept.body}
+`;
+};
+
+const treeOf = (files: Readonly<Record<string, string>>): BundleTree =>
+  new Map(Object.entries(files));
+
+type Verifiers = { readonly mona: string; readonly theo: string };
+
+const humanOf = (email: string): string => `human:${email}`;
+
+const soundBundle = (verifiers: Verifiers): BundleTree => {
+  const byMona = { by: humanOf(verifiers.mona), at: VERIFIED_AT };
+  const byTheo = { by: humanOf(verifiers.theo), at: CHECKED_AGAIN_AT };
+  return treeOf({
+    "manifest.yaml": MANIFEST,
+    "index.md":
+      "# Subdirectories\n\n* [company](company/index.md)\n* [product](product/index.md)\n",
+    "log.md": "# Log\n\n## 2026-09-22\n\nMade from the two libraries.\n",
+    "company/index.md": "# Subdirectories\n\n* [answers](answers/index.md)\n",
+    "company/answers/index.md": "# Concepts\n\n* [Support hours](support-hours.md)\n",
+    "company/answers/support-hours.md": conceptFile({
+      title: "Support hours",
+      entry: "ENTRY-001",
+      verified: [byMona],
+      body: "Support answers between 08:00 and 18:00 on working days. [Advanced plan](../../product/tiers/advanced-plan.md) customers reach an engineer out of hours.",
+    }),
+    "company/answers/data-retention-period.md": conceptFile({
+      title: "Data retention period",
+      entry: "ENTRY-002",
+      tags: "company, g-cloud-15",
+      verified: [byMona, byTheo],
+      body: "Customer data is kept for the life of the contract and ninety days after.\n\n## G-Cloud 15 Service Definition\n\nRetention is ninety days beyond termination, then deletion is certified in writing.",
+    }),
+    "product/tiers/standard-plan.md": conceptFile({
+      type: "Tier",
+      title: "Standard plan",
+      tags: "product, standard",
+      entry: "standard-plan",
+      verified: [byMona],
+      body: "The Standard plan is one of the two plans of the product.",
+    }),
+    "product/tiers/advanced-plan.md": conceptFile({
+      type: "Tier",
+      title: "Advanced plan",
+      tags: "product, advanced",
+      entry: "advanced-plan",
+      verified: [byMona],
+      body: "The Advanced plan adds encrypted case data and out-of-hours support.",
+    }),
+    "product/answers/can-two-teams-share-one-account-standard-plan.md": conceptFile({
+      title: "Can two teams share one account? (Standard plan)",
+      tags: "product, standard",
+      entry: "PROD-013",
+      verified: [byMona],
+      body: "Yes, under one data-sharing agreement; access follows the team by default.\n\nThis answer is for the [Standard plan](../tiers/standard-plan.md).",
+    }),
+    "product/answers/can-two-teams-share-one-account-advanced-plan.md": conceptFile({
+      title: "Can two teams share one account? (Advanced plan)",
+      tags: "product, advanced",
+      entry: "PROD-013",
+      verified: [byMona],
+      body: "Yes, and each case is granted to named people alone. The [Standard plan's answer](./can-two-teams-share-one-account-standard-plan.md) is the looser default.\n\nThis answer is for the [Advanced plan](../tiers/advanced-plan.md).",
+    }),
+  });
+};
+
+const PATHS_IN_ORDER = [
+  "knowledge/company/answers/data-retention-period.md",
+  "knowledge/company/answers/support-hours.md",
+  "knowledge/product/answers/can-two-teams-share-one-account-advanced-plan.md",
+  "knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md",
+  "knowledge/product/tiers/advanced-plan.md",
+  "knowledge/product/tiers/standard-plan.md",
+] as const;
+
+type Arranged = {
+  readonly scenario: Scenario;
+  readonly verifiers: Verifiers;
+  readonly people: { readonly mona: string; readonly theo: string };
+};
+
+const arranged = async (): Promise<Arranged> => {
+  const scenario = await arrange();
+  const verifiers = { mona: addressOf("mona"), theo: addressOf("theo") };
+  const mona = await memberOf(db().pool, scenario.workspaceId, verifiers.mona);
+  const theo = await memberOf(db().pool, scenario.workspaceId, verifiers.theo);
+  return { scenario, verifiers, people: { mona: mona.id, theo: theo.id } };
+};
+
+const SILENT: ImportLog = { warn: () => undefined };
+
+const importing = (
+  scenario: Scenario,
+  principal: UserPrincipal,
+  input: ImportBundleInput,
+  log: ImportLog = SILENT,
+): ReturnType<typeof importBundle> => importBundle(principal, { ...doorsOf(scenario), log }, input);
+
+const imported = async (
+  scenario: Scenario,
+  tree: BundleTree,
+  overrides: Partial<ImportBundleInput> = {},
+): Promise<BundleImported> => {
+  const run = await importing(scenario, scenario.admin, { tree, ...overrides });
+  if (!run.ok) throw new Error(`the import was refused: ${JSON.stringify(run.error)}`);
+  return run.value;
+};
+
+const COUNTED_TABLES = {
+  concepts: "concept_index",
+  commits: "bundle_commit",
+  verifications: "concept_verification",
+} as const;
+
+const rowsFor = async (workspaceId: string) => {
+  const counts: Record<string, string> = {};
+  for (const [name, table] of Object.entries(COUNTED_TABLES)) {
+    const counted = await db().pool.query<{ n: string }>(
+      `SELECT count(*) AS n FROM ${table} WHERE workspace_id = $1`,
+      [workspaceId],
+    );
+    counts[name] = counted.rows[0]?.n ?? "";
+  }
+  const events = await db().pool.query<{ n: string }>(
+    "SELECT count(*) AS n FROM audit_event WHERE workspace_id = $1 AND action LIKE 'knowledge.%'",
+    [workspaceId],
+  );
+  return { ...counts, events: events.rows[0]?.n ?? "" };
+};
+
+const nothingWritten = async (scenario: Scenario) => {
+  const [sha, rows] = await Promise.all([
+    head(scenario.admin, scenario.git),
+    rowsFor(scenario.workspaceId),
+  ]);
+  expect({ head: sha, ...rows }).toEqual({
+    head: null,
+    concepts: "0",
+    commits: "0",
+    verifications: "0",
+    events: "0",
+  });
+};
+
+const indexRows = async (workspaceId: string) => {
+  const found = await db().pool.query<Record<string, unknown>>(
+    `SELECT path, kind, title, status, sensitivity
+       FROM concept_index WHERE workspace_id = $1 ORDER BY path`,
+    [workspaceId],
+  );
+  return found.rows;
+};
+
+const verificationRows = async (workspaceId: string) => {
+  const found = await db().pool.query<Record<string, unknown>>(
+    `SELECT c.path, v.actor, v.verified_at, v.content_hash, v.origin
+       FROM concept_verification v
+       JOIN concept_index c ON c.workspace_id = v.workspace_id AND c.iri = v.iri
+      WHERE v.workspace_id = $1
+      ORDER BY c.path, v.verified_at`,
+    [workspaceId],
+  );
+  return found.rows;
+};
+
+const knowledgeEventsOf = async (workspaceId: string) => {
+  const found = await db().pool.query<Record<string, unknown>>(
+    `SELECT action, actor, subject_kind, batch_id
+       FROM audit_event WHERE workspace_id = $1 AND action LIKE 'knowledge.%'
+      ORDER BY at, id`,
+    [workspaceId],
+  );
+  return found.rows;
+};
+
+const authorOf = async (principal: UserPrincipal): Promise<string> => {
+  const found = await db().pool.query<{ name: string; email: string }>(
+    'SELECT name, email FROM "user" WHERE id = $1',
+    [principal.userId],
+  );
+  const row = found.rows[0];
+  if (row === undefined) throw new Error("the principal has no user row");
+  return `${row.name} <${row.email}>`;
+};
+
+const irisByPath = async (workspaceId: string): Promise<ReadonlyMap<string, ConceptIri>> => {
+  const found = await db().pool.query<{ path: string; iri: string }>(
+    "SELECT path, iri FROM concept_index WHERE workspace_id = $1",
+    [workspaceId],
+  );
+  return new Map(found.rows.map((row) => [row.path, ids.conceptIri.parse(row.iri)]));
+};
+
+const filesAtHead = async (scenario: Scenario): Promise<ReadonlyMap<string, string>> => {
+  const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1) ?? "";
+  const files = new Map<string, string>();
+  for (const path of PATHS_IN_ORDER) {
+    files.set(path, await fileAtCommit(scenario.git, scenario.workspaceId, sha, path));
+  }
+  return files;
+};
+
+const LINKED = {
+  supportHours: "knowledge/company/answers/support-hours.md",
+  advancedAnswer: "knowledge/product/answers/can-two-teams-share-one-account-advanced-plan.md",
+  standardAnswer: "knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md",
+  advancedTier: "knowledge/product/tiers/advanced-plan.md",
+  standardTier: "knowledge/product/tiers/standard-plan.md",
+} as const;
+
+const REWRITTEN_IN_ORDER = [
+  { path: LINKED.supportHours, links: 1 },
+  { path: LINKED.advancedAnswer, links: 2 },
+  { path: LINKED.standardAnswer, links: 1 },
+];
+
+const movedBetweenThePasses = async <T>(path: string, work: () => Promise<T>): Promise<T> => {
+  const pool = db().pool;
+  await pool.query(
+    `CREATE FUNCTION move_between_the_passes() RETURNS trigger LANGUAGE plpgsql AS $$
+       BEGIN
+         UPDATE concept_index SET content_hash = repeat('f', 64)
+          WHERE workspace_id = NEW.workspace_id AND iri = NEW.iri AND path = '${path}';
+         RETURN NEW;
+       END $$`,
+  );
+  await pool.query(
+    "CREATE TRIGGER move_between_the_passes AFTER INSERT ON concept_verification FOR EACH ROW EXECUTE FUNCTION move_between_the_passes()",
+  );
+  try {
+    return await work();
+  } finally {
+    await pool.query("DROP TRIGGER move_between_the_passes ON concept_verification");
+    await pool.query("DROP FUNCTION move_between_the_passes()");
+  }
+};
+
+const standingConcept = (
+  scenario: Scenario,
+  mergeKey: string,
+  overrides: Partial<WriteConceptInput> = {},
+) =>
+  writeConcept(scenario.admin, doorsOf(scenario), {
+    mergeKey,
+    path: "knowledge/elsewhere.md",
+    kind: "Answer",
+    title: "Elsewhere",
+    frontmatter: { title: "Elsewhere", type: "Answer" },
+    body: "A concept that already stands.",
+    message: "Record a standing concept",
+    author: { name: "Ada Editor", email: "ada@acme.invalid" },
+    expects: { head: null },
+    ...overrides,
+  });
+
+const landedBetweenTheReadAndTheWrite = async (
+  scenario: Scenario,
+  path: string,
+  run: () => ReturnType<typeof importBundle>,
+) => {
+  let stopped: ReturnType<typeof importBundle> | undefined;
+  let landing: ReturnType<typeof writeConcept> | undefined;
+  await holdingTable(db().pool, "bundle_commit", async () => {
+    stopped = run();
+    await until(() => isBlockedOnTable(db().pool, "bundle_commit"));
+    landing = standingConcept(scenario, "Answer:landed elsewhere", {
+      path,
+      title: "Landed elsewhere",
+      frontmatter: { title: "Landed elsewhere", type: "Answer" },
+      body: "Landed by another writer.",
+      message: "Land a concept between the loader's read and its write",
+      expects: { base: null },
+    });
+  });
+  const other = await landing;
+  if (other === undefined || !other.ok) {
+    throw new Error(`the other writer was refused: ${String(other?.error)}`);
+  }
+  return { stopped: await stopped, other: other.value };
+};
+
+const stoppedAt = (file: string, reason: string, progress: ImportProgress) => ({
+  ok: false,
+  error: { kind: "stopped", file, reason, progress },
+});
+
+const STOPPED_WHERE_THE_CONCEPT_MOVED = stoppedAt(
+  "company/answers/support-hours.md",
+  "stale-precondition",
+  {
+    landed: PATHS_IN_ORDER,
+    skipped: [],
+    verifications: { recorded: 7, present: 0 },
+    rewritten: [],
+  },
+);
+
+const MAP_TABLES = ["map_edge", "map_node"] as const;
+
+const mapRowsHeld = async (): Promise<Record<string, number>> => {
+  const counted = await db().pool.query<Record<string, number>>(
+    `SELECT (SELECT count(*)::int FROM map_edge) AS map_edge,
+            (SELECT count(*)::int FROM map_node) AS map_node`,
+  );
+  return counted.rows[0] ?? {};
+};
+
+const plannersRowEstimates = async (): Promise<Record<string, number>> => {
+  const read = await db().pool.query<{ table: string; estimate: number }>(
+    `SELECT relname AS "table", reltuples::int AS estimate FROM pg_class
+      WHERE relnamespace = 'public'::regnamespace AND relname = ANY($1::text[])`,
+    [[...MAP_TABLES]],
+  );
+  return Object.fromEntries(read.rows.map((row) => [row.table, row.estimate]));
+};
+
+const warningsKept = (): { readonly log: ImportLog; readonly warnings: MapNotAnalysedLine[] } => {
+  const warnings: MapNotAnalysedLine[] = [];
+  const warn = (line: MapNotAnalysedLine): void => {
+    warnings.push(line);
+  };
+  return { log: { warn }, warnings };
+};
+
+const analyseHeldOff = <T>(work: () => Promise<T>): Promise<T> =>
+  holdingTable(db().pool, "map_node", work, "SHARE UPDATE EXCLUSIVE");
+
+describe("importing the bundle", () => {
+  beforeAll(() => mapAutovacuumOff(db().pool));
+
+  it("analyses the map for the planner once landed", async () => {
+    const { scenario, verifiers } = await arranged();
+    const { log, warnings } = warningsKept();
+
+    await importing(scenario, scenario.admin, { tree: soundBundle(verifiers) }, log);
+
+    expect(await plannersRowEstimates()).toEqual(await mapRowsHeld());
+    expect(warnings).toEqual([]);
+  });
+
+  it("reports a landed import when the analyse fails", async () => {
+    const { scenario, verifiers } = await arranged();
+    const { log, warnings } = warningsKept();
+
+    const run = await analyseHeldOff(() =>
+      importing(scenario, scenario.admin, { tree: soundBundle(verifiers) }, log),
+    );
+
+    expect(run).toMatchObject({ ok: true, value: { landed: PATHS_IN_ORDER, dryRun: false } });
+    expect(warnings).toEqual([
+      {
+        workspace_id: scenario.workspaceId,
+        bundle_id: BUNDLE_ID,
+        error: "canceling statement due to lock timeout",
+      },
+    ]);
+  });
+
+  it("keeps the stopped refusal when the analyse fails too", async () => {
+    const { scenario, verifiers } = await arranged();
+    const { log, warnings } = warningsKept();
+
+    const stopped = await analyseHeldOff(() =>
+      movedBetweenThePasses(LINKED.supportHours, () =>
+        importing(scenario, scenario.admin, { tree: soundBundle(verifiers) }, log),
+      ),
+    );
+
+    expect(stopped).toEqual(STOPPED_WHERE_THE_CONCEPT_MOVED);
+    expect(warnings).toHaveLength(1);
+  });
+
+  it("commits the manifest, then each concept in path order", async () => {
+    const { scenario, verifiers } = await arranged();
+
+    const run = await imported(scenario, soundBundle(verifiers));
+
+    expect(run).toEqual({
+      bundleId: BUNDLE_ID,
+      manifest: "written",
+      landed: PATHS_IN_ORDER,
+      skipped: [],
+      verifications: { recorded: 7, present: 0 },
+      rewritten: REWRITTEN_IN_ORDER,
+      concepts: 6,
+      dryRun: false,
+    });
+    const history = await bundleHistory(scenario.git, scenario.workspaceId);
+    expect(history).toHaveLength(10);
+    const [firstSha, secondSha] = history;
+    assert(firstSha !== undefined, "the import committed its manifest");
+    assert(secondSha !== undefined, "the import committed its first concept");
+    const first = await commitFacts(scenario.git, scenario.workspaceId, firstSha);
+    expect({ subject: first.subject, files: first.files, parents: first.parents }).toEqual({
+      subject: "Write the bundle's manifest",
+      files: ["knowledge/manifest.yaml"],
+      parents: [],
+    });
+    const second = await commitFacts(scenario.git, scenario.workspaceId, secondSha);
+    expect({ subject: second.subject, author: second.author, trailers: second.trailers }).toEqual({
+      subject:
+        "Import knowledge/company/answers/data-retention-period.md from Acme Bid Library v1, entry ENTRY-002",
+      author: await authorOf(scenario.admin),
+      trailers: { Actor: `human:${scenario.admin.userId}`, Audit: matching.any(String) },
+    });
+    expect(await indexRows(scenario.workspaceId)).toEqual([
+      {
+        path: "knowledge/company/answers/data-retention-period.md",
+        kind: "Answer",
+        title: "Data retention period",
+        status: "stable",
+        sensitivity: "Internal",
+      },
+      {
+        path: "knowledge/company/answers/support-hours.md",
+        kind: "Answer",
+        title: "Support hours",
+        status: "stable",
+        sensitivity: "Internal",
+      },
+      {
+        path: "knowledge/product/answers/can-two-teams-share-one-account-advanced-plan.md",
+        kind: "Answer",
+        title: "Can two teams share one account? (Advanced plan)",
+        status: "stable",
+        sensitivity: "Internal",
+      },
+      {
+        path: "knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md",
+        kind: "Answer",
+        title: "Can two teams share one account? (Standard plan)",
+        status: "stable",
+        sensitivity: "Internal",
+      },
+      {
+        path: "knowledge/product/tiers/advanced-plan.md",
+        kind: "Tier",
+        title: "Advanced plan",
+        status: "stable",
+        sensitivity: "Internal",
+      },
+      {
+        path: "knowledge/product/tiers/standard-plan.md",
+        kind: "Tier",
+        title: "Standard plan",
+        status: "stable",
+        sensitivity: "Internal",
+      },
+    ]);
+  });
+
+  it("writes each file in platform form with its minted iri", async () => {
+    const { scenario, verifiers, people } = await arranged();
+
+    await imported(scenario, soundBundle(verifiers));
+
+    const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1);
+    assert(sha !== undefined, "the import committed");
+    const file = await fileAtCommit(
+      scenario.git,
+      scenario.workspaceId,
+      sha,
+      "knowledge/company/answers/data-retention-period.md",
+    );
+    const iri = /"iri": "([^"]+)"/.exec(file)?.[1];
+    assert(iri !== undefined, "the file names its iri");
+    expect(iri).toMatch(/^https:\/\/better-answers\.com\/c\/[0-9A-HJKMNP-TV-Z]{26}$/);
+    expect(file).toBe(
+      [
+        "---",
+        '"type": "Answer"',
+        '"title": "Data retention period"',
+        '"description": "One sentence a listing shows."',
+        '"tags":',
+        '  - "company"',
+        '  - "g-cloud-15"',
+        '"generated":',
+        '  - "by": "claude-code/claude-fable-5-1"',
+        '    "at": "2026-09-22T00:30:00Z"',
+        '"verified":',
+        `  - "by": "human:${people.mona}"`,
+        '    "at": "2026-04-16T00:00:00Z"',
+        `  - "by": "human:${people.theo}"`,
+        '    "at": "2026-06-01T09:30:00Z"',
+        '"sources":',
+        '  - "id": "ENTRY-002"',
+        '    "resource": "../sources/Acme_Bid_Library_v1.md"',
+        '    "title": "Acme Bid Library v1, entry ENTRY-002"',
+        '    "last_modified": "2026-03-01"',
+        '"status": "stable"',
+        `"iri": "${iri}"`,
+        "---",
+        "",
+        "Customer data is kept for the life of the contract and ninety days after.",
+        "",
+        "## G-Cloud 15 Service Definition",
+        "",
+        "Retention is ninety days beyond termination, then deletion is certified in writing.",
+        "",
+      ].join("\n"),
+    );
+    expect(file).not.toContain("@");
+  });
+
+  it("keeps __proto__ and constructor keys, as any other key", async () => {
+    const { scenario } = await arranged();
+    const path = "knowledge/company/answers/support-hours.md";
+
+    await imported(
+      scenario,
+      treeOf({
+        "manifest.yaml": MANIFEST,
+        "company/answers/support-hours.md": conceptFile({
+          title: "Support hours",
+          frontmatter: "__proto__: x\nconstructor: y\n",
+          sources: "  - resource: ../sources/a.md\n    __proto__: z\n",
+          body: "Text.",
+        }),
+      }),
+    );
+
+    const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1);
+    assert(sha !== undefined, "the import committed");
+    const read = parseConceptFile(
+      await fileAtCommit(scenario.git, scenario.workspaceId, sha, path),
+    );
+    assert(read.ok, `the imported file is not a concept file: ${inspect(read)}`);
+    const { frontmatter } = read.value;
+    expect([frontmatter["__proto__"], frontmatter["constructor"], frontmatter["sources"]]).toEqual([
+      "x",
+      "y",
+      [
+        Object.fromEntries([
+          ["resource", "../sources/a.md"],
+          ["__proto__", "z"],
+        ]),
+      ],
+    ]);
+    const row = await db().pool.query<{ frontmatter: unknown }>(
+      "SELECT frontmatter FROM concept_index WHERE workspace_id = $1 AND path = $2",
+      [scenario.workspaceId, path],
+    );
+    expect(row.rows[0]?.frontmatter).toEqual(frontmatter);
+  });
+
+  it("records verified events as imported verifications under the run's batch", async () => {
+    const { scenario, verifiers, people } = await arranged();
+
+    await imported(scenario, soundBundle(verifiers));
+
+    const verifications = await verificationRows(scenario.workspaceId);
+    expect(verifications).toHaveLength(7);
+    expect(verifications.slice(0, 2)).toEqual([
+      {
+        path: "knowledge/company/answers/data-retention-period.md",
+        actor: `human:${people.mona}`,
+        verified_at: new Date("2026-04-16T00:00:00.000Z"),
+        content_hash: null,
+        origin: "imported",
+      },
+      {
+        path: "knowledge/company/answers/data-retention-period.md",
+        actor: `human:${people.theo}`,
+        verified_at: new Date("2026-06-01T09:30:00.000Z"),
+        content_hash: null,
+        origin: "imported",
+      },
+    ]);
+    const auditEvents = await knowledgeEventsOf(scenario.workspaceId);
+    expect(auditEvents.map((row) => row["subject_kind"]).join(" ")).toBe(
+      "manifest concept check check concept check concept check concept check concept check concept check concept concept concept",
+    );
+    expect(
+      new Set(
+        auditEvents.map((row) => `${String(row["action"])} on a ${String(row["subject_kind"])}`),
+      ),
+    ).toEqual(
+      new Set([
+        "knowledge.manifest.written on a manifest",
+        "knowledge.concept.committed on a concept",
+        "knowledge.check.imported on a check",
+      ]),
+    );
+    const batches = new Set(
+      auditEvents
+        .filter((row) => row["action"] === "knowledge.check.imported")
+        .map((row) => row["batch_id"]),
+    );
+    expect(batches.size).toBe(1);
+    expect([...batches][0]).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+    expect(new Set(auditEvents.map((row) => row["actor"]))).toEqual(
+      new Set([`human:${scenario.admin.userId}`]),
+    );
+  });
+
+  it("skips what already landed on a rerun, and says so", async () => {
+    const { scenario, verifiers } = await arranged();
+    await imported(scenario, soundBundle(verifiers));
+
+    const again = await imported(scenario, soundBundle(verifiers));
+    const dry = await imported(scenario, soundBundle(verifiers), { dryRun: true });
+
+    expect(again).toEqual({
+      bundleId: BUNDLE_ID,
+      manifest: "standing",
+      landed: [],
+      skipped: PATHS_IN_ORDER,
+      verifications: { recorded: 0, present: 7 },
+      rewritten: [],
+      concepts: 6,
+      dryRun: false,
+    });
+    expect(dry.rewritten).toEqual([]);
+    expect(dry.manifest).toBe("standing");
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(10);
+    expect(await rowsFor(scenario.workspaceId)).toEqual({
+      concepts: "6",
+      commits: "10",
+      verifications: "7",
+      events: "17",
+    });
+  });
+
+  it("stops at a taken merge key, completing once it frees", async () => {
+    const { scenario, verifiers } = await arranged();
+    const standing = await standingConcept(
+      scenario,
+      "Answer:can two teams share one account? (advanced plan)",
+    );
+    assert(standing.ok, `the standing concept was refused: ${inspect(standing)}`);
+
+    const stopped = await importing(scenario, scenario.admin, { tree: soundBundle(verifiers) });
+
+    expect(stopped).toEqual(
+      stoppedAt(
+        "product/answers/can-two-teams-share-one-account-advanced-plan.md",
+        "merge-key-taken",
+        {
+          landed: [
+            "knowledge/company/answers/data-retention-period.md",
+            "knowledge/company/answers/support-hours.md",
+          ],
+          skipped: [],
+          verifications: { recorded: 3, present: 0 },
+          rewritten: [],
+        },
+      ),
+    );
+    expect(await rowsFor(scenario.workspaceId)).toEqual({
+      concepts: "3",
+      commits: "4",
+      verifications: "3",
+      events: "7",
+    });
+
+    const freed = await writeConcept(scenario.admin, doorsOf(scenario), {
+      iri: standing.value.iri,
+      mergeKey: "Answer:elsewhere",
+      path: "knowledge/elsewhere.md",
+      kind: "Answer",
+      title: "Elsewhere",
+      frontmatter: { title: "Elsewhere", type: "Answer" },
+      body: "A concept that already stands.",
+      message: "Move the standing concept onto its own key",
+      author: { name: "Ada Editor", email: "ada@acme.invalid" },
+      expects: { base: standing.value.contentHash },
+    });
+    assert(freed.ok, `the rewrite was refused: ${inspect(freed)}`);
+    const completed = await imported(scenario, soundBundle(verifiers));
+
+    expect(completed).toEqual({
+      bundleId: BUNDLE_ID,
+      manifest: "standing",
+      landed: [
+        "knowledge/product/answers/can-two-teams-share-one-account-advanced-plan.md",
+        "knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md",
+        "knowledge/product/tiers/advanced-plan.md",
+        "knowledge/product/tiers/standard-plan.md",
+      ],
+      skipped: [
+        "knowledge/company/answers/data-retention-period.md",
+        "knowledge/company/answers/support-hours.md",
+      ],
+      verifications: { recorded: 4, present: 3 },
+      rewritten: REWRITTEN_IN_ORDER,
+      concepts: 6,
+      dryRun: false,
+    });
+    expect(await verificationRows(scenario.workspaceId)).toHaveLength(7);
+  });
+
+  it("stops at a path another writer took mid-run, naming it", async () => {
+    const { scenario, verifiers } = await arranged();
+
+    const { stopped, other } = await landedBetweenTheReadAndTheWrite(
+      scenario,
+      LINKED.supportHours,
+      () => importing(scenario, scenario.admin, { tree: soundBundle(verifiers) }),
+    );
+
+    expect(stopped).toEqual(
+      stoppedAt("company/answers/support-hours.md", "path-taken", {
+        landed: ["knowledge/company/answers/data-retention-period.md"],
+        skipped: [],
+        verifications: { recorded: 2, present: 0 },
+        rewritten: [],
+      }),
+    );
+    const history = await bundleHistory(scenario.git, scenario.workspaceId);
+    expect(history).toHaveLength(3);
+    expect(history[1]).toBe(other.sha);
+    expect(await head(scenario.admin, scenario.git)).toBe(history[2]);
+    expect(await rowsFor(scenario.workspaceId)).toEqual({
+      concepts: "2",
+      commits: "3",
+      verifications: "2",
+      events: "5",
+    });
+
+    const completed = await imported(scenario, soundBundle(verifiers));
+
+    expect(completed).toMatchObject({
+      landed: [
+        LINKED.advancedAnswer,
+        LINKED.standardAnswer,
+        LINKED.advancedTier,
+        LINKED.standardTier,
+      ],
+      skipped: ["knowledge/company/answers/data-retention-period.md", LINKED.supportHours],
+    });
+  });
+
+  it("reports a dry run's plan and writes nothing", async () => {
+    const { scenario, verifiers } = await arranged();
+
+    const run = await imported(scenario, soundBundle(verifiers), { dryRun: true });
+
+    expect(run).toEqual({
+      bundleId: BUNDLE_ID,
+      manifest: "would-write",
+      landed: PATHS_IN_ORDER,
+      skipped: [],
+      verifications: { recorded: 7, present: 0 },
+      rewritten: REWRITTEN_IN_ORDER,
+      concepts: 6,
+      dryRun: true,
+    });
+    await nothingWritten(scenario);
+  });
+
+  it("lands each concept at the class the caller names", async () => {
+    const { scenario, verifiers } = await arranged();
+
+    const run = await importing(scenario, scenario.admin, {
+      tree: soundBundle(verifiers),
+      sensitivity: "Restricted",
+    });
+
+    assert(run.ok, `the import was refused: ${inspect(run)}`);
+    expect(run.value.rewritten).toEqual(REWRITTEN_IN_ORDER);
+    expect(
+      new Set((await indexRows(scenario.workspaceId)).map((row) => row["sensitivity"])),
+    ).toEqual(new Set(["Restricted"]));
+  });
+});
+
+describe("the second pass: each relative link becomes its concept's iri", () => {
+  it("rewrites each link's target to its iri, text untouched", async () => {
+    const { scenario, verifiers } = await arranged();
+
+    const run = await imported(scenario, soundBundle(verifiers));
+
+    expect(run.rewritten).toEqual(REWRITTEN_IN_ORDER);
+    const iri = await irisByPath(scenario.workspaceId);
+    const files = await filesAtHead(scenario);
+    expect(files.get(LINKED.supportHours)).toContain(
+      `Support answers between 08:00 and 18:00 on working days. [Advanced plan](${iri.get(LINKED.advancedTier)}) customers reach an engineer out of hours.`,
+    );
+    expect(files.get(LINKED.advancedAnswer)).toContain(
+      `The [Standard plan's answer](${iri.get(LINKED.standardAnswer)}) is the looser default.\n\nThis answer is for the [Advanced plan](${iri.get(LINKED.advancedTier)}).`,
+    );
+    expect(files.get(LINKED.standardAnswer)).toContain(
+      `This answer is for the [Standard plan](${iri.get(LINKED.standardTier)}).`,
+    );
+    for (const file of files.values()) {
+      expect(file).not.toMatch(/\]\([^)]*\.md/);
+      expect(file).not.toContain("@");
+    }
+    const history = await bundleHistory(scenario.git, scenario.workspaceId);
+    expect(history).toHaveLength(10);
+    const rewriteSha = history[7];
+    assert(rewriteSha !== undefined, "the import committed its link rewrites");
+    const rewrite = await commitFacts(scenario.git, scenario.workspaceId, rewriteSha);
+    expect({
+      subject: rewrite.subject,
+      author: rewrite.author,
+      actor: rewrite.trailers["Actor"],
+    }).toEqual({
+      subject:
+        "Rewrite the links in knowledge/company/answers/support-hours.md to the iris of the concepts they name",
+      author: await authorOf(scenario.admin),
+      actor: `human:${scenario.admin.userId}`,
+    });
+    expect(
+      (await knowledgeEventsOf(scenario.workspaceId)).slice(-3).map((row) => row["action"]),
+    ).toEqual([
+      "knowledge.concept.committed",
+      "knowledge.concept.committed",
+      "knowledge.concept.committed",
+    ]);
+    const edges = await db().pool.query<{ from_uid: string; to_uid: string }>(
+      `SELECT from_uid, to_uid FROM map_edge
+        WHERE workspace_id = $1 AND label = 'LINKS_TO' ORDER BY from_uid, uid`,
+      [scenario.workspaceId],
+    );
+    const linked: readonly (readonly [string, string])[] = [
+      [LINKED.supportHours, LINKED.advancedTier],
+      [LINKED.advancedAnswer, LINKED.standardAnswer],
+      [LINKED.advancedAnswer, LINKED.advancedTier],
+      [LINKED.standardAnswer, LINKED.standardTier],
+    ];
+    expect(edges.rows).toEqual(
+      linked
+        .map(([from, to]) => ({ from_uid: iri.get(from), to_uid: iri.get(to) }))
+        .toSorted((one, other) => String(one.from_uid).localeCompare(String(other.from_uid))),
+    );
+  });
+
+  it("stops at a file whose concept moved between the passes", async () => {
+    const { scenario, verifiers } = await arranged();
+
+    const stopped = await movedBetweenThePasses(LINKED.supportHours, () =>
+      importing(scenario, scenario.admin, { tree: soundBundle(verifiers) }),
+    );
+
+    expect(stopped).toEqual(STOPPED_WHERE_THE_CONCEPT_MOVED);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(7);
+    const files = await filesAtHead(scenario);
+    for (const { path } of REWRITTEN_IN_ORDER) expect(files.get(path)).toMatch(/\]\([^)]*\.md\)/);
+
+    const completed = await imported(scenario, soundBundle(verifiers));
+
+    expect(completed.rewritten).toEqual(REWRITTEN_IN_ORDER);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(10);
+    for (const file of (await filesAtHead(scenario)).values()) {
+      expect(file).not.toMatch(/\]\([^)]*\.md/);
+    }
+  });
+
+  it.each(["roles/%C3%A9quipe.md", "roles/%c3%a9quipe.md", "roles/%C3%A9quipe%2Emd"])(
+    "resolves the encoded link %s to the concept it names",
+    async (link) => {
+      const { scenario, verifiers } = await arranged();
+      const byMona = { by: humanOf(verifiers.mona), at: VERIFIED_AT };
+
+      await imported(
+        scenario,
+        treeOf({
+          "manifest.yaml": MANIFEST,
+          "company/roles/équipe.md": conceptFile({
+            type: "Role",
+            title: "Équipe",
+            entry: "ROLE-001",
+            verified: [byMona],
+            body: "The team that answers expenses.",
+          }),
+          "company/expenses.md": conceptFile({
+            title: "Expenses",
+            entry: "ENTRY-003",
+            verified: [byMona],
+            body: `Ask [the team](${link}).`,
+          }),
+        }),
+      );
+
+      const iri = await irisByPath(scenario.workspaceId);
+      const expenses = iri.get("knowledge/company/expenses.md");
+      const team = iri.get("knowledge/company/roles/équipe.md");
+      const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1);
+      assert(sha !== undefined, "the import committed");
+      expect(
+        await fileAtCommit(
+          scenario.git,
+          scenario.workspaceId,
+          sha,
+          "knowledge/company/expenses.md",
+        ),
+      ).toContain(`Ask [the team](${team}).`);
+      const edges = await db().pool.query<{ from_uid: string; to_uid: string }>(
+        "SELECT from_uid, to_uid FROM map_edge WHERE workspace_id = $1 AND label = 'LINKS_TO'",
+        [scenario.workspaceId],
+      );
+      expect(edges.rows).toEqual([{ from_uid: expenses, to_uid: team }]);
+    },
+  );
+});
+
+describe("an imported concept, opened", () => {
+  const SUPPORT_HOURS = "Support answers between 08:00 and 18:00 on working days.";
+
+  const TWO_SOURCES = [
+    "  - id: ENTRY-001",
+    "    resource: ../sources/Acme_Bid_Library_v1.md",
+    "    title: Acme Bid Library v1, entry ENTRY-001",
+    "    locator: p.4",
+    "  - id: PROD-005",
+    "    resource: ../sources/Acme_Product_Library_v2.md",
+    "    title: Acme Product Library v2, entry PROD-005",
+    "",
+  ].join("\n");
+
+  const openedImport = async (sources: string, body = SUPPORT_HOURS) => {
+    const { scenario, verifiers } = await arranged();
+    await imported(
+      scenario,
+      treeOf({
+        "manifest.yaml": MANIFEST,
+        "company/answers/support-hours.md": conceptFile({
+          title: "Support hours",
+          verified: [{ by: humanOf(verifiers.mona), at: VERIFIED_AT }],
+          sources,
+          body,
+        }),
+      }),
+    );
+    const iri = (await irisByPath(scenario.workspaceId)).get(LINKED.supportHours);
+    if (iri === undefined) throw new Error("the support hours concept did not land");
+    return readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
+      open(principal, tx, { iri }, new Date("2026-09-22T10:00:00.000Z")),
+    );
+  };
+
+  it("renders a page locator as the source's place", async () => {
+    const opened = await openedImport(TWO_SOURCES);
+
+    assert(opened.ok, inspect(opened));
+    expect(renderOpen(opened.value).split("\n").slice(-3)).toEqual([
+      "Evidence:",
+      "- Acme Bid Library v1, entry ENTRY-001, p.4",
+      "- Acme Product Library v2, entry PROD-005",
+    ]);
+  });
+
+  it("answers each source's id, title and page, opening nothing", async () => {
+    const opened = await openedImport(TWO_SOURCES);
+
+    assert(opened.ok, inspect(opened));
+    assert(opened.value.found, "the imported concept opens");
+    expect(opened.value.concept?.evidence).toStrictEqual([
+      { id: "ENTRY-001", source: "Acme Bid Library v1, entry ENTRY-001", at: "p.4" },
+      { id: "PROD-005", source: "Acme Product Library v2, entry PROD-005" },
+    ]);
+  });
+
+  it("treats a locator of only spaces as no locator", async () => {
+    const opened = await openedImport(
+      [
+        "  - id: PROD-005",
+        "    resource: ../sources/Acme_Product_Library_v2.md",
+        "    title: Acme Product Library v2, entry PROD-005",
+        '    locator: "   "',
+        "",
+      ].join("\n"),
+    );
+
+    assert(opened.ok, inspect(opened));
+    assert(opened.value.found, "the imported concept opens");
+    expect(opened.value.concept?.evidence).toStrictEqual([
+      { id: "PROD-005", source: "Acme Product Library v2, entry PROD-005" },
+    ]);
+    expect(renderOpen(opened.value).split("\n").slice(-2)).toEqual([
+      "Evidence:",
+      "- Acme Product Library v2, entry PROD-005",
+    ]);
+  });
+
+  it("renders a newline-ended body without an extra blank line", async () => {
+    const opened = await openedImport(TWO_SOURCES, `${SUPPORT_HOURS}\n`);
+
+    assert(opened.ok, inspect(opened));
+    expect(renderOpen(opened.value).split("\n").slice(0, 5)).toEqual([
+      "# Support hours",
+      "",
+      SUPPORT_HOURS,
+      "",
+      "_Verified by Priya Anand · 16 April 2026 · imported_",
+    ]);
+  });
+});
+
+describe("what the import refuses before it writes anything", () => {
+  const withMona = (verifiers: Verifiers): Event => ({
+    by: humanOf(verifiers.mona),
+    at: VERIFIED_AT,
+  });
+
+  const oneConcept = (verifiers: Verifiers, file: string, concept: Concept): BundleTree =>
+    treeOf({
+      "manifest.yaml": MANIFEST,
+      [file]: conceptFile({ verified: [withMona(verifiers)], ...concept }),
+    });
+
+  const supportHours = (verifiers: Verifiers): string =>
+    conceptFile({ title: "Support hours", verified: [withMona(verifiers)], body: "Text." });
+
+  it.each([
+    [
+      "a file whose frontmatter is not YAML",
+      (verifiers: Verifiers) =>
+        treeOf({
+          "manifest.yaml": MANIFEST,
+          "company/answers/broken.md": conceptFile({
+            title: "Broken",
+            verified: [withMona(verifiers)],
+            frontmatter: "owner: a: b\n",
+            body: "Text.",
+          }),
+        }),
+      {
+        file: "company/answers/broken.md",
+        reason: "does-not-parse",
+        about: matching.stringContaining("Nested mappings are not allowed"),
+      },
+    ],
+    [
+      "a file with no frontmatter fence",
+      () => treeOf({ "manifest.yaml": MANIFEST, "company/answers/bare.md": "Just a body.\n" }),
+      { file: "company/answers/bare.md", reason: "does-not-parse", about: "no frontmatter fence" },
+    ],
+    [
+      "a file whose verified event has no instant",
+      (verifiers: Verifiers) =>
+        oneConcept(verifiers, "company/answers/undated.md", {
+          title: "Undated",
+          body: "Text.",
+          verified: [{ by: humanOf(verifiers.mona), at: "yesterday" }],
+        }),
+      { file: "company/answers/undated.md", reason: "does-not-parse", about: "verified[0].at" },
+    ],
+    [
+      "a file with no title",
+      (verifiers: Verifiers) =>
+        treeOf({
+          "manifest.yaml": MANIFEST,
+          "company/answers/untitled.md": `---\ntype: Answer\nverified:\n  - { by: ${humanOf(verifiers.mona)}, at: ${VERIFIED_AT} }\n---\n\nText.\n`,
+        }),
+      { file: "company/answers/untitled.md", reason: "type-or-title-missing", about: "title" },
+    ],
+    [
+      "a link to no concept in the tree",
+      (verifiers: Verifiers) =>
+        oneConcept(verifiers, "company/answers/dangling.md", {
+          title: "Dangling",
+          body: "See the [Premium plan](../../product/tiers/premium-plan.md).",
+        }),
+      {
+        file: "company/answers/dangling.md",
+        reason: "link-outside-tree",
+        about: "../../product/tiers/premium-plan.md",
+      },
+    ],
+    [
+      "a link whose path decodes to a NUL",
+      (verifiers: Verifiers) =>
+        oneConcept(verifiers, "company/answers/nul.md", {
+          title: "Nul",
+          body: "See the [plan](%00.md).",
+        }),
+      { file: "company/answers/nul.md", reason: "link-outside-tree", about: "%00.md" },
+    ],
+    [
+      "a verifier who is not a workspace member",
+      () =>
+        oneConcept({ mona: "", theo: "" }, "company/answers/stranger.md", {
+          title: "Stranger",
+          body: "Text.",
+          verified: [{ by: "human:nobody@elsewhere.invalid", at: VERIFIED_AT }],
+        }),
+      {
+        file: "company/answers/stranger.md",
+        reason: "verifier-not-a-member",
+        about: "nobody@elsewhere.invalid",
+      },
+    ],
+    [
+      "a verifier who is not a person",
+      () =>
+        oneConcept({ mona: "", theo: "" }, "company/answers/machine.md", {
+          title: "Machine",
+          body: "Text.",
+          verified: [{ by: "better-answers-judge/1", at: VERIFIED_AT }],
+        }),
+      {
+        file: "company/answers/machine.md",
+        reason: "verifier-not-a-member",
+        about: "better-answers-judge/1",
+      },
+    ],
+    [
+      "a file at the path the erasure drill keeps",
+      (verifiers: Verifiers) =>
+        oneConcept(verifiers, "erasure-rehearsal.md", { title: "Rehearsal", body: "Text." }),
+      {
+        file: "erasure-rehearsal.md",
+        reason: "reserved-path",
+        about: "knowledge/erasure-rehearsal.md",
+      },
+    ],
+    [
+      "a file at a path the platform cannot hold",
+      (verifiers: Verifiers) =>
+        oneConcept(verifiers, "company/answers/with space.md", { title: "Spaced", body: "Text." }),
+      {
+        file: "company/answers/with space.md",
+        reason: "path-refused",
+        about: "knowledge/company/answers/with space.md",
+      },
+    ],
+    [
+      "two files that derive one merge key",
+      (verifiers: Verifiers) =>
+        treeOf({
+          "manifest.yaml": MANIFEST,
+          "company/answers/support-hours.md": supportHours(verifiers),
+          "product/answers/support-hours-again.md": conceptFile({
+            title: "support  HOURS",
+            verified: [withMona(verifiers)],
+            body: "Other text.",
+          }),
+        }),
+      {
+        file: "product/answers/support-hours-again.md",
+        reason: "merge-key-clash",
+        about: "company/answers/support-hours.md",
+      },
+    ],
+    [
+      "a tree with no manifest",
+      (verifiers: Verifiers) =>
+        treeOf({ "company/answers/support-hours.md": supportHours(verifiers) }),
+      { file: "manifest.yaml", reason: "manifest-missing", about: "manifest.yaml" },
+    ],
+    [
+      "a manifest whose id is not the minter's",
+      (verifiers: Verifiers) =>
+        treeOf({
+          "manifest.yaml": MANIFEST.replace(BUNDLE_ID, "acme-2026"),
+          "company/answers/support-hours.md": supportHours(verifiers),
+        }),
+      { file: "manifest.yaml", reason: "manifest-malformed", about: "id" },
+    ],
+  ])("refuses %s", async (_shape, tree, unsound) => {
+    const { scenario, verifiers } = await arranged();
+
+    const refused = await importing(scenario, scenario.admin, { tree: tree(verifiers) });
+
+    expect(refused, "the refusal names the file and the reason").toEqual({
+      ok: false,
+      error: { kind: "unsound", ...unsound },
+    });
+    await nothingWritten(scenario);
+  });
+
+  it("refuses a Viewer, who may not write to the bundle", async () => {
+    const { scenario, verifiers } = await arranged();
+
+    const refused = await importing(scenario, scenario.viewer, { tree: soundBundle(verifiers) });
+
+    expect(refused).toEqual({ ok: false, error: "role-forbids" });
+    await nothingWritten(scenario);
+  });
+
+  it.each([false, true])("refuses an Editor the import, by role, dry run %s", async (dryRun) => {
+    const { scenario, verifiers } = await arranged();
+
+    const refused = await importing(scenario, scenario.editor, {
+      tree: soundBundle(verifiers),
+      dryRun,
+    });
+
+    expect(refused).toEqual({ ok: false, error: "role-forbids" });
+    await nothingWritten(scenario);
+  });
+
+  it("refuses a bundle whose workspace carries another manifest id", async () => {
+    const { scenario, verifiers } = await arranged();
+    const other = await writeManifest(scenario.admin, doorsOf(scenario), {
+      manifest: {
+        id: "01J6DDDDDDDDDDDDDDDDDDDDDD",
+        origin: "company",
+        ref: "An earlier bundle",
+        owner: "Acme Software Ltd",
+        content_version: "2026-08-01",
+      },
+      message: "Write the bundle's manifest",
+      author: { name: "Ada Editor", email: "ada@acme.invalid" },
+    });
+    assert(other.ok, `the manifest was refused: ${inspect(other)}`);
+
+    const run = await importing(scenario, scenario.admin, { tree: soundBundle(verifiers) });
+    const dry = await importing(scenario, scenario.admin, {
+      tree: soundBundle(verifiers),
+      dryRun: true,
+    });
+
+    expect(run).toEqual({ ok: false, error: "manifest-taken" });
+    expect(dry).toEqual({ ok: false, error: "manifest-taken" });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
+    expect(await rowsFor(scenario.workspaceId)).toEqual({
+      concepts: "0",
+      commits: "1",
+      verifications: "0",
+      events: "1",
+    });
+  });
+
+  it("answers a lost manifest commit in the git door's word", async () => {
+    const { scenario, verifiers } = await arranged();
+    const release = await holdMainRef(scenario.git, scenario.workspaceId);
+
+    const refused = await importing(scenario, scenario.admin, { tree: soundBundle(verifiers) });
+
+    expect(refused).toEqual({ ok: false, error: "stale-precondition" });
+    await nothingWritten(scenario);
+
+    await release();
+    const rerun = await importing(scenario, scenario.admin, { tree: soundBundle(verifiers) });
+
+    expect(rerun).toMatchObject({ ok: true, value: { manifest: "written", dryRun: false } });
+  });
+});
