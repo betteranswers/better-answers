@@ -109,7 +109,9 @@ const sweepEveryCharacter = (): Sweep => {
   const joiners: string[] = [];
   for (const character of everyCharacter()) {
     const folded = normalisedIdentifier(character);
-    if (folded === "") spaced.push(character);
+    if (folded === "" && normalisedIdentifier(`a${character}b`) === "a b") {
+      spaced.push(character);
+    }
     if (WHITESPACE.has(character)) continue;
     if (folded !== character) folding.push(`${hexOf(character)} ${hexOf(folded)}\n`);
     if (ofTheAddress(`ab@cd.ef${character}g`).length > 0) continue;
