@@ -304,7 +304,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 - [ ] Metric. Job wall seconds of `full-api` and `full-worker` on CI runners.
-- [ ] Probe. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Rerun it with `gh run rerun <id>` until it has three full-lane attempts, each after the last has finished. After merge, read the first five merge-group runs for Appendix E.
+- [ ] Probe. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Rerun it with `gh run rerun <id>` until it has three full-lane attempts, each after the last has finished, and read each with `gh run view <id> --attempt <n> --json jobs`. After merge, read the first five merge-group runs for Appendix E.
 - [ ] Baseline. Record first the medians of the five latest merge-group runs on `main`. Over the eleven runs in Appendix E, `full-api` had a median of 287s (239 to 320s) and `full-worker` 272s (226 to 328s).
 - [ ] Rule. Fails if the head's `full-api` median over three attempts is not at least 60s below the baseline median. Fails if `full-images` is the longest job in any head attempt.
 
@@ -691,7 +691,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 - [ ] Metric. Job wall seconds of `full-web-browser`, the slowest shard at trunk and the single job at head.
-- [ ] Probe. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Rerun it with `gh run rerun <id>` until it has three full-lane attempts, each after the last has finished. After merge, read five merge-group runs.
+- [ ] Probe. Read the PR's own `check` run at the head SHA with `gh run view <id> --json jobs`. Rerun it with `gh run rerun <id>` until it has three full-lane attempts, each after the last has finished, and read each with `gh run view <id> --attempt <n> --json jobs`. After merge, read five merge-group runs.
 - [ ] Baseline. Record first the slowest shard's median over the five latest merge-group runs on `main`. Over the eleven runs in Appendix E it was 474s, and shard 3 ranged from 332 to 805s.
 - [ ] Rule. Fails if the head's `full-web-browser` median over three attempts exceeds 240s.
 
