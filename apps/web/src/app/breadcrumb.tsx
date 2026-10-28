@@ -1,8 +1,8 @@
 import { useLinkProps } from "@tanstack/react-router";
 
 import { Icon } from "@/shared/icon.tsx";
-import { keyed } from "@/shared/keyed.ts";
 import { cn } from "@/shared/lib/utils.ts";
+import { keyed } from "@/shared/list/keyed.ts";
 import type { Place, VisibleArea } from "@/shared/navigation.ts";
 import {
   Breadcrumb,

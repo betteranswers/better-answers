@@ -1,4 +1,4 @@
-import { type Ask, askedIn } from "@/shared/address-ask.ts";
+import { type Ask, askedIn } from "@/shared/address/address-ask.ts";
 import type { PagePath } from "@/shared/navigation.ts";
 
 export const EVERYONE_PATH: PagePath = "/console/people/everyone";

@@ -1,0 +1,65 @@
+import type { Locator, Page } from "@playwright/test";
+
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+
+import { expect, test } from "../browser.ts";
+import { anAddress, provision, signIn } from "../harness.ts";
+
+const GROUPS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Groups").path;
+
+const groupsRegion = (page: Page) => page.getByRole("region", { name: "Groups" });
+
+const emptyStatusIn = (scope: Locator): Locator =>
+  scope.getByRole("status").filter({ hasNotText: /\S/ });
+
+const standsWithoutRoom = async (status: Locator) => {
+  await expect(status).not.toHaveCSS("display", "none");
+  const box = await status.boundingBox();
+  expect(box?.height, "the empty region takes room on the page").toBeLessThanOrEqual(1);
+};
+
+test.describe("an action's outcome region", () => {
+  test("stands in the accessibility tree before its first outcome", async ({ page, request }) => {
+    const adminEmail = anAddress("admin");
+    await provision(request, { name: "Calder Joinery", adminEmail });
+    await page.goto(GROUPS_PAGE);
+    await signIn(page, request, adminEmail);
+    await expect(page).toHaveURL(new RegExp(`${GROUPS_PAGE}$`));
+
+    const inTheBand = emptyStatusIn(page.getByRole("banner"));
+    await expect(inTheBand, "the band's outcome region is out of the tree").toHaveCount(1);
+    await standsWithoutRoom(inTheBand);
+
+    await expect(
+      groupsRegion(page).getByRole("status").filter({ hasText: /\b0\b/ }),
+      "the groups are still unread",
+    ).toHaveCount(1);
+
+    const onThePage = emptyStatusIn(groupsRegion(page));
+    await expect(onThePage, "the page's outcome region is out of the tree").toHaveCount(1);
+    for (const status of await onThePage.all()) {
+      await standsWithoutRoom(status);
+    }
+    const standing = await onThePage.elementHandles();
+
+    await groupsRegion(page).getByRole("button", { name: "Create a Group" }).click();
+    const creating = page.getByRole("dialog", { name: "Create a Group" });
+    const inTheDialog = emptyStatusIn(creating);
+    await expect(inTheDialog, "the dialog's outcome region is out of the tree").toHaveCount(1);
+    for (const status of await inTheDialog.all()) {
+      await standsWithoutRoom(status);
+    }
+    await creating.getByRole("textbox", { name: "New Group Name" }).fill("Site leads");
+    await creating.getByRole("button", { name: "Create Group" }).click();
+
+    await expect
+      .poll(() => Promise.all(standing.map((status) => status.textContent())), {
+        message: "the outcome came in a region that was not there while it was empty",
+      })
+      .toContainEqual(expect.stringContaining("Site leads"));
+    await expect(creating).toHaveCount(0);
+    await expect(
+      groupsRegion(page).getByRole("button", { name: "Site leads", exact: true }),
+    ).toBeFocused();
+  });
+});

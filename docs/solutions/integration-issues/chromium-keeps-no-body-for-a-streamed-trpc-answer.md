@@ -40,7 +40,7 @@ A browser spec must show the api refused for the reason it is testing before it 
 
 - `page.waitForResponse(...)` on the `ask.question` call, then `response.text()`, threw `Protocol error (Network.getResponseBody): No data found for resource with given identifier`.
 - Playwright added that the body "is not available for a response that was navigated away from". It appends that hint to any protocol error from the body read. No navigation had happened, so the hint pointed the wrong way.
-- Without the body, the spending-limit test on New question (`apps/web/e2e/ask-new-question.spec.ts`, "says the spending limit in the refusal's sentence") asserted that an alert held words, that no answer was drawn and that the word stayed off the page, but never read the api's own word. Code review found it would still pass if the page dropped the spending limit's own sentence, or if the ask failed for another reason.
+- Without the body, the spending-limit test on New question (`apps/web/e2e/ask/ask-new-question.spec.ts`, "says the spending limit in the refusal's sentence") asserted that an alert held words, that no answer was drawn and that the word stayed off the page, but never read the api's own word. Code review found it would still pass if the page dropped the spending limit's own sentence, or if the ask failed for another reason.
 
 ## What Didn't Work
 

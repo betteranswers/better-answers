@@ -10,9 +10,7 @@ import {
   type RefObject,
 } from "react";
 
-import { useAsked } from "@/shared/address-ask.ts";
-import { FilterRow } from "@/shared/filter-row.tsx";
-import { RowLink } from "@/shared/grid-table.tsx";
+import { useAsked } from "@/shared/address/address-ask.ts";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import {
   BROWSE,
@@ -33,14 +31,16 @@ import { useOpenMatch } from "@/shared/knowledge/open-match.ts";
 import { failedReadWords } from "@/shared/knowledge/refusal.tsx";
 import { useLanding, useLandingLine, type Landing } from "@/shared/landing.ts";
 import { cn } from "@/shared/lib/utils.ts";
-import { ListPages, ListState } from "@/shared/list-pages.tsx";
-import { PageHead } from "@/shared/page-head.tsx";
-import { keyedRow, rowInFocus } from "@/shared/row-focus.ts";
-import { useSearchedList } from "@/shared/searched-list.ts";
+import { FilterRow } from "@/shared/list/filter-row.tsx";
+import { RowLink } from "@/shared/list/grid-table.tsx";
+import { ListPages, ListState } from "@/shared/list/list-pages.tsx";
+import { keyedRow, rowInFocus } from "@/shared/list/row-focus.ts";
+import { useSearchedList } from "@/shared/list/searched-list.ts";
+import { PageHead } from "@/shared/page/page-head.tsx";
+import { useRoomBeside } from "@/shared/page/wide-layout.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { useRoomBeside } from "@/shared/wide-layout.ts";
 
 import {
   asksNothing,

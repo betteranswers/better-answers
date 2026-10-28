@@ -3,7 +3,11 @@ import type { Outcome } from "@/shared/outcome.tsx";
 import { counted, dayWords } from "@/shared/words.ts";
 
 import { EMPTY_LINES } from "./empty-lines.ts";
-import type { InvitationStatus, InvitedOne, SentInvitation } from "./invitations-api.ts";
+import type {
+  InvitationStatus,
+  InvitedOne,
+  SentInvitation,
+} from "./invitations/invitations-api.ts";
 import { aRole } from "./role-meanings.ts";
 
 const invitations = (count: number): string => counted(count, "invitation", "invitations");

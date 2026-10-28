@@ -1,9 +1,9 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 
-import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
 import { KeystrokesAction, usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
-import { PageHead } from "@/shared/page-head.tsx";
+import { useBreadcrumbLastPart } from "@/shared/page/breadcrumb-last-part.ts";
+import { PageHead } from "@/shared/page/page-head.tsx";
 import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
@@ -24,20 +24,20 @@ import {
 } from "./account-words.ts";
 import { emailOf, useSession } from "./auth-hooks.ts";
 import { AuthPage, focusOn, Outcome } from "./auth-page.tsx";
-import { COPY_KEY } from "./authenticator-part.tsx";
 import { passkeysHere, useRemovePasskey, type PasskeyAdded } from "./passkey-hooks.ts";
+import { COPY_KEY } from "./second-factor/authenticator-part.tsx";
 import {
   ADD_A_PASSKEY,
   ADD_A_PASSKEY_BUTTON,
   PasskeysSection,
   type Passkey,
-} from "./passkeys-part.tsx";
+} from "./second-factor/passkeys-part.tsx";
 import {
   CODES_KEYSTROKES,
   codesUnanswered,
   saidOfAcknowledging,
   type CodesInHand,
-} from "./recovery-codes.tsx";
+} from "./second-factor/recovery-codes.tsx";
 import {
   FIRST_AUTHENTICATOR,
   NEW_AUTHENTICATOR,
@@ -50,9 +50,13 @@ import {
   type AuthenticatorRoutes,
   type CodesIssued,
   type SecondFactorRead,
-} from "./second-factor-hooks.ts";
-import { READ_AGAIN, readUnanswered, SecondFactorRefused } from "./second-factor-parts.tsx";
-import { SessionsSection } from "./sessions-part.tsx";
+} from "./second-factor/second-factor-hooks.ts";
+import {
+  READ_AGAIN,
+  readUnanswered,
+  SecondFactorRefused,
+} from "./second-factor/second-factor-parts.tsx";
+import { SessionsSection } from "./sessions/sessions-part.tsx";
 import { SignOutButton } from "./sign-out-button.tsx";
 import { ThemeSection } from "./theme-section.tsx";
 

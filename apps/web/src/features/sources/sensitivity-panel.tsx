@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useId, useState, type RefObject } from "react";
 
-import { SummaryRow } from "@/shared/summary-row.tsx";
+import { SummaryRow } from "@/shared/list/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 import {

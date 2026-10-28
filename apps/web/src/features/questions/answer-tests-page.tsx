@@ -1,7 +1,7 @@
 import { useId } from "react";
 
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
-import { PageHead } from "@/shared/page-head.tsx";
+import { PageHead } from "@/shared/page/page-head.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { EmptyAction } from "@/shared/ui/kibo-ui/empty-action.tsx";
 

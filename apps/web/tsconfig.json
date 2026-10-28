@@ -17,7 +17,9 @@
     // directory is written `@/<zone>/…`, so the per-glob `no-restricted-imports` overrides in
     // `.oxlintrc.json` can name a zone instead of guessing how many `../` a file climbed.
     // TypeScript 7 removed `baseUrl`; the mapping is relative to this file instead.
-    "paths": { "@/*": ["./src/*"] }
+    // `@test/` is the same for a test that reaches a helper in `test/support/` from a folder
+    // of its own, where a relative path would climb out of the folder.
+    "paths": { "@/*": ["./src/*"], "@test/*": ["./test/support/*"] }
   },
   "include": ["src", "test", "e2e", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
 }

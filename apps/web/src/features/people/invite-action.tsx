@@ -10,11 +10,11 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 
-import { useAsked } from "@/shared/address-ask.ts";
-import { Address } from "@/shared/address.tsx";
+import { useAsked } from "@/shared/address/address-ask.ts";
 import { refusalOf } from "@/shared/api/trpc.ts";
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
+import { Address } from "@/shared/member/address.tsx";
 import { INVITE_A_PERSON } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { refusedWith, setRefusalOutcome } from "@/shared/refusal-outcome.tsx";
@@ -35,7 +35,7 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
 import { INVITE_REFUSED, INVITE_WORDS, invitedOutcome } from "./invitation-words.ts";
-import { useInvite, type InvitedOne, type SentInvitation } from "./invitations-api.ts";
+import { useInvite, type InvitedOne, type SentInvitation } from "./invitations/invitations-api.ts";
 import {
   addressesCounted,
   allInto,
@@ -48,7 +48,7 @@ import {
   type Flag,
   type Held,
   type Moved,
-} from "./invite-addresses.ts";
+} from "./invitations/invite-addresses.ts";
 import { useMembers, type ListedMember, type Role } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES } from "./people-state.ts";
 import { outcomeOfSendingFailure } from "./refusal.tsx";

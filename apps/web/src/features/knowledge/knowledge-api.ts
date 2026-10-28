@@ -10,7 +10,7 @@ import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 import { useOptimistic, type Undo } from "@/shared/api/optimistic.ts";
 import { WHILE_A_CEILING_HOLDS } from "@/shared/api/query-client.ts";
 import { useTRPC } from "@/shared/api/trpc.ts";
-import { memberOptions } from "@/shared/member.ts";
+import { memberOptions } from "@/shared/member/member.ts";
 
 import { MATCHES_A_PAGE, type OpenKind } from "./knowledge-state.ts";
 

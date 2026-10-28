@@ -30,18 +30,12 @@ const pinned = (folder: string, cap: number, reason: string): Cap => ({
 });
 
 export const CAPS: readonly Cap[] = [
-  awaiting("apps/web/e2e", 56),
   awaiting("apps/web/src/app", 18),
-  awaiting("apps/web/src/features/auth", 47),
-  awaiting("apps/web/src/features/console", 25),
-  awaiting("apps/web/src/features/people", 49),
-  awaiting("apps/web/src/shared", 43),
   pinned(
     "apps/web/src/shared/ui",
     29,
     "the shadcn CLI's target, named in apps/web/components.json",
   ),
-  awaiting("apps/web/test", 111),
   pinned(
     "apps/worker/src/better_answers_worker/redaction",
     16,

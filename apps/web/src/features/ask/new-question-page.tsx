@@ -7,7 +7,7 @@ import { LINK } from "@/shared/knowledge/concept-body.tsx";
 import { SAID_OF_KNOWLEDGE } from "@/shared/knowledge/refusal-words.ts";
 import { ASK, headingOf, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
-import { PageHead } from "@/shared/page-head.tsx";
+import { PageHead } from "@/shared/page/page-head.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
 import { stockWait } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";

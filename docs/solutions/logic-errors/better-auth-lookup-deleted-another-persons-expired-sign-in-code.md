@@ -12,7 +12,7 @@ applies_when:
 symptoms:
   - "A person typing a just-expired email code got INVALID_OTP, which the sign-in page reads as 'That code is wrong.' with tries left, instead of OTP_EXPIRED, which it reads as spent"
   - "It happened only when another request looked up a verification row between the code's expiry and its holder's try; the holder's own lookup alone answered OTP_EXPIRED"
-  - "The expired-code spec in apps/web/e2e/sign-in.spec.ts was flaky under parallel Playwright workers, because other workers' sign-ins deleted the aged code"
+  - "The expired-code spec in apps/web/e2e/auth/sign-in.spec.ts was flaky under parallel Playwright workers, because other workers' sign-ins deleted the aged code"
 root_cause: wrong_api
 resolution_type: config_change
 severity: medium
@@ -43,7 +43,7 @@ That table is the library's store of short-lived tokens: sign-in codes and links
 - After someone else had tried a code, a person typing a code just past its expiry got `400 INVALID_OTP` rather than `400 OTP_EXPIRED`. The sign-in page showed "That code is wrong. Check it and try again. 2 tries left." instead of "That code can't be used any more." (the wording of the time; `apps/web/src/features/auth/refusal-words.ts` has since reworded both). The page reads a code as spent only on a 403 or `OTP_EXPIRED` (`apps/web/src/features/auth/code-entry.ts:25-34`).
 - Every later try was refused as wrong as well, so the page counted tries down for a code the database no longer held.
 - On its own, the same code read correctly as expired. The fault needed another request's lookup between the expiry and the holder's try.
-- The browser spec "an expired code reads as spent, handing focus to another" (`apps/web/e2e/sign-in.spec.ts:666`) was flaky under parallel Playwright workers: another worker's sign-in deleted the aged code before the spec typed it.
+- The browser spec "an expired code reads as spent, handing focus to another" (`apps/web/e2e/auth/sign-in.spec.ts:666`) was flaky under parallel Playwright workers: another worker's sign-in deleted the aged code before the spec typed it.
 
 ## What Didn't Work
 
@@ -164,7 +164,7 @@ The api now clears it first (Linear BA-39). A `hooks.before` on `/sign-in/email-
 
 - `apps/api/tests/auth/sign-in/sign-in-and-consent.test.ts:139-160`, "still answers expired after another person's code is tried". It ages the holder's code, has another person try a wrong code, asserts that try reached the library, then expects `OTP_EXPIRED` for the holder. Turn the deletion at lookup back on and it fails.
 - `apps/api/tests/timers/sweeps.test.ts:270-282`, "deletes codes over a day expired, keeping later ones", pins the day's grace to the minute either side and the `verifications_deleted` count.
-- `apps/web/e2e/sign-in.spec.ts:666`, "an expired code reads as spent, handing focus to another", proves the spent reading through the browser.
+- `apps/web/e2e/auth/sign-in.spec.ts:666`, "an expired code reads as spent, handing focus to another", proves the spent reading through the browser.
 - `apps/api/tests/auth/promotion-lock.test.ts` seeds an orphaned lock under the library's reservation id on a person holding a session and an account, then signs in by code and by link and expects both gone and the address proven. Remove the hook and those tests fail. The same file pins the library's lock name and reservation key.
 
 ### When Better Auth changes

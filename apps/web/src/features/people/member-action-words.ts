@@ -1,5 +1,5 @@
+import { aRole } from "@/shared/member/role-words.ts";
 import type { Role } from "@/shared/navigation.ts";
-import { aRole } from "@/shared/role-words.ts";
 import { counted } from "@/shared/words.ts";
 
 import type { Direction } from "./people-api.ts";

@@ -1,16 +1,16 @@
 import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useId, useRef, useState, type RefObject } from "react";
 
-import { RowLink } from "@/shared/grid-table.tsx";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { useLandingLine } from "@/shared/landing.ts";
-import { ListRead, ListState } from "@/shared/list-pages.tsx";
-import { useRole } from "@/shared/member.ts";
+import { RowLink } from "@/shared/list/grid-table.tsx";
+import { ListRead, ListState } from "@/shared/list/list-pages.tsx";
+import { keyedRow, onTheRowInFocus, rowInFocus, type Saying } from "@/shared/list/row-focus.ts";
+import { SelectionBar } from "@/shared/list/selection-bar.tsx";
+import { useRole } from "@/shared/member/member.ts";
 import { detailAt, headingOf } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
-import { ListHead, PageHead } from "@/shared/page-head.tsx";
-import { keyedRow, onTheRowInFocus, rowInFocus, type Saying } from "@/shared/row-focus.ts";
-import { SelectionBar } from "@/shared/selection-bar.tsx";
+import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";

@@ -79,9 +79,9 @@ Shift+Tab counts as leaving from a non-tabbable element as well. The heading the
 Two parts make the panel usable from the keyboard as well as reachable:
 
 - **A way back in.** The panel is portalled to the end of `<body>`, so Tab cannot reach it from the list. A reader who Tabs off the panel continues from its opener, and enters the panel again by pressing the opener, which moves focus back to the panel's heading. `Opened.pressed` counts presses, and `PanelBody` is keyed by it, so a repeat press remounts the heading, and the heading's mount ref focuses it.
-- **Room beside the page.** A fixed 28rem sheet covers the whole content column at the shell's own `md` breakpoint: 768 px, less the 56 px rail, the 248 px menu and `md:px-8`, leaves about 400 px. So the panel opens beside the page only from `xl`, and inline under its match below that. The stylesheet holds that breakpoint as `--room-beside` (`apps/web/src/index.css`), and `useRoomBeside` (`apps/web/src/shared/wide-layout.ts`) reads it, as `useWideLayout` reads `--shell-wide`.
+- **Room beside the page.** A fixed 28rem sheet covers the whole content column at the shell's own `md` breakpoint: 768 px, less the 56 px rail, the 248 px menu and `md:px-8`, leaves about 400 px. So the panel opens beside the page only from `xl`, and inline under its match below that. The stylesheet holds that breakpoint as `--room-beside` (`apps/web/src/index.css`), and `useRoomBeside` (`apps/web/src/shared/page/wide-layout.ts`) reads it, as `useWideLayout` reads `--shell-wide`.
 
-The proof is `apps/web/e2e/knowledge-search.spec.ts`, "hands Tab from the open panel back to its opener". With the handler disabled it failed at "Tab off the panel did not reach the page". With the handler in place it passes.
+The proof is `apps/web/e2e/knowledge/knowledge-search.spec.ts`, "hands Tab from the open panel back to its opener". With the handler disabled it failed at "Tab off the panel did not reach the page". With the handler in place it passes.
 
 ## Why This Works
 

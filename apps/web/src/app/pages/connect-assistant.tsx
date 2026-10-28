@@ -4,7 +4,7 @@ import { CONNECT_ASSISTANT } from "@/app/words.ts";
 import { copiedToTheClipboard } from "@/features/auth/clipboard.ts";
 import { ASK, headingOf, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
-import { PageHead } from "@/shared/page-head.tsx";
+import { PageHead } from "@/shared/page/page-head.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { moduleAt, playwrightOver } from "./playwright-tree.ts";
+import { moduleAt, playwrightOver } from "@test/playwright-tree.ts";
 
 const runSummaryOver = async (spec: string) => {
   const reporter = moduleAt("e2e/run-summary.ts");

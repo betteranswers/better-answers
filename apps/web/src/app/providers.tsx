@@ -10,8 +10,8 @@ import {
   type ApiClient,
   type ApiProxy,
 } from "@/shared/api/trpc.ts";
-import { workspaceShownBy, type WorkspaceShown } from "@/shared/member.ts";
-import { useThemeFollowed } from "@/shared/theme.ts";
+import { workspaceShownBy, type WorkspaceShown } from "@/shared/member/member.ts";
+import { useThemeFollowed } from "@/shared/theme/theme.ts";
 
 type FailureListener = {
   readonly heard: FailureHeard;

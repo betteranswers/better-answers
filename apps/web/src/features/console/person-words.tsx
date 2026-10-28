@@ -1,4 +1,4 @@
-import { Address } from "@/shared/address.tsx";
+import { Address } from "@/shared/member/address.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { instantWords, nameOrAddress } from "@/shared/words.ts";
 

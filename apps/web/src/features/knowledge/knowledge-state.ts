@@ -1,5 +1,5 @@
+import { searchText } from "@/shared/address/list-address.ts";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
-import { searchText } from "@/shared/list-address.ts";
 
 export const SEARCH_KEYSTROKES = {
   search: { key: "/", action: "Search This Workspace’s Knowledge" },

@@ -1,9 +1,9 @@
 import { useId, useRef, useState, type SubmitEvent, type ReactNode } from "react";
 
-import { ActionDialog } from "@/shared/action-dialog.tsx";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { ActionDialog } from "@/shared/page/action-dialog.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";

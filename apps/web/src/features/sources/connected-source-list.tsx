@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import { keyedRow } from "@/shared/row-focus.ts";
-import { SummaryRow as Row } from "@/shared/summary-row.tsx";
+import { keyedRow } from "@/shared/list/row-focus.ts";
+import { SummaryRow as Row } from "@/shared/list/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";

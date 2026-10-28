@@ -16,7 +16,7 @@ import { z } from "zod";
 import { useTRPC } from "@/shared/api/trpc.ts";
 
 import { askOfOurRoute, type SignedIn } from "./auth-hooks.ts";
-import { useRereadTheSecondFactor } from "./second-factor-hooks.ts";
+import { useRereadTheSecondFactor } from "./second-factor/second-factor-hooks.ts";
 import { signedInHere } from "./session-memory.ts";
 
 const ADD_OPTIONS_PATH = "/passkeys/add-options";

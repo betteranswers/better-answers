@@ -15,7 +15,6 @@ import { z } from "zod";
 import { RECORD_ID } from "@/features/ask/ask-state.ts";
 import { NewQuestionPage } from "@/features/ask/new-question-page.tsx";
 import { YourQuestionsPage, YourRecordPage } from "@/features/ask/your-questions-page.tsx";
-import { AcceptInvitationPage } from "@/features/auth/accept-invitation-page.tsx";
 import { AccountPage } from "@/features/auth/account-page.tsx";
 import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import {
@@ -24,13 +23,6 @@ import {
   signedOutOfAStep,
 } from "@/features/auth/auth-hooks.ts";
 import { backTo, carriedFlow, leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
-import { ChooseWorkspacePage } from "@/features/auth/choose-workspace-page.tsx";
-import { DisplayNamePage } from "@/features/auth/display-name-page.tsx";
-import { LinkPage } from "@/features/auth/link-page.tsx";
-import { NoWorkspacePage } from "@/features/auth/no-workspace-page.tsx";
-import { detourAfter } from "@/features/auth/pending-refusal.ts";
-import { reconfirmAfter, ReconfirmDialog } from "@/features/auth/reconfirm-dialog.tsx";
-import { ConfirmPage, RecoveryPage } from "@/features/auth/second-factor-pages.tsx";
 import {
   CODES_STEP,
   codesDetour,
@@ -41,12 +33,26 @@ import {
   SETUP_STEP,
   type LeftFrom,
 } from "@/features/auth/second-factor-steps.ts";
+import { detourAfter } from "@/features/auth/second-factor/pending-refusal.ts";
+import {
+  reconfirmAfter,
+  ReconfirmDialog,
+} from "@/features/auth/second-factor/reconfirm-dialog.tsx";
+import { ConfirmPage, RecoveryPage } from "@/features/auth/second-factor/second-factor-pages.tsx";
+import { CodesPage, SetupPage } from "@/features/auth/second-factor/setup-page.tsx";
 import { rememberTheSession } from "@/features/auth/session-memory.ts";
-import { CodesPage, SetupPage } from "@/features/auth/setup-page.tsx";
-import { SignInPage } from "@/features/auth/sign-in-page.tsx";
-import { homeAfterASwitchElsewhere, homeOnceLeft } from "@/features/auth/switched-elsewhere.ts";
-import { EveryonePage } from "@/features/console/everyone-page.tsx";
-import { NamesWaitingPage } from "@/features/console/names-waiting-page.tsx";
+import { DisplayNamePage } from "@/features/auth/sign-in/display-name-page.tsx";
+import { LinkPage } from "@/features/auth/sign-in/link-page.tsx";
+import { SignInPage } from "@/features/auth/sign-in/sign-in-page.tsx";
+import { AcceptInvitationPage } from "@/features/auth/workspace/accept-invitation-page.tsx";
+import { ChooseWorkspacePage } from "@/features/auth/workspace/choose-workspace-page.tsx";
+import { NoWorkspacePage } from "@/features/auth/workspace/no-workspace-page.tsx";
+import {
+  homeAfterASwitchElsewhere,
+  homeOnceLeft,
+} from "@/features/auth/workspace/switched-elsewhere.ts";
+import { EveryonePage } from "@/features/console/everyone/everyone-page.tsx";
+import { NamesWaitingPage } from "@/features/console/names-waiting/names-waiting-page.tsx";
 import { isTheOperator, mustSignInForTheConsole } from "@/features/console/operator.ts";
 import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
 import { SUGGESTION_ID } from "@/features/inbox/inbox-state.ts";
@@ -56,15 +62,15 @@ import { CollectionsAndOwnersPage } from "@/features/knowledge/collections-and-o
 import { ConceptPage } from "@/features/knowledge/concept-page.tsx";
 import { KnowledgeBasePage } from "@/features/knowledge/knowledge-base-page.tsx";
 import { SearchPage } from "@/features/knowledge/search-page.tsx";
-import { AuditLogPage } from "@/features/people/audit-log-page.tsx";
-import { GroupsPage } from "@/features/people/groups-page.tsx";
-import { MemberPage } from "@/features/people/member-page.tsx";
-import { PERSON_ID } from "@/features/people/members-address.ts";
+import { AuditLogPage } from "@/features/people/audit-log/audit-log-page.tsx";
+import { GroupsPage } from "@/features/people/groups/groups-page.tsx";
 import { MEMBERS_TOOLBAR, MembersPage } from "@/features/people/members-page.tsx";
+import { MemberPage } from "@/features/people/members/member-page.tsx";
+import { PERSON_ID } from "@/features/people/members/members-address.ts";
 import { AnswerTestsPage } from "@/features/questions/answer-tests-page.tsx";
 import { QuestionsAskedPage } from "@/features/questions/questions-asked-page.tsx";
 import { ConnectedSourcesPage } from "@/features/sources/connected-sources-page.tsx";
-import { ADDRESS_QUERY } from "@/shared/address-query.ts";
+import { ADDRESS_QUERY } from "@/shared/address/address-query.ts";
 import type { FailedDuring } from "@/shared/api/query-client.ts";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
 import { CONCEPT_IRI } from "@/shared/knowledge/concept-address.ts";
@@ -75,7 +81,7 @@ import {
   roleHeld,
   SECOND_FACTOR_PENDING,
   useMember,
-} from "@/shared/member.ts";
+} from "@/shared/member/member.ts";
 import {
   CONSOLE,
   hides,
@@ -93,7 +99,7 @@ import {
   type PagePath,
   type Area,
 } from "@/shared/navigation.ts";
-import type { PageToolbar } from "@/shared/page-toolbar.tsx";
+import type { PageToolbar } from "@/shared/page/page-toolbar.tsx";
 
 import { ConsoleFrame } from "./console-frame.tsx";
 import { FailedPage } from "./failed-page.tsx";

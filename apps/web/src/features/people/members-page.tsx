@@ -2,13 +2,13 @@ import type { ComponentType } from "react";
 
 import { usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
-import { PageHead } from "@/shared/page-head.tsx";
-import { useOpenTab, type PageTab, type PageToolbar } from "@/shared/page-toolbar.tsx";
+import { PageHead } from "@/shared/page/page-head.tsx";
+import { useOpenTab, type PageTab, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
 
-import { InvitationsTab } from "./invitations-tab.tsx";
-import { MembersTab } from "./members-tab.tsx";
+import { InvitationsTab } from "./invitations/invitations-tab.tsx";
+import { MembersTab } from "./members/members-tab.tsx";
 import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
-import { RequestsTab } from "./requests-tab.tsx";
+import { RequestsTab } from "./requests/requests-tab.tsx";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
 

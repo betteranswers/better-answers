@@ -1,13 +1,13 @@
 import { useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
-import { Address } from "@/shared/address.tsx";
+import { Address } from "@/shared/member/address.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
-import { useOneAtATime } from "./invitation-actions.tsx";
 import { INVITATIONS_WORDS, resentOutcome } from "./invitation-words.ts";
-import { useResendInvitation, type SentInvitation } from "./invitations-api.ts";
+import { useOneAtATime } from "./invitations/invitation-actions.tsx";
+import { useResendInvitation, type SentInvitation } from "./invitations/invitations-api.ts";
 import { outcomeOfSendingFailure } from "./refusal.tsx";
 
 const NONE_WENT: ReadonlySet<SentInvitation> = new Set();

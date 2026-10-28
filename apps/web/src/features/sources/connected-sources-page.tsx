@@ -2,13 +2,13 @@ import { useId, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
-import { EmptyState } from "@/shared/empty-state.tsx";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
+import { onTheRowInFocus, rowInFocus } from "@/shared/list/row-focus.ts";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
-import { ListHead, PageHead } from "@/shared/page-head.tsx";
+import { EmptyState } from "@/shared/page/empty-state.tsx";
+import { ListHead, PageHead } from "@/shared/page/page-head.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
-import { onTheRowInFocus, rowInFocus } from "@/shared/row-focus.ts";
 import { counted } from "@/shared/words.ts";
 
 import { ConnectAction } from "./connect-action.tsx";

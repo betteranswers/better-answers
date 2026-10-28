@@ -2,9 +2,9 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
 import { QUERY_MAX } from "@/features/knowledge/knowledge-state.ts";
-import { MEMBERS_PAGE, openingFrom } from "@/features/people/members-address.ts";
+import { MEMBERS_PAGE, openingFrom } from "@/features/people/members/members-address.ts";
 import { useMembers } from "@/features/people/people-api.ts";
-import { askingHere, type Here } from "@/shared/address-ask.ts";
+import { askingHere, type Here } from "@/shared/address/address-ask.ts";
 import { Icon, type IconName } from "@/shared/icon.tsx";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";

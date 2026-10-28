@@ -3,7 +3,6 @@ import { createContext, useContext, useId, useState, type ReactNode } from "reac
 import type { JudgeState, QuestionVerdict } from "@better-answers/schema";
 
 import type { ProsePart } from "@/shared/api/ask-stream.ts";
-import { keyed } from "@/shared/keyed.ts";
 import { ConceptBody, type MarkOpening } from "@/shared/knowledge/concept-body.tsx";
 import {
   EvidenceInline,
@@ -13,10 +12,11 @@ import {
 } from "@/shared/knowledge/evidence-panel.tsx";
 import { openingOf, type Evidence } from "@/shared/knowledge/knowledge-reads.ts";
 import { cn } from "@/shared/lib/utils.ts";
+import { keyed } from "@/shared/list/keyed.ts";
+import { useRoomBeside } from "@/shared/page/wide-layout.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { useRoomBeside } from "@/shared/wide-layout.ts";
 
 import { FlagControl, HelpfulControl } from "./answer-feedback.tsx";
 import { ASK_WORDS as WORDS } from "./ask-words.ts";

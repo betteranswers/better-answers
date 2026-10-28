@@ -16,7 +16,10 @@ const TABLE_ROW_NAME = /^\| `(?<name>\w+)` \|/gm;
 const PLAYWRIGHT_FIXTURES = new Set(["context", "page", "request", "passesTheAccessibilityGate"]);
 
 function filesIn(directory: string): string[] {
-  return readdirSync(path.join(repositoryRoot, directory)).map((file) => `${directory}/${file}`);
+  return readdirSync(path.join(repositoryRoot, directory), {
+    encoding: "utf8",
+    recursive: true,
+  }).map((file) => `${directory}/${file}`);
 }
 
 const read = (file: string): string => readFileSync(path.join(repositoryRoot, file), "utf8");

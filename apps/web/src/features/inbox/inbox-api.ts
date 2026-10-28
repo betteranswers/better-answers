@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
-import { memberOptions } from "@/shared/member.ts";
+import { memberOptions } from "@/shared/member/member.ts";
 
 import { stillWaitingAfter } from "./decided.ts";
 

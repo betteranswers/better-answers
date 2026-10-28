@@ -1,6 +1,6 @@
 import { UNBUILT_LINE } from "@/app/words.ts";
 import { headingOf, type Page } from "@/shared/navigation.ts";
-import { PageHead } from "@/shared/page-head.tsx";
+import { PageHead } from "@/shared/page/page-head.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 
 export function UnbuiltPage(properties: { readonly home: Page }) {

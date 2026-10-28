@@ -6,7 +6,7 @@ import {
   ViewStateSlot,
   type PageTab,
   type PageToolbar,
-} from "@/shared/page-toolbar.tsx";
+} from "@/shared/page/page-toolbar.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs.tsx";
 
 export const openTabIn = (

@@ -1,0 +1,483 @@
+import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { useTable } from "@tanstack/react-table";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+
+/* jscpd:ignore-start */
+import { useKeystroke } from "@/shared/keystrokes.tsx";
+import { FilterRow } from "@/shared/list/filter-row.tsx";
+import { GridTable } from "@/shared/list/grid-table.tsx";
+import { ListPages, ListState } from "@/shared/list/list-pages.tsx";
+import { onTheRowInFocus, rowInFocus, type Saying } from "@/shared/list/row-focus.ts";
+import { RowMenu } from "@/shared/list/row-menu.tsx";
+import { useSearchedList } from "@/shared/list/searched-list.ts";
+import { SelectionBar } from "@/shared/list/selection-bar.tsx";
+import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
+import { ListHead } from "@/shared/page/page-head.tsx";
+/* jscpd:ignore-end */
+import { useHiddenColumns } from "@/shared/page/wide-layout.ts";
+import { Card } from "@/shared/ui/card.tsx";
+import { CLEAR_WORDS, counted } from "@/shared/words.ts";
+
+import { useGroups } from "../groups-api.ts";
+import { useInviteAction } from "../invite-action.tsx";
+import {
+  MEMBER_PAGE_WORDS,
+  MEMBERS_LOADING,
+  NO_LONGER_LISTED,
+  SELECTED_MEMBERS,
+} from "../member-action-words.ts";
+import { useMembers, useRemovalOf, type ListedMember, type Role } from "../people-api.ts";
+import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST } from "../people-state.ts";
+import { outcomeOfFailure } from "../refusal.tsx";
+import { ROLES } from "../role-meanings.ts";
+import { UnsentEmails } from "../unsent-emails.tsx";
+import { nameOf } from "../words.tsx";
+import {
+  MemberBulkActions,
+  MemberBulkDialogs,
+  useMemberBulkActions,
+} from "./member-bulk-actions.tsx";
+import {
+  HIDEABLE,
+  MemberActionsContext,
+  memberColumns,
+  memberFeatures,
+  NO_MARKS,
+  SORTABLE,
+  type RefusedRows,
+} from "./member-columns.tsx";
+import {
+  MEMBERS_FIELDS,
+  MEMBERS_LIST,
+  memberPageOf,
+  RETURNED_FROM_A_REMOVAL,
+  sortedOf,
+  sortOf,
+  type OpenedAt,
+  type Opening,
+} from "./members-address.ts";
+
+const PAGE_SIZE = 25;
+
+const MEMBERS_HEADING = "Members";
+
+const SEARCH_LABEL = "Search by name or address";
+
+const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.member);
+
+const NONE: ReadonlySet<string> = new Set();
+
+const NO_ONE: readonly ListedMember[] = [];
+
+const NARROW_HIDES: ReadonlySet<string> = new Set(["groups", "joined"]);
+
+const countOfMembers = (count: number): string => counted(count, "member", "members");
+
+type Narrowing = {
+  readonly search: string;
+  readonly role: Role | undefined;
+  readonly group: string | undefined;
+};
+
+const isNarrowed = (narrowing: Narrowing): boolean =>
+  narrowing.search !== "" || narrowing.role !== undefined || narrowing.group !== undefined;
+
+const saidOfCount = (shown: number, total: number, narrowing: Narrowing): string => {
+  if (!isNarrowed(narrowing)) return countOfMembers(total);
+  const of = `${String(shown)} of ${countOfMembers(total)} match`;
+  return narrowing.search === "" ? `${of} these filters.` : `${of} “${narrowing.search}”.`;
+};
+
+const matching = (narrowing: Narrowing) => {
+  const search = narrowing.search.toLowerCase();
+  return (member: ListedMember): boolean =>
+    (narrowing.role === undefined || member.role === narrowing.role) &&
+    (narrowing.group === undefined ||
+      member.groups.some((group) => group.groupId === narrowing.group)) &&
+    `${member.displayName} ${member.address}`.toLowerCase().includes(search);
+};
+
+const KEPT_ON_CLEAR = ["sort"] as const;
+
+const useNarrowedMembers = (listed: readonly ListedMember[]) => {
+  const list = useSearchedList(MEMBERS_LIST, MEMBERS_FIELDS, KEPT_ON_CLEAR);
+  const { search } = list;
+  const { role, group } = list.state;
+  const narrowing: Narrowing = { search, role, group };
+  const data = useMemo(
+    () => listed.filter(matching({ search, role, group })),
+    [listed, search, role, group],
+  );
+  return { ...list, narrowing, data, pageIndex: list.pageIndex(PAGE_SIZE, data.length) };
+};
+
+type Narrowed = ReturnType<typeof useNarrowedMembers>;
+
+const toggled = (ticked: ReadonlySet<string>, personId: string): ReadonlySet<string> => {
+  const next = new Set(ticked);
+  if (next.has(personId)) next.delete(personId);
+  else next.add(personId);
+  return next;
+};
+
+const useOpenMember = (flush: () => void) => {
+  const navigate = useNavigate();
+  const router = useRouter();
+
+  return (personId: string, openedAt: OpenedAt) => {
+    flush();
+    // The browser's history folds a replace and a push in one task into one push, losing the search.
+    router.history.flush();
+    const opening: Opening = { openedAt, membersQuery: router.latestLocation.searchStr };
+    void navigate({ href: memberPageOf(personId), state: (held) => ({ ...held, ...opening }) });
+  };
+};
+
+const removalSaid = (
+  name: string | undefined,
+  removal: ReturnType<typeof useRemovalOf>,
+): Outcome | undefined => {
+  if (name === undefined || removal === undefined) return undefined;
+  if (removal.error !== null) return outcomeOfFailure(removal.error, "action");
+  return {
+    tone: "said",
+    words:
+      removal.status === "success"
+        ? MEMBER_PAGE_WORDS.removed(name)
+        : MEMBER_PAGE_WORDS.removing(name),
+  };
+};
+
+const useReturnedFromARemoval = (heading: RefObject<HTMLElement | null>) => {
+  const personId = useRouterState({
+    select: (state) =>
+      RETURNED_FROM_A_REMOVAL.safeParse(state.location.state).data?.removed.personId,
+  });
+  const name = useRouterState({
+    select: (state) => RETURNED_FROM_A_REMOVAL.safeParse(state.location.state).data?.removed.name,
+  });
+  const removal = useRemovalOf(personId);
+
+  useEffect(() => {
+    if (personId !== undefined) heading.current?.focus();
+  }, [personId, heading]);
+
+  return {
+    outcome: removalSaid(name, removal),
+    heard: `${personId ?? ""} ${removal?.status ?? ""}`,
+  };
+};
+
+const ROW_ACTIONS: readonly { readonly label: string; readonly at: OpenedAt }[] = [
+  { label: "Open", at: "member" },
+  { label: "Change Role", at: "role" },
+  { label: "Add to Group", at: "groups" },
+  { label: "Remove", at: "removal" },
+];
+
+const rowMenuOf = (open: (personId: string, at: OpenedAt) => void) => (member: ListedMember) => (
+  <RowMenu
+    name={nameOf(member)}
+    actions={ROW_ACTIONS.map(({ label, at }) => ({
+      label,
+      destructive: at === "removal",
+      onSelect: () => {
+        open(member.personId, at);
+      },
+    }))}
+  />
+);
+
+function MemberFilters(properties: {
+  readonly narrowed: Narrowed;
+  readonly searchRef: RefObject<HTMLInputElement | null>;
+  readonly hidden: ReadonlySet<string>;
+  readonly onHiddenChange: (hidden: ReadonlySet<string>) => void;
+}) {
+  const { narrowed, searchRef } = properties;
+  const groups = useGroups().data ?? [];
+  const groupFilter = {
+    label: "Group",
+    value: narrowed.state.group,
+    anyLabel: "Any Group",
+    choices: groups.map((group) => ({ value: group.id, label: group.name })),
+    onChange: (group: string | undefined) => {
+      narrowed.write({ group, page: 1 });
+    },
+  };
+  return (
+    <FilterRow
+      search={{
+        label: SEARCH_LABEL,
+        value: narrowed.search,
+        onChange: narrowed.setSearch,
+        keystroke: KEY.search,
+        inputRef: searchRef,
+      }}
+      filters={[
+        {
+          label: "Role",
+          value: narrowed.state.role,
+          anyLabel: "Any Role",
+          choices: ROLES.map((role) => ({ value: role, label: role })),
+          onChange: (role) => {
+            narrowed.write({ role: ROLES.find((each) => each === role), page: 1 });
+          },
+        },
+        ...(groups.length === 0 ? [] : [groupFilter]),
+      ]}
+      columns={{
+        columns: HIDEABLE,
+        hidden: properties.hidden,
+        onHiddenChange: properties.onHiddenChange,
+      }}
+    />
+  );
+}
+
+function MembersRead(properties: {
+  readonly read: ReturnType<typeof useMembers>;
+  readonly searchRef: RefObject<HTMLInputElement | null>;
+  readonly children: ReactNode;
+}) {
+  const { read } = properties;
+  if (read.error !== null) {
+    return (
+      <ListState
+        state={{
+          kind: "failed",
+          words: outcomeOfFailure(read.error, "read").words,
+          onRetry: () => {
+            void read.refetch();
+          },
+          focusAfterRetry: properties.searchRef,
+        }}
+      />
+    );
+  }
+  if (read.data === undefined) {
+    return <ListState state={{ kind: "loading", words: MEMBERS_LOADING }} />;
+  }
+  return properties.children;
+}
+
+function NoOneMatches(properties: {
+  readonly narrowed: Narrowed;
+  readonly focusAfterClear: RefObject<HTMLElement | null>;
+}) {
+  const { narrowed } = properties;
+  return (
+    <ListState
+      state={{
+        kind: "emptied",
+        words:
+          narrowed.search === ""
+            ? "No results found. Try adjusting your filters to see more results."
+            : `No results found for “${narrowed.search}”.`,
+        clearWords: CLEAR_WORDS.filters,
+        onClear: narrowed.clear,
+        focusAfterClear: properties.focusAfterClear,
+      }}
+    />
+  );
+}
+
+const namedIn =
+  (listed: readonly ListedMember[]) =>
+  (personId: string): string => {
+    const member = listed.find((each) => each.personId === personId);
+    return member === undefined ? NO_LONGER_LISTED : nameOf(member);
+  };
+
+type Shown = { readonly outcome: Outcome | undefined; readonly refused: RefusedRows };
+
+const NOTHING_SHOWN: Shown = { outcome: undefined, refused: NO_MARKS };
+
+const useLastSaid = (heading: RefObject<HTMLElement | null>) => {
+  const returned = useReturnedFromARemoval(heading);
+  const removalSaidOnly: Shown = { ...NOTHING_SHOWN, outcome: returned.outcome };
+  const [shown, setShown] = useState<Shown>(removalSaidOnly);
+  const [heard, setHeard] = useState(returned.heard);
+  if (returned.heard !== heard) {
+    setHeard(returned.heard);
+    if (returned.outcome !== undefined) setShown(removalSaidOnly);
+  }
+  const say = (outcome: Outcome | undefined, refused: RefusedRows = NO_MARKS) => {
+    setShown({ outcome, refused });
+  };
+  const sayFrom: Saying = (next) => {
+    setShown((was) => {
+      const outcome = next(was.outcome);
+      return outcome === was.outcome ? was : { outcome, refused: NO_MARKS };
+    });
+  };
+  return { ...shown, say, sayFrom };
+};
+
+function MemberList(properties: {
+  readonly read: ReturnType<typeof useMembers>;
+  readonly headingId: string;
+  readonly heading: RefObject<HTMLHeadingElement | null>;
+}) {
+  const { read, heading } = properties;
+  const listed = read.data ?? NO_ONE;
+  const narrowed = useNarrowedMembers(listed);
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(NONE);
+  const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const openMember = useOpenMember(narrowed.flush);
+  const { outcome, refused, say, sayFrom } = useLastSaid(heading);
+  const invite = useInviteAction(say);
+
+  const columns = useMemo(() => memberColumns(refused), [refused]);
+
+  const sorted = sortedOf(narrowed.state.sort);
+  const table = useTable({
+    features: memberFeatures,
+    columns,
+    data: narrowed.data,
+    getRowId: (member) => member.personId,
+    state: {
+      sorting: sorted === undefined ? [] : [sorted],
+      pagination: { pageIndex: narrowed.pageIndex, pageSize: PAGE_SIZE },
+    },
+  });
+  const shownIds = () => table.getRowModel().rows.map((row) => row.id);
+
+  const actions = useMemberBulkActions({
+    readable: read.isSuccess,
+    ticked,
+    tick: setTicked,
+    nameOf: namedIn(listed),
+    heading,
+    say,
+  });
+
+  useInFocusKeystrokes({
+    inFocus: () => rowInFocus(narrowed.data, (member) => member.personId),
+    open: openMember,
+    tick: (member) => {
+      setTicked(toggled(ticked, member.personId));
+    },
+    say: sayFrom,
+  });
+
+  return (
+    <>
+      <ListHead
+        heading={MEMBERS_HEADING}
+        headingId={properties.headingId}
+        headingRef={heading}
+        count={
+          read.data === undefined
+            ? ""
+            : saidOfCount(narrowed.data.length, read.data.length, narrowed.narrowing)
+        }
+        action={invite.action}
+      />
+      <OutcomeLine outcome={outcome} className="mt-2" />
+      <UnsentEmails unsent={invite.unsent} />
+
+      <Card className="mt-4">
+        <MemberFilters
+          narrowed={narrowed}
+          searchRef={searchRef}
+          hidden={hidden}
+          onHiddenChange={setHidden}
+        />
+        <MembersRead read={read} searchRef={searchRef}>
+          <SelectionBar
+            label={SELECTED_MEMBERS}
+            ticked={ticked}
+            shown={shownIds()}
+            noun={["member", "members"]}
+            clearKeystroke={KEY.clearSelection}
+            onClear={() => {
+              setTicked(NONE);
+            }}
+            focusAfterClear={heading}
+          >
+            <MemberBulkActions actions={actions} />
+          </SelectionBar>
+          <MemberActionsContext
+            value={{
+              open: (personId) => {
+                openMember(personId, "member");
+              },
+            }}
+          >
+            <GridTable
+              table={table}
+              caption="Members of this workspace."
+              ticking={{
+                ticked,
+                onTickedChange: setTicked,
+                nameOf,
+                everyOnThePage: "Select every member on this page",
+              }}
+              sorting={{
+                sortable: SORTABLE,
+                sorted,
+                onSortedChange: (next) => {
+                  narrowed.write({ sort: sortOf(next), page: 1 });
+                },
+              }}
+              hidden={hidden}
+              rowMenu={rowMenuOf(openMember)}
+              empty={<NoOneMatches narrowed={narrowed} focusAfterClear={searchRef} />}
+            />
+          </MemberActionsContext>
+          <ListPages
+            pages={{
+              kind: "pages",
+              label: "Pages of Members",
+              pageIndex: narrowed.pageIndex,
+              pageSize: PAGE_SIZE,
+              total: narrowed.data.length,
+              onTurn: (pageIndex) => {
+                narrowed.write({ page: pageIndex + 1 });
+              },
+              keystrokes: { previous: KEY.previousPage, next: KEY.nextPage },
+            }}
+          />
+        </MembersRead>
+      </Card>
+
+      <MemberBulkDialogs actions={actions} />
+    </>
+  );
+}
+
+function useInFocusKeystrokes(properties: {
+  readonly inFocus: () => ListedMember | undefined;
+  readonly open: (personId: string, at: OpenedAt) => void;
+  readonly tick: (member: ListedMember) => void;
+  readonly say: Saying;
+}) {
+  const acting = onTheRowInFocus(properties.inFocus, properties.say, NOTHING_IN_FOCUS);
+  const opening = (at: OpenedAt) =>
+    acting((member) => {
+      properties.open(member.personId, at);
+    });
+
+  useKeystroke(KEY.open, opening("member"));
+  useKeystroke(KEY.changeRole, opening("role"));
+  useKeystroke(KEY.endEverySignInAndToken, opening("credentials"));
+  useKeystroke(KEY.changeGroups, opening("groups"));
+  useKeystroke(KEY.remove, opening("removal"));
+  useKeystroke(KEY.flagName, opening("flag"));
+  useKeystroke(KEY.tick, acting(properties.tick));
+}
+
+export function MembersTab() {
+  const members = useMembers();
+  const headingId = useId();
+  const heading = useRef<HTMLHeadingElement>(null);
+  useGroups();
+
+  return (
+    <section aria-labelledby={headingId} className="mt-6">
+      <MemberList read={members} headingId={headingId} heading={heading} />
+    </section>
+  );
+}

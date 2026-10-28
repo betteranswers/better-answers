@@ -1,7 +1,7 @@
 import { useId, useState, type ReactNode } from "react";
 
-import { ActionDialog } from "@/shared/action-dialog.tsx";
-import { SummaryRow } from "@/shared/summary-row.tsx";
+import { SummaryRow } from "@/shared/list/summary-row.tsx";
+import { ActionDialog } from "@/shared/page/action-dialog.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Label } from "@/shared/ui/label.tsx";

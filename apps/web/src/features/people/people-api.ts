@@ -12,7 +12,7 @@ import { z } from "zod";
 
 import { takenFrom, type Undo } from "@/shared/api/optimistic.ts";
 import { useTRPC, type ApiError } from "@/shared/api/trpc.ts";
-import { memberOptions, useMember } from "@/shared/member.ts";
+import { memberOptions, useMember } from "@/shared/member/member.ts";
 
 import { roleOf } from "./role-meanings.ts";
 
