@@ -71,3 +71,15 @@ Each PR moves the `max-lines` override of any capped file it moves. If a capped 
 4. Run `pnpm format`, the workspace's `check` and `pnpm check:gates`.
 5. Run `scripts/test-inventory.sh <dir>` before and after the move and `diff` the two directories: every test file name and title must match. A split test file compares by title.
 6. Web runs the full Playwright suite on the served build, with no assertion edits.
+
+## Result
+
+The twelve PRs landed as #913, #914, #916, #920, #922, #923, #924, #926, #925, #927, #928 and the BA-267 PR, which grouped `apps/web/src/app/` into `shell/` and `pages/` last. Each `src`, `test`, `tests` and `e2e` folder now holds 15 tracked files or fewer, except the two a tool pins: `apps/web/src/shared/ui`, the shadcn CLI's target, and `apps/worker/src/better_answers_worker/redaction`, which the image's early COPY and the CI cache keys name. The `loose-files` table holds only those two, each with its reason. Root `AGENTS.md` states the convention under "Where a file goes".
+
+Three follow-ups stay open in Linear:
+
+- BA-285 points the fixture descriptions under `contracts/` at the moved paths and regenerates both contract stamps.
+- BA-286 splits the product files that still carry a `max-lines` override.
+- BA-284 fixes the waiting-on-you volume budget, which fails under load because its baseline is about 1 ms.
+
+No ADR records the convention. An ADR needs a decision that is hard to reverse, surprising without context and the result of a real trade-off. This one is cheap to reverse with `scripts/move-files.mjs`, and the `loose-files` table records why each pinned folder is over the limit.

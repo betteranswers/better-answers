@@ -1,5 +1,7 @@
 # Explore: schema-core
 
+> **Note, 28/10/2026.** This map records the tree at `d6fc08ee6`. PRs #914, #916, #920, #922 and #923 carried it out. #922 kept `ConceptFound` private to `concepts/reading/lookup.ts`, so section 6's list of face re-exports names one more than the face has. Paths and line numbers here can differ from `main`.
+
 Area: `packages/schema/src/`, `packages/schema/test/`, `packages/core/src/<slice>/` (every slice over ~15 loose files), `packages/core/test/`. Read only; every claim below was read from the worktree at `refactor/folder-restructure` unless marked *inferred*.
 
 ## 1. Inventory

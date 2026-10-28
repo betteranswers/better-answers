@@ -215,7 +215,7 @@ sequenceDiagram
 
 | What | Command |
 | --- | --- |
-| Core suites touched | `pnpm --filter @better-answers/core run test test/erasure-routine.test.ts test/erasure-map.test.ts test/erasure-replay.test.ts test/erasure-rehearsal.test.ts test/concepts.test.ts test/manifest.test.ts test/git.test.ts test/reconciler.test.ts` |
+| Core suites touched | `pnpm --filter @better-answers/core run test test/erasure/routine/erasure-routine.test.ts test/erasure/erasure-map.test.ts test/erasure/erasure-replay.test.ts test/erasure/erasure-rehearsal.test.ts test/concepts/concepts.test.ts test/concepts/import/manifest.test.ts test/store/git/git.test.ts test/concepts/writes/reconciler.test.ts` |
 | Types and lint | `pnpm --filter @better-answers/core run typecheck`, `pnpm run check:gates` |
 | Mutation | `/mutation-testing` on `packages/core/src/erasure/` and the changed `rewriteHistory` |
 | Review | full `/ce-code-review` in session |

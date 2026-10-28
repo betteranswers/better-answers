@@ -1,5 +1,7 @@
 # Explore: api (`apps/api/src/`, `apps/api/tests/`)
 
+> **Note, 28/10/2026.** This map records the tree at `d6fc08ee6`. PRs #925 and #927 carried it out. Paths and line numbers here can differ from `main`.
+
 Read-only survey of the worktree at `d6fc08ee6`. Counts are measured with `find`/`ls`. Code-line counts use oxlint's `max-lines` rule (blank lines and comments skipped) and were computed with a small script over the worktree file.
 
 ## 1. Inventory

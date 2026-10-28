@@ -1,5 +1,7 @@
 # Explore: worker (`apps/worker`)
 
+> **Note, 28/10/2026.** This map records the tree at `d6fc08ee6`. PRs #924 and #926 carried it out. Paths and line numbers here can differ from `main`.
+
 Read-only survey of `apps/worker/src/better_answers_worker/` and `apps/worker/tests/` on `refactor/folder-restructure`. Every `file:line` below was read or grepped in this worktree.
 
 Correction to the brief's counts. The package root holds 19 files (18 modules plus `__init__.py`), not 20, and 2 subpackages (`pipeline/`, `redaction/`), not 3. `tests/` holds 48 loose files (40 `test_*.py`, `conftest.py`, 6 helpers, a tracked `.gitkeep`) and one data subfolder, `fixtures/` (`conversion/`, `redaction/`).

@@ -56,39 +56,26 @@ No fix attempt failed. The defect surfaced while the expired-code browser spec w
 
 Two parts, merged as #514 (Linear BA-34).
 
-**1. Turn the library's deletion at lookup off** (`apps/api/src/auth/auth.ts:570-574`):
+**1. Turn the library's deletion at lookup off** (the `verification` option in `apps/api/src/auth/auth.ts`):
 
 ```ts
-    /**
-     * The library's lookup deletes every expired row, so another person's sign-in would make a
-     * code just expired read as wrong. The daily sweep deletes them.
-     */
     verification: { disableCleanup: true },
 ```
 
-**2. Delete expired rows in the api's daily sweep pass instead, a day after they expire.** As merged in #514; both files below have since gone, and the delete now lives in core (below).
+**2. Delete expired rows in the daily sweep pass instead, a day after they expire.** #514 put the delete in the api. It now lives in core, as one of the three deletes in `sweepIdentitySet`, beside expired sessions and rate-limit windows:
 
 ```ts
-// apps/api/src/auth/constants.ts:20-24
-/**
- * Past any wait to type a code from an email, so one that expired just before the daily sweep
- * still reads as spent.
- */
-export const VERIFICATION_KEPT_PAST_EXPIRY_SECONDS = 24 * 60 * 60;
+// packages/core/src/sweeps/index.ts
+const VERIFICATION_KEPT_PAST_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
-// apps/api/src/auth/expired-verifications.ts:7-13
-export const dropExpiredVerifications = async (door: PostgresDoor, now: Date): Promise<number> => {
-  const keptFrom = new Date(now.getTime() - VERIFICATION_KEPT_PAST_EXPIRY_SECONDS * 1000);
-  const dropped = await withIdentityWrite(IDENTITY_PRINCIPAL, door, (tx) =>
-    tx.query("DELETE FROM verification WHERE expires_at < $1", [keptFrom]),
-  );
-  return dropped.rowCount ?? 0;
-};
+const EXPIRED_VERIFICATIONS = "DELETE FROM verification WHERE expires_at < $1";
+
+  verifications: await countDeleted(platform, door, EXPIRED_VERIFICATIONS, [
+    before(input.now, VERIFICATION_KEPT_PAST_EXPIRY_MS),
+  ]),
 ```
 
-The pass in `apps/api/src/timers/sweeps.ts` runs it after the workspace sweeps, whether or not they succeeded; a pass skipped for a held lock skips it too. A refused delete becomes a refusal whose sweep is `verifications` and which names no workspace, and the pass's log line carries `verifications_deleted`, as does `the sweep pass failed` (`sweptOutsideAnyWorkspace` and `pass` in `sweeps.ts`). The delete covers every verification row more than a day past expiry, not only sign-in codes: links, OAuth state, trusted devices and the library's locks too. The runbook's "The daily sweeps" and §11 say so (`docs/operations/RUNBOOK.md`), and so does CONCEPTS.md's **sweep pass** entry.
-
-The delete and its day's grace have since moved to core, as one of the three deletes in `sweepIdentitySet` (`packages/core/src/sweeps/index.ts`), beside expired sessions and rate-limit windows. The grace, now `VERIFICATION_KEPT_PAST_EXPIRY_MS`, and the refusal word `verifications` are unchanged.
+The day's grace lets a code that expired just before the sweep still read as spent. The pass in `apps/api/src/timers/sweeps.ts` runs `sweepIdentitySet` after the workspace sweeps, whether or not they succeeded; a pass skipped for a held lock skips it too. A refused delete becomes a refusal whose sweep is `verifications` and which names no workspace, and the pass's log line carries `verifications_deleted`, as does `the sweep pass failed` (`sweptOutsideAnyWorkspace` and `pass` in `sweeps.ts`). The delete covers every verification row more than a day past expiry, not only sign-in codes: links, OAuth state, trusted devices and the library's locks too. The runbook's "The daily sweeps" and §11 say so (`docs/operations/RUNBOOK.md`), and so does CONCEPTS.md's **sweep pass** entry.
 
 ## Why This Works
 

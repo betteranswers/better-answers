@@ -1,5 +1,7 @@
 # Explore: devtools (Job 1) and the repo-wide path-coupling map (Job 2)
 
+> **Note, 28/10/2026.** This map records the tree at `d6fc08ee6`. PR #913 carried it out. Paths and line numbers here can differ from `main`.
+
 Read-only. Worktree `refactor/folder-restructure` at `d6fc08ee6`. Every `file:line` below was read in this worktree. Counts come from `ls`.
 
 ---
