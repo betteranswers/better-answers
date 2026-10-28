@@ -402,7 +402,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     inTheLane: "check:docs:devtools",
   },
   {
-    file: "packages/devtools/test/solutions-docs.test.ts",
+    file: "packages/devtools/test/gates/solutions-docs.test.ts",
     reads:
       "every doc under docs/solutions, for its applies_when and for a line-number reference, and each architecture decision for the ADR format",
     inTheLane: "check:docs:devtools",
@@ -413,7 +413,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     inTheLane: "check:docs:devtools",
   },
   {
-    file: "apps/web/test/browser-suite-skill.test.ts",
+    file: "apps/web/test/gates/browser-suite-skill.test.ts",
     reads:
       ".claude/skills/browser-suite/SKILL.md and its references, every path under apps/ they name, and the suite's modules and specs for the helpers they share",
     inTheLane: "check:docs:web",

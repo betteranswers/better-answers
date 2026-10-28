@@ -109,6 +109,10 @@ pre-push-gates:
       run: "{without-git-env} pnpm run loose-files"
       fail_text: "run it alone with pnpm run loose-files"
 
+    test-folders:
+      run: "{without-git-env} pnpm run test-folders"
+      fail_text: "run it alone with pnpm run test-folders"
+
     table-ownership-scan:
       run: "{without-git-env} pnpm run table-ownership-scan"
       fail_text: "run it alone with pnpm run table-ownership-scan"

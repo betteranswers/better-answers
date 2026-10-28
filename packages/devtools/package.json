@@ -25,6 +25,7 @@
     "./refusal-unions": "./src/scans/refusal-unions.ts",
     "./root-commands": "./src/root-config/root-commands.ts",
     "./table-ownership-scan": "./src/scans/table-ownership-scan.ts",
+    "./test-folders": "./src/scans/test-folders.ts",
     "./throwaway-tree": "./src/throwaway-tree.ts",
     "./workflows": "./src/root-config/workflows.ts",
     "./worktree-hooks": "./src/worktree-hooks.ts"
