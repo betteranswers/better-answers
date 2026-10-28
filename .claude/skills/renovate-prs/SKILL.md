@@ -57,7 +57,7 @@ The test between the first two: check the fix out on `main` and run the suite. G
 
 Order matters because Renovate **regenerates** a branch when its rebase box is ticked, force-pushing its own commit and dropping everyone else's.
 
-1. **Main first and rules land.** A branch off `origin/main`, one commit in the form `commitlint.config.mjs` enforces, and a pull request under pstack's *Opening a PR* playbook, landed as in step 5 once its verdict is `PASS`. Wait for each to merge.
+1. **Main first and rules land.** A branch off `origin/main`, one commit in the form `commitlint.config.mjs` enforces, and a pull request under pstack's *Opening a PR* playbook, landed as in step 5 once its verdict is `PASS` or `PASS+NOTES`. Wait for each to merge.
 2. **Tick the rebase box** on every pull request they touch, so Renovate regenerates it over the new `main`:
 
    ```bash
