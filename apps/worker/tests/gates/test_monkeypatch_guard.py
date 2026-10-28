@@ -3,9 +3,16 @@ import re
 
 import pytest
 
-from better_answers_worker import config
+from better_answers_worker import config, loop
 
 OWN_CODE_REFUSAL = re.escape("Our own code is never mocked")
+
+
+def test_refuses_a_patch_of_the_work_loops_sleep(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(RuntimeError, match=OWN_CODE_REFUSAL):
+        monkeypatch.setattr(loop, "sleep_until_stopped", lambda _seconds: None)
 
 
 def test_refuses_a_patch_of_this_tiers_own_module(
