@@ -55,7 +55,7 @@ import { suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bund
 import { inputOf } from "../support/suite-input.ts";
 import { objectStoreForSuite, textOf } from "../support/suite-objects.ts";
 import { answered, leaseLetLapse, readingAs, until } from "../support/suite-postgres.ts";
-import { lmdbRootUnder, runWorkerOnce } from "../support/worker-process.ts";
+import { lmdbRootUnder, workerForSuite } from "../support/worker-process.ts";
 
 const { db, bundles, arrange } = suiteWithBundles();
 const store = objectStoreForSuite();
@@ -80,8 +80,13 @@ const doorsOf = (scenario: Scenario) => ({
 const acting = <T>(who: UserPrincipal, work: (principal: UserPrincipal, tx: Tx) => Promise<T>) =>
   readingAs(db().runtimePool, who, work);
 
-const runTheWorker = (workerId: string): Promise<void> =>
-  runWorkerOnce(db().connectionUri, bundles().root, workerId, store());
+const worker = workerForSuite("cross-tier", () => ({
+  connectionUri: db().connectionUri,
+  bundleRoot: bundles().root,
+  objects: store(),
+}));
+
+const runTheWorker = (): Promise<void> => worker.tick();
 
 const boundHandbook = (scenario: Scenario, called?: string, text?: string) =>
   connectTheHandbook(scenario.admin, doorsOf(scenario), called, text);
@@ -238,7 +243,7 @@ describe("one uploaded document, read back through both tiers", () => {
       const bound = await boundHandbook(scenario);
 
       await leaseLetLapse(db().pool, { workspaceId: scenario.workspaceId, jobId: bound.jobId });
-      await runTheWorker("cross-tier-1");
+      await runTheWorker();
 
       const landed = await passagesOf(scenario.workspaceId, bound.connectedSourceId);
       const locator = locatorOf(bound.documentId, THE_WITHHELD_SPAN);
@@ -325,7 +330,7 @@ describe("one uploaded document, read back through both tiers", () => {
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario);
-      await runTheWorker("cross-tier-2");
+      await runTheWorker();
       const landed = await passagesOf(scenario.workspaceId, bound.connectedSourceId);
       const raised = await findingsOf(scenario.workspaceId, bound.documentId);
 
@@ -337,7 +342,7 @@ describe("one uploaded document, read back through both tiers", () => {
           reason: "restored",
         }),
       );
-      await runTheWorker("cross-tier-2");
+      await runTheWorker();
       const unchanged = await passagesOf(scenario.workspaceId, bound.connectedSourceId);
       const raisedAgain = await findingsOf(scenario.workspaceId, bound.documentId);
 
@@ -355,7 +360,7 @@ describe("one uploaded document, read back through both tiers", () => {
         ),
       );
       const emptied = await passagesOf(scenario.workspaceId, bound.connectedSourceId);
-      await runTheWorker("cross-tier-2");
+      await runTheWorker();
       const again = await passagesOf(scenario.workspaceId, bound.connectedSourceId);
 
       expect(landed.map((passage) => passage.content)).toEqual([THE_PASSAGE]);
@@ -381,7 +386,7 @@ describe("one uploaded document, read back through both tiers", () => {
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario, "kept-handbook.md");
-      await runTheWorker("cross-tier-5");
+      await runTheWorker();
       const withheld = await passagesOf(scenario.workspaceId, bound.connectedSourceId);
 
       answered(
@@ -397,7 +402,7 @@ describe("one uploaded document, read back through both tiers", () => {
           ),
         ),
       );
-      await runTheWorker("cross-tier-5");
+      await runTheWorker();
       const kept = await passagesOf(scenario.workspaceId, bound.connectedSourceId);
       const restored = locatorOf(bound.documentId, THE_RESTORED_SPAN);
       await publishedHandbook(scenario, bound.connectedSourceId);
@@ -424,7 +429,7 @@ describe("one uploaded document, read back through both tiers", () => {
           ),
         ),
       );
-      await runTheWorker("cross-tier-5");
+      await runTheWorker();
 
       const erased = await passagesOf(scenario.workspaceId, bound.connectedSourceId);
       const runs = await syncsOf(scenario.workspaceId, bound.connectedSourceId);
@@ -483,7 +488,8 @@ describe("one uploaded document, read back through both tiers", () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario);
 
-      const running = runTheWorker("cross-tier-3");
+      const running = runTheWorker();
+      // BA-298: on a dead worker this still waits out `until` before `running` names the cause.
       await until(async () => (await statusOf(scenario.workspaceId, bound.jobId)) === "claimed");
       answered(
         await acting(scenario.admin, (admin, tx) =>
@@ -508,7 +514,7 @@ describe("one uploaded document, read back through both tiers", () => {
       const racedByTheAdmin = answered(await finding(scenario.admin, THE_QUERY));
 
       const later = await boundHandbook(scenario, "second-handbook.md");
-      await runTheWorker("cross-tier-3");
+      await runTheWorker();
       const depot = await groupNamed(db(), scenario, "Depot", [scenario.editor]);
       answered(
         await acting(scenario.admin, (admin, tx) =>
@@ -561,8 +567,8 @@ describe("one uploaded document, read back through both tiers", () => {
       const scenario = await arrange();
       const kept = await boundHandbook(scenario, "the-handbook-that-stays.md");
       const dropped = await boundHandbook(scenario, "the-handbook-that-goes.md");
-      await runTheWorker("cross-tier-4");
-      await runTheWorker("cross-tier-4");
+      await runTheWorker();
+      await runTheWorker();
       const before = await passagesOf(scenario.workspaceId, kept.connectedSourceId);
 
       answered(
@@ -582,7 +588,7 @@ describe("one uploaded document, read back through both tiers", () => {
         "DELETE FROM source_document WHERE workspace_id = $1 AND connected_source_id = $2",
         [scenario.workspaceId, dropped.connectedSourceId],
       );
-      await runTheWorker("cross-tier-4");
+      await runTheWorker();
 
       const standing = bytesUnder(findingsStoreOf(scenario.workspaceId, kept.connectedSourceId));
 
@@ -677,7 +683,7 @@ describe("an erasure over a bound document, read through both tiers", () => {
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario, "claims-handbook.md", THE_HANDBOOK_NAMING_ANN);
-      await runTheWorker("cross-tier-6");
+      await runTheWorker();
       await publishedHandbook(scenario, bound.connectedSourceId);
       const namedBefore = await passagesFoundBy(scenario.viewer, THE_SURNAME);
       const addressedBefore = await passagesFoundBy(scenario.viewer, THE_WORK_ADDRESS);
@@ -685,7 +691,7 @@ describe("an erasure over a bound document, read through both tiers", () => {
       const subjectRequestId = await erasureRecordedAbout(scenario);
 
       const erased = await erasing(scenario, subjectRequestId, ERASED_AT);
-      await runTheWorker("cross-tier-6");
+      await runTheWorker();
 
       const namedBySurname = await passagesFoundBy(scenario.viewer, THE_SURNAME);
       const namedByAddress = await passagesFoundBy(scenario.viewer, THE_WORK_ADDRESS);
@@ -724,7 +730,7 @@ describe("a special-category verdict, followed through both tiers", () => {
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario, "absence.md", A_SICK_NOTE);
-      await runTheWorker("cross-tier-7");
+      await runTheWorker();
       await publishedHandbook(scenario, bound.connectedSourceId);
       const written = await conceptCiting(scenario, scenario.editor, [bound.documentId]);
       const sensitivityHeld = async () =>
@@ -759,7 +765,7 @@ describe("a special-category verdict, followed through both tiers", () => {
         ),
       );
 
-      await runTheWorker("cross-tier-7");
+      await runTheWorker();
       const lift = (await syncsOf(scenario.workspaceId, bound.connectedSourceId)).at(-1);
       const heldAfterTheLift = await sensitivityHeld();
       await followSyncsInEveryWorkspace(SYNC_CASCADE, scenario.postgres);

@@ -950,6 +950,105 @@ def test_a_worker_with_matching_stamps_runs_what_is_queued(
     assert audit_job(database, workspace) == ("done", WORKER)
 
 
+A_TICKING_WORKER = """
+import sys
+from better_answers_worker import loop
+
+sys.exit(loop.main())
+"""
+
+TICK_ANSWER_SECONDS = 60
+
+
+@contextlib.contextmanager
+def a_ticking_worker(
+    database: psycopg.Connection, tmp_path: Path
+) -> Iterator[subprocess.Popen[str]]:
+    with (
+        (tmp_path / "stderr.txt").open("w") as stderr,
+        subprocess.Popen(
+            [sys.executable, "-c", A_TICKING_WORKER, "--ticks"],
+            env=worker_environment(bootstrap_for(database, tmp_path)),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=stderr,
+            text=True,
+        ) as worker,
+    ):
+        try:
+            yield worker
+        finally:
+            worker.kill()
+
+
+def its_answer_to_a_tick(worker: subprocess.Popen[str]) -> dict[str, Any]:
+    assert worker.stdin is not None and worker.stdout is not None
+    worker.stdin.write("tick\n")
+    worker.stdin.flush()
+    watchdog = threading.Timer(TICK_ANSWER_SECONDS, worker.kill)
+    watchdog.start()
+    try:
+        for line in worker.stdout:
+            said = json.loads(line) if line.startswith("{") else {}
+            if said.get("event") == "tick done":
+                return dict(said)
+    finally:
+        watchdog.cancel()
+    raise AssertionError("the worker ended before it answered the tick")
+
+
+def test_a_ticking_worker_answers_each_tick_then_exits(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = a_workspace_with_a_queued_audit(database, tmp_path)
+    with database.cursor() as cursor:
+        stamp_contract_as_migrate_does(cursor, digest=CONTRACT_DIGEST)
+    database.commit()
+
+    with a_ticking_worker(database, tmp_path) as worker:
+        first = its_answer_to_a_tick(worker)
+        second = its_answer_to_a_tick(worker)
+        assert worker.stdin is not None
+        worker.stdin.close()
+        exit_code = worker.wait(timeout=EXIT_AFTER_STOP_SECONDS)
+
+    assert (first["worked"], second["worked"]) == (True, False)
+    assert audit_job(database, workspace) == ("done", WORKER)
+    assert exit_code == 0, (tmp_path / "stderr.txt").read_text()
+
+
+def test_a_ticking_worker_claims_nothing_until_its_stamps_match(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = a_workspace_with_a_queued_audit(database, tmp_path)
+    stamped_as_deploy_leaves_it(database, "a" * 64)
+
+    def ticks_across_the_deploy_finishing() -> Iterator[str]:
+        yield "tick\n"
+        assert audit_job(database, workspace) == ("queued", None)
+        stamped_as_deploy_leaves_it(database, CONTRACT_DIGEST)
+        yield "tick\n"
+
+    with capture_logs() as written:
+        loop.run_ticks(
+            bootstrap_for(database, tmp_path), ticks_across_the_deploy_finishing()
+        )
+
+    answers = [
+        (line["worked"], line["contract_stamp"])
+        for line in written
+        if line["event"] == "tick done"
+    ]
+    assert answers == [(False, loop.DIFFERS), (True, loop.MATCHES)]
+    assert audit_job(database, workspace) == ("done", WORKER)
+
+
+def stamped_as_deploy_leaves_it(database: psycopg.Connection, digest: str) -> None:
+    with database.cursor() as cursor:
+        stamp_contract_as_migrate_does(cursor, digest=digest)
+    database.commit()
+
+
 def a_daemon(bootstrap: Bootstrap) -> threading.Thread:
     def serve() -> None:
         with contextlib.suppress(psycopg.OperationalError):

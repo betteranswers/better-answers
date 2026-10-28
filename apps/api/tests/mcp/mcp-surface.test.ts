@@ -10,6 +10,13 @@ import {
   TRUST_TIERS,
 } from "@better-answers/core/answering";
 import { groupMemberInput, removeFromGroup } from "@better-answers/core/members";
+import {
+  THE_OPENING,
+  THE_PASSAGE,
+  THE_PASSAGE_QUOTED,
+  THE_QUERY,
+  THE_TITLE,
+} from "@better-answers/core/testing/cross-tier";
 import { documentLanded, groupSeeded } from "@better-answers/core/testing/documents";
 import { inputOf } from "@better-answers/core/testing/input";
 import { holdingTable, until, whileActionsWaitAt } from "@better-answers/core/testing/postgres";
@@ -24,7 +31,7 @@ import { MCP_TOKEN_RULE, MCP_UNAUTHENTICATED_IP_RULE } from "../../src/auth/cons
 import { connectAsHost } from "../support/flow.ts";
 import { conceptsSeeding, seedConcepts } from "../support/harness/harness-knowledge.ts";
 import { actingIn, type TestClient } from "../support/harness/harness.ts";
-import { callMcp } from "../support/mcp-call.ts";
+import { calledTool, callMcp, rendered, structured } from "../support/mcp-call.ts";
 import {
   changedWhileItWaitsOn,
   landedOrTwoWaitOnALock,
@@ -440,6 +447,43 @@ describe("era-independent", () => {
     expect(text).toBe(`No concept at ${ABSENT}.`);
     expect(text).not.toBe(JSON.stringify(absent.structuredContent));
     expect(text.length).toBeLessThan(RESULT_CHARACTERS_CHECKED_UNDER);
+  });
+
+  it("finds and opens a landed passage, rendering its stored text", async () => {
+    const { workspace, client, token } = await connectAViewer();
+    const landed = await documentLanded(app().database.superuser, workspace.workspaceId, {
+      title: THE_TITLE,
+      text: THE_PASSAGE,
+    });
+
+    const found = await calledTool(client, token, "find", { query: THE_QUERY });
+    const opened = await calledTool(client, token, "open", { locator: landed.locator });
+
+    expect(structured(found)["hits"]).toEqual([
+      {
+        layer: "sources",
+        kind: "document",
+        title: THE_TITLE,
+        locator: landed.locator,
+        sensitivity: "Internal",
+        openingLine: THE_OPENING,
+      },
+    ]);
+    expect(rendered(found)).toBe(
+      `document · ${THE_TITLE} · Not company knowledge · Internal · ${landed.locator} · "${THE_OPENING}"`,
+    );
+    expect(structured(opened)).toEqual({
+      found: true,
+      passage: {
+        locator: landed.locator,
+        source: THE_TITLE,
+        text: THE_PASSAGE,
+        sensitivity: "Internal",
+      },
+    });
+    expect(rendered(opened)).toBe(
+      `${THE_PASSAGE_QUOTED}\n\n— ${THE_TITLE} (${landed.locator}) · Internal`,
+    );
   });
 
   it("refuses a malformed iri before open runs", async () => {
