@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { useJumping } from "@/app/jump-to.tsx";
+import { useJumping } from "@/app/shell/jump-to.tsx";
 
 afterEach(cleanup);
 

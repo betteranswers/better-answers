@@ -1,6 +1,7 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
+import { findWhat, JUMP_TO, searchFor } from "@/app/words.ts";
 import { QUERY_MAX } from "@/features/knowledge/knowledge-state.ts";
 import { MEMBERS_PAGE, openingFrom } from "@/features/people/members/members-address.ts";
 import { useMembers } from "@/features/people/people-api.ts";
@@ -27,8 +28,6 @@ import {
 } from "@/shared/ui/command.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui/dialog.tsx";
 import { nameOrAddress, nothingMatches } from "@/shared/words.ts";
-
-import { findWhat, JUMP_TO, searchFor } from "./words.ts";
 
 const SEARCH_ROW = "search";
 

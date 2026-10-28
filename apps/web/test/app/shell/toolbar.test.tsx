@@ -2,7 +2,7 @@ import { CatchBoundary } from "@tanstack/react-router";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Toolbar, PagePanel, PageTabsRoot } from "@/app/toolbar.tsx";
+import { Toolbar, PagePanel, PageTabsRoot } from "@/app/shell/toolbar.tsx";
 import { viewStateOf, type PageToolbar } from "@/shared/page/page-toolbar.tsx";
 import { openApp } from "@test/open-app.tsx";
 

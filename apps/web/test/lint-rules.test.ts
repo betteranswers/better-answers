@@ -65,7 +65,7 @@ describe("imports run app \u2192 features \u2192 shared, never back", () => {
   it("lets a page import shared's toolbar state, not the shell's", () => {
     const refused = flagged({
       "apps/web/src/features/sources/review-toolbar.ts": probe("@/shared/page-toolbar.tsx"),
-      "apps/web/src/features/sources/reaches-the-shell.ts": probe("@/app/toolbar.tsx"),
+      "apps/web/src/features/sources/reaches-the-shell.ts": probe("@/app/shell/toolbar.tsx"),
     });
 
     expect(refused).toEqual(["apps/web/src/features/sources/reaches-the-shell.ts"]);

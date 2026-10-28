@@ -1,6 +1,8 @@
 import { Outlet, useRouterState } from "@tanstack/react-router";
 import { useId, useMemo, useState, type ReactNode } from "react";
 
+import { useArrivalTakenOnceRead, useHidden, VisibleTreeContext } from "@/app/visible-tree.ts";
+import { switchedInAnotherTab } from "@/app/words.ts";
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { saidOfASignOutRefused } from "@/features/auth/refusal-words.ts";
 import {
@@ -40,8 +42,6 @@ import { useMenuShowing } from "./menu-showing.ts";
 import { Menu } from "./menu.tsx";
 import { NavigationButton, NavigationSheet, useNavigationSheet } from "./navigation-control.tsx";
 import { openTabIn, PagePanel, PageTabsRoot, Toolbar, type PickedTab } from "./toolbar.tsx";
-import { useArrivalTakenOnceRead, useHidden, VisibleTreeContext } from "./visible-tree.ts";
-import { switchedInAnotherTab } from "./words.ts";
 import {
   useWorkspaceSwitch,
   WorkspaceSwitcher,

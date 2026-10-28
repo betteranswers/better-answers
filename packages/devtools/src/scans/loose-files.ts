@@ -13,15 +13,6 @@ export type Cap = {
   readonly reason: string;
 };
 
-const AWAITS = "awaits the folder restructure, docs/plans/008-folder-restructure.md";
-
-const awaiting = (folder: string, cap: number): Cap => ({
-  folder,
-  cap,
-  kind: "awaiting",
-  reason: AWAITS,
-});
-
 const pinned = (folder: string, cap: number, reason: string): Cap => ({
   folder,
   cap,
@@ -30,7 +21,6 @@ const pinned = (folder: string, cap: number, reason: string): Cap => ({
 });
 
 export const CAPS: readonly Cap[] = [
-  awaiting("apps/web/src/app", 18),
   pinned(
     "apps/web/src/shared/ui",
     29,

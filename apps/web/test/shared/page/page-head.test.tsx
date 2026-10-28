@@ -8,7 +8,8 @@ import { sourceFiles } from "@test/source-files.ts";
 afterEach(cleanup);
 
 const ALLOWED_ELSEWHERE: Readonly<Record<string, string>> = {
-  "app/failed-page.tsx": "the failed page names no menu group, and its alert holds the heading",
+  "app/pages/failed-page.tsx":
+    "the failed page names no menu group, and its alert holds the heading",
   "features/auth/auth-page.tsx": "a sign-in page's heading is its card's title",
   "features/auth/second-factor/recovery-codes.tsx":
     "the codes' heading is h1 on a sign-in page and h3 on Account",

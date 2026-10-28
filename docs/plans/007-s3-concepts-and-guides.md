@@ -298,7 +298,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `apps/api/tests/support/harness/harness-knowledge.ts`.
 - [ ] Edit `apps/api/tests/support/harness/harness-control.ts`.
 - [ ] Edit `apps/web/src/shared/navigation.ts`.
-- [ ] Edit `apps/web/src/app/router.tsx` and `apps/web/src/app/frame.tsx`.
+- [ ] Edit `apps/web/src/app/router.tsx` and `apps/web/src/app/shell/frame.tsx`.
 - [ ] Edit `apps/web/src/shared/member/member.ts`.
 - [ ] Create `apps/web/src/features/knowledge/collections-and-owners-page.tsx`.
 - [ ] Edit `apps/web/src/features/knowledge/knowledge-api.ts` and `apps/web/src/features/knowledge/knowledge-words.ts`.
