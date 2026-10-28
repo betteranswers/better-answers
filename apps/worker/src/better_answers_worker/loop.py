@@ -2,7 +2,7 @@ import argparse
 import signal
 import sys
 import threading
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from types import FrameType
 from typing import Any
@@ -64,6 +64,13 @@ class _Stop:
 
 
 STOP = _Stop()
+
+
+type Sleep = Callable[[float], object]
+
+
+def sleep_until_stopped(seconds: float) -> None:
+    STOP.requested.wait(seconds)
 
 
 def schema_stamp_matches(connection: psycopg.Connection) -> bool:
@@ -256,9 +263,7 @@ def warm_the_detectors_stack(worker_id: str) -> None:
     )
 
 
-def run(bootstrap: Bootstrap, *, once: bool) -> int:
-    if not once:
-        warm_the_detectors_stack(bootstrap.worker_id)
+def run(bootstrap: Bootstrap, *, once: bool, sleep: Sleep = sleep_until_stopped) -> int:
     with queue.connected(bootstrap.database_url) as connection:
         said: dict[str, str] | None = None
         while not STOP.requested.is_set():
@@ -275,14 +280,14 @@ def run(bootstrap: Bootstrap, *, once: bool) -> int:
                     said = stamps
                 if once:
                     return 1
-                STOP.requested.wait(IDLE_SLEEP_SECONDS)
+                sleep(IDLE_SLEEP_SECONDS)
                 continue
             said = None
             worked = tick(connection, bootstrap)
             if once:
                 return 0
             if not worked:
-                STOP.requested.wait(IDLE_SLEEP_SECONDS)
+                sleep(IDLE_SLEEP_SECONDS)
     logger.info("the worker stopped", worker_id=bootstrap.worker_id)
     return 0
 
@@ -323,4 +328,7 @@ def serve(
     *, once: bool = False, finish_within_seconds: float = FINISH_WITHIN_SECONDS
 ) -> int:
     STOP.install(finish_within_seconds)
-    return run(read_bootstrap(), once=once)
+    bootstrap = read_bootstrap()
+    if not once:
+        warm_the_detectors_stack(bootstrap.worker_id)
+    return run(bootstrap, once=once)
