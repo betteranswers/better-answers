@@ -1,6 +1,6 @@
 # Outside the shell
 
-These pages sit outside the workspace's frame, with no rail and no menu. A person signs in by email code or by an emailed link, names themselves, sets up and confirms a second factor, recovers with a recovery code, manages their account, chooses a workspace, asks to join one, accepts an invitation and lets Claude act for them. An address no page answers draws the not-found page.
+The pages before sign-in and the sign-in steps sit outside the workspace's frame, with no rail and no menu, and so do `/no-workspace`, `/choose-workspace`, an invitation and the api's `/consent`. For a person who holds a role in a workspace, `/account` and the not-found page are drawn inside the frame, with the rail and the breadcrumb. For anyone else they sit outside it. A person signs in by email code or by an emailed link, names themselves, sets up and confirms a second factor, recovers with a recovery code, manages their account, chooses a workspace, asks to join one, accepts an invitation and lets Claude act for them. An address no page answers draws the not-found page.
 
 ## Sub-features
 
@@ -16,7 +16,7 @@ These pages sit outside the workspace's frame, with no rail and no menu. A perso
 - `choose-workspace` lets a member of more than one workspace pick where to go at `/choose-workspace`.
 - `invitation` lets an invited person join a workspace at `/invitations/$invitationId`, with the invitation's id in place of `$invitationId`.
 - `consent` asks the person to let Claude act for them at `/consent`, the page the api serves in Claude's OAuth flow.
-- `not-found` draws `Page Not Found` with a link to the role's home for an address no page answers.
+- `not-found` draws `Page Not Found` for an address no page answers, with a link to the role's home for a person who holds a role, `Go to Your Home Page` for a person signed in with no role, and `Sign In` for a person signed out.
 
 ## How to get to it (user POV)
 
