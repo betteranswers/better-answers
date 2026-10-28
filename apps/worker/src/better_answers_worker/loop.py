@@ -1,7 +1,8 @@
 import argparse
 import signal
+import sys
 import threading
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from types import FrameType
 from typing import Any
@@ -286,15 +287,36 @@ def run(bootstrap: Bootstrap, *, once: bool) -> int:
     return 0
 
 
+def run_ticks(bootstrap: Bootstrap, ticks: Iterable[str]) -> int:
+    with queue.connected(bootstrap.database_url) as connection:
+        for _ in ticks:
+            stamps = deploy_stamps(connection)
+            worked = DIFFERS not in stamps.values() and tick(connection, bootstrap)
+            logger.info(
+                "tick done", worked=worked, worker_id=bootstrap.worker_id, **stamps
+            )
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="better-answers-worker")
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--once",
         action="store_true",
         help="one pass over every workspace, then exit — what a test drives",
     )
+    mode.add_argument(
+        "--ticks",
+        action="store_true",
+        help="one pass per line on standard input, each answered with a done line,"
+        " then exit at its end (what a test file drives)",
+    )
+    arguments = parser.parse_args()
 
-    return serve(once=parser.parse_args().once)
+    if arguments.ticks:
+        return run_ticks(read_bootstrap(), sys.stdin)
+    return serve(once=arguments.once)
 
 
 def serve(
