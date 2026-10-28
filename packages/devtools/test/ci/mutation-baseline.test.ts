@@ -371,8 +371,6 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
 });
 
 const CONCURRENT_JOBS = 20;
-const PULL_REQUEST_JOBS = 4;
-const A_LANE_JOB = 1;
 
 const checkLegsSchema = z.object({
   jobs: z.record(
@@ -383,10 +381,11 @@ const checkLegsSchema = z.object({
   ),
 });
 
-const mergeGroupLegJobs = (): number =>
-  Object.entries(readWorkflow("check.yml", checkLegsSchema).jobs)
-    .filter(([job]) => job.startsWith("full-"))
-    .reduce((jobs, [, leg]) => jobs + (leg.strategy?.matrix.shard.length ?? 1), 0);
+const checkRunJobs = (): number =>
+  Object.values(readWorkflow("check.yml", checkLegsSchema).jobs).reduce(
+    (jobs, job) => jobs + (job.strategy?.matrix.shard.length ?? 1),
+    0,
+  );
 
 const legRoots = new Map([
   ["api", "apps/api"],
@@ -590,9 +589,9 @@ describe("each mutation leg, run as shards and summed once", () => {
     );
   });
 
-  it("leaves room for a merge group and a pull request", () => {
+  it("leaves room for a run of check.yml", () => {
     expect(mutationWorkflow().jobs.stryker.strategy["max-parallel"]).toBeLessThanOrEqual(
-      CONCURRENT_JOBS - mergeGroupLegJobs() - PULL_REQUEST_JOBS - A_LANE_JOB,
+      CONCURRENT_JOBS - checkRunJobs(),
     );
   });
 });

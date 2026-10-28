@@ -1,6 +1,6 @@
 # Releases — closed 23/09/2026; a promotion is a `release/*` tag now
 
-**This file is frozen** (`T-342`, 23/09/2026). `main`'s ruleset is merge-queue-only, so the push that appended a row is refused: the record was lost and the smoke behind it skipped. A promotion is recorded instead as an **annotated `release/<UTC stamp>-<short commit>` tag**, which no branch ruleset governs. The tag carries what a row carried — when, who, both digests, what the release rode on — and names the commit it points at. List them newest first and read one:
+**This file is frozen** (`T-342`, 23/09/2026). `main`'s ruleset requires `check` and `verdict` and allows squash merges only, so the push that appended a row is refused: the record was lost and the smoke behind it skipped. A promotion is recorded instead as an **annotated `release/<UTC stamp>-<short commit>` tag**, which no branch ruleset governs. The tag carries what a row carried — when, who, both digests, what the release rode on — and names the commit it points at. List them newest first and read one:
 
 ```sh
 git fetch --tags && git tag --list 'release/*' --sort=-creatordate
