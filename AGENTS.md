@@ -64,7 +64,7 @@ The project playbooks in `.agents/playbooks/` add this repository's steps to pst
 
 Until v0.1 the session lands its own pull request, with no press from the owner, once the verdict is `PASS` or `PASS+NOTES`.
 
-The verifier records its Shipping verdict as a commit status on the verified head, context `verdict`: `success` for PASS or PASS+NOTES, `failure` for FAIL, and a description naming the verdict and the verifier, for example `gh api repos/{owner}/{repo}/statuses/<sha> -f state=success -f context=verdict -f description='PASS by <verifier>'`. The merge queue refuses a head without it.
+The verifier records its Shipping verdict as a commit status on the verified head, context `verdict`: `success` for PASS or PASS+NOTES, `failure` for FAIL, and a description naming the verdict and the verifier, for example `gh api repos/{owner}/{repo}/statuses/<sha> -f state=success -f context=verdict -f description='PASS by <verifier>'`. The `main` ruleset requires a successful `verdict` and `check` on the head, so GitHub refuses a merge without them. The session lands with `gh pr merge <n> --squash --match-head-commit <verified-sha>`. Before landing, read `main`'s newest completed `build` run (`gh run list --workflow build.yml --branch main --status completed --limit 1`), and when its `check` is red, land the fix for `main` first.
 
 ### Issue tracker
 
