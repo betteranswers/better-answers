@@ -395,6 +395,12 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     inTheLane: "check:docs:devtools",
   },
   {
+    file: "packages/devtools/test/scans/contract-paths.test.ts",
+    reads:
+      "contracts/README.md and every fixture under contracts/, for the repository paths they name",
+    inTheLane: "check:docs:devtools",
+  },
+  {
     file: "packages/devtools/test/solutions-docs.test.ts",
     reads:
       "every doc under docs/solutions, for its applies_when, and each architecture decision for the ADR format",
