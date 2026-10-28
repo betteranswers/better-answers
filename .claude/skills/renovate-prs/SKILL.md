@@ -36,7 +36,7 @@ gh run view <run> --log-failed > /tmp/pr<n>.log
 
 Find the first failing assertion or error line. A red whose only failure is a browser spec the pull request did not touch is a flake: one fresh build, per pstack's Babysit playbook.
 
-A branch is tested alone, so a cause that `main` already carries shows on the branch too. Before attributing a red to the pull request, read `main`'s newest completed `build` run (`gh run list --workflow build.yml --branch main --status completed --limit 1`). When its `check` is red on the same line, the cause is on `main` and the path is *main first* (step 3).
+A branch is tested alone, so a cause that `main` already carries shows on the branch too. Before attributing a red to the pull request, read `main`'s newest completed `build` run (`gh run list --workflow build.yml --branch main --status completed --limit 1`). When that run is red on the same line, the cause is on `main` and the path is *main first* (step 3).
 
 **Done when** every red pull request has a cause quoted from a log line, never inferred from a check's name.
 
@@ -78,17 +78,17 @@ What a fix owes, whichever path:
 
 **Done when** every pull request on the first three paths has a head whose red leg's failing line is gone from a run of that suite.
 
-## 5. Land and watch
+## 5. Land
 
-Land each pull request under pstack's Shipping playbook. Renovate's force-push is a new head, so redo the verdict on it before landing. A cloud session stops at merge-ready (`docs/agents/cloud-sessions.md`).
+The session that runs this skill lands each pull request itself (`AGENTS.md`, *Workflow*), under pstack's Shipping playbook. Renovate's force-push is a new head, so redo the verdict on it before landing. A cloud session stops at merge-ready (`docs/agents/cloud-sessions.md`).
 
-This skill reads the pull request's own `check`, posts no verdict and merges nothing. The coordinator or the owner lands it with `gh pr merge <n> --squash --match-head-commit <verified-sha>`, after a `verdict` status of `success` on that head, and its state reads back with:
+Land a head only after an agent that did not write the change has posted a `verdict` status of `success` on it; the ruleset requires `check` and `verdict`. This skill posts no verdict. Land with `gh pr merge <n> --squash --match-head-commit <verified-sha>`, and read the state back with:
 
 ```bash
 gh pr view <n> --json state,mergedAt,mergeStateStatus,headRefOid
 ```
 
-GitHub refuses the merge of a head that conflicts with `main`. When a pull request that rewrote the lockfile merged ahead of this one, tick its rebase box (step 4), wait for the head to change and verify the new head. After each landing, read `main`'s newest `build` run as in step 2. A red `check` there is a *main first* fix, landed before the next pull request.
+GitHub refuses the merge of a head that conflicts with `main`. When a pull request that rewrote the lockfile merged ahead of this one, tick its rebase box (step 4), wait for the head to change and verify the new head. After each landing, read `main`'s newest `build` run as in step 2. A red run there is a *main first* fix, landed before the next pull request.
 
 **Done when** every pull request is merged, closed by Renovate, or handed over in step 6.
 
