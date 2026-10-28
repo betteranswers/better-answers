@@ -19,18 +19,6 @@
       "skillPath": "engineering/ban-type-assertions/SKILL.md",
       "computedHash": "de04a4a73910b9ff960f4759b05f828507b16ab72fea6122f843c01f64ac4e84"
     },
-    "better-auth-best-practices": {
-      "source": "better-auth/skills",
-      "sourceType": "github",
-      "skillPath": "better-auth/best-practices/SKILL.md",
-      "computedHash": "61ba0ef64ed2e7c424401cc848ca33dd6d790a720c44727717dc0c5cba5fc122"
-    },
-    "better-auth-security-best-practices": {
-      "source": "better-auth/skills",
-      "sourceType": "github",
-      "skillPath": "security/SKILL.md",
-      "computedHash": "7a230edf3a24ce18162cb4379f59b6a19b8d24ca04db530609d0f15cede556dc"
-    },
     "c4-architecture": {
       "source": "softaworks/agent-toolkit",
       "sourceType": "github",
@@ -55,17 +43,11 @@
       "skillPath": "packages/client/skills/client-setup/SKILL.md",
       "computedHash": "65b2f97d796665441ec9044e422d549184836684b2f15b8586d978b9f8bb0406"
     },
-    "create-auth": {
-      "source": "better-auth/skills",
-      "sourceType": "github",
-      "skillPath": "better-auth/create-auth/SKILL.md",
-      "computedHash": "4e261efac2ae9a2321c4495c846ef97cf239818fc8bd2ab7e92ed1f9d25470f7"
-    },
     "docker-patterns": {
       "source": "affaan-m/ecc",
       "sourceType": "github",
       "skillPath": "skills/docker-patterns/SKILL.md",
-      "computedHash": "af6deba271429bcb5198a7e56a4f71f948509e06037e6a3210d0ad5f516eeb29"
+      "computedHash": "2518afd6ae1e1b91d7f8d2f8d9b7145fb08ec640b9624e3dffc0a21289417245"
     },
     "email-best-practices": {
       "source": "resend/resend-skills",
@@ -78,12 +60,6 @@
       "sourceType": "github",
       "skillPath": "packages/server/skills/error-handling/SKILL.md",
       "computedHash": "5816a0b5e2e7a33b2bf5b130201bba4251b0865688f4c647a780f39af277c6b8"
-    },
-    "fix-knip-unused-exports": {
-      "source": "factory-ai/factory-plugins",
-      "sourceType": "github",
-      "skillPath": "plugins/typescript/skills/fix-knip-unused-exports/SKILL.md",
-      "computedHash": "3e368a8a3d6ab324fd260639becf9144c87eab9fc93147299ee5f88b127d4518"
     },
     "hono": {
       "source": "honojs/skills",
@@ -101,7 +77,7 @@
       "source": "pproenca/dot-skills",
       "sourceType": "github",
       "skillPath": "skills/.experimental/knip-deadcode/SKILL.md",
-      "computedHash": "09879fec7939329934ef2fc383a8d734b53e6500e8d7f5fd7fdad03becd51ad8"
+      "computedHash": "45d9e8307860a058942a1de80571036521c3edf29ec371741c326736b29b81b5"
     },
     "links": {
       "source": "trpc/trpc",
@@ -138,12 +114,6 @@
       "sourceType": "github",
       "skillPath": "packages/openapi/skills/openapi/SKILL.md",
       "computedHash": "57e440645a1c48a9321a8581a1e5b4ee0c152eeef9edea00c9c58f32fbf3a203"
-    },
-    "organization-best-practices": {
-      "source": "better-auth/skills",
-      "sourceType": "github",
-      "skillPath": "better-auth/organization/SKILL.md",
-      "computedHash": "27627eb3a13bd44eff3a5d890f96e7db052b623db90e01684f759abe3e7fe56b"
     },
     "pii-detection-pipeline": {
       "source": "mukul975/privacy-data-protection-skills",
@@ -198,12 +168,6 @@
       "sourceType": "github",
       "skillPath": "packages/server/skills/trpc-router/SKILL.md",
       "computedHash": "dd22c754d042bbc48826d7289463e5cfc40725899c576e25bf9766706a4b2850"
-    },
-    "two-factor-authentication-best-practices": {
-      "source": "better-auth/skills",
-      "sourceType": "github",
-      "skillPath": "better-auth/twoFactor/SKILL.md",
-      "computedHash": "a6f720042e5a090909e0d519a6a50a7eb8179553cd5315f0bbad852a6d20dac8"
     },
     "validators": {
       "source": "trpc/trpc",

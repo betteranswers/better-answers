@@ -203,6 +203,10 @@ en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/dow
 [tool.ruff]
 target-version = "py313"
 src = ["src", "tests"]
+# Vendored skills sit under .claude/. force-exclude, because the commit hook names its staged files
+# and ruff lints named files despite excludes.
+extend-exclude = [".claude"]
+force-exclude = true
 
 [tool.ruff.lint]
 select = [

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# The desktop client starts a hook with launchd's bare PATH.
+PATH="$PATH:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"
+
 # stdout must be exactly the created directory or session startup aborts: diagnostics go to stderr.
 INPUT="$(cat)"
 NAME="$(printf '%s' "$INPUT" | jq -r '.name // empty' 2>/dev/null || true)"
@@ -37,15 +40,33 @@ else
   BASE=main
 fi
 
-git -C "$ROOT" worktree add -b "$BRANCH" "$DIR" "$BASE" >&2
+# --no-track: with origin/main as upstream, a bare pull merges main and, under push.default=upstream, a bare push writes to it.
+git -C "$ROOT" worktree add --no-track -b "$BRANCH" "$DIR" "$BASE" >&2
 
-# Each creation sweeps, as nothing runs as often as worktrees pile up, off stdout so it never waits.
-# Not before the add: the sweep fetches main too, and the two fetches would race for the ref.
-LOG="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
-  && LOG="$LOG/worktree-sweep.log" || LOG=/dev/null
-nohup bash "$ROOT/.claude/hooks/sweep-worktrees.sh" "$ROOT" </dev/null >"$LOG" 2>&1 &
+# Give the worktree an index of its own, or every edit here registers in the main checkout's index.
+REAL="$(cd "$DIR" && pwd -P)"
+if command -v jcodemunch-mcp >/dev/null 2>&1; then
+  jcodemunch-mcp index "$REAL" >/dev/null \
+    || echo "worktree-create-hook: jcodemunch index FAILED — edits here register in the main checkout's index" >&2
+else
+  echo "worktree-create-hook: jcodemunch not on PATH — edits here register in the main checkout's index" >&2
+fi
 
-bash "$ROOT/.claude/hooks/provision-worktree.sh" "$DIR" >&2 \
-  || echo "worktree-create-hook: provisioning incomplete — the worktree is usable, install by hand" >&2
+# jDocMunch's CLI lacks branch-local mode, so call its Python API. Leave the index unnamed: its edit
+# hook finds it by folder name.
+if command -v jdocmunch-mcp >/dev/null 2>&1; then
+  JDOC_PYTHON="$(dirname "$(readlink -f "$(command -v jdocmunch-mcp)")")/python3"
+  if ! "$JDOC_PYTHON" - "$REAL" >/dev/null <<'PY'
+import sys
+from jdocmunch_mcp.tools.index_local import index_local
+result = index_local(path=sys.argv[1], use_ai_summaries=False, use_embeddings=False, worktree_mode="branch_local")
+sys.exit(0 if result.get("success") else 1)
+PY
+  then
+    echo "worktree-create-hook: jdocmunch index FAILED — doc edits here land in the main checkout's index" >&2
+  fi
+else
+  echo "worktree-create-hook: jdocmunch not on PATH — doc edits here land in the main checkout's index" >&2
+fi
 
 echo "$DIR"
