@@ -130,6 +130,9 @@ type Waiting = {
 
 const STOP_GRACE_MS = 30_000;
 
+/** A warm tick answers in about a second and a cold one under 45 s; a case allows 300 s. */
+const A_TICK_ALLOWANCE_MS = 120_000;
+
 type TickingWorker = {
   readonly tick: () => Promise<void>;
 };
@@ -161,8 +164,9 @@ const startTickingWorker = (workerId: string, where: Where) => {
   const heard: string[] = [];
   const waiting: Waiting[] = [];
 
-  const goneWith = (reason: string): void => {
-    gone = new Error(`the worker ${workerId} ${reason}\n${stderr}`);
+  const end = (reason: string): void => {
+    gone ??= new Error(`the worker ${workerId} ${reason}\n${stderr}`);
+    killTheGroup(child);
     for (const { fail } of waiting.splice(0)) fail(gone);
   };
 
@@ -170,12 +174,12 @@ const startTickingWorker = (workerId: string, where: Where) => {
     child.once("exit", (code, signal) => {
       // The last of its stderr is still in the pipe when the exit arrives.
       setImmediate(() => {
-        goneWith(`exited (code ${String(code)}, signal ${String(signal)}) before it answered`);
+        end(`exited (code ${String(code)}, signal ${String(signal)})`);
         resolve();
       });
     });
     child.once("error", (cause) => {
-      goneWith(`did not start: ${cause.message}`);
+      end(`did not start: ${cause.message}`);
       resolve();
     });
   });
@@ -204,7 +208,20 @@ const startTickingWorker = (workerId: string, where: Where) => {
         fail(gone);
         return;
       }
-      waiting.push({ answer, fail });
+      const deadline = setTimeout(
+        () => end(`timed out: a tick went unanswered for ${A_TICK_ALLOWANCE_MS / 1000}s`),
+        A_TICK_ALLOWANCE_MS,
+      );
+      waiting.push({
+        answer: (given) => {
+          clearTimeout(deadline);
+          answer(given);
+        },
+        fail: (failure) => {
+          clearTimeout(deadline);
+          fail(failure);
+        },
+      });
       child.stdin.write("tick\n");
     });
 
