@@ -14,8 +14,8 @@ import {
 } from "@better-answers/core/answering";
 import type { Malformed, Result } from "@better-answers/core/kernel";
 
-import { draftStepsFor, stepsFor } from "../ask-steps.ts";
-import { eventsOf, type KeepAlive } from "../ask-stream.ts";
+import { draftStepsFor, stepsFor } from "../ask/ask-steps.ts";
+import { eventsOf, type KeepAlive } from "../ask/ask-stream.ts";
 import {
   crossing,
   given,

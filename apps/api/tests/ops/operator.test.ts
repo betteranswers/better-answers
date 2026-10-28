@@ -1,0 +1,988 @@
+import type { inferProcedureBuilderResolverOptions } from "@trpc/server";
+import { assert, describe, expect, expectTypeOf, it } from "vitest";
+import { z } from "zod";
+
+import { err, type OperatorPrincipal, type Principal } from "@better-answers/core/kernel";
+import type { Tx } from "@better-answers/core/store/postgres";
+import { ulid } from "@better-answers/schema";
+import { matching } from "@better-answers/schema/testing/matching";
+
+import { runOps } from "../../src/ops/index.ts";
+import type { operatorMutationProcedure, operatorQueryProcedure } from "../../src/trpc/base.ts";
+import { TRPC_ENDPOINT } from "../../src/trpc/mount.ts";
+import { appRouter } from "../../src/trpc/router.ts";
+import { connectAsHost, refresh, revokeAtEndpoint, signIn } from "../support/flow.ts";
+import { CLAUDE_CLIENT_ID, capturingLogger } from "../support/harness/harness.ts";
+import { callMcp } from "../support/mcp-call.ts";
+import { confirmationsAgedOverAnHourAgo, displayNameHeldBy } from "../support/provoke.ts";
+import { appForSuite } from "../support/suite-app.ts";
+import { refusalOfCall, webSignedIn } from "../support/web-client.ts";
+
+const app = appForSuite();
+
+const IDENTITY_ACTOR = "process:better-answers-identity";
+
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+type OperatorContext = inferProcedureBuilderResolverOptions<typeof operatorQueryProcedure>["ctx"];
+
+type OperatorMutationContext = inferProcedureBuilderResolverOptions<
+  typeof operatorMutationProcedure
+>["ctx"];
+
+type WebApi = Awaited<ReturnType<typeof webSignedIn>>["api"];
+
+const CONSOLE_CALLS: readonly (readonly [
+  string,
+  (api: WebApi, personId: string) => Promise<unknown>,
+])[] = [
+  ["console.workspaces.list", (api) => api.console.workspaces.list.query()],
+  ["console.people.list", (api) => api.console.people.list.query({})],
+  ["console.people.inspect", (api, personId) => api.console.people.inspect.query({ personId })],
+  [
+    "console.people.endEverySignInAndToken",
+    (api, personId) => api.console.people.endEverySignInAndToken.mutate({ personId }),
+  ],
+  ["console.people.namesWaiting", (api) => api.console.people.namesWaiting.query()],
+  [
+    "console.people.correctDisplayName",
+    (api, personId) =>
+      api.console.people.correctDisplayName.mutate({ personId, displayName: "Priya Shah" }),
+  ],
+];
+
+const BEARER_ASKS: readonly (readonly [string, RequestInit])[] = [
+  ["console.workspaces.list", {}],
+  ["console.people.list", {}],
+  ["console.people.inspect", {}],
+  [
+    "console.people.endEverySignInAndToken",
+    { method: "POST", body: JSON.stringify({ personId: ulid() }) },
+  ],
+  ["console.people.namesWaiting", {}],
+  [
+    "console.people.correctDisplayName",
+    { method: "POST", body: JSON.stringify({ personId: ulid(), displayName: "Priya Shah" }) },
+  ],
+];
+
+const answeredUser = z.object({ user: z.looseObject({ id: z.string() }) });
+
+const PROCEDURE_TYPES = ["query", "mutation"] as const;
+
+/** The router's flattened record types its entries as routers, though each is a procedure. */
+const procedureDef = z.object({ type: z.enum(PROCEDURE_TYPES) });
+
+type Run = { readonly exitCode: number; readonly lines: readonly string[] };
+
+const ops = async (argv: readonly string[]): Promise<Run> => {
+  const lines: string[] = [];
+  const exitCode = await runOps(argv, app().doors, {
+    fetch: async (url, init) => app().server.request(url, init),
+    stdin: async () => "",
+    say: (line) => {
+      lines.push(line);
+    },
+    logger: capturingLogger().logger,
+    modelKeySetting: err("this suite's commands are given no envelope key"),
+  });
+  return { exitCode, lines };
+};
+
+const operatorRowsOf = async (personId: string) => {
+  const found = await app().database.superuser.query<Record<string, unknown>>(
+    `SELECT action, actor, subject_id, detail FROM identity_audit_event
+      WHERE subject_id = $1 AND action LIKE 'people.operator.%' ORDER BY at, id`,
+    [personId],
+  );
+  return found.rows;
+};
+
+const operatorRowCount = async (): Promise<number> => {
+  const found = await app().database.superuser.query<{ rows: number }>(
+    "SELECT count(*)::int AS rows FROM identity_audit_event WHERE action LIKE 'people.operator.%'",
+  );
+  return found.rows[0]?.rows ?? 0;
+};
+
+const markHeldBy = async (personId: string): Promise<boolean | undefined> => {
+  const found = await app().database.superuser.query<{ operator: boolean }>(
+    'SELECT operator FROM "user" WHERE id = $1',
+    [personId],
+  );
+  return found.rows[0]?.operator;
+};
+
+const theOperatorOnTheWeb = async () => {
+  const workspace = await app().provision();
+  await app().markOperator(workspace.admin.email, "grant");
+  return { workspace, ...(await webSignedIn(app(), workspace.admin.email)) };
+};
+
+const everyRoleOnTheWeb = async () => {
+  const workspace = await app().provision();
+  const editor = await app().person();
+  const viewer = await app().person();
+  await app().addMember(workspace.workspaceId, editor.id, "Editor");
+  await app().addMember(workspace.workspaceId, viewer.id, "Viewer");
+
+  const signedIn = [];
+  for (const email of [workspace.admin.email, editor.email, viewer.email]) {
+    signedIn.push(await webSignedIn(app(), email));
+  }
+  return signedIn;
+};
+
+const theOperatorsBearerAt = async (path: string, init: RequestInit = {}) => {
+  const { workspace } = await theOperatorOnTheWeb();
+  const { accessToken } = await connectAsHost(app(), app().client(), workspace.admin);
+  const response = await app()
+    .client()
+    .fetch(`${TRPC_ENDPOINT}/${path}`, {
+      ...init,
+      headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+    });
+  return { status: response.status, answer: await response.json() };
+};
+
+describe("operator — the mark an ops command sets and clears", () => {
+  it("grants the mark, recorded under the platform's identity actor", async () => {
+    const person = await app().person();
+
+    const run = await ops(["operator", "--email", person.email, "--grant"]);
+
+    expect(run).toEqual({
+      exitCode: 0,
+      lines: [`operator: done — ${person.email} is the operator`],
+    });
+    expect(await markHeldBy(person.id)).toBe(true);
+    expect(await operatorRowsOf(person.id)).toEqual([
+      {
+        action: "people.operator.granted",
+        actor: IDENTITY_ACTOR,
+        subject_id: person.id,
+        detail: {},
+      },
+    ]);
+  });
+
+  it("revokes the mark, recording the revocation as its own row", async () => {
+    const person = await app().person();
+    await ops(["operator", "--email", person.email, "--grant"]);
+
+    const run = await ops(["operator", "--revoke", "--email", person.email.toUpperCase()]);
+
+    expect(run).toEqual({
+      exitCode: 0,
+      lines: [`operator: done — ${person.email.toUpperCase()} is no longer the operator`],
+    });
+    expect(await markHeldBy(person.id)).toBe(false);
+    expect((await operatorRowsOf(person.id)).map((row) => [row["action"], row["actor"]])).toEqual([
+      ["people.operator.granted", IDENTITY_ACTOR],
+      ["people.operator.revoked", IDENTITY_ACTOR],
+    ]);
+  });
+
+  it("writes nothing for a person already standing as asked", async () => {
+    const person = await app().person();
+    await ops(["operator", "--email", person.email, "--grant"]);
+
+    const again = await ops(["operator", "--email", person.email, "--grant"]);
+    const someoneElse = await app().person();
+    const never = await ops(["operator", "--email", someoneElse.email, "--revoke"]);
+
+    expect([again, never]).toEqual([
+      {
+        exitCode: 0,
+        lines: [`operator: done — ${person.email} was already the operator; nothing written`],
+      },
+      {
+        exitCode: 0,
+        lines: [`operator: done — ${someoneElse.email} was not the operator; nothing written`],
+      },
+    ]);
+    expect(await operatorRowsOf(person.id)).toHaveLength(1);
+    expect(await operatorRowsOf(someoneElse.id)).toEqual([]);
+  });
+
+  it("refuses an address nobody has signed in with, writing nothing", async () => {
+    const before = await operatorRowCount();
+
+    const run = await ops(["operator", "--email", "nobody@acme.invalid", "--grant"]);
+
+    expect(run).toEqual({
+      exitCode: 6,
+      lines: [
+        "operator: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
+      ],
+    });
+    expect(await operatorRowCount()).toBe(before);
+  });
+
+  it.each([
+    ["neither --grant nor --revoke", ["--email", "a@b.c"]],
+    ["both --grant and --revoke", ["--email", "a@b.c", "--grant", "--revoke"]],
+    ["no --email", ["--grant"]],
+  ])("answers usage to %s", async (_shape, flags) => {
+    const run = await ops(["operator", ...flags]);
+
+    expect(run).toEqual({
+      exitCode: 2,
+      lines: ["operator: --email <email> and one of --grant or --revoke are required"],
+    });
+  });
+
+  it("names the command in the usage", async () => {
+    const run = await ops(["help"]);
+
+    expect(run.lines.join("\n")).toContain("operator --email <email> --grant|--revoke");
+  });
+});
+
+describe("the mark the identity provider never takes or returns", () => {
+  it("refuses a first sign-in whose body sets the mark", async () => {
+    const email = `mallory-${Date.now()}@acme.invalid`;
+    const client = app().client();
+    const asked = await client.json("/email-otp/send-verification-otp", {
+      email,
+      type: "sign-in",
+    });
+    expect(asked.status).toBe(200);
+
+    const signedIn = await client.json("/sign-in/email-otp", {
+      email,
+      otp: app().codeSentTo(email),
+      operator: true,
+    });
+
+    expect(signedIn.status).toBe(400);
+    const marked = await app().database.superuser.query(
+      'SELECT 1 FROM "user" WHERE lower(email) = lower($1) AND operator',
+      [email],
+    );
+    expect(marked.rowCount).toBe(0);
+  });
+
+  it("leaves the mark out of the session the library answers", async () => {
+    const person = await app().person();
+    await app().markOperator(person.email, "grant");
+    const client = app().client();
+
+    const signedIn = await signIn(app(), client, person.email);
+    const session = await client.fetch("/get-session");
+
+    const answered = [await signedIn.json(), await session.json()].map(
+      (body) => answeredUser.parse(body).user,
+    );
+    expect(answered.map((user) => [user.id, Object.hasOwn(user, "operator")])).toEqual([
+      [person.id, false],
+      [person.id, false],
+    ]);
+  });
+});
+
+const sessionsHeldBy = async (personId: string): Promise<number | undefined> => {
+  const found = await app().database.superuser.query<{ held: number }>(
+    "SELECT count(*)::int AS held FROM session WHERE user_id = $1",
+    [personId],
+  );
+  return found.rows[0]?.held;
+};
+
+describe("the console, the operator's alone", () => {
+  const auditRowsHeld = async () =>
+    (
+      await app().database.superuser.query<Record<string, unknown>>(
+        `SELECT (SELECT count(*)::int FROM identity_audit_event) AS identity_set,
+                (SELECT count(*)::int FROM audit_event) AS workspaces`,
+      )
+    ).rows;
+
+  it("hands a console procedure the operator, never a Principal", () => {
+    expectTypeOf<OperatorContext["operator"]>().toEqualTypeOf<OperatorPrincipal>();
+    expectTypeOf<OperatorContext["tx"]>().toEqualTypeOf<Tx>();
+    expectTypeOf<OperatorContext["doors"]>().toEqualTypeOf<undefined>();
+    expectTypeOf<OperatorContext>().not.toHaveProperty("principal");
+    expectTypeOf<OperatorMutationContext>().toEqualTypeOf<OperatorContext>();
+    expectTypeOf<OperatorPrincipal>().not.toExtend<Principal>();
+  });
+
+  it("lists each workspace with its short name, members and creation", async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const acme = await app().provision({ name: "Acme Holdings" });
+    const colleague = await app().person();
+    await app().addMember(acme.workspaceId, colleague.id, "Editor");
+
+    const listed = await api.console.workspaces.list.query();
+
+    expect(listed.find((workspace) => workspace.id === acme.workspaceId)).toEqual({
+      id: acme.workspaceId,
+      name: "Acme Holdings",
+      shortName: `ws-${acme.workspaceId.toLowerCase()}`,
+      memberCount: 2,
+      createdAt: matching.stringMatching(ISO_INSTANT),
+    });
+  });
+
+  it("refuses every console procedure the router serves, none left out", () => {
+    const consoleProcedures = Object.keys(appRouter._def.procedures)
+      .filter((path) => path.startsWith("console."))
+      .sort();
+
+    expect(CONSOLE_CALLS.map(([path]) => path).toSorted()).toEqual(consoleProcedures);
+    expect(BEARER_ASKS.map(([path]) => path).toSorted()).toEqual(consoleProcedures);
+  });
+
+  it.each(CONSOLE_CALLS)("refuses %s to Admin, Editor and Viewer", async (_path, call) => {
+    const refusals: unknown[] = [];
+    for (const { api } of await everyRoleOnTheWeb()) {
+      refusals.push(await refusalOfCall(call(api, ulid())));
+    }
+
+    expect(refusals).toEqual(
+      Array.from({ length: 3 }, () =>
+        matching.objectContaining({
+          data: matching.objectContaining({
+            httpStatus: 403,
+            refusal: { word: "not-the-operator", class: "forbidden" },
+          }),
+        }),
+      ),
+    );
+  });
+
+  it.each(BEARER_ASKS)("refuses %s to the operator's own OAuth bearer", async (path, init) => {
+    expect(await theOperatorsBearerAt(path, init)).toMatchObject({
+      status: 401,
+      answer: { error: { data: { refusal: { word: "no-session" } } } },
+    });
+  });
+
+  it("writes nothing to either audit log for any console read", async () => {
+    const queries = new Set(
+      Object.entries(appRouter._def.procedures)
+        .filter(
+          ([, procedure]) => procedureDef.parse(Reflect.get(procedure, "_def")).type === "query",
+        )
+        .map(([path]) => path),
+    );
+    const reads = CONSOLE_CALLS.filter(([path]) => queries.has(path));
+    const { api, workspace } = await theOperatorOnTheWeb();
+    const before = await auditRowsHeld();
+
+    for (const [, read] of reads) await read(api, workspace.admin.id);
+
+    expect(reads.length).toBeGreaterThan(0);
+    expect(await auditRowsHeld()).toEqual(before);
+  });
+
+  it("refuses the operator from the moment the mark is cleared", async () => {
+    const { workspace, api } = await theOperatorOnTheWeb();
+    expect(Array.isArray(await api.console.workspaces.list.query())).toBe(true);
+
+    await app().markOperator(workspace.admin.email, "revoke");
+
+    expect(await refusalOfCall(api.console.workspaces.list.query())).toMatchObject({
+      data: { refusal: { word: "not-the-operator", class: "forbidden" } },
+    });
+  });
+});
+
+describe("ending every sign-in and token everywhere, from the console", () => {
+  const revocationRowsOf = async (personId: string) => {
+    const found = await app().database.superuser.query<Record<string, unknown>>(
+      `SELECT action, actor, subject_id, detail FROM identity_audit_event
+        WHERE subject_id = $1 AND action = 'people.person.credentials_revoked'`,
+      [personId],
+    );
+    return found.rows;
+  };
+
+  const refreshTokensOf = async (personId: string) => {
+    const found = await app().database.superuser.query<Record<string, unknown>>(
+      "SELECT id FROM oauth_refresh_token WHERE user_id = $1",
+      [personId],
+    );
+    return found.rows;
+  };
+
+  const revokedAtOf = async (personId: string) => {
+    const found = await app().database.superuser.query<Record<string, unknown>>(
+      'SELECT credentials_revoked_at FROM "user" WHERE id = $1',
+      [personId],
+    );
+    return found.rows;
+  };
+
+  it("ends a person's sessions and tokens in both their workspaces", async () => {
+    const { workspace: operators, api } = await theOperatorOnTheWeb();
+    const acme = await app().provision({ name: "Acme" });
+    const beta = await app().provision({ name: "Beta" });
+    const person = acme.admin;
+    await app().addMember(beta.workspaceId, person.id, "Editor");
+    const inAcme = await connectAsHost(app(), app().client(), person, { pick: acme.workspaceId });
+    const inBeta = await connectAsHost(app(), app().client(), person, { pick: beta.workspaceId });
+    const host = app().client();
+    expect(await sessionsHeldBy(person.id)).toBe(2);
+    expect([
+      (await callMcp(host, inAcme.accessToken, "tools/list")).status,
+      (await callMcp(host, inBeta.accessToken, "tools/list")).status,
+    ]).toEqual([200, 200]);
+
+    const revoked = await api.console.people.endEverySignInAndToken.mutate({ personId: person.id });
+
+    expect(revoked).toEqual({
+      personId: person.id,
+      revokedAt: matching.stringMatching(ISO_INSTANT),
+    });
+    expect(await sessionsHeldBy(person.id)).toBe(0);
+    expect(await refreshTokensOf(person.id)).toEqual([]);
+    assert(inAcme.refreshToken !== undefined, "Acme's connection issued a refresh token");
+    assert(inBeta.refreshToken !== undefined, "Beta's connection issued a refresh token");
+    expect([
+      (await callMcp(host, inAcme.accessToken, "tools/list")).status,
+      (await callMcp(host, inBeta.accessToken, "tools/list")).status,
+      (await refresh(host, inAcme.refreshToken)).status,
+      (await refresh(host, inBeta.refreshToken)).status,
+    ]).toEqual([401, 401, 400, 400]);
+    expect(await revocationRowsOf(person.id)).toEqual([
+      {
+        action: "people.person.credentials_revoked",
+        actor: `human:${operators.admin.id}`,
+        subject_id: person.id,
+        detail: {
+          grants: [acme, beta].map(({ workspaceId }) => ({
+            clientId: CLAUDE_CLIENT_ID,
+            workspaceId,
+            issuedAt: matching.stringMatching(ISO_INSTANT),
+          })),
+        },
+      },
+    ]);
+
+    for (const workspaceId of [acme.workspaceId, beta.workspaceId]) {
+      await connectAsHost(app(), app().client(), person, { pick: workspaceId });
+    }
+  });
+
+  const connectedAgainAfterRevocation = async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const { admin: person } = await app().provision();
+    const before = await connectAsHost(app(), app().client(), person);
+    await api.console.people.endEverySignInAndToken.mutate({ personId: person.id });
+    const after = await connectAsHost(app(), app().client(), person);
+    const [earlier, later] = [before.refreshToken, after.refreshToken];
+    if (earlier === undefined || later === undefined)
+      throw new Error("a grant came without a refresh token");
+    return { earlier, later, host: app().client() };
+  };
+
+  it("keeps the later grant when an earlier token is replayed", async () => {
+    const { earlier, later, host } = await connectedAgainAfterRevocation();
+
+    const replayed = await refresh(host, earlier);
+
+    expect(replayed.status).toBe(400);
+    expect((await refresh(host, later)).status).toBe(200);
+  });
+
+  it("keeps the later grant when an earlier token is revoked", async () => {
+    const { earlier, later, host } = await connectedAgainAfterRevocation();
+
+    const revoking = await revokeAtEndpoint(host, earlier);
+
+    expect(revoking.status).toBe(400);
+    expect((await refresh(host, later)).status).toBe(200);
+  });
+
+  it("admits the person's fresh sign-in once the revocation lands", async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const acme = await app().provision();
+    const before = await webSignedIn(app(), acme.admin.email);
+    await api.console.people.endEverySignInAndToken.mutate({ personId: acme.admin.id });
+
+    const again = await webSignedIn(app(), acme.admin.email);
+
+    expect(await refusalOfCall(before.api.session.member.query())).toMatchObject({
+      data: { refusal: { word: "no-session" } },
+    });
+    expect(await again.api.session.member.query()).toMatchObject({
+      workspace: { id: acme.workspaceId },
+      person: { id: acme.admin.id },
+      role: "Admin",
+    });
+  });
+
+  it("refuses the operator's hour-old confirmation, writing nothing", async () => {
+    const { workspace, api } = await theOperatorOnTheWeb();
+    const person = await app().person();
+    await confirmationsAgedOverAnHourAgo(app(), workspace.admin.id);
+
+    const refused = await refusalOfCall(
+      api.console.people.endEverySignInAndToken.mutate({ personId: person.id }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 412, refusal: { word: "confirmation-too-old", class: "precondition" } },
+    });
+    expect(await revokedAtOf(person.id)).toEqual([{ credentials_revoked_at: null }]);
+    expect(await revocationRowsOf(person.id)).toEqual([]);
+  });
+
+  it("admits the operator again after a fresh sign-in's confirmation", async () => {
+    const { workspace } = await theOperatorOnTheWeb();
+    const person = await app().person();
+    await confirmationsAgedOverAnHourAgo(app(), workspace.admin.id);
+
+    const { api } = await webSignedIn(app(), workspace.admin.email);
+    const revoked = await api.console.people.endEverySignInAndToken.mutate({ personId: person.id });
+
+    expect(revoked.personId).toBe(person.id);
+    expect(await revocationRowsOf(person.id)).toHaveLength(1);
+  });
+
+  it("refuses a person nobody holds, writing nothing", async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const nobody = ulid();
+
+    const refused = await refusalOfCall(
+      api.console.people.endEverySignInAndToken.mutate({ personId: nobody }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 404, refusal: { word: "no-such-user", class: "absent" } },
+    });
+    expect(await revocationRowsOf(nobody)).toEqual([]);
+  });
+
+  it("refuses a malformed person id, naming the field", async () => {
+    const { api } = await theOperatorOnTheWeb();
+
+    const refused = await refusalOfCall(
+      api.console.people.endEverySignInAndToken.mutate({ personId: "not-a-person" }),
+    );
+
+    expect(refused).toMatchObject({
+      data: {
+        httpStatus: 400,
+        refusal: { word: "malformed", fields: { personId: matching.any(String) } },
+      },
+    });
+    expect(await revocationRowsOf("not-a-person")).toEqual([]);
+  });
+});
+
+describe("correcting a flagged display name, from the console", () => {
+  const RUDE_NAME = "Rude Name";
+
+  const correctionRowsOf = async (personId: string) => {
+    const found = await app().database.superuser.query<Record<string, unknown>>(
+      `SELECT action, actor, subject_id, detail FROM identity_audit_event
+        WHERE subject_id = $1 AND action = 'people.person.renamed'`,
+      [personId],
+    );
+    return found.rows;
+  };
+
+  const theOperatorAndAFlaggedPerson = async () => {
+    const operator = await theOperatorOnTheWeb();
+    const acme = await app().provision({ name: "Acme Flagging" });
+    const person = await app().person(undefined, RUDE_NAME);
+    await app().addMember(acme.workspaceId, person.id, "Viewer");
+    const { api: admin } = await webSignedIn(app(), acme.admin.email);
+    await admin.members.flagDisplayName.mutate({ personId: person.id });
+    return { ...operator, acme, person };
+  };
+
+  const waitingFor = async (api: WebApi, personId: string) =>
+    (await api.console.people.namesWaiting.query()).filter(
+      (waiting) => waiting.personId === personId,
+    );
+
+  it("corrects the name, taking the person off the names waiting", async () => {
+    const { api, workspace, acme, person } = await theOperatorAndAFlaggedPerson();
+    expect(await waitingFor(api, person.id)).toEqual([
+      {
+        personId: person.id,
+        displayName: RUDE_NAME,
+        flags: [
+          {
+            workspace: { id: acme.workspaceId, name: "Acme Flagging" },
+            raisedAt: matching.stringMatching(ISO_INSTANT),
+          },
+        ],
+      },
+    ]);
+
+    const corrected = await api.console.people.correctDisplayName.mutate({
+      personId: person.id,
+      displayName: "  Priya Shah ",
+    });
+
+    expect(corrected).toEqual({ personId: person.id, displayName: "Priya Shah" });
+    expect(await displayNameHeldBy(app(), person.id)).toBe("Priya Shah");
+    expect(await waitingFor(api, person.id)).toEqual([]);
+    expect(await correctionRowsOf(person.id)).toEqual([
+      {
+        action: "people.person.renamed",
+        actor: `human:${workspace.admin.id}`,
+        subject_id: person.id,
+        detail: {},
+      },
+    ]);
+  });
+
+  it("refuses a name the person's own rule refuses, still waiting", async () => {
+    const { api, person } = await theOperatorAndAFlaggedPerson();
+
+    const refused = await refusalOfCall(
+      api.console.people.correctDisplayName.mutate({ personId: person.id, displayName: "Sam\tO" }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 400, refusal: { word: "display-name-control-character" } },
+    });
+    expect(await displayNameHeldBy(app(), person.id)).toBe(RUDE_NAME);
+    expect(await waitingFor(api, person.id)).toHaveLength(1);
+    expect(await correctionRowsOf(person.id)).toEqual([]);
+  });
+
+  it("refuses the operator's hour-old confirmation, writing nothing", async () => {
+    const { api, workspace, person } = await theOperatorAndAFlaggedPerson();
+    await confirmationsAgedOverAnHourAgo(app(), workspace.admin.id);
+
+    const refused = await refusalOfCall(
+      api.console.people.correctDisplayName.mutate({ personId: person.id, displayName: "Sam" }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 412, refusal: { word: "confirmation-too-old", class: "precondition" } },
+    });
+    expect(await displayNameHeldBy(app(), person.id)).toBe(RUDE_NAME);
+    expect(await correctionRowsOf(person.id)).toEqual([]);
+  });
+
+  it("admits the operator again after a fresh sign-in's confirmation", async () => {
+    const { workspace, person } = await theOperatorAndAFlaggedPerson();
+    await confirmationsAgedOverAnHourAgo(app(), workspace.admin.id);
+
+    const { api } = await webSignedIn(app(), workspace.admin.email);
+    const corrected = await api.console.people.correctDisplayName.mutate({
+      personId: person.id,
+      displayName: "Sam Okoro",
+    });
+
+    expect(corrected.displayName).toBe("Sam Okoro");
+    expect(await waitingFor(api, person.id)).toEqual([]);
+  });
+
+  it("refuses a person nobody holds, writing nothing", async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const nobody = ulid();
+
+    const refused = await refusalOfCall(
+      api.console.people.correctDisplayName.mutate({ personId: nobody, displayName: "Sam" }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 404, refusal: { word: "no-such-user", class: "absent" } },
+    });
+    expect(await correctionRowsOf(nobody)).toEqual([]);
+  });
+
+  it("refuses a malformed person id, naming the field", async () => {
+    const { api } = await theOperatorOnTheWeb();
+
+    const refused = await refusalOfCall(
+      api.console.people.correctDisplayName.mutate({
+        personId: "not-a-person",
+        displayName: "Sam",
+      }),
+    );
+
+    expect(refused).toMatchObject({
+      data: {
+        httpStatus: 400,
+        refusal: { word: "malformed", fields: { personId: matching.any(String) } },
+      },
+    });
+    expect(await correctionRowsOf("not-a-person")).toEqual([]);
+  });
+});
+
+describe("the session's read of whether its person is the operator", () => {
+  it("names the operator, who needs no workspace for it", async () => {
+    const person = await app().person();
+    await app().markOperator(person.email, "grant");
+    const { api } = await webSignedIn(app(), person.email);
+
+    expect(await api.session.operator.query()).toEqual({ operator: true, name: person.name });
+  });
+
+  it("answers no to an Admin, an Editor and a Viewer", async () => {
+    const answers: unknown[] = [];
+    for (const { api } of await everyRoleOnTheWeb()) {
+      answers.push(await api.session.operator.query());
+    }
+
+    expect(answers).toEqual([{ operator: false }, { operator: false }, { operator: false }]);
+  });
+
+  it("answers no from the moment the mark is cleared", async () => {
+    const { workspace, api } = await theOperatorOnTheWeb();
+    await app().markOperator(workspace.admin.email, "revoke");
+
+    expect(await api.session.operator.query()).toEqual({ operator: false });
+  });
+
+  it("refuses a caller with no session, the operator's bearer included", async () => {
+    expect(await theOperatorsBearerAt("session.operator")).toMatchObject({
+      status: 401,
+      answer: { error: { data: { refusal: { word: "no-session", class: "unauthenticated" } } } },
+    });
+  });
+});
+
+describe("the console's list and inspection of people", () => {
+  const signInsOf = async (personId: string): Promise<readonly string[]> => {
+    const found = await app().database.superuser.query<{ at: Date }>(
+      `SELECT at FROM identity_audit_event
+        WHERE action = 'people.person.signed_in' AND subject_id = $1 ORDER BY at`,
+      [personId],
+    );
+    return found.rows.map((row) => row.at.toISOString());
+  };
+
+  it("lists a person's workspaces, roles and last sign-in", async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const acme = await app().provision({ name: "Acme" });
+    const zenith = await app().provision({ name: "Zenith" });
+    const person = await app().person(undefined, "Robin Hart");
+    await app().addMember(zenith.workspaceId, person.id, "Viewer");
+    await app().addMember(acme.workspaceId, person.id, "Editor");
+    await signIn(app(), app().client(), person.email);
+
+    const listed = await api.console.people.list.query({ search: person.email.toUpperCase() });
+
+    expect(listed).toEqual({
+      people: [
+        {
+          id: person.id,
+          displayName: "Robin Hart",
+          email: person.email,
+          workspaces: [
+            { workspace: { id: acme.workspaceId, name: "Acme" }, role: "Editor" },
+            { workspace: { id: zenith.workspaceId, name: "Zenith" }, role: "Viewer" },
+          ],
+          lastSignedInAt: (await signInsOf(person.id))[0],
+          credentialsRevokedAt: null,
+        },
+      ],
+      total: 1,
+    });
+  });
+
+  it("keeps a person's last sign-in once their sessions are deleted", async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const person = await app().person();
+    await signIn(app(), app().client(), person.email);
+    const revokedAt = new Date(Date.now() + 1);
+    await app().endEverySignInAndToken(person.id, revokedAt);
+    expect(await sessionsHeldBy(person.id)).toBe(0);
+
+    const listed = await api.console.people.list.query({ search: person.email });
+
+    expect(listed.people).toEqual([
+      matching.objectContaining({
+        id: person.id,
+        lastSignedInAt: (await signInsOf(person.id))[0],
+        credentialsRevokedAt: revokedAt.toISOString(),
+      }),
+    ]);
+  });
+
+  it("answers a page of the matches, counting every match", async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const tag = ulid().toLowerCase();
+    await app().person(undefined, `${tag} Ada`);
+    const second = await app().person(undefined, `${tag} Bo`);
+
+    const listed = await api.console.people.list.query({ search: tag, offset: 1, limit: 1 });
+
+    expect({ ids: listed.people.map((person) => person.id), total: listed.total }).toEqual({
+      ids: [second.id],
+      total: 2,
+    });
+  });
+
+  it("shows a person's session and their assistant's standing grant", async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const workspace = await app().provision({ name: "Acme" });
+    const connected = await connectAsHost(app(), app().client(), workspace.admin);
+    assert(connected.refreshToken !== undefined, "the connection issued a refresh token");
+    const refreshed = await refresh(app().client(), connected.refreshToken);
+    expect(refreshed.status).toBe(200);
+
+    const inspected = await api.console.people.inspect.query({ personId: workspace.admin.id });
+
+    const instant = matching.stringMatching(ISO_INSTANT);
+    expect(inspected).toEqual({
+      sessions: [{ createdAt: instant, lastUsedAt: instant, expiresAt: instant }],
+      grants: [
+        {
+          assistant: { id: CLAUDE_CLIENT_ID, name: "Claude" },
+          workspace: { id: workspace.workspaceId, name: "Acme" },
+          issuedAt: instant,
+          lastUsedAt: instant,
+          expiresAt: instant,
+        },
+      ],
+      ended: [],
+    });
+  });
+
+  it("shows ended grants in both scopes, newest first", async () => {
+    const { workspace: operators, api } = await theOperatorOnTheWeb();
+    const acme = await app().provision({ name: "Acme" });
+    const zenith = await app().provision({ name: "Zenith" });
+    const person = await app().person(undefined, "Priya Shah");
+    await app().addMember(acme.workspaceId, person.id, "Editor");
+    await app().addMember(zenith.workspaceId, person.id, "Editor");
+    for (const { workspaceId } of [acme, zenith]) {
+      await connectAsHost(app(), app().client(), person, { pick: workspaceId });
+    }
+    const acmeAdmin = await webSignedIn(app(), acme.admin.email);
+    await acmeAdmin.api.members.endEverySignInAndToken.mutate({ personId: person.id });
+    await api.console.people.endEverySignInAndToken.mutate({ personId: person.id });
+
+    const inspected = await api.console.people.inspect.query({ personId: person.id });
+
+    const instant = matching.stringMatching(ISO_INSTANT);
+    const claude = { id: CLAUDE_CLIENT_ID, name: "Claude" };
+    expect(inspected).toEqual({
+      sessions: [],
+      grants: [],
+      ended: [
+        {
+          assistant: claude,
+          workspace: { id: zenith.workspaceId, name: "Zenith" },
+          issuedAt: instant,
+          endedAt: instant,
+          scope: "everywhere",
+          endedBy: { kind: "person", displayName: operators.admin.name },
+        },
+        {
+          assistant: claude,
+          workspace: { id: acme.workspaceId, name: "Acme" },
+          issuedAt: instant,
+          endedAt: instant,
+          scope: "workspace",
+          endedBy: { kind: "person", displayName: acme.admin.name },
+        },
+      ],
+    });
+    const [everywhere, here] = inspected.ended;
+    assert(everywhere !== undefined, "the sign-out everywhere is listed");
+    assert(here !== undefined, "the sign-out here is listed");
+    expect(Date.parse(everywhere.endedAt)).toBeGreaterThanOrEqual(Date.parse(here.endedAt));
+  });
+
+  const endedByTheServer = (workspaceId: string) => [
+    {
+      assistant: { id: CLAUDE_CLIENT_ID, name: "Claude" },
+      workspace: { id: workspaceId, name: "Acme" },
+      issuedAt: matching.stringMatching(ISO_INSTANT),
+      endedAt: matching.stringMatching(ISO_INSTANT),
+      scope: "grant",
+      endedBy: { kind: "authorization-server" },
+    },
+  ];
+
+  const acmeConnected = async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const acme = await app().provision({ name: "Acme" });
+    const host = app().client();
+    const { refreshToken } = await connectAsHost(app(), host, acme.admin);
+    return { api, acme, host, refreshToken: refreshToken ?? "" };
+  };
+
+  const revokedByItsAssistant = async () => {
+    const { api, acme, host, refreshToken } = await acmeConnected();
+    expect((await revokeAtEndpoint(host, refreshToken)).status).toBe(200);
+    return { api, acme };
+  };
+
+  it("shows an assistant's own revocation as the authorization server's ending", async () => {
+    const { api, acme } = await revokedByItsAssistant();
+
+    const inspected = await api.console.people.inspect.query({ personId: acme.admin.id });
+
+    expect(inspected).toMatchObject({ grants: [], ended: endedByTheServer(acme.workspaceId) });
+  });
+
+  // Sign-out marks only a refresh token without `offline_access`, which Claude's grant holds
+  // until a refresh narrows its scopes.
+  it("shows a sign-out's revocation as the authorization server's ending", async () => {
+    const { api, acme, host, refreshToken } = await acmeConnected();
+    const narrowed = await refresh(host, refreshToken, "knowledge:read");
+    expect(narrowed.status).toBe(200);
+    expect((await host.json("/sign-out", {})).status).toBe(200);
+
+    const inspected = await api.console.people.inspect.query({ personId: acme.admin.id });
+
+    expect(inspected).toEqual({
+      sessions: [],
+      grants: [],
+      ended: endedByTheServer(acme.workspaceId),
+    });
+  });
+
+  it("leaves a grant its assistant revoked out of revoking everywhere", async () => {
+    const { api, acme } = await revokedByItsAssistant();
+
+    await api.console.people.endEverySignInAndToken.mutate({ personId: acme.admin.id });
+
+    const recorded = await app().database.superuser.query(
+      `SELECT detail FROM identity_audit_event
+        WHERE subject_id = $1 AND action = 'people.person.credentials_revoked'`,
+      [acme.admin.id],
+    );
+    expect(recorded.rows).toEqual([{ detail: { grants: [] } }]);
+    const inspected = await api.console.people.inspect.query({ personId: acme.admin.id });
+    expect(inspected.ended).toEqual([]);
+  });
+
+  it("refuses a malformed ask, naming the field", async () => {
+    const { api } = await theOperatorOnTheWeb();
+
+    const refusals = [
+      await refusalOfCall(api.console.people.inspect.query({ personId: "not-a-person" })),
+      await refusalOfCall(api.console.people.list.query({ limit: 0 })),
+    ];
+
+    expect(refusals).toMatchObject([
+      {
+        data: {
+          httpStatus: 400,
+          refusal: { word: "malformed", fields: { personId: matching.any(String) } },
+        },
+      },
+      {
+        data: {
+          httpStatus: 400,
+          refusal: { word: "malformed", fields: { limit: matching.any(String) } },
+        },
+      },
+    ]);
+  });
+
+  it("refuses to inspect an id no person holds", async () => {
+    const { api } = await theOperatorOnTheWeb();
+
+    const refused = await refusalOfCall(api.console.people.inspect.query({ personId: ulid() }));
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 404, refusal: { word: "no-such-user", class: "absent" } },
+    });
+  });
+});

@@ -1,0 +1,61 @@
+import { assert, describe, expect, it } from "vitest";
+
+import { authAsServerBuildsIt } from "../support/auth-instance.ts";
+
+const { auth } = authAsServerBuildsIt();
+
+type Declared = { type?: unknown; required?: unknown; input?: unknown; returned?: unknown };
+
+const platformWritten = (field: Declared | undefined): Readonly<Record<string, unknown>> => ({
+  type: field?.type,
+  required: field?.required,
+  input: field?.input,
+});
+
+const PLATFORM_DATE = { type: "date", required: false, input: false };
+
+const memberSchema = (): { additionalFields?: Record<string, Declared> } | undefined => {
+  const plugins: readonly unknown[] = auth.options.plugins;
+  const organisation = plugins.find(
+    (
+      plugin,
+    ): plugin is {
+      options: { schema?: { member?: { additionalFields?: Record<string, Declared> } } };
+    } =>
+      typeof plugin === "object" &&
+      plugin !== null &&
+      "id" in plugin &&
+      plugin.id === "organization",
+  );
+  return organisation?.options.schema?.member;
+};
+
+describe("the revocation instants the identity provider carries", () => {
+  it("gives a person one user-row instant the person cannot set", () => {
+    const fields: Record<string, Declared> = auth.options.user.additionalFields;
+
+    expect(platformWritten(fields["credentialsRevokedAt"])).toEqual(PLATFORM_DATE);
+  });
+
+  it("gives a member its own instant, kept to one workspace", () => {
+    const schema = memberSchema();
+    assert(
+      schema?.additionalFields !== undefined,
+      "the organisation plugin declares member fields",
+    );
+    const fields = schema.additionalFields;
+
+    expect(platformWritten(fields["credentialsRevokedAt"])).toEqual(PLATFORM_DATE);
+  });
+
+  it("keeps the member's instant from what a colleague sees", () => {
+    const schema = memberSchema();
+    assert(
+      schema?.additionalFields !== undefined,
+      "the organisation plugin declares member fields",
+    );
+    const fields = schema.additionalFields;
+
+    expect(fields["credentialsRevokedAt"]?.returned).toBe(false);
+  });
+});

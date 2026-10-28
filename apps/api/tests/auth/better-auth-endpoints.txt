@@ -1,0 +1,163 @@
+# Every path Better Auth's configured instance mounts: its own endpoint table, sorted,
+# each path once. Read by apps/api/src/auth/endpoints.ts (`mountedPaths`), never typed
+# out by hand.
+#
+# This file is the review point for the hostname fence's catch-all entry
+# (apps/api/src/ingress/hostnames.ts). That entry gives `/*` to `app.` — the one
+# origin the product, the authorization server and the MCP surface share — without
+# listing what it admits, because the list is the plugin list's; this is what it
+# admitted when a human last looked. A path added here is a path the fence hands to
+# that hostname — read it before you commit it, and check that the one origin needs
+# it. The hostname list is the edge's second fence, after the tunnel's ingress rules,
+# because Better Auth's handler answers on every hostname the process is given. Two
+# classes are refused by configuration rather than by the fence and are reviewed here
+# for that reason: the password and sign-up paths (no password or sign-up plugin is
+# enabled, and the product never posts to them — sign-in is an email code, the sign-in
+# link the same email carries, or Microsoft, never a password), and the social paths,
+# which open for Microsoft in its own task. The sign-in link's own two routes are the
+# api's, not the library's, so they are not listed here: the hostname fence names them
+# beside consent.
+#
+# Refresh:
+#   UPDATE_BETTER_AUTH_ENDPOINTS=1 pnpm --filter @better-answers/api run test tests/auth/better-auth-endpoints.test.ts
+#
+# A path here is a path to check, not a path that answers: better-call leaves a
+# `SERVER_ONLY` endpoint off its router and `disabledPaths` closes `/token`,
+# `/update-user`, `/oauth2/consent`, `/oauth2/client/rotate-keys`, eleven
+# `/organization/*` paths, every `/passkey/*` and `/two-factor/*` path, and six session
+# paths. `/update-user` would write a display name past the rule (update-user.test.ts
+# holds it refused). `/oauth2/consent` would grant past the api's consent route, which
+# calls it as a server function (oauth-flow.test.ts holds a direct post refused).
+# `/oauth2/client/rotate-keys` would let a `private_key_jwt` client replace its own
+# keys. No client here holds keys of its own, and the library opens it only under a flag
+# this api leaves off, so it is closed too (oauth-flow.test.ts holds it refused). The organisation
+# plugin's ten writes would change a member or a workspace with no audit event,
+# and `/organization/check-slug` would tell anyone signed in whether a company is a
+# customer, so of `/organization/*` only the picker's `set-active` and the reads
+# answer. organisation-plugin.test.ts names each `/organization/*` path below as
+# closed or kept, and holds each closed one refused for every role.
+# A `/passkey/*` or `/two-factor/*` path would add, remove, reveal or spend a second
+# factor past the gate, so the api's own routes call the few they need as server
+# functions. `/update-session` would let a session write its own fields, and
+# `/list-sessions`, the three `/revoke-*` paths and `/unlink-account` would list
+# sessions with their addresses, end them unrecorded or drop a linked account.
+# second-factor-foundation.test.ts holds each of these refused to a signed-in person,
+# and every path the two plugins mount among them.
+# The list keeps every closed path anyway, because neither flag is ours to keep and the
+# day one stops applying should be a diff rather than a silence.
+#
+# Already checked, so nobody need raise it twice: the five `/admin/oauth2/*` paths —
+# @better-auth/oauth-provider's surface for minting OAuth clients and managing resource
+# registrations — are `SERVER_ONLY`, so better-call leaves them off its router. They
+# answer 404 on `app.`, GET and POST, and that is held by a test rather than a claim:
+# hostnames.test.ts, "refuses the identity provider's admin endpoints on the one
+# hostname that answers". They are listed here because the flag is the library's, not
+# because they are reachable.
+/.well-known/oauth-authorization-server
+/.well-known/openid-configuration
+/account-info
+/admin/oauth2/create-client
+/admin/oauth2/resources
+/admin/oauth2/resources/:identifier
+/admin/oauth2/resources/:identifier/clients/:client_id
+/admin/oauth2/update-client
+/callback/:id
+/change-email
+/change-password
+/delete-user
+/delete-user/callback
+/email-otp/change-email
+/email-otp/check-verification-otp
+/email-otp/request-email-change
+/email-otp/request-password-reset
+/email-otp/reset-password
+/email-otp/send-verification-otp
+/email-otp/verify-email
+/error
+/forget-password/email-otp
+/get-access-token
+/get-session
+/jwks
+/link-social
+/list-accounts
+/list-sessions
+/oauth2/authorize
+/oauth2/client/rotate-keys
+/oauth2/client/rotate-secret
+/oauth2/consent
+/oauth2/continue
+/oauth2/create-client
+/oauth2/delete-client
+/oauth2/delete-consent
+/oauth2/end-session
+/oauth2/end-session/confirm
+/oauth2/get-client
+/oauth2/get-clients
+/oauth2/get-consent
+/oauth2/get-consents
+/oauth2/introspect
+/oauth2/public-client
+/oauth2/public-client-prelogin
+/oauth2/register
+/oauth2/revoke
+/oauth2/token
+/oauth2/update-client
+/oauth2/update-consent
+/oauth2/userinfo
+/ok
+/organization/accept-invitation
+/organization/cancel-invitation
+/organization/check-slug
+/organization/create
+/organization/delete
+/organization/get-active-member
+/organization/get-active-member-role
+/organization/get-full-organization
+/organization/get-invitation
+/organization/get-organization
+/organization/has-permission
+/organization/invite-member
+/organization/leave
+/organization/list
+/organization/list-invitations
+/organization/list-members
+/organization/list-user-invitations
+/organization/reject-invitation
+/organization/remove-member
+/organization/set-active
+/organization/update
+/organization/update-member-role
+/passkey/delete-passkey
+/passkey/generate-authenticate-options
+/passkey/generate-register-options
+/passkey/list-user-passkeys
+/passkey/update-passkey
+/passkey/verify-authentication
+/passkey/verify-registration
+/refresh-token
+/request-password-reset
+/reset-password
+/reset-password/:token
+/revoke-other-sessions
+/revoke-session
+/revoke-sessions
+/send-verification-email
+/sign-in/email
+/sign-in/email-otp
+/sign-in/social
+/sign-out
+/sign-up/email
+/token
+/two-factor/disable
+/two-factor/enable
+/two-factor/generate-backup-codes
+/two-factor/get-totp-uri
+/two-factor/send-otp
+/two-factor/verify-backup-code
+/two-factor/verify-otp
+/two-factor/verify-totp
+/unlink-account
+/update-session
+/update-user
+/verify-email
+/verify-password

@@ -35,7 +35,7 @@ tags:
 
 An api test that sends one request more than a rate ceiling allows, and expects the last one refused, fails now and then with `expected 200 to be 429`. The ceiling counts in fixed windows that start on the epoch's boundaries. A test that sends its requests on the real clock passes only when every request lands in one window.
 
-It surfaced in the merge queue for #544 (run 37205988406, job `full-api`, 04/10/2026). `apps/api/tests/passkeys.test.ts` › "signing in with a passkey" › "answers 429 at /passkeys/sign-in-options past thirty a minute" failed, though the pull request changed no code. The same test passed on the pull request's own `check`, on every recent `main` merge and on every local run. The CI log puts the failing test at 13:35:00 UTC, on a minute's edge.
+It surfaced in the merge queue for #544 (run 37205988406, job `full-api`, 04/10/2026). `apps/api/tests/auth/second-factor/passkeys.test.ts` › "signing in with a passkey" › "answers 429 at /passkeys/sign-in-options past thirty a minute" failed, though the pull request changed no code. The same test passed on the pull request's own `check`, on every recent `main` merge and on every local run. The CI log puts the failing test at 13:35:00 UTC, on a minute's edge.
 
 What did not explain it:
 
@@ -69,7 +69,7 @@ The flaw is in every test that counts past a ceiling this way, so it recurs: six
 
 ## Examples
 
-The stopped clock is `aStoppableClock` in `apps/api/tests/suite-app.ts`, which restarts the clock after every test. A suite hands its clock to `appForSuite`:
+The stopped clock is `aStoppableClock` in `apps/api/tests/support/suite-app.ts`, which restarts the clock after every test. A suite hands its clock to `appForSuite`:
 
 ```ts
 const { clock, stopTheClock } = aStoppableClock();
@@ -77,7 +77,7 @@ const { clock, stopTheClock } = aStoppableClock();
 const app = appForSuite({ clock });
 ```
 
-`appForSuite` passes its options to `startApp`, and `TestAppOptions` takes a `clock` (`apps/api/tests/harness.ts:335`). Each ceiling test calls `stopTheClock()` before its loop (`passkeys.test.ts:211`, `:299`; `confirm.test.ts:587`).
+`appForSuite` passes its options to `startApp`, and `TestAppOptions` takes a `clock` (`apps/api/tests/support/harness/harness.ts:335`). Each ceiling test calls `stopTheClock()` before its loop (`passkeys.test.ts:211`, `:299`; `confirm.test.ts:587`).
 
 The last answer of a split count is whatever the path answers under its ceiling, not always 200. The confirm and recovery paths are sent `{}`, so a split count answers 400 or 409. BA-68 (merge-queue run 37626160905 for #605, 07/10/2026) failed with `expected 400 to be 429` at `/second-factor/replace/authenticator-finish`, the last of the seven to run, which the log puts at 13:10:00, a ten-minute edge. The edge probe reproduced it with a 5 ms and a 20 ms lead.
 

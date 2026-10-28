@@ -121,8 +121,8 @@ import {
 } from "@better-answers/schema";
 
 import { doorTold, type Doors } from "../doors.ts";
-import type { Mail } from "../email.ts";
-import { sendFactorNotice } from "../factor-notice-email.ts";
+import type { Mail } from "../email/email.ts";
+import { sendFactorNotice } from "../email/factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { refusalOf, type RefusalWord } from "../refusal.ts";
 import { bodyDiffLines } from "./body-diff.ts";

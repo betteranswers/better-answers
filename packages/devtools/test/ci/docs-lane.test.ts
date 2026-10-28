@@ -168,7 +168,7 @@ const LANES: readonly LaneCase[] = [
     because: "the worker image's uv must be the uv the runner resolves the lockfile with",
   },
   {
-    changed: ["apps/api/tests/image.test.ts"],
+    changed: ["apps/api/tests/deploy/image.test.ts"],
     lane: "full",
     images: "yes",
     diff: "an image probe",

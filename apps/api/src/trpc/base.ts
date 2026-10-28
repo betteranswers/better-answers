@@ -33,10 +33,10 @@ import {
   TAB_WORKSPACE_HEADER,
 } from "@better-answers/schema/tab-workspace";
 
-import type { ModelDoors } from "../ask-steps.ts";
+import type { ModelDoors } from "../ask/ask-steps.ts";
 import { sessionClaims } from "../auth/verify.ts";
 import type { Doors } from "../doors.ts";
-import type { Mail } from "../email.ts";
+import type { Mail } from "../email/email.ts";
 import { refusalLogged, refusalOf, RefusedError, type RefusalAnswer } from "../refusal.ts";
 import { type GatedSessionReader, PENDING_PROCEDURES, refusalFor } from "../second-factor-gate.ts";
 

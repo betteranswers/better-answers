@@ -1,0 +1,592 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { Writable } from "node:stream";
+
+import type { Hono } from "hono";
+import { exportJWK, generateKeyPair, SignJWT, type GenerateKeyPairResult } from "jose";
+import { Pool } from "pg";
+import { pino, type Logger } from "pino";
+import { z } from "zod";
+
+import type { Clock, PlatformPrincipal, UserPrincipal } from "@better-answers/core/kernel";
+import type { GitDoor } from "@better-answers/core/store/git";
+import type { ObjectStoreSettings } from "@better-answers/core/store/objects";
+import {
+  folded,
+  withOperator,
+  withPrincipal,
+  type Foldable,
+  type Tx,
+} from "@better-answers/core/store/postgres";
+import { removeBundleRoot } from "@better-answers/core/testing/bundle-root";
+import {
+  provisionWorkspace,
+  endEverySignInAndToken as endEverySignInAndToken_,
+  setOperatorMark,
+} from "@better-answers/core/workspaces";
+import { boundarySchemas, ulid } from "@better-answers/schema";
+import { testData } from "@better-answers/schema/testing";
+
+import type { EmailMessage } from "../../../src/auth/index.ts";
+import { CLIENT_IP_HEADER } from "../../../src/auth/index.ts";
+import { openDoors, type Doors } from "../../../src/doors.ts";
+import {
+  hostnameOfUrl,
+  originOfUrl,
+  type PublicHostnames,
+} from "../../../src/ingress/hostnames.ts";
+import { createServer } from "../../../src/server.ts";
+import { defaultClientAddresses } from "../client-addresses.ts";
+import { startTestDatabase, type TestDatabase } from "../postgres.ts";
+
+export const PUBLIC_URL = "https://app.example.test";
+export const MCP_URL = `${PUBLIC_URL}/mcp`;
+export const AUTH_SECRET = "test-secret-that-is-at-least-thirty-two-characters-long";
+
+export const APP_HOSTNAME = hostnameOfUrl(PUBLIC_URL);
+export const AGENT_HOSTNAME = "agent.example.test";
+export const APEX_HOSTNAME = "example.test";
+const HOSTNAMES: PublicHostnames = {
+  app: APP_HOSTNAME,
+  agent: AGENT_HOSTNAME,
+  apex: APEX_HOSTNAME,
+};
+
+export const CLAUDE_CLIENT_ID = "https://claude.ai/oauth/mcp-oauth-client-metadata";
+export const CLAUDE_REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback";
+const CLAUDE_METADATA_DOCUMENT = {
+  client_id: CLAUDE_CLIENT_ID,
+  client_name: "Claude",
+  client_uri: "https://claude.ai",
+  redirect_uris: [CLAUDE_REDIRECT_URI],
+  grant_types: [
+    "authorization_code",
+    "refresh_token",
+    "urn:ietf:params:oauth:grant-type:jwt-bearer",
+  ],
+  response_types: ["code"],
+  token_endpoint_auth_method: "none",
+} as const;
+
+export const NAMELESS_CLIENT_ID = "https://claude.ai/oauth/nameless-client-metadata";
+
+export const KEYED_CLIENT_ID = "https://claude.ai/oauth/keyed-client-metadata";
+export const KEYED_CLIENT_JWKS_URI = "https://claude.ai/oauth/keyed-client-jwks.json";
+const KEYED_CLIENT_KEY = { alg: "ES256", kid: "keyed" } as const;
+let keyedClientKeyPair: Promise<GenerateKeyPairResult> | undefined;
+const keyPairOfKeyedClient = () =>
+  (keyedClientKeyPair ??= generateKeyPair(KEYED_CLIENT_KEY.alg, { extractable: true }));
+
+export const keyedClientAssertion = async (audience: string): Promise<string> =>
+  new SignJWT({})
+    .setProtectedHeader(KEYED_CLIENT_KEY)
+    .setIssuer(KEYED_CLIENT_ID)
+    .setSubject(KEYED_CLIENT_ID)
+    .setAudience(audience)
+    .setJti(ulid())
+    .setIssuedAt()
+    .setExpirationTime("1m")
+    .sign((await keyPairOfKeyedClient()).privateKey);
+
+const keyedClientJwks = async () => ({
+  keys: [{ ...(await exportJWK((await keyPairOfKeyedClient()).publicKey)), ...KEYED_CLIENT_KEY }],
+});
+
+export const LOOKALIKE_CLIENT_ID = "https://claude-ai.example/oauth/mcp-oauth-client-metadata";
+const LOOKALIKE_REDIRECT_URI = "https://claude-ai.example/api/mcp/auth_callback";
+
+const logLine = z.looseObject({ level: z.number(), time: z.number() });
+export type LogLine = Readonly<z.infer<typeof logLine>>;
+
+export const capturingLogger = (level: "debug" | "info" = "info") => {
+  const logs: LogLine[] = [];
+  const sink = new Writable({
+    write(chunk: Buffer, _encoding, callback) {
+      for (const line of chunk.toString("utf8").split("\n")) {
+        if (line.trim() === "") continue;
+        logs.push(logLine.parse(JSON.parse(line)));
+      }
+      callback();
+    },
+  });
+  return { logger: pino({ level }, sink), logs };
+};
+
+export const codeIn = (message: EmailMessage): string | undefined =>
+  /^(\d{6})$/m.exec(message.text)?.[1];
+
+const linkTokenIn = (message: EmailMessage): string | undefined =>
+  /\/sign-in\/link#([A-Za-z0-9]+)$/m.exec(message.text)?.[1];
+
+export type TestApp = {
+  readonly server: Hono;
+  readonly database: TestDatabase;
+
+  readonly publicUrl: string;
+
+  readonly doors: Doors;
+
+  readonly gitStoreDir: string;
+
+  readonly emails: EmailMessage[];
+
+  readonly metadataFetches: string[];
+
+  readonly logs: LogLine[];
+
+  codeSentTo(email: string): string;
+
+  linkSentTo(email: string): string;
+
+  provision(input?: {
+    name?: string | undefined;
+    adminEmail?: string | undefined;
+  }): Promise<Provisioned>;
+
+  person(email?: string, name?: string): Promise<Person>;
+
+  addMember(
+    workspaceId: string,
+    userId: string,
+    role: "Admin" | "Editor" | "Viewer",
+  ): Promise<{ id: string }>;
+
+  invite(input: {
+    workspaceId: string;
+    email: string;
+    inviterId: string;
+    role?: "Admin" | "Editor" | "Viewer" | undefined;
+    status?: "pending" | "accepted" | "canceled" | undefined;
+    expiresAt?: Date | undefined;
+  }): Promise<{ id: string }>;
+
+  setEmailVerified(email: string, verified: boolean): Promise<void>;
+
+  endEverySignInAndToken(userId: string, at: Date): Promise<void>;
+
+  markOperator(email: string, change: "grant" | "revoke"): Promise<void>;
+
+  removeMember(workspaceId: string, userId: string): Promise<void>;
+
+  setWorkspaceConfig(workspaceId: string, key: string, value: string): Promise<void>;
+
+  client(ip?: string, hostname?: string): TestClient;
+  stop(): Promise<void>;
+};
+
+type Provisioned = {
+  readonly workspaceId: string;
+  readonly name: string;
+  readonly shortName: string;
+  readonly admin: Person;
+};
+
+type Person = {
+  readonly id: string;
+  readonly email: string;
+  readonly name: string;
+};
+
+export type TestClient = {
+  readonly ip: string;
+
+  readonly origin: string;
+  fetch(path: string, init?: RequestInit): Promise<Response>;
+
+  form(path: string, fields: Readonly<Record<string, string>>): Promise<Response>;
+
+  json(path: string, body: unknown): Promise<Response>;
+  cookies(): string;
+};
+
+const bootstrap: PlatformPrincipal = {
+  kind: "platform",
+  actorId: "process:better-answers-bootstrap",
+};
+
+const cimdFixture = async (input: string | URL | Request): Promise<Response> => {
+  const url = new URL(input instanceof Request ? input.url : String(input));
+  const document = (clientId: string, redirectUri: string, fields: object = {}) =>
+    Response.json(
+      { ...CLAUDE_METADATA_DOCUMENT, client_id: clientId, redirect_uris: [redirectUri], ...fields },
+      { headers: { "content-type": "application/json", "cache-control": "max-age=3600" } },
+    );
+  if (url.href === CLAUDE_CLIENT_ID) return document(CLAUDE_CLIENT_ID, CLAUDE_REDIRECT_URI);
+  if (url.href === NAMELESS_CLIENT_ID) {
+    return document(NAMELESS_CLIENT_ID, CLAUDE_REDIRECT_URI, { client_name: undefined });
+  }
+  if (url.href === KEYED_CLIENT_ID) {
+    return document(KEYED_CLIENT_ID, CLAUDE_REDIRECT_URI, {
+      token_endpoint_auth_method: "private_key_jwt",
+      jwks_uri: KEYED_CLIENT_JWKS_URI,
+    });
+  }
+  if (url.href === KEYED_CLIENT_JWKS_URI) {
+    return Response.json(await keyedClientJwks(), {
+      headers: { "content-type": "application/json" },
+    });
+  }
+  if (url.href === LOOKALIKE_CLIENT_ID) {
+    return document(LOOKALIKE_CLIENT_ID, LOOKALIKE_REDIRECT_URI);
+  }
+  return new Response("no such document", { status: 404 });
+};
+
+export const HARNESS_ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => 31 - index);
+
+const noModelWire = async (): Promise<Response> =>
+  new Response("no model provider answers in the suites", { status: 418 });
+
+type DoorOptions = {
+  readonly gitStoreDir?: string | undefined;
+  readonly objectStore?: ObjectStoreSettings | undefined;
+  readonly clock?: Clock | undefined;
+};
+
+export const doorsFor = (database: Pool | string, options: DoorOptions = {}): Doors =>
+  openDoors({ database, ...options });
+
+export const serverFor = (
+  pool: Pool,
+  options: {
+    readonly imageDigest?: string | undefined;
+    readonly logger?: Logger | undefined;
+  } = {},
+): Hono =>
+  createServer({
+    doors: doorsFor(pool),
+    publicUrl: PUBLIC_URL,
+    hostnames: HOSTNAMES,
+    authSecret: AUTH_SECRET,
+    sendEmail: async () => {},
+    fetchClientMetadataResource: cimdFixture,
+    fetchModel: noModelWire,
+    envelopeKey: HARNESS_ENVELOPE_KEY,
+    logger: options.logger ?? pino({ level: "silent" }),
+    imageDigest: options.imageDigest,
+  });
+
+export const actingIn = async <T>(
+  app: TestApp,
+  who: { readonly workspaceId: string; readonly userId: string },
+  work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
+) => {
+  const answered = folded<T>(
+    await withPrincipal(app.doors.postgres, { ...who, issuedAt: new Date() }, work),
+  );
+  if (!answered.ok) throw new Error(`the action answered ${String(answered.error)}`);
+  return answered.value;
+};
+
+export const openTestGit = (app: TestApp): GitDoor => {
+  if (app.doors.git?.ok !== true) {
+    throw new Error(`the TestApp's repositories' root is ${app.doors.git?.error ?? "not set"}`);
+  }
+  return app.doors.git.value;
+};
+
+export type TestAppOptions = {
+  readonly webRoot?: string | undefined;
+
+  readonly hostnames?: PublicHostnames | undefined;
+
+  readonly publicUrl?: string | undefined;
+
+  readonly onEmail?: ((message: EmailMessage) => void | Promise<void>) | undefined;
+
+  readonly clock?: Clock | undefined;
+
+  readonly objectStore?: ObjectStoreSettings | undefined;
+
+  readonly poolSize?: number | undefined;
+
+  readonly fetchModel?:
+    | ((input: string | URL | Request, init?: RequestInit) => Promise<Response>)
+    | undefined;
+
+  readonly envelopeKey?: Uint8Array | null | undefined;
+
+  readonly askKeepAliveMs?: number | undefined;
+};
+
+const envelopeKeyOf = ({ envelopeKey }: TestAppOptions): Uint8Array | undefined =>
+  envelopeKey === null ? undefined : (envelopeKey ?? HARNESS_ENVELOPE_KEY);
+
+export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> => {
+  const hostnames = options.hostnames ?? HOSTNAMES;
+  const publicUrl = options.publicUrl ?? PUBLIC_URL;
+
+  if (hostnameOfUrl(publicUrl) !== hostnames.app) {
+    throw new Error(
+      `the harness was started with publicUrl ${publicUrl} but hostnames.app ${hostnames.app}; the estate has one origin and its host is the app hostname (ADR 0034)`,
+    );
+  }
+  const database = await startTestDatabase();
+
+  const gitStoreDir = await mkdtemp(path.join(tmpdir(), "better-answers-git-"));
+  const emails: EmailMessage[] = [];
+  const metadataFetches: string[] = [];
+  const { logger, logs } = capturingLogger();
+
+  const pool =
+    options.poolSize === undefined
+      ? database.pool
+      : new Pool({ ...database.pool.options, max: options.poolSize });
+  const doors = doorsFor(pool, {
+    gitStoreDir,
+    clock: options.clock,
+    objectStore: options.objectStore,
+  });
+  const server = createServer({
+    doors,
+    publicUrl,
+    hostnames,
+    authSecret: AUTH_SECRET,
+    sendEmail: async (message) => {
+      emails.push(message);
+      await options.onEmail?.(message);
+    },
+    fetchClientMetadataResource: (input) => {
+      metadataFetches.push(input instanceof Request ? input.url : String(input));
+      return cimdFixture(input);
+    },
+    fetchModel: options.fetchModel ?? noModelWire,
+    envelopeKey: envelopeKeyOf(options),
+    askKeepAliveMs: options.askKeepAliveMs,
+    logger,
+    webRoot: options.webRoot,
+  });
+  const stop = async () => {
+    if (pool !== database.pool) await pool.end();
+    await database.stop();
+
+    await removeBundleRoot(gitStoreDir);
+  };
+
+  const health = await server.request(new URL("/health", publicUrl));
+  if (health.status !== 200) {
+    const answered = await health.text();
+    await stop();
+    throw new Error(`the TestApp's api did not start healthy: ${answered}`);
+  }
+  const door = doors.postgres;
+
+  const person: TestApp["person"] = async (email, name) => {
+    const named = name === undefined ? {} : { name };
+    const client = await database.superuser.connect();
+    try {
+      const created = await testData(client).user(
+        email === undefined ? named : { ...named, email },
+      );
+      return { id: created.id, email: created.email, name: created.name };
+    } finally {
+      client.release();
+    }
+  };
+
+  const provision: TestApp["provision"] = async (input = {}) => {
+    const admin = await person(input.adminEmail);
+    const id = ulid();
+    const name = input.name ?? `Workspace ${id.slice(-4)}`;
+    const shortName = `ws-${id.toLowerCase()}`;
+    const provisioned = await provisionWorkspace(bootstrap, door, {
+      id,
+      name,
+      shortName,
+      adminUserId: admin.id,
+    });
+    if (!provisioned.ok) throw new Error(`provisioning failed: ${provisioned.error}`);
+    return { workspaceId: id, name, shortName, admin };
+  };
+
+  const addMember: TestApp["addMember"] = async (workspaceId, userId, role) => {
+    const client = await database.superuser.connect();
+    try {
+      const created = await testData(client).member({ workspaceId, userId, role });
+      return { id: created.id };
+    } finally {
+      client.release();
+    }
+  };
+
+  const invite: TestApp["invite"] = async (input) => {
+    const client = await database.superuser.connect();
+    try {
+      const created = await testData(client).invitation({
+        workspaceId: input.workspaceId,
+        email: input.email,
+        inviterId: input.inviterId,
+        ...(input.role === undefined ? {} : { role: input.role }),
+        ...(input.status === undefined ? {} : { status: input.status }),
+        ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }),
+      });
+      return { id: created.id };
+    } finally {
+      client.release();
+    }
+  };
+
+  const setEmailVerified: TestApp["setEmailVerified"] = async (email, verified) => {
+    await database.superuser.query('UPDATE "user" SET email_verified = $2 WHERE email = $1', [
+      email,
+      verified,
+    ]);
+  };
+
+  let operatorMade: Promise<string> | undefined;
+  const operatorsId = (): Promise<string> => {
+    operatorMade ??= (async () => {
+      const client = await database.superuser.connect();
+      try {
+        return (await testData(client).user({ operator: true })).id;
+      } finally {
+        client.release();
+      }
+    })();
+    return operatorMade;
+  };
+
+  const endEverySignInAndToken: TestApp["endEverySignInAndToken"] = async (userId, at) => {
+    const operatorId = await operatorsId();
+    const client = await database.superuser.connect();
+    let confirmedId: string;
+    try {
+      confirmedId = (
+        await testData(client).session({
+          userId: operatorId,
+          createdAt: at,
+          updatedAt: at,
+          secondFactorConfirmedAt: at,
+        })
+      ).id;
+    } finally {
+      client.release();
+    }
+    const opened = await withOperator(
+      door,
+      { userId: operatorId, issuedAt: at, sessionId: confirmedId },
+      (operator, tx) =>
+        endEverySignInAndToken_(operator, tx, {
+          personId: boundarySchemas.user.select.shape.id.parse(userId),
+          at,
+        }),
+    );
+    const revoked = opened.ok ? opened.value : opened;
+    if (!revoked.ok) throw new Error(`endEverySignInAndToken failed: ${String(revoked.error)}`);
+  };
+
+  const markOperator: TestApp["markOperator"] = async (email, change) => {
+    const marked = await setOperatorMark(bootstrap, door, { email, change });
+    if (!marked.ok) throw new Error(`the mark was refused: ${String(marked.error)}`);
+  };
+
+  const removeMember: TestApp["removeMember"] = async (workspaceId, userId) => {
+    await database.superuser.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+      workspaceId,
+      userId,
+    ]);
+  };
+
+  const setWorkspaceConfig: TestApp["setWorkspaceConfig"] = async (workspaceId, key, value) => {
+    await database.superuser.query(
+      "UPDATE workspace_config SET value = $3 WHERE workspace_id = $1 AND key = $2",
+      [workspaceId, key, value],
+    );
+  };
+
+  const codeSentTo: TestApp["codeSentTo"] = (email) => {
+    const message = emails.findLast((candidate) => candidate.to === email);
+    const code = message === undefined ? undefined : codeIn(message);
+    if (code === undefined) throw new Error(`no code was sent to ${email}`);
+    return code;
+  };
+
+  const linkSentTo: TestApp["linkSentTo"] = (email) => {
+    const message = emails.findLast((candidate) => candidate.to === email);
+    const token = message === undefined ? undefined : linkTokenIn(message);
+    if (token === undefined) throw new Error(`no sign-in link was sent to ${email}`);
+    return token;
+  };
+
+  const nextDefaultAddress = defaultClientAddresses();
+
+  const client: TestApp["client"] = (ip = nextDefaultAddress(), hostname = hostnames.app) => {
+    const origin = hostname === hostnames.app ? originOfUrl(publicUrl) : `https://${hostname}`;
+    const jar = new Map<string, string>();
+    const remember = (response: Response) => {
+      for (const cookie of response.headers.getSetCookie()) {
+        const [pair] = cookie.split(";");
+        const [name, value] = (pair ?? "").split("=");
+        if (name === undefined) continue;
+        if (value === undefined || value === "") jar.delete(name);
+        else jar.set(name, value);
+      }
+    };
+    const cookies = () => [...jar.entries()].map(([name, value]) => `${name}=${value}`).join("; ");
+    const request = async (urlPath: string, init: RequestInit = {}): Promise<Response> => {
+      const headers = new Headers(init.headers);
+      headers.set(CLIENT_IP_HEADER, ip);
+
+      if (init.method !== undefined && init.method !== "GET" && !headers.has("origin")) {
+        headers.set("origin", origin);
+      }
+      if (jar.size > 0) headers.set("cookie", cookies());
+
+      const url = urlPath.startsWith("http") ? urlPath : `${origin}${urlPath}`;
+      const response = await server.request(new Request(url, { ...init, headers }));
+      remember(response);
+      return response;
+    };
+    return {
+      ip,
+      origin,
+      fetch: request,
+      form: (urlPath, fields) =>
+        request(urlPath, {
+          method: "POST",
+
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            origin,
+            "sec-fetch-dest": "document",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "same-origin",
+          },
+          body: new URLSearchParams(fields).toString(),
+        }),
+      json: (urlPath, body) =>
+        request(urlPath, {
+          method: "POST",
+
+          headers: { "content-type": "application/json", origin, accept: "application/json" },
+          body: JSON.stringify(body),
+        }),
+      cookies,
+    };
+  };
+
+  return {
+    server,
+    database,
+    publicUrl,
+    doors,
+    gitStoreDir,
+    emails,
+    metadataFetches,
+    logs,
+    codeSentTo,
+    linkSentTo,
+    provision,
+    person,
+    addMember,
+    invite,
+    setEmailVerified,
+    endEverySignInAndToken,
+    markOperator,
+    removeMember,
+    setWorkspaceConfig,
+    client,
+    stop,
+  };
+};

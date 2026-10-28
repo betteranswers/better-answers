@@ -65,10 +65,10 @@ import type { Tx } from "@better-answers/core/store/postgres";
 
 import { AUDIT_EXPORT_PERSON_RULE } from "../auth/constants.ts";
 import type { Doors } from "../doors.ts";
-import type { Mail } from "../email.ts";
-import { sendPromotionNotice } from "../promotion-notice-email.ts";
+import type { Mail } from "../email/email.ts";
+import { sendPromotionNotice } from "../email/promotion-notice-email.ts";
+import { EMAILS_PER_SECOND } from "../email/smtp.ts";
 import type { RefusalAnswer } from "../refusal.ts";
-import { EMAILS_PER_SECOND } from "../smtp.ts";
 import {
   answeredBy,
   committedAs,

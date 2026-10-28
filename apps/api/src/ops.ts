@@ -11,12 +11,12 @@ import {
   requireBootstrap,
 } from "./config.ts";
 import { closeDoors, openDoors } from "./doors.ts";
+import { emailSender, pacedTransport } from "./email/smtp.ts";
 import { logger } from "./logger.ts";
 import { fetchHonouringHost } from "./ops/http-fetch.ts";
 import { runOps } from "./ops/index.ts";
 import { readTreeUnder } from "./ops/read-tree.ts";
 import { senderAt } from "./product-name.ts";
-import { emailSender, pacedTransport } from "./smtp.ts";
 
 const bootstrap = requireBootstrap("pnpm ops");
 const identity = readIdentityBootstrap();

@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { expect, it } from "vitest";
 
-import { heldPort, released } from "./loopback-port.ts";
+import { heldPort, released } from "./support/loopback-port.ts";
 
 const api = path.resolve(import.meta.dirname, "..");
 

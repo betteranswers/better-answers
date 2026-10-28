@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { FIRST_PAINT } from "@better-answers/schema/theme";
 
-import { escaped } from "../email-page.ts";
+import { escaped } from "../email/email-page.ts";
 import { PRODUCT_NAME } from "../product-name.ts";
 import { OAUTH_SCOPES, type OAuthScope, SIGN_IN_PATH } from "./constants.ts";
 import { PAGE_STYLE } from "./page-style.ts";

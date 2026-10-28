@@ -1,0 +1,86 @@
+import { afterAll, beforeAll } from "vitest";
+
+import type { Clock } from "@better-answers/core/kernel";
+
+import { askToJoin } from "./harness/harness-people.ts";
+import { startApp, type TestApp } from "./harness/harness.ts";
+import { anAdminOfElsewherePointedAt } from "./people-refusals.ts";
+import { refusalOfCall, webSignedIn } from "./web-client.ts";
+
+export const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
+export const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+export const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+export const PER_ADDRESS_CEILING = 5;
+
+export type Api = Awaited<ReturnType<typeof webSignedIn>>["api"];
+
+export const anAddress = (who: string): string =>
+  `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@client.example`;
+
+export const appForSuite = (unreachable: ReadonlySet<string>, clock?: Clock): (() => TestApp) => {
+  let started: TestApp | undefined;
+
+  beforeAll(async () => {
+    started = await startApp({
+      clock,
+      onEmail: (message) => {
+        if (unreachable.has(message.to)) throw new Error("the relay refused the message");
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await started?.stop();
+  });
+
+  return () => {
+    if (started === undefined) throw new Error("the suite's TestApp has not started");
+    return started;
+  };
+};
+
+export const emailsTo = (app: TestApp, address: string) =>
+  app.emails.filter((message) => message.to === address);
+
+export const eventsOn = async (app: TestApp, subjectId: string): Promise<string[]> =>
+  (
+    await app.database.superuser.query<{ action: string }>(
+      "SELECT action FROM audit_event WHERE subject_id = $1 ORDER BY id",
+      [subjectId],
+    )
+  ).rows.map((row) => row.action);
+
+export const asksToJoin = async (
+  app: TestApp,
+  workspace: { readonly shortName: string },
+  displayName: string,
+  reason: string,
+) => {
+  const requester = await app.person(anAddress(displayName.toLowerCase()), displayName);
+  await askToJoin(app, { shortName: workspace.shortName, requesterId: requester.id, reason });
+  return requester;
+};
+
+export const answeredBelowAdmin = async (
+  app: TestApp,
+  workspaceId: string,
+  call: (api: Api) => Promise<unknown>,
+): Promise<Readonly<Record<string, unknown>>> => {
+  const answers: (readonly [string, unknown])[] = [];
+  for (const role of ["Editor", "Viewer"] as const) {
+    const person = await app.person(anAddress(role.toLowerCase()));
+    await app.addMember(workspaceId, person.id, role);
+    const { api } = await webSignedIn(app, person.email);
+    answers.push([role, await refusalOfCall(call(api))]);
+  }
+  return Object.fromEntries(answers);
+};
+
+export const answeredToAnAdminPointedHere = async (
+  app: TestApp,
+  workspaceId: string,
+  call: (api: Api) => Promise<unknown>,
+): Promise<unknown> => refusalOfCall(call(await anAdminOfElsewherePointedAt(app, workspaceId)));

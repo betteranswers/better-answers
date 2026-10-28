@@ -3,8 +3,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { capturingLogger, serverFor, startApp, type TestApp } from "./harness.ts";
-import { startTestDatabase } from "./postgres.ts";
+import { capturingLogger, serverFor, startApp, type TestApp } from "./support/harness/harness.ts";
+import { startTestDatabase } from "./support/postgres.ts";
 
 const PROMOTED = "sha256:4c0ffee5d1a7e2b9f8c3a6d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4";
 

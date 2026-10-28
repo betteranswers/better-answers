@@ -28,7 +28,7 @@ import {
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "@better-answers/core/workspaces";
 
-import { stepsFor, type ModelDoors, type StepDoors } from "../ask-steps.ts";
+import { stepsFor, type ModelDoors, type StepDoors } from "../ask/ask-steps.ts";
 import {
   MCP_REQUIRED_SCOPE,
   MCP_SCOPES,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { closeDoors, openDoors, POSTGRES_POOL_MAX } from "../src/doors.ts";
-import { appForSuite } from "./suite-app.ts";
+import { appForSuite } from "./support/suite-app.ts";
 
 const UNUSED_DATABASE = "postgresql://unused@127.0.0.1:1/unused";
 

@@ -1,4 +1,4 @@
-export type { EmailMessage, EmailSender } from "../email.ts";
+export type { EmailMessage, EmailSender } from "../email/email.ts";
 export { createAuth, type Auth } from "./auth.ts";
 export { mountedPaths } from "./endpoints.ts";
 export { serveFaces } from "./page-style.ts";

@@ -51,7 +51,7 @@ import {
 } from "@better-answers/schema";
 import { EMAIL_CODE_ATTEMPTS, EMAIL_CODE_LENGTH } from "@better-answers/schema/email-code";
 
-import type { EmailSender } from "../email.ts";
+import type { EmailSender } from "../email/email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { PRODUCT_NAME } from "../product-name.ts";
 import {
@@ -76,11 +76,11 @@ import {
   SESSION_RENEWAL_AGE_SECONDS,
   SIGN_IN_PATH,
 } from "./constants.ts";
-import { codeHashOf } from "./link-token.ts";
 import { dropAnExpiredPromotionLock } from "./promotion-lock.ts";
 import { accessControl, creatorRole, roles } from "./roles.ts";
-import { signInEmail } from "./sign-in-email.ts";
-import { keepALink, signInMethodOfThisCall } from "./sign-in-link.ts";
+import { codeHashOf } from "./sign-in/link-token.ts";
+import { signInEmail } from "./sign-in/sign-in-email.ts";
+import { keepALink, signInMethodOfThisCall } from "./sign-in/sign-in-link.ts";
 import { surfacingUniqueViolations } from "./unique-violations.ts";
 
 type AuthEndpoint = NonNullable<BetterAuthPlugin["endpoints"]>[string];

@@ -185,7 +185,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `packages/core/test/fixtures/workspace-with-bundle.ts`.
 - [ ] Create `packages/core/test/concepts/owners.test.ts`.
 - [ ] Edit `packages/core/test/concepts/writes/suggestions.test.ts`, `packages/core/test/concepts/concepts.test.ts`, `packages/core/test/concepts/import/import-bundle.test.ts`, `packages/core/test/concepts/import/manifest.test.ts`, `packages/core/test/erasure/routine/erasure-routine.test.ts` and `packages/core/test/erasure/erasure-map.test.ts`.
-- [ ] Edit `apps/api/tests/harness-knowledge.ts` and `apps/api/tests/ops.test.ts`.
+- [ ] Edit `apps/api/tests/support/harness/harness-knowledge.ts` and `apps/api/tests/ops.test.ts`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0012.md`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0014.md`.
 - [ ] Edit `docs/specs/route/s3.md` where this unit moves a page. Edit `docs/solutions/architecture-patterns/adr-0051.md` only if the navigation-list decision itself changes.
@@ -218,7 +218,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Migrate the tests. `arrangeWorkspace` (`packages/core/test/fixtures/workspace-with-bundle.ts:69-91`) names `scenario.editor` the default owner of each collection the core suites write into, through `nameOwner` as `scenario.admin`, and adds `scenario.unowned`, an Editor who owns nothing.
   - [ ] Run the core suite. Each new failure is a write by an Editor outside those collections. Fix each by naming the owner in that test. Where the test's subject is the Editor, never switch the writer to Admin.
   - [ ] `import-bundle.test.ts` and `apps/api/tests/ops.test.ts` import as Admin. The case at `import-bundle.test.ts:1191`, "refuses an Editor asked to land the bundle Restricted", becomes the role refusal.
-  - [ ] Check that every `seedConcepts` writer in `apps/web/e2e/` is an Admin, since `apps/api/tests/harness-knowledge.ts:341` writes as that principal. If one is an Editor, name them owner in the harness seed.
+  - [ ] Check that every `seedConcepts` writer in `apps/web/e2e/` is an Admin, since `apps/api/tests/support/harness/harness-knowledge.ts:341` writes as that principal. If one is an Editor, name them owner in the harness seed.
 - [ ] Amend ADR 0012. Direct write, accept and decline admit the owner or an Admin, read inside the act's transaction. The import and the manifest are Admin-only. An accepted *edit* commits with the proposer as author, and with the accepter once the proposer has left (`authorFor`'s fallback, now the rule). Replay records a non-Admin decider from `Actor:`.
 - [ ] Amend ADR 0014. `concept_owner` is built as KTD1 says, with no row at mint. `attachedByIri()` is exported. The erasure union gains `concept-owner`, and `suggestion` and `concept_write_request` join through BA-220.
 - [ ] Record in `docs/specs/route/s3.md` that hiding is navigation only and the api refuses by role or by ownership.
@@ -294,9 +294,9 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `packages/core/src/workspaces/index.ts`.
 - [ ] Edit `packages/core/test/concepts/owners.test.ts`.
 - [ ] Edit `apps/api/src/trpc/knowledge.ts`.
-- [ ] Create `apps/api/tests/knowledge-owners.test.ts`.
-- [ ] Edit `apps/api/tests/harness-knowledge.ts`.
-- [ ] Edit `apps/api/tests/harness-control.ts`.
+- [ ] Create `apps/api/tests/trpc/knowledge-owners.test.ts`.
+- [ ] Edit `apps/api/tests/support/harness/harness-knowledge.ts`.
+- [ ] Edit `apps/api/tests/support/harness/harness-control.ts`.
 - [ ] Edit `apps/web/src/shared/navigation.ts`.
 - [ ] Edit `apps/web/src/app/router.tsx` and `apps/web/src/app/frame.tsx`.
 - [ ] Edit `apps/web/src/shared/member.ts`.
@@ -322,7 +322,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
   - [ ] An Admin names or clears a collection's owner with a native select of every member, Viewers included, since a Viewer may own (ADR 0051). It applies optimistically, announces the outcome in a live region, and invalidates the member query so the Admin's own rail updates at their next move.
   - [ ] An owner who is not an Admin reads the same list with no picker.
   - [ ] The page serves the Founder-Operator, who hands domains off "until someone else takes them" (`docs/personas/personas.md:45`), so each row shows who owns it now and an unowned collection says Admins decide. It serves the Knowledge Curator, for whom "unclear who owns a concept" is a cut (`:205`), so each override count is on the row. It serves the Occasional Expert, a Viewer who owns (`:218`), so the picker lists Viewers and the read-only view uses no product word without its explanation.
-- [ ] Add the harness action `nameOwners`, the program's one owner seed. It writes collection-default and per-concept owner rows. Its function goes in `apps/api/tests/harness-knowledge.ts` and calls `nameOwner` as the workspace's Admin. Its route goes in `apps/api/tests/harness-control.ts`, beside the routes at `harness-control.ts:161-177`, and its wrapper in `apps/web/e2e/harness.ts`. BA-232 and BA-236 reuse it. List it in `.claude/skills/browser-suite/references/harness.md`.
+- [ ] Add the harness action `nameOwners`, the program's one owner seed. It writes collection-default and per-concept owner rows. Its function goes in `apps/api/tests/support/harness/harness-knowledge.ts` and calls `nameOwner` as the workspace's Admin. Its route goes in `apps/api/tests/support/harness/harness-control.ts`, beside the routes at `harness-control.ts:161-177`, and its wrapper in `apps/web/e2e/harness.ts`. BA-232 and BA-236 reuse it. List it in `.claude/skills/browser-suite/references/harness.md`.
 - [ ] An Editor who owns nothing sees no Curation group, and `/knowledge/collections-and-owners` shows the not-found page through `hides` (`navigation.ts:578-579`) and `Seen` (`router.tsx:346-349`). This is the brief's third Done when check.
 - [ ] Record in `docs/specs/route/s3.md` that ownership has landed. A page is seen by role, by owning a collection, or, for Waiting on You, by owning any concept. An ownership change takes effect at the person's next move, like a role change. Hiding is navigation only, and the api refuses by role or by ownership.
 - [ ] Leave `apps/web/e2e/frame.spec.ts:52` and `apps/web/test/navigation.test.ts:60-80` unedited. Waiting on You stays unbuilt, so `shownOf` still drops Inbox from every rail, and no page is declared or renamed. `AREA_NAMES` changes in BA-232, and the outline in BA-239. The cases at `navigation.test.ts:240-270` and the `aPage` helper (`:48-55`) change, since `owns` and `owners` change shape.
@@ -342,7 +342,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] `packages/core/test/concepts/owners.test.ts` gains `answers the member's owned collections and concept count`, through `readMember`. Run `pnpm --filter @better-answers/core exec vitest run test/owners.test.ts -t "owned collections and concept count"`.
 - [ ] `packages/core/test/concepts/owners.test.ts` gains `lists only collections the reader may read`. Run `pnpm --filter @better-answers/core exec vitest run test/owners.test.ts -t "collections the reader may read"`.
 - [ ] `packages/core/test/concepts/owners.test.ts` gains `refuses an Editor owning nothing the collections read`. Its reader differs from the owning Editor's valid read in ownership alone. Run `pnpm --filter @better-answers/core exec vitest run test/owners.test.ts -t "owning nothing the collections read"`.
-- [ ] `apps/api/tests/knowledge-owners.test.ts` gains `carries the owner's collections on the member read`, `refuses an Editor naming an owner, by role` and `names an owner and answers the new list`, through `server.request`. The refused call differs from the Admin's valid naming in the caller's role alone. Run `pnpm --filter @better-answers/api exec vitest run tests/knowledge-owners.test.ts`.
+- [ ] `apps/api/tests/trpc/knowledge-owners.test.ts` gains `carries the owner's collections on the member read`, `refuses an Editor naming an owner, by role` and `names an owner and answers the new list`, through `server.request`. The refused call differs from the Admin's valid naming in the caller's role alone. Run `pnpm --filter @better-answers/api exec vitest run tests/trpc/knowledge-owners.test.ts`.
 - [ ] Break each new test once in the production line it guards, and see it fail. Run `/mutation-testing` over `sees` and `collectionsAndOwners`, since both decide visibility.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on the configured `swarm workers` model at the PR head, per the boot recipe. Every lane drives the served build through `apps/web/e2e/collections-and-owners.spec.ts` unless it names another spec, seeding with `provision`, `addMember`, `seedConcepts` and the new `nameOwners`, and signing in with `signIn`.
@@ -394,7 +394,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `packages/core/src/concepts/import/loader.ts`.
 - [ ] Edit `packages/core/src/concepts/vocabulary.ts`.
 - [ ] Edit `apps/api/src/trpc/knowledge.ts`.
-- [ ] Edit `apps/api/tests/harness-knowledge.ts`.
+- [ ] Edit `apps/api/tests/support/harness/harness-knowledge.ts`.
 - [ ] Edit `packages/core/test/fixtures/sourced-concept.ts`.
 - [ ] Create `packages/core/test/concepts/writes/concept-edit.test.ts`.
 - [ ] Create `packages/core/test/concepts/writes/edit-budget.test.ts`.
@@ -402,7 +402,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `packages/core/test/concepts/writes/reconciler.test.ts`.
 - [ ] Edit `packages/core/test/concepts/writes/suggestions.test.ts`.
 - [ ] Edit `packages/core/test/refusal-words.test.ts`.
-- [ ] Edit `apps/api/tests/knowledge-procedures.test.ts`.
+- [ ] Edit `apps/api/tests/trpc/knowledge-procedures.test.ts`.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0012.md`.
 
 **Build.**
@@ -414,7 +414,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Fork inside `saveConcept` on the owner-or-Admin predicate, read in the act's transaction (KTD2). An owner or an Admin reaches `writeConcept` with `expects: { base }`. Anyone else reaches `submitSuggestionSet` (`suggestions.ts:182`) with one item of kind `edit`, whose payload is the merged raw file and whose `base_content_hash` is `base`. The answer is `{ outcome: "committed", iri, sha }`, `{ outcome: "unchanged", iri }` or `{ outcome: "suggested", suggestionId }`.
   - [ ] The fork's read only routes the save. `writeConcept` reads the owner again inside its own transaction (BA-231), and that read decides. When it answers `owner-forbids`, `saveConcept` sends the same merged file to `submitSuggestionSet` in the same act. A saver whose ownership an Admin clears between the two reads therefore gets a suggestion, never a refusal.
 - [ ] Land a new concept from `{ collection }` at `newConceptPathOf(collection, title)` in `edit.ts`, which folds the title to a slug under `knowledge/<collection>/` and checks it against `conceptPathOf`'s rule (`loader.ts:240`). `path-taken` and `merge-key-taken` refuse as they do today. The collection is the path's first folder, as `CONCEPT_COLLECTION` (`packages/schema/src/knowledge/concept-tables.ts:209`) derives it, so no file key is added.
-- [ ] Hold `sources` and the evidence rows to one list (KTD5, BA-127). Remove `WriteConceptInput.evidence` and `EvidenceInput` (`index.ts:225`). `commitConcept` (`index.ts:327`) derives the evidence rows from `hashedFileOf(...).sources` through a new `evidenceOfSources`, so a source naming a document becomes a row and `no-such-document` still refuses one the catalogue lacks. A source naming a concept stays a graph edge and never becomes a row. `landRows` (`landing.ts:318`) reads `Landing.sources`, which it ignores today. Migrate every caller that passes `evidence` into a write in this PR. Read on the worktree, they are `apps/api/tests/harness-knowledge.ts:363`, where `citationsOf` feeds `evidence`, and the shared seed helper `packages/core/test/fixtures/sourced-concept.ts:257` and `:286`, which BA-230 also edits. `importBundle` (`index.ts:1003`, `:1085`) and `erasure/rehearsal.ts:171` call `writeConcept` without `evidence`, so they need no change. Confirm the list with a jCodeMunch `search_text` for `evidence:`, reading each hit in context, since most `evidence: [` literals in the core tests are expectations on read output, not write inputs.
+- [ ] Hold `sources` and the evidence rows to one list (KTD5, BA-127). Remove `WriteConceptInput.evidence` and `EvidenceInput` (`index.ts:225`). `commitConcept` (`index.ts:327`) derives the evidence rows from `hashedFileOf(...).sources` through a new `evidenceOfSources`, so a source naming a document becomes a row and `no-such-document` still refuses one the catalogue lacks. A source naming a concept stays a graph edge and never becomes a row. `landRows` (`landing.ts:318`) reads `Landing.sources`, which it ignores today. Migrate every caller that passes `evidence` into a write in this PR. Read on the worktree, they are `apps/api/tests/support/harness/harness-knowledge.ts:363`, where `citationsOf` feeds `evidence`, and the shared seed helper `packages/core/test/fixtures/sourced-concept.ts:257` and `:286`, which BA-230 also edits. `importBundle` (`index.ts:1003`, `:1085`) and `erasure/rehearsal.ts:171` call `writeConcept` without `evidence`, so they need no change. Confirm the list with a jCodeMunch `search_text` for `evidence:`, reading each hit in context, since most `evidence: [` literals in the core tests are expectations on read output, not write inputs.
 - [ ] Replay a commit's evidence from its file. The reconciler (`reconciler.ts:333`) derives the rows the same way, and `fileCitesTheStandingEvidence` (`reconciler.ts:184-205`) goes, since the two lists can no longer differ.
 - [ ] Recheck labels at write (KTD7, BA-126). `saveConcept` refuses with `source-label-refused` a string source whose whole text parses as a wire locator through `parseLocator` (`packages/core/src/sources/passages.ts`). It refuses with `body-locator-refused` a body that holds a passage locator outside `sources`. `labelOf` (`read.ts:118`) shows a fixed withheld label in place of a raw `resource` that is a concept IRI the reader cannot open. `placeOf` (`read.ts:141`) stays as it is, because the platform writer now refuses the shapes it would pass.
 - [ ] Name no sharer for an unwritten concept (BA-127, third criterion). `resolvedOf` (`read.ts:154`) marks a concept source whose IRI `concept_identity` never minted as pointing at nothing, so `paneOf` (`read.ts:246`) leaves `sharedBeyondEvidence` undefined when that source is the only one unopened.
@@ -449,8 +449,8 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] `packages/core/test/concepts/reading/concept-read.test.ts` gains `labels a withheld concept source with the withheld words`. Run `pnpm --filter @better-answers/core exec vitest run test/concept-read.test.ts -t "labels a withheld concept source with the withheld words"`.
 - [ ] `packages/core/test/concepts/reading/concept-read.test.ts` gains `names no sharer when only an unwritten concept is unopened`. Run `pnpm --filter @better-answers/core exec vitest run test/concept-read.test.ts -t "names no sharer when only an unwritten concept is unopened"`.
 - [ ] `packages/core/test/concepts/writes/reconciler.test.ts` gains `replays a commit's evidence rows from its file`. Run `pnpm --filter @better-answers/core exec vitest run test/reconciler.test.ts -t "replays a commit's evidence rows from its file"`.
-- [ ] `apps/api/tests/knowledge-procedures.test.ts` gains `signs a save as the signed-in person, never the client`. Run `pnpm --filter @better-answers/api exec vitest run tests/knowledge-procedures.test.ts -t "signs a save as the signed-in person, never the client"`.
-- [ ] `apps/api/tests/knowledge-procedures.test.ts` gains `answers each reader's standing beside the concept read`, whose two readers differ in ownership alone. Run `pnpm --filter @better-answers/api exec vitest run tests/knowledge-procedures.test.ts -t "answers each reader's standing beside the concept read"`.
+- [ ] `apps/api/tests/trpc/knowledge-procedures.test.ts` gains `signs a save as the signed-in person, never the client`. Run `pnpm --filter @better-answers/api exec vitest run tests/trpc/knowledge-procedures.test.ts -t "signs a save as the signed-in person, never the client"`.
+- [ ] `apps/api/tests/trpc/knowledge-procedures.test.ts` gains `answers each reader's standing beside the concept read`, whose two readers differ in ownership alone. Run `pnpm --filter @better-answers/api exec vitest run tests/trpc/knowledge-procedures.test.ts -t "answers each reader's standing beside the concept read"`.
 - [ ] Break each new test once in the production line it guards and see it fail. Record the line and the failure in the PR body.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on the configured `swarm workers` model at the PR head, per the boot recipe.
@@ -581,9 +581,9 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `packages/core/src/concepts/index.ts`.
 - [ ] Create `apps/api/src/trpc/inbox.ts`.
 - [ ] Edit `apps/api/src/trpc/router.ts`.
-- [ ] Edit `apps/api/tests/harness-knowledge.ts`.
-- [ ] Edit `apps/api/tests/harness-control.ts`.
-- [ ] Edit `apps/api/tests/harness-knowledge.test.ts`.
+- [ ] Edit `apps/api/tests/support/harness/harness-knowledge.ts`.
+- [ ] Edit `apps/api/tests/support/harness/harness-control.ts`.
+- [ ] Edit `apps/api/tests/support/harness/harness-knowledge.test.ts`.
 - [ ] Edit `apps/web/e2e/harness.ts`.
 - [ ] Edit `apps/web/src/shared/navigation.ts`.
 - [ ] Edit `apps/web/src/app/router.tsx`.
@@ -594,7 +594,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `apps/web/e2e/frame.spec.ts`.
 - [ ] Edit `apps/web/test/navigation.test.ts`.
 - [ ] Create `packages/core/test/concepts/waiting-on-you.test.ts`.
-- [ ] Create `apps/api/tests/inbox-procedures.test.ts`.
+- [ ] Create `apps/api/tests/trpc/inbox-procedures.test.ts`.
 - [ ] Edit `docs/specs/route/s3.md` where this unit moves a page. Edit `docs/solutions/architecture-patterns/adr-0051.md` only if the navigation-list decision itself changes.
 - [ ] Edit `docs/solutions/architecture-patterns/adr-0012.md`.
 - [ ] Edit `CONCEPTS.md`.
@@ -610,7 +610,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Declare a detail address `/inbox/waiting-on-you/<suggestion>` on Waiting on You in `navigation.ts`, with its `detailOf` entry in `router.tsx`. The detail draws the current and the proposed title and body side by side, marks each changed paragraph with the word `Changed` rather than colour alone, and puts *Accept* and *Decline* on its own header beside the concept's title, as BA-144 does.
 - [ ] Announce each outcome in a `status` region. Accepting reads `Accepted. The change is committed with <proposer> as its author.` Declining reads `Declined. <proposer> can read your reason.` A returned item reads `Returned to <proposer>, because the concept changed after they wrote this.`
 - [ ] Export `INBOX` from `navigation.ts`, set Waiting on You to `built: true`, and add its `BUILT_PAGES` entry in `router.tsx` (`router.tsx:104`). Confirm that BA-12's ownership arm lights the page for a person who owns one concept by override and no collection (KTD4). Lane 5 proves it.
-- [ ] Reuse BA-12's harness action `nameOwners` for every owner seed, and add two harness actions, both new. `seedEditSuggestion` posts to `${HARNESS_PREFIX}/suggestions` and submits one `edit` suggestion through `submitSuggestionSet` as the named proposer. `commitAuthorsOf` gets `${HARNESS_PREFIX}/commit-authors` and answers the author lines of a concept's commits through `authorLinesOf` (`packages/core/test/fixtures/bundle.ts:240`). Each has its function in `apps/api/tests/harness-knowledge.ts`, its route in `apps/api/tests/harness-control.ts` and its wrapper in `apps/web/e2e/harness.ts`.
+- [ ] Reuse BA-12's harness action `nameOwners` for every owner seed, and add two harness actions, both new. `seedEditSuggestion` posts to `${HARNESS_PREFIX}/suggestions` and submits one `edit` suggestion through `submitSuggestionSet` as the named proposer. `commitAuthorsOf` gets `${HARNESS_PREFIX}/commit-authors` and answers the author lines of a concept's commits through `authorLinesOf` (`packages/core/test/fixtures/bundle.ts:240`). Each has its function in `apps/api/tests/support/harness/harness-knowledge.ts`, its route in `apps/api/tests/support/harness/harness-control.ts` and its wrapper in `apps/web/e2e/harness.ts`.
 - [ ] State (KTD4) that an owner decides the *edit* kind inline in Inbox › Waiting on You, and only the Admin kinds point into Control Centre › Suggestions › To decide. An Admin's Waiting on You lists every *edit*, each owned one with its owner named, so an Admin reaches an owned concept's edit from a page, as KTD2 lets them decide it.
 - [ ] Edit ADR 0012's live doc. L35 names Inbox › Waiting on You as where the owner decides. The rule that nothing reads a payload but the acceptance path (archived ADR 0012 L54) now also admits the deciding owner's preview, projected under the owner's predicate.
 - [ ] Edit `CONCEPTS.md`. Amend *To decide* and *area* so a person's Inbox decides the *edit* kind itself and points into To decide only for the Admin kinds. Add a *Waiting on you* entry for the page.
@@ -628,10 +628,10 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] `packages/core/test/concepts/waiting-on-you.test.ts` gains `lists every edit for an Admin, naming each owner`. Run `pnpm --filter @better-answers/core exec vitest run test/waiting-on-you.test.ts -t "lists every edit for an Admin, naming each owner"`.
 - [ ] `packages/core/test/concepts/waiting-on-you.test.ts` gains `shows an override owner the suggestion on their concept`. Run `pnpm --filter @better-answers/core exec vitest run test/waiting-on-you.test.ts -t "shows an override owner the suggestion on their concept"`.
 - [ ] `packages/core/test/concepts/waiting-on-you.test.ts` gains `withholds a source the owner cannot open from the preview`. Run `pnpm --filter @better-answers/core exec vitest run test/waiting-on-you.test.ts -t "withholds a source the owner cannot open from the preview"`.
-- [ ] `apps/api/tests/inbox-procedures.test.ts` gains `commits an owner's acceptance with the proposer as author`. Run `pnpm --filter @better-answers/api exec vitest run tests/inbox-procedures.test.ts -t "commits an owner's acceptance with the proposer as author"`.
-- [ ] `apps/api/tests/inbox-procedures.test.ts` gains `records the decider and reason of a decline`. Run `pnpm --filter @better-answers/api exec vitest run tests/inbox-procedures.test.ts -t "records the decider and reason of a decline"`.
-- [ ] `apps/api/tests/inbox-procedures.test.ts` gains `answers an outsider's item as not found`. Its reader differs from the owner's valid read of the item in ownership alone. Run `pnpm --filter @better-answers/api exec vitest run tests/inbox-procedures.test.ts -t "answers an outsider's item as not found"`.
-- [ ] `apps/api/tests/harness-knowledge.test.ts` gains `seeds an owner and a waiting edit suggestion`. Run `pnpm --filter @better-answers/api exec vitest run tests/harness-knowledge.test.ts -t "seeds an owner and a waiting edit suggestion"`.
+- [ ] `apps/api/tests/trpc/inbox-procedures.test.ts` gains `commits an owner's acceptance with the proposer as author`. Run `pnpm --filter @better-answers/api exec vitest run tests/trpc/inbox-procedures.test.ts -t "commits an owner's acceptance with the proposer as author"`.
+- [ ] `apps/api/tests/trpc/inbox-procedures.test.ts` gains `records the decider and reason of a decline`. Run `pnpm --filter @better-answers/api exec vitest run tests/trpc/inbox-procedures.test.ts -t "records the decider and reason of a decline"`.
+- [ ] `apps/api/tests/trpc/inbox-procedures.test.ts` gains `answers an outsider's item as not found`. Its reader differs from the owner's valid read of the item in ownership alone. Run `pnpm --filter @better-answers/api exec vitest run tests/trpc/inbox-procedures.test.ts -t "answers an outsider's item as not found"`.
+- [ ] `apps/api/tests/support/harness/harness-knowledge.test.ts` gains `seeds an owner and a waiting edit suggestion`. Run `pnpm --filter @better-answers/api exec vitest run tests/support/harness/harness-knowledge.test.ts -t "seeds an owner and a waiting edit suggestion"`.
 - [ ] `apps/web/test/navigation.test.ts` gains `shows Waiting on you to an owner and Admins`. Run `pnpm --filter @better-answers/web exec vitest run test/navigation.test.ts -t "shows Waiting on you to an owner and Admins"`.
 - [ ] Break each new test once in the production line it guards and see it fail. Record the line and the failure in the PR body.
 
@@ -831,7 +831,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] `write_up_include` gains `content_hash` (not null, the concept's hash at generation), `expected_fact_id` (nullable, a foreign key to `guide_expected_fact`, naming the fact the include meets), `wording_heading` and `wording_hash`. The fact id lets coverage count each fact's includes by a join, never by matching kind and tags a second time. A CHECK requires both wording columns or neither. The include table has no writer on `main`, so it holds no rows and a not-null column adds cleanly. The migration asserts that `write_up` and `write_up_include` are empty before it adds `home` and `content_hash`, and stops if either holds a row.
 - [ ] Declare `write_up_version` with `versionColumns()`, `markdown` (the Brief as saved, never normalised) and `includes` (jsonb, the include rows as they stood at that version). The live include list stays rows in `write_up_include`. The snapshot is history, so a copied version can name what it drew on.
 - [ ] Declare `usage` in `packages/schema/src/knowledge/usage-tables.ts` on the answering slice. It holds `workspace_id`, `id`, `actor`, `at`, `act` (`copied`, `exported` or `submitted`, by CHECK), and either `write_up_id` with `write_up_version`, or `iri` through `attachedByIri()`. A CHECK requires exactly one target. An index on `(workspace_id, write_up_id, write_up_version)` serves BA-237's `usageOf` and BA-238's records export, which read by write-up.
-- [ ] Give the factory in `packages/schema/test/support/factory.ts` entries for every new table. `writeUp` defaults to home `section` and mints a guide definition and a section when none is given, as `writeUpInclude` mints a `conceptIdentity`. `writeUpInclude` defaults `content_hash`. Every existing `seed.writeUp` caller (`visibility.test.ts`, `invisibility.test.ts`, `review.test.ts`, `sync-cascade.test.ts`, `rls.test.ts` and `apps/api/tests/harness-sources.ts`) then runs unchanged. The raw `A_WRITE_UP_INCLUDE` in `packages/schema/test/support/rls-probes.ts:115` gains `content_hash`.
+- [ ] Give the factory in `packages/schema/test/support/factory.ts` entries for every new table. `writeUp` defaults to home `section` and mints a guide definition and a section when none is given, as `writeUpInclude` mints a `conceptIdentity`. `writeUpInclude` defaults `content_hash`. Every existing `seed.writeUp` caller (`visibility.test.ts`, `invisibility.test.ts`, `review.test.ts`, `sync-cascade.test.ts`, `rls.test.ts` and `apps/api/tests/support/harness/harness-sources.ts`) then runs unchanged. The raw `A_WRITE_UP_INCLUDE` in `packages/schema/test/support/rls-probes.ts:115` gains `content_hash`.
 - [ ] Map every new table in `TABLE_OWNERS`. The guide tables and `write_up_version` go to `guides`, and `usage` to `answering`.
 - [ ] Add the definer `public.pseudonymise_record_actors(workspace_id, actors, pseudonym)` to the migration. It is the only path that rewrites `actor` on the two version tables. It refuses a workspace other than the transaction's, pins `search_path`, schema-qualifies each table and touches `actor` alone. `EXECUTE` is revoked from `PUBLIC` and granted to `app_rt`. Name it in `packages/schema/src/definer-reach.ts`.
 - [ ] Add the families `write-up-version`, `guide-definition-version` and `usage` to `ERASURE_FAMILIES` in `packages/core/src/erasure/map.ts`, each with the category `actor-id` and a finder by actor. A version's prose is company knowledge, like a concept body, so erasure rewrites the actor and keeps the text.
@@ -1068,8 +1068,8 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Create `packages/core/test/guide-read.test.ts`.
 - [ ] Create `packages/core/test/brief-save.test.ts`.
 - [ ] Create `packages/core/test/brief-renderer.test.ts`.
-- [ ] Edit `apps/api/tests/knowledge-procedures.test.ts`.
-- [ ] Edit `apps/api/tests/harness-knowledge.ts`.
+- [ ] Edit `apps/api/tests/trpc/knowledge-procedures.test.ts`.
+- [ ] Edit `apps/api/tests/support/harness/harness-knowledge.ts`.
 - [ ] Edit `apps/web/e2e/harness.ts`.
 - [ ] Create `apps/web/e2e/guides.spec.ts`.
 - [ ] Create `apps/web/test/brief-editor.test.tsx`.
@@ -1101,7 +1101,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Save is explicit, by **Save Brief** or its keystroke. A client draft survives a reload through `apps/web/src/shared/browser-storage.ts`, and leaving with an unsaved draft asks once to confirm (KTD13). The save waits on the server, which alone knows whether anything changed, so the `status` region says "Saving the Brief." at once, then the result, either "Saved version 3." or "No changes to save. Version 2 stands." A stale save reads "Someone saved this Brief after you opened it." and keeps the draft.
 - [ ] In `apps/web/e2e/guides.spec.ts`, add "renders the seeded guide within its budget", modelled on `e2e/concept-page.spec.ts:776`, which times the last section heading against 1,000 ms. Add "acknowledges a Brief save within its budget", which clocks the keystroke to "Saving the Brief." with `clockTheNextKey` and `theActionLandedWithinItsBudget(page, "save the Brief")`, then times "Saved version" against 1,000 ms.
 - [ ] Put every page word in `apps/web/src/features/knowledge/guide-words.ts`, in the glossary's reader words. Give **Show Detail**, **Edit Brief**, **Save Brief** and **Add This Fact** keystrokes, listed under `?`.
-- [ ] In `apps/api/tests/harness-knowledge.ts` and `apps/web/e2e/harness.ts`, add the new harness action `seedGuide`. It seeds BA-235's synthetic template over the Northgate fixture for one collection, as BA-235's fixture table sets out. The employers' liability concept is absent from section 3, the Cyber Essentials Plus certificate is cited from sections 4 and 6, and section 3's professional indemnity concept is Restricted to `finance`. It then writes a prose Brief as version 2 over BA-235's empty version 1 for each section, with markers for every include. Version 2 therefore stands in a fresh lane worktree, and lane 8 holds without lane 7.
+- [ ] In `apps/api/tests/support/harness/harness-knowledge.ts` and `apps/web/e2e/harness.ts`, add the new harness action `seedGuide`. It seeds BA-235's synthetic template over the Northgate fixture for one collection, as BA-235's fixture table sets out. The employers' liability concept is absent from section 3, the Cyber Essentials Plus certificate is cited from sections 4 and 6, and section 3's professional indemnity concept is Restricted to `finance`. It then writes a prose Brief as version 2 over BA-235's empty version 1 for each section, with markers for every include. Version 2 therefore stands in a fresh lane worktree, and lane 8 holds without lane 7.
 - [ ] In `apps/web/test/navigation.test.ts`, replace `/knowledge/guides` in the unbuilt-page loop (`:486`) with `/knowledge/conflicts`, which stays unbuilt through S3.
 - [ ] Add a `CONCEPTS.md` entry for *coverage*, the reader word the page shows. Edit ADR 0004 to record that Detail opens in place under its Brief. Edit ADR 0015 to record that the Brief editor never changes include rows and that the renderer's page profile renumbers past a withheld include.
 
@@ -1121,7 +1121,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] `packages/core/test/brief-save.test.ts` gains "a changed Brief save writes one version and event". Run `pnpm --filter @better-answers/core exec vitest run test/brief-save.test.ts -t "a changed Brief save writes one version and event"`.
 - [ ] `packages/core/test/brief-save.test.ts` gains "a Brief save leaves the bundle head unmoved", read with `head` on the bare repository. Run `pnpm --filter @better-answers/core exec vitest run test/brief-save.test.ts -t "a Brief save leaves the bundle head unmoved"`.
 - [ ] `packages/core/test/brief-save.test.ts` gains three refusals, each one field from a valid save. "a Viewer's Brief save is refused" differs in role. "a marker naming no include row is refused" differs in one marker. "a save on a stale version is refused" differs in `base`. Run `pnpm --filter @better-answers/core exec vitest run test/brief-save.test.ts -t "refused"`.
-- [ ] `apps/api/tests/knowledge-procedures.test.ts` gains "saves a Brief through the knowledge router". Run `pnpm --filter @better-answers/api exec vitest run tests/knowledge-procedures.test.ts -t "saves a Brief through the knowledge router"`.
+- [ ] `apps/api/tests/trpc/knowledge-procedures.test.ts` gains "saves a Brief through the knowledge router". Run `pnpm --filter @better-answers/api exec vitest run tests/trpc/knowledge-procedures.test.ts -t "saves a Brief through the knowledge router"`.
 - [ ] `packages/core/test/guide-read.test.ts` gains "reads coverage from coverageOf in all three states". Run `pnpm --filter @better-answers/core exec vitest run test/guide-read.test.ts -t "reads coverage from coverageOf in all three states"`.
 - [ ] Run `pnpm --filter @better-answers/core exec vitest run test/import-direction.test.ts`, since this PR creates `guides/renderer.ts`, a path the import-direction lint fixtures name (lines 64, 87 and 88).
 - [ ] `apps/web/test/brief-editor.test.tsx` gains "moves past a footnote chip with one arrow key" and "announces an unchanged save in the status region". Run `pnpm --filter @better-answers/web exec vitest run test/brief-editor.test.tsx`.
@@ -1176,8 +1176,8 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `packages/core/test/brief-renderer.test.ts`.
 - [ ] Create `packages/core/test/brief-copy.test.ts`.
 - [ ] Edit `apps/api/src/trpc/knowledge.ts`.
-- [ ] Edit `apps/api/tests/knowledge-procedures.test.ts`.
-- [ ] Edit `apps/api/tests/harness-knowledge.ts`.
+- [ ] Edit `apps/api/tests/trpc/knowledge-procedures.test.ts`.
+- [ ] Edit `apps/api/tests/support/harness/harness-knowledge.ts`.
 - [ ] Edit `apps/web/e2e/harness.ts`.
 - [ ] Edit `apps/web/src/features/knowledge/guide-page.tsx`.
 - [ ] Edit `apps/web/src/features/knowledge/guide-words.ts`.
@@ -1199,7 +1199,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] In `apps/web/src/features/knowledge/brief-clipboard.ts`, write the clipboard inside the keystroke or click that asked for it. Call `navigator.clipboard.write` with one `ClipboardItem` whose `text/html` and `text/plain` blobs are promises resolved from `knowledge.briefCopy`, so the write keeps the user gesture. Call `knowledge.recordCopy` only after the write resolves, so a refused clipboard writes no usage row.
 - [ ] On the guide page, add **Copy** to each section with a Brief, with its keystroke listed under `?`. The `status` region says "Copying section 3." at once, then the outcome, either "Copied section 3 with 4 footnotes. Numbers start at 1 in each copy." or "Your browser did not allow copying. Nothing was copied."
 - [ ] In `apps/web/e2e/guide-copy.spec.ts`, add "acknowledges a copy within its budget", which clocks the keystroke to "Copying section 3." with `clockTheNextKey` and `theActionLandedWithinItsBudget(page, "copy")`, then times "Copied section 3" against 1,000 ms.
-- [ ] In `apps/api/tests/harness-knowledge.ts` and `apps/web/e2e/harness.ts`, add the new harness action `usageOf`, which reads a write-up's `usage` rows for a lane's predicate.
+- [ ] In `apps/api/tests/support/harness/harness-knowledge.ts` and `apps/web/e2e/harness.ts`, add the new harness action `usageOf`, which reads a write-up's `usage` rows for a lane's predicate.
 - [ ] Edit ADR 0015 to record the clipboard profile, the restart of numbers per copy, and the paste matrix's split between the browser suite and the operator. Edit ADR 0014 to record that a copy writes one `usage` row per write-up version and no audit event.
 
 **You see.**
@@ -1216,7 +1216,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] `packages/core/test/brief-copy.test.ts` gains "a usage row holds no copied text". Run `pnpm --filter @better-answers/core exec vitest run test/brief-copy.test.ts -t "a usage row holds no copied text"`.
 - [ ] `packages/core/test/brief-copy.test.ts` gains "a copy below the role's threshold is refused", whose reader differs from an admitted one in role alone. Run `pnpm --filter @better-answers/core exec vitest run test/brief-copy.test.ts -t "a copy below the role's threshold is refused"`.
 - [ ] `packages/core/test/brief-copy.test.ts` gains "a recorded copy writes no audit event". Run `pnpm --filter @better-answers/core exec vitest run test/brief-copy.test.ts -t "a recorded copy writes no audit event"`.
-- [ ] `apps/api/tests/knowledge-procedures.test.ts` gains "copies a Brief, then records its usage". Run `pnpm --filter @better-answers/api exec vitest run tests/knowledge-procedures.test.ts -t "copies a Brief, then records its usage"`.
+- [ ] `apps/api/tests/trpc/knowledge-procedures.test.ts` gains "copies a Brief, then records its usage". Run `pnpm --filter @better-answers/api exec vitest run tests/trpc/knowledge-procedures.test.ts -t "copies a Brief, then records its usage"`.
 - [ ] `apps/web/test/brief-clipboard.test.ts` gains "a refused clipboard records no usage", using `apps/web/test/clipboard-stand-in.ts`. Run `pnpm --filter @better-answers/web exec vitest run test/brief-clipboard.test.ts`.
 - [ ] Run `pnpm --filter @better-answers/core exec vitest run test/face-admission.test.ts`, since `recordUsage` and both copy acts are declared actions.
 - [ ] Break each new test once in the production line it guards and see it fail.
@@ -1281,7 +1281,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Create `packages/core/test/curation.test.ts`.
 - [ ] Create `packages/core/test/knowledge-export.test.ts`.
 - [ ] Create `packages/core/test/curation-budget.test.ts`.
-- [ ] Edit `apps/api/tests/knowledge-procedures.test.ts`.
+- [ ] Edit `apps/api/tests/trpc/knowledge-procedures.test.ts`.
 - [ ] Create `apps/web/e2e/all-knowledge.spec.ts`.
 - [ ] Create `apps/web/e2e/kinds.spec.ts`.
 - [ ] Create `apps/web/e2e/exports.spec.ts`.
@@ -1325,7 +1325,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] `packages/core/test/knowledge-export.test.ts` gains "an export past its confirmation window is refused". Run `pnpm --filter @better-answers/core exec vitest run test/knowledge-export.test.ts -t "an export past its confirmation window is refused"`.
 - [ ] `packages/core/test/knowledge-export.test.ts` gains "the snapshot holds every concept file and no skeleton", read from a real bare repository. Run `pnpm --filter @better-answers/core exec vitest run test/knowledge-export.test.ts -t "the snapshot holds every concept file and no skeleton"`.
 - [ ] `packages/core/test/knowledge-export.test.ts` gains "a guide snapshot writes one usage row per write-up" and "each export writes one audit event". Run `pnpm --filter @better-answers/core exec vitest run test/knowledge-export.test.ts -t "writes one"`.
-- [ ] `apps/api/tests/knowledge-procedures.test.ts` gains "reads Kinds through the knowledge router". Run `pnpm --filter @better-answers/api exec vitest run tests/knowledge-procedures.test.ts -t "reads Kinds through the knowledge router"`.
+- [ ] `apps/api/tests/trpc/knowledge-procedures.test.ts` gains "reads Kinds through the knowledge router". Run `pnpm --filter @better-answers/api exec vitest run tests/trpc/knowledge-procedures.test.ts -t "reads Kinds through the knowledge router"`.
 - [ ] `apps/web/test/navigation.test.ts` gains "shows an owning Editor Curation without Exports". Run `pnpm --filter @better-answers/web exec vitest run test/navigation.test.ts -t "shows an owning Editor Curation without Exports"`.
 - [ ] Break each new test once in the production line it guards and see it fail. Then run `/mutation-testing` over `packages/core/src/concepts/curation.ts` and `knowledge-export.ts`, since each carries admission.
 
@@ -1382,8 +1382,8 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `packages/core/src/concepts/index.ts`.
 - [ ] Create `packages/core/test/concepts/reading/browse.test.ts`.
 - [ ] Create `packages/core/test/concepts/reading/browse-budget.test.ts`.
-- [ ] Edit `apps/api/tests/knowledge-procedures.test.ts`.
-- [ ] Edit `apps/api/tests/harness-knowledge.ts`.
+- [ ] Edit `apps/api/tests/trpc/knowledge-procedures.test.ts`.
+- [ ] Edit `apps/api/tests/support/harness/harness-knowledge.ts`.
 - [ ] Edit `apps/web/e2e/harness.ts`.
 - [ ] Create `apps/web/e2e/knowledge-base.spec.ts`.
 - [ ] Create `apps/web/test/knowledge-tree.test.tsx`.
@@ -1402,7 +1402,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] In `apps/web/src/features/knowledge/knowledge-base-page.tsx`, draw the page head through `PageHead`, the tree, and beside it the open kind's concepts in `GridTable` (`apps/web/src/shared/grid-table.tsx`) with its count. Enter on a row opens the concept page at Search's detail address. The open collection and kind live in the address through `apps/web/src/shared/address-query.ts`, so Back returns to the same node. Below the wide breakpoint the list stacks under the tree, and focus is never hidden.
 - [ ] In `apps/web/src/shared/navigation.ts`, add the page **Knowledge Base** to Browse after Guides, at `/knowledge/knowledge-base`, `built: true`, `seenBy: EVERY_ROLE`, with the new icon name `knowledge-base`. Add that name to `IconName` and `GLYPHS` in `apps/web/src/shared/icon.tsx`, mapped to Phosphor's `TreeStructure`. Add its `BUILT_PAGES` entry in `apps/web/src/app/router.tsx`.
 - [ ] Put the page words in `apps/web/src/features/knowledge/knowledge-words.ts`. The page says *knowledge base* and *collection* and never *bundle*. Code names follow the page (`KnowledgeBasePage`, `readKnowledgeTree`), never the brief's *bundle browser*.
-- [ ] In `apps/api/tests/harness-knowledge.ts` and `apps/web/e2e/harness.ts`, add the new harness action `seedConceptIndex`. It writes `concept_index` rows directly through the schema factory, as `seedWideMap` does, so a lane reaches 3,000 concepts without 3,000 governed writes. Its concepts have no file, so a lane on them never opens a concept page.
+- [ ] In `apps/api/tests/support/harness/harness-knowledge.ts` and `apps/web/e2e/harness.ts`, add the new harness action `seedConceptIndex`. It writes `concept_index` rows directly through the schema factory, as `seedWideMap` does, so a lane reaches 3,000 concepts without 3,000 governed writes. Its concepts have no file, so a lane on them never opens a concept page.
 - [ ] Add **Knowledge Base** to Browse beside Search and Guides, seen by every role, reading the concept index under the read predicate. State that it is not the map explorer under Next, since it lists the index and walks no links. Add to the *knowledge base* entry in `CONCEPTS.md` that Knowledge › Knowledge Base lists it by collection and kind.
 - [ ] Edit the outline in `apps/web/test/navigation.test.ts:60-80` so Browse reads Search, Guides and Knowledge Base.
 - [ ] In `apps/web/e2e/knowledge-base.spec.ts`, add "renders the knowledge tree within its budget", modelled on `e2e/concept-page.spec.ts:776`, which times the tree and the open kind's first page against 1,000 ms on the 3,000-concept seed.
@@ -1419,7 +1419,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] `packages/core/test/concepts/reading/browse.test.ts` gains "an outside Viewer never sees a withheld concept", whose reader differs from an inside Viewer in group alone. Run `pnpm --filter @better-answers/core exec vitest run test/browse.test.ts -t "an outside Viewer never sees a withheld concept"`.
 - [ ] `packages/core/test/concepts/reading/browse.test.ts` gains "a concept outside every collection falls under No collection". Run `pnpm --filter @better-answers/core exec vitest run test/browse.test.ts -t "a concept outside every collection falls under No collection"`.
 - [ ] `packages/core/test/concepts/reading/browse.test.ts` gains "lists a kind's concepts fifty at a time". Run `pnpm --filter @better-answers/core exec vitest run test/browse.test.ts -t "lists a kind's concepts fifty at a time"`.
-- [ ] `apps/api/tests/knowledge-procedures.test.ts` gains "reads the knowledge tree through the knowledge router". Run `pnpm --filter @better-answers/api exec vitest run tests/knowledge-procedures.test.ts -t "reads the knowledge tree through the knowledge router"`.
+- [ ] `apps/api/tests/trpc/knowledge-procedures.test.ts` gains "reads the knowledge tree through the knowledge router". Run `pnpm --filter @better-answers/api exec vitest run tests/trpc/knowledge-procedures.test.ts -t "reads the knowledge tree through the knowledge router"`.
 - [ ] `apps/web/test/knowledge-tree.test.tsx` gains "moves focus between tree items by arrow keys", "opens a collection with the right arrow" and "a typed letter moves to the next match". Run `pnpm --filter @better-answers/web exec vitest run test/knowledge-tree.test.tsx`.
 - [ ] Break each new test once in the production line it guards and see it fail.
 
@@ -1514,7 +1514,7 @@ These key technical decisions (KTD) bind the program. Each names what lost and w
 - **BA-231 builds on #869's landing.** The race tests in `concepts.test.ts` and `manifest.test.ts`, with their helper `packages/core/test/concepts/revocation-race.ts`, must stay green once the owner read joins the transaction.
 - **BA-231 changes who may import.** `pnpm ops import-bundle` becomes Admin-only (KTD2). The PR owner says so in the PR body and in `docs/operations/`.
 - **BA-232 needs BA-231 to widen the acceptance branch.** `writeConceptAction`'s acceptance branch and `declineSuggestionAction` admit the owner, not only the direct write. BA-232's PR owner checks it before building.
-- **Harness actions are named in several sections.** BA-12, BA-232, BA-236, BA-237 and BA-239 each add harness actions (`nameOwners`, `seedEditSuggestion`, `commitAuthorsOf`, `seedGuide`, `usageOf`, `seedConceptIndex`). BA-12 defines `nameOwners`, the one owner seed, with its function in `apps/api/tests/harness-knowledge.ts` and its route in `harness-control.ts`. BA-232 and BA-236 reuse it and add no owner seed of their own.
+- **Harness actions are named in several sections.** BA-12, BA-232, BA-236, BA-237 and BA-239 each add harness actions (`nameOwners`, `seedEditSuggestion`, `commitAuthorsOf`, `seedGuide`, `usageOf`, `seedConceptIndex`). BA-12 defines `nameOwners`, the one owner seed, with its function in `apps/api/tests/support/harness/harness-knowledge.ts` and its route in `harness-control.ts`. BA-232 and BA-236 reuse it and add no owner seed of their own.
 - **Five PRs edit the navigation and the router.** BA-12, BA-232, BA-236, BA-238 and BA-239 change `apps/web/src/shared/navigation.ts` or `router.tsx`, so each rebases on the last. `AREA_NAMES` in `frame.spec.ts` changes in BA-232 alone.
 - **BA-233 shares `contracts/links` with BA-146.** BA-146's fourth criterion adds cases to the same fixture. Whichever lands second rebases the fixture and both tiers' digest files, and runs alone.
 - **BA-233 settles a moved concept's new path only.** A link to the old path stays unanswered, because an edge carries no path. BA-146's first criterion asks only for the new path. The old-path case stays on BA-146.

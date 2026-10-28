@@ -1,7 +1,7 @@
 import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { confirmedByTheHarness, holdAnAuthenticator } from "./factor-harness.ts";
+import { confirmedByTheHarness, holdAnAuthenticator } from "./support/factor-harness.ts";
 import {
   authorizeUrl,
   confirmWithTheAuthenticator,
@@ -10,12 +10,12 @@ import {
   pkce,
   setActiveWorkspace,
   signInByEmailOnly,
-} from "./flow.ts";
-import { PUBLIC_URL, type TestClient } from "./harness.ts";
-import type { PasskeyDevice } from "./passkey-device.ts";
-import { passkeyAddedOn, setUpOn, signedInByEmailOnly } from "./provoke.ts";
-import { appForSuite } from "./suite-app.ts";
-import { refusalOfCall, webClientOf, webTabOf } from "./web-client.ts";
+} from "./support/flow.ts";
+import { PUBLIC_URL, type TestClient } from "./support/harness/harness.ts";
+import type { PasskeyDevice } from "./support/passkey-device.ts";
+import { passkeyAddedOn, setUpOn, signedInByEmailOnly } from "./support/provoke.ts";
+import { appForSuite } from "./support/suite-app.ts";
+import { refusalOfCall, webClientOf, webTabOf } from "./support/web-client.ts";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 

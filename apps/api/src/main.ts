@@ -12,13 +12,13 @@ import {
   requireRunningImage,
 } from "./config.ts";
 import { closeDoors, openDoors } from "./doors.ts";
-import type { EmailSender } from "./email.ts";
+import type { EmailSender } from "./email/email.ts";
+import { emailSender, pacedTransport } from "./email/smtp.ts";
 import { logger } from "./logger.ts";
 import { senderAt } from "./product-name.ts";
-import { RECONCILER_INTERVAL_MS, startReconciler } from "./reconciler.ts";
 import { createServer } from "./server.ts";
-import { emailSender, pacedTransport } from "./smtp.ts";
-import { startSweeps, SWEEP_FIRST_PASS_MS, SWEEP_INTERVAL_MS } from "./sweeps.ts";
+import { RECONCILER_INTERVAL_MS, startReconciler } from "./timers/reconciler.ts";
+import { startSweeps, SWEEP_FIRST_PASS_MS, SWEEP_INTERVAL_MS } from "./timers/sweeps.ts";
 
 const bootstrap = requireBootstrap("the api");
 const identity = requireIdentityBootstrap("the api");
