@@ -1,4 +1,4 @@
-import { execFile, spawn } from "node:child_process";
+import { type ChildProcess, execFile, spawn } from "node:child_process";
 import path from "node:path";
 import readline from "node:readline";
 import { promisify } from "node:util";
@@ -140,10 +140,21 @@ type Where = {
   readonly objects: WorkerObjectStore;
 };
 
+/** `uv run` keeps the worker as its child, so a kill must reach the process group. */
+const killTheGroup = (child: ChildProcess): void => {
+  if (child.pid === undefined) return;
+  try {
+    process.kill(-child.pid, "SIGKILL");
+  } catch {
+    // Every process in the group has already exited.
+  }
+};
+
 const startTickingWorker = (workerId: string, where: Where) => {
   const child = spawn("uv", ["run", "--frozen", "better-answers-worker", "--ticks"], {
     cwd: workerDirectory,
     env: workerEnvironment(where.connectionUri, where.bundleRoot, workerId, where.objects),
+    detached: true,
   });
   let stderr = "";
   let gone: Error | undefined;
@@ -213,7 +224,7 @@ const startTickingWorker = (workerId: string, where: Where) => {
     },
     stop: async (): Promise<void> => {
       child.stdin.end();
-      const killer = setTimeout(() => child.kill("SIGKILL"), STOP_GRACE_MS);
+      const killer = setTimeout(() => killTheGroup(child), STOP_GRACE_MS);
       await ended;
       clearTimeout(killer);
     },
