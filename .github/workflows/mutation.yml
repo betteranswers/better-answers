@@ -36,7 +36,7 @@ jobs:
       SELECTED: ${{ !inputs.shards || contains(format(',{0},', inputs.shards), format(',{0}-{1},', matrix.name, matrix.shard)) }}
     strategy:
       fail-fast: false
-      # The plan runs 20 jobs at once; 14 are kept for a merge group's lane and nine leg jobs, and a pull request's four.
+      # The plan runs 20 jobs at once; this matrix leaves room for a run of check.yml, and mutation-baseline.test.ts counts that run's jobs.
       max-parallel: 6
       matrix:
         include:
