@@ -2,9 +2,11 @@ import { mkdtempSync, readdirSync, realpathSync, rmSync, utimesSync } from "node
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
+  knipBatchOver,
+  oxlintBatchOver,
   oxlintOver,
   runsOverThrowawayTree,
   writeUnder,
@@ -140,6 +142,107 @@ describe("oxlintOver", () => {
     expect(() =>
       oxlintOver(kebabCaseConfig, { tree: smokeTree, flagged: [KEBAB_CASE_FILE] }),
     ).toThrow(/smoke/i);
+  });
+});
+
+describe("oxlintBatchOver", () => {
+  const MIXED_CASE_COUNT = 12;
+  const batch = oxlintBatchOver();
+  batch.control(smokeTree, kebabCaseConfig, [CAMEL_CASE_FILE]);
+  const camel = batch.plan(smokeTree, kebabCaseConfig);
+  const both = batch.plan(
+    { [CAMEL_CASE_FILE]: SOURCE, [KEBAB_CASE_FILE]: SOURCE },
+    kebabCaseConfig,
+  );
+  const clean = batch.plan({ [KEBAB_CASE_FILE]: SOURCE }, kebabCaseConfig);
+  const unconfigured = batch.plan({ [CAMEL_CASE_FILE]: SOURCE }, "{}");
+  const tenth = Array.from({ length: MIXED_CASE_COUNT }, (_case, index) =>
+    batch.plan({ [index === 1 ? CAMEL_CASE_FILE : KEBAB_CASE_FILE]: SOURCE }, kebabCaseConfig),
+  );
+
+  beforeAll(batch.run);
+
+  it("keeps each case's findings to its own folder", () => {
+    expect(camel.flagged()).toEqual([CAMEL_CASE_FILE]);
+    expect(both.flagged()).toEqual([CAMEL_CASE_FILE]);
+    expect(clean.flagged()).toEqual([]);
+  });
+
+  it("reads each case's report with the case's own paths", () => {
+    expect(both.output()).toContain("filename-case");
+    expect(both.output()).not.toContain("case-");
+  });
+
+  it("runs each case under its own config", () => {
+    expect(unconfigured.output()).toBe("");
+    expect(camel.output()).not.toBe("");
+  });
+
+  it("tells case 1 from case 10 by folder", () => {
+    expect(tenth[1]?.flagged()).toEqual([CAMEL_CASE_FILE]);
+    expect(tenth[10]?.flagged()).toEqual([]);
+    expect(tenth[0]?.flagged()).toEqual([]);
+  });
+});
+
+describe("oxlintBatchOver's refusals", () => {
+  it("refuses a batch with no control case", () => {
+    const batch = oxlintBatchOver();
+    batch.plan(smokeTree, kebabCaseConfig);
+
+    expect(batch.run).toThrow(/no control case/);
+  });
+
+  it("refuses a control the tool does not report", () => {
+    const batch = oxlintBatchOver();
+    batch.control({ [KEBAB_CASE_FILE]: SOURCE }, kebabCaseConfig, [KEBAB_CASE_FILE]);
+
+    expect(batch.run).toThrow(/failed a control case/);
+  });
+
+  it("refuses to read a case before the batch ran", () => {
+    const batch = oxlintBatchOver();
+    const planned = batch.plan(smokeTree, kebabCaseConfig);
+
+    expect(planned.output).toThrow(/before the batch ran/);
+  });
+
+  it("refuses a case planned after the batch ran", () => {
+    const batch = oxlintBatchOver();
+    batch.control(smokeTree, kebabCaseConfig, [CAMEL_CASE_FILE]);
+    batch.run();
+
+    expect(() => batch.plan(smokeTree, kebabCaseConfig)).toThrow(/planned after its batch ran/);
+  });
+});
+
+describe("knipBatchOver", () => {
+  const KNIP_CASE = { entry: ["src/main.ts"], project: ["**/*.ts"] };
+  const MAIN = "export const run = 1;\n";
+  const SPARE = { kind: "files", file: "src/spare.ts", name: "src/spare.ts" } as const;
+  const scaffold: Tree = { "package.json": JSON.stringify({ name: "case", private: true }) };
+  const treeWithSpare: Tree = { "src/main.ts": MAIN, "src/spare.ts": MAIN };
+
+  const batch = knipBatchOver(scaffold);
+  batch.control(treeWithSpare, KNIP_CASE, [SPARE]);
+  const both = batch.plan(treeWithSpare, KNIP_CASE);
+  const clean = batch.plan({ "src/main.ts": MAIN }, KNIP_CASE);
+
+  beforeAll(batch.run);
+
+  it("names a finding with its own case's paths", () => {
+    expect(both.findings()).toEqual([SPARE]);
+  });
+
+  it("keeps a clean case silent beside a flagged one", () => {
+    expect(clean.findings()).toEqual([]);
+  });
+
+  it("refuses a control the report does not match", () => {
+    const refusing = knipBatchOver(scaffold);
+    refusing.control({ "src/main.ts": MAIN }, KNIP_CASE, [SPARE]);
+
+    expect(refusing.run).toThrow(/failed a control case/);
   });
 });
 
