@@ -80,7 +80,7 @@ Every instance starts with no workspace and no person. A drive seeds what it nee
 .claude/skills/verify/scripts/doctor.sh 4610
 ```
 
-It reads and changes nothing. It prints `worth driving` and exits 0, or prints `not worth driving:` with the reason and exits 1. It checks these, in order:
+It reads and changes nothing. It prints `worth driving:` with the origin and the pid and exits 0, or prints `not worth driving:` with the reason and exits 1. It checks these, in order:
 
 - `lsof`, `curl`, `node` and agent-browser are on `PATH`.
 - launch.sh started a server on that port, and that process is still alive.
@@ -136,8 +136,10 @@ Save each artifact in the `evidence` directory launch.sh prints, `/tmp/better-an
 
 ```bash
 .claude/skills/verify/scripts/browse.sh 4610 screenshot /tmp/better-answers-verify/4610/evidence/control-centre-members.png
-.claude/skills/verify/scripts/browse.sh 4610 snapshot -c > /tmp/better-answers-verify/4610/evidence/control-centre-members.aria.txt
+.claude/skills/verify/scripts/browse.sh 4610 snapshot > /tmp/better-answers-verify/4610/evidence/control-centre-members.aria.txt
 ```
+
+Save the full `snapshot` as evidence. `snapshot -c` leaves out every part of the page that holds no control, such as a status or an empty list's words, so it cannot prove an end state.
 
 - Capture each action and the state it leaves, not only the last screen. Take a snapshot before and after an action that changes something.
 - Prove a write from a second view. Reload the page, or open the page that lists what was written, and read it there.
