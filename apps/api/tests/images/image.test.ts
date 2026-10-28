@@ -267,7 +267,7 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
 
   it("runs pnpm through corepack at the root manifest's version", () => {
     expect(contents.pnpmTarget).toBe("/usr/local/lib/node_modules/corepack/dist/pnpm.js");
-    expect(contents.pnpmVersion).toBe(pinnedPnpmVersion());
+    expect(contents.pnpmVersion).toBe(`${pinnedPnpmVersion()}-throwaway`);
   });
 
   it("reaches the operator's commands through pnpm", () => {
