@@ -7,7 +7,12 @@ import { pathWithAppleGit } from "@better-answers/schema/testing/apple-git";
 
 export default defineConfig({
   plugins: [react()],
-  resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@test": fileURLToPath(new URL("./test/support", import.meta.url)),
+    },
+  },
   test: {
     include: ["test/**/*.test.ts", "test/**/*.test.tsx"],
     environment: "jsdom",

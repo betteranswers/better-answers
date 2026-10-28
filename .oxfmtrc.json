@@ -2,7 +2,7 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "sortImports": {
     "internalPattern": ["@better-answers/"],
-    "customGroups": [{ "groupName": "app-alias", "elementNamePattern": ["@/**"] }],
+    "customGroups": [{ "groupName": "app-alias", "elementNamePattern": ["@/**", "@test/**"] }],
     "groups": [
       "builtin",
       "external",
