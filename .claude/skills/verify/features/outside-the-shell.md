@@ -1,6 +1,6 @@
 # Outside the shell
 
-The pages before sign-in and the sign-in steps sit outside the workspace's frame, with no rail and no menu, and so do `/no-workspace`, `/choose-workspace`, an invitation and the api's `/consent`. For a person who holds a role in a workspace, `/account` and the not-found page are drawn inside the frame, with the rail and the breadcrumb. For anyone else they sit outside it. A person signs in by email code or by an emailed link, names themselves, sets up and confirms a second factor, recovers with a recovery code, manages their account, chooses a workspace, asks to join one, accepts an invitation and lets Claude act for them. An address no page answers draws the not-found page.
+A person signs in by email code or by an emailed link, names themselves, sets up and confirms a second factor, recovers with a recovery code, manages their account, chooses a workspace, asks to join one, accepts an invitation and lets Claude act for them. An address no page answers draws the not-found page.
 
 ## Sub-features
 
@@ -16,15 +16,15 @@ The pages before sign-in and the sign-in steps sit outside the workspace's frame
 - `choose-workspace` lets a member of more than one workspace pick where to go at `/choose-workspace`.
 - `invitation` lets an invited person join a workspace at `/invitations/$invitationId`, with the invitation's id in place of `$invitationId`.
 - `consent` asks the person to let Claude act for them at `/consent`, the page the api serves in Claude's OAuth flow.
-- `not-found` draws `Page Not Found` for an address no page answers, with a link to the role's home for a person who holds a role, `Go to Your Home Page` for a person signed in with no role, and `Sign In` for a person signed out.
+- `not-found` draws `Page Not Found` for an address no page answers. The recipe below drives it as a Viewer who has picked a workspace, where it holds the link `Go to New Question`.
 
 ## How to get to it (user POV)
 
-- Open `/sign-in`, or any page while signed out, which sends the person to `/sign-in` and back after.
+- Open `/sign-in`.
 - Choose the link in the sign-in email, which opens `/sign-in/link` in the browser.
 - Sign in for the first time with no display name, which opens `/display-name`.
 - Sign in as a person in no workspace, which opens `/no-workspace`.
-- Choose `Account` in the person menu in the banner, or the `Account` link on `/no-workspace` and `/choose-workspace`.
+- Choose the `Account` link on `/no-workspace`.
 - Sign in as an Admin with no second factor, which opens `/setup`.
 - Sign in by email as a person holding a second factor, which opens `/confirm`. Choose `Use a Recovery Code` there for `/recovery`.
 - Confirm a second factor when no recovery codes were saved, which opens `/recovery-codes`.
@@ -100,6 +100,5 @@ An invited Editor drives the invitation, consent and the sign-in link.
 - A recovery code works once. Note one from the codes page before you finish, because the page never shows them again. Once spent, `/recovery` sends the person on to `/setup`.
 - `Request sent` shows whether or not the short name exists. Prove the request on the workspace Admin's Requests tab, in Control Centre.
 - The sign-in link signs in only the browser that asked for the code. Another browser sees `Enter This Code Where You Started` in place of the `Sign In` button.
-- The api serves `/consent`, not the SPA, so it has no rail and no menu. Without the route on Claude's callback, `Connect` sends the browser and a live code to claude.ai.
+- Without the route on Claude's callback, `Connect` sends the browser and a live code to claude.ai.
 - `Account` lists no Claude grant after consent. The code is spent only when Claude exchanges it, and the browser never does.
-- A person without the operator mark who opens a `/console` address meets `Access Denied` with `Back to Your Workspaces`, not `Page Not Found`.

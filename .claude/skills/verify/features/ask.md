@@ -1,6 +1,6 @@
 # Ask
 
-Ask lets any member put a question to the workspace's knowledge, read the Answer or the related knowledge it finds, flag what is wrong, return to their own past questions and connect Claude so they can ask from there. Every role sees all three pages.
+Ask lets a person put a question to the workspace's knowledge, read the Answer or the related knowledge it finds, flag what is wrong, return to their own past questions and connect Claude so they can ask from there.
 
 ## Sub-features
 
@@ -11,10 +11,8 @@ Ask lets any member put a question to the workspace's knowledge, read the Answer
 
 ## How to get to it (user POV)
 
-- An Editor or a Viewer lands on `/ask/new-question` after signing in.
-- Choose the `Ask` link in the rail, the `navigation` named `Areas`.
-- Choose `New Question`, `Your Questions` or `Connect Claude` in the `navigation` named `Ask`.
-- Choose the `connect Claude` link in the sentence under the `Ask` heading.
+- The Viewer the recipe signs in lands on `/ask/new-question`.
+- Choose `Your Questions` or `Connect Claude` in the `navigation` named `Ask`.
 - Choose a question's link on `Your Questions` to open its record.
 - Open any of the addresses above with `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port><path>`.
 
@@ -43,7 +41,5 @@ Preconditions:
 
 - A workspace with no `POST /asking` script asks no model. The page then says `Not judged` and shows each Answer in full, which is a different end state from `Judged`.
 - `judging.fits` and `drafting.writes[].citing` name concepts by their exact title. A title the workspace does not hold is ignored, so the page shows related knowledge in place of an Answer.
-- The drafted sentence appears only when the judge finds no fit. With a fit, the page shows the Answer and keeps the other concepts under the button `Related Knowledge`.
 - `Ask` is a substring of other names on the page. Keep `--exact` on its click.
 - The answer's own flag is `Flag This Answer`. Each Answer has a flag of its own named `Flag “<title>”` with curly quotes. Match the answer's flag by its full name.
-- `Your Questions` lists only the signed-in person's own questions. A question seeded for someone else never appears, and its record address draws the not-found page.

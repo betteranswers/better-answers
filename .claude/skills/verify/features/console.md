@@ -12,9 +12,7 @@ The Console is the platform operator's view across every workspace. The operator
 ## How to get to it (user POV)
 
 - The operator lands on `/console/workspaces/every-workspace` after signing in at `/console`.
-- Choose the `Console` link in the rail, the `navigation` named `Areas`.
 - Choose `Everyone`, `Names Waiting` or `Every Workspace` in the `navigation` named `Console`.
-- Choose `Go to Everyone` on an empty `Names Waiting` list.
 - Open any of the addresses above with `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port><path>`.
 
 ## Driving it with agent-browser
@@ -27,7 +25,7 @@ Preconditions:
 
 - **Make the operator.** The operator is a person granted the mark. Run `.claude/skills/verify/scripts/harness.sh <port> POST /workspaces '{"name":"Operators <stamp>"}'`. Note `workspaceId`, `admin.id` and `admin.email`. Then run `.claude/skills/verify/scripts/harness.sh <port> POST /operators '{"email":"<admin.email>","change":"grant"}'`. It answers `{"marked":true}`.
 - **Add a member with a flagged name.** Run `.claude/skills/verify/scripts/harness.sh <port> POST /people '{"displayName":"Priya Shah <stamp>"}'`, which answers her `id` and `email`, and `.claude/skills/verify/scripts/harness.sh <port> POST /members '{"workspaceId":"<workspaceId>","userId":"<priya id>","role":"Editor"}'`. Then the workspace's Admin flags her name. Run `.claude/skills/verify/scripts/harness.sh <port> POST /name-flags '{"workspaceId":"<workspaceId>","adminId":"<admin.id>","personId":"<priya id>"}'`. It answers `{"flagged":true}`.
-- **Sign in.** Run `.claude/skills/verify/scripts/sign-in.sh <port> <admin.email> /console`. It prints the page's address, `http://localhost:<port>/console/workspaces/every-workspace`. The rail holds one link, `Console`.
+- **Sign in.** Run `.claude/skills/verify/scripts/sign-in.sh <port> <admin.email> /console`. It prints the page's address, `http://localhost:<port>/console/workspaces/every-workspace`.
 - **Every Workspace.** Run `.claude/skills/verify/scripts/browse.sh <port> find role searchbox fill "Operators <stamp>" --name "Search by name or short name"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "1 workspace matches"`. The table `Every workspace on the platform.` holds one row, `Operators <stamp>`, with its short name and `2 members`.
 - **A workspace's id.** Run `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "More About Operators <stamp>"`. The row opens to show `Workspace ID` with the id `POST /workspaces` answered. Run `.claude/skills/verify/scripts/browse.sh <port> screenshot /tmp/better-answers-verify/<port>/evidence/console-every-workspace.png` and `.claude/skills/verify/scripts/browse.sh <port> snapshot > /tmp/better-answers-verify/<port>/evidence/console-every-workspace.aria.txt`.
 - **Everyone.** Run `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Everyone" --exact`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/console/people/everyone'"`, `.claude/skills/verify/scripts/browse.sh <port> find role searchbox fill "Priya Shah <stamp>" --name "Search by name or address"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "1 person matches"`. The table `Every person on the platform.` holds one row. Its cells read `Priya Shah <stamp>` with her address, `Operators <stamp> Editor` and `None on record`.
@@ -39,8 +37,6 @@ Preconditions:
 
 ## Gotchas
 
-- The Console shows only to a person holding the operator mark. Anyone else who opens a `/console` address meets `Access Denied` with the link `Back to Your Workspaces`, not the not-found page.
-- The operator here is also the Admin of a workspace, yet signing in at `/console` opens the Console with only the `Console` link in its rail.
 - Every list holds what the whole instance holds, from every recipe run on it. Give each seeded name the stamp, search for it, and wait for the status to say `matches` before you read the table.
 - The correct button's full name is `Correct Priya Shah <stamp>’s Display Name` with a curly apostrophe. Match it by the substring `Correct Priya Shah <stamp>`.
 - A person's sheet draws its headings before its facts, with one region `Sessions and Assistant Access` while it reads. Wait for a fact such as `No open sessions` before you capture it.

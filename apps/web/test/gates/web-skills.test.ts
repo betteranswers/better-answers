@@ -22,7 +22,7 @@ const DRIVING_COMMAND =
 const NAVIGATION = /^browse\.sh <port> (?:open|reload)\b/;
 const TEXT_WAIT = /^(?:sign-in\.sh |browse\.sh <port> wait --text )/;
 const FUNCTION_WAIT = /^browse\.sh <port> wait --fn "(?<body>[^"]*)"/;
-const ADDRESS_OR_LOAD = /\bdocument\.(?:location|URL|readyState)\b/g;
+const ADDRESS_OR_LOAD = /\bdocument\.(?:location|URL|documentURI|baseURI|readyState)\b/g;
 const PAGE_ACTION =
   /^browse\.sh <port> (?:find|click|dblclick|type|fill|press|keyboard|hover|focus|check|uncheck|select|drag|upload|download|scrollintoview|mouse)\b/;
 const PLAYWRIGHT_FIXTURES = new Set(["context", "page", "request", "passesTheAccessibilityGate"]);

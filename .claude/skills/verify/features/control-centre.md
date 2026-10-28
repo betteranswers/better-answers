@@ -1,6 +1,6 @@
 # Control Centre
 
-Control Centre is where an Admin runs the workspace. An Admin manages members, their invitations and groups, publishes connected sources, reads the model choices, reviews the questions people asked and closes their flags, and reads the audit log. Only an Admin sees the area. An Editor or a Viewer who opens one of its addresses meets the not-found page.
+Control Centre is where an Admin runs the workspace. An Admin manages members, their invitations and groups, publishes connected sources, reads the model choices, reviews the questions people asked and closes their flags, and reads the audit log.
 
 ## Sub-features
 
@@ -12,17 +12,14 @@ Control Centre is where an Admin runs the workspace. An Admin manages members, t
 - `cc-models-and-spend` is the Models and Spend page at `/models/models-and-spend`. It shows the model chosen for each purpose. Its Spend tab says spend is coming soon.
 - `cc-questions-asked` is the Questions Asked page at `/questions/questions-asked`. It groups flagged questions apart from the others and closes a flag.
 - `cc-answer-tests` is the Answer Tests page at `/questions/answer-tests`. It says no answer test exists yet.
-- `cc-not-built` covers the pages not built yet. Each address draws the not-found page with a link home. They are `/overview`, `/suggestions/to-decide`, `/sources/publishing-rules`, `/sources/cost-estimates`, `/sources/backlogs`, `/sources/removed-at-source`, `/sources/share-agents`, `/models/spending-limit`, `/people/personal-tokens`, `/personal-data/erasure-and-suppression`, `/system/signals`, `/system/health` and `/system/backups`.
+- `cc-not-built` covers the pages not built yet. As the Admin, each address draws the not-found page with the link `Go to Members`. They are `/overview`, `/suggestions/to-decide`, `/sources/publishing-rules`, `/sources/cost-estimates`, `/sources/backlogs`, `/sources/removed-at-source`, `/sources/share-agents`, `/models/spending-limit`, `/people/personal-tokens`, `/personal-data/erasure-and-suppression`, `/system/signals`, `/system/health` and `/system/backups`.
 
 ## How to get to it (user POV)
 
 - Sign in as an Admin of one workspace. The person lands on `/people/members`.
-- Choose *Control Centre* in the rail, the `navigation` named *Areas*. It opens `/people/members`.
 - Choose a page in the menu, the `navigation` named *Control Centre*. It lists only the built pages, under the headings *SOURCES*, *MODELS*, *QUESTIONS*, *PEOPLE* and *SYSTEM*.
-- Choose a member's name in the Members table, or choose *Actions for <name>* on the row and then *Open*. The member's page opens.
+- Choose a member's name in the Members table. The member's page opens.
 - Choose a link in the breadcrumb, the `navigation` named *Breadcrumb*, such as *People* or *Members* on a member's page.
-- Press *Jump To* in the banner and type a page's name.
-- Open an older address. `/sources` and `/sources/bindings` forward to `/sources/connected-sources`. `/people` forwards to `/people/members`. `/system` and `/people/audit-log` forward to `/system/audit-log`. `/system/routes-and-spend` and `/agent-operations/routes-and-spend` forward to `/models/models-and-spend`.
 
 ## Driving it with agent-browser
 
@@ -97,7 +94,7 @@ Answer Tests, at `/questions/answer-tests`, as the Admin:
 - **Open.** Run `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/questions/answer-tests` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "No answer tests yet"`. The region *Answer Tests* says each correction recorded becomes an answer test, and that recording corrections is coming soon. It shows no table, no list and no figure.
 - **Evidence.** Run `.claude/skills/verify/scripts/browse.sh <port> screenshot /tmp/better-answers-verify/<port>/evidence/control-centre-answer-tests.png` and `.claude/skills/verify/scripts/browse.sh <port> snapshot > /tmp/better-answers-verify/<port>/evidence/control-centre-answer-tests.aria.txt`.
 
-Pages not built, as the Admin. Each address draws the heading *Page Not Found* over the link *Go to Members*. The rail and the breadcrumb stay, and the breadcrumb reads *Page Not Found*. No area menu is drawn.
+Pages not built, as the Admin. Each address draws the heading *Page Not Found* over the link *Go to Members*.
 
 - **`/overview`.** Run `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/overview`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Page Not Found"`, `.claude/skills/verify/scripts/browse.sh <port> screenshot /tmp/better-answers-verify/<port>/evidence/control-centre-overview.png` and `.claude/skills/verify/scripts/browse.sh <port> snapshot > /tmp/better-answers-verify/<port>/evidence/control-centre-overview.aria.txt`.
 - **`/suggestions/to-decide`.** Run `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/suggestions/to-decide`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Page Not Found"`, `.claude/skills/verify/scripts/browse.sh <port> screenshot /tmp/better-answers-verify/<port>/evidence/control-centre-to-decide.png` and `.claude/skills/verify/scripts/browse.sh <port> snapshot > /tmp/better-answers-verify/<port>/evidence/control-centre-to-decide.aria.txt`.
@@ -116,10 +113,10 @@ Pages not built, as the Admin. Each address draws the heading *Page Not Found* o
 
 ## Gotchas
 
-- Every page here is an Admin's. Signed in as an Editor or a Viewer, each address draws *Page Not Found* with *Go to New Question*. Prove a page's work only as an Admin.
+- Every recipe here signs in as the workspace's Admin. Prove a page's work as that Admin.
 - A flag that disputes a sentence must also name the concept it disputes. A seed with `disputedSentence` and no `disputedConcept` answers 400 naming `question_feedback_flag_check`. The setup's flag leaves out `disputedSentence` for that reason.
 - `wait --text` matches a field's own text too. After filling *Email Addresses* or *New Group Name*, wait on the status sentence, never on the value just typed.
 - Wait for the record's dialog before pressing *Fixed in the Knowledge*. Pressed while the dialog still opens, the click lands on the overlay and agent-browser refuses it.
 - Two controls can share a name. *Publish Staff handbook* sits on the row and *Publish* in its dialog, *Members* sits in the menu and the breadcrumb, and *Site leads* names both a row's button and its sheet. Keep `--exact` where a recipe gives it.
-- The Control Centre menu on a built page leaves out every page not built. A not-found page draws no area menu at all, so it proves only that its address is not served yet. Never report it as a broken page.
+- The Control Centre menu leaves out every page not built, so a not-found page proves only that its address is not served yet. Never report it as a broken page.
 - The seeded questions name no asker, so each reads *A former member*. That is the erased-asker wording, not a fault.

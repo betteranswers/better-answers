@@ -114,10 +114,13 @@ Every browser command goes through `scripts/browse.sh <port> <agent-browser comm
 
    It keeps the session's browser open and clears its cookies and storage first, so it also switches from one person to another. It then sets a client address of its own in `cf-connecting-ip`, so sign-ins on one instance do not share the per-address ceiling. Never run `browse.sh <port> close` mid-drive. The next commands relaunch the browser on a blank page, and only cleanup.sh closes it. It opens `path`, `/sign-in` by default, waits for *Email Address*, fills it and presses *Send Code*. It waits for the new email to reach the captured transport and for *Verification Code* to draw, then fills the code. An Admin or the operator then meets the confirm or setup page. The script gives that person the harness's authenticator, opens `/confirm` with the page's own query and types the six digits the authenticator shows. It waits for the landing page's heading, then prints the address.
 
-   - An Admin of one workspace lands on `/people/members`.
-   - An Editor or a Viewer lands on `/ask/new-question`.
-   - The operator lands on `/console/workspaces/every-workspace`.
-   - A person in several workspaces meets the workspace picker, and a person in none meets *No Workspace Yet*.
+   With no path, signing in lands on:
+
+   - An Admin of one workspace: `/people/members`.
+   - An Editor or a Viewer of one workspace: `/ask/new-question`.
+   - A person in several workspaces: the workspace picker. A person in none: *No Workspace Yet*.
+
+   With the path `/console`, the operator lands on `/console/workspaces/every-workspace`.
 
 3. **Locate by role and accessible name.** Read the page, then act on the names it gives:
 

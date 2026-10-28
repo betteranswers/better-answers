@@ -1,6 +1,6 @@
 # Inbox
 
-Inbox is where a person decides the changes other members suggest to concepts. An Admin sees every waiting edit, and a member named owner of a collection or a concept sees the edits to what they own. They compare a suggestion with the current version, then accept it, which saves the change with its proposer as author, or decline it with a reason.
+Inbox is where a person decides the changes other members suggest to concepts. An Admin sees the waiting edits, compares a suggestion with the current version, then accepts it, which saves the change with its proposer as author, or declines it with a reason.
 
 ## Sub-features
 
@@ -9,11 +9,9 @@ Inbox is where a person decides the changes other members suggest to concepts. A
 
 ## How to get to it (user POV)
 
-- Choose *Inbox* in the rail, the `navigation` named *Areas*. It opens `/inbox/waiting-on-you`. The rail shows *Inbox* only to an Admin and to an owner.
-- Choose *Waiting on You* in the menu, the `navigation` named *Inbox*.
+- As the Admin the setup signs in, choose *Inbox* in the rail, the `navigation` named *Areas*. It opens `/inbox/waiting-on-you`.
 - Choose a suggestion's title in the list. Its page opens.
-- Choose *Back to Waiting on You* on a suggestion's page, or a link in the breadcrumb, the `navigation` named *Breadcrumb*.
-- Open a suggestion's address before signing in. The address survives sign-in and the suggestion opens.
+- Choose *Back to Waiting on You* on a suggestion's page.
 
 ## Driving it with agent-browser
 
@@ -48,10 +46,9 @@ A waiting suggestion, at `/inbox/waiting-on-you/<suggestionId>`, as the Admin:
 
 ## Gotchas
 
-- The page is an Admin's and an owner's. An Editor or a Viewer sees *Inbox* only once an Admin names them owner, of a collection with `.claude/skills/verify/scripts/harness.sh <port> POST /owners '{"workspaceId":"<workspaceId>","userId":"<adminId>","owners":[{"collection":"policies","personId":"<ifanId>"}]}'` or of one concept with `{"iri":"<annualLeaveIri>","personId":"<ifanId>"}` in `owners`. An owner of one concept sees that concept's suggestions alone. Owning nothing, they meet *Page Not Found* with *Go to New Question*, at the list and at each suggestion's address.
 - The instance allows five codes to one address in ten minutes. A sixth sign-in of the same person in that window fails at *Send Code*. Sign in once and drive both recipes from that session.
 - `POST /suggestions` takes the concept's whole IRI, and a concept's page takes only its last part. A concept the workspace does not hold answers 400 naming `iri`.
 - A suggestion is made against the concept as it stood. Accept one, and a second suggestion waiting on the same concept goes back to its proposer instead of committing. Seed each recipe's suggestions on different concepts.
 - Seed the suggestions as a member other than the one signed in, so *Suggested By* proves who proposed them.
-- Several names nest. *Accept* sits inside *Accept Selected*, *Decline* inside *Decline Suggestion*, and *Inbox* names the rail's link, a heading and the menu's `navigation`. Keep `--exact` where a recipe gives it.
+- Several names nest. *Accept* sits inside *Accept Selected*, *Decline* inside *Decline Suggestion*, and *Inbox* names the rail's link and a heading. Keep `--exact` where a recipe gives it.
 - `wait --text` matches a substring, so `wait --text "2 suggestions waiting"` also matches *12 suggestions waiting*. Seed few enough suggestions that the count cannot nest.

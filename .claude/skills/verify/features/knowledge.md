@@ -1,23 +1,21 @@
 # Knowledge
 
-Knowledge is where a person finds and reads the workspace's concepts. Every member searches the concepts, opens one to read its body and sources, and browses them by collection and kind. An Admin, and a member named owner of a collection, also reach Curation, where an Admin names each collection's owner.
+Knowledge is where a person finds and reads the workspace's concepts. A person searches the concepts, opens one to read its body and sources, and browses them by collection and kind. An Admin also reaches Curation, where the Admin names each collection's owner.
 
 ## Sub-features
 
 - `knowledge-search` is the Search page at `/knowledge/search`. It finds concepts by a word or a question and keeps the query in the address.
 - `knowledge-concept` is one concept's page at `/knowledge/search/<conceptId>`, reached from a match. It shows the concept's body, sources, verification and links. `<conceptId>` is the last part of the concept's IRI.
-- `knowledge-base` is the Knowledge Base page at `/knowledge/knowledge-base`. It lists every concept the person can read in a tree of collections and kinds.
+- `knowledge-base` is the Knowledge Base page at `/knowledge/knowledge-base`. It lists the concepts in a tree of collections and kinds.
 - `knowledge-collections-and-owners` is the Collections and Owners page at `/knowledge/collections-and-owners`. It lists each collection with its owner, and an Admin names a new owner there.
-- `knowledge-not-built` covers the pages not built yet. Each address draws the not-found page with a link home. They are `/knowledge/guides`, `/knowledge/all-knowledge`, `/knowledge/due-for-verification`, `/knowledge/conflicts`, `/knowledge/kinds` and `/knowledge/exports`.
+- `knowledge-not-built` covers the pages not built yet. As the Admin, each address draws the not-found page with the link `Go to Members`. They are `/knowledge/guides`, `/knowledge/all-knowledge`, `/knowledge/due-for-verification`, `/knowledge/conflicts`, `/knowledge/kinds` and `/knowledge/exports`.
 
 ## How to get to it (user POV)
 
-- Choose *Knowledge* in the rail, the `navigation` named *Areas*. It opens `/knowledge/search`.
-- Choose a page in the menu, the `navigation` named *Knowledge*. Under *BROWSE* it lists *Search* and *Knowledge Base*. Under *CURATION* it lists *Collections and Owners*, for an Admin or an owner of a collection only.
+- As the Admin the setup signs in, choose *Knowledge* in the rail, the `navigation` named *Areas*. It opens `/knowledge/search`.
+- Choose a page in the menu, the `navigation` named *Knowledge*. Under *BROWSE* it lists *Search* and *Knowledge Base*. Under *CURATION* it lists *Collections and Owners*.
 - Type in *Search by a word or a question* and choose a match in the *Matches* list. The concept's page opens.
-- Choose a concept's title in a kind's table on Knowledge Base. The concept's page opens.
-- Choose *Back to Search* on a concept's page, or a link in the breadcrumb, the `navigation` named *Breadcrumb*, such as *Knowledge* or *Browse*.
-- Press *Jump To* in the banner and type a page's name.
+- Choose *Back to Search* on a concept's page.
 
 ## Driving it with agent-browser
 
@@ -71,14 +69,11 @@ Pages not built, as the Admin:
 
 ## Gotchas
 
-- Curation is an Admin's, and an owner's. An Editor or a Viewer sees *CURATION* and Collections and Owners only once an Admin names them owner of a collection, through the page or `.claude/skills/verify/scripts/harness.sh <port> POST /owners '{"workspaceId":"<workspaceId>","userId":"<adminId>","owners":[{"collection":"policies","personId":"<ifanId>"}]}'`. Owning nothing, they meet *Page Not Found* with *Go to New Question* there. A Viewer owner reads the list with no picker and no *Save*.
 - The instance allows five codes to one address in ten minutes. A sixth sign-in of the same person in that window fails at *Send Code*. Sign in once and drive every recipe from that session.
 - The owner picker is a native select. `.claude/skills/verify/scripts/browse.sh <port> select` with a role or label selector and `.claude/skills/verify/scripts/browse.sh <port> find label "New Owner of policies" fill` both answer *Done* and change nothing. A click opens a popup the keys never reach. Use the page's own `c` key and a typed letter, as the recipe does, or `.claude/skills/verify/scripts/browse.sh <port> select @<ref> "Ifan Morgan"` with the ref a fresh `snapshot -c` gives the picker.
 - The `c` key focuses the first collection's picker, in the order the list draws. Read which picker holds focus in a snapshot before typing a letter when the collections differ from the setup's.
-- A concept's page takes the last part of its IRI, never the whole IRI. A malformed, absent or withheld id draws the concept page's own not-found state, not the shell's *Page Not Found*. The heading stays *Browse*, *Search* is last in the breadcrumb, and the page says `This page isn't available. Please try searching again.` over the link *Back to Search*.
-- Concepts that `POST /concept-index` seeds fill Knowledge Base's counts and lists, but they have no file, so their page never opens. Seed through `POST /concepts` any concept a recipe opens.
-- A Viewer never sees a *Restricted* concept, and nobody outside a `"groups"` audience sees that concept, its Admin included. A recipe that signs in a Viewer and expects a match needs the concept at the default *Internal*.
+- A concept's page takes the last part of its IRI, never the whole IRI.
 - Search and a concept's page share one count of reads for each person, which resets each minute of the clock. Past it the api refuses the read until the next minute. Knowledge Base's tree and kind tables, and each question asked in Ask, take from the same count. A recipe that searches or opens concepts in a tight loop meets it.
-- Several names repeat. *Knowledge* names the rail's link, the breadcrumb's first link and the menu's `navigation`. *Search* names a menu link, a region and a heading. Keep `--exact` where a recipe gives it.
+- Several names repeat. *Search* names a menu link, a region and a heading. Keep `--exact` where a recipe gives it.
 - `POST /concepts` refuses a title whose file the workspace already holds. Rerun the setup in a fresh workspace, never in the same one.
 - The menu leaves out every page not built, so a not-found page proves only that its address is not served yet. Never report it as a broken page.
