@@ -4,6 +4,8 @@ import path from "node:path";
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
+import { CORE_TESTS, isNamedKind } from "../../src/scans/test-folders.ts";
+
 const CORE = "@better-answers/core";
 
 type Zone = "kernel" | "access" | "door" | "layer" | "slice" | "catalogue" | "test";
@@ -130,20 +132,18 @@ const srcPlaceOf = (first: string, second: string | undefined, depth: number): P
   return { zone, dir, top: first };
 };
 
-const testPlaceOf = (
-  first: string | undefined,
-  second: string | undefined,
-  depth: number,
-): Place => {
+const testPlaceOf = (segments: readonly string[]): Place => {
   const place: Place = { zone: "test", dir: "test", top: "test" };
-  if (first === undefined || depth < 3) return place;
-  return { ...place, mirror: srcPlaceOf(first, second, depth).dir };
+  const folders = segments.slice(1, -1);
+  const [first, second] = folders;
+  if (first === undefined || isNamedKind(CORE_TESTS, folders.join("/"))) return place;
+  return { ...place, mirror: srcPlaceOf(first, second, segments.length).dir };
 };
 
 const placeOf = (pkg: CorePackage, absolute: string): Place | undefined => {
   const segments = path.relative(pkg.root, absolute).split(path.sep);
   const [area, first, second] = segments;
-  if (area === "test" && segments.length >= 2) return testPlaceOf(first, second, segments.length);
+  if (area === "test" && segments.length >= 2) return testPlaceOf(segments);
   if (area !== "src" || first === undefined || segments.length < 3) return undefined;
   return srcPlaceOf(first, second, segments.length);
 };

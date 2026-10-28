@@ -9,6 +9,7 @@ import {
   readOxlintConfig,
 } from "@better-answers/devtools/oxlint-config";
 import { repositoryRoot } from "@better-answers/devtools/paths";
+import { GATES_FOLDER, HELPER_FOLDERS, PINS } from "@better-answers/devtools/test-folders";
 import { oxlintOver, type Tree } from "@better-answers/devtools/throwaway-tree";
 
 const RULE = "better-answers/import-direction";
@@ -69,7 +70,22 @@ const ELSEWHERE = `${CORE}/test/answering/draft.test.ts`;
 const OTHER_DOOR = `${CORE}/test/store/postgres/handle.test.ts`;
 const SUPPORT = `${CORE}/test/support/probe.ts`;
 const GATE = `${CORE}/test/gates/probe.test.ts`;
+const NESTED_HELPER = `${CORE}/test/concepts/support/probe.ts`;
 const ROOT_FILE = `${CORE}/probe.ts`;
+
+const KIND_FOLDERS: readonly string[] = [
+  ...HELPER_FOLDERS,
+  GATES_FOLDER,
+  ...PINS.filter((pin) => pin.folder.startsWith(`${CORE}/test/`)).map((pin) =>
+    path.posix.basename(pin.folder),
+  ),
+];
+
+const KIND_REFUSALS: readonly (readonly [string, string, string])[] = KIND_FOLDERS.map((kind) => [
+  `a ${kind} file reaching src/${kind}`,
+  `${CORE}/test/${kind}/probe.ts`,
+  `../../src/${kind}/probe.ts`,
+]);
 
 const lint = oxlintOver(pluginConfigFor({ [RULE]: severity }), {
   tree: importing(SLICE, "../guides/renderer.ts"),
@@ -106,6 +122,12 @@ const REFUSED: Readonly<Record<string, readonly (readonly [string, string, strin
     ["a test reaching another slice's internal", ELSEWHERE, "../../src/concepts/file.ts"],
     ["a test helper reaching a slice's internal", SUPPORT, "../../src/concepts/file.ts"],
     ["a gate reaching a slice's internal", GATE, "../../src/concepts/file.ts"],
+    [
+      "a nested helper reaching its slice's internal",
+      NESTED_HELPER,
+      "../../../src/concepts/file.ts",
+    ],
+    ...KIND_REFUSALS,
     [
       "a test reaching a door's internal outside the door",
       MIRRORED,
