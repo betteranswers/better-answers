@@ -20,8 +20,11 @@ const TABLE_ROW_NAME = /^\| `(?<name>\w+)` \|/gm;
 const DRIVING_COMMAND =
   /`\.claude\/skills\/verify\/scripts\/(?<command>(?:browse|sign-in)\.sh [^`]+)`/g;
 const NAVIGATION = /^browse\.sh <port> (?:open|reload)\b/;
-const DRAWN_WAIT = /^(?:sign-in\.sh |browse\.sh <port> wait (?:--text |--fn "[^"]*\bdocument\b))/;
-const PAGE_ACTION = /^browse\.sh <port> (?:press|select|find .* (?:click|fill|check|type)\b)/;
+const TEXT_WAIT = /^(?:sign-in\.sh |browse\.sh <port> wait --text )/;
+const FUNCTION_WAIT = /^browse\.sh <port> wait --fn "(?<body>[^"]*)"/;
+const ADDRESS_OR_LOAD = /\bdocument\.(?:location|URL|readyState)\b/g;
+const PAGE_ACTION =
+  /^browse\.sh <port> (?:find|click|dblclick|type|fill|press|keyboard|hover|focus|check|uncheck|select|drag|upload|download|scrollintoview|mouse)\b/;
 const PLAYWRIGHT_FIXTURES = new Set(["context", "page", "request", "passesTheAccessibilityGate"]);
 
 function filesIn(directory: string): string[] {
@@ -50,21 +53,32 @@ const verifyFrontmatter = read(`${verifyDirectory}/SKILL.md`).split("---")[1] ??
 
 const escaped = (text: string): string => text.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const drivingCommands = markdownIn(featuresDirectory).map((file) => ({
-  file,
-  commands: [...read(file).matchAll(DRIVING_COMMAND)].map(
-    (match) => match.groups?.["command"] ?? "",
-  ),
-}));
+type DrivingCommand = { readonly command: string; readonly line: number };
 
-function actsBeforeTheDraw(file: string, commands: string[]): string[] {
+const drivingCommands = markdownIn(featuresDirectory).map((file) => {
+  const text = read(file);
+  const commands: DrivingCommand[] = [...text.matchAll(DRIVING_COMMAND)].map((match) => ({
+    command: match.groups?.["command"] ?? "",
+    line: text.slice(0, match.index).split("\n").length,
+  }));
+  return { file, commands };
+});
+
+const waitsForTheDraw = (command: string): boolean => {
+  const body = FUNCTION_WAIT.exec(command)?.groups?.["body"];
+  return (
+    TEXT_WAIT.test(command) || /\bdocument\b/.test(body?.replaceAll(ADDRESS_OR_LOAD, "") ?? "")
+  );
+};
+
+function actsBeforeTheDraw(file: string, commands: DrivingCommand[]): string[] {
   let opened: string | undefined;
   const acts: string[] = [];
-  for (const command of commands) {
+  for (const { command, line } of commands) {
     if (NAVIGATION.test(command)) opened = command;
-    else if (DRAWN_WAIT.test(command)) opened = undefined;
+    else if (waitsForTheDraw(command)) opened = undefined;
     else if (opened !== undefined && PAGE_ACTION.test(command)) {
-      acts.push(`${file}: ${opened} then ${command}`);
+      acts.push(`${file}:${line}: ${opened} then ${command}`);
       opened = undefined;
     }
   }
@@ -125,7 +139,7 @@ describe("the verify and playwright-specs skills", () => {
 
   it("wait for drawn text before acting after an open", () => {
     const navigations = drivingCommands.flatMap(({ commands }) =>
-      commands.filter((command) => NAVIGATION.test(command)),
+      commands.filter(({ command }) => NAVIGATION.test(command)),
     );
     const undrawn = drivingCommands.flatMap(({ file, commands }) =>
       actsBeforeTheDraw(file, commands),
