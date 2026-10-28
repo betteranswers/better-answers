@@ -96,6 +96,7 @@ const detectorsWeightsCached = (): Promise<void> =>
     ["run", "--frozen", "python", "-c", THE_DETECTORS_WEIGHTS_CACHED],
     {
       cwd: workerDirectory,
+      maxBuffer: Number.POSITIVE_INFINITY,
     },
   ).then(
     () => undefined,
@@ -183,7 +184,10 @@ type Where = {
   readonly objects: WorkerObjectStore;
 };
 
-const aGroupAlreadyGone = z.object({ code: z.literal("ESRCH") });
+/** macOS answers EPERM, not ESRCH, while a killed group's last member is still exiting. */
+const A_GONE_GROUPS_ANSWERS = ["ESRCH", "EPERM"] as const;
+
+const aGroupAlreadyGone = z.object({ code: z.enum(A_GONE_GROUPS_ANSWERS) });
 
 /** `uv run` keeps the worker as its child, so a kill must reach the process group. */
 const killTheGroup = (child: ChildProcess): void => {
@@ -216,13 +220,19 @@ const startTickingWorker = (workerId: string, where: Where) => {
     child.once("exit", (code, signal) => {
       // The last of its stderr is still in the pipe when the exit arrives.
       setImmediate(() => {
-        end(`exited (code ${String(code)}, signal ${String(signal)})`);
-        resolve();
+        try {
+          end(`exited (code ${String(code)}, signal ${String(signal)})`);
+        } finally {
+          resolve();
+        }
       });
     });
     child.once("error", (cause) => {
-      end(`did not start: ${cause.message}`);
-      resolve();
+      try {
+        end(`did not start: ${cause.message}`);
+      } finally {
+        resolve();
+      }
     });
   });
 
