@@ -162,4 +162,4 @@ Launch each on its own port. Each instance has its own Postgres and object store
 .claude/skills/verify/scripts/launch.sh 4611 --no-build
 ```
 
-Build once. A second build while an instance serves `apps/web/dist` rewrites the files under it, so launch.sh refuses to build while another of its instances runs.
+Build once. A second build while an instance serves `apps/web/dist` rewrites the files under it, so launch.sh refuses to build while another instance launched from the same checkout runs.

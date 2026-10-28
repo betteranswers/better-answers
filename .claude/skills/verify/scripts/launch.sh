@@ -29,8 +29,9 @@ mkdir -p "$state/evidence"
 
 if [[ "$build" != "--no-build" ]]; then
   for other in "$home"/*/server.pid; do
-    if [[ -f "$other" ]] && kill -0 "$(cat "$other")" 2>/dev/null; then
-      echo "launch: another instance ($other) serves apps/web/dist, and a build would rewrite it under that instance. Launch with --no-build." >&2
+    if [[ -f "$other" ]] && kill -0 "$(cat "$other")" 2>/dev/null \
+      && [[ "$(cat "$(dirname "$other")/root" 2>/dev/null)" == "$root" ]]; then
+      echo "launch: another instance ($other) serves this checkout's apps/web/dist, and a build would rewrite it under that instance. Launch with --no-build." >&2
       exit 1
     fi
   done
@@ -43,6 +44,7 @@ fi
 cd "$root/apps/api"
 nohup node tests/serve.ts "$port" >"$state/server.log" 2>&1 &
 echo $! >"$state/server.pid"
+echo "$root" >"$state/root"
 pid="$(cat "$state/server.pid")"
 
 deadline=$((SECONDS + 240))
