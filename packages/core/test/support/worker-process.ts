@@ -102,17 +102,27 @@ export const runWorkerOnce = async (
 /** The engine logs a component's exception on stdout and carries on, so the pass exits 0. */
 const errorLine = z.object({ level: z.literal("error"), event: z.string() });
 
+/** A worker killed mid-line leaves half a JSON object, which reads as nothing. */
+const readLogLine = (line: string): unknown => {
+  try {
+    return JSON.parse(line);
+  } catch {
+    return undefined;
+  }
+};
+
 const errorsLoggedIn = (stdout: string): readonly string[] =>
   stdout.split("\n").flatMap((line) => {
     if (!line.startsWith("{")) return [];
-    const read = errorLine.safeParse(JSON.parse(line));
+    const read = errorLine.safeParse(readLogLine(line));
     return read.success ? [read.data.event] : [];
   });
 
 const A_STAMP_THAT_MATCHES = "matches";
 
-const tickDone = z.object({
-  event: z.literal("tick done"),
+const saysTickDone = z.object({ event: z.literal("tick done") });
+
+const tickDone = saysTickDone.extend({
   schema_stamp: z.string(),
   contract_stamp: z.string(),
 });
@@ -190,8 +200,14 @@ const startTickingWorker = (workerId: string, where: Where) => {
   });
   readline.createInterface({ input: child.stdout }).on("line", (line) => {
     heard.push(line);
-    const done = line.startsWith("{") ? tickDone.safeParse(JSON.parse(line)) : undefined;
-    if (done === undefined || !done.success) return;
+    if (!line.startsWith("{")) return;
+    const read = readLogLine(line);
+    if (read !== undefined && !saysTickDone.safeParse(read).success) return;
+    const done = tickDone.safeParse(read);
+    if (!done.success) {
+      end(`broke the tick protocol with ${line}`);
+      return;
+    }
 
     const answer = {
       logged: heard.splice(0).join("\n"),
