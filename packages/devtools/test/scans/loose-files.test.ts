@@ -230,6 +230,14 @@ const repositoryOf = (tracked: readonly string[], untracked: readonly string[] =
 
 const linesOf = (stdout: string): readonly string[] => stdout.split("\n");
 
+const pinnedCap = (folder: string): Cap => {
+  const found = CAPS.find((one) => one.folder === folder && one.kind === "pinned");
+  if (found === undefined) throw new Error(`no pinned cap for ${folder}`);
+  return found;
+};
+
+const REDACTION = pinnedCap("apps/worker/src/better_answers_worker/redaction");
+
 describe("the gate over a throwaway repository", () => {
   it("fails a folder over the limit, naming it", () => {
     const ran = spawned(repositoryOf(filesIn(PROBE, 16)));
@@ -241,10 +249,12 @@ describe("the gate over a throwaway repository", () => {
   });
 
   it("fails a folder over its cap", () => {
-    const ran = spawned(repositoryOf(filesIn("apps/web/test", 112)));
+    const ran = spawned(repositoryOf(filesIn(REDACTION.folder, REDACTION.cap + 1)));
 
     expect(ran.status).toBe(1);
-    expect(ran.stdout).toContain("apps/web/test: 112 files directly inside, over its cap of 111");
+    expect(ran.stdout).toContain(
+      `${REDACTION.folder}: ${String(REDACTION.cap + 1)} files directly inside, over its cap of ${String(REDACTION.cap)}`,
+    );
   });
 
   it("tells a pinned folder over its cap to raise it", () => {
@@ -265,10 +275,10 @@ describe("the gate over a throwaway repository", () => {
   });
 
   it("fails a cap whose folder is within the limit", () => {
-    const ran = spawned(repositoryOf(filesIn("apps/api/tests", 14)));
+    const ran = spawned(repositoryOf(filesIn(REDACTION.folder, 14)));
 
     expect(ran.status).toBe(1);
-    expect(ran.stdout).toContain("apps/api/tests: its cap of 115");
+    expect(ran.stdout).toContain(`${REDACTION.folder}: its cap of ${String(REDACTION.cap)}`);
     expect(ran.stdout).toContain("Delete the entry");
   });
 
