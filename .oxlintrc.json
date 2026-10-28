@@ -614,12 +614,6 @@
       }
     },
     {
-      "files": ["packages/core/src/store/postgres/index.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 699, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["packages/core/src/workspaces/index.ts"],
       "rules": {
         "max-lines": ["error", { "max": 626, "skipBlankLines": true, "skipComments": true }]
