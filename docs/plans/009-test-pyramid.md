@@ -124,7 +124,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `packages/devtools/test/solutions-docs.test.ts` accepts the new ADR's frontmatter. Run `pnpm check:docs`.
+- [ ] `packages/devtools/test/gates/solutions-docs.test.ts` accepts the new ADR's frontmatter. Run `pnpm check:docs`.
 - [ ] The browser-suite skill's test, at `apps/web/test/` or under `gates/` once BA-287 has merged, still finds every path the skill names. Run `pnpm check:docs:web`.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on the configured `swarm workers` model at the PR head, per the boot recipe.
@@ -179,9 +179,9 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Write the three bullets of "Where a file goes" as follows.
 
   ```markdown
-  - Test folders mirror source folders. A test sits in the folder that mirrors the folder of the entry it drives: `test/a/b/` for `src/a/b/`, `tests/a/b/` in `apps/api` and `apps/worker`, and `test/<feature>/` or `e2e/<feature>/` for `src/features/<feature>/` in `apps/web`. The test root mirrors the source root. Imports that only set a test up, a store door or `kernel`, do not place it. Name the file for the behaviour it checks, or for the source file when it checks that one file end to end. To find the tests of a source file, open its mirror folder and search for the names the file exports.
-  - A test folder that mirrors no source folder is one of four kinds. `support/` and `fixtures/` hold helpers. `gates/` holds the checks of the repository itself: a config, a lint rule, a workflow, a skill, the tree. A run folder holds the tests a job other than `check` selects, such as `readings/`, `budgets/` and `images/`. A pinned folder mirrors a tree outside `src/`, or holds one source file's tests when they fill a folder. `pnpm run test-folders` holds this. Its table in `packages/devtools/src/scans/test-folders.ts` lists every run and pinned folder, and why.
-  - A helper one folder uses sits beside its tests. A helper two folders share goes to `support/`. A helper's own test sits beside the helper.
+  - Test folders mirror source folders. A test sits in the folder that mirrors the folder of the slice whose entry or module it drives: `test/a/b/` for `src/a/b/`, `tests/a/b/` in `apps/api` and `apps/worker`, and `test/<feature>/` or `e2e/<feature>/` for `src/features/<feature>/` in `apps/web`. The test root mirrors the source root, which is `src/better_answers_worker/` in `apps/worker`. Imports that only set a test up, a store door or `kernel`, do not place it. Name the file for the behaviour it checks, or for the source file when it checks that one file end to end. To find the tests of a source file, open its mirror folder and search for its path or the names it exports.
+  - A test folder that mirrors no source folder is one of four kinds. `support/` and `fixtures/` hold helpers. `gates/` at the test root holds the checks of the repository itself: a config, a lint rule, a workflow, a skill, the tree. A run folder holds the tests a job other than `check` selects, such as `readings/`. A pinned folder mirrors a tree outside `src/`, or holds one source file's tests when they fill a folder. `pnpm run test-folders` holds this. Its table in `packages/devtools/src/scans/test-folders.ts` lists every run and pinned folder, and why.
+  - A helper one folder uses sits beside its tests. A helper two folders share goes to `support/`. In `apps/web`, every helper of `test/` goes to `test/support/`. A helper's own test sits beside the helper.
   ```
 
 - [ ] Seed the scan's table with these rows and no others. For a `mirror` or `split` row the reason is a path, which the gate checks still exists. For a `run` row the reason is the selector, prose the gate does not parse.
@@ -690,7 +690,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Edit core's concepts slice write path, today `packages/core/src/concepts/write.ts` and `edit.ts`, and the concepts test.
 - [ ] Edit core's guides slice and its test.
 - [ ] Edit core's bundle import, today under `packages/core/src/concepts/import/`, and the import-bundle test. Leave the fence wrappers in `packages/core/src/bundle/index.ts` as they are.
-- [ ] Edit `packages/core/package.json` `exports` only if a slice entry must name a new function.
+- [ ] Add no name to a face or to `packages/core/package.json` `exports` for a test's sake; a face names what a sibling or a transport calls.
 
 **Build.**
 
@@ -699,7 +699,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Guides. Extract coverage and marking as functions over rows already read. Share one seeded northgate fixture for the cases that stay.
 - [ ] Import. Pass the analyse step to import as a function, so "reports a landed import when the analyse fails" runs with a failing step. Keep the lock-timeout case real.
 - [ ] Delete each seeded case whose claim a new pure case now makes, and list it in the PR body.
-- [ ] Put each new in-process file in the mirror folder of the slice entry it drives, named for the behaviour, with no `PINS` row.
+- [ ] Put each new in-process file in the mirror folder of the slice whose module it drives, named for the behaviour, with no `PINS` row.
   - [ ] Erasure's report and pseudonym tests go in `packages/core/test/erasure/`, as `report.test.ts` and `identifiers.test.ts`, since each checks one source file.
   - [ ] The merge key goes in `test/concepts/writes/`.
   - [ ] Kind folding goes where the entry that exports it is mirrored. `src/bundle/index.ts` already exports `foldKind`, so its test is `test/bundle/fold-kind.test.ts`, a new one-file mirror folder. A function extracted into the concepts write path is tested in `test/concepts/writes/`.
@@ -712,7 +712,7 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Each extracted function has an in-process test through its slice entry. Run `pnpm check:core:suite`.
+- [ ] Each extracted function has an in-process test that imports its module from its slice's mirror folder. Run `pnpm check:core:suite`.
 - [ ] Mutants in each extracted function are killed. Run a scoped Stryker run per the mutation-testing skill.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on the configured `swarm workers` model at the PR head, per the boot recipe.
@@ -1064,8 +1064,8 @@ The triage's named duplicates include people's "refuses demoting both Admins" ag
 
 **Layers.**
 
-1. **Unit, in-process.** No store, no process, no network. A pure function's test calls it through the entry its package's `exports` map names. Web components run through Testing Library over the stubbed api. Lint rules run through their finding functions. This is most of the suite.
-2. **Integration, real store.** The real Postgres, git repository, object store or map, used only where the store is the claim. That covers row-level security and zero-rows, migrations and DDL (ADR 0007), the SQL a slice runs for visibility, walks, ranking and sensitivity folds (ADRs 0023, 0032, 0044), locks and races, governed git commits and history rewrites (ADRs 0012, 0024), the erasure rehearsal, boundary-schema parity (ADR 0028) and the tier contract's SQL agreements (ADR 0031). Each transport keeps one case per route or command through its real entry.
+1. **Unit, in-process.** No store, no process, no network. A pure function's test imports its module by path and calls it. In `packages/core` a test reaches the one `src/` directory its folder mirrors that way, and every other directory through an entry the package's `exports` map names. Web components run through Testing Library over the stubbed api. Lint rules run through their finding functions. This is most of the suite.
+2. **Integration, real store.** The real Postgres, git repository, object store or map, used only where the store is the claim. That covers row-level security and zero-rows, migrations and DDL (ADR 0007), the SQL a slice runs for visibility, walks and sensitivity folds (ADRs 0023, 0032, 0044), ranking, locks and races, governed git commits and history rewrites (ADRs 0012, 0024), the erasure rehearsal, boundary-schema parity (ADR 0028) and the tier contract's SQL agreements (ADR 0031). Each transport keeps one case per route or command through its real entry.
 3. **Process and image.** Images, compose scripts, process lifecycles and the cross-tier worker. These run in their own CI job (BA-271) or with one worker per file (BA-270). The image and process tests sit in the `images/` run folder of their tree.
 4. **Browser.** One spec per page, about 30, with its latency budget, the accessibility gate and keyboard reach. About 12 journeys cross pages through the real api. They are code sign-in to the picker to the shell, two-workspace scoping, invite then accept, consent and OAuth, passkey enrol and sign-in, workspace switch, self-removal to the chooser, source upload to indexed and published, ask with its stream and a flag, console end-sessions, the second factor, and recovery. Layout at 320 and 390px runs in a project with no api.
 5. **Readings and budgets.** Figures and performance budgets run on a schedule (BA-269), like the readings and mutation runs today. They sit in the `readings/` and `budgets/` run folders of `packages/core/test`.
@@ -1084,7 +1084,7 @@ The triage's named duplicates include people's "refuses demoting both Admins" ag
 ```markdown
 ## Testing
 
-- Test at the lowest layer that can see the claim. A pure function's test calls it in-process through the entry its package's `exports` map names. A transport's test crosses its interface: `apps/api` through `server.request(...)`, `apps/worker` through the job or module entry point. A page's single-screen behaviour is a component test through Testing Library.
+- Test at the lowest layer that can see the claim. A pure function's test calls it in-process and imports its module by path. In `packages/core`, a test under `test/<x>/` imports the modules of `src/<x>/` that way (`test/store/<door>/` and `src/store/<door>/` for a door) and reaches every other directory through an entry the package's `exports` map names. A transport's test crosses its interface: `apps/api` through `server.request(...)`, `apps/worker` through the job or module entry point. A page's single-screen behaviour is a component test through Testing Library.
 - Use the real Postgres, object store, git repository or map only where that store is the claim: row-level security and zero-rows, migrations, the SQL a slice runs, locks and races, governed commits and history rewrites, the erasure rehearsal, boundary-schema parity, and the tier contract's SQL agreements. Each route or command keeps one case through its real entry.
 - A decision over rows already read is a pure function on its slice. Never mock this repository's own code, and never add an in-memory stand-in for a store the platform runs. An in-memory adapter replaces only a third-party service, such as an LLM provider, behind its injected seam.
 - The browser suite holds one spec per page, with its latency budget, the accessibility gate and keyboard reach, and the journeys that cross pages through the real api. A bug's regression test sits at the lowest layer that reproduces it.

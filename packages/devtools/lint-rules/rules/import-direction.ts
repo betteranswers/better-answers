@@ -4,6 +4,8 @@ import path from "node:path";
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
+import { CORE_TESTS, isNamedKind } from "../../src/scans/test-folders.ts";
+
 const CORE = "@better-answers/core";
 
 type Zone = "kernel" | "access" | "door" | "layer" | "slice" | "catalogue" | "test";
@@ -43,7 +45,7 @@ const ZONES = {
   },
   test: {
     reaches: new Set<Zone>(["kernel", "access", "door", "layer", "slice", "catalogue"]),
-    clause: "a test reaches a slice only through its face",
+    clause: "a test reaches the directory its folder mirrors, and any other only through its face",
   },
 } satisfies Record<Zone, { readonly reaches: ReadonlySet<Zone>; readonly clause: string }>;
 
@@ -114,6 +116,8 @@ type Place = {
   readonly dir: string;
 
   readonly top: string;
+
+  readonly mirror?: string;
 };
 
 const srcPlaceOf = (first: string, second: string | undefined, depth: number): Place => {
@@ -128,10 +132,18 @@ const srcPlaceOf = (first: string, second: string | undefined, depth: number): P
   return { zone, dir, top: first };
 };
 
+const testPlaceOf = (segments: readonly string[]): Place => {
+  const place: Place = { zone: "test", dir: "test", top: "test" };
+  const folders = segments.slice(1, -1);
+  const [first, second] = folders;
+  if (first === undefined || isNamedKind(CORE_TESTS, folders.join("/"))) return place;
+  return { ...place, mirror: srcPlaceOf(first, second, segments.length).dir };
+};
+
 const placeOf = (pkg: CorePackage, absolute: string): Place | undefined => {
   const segments = path.relative(pkg.root, absolute).split(path.sep);
   const [area, first, second] = segments;
-  if (area === "test" && segments.length >= 2) return { zone: "test", dir: "test", top: "test" };
+  if (area === "test" && segments.length >= 2) return testPlaceOf(segments);
   if (area !== "src" || first === undefined || segments.length < 3) return undefined;
   return srcPlaceOf(first, second, segments.length);
 };
@@ -161,12 +173,20 @@ const edgeOf = (pkg: CorePackage, importerFile: string, specifier: string): Edge
   const target = targetOf(pkg, importerFile, specifier);
   if (target === undefined) return undefined;
   const reached = placeOf(pkg, target);
-  if (reached === undefined || reached.dir === importer.dir) return undefined;
+  if (reached === undefined || reached.dir === importer.dir || reached.dir === importer.mirror) {
+    return undefined;
+  }
   return { importer, reached, target };
 };
 
 type Finding = {
-  readonly messageId: "catalogue" | "direction" | "erasure" | "internal" | "unexported";
+  readonly messageId:
+    | "catalogue"
+    | "direction"
+    | "erasure"
+    | "internal"
+    | "testInternal"
+    | "unexported";
   readonly data?: Readonly<Record<string, string>>;
 };
 
@@ -203,14 +223,14 @@ const faceFinding = (
 ): Finding | undefined => {
   const face = faceOf(pkg, reached);
   if (target !== face) {
+    const inside = path.relative(path.dirname(face), target).split(path.sep).join("/");
+    if (importer.zone === "test") {
+      const folder = `test/${reached.dir.slice("src/".length)}/`;
+      return { messageId: "testInternal", data: { dir: reached.dir, inside, folder } };
+    }
     return {
       messageId: "internal",
-      data: {
-        fromDir: importer.dir,
-        from: importer.zone,
-        dir: reached.dir,
-        inside: path.relative(path.dirname(face), target).split(path.sep).join("/"),
-      },
+      data: { fromDir: importer.dir, from: importer.zone, dir: reached.dir, inside },
     };
   }
   if (pkg.faces.has(target)) return undefined;
@@ -242,8 +262,10 @@ export const importDirectionRule = defineRule({
         "Nothing in core imports `erasure` but the refusal catalogue; it sits at the top of the slice graph, and beyond the catalogue only a test reaches it.",
       internal:
         "`{{fromDir}}` ({{from}}) reaches `{{dir}}` only through its own index.ts, never `{{inside}}`. Export what you need from that face and import it from there.",
+      testInternal:
+        "A test reaches `{{dir}}` only through its own index.ts, never `{{inside}}`, unless it sits in `{{folder}}`, the folder that mirrors `{{dir}}`. Import the face, or move the test to `{{folder}}`.",
       unexported:
-        "`{{dir}}/index.ts` is a face packages/core's exports map does not name. Add `./{{entry}}` to the map, so a sibling and a transport reach one face and a test reaches an entry point.",
+        "`{{dir}}/index.ts` is a face packages/core's exports map does not name. Add `./{{entry}}` to the map, so a sibling and a transport reach one face and a test outside its mirror folder reaches an entry point.",
     },
   },
   createOnce(context) {

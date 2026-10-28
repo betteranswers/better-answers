@@ -9,6 +9,7 @@ import {
   readOxlintConfig,
 } from "@better-answers/devtools/oxlint-config";
 import { repositoryRoot } from "@better-answers/devtools/paths";
+import { GATES_FOLDER, HELPER_FOLDERS, PINS } from "@better-answers/devtools/test-folders";
 import { oxlintOver, type Tree } from "@better-answers/devtools/throwaway-tree";
 
 const RULE = "better-answers/import-direction";
@@ -61,7 +62,30 @@ const LLM = `${CORE}/src/llm/model-choices.ts`;
 const AUDIT = `${CORE}/src/audit/index.ts`;
 const CATALOGUE = `${CORE}/src/refusals/index.ts`;
 const TEST = `${CORE}/test/concepts.test.ts`;
+const MIRRORED = `${CORE}/test/concepts/grammar.test.ts`;
+const MIRRORED_NESTED = `${CORE}/test/concepts/writes/key.test.ts`;
+const MIRRORED_DOOR = `${CORE}/test/store/map/walk.test.ts`;
+const MIRRORED_UNMAPPED = `${CORE}/test/sources/ingest.test.ts`;
+const ELSEWHERE = `${CORE}/test/answering/draft.test.ts`;
+const OTHER_DOOR = `${CORE}/test/store/postgres/handle.test.ts`;
+const SUPPORT = `${CORE}/test/support/probe.ts`;
+const GATE = `${CORE}/test/gates/probe.test.ts`;
+const NESTED_HELPER = `${CORE}/test/concepts/support/probe.ts`;
 const ROOT_FILE = `${CORE}/probe.ts`;
+
+const KIND_FOLDERS: readonly string[] = [
+  ...HELPER_FOLDERS,
+  GATES_FOLDER,
+  ...PINS.filter((pin) => pin.folder.startsWith(`${CORE}/test/`)).map((pin) =>
+    path.posix.basename(pin.folder),
+  ),
+];
+
+const KIND_REFUSALS: readonly (readonly [string, string, string])[] = KIND_FOLDERS.map((kind) => [
+  `a ${kind} file reaching src/${kind}`,
+  `${CORE}/test/${kind}/probe.ts`,
+  `../../src/${kind}/probe.ts`,
+]);
 
 const lint = oxlintOver(pluginConfigFor({ [RULE]: severity }), {
   tree: importing(SLICE, "../guides/renderer.ts"),
@@ -95,6 +119,31 @@ const REFUSED: Readonly<Record<string, readonly (readonly [string, string, strin
     ["a door reaching kernel's internal", MAP_DOOR, "../../kernel/actor.ts"],
     ["the map door reaching access's internal", MAP_DOOR, "../../access/predicate.ts"],
     ["a test reaching a slice's internal", TEST, "../src/concepts/file.ts"],
+    ["a test reaching another slice's internal", ELSEWHERE, "../../src/concepts/file.ts"],
+    ["a test helper reaching a slice's internal", SUPPORT, "../../src/concepts/file.ts"],
+    ["a gate reaching a slice's internal", GATE, "../../src/concepts/file.ts"],
+    [
+      "a nested helper reaching its slice's internal",
+      NESTED_HELPER,
+      "../../../src/concepts/file.ts",
+    ],
+    ...KIND_REFUSALS,
+    [
+      "a test reaching a door's internal outside the door",
+      MIRRORED,
+      "../../src/store/postgres/handle.ts",
+    ],
+    ["a test reaching another door's internal", OTHER_DOOR, "../../../src/store/map/walk.ts"],
+    [
+      "a test reaching another slice's nested face",
+      ELSEWHERE,
+      "../../src/concepts/writes/index.ts",
+    ],
+    [
+      "a test reaching another slice's internal by self-reference",
+      MIRRORED,
+      "@better-answers/core/guides/renderer.ts",
+    ],
     [
       "a self-reference to a sibling's internal file",
       SLICE,
@@ -108,6 +157,7 @@ const REFUSED: Readonly<Record<string, readonly (readonly [string, string, strin
     ["a slice reaching an unmapped sibling", SLICE, "../sources/index.ts"],
     ["a slice reaching an unmapped directory", SLICE, "../sources"],
     ["a test reaching an unmapped face", TEST, "../src/store/objects/index.ts"],
+    ["a test reaching another slice's unmapped face", MIRRORED, "../../src/sources/index.ts"],
     ["a self-reference to an unmapped entry", SLICE, "@better-answers/core/sources"],
   ],
   "only a test reaches it": [
@@ -176,6 +226,26 @@ describe("the rule fires, stating the clause it holds", () => {
     expect(output).toContain("`./store/objects`");
   });
 
+  it("names the fix for a test outside its mirror", () => {
+    const output = lint.output(importing(ELSEWHERE, "../../src/concepts/file.ts"));
+
+    expect(output).toContain("never `file.ts`");
+    expect(output).toContain("Import the face, or move the test to `test/concepts/`");
+    expect(output).toContain("mirrors `src/concepts`");
+  });
+
+  it("names the mirror folder of a door", () => {
+    const output = lint.output(importing(MIRRORED, "../../src/store/postgres/handle.ts"));
+
+    expect(output).toContain("move the test to `test/store/postgres/`");
+  });
+
+  it("says a test outside its mirror reaches an entry point", () => {
+    const output = lint.output(importing(MIRRORED, "../../src/sources/index.ts"));
+
+    expect(output).toContain("a test outside its mirror folder reaches an entry point");
+  });
+
   it("reads a sibling's nested index.ts as internal, not a face", () => {
     const output = lint.output(importing(SLICE, "../guides/internal/index.ts"));
 
@@ -232,7 +302,33 @@ describe("the rule stays silent where the ADR allows the import", () => {
     ["the catalogue importing kernel's face", CATALOGUE, "../kernel/index.ts"],
     ["the catalogue importing a slice's face", CATALOGUE, "../concepts/index.ts"],
     ["the catalogue importing erasure's face", CATALOGUE, "../erasure/index.ts"],
+    ["a test importing the module its folder mirrors", MIRRORED, "../../src/concepts/file.ts"],
+    ["a test importing that module without its extension", MIRRORED, "../../src/concepts/file"],
+    [
+      "a nested test importing a nested module of its slice",
+      MIRRORED_NESTED,
+      "../../../src/concepts/writes/write.ts",
+    ],
+    [
+      "a nested test importing its slice's root module",
+      MIRRORED_NESTED,
+      "../../../src/concepts/file.ts",
+    ],
+    [
+      "a door's test importing the door's internal",
+      MIRRORED_DOOR,
+      "../../../src/store/map/walk.ts",
+    ],
+    [
+      "a test importing its own directory's unmapped face",
+      MIRRORED_UNMAPPED,
+      "../../src/sources/index.ts",
+    ],
+    ["a test importing its own directory by its path", MIRRORED_UNMAPPED, "../../src/sources"],
+    ["a test importing another slice's face", MIRRORED, "../../src/guides/index.ts"],
+    ["a test importing a door's face", MIRRORED, "../../src/store/postgres/index.ts"],
     ["a test importing its own sibling", TEST, "./suite-postgres.ts"],
+    ["a test importing a helper from the support folder", MIRRORED, "../support/seed.ts"],
     ["a test importing the devtools runner", TEST, "@better-answers/devtools/throwaway-tree"],
     ["a slice importing a third-party package", SLICE, "zod"],
     ["a slice importing the schema package", SLICE, "@better-answers/schema"],

@@ -45,8 +45,10 @@ export const PINS: readonly Pin[] = [
   },
 ];
 
+export const CORE_TESTS = "packages/core/test";
+
 export const TREES: readonly Tree[] = [
-  { tests: "packages/core/test", source: "packages/core/src" },
+  { tests: CORE_TESTS, source: "packages/core/src" },
   { tests: "packages/schema/test", source: "packages/schema/src" },
   { tests: "packages/devtools/test", source: "packages/devtools/src" },
   { tests: "apps/api/tests", source: "apps/api/src" },
@@ -88,7 +90,11 @@ const sourceFoldersOf = (
   );
 };
 
-const isNamedKind = (tests: string, folder: string, pins: readonly Pin[]): boolean => {
+export const isNamedKind = (
+  tests: string,
+  folder: string,
+  pins: readonly Pin[] = PINS,
+): boolean => {
   const segments = folder.split("/");
   return (
     segments.some((segment) => HELPER_FOLDERS.has(segment)) ||
