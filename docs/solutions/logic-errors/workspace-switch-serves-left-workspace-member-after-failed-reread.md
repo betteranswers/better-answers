@@ -53,8 +53,8 @@ Library lines below are from `@tanstack/query-core` 5.103.2, installed at `node_
 - The same happened offline. The pick landed, the network dropped, the band kept A's name while the switch waited.
 - The role stayed A's. The frame derives the visible areas and the person's role from the one member it holds (`visibleTo(readerOf(role, owns), AREAS)` in `apps/web/src/app/shell/frame.tsx`), so A's role was applied over B's data.
 - The frame draws the page under `key={here?.workspaceId}` so that a switch redraws it afresh (in `apps/web/src/app/shell/frame.tsx` at the time; the frame now keys it on `switches`). With A's member held, that key never changed.
-- Navigation followed the stale answer. The index route redirects to the home of whatever role the cache holds (`apps/web/src/app/router.tsx:175-178`), and `roleHeld` reads the cache directly (`member.ts:20-21`).
-- A switch through All workspaces drew the left workspace's member rows on the Members page and in jump-to until the new list arrived. `members.list` is asked with no input, so its key names no workspace (`apps/web/src/features/people/people-api.ts:23-26`). The web app sets no `gcTime` (`apps/web/src/shared/api/query-client.ts:13-20`), so the query-core default of five minutes applies (`removable.ts:24-29`).
+- Navigation followed the stale answer. The index route redirects to the home of whatever role the cache holds (`beforeLoad` of `indexRoute` in `apps/web/src/app/router.tsx`), and `roleHeld` reads the cache directly (`roleHeld` in `apps/web/src/shared/member/member.ts`).
+- A switch through All workspaces drew the left workspace's member rows on the Members page and in jump-to until the new list arrived. `members.list` is asked with no input, so its key names no workspace (`useMembers` in `apps/web/src/features/people/people-api.ts`). The web app sets no `gcTime` (`createQueryClient` in `apps/web/src/shared/api/query-client.ts`), so the query-core default of five minutes applies (`removable.ts:24-29`).
 
 ## What Didn't Work
 
@@ -79,8 +79,8 @@ So after a failed or paused re-read the cache held A's member, and `refetchQueri
 - `removeQueries` calls `queryCache.remove` for each match (`queryClient.ts:378-387`). `remove` destroys the query, deletes it from the map and emits a `'removed'` event to cache subscribers (`queryCache.ts:208-216`). `Query.destroy` calls the base class's `destroy`, which clears the gc timeout (`removable.ts:10-12`), and then silently cancels any fetch (`query.ts:361-365`).
 - A mounted observer is told of changes in one place: `Query.#dispatch` calls `observer.onQueryUpdate()` on each observer (`query.ts:822`, `:899`). Nothing in `removeQueries` dispatches. The one cache subscription in `queryObserver.ts` is in the suspense path (`queryObserver.ts:418`), not the path a normal `useQuery` takes.
 - The observer moves to a replacement query only when it next runs `setOptions` (`queryObserver.ts:208`, called after a render from `useBaseQuery.ts:117-119`) or starts a fetch (`queryObserver.ts:464`).
-- `WorkspaceFrame` calls `useMember`, `useOperatorStanding` and `useMemo`, and nothing from the router (`frame.tsx:168-188`). The router state is read one level down, in `Frame` (`frame.tsx:72`), which re-renders `Frame` and not its parent. So nothing re-rendered `WorkspaceFrame`, its observer went on holding the removed query with A's data, and `held` stayed A's.
-- Meanwhile the cache was empty. The index route's `beforeLoad` found no role and let `HomeUnread` render (`router.tsx:175-182`). That component takes `home` from `useVisibleTree()`, which the stale frame still supplied, and navigated to it.
+- `WorkspaceFrame` calls `useMember`, `useOperatorStanding` and `useMemo`, and nothing from the router (`WorkspaceFrame` in `apps/web/src/app/shell/frame.tsx`). The router state is read one level down, in `Frame` (its `useRouterState` calls, in `frame.tsx`), which re-renders `Frame` and not its parent. So nothing re-rendered `WorkspaceFrame`, its observer went on holding the removed query with A's data, and `held` stayed A's.
+- Meanwhile the cache was empty. The index route's `beforeLoad` found no role and let `HomeUnread` render (`indexRoute` in `router.tsx`). That component takes `home` from `useVisibleTree()`, which the stale frame still supplied, and navigated to it.
 
 The removal was right for the cache and wrong for the page.
 
@@ -90,7 +90,7 @@ The removal was right for the cache and wrong for the page.
 
 ### 1. Re-read in place, then reset anything that is not a fresh answer
 
-`apps/web/src/features/auth/member.ts:53-65`, after the fix:
+`rereadMember` in `apps/web/src/features/auth/member.ts`, after the fix (`memberChanged` in `apps/web/src/shared/member/member.ts` now holds this step):
 
 ```ts
 /**
@@ -112,7 +112,7 @@ The condition keeps the answer only when the query is `success` and `idle`. A re
 
 ### 2. One shared step that clears the left workspace's other reads
 
-`apps/web/src/features/auth/auth-hooks.ts:274-289`, after the fix:
+`aboutTheWorkspace` and `forgetTheWorkspaceLeft` in `apps/web/src/features/auth/auth-hooks.ts`, after the fix:
 
 ```ts
 const aboutTheWorkspace = (api: ApiProxy) => {
@@ -146,23 +146,23 @@ onSuccess: () => {
 },
 ```
 
-(`auth-hooks.ts:295-309`.) `useSwitchWorkspace` now runs `followTheSession`, which calls `forgetTheWorkspaceLeft` and then `await memberChanged(queryClient, api, { readAgain: true, ifUnread: "reset" })`. `useAcceptInvitation` gained the same call (`auth-hooks.ts:211-226`) in the next commit on the branch, "fix(web): hide a page once a role read late shows it is not theirs". The callers are now four: accepting an invitation, the picker, `followTheSession`, and `forgetAWorkspaceLeftElsewhere`, which drops the reads when another tab moves the session.
+(`useSetActiveOrganization` in `auth-hooks.ts`.) `useSwitchWorkspace` now runs `followTheSession`, which calls `forgetTheWorkspaceLeft` and then `await memberChanged(queryClient, api, { readAgain: true, ifUnread: "reset" })`. `useAcceptInvitation` gained the same call (`useAcceptInvitation` in `auth-hooks.ts`) in the next commit on the branch, "fix(web): hide a page once a role read late shows it is not theirs". The callers are now four: accepting an invitation, the picker, `followTheSession`, and `forgetAWorkspaceLeftElsewhere`, which drops the reads when another tab moves the session.
 
-`forgetMember` (`member.ts:48-51`) stays a `removeQueries`. The picker is a sibling of the shell route, not a child (`router.tsx:141`), so no mounted observer holds the member there and a removal is enough. That is the reading the code supports. Where the accept-invitation route sits in the tree was not traced here.
+`forgetMember` (`apps/web/src/shared/member/member.ts`) stays a `removeQueries`. The picker is a sibling of the shell route, not a child (`chooseWorkspaceRoute` in `router.tsx`), so no mounted observer holds the member there and a removal is enough. That is the reading the code supports. Where the accept-invitation route sits in the tree was not traced here.
 
 ## Why This Works
 
 `resetQueries` notifies. It calls `query.reset()` on every match (`queryClient.ts:409`). `Query.reset` destroys the query, which cancels any fetch, and then sets the state back to its initial state (`query.ts:377-380`). `setState` goes through `#dispatch` (`query.ts:334-336`), and `#dispatch` calls `observer.onQueryUpdate()` on each attached observer (`query.ts:899`). The query stays in the cache and the observer stays attached to it, so the mounted `useQuery` in `WorkspaceFrame` hears the change without any re-render of its parent.
 
-`held` becomes `undefined`, so `here` and `person` become `undefined` (`frame.tsx:171-183`), and the band empties. The member query sets no `initialData` (`member.ts:5-7`), so "initial state" holds no data.
+`held` becomes `undefined`, so `here` and `person` become `undefined` (`WorkspaceFrame` in `frame.tsx`), and the band empties. The member query sets no `initialData` (`memberOptions` in `apps/web/src/shared/member/member.ts`), so "initial state" holds no data.
 
-Then the reset refetches. After the matches are reset, `resetQueries` refetches the ones that are active (`queryClient.ts:413`), and the shell's mounted observer makes this one active. If the read fails again, the shell shows its failed page and a retry (`RoleUnread`, `router.tsx:159-170`), which is what the first spec asserts (`workspace-switcher.spec.ts:410-416`). If the device is offline, the offline spec goes back online and lands on the new workspace's home and name (`:444-446`).
+Then the reset refetches. After the matches are reset, `resetQueries` refetches the ones that are active (`queryClient.ts:413`), and the shell's mounted observer makes this one active. If the read fails again, the shell shows its failed page and a retry (`RoleUnread` in `router.tsx`), which is what the first spec asserts ("drops the left workspace's name when the member read fails" in `apps/web/e2e/app/workspace-switcher.spec.ts`). If the device is offline, the offline spec ("drops the left workspace's name while the switch waits offline") goes back online and lands on the new workspace's home and name.
 
 Checking `fetchStatus` as well as `status` is what catches the paused case. A paused read after a good pick has `status: 'success'` (A's data) and `fetchStatus: 'paused'`, so a check on `status` alone would keep A's answer.
 
-The reset is not awaited. Its promise settles with the refetch it starts (the doc comment at `queryClient.ts:391-392`), and the switch need not wait on that to invalidate the session and navigate. Navigating to `/` then reads afresh. The shell route's `memberRefusal` calls `ensureQueryData` (`member.ts:41`), which returns cached data when there is any and fetches only when there is none (`queryClient.ts:197-223`). Before the fix it found A's data. Now it finds nothing and reads. The index route's `roleHeld` finds no stale role to redirect on.
+The reset is not awaited. Its promise settles with the refetch it starts (the doc comment at `queryClient.ts:391-392`), and the switch need not wait on that to invalidate the session and navigate. Navigating to `/` then reads afresh. The shell route's `memberRefusal` (in `apps/web/src/shared/member/member.ts`) called `ensureQueryData` when this was written, which returns cached data when there is any and fetches only when there is none (`queryClient.ts:197-223`). It now calls `queryClient.query` with `staleTime: "static"`. Before the fix it found A's data. Now it finds nothing and reads. The index route's `roleHeld` finds no stale role to redirect on.
 
-`forgetTheWorkspaceLeft` is also a `removeQueries`, and the same limit applies to it. It clears reads such as `members.list`, whose key names no workspace. A removal reaches no observer that is already mounted on the removed query. What keeps the old rows off the page here is that the frame redraws the page under the workspace's id (`frame.tsx:153-155`), so a new observer builds a fresh query after the removal. The member now moves on every switch, including the failed one, so that key now changes. Whether some other mounted reader of a removed query could outlive a switch was not traced here. The spec at `:180` checks the picker path and the Members page and jump-to, not every reader.
+`forgetTheWorkspaceLeft` is also a `removeQueries`, and the same limit applies to it. It clears reads such as `members.list`, whose key names no workspace. A removal reaches no observer that is already mounted on the removed query. What keeps the old rows off the page here is that the frame redraws the page under the workspace's id (the `key` on `ToolbarAndPage` in `frame.tsx`), so a new observer builds a fresh query after the removal. The member now moves on every switch, including the failed one, so that key now changes. Whether some other mounted reader of a removed query could outlive a switch was not traced here. The spec "drops the left workspace's members when All workspaces picks another" checks the picker path and the Members page and jump-to, not every reader.
 
 ## Prevention
 
@@ -172,11 +172,11 @@ The reset is not awaited. Its promise settles with the refetch it starts (the do
 - **Put the scope in the key where the key can carry it.** `members.list` has no workspace in its key, which is why `forgetTheWorkspaceLeft` exists. Moving the id into the key would make that clearing unnecessary. This commit does not do that, and how the web app's tRPC keys are built was not checked here.
 - **Send every new way of changing workspace through `forgetTheWorkspaceLeft`.** A new read that belongs to no workspace, as the console's do, must be added to `theirOwn` in `aboutTheWorkspace` (`auth-hooks.ts`, which now also keeps the workspace list, `theWorkspaceList(api)`) or it will be dropped on every switch.
 - **Test shape: a real browser with a mounted observer, asserting on what is drawn.** A unit test that asserts `getQueryData(key) === undefined` passes against the failed `removeQueries` fix, because `getQueryData` reads straight from the cache (`queryClient.ts:183-191`). The bug lived between the cache and the page. The three specs in `apps/web/e2e/app/workspace-switcher.spec.ts` have this shape:
-  - Two workspaces, the person a member of both, signed in to the first (`inTwoWorkspaces`, `:64-81`), each with a name or member unique to it so a leftover is visible.
-  - Force the failure. Abort the member read with `page.route(MEMBER_READ, (route) => route.abort())` (`:401`). Or let the pick land, then go offline with `route.fetch()`, `context.setOffline(true)` and `route.fulfill(...)` (`:431-435`), which is the paused path.
-  - Assert the old name is gone: `switcherOf(page, first.name)` has `toHaveCount(0)` (`:406-409`, `:440-442`). Allow 15 s for the failing case, because the switch's read and then the shell's each ask twice more before they give up (`:405`, `query-client.ts:5`, `:17`).
-  - Assert the way back: remove the abort or go online, then `landedAtHome` and the new workspace's name is on the switcher (`:415-418`, `:444-446`).
-  - For stale rows, hold the new workspace's read with `heldBack` (`:84-94`), so the gap state is showing, and assert the old rows have a count of 0 on the page and in jump-to (`:193-211`). The spec is "drops the left workspace's members when All workspaces picks another" (`:180`). The other two are "drops the left workspace's name when the member read fails" (`:393`) and "drops the left workspace's name while the switch waits offline" (`:421`).
+  - Two workspaces, the person a member of both, signed in to the first (`inTwoWorkspaces`), each with a name or member unique to it so a leftover is visible.
+  - Force the failure. Abort the member read with `page.route(MEMBER_READ, (route) => route.abort())` (the `MEMBER_READ` route). Or let the pick land, then go offline with `route.fetch()`, `context.setOffline(true)` and `route.fulfill(...)` (the offline spec), which is the paused path.
+  - Assert the old name is gone: `switcherOf(page, first.name)` has `toHaveCount(0)` in both specs. Allow 15 s for the failing case, because the switch's read and then the shell's each ask twice more before they give up (`RETRY_ATTEMPTS` in `apps/web/src/shared/api/query-client.ts`).
+  - Assert the way back: remove the abort or go online, then `landedAtHome` and the new workspace's name is on the switcher.
+  - For stale rows, hold the new workspace's read with `heldBack`, so the gap state is showing, and assert the old rows have a count of 0 on the page and in jump-to. The spec is "drops the left workspace's members when All workspaces picks another". The other two are "drops the left workspace's name when the member read fails" and "drops the left workspace's name while the switch waits offline".
 - **The join path has no spec among these three.** `useAcceptInvitation` calls the shared step, but whether `accept-invitation.spec.ts` asserts the drop was not checked here. Check before relying on it.
 - **Re-run the three specs on every `@tanstack/query-core` bump.** They are the tripwire for the behaviours this note relies on in 5.103.2: `refetchQueries` swallowing errors and resolving on pause, the error reducer keeping data, and `removeQueries` not notifying a mounted observer.
 
