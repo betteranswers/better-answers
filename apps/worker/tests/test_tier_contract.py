@@ -387,8 +387,8 @@ def test_a_minted_id_matches_the_shape_the_other_tier_parses() -> None:
 
 
 def test_model_choice_resolves_every_fixtured_call() -> None:
-    from factories import seed_model_choice, seed_workspace
-    from pg_harness import migrated_postgres
+    from support.factories import seed_model_choice, seed_workspace
+    from support.pg_harness import migrated_postgres
 
     fixture = json.loads(
         (CONTRACTS_DIR / "model-choice" / "cases.json").read_text("utf-8")
@@ -429,7 +429,11 @@ def read_suggestions() -> dict[str, Any]:
 
 
 def _seed_suggestions_fixture(cursor: Cursor[Any], fixture: dict[str, Any]) -> None:
-    from factories import seed_concept_identity, seed_concept_index, seed_workspace
+    from support.factories import (
+        seed_concept_identity,
+        seed_concept_index,
+        seed_workspace,
+    )
 
     for workspace in fixture["workspaces"]:
         seed_workspace(cursor, workspace_id=workspace["id"], name=workspace["name"])
@@ -470,7 +474,7 @@ def _submit_fixture_set(cursor: Cursor[Any], fixture: dict[str, Any]) -> int:
 
 
 def test_one_call_submits_a_set_and_re_renders_its_summary() -> None:
-    from pg_harness import migrated_postgres
+    from support.pg_harness import migrated_postgres
 
     fixture = read_suggestions()
 
@@ -500,7 +504,7 @@ def test_one_call_submits_a_set_and_re_renders_its_summary() -> None:
 
 
 def test_suggestions_refuse_every_road_the_fixture_says_is_closed() -> None:
-    from pg_harness import migrated_postgres
+    from support.pg_harness import migrated_postgres
 
     fixture = read_suggestions()
 
@@ -533,7 +537,7 @@ def read_queue() -> dict[str, Any]:
 
 
 def _seed_queue_fixture(cursor: Cursor[Any], fixture: dict[str, Any]) -> None:
-    from factories import seed_job, seed_workspace
+    from support.factories import seed_job, seed_workspace
 
     for workspace in fixture["workspaces"]:
         seed_workspace(cursor, workspace_id=workspace["id"], name=workspace["name"])
@@ -556,7 +560,7 @@ def _seed_queue_fixture(cursor: Cursor[Any], fixture: dict[str, Any]) -> None:
 
 
 def _enqueue_answer(cursor: Cursor[Any], enqueue: dict[str, Any]) -> str:
-    from factories import enqueue_job
+    from support.factories import enqueue_job
 
     cursor.execute("SAVEPOINT enqueue")
     try:
@@ -593,7 +597,7 @@ def _as_role_in_scope(cursor: Cursor[Any], where: dict[str, Any]) -> None:
 
 
 def test_the_queue_hands_out_and_answers_as_the_fixture_says() -> None:
-    from pg_harness import migrated_postgres
+    from support.pg_harness import migrated_postgres
 
     fixture = read_queue()
     lease = f"{fixture['lease_seconds']} seconds"
@@ -683,7 +687,7 @@ def read_concept_file() -> dict[str, Any]:
 
 
 def test_the_canonical_text_and_hash_match_every_fixture_case() -> None:
-    from better_answers_worker.concept_file import (
+    from better_answers_worker.concepts.concept_file import (
         Frontmatter,
         canonical_frontmatter,
         content_hash_of,
@@ -704,7 +708,7 @@ def test_the_canonical_text_and_hash_match_every_fixture_case() -> None:
 
 
 def test_writes_every_fixture_number_as_both_tiers_write_it() -> None:
-    from better_answers_worker.concept_file import canonical_frontmatter
+    from better_answers_worker.concepts.concept_file import canonical_frontmatter
 
     for entry in read_concept_file()["numbers"]:
         assert canonical_frontmatter({"n": entry["value"]}, "knowledge/x.md") == (

@@ -9,7 +9,7 @@ from better_answers_worker.config import (
     BootstrapError,
     read_bootstrap,
 )
-from deploy_unit import worker_service
+from support.deploy_unit import worker_service
 
 COMPLETE = {
     "DATABASE_URL": "postgresql://worker_rt@db/better_answers",

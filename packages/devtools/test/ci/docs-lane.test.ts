@@ -412,7 +412,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     inTheLane: "check:docs:web",
   },
   {
-    file: "apps/worker/tests/test_redaction.py",
+    file: "apps/worker/tests/redaction/test_redaction.py",
     reads: "apps/worker/tests/fixtures/redaction/supplier-information-pack.md",
     inTheLane: {
       outside:
@@ -420,7 +420,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     },
   },
   {
-    file: "apps/worker/tests/test_redaction_windows.py",
+    file: "apps/worker/tests/redaction/test_redaction_windows.py",
     reads: "the same fixture, for heading offsets and truncation lengths",
     inTheLane: { outside: "the same fixture and the same uv environment as the suite above" },
   },
@@ -701,8 +701,8 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     github: aGroupOn(AHEAD),
     fetched: true,
     changedSince: {
-      [AHEAD]: ["apps/worker/tests/test_pipeline_landed.py"],
-      [TARGET_TIP]: [...AN_IMAGE_CHANGE, "apps/worker/tests/test_pipeline_landed.py"],
+      [AHEAD]: ["apps/worker/tests/pipeline/test_pipeline_landed.py"],
+      [TARGET_TIP]: [...AN_IMAGE_CHANGE, "apps/worker/tests/pipeline/test_pipeline_landed.py"],
     },
     lane: "full",
     images: "yes",

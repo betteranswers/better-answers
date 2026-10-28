@@ -62,7 +62,7 @@ describe("the territory the scan reads", () => {
     ["apps/web/e2e/page.spec.ts", true],
     ["apps/worker/tests/test_work_loop.py", true],
     ["packages/core/test/support/platform.ts", true],
-    ["apps/worker/tests/factories.py", true],
+    ["apps/worker/tests/support/factories.py", true],
     ["packages/core/src/workspaces/index.ts", false],
     ["apps/worker/tests/fixtures/rows.sql", false],
   ])("reads %s as a suite file: %s", (file, expected) => {
@@ -159,7 +159,7 @@ describe("the scan over a throwaway tree", () => {
   it("passes over a named Python factory module that carries one", () => {
     const tree = {
       ...CLEAN,
-      ["apps/worker/tests/factories.py"]: `Q = "${insert("workspace")}"\n`,
+      ["apps/worker/tests/support/factories.py"]: `Q = "${insert("workspace")}"\n`,
     };
 
     expect(scan(tree)).toContain("no raw insert");

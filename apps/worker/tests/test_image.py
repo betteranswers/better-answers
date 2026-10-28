@@ -18,8 +18,8 @@ from typing import Any, cast
 import pytest
 
 from conftest import DAEMON_SKIP_REASON
-from deploy_unit import worker_environment, worker_service
-from planted_page import (
+from support.deploy_unit import worker_environment, worker_service
+from support.planted_page import (
     FINDINGS_BY_CATEGORY,
     FIXTURE_PAGE,
     spans_withheld_under,

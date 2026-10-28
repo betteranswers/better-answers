@@ -39,7 +39,7 @@ def test_every_row_carries_exactly_the_recorded_columns() -> None:
 
 
 def test_records_exactly_the_columns_and_outcomes_the_table_has() -> None:
-    from pg_harness import migrated_postgres
+    from support.pg_harness import migrated_postgres
 
     fixture = read_cost_ledger()
 
@@ -67,8 +67,12 @@ def test_records_no_column_a_prompt_or_completion_sits_under() -> None:
 
 
 def test_resolves_a_model_choice_for_every_purpose_and_no_other() -> None:
-    from factories import EMBEDDING_DIMENSIONS, seed_model_choice, seed_workspace
-    from pg_harness import migrated_postgres
+    from support.factories import (
+        EMBEDDING_DIMENSIONS,
+        seed_model_choice,
+        seed_workspace,
+    )
+    from support.pg_harness import migrated_postgres
 
     purposes = purposes_the_rows_use()
 

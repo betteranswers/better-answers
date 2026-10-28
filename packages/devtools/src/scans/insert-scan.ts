@@ -7,8 +7,8 @@ const SCANNED = /\.(?:tsx?|py)$/u;
 export const WHERE_THE_LIST_LIVES = "packages/devtools/src/scans/insert-scan.ts";
 
 export const FACTORY_MODULES = [
-  "apps/worker/tests/factories.py",
-  "apps/worker/tests/pg_harness.py",
+  "apps/worker/tests/support/factories.py",
+  "apps/worker/tests/support/pg_harness.py",
   "packages/core/test/members/audit-log/audit-rows.ts",
   "packages/core/test/support/identity-rows.ts",
   "packages/schema/test/knowledge/concept-index-rows.ts",

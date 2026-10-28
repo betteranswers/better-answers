@@ -12,7 +12,7 @@ applies_when:
   - "Changing how the worker's `Host` closes, evicts or reopens its cocoindex environments"
   - "Chasing `environment already open in this program` from a worker test or job"
 symptoms:
-  - "apps/worker/tests/test_pipeline_landed.py failed intermittently in CI merge groups with RuntimeError: environment already open in this program; close it to be able to open it again with different options"
+  - "apps/worker/tests/pipeline/test_pipeline_landed.py failed intermittently in CI merge groups with RuntimeError: environment already open in this program; close it to be able to open it again with different options"
   - "Merge-group runs 36358367778, 36358640405, 36992793999 and 37061772234 (4 of 78 since PR #448) each dropped an unrelated PR (#472, #470, #506, #514) from the merge queue"
   - "It never reproduced in 120 local rounds"
   - "An earlier failure, run 36336846608, was the same lifecycle race on cocoindex's app-name slot, which refused the landed app a second registration when two reads shared one Host"
@@ -42,7 +42,7 @@ A worker `Host` that opens a connected source's LMDB store after the same proces
 
 - `coco.Environment(...)` raises a plain `RuntimeError` whose text is exactly `environment already open in this program; close it to be able to open it again with different options`.
 - Merge-group runs 36358367778, 36358640405, 36992793999 and 37061772234 failed this way: 4 of 78 merge groups since PR #448. Each dropped an unrelated PR (#472, #470, #506, #514) that touched no worker file.
-- Every failure was a test in `apps/worker/tests/test_pipeline_landed.py` that calls `read_the_copies` twice, each read through its own `Host`.
+- Every failure was a test in `apps/worker/tests/pipeline/test_pipeline_landed.py` that calls `read_the_copies` twice, each read through its own `Host`.
 - A two-read race script never reproduced it locally in 120 rounds.
 
 ## What Didn't Work
@@ -72,7 +72,7 @@ After `close()`, every later operation on that environment fails, and an update 
 
 - **Close what you let go.** Any new place where `Host` drops an environment must call `close()` on it, or a reopen in the same process can fail.
 - **Never close a store an app still runs on.** If a `Host` ever holds more than one connected source at a time, the cache bound could shed a store that an update is using, and that update would fail.
-- **Hold a reference across the reopen in the test.** CPython frees an environment with no references at once, so a test that keeps none passes without the close. Each of the three tests in `apps/worker/tests/test_pipeline_host.py` holds an `AppConfig` of the environment across the reopen:
+- **Hold a reference across the reopen in the test.** CPython frees an environment with no references at once, so a test that keeps none passes without the close. Each of the three tests in `apps/worker/tests/pipeline/test_pipeline_host.py` holds an `AppConfig` of the environment across the reopen:
   - `test_a_closed_hosts_store_reopens_while_its_config_is_held`
   - `test_a_store_closed_for_the_cache_bound_reopens_while_held`
   - `test_a_removed_store_reopens_while_its_config_is_held`

@@ -684,14 +684,14 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Edit `packages/schema/test/rls.test.ts`.
 - [ ] Edit `apps/worker/src/better_answers_worker/schema_view.py` through `pnpm --filter @better-answers/schema generate:worker-view`.
 - [ ] Edit `packages/core/src/store/map/index.ts`.
-- [ ] Edit `apps/worker/src/better_answers_worker/links.py`.
-- [ ] Edit `apps/worker/src/better_answers_worker/rebuild.py`.
+- [ ] Edit `apps/worker/src/better_answers_worker/concepts/links.py`.
+- [ ] Edit `apps/worker/src/better_answers_worker/concepts/rebuild.py`.
 - [ ] Edit `contracts/links/cases.json`.
 - [ ] Edit `packages/schema/src/contract-stamp.ts` through `pnpm --filter @better-answers/schema run generate:contract-stamp`.
 - [ ] Edit `apps/worker/src/better_answers_worker/contract_stamp.py` through `cd apps/worker && uv run --frozen generate-contract-stamp`.
 - [ ] Edit `packages/core/test/store/map/links.contract.test.ts`.
-- [ ] Edit `apps/worker/tests/test_links_contract.py`.
-- [ ] Edit `apps/worker/tests/test_links.py`.
+- [ ] Edit `apps/worker/tests/concepts/test_links_contract.py`.
+- [ ] Edit `apps/worker/tests/concepts/test_links.py`.
 - [ ] Edit `packages/core/test/store/map/map.test.ts`.
 - [ ] Edit `packages/core/test/concepts/rebuild-equivalence.test.ts`.
 - [ ] Create `packages/core/test/concepts/writes/write-budget.test.ts`.
@@ -715,8 +715,8 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Replace the scan in `writeConceptDelta` with a keyed lookup. On every landing, select the distinct `from_uid` of rows at the live generation whose `target_path` equals `delta.path`, read those concepts' `concept_index` rows, and re-derive each with `replaceOutgoingEdges`, which turns each row into an edge and deletes the row in the same transaction. The lookup runs on every write, new or not, so a concept landing at a path that older links name is answered at once, whether it is new or moved. It usually returns no rows.
 - [ ] Delete `namePattern`, the `naming` query and the `mapped` and `isNew` lines that only gated the scan.
 - [ ] Make `SWEEP` in `sweepNonLiveGenerations` delete the rows at non-live generations, and report their count beside the nodes and edges.
-- [ ] In `apps/worker/src/better_answers_worker/links.py`, add `unresolved_references`, which returns the `(relation, ordinal, target_path)` of each path reference from `references_of` that `by_path` does not hold.
-- [ ] In `apps/worker/src/better_answers_worker/rebuild.py`, make `run_rebuild` insert those rows at `outcome.generation` for every record it derives edges for, and count them on `RebuildOutcome`.
+- [ ] In `apps/worker/src/better_answers_worker/concepts/links.py`, add `unresolved_references`, which returns the `(relation, ordinal, target_path)` of each path reference from `references_of` that `by_path` does not hold.
+- [ ] In `apps/worker/src/better_answers_worker/concepts/rebuild.py`, make `run_rebuild` insert those rows at `outcome.generation` for every record it derives edges for, and count them on `RebuildOutcome`.
 - [ ] `contracts/links/cases.json` gains an `unresolved` output on every case and new cases with path targets. These are a relative path, an absolute `/knowledge/` path, a path with a fragment and a `sources` entry naming a path. No concept holds any path in a case, so every path target is unresolved and neither tier looks anything up, which keeps the fixture's rule. Rewrite the fixture's `description` to say so. `links.contract.test.ts` and `test_links_contract.py` both read `unresolved`.
 - [ ] Regenerate both contract stamps in the same commit as the fixture.
 - [ ] No producer can move a concept today. `rename-refused` guards the governed write (`packages/core/src/concepts/index.ts:479`) and replay (`reconciler.ts:302`), and `importBundle` goes through `writeConcept`. The test therefore proves the moved case by driving `writeConceptDelta` directly, as `map.test.ts:611` does, and this PR builds no mover (BA-146's ruling of 20/10).
@@ -742,7 +742,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] The existing "backfills a link written before its target landed, however deep" passes unchanged. Run `pnpm --filter @better-answers/core exec vitest run test/map.test.ts -t "backfills a link written before its target landed, however deep"`.
 - [ ] `packages/core/test/concepts/rebuild-equivalence.test.ts` reads `map_unresolved_reference` at both generations beside `nodesAt` and `edgesAt`, and `buildTheMap` adds a link to a path nothing ever lands at. Run `pnpm --filter @better-answers/core exec vitest run test/rebuild-equivalence.test.ts -t "reproduces the live generation exactly from the bundle and records"`.
 - [ ] `packages/core/test/store/map/links.contract.test.ts` checks every case's `unresolved`. Run `pnpm --filter @better-answers/core exec vitest run test/links.contract.test.ts`.
-- [ ] `apps/worker/tests/test_links.py` gains `test_a_path_no_concept_holds_is_an_unresolved_reference`, and `test_links_contract.py` checks `unresolved`. Run `cd apps/worker && uv run --frozen pytest tests/test_links.py tests/test_links_contract.py`.
+- [ ] `apps/worker/tests/concepts/test_links.py` gains `test_a_path_no_concept_holds_is_an_unresolved_reference`, and `test_links_contract.py` checks `unresolved`. Run `cd apps/worker && uv run --frozen pytest tests/concepts/test_links.py tests/concepts/test_links_contract.py`.
 - [ ] `packages/schema/test/rls.test.ts` lists `map_unresolved_reference` among the zero-rows tables, and gains "refuses the worker an update or delete of references". The refused statement differs from the worker's allowed `INSERT` in its verb alone. Run `pnpm --filter @better-answers/schema exec vitest run test/rls.test.ts`.
 - [ ] `packages/schema/test/migrations/worker-schema-view.test.ts` and `packages/schema/test/table-ownership.test.ts` pass. Run `pnpm --filter @better-answers/schema exec vitest run test/worker-schema-view.test.ts test/table-ownership.test.ts`.
 - [ ] Break each new test once in the production line it guards and see it fail. Break the promotion lookup's `target_path` match, the row insert in `replaceOutgoingEdges`, and the worker's `unresolved_references`.
@@ -755,7 +755,7 @@ Each live lane runs in its own worktree at the PR head. Drive each lane through 
 - [ ] Lane 3. Continue lane 2's workspace by writing concept B at `knowledge/later.md`, through the case "settles every reference when a concept lands at its path", with two citing concepts. Save `ba-233-settled.png`. Pass when both citers have an edge to B, the row query prints `(0 rows)`, and the edges and the deletions share one transaction (`xmin` of the new edges equals the landing row's).
 - [ ] Lane 4. Drive the case "answers a moved concept at the path older links name". Concept C sits at `knowledge/old.md`, and A links `/knowledge/new.md`. The case moves C to `knowledge/new.md` and runs the delta. Save `ba-233-moved.png`. Pass when `readConcept` for A as the scenario's Viewer lists the link answered to C's IRI at `knowledge/new.md`, with no map rebuild in between.
 - [ ] Lane 5. As the owning Editor, write concept A whose `sources` names `/knowledge/policy.md`, then land a deprecated concept of A's kind at that path, through the case "settles a sources path into lineage once it lands". Save `ba-233-lineage.png`. Pass when `psql` shows a `SUPERSEDES` edge from A to the new IRI and no row left for the path.
-- [ ] Lane 6. Run both contract suites against the new `contracts/links/cases.json`, with `pnpm --filter @better-answers/core exec vitest run test/links.contract.test.ts` and `cd apps/worker && uv run --frozen pytest tests/test_links_contract.py`. Save `ba-233-contract.png`. Pass when both pass, and `generate:contract-stamp` and `generate-contract-stamp` rerun leave `git status` clean.
+- [ ] Lane 6. Run both contract suites against the new `contracts/links/cases.json`, with `pnpm --filter @better-answers/core exec vitest run test/links.contract.test.ts` and `cd apps/worker && uv run --frozen pytest tests/concepts/test_links_contract.py`. Save `ba-233-contract.png`. Pass when both pass, and `generate:contract-stamp` and `generate-contract-stamp` rerun leave `git status` clean.
 - [ ] Lane 7. Run the rebuild-equivalence case with the worker. Save `ba-233-rebuild.png`. Pass when the case passes, and `psql` on `SELECT gen, count(*) FROM map_unresolved_reference GROUP BY gen` shows the same count at generation 1 and generation 2.
 - [ ] Lane 8. After lane 7, run the map sweep through `sweepNonLiveGenerations` as the platform principal. Save `ba-233-sweep.png`. Pass when the sweep reports the old generation's reference count, and the row query shows rows at the live generation alone.
 - [ ] Lane 9. In `psql` on the run's database, as `app_rt` scoped to another workspace, select the rows. Then, as `worker_rt`, insert a row, update it and delete it. Save `ba-233-privileges.png`. Pass when the cross-tenant select prints `(0 rows)`, the insert succeeds, and the update and the delete each print `permission denied for table map_unresolved_reference`.
