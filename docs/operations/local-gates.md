@@ -173,7 +173,7 @@ pnpm can select scripts by regular expression and `--no-bail` will keep going pa
 
 ## The shared test Postgres
 
-By default every test run starts its own Postgres container. Several worktrees running `check` at once then run several servers, and on 15/10/2026 four of them took a 14-core Mac to a load average of 45. One shared server per pinned image avoids that. It is opt-in, and CI never uses it.
+By default every test run starts its own Postgres container. Several worktrees running `check` at once then run several servers, and on 15/10/2026 four of them took a 14-core Mac to a load average of 45. One shared server per pinned image avoids that. It is opt-in on a laptop. In CI only `full-worker` uses it, started with `deploy/test-postgres.sh up`, so that the suite's four pytest workers share one server instead of starting four.
 
 Start the server for this checkout's pin, then export the line it prints:
 

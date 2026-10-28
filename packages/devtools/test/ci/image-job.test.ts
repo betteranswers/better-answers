@@ -6,7 +6,7 @@ import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
-import { gatesUnder, rootScripts, workspacesChecked } from "@better-answers/devtools/root-commands";
+import { gatesUnder, rootScripts } from "@better-answers/devtools/root-commands";
 import {
   buildWorkflow,
   imageJob,
@@ -78,10 +78,12 @@ const trackedWorkspacesReadingTheDeferral = (): ReadonlySet<string> => {
   );
 };
 
-const workspacesUnder = (steps: readonly ImageStep[]): readonly string[] =>
-  steps.flatMap((step) =>
-    gatesUnder(step.run ?? "").flatMap((gate) => workspacesChecked(rootScripts()[gate] ?? "")),
-  );
+const RUNS_AN_IMAGES_SCRIPT = /\bimages$/u;
+
+const runsImageSuites = (steps: readonly ImageStep[]): boolean =>
+  steps
+    .flatMap((step) => gatesUnder(step.run ?? ""))
+    .some((gate) => RUNS_AN_IMAGES_SCRIPT.test(rootScripts()[gate] ?? ""));
 
 const input = (step: ImageStep, name: string): string => {
   const value = step.with?.[name];
@@ -112,11 +114,7 @@ describe("the job that probes every image it pushes", () => {
     assert(first !== undefined, "a leg reads the deferral");
     const { input: given, answer } = first;
 
-    expect(read.length).toBeGreaterThan(1);
-    expect(
-      read,
-      "a leg reads the deferral another way, so the caller's input no longer wins or a changed input no longer probes",
-    ).toEqual(read.map(() => ({ input: given, answer })));
+    expect(read.length, "the image suites run in one leg, which reads the deferral once").toBe(1);
     expect(check.on.workflow_call.inputs[given]?.["default"]).toBe(false);
     expect(buildWorkflow().jobs.check.with?.[given]).toBe(true);
     expect(check.jobs["lane"]?.outputs?.[answer]).toEqual("${{ steps.lane.outputs.images }}");
@@ -125,7 +123,7 @@ describe("the job that probes every image it pushes", () => {
   it("hands the deferral to exactly the legs reading it", () => {
     const reading = trackedWorkspacesReadingTheDeferral();
     const wanted = checkLegs()
-      .filter(([, steps]) => workspacesUnder(steps).some((workspace) => reading.has(workspace)))
+      .filter(([, steps]) => runsImageSuites(steps))
       .map(([job]) => job);
 
     expect(

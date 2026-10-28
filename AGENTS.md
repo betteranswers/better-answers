@@ -46,7 +46,7 @@ A living company knowledge map for UK SMBs, built on the Open Knowledge Format (
 - Use the real Postgres, object store, git repository or map only where that store is the claim: row-level security and zero-rows, migrations, the SQL a slice runs, locks and races, governed commits and history rewrites, the erasure rehearsal, boundary-schema parity, and the tier contract's SQL agreements. Each route or command keeps one case through its real entry.
 - A decision over rows already read is a pure function on its slice. Never mock this repository's own code, and never add an in-memory stand-in for a store the platform runs. An in-memory adapter replaces only a third-party service, such as an LLM provider, behind its injected seam.
 - The browser suite holds one spec per page, with its latency budget, the accessibility gate and keyboard reach, and the journeys that cross pages through the real api. A bug's regression test sits at the lowest layer that reproduces it.
-- Images, compose scripts and process lifecycles run in the image job. A test that records figures, or a performance budget, runs on the schedule, not in `check`.
+- Images, compose scripts and the api's stop run in the image job, `pnpm run check:images`, which `check` leaves out. A test that spawns the worker stays in its package's `check`. A test that records figures, or a performance budget, runs on the schedule, not in `check`.
 - Postgres aborts the transaction after a failed statement, even a caught one. Assert the rejection or the rows before any returned value if the intention is for a test to provoke a failure.
 
 ## Secrets
