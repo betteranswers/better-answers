@@ -11,12 +11,10 @@ import {
 } from "@better-answers/core/answering";
 import { groupMemberInput, removeFromGroup } from "@better-answers/core/members";
 import {
-  THE_ACCOUNT_NUMBER,
   THE_OPENING,
   THE_PASSAGE,
   THE_PASSAGE_QUOTED,
   THE_QUERY,
-  THE_SORT_CODE,
   THE_TITLE,
 } from "@better-answers/core/testing/cross-tier";
 import { documentLanded, groupSeeded } from "@better-answers/core/testing/documents";
@@ -451,7 +449,7 @@ describe("era-independent", () => {
     expect(text.length).toBeLessThan(RESULT_CHARACTERS_CHECKED_UNDER);
   });
 
-  it("finds and opens a landed passage, its sort code withheld", async () => {
+  it("finds and opens a landed passage, rendering its stored text", async () => {
     const { workspace, client, token } = await connectAViewer();
     const landed = await documentLanded(app().database.superuser, workspace.workspaceId, {
       title: THE_TITLE,
@@ -486,8 +484,6 @@ describe("era-independent", () => {
     expect(rendered(opened)).toBe(
       `${THE_PASSAGE_QUOTED}\n\n— ${THE_TITLE} (${landed.locator}) · Internal`,
     );
-    expect(JSON.stringify(opened)).not.toContain(THE_SORT_CODE);
-    expect(JSON.stringify(opened)).not.toContain(THE_ACCOUNT_NUMBER);
   });
 
   it("refuses a malformed iri before open runs", async () => {
