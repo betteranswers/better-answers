@@ -4,7 +4,7 @@ import { serve } from "@hono/node-server";
 
 import { hostnameOfUrl, originOfUrl } from "../src/ingress/hostnames.ts";
 import { PRODUCT_NAME } from "../src/product-name.ts";
-import { codeIn, startApp } from "./harness.ts";
+import { codeIn, startApp } from "./support/harness/harness.ts";
 
 const PORT = 3200;
 const LOOPBACK_URL = `http://127.0.0.1:${PORT}`;

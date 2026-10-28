@@ -30,9 +30,6 @@ const pinned = (folder: string, cap: number, reason: string): Cap => ({
 });
 
 export const CAPS: readonly Cap[] = [
-  awaiting("apps/api/src", 21),
-  awaiting("apps/api/src/auth", 21),
-  awaiting("apps/api/tests", 115),
   awaiting("apps/web/e2e", 56),
   awaiting("apps/web/src/app", 18),
   awaiting("apps/web/src/features/auth", 47),

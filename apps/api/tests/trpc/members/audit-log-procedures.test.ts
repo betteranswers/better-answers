@@ -1,0 +1,200 @@
+import { afterAll, afterEach, assert, beforeAll, describe, expect, it } from "vitest";
+
+import { makeGroups } from "../../support/harness/harness-people.ts";
+import { startApp, type TestApp } from "../../support/harness/harness.ts";
+import {
+  NOT_A_MEMBER_ANSWERED,
+  refusalToAMemberAt,
+  refusalToAnotherWorkspacesAdmin,
+  refusalToTheAdmin,
+  ROLE_FORBIDS_ANSWERED,
+} from "../../support/people-refusals.ts";
+import { webSignedIn } from "../../support/web-client.ts";
+
+let app: TestApp;
+
+const stopped: { at: number | undefined } = { at: undefined };
+
+beforeAll(async () => {
+  app = await startApp({ clock: { now: () => new Date(stopped.at ?? Date.now()) } });
+});
+
+afterEach(() => {
+  stopped.at = undefined;
+});
+
+afterAll(async () => {
+  await app.stop();
+});
+
+const signInsOf = async (personId: string): Promise<number> => {
+  const found = await app.database.superuser.query<{ held: number }>(
+    `SELECT count(*)::int AS held FROM identity_audit_event
+      WHERE action = 'people.person.signed_in' AND subject_id = $1`,
+    [personId],
+  );
+  return found.rows[0]?.held ?? 0;
+};
+
+describe("the audit log over tRPC", () => {
+  it("answers an Admin the workspace's events newest first, actors named", async () => {
+    const workspace = await app.provision();
+    const { workspaceId, admin } = workspace;
+    const unnamed = await app.person(undefined, "");
+    await app.addMember(workspaceId, unnamed.id, "Admin");
+    await makeGroups(app, { workspaceId, userId: unnamed.id, names: ["Estimators"] });
+    await makeGroups(app, { workspaceId, userId: admin.id, names: ["Bid writers"] });
+    const { api } = await webSignedIn(app, admin.email);
+
+    const page = await api.members.auditLog.query({});
+
+    expect(page.events.map(({ action, by }) => [action, by])).toEqual([
+      ["people.group.created", { kind: "person", displayName: admin.name, address: admin.email }],
+      ["people.group.created", { kind: "person", displayName: "", address: unnamed.email }],
+      ["platform.workspace.provisioned", { kind: "platform" }],
+    ]);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it("crosses each instant as ISO-8601 text", async () => {
+    const workspace = await app.provision();
+    const { api } = await webSignedIn(app, workspace.admin.email);
+
+    const [provisioned] = (await api.members.auditLog.query({})).events;
+
+    assert(provisioned !== undefined, "provisioning wrote an event");
+    expect(provisioned.at).toBe(new Date(provisioned.at).toISOString());
+  });
+
+  it("answers no sign-in, which the identity-set audit log keeps", async () => {
+    const workspace = await app.provision();
+    const { api } = await webSignedIn(app, workspace.admin.email);
+    await webSignedIn(app, workspace.admin.email);
+
+    const page = await api.members.auditLog.query({});
+
+    expect(await signInsOf(workspace.admin.id)).toBe(2);
+    expect(page.events.map((event) => event.action)).toEqual(["platform.workspace.provisioned"]);
+  });
+
+  it("answers one family, a page at a time", async () => {
+    const workspace = await app.provision();
+    const { workspaceId, admin } = workspace;
+    await makeGroups(app, { workspaceId, userId: admin.id, names: ["One", "Two", "Three"] });
+    const { api } = await webSignedIn(app, admin.email);
+
+    const first = await api.members.auditLog.query({ family: "people", limit: 2 });
+    const rest = await api.members.auditLog.query({
+      family: "people",
+      limit: 2,
+      cursor: first.nextCursor,
+    });
+
+    expect(first.events).toHaveLength(2);
+    expect(first.nextCursor).toBe(first.events[1]?.id);
+    expect(rest.events.map((event) => event.action)).toEqual(["people.group.created"]);
+    expect(rest.nextCursor).toBeNull();
+  });
+
+  it("never answers an event of another workspace", async () => {
+    const mine = await app.provision();
+    const theirs = await app.provision();
+    await makeGroups(app, {
+      workspaceId: theirs.workspaceId,
+      userId: theirs.admin.id,
+      names: ["Theirs"],
+    });
+    const { api } = await webSignedIn(app, mine.admin.email);
+
+    const page = await api.members.auditLog.query({});
+
+    expect(page.events.map((event) => [event.action, event.subjectId])).toEqual([
+      ["platform.workspace.provisioned", mine.workspaceId],
+    ]);
+  });
+});
+
+const exportsIn = async (workspaceId: string): Promise<number> => {
+  const found = await app.database.superuser.query<{ held: number }>(
+    `SELECT count(*)::int AS held FROM audit_event
+      WHERE workspace_id = $1 AND action = 'platform.audit_log.exported'`,
+    [workspaceId],
+  );
+  return found.rows[0]?.held ?? 0;
+};
+
+describe("searching and exporting over tRPC", () => {
+  it("answers the events a search finds", async () => {
+    const { workspaceId, admin } = await app.provision();
+    await makeGroups(app, { workspaceId, userId: admin.id, names: ["Bid writers", "Site team"] });
+    const { api } = await webSignedIn(app, admin.email);
+
+    const page = await api.members.auditLog.query({ search: "bid" });
+
+    expect(page.events.map((event) => [event.action, event.subject])).toEqual([
+      ["people.group.created", { kind: "group", name: "Bid writers" }],
+    ]);
+    expect(page.searchTooBroad).toBe(false);
+  });
+
+  it("answers an Admin the CSV text, and records the export", async () => {
+    const { workspaceId, admin } = await app.provision();
+    await makeGroups(app, { workspaceId, userId: admin.id, names: ["Bid writers"] });
+    const { api } = await webSignedIn(app, admin.email);
+
+    const file = await api.members.exportAuditLog.mutate({ family: "people" });
+
+    expect(file).toMatchObject({ count: 1, capped: false, searchTooBroad: false });
+    expect(file.csv).toContain('"people.group.created"');
+    expect(await exportsIn(workspaceId)).toBe(1);
+  });
+
+  it.each(["Editor", "Viewer"] as const)("refuses an export at %s, role-forbids", async (role) => {
+    const refused = await refusalToAMemberAt(app, role, (api) =>
+      api.members.exportAuditLog.mutate({}),
+    );
+
+    expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
+  });
+
+  it("refuses an Admin past the ceiling, recording nothing more", async () => {
+    const { workspaceId, admin } = await app.provision();
+    const { api } = await webSignedIn(app, admin.email);
+    stopped.at = Date.now();
+    for (let made = 0; made < 10; made += 1) await api.members.exportAuditLog.mutate({});
+
+    const refused = await api.members.exportAuditLog.mutate({}).catch((error: unknown) => error);
+
+    expect(refused).toMatchObject({ data: { httpStatus: 429, code: "TOO_MANY_REQUESTS" } });
+    expect(await exportsIn(workspaceId)).toBe(10);
+  });
+});
+
+describe("what the audit log refuses", () => {
+  it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
+    const refused = await refusalToAMemberAt(app, role, (api) => api.members.auditLog.query({}));
+
+    expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
+  });
+
+  it("refuses an Admin of another workspace pointed at this one", async () => {
+    const refused = await refusalToAnotherWorkspacesAdmin(app, (api) =>
+      api.members.auditLog.query({}),
+    );
+
+    expect(refused).toMatchObject(NOT_A_MEMBER_ANSWERED);
+  });
+
+  it.each([
+    ["a cursor that is no event's id", { cursor: "not-an-id" }],
+    ["a page of no events", { limit: 0 }],
+    ["a page past fifty events", { limit: 51 }],
+    ["a search past 100 characters", { search: "a".repeat(101) }],
+  ])("refuses %s, malformed", async (_asked, input) => {
+    const refused = await refusalToTheAdmin(app, (api) => api.members.auditLog.query(input));
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 400, refusal: { word: "malformed", class: "malformed" } },
+    });
+  });
+});

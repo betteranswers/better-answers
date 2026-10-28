@@ -197,7 +197,7 @@ What to expect:
 - A run's databases carry its process id. A run that is killed leaves them behind, and the next run on the machine drops them once that process has gone.
 - Each run stamps its template with the time it used it. A template no run has used for a day is dropped by the next run of the same tier, so old migration sets do not fill the server. A run held open for longer than a day can lose its template; restart it and it rebuilds one.
 - `pnpm reap-containers` and Ryuk select only containers testcontainers labelled, so neither touches the shared servers.
-- Some test files still start a server of their own: the two that replay part of the migration history, `roles-surface.test.ts` and `apps/api/tests/browse-role.test.ts`, which read or alter roles across the whole server, and the case in `warm-postgres.test.ts` that proves the path without a warm server. Garage still starts a container per run.
+- Some test files still start a server of their own: the two that replay part of the migration history, `roles-surface.test.ts` and `apps/api/tests/deploy/browse-role.test.ts`, which read or alter roles across the whole server, and the case in `warm-postgres.test.ts` that proves the path without a warm server. Garage still starts a container per run.
 - Renovate proposes updates to the pin each weekend and holds a Postgres major in the Dependency Dashboard. Production's Postgres is a Coolify resource set to the pin by hand: after merging a pin update, re-point it to the new image reference, and run `ALTER EXTENSION vector UPDATE` when pgvector's version moved.
 
 ## The tool configuration at the repository root

@@ -23,13 +23,13 @@ Two reference files hold the detail. Open the one a task needs:
 ## The seam
 
 The server under the browser is the api's own test harness, `startApp` in
-`apps/api/tests/harness.ts`, over a Testcontainers Postgres and a Garage object store. The email
+`apps/api/tests/support/harness/harness.ts`, over a Testcontainers Postgres and a Garage object store. The email
 transport captures codes, Claude's client metadata document is served in process, and a model wire
 answers each workspace's model calls as its spec scripted them and fails any call no script
 answers. Playwright starts it as a **process**, not an import: `apps/web` imports nothing from
 `apps/api` at runtime, so launching it is the only way the browser suite reaches the real server.
 `apps/api/tests/serve.ts` takes a port as its one argument and listens on it, with the harness's
-control paths (`apps/api/tests/harness-control.ts`) mounted in front of the api and served
+control paths (`apps/api/tests/support/harness/harness-control.ts`) mounted in front of the api and served
 nowhere in `apps/api/src`.
 
 One origin carries the SPA, sign-in, consent and `/oauth2/*`, which is why the consent
@@ -88,8 +88,8 @@ proves and reaches it from the side that counts; `references/harness.md` lists t
 
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
 `request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Each
-action calls `/__harness`, which `apps/api/tests/harness-control.ts` mounts, and an area's own
-actions live beside it in `apps/api/tests/harness-*.ts`. The same module re-exports the locators
+action calls `/__harness`, which `apps/api/tests/support/harness/harness-control.ts` mounts, and an area's own
+actions live beside it in `apps/api/tests/support/harness/harness-*.ts`. The same module re-exports the locators
 and browser helpers in `apps/web/e2e/locators.ts`. Most specs sign in with `signIn` or
 `signedInAtHome`, which pass through the product's own sign-in page and its second-factor gate,
 never around them. Each spec provisions its own workspace with `provision` and mints its own

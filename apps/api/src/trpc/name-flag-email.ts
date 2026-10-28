@@ -5,7 +5,7 @@ import type { RaisedFlag } from "@better-answers/core/members";
 import { operatorAddresses } from "@better-answers/core/workspaces";
 
 import type { Doors } from "../doors.ts";
-import type { EmailMessage, Mail } from "../email.ts";
+import type { EmailMessage, Mail } from "../email/email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 
 const nameFlagEmail = (to: string, raised: RaisedFlag): EmailMessage => ({

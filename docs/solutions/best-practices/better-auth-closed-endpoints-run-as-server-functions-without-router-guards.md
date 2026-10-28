@@ -32,7 +32,7 @@ retire_when: "better-auth past 1.7.5 changes any of: disabledPaths, the rate lim
 
 The api's Better Auth 1.7.5 instance (`createAuth`, `apps/api/src/auth/auth.ts:377`) registers the authenticator plugin (`twoFactor`, `auth.ts:783-792`) and the passkey plugin (`auth.ts:793-808`). Every path the two plugins mount is closed through `disabledPaths` (`auth.ts:535-542`), from the lists `CLOSED_FACTOR_PATHS` (`auth.ts:176-192`) and `CLOSED_SESSION_PATHS` (`auth.ts:198-205`). The comment above the factor list gives the reason. Each path adds, removes, reveals or spends a factor past our gate, and our routes call the few they need as server functions (`auth.ts:172-175`).
 
-U6 (passkeys) and U7 (authenticator, recovery codes) of the plan wrote those routes in `apps/api/src/auth/` (`passkeys.ts`, `authenticator.ts`, and `confirm.ts` for re-confirming). They call `auth.api.enableTwoFactor`, `auth.api.verifyTOTP` and the passkey endpoints directly, each behind `fenced.asThePerson` (`person-routes.ts`), which carries a per-person rate rule, `sameOriginOnly` and the second-factor gate. This doc records what such a call carries and what it loses, read from the installed library. It also records two schema facts that the U5 change for BA-28 settled on the way.
+U6 (passkeys) and U7 (authenticator, recovery codes) of the plan wrote those routes in `apps/api/src/auth/second-factor/` (`passkeys.ts`, `authenticator.ts`, and `confirm.ts` for re-confirming). They call `auth.api.enableTwoFactor`, `auth.api.verifyTOTP` and the passkey endpoints directly, each behind `fenced.asThePerson` (`person-routes.ts`), which carries a per-person rate rule, `sameOriginOnly` and the second-factor gate. This doc records what such a call carries and what it loses, read from the installed library. It also records two schema facts that the U5 change for BA-28 settled on the way.
 
 A `dist/...` citation below is a path inside the installed package (`node_modules/.pnpm/better-auth@1.7.5_*/node_modules/better-auth/`, or the named package), not in the repository.
 
@@ -47,7 +47,7 @@ The plan's own research had already found that the library's sign-in challenge c
 
 ### `disabledPaths` lives in the router, and so do the other request guards
 
-Better Auth checks `disabledPaths` in one place: the router's `onRequest`, which answers `404 Not Found` for a listed path (`better-auth 1.7.5 dist/api/index.mjs:165-168`). An `auth.api.<endpoint>()` call never enters the router. It goes through `toAuthEndpoints` straight to `dispatchAuthEndpoint` (`dist/api/to-auth-endpoints.mjs:34-53`). So a closed endpoint still runs when the api calls it. The test harness's `authOver` exists for exactly this (`apps/api/tests/auth-instance.ts:23-24`).
+Better Auth checks `disabledPaths` in one place: the router's `onRequest`, which answers `404 Not Found` for a listed path (`better-auth 1.7.5 dist/api/index.mjs:165-168`). An `auth.api.<endpoint>()` call never enters the router. It goes through `toAuthEndpoints` straight to `dispatchAuthEndpoint` (`dist/api/to-auth-endpoints.mjs:34-53`). So a closed endpoint still runs when the api calls it. The test harness's `authOver` exists for exactly this (`apps/api/tests/support/auth-instance.ts:23-24`).
 
 The 404 is not the only thing that lives in the router. A server-function call also skips:
 
@@ -71,7 +71,7 @@ The route is the only guard the call has. It must bring:
 3. Its own same-origin fence. `sameOriginOnly` (`apps/api/src/auth/same-origin.ts`) is the shape the api already uses. It fences POST only.
 4. The second-factor gate, and the platform's own freshness rule (next section).
 
-The call shape, as the test helper makes it (`setUpAnAuthenticator`, `apps/api/tests/provoke.ts:47-60`):
+The call shape, as the test helper makes it (`setUpAnAuthenticator`, `apps/api/tests/support/provoke.ts:47-60`):
 
 ```ts
 const enabled = await auth.api.enableTwoFactor({
@@ -97,7 +97,7 @@ The checks that go quiet:
 - `/delete-user` without a password (`dist/api/routes/update-user.mjs:333-336`, inside the endpoint that opens at `:233`). The file is named `update-user.mjs`, but `/update-user` itself has no freshness check.
 - Passkey registration, under the default `registration.requireSession`: `/passkey/generate-register-options` and `/passkey/verify-registration` (`@better-auth/passkey 1.7.5 dist/index.mjs:88`, `:324`).
 
-Nothing reachable changed here. The first two are in `CLOSED_SESSION_PATHS` and passkey registration is in `CLOSED_FACTOR_PATHS`. `/delete-user` refuses outright, because `createAuth` sets no `user.deleteUser` (`dist/api/routes/update-user.mjs:292`). So a route that calls passkey registration as a server function gets no freshness check from the library. The api's add routes apply the platform's own rule instead: a person who already holds a factor must re-confirm before adding another, and is refused 412 `confirmationTooOld` while `factorChangeStale` holds (`heldForAnAdd` in `apps/api/src/auth/passkeys.ts`, `refusedAFirstSetup` in `authenticator.ts`). A first factor has nothing to re-confirm against.
+Nothing reachable changed here. The first two are in `CLOSED_SESSION_PATHS` and passkey registration is in `CLOSED_FACTOR_PATHS`. `/delete-user` refuses outright, because `createAuth` sets no `user.deleteUser` (`dist/api/routes/update-user.mjs:292`). So a route that calls passkey registration as a server function gets no freshness check from the library. The api's add routes apply the platform's own rule instead: a person who already holds a factor must re-confirm before adding another, and is refused 412 `confirmationTooOld` while `factorChangeStale` holds (`heldForAnAdd` in `apps/api/src/auth/second-factor/passkeys.ts`, `refusedAFirstSetup` in `authenticator.ts`). A first factor has nothing to re-confirm against.
 
 ### A plugin's `schema` option renames; it cannot add a field
 
@@ -127,9 +127,9 @@ The schema fact saves a dead end. A field added through a plugin's `schema` opti
 
 ## Examples
 
-`apps/api/tests/second-factor-foundation.test.ts` pins the shape:
+`apps/api/tests/auth/second-factor/second-factor-foundation.test.ts` pins the shape:
 
-- `setUpAnAuthenticator` (`apps/api/tests/provoke.ts:47-60`) enrols an authenticator through `auth.api.enableTwoFactor` and `auth.api.verifyTOTP`, over `authOver`. The rows land: `authenticator_enabled` and `verified` both read true (`:62-64`).
+- `setUpAnAuthenticator` (`apps/api/tests/support/provoke.ts:47-60`) enrols an authenticator through `auth.api.enableTwoFactor` and `auth.api.verifyTOTP`, over `authOver`. The rows land: `authenticator_enabled` and `verified` both read true (`:62-64`).
 - The same suite asks every factor path and every closed session path over HTTP, as a signed-in person, and gets 404 for both GET and POST (`:78-88`). The factor paths are read off the built instance (`:14-16`), so a path a plugin adds on an upgrade is held closed too.
 - "gets a pending session, refused until it confirms" (`:59-74`) pins the gap's close for email-code sign-in. An Admin with an authenticator signs in again by email code. `/get-session` answers, but `/me` answers 403 `second-factor-pending`, so our gate holds it, not the library's challenge. Passkey and social sign-in follow from the same matcher, but no test here pins them.
 

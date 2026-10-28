@@ -3,8 +3,8 @@ import type { Logger } from "pino";
 import { attempt } from "@better-answers/core/kernel";
 import type { InvitationToSend } from "@better-answers/core/members";
 
-import { LONG_UK_DATE } from "../email-page.ts";
-import type { EmailMessage, Mail } from "../email.ts";
+import { LONG_UK_DATE } from "../email/email-page.ts";
+import type { EmailMessage, Mail } from "../email/email.ts";
 import { PRODUCT_NAME } from "../product-name.ts";
 
 const ACCEPT_INVITATION_PATH = "/invitations";

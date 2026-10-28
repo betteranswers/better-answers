@@ -9,9 +9,15 @@ import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 
 import { until } from "@better-answers/core/testing/postgres";
 
-import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME, AUTH_SECRET, PUBLIC_URL } from "./harness.ts";
-import { freePort } from "./loopback-port.ts";
-import { startTestDatabase, type TestDatabase } from "./postgres.ts";
+import {
+  AGENT_HOSTNAME,
+  APEX_HOSTNAME,
+  APP_HOSTNAME,
+  AUTH_SECRET,
+  PUBLIC_URL,
+} from "./support/harness/harness.ts";
+import { freePort } from "./support/loopback-port.ts";
+import { startTestDatabase, type TestDatabase } from "./support/postgres.ts";
 
 const apiRoot = path.resolve(import.meta.dirname, "..");
 

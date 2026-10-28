@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CONTRACT_DIGEST } from "@better-answers/schema";
 import { matchIsLeakproof, UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
 
-import { startTestDatabase, type TestDatabase } from "./postgres.ts";
+import { startTestDatabase, type TestDatabase } from "./support/postgres.ts";
 
 const apiRoot = path.resolve(import.meta.dirname, "..");
 

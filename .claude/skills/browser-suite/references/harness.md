@@ -28,9 +28,9 @@ Read the numbers off those files rather than from here.
 ## The harness's actions
 
 Each action below is a function in `apps/web/e2e/harness.ts` that calls `/__harness`. An area's own actions live
-beside `apps/api/tests/harness-control.ts`: Sources in `apps/api/tests/harness-sources.ts`, People in
-`apps/api/tests/harness-people.ts`, Knowledge in `apps/api/tests/harness-knowledge.ts`, Questions in
-`apps/api/tests/harness-questions.ts` and asking in `apps/api/tests/harness-asking.ts`:
+beside `apps/api/tests/support/harness/harness-control.ts`: Sources in `apps/api/tests/support/harness/harness-sources.ts`, People in
+`apps/api/tests/support/harness/harness-people.ts`, Knowledge in `apps/api/tests/support/harness/harness-knowledge.ts`, Questions in
+`apps/api/tests/support/harness/harness-questions.ts` and asking in `apps/api/tests/support/harness/harness-asking.ts`:
 
 | Action | What it does |
 | --- | --- |

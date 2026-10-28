@@ -4,12 +4,12 @@ import type { Logger } from "pino";
 
 import { CeilingMet } from "@better-answers/core/kernel";
 
-import type { ModelDoors } from "../ask-steps.ts";
-import { ASK_KEEP_ALIVE_MS } from "../ask-stream.ts";
+import type { ModelDoors } from "../ask/ask-steps.ts";
+import { ASK_KEEP_ALIVE_MS } from "../ask/ask-stream.ts";
 import type { Auth } from "../auth/index.ts";
 import { TRPC_IP_RULE } from "../auth/index.ts";
 import type { Doors } from "../doors.ts";
-import type { Mail } from "../email.ts";
+import type { Mail } from "../email/email.ts";
 import { limitByIp } from "../ingress/limits.ts";
 import { gatedReader, type GatedSessionReader } from "../second-factor-gate.ts";
 import { appRouter } from "./router.ts";

@@ -28,9 +28,9 @@ await new Promise((bound) => listening.once("listening", bound));
 const [{ openObjectStore }, { scriptedModels }, { harnessControl }, { startApp }] =
   await Promise.all([
     import("@better-answers/core/testing/warm-objects"),
-    import("./harness-asking.ts"),
-    import("./harness-control.ts"),
-    import("./harness.ts"),
+    import("./support/harness/harness-asking.ts"),
+    import("./support/harness/harness-control.ts"),
+    import("./support/harness/harness.ts"),
   ]);
 
 const objects = await openObjectStore("browser-suite");

@@ -11,7 +11,7 @@ import {
 } from "@better-answers/core/store/postgres";
 import { hasNoDisplayName } from "@better-answers/core/workspaces";
 
-import type { EmailSender } from "../email.ts";
+import type { EmailSender } from "../email/email.ts";
 import {
   countByAddress,
   countingPostsAlone,
@@ -20,8 +20,6 @@ import {
 } from "../ingress/limits.ts";
 import { judged, pendingOr, SECOND_FACTOR_PENDING } from "../second-factor-gate.ts";
 import type { Auth } from "./auth.ts";
-import { mountTheAuthenticator } from "./authenticator.ts";
-import { mountTheConfirm } from "./confirm.ts";
 import { grantingFor } from "./consent-grant.ts";
 import {
   DISCOVERY_CACHE_CONTROL,
@@ -46,6 +44,17 @@ import {
 } from "./constants.ts";
 import { mountedPaths } from "./endpoints.ts";
 import {
+  CONSENT_WORKSPACE_FIELD,
+  consentPage,
+  refusedPage,
+  REFUSAL_PAGES,
+  signInPage,
+} from "./pages.ts";
+import { sameOriginOnly } from "./same-origin.ts";
+import { mountTheAuthenticator } from "./second-factor/authenticator.ts";
+import { mountTheConfirm } from "./second-factor/confirm.ts";
+import { mountThePasskeys } from "./second-factor/passkeys.ts";
+import {
   DEAD_LINK,
   hashOf,
   isBound,
@@ -55,17 +64,8 @@ import {
   mintNonce,
   shownOf,
   unseal,
-} from "./link-token.ts";
-import {
-  CONSENT_WORKSPACE_FIELD,
-  consentPage,
-  refusedPage,
-  REFUSAL_PAGES,
-  signInPage,
-} from "./pages.ts";
-import { mountThePasskeys } from "./passkeys.ts";
-import { sameOriginOnly } from "./same-origin.ts";
-import { askingWithALink, dropALink, readALink, signingInByLink } from "./sign-in-link.ts";
+} from "./sign-in/link-token.ts";
+import { askingWithALink, dropALink, readALink, signingInByLink } from "./sign-in/sign-in-link.ts";
 import { sessionClaims } from "./verify.ts";
 
 export type AuthRoutesDependencies = {

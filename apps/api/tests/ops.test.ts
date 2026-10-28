@@ -74,7 +74,7 @@ import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
 
 import type { Doors } from "../src/doors.ts";
-import type { EmailMessage, Mail } from "../src/email.ts";
+import type { EmailMessage, Mail } from "../src/email/email.ts";
 import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
 import {
   EXIT_OF_CLASS,
@@ -85,7 +85,7 @@ import {
   type OpsIo,
 } from "../src/ops/index.ts";
 import { readTreeUnder } from "../src/ops/read-tree.ts";
-import { connectAsHost, signIn } from "./flow.ts";
+import { connectAsHost, signIn } from "./support/flow.ts";
 import {
   APP_HOSTNAME,
   capturingLogger,
@@ -94,11 +94,11 @@ import {
   PUBLIC_URL,
   type LogLine,
   type TestApp,
-} from "./harness.ts";
-import { calledTool, rendered, rpcOf, structured } from "./mcp-call.ts";
-import { aPersonHoldingEverything, signedInClient } from "./provoke.ts";
-import { servedApp } from "./suite-app.ts";
-import { webClientOf } from "./web-client.ts";
+} from "./support/harness/harness.ts";
+import { calledTool, rendered, rpcOf, structured } from "./support/mcp-call.ts";
+import { aPersonHoldingEverything, signedInClient } from "./support/provoke.ts";
+import { servedApp } from "./support/suite-app.ts";
+import { webClientOf } from "./support/web-client.ts";
 
 type Run = {
   readonly exitCode: number;

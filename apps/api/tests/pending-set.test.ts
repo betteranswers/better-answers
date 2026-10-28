@@ -9,11 +9,11 @@ import {
 } from "../src/second-factor-gate.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { appRouter } from "../src/trpc/router.ts";
-import { authAsBuiltForSuite } from "./auth-instance.ts";
-import { holdAnAuthenticator } from "./factor-harness.ts";
-import type { TestClient } from "./harness.ts";
-import { signedInByEmailOnly } from "./provoke.ts";
-import { appForSuite } from "./suite-app.ts";
+import { authAsBuiltForSuite } from "./support/auth-instance.ts";
+import { holdAnAuthenticator } from "./support/factor-harness.ts";
+import type { TestClient } from "./support/harness/harness.ts";
+import { signedInByEmailOnly } from "./support/provoke.ts";
+import { appForSuite } from "./support/suite-app.ts";
 
 const app = appForSuite();
 

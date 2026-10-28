@@ -1,0 +1,61 @@
+import { expect } from "vitest";
+
+import type { TestClient } from "./harness/harness.ts";
+
+export const callMcp = (
+  client: Pick<TestClient, "fetch">,
+  token: string,
+  method: string,
+  params: Readonly<Record<string, unknown>> = {},
+): Promise<Response> =>
+  client.fetch("/mcp", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      authorization: `Bearer ${token}`,
+      "mcp-protocol-version": "2025-11-25",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+
+export type Rpc = Readonly<Record<string, unknown>>;
+
+const isRpc = (value: unknown): value is Rpc =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+export const rpcOf = (value: unknown): Rpc => (isRpc(value) ? value : {});
+
+export const rpcListOf = (value: unknown): readonly Rpc[] =>
+  Array.isArray(value) ? value.filter(isRpc) : [];
+
+export const toolAnswered = async (
+  client: Pick<TestClient, "fetch">,
+  token: string,
+  name: string,
+  args: Rpc,
+): Promise<Rpc> => {
+  const response = await callMcp(client, token, "tools/call", { name, arguments: args });
+  const text = await response.text();
+  /** The surface answers an event stream, and the tool's answer is its last frame. */
+  const streamed = [...text.matchAll(/^data:(.*)$/gm)].at(-1)?.[1];
+  const body = rpcOf(JSON.parse(streamed ?? text));
+  expect(body["error"]).toBeUndefined();
+  return rpcOf(body["result"]);
+};
+
+export const calledTool = async (
+  client: TestClient,
+  token: string,
+  name: string,
+  args: Rpc,
+): Promise<Rpc> => {
+  const result = await toolAnswered(client, token, name, args);
+  expect(result["isError"]).toBeFalsy();
+  return result;
+};
+
+export const structured = (result: Rpc): Rpc => rpcOf(result["structuredContent"]);
+
+export const rendered = (result: Rpc): string =>
+  String(rpcOf(rpcListOf(result["content"])[0])["text"]);

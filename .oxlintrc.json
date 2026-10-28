@@ -511,7 +511,7 @@
       }
     },
     {
-      "files": ["apps/api/src/auth/confirm.ts"],
+      "files": ["apps/api/src/auth/second-factor/confirm.ts"],
       "rules": {
         "max-lines-per-function": [
           "error",

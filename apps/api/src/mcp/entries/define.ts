@@ -5,7 +5,7 @@ import type { AskSteps } from "@better-answers/core/answering";
 import type { Result, UserPrincipal } from "@better-answers/core/kernel";
 import type { Tx } from "@better-answers/core/store/postgres";
 
-import type { StepRefusal } from "../../ask-steps.ts";
+import type { StepRefusal } from "../../ask/ask-steps.ts";
 import type { McpScope } from "../../auth/constants.ts";
 import type { RefusalAnswer } from "../../refusal.ts";
 

@@ -39,9 +39,9 @@ import {
   RECOVERY_CODES_PERSON_RULE,
 } from "../auth/constants.ts";
 import type { Doors } from "../doors.ts";
-import { sendFactorNotice } from "../factor-notice-email.ts";
+import { sendFactorNotice } from "../email/factor-notice-email.ts";
+import { sendPromotionNotice } from "../email/promotion-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
-import { sendPromotionNotice } from "../promotion-notice-email.ts";
 import type { RefusalAnswer } from "../refusal.ts";
 import { crossing, given, parsedBy, personCeiling, personProcedure, router } from "./base.ts";
 
