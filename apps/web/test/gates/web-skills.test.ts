@@ -17,6 +17,11 @@ const suiteDirectory = "apps/web/e2e";
 const NAMED_PATH = /`(?<file>apps\/[\w./-]+\.(?:tsx?|json))`/g;
 const EXPORTED_NAME = /^export (?:async )?(?:function|const|class) (?<name>\w+)/gm;
 const TABLE_ROW_NAME = /^\| `(?<name>\w+)` \|/gm;
+const DRIVING_COMMAND =
+  /`\.claude\/skills\/verify\/scripts\/(?<command>(?:browse|sign-in)\.sh [^`]+)`/g;
+const NAVIGATION = /^browse\.sh <port> (?:open|reload)\b/;
+const DRAWN_WAIT = /^(?:sign-in\.sh |browse\.sh <port> wait (?:--text |--fn "[^"]*\bdocument\b))/;
+const PAGE_ACTION = /^browse\.sh <port> (?:press|select|find .* (?:click|fill|check|type)\b)/;
 const PLAYWRIGHT_FIXTURES = new Set(["context", "page", "request", "passesTheAccessibilityGate"]);
 
 function filesIn(directory: string): string[] {
@@ -44,6 +49,27 @@ const modules = suiteFiles.filter((file) => !file.endsWith(".spec.ts"));
 const verifyFrontmatter = read(`${verifyDirectory}/SKILL.md`).split("---")[1] ?? "";
 
 const escaped = (text: string): string => text.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const drivingCommands = markdownIn(featuresDirectory).map((file) => ({
+  file,
+  commands: [...read(file).matchAll(DRIVING_COMMAND)].map(
+    (match) => match.groups?.["command"] ?? "",
+  ),
+}));
+
+function actsBeforeTheDraw(file: string, commands: string[]): string[] {
+  let opened: string | undefined;
+  const acts: string[] = [];
+  for (const command of commands) {
+    if (NAVIGATION.test(command)) opened = command;
+    else if (DRAWN_WAIT.test(command)) opened = undefined;
+    else if (opened !== undefined && PAGE_ACTION.test(command)) {
+      acts.push(`${file}: ${opened} then ${command}`);
+      opened = undefined;
+    }
+  }
+  return acts;
+}
 
 describe("the verify and playwright-specs skills", () => {
   it("point at files that are in the tree", () => {
@@ -95,6 +121,20 @@ describe("the verify and playwright-specs skills", () => {
       .map((page) => page.path)
       .filter((address) => !new RegExp(`${escaped(address)}(?![\\w/-])`).test(features));
     expect(unmapped, `no file under ${featuresDirectory} names these pages`).toEqual([]);
+  });
+
+  it("wait for drawn text before acting after an open", () => {
+    const navigations = drivingCommands.flatMap(({ commands }) =>
+      commands.filter((command) => NAVIGATION.test(command)),
+    );
+    const undrawn = drivingCommands.flatMap(({ file, commands }) =>
+      actsBeforeTheDraw(file, commands),
+    );
+    expect(
+      navigations.length,
+      "no open or reload was found, so the check holds nothing",
+    ).toBeGreaterThan(0);
+    expect(undrawn, "these act on a page with no wait on its text or its elements").toEqual([]);
   });
 
   it("register the verify skill for the model to call", () => {
