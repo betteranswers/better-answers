@@ -33,6 +33,11 @@ export const PINS: readonly Pin[] = [
   },
   { folder: "apps/api/tests/trpc/members", kind: "split", reason: "apps/api/src/trpc/members.ts" },
   {
+    folder: "packages/core/test/budgets",
+    kind: "run",
+    reason: "vitest.budgets.config.ts selects it",
+  },
+  {
     folder: "packages/core/test/readings",
     kind: "run",
     reason: "vitest.readings.config.ts selects it",

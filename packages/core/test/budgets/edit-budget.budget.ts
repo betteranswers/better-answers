@@ -7,13 +7,13 @@ import {
   saveConcept,
   writeConcept,
   type WriteConceptInput,
-} from "../../../src/concepts/index.ts";
-import type { UserPrincipal } from "../../../src/kernel/index.ts";
-import { passageAt } from "../../../src/sources/index.ts";
-import type { Tx } from "../../../src/store/postgres/index.ts";
-import { doorsOf, suiteWithBundles, type Scenario } from "../../fixtures/workspace-with-bundle.ts";
-import { inMs, percentile, recordFigures } from "../../support/figures.ts";
-import { answered, readingAs } from "../../support/suite-postgres.ts";
+} from "../../src/concepts/index.ts";
+import type { UserPrincipal } from "../../src/kernel/index.ts";
+import { passageAt } from "../../src/sources/index.ts";
+import type { Tx } from "../../src/store/postgres/index.ts";
+import { doorsOf, suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";
+import { inMs, percentile, recordFigures } from "../support/figures.ts";
+import { answered, readingAs } from "../support/suite-postgres.ts";
 
 const { db, arrange } = suiteWithBundles();
 

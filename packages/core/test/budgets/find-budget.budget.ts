@@ -5,6 +5,7 @@ import type { ConceptIri } from "@better-answers/schema";
 import { find, open, type FindResult, type OpenResult } from "../../src/answering/index.ts";
 import type { UserPrincipal } from "../../src/kernel/index.ts";
 import type { Tx } from "../../src/store/postgres/index.ts";
+import { landRecallSet, theRecallSet } from "../answering/recall.ts";
 import {
   conceptCiting,
   connectedSourceHolding,
@@ -14,7 +15,6 @@ import {
 import { suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { alternating, inMs, percentile, recordFigures } from "../support/figures.ts";
 import { answered, readingAs, runtimePoolFor } from "../support/suite-postgres.ts";
-import { landRecallSet, theRecallSet } from "./recall.ts";
 
 const { db, arrange } = suiteWithBundles();
 

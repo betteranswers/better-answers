@@ -9,6 +9,7 @@
     "scripts",
     "vitest.config.ts",
     "vitest.stryker.config.ts",
-    "vitest.readings.config.ts"
+    "vitest.readings.config.ts",
+    "vitest.budgets.config.ts"
   ]
 }

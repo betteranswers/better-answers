@@ -97,16 +97,16 @@ The first twelve other `Answer`s Clef took at threshold 0.7, read by hand, each 
 
 ## The governed write at 3,000 concepts
 
-How long one governed concept write takes as the workspace grows to 3,000 concepts, and how much of it the creation-time backfill takes, read through the core interface. The rows of 2026-09-10 came from a probe that was never merged. Since 2026-10-21 the probe is `packages/core/test/concepts/writes/write-budget.test.ts`, and the write's own time is the figure S3's plan keeps or beats.
+How long one governed concept write takes as the workspace grows to 3,000 concepts, and how much of it the creation-time backfill takes, read through the core interface. The rows of 2026-09-10 came from a probe that was never merged. Since 2026-10-21 the probe is `packages/core/test/budgets/write-budget.budget.ts`, and the write's own time is the figure S3's plan keeps or beats.
 
 | Date | Release or commit | Set or rule | Figure | Source |
 | --- | --- | --- | --- | --- |
 | 2026-09-10 | A probe branch, never merged | One governed write, from 250 to 3,000 concepts | About 0.9 s, flat | Old route, archived |
 | 2026-09-10 | A probe branch, never merged | The backfill scan inside one write, at 3,000 concepts | 31 to 42 ms of about 960 ms | Old route, archived |
-| 2026-10-22 | `0ca741960` with the probe commit | One governed write landing a concept three seeded bodies link, at 3,000 concepts, median of five runs' medians of 74.5, 123.5, 73.4, 71.3 and 72.4 ms, interleaved with the head runs on a machine at a one-minute load of 3 to 12 | 73.4 ms | `packages/core/test/concepts/writes/write-budget.test.ts` |
-| 2026-10-22 | `0ca741960` with the probe commit | The backfill scan inside one delta at 3,000 concepts, median of five runs' medians of 22.3, 41.8, 23.0, 22.1 and 21.9 ms | 22.3 ms | `packages/core/test/concepts/writes/write-budget.test.ts` |
-| 2026-10-22 | BA-233's branch (#890), the keyed lookup | One governed write as above, median of five runs' medians of 144.7, 118.3, 58.6, 54.9 and 55.8 ms | 58.6 ms | `packages/core/test/concepts/writes/write-budget.test.ts` |
-| 2026-10-22 | BA-233's branch (#890), the keyed lookup | The keyed lookup and re-derivation inside one delta, as above, median of five runs' medians of 5.6, 14.4, 6.4, 6.3 and 5.8 ms | 6.3 ms | `packages/core/test/concepts/writes/write-budget.test.ts` |
+| 2026-10-22 | `0ca741960` with the probe commit | One governed write landing a concept three seeded bodies link, at 3,000 concepts, median of five runs' medians of 74.5, 123.5, 73.4, 71.3 and 72.4 ms, interleaved with the head runs on a machine at a one-minute load of 3 to 12 | 73.4 ms | `packages/core/test/budgets/write-budget.budget.ts` |
+| 2026-10-22 | `0ca741960` with the probe commit | The backfill scan inside one delta at 3,000 concepts, median of five runs' medians of 22.3, 41.8, 23.0, 22.1 and 21.9 ms | 22.3 ms | `packages/core/test/budgets/write-budget.budget.ts` |
+| 2026-10-22 | BA-233's branch (#890), the keyed lookup | One governed write as above, median of five runs' medians of 144.7, 118.3, 58.6, 54.9 and 55.8 ms | 58.6 ms | `packages/core/test/budgets/write-budget.budget.ts` |
+| 2026-10-22 | BA-233's branch (#890), the keyed lookup | The keyed lookup and re-derivation inside one delta, as above, median of five runs' medians of 5.6, 14.4, 6.4, 6.3 and 5.8 ms | 6.3 ms | `packages/core/test/budgets/write-budget.budget.ts` |
 
 ## The cascade ceiling
 

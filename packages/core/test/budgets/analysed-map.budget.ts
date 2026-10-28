@@ -6,11 +6,11 @@ import { policiesIndexedInBulk } from "@better-answers/schema/testing/probes";
 import { ASK_CAPS, type AnswerResult } from "../../src/answering/index.ts";
 import { contentHashOf, renderConceptFile } from "../../src/concepts/index.ts";
 import { enqueueJob } from "../../src/runs/index.ts";
+import { askedAsIs } from "../answering/asking.ts";
 import { treeCommitted } from "../fixtures/bundle.ts";
 import { suiteWithBundles, type Scenario } from "../fixtures/workspace-with-bundle.ts";
 import { answered, mapAutovacuumOff, seedingWith } from "../support/suite-postgres.ts";
 import { runWorkerOnce } from "../support/worker-process.ts";
-import { askedAsIs } from "./asking.ts";
 
 const { db, bundles, arrange } = suiteWithBundles();
 
