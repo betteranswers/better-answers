@@ -8,14 +8,14 @@ import type {
   AcceptSuggestionRefusal,
   ImportBundleRefusal,
   WriteConceptRefusal,
-} from "../src/concepts/index.ts";
+} from "../../src/concepts/index.ts";
 import {
   classesIn,
   REFUSAL_CLASSES,
   refusalsIn,
   type RefusedItems,
   type WordIn,
-} from "../src/kernel/index.ts";
+} from "../../src/kernel/index.ts";
 import type {
   AcceptInvitationRefusal,
   ApproveRefusal,
@@ -34,21 +34,21 @@ import type {
   RequestAccessRefusal,
   ResendInvitationRefusal,
   EndEverySignInAndTokenHereRefusal,
-} from "../src/members/index.ts";
-import { REFUSAL_CATALOGUE } from "../src/refusals/index.ts";
-import type { ConnectUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
-import type { CommitRefusal } from "../src/store/git/index.ts";
+} from "../../src/members/index.ts";
+import { REFUSAL_CATALOGUE } from "../../src/refusals/index.ts";
+import type { ConnectUploadRefusal, SourceRefusal } from "../../src/sources/index.ts";
+import type { CommitRefusal } from "../../src/store/git/index.ts";
 import type {
   AddMemberRefusal,
   AddPersonRefusal,
   ProvisionRefusal,
   SetDisplayNameRefusal,
-} from "../src/workspaces/index.ts";
+} from "../../src/workspaces/index.ts";
 import {
   asSliceRelative,
   coreSourceFiles,
   sourceTreeIsInstrumented,
-} from "./support/source-tree.ts";
+} from "../support/source-tree.ts";
 
 const SEVEN_CLASSES = [
   "unauthenticated",

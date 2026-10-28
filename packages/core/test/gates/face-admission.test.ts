@@ -10,7 +10,7 @@ import {
   asSliceRelative,
   coreSourceFiles,
   sourceTreeIsInstrumented,
-} from "./support/source-tree.ts";
+} from "../support/source-tree.ts";
 
 const HOLDS_NO_ACTION = ["access", "kernel", "refusals", "store"];
 
@@ -68,7 +68,9 @@ const SRC = "./src/";
 const exportedFaces = (): readonly string[] => {
   const manifest = z
     .object({ exports: z.record(z.string(), z.string()) })
-    .parse(JSON.parse(readFileSync(path.resolve(import.meta.dirname, "../package.json"), "utf8")));
+    .parse(
+      JSON.parse(readFileSync(path.resolve(import.meta.dirname, "../../package.json"), "utf8")),
+    );
   return Object.values(manifest.exports)
     .filter((target) => target.startsWith(SRC))
     .map((target) => target.slice(SRC.length));

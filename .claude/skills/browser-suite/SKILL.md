@@ -267,7 +267,7 @@ The merge queue runs the browser suite as three shards of `check:web:e2e`, with 
 `test.only` is allowed while debugging and refused under CI by `forbidOnly`. The specs import
 `test` from the fixture module, so oxlint's vitest rules never see them and this is the only
 fence: a focused spec left behind would run alone and report the suite green.
-`apps/web/test/playwright-config.test.ts` holds it both ways. Take the `.only` out before
+`apps/web/test/gates/playwright-config.test.ts` holds it both ways. Take the `.only` out before
 committing.
 
 Under CI a failed test gets one retry, and the retry records a trace. A test that passes only on

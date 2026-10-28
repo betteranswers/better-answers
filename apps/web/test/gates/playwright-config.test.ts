@@ -19,7 +19,8 @@ const setAll = (settings: Settings): void => {
 const configWith = async (settings: Settings): Promise<PlaywrightTestConfig> => {
   setAll(settings);
   vi.resetModules();
-  return (await import("../playwright.config.ts")).default;
+  // oxlint-disable-next-line no-restricted-imports -- the config sits at the web's root, which no `@/<zone>` alias reaches
+  return (await import("../../playwright.config.ts")).default;
 };
 
 const configUnder = (ci: string | undefined): Promise<PlaywrightTestConfig> =>
