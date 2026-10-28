@@ -385,7 +385,9 @@ Each live lane runs in its own worktree at the PR head. The surface under test i
 - [ ] Metric. Wall seconds of `pnpm check:core:suite --shard=1/2` and `--shard=2/2`, summed.
 - [ ] Probe. Run both shards at trunk and head, interleaved, three times each, against one shared Postgres.
 - [ ] Baseline. Record the trunk median first.
-- [ ] Rule. The moved files held 326s of CI file time. Fails if the head median is not at least 60s below trunk.
+- [ ] Rule. Fails unless every head round is faster than every trunk round. Record the median gain and name the file that bounds each shard.
+
+Changed 28/10/2026. The 60s rule summed file times across parallel files. The measured median gain on trunk `d672b7313` was 50.6s, bounded by two 45s files, `import-direction.test.ts` and `erasure-routine.test.ts`. The rule now asks that the two ranges not overlap, which a real gain passes and no gain fails.
 
 **Review gate.** None. BA-269 is not review-gated.
 
