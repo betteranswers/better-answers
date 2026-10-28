@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
-import { knipOver } from "@better-answers/devtools/throwaway-tree";
-import type { KnipFinding, KnipRunner, Tree } from "@better-answers/devtools/throwaway-tree";
+import { knipBatchOver, knipOver } from "@better-answers/devtools/throwaway-tree";
+import type {
+  KnipCaseConfig,
+  KnipFinding,
+  PlannedKnip,
+  Tree,
+} from "@better-answers/devtools/throwaway-tree";
 
 import knipConfig from "../../../../knip.config.ts";
 
@@ -9,12 +14,12 @@ const PACKAGE = { name: "throwaway", version: "0.0.0", private: true, type: "mod
 
 const MANIFEST = JSON.stringify(PACKAGE);
 
-const KNIP_CONFIG = JSON.stringify({
+const KNIP_CONFIG = {
   entry: ["src/main.ts", "src/registry/**"],
   project: ["**/*.ts"],
-});
+};
 
-const scaffold: Tree = { "package.json": MANIFEST, "knip.json": KNIP_CONFIG };
+const scaffold: Tree = { "package.json": MANIFEST, "knip.json": JSON.stringify(KNIP_CONFIG) };
 
 const MAIN =
   'import { reached } from "./reached.ts";\n\nexport const run = (): number => reached;\n';
@@ -27,61 +32,68 @@ const smokeTree: Tree = {
   "src/reached.ts": REACHED_AND_SPARE,
 };
 
-const knip = knipOver(scaffold, {
-  tree: smokeTree,
-  findings: [{ kind: "exports", file: "src/reached.ts", name: "spare" }],
-});
+const SPARE: KnipFinding = { kind: "exports", file: "src/reached.ts", name: "spare" };
+
+const batch = knipBatchOver({ "package.json": MANIFEST });
+
+batch.control(smokeTree, KNIP_CONFIG, [SPARE]);
+
+const found = (tree: Tree, config: KnipCaseConfig = KNIP_CONFIG): PlannedKnip =>
+  batch.plan(tree, config);
+
+beforeAll(batch.run);
+
+const knip = knipOver(scaffold, { tree: smokeTree, findings: [SPARE] });
 
 const namesOf = (findings: readonly KnipFinding[]): readonly string[] =>
   findings.map((finding) => `${finding.kind}:${finding.file}:${finding.name}`);
 
 describe("knip over a throwaway tree", () => {
-  it("names an export nothing imports", () => {
-    const findings = knip.findings({
-      "src/main.ts": MAIN,
-      "src/reached.ts": REACHED_AND_SPARE,
-    });
+  const spare = found(smokeTree);
 
-    expect(namesOf(findings)).toEqual(["exports:src/reached.ts:spare"]);
+  it("names an export nothing imports", () => {
+    expect(namesOf(spare.findings())).toEqual(["exports:src/reached.ts:spare"]);
+  });
+
+  const undeclared = found({
+    "package.json": JSON.stringify({
+      ...PACKAGE,
+      dependencies: { "a-package-nothing-imports": "1.0.0" },
+    }),
+    "src/main.ts": MAIN,
+    "src/reached.ts": REACHED,
   });
 
   it("names a dependency the tree declares and no file imports", () => {
-    const findings = knip.findings({
-      "package.json": JSON.stringify({
-        ...PACKAGE,
-        dependencies: { "a-package-nothing-imports": "1.0.0" },
-      }),
-      "src/main.ts": MAIN,
-      "src/reached.ts": REACHED,
-    });
+    expect(namesOf(undeclared.findings())).toEqual([
+      "dependencies:package.json:a-package-nothing-imports",
+    ]);
+  });
 
-    expect(namesOf(findings)).toEqual(["dependencies:package.json:a-package-nothing-imports"]);
+  const orphaned = found({
+    "src/main.ts": MAIN,
+    "src/reached.ts": REACHED,
+    "src/orphan.ts": ALONE,
   });
 
   it("names a file no entry reaches", () => {
-    const findings = knip.findings({
-      "src/main.ts": MAIN,
-      "src/reached.ts": REACHED,
-      "src/orphan.ts": ALONE,
-    });
-
-    expect(namesOf(findings)).toEqual(["files:src/orphan.ts:src/orphan.ts"]);
+    expect(namesOf(orphaned.findings())).toEqual(["files:src/orphan.ts:src/orphan.ts"]);
   });
 
-  it("stays silent when every file and export is reached", () => {
-    const findings = knip.findings({ "src/main.ts": MAIN, "src/reached.ts": REACHED });
+  const reachedAll = found({ "src/main.ts": MAIN, "src/reached.ts": REACHED });
 
-    expect(findings).toEqual([]);
+  it("stays silent when every file and export is reached", () => {
+    expect(reachedAll.findings()).toEqual([]);
+  });
+
+  const registry = found({
+    "src/main.ts": MAIN,
+    "src/reached.ts": REACHED,
+    "src/registry/dialog.ts": "export const dialog = 1;\n",
   });
 
   it("stays silent about an unreached file under an entry directory", () => {
-    const findings = knip.findings({
-      "src/main.ts": MAIN,
-      "src/reached.ts": REACHED,
-      "src/registry/dialog.ts": "export const dialog = 1;\n",
-    });
-
-    expect(findings).toEqual([]);
+    expect(registry.findings()).toEqual([]);
   });
 });
 
@@ -148,53 +160,59 @@ describe("a slice's unused barrel export where entry exports are gated", () => {
     );
   };
 
-  const knipConfiguredAs = (workspace: string): KnipRunner =>
-    knipOver(
-      {
-        "package.json": SLICE_MANIFEST,
-        "knip.json": JSON.stringify({
-          entry: ["src/consumer.ts"],
-          project: ["**/*.ts"],
-          includeEntryExports: entryExportsIn(workspace),
-        }),
-      },
-      {
-        tree: { ...sliceTree(ONE_NAME, REACHED), "src/orphan.ts": ALONE },
-        findings: [{ kind: "files", file: "src/orphan.ts", name: "src/orphan.ts" }],
-      },
-    );
+  const configuredAs = (workspace: string): KnipCaseConfig => ({
+    entry: ["src/consumer.ts"],
+    project: ["**/*.ts"],
+    includeEntryExports: entryExportsIn(workspace),
+  });
 
-  it.each([
-    ".",
-    "apps/api",
-    "packages/core",
-    "packages/design-system",
-    "packages/devtools",
-    "packages/schema",
-  ])("names it and the source export it re-exports in %s", (workspace) => {
-    const findings = knipConfiguredAs(workspace).findings(sliceTree(BOTH_NAMES, REACHED_AND_SPARE));
+  const manifested = (tree: Tree): Tree => ({ "package.json": SLICE_MANIFEST, ...tree });
 
-    expect(namesOf(findings)).toEqual([
+  batch.control(
+    manifested({ ...sliceTree(ONE_NAME, REACHED), "src/orphan.ts": ALONE }),
+    configuredAs("."),
+    [{ kind: "files", file: "src/orphan.ts", name: "src/orphan.ts" }],
+  );
+
+  it.each(
+    [
+      ".",
+      "apps/api",
+      "packages/core",
+      "packages/design-system",
+      "packages/devtools",
+      "packages/schema",
+    ].map(
+      (workspace) =>
+        [
+          workspace,
+          found(manifested(sliceTree(BOTH_NAMES, REACHED_AND_SPARE)), configuredAs(workspace)),
+        ] as const,
+    ),
+  )("names it and the source export it re-exports in %s", (_workspace, planned) => {
+    expect(namesOf(planned.findings())).toEqual([
       "exports:src/slice/index.ts:spare",
       "exports:src/slice/reached.ts:spare",
     ]);
   });
 
-  it("stays silent in apps/web, whose registry lands before its callers", () => {
-    const findings = knipConfiguredAs("apps/web").findings(
-      sliceTree(BOTH_NAMES, REACHED_AND_SPARE),
-    );
+  const web = found(manifested(sliceTree(BOTH_NAMES, REACHED_AND_SPARE)), configuredAs("apps/web"));
 
-    expect(findings).toEqual([]);
+  it("stays silent in apps/web, whose registry lands before its callers", () => {
+    expect(web.findings()).toEqual([]);
   });
 
+  const tagged = found(
+    manifested(
+      sliceTree(
+        `${ONE_NAME}/** @public S3 */\nexport { spare } from "./reached.ts";\n`,
+        REACHED_AND_SPARE,
+      ),
+    ),
+    configuredAs("packages/core"),
+  );
+
   it("stays silent about one tagged `@public` for a later block", () => {
-    const tagged = `${ONE_NAME}/** @public S3 */\nexport { spare } from "./reached.ts";\n`;
-
-    const findings = knipConfiguredAs("packages/core").findings(
-      sliceTree(tagged, REACHED_AND_SPARE),
-    );
-
-    expect(findings).toEqual([]);
+    expect(tagged.findings()).toEqual([]);
   });
 });
