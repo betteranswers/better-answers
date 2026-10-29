@@ -46,7 +46,6 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `saysTheWait` | Asserts an alert names a ceiling's wait, given in seconds as the answer named it, as the page counts it: whole minutes, rounded up, matched by their number. A wait the answer did not name fails |
 | `keepsItsWordOffThePage` | Asserts the api's word for a refusal is nowhere on the page: the word is for the logs and the wire |
 | `keyShown` | An authenticator's key, read off the page as a person types it into their phone, without the spaces that group it in fours |
-| `refusedDigitsSelected` | Asserts a refused code's six digits are selected, so the next code typed replaces them |
 | `tokenColour` | A design-system token's colour as the browser paints it, so a computed style is compared with the token rather than a copied value |
 | `contrastBetween` | WCAG's contrast ratio between two painted `rgb()` colours, as `apps/web/e2e/app/focus-ring.spec.ts` measures each focus edge against the surface behind it |
 | `controlEdges` | Each enabled control found by its edge alone, with its fill, every side it draws and the colour behind it, each composited as painted through fills and every ancestor's opacity. A wordless wrapper with a side within 8px of the control's own lends its fill, and its border on each such side. One with no such side lends nothing, and its own fill is the colour behind the control. The gate measures them with `contrastBetween` |
@@ -54,16 +53,14 @@ More helpers drive the browser rather than the harness. Most are defined in `app
 | `inTwoWorkspaces` | A new person who is the Admin of one new workspace and holds a role in a second, Admin unless Viewer is named. It signs them in through `signIn`, picks the first workspace, waits for the Admin's home and the switcher named for it, and answers the address and both workspaces. A spec about moving between workspaces starts from it |
 | `reconfirmedOn` | Waits for the *Confirm It’s You* dialog, gives the person the harness's authenticator through `withAnAuthenticator`, types its code, and waits for the dialog to go. A spec runs it after `ageTheConfirmation` has made an act ask again |
 | `authenticatorCodeField` | The *Authenticator Code* field, by its exact label. `signIn` fills it on the confirm page, and `reconfirmedOn` fills it in the *Confirm It’s You* dialog |
-| `holdingTheFirstAnswer` | Fetches every answer a matcher picks, holds the first until the spec releases it, and counts every ask. It answers `reached`, `release` and `asked`. A spec presses a second time while the first answer is held and expects `asked` to be 1, as `apps/web/e2e/auth/sessions.spec.ts` does |
+| `holdingTheFirstAnswer` | Fetches every answer a matcher picks, holds the first until the spec releases it, and counts every ask. It answers `reached`, `release` and `asked`. A spec acts again while the first answer is held, as `apps/web/e2e/people/audit-log.spec.ts` does |
 | `requestsSent` | Collects every request the page sends from then on whose address a matcher picks, in the order sent. A spec reads its length, or maps it to addresses, to show what the page asked and what it never asked, as `apps/web/e2e/app/jump-to.spec.ts` does |
-| `answersRead` | Collects the body of every answer a matcher picks, each read as it lands, because the page's next navigation discards it. A spec awaits them all before it reads them, as `apps/web/e2e/knowledge/concept-body-links.spec.ts` does |
 | `memberUnreadUntil` | Drops the shell's member read, fails the member read in the frame's batch, and holds the lone retry until the promise it is given settles. The page then draws with the member unread. A spec sets it up, reloads, and acts before it lets the read land, as `apps/web/e2e/app/member-unread.spec.ts` and `apps/web/e2e/people/people.spec.ts` do |
-| `askShowsTheServedAddress` | Reads the MCP surface's address from `/.well-known/oauth-protected-resource/mcp` and asserts the page's main region shows it exactly. It answers that address and fails when the document does not answer. A spec compares the page with what the api serves, not with a copied value. `apps/web/e2e/app/home.spec.ts` is the worked example |
 | `ACTION_SAMPLES` | How many times a spec clocks one action before it judges it, five. A spec seeds `ACTION_SAMPLES - 1` extra rows, so each sample has a row to act on |
 | `actionClocked` | Waits for the clock `clockTheNextKey` started and answers it in milliseconds. It fails when no clock was started, and fails by name when the node had not read its text 2 s after the key while a request was held. A spec collects one per sample for `theActionsLandedWithinTheirBudget` |
 | `theActionsLandedWithinTheirBudget` | Annotates the test with every sample of an action and their median, and asserts the median under the action's 100 ms, which on CI it only annotates. It fails by name when the action was never clocked. `theActionLandedWithinItsBudget` is the same check over one sample |
 | `tokenPainted` | A design-system token's value for a named CSS property as the browser paints it. It is read off a probe element styled with the token. `tokenColour` is this for `color`. `apps/web/e2e/app/focus-ring.spec.ts` reads `--focus-ring` as `box-shadow` with it |
-| `drawnMarks` | The visible elements holding `data-marks` whose `::before` draws, each named by its `data-slot` or its tag. `apps/web/e2e/auth/sign-in.spec.ts` asserts the card alone draws them, and that the primary button inside it holds `data-marks` and draws none |
+| `drawnMarks` | The visible elements holding `data-marks` whose `::before` draws, each named by its `data-slot` or its tag. `apps/web/e2e/auth/consent.spec.ts` asserts the card alone draws them |
 
 The sign-in code is read from that capture, with `codeSentTo`, and from nowhere else: the api's
 logger is forbidden from ever holding one. `emailsSentTo` counts the emails the capture holds for an address, and the suite's
@@ -80,22 +77,14 @@ Six more play Claude's part in its OAuth flow on the suite's own origin — `app
 | `claudesAuthorizeUrl` | Claude's authorize request for the MCP surface at an origin, with an optional challenge, `prompt` and `state` |
 | `catchClaudesRedirect` | Answers the redirect to claude.ai with a stand-in page, since the suite cannot reach it |
 | `claudeExchanges` | Exchanges the code at the redirect for tokens, which is when the grant's refresh token is minted, and answers that refresh token |
-| `claudeDisconnects` | Revokes that refresh token at `/oauth2/revoke`, as Claude does when the person disconnects it, so the authorization server ends the grant itself |
 | `CLAUDES_REDIRECT_URI` | The redirect address the suite's Claude names in its authorize request and its token exchanges, `https://claude.ai/api/mcp/auth_callback`. A spec compares where *Connect* or *Cancel* landed with it. `catchClaudesRedirect` routes it, and `apps/web/e2e/console/console-people.spec.ts` unroutes it |
 
 ## Reading the api's answers
 
-Three helpers answer for the api. `refusedFromNowOn` in `apps/web/e2e/refused-read.ts` refuses one
-console procedure inside a tRPC batch, in the api's own words for a person without the operator's
-mark, and leaves the batch's other answers real. A spec uses it to meet a list's refused re-read
-while the console stays open, since clearing the mark itself closes the whole console.
-`apps/web/e2e/console/console.spec.ts` and `apps/web/e2e/console/console-people.spec.ts` are the worked examples.
-
-`theNextAskMeetsACeiling` in the same module answers the next ask of one path outside tRPC with the
+Two helpers in `apps/web/e2e/refused-read.ts` answer for the api. `theNextAskMeetsACeiling` answers the next ask of one path outside tRPC with the
 api's own 429 and the wait it is handed, then lets that path through again. `aCeilingMet` is that
 answer alone, for a spec that refuses every ask and counts them.
-`apps/web/e2e/auth/sign-out.spec.ts` uses both. `apps/web/e2e/auth/accept-invitation.spec.ts` and
-`apps/web/e2e/auth/sign-in-link.spec.ts` use the first.
+`apps/web/e2e/auth/sign-out.spec.ts` uses both.
 
 Two more in that module read what the api answered. `refusalAnswering` waits for the next answer to
 one tRPC procedure, found by its place in a batch or in a call sent alone. It answers the refusal's
@@ -108,16 +97,14 @@ still shown the api refused.
 
 ## The knowledge module
 
-`apps/web/e2e/knowledge.ts` holds what the knowledge pages' specs share. `readsCeilingFilled`
-fills the knowledge reads' ceiling, `KNOWLEDGE_CEILING` in `apps/api/src/trpc/knowledge.ts`.
+`apps/web/e2e/knowledge.ts` holds what the knowledge pages' specs share.
 
 | Helper | What it does |
 | --- | --- |
 | `isAFind` | Matches a request whose path names `knowledge.find` anywhere, because the tRPC client batches its reads. A spec hands it to `heldBack`, `page.route` or a request wait to catch a search's read |
-| `isAnOpen` | Matches a request whose path names `knowledge.open` anywhere, as `isAFind` does for a find. `apps/web/e2e/knowledge/concept-body-links.spec.ts` collects a concept page's opens with it |
+| `isAnOpen` | Matches a request whose path names `knowledge.open` anywhere, as `isAFind` does for a find. `apps/web/e2e/knowledge/concept-page.spec.ts` collects a concept page's opens with it |
 | `heldBack` | Holds every request a matcher picks until the spec releases it. It answers `reached`, which settles when the first arrives, and `release`. A spec reads the page while a read is still out with it. `apps/web/e2e/knowledge/knowledge-search.spec.ts` uses it during a search and `apps/web/e2e/sources/sources.spec.ts` during the sources list |
-| `windowRefocused` | Dispatches `visibilitychange` on the window and waits two tasks, one for the query client to resume and one for the api client's batch timer. Then it fetches `/health`. A spec follows it by counting what was sent, to show a refocus asked nothing again |
 | `scrolledSideways` | How far the page scrolls sideways in pixels, the document's scroll width less its client width. A spec at a narrow width asserts it is 0 |
 | `listsItsKeystrokes` | Opens the page's list of keystrokes through `keystrokesListed`. It asserts each given key is among the list's terms and each named action is in it, then dismisses the list through `keystrokesDismissed`. A page's keystroke spec runs it with the page's own keys |
-| `conceptsSeeded` | Runs `seedConcepts` and answers a map from each concept's title to what the harness answered for it, its IRI, path and cited documents. `apps/web/e2e/knowledge/concept-page.spec.ts` and `apps/web/e2e/knowledge/concept-body-links.spec.ts` look concepts up in it by title |
-| `knowledgeMenuOpened` | Opens Knowledge from the rail and answers its menu once it shows. `apps/web/e2e/knowledge/collections-and-owners.spec.ts` and `apps/web/e2e/knowledge/knowledge-base.spec.ts` read which pages a role sees there |
+| `conceptsSeeded` | Runs `seedConcepts` and answers a map from each concept's title to what the harness answered for it, its IRI, path and cited documents. `apps/web/e2e/knowledge/concept-page.spec.ts` and `apps/web/e2e/knowledge/knowledge-search.spec.ts` look concepts up in it by title |
+| `knowledgeMenuOpened` | Opens Knowledge from the rail and answers its menu once it shows. `apps/web/e2e/knowledge/collections-and-owners.spec.ts` reads which pages a role sees there |
