@@ -713,7 +713,7 @@ Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` c
 
 **You see.**
 
-- [ ] The erasure-routine file runs fewer than half of trunk's 115 seeded cases, and a new in-process file holds the moved claims.
+- [ ] The 7 erasure-routine cases whose claim a pure test can make run in a new in-process file. The 108 cases that assert rows, git history, locks, audit events or stored copies stay.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -735,10 +735,12 @@ Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` c
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Wall seconds of `pnpm check:core:suite`, both shards summed.
-- [ ] Probe. Run at trunk and head, interleaved, three times each.
-- [ ] Baseline. Record the trunk median first.
-- [ ] Rule. Fails if the head median is not at least 30s below trunk's.
+- [ ] Metric. The summed test-body seconds of the four touched test files at trunk and head, from vitest's JSON reporter.
+- [ ] Probe. Five interleaved runs per side inside `suite-slot.sh --exclusive`.
+- [ ] Baseline. Record the trunk rounds first.
+- [ ] Rule. Fails unless every head round is lower than every trunk round. Record `check:core:suite`'s wall at trunk and head as a figure.
+
+Changed 28/10/2026. The first rule asked `check:core:suite` to run 30s faster, but six workers share each shard's wall, so this unit's saving of about 8 CPU-seconds is about 1.3s of wall. Five interleaved runs per side gave a trunk median of 80.4s and a head median of 83.6s.
 
 **Review gate.** None. BA-275 is not review-gated.
 
@@ -1012,7 +1014,7 @@ The table places each file in one column. Seven more files in the worker-process
 
 1. Readings that assert no threshold, or budgets that belong on a schedule. Write-budget 88s, map-budget 59s, analysed-map 47s, find-budget 43s, edit-budget 37s and guide-seed-budget 18s. Recall's file took 65s, but only its report case, about 34s, moves. That is 326s of core file time in all.
 2. Process launches in series. cross-tier-document 185s for 16 worker launches. backup-image 94s and image 82s for image builds. Four lint-rule files, 164s, for one oxlint or knip process per case. `test_image.py` 291s locally in one xdist group.
-3. Seeding loops. erasure-routine 58s at about 0.5s per case for an arrange and a git rewrite. guides 29s for a northgate import per case. ops 53s over 199 cases through the real app.
+3. Seeding loops. erasure-routine 58s at about 0.5s per case for an arrange and a git rewrite. guides 29s for a northgate import per case, now one shared seed. ops 53s over 199 cases through the real app.
 4. Browser test count. 710 tests at a mean of 4.05s, of which the triage marks about 70 as duplicates and about 150 in the ten slowest specs as single-screen.
 
 **Slowest files, with class.** BOUNDARY means the real store is the claim. INCIDENTAL means the logic reaches it only through the harness. READING means a figure with no threshold or a budget for the schedule.
@@ -1038,7 +1040,7 @@ The table places each file in one column. Seven more files in the worker-process
 | core import-bundle | 37 | two 5s lock-timeout waits | mixed | BA-275 |
 | api ask | 31 | provision, seed and connect per case | INCIDENTAL | BA-274 |
 | api lint-rules | 30 | oxlint per case | INCIDENTAL | BA-273 |
-| core guides | 29 | northgate import per case | INCIDENTAL | BA-275 |
+| core guides | 29 | one shared northgate seed | INCIDENTAL | BA-275 |
 | api mcp-cross-tier | 28 | one worker launch | duplicate | BA-270 |
 | api local-database | 28 | container restarts | BOUNDARY | BA-271 |
 | api stop | 28 | a fixed 10s deadline | BOUNDARY | BA-271 |
