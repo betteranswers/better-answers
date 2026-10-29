@@ -579,12 +579,6 @@
       }
     },
     {
-      "files": ["packages/core/src/workspaces/index.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 626, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["packages/devtools/src/comments/comment-inventory.ts"],
       "rules": {
         "max-lines": ["error", { "max": 567, "skipBlankLines": true, "skipComments": true }]
