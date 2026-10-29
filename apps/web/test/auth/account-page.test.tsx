@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
@@ -6,14 +7,18 @@ import {
   ACTION_LANDED,
   AUTHENTICATOR_WORDS,
   PASSKEY_WORDS,
+  RECOVERY_CODE_WORDS,
 } from "@/features/auth/account-words.ts";
 import { SAID_OF_SECOND_FACTOR } from "@/features/auth/refusal-words.ts";
 import { THEME_KEPT_UNDER } from "@/shared/theme/theme-switch.ts";
+import { placedWithoutMeasuring } from "@test/measuring.ts";
 import { openApp } from "@test/open-app.tsx";
 import {
   adasApi as adasRoutes,
   answering,
   BOTH_HELD,
+  CODES,
+  MADE_AT,
   NOTHING_HELD,
   openAsAda,
   sessionStanding,
@@ -268,5 +273,202 @@ describe("making a first set on the Account page", () => {
     await makeCodesPressed();
 
     expect(await screen.findByText(SAID_OF_SECOND_FACTOR["restore-code-needed"])).toBeDefined();
+  });
+});
+
+const NO_FACTOR_YET = {
+  ...NOTHING_HELD,
+  mustHoldOne: false,
+  thisSession: sessionStanding("not-required"),
+};
+
+const AN_AUTHENTICATOR_AND_CODES = {
+  ...NO_FACTOR_YET,
+  authenticator: "set-up",
+  recoveryCodes: { unused: CODES.length, madeAt: MADE_AT },
+};
+
+const A_SETUP_KEY = { setupAddress: "otpauth://totp/better-answers:ada?secret=JBSWY3DPEHPK3PXP" };
+
+const readingAfter = (happened: () => boolean, before: unknown, after: unknown) => (): unknown =>
+  happened() ? after : before;
+
+const saidOnThePage = (): readonly string[] =>
+  [...document.querySelectorAll('[role="status"]')]
+    .map((status) => status.textContent)
+    .filter((words) => words !== "");
+
+const timesAsked = (asked: readonly string[], procedure: string): number =>
+  asked.filter((address) => address === `/trpc/${procedure}`).length;
+
+describe("finishing a first authenticator on the Account page", () => {
+  it("a setup's codes land though Set up is pressed mid-finish", async () => {
+    const answer = Promise.withResolvers<void>();
+    let finished = false;
+    const asked = adasRoutes(
+      readingAfter(() => finished, NO_FACTOR_YET, AN_AUTHENTICATOR_AND_CODES),
+      new Map([
+        ["/authenticator/start", answering(A_SETUP_KEY)],
+        [
+          "/authenticator/finish",
+          async () => {
+            await answer.promise;
+            finished = true;
+            return answered({ recoveryCodes: CODES, madeAt: MADE_AT });
+          },
+        ],
+      ]),
+    );
+    await openAsAda("/account");
+    const setUp = await screen.findByRole("button", { name: "Set Up an Authenticator" });
+    fireEvent.click(setUp);
+    expect(setUp.getAttribute("aria-expanded")).toBe("true");
+    const field = await screen.findByRole("textbox", { name: "Authenticator Code" });
+
+    fireEvent.change(field, { target: { value: "123456" } });
+
+    await waitFor(() => {
+      expect(asked).toContain("/authenticator/finish");
+      expect(setUp.getAttribute("aria-disabled")).toBe("true");
+    });
+    act(() => {
+      setUp.focus();
+    });
+    await userEvent.keyboard("{Enter}");
+    expect(setUp.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("textbox", { name: "Authenticator Code" })).toBeDefined();
+
+    answer.resolve();
+
+    const list = await screen.findByRole("list", { name: "Recovery Codes" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(CODES.length);
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        screen.getByRole("heading", { name: RECOVERY_CODE_WORDS.saveHeading }),
+      );
+    });
+  });
+});
+
+describe("removing and replacing on the Account page", () => {
+  it("a member removes their authenticator through its dialog", async () => {
+    let removed = false;
+    const asked = adasRoutes(
+      readingAfter(() => removed, AN_AUTHENTICATOR_AND_CODES, NO_FACTOR_YET),
+      new Map(),
+      new Map([
+        [
+          "person.removeAuthenticator",
+          () => {
+            removed = true;
+            return {};
+          },
+        ],
+      ]),
+    );
+    await openAsAda("/account");
+    const remove = await screen.findByRole("button", { name: "Remove" });
+    expect(saidOnThePage()).toEqual([]);
+
+    fireEvent.click(remove);
+
+    const dialog = await screen.findByRole("dialog", {
+      name: AUTHENTICATOR_WORDS.removeTitle,
+      description: /\S/,
+    });
+    expect(timesAsked(asked, "person.removeAuthenticator")).toBe(0);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+    const setUp = await screen.findByRole("button", { name: "Set Up an Authenticator" });
+    expect(timesAsked(asked, "person.removeAuthenticator")).toBe(1);
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+    expect(saidOnThePage()).toEqual([ACTION_LANDED.removed(SIGNED_IN_AS_ADA.person.email)]);
+    await waitFor(() => {
+      expect(document.activeElement).toBe(setUp);
+    });
+  });
+
+  it("replacing the recovery codes shows a new set", async () => {
+    const asked = adasRoutes(
+      () => AN_AUTHENTICATOR_AND_CODES,
+      new Map(),
+      new Map([
+        [
+          "person.replaceRecoveryCodes",
+          () => ({ recoveryCodes: CODES, madeAt: MADE_AT, replaced: true }),
+        ],
+      ]),
+    );
+    await openAsAda("/account");
+    const replace = await screen.findByRole("button", { name: RECOVERY_CODE_WORDS.replace });
+    expect(screen.queryByRole("list", { name: "Recovery Codes" })).toBeNull();
+
+    fireEvent.click(replace);
+
+    const dialog = await screen.findByRole("dialog", {
+      name: RECOVERY_CODE_WORDS.replaceTitle,
+      description: /\S/,
+    });
+    expect(timesAsked(asked, "person.replaceRecoveryCodes")).toBe(0);
+
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: RECOVERY_CODE_WORDS.replaceCommit }),
+    );
+
+    const list = await screen.findByRole("list", { name: "Recovery Codes" });
+    expect(timesAsked(asked, "person.replaceRecoveryCodes")).toBe(1);
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((code) => code.textContent),
+    ).toEqual(CODES);
+    expect(screen.getByText(RECOVERY_CODE_WORDS.replacedLine)).toBeDefined();
+    expect(saidOnThePage()).toEqual([ACTION_LANDED.replaced(SIGNED_IN_AS_ADA.person.email)]);
+  });
+});
+
+const EDITOR = {
+  workspace: { id: "w", name: "Northern Tooling" },
+  person: { id: "p", name: "Ada", email: SIGNED_IN_AS_ADA.person.email },
+  role: "Editor",
+};
+
+const inTheBand = () => within(screen.getByRole("banner"));
+
+describe("the Account page of a member", () => {
+  placedWithoutMeasuring();
+
+  it("a member's Account page sits inside the shell", async () => {
+    adasRoutes(() => NO_FACTOR_YET);
+    const outside = await openAsAda("/account");
+    await screen.findByRole("heading", { level: 1, name: "Account" });
+    expect(screen.getByRole("link", { name: "Go to better-answers" })).toBeDefined();
+    expect(screen.queryByRole("navigation", { name: "Areas" })).toBeNull();
+    outside.rendered.unmount();
+
+    adasRoutes(
+      () => NO_FACTOR_YET,
+      new Map(),
+      new Map<string, () => unknown>([
+        ["session.member", () => EDITOR],
+        ["session.operator", () => ({ operator: false, name: "Ada" })],
+      ]),
+    );
+    await openAsAda("/account");
+
+    const rail = await screen.findByRole("navigation", { name: "Areas" });
+    expect(within(rail).getAllByRole("link").length).toBeGreaterThan(0);
+    const crumbs = inTheBand().getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(crumbs).getByRole("link", { name: "Account" })).toBeDefined();
+    expect(screen.queryByRole("link", { name: "Go to better-answers" })).toBeNull();
+
+    fireEvent.keyDown(document.body, { key: "?" });
+    const listed = await screen.findByRole("dialog", { name: "Keyboard Shortcuts on Account" });
+    fireEvent.keyDown(listed, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Keyboard Shortcuts on Account" })).toBeNull();
+    });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Keyboard Shortcuts" }));
   });
 });
