@@ -189,7 +189,7 @@ export const press = (key: string): void => {
   fireEvent.keyDown(document.activeElement ?? document.body, { key });
 };
 
-export const describerOf = (control: HTMLElement): HTMLElement | null => {
+const describerOf = (control: HTMLElement): HTMLElement | null => {
   const id = control.getAttribute("aria-describedby");
   return id === null ? null : document.getElementById(id);
 };
