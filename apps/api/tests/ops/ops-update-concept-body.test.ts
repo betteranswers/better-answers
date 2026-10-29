@@ -436,24 +436,16 @@ describe("pnpm ops update-concept-body: a standing concept's body replaced in pl
     expect(await standingOf(scene)).toEqual(before);
   });
 
-  it.each([
-    [
-      "a write with no --expect",
-      { expect: undefined },
-      "update-concept-body: --expect <content hash> is required on a write; run with --dry-run to read the hash the concept stands at",
-    ],
-    [
-      "an empty stdin",
-      { body: "" },
-      "update-concept-body: the new body is read from stdin, and stdin was empty",
-    ],
-  ] as const)("answers usage to %s, writing nothing", async (_shape, overrides, said) => {
+  it("answers usage to an empty stdin, writing nothing", async () => {
     const scene = await imported();
     const before = await standingOf(scene);
 
-    const run = await scene.update(overrides);
+    const run = await scene.update({ body: "" });
 
-    expect(run).toEqual({ exitCode: 2, lines: [said] });
+    expect(run).toEqual({
+      exitCode: 2,
+      lines: ["update-concept-body: the new body is read from stdin, and stdin was empty"],
+    });
     expect(await standingOf(scene)).toEqual(before);
   });
 });

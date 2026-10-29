@@ -1,5 +1,6 @@
 import { getTableName } from "drizzle-orm";
 
+import { err, ok, type Result } from "@better-answers/core/kernel";
 import {
   CHOOSABLE_PROVIDERS,
   FIXED_PURPOSE,
@@ -22,21 +23,12 @@ import {
 import { decisionThreshold, MODEL_PROVIDERS, modelPrice } from "@better-answers/schema";
 
 import type { Doors } from "../doors.ts";
-import {
-  DONE,
-  REFUSED,
-  USAGE,
-  NOT_BUILT,
-  type OpsIo,
-  type Flags,
-  flagValue,
-  exitOf,
-} from "./cli.ts";
+import { DONE, REFUSED, NOT_BUILT, type OpsIo, type Flags, flagValue, exitOf } from "./cli.ts";
 import { noSuchWorkspace } from "./workspaces.ts";
 
 export const CHOSEN_PURPOSES = LLM_PURPOSES.filter((purpose) => purpose !== FIXED_PURPOSE);
 
-const MODEL_KEY_USAGE = `set-model-key: --workspace <id> and --provider <${MODEL_PROVIDERS.join("|")}> are required, with the key on standard input`;
+const MODEL_KEY_USAGE = `--workspace <id> and --provider <${MODEL_PROVIDERS.join("|")}> are required, with the key on standard input`;
 
 const modelKeyReason = (refusal: SetModelKeyRefusal | Error, workspaceId: string): string => {
   if (refusal instanceof Error) return refusal.message;
@@ -48,17 +40,19 @@ const modelKeyReason = (refusal: SetModelKeyRefusal | Error, workspaceId: string
   }
 };
 
+type SetModelKeyAsked = { readonly provider: string };
+
+export const setModelKeyAskedOf = (flags: Flags): Result<SetModelKeyAsked, string> => {
+  const provider = flagValue(flags, "provider");
+  return provider === undefined ? err(MODEL_KEY_USAGE) : ok({ provider });
+};
+
 export const setModelKeyCommand = async (
   doors: Doors,
   workspaceId: string,
-  flags: Flags,
+  { provider }: SetModelKeyAsked,
   io: OpsIo,
 ): Promise<number> => {
-  const provider = flagValue(flags, "provider");
-  if (provider === undefined) {
-    io.say(MODEL_KEY_USAGE);
-    return USAGE;
-  }
   if (!io.modelKeySetting.ok) {
     io.say(`set-model-key: REFUSED — ${io.modelKeySetting.error}; nothing changed`);
     return REFUSED;
@@ -92,17 +86,21 @@ const spendingLimitReason = (
   }
 };
 
+type SetSpendingLimitAsked = { readonly gbp: string };
+
+export const setSpendingLimitAskedOf = (flags: Flags): Result<SetSpendingLimitAsked, string> => {
+  const gbp = flagValue(flags, "gbp");
+  return gbp === undefined
+    ? err("--workspace <id> and --gbp <pounds a month> are required")
+    : ok({ gbp });
+};
+
 export const setSpendingLimitCommand = async (
   doors: Doors,
   workspaceId: string,
-  flags: Flags,
+  { gbp }: SetSpendingLimitAsked,
   io: OpsIo,
 ): Promise<number> => {
-  const gbp = flagValue(flags, "gbp");
-  if (gbp === undefined) {
-    io.say("set-spending-limit: --workspace <id> and --gbp <pounds a month> are required");
-    return USAGE;
-  }
   const set = await setSpendingLimit(BOOTSTRAP, doors.postgres, { workspaceId, gbp });
   if (!set.ok) {
     io.say(`set-spending-limit: REFUSED — ${spendingLimitReason(set.error, workspaceId)}`);
@@ -116,7 +114,7 @@ export const setSpendingLimitCommand = async (
 
 const MODEL_CHOICE_FLAGS = ["purpose", "provider", "model"] as const;
 
-const MODEL_CHOICE_USAGE = `set-model-choice: --workspace <id>, --purpose <${CHOSEN_PURPOSES.join("|")}>, --provider <provider> and --model <model> are required`;
+const MODEL_CHOICE_USAGE = `--workspace <id>, --purpose <${CHOSEN_PURPOSES.join("|")}>, --provider <provider> and --model <model> are required`;
 
 const modelChoiceReason = (
   refusal: SetModelChoiceRefusal | Error,
@@ -139,17 +137,25 @@ const modelChoiceReason = (
   }
 };
 
+type SetModelChoiceAsked = {
+  readonly purpose: string;
+  readonly provider: string;
+  readonly model: string;
+};
+
+export const setModelChoiceAskedOf = (flags: Flags): Result<SetModelChoiceAsked, string> => {
+  const [purpose, provider, model] = MODEL_CHOICE_FLAGS.map((name) => flagValue(flags, name));
+  return purpose === undefined || provider === undefined || model === undefined
+    ? err(MODEL_CHOICE_USAGE)
+    : ok({ purpose, provider, model });
+};
+
 export const setModelChoiceCommand = async (
   doors: Doors,
   workspaceId: string,
-  flags: Flags,
+  { purpose, provider, model }: SetModelChoiceAsked,
   io: OpsIo,
 ): Promise<number> => {
-  const [purpose, provider, model] = MODEL_CHOICE_FLAGS.map((name) => flagValue(flags, name));
-  if (purpose === undefined || provider === undefined || model === undefined) {
-    io.say(MODEL_CHOICE_USAGE);
-    return USAGE;
-  }
   const asked = { workspaceId, purpose, provider, model };
   const set = await setModelChoice(BOOTSTRAP, doors.postgres, { ...asked, now: doors.clock.now() });
   if (!set.ok) {
@@ -173,9 +179,17 @@ const MODEL_PRICE_FLAGS = [
 
 const MODEL_PRICE_NAMED = `--provider <${MODEL_PROVIDERS.join("|")}>, --model <model>, --from <yyyy-mm-dd>, --gbp-per-million-in <pounds> and --gbp-per-million-out <pounds>`;
 
-const MODEL_PRICE_USAGE = `set-model-price: ${MODEL_PRICE_NAMED} are required`;
+const MODEL_PRICE_USAGE = `${MODEL_PRICE_NAMED} are required`;
 
-const priceNamed = (flags: Flags) => {
+type SetModelPriceAsked = {
+  readonly provider: string;
+  readonly model: string;
+  readonly effectiveFrom: string;
+  readonly gbpPerMillionIn: string;
+  readonly gbpPerMillionOut: string;
+};
+
+export const setModelPriceAskedOf = (flags: Flags): Result<SetModelPriceAsked, string> => {
   const named = MODEL_PRICE_FLAGS.map((name) => flagValue(flags, name));
   const [provider, model, effectiveFrom, gbpPerMillionIn, gbpPerMillionOut] = named;
   return provider === undefined ||
@@ -183,20 +197,16 @@ const priceNamed = (flags: Flags) => {
     effectiveFrom === undefined ||
     gbpPerMillionIn === undefined ||
     gbpPerMillionOut === undefined
-    ? undefined
-    : { provider, model, effectiveFrom, gbpPerMillionIn, gbpPerMillionOut };
+    ? err(MODEL_PRICE_USAGE)
+    : ok({ provider, model, effectiveFrom, gbpPerMillionIn, gbpPerMillionOut });
 };
 
 export const setModelPriceCommand = async (
   doors: Doors,
-  flags: Flags,
+  { provider, model, effectiveFrom, gbpPerMillionIn, gbpPerMillionOut }: SetModelPriceAsked,
   io: OpsIo,
 ): Promise<number> => {
-  const price = priceNamed(flags);
-  if (price === undefined) {
-    io.say(MODEL_PRICE_USAGE);
-    return USAGE;
-  }
+  const price = { provider, model, effectiveFrom, gbpPerMillionIn, gbpPerMillionOut };
   const table = getTableName(modelPrice);
   if ((await tablesPresent(doors.postgres, [table])).length === 0) {
     io.say(`set-model-price: not built — ${table} absent from this schema`);
@@ -221,18 +231,28 @@ const THRESHOLD_FLAGS = ["provider", "model", "threshold"] as const;
 
 const THRESHOLD_NAMED = `--provider <${DECISION_PROVIDERS.join("|")}>, --model <model> and --threshold <probability>`;
 
-const THRESHOLD_USAGE = `set-decision-threshold: ${THRESHOLD_NAMED} are required`;
+const THRESHOLD_USAGE = `${THRESHOLD_NAMED} are required`;
+
+type SetDecisionThresholdAsked = {
+  readonly provider: string;
+  readonly model: string;
+  readonly threshold: string;
+};
+
+export const setDecisionThresholdAskedOf = (
+  flags: Flags,
+): Result<SetDecisionThresholdAsked, string> => {
+  const [provider, model, threshold] = THRESHOLD_FLAGS.map((name) => flagValue(flags, name));
+  return provider === undefined || model === undefined || threshold === undefined
+    ? err(THRESHOLD_USAGE)
+    : ok({ provider, model, threshold });
+};
 
 export const setDecisionThresholdCommand = async (
   doors: Doors,
-  flags: Flags,
+  { provider, model, threshold }: SetDecisionThresholdAsked,
   io: OpsIo,
 ): Promise<number> => {
-  const [provider, model, threshold] = THRESHOLD_FLAGS.map((name) => flagValue(flags, name));
-  if (provider === undefined || model === undefined || threshold === undefined) {
-    io.say(THRESHOLD_USAGE);
-    return USAGE;
-  }
   const table = getTableName(decisionThreshold);
   if ((await tablesPresent(doors.postgres, [table])).length === 0) {
     io.say(`set-decision-threshold: not built — ${table} absent from this schema`);

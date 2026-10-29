@@ -24,7 +24,6 @@ import {
   sourceDocument,
   spendReservation,
   suppression,
-  ulid,
 } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
@@ -53,6 +52,29 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "update-concept-body": [conceptIndex, bundleCommit],
 };
 
+const WELL_FORMED_FLAGS: Readonly<Record<string, readonly string[]>> = {
+  "object-store-orphans": ["--list"],
+  "erasure-rehearsal": ["--synthetic", "--seed"],
+  "import-bundle": ["--from", "/dump", "--as", "admin@acme.invalid"],
+  "update-concept-body": [
+    "--iri",
+    "https://acme.invalid/c/x",
+    "--as",
+    "admin@acme.invalid",
+    "--dry-run",
+  ],
+  "set-model-key": ["--provider", "anthropic"],
+  "set-spending-limit": ["--gbp", "1"],
+  "set-model-choice": ["--purpose", "judge", "--provider", "anthropic", "--model", "m"],
+};
+
+const wellFormed = (command: string): readonly string[] => [
+  command,
+  "--workspace",
+  "ws_synthetic",
+  ...(WELL_FORMED_FLAGS[command] ?? []),
+];
+
 describe("pnpm ops — the restore scripts' commands", () => {
   const served = servedApp();
 
@@ -61,23 +83,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
     expect(parseSince("2026-09-03T02:05:00Z")?.toISOString()).toBe("2026-09-03T02:05:00.000Z");
     expect(parseSince("yesterday")).toBeUndefined();
   });
-
-  it("answers usage to a missing or unknown command, never guessing", async () => {
-    expect((await ops(served(), [])).exitCode).toBe(2);
-    expect((await ops(served(), ["make-it-so"])).exitCode).toBe(2);
-    expect((await ops(served(), ["map-counts"])).exitCode).toBe(2);
-    expect((await ops(served(), ["replay-erasures"])).exitCode).toBe(2);
-  });
-
-  it.each(["toString", "__proto__"])(
-    "answers %s, a name every object inherits, as unknown",
-    async (command) => {
-      const run = await ops(served(), [command, "--workspace", ulid()]);
-
-      expect(run.exitCode).toBe(2);
-      expect(run.lines.join("\n")).toContain(`unknown command: ${command}`);
-    },
-  );
 
   it("prints a refusal's word and exits with its class's code", async () => {
     const run = await ops(served(), ["map-counts", "--workspace", "not-a-workspace-id"]);
@@ -123,20 +128,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     expect(run.exitCode).toBe(0);
     expect(run.lines.join("\n")).toContain("replayed 0 erasures");
-    expect((await ops(served(), ["--"])).exitCode).toBe(2);
   });
 
   describe("the slice-owned commands", () => {
     it.each(["erasure-rehearsal", "object-store-orphans", "import-bundle"])(
       "%s says `not built`, exit 3, without its slice's tables",
       async (command) => {
-        const run = await opsBeforeTheJournal(served(), [
-          command,
-          "--workspace",
-          "ws_synthetic",
-          "--wait",
-          "--list",
-        ]);
+        const run = await opsBeforeTheJournal(served(), wellFormed(command));
 
         expect(run.exitCode).toBe(NOT_BUILT);
         expect(run.lines.join("\n")).toContain("not built");
@@ -147,13 +145,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect([...SLICE_COMMANDS].toSorted()).toEqual(Object.keys(SLICE_TABLES).toSorted());
 
       for (const [command, tables] of Object.entries(SLICE_TABLES)) {
-        const run = await opsBeforeTheJournal(served(), [
-          command,
-          "--workspace",
-          "ws_synthetic",
-          "--wait",
-          "--list",
-        ]);
+        const run = await opsBeforeTheJournal(served(), wellFormed(command));
         const absent = tables.map((table) => getTableName(table)).join(", ");
 
         expect({ command, exitCode: run.exitCode, said: run.lines }).toEqual({

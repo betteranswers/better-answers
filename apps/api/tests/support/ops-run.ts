@@ -186,6 +186,8 @@ export const opsRunner = (objects: () => ObjectStore) => {
     return { exitCode, lines: io.lines, logs: io.logs };
   };
 
+  const help = async (app: TestApp): Promise<string> => (await ops(app, ["help"])).lines.join("\n");
+
   const opsWith = async (
     app: TestApp,
     argv: readonly string[],
@@ -277,6 +279,7 @@ export const opsRunner = (objects: () => ObjectStore) => {
   return {
     doorsFrom,
     ops,
+    help,
     opsWith,
     opsBeforeTheJournal,
     provisioning,

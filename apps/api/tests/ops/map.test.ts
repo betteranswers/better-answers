@@ -89,6 +89,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
 
       expect(run.exitCode).toBe(2);
+      expect(run.lines).toEqual([
+        "map-rebuild: --reason must be one of first-build, model-choice-change, reconciler, erasure, upgrade, drill",
+      ]);
       expect(await jobsOf(served(), workspaceId)).toEqual([]);
     });
 
@@ -99,19 +102,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         "map-rebuild: REFUSED — malformed: --workspace ws_synthetic is not a workspace id",
       ]);
-    });
-
-    it.each([
-      ["a --wait carrying a value", ["--wait", "soon"]],
-      ["a non-numeric --wait-seconds", ["--wait-seconds", "soon"]],
-      ["a --wait-seconds of zero", ["--wait-seconds", "0"]],
-    ])("answers usage to %s, queueing nothing", async (_shape, flags) => {
-      const { workspaceId } = await served().provision();
-
-      const run = await ops(served(), ["map-rebuild", "--workspace", workspaceId, ...flags]);
-
-      expect(run.exitCode).toBe(2);
-      expect(await jobsOf(served(), workspaceId)).toEqual([]);
     });
 
     it("waits two minutes by default, as its usage says", async () => {

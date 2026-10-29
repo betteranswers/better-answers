@@ -24,7 +24,7 @@ import { workspaceRoot } from "../support/roots/roots.ts";
 import { servedApp } from "../support/suite-app.ts";
 
 const objects = objectStoreForSuite();
-const { ops, opsWith } = opsRunner(objects);
+const { ops, help, opsWith } = opsRunner(objects);
 
 describe("pnpm ops — the restore scripts' commands", () => {
   const served = servedApp();
@@ -496,7 +496,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await thresholdsHeld(served(), model)).toEqual([]);
     });
 
-    it("answers usage with the threshold missing, as help names it", async () => {
+    it("answers usage with the threshold missing, writing nothing", async () => {
       const model = aModel();
 
       const run = await ops(served(), [
@@ -506,7 +506,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "--model",
         model,
       ]);
-      const help = await ops(served(), ["help"]);
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 2,
@@ -515,7 +514,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
         ],
       });
       expect(await thresholdsHeld(served(), model)).toEqual([]);
-      expect(help.lines.join("\n")).toContain(
+    });
+
+    it("names the command in the usage", async () => {
+      expect(await help(served())).toContain(
         "set-decision-threshold --provider <cloudflare> --model <model> --threshold <probability>",
       );
     });
@@ -676,11 +678,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("answers usage with the model missing, as help names it", async () => {
+    it("answers usage with the model missing, writing nothing", async () => {
       const { workspaceId } = await served().provision();
 
       const run = await ops(served(), ["set-model-choice", "--workspace", workspaceId]);
-      const help = await ops(served(), ["help"]);
 
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 2,
@@ -689,7 +690,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
         ],
       });
       expect(await choicesHeld(served(), workspaceId)).toEqual([]);
-      expect(help.lines.join("\n")).toContain(
+    });
+
+    it("names the command in the usage", async () => {
+      expect(await help(served())).toContain(
         "set-model-choice --workspace <id> --purpose <extraction|enrichment|answering|judging> --provider <anthropic|mistral> --model <model>",
       );
     });

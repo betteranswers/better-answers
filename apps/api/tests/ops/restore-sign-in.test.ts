@@ -14,7 +14,7 @@ import { servedApp } from "../support/suite-app.ts";
 import { webClientOf } from "../support/web-client.ts";
 
 const objects = objectStoreForSuite();
-const { ops, opsWith } = opsRunner(objects);
+const { help, opsWith } = opsRunner(objects);
 
 describe("pnpm ops — the restore scripts' commands", () => {
   const served = servedApp();
@@ -301,19 +301,22 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await restoreRowsOf(person.email)).toEqual([]);
     });
 
-    it("answers usage without --email", async () => {
-      const run = await opsWith(served(), ["restore-sign-in"], {});
+    it("answers usage without --email, restoring no one", async () => {
+      const person = await served().person();
+
+      const run = await opsWith(served(), ["restore-sign-in"], {
+        io: { mail: capturingMail().mail },
+      });
 
       expect(run).toMatchObject({
         exitCode: 2,
         lines: ["restore-sign-in: --email <email> is required"],
       });
+      expect(await restoreRowsOf(person.email)).toEqual([]);
     });
 
     it("names the command in the usage", async () => {
-      const run = await ops(served(), ["help"]);
-
-      expect(run.lines.join("\n")).toContain("restore-sign-in --email <email>");
+      expect(await help(served())).toContain("restore-sign-in --email <email>");
     });
   });
 });

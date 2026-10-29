@@ -34,7 +34,7 @@ import {
 import { servedApp } from "../support/suite-app.ts";
 
 const objects = objectStoreForSuite();
-const { ops, opsWith, opsBeforeTheJournal, theSyncLanded, boundAndIndexed } = opsRunner(objects);
+const { opsWith, opsBeforeTheJournal, theSyncLanded, boundAndIndexed } = opsRunner(objects);
 
 const FROM_THE_ROWS_AT = new Date("2026-06-01T12:00:00.000Z");
 
@@ -438,25 +438,29 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it.each([
-      ["--seed", []],
-      ["--run", ["--report", "report.md"]],
-    ])("answers usage to %s with a wait not in seconds", async (phase, report) => {
-      const run = await ops(served(), [
-        "erasure-rehearsal",
-        "--workspace",
-        "ws_synthetic",
-        "--synthetic",
-        phase,
-        ...report,
-        "--wait-seconds",
-        "a minute",
-      ]);
+    it("answers usage to a wait not in seconds, queueing nothing", async () => {
+      const { workspaceId } = await aWorkspaceToDrillIn();
+
+      const run = await opsWith(
+        served(),
+        [
+          "erasure-rehearsal",
+          "--workspace",
+          workspaceId,
+          "--synthetic",
+          "--seed",
+          "--wait-seconds",
+          "a minute",
+        ],
+        {},
+      );
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual([
         "erasure-rehearsal: --wait-seconds takes a whole number of seconds",
       ]);
+      expect(await jobsOf(served(), workspaceId)).toEqual([]);
+      expect(await indexJobsIn(served(), workspaceId)).toEqual([]);
     });
 
     it("erases the subject, writes the routine's report, reprints the tokens", async () => {
@@ -549,51 +553,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.precondition);
       expect(run.lines.join("\n")).toContain("no synthetic subject stands in this workspace");
-    });
-
-    it("answers usage without --synthetic, the caller's consent to run here", async () => {
-      const run = await ops(served(), [
-        "erasure-rehearsal",
-        "--workspace",
-        "ws_synthetic",
-        "--seed",
-      ]);
-
-      expect(run.exitCode).toBe(2);
-      expect(run.lines.join("\n")).toContain("--synthetic is required");
-    });
-
-    it("answers usage to neither or both phases at once", async () => {
-      const both = await ops(served(), [
-        "erasure-rehearsal",
-        "--workspace",
-        "ws_synthetic",
-        "--synthetic",
-        "--seed",
-        "--run",
-      ]);
-      const neither = await ops(served(), [
-        "erasure-rehearsal",
-        "--workspace",
-        "ws_synthetic",
-        "--synthetic",
-      ]);
-
-      expect([both.exitCode, neither.exitCode]).toEqual([2, 2]);
-      expect(both.lines.join("\n")).toContain("exactly one of --seed");
-    });
-
-    it("answers usage to a reportless run, which would prove nothing", async () => {
-      const run = await ops(served(), [
-        "erasure-rehearsal",
-        "--workspace",
-        "ws_synthetic",
-        "--synthetic",
-        "--run",
-      ]);
-
-      expect(run.exitCode).toBe(2);
-      expect(run.lines.join("\n")).toContain("--report <file>");
     });
   });
 });

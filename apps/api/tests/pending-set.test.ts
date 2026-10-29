@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
@@ -23,6 +23,30 @@ const aPendingSession = async (): Promise<TestClient> => {
   const workspace = await app().provision();
   await holdAnAuthenticator(app(), workspace.admin.id);
   return signedInByEmailOnly(app(), workspace.admin.email);
+};
+
+let sharedSession: TestClient;
+
+beforeAll(async () => {
+  sharedSession = await aPendingSession();
+});
+
+const sessionFor = async (served: boolean): Promise<TestClient> =>
+  served ? aPendingSession() : sharedSession;
+
+/**
+ * Code-sending endpoints are counted per client address ahead of the gate, at 5 per ten minutes,
+ * and the shared session's sign-in used one.
+ */
+const sharedSessionFromAFreshAddress = (): Pick<TestClient, "fetch"> => {
+  const fresh = app().client();
+  return {
+    fetch: (path, init) => {
+      const headers = new Headers(init?.headers);
+      headers.set("cookie", sharedSession.cookies());
+      return fresh.fetch(path, { ...init, headers });
+    },
+  };
 };
 
 const refusedAsPending = async (answered: Response): Promise<boolean> => {
@@ -59,7 +83,7 @@ describe("the pending set over tRPC", () => {
   });
 
   it.each(PROCEDURES)("answers %s to a pending session as the set says", async (path, type) => {
-    const answered = await askedOver(await aPendingSession(), path, type);
+    const answered = await askedOver(await sessionFor(PENDING_PROCEDURES.has(path)), path, type);
 
     expect(await refusedAsPending(answered)).toBe(!PENDING_PROCEDURES.has(path));
   });
@@ -87,7 +111,11 @@ const OPEN_TO_A_PENDING_SESSION = new Set([
 const UNSUPPORTED_MEDIA_TYPE = 415;
 
 /** JSON first; a path that takes forms alone refuses it before any gate, so it is asked again. */
-const askedOfTheLibrary = async (client: TestClient, path: string, method: string) => {
+const askedOfTheLibrary = async (
+  client: Pick<TestClient, "fetch">,
+  path: string,
+  method: string,
+) => {
   const concrete = path.replaceAll(/:\w+/g, "x");
   if (method === "GET") return client.fetch(concrete, { redirect: "manual" });
   const asJson = await client.fetch(concrete, {
@@ -129,7 +157,7 @@ describe("the pending set in the library's endpoints", () => {
   });
 
   it.each(GATED)("refuses or hides %s from a pending session", async (path, method) => {
-    const answered = await askedOfTheLibrary(await aPendingSession(), path, method);
+    const answered = await askedOfTheLibrary(sharedSessionFromAFreshAddress(), path, method);
 
     const pending = await refusedAsPending(answered);
     const absent = answered.status === 404;
@@ -196,7 +224,7 @@ describe("the pending set in the api's own routes", () => {
     "answers %s to a pending session as %s",
     async (route, held) => {
       const [method = "", path = ""] = route.split(" ");
-      const client = await aPendingSession();
+      const client = await sessionFor(held === "open");
       const answered = await askedOfTheApi(client, method, path);
 
       expect(await refusedAsPending(answered)).toBe(held === "refused");

@@ -1,3 +1,4 @@
+import { err, ok, type Result } from "@better-answers/core/kernel";
 import {
   restoreSignIn,
   setOperatorMark,
@@ -7,10 +8,10 @@ import {
 import type { Doors } from "../doors.ts";
 import { sendFactorNotice } from "../email/factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
-import { DONE, REFUSED, USAGE, type OpsIo, type Flags, flagValue, exitOf } from "./cli.ts";
+import { DONE, REFUSED, type OpsIo, type Flags, flagValue, exitOf } from "./cli.ts";
 import { notSignedIn } from "./workspaces.ts";
 
-const OPERATOR_USAGE = "operator: --email <email> and one of --grant or --revoke are required";
+const OPERATOR_USAGE = "--email <email> and one of --grant or --revoke are required";
 
 const MARK_SAID = {
   grant: { changed: "is the operator", unchanged: "was already the operator; nothing written" },
@@ -20,14 +21,20 @@ const MARK_SAID = {
   },
 } as const;
 
-export const operatorCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
+type OperatorAsked = { readonly email: string; readonly change: "grant" | "revoke" };
+
+export const operatorAskedOf = (flags: Flags): Result<OperatorAsked, string> => {
   const email = flagValue(flags, "email");
   const granting = flags.has("grant");
-  if (email === undefined || granting === flags.has("revoke")) {
-    io.say(OPERATOR_USAGE);
-    return USAGE;
-  }
-  const change = granting ? "grant" : "revoke";
+  if (email === undefined || granting === flags.has("revoke")) return err(OPERATOR_USAGE);
+  return ok({ email, change: granting ? "grant" : "revoke" });
+};
+
+export const operatorCommand = async (
+  doors: Doors,
+  { email, change }: OperatorAsked,
+  io: OpsIo,
+): Promise<number> => {
   const marked = await setOperatorMark(IDENTITY_PRINCIPAL, doors.postgres, { email, change });
   if (!marked.ok) {
     const reason = marked.error === "no-such-user" ? notSignedIn(email) : marked.error.message;
@@ -39,7 +46,7 @@ export const operatorCommand = async (doors: Doors, flags: Flags, io: OpsIo): Pr
   return DONE;
 };
 
-const RESTORE_USAGE = "restore-sign-in: --email <email> is required";
+const RESTORE_USAGE = "--email <email> is required";
 
 const NO_MAIL =
   "no email transport is configured (SMTP_URL on the api service), so the restore notice cannot go; nothing changed";
@@ -53,16 +60,18 @@ const restoredSaid = (restored: SignInRestored, noticed: boolean): readonly stri
   "restore-sign-in: run this only once you have checked who they are by a channel other than their email, and hand them the code by that same channel, never by email",
 ];
 
+type RestoreSignInAsked = { readonly email: string };
+
+export const restoreSignInAskedOf = (flags: Flags): Result<RestoreSignInAsked, string> => {
+  const email = flagValue(flags, "email");
+  return email === undefined ? err(RESTORE_USAGE) : ok({ email });
+};
+
 export const restoreSignInCommand = async (
   doors: Doors,
-  flags: Flags,
+  { email }: RestoreSignInAsked,
   io: OpsIo,
 ): Promise<number> => {
-  const email = flagValue(flags, "email");
-  if (email === undefined) {
-    io.say(RESTORE_USAGE);
-    return USAGE;
-  }
   if (io.mail === undefined) {
     io.say(`restore-sign-in: REFUSED — ${NO_MAIL}`);
     return REFUSED;

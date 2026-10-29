@@ -676,10 +676,12 @@ Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` c
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Wall seconds of `pnpm check:api`.
-- [ ] Probe. Run it at trunk and head, interleaved, three times each.
+- [ ] Metric. The summed file-seconds of the touched test files at trunk and head, from vitest's reporter.
+- [ ] Probe. Run five interleaved runs per side inside `suite-slot.sh --exclusive`.
 - [ ] Baseline. Record the trunk median first.
-- [ ] Rule. Fails if the head median is not at least 40s below trunk's.
+- [ ] Rule. Fails unless every head round is lower than every trunk round. Record `pnpm check:api`'s wall at trunk and head as a figure.
+
+Changed 29/10/2026. The first rule, a 40s drop in `pnpm check:api`'s wall, summed test time across parallel workers, so it ignored that the suite runs on six. At trunk the suite held 269.8 file-seconds, which is 45s of wall on six workers, and the files this unit touches held 122.1 of them, so deleting every one of them would save at most 20.3s. The unit removed 38.0 file-seconds (122.1 to 84.1), at most 6.3s of wall, before the nine real usage cases restored on review added 0.2s of case time. Measured over five interleaved rounds, the wall went from a median of 65.3s at trunk (63.7 to 67.5) to 63.3s at head (63.0 to 63.5). BA-269, BA-276 and BA-275 had the same rule and were ruled the same way. The rule now asks for a metric this unit can move. A slice command with a bad flag, against a schema without its tables, now answers usage (exit 2) before not built (exit 3), because the parse runs before the table check.
 
 **Review gate.** None. BA-274 is not review-gated.
 
