@@ -151,3 +151,13 @@ export const openAt = async (path: string, api: Api) => {
   await switcher();
   return router;
 };
+
+/** A page outside the shell draws no switcher, so this waits for none. */
+export const openOutsideTheShellAt = async (path: string, api: Api) => {
+  server.asks = [];
+  server.answer = answering(api);
+  const clients = createAppClients();
+  clients.queryClient.setDefaultOptions({ queries: { retry: false } });
+  const { router } = await openApp(path, clients);
+  return router;
+};
