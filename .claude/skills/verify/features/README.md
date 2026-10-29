@@ -1,12 +1,12 @@
 # better-answers verification map
 
-This directory is the maintained source for verifying what a person sees in better-answers. It has one file for each area of `apps/web/src/shared/navigation.ts` and one for the pages outside the shell. Every page that navigation list names appears, by its address, in exactly one file. Read this index before driving the app, then use the matching feature file as the recipe.
+This directory is the maintained source for verifying what a person sees in better-answers. It has one file for each area of `apps/web/src/shared/navigation.ts` and one for the pages outside the shell. Every page that navigation list names appears, by its address, in a feature file. Read this index before driving the app, then use the matching feature file as the recipe.
 
 ## Baseline preconditions
 
 - Launch with `.claude/skills/verify/scripts/launch.sh <port>` and require `.claude/skills/verify/scripts/doctor.sh <port>` to print `worth driving`.
 - Use `http://localhost:<port>`, never `127.0.0.1`.
-- Each recipe provisions its own workspace through `.claude/skills/verify/scripts/harness.sh`, and the harness mints each person's address. Nothing is seeded before a recipe runs.
+- Each recipe provisions its own workspace through `.claude/skills/verify/scripts/harness.sh`. Nothing is seeded before a recipe runs.
 - Sign in with `.claude/skills/verify/scripts/sign-in.sh <port> <email> [path]`. It also switches from one person to another.
 - Never drive an instance this run did not launch.
 

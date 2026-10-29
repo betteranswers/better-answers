@@ -104,7 +104,7 @@ Every browser command goes through `scripts/browse.sh <port> <agent-browser comm
    .claude/skills/verify/scripts/harness.sh 4610 POST /workspaces '{"name":"Verify people"}'
    ```
 
-   It answers the workspace's `workspaceId`, `name` and `shortName`, and the Admin's `id`, `email` and `name`. Sign in with that `email`. `references/harness.md` lists every action by the name of its function in `apps/web/e2e/harness.ts`. An action's route is the path that function passes to `/__harness`. The body a route takes is the schema it parses, in `apps/api/tests/support/harness/harness-control.ts` or in the area's `harness-*.ts` file beside it. The function in `apps/web/e2e/harness.ts` may reshape its arguments before it sends them. Each feature file names the routes its pages need.
+   It answers the workspace's `workspaceId`, `name` and `shortName`, and the Admin's `id`, `email` and `name`. Sign in with that `email`. `references/harness.md` lists the actions by the name of their function in `apps/web/e2e/harness.ts`. An action's route is the path that function passes to `/__harness`. The body a route takes is the schema it parses, in `apps/api/tests/support/harness/harness-control.ts` or in the area's `harness-*.ts` file beside it. The function in `apps/web/e2e/harness.ts` may reshape its arguments before it sends them. Each feature file names the routes its pages need.
 
 2. **Sign in through the product's own page.**
 
@@ -133,7 +133,7 @@ Every browser command goes through `scripts/browse.sh <port> <agent-browser comm
 
    `snapshot -c` prints the accessibility tree with refs. A name matches as a case-insensitive substring unless the command adds `--exact`. Add it where one name sits inside another on the same page. Never locate by CSS class, coordinates or tab order. Wait on a condition, never for a fixed time.
 
-   Move between pages as a person does. The rail is the `navigation` named *Areas*. The menu is the `navigation` named for the open area. The breadcrumb is the `navigation` named *Breadcrumb*. To open a page by its address, run `.claude/skills/verify/scripts/browse.sh 4610 open http://localhost:4610<path>`. `open` returns before the page's data arrives, so `wait` for a text or a condition the loaded page draws before the next `find`. A `find` that runs first fails on a page that has not drawn its rows yet.
+   Move between pages as a person does. The rail is the `navigation` named *Areas*. The menu is the `navigation` named for the open area. To open a page by its address, run `.claude/skills/verify/scripts/browse.sh 4610 open http://localhost:4610<path>`. `open` returns before the page's data arrives, so `wait` for a text or a condition the loaded page draws before the next `find`. A `find` that runs first fails on a page that has not drawn its rows yet.
 
 ## Evidence
 
@@ -144,7 +144,7 @@ Save each artifact in the `evidence` directory launch.sh prints, `/tmp/better-an
 .claude/skills/verify/scripts/browse.sh 4610 snapshot > /tmp/better-answers-verify/4610/evidence/control-centre-members.aria.txt
 ```
 
-Save the full `snapshot` as evidence. `snapshot -c` leaves out every part of the page that holds no control, such as a status or an empty list's words, so it cannot prove an end state.
+Save the full `snapshot` as evidence.
 
 - Capture each action and the state it leaves, not only the last screen. Take a snapshot before and after an action that changes something.
 - Prove a write from a second view. Reload the page, or open the page that lists what was written, and read it there.

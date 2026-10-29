@@ -22,7 +22,7 @@ Knowledge is where a person finds and reads the workspace's concepts. A person s
 Preconditions:
 
 - `.claude/skills/verify/scripts/doctor.sh <port>` printed `worth driving`. Put the launched port wherever a command says `<port>`.
-- One workspace serves every recipe in this file, and one Admin sign-in drives them all. Run the setup bullets once, then the recipes in the order given. Collections and Owners changes an owner, so drive it after Search and Knowledge Base.
+- One workspace serves every recipe in this file, and one Admin sign-in drives them all. Run the setup bullets once, then the recipes in the order given.
 - Each answer below names values that later commands take. Put the answer's `workspaceId` where a command says `<workspaceId>`, the Admin's `id` where it says `<adminId>`, the Admin's `email` where it says `<adminEmail>` and Ifan's `id` where it says `<ifanId>`. Put the last part of the *Annual leave* concept's `iri`, after `/c/`, where a command says `<annualLeaveId>`.
 
 Setup:

@@ -116,5 +116,5 @@ Pages not built, as the Admin. Each address draws the heading *Page Not Found* o
 - `wait --text` matches a field's own text too. After filling *Email Addresses* or *New Group Name*, wait on the status sentence, never on the value just typed.
 - Wait for the record's dialog before pressing *Fixed in the Knowledge*. Pressed while the dialog still opens, the click lands on the overlay and agent-browser refuses it.
 - Two controls can share a name. *Publish Staff handbook* sits on the row and *Publish* in its dialog, while *Site leads* names both a row's button and its sheet. Keep `--exact` where a recipe gives it.
-- The Control Centre menu leaves out every page not built, so a not-found page proves only that its address is not served yet. Never report it as a broken page.
+- A not-found page for a page not built proves only that its address is not served yet. Never report it as a broken page.
 - The seeded questions name no asker, so each reads *A former member*. That is the erased-asker wording, not a fault.

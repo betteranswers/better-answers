@@ -12,8 +12,7 @@ The api harness's actions, the ceilings a spec or a drive runs into, and what a 
   and counts each route group apart. `AddressScope` there names the groups, and each group's rule
   is in `apps/api/src/auth/constants.ts`. A code's send and a sign-in by code count over ten
   minutes, and the rest over one. Better Auth's own limiter is off, so the api's counts are the
-  only ones. `MCP_TOKEN_RULE` is the odd one out, counted against the bearer token rather than
-  the caller's address.
+  only ones.
 - **Per person.** `personCeiling` in `apps/api/src/trpc/base.ts` counts a signed-in person's calls
   to one procedure against a rule from the same constants file, `ASK_TO_JOIN_PERSON_RULE` for
   asking to join. Past it the call answers 429 with `Retry-After` and no refusal word. It keys on
@@ -73,14 +72,13 @@ A body is checked before anything is written. What a refusal after that leaves d
 writes the rows:
 
 - **The harness writes them itself**, in one transaction, so a refused seed leaves nothing behind:
-  `seedModelChoices`, `seedConnectedSources` and `seedQuestions`.
+  `seedModelChoices`, `seedConnectedSources`, `seedQuestions` and `seedConceptIndex`.
 - **A slice's own action writes them**, and each action opens a transaction of its own on the api's
   connections, so a refusal part-way leaves what was written before it. `makeGroups` commits each
   group and each member as it goes. `seedConcepts` commits each concept as it goes: its connected
   sources, documents and passages, then a commit in the workspace's repository, then its rows.
   `scriptAsking` commits each ops command as it runs. `nameOwners` commits each owner as it goes,
   and a refused one answers 400 naming its place in `owners` and the refusal word.
-  `seedConceptIndex` writes every batch in one transaction, so a refusal leaves none of them.
 
 Among the body's rules for `seedConcepts`, a seed gives each title, whatever its case and spacing,
 and each file to one concept, and a group names each member once. Two titles with one file name in
