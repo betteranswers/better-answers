@@ -1,6 +1,6 @@
 # Recipes
 
-One file for each area of `apps/web/src/shared/navigation.ts` and one for the pages outside the shell. Launch, check and sign in per `../SKILL.md`, then run the file for the area you changed. Run every command from the repository root, with the launched port where a command says `<port>`, and take each id and address from the answer of the command that made it.
+One file for each area of `apps/web/src/shared/navigation/areas.ts` and one for the pages outside the shell. Launch, check and sign in per `../SKILL.md`, then run the file for the area you changed. Run every command from the repository root, with the launched port where a command says `<port>`, and take each id and address from the answer of the command that made it.
 
 - [Ask](./ask.md): asking a question, the asker's own questions, connecting Claude.
 - [Knowledge](./knowledge.md): search, the knowledge base, collections and owners, the Knowledge pages not built.
