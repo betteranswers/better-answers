@@ -147,7 +147,7 @@ and `apps/web/e2e/auth/confirm-recovery.spec.ts` signs in by email while the dev
   a number the alert shows is matched by pattern. No spec imports a refusal's sentence, and the
   page gains no marker for a test's sake. `apps/web/e2e/people/people.spec.ts` reads a batched answer,
   `apps/web/e2e/sources/sources.spec.ts` one sent alone,
-  `apps/web/e2e/auth/sign-in.spec.ts` Better Auth's, and `apps/web/e2e/knowledge/knowledge-search.spec.ts` a
+  `apps/web/e2e/auth/sign-in.spec.ts` Better Auth's, and `apps/web/e2e/app/failed-page.spec.ts` a
   dropped request.
 - **A latency budget is measured, annotated and asserted**: `test.info().annotations.push(…)`
   beside the comparison, so a run that passes still says how close it came. A list's second is
