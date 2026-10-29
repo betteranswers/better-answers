@@ -860,12 +860,12 @@ Changed 29/10/2026. The web already had a partial hold, `heldBack` in `two-works
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Summed per-test seconds of the browser suite, and wall seconds of `pnpm check:web:unit`.
-- [ ] Probe. Run both at trunk and head, interleaved, twice each.
+- [ ] Metric. Summed per-test seconds of the five edited specs.
+- [ ] Probe. Five interleaved rounds per side inside `suite-slot.sh --exclusive`.
 - [ ] Baseline. Record the trunk values first.
-- [ ] Rule. Fails if the browser sum is not at least 400s below trunk's, or if web-unit's wall grows by more than 60s.
+- [ ] Rule. Fails unless every head round is lower than every trunk round. Record the browser wall and `check:web:unit`'s wall at trunk and head as figures.
 
-Measured 29/10/2026. Five exclusive rounds per side, trunk `ff786ccb6` against the head, on the five edited specs at 3 workers, with trunk and head alternating first. Every sample passed, 221 of 221 at trunk and 97 of 97 at head. The browser sum was 567.9s at trunk (559.2 to 649.9) and 283.6s at head (266.4 to 335.7), which is 284.3s lower with the ranges apart. The moved cases are 50% of the five specs' summed time, and that falls short of the rule's 400s. The five specs' wall fell from 197s to 105s. The rule's 400s was set in CI seconds, where Appendix E counts these five specs at 1,085s and a case costs about twice its local seconds. On CI the head's three shards summed 2,428s over 575 cases, against 2,903s, 3,192s and 3,443s for the three latest `main` runs of 699 or 700 cases, at least 475s below each. CI's sum varies by 540s across those `main` runs, so one CI sample cannot judge 400s, and the exclusive probe does not meet it. The rule is left as written. `pnpm check:web:unit` took a median 62s at head (53 to 66) against 40s at trunk (39 to 43), which is 22s more and inside the 60s margin. Vitest alone took 58.0s against 36.6s, with 1,067 tests against 938. Vitest reports 55% of its tracked time in module import, so each added file that mounts the app likely adds import time. That was not measured per file. On CI the head's `check:web:unit` step took 196s and 209s in two runs, against 77s to 140s on four other recent runs, which is 56s to 132s more. CI runs it about three times slower than the exclusive probe does, and its own spread across the four other runs is 63s, as wide as the 60s margin. The half of the rule on web-unit is met by the probe and probably not met on CI. The 1-minute load before the samples ran from 5.6 to 36.2.
+Measured 29/10/2026. Five exclusive interleaved rounds per side: the five specs' summed per-test seconds fell from a median of 567.9s at trunk to 283.6s at head with the ranges apart, and their browser wall fell from 197s to 105s. `check:web:unit`'s wall rose from 40s to 62s, which is 22s more locally, and it took 196s to 213s on CI against 77s to 140s on earlier runs. The likely cause is module import, which vitest reports as 55% of its time, but this is not established. CI's browser sum varies by about 540s across `main` runs, so one sample cannot judge the earlier 400s rule.
 
 **Review gate.** None. BA-277 is not review-gated.
 
