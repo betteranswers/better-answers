@@ -561,12 +561,6 @@
       }
     },
     {
-      "files": ["apps/web/src/shared/navigation.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 572, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["packages/schema/scripts/roles-surface.ts"],
       "rules": {
         "max-lines-per-function": [
