@@ -48,14 +48,14 @@ beside `apps/api/tests/support/harness/harness-control.ts`: Sources in `apps/api
 | `restored` | The platform operator's restore of a person's sign-in. It answers the restore code |
 | `seedModelChoices` | The model choices a workspace has made. A purpose left out of the list has no model choice |
 | `seedConnectedSources` | Connected sources with documents, passages, findings, a sync status and a concept citing a document. It answers each connected source's and document's id |
-| `moveTheSync` | Moves the workspace's one sync to claimed, then to done, with no worker process |
+| `moveTheSync` | Moves the workspace's one sync to `claimed` or to `done`, as `to` names, with no worker process. `done` needs a claimed sync |
 | `makeGroups` | Groups made by a named member, every group holding the members `memberIds` names |
 | `askToJoin` | A person's ask to join a workspace by its short name, with a reason, waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name, which then waits on the console's *Names waiting* page |
 | `seedConcepts` | Concepts a named Admin writes in order. Each takes a kind, a sensitivity, further frontmatter keys, links to concepts earlier in the list and sources. A trust tier other than `unverified` is written as a verification row. It answers each concept's IRI, path and cited documents |
 | `nameOwners` | Owners a named Admin names in order: a collection's owner by its name, or a concept's own owner by its IRI. It answers how many it named |
-| `seedConceptIndex` | Concept index rows written straight to the store, in batches of one collection (or none), one kind and a count. The rows have no file, no repository commit and no map, so no concept page opens for them. It answers how many it seeded |
-| `seedEditSuggestion` | One waiting `edit` suggestion a named member raises on a concept, by its IRI, with the title and the body replaced where given. It answers the suggestion's id and its set's id. A concept the workspace does not hold answers 400 naming `iri` |
+| `seedConceptIndex` | Concept index rows written straight to the store, in batches of one collection (or none), one kind and a count. The rows have no file, no git commit and no map, so no concept page opens for them. It answers how many it seeded |
+| `seedEditSuggestion` | One waiting `edit` suggestion a named member raises on a concept, by its IRI, with the title and the body replaced where given. It answers the suggestion's id and its set's id. A concept the workspace does not hold answers 400 naming `iri`, and a suggestion the slice refuses answers 400 naming `userId` |
 | `commitAuthorsOf` | The author lines, `Name <email>`, of the commits in the workspace's repository that touched a concept's file, by its IRI, newest first. A concept the workspace does not hold answers 400 naming `iri` |
 | `seedQuestions` | *Questions asked* records, listed oldest first and a second apart: a verdict, a judge state, the concepts it returned by IRI, the drafted sentences with the concepts each cites, and flags open or closed. It answers each record's id and its flags' ids |
 | `scriptAsking` | A workspace's models set as the owner sets them, through the ops commands (its key, a price, its spending limit and its model choices), and a script for how the suite's model wire answers that workspace: the judge's fits or a failure, the drafter's sentences, each citing a concept by title, or a failure, and a call held until released. A model the script leaves out is not chosen |
@@ -76,12 +76,12 @@ A body is checked before anything is written. What a refusal after that leaves d
 writes the rows:
 
 - **The harness writes them itself**, in one transaction, so a refused seed leaves nothing behind:
-  `seedModelChoices`, `seedConnectedSources`, `seedQuestions` and `seedConceptIndex`.
-- **A slice's own action or an ops command writes them**, and each opens a transaction of its own, so a
-  refusal part-way leaves what was written before it: `makeGroups`, `flagTheName`, `seedConcepts`,
+  `seedModelChoices`, `seedConnectedSources`, `seedQuestions`, `seedConceptIndex` and `moveTheSync`, whose refusals answer 500.
+- **A slice's own action, an ops command or the harness one transaction at a time writes them**, so a
+  refusal part-way leaves what was written before it: `makeGroups`, `seedConcepts`,
   `scriptAsking` and `nameOwners`. Such a refusal answers 500 and its reason is in `server.log`, except
   `nameOwners`, which answers 400 naming its place in `owners`, and the checks `seedConcepts` makes before its
   first write. Those answer 400 naming the field: a writer who is no member or no Admin, a title whose
   file the workspace already holds, and a group member who is no member of the workspace. Any other
-  refusal at one concept leaves the concepts before it whole. `scriptAsking` sets its model script before
+  refusal at one concept leaves the concepts before it whole, and the refused concept's file may already be committed. `scriptAsking` sets its model script before
   any ops command runs, so the script stays set after a failure.

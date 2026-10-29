@@ -47,7 +47,7 @@ and browser helpers in `apps/web/e2e/locators.ts`.
 
 A seed the harness refuses answers 400, naming each field and its rule or the constraint it
 tripped, and `harness.sh` prints that answer. A refusal inside a slice's own action or an ops
-command answers 500, and its reason is only in `server.log`. A seed that a slice's own action
+command answers 500, with its reason only in `server.log`, except the 400s `references/harness.md` names. A seed that a slice's own action
 writes can leave part of its rows behind when refused part-way; `references/harness.md` says
 which seeds do. Before adding an action, search that
 file for one that already does the job, and before adding a helper, search
@@ -62,7 +62,7 @@ Docker must be running, because the harness starts a Testcontainers Postgres and
 .claude/skills/verify/scripts/launch.sh 4610 --no-build  # serves the build already in apps/web/dist
 ```
 
-It builds the SPA with `pnpm --filter @better-answers/web run build`, then runs `node tests/serve.ts <port>` in `apps/api`. It runs `node`, not the `serve:e2e` script, for the process-group reason under *The seam*. It records the server's pid and its log under `/tmp/better-answers-verify/<port>/`, and returns once `/health` answers 200. A cold Docker pulls its images first, so it waits up to 240 s. It refuses a port that any process already holds. Set `VERIFY_HOME` to keep the state somewhere other than `/tmp/better-answers-verify`.
+It builds the SPA with `pnpm --filter @better-answers/web run build`, then runs `node tests/serve.ts <port>` in `apps/api`. It records the server's pid and its log under `/tmp/better-answers-verify/<port>/`, and returns once `/health` answers 200. A cold Docker pulls its images first, so it waits up to 240 s. It refuses a port that any process already holds. Set `VERIFY_HOME` to keep the state somewhere other than `/tmp/better-answers-verify`.
 
 Every instance starts with no workspace and no person. A drive seeds what it needs through the harness.
 
@@ -124,7 +124,7 @@ Every browser command goes through `scripts/browse.sh <port> <agent-browser comm
    .claude/skills/verify/scripts/browse.sh 4610 wait --fn "location.pathname === '/people/groups'"
    ```
 
-   `snapshot -c` prints the accessibility tree with refs. It can leave out text inside status messages, dialogs and description lists, so read a quoted status or a row's values in the full `snapshot`. A name matches as a case-insensitive substring unless the command adds `--exact`. Add it where one name sits inside another on the same page. Never locate by CSS class, coordinates or tab order. Wait on a condition, never for a fixed time.
+   `snapshot -c` prints the accessibility tree with refs. It can leave out static text, such as a status message, a paragraph, a list's items or a row's values, so read every quoted string in the full `snapshot`. A name matches as a case-insensitive substring unless the command adds `--exact`. Add it where one name sits inside another on the same page. Never locate by CSS class, coordinates or tab order. Wait on a condition, never for a fixed time.
 
    Move between pages as a person does. The rail is the `navigation` named *Areas*. The menu is the `navigation` named for the open area. To open a page by its address, run `.claude/skills/verify/scripts/browse.sh 4610 open http://localhost:4610<path>`. `open` returns before the page's data arrives, so `wait` for a text or a condition the loaded page draws before the next `find`. A `find` that runs first fails on a page that has not drawn its rows yet.
 
@@ -141,7 +141,7 @@ Save the full `snapshot` as evidence.
 
 - Capture each action and the state it leaves, not only the last screen. Take a snapshot before and after an action that changes something.
 - Prove a write from a second view. Reload the page, or open the page that lists what was written, and read it there.
-- Check a side effect the page cannot show through a harness read, such as `GET /emails?to=<address>` for a sent email or `GET /commit-authors?workspaceId=<id>&iri=<iri>` for a commit.
+- Check a side effect the page cannot show through a harness read, such as `GET /emails?to=<address>` for a sent email.
 - Beside each artifact, report the feature file, the page's address and the role signed in.
 - Report a page the drive cannot reach as `verified-unreachable`, with the prerequisite it lacks and the command it tried. Never report one entry point as proven through another.
 
@@ -151,7 +151,7 @@ Save the full `snapshot` as evidence.
 .claude/skills/verify/scripts/cleanup.sh 4610
 ```
 
-It closes the session's browser, sends SIGTERM to the pid launch.sh recorded, waits up to 30 s, then sends SIGKILL, and confirms the port is free. If another process holds the port, it names that pid and exits 1. It signals the recorded pid only while that pid still runs `tests/serve.ts`, and it never kills by process name. On SIGTERM the server stops its own Postgres and object store containers. After a SIGKILL, Testcontainers' Ryuk container removes them once the process is gone. It deletes the pid file and keeps `server.log`, `build.log` and `evidence/`. Run it after the last drive, and after every failed launch or drive.
+It closes the session's browser, sends SIGTERM to the pid launch.sh recorded, waits up to 30 s, then sends SIGKILL, and confirms the port is free. If another process holds the port, it names that pid and exits 1. It signals the recorded pid only while that pid still runs `tests/serve.ts`, and it never kills by process name. On SIGTERM the server stops its own Postgres and object store containers. It deletes the pid file and keeps `server.log`, `build.log` and `evidence/`. Run it after the last drive, and after every failed launch or drive.
 
 ## Two drives side by side
 
