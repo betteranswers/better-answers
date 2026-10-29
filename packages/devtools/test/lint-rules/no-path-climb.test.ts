@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
+import { pluginConfigFor, readOxlintConfig } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
@@ -23,6 +23,13 @@ const lint = oxlintOver(pluginConfigFor({ [RULE]: "error" }), {
   tree: reading(SEEDED, CLIMB),
   flagged: [SEEDED],
 });
+
+const lifting = readOxlintConfig().overrides.filter((one) => one.rules?.[RULE] !== undefined);
+
+const inTheRealConfig = oxlintOver(
+  JSON.stringify({ ...JSON.parse(pluginConfigFor({ [RULE]: "error" })), overrides: lifting }),
+  { tree: reading(SEEDED, CLIMB), flagged: [SEEDED] },
+);
 
 describe("the no-path-climb rule", () => {
   it("refuses a seeded climb and names the helper", () => {
@@ -113,5 +120,26 @@ describe("the no-path-climb rule stays silent", () => {
     const code = 'export const at = path.resolve(import.meta.dirname, "..");';
 
     expect(lint.flagged(reading(file, code))).toEqual([]);
+  });
+});
+
+describe("the no-path-climb rule in the real config", () => {
+  it("is on for every file", () => {
+    expect(readOxlintConfig().rules[RULE]).toBe("error");
+  });
+
+  it("refuses a climb in a test", () => {
+    expect(inTheRealConfig.flagged(reading(SEEDED, CLIMB))).toEqual([SEEDED]);
+  });
+
+  it.each(["apps/api/src/probe.ts", "packages/schema/src/probe.ts"])(
+    "stays silent over production source in %s",
+    (file) => {
+      expect(inTheRealConfig.flagged(reading(file, CLIMB))).toEqual([]);
+    },
+  );
+
+  it("is lifted by one override", () => {
+    expect(lifting).toHaveLength(1);
   });
 });

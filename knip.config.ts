@@ -37,6 +37,9 @@ const config: KnipConfig = {
       entry: [
         // Installed ahead of its pages, so an unimported component or export is not dead code.
         "src/shared/ui/**",
+
+        // A spec bundles it by its path, so nothing imports it.
+        "test/support/blueprint-parts.tsx",
       ],
       includeEntryExports: false,
     },

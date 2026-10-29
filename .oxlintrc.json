@@ -138,6 +138,7 @@
     "better-answers/declaration-doc-block": "error",
     "better-answers/import-statically": "error",
     "better-answers/string-cites-nothing": "error",
+    "better-answers/no-path-climb": "error",
     "better-answers/mcp-entry-annotations": "error",
     "better-answers/mcp-entry-no-workspace-argument": "error",
     "better-answers/import-direction": "error",
@@ -498,6 +499,12 @@
       ],
       "rules": {
         "better-answers/import-statically": "off"
+      }
+    },
+    {
+      "files": ["apps/*/src/**", "packages/*/src/**"],
+      "rules": {
+        "better-answers/no-path-climb": "off"
       }
     },
     {

@@ -106,13 +106,14 @@ def _findings_in(module: Path, tree: ast.AST) -> list[str]:
 
 
 def _modules(argv: list[str]) -> list[Path] | Refused:
-    if not argv:
+    roots = [Path(root) for root in argv]
+    if not roots:
         return Refused("name at least one directory to read")
-    missing = [root for root in argv if not Path(root).is_dir()]
-    if missing:
-        return Refused(f"no directory at {', '.join(missing)}")
-    modules = sorted({found for root in argv for found in Path(root).rglob("*.py")})
-    return modules or Refused(f"no Python file under {', '.join(argv)}")
+    absent = next((root for root in roots if not root.is_dir()), None)
+    if absent is not None:
+        return Refused(f"no directory at {absent}")
+    found = {module for root in roots for module in root.rglob("*.py")}
+    return sorted(found) or Refused(f"no Python file under {', '.join(argv)}")
 
 
 def _scan(argv: list[str]) -> Scanned | Refused:

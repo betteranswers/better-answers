@@ -6,7 +6,7 @@
   "scripts": {
     "prepare": "lefthook install || echo 'lefthook is absent — no git hooks installed (see lefthook.yml)'",
     "check": "node scripts/check.mjs check:gates check:workspaces check:worker",
-    "check:gates": "node scripts/check.mjs format:check lint lint:workflows comment-gate:python comment-density insert-scan loose-files test-folders table-ownership-scan auth-seam-scan port-scan jscpd knip",
+    "check:gates": "node scripts/check.mjs format:check lint lint:workflows comment-gate:python comment-density insert-scan loose-files test-folders table-ownership-scan auth-seam-scan port-scan climb-scan jscpd knip",
     "check:workspaces": "pnpm -r --no-bail --if-present run check",
     "check:tree": "node scripts/check.mjs check:gates check:libraries",
     "check:libraries": "pnpm --no-bail --if-present --filter @better-answers/core --filter @better-answers/schema --filter @better-answers/devtools run check",
@@ -38,6 +38,7 @@
     "table-ownership-scan": "node scripts/table-ownership-scan.mjs packages/core/src apps/api/src",
     "auth-seam-scan": "node scripts/auth-seam-scan.mjs apps/web/tsconfig.json apps/web/src/features/auth/auth-hooks.ts",
     "port-scan": "python3 packages/devtools/python/port_scan.py apps/worker/src",
+    "climb-scan": "python3 packages/devtools/python/climb_scan.py apps/worker/tests packages/devtools/python",
     "mutant-probe": "node scripts/mutant-probe.mjs",
     "reap-containers": "node scripts/reap-containers.mjs",
     "comment-inventory": "node scripts/comment-inventory.mjs",
