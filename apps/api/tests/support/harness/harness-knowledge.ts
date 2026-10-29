@@ -716,7 +716,7 @@ export const seedEditSuggestion = async (
   return { suggestionId, setId: submitted.value.setId };
 };
 
-export const commitAuthorsAsking = z.strictObject({
+const commitAuthorsAsking = z.strictObject({
   workspaceId: z.string().min(1),
   iri: z.string().min(1),
 });

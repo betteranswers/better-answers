@@ -28,8 +28,6 @@ import {
   type ScriptedModels,
 } from "./harness-asking.ts";
 import {
-  commitAuthorsAsking,
-  commitAuthorsOf,
   conceptIndexSeeding,
   conceptsSeeding,
   editSuggesting,
@@ -281,14 +279,6 @@ export const harnessControl = (app: TestApp, models?: ScriptedModels): Hono => {
   control.post(`${HARNESS_PREFIX}/suggestions`, async (context) => {
     const asked = await readBody(context.req.raw, editSuggesting);
     return context.json(await seedEditSuggestion(app, asked));
-  });
-
-  control.get(`${HARNESS_PREFIX}/commit-authors`, async (context) => {
-    const asked = commitAuthorsAsking.parse({
-      workspaceId: context.req.query("workspaceId"),
-      iri: context.req.query("iri"),
-    });
-    return context.json(await commitAuthorsOf(app, asked));
   });
 
   control.post(`${HARNESS_PREFIX}/asking`, async (context) => {
