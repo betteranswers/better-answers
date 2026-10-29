@@ -34,7 +34,6 @@ placedForSearch();
 
 const FIRST_PALLET_PASSAGE = palletPassage(0);
 
-/** Answers each page of pallet without its first `withheld` matches, as a re-read after a change would. */
 const withholding = () => {
   const withheld = { count: 0 };
   const api = aSearchApi();

@@ -152,7 +152,6 @@ export const openAt = async (path: string, api: Api) => {
   return router;
 };
 
-/** A page outside the shell draws no switcher, so none is awaited. `watching` sees each ask, a write's body included. */
 export const openOutsideTheShellAt = async (
   path: string,
   api: Api,

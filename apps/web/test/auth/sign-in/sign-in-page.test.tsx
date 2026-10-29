@@ -27,7 +27,6 @@ const sent = () => Response.json({ success: true });
 
 const refused = (code: string) => () => Response.json({ code, message: code }, { status: 400 });
 
-/** Anything the page asks that is not named here is answered as a person who is signed out. */
 const wire = (answers: Readonly<Record<string, () => Response>>) => {
   const asked = new Map<string, number>();
   server.answer = (input) => {

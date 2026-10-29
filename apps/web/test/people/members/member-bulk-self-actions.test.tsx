@@ -92,7 +92,6 @@ const editorPickedByKeyboard = async (select: HTMLElement) => {
   }
 };
 
-/** The reader's removal ends their membership, then the workspaces they still hold are read again. */
 const removingYourself = (
   before: readonly object[],
   after: readonly object[],

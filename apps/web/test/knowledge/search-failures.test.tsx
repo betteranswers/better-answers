@@ -42,7 +42,6 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedForSearch();
 
-/** The first page answers; every page after it is refused. */
 const moreRefused = (asked: FindAsked) =>
   asked.cursor === undefined ? read(pageOf(PALLET_PASSAGES, asked)) : FORBIDDEN;
 

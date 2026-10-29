@@ -35,7 +35,6 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedForSearch();
 
-/** The next page repeats the match the first page began with. */
 const repeatingTheFirstMatch = (asked: FindAsked) => {
   const page = pageOf(PALLET_PASSAGES, asked);
   return read(

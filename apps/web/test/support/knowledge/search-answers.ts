@@ -34,7 +34,6 @@ const CONCEPT_ASKED = z.object({ iri: z.string() });
 const lastAsk = (procedure: string): unknown =>
   server.asks.findLast((ask) => ask.procedure === procedure)?.input;
 
-/** The batch link asks each procedure alone here, so the newest ask of it is the one being answered. */
 export const answeringFinds = (answer: (asked: FindAsked) => unknown) => (): unknown =>
   answer(FIND_ASKED.parse(lastAsk(FIND)));
 
@@ -51,7 +50,6 @@ export const findsAsked = (): readonly FindAsked[] =>
 
 export const opensAsked = (): number => server.asks.filter((ask) => ask.procedure === OPEN).length;
 
-/** A page of `matches` as the read gives it: the next cursor is named while any match is left. */
 export const pageOf = (matches: readonly Match[], asked: FindAsked) => {
   const from = asked.cursor === undefined ? 0 : Number(asked.cursor);
   const shown = matches.slice(from, from + asked.limit);
@@ -66,7 +64,6 @@ export const pageOf = (matches: readonly Match[], asked: FindAsked) => {
 export const finding = (table: Readonly<Record<string, readonly Match[]>>) =>
   answeringFinds((asked) => read(pageOf(table[asked.query] ?? [], asked)));
 
-/** Answers each first page at once and holds every later page until `release`. */
 export const withMoreHeld = (api: Api, table: Readonly<Record<string, readonly Match[]>>) => {
   const held = Promise.withResolvers<void>();
   const reached = Promise.withResolvers<void>();
@@ -186,7 +183,6 @@ export const theForkliftGuide = answeringPassages(() =>
   aPassageRead(FORKLIFT_GUIDE, FORKLIFT_GUIDE_LOCATOR, FORKLIFT_GUIDE_TEXT),
 );
 
-/** The refusal a read meets once its ceiling is reached, naming the seconds until it lifts. */
 export const aCeilingMet = (retryAfterSeconds: number) => ({
   error: {
     message: "Too many requests.",
@@ -281,7 +277,6 @@ export const openedSearch = async (api: Api, address: string = SEARCH_PAGE.path)
   return router;
 };
 
-/** The handbook's twenty-five passages, found by a search for pallet and each readable. */
 export const palletsFound = async () => {
   const api = aSearchApi();
   api.set(FIND, finding({ pallet: PALLET_PASSAGES }));
@@ -299,7 +294,6 @@ export const knowledgeRailPressed = (): void => {
   );
 };
 
-/** Asks with `ask`, holds the read while the status says it is searching, then answers no match. */
 export const foundNothing = async (
   api: Api,
   query: string,
@@ -348,23 +342,19 @@ export const refocused = (): void => {
   globalThis.dispatchEvent(new Event("visibilitychange"));
 };
 
-/** Gives the page the turns it takes to take an answer it is meant to drop. */
 export const aMoment = (): Promise<void> =>
   new Promise((done) => {
     setTimeout(done, 50);
   });
 
-/** index.css opens a passage inline below this width and beside the page from it. */
 const ROOM_BESIDE_FROM_PX = 1280;
 
 const ROOM_BESIDE = "--room-beside";
 
-/** jsdom loads no stylesheet, so a width is the variable index.css would set for it. */
 export const atWidth = (width: number): void => {
   document.documentElement.style.setProperty(ROOM_BESIDE, width < ROOM_BESIDE_FROM_PX ? "0" : "1");
 };
 
-/** A typed search waits 300 ms to settle, and a busy runner takes longer than the default second. */
 const WAITS_AT_MOST_MS = 4000;
 
 export const placedForSearch = (): void => {

@@ -46,7 +46,6 @@ const TABLE: Readonly<Record<string, readonly Match[]>> = {
   forklift: [aForkliftGuide],
 };
 
-/** Answers pallet at once and holds the forklift list until `release`. */
 const forkliftListHeld = () => {
   const reached = Promise.withResolvers<void>();
   const held = Promise.withResolvers<void>();

@@ -4,7 +4,6 @@ export type Ask = { readonly procedure: string; readonly input: unknown };
 
 export const server: {
   answer: (asked: Asked, init?: RequestInit) => Promise<Response>;
-  /** Each procedure the app asked, in the order asked, with the input it sent. */
   asks: Ask[];
 } = {
   answer: () => Promise.reject(new TypeError("unanswered")),

@@ -12,7 +12,6 @@ const CONNECTED_SOURCES = pageNamed(
 
 let minted = 0;
 
-/** The api's ids are 26-character ulids, so a page that drew one would show it. */
 export const anId = (): string => {
   minted += 1;
   return `01K5T${String(minted).padStart(21, "0")}`;
@@ -20,7 +19,6 @@ export const anId = (): string => {
 
 type Sync = NonNullable<ListedConnectedSource["lastSync"]>;
 
-/** A connected source as it crosses the wire, where the api's branded ids are plain strings. */
 type AConnectedSource = {
   readonly connectedSourceId: string;
   readonly name: string;
@@ -144,7 +142,6 @@ export const openSources = (api: Api) => openAt(CONNECTED_SOURCES, api);
 export const connectedSourcesRegion = (): HTMLElement =>
   screen.getByRole("region", { name: "Connected Sources" });
 
-/** The line a settled action leaves is the last status the region holds. */
 export const saidIn = (): HTMLElement | undefined =>
   within(connectedSourcesRegion()).getAllByRole("status").at(-1);
 
@@ -188,7 +185,6 @@ export const pressed = (button: HTMLElement): void => {
   fireEvent.click(button);
 };
 
-/** A key goes to the element in focus, and the page hears it as the document does. */
 export const press = (key: string): void => {
   fireEvent.keyDown(document.activeElement ?? document.body, { key });
 };
@@ -207,10 +203,8 @@ const definitionOf = (terms: readonly HTMLElement[], word: string): HTMLElement 
   return definition;
 };
 
-/** The row's own lead, drawn before More Details opens. */
 export const leadOf = (row: HTMLElement, word: string): HTMLElement =>
   definitionOf(within(row).getAllByRole("term"), word);
 
-/** A term More Details repeats is read from its last place. */
 export const detailOf = (row: HTMLElement, word: string): HTMLElement =>
   definitionOf(within(row).getAllByRole("term").toReversed(), word);
