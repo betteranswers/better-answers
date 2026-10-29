@@ -41,6 +41,11 @@ class Scanned(NamedTuple):
     modules: int
 
 
+class Position(NamedTuple):
+    rise: int
+    names: int
+
+
 class Placement(NamedTuple):
     workspace: str
     depth: int
@@ -63,17 +68,17 @@ def _segments(nodes: Sequence[ast.expr]) -> list[str]:
     return segments
 
 
-def _after(rise: int, segments: Sequence[str]) -> int:
-    names = 0
+def _after(at: Position, segments: Sequence[str]) -> Position:
     for segment in segments:
         if segment == "..":
-            if names:
-                names -= 1
-            else:
-                rise += 1
+            at = _up(at)
         elif segment not in ("", "."):
-            names += 1
-    return rise
+            at = Position(at.rise, at.names + 1)
+    return at
+
+
+def _up(at: Position) -> Position:
+    return Position(at.rise, at.names - 1) if at.names else Position(at.rise + 1, 0)
 
 
 def _called(node: ast.Call) -> str | None:
@@ -82,25 +87,27 @@ def _called(node: ast.Call) -> str | None:
     return node.func.attr if isinstance(node.func, ast.Attribute) else None
 
 
-def _plus(rise: int | None, steps: int) -> int | None:
-    return None if rise is None else rise + steps
+def _up_by(at: Position | None, steps: int) -> Position | None:
+    for _ in range(steps):
+        at = None if at is None else _up(at)
+    return at
 
 
-def _parents_rise(node: ast.Subscript) -> int | None:
+def _parents_rise(node: ast.Subscript) -> Position | None:
     parents, index = node.value, node.slice
     if not (isinstance(parents, ast.Attribute) and parents.attr == "parents"):
         return None
     if not (isinstance(index, ast.Constant) and isinstance(index.value, int)):
         return None
-    return _plus(_rise(parents.value), index.value + 1)
+    return _up_by(_rise(parents.value), index.value + 1)
 
 
-def _divided_rise(node: ast.BinOp) -> int | None:
+def _divided_rise(node: ast.BinOp) -> Position | None:
     base = _rise(node.left) if isinstance(node.op, ast.Div) else None
     return None if base is None else _after(base, _segments([node.right]))
 
 
-def _call_rise(node: ast.Call) -> int | None:
+def _call_rise(node: ast.Call) -> Position | None:
     name = _called(node)
     if name in METHODS and isinstance(node.func, ast.Attribute):
         return _rise(node.func.value)
@@ -108,17 +115,17 @@ def _call_rise(node: ast.Call) -> int | None:
     if base is None:
         return None
     if name == "dirname":
-        return base + 1
+        return _up(base)
     if name in JOINS:
         return _after(base, _segments(node.args[1:]))
     return base if name in PASSES_THROUGH else None
 
 
-def _rise(node: ast.expr) -> int | None:
+def _rise(node: ast.expr) -> Position | None:
     if isinstance(node, ast.Name):
-        return -1 if node.id == "__file__" else None
+        return Position(-1, 0) if node.id == "__file__" else None
     if isinstance(node, ast.Attribute):
-        return _plus(_rise(node.value), 1) if node.attr == "parent" else None
+        return _up_by(_rise(node.value), 1) if node.attr == "parent" else None
     if isinstance(node, ast.Subscript):
         return _parents_rise(node)
     if isinstance(node, ast.BinOp):
@@ -133,8 +140,8 @@ def _reads_from_cwd(node: ast.expr) -> bool:
 
 
 def _climbs(node: ast.expr, depth: int) -> bool:
-    rise = _rise(node)
-    return (rise is not None and rise >= max(depth, 1)) or _reads_from_cwd(node)
+    at = _rise(node)
+    return (at is not None and at.rise >= max(depth, 1)) or _reads_from_cwd(node)
 
 
 def _outermost(climbs: list[ast.expr]) -> list[ast.expr]:

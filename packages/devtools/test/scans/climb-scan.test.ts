@@ -75,6 +75,10 @@ describe("the climb scan over a throwaway tree", () => {
     ["a Path built from a dirname", 'Path(os.path.dirname(__file__), "..", "..")'],
     ["a `..` path joined by a slash", 'Path(__file__).parent / "../../.."'],
     ["a `..` step after a slash", 'Path(__file__).parent / ".." / ".." / "deploy"'],
+    [
+      "a `..` step beyond the folders named before it",
+      'Path(__file__).parent / "f" / ".." / ".." / ".." / "x"',
+    ],
     ["an abspath around a join", 'abspath(join(dirname(__file__), "../../.."))'],
     ["a dirname of a dirname", "os.path.dirname(os.path.dirname(os.path.dirname(__file__)))"],
     ["a file opened from the working directory", 'open("../../AGENTS.md")'],
@@ -111,6 +115,14 @@ describe("the climb scan walks past a path that stays", () => {
     ["its own folder", 'HERE = Path(__file__).parent / "fixtures"'],
     ["a folder inside the workspace", 'FIXTURES = Path(__file__).parent.parent / "fixtures"'],
     ["a sibling folder by a `..` step", 'SIBLING = Path(__file__).parent / "../fixtures"'],
+    [
+      "a `..` step after a folder it undoes",
+      'DATA = Path(__file__).parent / "fixtures" / ".." / "data"',
+    ],
+    [
+      "a join with a `..` step after a folder",
+      'DATA = os.path.join(os.path.dirname(__file__), "fixtures", "..", "data")',
+    ],
     ["a root from the helper", 'CONTRACTS = REPOSITORY_ROOT / "contracts"'],
     ["a climb from a name that holds a root", "REPO = WORKER_ROOT.parents[1]"],
     ["a search up for a marker", "FOUND = [d for d in Path(__file__).resolve().parents if d]"],
