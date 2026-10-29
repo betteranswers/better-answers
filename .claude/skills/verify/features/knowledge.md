@@ -1,74 +1,41 @@
 # Knowledge
 
-Knowledge is where a person finds and reads the workspace's concepts. A person searches the concepts, opens one to read its body and sources, and browses them by collection and kind.
+Search the workspace's concepts, read one, browse them by collection and kind, name a collection's owner.
 
-## Sub-features
+Setup, once, in a fresh workspace (a title the workspace already holds is refused), then the recipes in order. `<annualLeaveId>` is the part of the *Annual leave* concept's `iri` after `/c/`.
 
-- `knowledge-search` is the Search page at `/knowledge/search`. It finds concepts by a word or a question and keeps the query in the address.
-- `knowledge-concept` is one concept's page at `/knowledge/search/<conceptId>`, reached from a match. It shows the concept's body, sources, verification and links. `<conceptId>` is the last part of the concept's IRI.
-- `knowledge-base` is the Knowledge Base page at `/knowledge/knowledge-base`. It lists the concepts in a tree of collections and kinds.
-- `knowledge-collections-and-owners` is the Collections and Owners page at `/knowledge/collections-and-owners`. It lists each collection with its owner, and an Admin names a new owner there.
-- `knowledge-not-built` covers the pages not built yet. As the Admin, each address draws the not-found page with the link `Go to Members`. They are `/knowledge/guides`, `/knowledge/all-knowledge`, `/knowledge/due-for-verification`, `/knowledge/conflicts`, `/knowledge/kinds` and `/knowledge/exports`.
+1. `.claude/skills/verify/scripts/harness.sh <port> POST /workspaces '{"name":"Verify Knowledge"}'` answers `workspaceId`, `admin.id` and `admin.email`.
+2. `.claude/skills/verify/scripts/harness.sh <port> POST /people '{"displayName":"Ifan Morgan"}'` answers Ifan's `id`. Then `.claude/skills/verify/scripts/harness.sh <port> POST /members '{"workspaceId":"<workspaceId>","userId":"<ifanId>","role":"Editor"}'` answers `{"added":true}`.
+3. `.claude/skills/verify/scripts/harness.sh <port> POST /concepts '{"workspaceId":"<workspaceId>","userId":"<admin.id>","concepts":[{"title":"Annual leave","collection":"policies","kind":"Policy","body":"Everyone takes 25 days of leave."},{"title":"Expense claims","collection":"policies","kind":"Policy","body":"Claims go in within 30 days."},{"title":"Fire drills","collection":"safety","kind":"Procedure","body":"A fire drill runs each quarter."}]}'` answers each concept's `iri`.
+4. `.claude/skills/verify/scripts/sign-in.sh <port> <admin.email>`, then `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/people/members'"`.
 
-## How to get to it (user POV)
+## knowledge-search at `/knowledge/search`
 
-- As the Admin the setup signs in, choose *Knowledge* in the rail. It opens `/knowledge/search`.
-- Choose a page in the menu, the `navigation` named *Knowledge*. Under *BROWSE* it lists *Search* and *Knowledge Base*. Under *CURATION* it lists *Collections and Owners*.
-- Type in *Search by a word or a question* and choose a concept in the *Matches* list. Its page opens.
-- Choose *Back to Search* on a concept's page.
+1. `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/people/members`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "2 members"`, `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Knowledge" --exact`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/knowledge/search'"`. Expect the searchbox *Search by a word or a question*.
+2. `.claude/skills/verify/scripts/browse.sh <port> find role searchbox fill "leave" --name "Search by a word or a question"`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "new URL(location.href).searchParams.get('knowledge.search') === 'leave'"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Annual leave"`. Expect the status *Showing matches for “leave”.* and the list *Matches* to hold the link *Annual leave*.
+3. Second view: `.claude/skills/verify/scripts/browse.sh <port> reload`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Annual leave"`. Expect the searchbox to hold `leave` and the match listed.
 
-## Driving it with agent-browser
+## knowledge-concept at `/knowledge/search/<annualLeaveId>`
 
-Preconditions:
+1. On the Search page after step 2 above, `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Annual leave" --exact`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname.startsWith('/knowledge/search/')"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Everyone takes 25 days of leave."`. Expect the article *Annual leave* with the link *Back to Search* and the regions *Sources*, *Verification* and *Links*.
+2. `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Back to Search"`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/knowledge/search'"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Showing matches for"`. Expect the address to carry `knowledge.search=leave` and the match listed.
+3. Second view: `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/knowledge/search/<annualLeaveId>`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Everyone takes 25 days of leave."`.
 
-- `.claude/skills/verify/scripts/doctor.sh <port>` printed `worth driving`. Put the launched port wherever a command says `<port>`.
-- One workspace serves every recipe in this file, and one Admin sign-in drives them all. Run the setup bullets once, then the recipes in the order given.
-- Each answer below names values that later commands take. Put the answer's `workspaceId` where a command says `<workspaceId>`, the Admin's `id` where it says `<adminId>`, the Admin's `email` where it says `<adminEmail>` and Ifan's `id` where it says `<ifanId>`. Put the last part of the *Annual leave* concept's `iri`, after `/c/`, where a command says `<annualLeaveId>`.
+## knowledge-base at `/knowledge/knowledge-base`
 
-Setup:
+1. `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Knowledge Base"`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/knowledge/knowledge-base'"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "3 concepts"`. Expect the tree *Collections and kinds* with the closed items *policies, 2 concepts* and *safety, 1 concept*.
+2. `.claude/skills/verify/scripts/browse.sh <port> find role treeitem click --name "policies, 2 concepts"`, `.claude/skills/verify/scripts/browse.sh <port> find role treeitem click --name "Policy, 2 concepts" --exact`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.search.includes('base.kind=Policy')"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Expense claims"`. Expect the region *Policy in policies* to hold a table of *Annual leave* and *Expense claims*, each *Policy* and *Unverified*.
+3. Second view: `.claude/skills/verify/scripts/browse.sh <port> reload`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Expense claims"`. Expect the address to keep `base.collection=policies&base.kind=Policy` and the same kind open.
 
-- **Provision.** Make the workspace and its Admin. Run `.claude/skills/verify/scripts/harness.sh <port> POST /workspaces '{"name":"Verify Knowledge"}'`. The answer names the `workspaceId` and the Admin's `id` and `email`.
-- **Add an Editor.** Run `.claude/skills/verify/scripts/harness.sh <port> POST /people '{"displayName":"Ifan Morgan"}'`, then `.claude/skills/verify/scripts/harness.sh <port> POST /members '{"workspaceId":"<workspaceId>","userId":"<ifanId>","role":"Editor"}'`. It answers `{"added":true}`.
-- **Write three concepts.** Run `.claude/skills/verify/scripts/harness.sh <port> POST /concepts '{"workspaceId":"<workspaceId>","userId":"<adminId>","concepts":[{"title":"Annual leave","collection":"policies","kind":"Policy","body":"Everyone takes 25 days of leave."},{"title":"Expense claims","collection":"policies","kind":"Policy","body":"Claims go in within 30 days."},{"title":"Fire drills","collection":"safety","kind":"Procedure","body":"A fire drill runs each quarter."}]}'`. The answer lists the three concepts, each with an `iri` such as `https://better-answers.com/c/01M61VDHKD4JVYRNQ0SYDRM45E`.
-- **Sign in.** Run `.claude/skills/verify/scripts/sign-in.sh <port> <adminEmail>`, then `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/people/members'"`. The Admin lands on Members.
+## knowledge-collections-and-owners at `/knowledge/collections-and-owners`
 
-Search, at `/knowledge/search`, as the Admin:
+1. `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Collections and Owners"`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/knowledge/collections-and-owners'"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Concepts with Their Own Owner"`. Expect the status *2 collections* and *policies* and *safety* each beginning *No owner yet*, each with a picker *New Owner of <collection>* and a *Save* button.
+2. The picker is a native select, so `select` and `fill` change nothing. Run `.claude/skills/verify/scripts/browse.sh <port> wait --fn "[...document.querySelectorAll('option')].some((each) => each.textContent === 'Ifan Morgan')"`, then `.claude/skills/verify/scripts/browse.sh <port> press c` and `.claude/skills/verify/scripts/browse.sh <port> press i` as separate commands, then `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Save the new owner of policies"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Ifan Morgan now owns “policies”."`. Expect the owner of *policies* to read *Ifan Morgan*.
+3. Second view: `.claude/skills/verify/scripts/browse.sh <port> reload`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Concepts with Their Own Owner"`. Expect *policies* owned by *Ifan Morgan* and *safety* with no owner.
 
-- **Open from the rail.** Run `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/people/members`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "2 members"`, `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Knowledge" --exact` and `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/knowledge/search'"`. The heading *Browse* stands over the region *Search* and its searchbox *Search by a word or a question*. The menu lists *Search* and *Knowledge Base* under *BROWSE* and *Collections and Owners* under *CURATION*.
-- **Search.** Run `.claude/skills/verify/scripts/browse.sh <port> find role searchbox fill "leave" --name "Search by a word or a question"`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "new URL(location.href).searchParams.get('knowledge.search') === 'leave'"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Annual leave"`. The status reads *Showing matches for “leave”.* and the list *Matches* holds the link *Annual leave*.
-- **Prove it.** Run `.claude/skills/verify/scripts/browse.sh <port> reload` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Annual leave"`. The searchbox still holds `leave` and the same match is listed.
-- **Evidence.** Run `.claude/skills/verify/scripts/browse.sh <port> screenshot /tmp/better-answers-verify/<port>/evidence/knowledge-search.png` and `.claude/skills/verify/scripts/browse.sh <port> snapshot > /tmp/better-answers-verify/<port>/evidence/knowledge-search.aria.txt`.
+## knowledge-not-built
 
-A concept's page, at `/knowledge/search/<annualLeaveId>`, as the Admin:
+Pages not built draw the not-found page. A not-found page proves only that the address is not served yet, never a broken page.
 
-- **Open from a match.** On the Search page above, run `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Annual leave" --exact`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname.startsWith('/knowledge/search/')"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Everyone takes 25 days of leave."`. The article *Annual leave* holds the link *Back to Search*, the heading *Annual leave*, the body, the regions *Sources*, *Verification* and *Links*, and the button *Details from the File*.
-- **Return.** Run `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Back to Search"` and `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/knowledge/search'"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Showing matches for"`. The address still carries `knowledge.search=leave` and the match is listed again.
-- **Prove it.** Open the page by its address. Run `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/knowledge/search/<annualLeaveId>` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Everyone takes 25 days of leave."`. The same article draws.
-- **Evidence.** Run `.claude/skills/verify/scripts/browse.sh <port> screenshot /tmp/better-answers-verify/<port>/evidence/knowledge-concept.png` and `.claude/skills/verify/scripts/browse.sh <port> snapshot > /tmp/better-answers-verify/<port>/evidence/knowledge-concept.aria.txt`.
-
-Knowledge Base, at `/knowledge/knowledge-base`, as the Admin:
-
-- **Open from the menu.** Run `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Knowledge Base"` and `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/knowledge/knowledge-base'"`. Then run `.claude/skills/verify/scripts/browse.sh <port> wait --text "3 concepts"`. The region *Knowledge Base* holds the tree *Collections and kinds*, with the items *policies, 2 concepts* and *safety, 1 concept*, both closed.
-- **Open a kind.** Run `.claude/skills/verify/scripts/browse.sh <port> find role treeitem click --name "policies, 2 concepts"`, `.claude/skills/verify/scripts/browse.sh <port> find role treeitem click --name "Policy, 2 concepts" --exact`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.search.includes('base.kind=Policy')"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Expense claims"`. The region *Policy in policies* holds a table with the columns *Title*, *Kind* and *Trust*. Its rows are *Annual leave* and *Expense claims*, each *Policy* and *Unverified*.
-- **Prove it.** Run `.claude/skills/verify/scripts/browse.sh <port> reload` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Expense claims"`. The address keeps `base.collection=policies&base.kind=Policy`, and the same kind stays open and selected.
-- **Evidence.** Run `.claude/skills/verify/scripts/browse.sh <port> screenshot /tmp/better-answers-verify/<port>/evidence/knowledge-knowledge-base.png` and `.claude/skills/verify/scripts/browse.sh <port> snapshot > /tmp/better-answers-verify/<port>/evidence/knowledge-knowledge-base.aria.txt`.
-
-Collections and Owners, at `/knowledge/collections-and-owners`, as the Admin:
-
-- **Open from the menu.** Run `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Collections and Owners"`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/knowledge/collections-and-owners'"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Concepts with Their Own Owner"`. The status reads *2 collections*. The items *policies* and *safety* each begin *No owner yet* under *Owner*, with the picker *New Owner of policies* or *New Owner of safety* and its *Save* button.
-- **Name an owner.** Run `.claude/skills/verify/scripts/browse.sh <port> wait --fn "[...document.querySelectorAll('option')].some((each) => each.textContent === 'Ifan Morgan')"` and `.claude/skills/verify/scripts/browse.sh <port> press c`. Run `.claude/skills/verify/scripts/browse.sh <port> press i`. The picker *New Owner of policies* now reads *Ifan Morgan*. Then run `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Save the new owner of policies"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Ifan Morgan now owns “policies”."`. The status says so, and the owner of *policies* reads *Ifan Morgan*.
-- **Prove it.** Run `.claude/skills/verify/scripts/browse.sh <port> reload` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Concepts with Their Own Owner"`. The owner of *policies* still reads *Ifan Morgan*, and *safety* still has no owner.
-- **Evidence.** Run `.claude/skills/verify/scripts/browse.sh <port> screenshot /tmp/better-answers-verify/<port>/evidence/knowledge-collections-and-owners.png` and `.claude/skills/verify/scripts/browse.sh <port> snapshot > /tmp/better-answers-verify/<port>/evidence/knowledge-collections-and-owners.aria.txt`.
-
-Pages not built, as the Admin:
-
-- **Read the menu.** On Collections and Owners, the menu *Knowledge* lists only *Search*, *Knowledge Base* and *Collections and Owners*. No page `knowledge-not-built` names is in it.
-- **Open each address.** For `/knowledge/guides`, run `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/knowledge/guides` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Page Not Found"`. The heading *Page Not Found* stands over the link *Go to Members*. Repeat for each address `knowledge-not-built` names.
-- **Evidence.** On each not-found page, run `.claude/skills/verify/scripts/browse.sh <port> screenshot /tmp/better-answers-verify/<port>/evidence/knowledge-<page>.png` and `.claude/skills/verify/scripts/browse.sh <port> snapshot > /tmp/better-answers-verify/<port>/evidence/knowledge-<page>.aria.txt`, naming `<page>` for the address's last part, such as `knowledge-guides.png`.
-- **Go home.** On the last of them, run `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Go to Members"` and `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/people/members'"`.
-
-## Gotchas
-
-- The owner picker is a native select. `.claude/skills/verify/scripts/browse.sh <port> select` with a role or label selector and `.claude/skills/verify/scripts/browse.sh <port> find label "New Owner of policies" fill` both answer *Done* and change nothing. A click opens a popup the keys never reach. Use the page's own `c` key and a typed letter, as the recipe does, or `.claude/skills/verify/scripts/browse.sh <port> select @<ref> "Ifan Morgan"` with the ref a fresh `snapshot -c` gives the picker.
-- `POST /concepts` refuses a title whose file the workspace already holds. Rerun the setup in a fresh workspace, never in the same one.
-- The menu leaves out every page not built, so a not-found page proves only that its address is not served yet. Never report it as a broken page.
+1. For each of `/knowledge/guides`, `/knowledge/all-knowledge`, `/knowledge/due-for-verification`, `/knowledge/conflicts`, `/knowledge/kinds` and `/knowledge/exports`, run `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port><address>` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Page Not Found"`. Expect the heading *Page Not Found* over the link *Go to Members*.
+2. `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Go to Members"`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/people/members'"`.

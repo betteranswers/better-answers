@@ -1,48 +1,23 @@
 # Inbox
 
-Inbox is where a person decides the changes other members suggest to concepts. An Admin sees the waiting edits, compares a suggestion with the current version, then accepts it, which saves the change with its proposer as author, or declines it with a reason.
+Decide the changes other members suggest to concepts: compare, then accept or decline.
 
-## Sub-features
+Setup, once, in a fresh workspace, then the recipes in order. `<annualLeaveIri>` and `<expenseClaimsIri>` are the concepts' whole `iri`. `<annualLeaveId>` is the part of the first after `/c/`.
 
-- `inbox-waiting-on-you` is the Waiting on You page at `/inbox/waiting-on-you`. It lists each waiting suggestion with who suggested it, and accepts the selected ones at once.
-- `inbox-waiting-item` is one suggestion's page at `/inbox/waiting-on-you/<suggestionId>`, reached from its row. It sets the current version beside the suggested one and accepts or declines it.
+1. `.claude/skills/verify/scripts/harness.sh <port> POST /workspaces '{"name":"Verify Inbox"}'` answers `workspaceId`, `admin.id` and `admin.email`.
+2. `.claude/skills/verify/scripts/harness.sh <port> POST /people '{"displayName":"Ifan Morgan"}'` answers Ifan's `id`. Then `.claude/skills/verify/scripts/harness.sh <port> POST /members '{"workspaceId":"<workspaceId>","userId":"<ifanId>","role":"Editor"}'` answers `{"added":true}`.
+3. `.claude/skills/verify/scripts/harness.sh <port> POST /concepts '{"workspaceId":"<workspaceId>","userId":"<admin.id>","concepts":[{"title":"Annual leave","collection":"policies","kind":"Policy","body":"Everyone takes 25 days of leave."},{"title":"Expense claims","collection":"policies","kind":"Policy","body":"Claims go in within 30 days."}]}'` answers each concept's `iri`.
+4. `.claude/skills/verify/scripts/harness.sh <port> POST /suggestions '{"workspaceId":"<workspaceId>","userId":"<ifanId>","iri":"<annualLeaveIri>","body":"Everyone takes 28 days of leave."}'` and `.claude/skills/verify/scripts/harness.sh <port> POST /suggestions '{"workspaceId":"<workspaceId>","userId":"<ifanId>","iri":"<expenseClaimsIri>","body":"Claims go in within 60 days."}'`. Each answers a `suggestionId`. Put the two suggestions on different concepts.
+5. `.claude/skills/verify/scripts/sign-in.sh <port> <admin.email>`, then `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/people/members'"`.
 
-## How to get to it (user POV)
+## inbox-waiting-on-you at `/inbox/waiting-on-you`
 
-- As the Admin the setup signs in, choose *Inbox* in the rail. It opens `/inbox/waiting-on-you`.
-- Choose a suggestion's title in the list. Its page opens.
+1. `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Inbox" --exact`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/inbox/waiting-on-you'"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "2 suggestions waiting"`. Expect the region *Waiting on You* to list the rows *Annual leave* and *Expense claims*, each with the checkbox *Select <title>* and *Ifan Morgan* under *Suggested By*.
+2. `.claude/skills/verify/scripts/browse.sh <port> find role checkbox check --name "Select Annual leave"`, `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Accept Selected"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "1 suggestion waiting"`. Expect the status *Accepted. The change is committed with Ifan Morgan as its author.* and only *Expense claims* listed.
+3. Second view: `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/knowledge/search/<annualLeaveId>`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Everyone takes 28 days of leave."`. Then `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/inbox/waiting-on-you`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "1 suggestion waiting"`. Expect only *Expense claims* listed.
 
-## Driving it with agent-browser
+## inbox-waiting-item at `/inbox/waiting-on-you/<suggestionId>`
 
-Preconditions:
-
-- `.claude/skills/verify/scripts/doctor.sh <port>` printed `worth driving`. Put the launched port wherever a command says `<port>`.
-- One workspace serves both recipes in this file, and one Admin sign-in drives them. Run the setup bullets once, then the recipes in the order given.
-- Each answer below names values that later commands take. Put the answer's `workspaceId` where a command says `<workspaceId>`, the Admin's `id` where it says `<adminId>`, the Admin's `email` where it says `<adminEmail>` and Ifan's `id` where it says `<ifanId>`. Put each concept's whole `iri` where a command says `<annualLeaveIri>` or `<expenseClaimsIri>`, and the last part of the *Annual leave* IRI, after `/c/`, where it says `<annualLeaveId>`.
-
-Setup:
-
-- **Provision.** Make the workspace and its Admin. Run `.claude/skills/verify/scripts/harness.sh <port> POST /workspaces '{"name":"Verify Inbox"}'`. The answer names the `workspaceId` and the Admin's `id` and `email`.
-- **Add an Editor.** Ifan proposes the changes. Run `.claude/skills/verify/scripts/harness.sh <port> POST /people '{"displayName":"Ifan Morgan"}'`, then `.claude/skills/verify/scripts/harness.sh <port> POST /members '{"workspaceId":"<workspaceId>","userId":"<ifanId>","role":"Editor"}'`. It answers `{"added":true}`.
-- **Write two concepts.** Run `.claude/skills/verify/scripts/harness.sh <port> POST /concepts '{"workspaceId":"<workspaceId>","userId":"<adminId>","concepts":[{"title":"Annual leave","collection":"policies","kind":"Policy","body":"Everyone takes 25 days of leave."},{"title":"Expense claims","collection":"policies","kind":"Policy","body":"Claims go in within 30 days."}]}'`. The answer lists both concepts, each with an `iri` such as `https://better-answers.com/c/01M61VDHKD4JVYRNQ0SYDRM45E`.
-- **Suggest two edits.** Run `.claude/skills/verify/scripts/harness.sh <port> POST /suggestions '{"workspaceId":"<workspaceId>","userId":"<ifanId>","iri":"<annualLeaveIri>","body":"Everyone takes 28 days of leave."}'` and `.claude/skills/verify/scripts/harness.sh <port> POST /suggestions '{"workspaceId":"<workspaceId>","userId":"<ifanId>","iri":"<expenseClaimsIri>","body":"Claims go in within 60 days."}'`. Each answers a `suggestionId`.
-- **Sign in.** Run `.claude/skills/verify/scripts/sign-in.sh <port> <adminEmail>`, then `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/people/members'"`. The Admin lands on Members.
-
-Waiting on You, at `/inbox/waiting-on-you`, as the Admin:
-
-- **Open from the rail.** Run `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Inbox" --exact`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/inbox/waiting-on-you'"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "2 suggestions waiting"`. The heading *Inbox* stands over the region *Waiting on You*. It holds the button *Accept Selected* and a list with the rows *Annual leave* and *Expense claims*. Each row has the checkbox *Select <title>*, its title as a link, *Ifan Morgan* under *Suggested By* and *No owner, so Admins decide* under *Owner*.
-- **Accept one.** Run `.claude/skills/verify/scripts/browse.sh <port> find role checkbox check --name "Select Annual leave"`, `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Accept Selected"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "1 suggestion waiting"`. The status reads *Accepted. The change is committed with Ifan Morgan as its author.* Only *Expense claims* is listed.
-- **Prove it.** Run `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/knowledge/search/<annualLeaveId>` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Everyone takes 28 days of leave."`. The concept's page shows the accepted body. Then run `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/inbox/waiting-on-you` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "1 suggestion waiting"`. Only *Expense claims* is listed.
-- **Evidence.** Run `.claude/skills/verify/scripts/browse.sh <port> screenshot /tmp/better-answers-verify/<port>/evidence/inbox-waiting-on-you.png` and `.claude/skills/verify/scripts/browse.sh <port> snapshot > /tmp/better-answers-verify/<port>/evidence/inbox-waiting-on-you.aria.txt`.
-
-A waiting suggestion, at `/inbox/waiting-on-you/<suggestionId>`, as the Admin:
-
-- **Open from the row.** Run `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Expense claims" --exact`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname.startsWith('/inbox/waiting-on-you/')"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Suggested Version"`. The address ends with the *Expense claims* `suggestionId`. The article *Expense claims* holds the link *Back to Waiting on You*, the buttons *Accept* and *Decline*, and the regions *Current Version*, *Suggested Version* and *Suggested Sources*. The current text says 30 days and the suggested text says 60 days.
-- **Evidence before the decision.** Run `.claude/skills/verify/scripts/browse.sh <port> screenshot /tmp/better-answers-verify/<port>/evidence/inbox-waiting-on-you-item.png` and `.claude/skills/verify/scripts/browse.sh <port> snapshot > /tmp/better-answers-verify/<port>/evidence/inbox-waiting-on-you-item.aria.txt`.
-- **Decline it.** Run `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Decline" --exact`, `.claude/skills/verify/scripts/browse.sh <port> find label "Reason for Declining" fill "The figure is from last year"` and `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Decline Suggestion"`. Then run `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/inbox/waiting-on-you'"` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "0 suggestions waiting"`. The page returns to the list. The status reads *Declined. Ifan Morgan can read your reason.* and the region *Waiting on You* begins *Nothing is waiting on you.*
-- **Prove it.** Run `.claude/skills/verify/scripts/browse.sh <port> reload` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "0 suggestions waiting"`. The list stays empty.
-- **Evidence after the decision.** Run `.claude/skills/verify/scripts/browse.sh <port> screenshot /tmp/better-answers-verify/<port>/evidence/inbox-waiting-on-you-declined.png` and `.claude/skills/verify/scripts/browse.sh <port> snapshot > /tmp/better-answers-verify/<port>/evidence/inbox-waiting-on-you-declined.aria.txt`.
-
-## Gotchas
-
-- A suggestion is made against the concept as it stood. After one is accepted, a second suggestion on the same concept stays in the list with the note *The concept changed after this was written.*, and accepting it sends it back to its proposer. Seed each recipe's suggestions on different concepts.
+1. `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Expense claims" --exact`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname.startsWith('/inbox/waiting-on-you/')"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Suggested Version"`. Expect the address to end with the *Expense claims* `suggestionId`, the buttons *Accept* and *Decline*, and the regions *Current Version* (30 days) and *Suggested Version* (60 days).
+2. `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Decline" --exact`, `.claude/skills/verify/scripts/browse.sh <port> find label "Reason for Declining" fill "The figure is from last year"`, `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Decline Suggestion"`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/inbox/waiting-on-you'"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "0 suggestions waiting"`. Expect the status *Declined. Ifan Morgan can read your reason.* and the region *Waiting on You* to begin *Nothing is waiting on you.*
+3. Second view: `.claude/skills/verify/scripts/browse.sh <port> reload`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "0 suggestions waiting"`. Expect the list empty.

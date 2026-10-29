@@ -21,11 +21,13 @@ Two reference files hold the detail. Open the one a task needs:
   Open it when the gate refuses a page, when a spec is about one theme, or when a change touches
   the gate.
 
-The verify skill holds the server under the browser and how a spec builds its state, under
-*The seam* and *Building state* in `.claude/skills/verify/SKILL.md`, at the repository root.
-*The seam* also says why a run can hang. The harness's actions, the ceilings a spec runs into and
-what a refused seed leaves are in `.claude/skills/verify/references/harness.md`. Open it before
-writing set-up, and before adding an action, which may already exist.
+`webServer` in `apps/web/playwright.config.ts` starts `apps/api/tests/serve.ts` as a process, and a
+comment there says why it is not `pnpm run`. A spec builds its state through the harness actions in
+`apps/web/e2e/harness.ts`, each of which calls `/__harness`, which
+`apps/api/tests/support/harness/harness-control.ts` mounts. Search both before adding an action.
+Specs share `provision`, `addMember`, `removeMember`, `endEverySignInAndToken`, `markTheOperator`,
+`invite`, `restored`, `seedModelChoices`, `seedConnectedSources`, `nameOwners`, `seedQuestions`,
+`makeGroups` and `askToJoin`.
 
 ## The fixture module
 
@@ -51,7 +53,7 @@ address of its own, a caller shares one bucket with every other caller in the ru
 trips a ceiling partway through. Both addresses come from RFC 2544's benchmarking block, keyed by
 worker index and a per-run count. The header's name is written out in `browser.ts` rather than
 imported, because `apps/web` takes nothing from `apps/api` at runtime. A spec that means to prove a ceiling names which ceiling it
-proves and reaches it from the side that counts; `.claude/skills/verify/references/harness.md` lists the three.
+proves and reaches it from the side that counts. The per-email and per-address rules are in `apps/api/src/auth/constants.ts`, and `personCeiling` in `apps/api/src/trpc/base.ts` counts a person's calls.
 
 ## A virtual authenticator
 

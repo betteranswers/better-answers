@@ -1,6 +1,6 @@
 # The suite's helpers
 
-The helpers in the suite's modules, the helpers that play Claude's part in OAuth, the readers of the api's answers and the knowledge pages' module. `SKILL.md` gives the rules for using them. The harness's actions, the ceilings a spec runs into and what a refused seed leaves are in `.claude/skills/verify/references/harness.md`.
+The helpers in the suite's modules, the helpers that play Claude's part in OAuth, the readers of the api's answers and the knowledge pages' module. `SKILL.md` gives the rules for using them. The harness's actions are in `apps/web/e2e/harness.ts`.
 
 ## The browser helpers
 
@@ -109,7 +109,7 @@ still shown the api refused.
 ## The knowledge module
 
 `apps/web/e2e/knowledge.ts` holds what the knowledge pages' specs share. `readsCeilingFilled`
-fills the knowledge reads' ceiling, which `.claude/skills/verify/references/harness.md` describes.
+fills the knowledge reads' ceiling, `KNOWLEDGE_CEILING` in `apps/api/src/trpc/knowledge.ts`.
 
 | Helper | What it does |
 | --- | --- |
