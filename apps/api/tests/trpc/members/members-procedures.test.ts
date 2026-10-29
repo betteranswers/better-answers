@@ -792,6 +792,32 @@ describe("an action from a tab left in another workspace", () => {
     expect(await samsRoles(left)).toEqual(["Viewer", "Viewer"]);
   });
 
+  it("refuses a ticked set's role change, every role kept", async () => {
+    const left = await aTabLeftInAcme();
+    const priya = await app.person(undefined, "Priya Shah");
+    await app.addMember(left.acme.workspaceId, priya.id, "Editor");
+    await app.addMember(left.beta.workspaceId, priya.id, "Admin");
+    const ticked = [left.sam.id, priya.id];
+
+    const refused = await refusalOfCall(
+      left.stale.members.bulkChangeRole.mutate({ personIds: ticked, role: "Editor" }),
+    );
+
+    const rolesKept = await Promise.all(
+      ticked.map((personId) =>
+        Promise.all([
+          roleHeldBy(left.acme.workspaceId, personId),
+          roleHeldBy(left.beta.workspaceId, personId),
+        ]),
+      ),
+    );
+    expect(rolesKept).toEqual([
+      ["Viewer", "Viewer"],
+      ["Editor", "Admin"],
+    ]);
+    expect(refused).toMatchObject(WORKSPACE_SWITCHED);
+  });
+
   it("refuses an invitation, inviting nobody to either workspace", async () => {
     const { stale } = await aTabLeftInAcme();
     const address = `invited-${Date.now()}@client.example`;
