@@ -823,20 +823,22 @@ On 28/10/2026 the first rule, a 20s drop in `pnpm check:worker`, summed case tim
 
 **Depends on.** BA-272.
 
+Changed 29/10/2026. The web already had a partial hold, `heldBack` in `two-workspaces.ts`, which could resolve and not reject. It now lives in `stubbed-api.ts` with `reject`, a `pending` flag and an ask count, and the stub's fetch records each procedure asked with its input in `server.asks`. Each of the five specs' 221 cases was read in full against its helpers, and a case moved only when a Testing Library test over the stubbed api makes every claim it makes, or when a named kept browser case or lower-layer test makes the one claim jsdom cannot. 124 cases moved, against Appendix E's estimate of about 110. They are 30 of people's 68, 30 of people-invitations' 35, 21 of sources' 36, 31 of knowledge-search's 45 and 12 of sign-in's 37. The other 97 keep a claim that only a real browser or the real api makes. These are a latency budget, layout at 320 or 390 px or a computed style, the accessibility gate run on a page's end state, a native Tab or Enter that jsdom does not do, a second tab or a hidden one, a real email code, upload or clipboard, and what the api decides, such as a Viewer's search withholding a Restricted match. People-invitations' "sends 50 at once, holding a 51st in the field" moves. BA-272 kept it because it asserts two focus landings and the second send, which the api's case does not, and no page test of the tab existed. Its page test now asserts both. Every helper the moved cases share sits in `apps/web/test/support/`, in a subfolder per feature, because `apps/web/AGENTS.md` puts every web test helper there and the folder was at its cap of 15 files.
+
 **Files.**
 
-- [ ] Edit the web's stubbed api, today `apps/web/test/support/stubbed-api.ts`.
-- [ ] Create component test files beside each feature's tests for people, people-invitations, sources, knowledge-search and sign-in. They go in `apps/web/test/people/`, `test/people/invitations/`, `test/sources/`, `test/knowledge/` and `test/auth/sign-in/`, which exist and mirror `src/features/`.
-- [ ] Edit those five specs under `apps/web/e2e/` to drop the moved cases.
+- [ ] Edit the web's stubbed api, `apps/web/test/support/stubbed-api.ts`, and `stub-server.ts` and `two-workspaces.ts`, which feed and answer it. Add `apps/web/test/support/stubbed-api.test.ts` for the hold.
+- [ ] Create component test files in the folders that mirror `src/features/`. They are `apps/web/test/people/`, `test/people/members/`, `test/people/invitations/`, `test/sources/`, `test/knowledge/`, `test/auth/sign-in/` and `test/auth/workspace/`. Their helpers go in `test/support/people/`, `test/support/sources/` and `test/support/knowledge/`.
+- [ ] Edit those five specs under `apps/web/e2e/` to drop the moved cases, and `apps/web/e2e/knowledge.ts` to drop the helpers only they used.
 
 **Build.**
 
 - [ ] Let a test hold a stubbed procedure and resolve or reject it when it chooses. This replaces the `page.route` holds the browser cases use.
-- [ ] Move each COMPONENT case in Appendix E's browser table for the five specs to Testing Library, keeping its title. About 110 cases move.
+- [ ] Move each browser case of the five specs whose every claim a Testing Library test makes, keeping its title. 124 cases move, and each is named in the PR body.
 
 **You see.**
 
-- [ ] The five specs hold their journey, budget, gate and layout cases only.
+- [ ] `pnpm check:web:e2e --list` counts 124 fewer tests than trunk's 699, which is 575, and the unit run holds each of the 124 titles. The five specs hold the cases whose claim a real browser or the real api makes.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -1076,7 +1078,7 @@ The table places each file in one column. Seven more files in the worker-process
 | workspace-switcher | 97 | 16 | 3 | 9 | 4 | 0 |
 | ask-new-question | 91 | 27 | 3 | 13 | 4 | 5 |
 
-The triage's named pairs include people's "refuses demoting both Admins" against the api's members-procedures case, people-invitations' "sends 50 at once, holding a 51st" against members-invitations, and workspace-switcher's "drops the left workspace's name when the member read fails" against the web's member-change test. BA-272 keeps all three, since each case asserts more than its twin.
+The triage's named pairs include people's "refuses demoting both Admins" against the api's members-procedures case, people-invitations' "sends 50 at once, holding a 51st" against members-invitations, and workspace-switcher's "drops the left workspace's name when the member read fails" against the web's member-change test. BA-272 keeps all three, since each case asserts more than its twin. BA-277 then moves the second, since a page test of the Invitations tab now makes its two focus landings and its second send.
 
 **After-table.** Each merged PR adds a row with the five `main` `build` runs that follow it.
 

@@ -9,6 +9,8 @@ The browser suite drives `apps/web`'s **served build in a browser**. A spec here
 only the served build shows: a page, with its latency budget, the accessibility gate and
 keyboard reach, or a journey that crosses pages through the real api. A page's single-screen
 behaviour is a component test through Testing Library, not a spec (the root `AGENTS.md`, *Testing*).
+A component test holds a request with `heldBack` in `apps/web/test/support/stubbed-api.ts`, which resolves or
+rejects it when the test chooses, where a spec holds one with `page.route`.
 Everything below is what the suite already is; `apps/web/e2e/model-choices/models-and-spend.spec.ts` is the fullest worked example.
 
 Two reference files hold the detail. Open the one a task needs:
