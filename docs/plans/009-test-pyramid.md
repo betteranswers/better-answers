@@ -727,7 +727,6 @@ Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` c
 - [ ] Lane 2. Run an erasure rehearsal with `pnpm ops` against a seeded local database. Save `erasure.log`. Pass when the report matches trunk's for the same seed.
 - [ ] Lane 3. Edit a concept with a folded kind through the api's `knowledge.saveConcept` on a server the verify skill launches, and read it back on the Knowledge Base page. Save `kind-fold.png`. Pass when the stored kind matches trunk's.
 - [ ] Lane 4. Seed a guide from a template through `seedGuide` at trunk and head. Save `guide-trunk.json` and `guide-head.json`. Pass when coverage and marks match.
-
 - [ ] Lane 5. Import a bundle with analyse held off. Save `import.log`. Pass when import reports landed, as trunk does.
 - [ ] Lane 6. Run `pnpm check:gates`. Save `gates.log`. Pass when import-direction and table-ownership pass.
 - [ ] Lane 7. Run `pnpm check:api`. Save `api.log`. Pass when it passes.
