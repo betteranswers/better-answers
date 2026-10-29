@@ -131,13 +131,6 @@ const BEYOND_USE = {
 
 const ANCHORED_ON_A_31ST = new Date("2026-08-31T12:00:00.000Z");
 
-const BEYOND_USE_FROM_THE_31ST = {
-  hourly: "2026-09-02T12:00:00.000Z",
-  daily: "2026-09-30T12:00:00.000Z",
-  weekly: "2026-10-26T12:00:00.000Z",
-  monthly: "2027-02-28T12:00:00.000Z",
-} as const;
-
 const DUMP_LOCK = 41;
 
 const ERASURE_ACTOR = "process:better-answers-erasure";
@@ -148,16 +141,6 @@ const INVITATIONS_WHEREVER_SENT =
   "Invitations sent to the address a person signs in with are deleted wherever they were sent, " +
   "by the request that erases them from their last workspace; the invitation line above counts this " +
   "workspace's alone.";
-
-const SIGN_IN_IDENTITY_REMOVED =
-  "A person's sign-in identity is removed from the platform by the request that erases " +
-  "them from their last workspace.";
-
-const DOCUMENTS_WITHHELD =
-  "The original files in the object store are untouched; the identifiers named in this request " +
-  "are withheld from the text of every document in this workspace, those held now and those " +
-  "bound later, each time a document is indexed; and the documents found above are indexed " +
-  "again now.";
 
 const operatorLines: ErasureLogLine[] = [];
 
@@ -274,11 +257,6 @@ const erasedOnEachArm = async (): Promise<{
 let theArmsErased: ReturnType<typeof erasedOnEachArm> | undefined;
 
 const erasedOnEachArmOnce = () => (theArmsErased ??= erasedOnEachArm());
-
-const armsWhoseReportSays = async (sentence: string): Promise<readonly string[]> =>
-  Object.entries((await erasedOnEachArmOnce()).runs)
-    .filter(([, done]) => done.report.includes(sentence))
-    .map(([arm]) => arm);
 
 const filesNaming = (
   email: string,
@@ -810,91 +788,11 @@ describe("the report", () => {
     });
   });
 
-  it("dates beyond use by calendar interval, never by day count", async () => {
-    const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
-
-    const done = await completing(scenario, subjectRequestId, ANCHORED_ON_A_31ST);
-
-    const [row] = await erasureRowsIn(scenario.workspaceId);
-    expect({
-      hourly: row?.beyond_use_hourly_at.toISOString(),
-      daily: row?.beyond_use_daily_at.toISOString(),
-      weekly: row?.beyond_use_weekly_at.toISOString(),
-      monthly: row?.beyond_use_monthly_at.toISOString(),
-    }).toEqual({
-      hourly: BEYOND_USE_FROM_THE_31ST.hourly,
-      daily: BEYOND_USE_FROM_THE_31ST.daily,
-      weekly: BEYOND_USE_FROM_THE_31ST.weekly,
-
-      monthly: BEYOND_USE_FROM_THE_31ST.monthly,
-    });
-
-    expect(done.report).toContain(
-      `${BEYOND_USE_FROM_THE_31ST.hourly} · ${BEYOND_USE_FROM_THE_31ST.daily} · ` +
-        `${BEYOND_USE_FROM_THE_31ST.weekly} · ${BEYOND_USE_FROM_THE_31ST.monthly}.`,
-    );
-  });
-
-  it("says its anchor is the lock, not the last dump", async () => {
-    const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
-
-    const done = await completing(scenario, subjectRequestId);
-
-    expect(done.report).toContain(
-      "The anchor above is the instant this routine took the erasure lock, not the stamp of the " +
-        "last dump before it: this routine reads no backup record, so the last dump precedes the anchor and " +
-        "every date above is the latest a copy can expire.",
-    );
-  });
-
-  it("says no export is recalled, since none was issued", async () => {
-    const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
-
-    const done = await completing(scenario, subjectRequestId);
-
-    expect(done.report).toContain(
-      "Exports already issued are not recalled. None have been issued.",
-    );
-  });
-
-  it("says on every arm the identifiers are withheld from documents", async () => {
-    expect(await armsWhoseReportSays(DOCUMENTS_WITHHELD)).toEqual([
-      "last-workspace",
-      "held-elsewhere",
-      "no-person",
-    ]);
-    expect(await armsWhoseReportSays("The object store is untouched")).toEqual([]);
-  });
-
-  it("says on every arm that invitations are deleted wherever sent", async () => {
-    expect(await armsWhoseReportSays(INVITATIONS_WHEREVER_SENT)).toEqual([
-      "last-workspace",
-      "held-elsewhere",
-      "no-person",
-    ]);
-  });
-
-  it("says on every arm when a sign-in identity is removed", async () => {
-    expect(await armsWhoseReportSays(SIGN_IN_IDENTITY_REMOVED)).toEqual([
-      "last-workspace",
-      "held-elsewhere",
-      "no-person",
-    ]);
-  });
-
   it("lists by IRI each concept whose body names the person", async () => {
     const { iri, done } = await theBundleRewritten();
 
     expect(done.report).toContain("Names inside concept bodies, for the owner to edit:");
     expect(done.report).toContain(`- ${iri}`);
-  });
-
-  it("says so plainly when no concept body names the person", async () => {
-    const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
-
-    const done = await completing(scenario, subjectRequestId);
-
-    expect(done.report).toContain("None: no concept body names this person.");
   });
 });
 

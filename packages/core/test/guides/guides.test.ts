@@ -572,7 +572,7 @@ describe("including an available concept", () => {
   });
 
   it("refuses an include by a Viewer", async () => {
-    const { ng, guideId } = await typedTheMissingPolicy();
+    const { ng, guideId } = await seededOnce();
     const { git, workspaceId } = ng.scenario;
     const insurance = await writeUpOf(workspaceId, guideId, "Insurance and financial standing");
     const headBefore = await head(ng.admin, git);

@@ -15,6 +15,7 @@ import {
   type UpdateConceptBodyRefusal,
 } from "@better-answers/core/concepts";
 import { attempt, err, ok, type Result, type UserPrincipal } from "@better-answers/core/kernel";
+import { analyseMap } from "@better-answers/core/store/map";
 import { principalOfMember } from "@better-answers/core/workspaces";
 import { SENSITIVITIES } from "@better-answers/schema";
 
@@ -218,7 +219,13 @@ export const importBundleCommand = async (
   const started = doors.clock.now();
   const run = await importBundle(
     principal.value,
-    { git: git.value, postgres, clock: doors.clock, log: io.logger },
+    {
+      git: git.value,
+      postgres,
+      clock: doors.clock,
+      log: io.logger,
+      analyse: () => analyseMap(postgres.pool),
+    },
     { tree: tree.value, sensitivity, dryRun },
   );
   const seconds = ((doors.clock.now().getTime() - started.getTime()) / 1_000).toFixed(1);

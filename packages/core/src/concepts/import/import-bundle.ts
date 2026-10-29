@@ -24,7 +24,6 @@ import {
   type UserPrincipal,
 } from "../../kernel/index.ts";
 import { type CommitAuthor, type GitDoor } from "../../store/git/index.ts";
-import { analyseMap } from "../../store/map/index.ts";
 import { withMember, type PostgresDoor } from "../../store/postgres/index.ts";
 import { type FrontmatterSource } from "../file.ts";
 import { writeConcept, type WriteConceptRefusal, type WriteDoors } from "../writes/write.ts";
@@ -83,7 +82,10 @@ export type ImportLog = {
   readonly warn: (line: MapNotAnalysedLine, message: string) => void;
 };
 
-type ImportDoors = WriteDoors & { readonly log: ImportLog };
+type ImportDoors = WriteDoors & {
+  readonly log: ImportLog;
+  readonly analyse: () => Promise<void>;
+};
 
 const importBundleAction = declareAction({
   admits: ADMIN_ALONE,
@@ -412,7 +414,7 @@ const runImport = async (
   const rewritten = landing.ok
     ? await rewriteEach(principal, doors, run, landing.value)
     : err(landing.error);
-  const analysed = await attempt(() => analyseMap(doors.postgres.pool));
+  const analysed = await attempt(doors.analyse);
   if (!analysed.ok) {
     doors.log.warn(
       {

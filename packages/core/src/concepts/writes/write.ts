@@ -45,7 +45,6 @@ import {
   holderOfPath,
   holdsEveryDocument,
   indexRowOf,
-  mergeKeyOf,
   type IndexRow,
   landRows,
   placesUsingReadableOrNot,
@@ -57,6 +56,7 @@ import { IMPORT_SENSITIVITY_DEFAULT } from "../import/loader.ts";
 import { deciderAdmits, ownerAdmits, standingConcept } from "../owners.ts";
 import { conceptVisibilityFrom } from "../visibility.ts";
 import type { PassedOnCommitRefusal } from "../vocabulary.ts";
+import { mergeKeyMovedBy } from "./merge-key.ts";
 import {
   conceptOfSuggestion,
   payloadFor,
@@ -337,8 +337,7 @@ const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: Par
 
 const landingKeyOf = ({ input, mergeKey }: ParsedWrite, held: Held | undefined): string => {
   if (input.acceptance === undefined || held === undefined) return mergeKey;
-  const edited = mergeKeyOf(foldKind(input.kind), input.title);
-  return edited === mergeKeyOf(held.kind, held.title) ? mergeKey : edited;
+  return mergeKeyMovedBy(held, input) ?? mergeKey;
 };
 
 const WRITE_REFUSALS: readonly (readonly [

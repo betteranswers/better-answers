@@ -107,6 +107,15 @@ export type SectionWriteUp = {
   readonly unmet: boolean;
 };
 
+export const leavesAFactUnmet = (
+  facts: readonly { readonly id: string; readonly atLeast: number }[],
+  includes: readonly Pick<IncludeRow, "expectedFactId">[],
+): boolean =>
+  facts.some(
+    (fact) =>
+      includes.filter((include) => include.expectedFactId === fact.id).length < fact.atLeast,
+  );
+
 export const insertSectionWriteUps = async (
   principal: UserPrincipal,
   tx: Tx,

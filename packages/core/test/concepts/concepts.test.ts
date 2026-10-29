@@ -19,7 +19,6 @@ import {
   contentHashOf,
   conceptByIri,
   findConcepts,
-  foldKind,
   parseConceptFile,
   renderConceptFile,
   trustWords,
@@ -584,23 +583,6 @@ describe("what a concept hashes and what it renders", () => {
         "",
       ].join("\n"),
     );
-  });
-
-  it.each([
-    ["policy", "Policy"],
-    ["Policies", "Policy"],
-    ["POLICY", "Policy"],
-    ["Boxes", "Box"],
-    ["Standards", "Standard"],
-    ["Assessments", "Assessment"],
-
-    ["Assessment", "Assessment"],
-    ["Business", "Business"],
-    ["Bonus", "Bonus"],
-    ["Analysis", "Analysis"],
-    ["Rate  card", "Rate  Card"],
-  ])("folds the kind %s to %s", (kind, folded) => {
-    expect(foldKind(kind)).toBe(folded);
   });
 });
 
