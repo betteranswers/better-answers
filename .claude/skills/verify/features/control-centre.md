@@ -22,16 +22,16 @@ Setup:
 
 ## cc-member-page at `/people/members/<priyaId>`
 
-1. `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/people/members`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "3 members"`, `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Priya Shah"`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname.startsWith('/people/members/')"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Priya Shah is an Editor"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Changes are saved immediately."`. Expect the *Role* radio group to have *Editor* checked and *Groups for Priya Shah* to have *HR team* ticked.
+1. `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/people/members`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "3 members"`, `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Priya Shah"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Priya Shah is an Editor"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Changes are saved immediately."`. Expect the *Role* radio group to have *Editor* checked and *Groups for Priya Shah* to have *HR team* ticked.
 2. `.claude/skills/verify/scripts/browse.sh <port> find role radio click --name "Viewer" --exact`, `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Change Role"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "role has been changed to Viewer"`.
-3. Second view: `.claude/skills/verify/scripts/browse.sh <port> reload`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Priya Shah is a Viewer"`. Then `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "People" --exact` (the breadcrumb, the only link of that name), `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/people/members'"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "3 members"`. Expect Priya Shah's row to read *Viewer*.
+3. Second view: `.claude/skills/verify/scripts/browse.sh <port> reload`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Priya Shah is a Viewer"`. Then `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "People" --exact`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/people/members'"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "3 members"`. Expect Priya Shah's row to read *Viewer*.
 
 ## cc-groups at `/people/groups`
 
 1. `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/people/groups`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "HR team"`. Expect *HR team* with *1 member*.
 2. `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Create a Group"`, `.claude/skills/verify/scripts/browse.sh <port> find role textbox fill "Site leads" --name "New Group Name"`, `.claude/skills/verify/scripts/browse.sh <port> press Enter`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Site leads has been created"`. Expect the count *2 groups*.
-3. `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Site leads" --exact`, `.claude/skills/verify/scripts/browse.sh <port> find role checkbox click --name "Sam Okoro"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Sam Okoro has been added to Site leads"`.
-4. Second view: `.claude/skills/verify/scripts/browse.sh <port> press Escape`, `.claude/skills/verify/scripts/browse.sh <port> reload`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Site leads"`. Expect the *Site leads* row to read *1 member*.
+3. `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Site leads" --exact`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Changes are saved immediately."`, `.claude/skills/verify/scripts/browse.sh <port> find role checkbox click --name "Sam Okoro"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Sam Okoro has been added to Site leads"`.
+4. Second view: `.claude/skills/verify/scripts/browse.sh <port> reload`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Site leads"`. Expect the *Site leads* row to read *1 member*.
 
 ## cc-audit-log at `/system/audit-log`
 
@@ -54,15 +54,13 @@ Setup:
 
 1. `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/questions/questions-asked`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "How long do you keep audit logs?"`. Expect the region *Flagged* to hold *How long do you keep audit logs?* and *Other Questions* to hold *Who can see the audit log?*.
 2. `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "How long do you keep audit logs?"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "We keep them for seven years."`, `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Fixed in the Knowledge"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "closed as fixed in the knowledge"`. Expect the flag to read *Closed* with *Fixed in the knowledge*.
-3. Second view: `.claude/skills/verify/scripts/browse.sh <port> press Escape`, `.claude/skills/verify/scripts/browse.sh <port> reload`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Other Questions"`. Expect no *Flagged* region and *Other Questions* holding both questions.
+3. Second view: `.claude/skills/verify/scripts/browse.sh <port> reload`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Other Questions"`. Expect no *Flagged* region and *Other Questions* holding both questions.
 
 ## cc-answer-tests at `/questions/answer-tests`
 
 1. `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/questions/answer-tests`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "No answer tests yet"`.
 
 ## cc-not-built
-
-Pages not built draw the not-found page. A not-found page proves only that the address is not served yet, never a broken page.
 
 1. For each of `/overview`, `/suggestions/to-decide`, `/sources/publishing-rules`, `/sources/cost-estimates`, `/sources/backlogs`, `/sources/removed-at-source`, `/sources/share-agents`, `/models/spending-limit`, `/people/personal-tokens`, `/personal-data/erasure-and-suppression`, `/system/signals`, `/system/health` and `/system/backups`, run `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port><address>` and `.claude/skills/verify/scripts/browse.sh <port> wait --text "Page Not Found"`. Expect the heading *Page Not Found* over the link *Go to Members*.
 2. `.claude/skills/verify/scripts/browse.sh <port> find role link click --name "Go to Members"`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/people/members'"`.

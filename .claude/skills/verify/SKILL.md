@@ -5,7 +5,7 @@ description: This skill should be used when asked to "verify this on the running
 
 # Verify the served app
 
-Drive the SPA's built pages through the api that serves them, in a real browser, as a person does. `features/README.md` lists the recipes. A recipe needs the instance, the harness and the sign-in below. Specs under `apps/web/e2e/` are written per `apps/web/.claude/skills/playwright-specs/SKILL.md`.
+Drive the SPA's built pages through the api that serves them, in a real browser, as a person does. `features/README.md` lists the recipes. A recipe needs the instance, the harness and the sign-in below.
 
 ## Launch
 
@@ -16,7 +16,7 @@ Docker must be running. Install the browser driver once with `npm install -g age
 .claude/skills/verify/scripts/launch.sh 4610 --no-build  # serves the build already in apps/web/dist
 ```
 
-It starts `apps/api/tests/serve.ts` on the port and returns once `/health` answers 200. A cold Docker pulls its images first, so it waits up to 240 s. It refuses a port that any process holds. Every instance starts with no workspace and no person. The origin is `http://localhost:<port>`, never `127.0.0.1`.
+It starts `apps/api/tests/serve.ts` on the port and returns once `/health` answers 200. A cold Docker pulls its images first, so it waits up to 240 s. It refuses a port that any process holds.
 
 ## Doctor
 
@@ -24,11 +24,11 @@ It starts `apps/api/tests/serve.ts` on the port and returns once `/health` answe
 .claude/skills/verify/scripts/doctor.sh 4610
 ```
 
-It prints `worth driving:` and exits 0, or prints `not worth driving:` with the reason and exits 1. Run it before the first drive, after any drive that failed, and whenever a page looks wrong. When it refuses, run cleanup.sh and launch again. Never drive an instance it refused. The reason may quote server-log lines that predate the exit, so read `server.log` in full before naming a cause.
+It prints `worth driving:` and exits 0, or prints `not worth driving:` with the reason and exits 1. Run it before the first drive and whenever a page looks wrong. Never drive an instance it refused.
 
 ## Drive
 
-Build state only through the harness, and act only through the page. Write every command out in full: a worktree-isolated agent's hook refuses a command assembled from a shell variable or a `$(...)`.
+Build state only through the harness, and act only through the page. Write every command out in full, with literal values: a worktree-isolated agent's hook refuses a command that carries a value computed at runtime.
 
 1. **Build state.** `scripts/harness.sh <port> <METHOD> <path> [json body]` calls `/__harness<path>` and prints the answer. A refusal prints its status and reasons and exits 1. `references/harness.md` lists the routes the recipes call.
 
@@ -36,7 +36,7 @@ Build state only through the harness, and act only through the page. Write every
    .claude/skills/verify/scripts/harness.sh 4610 POST /workspaces '{"name":"Verify people"}'
    ```
 
-2. **Sign in.** `scripts/sign-in.sh <port> <email> [path]` signs in through the product's own page, through the second-factor step, and switches from one person to another. It prints a line that ends with the page's address. Never run `browse.sh <port> close` mid-drive: the next command relaunches the browser on a blank page.
+2. **Sign in.** `scripts/sign-in.sh <port> <email> [path]` signs in through the product's own page, through the second-factor step, and switches from one person to another. It prints a line that ends with the page's address.
 
    With no path, a new Admin of one workspace lands on `/people/members`, an Editor or a Viewer of one on `/ask/new-question`, and a person in several workspaces on the workspace picker. With the path `/console`, the operator lands on `/console/workspaces/every-workspace`.
 
@@ -48,11 +48,11 @@ Build state only through the harness, and act only through the page. Write every
    .claude/skills/verify/scripts/browse.sh 4610 wait --fn "location.pathname === '/people/groups'"
    ```
 
-   Locate by role and accessible name, or by a field's label, never by CSS class, coordinates or tab order. A name matches as a case-insensitive substring unless the command adds `--exact`. `snapshot -c` can leave out static text, so read quoted strings in the full `snapshot`. Wait on a condition, never for a fixed time. `open <url>` returns before the page's data arrives, so `wait` for a text the loaded page draws before the next `find`.
+   Locate by role and accessible name, or by a field's label, never by CSS class, coordinates or tab order. A name matches as a case-insensitive substring unless the command adds `--exact`. Wait on a condition, never for a fixed time. `open <url>` returns before the page's data arrives, so `wait` for a text the loaded page draws before the next `find`.
 
 ## Evidence
 
-Save, for each page a recipe ends on, a screenshot and a full snapshot in `/tmp/better-answers-verify/<port>/evidence/`, named `<feature file>-<page>`.
+Save, for each page a recipe ends on, a screenshot and a full snapshot in `/tmp/better-answers-verify/<port>/evidence/`, named for the feature file and the last segment of the page's address, such as `control-centre-members` for `/people/members`.
 
 ```bash
 .claude/skills/verify/scripts/browse.sh 4610 screenshot /tmp/better-answers-verify/4610/evidence/control-centre-members.png

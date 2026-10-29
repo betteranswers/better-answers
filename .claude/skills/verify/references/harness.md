@@ -11,7 +11,7 @@
 | `POST /concepts` | `workspaceId`, `userId`, `concepts` of `title`, `body`, optional `collection`, `kind`, `trust` | `concepts` with `iri`, `title`, `path`, `documents` |
 | `POST /suggestions` | `workspaceId`, `userId`, `iri`, optional `title` and `body` | `suggestionId`, `setId` |
 | `POST /groups` | `workspaceId`, `userId`, `names`, optional `memberIds` | `{"made":<number of names>}` |
-| `POST /connected-sources` | `workspaceId`, `connectedSources` of `name`, `sensitivity`, `sync` (`none`, `queued`, `claimed` or `done`), `documents` of `title` | `connectedSources` with `connectedSourceId`, `name`, `documents` |
+| `POST /connected-sources` | `workspaceId`, `connectedSources` of `name`, optional `sensitivity`, `sync` (`none`, `queued`, `claimed` or `done`) and `documents` of `title` | `connectedSources` with `connectedSourceId`, `name`, `documents` |
 | `POST /model-choices` | `workspaceId`, `modelChoices` of `purpose`, `provider`, `model` | `{"seeded":<number>}` |
 | `POST /questions` | `workspaceId`, `records` of `question`, `verdict`, optional `flags` of `reason` and `note` | `records` with `recordId`, `flagIds` |
 | `POST /operators` | `email`, `change` of `grant` or `revoke` | `{"marked":true}` |

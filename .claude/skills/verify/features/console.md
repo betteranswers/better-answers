@@ -2,7 +2,7 @@
 
 The platform operator's view across every workspace: find a workspace or a person, correct a flagged display name.
 
-`<stamp>` is `date +%s`, taken once for this file. Every list holds everything on the instance, so each recipe searches for its stamped name and waits for the count before it reads the table.
+`<stamp>` is `date +%s`, taken once for this file.
 
 Setup, once:
 
