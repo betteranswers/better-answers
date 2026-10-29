@@ -12,10 +12,10 @@ from better_answers_worker.concepts.concept_file import (
 )
 from better_answers_worker.ids import ulid
 from support.bundles import render_concept_file
-from support.pg_harness import REPO_ROOT
+from support.roots import REPOSITORY_ROOT
 
 _DIMENSIONS_SOURCE = (
-    REPO_ROOT / "packages" / "schema" / "src" / "sources" / "index-tables.ts"
+    REPOSITORY_ROOT / "packages" / "schema" / "src" / "sources" / "index-tables.ts"
 )
 
 

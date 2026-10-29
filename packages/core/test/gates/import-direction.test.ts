@@ -14,13 +14,14 @@ import {
   pluginConfigFor,
   readOxlintConfig,
 } from "@better-answers/devtools/oxlint-config";
-import { repositoryRoot } from "@better-answers/devtools/paths";
 import { GATES_FOLDER, HELPER_FOLDERS, PINS } from "@better-answers/devtools/test-folders";
 import {
   oxlintBatchOver,
   type PlannedLint,
   type Tree,
 } from "@better-answers/devtools/throwaway-tree";
+
+import { repositoryRoot } from "../support/roots/roots.ts";
 
 const RULE = "better-answers/import-direction";
 const CORE = "packages/core";

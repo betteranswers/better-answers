@@ -2,7 +2,6 @@ import hashlib
 import json
 import sys
 from collections.abc import Iterable, Iterator
-from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -16,8 +15,9 @@ from better_answers_worker.redaction.suppressions import (
     clears_the_floor,
     erasure_matches_in,
 )
+from support.roots import REPOSITORY_ROOT
 
-CONTRACTS_DIR = Path(__file__).resolve().parents[4] / "contracts"
+CONTRACTS_DIR = REPOSITORY_ROOT / "contracts"
 
 
 def read_erasure_match() -> dict[str, Any]:

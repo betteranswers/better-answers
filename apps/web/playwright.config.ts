@@ -1,7 +1,9 @@
 import { createServer } from "node:net";
-import { fileURLToPath } from "node:url";
+import path from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
+
+import { repositoryRoot } from "./test/support/roots.ts";
 
 const inCi = Boolean(process.env["CI"]);
 
@@ -42,7 +44,7 @@ export default defineConfig({
     // Not `pnpm run`: pnpm 11.27 gives a script its own process group, which Playwright's
     // kill misses, and the orphan's open pipe hangs the run.
     command: `node tests/serve.ts ${PORT}`,
-    cwd: fileURLToPath(new URL("../api", import.meta.url)),
+    cwd: path.join(repositoryRoot, "apps/api"),
 
     url: `${baseURL}/health`,
 

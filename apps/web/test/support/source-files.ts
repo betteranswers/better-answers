@@ -1,7 +1,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-const source = path.resolve(import.meta.dirname, "../../src");
+import { workspaceRoot } from "./roots.ts";
+
+const source = path.resolve(workspaceRoot, "src");
 
 const filesUnder = (directory: string, named: RegExp): readonly string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

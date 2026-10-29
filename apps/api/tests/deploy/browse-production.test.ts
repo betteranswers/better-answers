@@ -14,8 +14,9 @@ import {
 } from "@better-answers/devtools/worktree-hooks";
 
 import { freePort, type Held, heldPort, released } from "../support/loopback-port.ts";
+import { repositoryRoot } from "../support/roots/roots.ts";
 
-const helper = path.resolve(import.meta.dirname, "../../../../deploy/browse-production.sh");
+const helper = path.resolve(repositoryRoot, "deploy/browse-production.sh");
 
 const scratch = scratchRoot("browse-production");
 

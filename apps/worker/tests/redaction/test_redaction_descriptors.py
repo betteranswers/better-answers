@@ -3,7 +3,6 @@ import json
 import re
 import tomllib
 from importlib.metadata import version as installed_version
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -39,12 +38,11 @@ from better_answers_worker.redaction.pseudonyms import (
     pseudonyms_for,
     written_as,
 )
+from support.roots import REPOSITORY_ROOT, WORKER_ROOT
 
-WORKER_ROOT = Path(__file__).resolve().parents[2]
-REPO_ROOT = WORKER_ROOT.parents[1]
-AGREEMENT = REPO_ROOT / "contracts" / "redaction" / "cases.json"
-CHECK_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "check.yml"
-BUILD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build.yml"
+AGREEMENT = REPOSITORY_ROOT / "contracts" / "redaction" / "cases.json"
+CHECK_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "check.yml"
+BUILD_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "build.yml"
 
 
 HF_HOME_IN_CI = "${{ runner.temp }}/huggingface"

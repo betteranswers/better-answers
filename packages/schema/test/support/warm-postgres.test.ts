@@ -16,6 +16,7 @@ import { POSTGRES_IMAGE } from "../../src/postgres-image.ts";
 import { testData } from "./factory.ts";
 import { type MigratedPostgres, POSTGRES_COMMAND } from "./harness.ts";
 import { matching } from "./matching.ts";
+import { repositoryRoot, workspaceRoot } from "./roots/roots.ts";
 import {
   BUILD_LOCK,
   clonedFrom,
@@ -27,8 +28,6 @@ import {
 } from "./warm-postgres.ts";
 
 const run = promisify(execFile);
-const packageRoot = fileURLToPath(new URL("../..", import.meta.url));
-const repoRoot = fileURLToPath(new URL("../../../..", import.meta.url));
 const warmPostgresModule = fileURLToPath(new URL("./warm-postgres.ts", import.meta.url));
 
 const writeModelChoice = async (db: MigratedPostgres): Promise<void> => {
@@ -255,7 +254,7 @@ describe("the warm harness", () => {
     ].join("\n");
 
     const cold = await run(process.execPath, ["--input-type=module", "--eval", script], {
-      cwd: packageRoot,
+      cwd: workspaceRoot,
     });
 
     expect(JSON.parse(cold.stdout)).toEqual({
@@ -466,7 +465,7 @@ const startInChild = async (
   env: Readonly<Record<string, string>> = {},
 ): Promise<StartedInChild> => {
   const child = await run(process.execPath, ["--input-type=module", "--eval", START_IN_CHILD], {
-    cwd: packageRoot,
+    cwd: workspaceRoot,
     env: { ...process.env, TEST_POSTGRES_URI: locator, ...env },
   });
   return startedInChildSchema.parse(JSON.parse(child.stdout));
@@ -821,7 +820,7 @@ const throwawayPostgres = (command: readonly string[]): Promise<StartedPostgreSq
 
 const scriptUriLineForThePin = async (): Promise<string | undefined> => {
   const printed = await run("bash", ["deploy/test-postgres.sh", "address"], {
-    cwd: repoRoot,
+    cwd: repositoryRoot,
     env: { ...process.env, TEST_POSTGRES_IMAGE: undefined },
   });
   const line = printed.stdout.split("\n").find((printedLine) => printedLine.startsWith("uri "));

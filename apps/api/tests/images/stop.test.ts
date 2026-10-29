@@ -18,8 +18,7 @@ import {
 } from "../support/harness/harness.ts";
 import { freePort } from "../support/loopback-port.ts";
 import { startTestDatabase, type TestDatabase } from "../support/postgres.ts";
-
-const apiRoot = path.resolve(import.meta.dirname, "../..");
+import { workspaceRoot } from "../support/roots/roots.ts";
 
 const DEFAULT_STOP_DEADLINE_MS = 10_000;
 
@@ -57,7 +56,7 @@ afterAll(async () => {
 const startApi = async (stopDeadlineMs?: number): Promise<Running> => {
   const port = await freePort();
   const child = spawn(process.execPath, ["src/main.ts"], {
-    cwd: apiRoot,
+    cwd: workspaceRoot,
     env: {
       PATH: process.env["PATH"],
       HOME: process.env["HOME"],

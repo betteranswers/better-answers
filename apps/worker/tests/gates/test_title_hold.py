@@ -2,11 +2,12 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
-CONFTEST = Path(__file__).resolve().parents[1] / "conftest.py"
+from support.roots import WORKER_ROOT
+
+CONFTEST = WORKER_ROOT / "tests" / "conftest.py"
 
 ELEVEN = "_".join(f"word{index}" for index in range(1, 12))
 

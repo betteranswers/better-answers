@@ -25,6 +25,7 @@ import {
 } from "@better-answers/schema";
 
 import { ulid } from "../src/kernel/index.ts";
+import { repositoryRoot } from "./support/roots/roots.ts";
 
 const SPOKEN_AGREEMENTS = {
   citation: "fixtured",
@@ -46,7 +47,7 @@ const SPOKEN_AGREEMENTS = {
 
 const NOT_FIXTURES = new Set(["manifest.json", "README.md"]);
 
-const contractsDir = path.resolve(import.meta.dirname, "../../../contracts");
+const contractsDir = path.resolve(repositoryRoot, "contracts");
 
 const manifest = z.object({
   agreements: z.record(z.string(), z.object({ form: z.string() })),

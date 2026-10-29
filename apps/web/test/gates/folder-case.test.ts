@@ -3,7 +3,9 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const source = path.resolve(import.meta.dirname, "../../src");
+import { workspaceRoot } from "@test/roots.ts";
+
+const source = path.resolve(workspaceRoot, "src");
 
 const KEBAB_CASE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 

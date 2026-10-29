@@ -1,10 +1,8 @@
 import tomllib
-from pathlib import Path
 
 import test_image
 from better_answers_worker.check import CI_RUNNER_VCPUS, IMAGES, SUITE
-
-WORKER_ROOT = Path(__file__).resolve().parents[2]
+from support.roots import WORKER_ROOT
 
 
 def pytest_options() -> dict[str, object]:

@@ -7,12 +7,11 @@ import pg from "pg";
 import { afterAll, assert, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { repositoryRoot } from "@better-answers/devtools/paths";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
 import { endPool, testData } from "@better-answers/schema/testing";
 import { matching } from "@better-answers/schema/testing/matching";
 
-const apiRoot = path.resolve(import.meta.dirname, "../..");
+import { repositoryRoot, workspaceRoot } from "../support/roots/roots.ts";
 
 const fenced = (script: string, step: string): string => {
   const text = readFileSync(path.join(repositoryRoot, script), "utf8");
@@ -90,7 +89,7 @@ const drilling = (database: string): Ran =>
 
 const migrating = (database: string): Ran => {
   const finished = spawnSync(process.execPath, ["src/migrate.ts"], {
-    cwd: apiRoot,
+    cwd: workspaceRoot,
     encoding: "utf8",
     env: { ...process.env, DATABASE_URL: uriFor(database) },
   });

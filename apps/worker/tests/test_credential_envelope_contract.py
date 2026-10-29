@@ -1,7 +1,6 @@
 import json
 import subprocess
 import sys
-from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -17,8 +16,9 @@ from better_answers_worker.envelope import (
     opened,
     sealed,
 )
+from support.roots import REPOSITORY_ROOT
 
-CONTRACTS_DIR = Path(__file__).resolve().parents[3] / "contracts"
+CONTRACTS_DIR = REPOSITORY_ROOT / "contracts"
 
 
 def read_credential_envelope() -> dict[str, Any]:

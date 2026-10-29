@@ -9,6 +9,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { describe, expect, it } from "vitest";
 
 import { closeObjects, type ObjectDoor, openObjects } from "../../../src/store/objects/index.ts";
+import { workspaceRoot } from "../../support/roots/roots.ts";
 import { objectStoreForSuite } from "../../support/suite-objects.ts";
 import {
   asksForAStore,
@@ -18,7 +19,6 @@ import {
 } from "../../support/warm-objects.ts";
 
 const run = promisify(execFile);
-const packageRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const warmObjectsModule = fileURLToPath(new URL("../../support/warm-objects.ts", import.meta.url));
 
 const store = objectStoreForSuite();
@@ -124,7 +124,7 @@ describe("the warm object store", () => {
     ].join("\n");
 
     const cold = await run(process.execPath, ["--input-type=module", "--eval", script], {
-      cwd: packageRoot,
+      cwd: workspaceRoot,
     });
 
     expect(JSON.parse(cold.stdout)).toEqual({ bucket: "ba-cold-e272deecde72", held: [] });

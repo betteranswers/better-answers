@@ -1,10 +1,10 @@
 import json
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any, cast
 
-TEST_DIRECTORY = Path(__file__).resolve().parents[1]
-REPO_ROOT = TEST_DIRECTORY.parents[2]
+from support.roots import REPOSITORY_ROOT, WORKER_ROOT
+
+TEST_DIRECTORY = WORKER_ROOT / "tests"
 
 FIXTURE_PAGE = (
     TEST_DIRECTORY / "fixtures" / "redaction" / "supplier-information-pack.md"
@@ -37,7 +37,7 @@ def the_engineers_section() -> str:
     return page[: page.index("## Cover")]
 
 
-TIER_AGREEMENT = REPO_ROOT / "contracts" / "redaction" / "cases.json"
+TIER_AGREEMENT = REPOSITORY_ROOT / "contracts" / "redaction" / "cases.json"
 
 _AGREEMENT = cast(
     "dict[str, Any]", json.loads(TIER_AGREEMENT.read_text(encoding="utf-8"))

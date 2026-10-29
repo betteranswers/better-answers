@@ -2,13 +2,13 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ASK_CAPS } from "../../src/answering/index.ts";
 import { visibilitySuite } from "../fixtures/sourced-concept.ts";
 import { theReuseSet } from "../readings/reuse-set.ts";
+import { repositoryRoot } from "../support/roots/roots.ts";
 import {
   answersOf,
   bothSetsOf,
@@ -192,9 +192,7 @@ describe("the buyer-worded set's reader", () => {
   });
 });
 
-const CUSTOMER_BUNDLE = fileURLToPath(
-  new URL("../../../../.planning/client-bundle/", import.meta.url),
-);
+const CUSTOMER_BUNDLE = join(repositoryRoot, ".planning/client-bundle/");
 
 const RUN_OF_WORDS = 8;
 

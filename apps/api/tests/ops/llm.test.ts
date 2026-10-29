@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -21,6 +20,7 @@ import {
   rowsOfAction,
   auditLogOf,
 } from "../support/ops-run.ts";
+import { workspaceRoot } from "../support/roots/roots.ts";
 import { servedApp } from "../support/suite-app.ts";
 
 const objects = objectStoreForSuite();
@@ -185,7 +185,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         process.execPath,
         ["src/ops.ts", "set-model-key", "--workspace", workspaceId, "--provider", "anthropic"],
         {
-          cwd: path.resolve(import.meta.dirname, "../.."),
+          cwd: workspaceRoot,
           encoding: "utf8",
           input: typed,
           env: {

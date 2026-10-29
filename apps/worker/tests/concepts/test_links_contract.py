@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 from typing import Any, cast
 
 from better_answers_worker.concepts.links import (
@@ -10,8 +9,9 @@ from better_answers_worker.concepts.links import (
     references_of,
     unresolved_references,
 )
+from support.roots import REPOSITORY_ROOT
 
-CONTRACTS_DIR = Path(__file__).resolve().parents[4] / "contracts"
+CONTRACTS_DIR = REPOSITORY_ROOT / "contracts"
 
 
 def read_links() -> dict[str, Any]:

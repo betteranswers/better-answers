@@ -4,8 +4,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { readOxlintConfig } from "@better-answers/devtools/oxlint-config";
-import { repositoryRoot } from "@better-answers/devtools/paths";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
+
+import { repositoryRoot } from "../support/roots/roots.ts";
 
 const RULE = "node/no-process-env";
 const SEVERITY = "error";

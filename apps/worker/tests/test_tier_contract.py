@@ -9,6 +9,8 @@ import psycopg
 import pytest
 from psycopg import Cursor
 
+from support.roots import REPOSITORY_ROOT
+
 SPOKEN_AGREEMENTS = {
     "citation": "fixtured",
     "concept-file": "fixtured",
@@ -28,14 +30,8 @@ SPOKEN_AGREEMENTS = {
 }
 NOT_FIXTURES = {"manifest.json", "README.md"}
 
-CONTRACTS_DIR = Path(__file__).resolve().parents[3] / "contracts"
-COMMENT_GATE = (
-    Path(__file__).resolve().parents[3]
-    / "packages"
-    / "devtools"
-    / "python"
-    / "comment_gate.py"
-)
+CONTRACTS_DIR = REPOSITORY_ROOT / "contracts"
+COMMENT_GATE = REPOSITORY_ROOT / "packages" / "devtools" / "python" / "comment_gate.py"
 
 
 class DeclaredForm(TypedDict):

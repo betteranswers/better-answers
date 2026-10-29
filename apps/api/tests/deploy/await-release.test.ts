@@ -6,8 +6,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { serverFor, startApp, type TestApp } from "../support/harness/harness.ts";
 import { servedOnLoopback as serving } from "../support/loopback-port.ts";
+import { repositoryRoot } from "../support/roots/roots.ts";
 
-const script = path.resolve(import.meta.dirname, "../../../../deploy/await-release.sh");
+const script = path.resolve(repositoryRoot, "deploy/await-release.sh");
 
 const PROMOTED = "sha256:1f2e3d4c5b6a79880a9b8c7d6e5f40312a3b4c5d6e7f8091a2b3c4d5e6f70819";
 const REPLACED = "sha256:e0d1c2b3a4958677f6e5d4c3b2a19080f7e6d5c4b3a29181a0b1c2d3e4f50617";

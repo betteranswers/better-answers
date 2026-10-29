@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { repositoryRoot } from "@better-answers/devtools/paths";
+import { repositoryRoot } from "@test/roots.ts";
 
 const skillDirectory = ".claude/skills/browser-suite";
 const suiteDirectory = "apps/web/e2e";

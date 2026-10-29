@@ -1,9 +1,10 @@
-import { fileURLToPath } from "node:url";
+import path from "node:path";
 
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 
 import { logger } from "../src/logger.ts";
+import { repositoryRoot } from "./support/roots/roots.ts";
 
 const port = Number(process.argv[2]);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -45,7 +46,7 @@ const app = await startApp({
     if (message.to.endsWith(UNREACHABLE)) throw new Error("the address is unreachable");
   },
   objectStore: objects,
-  webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
+  webRoot: path.join(repositoryRoot, "apps/web/dist"),
   // A passkey's relying party is a domain, never an IP, so the product is served on `localhost`.
   publicUrl: `http://localhost:${port}`,
   hostnames: {

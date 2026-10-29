@@ -16,10 +16,9 @@ import {
   refusesEach,
 } from "@better-answers/schema/testing/probes";
 
-const roleFile = readFileSync(
-  path.resolve(import.meta.dirname, "../../../../deploy/browse-role.sql"),
-  "utf8",
-);
+import { repositoryRoot } from "../support/roots/roots.ts";
+
+const roleFile = readFileSync(path.resolve(repositoryRoot, "deploy/browse-role.sql"), "utf8");
 
 const WITHHELD = {
   "public.session": ["token"],

@@ -1,9 +1,8 @@
 import re
-from pathlib import Path
 
-PLATFORM_COMPOSE = (
-    Path(__file__).resolve().parents[4] / "deploy" / "platform.compose.yaml"
-)
+from support.roots import REPOSITORY_ROOT
+
+PLATFORM_COMPOSE = REPOSITORY_ROOT / "deploy" / "platform.compose.yaml"
 
 
 def worker_service() -> str:

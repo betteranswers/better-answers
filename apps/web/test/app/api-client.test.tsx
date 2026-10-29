@@ -15,6 +15,7 @@ import { createAppClients, Providers, type AppClients } from "@/app/providers.ts
 import { createAppRouter } from "@/app/router.tsx";
 import { createApiProxy, TRPC_ENDPOINT, useTRPC } from "@/shared/api/trpc.ts";
 import { memberOptions, NEEDS_A_PICK } from "@/shared/member/member.ts";
+import { repositoryRoot } from "@test/roots.ts";
 import { addressOf, answered } from "@test/stubbed-api.ts";
 import { aRefusalAnswer, read } from "@test/two-workspaces.ts";
 
@@ -314,10 +315,7 @@ describe("an ask the web sends", () => {
 
 describe("the path the tRPC client and the api agree on", () => {
   it("matches the one path apps/api mounts its router at", () => {
-    const source = readFileSync(
-      path.join(import.meta.dirname, "../../../api/src/trpc/mount.ts"),
-      "utf8",
-    );
+    const source = readFileSync(path.join(repositoryRoot, "apps/api/src/trpc/mount.ts"), "utf8");
     const declared = [...source.matchAll(/^export const TRPC_ENDPOINT = "(?<path>[^"]+)";$/gm)];
 
     expect(declared).toHaveLength(1);

@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import path from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -7,8 +6,7 @@ import { CONTRACT_DIGEST } from "@better-answers/schema";
 import { matchIsLeakproof, UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
 
 import { startTestDatabase, type TestDatabase } from "./support/postgres.ts";
-
-const apiRoot = path.resolve(import.meta.dirname, "..");
+import { workspaceRoot } from "./support/roots/roots.ts";
 
 let database: TestDatabase;
 
@@ -22,7 +20,7 @@ afterAll(async () => {
 
 const migrating = (): { readonly status: number | null; readonly said: string } => {
   const finished = spawnSync(process.execPath, ["src/migrate.ts"], {
-    cwd: apiRoot,
+    cwd: workspaceRoot,
     encoding: "utf8",
     env: { ...process.env, DATABASE_URL: database.connectionUri },
   });

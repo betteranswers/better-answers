@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 from typing import Any
 
-CASES = Path(__file__).resolve().parents[3] / "contracts" / "citation" / "cases.json"
+from roots import REPOSITORY_ROOT
+
+CASES = REPOSITORY_ROOT / "contracts" / "citation" / "cases.json"
 
 
 def _compiled() -> tuple[tuple[str, re.Pattern[str]], ...]:

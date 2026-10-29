@@ -22,7 +22,6 @@ from support.pg_harness import (
     _BUILD_LOCK_KEY,
     LOCATOR,
     PORT_OVERRIDE,
-    REPO_ROOT,
     SHARED,
     _migrated_cluster,
     ensure_template,
@@ -33,6 +32,7 @@ from support.pg_harness import (
     shared_address,
     sweep_dead_cases,
 )
+from support.roots import REPOSITORY_ROOT
 
 UP_COMMAND = "deploy/test-postgres.sh up"
 
@@ -207,8 +207,8 @@ def test_shared_address_matches_the_scripts_uri(
     if port is not None:
         monkeypatch.setenv(PORT_OVERRIDE, port)
     printed = subprocess.run(
-        ("bash", str(REPO_ROOT / "deploy" / "test-postgres.sh"), "address"),
-        cwd=REPO_ROOT,
+        ("bash", str(REPOSITORY_ROOT / "deploy" / "test-postgres.sh"), "address"),
+        cwd=REPOSITORY_ROOT,
         capture_output=True,
         text=True,
         check=True,
@@ -220,7 +220,12 @@ def test_shared_address_matches_the_scripts_uri(
 
 def test_takes_the_same_build_lock_as_the_typescript_harness() -> None:
     harness = (
-        REPO_ROOT / "packages" / "schema" / "test" / "support" / "warm-postgres.ts"
+        REPOSITORY_ROOT
+        / "packages"
+        / "schema"
+        / "test"
+        / "support"
+        / "warm-postgres.ts"
     )
     keys = re.findall(
         r'^export const BUILD_LOCK = "([^"]*)";$',

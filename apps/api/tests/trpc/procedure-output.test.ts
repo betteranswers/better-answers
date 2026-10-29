@@ -1,6 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import type { AnyProcedure, inferProcedureOutput } from "@trpc/server";
 import { describe, expect, expectTypeOf, it } from "vitest";
@@ -8,9 +7,10 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import type { Result } from "@better-answers/core/kernel";
 
 import { appRouter, type AppRouter } from "../../src/trpc/router.ts";
+import { repositoryRoot, workspaceRoot } from "../support/roots/roots.ts";
 
-const API_SOURCE = fileURLToPath(new URL("../../src/", import.meta.url));
-const CORE_SOURCE = fileURLToPath(new URL("../../../../packages/core/src/", import.meta.url));
+const API_SOURCE = path.join(workspaceRoot, "src/");
+const CORE_SOURCE = path.join(repositoryRoot, "packages/core/src/");
 
 const filesMatching = (root: string, pattern: RegExp): readonly string[] =>
   readdirSync(root, { recursive: true, encoding: "utf8" })

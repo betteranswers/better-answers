@@ -1,8 +1,11 @@
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import react from "@vitejs/plugin-react";
 import { build } from "vite";
+
+import { workspaceRoot } from "@test/roots.ts";
 
 type Built = Awaited<ReturnType<typeof build>>;
 
@@ -44,7 +47,7 @@ export const bundledHarness = async (harness: {
           load: (id) => (id === resolved ? source : undefined),
         },
       ],
-      resolve: { alias: { "@": fileURLToPath(new URL("../src", import.meta.url)) } },
+      resolve: { alias: { "@": path.join(workspaceRoot, "src") } },
       build: {
         write: false,
         minify: false,

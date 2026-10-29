@@ -1,6 +1,10 @@
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
 import type { Locator, Page } from "@playwright/test";
 
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { workspaceRoot } from "@test/roots.ts";
 
 import { expect, test } from "../browser.ts";
 import { bundledHarness, harnessDrawn } from "../drawn-parts.ts";
@@ -13,7 +17,7 @@ let parts: string | undefined;
 test.beforeAll(async () => {
   parts = await bundledHarness({
     name: "blueprint-parts",
-    file: new URL("../../test/support/blueprint-parts.tsx", import.meta.url),
+    file: pathToFileURL(path.join(workspaceRoot, "test/support/blueprint-parts.tsx")),
     component: "BlueprintParts",
   });
 });

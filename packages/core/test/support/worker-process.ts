@@ -9,6 +9,8 @@ import { z } from "zod";
 
 import { CONTRACT_DIGEST, STAMP_THE_CONTRACT } from "@better-answers/schema";
 
+import { repositoryRoot } from "./roots/roots.ts";
+
 const run = promisify(execFile);
 
 /** What `execFile` hangs on its rejection: the spawn's streams and the error's own line. */
@@ -18,7 +20,7 @@ const execFailure = z.object({
   message: z.string().optional(),
 });
 
-const workerDirectory = path.resolve(import.meta.dirname, "../../../../apps/worker");
+const workerDirectory = path.resolve(repositoryRoot, "apps/worker");
 
 const workerDsn = (connectionUri: string): string => {
   const uri = new URL(connectionUri);

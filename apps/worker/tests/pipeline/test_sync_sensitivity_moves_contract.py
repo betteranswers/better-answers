@@ -17,8 +17,9 @@ from test_pipeline_index import (
 from better_answers_worker import queue
 from better_answers_worker.pipeline import SENSITIVITY_MOVED_KEY, IndexOutcome
 from better_answers_worker.pipeline.catalogue import reconcile_catalogue
+from support.roots import REPOSITORY_ROOT
 
-CONTRACTS_DIR = Path(__file__).resolve().parents[4] / "contracts"
+CONTRACTS_DIR = REPOSITORY_ROOT / "contracts"
 
 
 def read_sync_sensitivity_moves() -> dict[str, Any]:

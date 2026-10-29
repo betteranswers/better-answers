@@ -10,11 +10,12 @@ import {
 } from "../../scripts/worker-view.ts";
 import { journalEntries, journalEntriesOf, lastMigration } from "../../src/journal.ts";
 import type { MigratedPostgres } from "../support/harness.ts";
+import { repositoryRoot } from "../support/roots/roots.ts";
 import { openMigratedPostgres } from "../support/warm-postgres.ts";
 
 const viewPath = path.resolve(
-  import.meta.dirname,
-  "../../../../apps/worker/src/better_answers_worker/schema_view.py",
+  repositoryRoot,
+  "apps/worker/src/better_answers_worker/schema_view.py",
 );
 let db: MigratedPostgres;
 

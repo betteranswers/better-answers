@@ -4,9 +4,10 @@ import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { repositoryRoot, workspacePackages } from "@better-answers/devtools/paths";
+import { workspacePackages } from "@better-answers/devtools/paths";
 import { legFor, matrixLegs } from "@better-answers/devtools/workflows";
 
+import { repositoryRoot } from "../support/roots/roots.ts";
 import {
   fileFromTheWorkspace,
   IMAGE_PROBE_ALLOWANCE,

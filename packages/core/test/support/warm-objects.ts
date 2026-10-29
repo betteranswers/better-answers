@@ -10,6 +10,7 @@ import { parse } from "yaml";
 import { z } from "zod";
 
 import { type ObjectDoor, openObjects } from "../../src/store/objects/index.ts";
+import { repositoryRoot } from "./roots/roots.ts";
 
 export type WarmObjects = {
   readonly endpoint: string;
@@ -38,9 +39,9 @@ export type ObjectStore = {
   readonly stop: () => Promise<void>;
 };
 
-const GARAGE_CONFIG = path.resolve(import.meta.dirname, "../../../../deploy/garage.toml");
+const GARAGE_CONFIG = path.resolve(repositoryRoot, "deploy/garage.toml");
 
-const STORES_COMPOSE = path.resolve(import.meta.dirname, "../../../../deploy/stores.compose.yaml");
+const STORES_COMPOSE = path.resolve(repositoryRoot, "deploy/stores.compose.yaml");
 
 const storesComposeShape = z.object({
   services: z.object({ objectstore: z.object({ image: z.string().min(1) }) }),

@@ -61,6 +61,7 @@ from support.planted_page import (
     THE_ENGINEERS_SENTENCE_AT,
     the_engineers_section,
 )
+from support.roots import WORKER_ROOT
 
 CONNECTED_SOURCE = "01M2B1ND1NGAAAAAAAAAAAAAAA"
 
@@ -174,7 +175,7 @@ def normalised_key_of(document_id: str) -> str:
     return f"documents/{document_id.lower()}/normalised"
 
 
-CONVERSION_FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "conversion"
+CONVERSION_FIXTURES = WORKER_ROOT / "tests" / "fixtures" / "conversion"
 A_SCANNED_PDF = (CONVERSION_FIXTURES / "scanned-invoice.pdf").read_bytes()
 A_RATE_CARD_PDF = (CONVERSION_FIXTURES / "rate-card.pdf").read_bytes()
 AN_EXPENSES_POLICY_DOCX = (CONVERSION_FIXTURES / "expenses-policy.docx").read_bytes()

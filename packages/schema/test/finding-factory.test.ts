@@ -6,9 +6,10 @@ import { z } from "zod";
 
 import { type TestData, testData } from "./support/factory.ts";
 import { type MigratedPostgres, withRollback } from "./support/harness.ts";
+import { repositoryRoot } from "./support/roots/roots.ts";
 import { openMigratedPostgres } from "./support/warm-postgres.ts";
 
-const contractsDir = path.resolve(import.meta.dirname, "../../../contracts");
+const contractsDir = path.resolve(repositoryRoot, "contracts");
 const redactionContract = z.object({ categories: z.array(z.object({ category: z.string() })) });
 const redactionCases = redactionContract.parse(
   JSON.parse(readFileSync(path.join(contractsDir, "redaction", "cases.json"), "utf8")),

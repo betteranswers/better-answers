@@ -1,5 +1,5 @@
 import { readdirSync, statSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -12,8 +12,9 @@ import {
   OWNERS_OUTSIDE_CORE,
   TABLE_OWNERS,
 } from "../src/index.ts";
+import { repositoryRoot } from "./support/roots/roots.ts";
 
-const REPO_ROOT = new URL("../../../", import.meta.url);
+const REPO_ROOT = pathToFileURL(`${repositoryRoot}/`);
 
 const coreDirectories = (): Set<string> =>
   new Set(

@@ -7,7 +7,6 @@ import { parse } from "yaml";
 import { z } from "zod";
 
 import { type ObjectStore, objectStoreForSuite } from "@better-answers/core/testing/objects";
-import { repositoryRoot } from "@better-answers/devtools/paths";
 import { legFor } from "@better-answers/devtools/workflows";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
 import {
@@ -16,6 +15,7 @@ import {
   testData,
 } from "@better-answers/schema/testing";
 
+import { repositoryRoot } from "../support/roots/roots.ts";
 import {
   fileFromTheWorkspace,
   IMAGE_PROBE_ALLOWANCE,

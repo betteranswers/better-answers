@@ -24,6 +24,7 @@ import {
   refusesEach,
   UNMARK_THE_MATCH,
 } from "../support/probes.ts";
+import { repositoryRoot } from "../support/roots/roots.ts";
 
 const db = postgresForSuite();
 
@@ -90,8 +91,6 @@ describe("the full-text match `find` filters a passage by", () => {
   });
 });
 
-const REPO_ROOT = path.resolve(import.meta.dirname, "../../../..");
-
 const THE_RULE = "packages/schema/src/knowledge/full-text-match.ts";
 
 const LANGUAGE_IN_QUOTES = /(["'`])english\1/i;
@@ -105,7 +104,7 @@ const choosesItsOwnLanguage = (text: string): boolean =>
 
 const sourceFiles = (): readonly string[] =>
   globSync(["apps/*/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"], {
-    cwd: REPO_ROOT,
+    cwd: repositoryRoot,
     exclude: ["**/node_modules/**"],
   }).toSorted((a, b) => a.localeCompare(b));
 
@@ -416,7 +415,9 @@ describe("the language every full-text match is parsed under", () => {
   it("is chosen in source only by the full-text rule", () => {
     const choosing = sourceFiles()
       .filter((file) => file !== THE_RULE)
-      .filter((file) => choosesItsOwnLanguage(readFileSync(path.join(REPO_ROOT, file), "utf8")));
+      .filter((file) =>
+        choosesItsOwnLanguage(readFileSync(path.join(repositoryRoot, file), "utf8")),
+      );
 
     expect(choosing).toEqual([]);
   });

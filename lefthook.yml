@@ -125,6 +125,10 @@ pre-push-gates:
       run: "{without-git-env} pnpm run port-scan"
       fail_text: "run it alone with pnpm run port-scan"
 
+    climb-scan:
+      run: "{without-git-env} pnpm run climb-scan"
+      fail_text: "run it alone with pnpm run climb-scan"
+
     jscpd:
       run: "{without-git-env} pnpm run jscpd"
       fail_text: "run it alone with pnpm run jscpd"
