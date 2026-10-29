@@ -76,29 +76,7 @@ const everyCharacter = function* (): Generator<string> {
   }
 };
 
-describe("an identifier as the erasure-match agreement normalises it", () => {
-  it("is normalised as every case of the agreement answers", () => {
-    for (const { identifier, normalised, why } of fixture.normalisation.cases) {
-      expect({ why, normalised: normalisedIdentifier(identifier) }).toEqual({ why, normalised });
-    }
-  });
-
-  it("treats as whitespace exactly the code points the agreement lists", () => {
-    const spaced = [...everyCharacter()].filter(
-      (character) => normalisedIdentifier(`a${character}b`) === "a b",
-    );
-
-    expect(spaced.toSorted()).toEqual(fixture.normalisation.whitespace.toSorted());
-  });
-});
-
 const WHITESPACE = new Set(fixture.normalisation.whitespace);
-
-const charactersTheDigestsRead = function* (): Generator<string> {
-  for (const character of everyCharacter()) {
-    if (!WHITESPACE.has(character)) yield character;
-  }
-};
 
 const digestOf = (lines: Iterable<string>): string =>
   createHash("sha256")
@@ -115,16 +93,52 @@ const matchesOf = (kind: (typeof SUBJECT_IDENTIFIER_KINDS)[number], identifier: 
   return (text: string) => erasureMatchesIn(text, sought);
 };
 
-let theWordCharacters: ReadonlySet<string> | undefined;
-
-const wordCharacters = (): ReadonlySet<string> => {
-  if (theWordCharacters !== undefined) return theWordCharacters;
-  const ofABC = matchesOf("other", "abc");
-  theWordCharacters = new Set(
-    [...charactersTheDigestsRead()].filter((character) => ofABC(`abc${character}`).length === 0),
-  );
-  return theWordCharacters;
+type Sweep = {
+  readonly spaced: readonly string[];
+  readonly folding: readonly string[];
+  readonly words: readonly string[];
+  readonly joiners: readonly string[];
 };
+
+const sweepEveryCharacter = (): Sweep => {
+  const ofABC = matchesOf("other", "abc");
+  const ofTheAddress = matchesOf("emails", "ab@cd.ef");
+  const spaced: string[] = [];
+  const folding: string[] = [];
+  const words: string[] = [];
+  const joiners: string[] = [];
+  for (const character of everyCharacter()) {
+    const folded = normalisedIdentifier(character);
+    if (folded === "" && normalisedIdentifier(`a${character}b`) === "a b") {
+      spaced.push(character);
+    }
+    if (WHITESPACE.has(character)) continue;
+    if (folded !== character) folding.push(`${hexOf(character)} ${hexOf(folded)}\n`);
+    if (ofTheAddress(`ab@cd.ef${character}g`).length > 0) continue;
+    if (ofABC(`abc${character}`).length === 0) words.push(character);
+    else joiners.push(character);
+  }
+  return { spaced, folding, words, joiners };
+};
+
+let theSweep: Sweep | undefined;
+
+const sweep = (): Sweep => {
+  theSweep ??= sweepEveryCharacter();
+  return theSweep;
+};
+
+describe("an identifier as the erasure-match agreement normalises it", () => {
+  it("is normalised as every case of the agreement answers", () => {
+    for (const { identifier, normalised, why } of fixture.normalisation.cases) {
+      expect({ why, normalised: normalisedIdentifier(identifier) }).toEqual({ why, normalised });
+    }
+  });
+
+  it("treats as whitespace exactly the code points the agreement lists", () => {
+    expect(sweep().spaced.toSorted()).toEqual(fixture.normalisation.whitespace.toSorted());
+  });
+});
 
 describe("an occurrence as the erasure-match agreement answers it", () => {
   it("is found exactly where each agreement case names, nowhere else", () => {
@@ -142,28 +156,17 @@ describe("an occurrence as the erasure-match agreement answers it", () => {
   });
 
   it("folds each code point as the agreement's Unicode 15.1 digest", () => {
-    const lines = [...charactersTheDigestsRead()]
-      .map((character) => ({ character, folded: normalisedIdentifier(character) }))
-      .filter(({ character, folded }) => folded !== character)
-      .map(({ character, folded }) => `${hexOf(character)} ${hexOf(folded)}\n`);
-
-    expect(digestOf(lines)).toBe(fixture.digests.folding.sha256);
+    expect(digestOf(sweep().folding)).toBe(fixture.digests.folding.sha256);
   });
 
   it("is unbounded by exactly the word characters the digest names", () => {
-    const lines = [...wordCharacters()].map((character) => `${hexOf(character)}\n`);
+    const lines = sweep().words.map((character) => `${hexOf(character)}\n`);
 
     expect(digestOf(lines)).toBe(fixture.digests.word_characters.sha256);
   });
 
   it("is unbounded for an address by exactly the listed joiners", () => {
-    const ofTheAddress = matchesOf("emails", "ab@cd.ef");
-    const words = wordCharacters();
-    const joiners = [...charactersTheDigestsRead()]
-      .filter((character) => !words.has(character))
-      .filter((character) => ofTheAddress(`ab@cd.ef${character}g`).length === 0);
-
-    expect(joiners.toSorted()).toEqual(fixture.boundary.address_joiners.toSorted());
+    expect(sweep().joiners.toSorted()).toEqual(fixture.boundary.address_joiners.toSorted());
   });
 });
 

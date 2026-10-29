@@ -11,6 +11,7 @@
     "./comment-inventory": "./src/comments/comment-inventory.ts",
     "./contract-paths": "./src/scans/contract-paths.ts",
     "./face-admission": "./src/scans/face-admission.ts",
+    "./import-direction": "./lint-rules/rules/import-direction.ts",
     "./insert-scan": "./src/scans/insert-scan.ts",
     "./jscpd": "./src/scans/jscpd.ts",
     "./line-references": "./src/scans/line-references.ts",

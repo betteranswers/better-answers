@@ -64,7 +64,7 @@ const TRANSPORTS = [
 const isTransport = (specifier: string): boolean =>
   TRANSPORTS.some((name) => specifier === name || specifier.startsWith(`${name}/`));
 
-type CorePackage = {
+export type CorePackage = {
   readonly root: string;
 
   readonly entries: ReadonlyMap<string, string>;
@@ -84,17 +84,24 @@ const entriesOf = (
   return entries;
 };
 
-const readManifest = (root: string): CorePackage | null => {
-  const manifest: unknown = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
+type PackageManifest = {
+  readonly name?: unknown;
+  readonly exports?: unknown;
+};
 
-  if (typeof manifest !== "object" || manifest === null) return null;
-  if (!("name" in manifest) || manifest.name !== CORE) return null;
+export const corePackageOf = (root: string, manifest: PackageManifest): CorePackage | null => {
+  if (manifest.name !== CORE) return null;
   const exported =
-    "exports" in manifest && typeof manifest.exports === "object" && manifest.exports !== null
+    typeof manifest.exports === "object" && manifest.exports !== null
       ? Object.entries(manifest.exports)
       : [];
   const entries = entriesOf(root, exported);
   return { root, entries, faces: new Set(entries.values()) };
+};
+
+const readManifest = (root: string): CorePackage | null => {
+  const manifest: unknown = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
+  return typeof manifest === "object" && manifest !== null ? corePackageOf(root, manifest) : null;
 };
 
 const packageOf = (directory: string): CorePackage | null => {
@@ -179,13 +186,14 @@ const edgeOf = (pkg: CorePackage, importerFile: string, specifier: string): Edge
   return { importer, reached, target };
 };
 
-type Finding = {
+export type Finding = {
   readonly messageId:
     | "catalogue"
     | "direction"
     | "erasure"
     | "internal"
     | "testInternal"
+    | "transport"
     | "unexported";
   readonly data?: Readonly<Record<string, string>>;
 };
@@ -246,39 +254,51 @@ const findingOf = (pkg: CorePackage, edge: Edge): Finding | undefined =>
   erasureFinding(edge) ??
   faceFinding(pkg, edge);
 
+export const importFinding = (
+  pkg: CorePackage,
+  importerFile: string,
+  specifier: string,
+): Finding | undefined => {
+  if (isTransport(specifier)) return { messageId: "transport", data: { specifier } };
+  const edge = edgeOf(pkg, importerFile, specifier);
+  return edge === undefined ? undefined : findingOf(pkg, edge);
+};
+
+const MESSAGES = {
+  transport:
+    "packages/core is transport-agnostic: `{{specifier}}` is a transport or a transport's dependency. A status code, a Request or a Response belongs in apps/api; export a function and a typed error instead.",
+  direction: "`{{fromDir}}` ({{from}}) may not import `{{toDir}}` ({{to}}): {{clause}}.",
+  catalogue:
+    "Nothing in core imports the refusal catalogue; it reads every slice's vocabulary, and only a test reaches it.",
+  erasure:
+    "Nothing in core imports `erasure` but the refusal catalogue; it sits at the top of the slice graph, and beyond the catalogue only a test reaches it.",
+  internal:
+    "`{{fromDir}}` ({{from}}) reaches `{{dir}}` only through its own index.ts, never `{{inside}}`. Export what you need from that face and import it from there.",
+  testInternal:
+    "A test reaches `{{dir}}` only through its own index.ts, never `{{inside}}`, unless it sits in `{{folder}}`, the folder that mirrors `{{dir}}`. Import the face, or move the test to `{{folder}}`.",
+  unexported:
+    "`{{dir}}/index.ts` is a face packages/core's exports map does not name. Add `./{{entry}}` to the map, so a sibling and a transport reach one face and a test outside its mirror folder reaches an entry point.",
+} satisfies Record<Finding["messageId"], string>;
+
+export const messageOf = ({ messageId, data }: Finding): string =>
+  MESSAGES[messageId].replaceAll(
+    /\{\{(\w+)\}\}/gu,
+    (placeholder, key: string) => data?.[key] ?? placeholder,
+  );
+
 export const importDirectionRule = defineRule({
   meta: {
     type: "problem",
     docs: {
       description: "The import-direction rules over packages/core, by the position of both ends.",
     },
-    messages: {
-      transport:
-        "packages/core is transport-agnostic: `{{specifier}}` is a transport or a transport's dependency. A status code, a Request or a Response belongs in apps/api; export a function and a typed error instead.",
-      direction: "`{{fromDir}}` ({{from}}) may not import `{{toDir}}` ({{to}}): {{clause}}.",
-      catalogue:
-        "Nothing in core imports the refusal catalogue; it reads every slice's vocabulary, and only a test reaches it.",
-      erasure:
-        "Nothing in core imports `erasure` but the refusal catalogue; it sits at the top of the slice graph, and beyond the catalogue only a test reaches it.",
-      internal:
-        "`{{fromDir}}` ({{from}}) reaches `{{dir}}` only through its own index.ts, never `{{inside}}`. Export what you need from that face and import it from there.",
-      testInternal:
-        "A test reaches `{{dir}}` only through its own index.ts, never `{{inside}}`, unless it sits in `{{folder}}`, the folder that mirrors `{{dir}}`. Import the face, or move the test to `{{folder}}`.",
-      unexported:
-        "`{{dir}}/index.ts` is a face packages/core's exports map does not name. Add `./{{entry}}` to the map, so a sibling and a transport reach one face and a test outside its mirror folder reaches an entry point.",
-    },
+    messages: MESSAGES,
   },
   createOnce(context) {
     const check = (node: ESTree.Node, specifier: string): void => {
       const pkg = packageOf(path.dirname(context.filename));
       if (pkg === null) return;
-      if (isTransport(specifier)) {
-        context.report({ node, messageId: "transport", data: { specifier } });
-        return;
-      }
-      const edge = edgeOf(pkg, context.filename, specifier);
-      if (edge === undefined) return;
-      const found = findingOf(pkg, edge);
+      const found = importFinding(pkg, context.filename, specifier);
       if (found !== undefined) context.report({ node, ...found });
     };
     const source = (node: {

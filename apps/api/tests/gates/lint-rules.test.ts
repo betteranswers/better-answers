@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import {
   loadableAnywhere,
@@ -6,28 +6,40 @@ import {
   readOxlintConfig,
   type OxlintConfig,
 } from "@better-answers/devtools/oxlint-config";
-import { oxlintOver, type Tree } from "@better-answers/devtools/throwaway-tree";
+import {
+  oxlintBatchOver,
+  type PlannedLint,
+  type Tree,
+} from "@better-answers/devtools/throwaway-tree";
 
 const probe = (specifier: string): string =>
   `import * as probe from "${specifier}";\nexport const keep = probe;\n`;
 
 const config = readOxlintConfig();
 
-const { output: lint } = oxlintOver(
-  JSON.stringify({
-    jsPlugins: config.jsPlugins.map(loadableAnywhere),
-    rules: Object.fromEntries(
-      Object.entries(config.rules).filter(([name]) => name.startsWith("better-answers/")),
-    ),
-    overrides: [oxlintOverrideFor("**/*.ts"), oxlintOverrideFor("apps/api/src/auth/**")],
-  }),
+const batch = oxlintBatchOver(JSON.stringify({ options: config.options }));
+
+const linted = (tree: Tree, ruleConfig: string): PlannedLint => batch.plan(tree, ruleConfig);
+
+beforeAll(batch.run);
+
+const BETTER_ANSWERS_CONFIG = JSON.stringify({
+  jsPlugins: config.jsPlugins.map(loadableAnywhere),
+  rules: Object.fromEntries(
+    Object.entries(config.rules).filter(([name]) => name.startsWith("better-answers/")),
+  ),
+  overrides: [oxlintOverrideFor("**/*.ts"), oxlintOverrideFor("apps/api/src/auth/**")],
+});
+
+const lint = (tree: Tree): PlannedLint => linted(tree, BETTER_ANSWERS_CONFIG);
+
+batch.control(
   {
-    tree: {
-      "apps/api/src/mcp/probe.ts": probe("better-auth"),
-      "apps/api/src/auth/probe.ts": probe("better-auth"),
-    },
-    flagged: ["apps/api/src/mcp/probe.ts"],
+    "apps/api/src/mcp/probe.ts": probe("better-auth"),
+    "apps/api/src/auth/probe.ts": probe("better-auth"),
   },
+  BETTER_ANSWERS_CONFIG,
+  ["apps/api/src/mcp/probe.ts"],
 );
 
 const severityOf = (name: string): (typeof config.rules)[string] => {
@@ -41,24 +53,15 @@ const severityOf = (name: string): (typeof config.rules)[string] => {
   return correctness;
 };
 
-const ruleRunner = (
-  name: string,
-  smoke: { readonly tree: Tree; readonly flagged: readonly string[] },
-): ((tree: Tree) => string) => {
+const ruleLint = (name: string): ((tree: Tree) => PlannedLint) => {
   const setting = severityOf(name);
   const relaxed = config.overrides.filter((override) => override.rules?.[name] !== undefined);
   if (relaxed.length > 0)
     throw new Error(
       `\`${name}\` is re-set by an override over ${relaxed.map((o) => o.files?.join(", ")).join("; ")}, which this runner does not carry — so these cases would prove the rule somewhere it no longer holds.`,
     );
-  return oxlintOver(
-    JSON.stringify({
-      plugins: config.plugins,
-      options: config.options,
-      rules: { [name]: setting },
-    }),
-    smoke,
-  ).output;
+  const ruleConfig = JSON.stringify({ plugins: config.plugins, rules: { [name]: setting } });
+  return (tree) => linted(tree, ruleConfig);
 };
 
 const suiteOf = (...titles: readonly string[]): string =>
@@ -67,34 +70,31 @@ const suiteOf = (...titles: readonly string[]): string =>
     .join("\n")}\n});\n`;
 
 describe("no two tests in one block share a title", () => {
-  const copied: Tree = {
+  const lintTitles = ruleLint("vitest/no-identical-title");
+  const copied = lintTitles({
     "test/copied.test.ts": suiteOf("refuses a stranger", "refuses a stranger"),
-  };
-  const lintTitles = ruleRunner("vitest/no-identical-title", {
-    tree: copied,
-    flagged: ["test/copied.test.ts"],
+  });
+  const distinct = lintTitles({
+    "test/distinct.test.ts": suiteOf("refuses a stranger", "admits a member"),
+  });
+  const shared = lintTitles({
+    "test/one.test.ts": suiteOf("refuses a stranger"),
+    "test/two.test.ts": suiteOf("refuses a stranger"),
   });
 
   it("fires when a copied test keeps its original's title", () => {
-    const output = lintTitles(copied);
+    const output = copied.output();
 
     expect(output).toContain("test/copied.test.ts");
     expect(output).toContain("no-identical-title");
   });
 
   it("stays silent when the two titles differ", () => {
-    const output = lintTitles({
-      "test/distinct.test.ts": suiteOf("refuses a stranger", "admits a member"),
-    });
-
-    expect(output).not.toContain("test/distinct.test.ts");
+    expect(distinct.output()).not.toContain("test/distinct.test.ts");
   });
 
   it("stays silent when two files share a title", () => {
-    const output = lintTitles({
-      "test/one.test.ts": suiteOf("refuses a stranger"),
-      "test/two.test.ts": suiteOf("refuses a stranger"),
-    });
+    const output = shared.output();
 
     expect(output).not.toContain("test/one.test.ts");
     expect(output).not.toContain("test/two.test.ts");
@@ -105,30 +105,30 @@ const swallow = (body: string): string =>
   `export const rollbackQuietly = async (client: Client): Promise<void> => {\n  try {\n    await client.query("ROLLBACK");\n  } catch {${body}}\n};\n`;
 
 describe("no empty block; a swallowed error carries its comment", () => {
-  const silent: Tree = { "src/silent.ts": swallow("") };
-  const lintBlocks = ruleRunner("no-empty", { tree: silent, flagged: ["src/silent.ts"] });
+  const lintBlocks = ruleLint("no-empty");
+  const silent = lintBlocks({ "src/silent.ts": swallow("") });
+  const reasoned = lintBlocks({
+    "src/reasoned.ts": swallow(
+      "\n    // The connection is already gone; releasing it below is all that is left.\n  ",
+    ),
+  });
+  const branch = lintBlocks({
+    "src/branch.ts": `export const guard = (revoked: boolean): void => {\n  if (revoked) {\n  }\n};\n`,
+  });
 
   it("fires on an empty catch, with `allowEmptyCatch` off", () => {
-    const output = lintBlocks(silent);
+    const output = silent.output();
 
     expect(output).toContain("src/silent.ts");
     expect(output).toContain("no-empty");
   });
 
   it("stays silent on a catch holding a comment", () => {
-    const output = lintBlocks({
-      "src/reasoned.ts": swallow(
-        "\n    // The connection is already gone; releasing it below is all that is left.\n  ",
-      ),
-    });
-
-    expect(output).not.toContain("src/reasoned.ts");
+    expect(reasoned.output()).not.toContain("src/reasoned.ts");
   });
 
   it("fires on an empty block that is no catch", () => {
-    const output = lintBlocks({
-      "src/branch.ts": `export const guard = (revoked: boolean): void => {\n  if (revoked) {\n  }\n};\n`,
-    });
+    const output = branch.output();
 
     expect(output).toContain("src/branch.ts");
     expect(output).toContain("no-empty");
@@ -139,32 +139,31 @@ const renames = (body: string): string =>
   `type Member = { name: string };\n\nexport const rename = (member: Member, name: string): Member => {\n  ${body}\n};\n`;
 
 describe("no parameter mutated: a function returns a new value", () => {
-  const written: Tree = { "src/written.ts": renames("member.name = name;\n  return member;") };
-  const lintParameters = ruleRunner("no-param-reassign", {
-    tree: written,
-    flagged: ["src/written.ts"],
+  const lintParameters = ruleLint("no-param-reassign");
+  const written = lintParameters({
+    "src/written.ts": renames("member.name = name;\n  return member;"),
   });
+  const rebound = lintParameters({
+    "src/rebound.ts": renames("member = { name };\n  return member;"),
+  });
+  const copied = lintParameters({ "src/copied.ts": renames("return { ...member, name };") });
 
   it("fires on a write to a parameter's property", () => {
-    const output = lintParameters(written);
+    const output = written.output();
 
     expect(output).toContain("src/written.ts");
     expect(output).toContain("no-param-reassign");
   });
 
   it("fires on a parameter assigned a new value", () => {
-    const output = lintParameters({
-      "src/rebound.ts": renames("member = { name };\n  return member;"),
-    });
+    const output = rebound.output();
 
     expect(output).toContain("src/rebound.ts");
     expect(output).toContain("no-param-reassign");
   });
 
   it("stays silent on a copy that carries the change", () => {
-    const output = lintParameters({ "src/copied.ts": renames("return { ...member, name };") });
-
-    expect(output).not.toContain("src/copied.ts");
+    expect(copied.output()).not.toContain("src/copied.ts");
   });
 });
 
@@ -184,29 +183,26 @@ const callsRevoke = (call: string): string =>
   `const revoke = async (): Promise<void> => {};\n\nexport const action = async (): Promise<void> => {\n  ${call}\n};\n`;
 
 describe("no promise floats: a call is awaited or `void`", () => {
-  const forgotten = typedTree({ "src/forgotten.ts": callsRevoke("revoke();") });
-  const lintPromises = ruleRunner("typescript/no-floating-promises", {
-    tree: forgotten,
-    flagged: ["src/forgotten.ts"],
-  });
+  const lintPromises = ruleLint("typescript/no-floating-promises");
+  const forgotten = lintPromises(typedTree({ "src/forgotten.ts": callsRevoke("revoke();") }));
+  const sanctioned = lintPromises(
+    typedTree({ "src/sanctioned.ts": callsRevoke("void revoke();") }),
+  );
+  const awaited = lintPromises(typedTree({ "src/awaited.ts": callsRevoke("await revoke();") }));
 
   it("fires on a call whose promise nobody takes", () => {
-    const output = lintPromises(forgotten);
+    const output = forgotten.output();
 
     expect(output).toContain("src/forgotten.ts");
     expect(output).toContain("no-floating-promises");
   });
 
   it("stays silent on a `void`-prefixed call, the sanctioned fire-and-forget", () => {
-    const output = lintPromises(typedTree({ "src/sanctioned.ts": callsRevoke("void revoke();") }));
-
-    expect(output).not.toContain("src/sanctioned.ts");
+    expect(sanctioned.output()).not.toContain("src/sanctioned.ts");
   });
 
   it("stays silent on an awaited call", () => {
-    const output = lintPromises(typedTree({ "src/awaited.ts": callsRevoke("await revoke();") }));
-
-    expect(output).not.toContain("src/awaited.ts");
+    expect(awaited.output()).not.toContain("src/awaited.ts");
   });
 });
 
@@ -226,46 +222,43 @@ const registryZone = (): OxlintConfig["overrides"][number] => {
 };
 
 describe("one guard per condition, never re-refusing what the type refused", () => {
-  const twice = typedTree({
-    "src/twice.ts": refusesSession("session === null || session === undefined"),
+  const guardsConfig = JSON.stringify({
+    plugins: config.plugins,
+    rules: { [UNNECESSARY_CONDITION]: severityOf(UNNECESSARY_CONDITION) },
+    overrides: [registryZone()],
   });
-  const lintGuards = oxlintOver(
-    JSON.stringify({
-      plugins: config.plugins,
-      options: config.options,
-      rules: { [UNNECESSARY_CONDITION]: severityOf(UNNECESSARY_CONDITION) },
-      overrides: [registryZone()],
-    }),
-    { tree: twice, flagged: ["src/twice.ts"] },
-  ).output;
+  const lintGuards = (tree: Tree): PlannedLint => linted(tree, guardsConfig);
+  const twice = lintGuards(
+    typedTree({ "src/twice.ts": refusesSession("session === null || session === undefined") }),
+  );
+  const once = lintGuards(typedTree({ "src/once.ts": refusesSession("session === null") }));
+  const registry = lintGuards(
+    typedTree(
+      {
+        "apps/web/src/shared/ui/twice.ts": refusesSession(
+          "session === null || session === undefined",
+        ),
+        "apps/web/src/features/twice.ts": refusesSession(
+          "session === null || session === undefined",
+        ),
+      },
+      ["apps"],
+    ),
+  );
 
   it("fires on a guard the type makes unreachable", () => {
-    const output = lintGuards(twice);
+    const output = twice.output();
 
     expect(output).toContain("src/twice.ts");
     expect(output).toContain("no-unnecessary-condition");
   });
 
   it("stays silent on the one guard the type leaves reachable", () => {
-    const output = lintGuards(typedTree({ "src/once.ts": refusesSession("session === null") }));
-
-    expect(output).not.toContain("src/once.ts");
+    expect(once.output()).not.toContain("src/once.ts");
   });
 
   it("leaves registry source alone but fires on a copy outside", () => {
-    const output = lintGuards(
-      typedTree(
-        {
-          "apps/web/src/shared/ui/twice.ts": refusesSession(
-            "session === null || session === undefined",
-          ),
-          "apps/web/src/features/twice.ts": refusesSession(
-            "session === null || session === undefined",
-          ),
-        },
-        ["apps"],
-      ),
-    );
+    const output = registry.output();
 
     expect(output).toContain("apps/web/src/features/twice.ts");
     expect(output).not.toContain("apps/web/src/shared/ui/twice.ts");
@@ -285,41 +278,40 @@ const sortingModule = (call: string): string =>
   `export const ordered = (names: readonly string[]): readonly string[] => [...names].${call};\n`;
 
 describe("every sort in source names its comparator", () => {
-  const bare = typedTree({ "src/bare.ts": sortingModule("sort()") });
-  const lintSorts = oxlintOver(
-    JSON.stringify({
-      plugins: config.plugins,
-      options: config.options,
-      rules: { [SORT_COMPARE]: severityOf(SORT_COMPARE) },
-      overrides: sortCompareOverrides,
+  const sortsConfig = JSON.stringify({
+    plugins: config.plugins,
+    rules: { [SORT_COMPARE]: severityOf(SORT_COMPARE) },
+    overrides: sortCompareOverrides,
+  });
+  const lintSorts = (tree: Tree): PlannedLint => linted(tree, sortsConfig);
+  const bare = ["sort()", "toSorted()"].map(
+    (call) => [call, lintSorts(typedTree({ "src/bare.ts": sortingModule(call) }))] as const,
+  );
+  const compared = lintSorts(
+    typedTree({
+      "src/compared.ts": sortingModule("toSorted((one, other) => one.localeCompare(other))"),
     }),
-    { tree: bare, flagged: ["src/bare.ts"] },
-  ).output;
+  );
+  const inTest = lintSorts(
+    typedTree(
+      { "src/bare.test.ts": sortingModule("sort()"), "test/bare.ts": sortingModule("sort()") },
+      ["src", "test"],
+    ),
+  );
 
-  it.each(["sort()", "toSorted()"])("fires on a string array's bare `%s`", (call) => {
-    const output = lintSorts(typedTree({ "src/bare.ts": sortingModule(call) }));
+  it.each(bare)("fires on a string array's bare `%s`", (_call, found) => {
+    const output = found.output();
 
     expect(output).toContain("src/bare.ts");
     expect(output).toContain("require-array-sort-compare");
   });
 
   it("stays silent on a sort given a comparator", () => {
-    const output = lintSorts(
-      typedTree({
-        "src/compared.ts": sortingModule("toSorted((one, other) => one.localeCompare(other))"),
-      }),
-    );
-
-    expect(output).not.toContain("src/compared.ts");
+    expect(compared.output()).not.toContain("src/compared.ts");
   });
 
   it("stays silent on a bare sort in a test", () => {
-    const output = lintSorts(
-      typedTree(
-        { "src/bare.test.ts": sortingModule("sort()"), "test/bare.ts": sortingModule("sort()") },
-        ["src", "test"],
-      ),
-    );
+    const output = inTest.output();
 
     expect(output).not.toContain("bare.test.ts");
     expect(output).not.toContain("test/bare.ts");
@@ -403,46 +395,49 @@ const ADOPTED = [
 
 const reportedName = (rule: string): string => rule.slice(rule.indexOf("/") + 1);
 
-const lintUnderCategories = oxlintOver(
-  JSON.stringify({
-    plugins: config.plugins,
-    options: config.options,
-    categories: config.categories,
-  }),
-  { tree: typedTree({ "src/fires.ts": ADOPTED[0].fires }), flagged: ["src/fires.ts"] },
-).output;
+const CATEGORIES_CONFIG = JSON.stringify({
+  plugins: config.plugins,
+  categories: config.categories,
+});
+
+const lintUnderCategories = (tree: Tree): PlannedLint => linted(tree, CATEGORIES_CONFIG);
+
+batch.control(typedTree({ "src/fires.ts": ADOPTED[0].fires }), CATEGORIES_CONFIG, ["src/fires.ts"]);
 
 describe.each(ADOPTED)("$rule", ({ rule, refuses, fires, silent }) => {
   const firing = typedTree({ "src/fires.ts": fires });
-  const lintRule = ruleRunner(rule, { tree: firing, flagged: ["src/fires.ts"] });
+  const lintRule = ruleLint(rule);
+  const refused = lintRule(firing);
+  const asked = lintRule(typedTree({ "src/asked.ts": silent }));
+  const categorised = lintUnderCategories(firing);
 
   it("names the file holding the source it refuses", () => {
-    const output = lintRule(firing);
+    const output = refused.output();
 
     expect(output, `refuses ${refuses}`).toContain("src/fires.ts");
     expect(output).toContain(reportedName(rule));
   });
 
   it("stays silent on the same work done as it asks", () => {
-    const output = lintRule(typedTree({ "src/asked.ts": silent }));
-
-    expect(output, `refuses only ${refuses}`).not.toContain("src/asked.ts");
+    expect(asked.output(), `refuses only ${refuses}`).not.toContain("src/asked.ts");
   });
 
   it("runs under the categories, never named in the rules block", () => {
     expect(config.rules).not.toHaveProperty(rule);
-    expect(lintUnderCategories(firing)).toContain(reportedName(rule));
+    expect(categorised.output()).toContain(reportedName(rule));
   });
 });
 
 describe("the identity provider stays behind its seam", () => {
+  const seam = lint({
+    "apps/api/src/mcp/probe.ts": probe("better-auth"),
+    "apps/api/src/auth/probe.ts": probe("better-auth"),
+    "apps/api/lifts/better-auth-cimd-node/probe.ts": probe("@better-auth/core/utils/host"),
+    "packages/core/src/probe.ts": probe("@better-auth/oauth-provider"),
+  });
+
   it("refuses better-auth outside the auth module and allows it inside", () => {
-    const output = lint({
-      "apps/api/src/mcp/probe.ts": probe("better-auth"),
-      "apps/api/src/auth/probe.ts": probe("better-auth"),
-      "apps/api/lifts/better-auth-cimd-node/probe.ts": probe("@better-auth/core/utils/host"),
-      "packages/core/src/probe.ts": probe("@better-auth/oauth-provider"),
-    });
+    const output = seam.output();
 
     expect(output).toContain("apps/api/src/mcp/probe.ts");
     expect(output).toContain("packages/core/src/probe.ts");
@@ -452,12 +447,14 @@ describe("the identity provider stays behind its seam", () => {
 });
 
 describe("no MCP library type crosses into packages/core", () => {
+  const crossing = lint({
+    "packages/core/package.json": JSON.stringify({ name: "@better-answers/core" }),
+    "packages/core/src/probe.ts": probe("@modelcontextprotocol/server"),
+    "apps/api/src/mcp/probe.ts": probe("@modelcontextprotocol/server"),
+  });
+
   it("refuses @modelcontextprotocol/server inside packages/core and allows it in apps/api", () => {
-    const output = lint({
-      "packages/core/package.json": JSON.stringify({ name: "@better-answers/core" }),
-      "packages/core/src/probe.ts": probe("@modelcontextprotocol/server"),
-      "apps/api/src/mcp/probe.ts": probe("@modelcontextprotocol/server"),
-    });
+    const output = crossing.output();
 
     expect(output).toContain("packages/core/src/probe.ts");
     expect(output).toContain("import-direction");
@@ -466,13 +463,19 @@ describe("no MCP library type crosses into packages/core", () => {
 });
 
 describe("every MCP entry carries its annotations", () => {
+  const annotated = lint({
+    "apps/api/src/mcp/entries/without.ts": `defineEntry({ name: "find", input: z.object({ query: z.string() }) });\n`,
+    "apps/api/src/mcp/entries/with.ts": `defineEntry({ name: "find", input: z.object({ query: z.string() }), annotations: { readOnlyHint: true } });\n`,
+    "apps/api/src/mcp/registered-without.ts": `server.registerTool("find", { inputSchema: z.object({}) }, async () => ({}));\n`,
+    "apps/api/src/mcp/registered-with.ts": `server.registerTool("find", { inputSchema: z.object({}), annotations: { readOnlyHint: true } }, async () => ({}));\n`,
+  });
+  const hinted = lint({
+    "apps/api/src/mcp/entries/no-hint.ts": `defineEntry({ name: "find", input: z.object({}), annotations: { idempotentHint: true } });\n`,
+    "apps/api/src/mcp/entries/hinted.ts": `defineEntry({ name: "find", input: z.object({}), annotations: { readOnlyHint: false } });\n`,
+  });
+
   it("refuses defineEntry and registerTool without annotations, and allows both with", () => {
-    const output = lint({
-      "apps/api/src/mcp/entries/without.ts": `defineEntry({ name: "find", input: z.object({ query: z.string() }) });\n`,
-      "apps/api/src/mcp/entries/with.ts": `defineEntry({ name: "find", input: z.object({ query: z.string() }), annotations: { readOnlyHint: true } });\n`,
-      "apps/api/src/mcp/registered-without.ts": `server.registerTool("find", { inputSchema: z.object({}) }, async () => ({}));\n`,
-      "apps/api/src/mcp/registered-with.ts": `server.registerTool("find", { inputSchema: z.object({}), annotations: { readOnlyHint: true } }, async () => ({}));\n`,
-    });
+    const output = annotated.output();
 
     expect(output).toContain("entries/without.ts");
     expect(output).toContain("registered-without.ts");
@@ -482,10 +485,7 @@ describe("every MCP entry carries its annotations", () => {
   });
 
   it("refuses annotations with no readOnlyHint, the host's read-write split", () => {
-    const output = lint({
-      "apps/api/src/mcp/entries/no-hint.ts": `defineEntry({ name: "find", input: z.object({}), annotations: { idempotentHint: true } });\n`,
-      "apps/api/src/mcp/entries/hinted.ts": `defineEntry({ name: "find", input: z.object({}), annotations: { readOnlyHint: false } });\n`,
-    });
+    const output = hinted.output();
 
     expect(output).toContain("entries/no-hint.ts");
     expect(output).toContain("mcp-entry-annotations");
@@ -494,44 +494,51 @@ describe("every MCP entry carries its annotations", () => {
 });
 
 describe("no MCP entry takes a workspace argument", () => {
-  it.each(["workspace", "workspaceId", "bundle", "tenant_id"])(
-    "refuses an input named %s",
-    (name) => {
-      const output = lint({
-        "apps/api/src/mcp/entries/probe.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: z.object({ ${name}: z.string() }) });\n`,
-      });
+  it.each(
+    ["workspace", "workspaceId", "bundle", "tenant_id"].map(
+      (name) =>
+        [
+          name,
+          lint({
+            "apps/api/src/mcp/entries/probe.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: z.object({ ${name}: z.string() }) });\n`,
+          }),
+        ] as const,
+    ),
+  )("refuses an input named %s", (name, found) => {
+    const output = found.output();
 
-      expect(output).toContain("mcp-entry-no-workspace-argument");
-      expect(output).toContain(name);
-    },
-  );
+    expect(output).toContain("mcp-entry-no-workspace-argument");
+    expect(output).toContain(name);
+  });
+
+  const allowed = lint({
+    "apps/api/src/mcp/entries/probe.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: z.object({ query: z.string(), limit: z.number() }) });\n`,
+    "apps/api/src/mcp/entries/refined.ts": `defineEntry({ name: "open", annotations: { readOnlyHint: true }, input: z.object({ iri: z.string() }).refine(() => true) });\n`,
+    "apps/api/src/mcp/raw.ts": `server.registerTool("find", { annotations: { readOnlyHint: true }, inputSchema: { query: z.string() } }, async () => ({}));\n`,
+  });
 
   it("allows other inputs in either form, and unwraps a refine", () => {
-    const output = lint({
-      "apps/api/src/mcp/entries/probe.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: z.object({ query: z.string(), limit: z.number() }) });\n`,
-      "apps/api/src/mcp/entries/refined.ts": `defineEntry({ name: "open", annotations: { readOnlyHint: true }, input: z.object({ iri: z.string() }).refine(() => true) });\n`,
-      "apps/api/src/mcp/raw.ts": `server.registerTool("find", { annotations: { readOnlyHint: true }, inputSchema: { query: z.string() } }, async () => ({}));\n`,
-    });
+    expect(allowed.output()).not.toContain("mcp-entry-no-workspace-argument");
+  });
 
-    expect(output).not.toContain("mcp-entry-no-workspace-argument");
+  const closed = lint({
+    "apps/api/src/mcp/entries/opaque.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: sharedShape });\n`,
+    "apps/api/src/mcp/entries/spread.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: z.object({ ...base, query: z.string() }) });\n`,
   });
 
   it("fails closed on an opaque input and a spread key", () => {
-    const output = lint({
-      "apps/api/src/mcp/entries/opaque.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: sharedShape });\n`,
-      "apps/api/src/mcp/entries/spread.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: z.object({ ...base, query: z.string() }) });\n`,
-    });
+    const output = closed.output();
 
     expect(output).toContain("entries/opaque.ts");
     expect(output).toContain("entries/spread.ts");
     expect(output).toContain("mcp-entry-no-workspace-argument");
   });
 
-  it("fails closed on a registerTool whose inputSchema is a variable", () => {
-    const output = lint({
-      "apps/api/src/mcp/mount.ts": `server.registerTool(entry.name, { annotations: entry.annotations, inputSchema: entry.input }, entry.run);\n`,
-    });
+  const variable = lint({
+    "apps/api/src/mcp/mount.ts": `server.registerTool(entry.name, { annotations: entry.annotations, inputSchema: entry.input }, entry.run);\n`,
+  });
 
-    expect(output).toContain("mcp-entry-no-workspace-argument");
+  it("fails closed on a registerTool whose inputSchema is a variable", () => {
+    expect(variable.output()).toContain("mcp-entry-no-workspace-argument");
   });
 });

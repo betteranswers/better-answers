@@ -33,7 +33,7 @@ const STALE_AFTER_MS = 60 * 60 * 1000;
 
 export type Tree = Readonly<Record<string, string>>;
 
-export type Tool = {
+type UnprovenTool = {
   readonly executable: { readonly package: string; readonly path: readonly string[] };
 
   readonly argv: readonly string[];
@@ -45,7 +45,9 @@ export type Tool = {
   readonly foundSomething: readonly number[];
 
   readonly timeoutMs?: number;
+};
 
+export type Tool = UnprovenTool & {
   readonly smoke: { readonly tree: Tree; readonly reports: (output: string) => boolean };
 };
 
@@ -122,7 +124,7 @@ const failureOf = (cause: unknown): z.infer<typeof spawnFailure> => {
   return read.success ? read.data : {};
 };
 
-const timeoutMsFor = (tool: Tool): number => {
+const timeoutMsFor = (tool: UnprovenTool): number => {
   const timeoutMs = tool.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (timeoutMs >= STALE_AFTER_MS) {
     throw new Error(
@@ -137,7 +139,12 @@ const howItStopped = (failure: z.infer<typeof spawnFailure>, timeoutMs: number):
     ? `did not finish: stopped after ${String(timeoutMs)} ms`
     : `did not run: exit ${String(failure.status)}`;
 
-const reportOrThrow = (tool: Tool, binary: string, timeoutMs: number, cause: unknown): string => {
+const reportOrThrow = (
+  tool: UnprovenTool,
+  binary: string,
+  timeoutMs: number,
+  cause: unknown,
+): string => {
   const failure = failureOf(cause);
   const status = failure.status;
   if (status !== null && status !== undefined && tool.foundSomething.includes(status)) {
@@ -173,7 +180,9 @@ const sweptTreesFolder = (): string => {
 
 export const sweptFolder = (): string => mkdtempSync(path.join(sweptTreesFolder(), "tree-"));
 
-export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
+type ToolRunner = { readonly binary: string; readonly run: RunOverTree };
+
+const runnerFor = (tool: UnprovenTool): ToolRunner => {
   const binary = executableOf(tool.executable);
   const timeoutMs = timeoutMsFor(tool);
 
@@ -202,6 +211,12 @@ export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
       rmSync(directory, { recursive: true, force: true });
     }
   };
+
+  return { binary, run };
+};
+
+export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
+  const { binary, run } = runnerFor(tool);
 
   const smoked = run(tool.smoke.tree);
   if (!tool.smoke.reports(smoked)) {
@@ -342,4 +357,215 @@ export const knipOver = (
   });
 
   return { findings: (tree) => findingsIn(run(tree)) };
+};
+
+const BATCH_FOLDER = /^(?<folder>case-\d+)\//u;
+
+const folderOfCase = (index: number): string => `case-${String(index).padStart(4, "0")}`;
+
+const folderOfPath = (file: string): string | undefined =>
+  BATCH_FOLDER.exec(file)?.groups?.["folder"];
+
+const placedIn = (folder: string, tree: Tree): readonly (readonly [string, string])[] =>
+  Object.entries(tree).map(([file, source]) => [`${folder}/${file}`, source]);
+
+type BatchSpec<Planned, Result> = {
+  readonly tool: UnprovenTool;
+  readonly treeOf: (cases: readonly Planned[]) => Tree;
+  readonly resultsOf: (output: string) => ReadonlyMap<string, Result>;
+  readonly none: Result;
+  readonly isControl: (planned: Planned) => boolean;
+  readonly controlHeld: (planned: Planned, result: Result) => boolean;
+};
+
+const batchOver = <Planned, Result>(spec: BatchSpec<Planned, Result>) => {
+  const planned: Planned[] = [];
+  let results: ReadonlyMap<string, Result> | undefined;
+  const name = spec.tool.executable.package;
+
+  const resultOf = (index: number): Result => {
+    if (results === undefined) {
+      throw new Error(
+        `${name}: a batch case was read before the batch ran. Call run() in a beforeAll.`,
+      );
+    }
+    return results.get(folderOfCase(index)) ?? spec.none;
+  };
+
+  return {
+    plan: (added: Planned): (() => Result) => {
+      if (results !== undefined) {
+        throw new Error(`${name}: a case was planned after its batch ran.`);
+      }
+      planned.push(added);
+      const index = planned.length - 1;
+      return () => resultOf(index);
+    },
+    run: (): void => {
+      if (results !== undefined) return;
+      if (!planned.some(spec.isControl)) {
+        throw new Error(
+          `${name}: a batch with no control case. Plan one tree that must report, or a silence from this tool means nothing.`,
+        );
+      }
+      const { binary, run } = runnerFor(spec.tool);
+      const found = spec.resultsOf(run(spec.treeOf(planned)));
+      const failed = planned.findIndex(
+        (one, index) =>
+          spec.isControl(one) &&
+          !spec.controlHeld(one, found.get(folderOfCase(index)) ?? spec.none),
+      );
+      if (failed !== -1) {
+        throw new Error(
+          `${name} (${binary}) failed a control case of its batch: a tree that must produce a report did not. Until this passes, a silence from this tool means nothing.\nCase ${folderOfCase(failed)} read ${JSON.stringify(found.get(folderOfCase(failed)) ?? spec.none)}`,
+        );
+      }
+      results = found;
+    },
+  };
+};
+
+const linesByFolder = (output: string): ReadonlyMap<string, string> => {
+  const lines = new Map<string, string[]>();
+  for (const line of output.split("\n")) {
+    const folder = folderOfPath(line);
+    if (folder === undefined) continue;
+    const own = lines.get(folder) ?? [];
+    own.push(line.slice(folder.length + 1));
+    lines.set(folder, own);
+  }
+  return new Map([...lines].map(([folder, own]) => [folder, own.join("\n")]));
+};
+
+export type PlannedLint = {
+  readonly output: () => string;
+  readonly flagged: () => readonly string[];
+};
+
+export type OxlintBatch = {
+  readonly plan: (tree: Tree, config: string) => PlannedLint;
+  readonly control: (tree: Tree, config: string, flagged: readonly string[]) => void;
+  readonly run: () => void;
+};
+
+type LintPlan = {
+  readonly tree: Tree;
+  readonly config: string;
+  readonly control: readonly string[] | undefined;
+};
+
+export const oxlintBatchOver = (root = "{}", flags: readonly string[] = []): OxlintBatch => {
+  const batch = batchOver<LintPlan, string>({
+    tool: {
+      executable: { package: "oxlint", path: ["bin", "oxlint"] },
+      argv: [...flags, "--format=unix", "."],
+      scaffold: { ".oxlintrc.json": root },
+      env: { OXLINT_TSGOLINT_PATH: tsgolintPath() },
+      foundSomething: [1],
+    },
+    treeOf: (cases) =>
+      Object.fromEntries(
+        cases.flatMap((one, index) =>
+          placedIn(folderOfCase(index), { ...one.tree, ".oxlintrc.json": one.config }),
+        ),
+      ),
+    resultsOf: linesByFolder,
+    none: "",
+    isControl: (one) => one.control !== undefined,
+    controlHeld: (one, output) =>
+      sameInOrder(pathsIn(output), [...(one.control ?? [])].sort(byCodeUnit)),
+  });
+
+  return {
+    plan: (tree, config) => {
+      const read = batch.plan({ tree, config, control: undefined });
+      return { output: read, flagged: () => pathsIn(read()) };
+    },
+    control: (tree, config, flagged) => {
+      batch.plan({ tree, config, control: flagged });
+    },
+    run: batch.run,
+  };
+};
+
+export type PlannedKnip = { readonly findings: () => readonly KnipFinding[] };
+
+export type KnipCaseConfig = {
+  readonly entry?: readonly string[];
+  readonly project?: readonly string[];
+  readonly includeEntryExports?: boolean;
+};
+
+export type KnipBatch = {
+  readonly plan: (tree: Tree, config: KnipCaseConfig) => PlannedKnip;
+  readonly control: (tree: Tree, config: KnipCaseConfig, findings: readonly KnipFinding[]) => void;
+  readonly run: () => void;
+};
+
+type KnipPlan = {
+  readonly tree: Tree;
+  readonly config: KnipCaseConfig;
+  readonly control: readonly KnipFinding[] | undefined;
+};
+
+const findingsByFolder = (output: string): ReadonlyMap<string, readonly KnipFinding[]> => {
+  const grouped = new Map<string, KnipFinding[]>();
+  for (const finding of findingsIn(output)) {
+    const folder = folderOfPath(finding.file);
+    if (folder === undefined) {
+      throw new Error(
+        `knip reported ${finding.kind} ${finding.name} in ${finding.file}, outside every case.`,
+      );
+    }
+    const own = grouped.get(folder) ?? [];
+    const cut = folder.length + 1;
+    own.push({
+      kind: finding.kind,
+      file: finding.file.slice(cut),
+      name: finding.kind === "files" ? finding.name.slice(cut) : finding.name,
+    });
+    grouped.set(folder, own);
+  }
+  return new Map([...grouped].map(([folder, own]) => [folder, own.toSorted(byFinding)]));
+};
+
+export const knipBatchOver = (scaffold: Tree): KnipBatch => {
+  const batch = batchOver<KnipPlan, readonly KnipFinding[]>({
+    tool: {
+      executable: { package: "knip", path: ["bin", "knip.js"] },
+      argv: ["--reporter", "json"],
+      foundSomething: [1],
+    },
+    treeOf: (cases) => {
+      const placed = cases.map((one, index) => ({ one, folder: folderOfCase(index) }));
+      return {
+        "package.json": JSON.stringify({
+          name: "throwaway-batch",
+          private: true,
+          workspaces: placed.map(({ folder }) => folder),
+        }),
+        "knip.json": JSON.stringify({
+          workspaces: Object.fromEntries(placed.map(({ one, folder }) => [folder, one.config])),
+        }),
+        ...Object.fromEntries(
+          placed.flatMap(({ one, folder }) => placedIn(folder, { ...scaffold, ...one.tree })),
+        ),
+      };
+    },
+    resultsOf: findingsByFolder,
+    none: [],
+    isControl: (one) => one.control !== undefined,
+    controlHeld: (one, found) =>
+      sameInOrder(found.map(sortKey), [...(one.control ?? [])].sort(byFinding).map(sortKey)),
+  });
+
+  return {
+    plan: (tree, config) => ({
+      findings: batch.plan({ tree, config, control: undefined }),
+    }),
+    control: (tree, config, findings) => {
+      batch.plan({ tree, config, control: findings });
+    },
+    run: batch.run,
+  };
 };

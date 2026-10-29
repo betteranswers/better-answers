@@ -1,8 +1,14 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
+import {
+  corePackageOf,
+  importFinding,
+  messageOf,
+  type Finding,
+} from "@better-answers/devtools/import-direction";
 import {
   oxlintOverrideFor,
   pluginConfigFor,
@@ -10,7 +16,11 @@ import {
 } from "@better-answers/devtools/oxlint-config";
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { GATES_FOLDER, HELPER_FOLDERS, PINS } from "@better-answers/devtools/test-folders";
-import { oxlintOver, type Tree } from "@better-answers/devtools/throwaway-tree";
+import {
+  oxlintBatchOver,
+  type PlannedLint,
+  type Tree,
+} from "@better-answers/devtools/throwaway-tree";
 
 const RULE = "better-answers/import-direction";
 const CORE = "packages/core";
@@ -22,7 +32,7 @@ if (severity === undefined) {
   throw new Error(`.oxlintrc.json's base rules block no longer switches ${RULE} on.`);
 }
 
-const MANIFEST = JSON.stringify({
+const MANIFEST_VALUE = {
   name: "@better-answers/core",
   exports: {
     "./kernel": "./src/kernel/index.ts",
@@ -38,7 +48,9 @@ const MANIFEST = JSON.stringify({
     "./erasure": "./src/erasure/index.ts",
     "./refusals": "./src/refusals/index.ts",
   },
-});
+};
+
+const MANIFEST = JSON.stringify(MANIFEST_VALUE);
 
 const globsOf = (override: { readonly files?: readonly string[] | undefined }): readonly string[] =>
   override.files ?? [];
@@ -87,10 +99,34 @@ const KIND_REFUSALS: readonly (readonly [string, string, string])[] = KIND_FOLDE
   `../../src/${kind}/probe.ts`,
 ]);
 
-const lint = oxlintOver(pluginConfigFor({ [RULE]: severity }), {
-  tree: importing(SLICE, "../guides/renderer.ts"),
-  flagged: [SLICE],
-});
+const VIRTUAL_ROOT = path.resolve(path.sep, "virtual");
+
+const corePackage = corePackageOf(path.join(VIRTUAL_ROOT, CORE), MANIFEST_VALUE);
+if (corePackage === null) {
+  throw new Error("MANIFEST names @better-answers/core, so it reads as the core package.");
+}
+
+const findingFor = (file: string, specifier: string): Finding | undefined =>
+  importFinding(corePackage, path.join(VIRTUAL_ROOT, file), specifier);
+
+const statedBy = (file: string, specifier: string): string => {
+  const finding = findingFor(file, specifier);
+  if (finding === undefined)
+    throw new Error(`the rule is silent on ${file} importing ${specifier}`);
+  return messageOf(finding);
+};
+
+const spawn = oxlintBatchOver();
+
+const spawned = (tree: Tree, caseConfig: string): PlannedLint => spawn.plan(tree, caseConfig);
+
+const RULE_CONFIG = pluginConfigFor({ [RULE]: severity });
+
+const spawnedRule = (tree: Tree): PlannedLint => spawned(tree, RULE_CONFIG);
+
+spawn.control(importing(SLICE, "../guides/renderer.ts"), RULE_CONFIG, [SLICE]);
+
+beforeAll(spawn.run);
 
 const INTERNAL = "only through its own index.ts";
 
@@ -211,57 +247,85 @@ const REFUSALS = Object.entries(REFUSED).flatMap(([clause, cases]) =>
   cases.map(([title, file, specifier]) => [title, clause, file, specifier] as const),
 );
 
+const BRIDGED: readonly (readonly [string, string, string])[] = [
+  ["a transport finding", SLICE, "hono"],
+  ["a direction finding", KERNEL, "../concepts/index.ts"],
+  ["a catalogue finding", SLICE, "../refusals/index.ts"],
+  ["an erasure finding", SLICE, "../erasure/index.ts"],
+  ["an internal finding", SLICE, "../guides/renderer.ts"],
+  ["a test-internal finding", ELSEWHERE, "../../src/concepts/file.ts"],
+  ["an unexported finding", SLICE, "../store/objects/index.ts"],
+];
+
 describe("the rule fires, stating the clause it holds", () => {
   it.each(REFUSALS)("refuses %s", (_title, clause, file, specifier) => {
-    const output = lint.output(importing(file, specifier));
-
-    expect(output).toContain(file);
-    expect(output).toContain("import-direction");
-    expect(output).toContain(clause);
+    expect(statedBy(file, specifier)).toContain(clause);
   });
 
   it("says which entry to export for an unmapped face", () => {
-    const output = lint.output(importing(SLICE, "../store/objects/index.ts"));
-
-    expect(output).toContain("`./store/objects`");
+    expect(statedBy(SLICE, "../store/objects/index.ts")).toContain("`./store/objects`");
   });
 
   it("names the fix for a test outside its mirror", () => {
-    const output = lint.output(importing(ELSEWHERE, "../../src/concepts/file.ts"));
+    const message = statedBy(ELSEWHERE, "../../src/concepts/file.ts");
 
-    expect(output).toContain("never `file.ts`");
-    expect(output).toContain("Import the face, or move the test to `test/concepts/`");
-    expect(output).toContain("mirrors `src/concepts`");
+    expect(message).toContain("never `file.ts`");
+    expect(message).toContain("Import the face, or move the test to `test/concepts/`");
+    expect(message).toContain("mirrors `src/concepts`");
   });
 
   it("names the mirror folder of a door", () => {
-    const output = lint.output(importing(MIRRORED, "../../src/store/postgres/handle.ts"));
-
-    expect(output).toContain("move the test to `test/store/postgres/`");
+    expect(statedBy(MIRRORED, "../../src/store/postgres/handle.ts")).toContain(
+      "move the test to `test/store/postgres/`",
+    );
   });
 
   it("says a test outside its mirror reaches an entry point", () => {
-    const output = lint.output(importing(MIRRORED, "../../src/sources/index.ts"));
-
-    expect(output).toContain("a test outside its mirror folder reaches an entry point");
+    expect(statedBy(MIRRORED, "../../src/sources/index.ts")).toContain(
+      "a test outside its mirror folder reaches an entry point",
+    );
   });
 
   it("reads a sibling's nested index.ts as internal, not a face", () => {
-    const output = lint.output(importing(SLICE, "../guides/internal/index.ts"));
+    const message = statedBy(SLICE, "../guides/internal/index.ts");
 
-    expect(output).toContain("never `internal/index.ts`");
-    expect(output).not.toContain("Add `./guides`");
+    expect(message).toContain("never `internal/index.ts`");
+    expect(message).not.toContain("Add `./guides`");
   });
 
-  it.each([
-    ["export-all", `export * from "../guides/renderer.ts";\n`],
-    ["export-named", `export { render } from "../guides/renderer.ts";\n`],
-    [
-      "type-only",
-      `import type { Rendered } from "../guides/renderer.ts";\nexport type Kept = Rendered;\n`,
-    ],
-  ])("reads a %s declaration as it reads an import", (_form, source) => {
-    const output = lint.output(coreTree({ [SLICE]: source }));
+  const bridged = BRIDGED.map(
+    ([finding, file, specifier]) =>
+      [finding, file, specifier, spawnedRule(importing(file, specifier))] as const,
+  );
+
+  it("words each finding as the spawned rule does", () => {
+    const read = bridged.map(([finding, file, specifier, found]) => {
+      const output = found.output();
+      return {
+        finding,
+        names: [output.includes(file), output.includes("import-direction")],
+        states: output.includes(statedBy(file, specifier)),
+      };
+    });
+
+    expect(read).toEqual(
+      bridged.map(([finding]) => ({ finding, names: [true, true], states: true })),
+    );
+  });
+
+  it.each(
+    (
+      [
+        ["export-all", `export * from "../guides/renderer.ts";\n`],
+        ["export-named", `export { render } from "../guides/renderer.ts";\n`],
+        [
+          "type-only",
+          `import type { Rendered } from "../guides/renderer.ts";\nexport type Kept = Rendered;\n`,
+        ],
+      ] as const
+    ).map(([form, source]) => [form, spawnedRule(coreTree({ [SLICE]: source }))] as const),
+  )("reads a %s declaration as it reads an import", (_form, found) => {
+    const output = found.output();
 
     expect(output).toContain(SLICE);
     expect(output).toContain(INTERNAL);
@@ -334,31 +398,33 @@ describe("the rule stays silent where the ADR allows the import", () => {
     ["a slice importing the schema package", SLICE, "@better-answers/schema"],
     ["a slice importing a node builtin outside the list", SLICE, "node:crypto"],
   ])("%s", (_title, file, specifier) => {
-    expect(lint.flagged(importing(file, specifier))).toEqual([]);
+    expect(findingFor(file, specifier)).toBeUndefined();
   });
 
-  it.each([
-    ["an upward relative import", "apps/api/src/routers/probe.ts", "../auth/claims.ts"],
-    ["a transport import", "apps/api/src/probe.ts", "hono"],
-  ])("stays silent outside packages/core for %s", (_title, file, specifier) => {
-    expect(lint.flagged(importing(file, specifier))).toEqual([]);
+  it.each(
+    (
+      [
+        ["an upward relative import", "apps/api/src/routers/probe.ts", "../auth/claims.ts"],
+        ["a transport import", "apps/api/src/probe.ts", "hono"],
+      ] as const
+    ).map(([title, file, specifier]) => [title, spawnedRule(importing(file, specifier))] as const),
+  )("stays silent outside packages/core for %s", (_title, found) => {
+    expect(found.flagged()).toEqual([]);
+  });
+
+  const elsewhere = "libs/knowledge/src/kernel/actor.ts";
+  const otherName = spawnedRule({
+    [`${CORE}/package.json`]: JSON.stringify({ name: "@better-answers/other" }),
+    [KERNEL]: importOf("../concepts/index.ts"),
+  });
+  const movedCore = spawnedRule({
+    "libs/knowledge/package.json": MANIFEST,
+    [elsewhere]: importOf("../concepts/index.ts"),
   });
 
   it("keys on the manifest's name, not on a path segment", () => {
-    const elsewhere = "libs/knowledge/src/kernel/actor.ts";
-
-    expect(
-      lint.flagged({
-        [`${CORE}/package.json`]: JSON.stringify({ name: "@better-answers/other" }),
-        [KERNEL]: importOf("../concepts/index.ts"),
-      }),
-    ).toEqual([]);
-    expect(
-      lint.flagged({
-        "libs/knowledge/package.json": MANIFEST,
-        [elsewhere]: importOf("../concepts/index.ts"),
-      }),
-    ).toEqual([elsewhere]);
+    expect(otherName.flagged()).toEqual([]);
+    expect(movedCore.flagged()).toEqual([elsewhere]);
   });
 });
 
@@ -396,10 +462,8 @@ describe("the zones and the real tree", () => {
 
   it.each(directories)("places src/%s in its zone", (dir) => {
     const file = `${CORE}/src/${dir}/probe.ts`;
-    const output = lint.output(importing(file, crossZoneSpecifierFrom(dir)));
 
-    expect(output).toContain(file);
-    expect(output).toContain(`(${zoneOf(dir)})`);
+    expect(statedBy(file, crossZoneSpecifierFrom(dir))).toContain(`(${zoneOf(dir)})`);
   });
 
   it.each(["llm", "audit", "erasure"])("names a layer or top slice the tree has: %s", (named) => {
@@ -423,8 +487,10 @@ describe("the zones and the real tree", () => {
     );
   };
 
+  const committed = spawnedRule(committedCore());
+
   it("lints every committed import in packages/core clean", () => {
-    expect(lint.flagged(committedCore())).toEqual([]);
+    expect(committed.flagged()).toEqual([]);
   });
 });
 
@@ -439,15 +505,13 @@ describe("the base import bans reach packages/core unrestated", () => {
   });
 
   const probe = `${CORE}/src/concepts/probe.ts`;
-  const lintBase = oxlintOver(JSON.stringify({ overrides: [oxlintOverrideFor("**/*.ts")] }), {
-    tree: { [probe]: importOf("drizzle-zod") },
-    flagged: [probe],
-  });
+  const baseOverride = JSON.stringify({ overrides: [oxlintOverrideFor("**/*.ts")] });
 
-  it.each(["drizzle-zod", "better-auth", "@better-auth/oauth-provider"])(
-    "refuses %s in core through the base override alone",
-    (specifier) => {
-      expect(lintBase.flagged({ [probe]: importOf(specifier) })).toEqual([probe]);
-    },
-  );
+  it.each(
+    ["drizzle-zod", "better-auth", "@better-auth/oauth-provider"].map(
+      (specifier) => [specifier, spawned({ [probe]: importOf(specifier) }, baseOverride)] as const,
+    ),
+  )("refuses %s in core through the base override alone", (_specifier, found) => {
+    expect(found.flagged()).toEqual([probe]);
+  });
 });
