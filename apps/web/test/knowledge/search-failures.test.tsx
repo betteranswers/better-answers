@@ -2,9 +2,6 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { MATCHES_A_PAGE as A_PAGE } from "@/features/knowledge/knowledge-state.ts";
-import { heldBack } from "@test/stubbed-api.ts";
-import { FORBIDDEN, read } from "@test/two-workspaces.ts";
-
 import {
   aCeilingMet,
   aMoment,
@@ -37,7 +34,9 @@ import {
   typed,
   type FindAsked,
   palletsFound,
-} from "./search-answers.ts";
+} from "@test/knowledge/search-answers.ts";
+import { heldBack } from "@test/stubbed-api.ts";
+import { FORBIDDEN, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

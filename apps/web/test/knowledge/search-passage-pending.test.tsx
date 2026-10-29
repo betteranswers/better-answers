@@ -1,8 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { FORBIDDEN, read } from "@test/two-workspaces.ts";
-
 import {
   aForkliftGuide,
   aRackingPlan,
@@ -36,7 +34,8 @@ import {
   type Router,
   textOfRows,
   listsOnly,
-} from "./search-answers.ts";
+} from "@test/knowledge/search-answers.ts";
+import { FORBIDDEN, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

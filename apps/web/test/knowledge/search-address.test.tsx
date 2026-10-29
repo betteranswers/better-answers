@@ -3,8 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
 import { HOMES, type Role } from "@/shared/navigation.ts";
-import { adaAt, openAt } from "@test/two-workspaces.ts";
-
 import {
   aSearchApi,
   finding,
@@ -23,7 +21,8 @@ import {
   knowledgeRailPressed,
   listsOnly,
   textOfRows,
-} from "./search-answers.ts";
+} from "@test/knowledge/search-answers.ts";
+import { adaAt, openAt } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

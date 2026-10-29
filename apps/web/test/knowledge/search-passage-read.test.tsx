@@ -2,8 +2,6 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SAID_OF_KNOWLEDGE } from "@/shared/knowledge/refusal-words.ts";
-import { aRefusalAnswer, FORBIDDEN } from "@test/two-workspaces.ts";
-
 import {
   aPassageRead,
   answeringPassages,
@@ -18,7 +16,8 @@ import {
   rowAt,
   thePalletPassages,
   palletsFound,
-} from "./search-answers.ts";
+} from "@test/knowledge/search-answers.ts";
+import { aRefusalAnswer, FORBIDDEN } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

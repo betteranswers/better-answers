@@ -2,8 +2,6 @@ import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { MATCHES_A_PAGE as A_PAGE } from "@/features/knowledge/knowledge-state.ts";
-import { read } from "@test/two-workspaces.ts";
-
 import {
   aSearchApi,
   answeringFinds,
@@ -27,7 +25,8 @@ import {
   searchHeading,
   thePalletPassages,
   typed,
-} from "./search-answers.ts";
+} from "@test/knowledge/search-answers.ts";
+import { read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 

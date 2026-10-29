@@ -7,7 +7,6 @@ import {
 } from "@/features/knowledge/knowledge-state.ts";
 import { SEARCH_WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { SEARCH_PAGE as SEARCH } from "@/shared/knowledge/concept-address.ts";
-
 import {
   aConceptRead,
   aForkliftGuide,
@@ -38,7 +37,7 @@ import {
   FORKLIFT_LICENCES,
   listsOnly,
   palletsFound,
-} from "./search-answers.ts";
+} from "@test/knowledge/search-answers.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
 
