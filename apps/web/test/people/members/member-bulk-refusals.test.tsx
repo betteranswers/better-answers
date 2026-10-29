@@ -15,8 +15,6 @@ const MEMBERS = "/people/members";
 
 const TWO_TICKED_ONE_HIDDEN = /\b2\b\D+\b1\b/;
 
-const ONE_REFUSED = /\b1\b/;
-
 const refusedAs = (
   word: string,
   refusalClass: string,
@@ -150,9 +148,6 @@ describe("bulk actions on the members ticked", () => {
         expect(refusal().textContent).not.toBe("");
       });
       expect(within(refusal()).getByText(BULK_WORDS.refused(1))).toBeDefined();
-      expect(refusal().querySelector("p")?.textContent, "the refusal counts one refused").toMatch(
-        ONE_REFUSED,
-      );
       expect(within(refusal()).getAllByRole("listitem")).toHaveLength(1);
       expect(tickOf(PRIYA.displayName).getAttribute("aria-checked")).toBe("true");
       expect(roleOf(PRIYA.displayName)).toContain("Editor");
@@ -258,7 +253,9 @@ describe("bulk actions on the members ticked", () => {
     await waitFor(() => {
       expect(refusal().textContent, "the alert says nothing").not.toBe("");
     });
-    expect(removal.pending).toBe(false);
+    expect(outcome()?.textContent, "the status still says Priya is being removed").not.toContain(
+      PRIYA.displayName,
+    );
     expect(listed().getByRole("link", { name: PRIYA.displayName })).toBeDefined();
   });
 

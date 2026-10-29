@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import { MATCHES_A_PAGE as A_PAGE } from "@/features/knowledge/knowledge-state.ts";
 import {
   aCeilingMet,
-  aMoment,
   aSearchApi,
   alerted,
   answeringFinds,
@@ -35,7 +34,7 @@ import {
   type FindAsked,
   palletsFound,
 } from "@test/knowledge/search-answers.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { heldBack, settlingAfter } from "@test/stubbed-api.ts";
 import { FORBIDDEN, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -61,8 +60,7 @@ describe("the Knowledge Search page", () => {
     typed("forklift");
 
     await waitFor(() => saysTheWait(alerted(), 3));
-    refocused();
-    await aMoment();
+    await settlingAfter(refocused);
     expect(
       findsAsked().filter((asked) => asked.query === "forklift"),
       "the page asked again past the ceiling",
@@ -97,8 +95,7 @@ describe("the Knowledge Search page", () => {
     }
     pressed(wasRead);
     await waits();
-    refocused();
-    await aMoment();
+    await settlingAfter(refocused);
 
     expect(opensAsked() - before, "a passage was asked for again while its wait ran").toBe(2);
   });

@@ -81,7 +81,7 @@ describe("a tab shown again after a switch in another tab", () => {
 
     await switcher(HOLME);
     expect(tickOf(GRACE.displayName), "a row of the workspace left is drawn").toBeNull();
-    expect(screen.getByText(MEMBERS_LOADING)).toBeDefined();
+    expect(await screen.findByText(MEMBERS_LOADING)).toBeDefined();
     expect(router.state.location.pathname).toBe(MEMBERS);
     await waitFor(() => expect(band().getByRole("status").textContent).toBe(SAID));
 

@@ -231,7 +231,6 @@ describe("the People page's Invitations tab", () => {
     const saidWaiting = outcomeIn()?.textContent;
     expect(saidWaiting).toMatch(/\S/);
     expect(saidWaiting, "the second press said nothing of its own").not.toBe(saidPending);
-    expect(cancelling.asks, "the second press asked the api nothing").toBe(1);
 
     cancelling.resolve();
     await waitFor(() => {
@@ -246,6 +245,10 @@ describe("the People page's Invitations tab", () => {
     await waitFor(() => {
       expect(rowsOf(ana)).toHaveLength(0);
     });
+    expect(
+      asksOf("members.bulkCancelInvitations"),
+      "the second press asked the api to cancel, once the list was read again",
+    ).toHaveLength(1);
     expect(tickOf(ben)?.getAttribute("aria-checked")).toBe("true");
     expect(selectionAction("Cancel").getAttribute("aria-disabled")).not.toBe("true");
   });

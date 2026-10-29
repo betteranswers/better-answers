@@ -1,3 +1,4 @@
+import { act } from "@testing-library/react";
 import { TRPCClientError } from "@trpc/client";
 import { vi } from "vitest";
 
@@ -102,4 +103,19 @@ export const withTheApiDown = () => {
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false } });
   return clients;
+};
+
+const SETTLES_WITHIN_MS = 1000;
+
+/** Drains the app's and the stub's timers in virtual time, so a check that nothing happened waits for the app. */
+export const settlingAfter = async (happens: () => void): Promise<void> => {
+  vi.useFakeTimers();
+  try {
+    await act(async () => {
+      happens();
+      await vi.advanceTimersByTimeAsync(SETTLES_WITHIN_MS);
+    });
+  } finally {
+    vi.useRealTimers();
+  }
 };

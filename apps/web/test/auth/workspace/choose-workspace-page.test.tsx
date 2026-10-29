@@ -5,7 +5,7 @@ import { z } from "zod";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace/workspace-words.ts";
 import { HOMES, type Role } from "@/shared/navigation.ts";
 import type { Asked } from "@test/stub-server.ts";
-import { addressOf, type Api } from "@test/stubbed-api.ts";
+import { addressOf, type Api, heldBack, settlingAfter } from "@test/stubbed-api.ts";
 import {
   ADA,
   adaAnAdmin,
@@ -34,11 +34,6 @@ const SIGNED_IN_WITH_NONE_OPEN = {
 };
 
 const NEEDS_A_PICK = aRefusalAnswer("no-active-workspace", "unauthenticated", 401);
-
-const aTurnLater = () =>
-  new Promise<void>((resolve) => {
-    setTimeout(resolve);
-  });
 
 const holding = (workspaces: readonly unknown[]): Api => {
   const api = adaAnAdmin();
@@ -134,11 +129,15 @@ it("skips the picker for a workspace joined after sign-in", async () => {
 it("stops at one refused pick of a sole workspace", async () => {
   const api = holding([NORTHERN_ROW]);
   const picks = picksRefused(api);
+  const workspaces = heldBack(api, "person.workspaces");
   await openOutsideTheShellAt("/choose-workspace", api);
+  await workspaces.asked;
 
-  await waitFor(() => expect(refusal()).toMatch(/\S/));
-  await aTurnLater();
+  await settlingAfter(() => {
+    workspaces.resolve();
+  });
 
+  expect(refusal()).toMatch(/\S/);
   expect(await thePicker()).toBeDefined();
   expect(picks(), "a refused pick was asked again").toBe(1);
 });
@@ -177,13 +176,12 @@ it("separates an unread workspace list from no workspace, offering retry", async
   await openOutsideTheShellAt("/choose-workspace", api);
 
   await waitFor(() => expect(refusal()).toMatch(/\S/));
-  await aTurnLater();
   expect(await thePicker()).toBeDefined();
-  expect(screen.queryByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeNull();
 
   api.set("person.workspaces", () => listed?.());
   fireEvent.click(screen.getByRole("button", { name: PICKER_WORDS.tryAgain }));
 
   expect(await screen.findByRole("button", { name: NORTHERN.name })).toBeDefined();
   expect(screen.getByRole("button", { name: HOLME.name })).toBeDefined();
+  expect(screen.queryByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeNull();
 });

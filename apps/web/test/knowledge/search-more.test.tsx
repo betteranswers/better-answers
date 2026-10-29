@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MATCHES_A_PAGE as A_PAGE } from "@/features/knowledge/knowledge-state.ts";
 import {
-  aMoment,
   aSearchApi,
   answeringFinds,
   type FindAsked,
@@ -16,6 +15,7 @@ import {
   matchRows,
   openedSearch,
   pageOf,
+  palletPassage,
   PALLET_PASSAGES,
   placedForSearch,
   pressed,
@@ -29,6 +29,7 @@ import {
   listsOnly,
   textOfRows,
 } from "@test/knowledge/search-answers.ts";
+import { settlingAfter } from "@test/stubbed-api.ts";
 import { read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -93,6 +94,12 @@ describe("the Knowledge Search page", () => {
     pressed(loadMoreButton());
 
     await waitFor(() => expect(matchRows()).toHaveLength(PALLET_PASSAGES.length - 1));
+    const keptInOrder = PALLET_PASSAGES.map((_, index) => index).filter(
+      (index) => index !== A_PAGE,
+    );
+    expect(textOfRows(), "the repeat did not drop and the first appearance did not stay").toEqual(
+      keptInOrder.map((index): unknown => expect.stringContaining(palletPassage(index))),
+    );
     focusIsOn(rowAt(A_PAGE), "focus did not land on the first match the page added");
   });
 
@@ -107,8 +114,7 @@ describe("the Knowledge Search page", () => {
 
     typed("forklift");
     await listsOnly("Forklift Licences");
-    more.release();
-    await aMoment();
+    await settlingAfter(more.release);
 
     expect(textOfRows()).toEqual([expect.stringContaining("Forklift Licences")]);
     expect(handbookRows()).toHaveLength(0);

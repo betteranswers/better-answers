@@ -342,11 +342,6 @@ export const refocused = (): void => {
   globalThis.dispatchEvent(new Event("visibilitychange"));
 };
 
-export const aMoment = (): Promise<void> =>
-  new Promise((done) => {
-    setTimeout(done, 50);
-  });
-
 const ROOM_BESIDE_FROM_PX = 1280;
 
 const ROOM_BESIDE = "--room-beside";

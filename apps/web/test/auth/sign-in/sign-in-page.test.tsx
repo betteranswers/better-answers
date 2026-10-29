@@ -80,12 +80,6 @@ const openAtTheAddressBar = async (address: string) => {
   return router;
 };
 
-const rowOf = (button: HTMLElement): HTMLElement => {
-  const row = button.parentElement;
-  if (row === null) throw new Error("the code step draws no row of actions");
-  return row;
-};
-
 const inDocumentOrder = (...drawn: readonly HTMLElement[]): boolean =>
   drawn.every(
     (element, at) =>
@@ -94,22 +88,6 @@ const inDocumentOrder = (...drawn: readonly HTMLElement[]): boolean =>
         Node.DOCUMENT_POSITION_FOLLOWING) !==
         0,
   );
-
-it("draws a row of secondary actions in one treatment", async () => {
-  wire({ [SEND]: sent });
-  await openApp("/sign-in");
-  await sendTheFirstCode();
-  await codeField();
-  expect(screen.getByRole("status").textContent, "the page says nothing of the email").toMatch(
-    /\S/,
-  );
-
-  const treatments = within(rowOf(screen.getByRole("button", { name: "Send a New Code" })))
-    .getAllByRole("button")
-    .map((button) => button.dataset["variant"]);
-
-  expect([...new Set(treatments)], "the row mixes its treatments").toEqual(["outline"]);
-});
 
 it("names joining a workspace when sign-in carries an invitation", async () => {
   wire({});

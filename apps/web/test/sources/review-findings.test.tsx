@@ -9,7 +9,6 @@ import {
   anId,
   BANK_ACCOUNT_BOX,
   describedBy,
-  describerOf,
   openSources,
   press,
   reviewOf,
@@ -120,26 +119,29 @@ describe("reviewing a connected source's findings", () => {
   it("tells an Admin what enables the review's three actions", async () => {
     const { row } = await supplierFormsReviewed();
     const review = within(within(row).getByRole("region", { name: "Review of Supplier forms" }));
-    const keep = review.getByRole<HTMLButtonElement>("button", { name: "Keep in Text" });
-    const enabling = describerOf(keep);
-    expect(enabling, "Keep in Text is described by what enables it").not.toBeNull();
-    expect(enabling?.textContent).toMatch(/\S/v);
+    const enabling = describedBy(review.getByRole("button", { name: "Keep in Text" }));
+    expect(enabling, "Keep in Text is described by what enables it").toMatch(/\S/v);
 
-    for (const label of [
+    for (const name of [
       "Keep in Text",
       "Narrow These Documents",
       "Dismiss as Not Special Category",
     ]) {
-      const action = review.getByRole<HTMLButtonElement>("button", { name: label });
+      const action = review.getByRole<HTMLButtonElement>("button", {
+        name,
+        description: enabling,
+      });
       expect(action.disabled).toBe(true);
-      expect(describedBy(action)).toMatch(/\S/v);
-      expect(describerOf(action)).toBe(enabling);
     }
     fireEvent.click(review.getByRole("checkbox", { name: BANK_ACCOUNT_BOX }));
 
-    expect(enabling?.isConnected).toBe(false);
-    expect(keep.disabled).toBe(false);
-    expect(describedBy(keep)).toBe("");
+    expect(
+      review.queryByRole("button", { name: "Keep in Text", description: enabling }),
+      "Keep in Text is still described by what enables it",
+    ).toBeNull();
+    expect(review.getByRole<HTMLButtonElement>("button", { name: "Keep in Text" }).disabled).toBe(
+      false,
+    );
   });
 
   it("shows an Admin a kept group an erasure still withholds", async () => {

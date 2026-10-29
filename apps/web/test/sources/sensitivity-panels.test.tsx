@@ -20,7 +20,7 @@ import {
   connectedSourcesRegion,
 } from "@test/sources/stubbed-sources.ts";
 import { server } from "@test/stub-server.ts";
-import { heldBack } from "@test/stubbed-api.ts";
+import { heldBack, settlingAfter } from "@test/stubbed-api.ts";
 import { aRefusalAnswer, read } from "@test/two-workspaces.ts";
 
 await vi.hoisted(() => import("@test/stub-server.ts"));
@@ -47,11 +47,6 @@ const A_PUBLICATION = "2026-10-07T09:05:00.000Z";
 
 const textsOf = (elements: readonly HTMLElement[]): (string | null)[] =>
   elements.map((each) => each.textContent);
-
-const aMomentPasses = () =>
-  new Promise<void>((resolve) => {
-    setTimeout(resolve, 50);
-  });
 
 const commitIn = (panel: HTMLElement, label: "Narrow" | "Widen") =>
   within(panel).getByRole("button", { name: label });
@@ -179,11 +174,12 @@ describe("publishing, narrowing and widening a connected source", () => {
     const commit = commitIn(panel, "Widen");
     commit.focus();
 
-    fireEvent.keyDown(commit, { key: "Escape" });
+    await settlingAfter(() => {
+      fireEvent.keyDown(commit, { key: "Escape" });
+    });
 
     expect(panelOf("widen", "Staff handbook")).toBeNull();
     expect(document.activeElement, "Escape did not hand focus back to the button").toBe(opener);
-    await aMomentPasses();
     expect(
       server.asks.filter((ask) => ask.procedure === "sources.widen"),
       "Escape asked the api to widen",

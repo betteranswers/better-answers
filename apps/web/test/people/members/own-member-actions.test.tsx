@@ -137,9 +137,16 @@ describe("removing a member from their page", () => {
       describingWhoever(confirm, ADA.displayName),
       "their own removal is confirmed as another member's is",
     ).not.toBe(ofAnother);
+    const visited: string[] = [];
+    router.subscribe("onResolved", ({ toLocation }) => {
+      visited.push(toLocation.pathname);
+    });
     fireEvent.click(confirm);
 
     await leftForNoWorkspace(router);
+    expect(visited, "the person never reached the workspace chooser").toContain(
+      "/choose-workspace",
+    );
   });
 
   it("removing yourself, pressed twice, asks once and still leaves", async () => {

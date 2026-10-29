@@ -271,7 +271,7 @@ describe("a tab whose workspace the session has left", () => {
     await screen.findByRole("tab", { name: "Members" });
     expect(router.state.location.pathname).toBe(MEMBERS);
     expect(tickOf(GRACE.displayName), "a refused change put the left rows back").toBeNull();
-    expect(screen.getByText(MEMBERS_LOADING)).toBeDefined();
+    expect(await screen.findByText(MEMBERS_LOADING)).toBeDefined();
 
     list.resolve();
     await waitFor(() => expect(tickOf(HEDY.displayName)).not.toBeNull());

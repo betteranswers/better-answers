@@ -415,6 +415,20 @@ test("a new code sent from the code step signs in", async ({
       - button "Use a Different Email Address"
       - button "Keyboard Shortcuts"
   `);
+  const row = page.getByRole("button", { name: "Send a New Code" }).locator("..");
+  const treatments = await Promise.all(
+    (await row.getByRole("button").all()).map((button) =>
+      button.evaluate((element) => {
+        const { backgroundColor, borderTopColor, borderTopWidth, color } =
+          getComputedStyle(element);
+        return { backgroundColor, borderTopColor, borderTopWidth, color };
+      }),
+    ),
+  );
+  expect(treatments, "the row draws its three buttons").toHaveLength(3);
+  for (const treatment of treatments) {
+    expect(treatment, "the row mixes its treatments").toEqual(treatments[0]);
+  }
   await passesTheAccessibilityGate();
   await codeField(page).fill(await codeSentTo(request, email));
 
