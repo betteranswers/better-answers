@@ -37,6 +37,7 @@ import {
   insertIncludes,
   insertSectionWriteUps,
   insertWriteUpVersions,
+  leavesAFactUnmet,
   type IncludeRow,
   type SectionWriteUp,
 } from "./write-ups.ts";
@@ -115,10 +116,9 @@ const plannedWriteUps = (
         wordingHeading: null,
         wordingHash: null,
       }));
-    const unmet = rows.facts.some(
-      (fact) =>
-        fact.sectionId === section.id &&
-        includes.filter((include) => include.expectedFactId === fact.id).length < fact.atLeast,
+    const unmet = leavesAFactUnmet(
+      rows.facts.filter((fact) => fact.sectionId === section.id),
+      includes,
     );
     return { id, sectionId: section.id, unmet, includes };
   });

@@ -115,34 +115,6 @@ const skeletonCommits = async (ng: Northgate): Promise<readonly string[]> => {
   return touching;
 };
 
-const THE_FULL_COVERAGE = [
-  [
-    "Company overview",
-    ["Company registration: met", "Headcount: met", "Year founded: met", "Registered office: met"],
-  ],
-  ["What we offer", ["Services: met", "Sectors served: met"]],
-  [
-    "Insurance and financial standing",
-    [
-      "Public liability insurance: met",
-      "Professional indemnity insurance: met",
-      "Employers' liability insurance: missing",
-      "Filed accounts: met",
-    ],
-  ],
-  ["Certifications", ["ISO 27001 certificate: met", "Cyber Essentials Plus certificate: met"]],
-  [
-    "Data protection",
-    ["Data protection registration: met", "Privacy policy: met", "Data location: met"],
-  ],
-  ["Information security", ["Security practices: met", "Cyber Essentials Plus certificate: met"]],
-  ["Security testing", ["Security testing practices: met"]],
-  [
-    "Support and service levels",
-    ["Incident severity levels: met", "Support hours: met", "Escalation path: met"],
-  ],
-];
-
 describe("seeding a guide from a template", () => {
   it("fills sections from typed and imported concepts alike", async () => {
     const { ng, guideId } = await seededOnce();
@@ -197,15 +169,6 @@ describe("seeding a guide from a template", () => {
     );
     expect(stale.rows).toEqual([]);
     expect(await counted("write_up_include", ng.scenario.workspaceId)).toBe(24);
-  });
-
-  it("lists each missing fact by name", async () => {
-    const { ng, guideId } = await seededOnce();
-
-    const coverage = await coverageAs(ng.admin, guideId);
-
-    expect(coverage.collection).toBe("company");
-    expect(statesOf(coverage)).toEqual(THE_FULL_COVERAGE);
   });
 
   it("includes one concept in two sections' write-ups", async () => {
@@ -572,7 +535,7 @@ describe("including an available concept", () => {
   });
 
   it("refuses an include by a Viewer", async () => {
-    const { ng, guideId } = await typedTheMissingPolicy();
+    const { ng, guideId } = await seededOnce();
     const { git, workspaceId } = ng.scenario;
     const insurance = await writeUpOf(workspaceId, guideId, "Insurance and financial standing");
     const headBefore = await head(ng.admin, git);

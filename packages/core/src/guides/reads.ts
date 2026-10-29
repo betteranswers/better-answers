@@ -92,7 +92,7 @@ const coverageOfAction = declareAction({
   refuses: ["role-forbids"],
 });
 
-type CoverageRow = {
+export type CoverageRow = {
   readonly collection: string;
   readonly section_id: string;
   readonly parent_id: string | null;
@@ -168,6 +168,15 @@ const inTreeOrder = (rows: readonly CoverageRow[], parentId: string | null): Sec
   });
 };
 
+export const coverageFrom = (
+  guideId: string,
+  rows: readonly CoverageRow[],
+): Coverage | undefined => {
+  const [first] = rows;
+  if (first === undefined) return undefined;
+  return { guideId, collection: first.collection, sections: inTreeOrder(rows, null) };
+};
+
 export const coverageOf = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -181,11 +190,5 @@ export const coverageOf = async (
     tx.query<CoverageRow>(COVERAGE, [reader.workspaceId, guideId, ...readableParameters(reader)]),
   );
   if (!read.ok) return err(read.error);
-  const [first] = read.value.rows;
-  if (first === undefined) return ok(undefined);
-  return ok({
-    guideId,
-    collection: first.collection,
-    sections: inTreeOrder(read.value.rows, null),
-  });
+  return ok(coverageFrom(guideId, read.value.rows));
 };
