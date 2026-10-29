@@ -1,3 +1,4 @@
+import type { OAuthTokenVerifier } from "@modelcontextprotocol/server";
 import { assert, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -27,10 +28,22 @@ import {
 import { CONCEPT_BODY_MAX, JUDGE_STATES, QUESTION_VERDICTS, ULID } from "@better-answers/schema";
 import { matching } from "@better-answers/schema/testing/matching";
 
-import { MCP_TOKEN_RULE, MCP_UNAUTHENTICATED_IP_RULE } from "../../src/auth/constants.ts";
+import {
+  MCP_SCOPES,
+  MCP_TOKEN_RULE,
+  MCP_UNAUTHENTICATED_IP_RULE,
+} from "../../src/auth/constants.ts";
+import { entriesAt } from "../../src/mcp/entries/index.ts";
+import { createMcpSurface } from "../../src/mcp/surface.ts";
 import { connectAsHost } from "../support/flow.ts";
 import { conceptsSeeding, seedConcepts } from "../support/harness/harness-knowledge.ts";
-import { actingIn, type TestClient } from "../support/harness/harness.ts";
+import {
+  actingIn,
+  capturingLogger,
+  MCP_URL,
+  PUBLIC_URL,
+  type TestClient,
+} from "../support/harness/harness.ts";
 import { calledTool, callMcp, rendered, structured } from "../support/mcp-call.ts";
 import {
   changedWhileItWaitsOn,
@@ -46,6 +59,8 @@ const { clock, stopTheClock } = aStoppableClock();
 const app = appForSuite({ clock });
 
 type Params = Readonly<Record<string, unknown>>;
+
+type Fetching = Pick<TestClient, "fetch">;
 
 const rpcError = z.object({ code: z.number(), message: z.string(), data: z.unknown().optional() });
 const envelope = z.object({
@@ -122,7 +137,7 @@ const withoutEmpty = (headers: Record<string, string>): Record<string, string> =
   Object.fromEntries(Object.entries(headers).filter(([, value]) => value !== ""));
 
 const modern = async (
-  client: TestClient,
+  client: Fetching,
   token: string,
   method: string,
   params: Params = {},
@@ -172,10 +187,10 @@ const result = async <T>(response: Response, shape: z.ZodType<T>): Promise<T> =>
   return shape.parse(body.result);
 };
 
-const listTools = async (client: TestClient, token: string): Promise<Tool[]> =>
+const listTools = async (client: Fetching, token: string): Promise<Tool[]> =>
   (await result(await modern(client, token, "tools/list"), toolsListed)).tools;
 
-const callTool = (client: TestClient, token: string, name: string, args: Params) =>
+const callTool = (client: Fetching, token: string, name: string, args: Params) =>
   modern(client, token, "tools/call", { name, arguments: args });
 
 const firstText = (called: z.infer<typeof toolCalled>): string => called.content[0]?.text ?? "";
@@ -186,6 +201,60 @@ const connect = async (scope = "knowledge:read feedback:write offline_access") =
   const tokens = await connectAsHost(app(), client, workspace.admin, { scope });
   return { workspace, client, token: tokens.accessToken };
 };
+
+const FULL_TOKEN = "full";
+const READ_ONLY_TOKEN = "read-only";
+
+const verifiedAs = (claims: {
+  readonly workspaceId: string;
+  readonly userId: string;
+}): OAuthTokenVerifier => ({
+  verifyAccessToken: async (token) => ({
+    token,
+    clientId: "listing",
+    scopes: token === READ_ONLY_TOKEN ? ["knowledge:read"] : [...MCP_SCOPES],
+    expiresAt: Math.floor(Date.now() / 1000) + 600,
+    extra: { tokenId: `listing-${token}`, claims: { ...claims, issuedAt: new Date() } },
+  }),
+});
+
+const noModelIsCalled = (): never => {
+  throw new Error("a listing called a model");
+};
+
+/** The surface decides a listing from the token's scopes alone, so no person signs in for one. */
+const surfaceInProcess = (): (() => Fetching) => {
+  let fetching: Fetching | undefined;
+
+  beforeAll(async () => {
+    const workspace = await app().provision();
+    const surface = createMcpSurface({
+      door: app().doors.postgres,
+      verifier: verifiedAs({ workspaceId: workspace.workspaceId, userId: workspace.admin.id }),
+      publicUrl: PUBLIC_URL,
+      mcpUrl: MCP_URL,
+      logger: capturingLogger().logger,
+      serverVersion: "0.0.0",
+      clock: app().doors.clock,
+      entries: entriesAt(PUBLIC_URL),
+      credentials: undefined,
+      models: {
+        callModel: noModelIsCalled,
+        decide: noModelIsCalled,
+        decideYesNo: noModelIsCalled,
+        streamModel: noModelIsCalled,
+      },
+    });
+    fetching = { fetch: async (path, init) => surface(new Request(`${PUBLIC_URL}${path}`, init)) };
+  });
+
+  return () => {
+    assert(fetching !== undefined, "the surface is read before beforeAll has built it");
+    return fetching;
+  };
+};
+
+const inProcess = surfaceInProcess();
 
 const pastTheCeiling = async (max: number, send: () => Promise<Response>) => {
   stopTheClock();
@@ -302,9 +371,7 @@ const theErrorAskAnswers = async (client: TestClient, token: string) => {
 
 describe("era-independent", () => {
   it("lists a full token's four entries, in a stable order", async () => {
-    const { client, token } = await connect();
-
-    const lists = await Promise.all([1, 2, 3].map(() => listTools(client, token)));
+    const lists = await Promise.all([1, 2, 3].map(() => listTools(inProcess(), FULL_TOKEN)));
 
     expect(lists[0]?.map((listed) => listed.name)).toEqual([
       "find",
@@ -317,13 +384,11 @@ describe("era-independent", () => {
   });
 
   it("hides give_feedback from a read-only token and refuses its call", async () => {
-    const { client, token } = await connect("knowledge:read offline_access");
-
-    const names = (await listTools(client, token)).map((listed) => listed.name);
+    const names = (await listTools(inProcess(), READ_ONLY_TOKEN)).map((listed) => listed.name);
     expect(names).toEqual(["find", "ask", "open"]);
 
     const refused = await rpc(
-      await callTool(client, token, "give_feedback", {
+      await callTool(inProcess(), READ_ONLY_TOKEN, "give_feedback", {
         recordId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
         verdict: "flag",
         reason: "wrong",
@@ -334,9 +399,7 @@ describe("era-independent", () => {
   });
 
   it("lists give_feedback as naming the record it stores on", async () => {
-    const { client, token } = await connect();
-
-    const entry = (await listTools(client, token)).find(
+    const entry = (await listTools(inProcess(), FULL_TOKEN)).find(
       (listed) => listed.name === "give_feedback",
     );
 
@@ -355,9 +418,7 @@ describe("era-independent", () => {
   });
 
   it("annotates every entry: reads read-only, the one write not", async () => {
-    const { client, token } = await connect();
-
-    const tools = await listTools(client, token);
+    const tools = await listTools(inProcess(), FULL_TOKEN);
 
     for (const listed of tools) expect(listed.annotations).toBeDefined();
     expect(tools.map((entry) => [entry.name, entry.annotations?.readOnlyHint])).toEqual([
@@ -369,9 +430,7 @@ describe("era-independent", () => {
   });
 
   it("takes no workspace, bundle or tenant argument, mirroring no headers", async () => {
-    const { client, token } = await connect();
-
-    for (const entry of await listTools(client, token)) {
+    for (const entry of await listTools(inProcess(), FULL_TOKEN)) {
       const keys = Object.keys({ ...entry.inputSchema.properties });
       for (const key of keys) {
         expect(key.toLowerCase()).not.toMatch(/workspace|bundle|tenant/);
@@ -390,9 +449,7 @@ describe("era-independent", () => {
     ["give_feedback", "verdict", FEEDBACK_VERDICTS],
     ["give_feedback", "flag reason", FEEDBACK_REASONS],
   ])("offers %s every %s core declares", async (name, _set, values) => {
-    const { client, token } = await connect();
-
-    const entry = (await listTools(client, token)).find((listed) => listed.name === name);
+    const entry = (await listTools(inProcess(), FULL_TOKEN)).find((listed) => listed.name === name);
 
     expect(JSON.stringify([entry?.inputSchema, entry?.outputSchema])).toContain(
       `"enum":${JSON.stringify(values)}`,
@@ -400,27 +457,23 @@ describe("era-independent", () => {
   });
 
   it.each(["find", "ask", "open"])("offers %s every trust tier core declares", async (name) => {
-    const { client, token } = await connect();
-
-    const entry = (await listTools(client, token)).find((listed) => listed.name === name);
+    const entry = (await listTools(inProcess(), FULL_TOKEN)).find((listed) => listed.name === name);
 
     expect(tiersOffered(entry?.outputSchema).toSorted()).toEqual(TRUST_TIERS.toSorted());
   });
 
   it("offers open's body links in its output schema", async () => {
-    const { client, token } = await connect();
-
-    const entry = (await listTools(client, token)).find((listed) => listed.name === "open");
+    const entry = (await listTools(inProcess(), FULL_TOKEN)).find(
+      (listed) => listed.name === "open",
+    );
 
     expect(JSON.stringify(entry?.outputSchema)).toContain('"bodyLinks"');
     expect(entry?.description).toContain("`bodyLinks` gives the `iri` to open");
   });
 
   it("describes the two reads in the glossary's words", async () => {
-    const { client, token } = await connect();
-
     const described = new Map(
-      (await listTools(client, token)).map((entry) => [entry.name, entry.description]),
+      (await listTools(inProcess(), FULL_TOKEN)).map((entry) => [entry.name, entry.description]),
     );
 
     expect(described.get("find")).toContain("Not company knowledge");
@@ -713,9 +766,7 @@ describe("ask, on the own-transaction road", () => {
   });
 
   it("is listed read-only, its description naming the record", async () => {
-    const { client, token } = await connect();
-
-    const ask = (await listTools(client, token)).find((listed) => listed.name === "ask");
+    const ask = (await listTools(inProcess(), FULL_TOKEN)).find((listed) => listed.name === "ask");
 
     expect(ask?.annotations?.readOnlyHint).toBe(true);
     expect(ask?.description).toContain(
@@ -730,9 +781,7 @@ describe("ask, on the own-transaction road", () => {
   });
 
   it("describes each judge state without promising a retry", async () => {
-    const { client, token } = await connect();
-
-    const ask = (await listTools(client, token)).find((listed) => listed.name === "ask");
+    const ask = (await listTools(inProcess(), FULL_TOKEN)).find((listed) => listed.name === "ask");
 
     expect(ask?.description).toContain(
       "`judging-failed` when it could not judge (its candidates are then under `related`)",

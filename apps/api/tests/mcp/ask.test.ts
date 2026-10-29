@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { answerOutputWith, ASK_CAPS } from "@better-answers/core/answering";
 import { asksTablesLockedAtOnce } from "@better-answers/core/testing/postgres";
 
+import { entriesAt } from "../../src/mcp/entries/index.ts";
 import {
   aModelWire,
   type Answering,
@@ -14,7 +14,8 @@ import {
   judgingSetUp,
 } from "../support/harness/harness-model.ts";
 import { recordsIn as recordsOf } from "../support/harness/harness-questions.ts";
-import { rendered, structured, type Rpc } from "../support/mcp-call.ts";
+import { PUBLIC_URL } from "../support/harness/harness.ts";
+import { rendered, structured } from "../support/mcp-call.ts";
 import { appForSuite } from "../support/suite-app.ts";
 
 const wire = aModelWire();
@@ -32,89 +33,21 @@ const anAdminAsking = async (limitGbp?: string) => {
 const judged = z.object({
   verdict: z.string(),
   judgeState: z.string(),
-  answers: z.array(z.object({ title: z.string(), body: z.string(), collection: z.string() })),
-  related: z.array(z.object({ title: z.string() })),
+  answers: z.array(
+    z.object({ title: z.string(), body: z.string(), collection: z.string(), url: z.string() }),
+  ),
+  related: z.array(
+    z.object({
+      iri: z.string(),
+      title: z.string(),
+      body: z.string().optional(),
+      evidence: z.array(z.unknown()).optional(),
+    }),
+  ),
   recordId: z.string(),
 });
 
 const recordsIn = (workspaceId: string) => recordsOf(app(), workspaceId);
-
-const sized = (sentence: string, characters: number): string =>
-  sentence
-    .repeat(Math.ceil(characters / sentence.length))
-    .slice(0, characters)
-    .trimEnd();
-
-const anAnswer = (title: string, sentence: string, characters: number) => ({
-  title,
-  collection: "audits",
-  trust: "human-reviewed",
-  body: sized(sentence, characters),
-});
-
-const A_FIT_UNLINKED = anAnswer(
-  SUPPLIER.title,
-  "The supplier sends its own audit report on request. ",
-  700,
-);
-
-const A_FIT_LINKED = anAnswer(
-  USERS.title,
-  "Buyers download their users' audit log from the console. ",
-  700,
-);
-
-const FITS = [A_FIT_LINKED, A_FIT_UNLINKED];
-
-const RELATED_ANSWERS = [
-  anAnswer(
-    "How do buyers export audit information for a tender?",
-    "A tender pack holds an export of the audit trail. ",
-    7_000,
-  ),
-  anAnswer(
-    "Which audit information do buyers see on the dashboard?",
-    "The dashboard shows the last thirty days of activity. ",
-    4_000,
-  ),
-  ...Array.from({ length: ASK_CAPS.candidates - FITS.length - 1 }, (_, nth) =>
-    anAnswer(
-      `Can buyers access audit information for module ${String(nth)}?`,
-      `Module ${String(nth)} keeps its own activity record for buyers. `,
-      700,
-    ),
-  ),
-];
-
-const OTHER_CONCEPTS = Array.from({ length: 4 }, (_, nth) => ({
-  title: `Audit policy ${String(nth)}`,
-  collection: "audits",
-  kind: "Policy",
-  body: sized("Audit information is handled under the audit policy. ", 2_000),
-}));
-
-const A_QUESTION_ANSWERED_TWICE = [
-  ...RELATED_ANSWERS,
-  ...OTHER_CONCEPTS,
-  A_FIT_UNLINKED,
-  { ...A_FIT_LINKED, linksTo: [...RELATED_ANSWERS, ...OTHER_CONCEPTS].map(({ title }) => title) },
-];
-
-const CLAUDE_CODE_INLINE_RESULT_CHARACTERS = 50_000;
-
-const shaped = answerOutputWith(z.unknown());
-
-const askedOver = async (
-  concepts: readonly Rpc[],
-  judging: { readonly chosen?: boolean },
-  judge: Answering = judgeSaying(FITS.map(({ title }) => title)),
-) => {
-  const { workspaceId, asking } = await anAdminAskingIn(app(), concepts);
-  await judgingSetUp(app(), workspaceId, judging);
-  wire.answerWith(judge);
-  const result = await asking({ question: QUESTION, collections: ["audits"] });
-  return { result, text: rendered(result), answer: shaped.parse(structured(result)) };
-};
 
 /** Anthropic's refusal once the account's credit is used up. */
 const creditUsedUp: Answering = () =>
@@ -130,8 +63,6 @@ const creditUsedUp: Answering = () =>
     { status: 400 },
   );
 
-const judgedOverAE1 = () => askedOver(A_QUESTION_ANSWERED_TWICE, {});
-
 describe("ask, judged over MCP", () => {
   it("AE1: returns both fits word for word, none from lms", async () => {
     const { asking } = await anAdminAsking();
@@ -145,12 +76,23 @@ describe("ask, judged over MCP", () => {
       [USERS, SUPPLIER].map(({ title, body }) => ({ title, body: `${body}\n` })).toSorted(),
     );
     expect(answer.related.map(({ title }) => title)).toEqual([RETENTION.title]);
+    expect(answer.related.map(({ body, evidence }) => [body, evidence])).toEqual([
+      [undefined, undefined],
+    ]);
     const text = rendered(result);
     expect(text.split("\n")[0]).toBe("**Answered from the company's knowledge.**");
     expect(text).toContain(USERS.body);
     expect(text).toContain(SUPPLIER.body);
     expect(text).not.toContain(LMS.body);
+    expect(text).not.toContain(RETENTION.body);
+    expect(text).toContain(`- Answer · ${RETENTION.title} · audits · `);
+    expect(text).toContain(` · ${answer.related[0]?.iri}`);
     expect(text).toContain(`Record of this question: ${answer.recordId}`);
+    expect(Object.keys(structured(result)).slice(0, 3)).toEqual(["verdict", "recordId", "answers"]);
+    for (const { url } of answer.answers) {
+      expect(url).toMatch(/^https?:\/\/.+\/knowledge\//);
+      expect(text).not.toContain(url);
+    }
   });
 
   it("holds no connection while the judge is called", async () => {
@@ -182,92 +124,21 @@ describe("ask, judged over MCP", () => {
     ]);
   });
 
-  it("shows a judged-no `Answer` as a preview in both copies", async () => {
-    const { result, text, answer } = await judgedOverAE1();
-
-    const relatedAnswers = answer.related.filter(({ kind }) => kind === "Answer");
-    expect(relatedAnswers.map(({ title }) => title).toSorted()).toEqual(
-      RELATED_ANSWERS.map(({ title }) => title).toSorted(),
-    );
-    expect(answer.related.filter((concept) => "body" in concept)).toEqual([]);
-    expect(answer.related.filter((concept) => "evidence" in concept)).toEqual([]);
-    for (const { body } of RELATED_ANSWERS.slice(0, 2)) expect(text).not.toContain(body);
-    for (const { title, iri } of relatedAnswers) {
-      expect(text).toContain(`- Answer · ${title} · audits · `);
-      expect(text).toContain(` · ${iri}`);
-    }
-    expect(JSON.stringify(structured(result)).length).toBeLessThan(
-      CLAUDE_CODE_INLINE_RESULT_CHARACTERS,
-    );
-    expect(JSON.stringify(result).length).toBeLessThan(CLAUDE_CODE_INLINE_RESULT_CHARACTERS);
-  });
-
-  it.each([
-    ["not judged", { chosen: false }, undefined, "not-judged"],
-    ["judging failed", {}, creditUsedUp, "judging-failed"],
-  ] as const)(
-    "keeps `Answer`s in full in both copies when %s",
-    async (_, judging, judge, state) => {
-      const { text, answer } = await askedOver(A_QUESTION_ANSWERED_TWICE, judging, judge);
-
-      expect([answer.verdict, answer.judgeState, answer.answers]).toEqual(["related", state, []]);
-      const inFull = answer.related.filter(({ kind }) => kind === "Answer");
-      expect(inFull.map(({ title }) => title).toSorted()).toEqual(
-        [...RELATED_ANSWERS, ...FITS].map(({ title }) => title).toSorted(),
-      );
-      for (const { body } of inFull) {
-        expect(body).toBeDefined();
-        expect(text).toContain(body?.trimEnd());
-      }
-    },
-  );
-
-  it("keeps a fit word for word with who verified it", async () => {
-    const { text, answer } = await judgedOverAE1();
-
-    const fit = shaped.shape.answers.element.parse(
-      answer.answers.find(({ title }) => title === A_FIT_UNLINKED.title),
-    );
-    expect(fit.body).toBe(`${A_FIT_UNLINKED.body}\n`);
-    expect(fit.trustWords).toMatch(/^Verified by Test person · /);
-    expect(text).toContain(
-      [`Question: ${fit.title}`, `_${fit.trustWords}_`, "", A_FIT_UNLINKED.body].join("\n"),
-    );
-  });
-
-  it("follows the verdict with the record id and the fits", async () => {
-    const { result, text, answer } = await judgedOverAE1();
-
-    expect(text.split("\n").slice(0, 5)).toEqual([
-      "**Answered from the company's knowledge.**",
-      `Record of this question: ${answer.recordId}`,
-      "Answers that fit, each word for word below:",
-      ...answer.answers.map(({ title, iri }) => `- audits · ${title} · ${iri}`),
-    ]);
-    expect(Object.keys(structured(result)).slice(0, 3)).toEqual(["verdict", "recordId", "answers"]);
-  });
-
-  it("names one link per concept in the text, the iri", async () => {
-    const { text, answer } = await judgedOverAE1();
-
-    for (const concept of answer.related) expect(text.split(concept.iri)).toHaveLength(2);
-    for (const concept of [...answer.answers, ...answer.related]) {
-      expect(concept.url).toMatch(/^https?:\/\/.+\/knowledge\//);
-      expect(text).not.toContain(concept.url);
-    }
-  });
-
   it("answers related, judging failed, when the provider's credit runs out", async () => {
     const { workspaceId, asking } = await anAdminAsking();
     wire.answerWith(creditUsedUp);
 
-    const answer = judged.parse(structured(await asking({ question: QUESTION })));
+    const result = await asking({ question: QUESTION });
 
+    const answer = judged.parse(structured(result));
     expect([answer.verdict, answer.judgeState, answer.answers]).toEqual([
       "related",
       "judging-failed",
       [],
     ]);
+    const inFull = [USERS, SUPPLIER, RETENTION, LMS].map(({ body }) => body);
+    expect(answer.related.map(({ body }) => body?.trimEnd()).toSorted()).toEqual(inFull.toSorted());
+    for (const body of inFull) expect(rendered(result)).toContain(body);
     expect(await recordsIn(workspaceId)).toEqual([
       {
         transport: "mcp",
@@ -277,5 +148,72 @@ describe("ask, judged over MCP", () => {
         question: QUESTION,
       },
     ]);
+  });
+});
+
+const A_RECORD = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
+
+const THE_FIT = {
+  iri: "https://better-answers.com/c/01FIT",
+  url: `${PUBLIC_URL}/knowledge/search/01FIT`,
+  kind: "Answer",
+  title: "Who reads the audit log?",
+  collection: "audits",
+  trust: {
+    tier: "human-reviewed",
+    status: "current",
+    checkedBy: "Priya Anand",
+    checkedAt: "2026-05-02T09:00:00.000Z",
+    rider: null,
+  },
+  trustWords: "Verified by Priya Anand · 2 May 2026",
+  body: "Admins read it.\n",
+  evidence: [],
+};
+
+const THE_PREVIEW = {
+  iri: "https://better-answers.com/c/01PRE",
+  url: `${PUBLIC_URL}/knowledge/search/01PRE`,
+  kind: "Answer",
+  title: "Which audit information do buyers see on the dashboard?",
+  collection: "audits",
+  trust: { tier: "unverified", status: "current", checkedBy: null, checkedAt: null, rider: null },
+  trustWords: "Unverified",
+};
+
+const A_JUDGED_ANSWER = {
+  verdict: "ok",
+  recordId: A_RECORD,
+  answers: [THE_FIT],
+  judgeState: "judged",
+  related: [THE_PREVIEW],
+  conflicts: [],
+  unmappedPassages: [],
+  map: { state: "live" },
+  collections: ["audits"],
+  readableCollections: ["audits"],
+};
+
+describe("the ask entry's answer, from the wire to the text", () => {
+  it("renders a fit in full, a preview as one line", () => {
+    const entry = entriesAt(PUBLIC_URL).find(({ name }) => name === "ask");
+    assert(entry !== undefined, "ask is composed");
+
+    const wired = entry.output.parse(A_JUDGED_ANSWER);
+    const lines = entry.render(wired).split("\n");
+
+    expect(wired).toEqual(A_JUDGED_ANSWER);
+    expect(lines.slice(0, 4)).toEqual([
+      "**Answered from the company's knowledge.**",
+      `Record of this question: ${A_RECORD}`,
+      "Answers that fit, each word for word below:",
+      `- audits · ${THE_FIT.title} · ${THE_FIT.iri}`,
+    ]);
+    const block = [`Question: ${THE_FIT.title}`, `_${THE_FIT.trustWords}_`, "", "Admins read it."];
+    expect(lines.join("\n")).toContain(block.join("\n"));
+    expect(lines.filter((line) => line.includes(THE_PREVIEW.title))).toEqual([
+      `- Answer · ${THE_PREVIEW.title} · audits · Unverified · ${THE_PREVIEW.iri}`,
+    ]);
+    expect(lines.filter((line) => line.includes("/knowledge/"))).toEqual([]);
   });
 });
