@@ -685,7 +685,7 @@ Changed 28/10/2026. Lane 8 asked for exactly one spawn per file, but a `--fix` c
 - [ ] Base and verdict are current under the execution playbook and the patch-id rule in `playbooks/shipping.md`.
 - [ ] The coordinator lands it with `gh pr merge <n> --squash --match-head-commit <sha>`.
 
-## Extract pure decide functions from erasure, concepts, guides and import (BA-275)
+## Extract pure decide functions from concepts and guides, test erasure's in-process, and inject import's analyse step (BA-275)
 
 **Depends on.** BA-261, BA-269, BA-270 and BA-288.
 
@@ -1091,8 +1091,8 @@ The triage's named duplicates include people's "refuses demoting both Admins" ag
 
 **Seams.** Every seam is a pure function or an injected seam that exists already. No store door becomes a port.
 
-- Pure decide functions per slice, over rows already read. Today's examples are `kernel/admission.ts`, `concepts/trust.ts`, `erasure/identifiers.ts`, `concepts/file.ts` and `members/sets.ts`. BA-275 adds the merge key, guide coverage and marking, and import's analyse step. BA-274 adds `parseOpsArgs`.
-- The injected seams that exist today. `Clock`, `fetchModel` (ADR 0049), `sendEmail`, the Better Auth seam (ADR 0009) and `Doors`. BA-276 adds a clock to the worker loop.
+- Pure decide functions per slice, over rows already read. Today's examples are `kernel/admission.ts`, `concepts/trust.ts`, `erasure/identifiers.ts`, `concepts/file.ts` and `members/sets.ts`. BA-275 adds the merge key, guide coverage and marking. BA-274 adds `parseOpsArgs`.
+- The injected seams that exist today. `Clock`, `fetchModel` (ADR 0049), `sendEmail`, the Better Auth seam (ADR 0009) and `Doors`. BA-275 adds import's analyse step. BA-276 adds a clock to the worker loop.
 - The web's stubbed api, which BA-277 lets hold a request.
 - A rule's finding functions, which BA-273 calls directly.
 
