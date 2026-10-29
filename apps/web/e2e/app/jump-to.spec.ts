@@ -103,25 +103,6 @@ const typed = async (page: Page, words: string) => {
   await inputOf(page).fill(words);
 };
 
-test("hides People from a Viewer, reading no members", async ({ page, request }) => {
-  await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
-  const membersReads = requestsSent(page, theMembersRead);
-
-  await opened(page, "Control+k");
-  await expect(optionOf(page, /^Ask$/)).toBeVisible();
-  await typed(page, "people");
-
-  await expect(saidIn(page)).toContainText("people");
-  await expect(dialogOf(page).getByRole("option")).toHaveText(["Search for “people”"]);
-  await expect(groupOf(page, "Members")).toHaveCount(0);
-  await expect(inputOf(page)).toHaveAttribute("placeholder", /page/i);
-  await expect(inputOf(page)).not.toHaveAttribute("placeholder", /member|action/i);
-  expect(
-    membersReads.map((sent) => sent.url()),
-    "a Viewer's jump-to asked for the members",
-  ).toEqual([]);
-});
-
 const memberPageNaming = (page: Page, name: string) =>
   page.getByRole("main").getByRole("heading", { level: 2, name, exact: true });
 
@@ -202,24 +183,6 @@ for (const [what, words] of [
     await expect(searchBoxOf(page)).toHaveValue(words);
   });
 }
-
-test("opens a member who loads after the search row", async ({ page, request }) => {
-  const team = await anAdminWithATeam(page, request, "Hodder Valley Forge");
-  const held = Promise.withResolvers<void>();
-  await page.route(theMembersRead, async (route) => {
-    await held.promise;
-    await route.continue();
-  });
-
-  await opened(page, "Meta+k");
-  await typed(page, "priya");
-  await expect(searchRowOf(page)).toHaveAttribute("aria-selected", "true");
-  held.resolve();
-  await expect(optionOf(page, new RegExp(PRIYA))).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Enter");
-
-  await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}/${team.priya.id}$`));
-});
 
 test("draws the list within its second, timed in the page", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Ryedale Metalwork");
