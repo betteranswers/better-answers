@@ -3,12 +3,25 @@ import path from "node:path";
 
 import type { ESTree } from "@oxlint/plugins";
 
-export const ROOTS_OF: ReadonlyMap<string, string> = new Map([
-  ["apps/api", "apps/api/tests/support/roots/roots.ts"],
-  ["apps/web", "apps/web/test/support/roots.ts"],
-  ["packages/core", "packages/core/test/support/roots/roots.ts"],
-  ["packages/devtools", "@better-answers/devtools/paths"],
-  ["packages/schema", "packages/schema/test/support/roots/roots.ts"],
+export type RootsHelper = {
+  readonly file: string;
+  readonly exports: readonly string[];
+};
+
+const ROOT_AND_WORKSPACE = ["repositoryRoot", "workspaceRoot"] as const;
+
+export const ROOTS_OF: ReadonlyMap<string, RootsHelper> = new Map([
+  ["apps/api", { file: "apps/api/tests/support/roots/roots.ts", exports: ROOT_AND_WORKSPACE }],
+  ["apps/web", { file: "apps/web/test/support/roots.ts", exports: ROOT_AND_WORKSPACE }],
+  [
+    "packages/core",
+    { file: "packages/core/test/support/roots/roots.ts", exports: ROOT_AND_WORKSPACE },
+  ],
+  ["packages/devtools", { file: "packages/devtools/src/paths.ts", exports: ["repositoryRoot"] }],
+  [
+    "packages/schema",
+    { file: "packages/schema/test/support/roots/roots.ts", exports: ROOT_AND_WORKSPACE },
+  ],
 ]);
 
 export type Placement = {

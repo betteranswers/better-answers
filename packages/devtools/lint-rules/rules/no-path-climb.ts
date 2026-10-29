@@ -3,8 +3,6 @@ import type { ESTree } from "@oxlint/plugins";
 
 import { climbWritten, placementOfFile, reachesRoot, ROOTS_OF } from "../shared/path-climb.ts";
 
-const NO_HELPER = "the workspace's roots helper, which it does not have yet";
-
 export const noPathClimbRule = defineRule({
   meta: {
     type: "problem",
@@ -14,7 +12,9 @@ export const noPathClimbRule = defineRule({
     },
     messages: {
       climbs:
-        "`{{written}}` climbs to the root of {{workspace}} or out of it, so the path breaks when this file moves. Import `repositoryRoot` or `workspaceRoot` from {{helper}} and join the path from there.",
+        "`{{written}}` climbs to the root of `{{workspace}}` or out of it, so the path breaks when this file moves. Import {{exports}} from `{{file}}` and join the path from there.",
+      climbsWithoutHelper:
+        "`{{written}}` climbs to the root of `{{workspace}}` or out of it, so the path breaks when this file moves. `{{workspace}}` has no roots helper yet, so add one beside its tests and join the path from there.",
     },
   },
   createOnce(context) {
@@ -24,15 +24,13 @@ export const noPathClimbRule = defineRule({
       const placed = placementOfFile(context.filename);
       if (placed === null || !reachesRoot(placed.depth, written)) return;
       const helper = ROOTS_OF.get(placed.workspace);
-      context.report({
-        node,
-        messageId: "climbs",
-        data: {
-          written,
-          workspace: `\`${placed.workspace}\``,
-          helper: helper === undefined ? NO_HELPER : `\`${helper}\``,
-        },
-      });
+      const data = { written, workspace: placed.workspace };
+      if (helper === undefined) {
+        context.report({ node, messageId: "climbsWithoutHelper", data });
+        return;
+      }
+      const exports = helper.exports.map((name) => `\`${name}\``).join(" or ");
+      context.report({ node, messageId: "climbs", data: { ...data, exports, file: helper.file } });
     };
     return { NewExpression: check, CallExpression: check };
   },

@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -42,8 +42,9 @@ describe("the no-path-climb rule", () => {
     const output = lint.output(reading(SEEDED, CLIMB));
 
     expect(output).toContain("better-answers(no-path-climb)");
-    expect(output).toContain("`../../../../deploy/x.sh` climbs to the root of `apps/api`");
-    expect(output).toContain("`apps/api/tests/support/roots/roots.ts`");
+    expect(output).toContain(
+      "`../../../../deploy/x.sh` climbs to the root of `apps/api` or out of it, so the path breaks when this file moves. Import `repositoryRoot` or `workspaceRoot` from `apps/api/tests/support/roots/roots.ts` and join the path from there.",
+    );
   });
 
   it.each([
@@ -85,14 +86,18 @@ describe("the no-path-climb rule", () => {
       [file]: 'export const at = path.join(import.meta.dirname, "../../..");\n',
     };
 
-    expect(lint.output(tree)).toContain("`@better-answers/devtools/paths`");
+    expect(lint.output(tree)).toContain(
+      "`../../..` climbs to the root of `packages/devtools` or out of it, so the path breaks when this file moves. Import `repositoryRoot` from `packages/devtools/src/paths.ts` and join the path from there.",
+    );
   });
 
   it("says a workspace without a helper needs one", () => {
     const file = "packages/design-system/test/probe.test.ts";
     const code = 'export const at = path.join(import.meta.dirname, "../..");';
 
-    expect(lint.output(reading(file, code))).toContain("which it does not have yet");
+    expect(lint.output(reading(file, code))).toContain(
+      "`../..` climbs to the root of `packages/design-system` or out of it, so the path breaks when this file moves. `packages/design-system` has no roots helper yet, so add one beside its tests and join the path from there.",
+    );
   });
 });
 
@@ -150,9 +155,15 @@ describe("the no-path-climb rule in the real config", () => {
   });
 
   it("names only helper files the tree holds", () => {
-    const files = [...ROOTS_OF.values()].filter((helper) => !helper.startsWith("@"));
+    const helpers = [...ROOTS_OF.values()];
+    const missing = helpers.flatMap(({ file, exports }) => {
+      const source = readFileSync(path.join(repositoryRoot, file), "utf8");
+      return exports
+        .filter((name) => !new RegExp(`export[^;]*\\b${name}\\b`, "u").test(source))
+        .map((name) => `${file} lacks ${name}`);
+    });
 
-    expect(files.filter((helper) => !existsSync(path.join(repositoryRoot, helper)))).toEqual([]);
-    expect(files).toHaveLength(4);
+    expect(missing).toEqual([]);
+    expect(helpers).toHaveLength(5);
   });
 });
