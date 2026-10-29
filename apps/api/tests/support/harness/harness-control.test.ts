@@ -202,6 +202,7 @@ describe("a seed the browser suite's harness cannot write", () => {
         ],
       },
     });
+    expect(await heldIn("connected_source", workspaceId)).toBe(0);
   });
 
   it("answers 400 naming the field the store's own schema refuses", async () => {

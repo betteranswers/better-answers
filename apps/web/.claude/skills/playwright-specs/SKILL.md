@@ -202,7 +202,8 @@ audited nothing is refused by name, so an absence is a failure rather than a sil
 
 ## Running it
 
-One project, `chromium`, fully parallel. The api serves the SPA's build output, so a build comes
+Two projects, fully parallel. `chromium` runs every spec but one, and `gate` runs
+`accessibility-gate.spec.ts` alone. The api serves the SPA's build output, so a build comes
 first or the browser reaches the last build's pages.
 
 ```bash
@@ -218,6 +219,9 @@ pnpm --filter @better-answers/web exec playwright test e2e/model-choices/models-
 
 # what would run, starting no server
 pnpm --filter @better-answers/web exec playwright test --list
+
+# the gate's own spec alone: the build is served by vite preview, so no api or Postgres starts
+E2E_GATE_ALONE=1 pnpm --filter @better-answers/web run e2e
 ```
 
 This workspace's `check` runs types, the vitest suite and then the whole browser suite, so a
@@ -244,8 +248,9 @@ The suite started from Onyx's Playwright skill and leaves these of its practices
   what the browser sees is what a person would see.
 - **A worker-user pool.** The two client-address fixtures keep parallel workers apart, and
   people are minted per spec.
-- **A second, serial project for slow specs.** There is one project, and nothing yet needs a lane
-  of its own.
+- **A second, serial project for slow specs.** `gate` is the one project besides `chromium`. It
+  holds the accessibility gate's spec, shares the api's server in a normal run, and runs alone
+  without the api under `E2E_GATE_ALONE=1`. Nothing yet needs a lane of its own for slow specs.
 - **The Page Object Model.** A page is located by role and accessible name where it is used, so
   the spec says the words a person would hear rather than a name only the suite knows.
 - **An import alias for the suite.** A spec sits one folder below the suite's modules and imports

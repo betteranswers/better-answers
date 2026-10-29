@@ -41,3 +41,7 @@ the gate firing where it should. An `Expected to fail, but passed` there means t
 refuses that thing. A new case prints exactly that on the gate as it was before the change it
 proves. One that already prints a ✘ there fails for another reason, as an undersized field fails
 axe's `target-size`.
+
+That spec runs in the `gate` project, which needs only Chromium and the built pages. `E2E_GATE_ALONE=1`
+runs it alone against `vite preview`, so a change to the gate's rules is tried with no api and no
+Postgres.

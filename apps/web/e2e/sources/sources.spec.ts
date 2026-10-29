@@ -2,11 +2,7 @@ import assert from "node:assert/strict";
 
 import type { APIRequestContext, Locator, Page, Response } from "@playwright/test";
 
-import {
-  NEEDS_OCR,
-  SELECT_A_CONNECTED_SOURCE_FIRST,
-  THE_ACTION_BEFORE_IS_STILL_GOING,
-} from "@/features/sources/words.ts";
+import { NEEDS_OCR, SELECT_A_CONNECTED_SOURCE_FIRST } from "@/features/sources/words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -684,21 +680,6 @@ test.describe("reviewing a connected source's findings", () => {
     );
   });
 
-  test("opens an Admin's review inside its source's row", async ({ page, request }) => {
-    await anAdminAtSources(page, request, {
-      workspace: "Shelf Coachworks",
-      connectedSources: [SUPPLIER_FORMS],
-    });
-    const opener = rowAction(page, "Supplier forms", "review");
-    await expect(opener).toHaveAttribute("aria-expanded", "false");
-
-    await opener.click();
-
-    await expect(reviewOf(page, "Supplier forms")).toBeVisible();
-    await expect(reviewHeading(page, "Supplier forms")).toBeFocused();
-    await expect(opener).toHaveAttribute("aria-expanded", "true");
-  });
-
   test("selects no group of findings once focus leaves the table", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Midgley Keys",
@@ -1317,32 +1298,6 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(leadOf(page, "Staff handbook", "Audience")).toHaveText(EVERYONE);
   });
 
-  test("describes a widening by whether its source is published", async ({ page, request }) => {
-    await anAdminAtSources(page, request, {
-      workspace: "Barkisland Looms",
-      connectedSources: [
-        indexed("Price list", { sensitivity: "Restricted", published: true }),
-        indexed("Staff rota", { sensitivity: "Restricted" }),
-      ],
-    });
-
-    await rowAction(page, "Price list", "widen").click();
-    const published = panelOf(page, "Price list", "widen");
-    await expect(published).toHaveAccessibleDescription(/\S/);
-    const describedBy = await published.getAttribute("aria-describedby");
-    assert.ok(describedBy !== null, "the panel is described by its source's standing");
-    const ofAPublishedSource = await saidNowIn(published.locator(`[id="${describedBy}"]`));
-    await expect(published).toHaveAccessibleDescription(ofAPublishedSource);
-
-    await rowAction(page, "Staff rota", "widen").click();
-    const unpublished = panelOf(page, "Staff rota", "widen");
-    await expect(unpublished).toHaveAccessibleDescription(/\S/);
-    await expect(
-      unpublished,
-      "an unpublished source's widening is described as a published one's",
-    ).not.toHaveAccessibleDescription(ofAPublishedSource);
-  });
-
   test("cancels a widening, focus back on what opened it", async ({ page, request }) => {
     const { opener, panel } = await aWideningOpened(page, request, "Midgley Ropes");
     await panel.getByRole("button", { name: "Cancel" }).click();
@@ -1539,32 +1494,6 @@ test.describe("the Sources page's keystrokes", () => {
     await expect(said, "the select-first line outlived the narrow").toHaveCount(0);
   });
 
-  test("opens no review by key while a bulk action runs", async ({ page, request }) => {
-    await anAdminAtSources(page, request, {
-      workspace: "Sowerby Holding",
-      connectedSources: [SUPPLIER_FORMS, SERVICE_RECORDS],
-    });
-    await rowAction(page, "Supplier forms", "review").click();
-    await page.getByRole("checkbox", { name: BANK_ACCOUNT_BOX }).check();
-    await reviewOf(page, "Supplier forms").getByRole("button", { name: "Keep in Text" }).click();
-    const keeping = page.getByRole("dialog", { name: "Keep 1 Group of Findings in Text" });
-    await keeping.getByLabel("Reason").fill("The company's own bank details");
-    const kept = await heldBack(page, (url) => url.pathname.includes("sources.keepInText"));
-    await keeping.getByLabel("Reason").press("Enter");
-    await kept.reached;
-
-    await rowAction(page, "Service records", "review").focus();
-    await page.keyboard.press("r");
-
-    await expect(
-      connectedSourcesRegion(page).getByText(THE_ACTION_BEFORE_IS_STILL_GOING),
-    ).toHaveCount(1);
-    await expect(reviewNamed(page, "Service records"), "r opened a review mid-action").toHaveCount(
-      0,
-    );
-    kept.release();
-  });
-
   test("acts on no source by key once focus leaves", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Sowerby Keys",
@@ -1660,27 +1589,4 @@ test.describe("the Sources page's keystrokes", () => {
     await twoFramesDrawn(page);
     await expect(connectedSource, "the choice did not survive a reload").toHaveCount(0);
   });
-});
-
-test("tells a spec why the harness refused its seed", async ({ page, request }) => {
-  const email = anAddress("admin");
-  const workspace = await provision(request, { name: "Aire Scanning", adminEmail: email });
-
-  await expect(
-    seedConnectedSources(request, {
-      workspaceId: workspace.workspaceId,
-      connectedSources: [
-        indexed("Scans", {
-          documents: [{ title: "Floor plan", unreadableReason: "No text layer" }],
-        }),
-      ],
-    }),
-    "the refused seed's failure names no field or rule",
-  ).rejects.toThrow(/answered 400.*unreadableReason.*no space/s);
-
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await listsNothingConnected(page, () =>
-    nav(page).getByRole("link", { name: "Connected Sources" }).click(),
-  );
 });

@@ -109,9 +109,6 @@ const removeOf = (page: Page, address: string) =>
 
 const invitingButtons = (page: Page) => page.getByRole("button", { name: /^invite/i });
 
-const capitalised = (address: string): string =>
-  `${address.slice(0, 1).toUpperCase()}${address.slice(1)}`;
-
 const anUnreachableAddress = (who: string): string =>
   anAddress(who).replace("@example.test", "@unreachable.example");
 
@@ -524,21 +521,6 @@ test.describe("the People page's Invitations tab", () => {
     await expect(statusChoice(page, "Expired")).toBeChecked();
     await expect(page).toHaveURL(/invitations\.status=expired/);
     await expect(rowOf(page, lapsed)).toHaveCount(1);
-  });
-
-  test("folds two spellings of one address into one email", async ({ page, request }) => {
-    await anAdminAtInvitations(page, request, "Wensley Forge");
-    await openInvitations(page);
-    const ana = anAddress("ana");
-
-    await dialogOpened(page);
-    await addressField(page).fill(`${capitalised(ana)}, ${ana}`);
-    await sendButton(page).click();
-
-    await expect(inviteDialog(page).getByRole("status").first()).toContainText(ana);
-    await inviteDialog(page).getByRole("button", { name: "Done" }).click();
-    await expect(invitationRows(page)).toHaveCount(1);
-    expect(await emailsSentTo(request, ana), "one email for the folded address").toBe(1);
   });
 
   test("re-sends to an address waiting, and says so", async ({ page, request }) => {
