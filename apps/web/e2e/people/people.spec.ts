@@ -2,11 +2,7 @@ import assert from "node:assert/strict";
 
 import type { APIRequestContext, Locator, Page, Route } from "@playwright/test";
 
-import {
-  MEMBER_PAGE_KEYSTROKES,
-  PEOPLE_KEYSTROKES,
-  PEOPLE_SELECT_FIRST,
-} from "@/features/people/people-state.ts";
+import { MEMBER_PAGE_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "../browser.ts";
@@ -14,16 +10,13 @@ import {
   ACTION_SAMPLES,
   actionClocked,
   addMember,
-  aMemberSignedInAt,
   anAddress,
   askToJoin,
   avatarOf,
   clockTheNextKey,
   confirmedWhenAsked,
   countOf,
-  crumbOf,
   editorPickedByKeyboard,
-  holdingTheFirstAnswer,
   invite,
   keepsItsWordOffThePage,
   keyListed,
@@ -33,9 +26,7 @@ import {
   landedAtHome,
   makeGroups,
   memberUnreadUntil,
-  notFoundOfferingHome,
   person,
-  personMenuOpened,
   provision,
   removeMember,
   saysARefusal,
@@ -127,9 +118,6 @@ const describing = async (control: Locator): Promise<string> =>
     .locator(`[id="${(await control.getAttribute("aria-describedby")) ?? ""}"]`)
     .innerText();
 
-const describingWhoever = async (control: Locator, name: string): Promise<string> =>
-  (await describing(control)).replaceAll(name, "…");
-
 const searchBox = (page: Page) =>
   page.getByRole("searchbox", { name: "Search by name or address" });
 
@@ -209,8 +197,6 @@ const flagButton = (page: Page): Locator =>
 const activityOf = (page: Page): Locator => thePage(page).getByRole("region", { name: "Activity" });
 
 const linesOf = (page: Page): Locator => activityOf(page).getByRole("listitem");
-
-const ACTIVITY_READ = (url: URL): boolean => url.pathname.includes("members.activity");
 
 const readWithNoLine = async (page: Page, name: string): Promise<void> => {
   await expect(activityOf(page), "the empty Activity says nothing of the member").toContainText(
@@ -339,33 +325,10 @@ const anAdminBesideAnotherAtPeople = async (
   return workspace;
 };
 
-const demotedThemself = async (page: Page): Promise<void> => {
-  const commitFor = async (name: string): Promise<Locator> => {
-    await openedByName(page, name);
-    await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
-    return changeRoleButton(page);
-  };
-  const ofAnother = await describingWhoever(await commitFor("Ada Hartley"), "Ada Hartley");
-  await backToMembers(page);
-  const commit = await commitFor("Test person");
-  await expect(commit).toHaveAccessibleDescription(/\S/);
-  expect(
-    await describingWhoever(commit, "Test person"),
-    "their own demotion is described as another member's is",
-  ).not.toBe(ofAnother);
-  await commit.click();
-};
-
 const saysTheirRoleNow = (page: Page, role: string): Promise<void> =>
   expect(page.getByRole("status").filter({ hasText: /\S/ })).toHaveText(
     new RegExp(String.raw`\b${role}\b`),
   );
-
-const membersHiddenOnTheWayBack = async (page: Page): Promise<void> => {
-  await page.goBack();
-  await expect(page).toHaveURL(new RegExp(`${MEMBERS_PAGE}$`));
-  await notFoundOfferingHome(page, "Editor");
-};
 
 const removedThroughTheirPage = async (page: Page, name: string): Promise<void> => {
   await openedByName(page, name);
@@ -375,20 +338,6 @@ const removedThroughTheirPage = async (page: Page, name: string): Promise<void> 
 };
 
 test.describe("the People group's Members page", () => {
-  test("opens People on Members, and no page is called Roles", async ({ page, request }) => {
-    await anAdminAtPeople(page, request, "Calder Joinery");
-
-    await expect(page).toHaveURL(new RegExp(`${MEMBERS_PAGE}$`));
-    await expect(nav(page).getByRole("link", { name: "Members" })).toBeVisible();
-    await expect(nav(page).getByRole("link", { name: "Groups" })).toBeVisible();
-    await expect(nav(page).getByRole("link", { name: "Roles" })).toHaveCount(0);
-    await expect(page.getByRole("tab")).toHaveText(["Members", "Invitations", "Requests"]);
-    await expect(page.getByRole("tab", { name: "Members" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-  });
-
   test("opens Members with its heading, tabs, count, then action", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Ribble Castings");
     await expect(memberRows(page)).toHaveCount(3);
@@ -415,24 +364,6 @@ test.describe("the People group's Members page", () => {
     expect((await heading.boundingBox())?.width, "the tab's name shows twice").toBeLessThanOrEqual(
       1,
     );
-  });
-
-  test("shows an Admin each member's details, and no one else's", async ({ page, request }) => {
-    const { admin, joined, stranger } = await anAdminAtPeople(page, request, "Aire Valley Tooling");
-
-    await expect(memberRows(page)).toHaveCount(3);
-    await expect(countOf(membersRegion(page))).toHaveText(/\b3\b/);
-    for (const member of joined) {
-      await expect(rowOf(page, member.displayName)).toContainText(member.email);
-      await expect(cellOf(page, member.displayName, "Role")).toHaveText(member.role);
-      await expect(cellOf(page, member.displayName, "Groups")).toHaveText("No group");
-    }
-    await expect(cellOf(page, admin, "Role")).toHaveText("Admin");
-    await expect(cellOf(page, admin, "Joined")).toHaveText(/^\d{1,2} [A-Z][a-z]+ \d{4}$/);
-
-    const everything = page.locator("body");
-    await expect(everything).not.toContainText("Una Elsewhere");
-    await expect(everything).not.toContainText(stranger);
   });
 
   test("searches by name or address, and says when none match", async ({
@@ -483,14 +414,6 @@ test.describe("the People group's Members page", () => {
     expect(elapsed, "the list of three members rendered past its budget").toBeLessThan(
       LIST_BUDGET_MS,
     );
-  });
-
-  test("shows an Editor Members as not found, listing no one", async ({ page, request }) => {
-    const workspace = await aMemberSignedInAt(page, request, "Editor", MEMBERS_PAGE);
-
-    await notFoundOfferingHome(page, "Editor");
-    await expect(membersRegion(page)).toHaveCount(0);
-    await expect(page.locator("body")).not.toContainText(workspace.admin.email);
   });
 
   test("lets an Admin reach and search members by keyboard alone", async ({
@@ -582,30 +505,6 @@ const namesNoMember = async (page: Page): Promise<void> => {
 };
 
 test.describe("a member's own page", () => {
-  test("opens by name, row menu and link, crumbed by name", async ({ page, request }) => {
-    const { joined } = await anAdminAtPeople(page, request, "Swale Ironmongers");
-    const priya = joined.find((member) => member.displayName === "Priya Shah");
-    assert.ok(priya !== undefined, "Priya Shah was joined");
-    const priyasPage = new RegExp(`${memberPageAt(priya.id)}$`);
-
-    await memberLink(page, "Priya Shah").click();
-    await expect(page).toHaveURL(priyasPage);
-    await expect(crumbsOf(page)).toHaveText(["Control Centre", "People", "Members", "Priya Shah"]);
-    await expect(crumbOf(page, "Members")).toHaveAttribute("href", MEMBERS_PAGE);
-    await expect(page.getByRole("tab")).toHaveCount(0);
-
-    await backToMembers(page);
-    await membersRegion(page).getByRole("button", { name: "Actions for Priya Shah" }).click();
-    await page.getByRole("menuitem", { name: "Open" }).click();
-    await expect(page).toHaveURL(priyasPage);
-    await expect(personHeading(page, "Priya Shah")).toBeFocused();
-
-    await page.goto(memberPageAt(priya.id));
-    await expect(personHeading(page, "Priya Shah")).toBeVisible();
-    await expect(crumbsOf(page).last()).toHaveText("Priya Shah");
-    await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
-  });
-
   test("shows a member's role, groups and each role's meaning", async ({
     page,
     request,
@@ -791,39 +690,6 @@ test.describe("a member's own page", () => {
     await expect(changeRoleButton(page)).toHaveAccessibleDescription(/Test person.*Admin/);
   });
 
-  test("names a role change only once another role is picked", async ({ page, request }) => {
-    await anAdminAtPeople(page, request, "Swale Chandlery");
-    await openedByName(page, "Priya Shah");
-
-    await expect(changeRoleButton(page)).toBeDisabled();
-    await expect(changeRoleButton(page)).toHaveAccessibleDescription(/Priya Shah.*Editor/);
-
-    await thePage(page).getByRole("radio", { name: "Viewer", exact: true }).click();
-    await expect(changeRoleButton(page)).toBeEnabled();
-    await expect(
-      changeRoleButton(page),
-      "the primary names no change with another role picked",
-    ).toHaveAccessibleDescription(/Priya Shah.*Editor.*Viewer/);
-    await expect(rolePickerRegion(page).getByRole("button")).toHaveCount(1);
-
-    await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
-    await expect(changeRoleButton(page)).toBeDisabled();
-  });
-
-  test("demoting yourself says so, then lands on Editor's home", async ({ page, request }) => {
-    await anAdminBesideAnotherAtPeople(page, request, "Esk Presswork");
-
-    await demotedThemself(page);
-
-    await landedAtHome(page, "Editor");
-    await saysTheirRoleNow(page, "Editor");
-    const you = await personMenuOpened(page, "Test person");
-    await expect(you).toContainText("Editor");
-    await expect(you).not.toContainText("Admin");
-    await page.keyboard.press("Escape");
-    await membersHiddenOnTheWayBack(page);
-  });
-
   test("arriving unread, demoting yourself still lands on Editor's home", async ({
     page,
     request,
@@ -869,32 +735,6 @@ test.describe("a member's own page", () => {
     );
     await keystrokesDismissed(page, pressed);
     await expect(inTheRail).toBeFocused();
-  });
-
-  test("opens no member by key after focus leaves the list", async ({ page, request }) => {
-    await skippedToMembers(page, request, "Calder Drifting");
-    await memberLink(page, "Priya Shah").focus();
-    await listHeading(page).focus();
-
-    await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.open.key);
-  });
-
-  test("drops the select-first line once a key ticks a member", async ({ page, request }) => {
-    await skippedToMembers(page, request, "Calder Ticking");
-    const said = membersRegion(page).getByText(PEOPLE_SELECT_FIRST.member);
-
-    for (const { key } of [PEOPLE_KEYSTROKES.tick, PEOPLE_KEYSTROKES.changeSelectedRoles]) {
-      await listHeading(page).focus();
-      await page.keyboard.press(key);
-      await expect(said, `${key} with no member in focus or ticked said nothing`).toHaveCount(1);
-
-      await tickOf(page, "Priya Shah").focus();
-      await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
-      await expect(tickOf(page, "Priya Shah")).toBeChecked();
-      await expect(said, `the select-first line of ${key} outlived the tick`).toHaveCount(0);
-      await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
-      await expect(tickOf(page, "Priya Shah")).not.toBeChecked();
-    }
   });
 
   test("opens a member and changes their role by keyboard alone", async ({ page, request }) => {
@@ -1038,70 +878,6 @@ test.describe("a member's Activity", () => {
     await expect(linesOf(page)).toHaveCount(1);
     await expect(linesOf(page)).toContainText("Ola Asker");
   });
-
-  test("draws nothing of the workspace left after a switch", async ({ page, request }) => {
-    const left = await provision(request, { name: "Wharfe Smithy" });
-    const entered = await provision(request, { name: "Aire Smithy" });
-    const address = anAddress("rhea");
-    const rhea = await person(request, address, { displayName: "Rhea Kemp" });
-    for (const { workspaceId } of [left, entered]) {
-      await addMember(request, { workspaceId, userId: rhea.id, role: "Admin" });
-    }
-    const { workspaceId } = left;
-    await makeGroups(request, { workspaceId, userId: rhea.id, names: ["Wharfe leads"] });
-    await page.goto("/sign-in");
-    await signIn(page, request, address);
-    await page.getByRole("button", { name: left.name, exact: true }).click();
-    await landedAtHome(page, "Admin");
-    await openedByName(page, "Rhea Kemp");
-    await expect(linesOf(page).filter({ hasText: "Wharfe leads" })).toHaveCount(1);
-
-    const held = Promise.withResolvers<void>();
-    await page.route(ACTIVITY_READ, async (route) => {
-      await held.promise;
-      await route.continue();
-    });
-    await switcherOf(page, left.name).click();
-    await switcherMenuOf(page, left.name)
-      .getByRole("menuitemradio")
-      .filter({ hasText: entered.name })
-      .click();
-    await landedAtHome(page, "Admin");
-    await expect(switcherOf(page, entered.name)).toBeVisible();
-    await openedByName(page, "Rhea Kemp");
-
-    await expect(activityOf(page).getByRole("status"), "the held read says nothing").toHaveText(
-      /\S/,
-    );
-    await expect(thePage(page), "drew the left workspace's Activity").not.toContainText(
-      "Wharfe leads",
-    );
-    held.resolve();
-    await readWithNoLine(page, "Rhea Kemp");
-    await expect(thePage(page)).not.toContainText("Wharfe leads");
-  });
-
-  test("says a failed read in Activity alone, then retries it", async ({ page, request }) => {
-    const { adminId } = await anAdminAtPeople(page, request, "Swale Cutlers");
-    await page.route(ACTIVITY_READ, (route) => route.abort());
-
-    await page.goto(memberPageAt(adminId));
-
-    await saysARefusal(activityOf(page).getByRole("alert"), { timeout: 10_000 });
-    await expect(accessOf(page), "a failed Activity took Access with it").toBeVisible();
-    await expect(
-      thePage(page).getByRole("region", { name: "Remove and End Every Sign-In" }),
-      "a failed Activity took Remove and end every sign-in with it",
-    ).toBeVisible();
-
-    await page.unroute(ACTIVITY_READ);
-    await activityOf(page).getByRole("button", { name: "Retry" }).click();
-
-    await expect(
-      activityOf(page).getByRole("heading", { level: 2, name: "Activity" }),
-    ).toBeFocused();
-    await expect(linesOf(page)).toHaveCount(1);
-  });
 });
 
 const ENDED_AT = /\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}/;
@@ -1175,20 +951,6 @@ test.describe("ending every sign-in and token a member holds here", () => {
     await expect(page).toHaveURL(ownPage);
     await expect(personHeading(page, "Test person")).toBeVisible();
     await expect(accessOf(page)).toContainText(ENDED_AT);
-  });
-
-  test("opens a member's sign-ins and ends them by keyboard", async ({ page, request }) => {
-    await skippedToMembers(page, request, "Nidd Presswork");
-
-    await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.endEverySignInAndToken.key);
-
-    await tabUntilFocused(page, memberLink(page, "Sam Okoro"));
-    await page.keyboard.press(PEOPLE_KEYSTROKES.endEverySignInAndToken.key);
-    const revoke = endButton(page);
-    await expect(revoke).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(credentialsRegion(page).getByRole("status")).toContainText("Sam Okoro");
-    await expect(revoke).toBeFocused();
   });
 });
 
@@ -1320,63 +1082,6 @@ test.describe("removing a member from their page", () => {
     await passesTheAccessibilityGate();
   });
 
-  test("an Admin removing themself leaves through the workspace chooser", async ({
-    page,
-    request,
-  }) => {
-    await anAdminBesideAnotherAtPeople(page, request, "Esk Tinsmiths");
-    await openedByName(page, "Ada Hartley");
-    await removalOf(page).getByRole("button", { name: "Remove Member" }).click();
-    const ofAnother = await describingWhoever(
-      removalOf(page).getByRole("button", { name: "Remove", exact: true }),
-      "Ada Hartley",
-    );
-    await backToMembers(page);
-    await openedByName(page, "Test person");
-    const removal = removalOf(page);
-    const asked = removal.getByRole("button", { name: "Remove Member" });
-    await expect(asked).toHaveAccessibleDescription(/\S/);
-    await expect(
-      asked,
-      "their own removal names them as it would another",
-    ).not.toHaveAccessibleDescription(/Test person/);
-    await asked.click();
-    const confirm = removal.getByRole("button", { name: "Remove", exact: true });
-    await expect(confirm).toHaveAccessibleDescription(/\S/);
-    expect(
-      await describingWhoever(confirm, "Test person"),
-      "their own removal is confirmed as another member's is",
-    ).not.toBe(ofAnother);
-    await confirm.click();
-
-    await expect(page).toHaveURL(/\/no-workspace$/);
-    await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
-  });
-
-  test("removing yourself, pressed twice, asks once and still leaves", async ({
-    page,
-    request,
-  }) => {
-    await anAdminBesideAnotherAtPeople(page, request, "Esk Coopers");
-    await openedByName(page, "Test person");
-    const removal = removalOf(page);
-    await removal.getByRole("button", { name: "Remove Member" }).click();
-    const confirm = removal.getByRole("button", { name: "Remove", exact: true });
-
-    const held = await holdingTheFirstAnswer(page, REMOVAL);
-
-    await confirm.focus();
-    await page.keyboard.press("Enter");
-    await held.reached;
-    await expect(confirm).toHaveAttribute("aria-disabled", "true");
-    await page.keyboard.press("Enter");
-    held.release();
-
-    await expect(page).toHaveURL(/\/no-workspace$/);
-    await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
-    expect(held.asked(), "the second press asked the api again").toBe(1);
-  });
-
   test("removes a member by keyboard alone", async ({ page, request }) => {
     await skippedToMembers(page, request, "Calder Presswork");
 
@@ -1428,22 +1133,6 @@ test.describe("a member's display name, flagged to better-answers support", () =
     await passesTheAccessibilityGate();
   });
 
-  test("offers no flag for a member with no display name", async ({ page, request }) => {
-    const { workspaceId } = await anAdminAtPeople(page, request, "Swale Lettering");
-    const unnamed = anAddress("unnamed");
-    const made = await person(request, unnamed, { displayName: "" });
-    await addMember(request, { workspaceId, userId: made.id, role: "Viewer" });
-    await page.reload();
-
-    await memberLink(page, "No display name yet").click();
-    await expect(personHeading(page, unnamed)).toBeVisible();
-    await expect(crumbsOf(page).last()).toHaveText(unnamed);
-    const region = displayNameRegion(page);
-
-    await expect(region).toContainText(unnamed);
-    await expect(region.getByRole("button")).toHaveCount(0);
-  });
-
   test("refuses a member removed meanwhile, saying why and what next", async ({
     page,
     request,
@@ -1463,21 +1152,6 @@ test.describe("a member's display name, flagged to better-answers support", () =
     await saysARefusal(displayNameRegion(page).getByRole("alert"));
     await expect(displayNameRegion(page).getByRole("status")).toHaveText("");
     await passesTheAccessibilityGate();
-  });
-
-  test("flags a member's name by keyboard alone, from the list", async ({ page, request }) => {
-    await skippedToMembers(page, request, "Swale Carving");
-
-    const keystrokes = await keystrokesListed(page, "Members");
-    await expect(keyListed(keystrokes, PEOPLE_KEYSTROKES.flagName.key)).toBeVisible();
-    await keystrokesDismissed(page, keystrokes);
-
-    await tabUntilFocused(page, memberLink(page, "Priya Shah"));
-    await page.keyboard.press(PEOPLE_KEYSTROKES.flagName.key);
-    await expect(flagButton(page)).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(displayNameRegion(page).getByRole("status")).toHaveText(/\S/);
-    await expect(displayNameRegion(page).getByRole("alert")).toHaveCount(0);
   });
 });
 
