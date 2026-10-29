@@ -567,12 +567,6 @@
       }
     },
     {
-      "files": ["packages/core/src/store/map/index.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 539, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["packages/devtools/src/comments/comment-inventory.ts"],
       "rules": {
         "max-lines": ["error", { "max": 567, "skipBlankLines": true, "skipComments": true }]
