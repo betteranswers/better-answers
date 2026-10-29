@@ -95,7 +95,7 @@ const passageOpenedWhileTheListLoads = async () => {
   return { panel, release: forklift.release };
 };
 
-describe("a passage opened while the list changes", () => {
+describe("the Knowledge Search page", () => {
   for (const width of [320, 1280]) {
     it(`keeps open a passage clicked before settling, at ${String(width)} px`, async () => {
       atWidth(width);

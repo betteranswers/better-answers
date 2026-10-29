@@ -53,7 +53,7 @@ const noMatchWasInFocus = async (listed: string) => {
   );
 };
 
-describe("opening a match by key", () => {
+describe("the Knowledge Search page", () => {
   it("opens the focused match by key, else says none is", async () => {
     const api = aSearchApi();
     api.set(
@@ -119,9 +119,7 @@ describe("opening a match by key", () => {
       expect(openerIn(landed, HANDBOOK).getAttribute("aria-expanded")).toBe("true"),
     );
   });
-});
 
-describe("keeping the typed search", () => {
   it("keeps the typed search for a concept opened before settling", async () => {
     const api = aSearchApi();
     api.set(

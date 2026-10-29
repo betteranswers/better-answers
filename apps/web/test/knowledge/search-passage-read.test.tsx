@@ -35,7 +35,7 @@ const panelOpened = async (title = HANDBOOK) => {
   return { panel, heading: within(panel).getByRole("heading", { name: title }) };
 };
 
-describe("reading a passage from Search", () => {
+describe("the Knowledge Search page", () => {
   it("says why a passage went unread, offering a retry", async () => {
     const { api } = await palletsFound();
     api.set("knowledge.open", answeringPassages(refusing(FORBIDDEN)));

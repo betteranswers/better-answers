@@ -29,7 +29,11 @@ await vi.hoisted(() => import("@test/stub-server.ts"));
 
 placedForSearch();
 
-describe("the Knowledge Search page's address", () => {
+const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const satisfies Partial<
+  Readonly<Record<Role, string>>
+>;
+
+describe("the Knowledge Search page", () => {
   it("writes the settled query to the address, kept by reload", async () => {
     const api = aSearchApi();
     api.set(
@@ -99,13 +103,7 @@ describe("the Knowledge Search page's address", () => {
     await foundNothing(api, "the and of");
     expect(said().textContent).toContain("the and of");
   });
-});
 
-const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const satisfies Partial<
-  Readonly<Record<Role, string>>
->;
-
-describe("reaching Search from the rail", () => {
   for (const role of ["Editor", "Viewer"] as const) {
     it(`takes ${A_ROLE[role]} to Search from the rail`, async () => {
       const api = aSearchApi();

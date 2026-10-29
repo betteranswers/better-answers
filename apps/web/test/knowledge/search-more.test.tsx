@@ -48,7 +48,7 @@ const repeatingTheFirstMatch = (asked: FindAsked) => {
 
 const handbookRows = () => matchRows().filter((row) => row.textContent.includes(HANDBOOK));
 
-describe("Search's More matches", () => {
+describe("the Knowledge Search page", () => {
   it("loads more, and focus lands on the first new row", async () => {
     const api = aSearchApi();
     api.set("knowledge.find", finding({ pallet: PALLET_PASSAGES }));

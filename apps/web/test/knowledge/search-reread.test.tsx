@@ -52,7 +52,7 @@ const withholding = () => {
 
 const firstOpener = () => openerIn(rowAt(0), HANDBOOK);
 
-describe("a re-read of the list under an open passage", () => {
+describe("the Knowledge Search page", () => {
   for (const width of [1024, 1280]) {
     it(`closes a passage a re-read drops, at ${String(width)} px`, async () => {
       atWidth(width);

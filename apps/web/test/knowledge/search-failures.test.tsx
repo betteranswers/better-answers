@@ -55,7 +55,7 @@ const saysTheWait = (alert: HTMLElement | null, minutes: number) =>
 const saysSomething = (alert: HTMLElement | null) =>
   expect(alert?.textContent, "the alert says nothing").toMatch(/\S/);
 
-describe("a read that is refused or fails", () => {
+describe("the Knowledge Search page", () => {
   it("says the reads' ceiling and asks no more", async () => {
     const { api } = await palletsFound();
     api.set("knowledge.find", answeringFinds(refusing(aCeilingMet(180))));
