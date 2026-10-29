@@ -4,7 +4,7 @@ Inbox is where a person decides the changes other members suggest to concepts. A
 
 ## Sub-features
 
-- `inbox-waiting-on-you` is the Waiting on You page at `/inbox/waiting-on-you`. It lists each waiting suggestion with who suggested it and when, and accepts the selected ones at once.
+- `inbox-waiting-on-you` is the Waiting on You page at `/inbox/waiting-on-you`. It lists each waiting suggestion with who suggested it, and accepts the selected ones at once.
 - `inbox-waiting-item` is one suggestion's page at `/inbox/waiting-on-you/<suggestionId>`, reached from its row. It sets the current version beside the suggested one and accepts or declines it.
 
 ## How to get to it (user POV)
@@ -25,7 +25,7 @@ Setup:
 - **Provision.** Make the workspace and its Admin. Run `.claude/skills/verify/scripts/harness.sh <port> POST /workspaces '{"name":"Verify Inbox"}'`. The answer names the `workspaceId` and the Admin's `id` and `email`. The harness mints the address.
 - **Add an Editor.** Ifan proposes the changes. Run `.claude/skills/verify/scripts/harness.sh <port> POST /people '{"displayName":"Ifan Morgan"}'`, then `.claude/skills/verify/scripts/harness.sh <port> POST /members '{"workspaceId":"<workspaceId>","userId":"<ifanId>","role":"Editor"}'`. It answers `{"added":true}`.
 - **Write two concepts.** Run `.claude/skills/verify/scripts/harness.sh <port> POST /concepts '{"workspaceId":"<workspaceId>","userId":"<adminId>","concepts":[{"title":"Annual leave","collection":"policies","kind":"Policy","body":"Everyone takes 25 days of leave."},{"title":"Expense claims","collection":"policies","kind":"Policy","body":"Claims go in within 30 days."}]}'`. The answer lists both concepts, each with an `iri` such as `https://better-answers.com/c/01M61VDHKD4JVYRNQ0SYDRM45E`.
-- **Suggest two edits.** Run `.claude/skills/verify/scripts/harness.sh <port> POST /suggestions '{"workspaceId":"<workspaceId>","userId":"<ifanId>","iri":"<annualLeaveIri>","body":"Everyone takes 28 days of leave."}'` and `.claude/skills/verify/scripts/harness.sh <port> POST /suggestions '{"workspaceId":"<workspaceId>","userId":"<ifanId>","iri":"<expenseClaimsIri>","body":"Claims go in within 60 days."}'`. Each answers a `suggestionId` and a `setId`.
+- **Suggest two edits.** Run `.claude/skills/verify/scripts/harness.sh <port> POST /suggestions '{"workspaceId":"<workspaceId>","userId":"<ifanId>","iri":"<annualLeaveIri>","body":"Everyone takes 28 days of leave."}'` and `.claude/skills/verify/scripts/harness.sh <port> POST /suggestions '{"workspaceId":"<workspaceId>","userId":"<ifanId>","iri":"<expenseClaimsIri>","body":"Claims go in within 60 days."}'`. Each answers a `suggestionId`.
 - **Sign in.** Run `.claude/skills/verify/scripts/sign-in.sh <port> <adminEmail>`, then `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '/people/members'"`. The Admin lands on Members.
 
 Waiting on You, at `/inbox/waiting-on-you`, as the Admin:
@@ -45,9 +45,4 @@ A waiting suggestion, at `/inbox/waiting-on-you/<suggestionId>`, as the Admin:
 
 ## Gotchas
 
-- The instance allows five codes to one address in ten minutes. A sixth sign-in of the same person in that window fails at *Send Code*. Sign in once and drive both recipes from that session.
-- `POST /suggestions` takes the concept's whole IRI, and a concept's page takes only its last part. A concept the workspace does not hold answers 400 naming `iri`.
-- A suggestion is made against the concept as it stood. Accept one, and a second suggestion waiting on the same concept goes back to its proposer instead of committing. Seed each recipe's suggestions on different concepts.
-- Seed the suggestions as a member other than the one signed in, so *Suggested By* proves who proposed them.
-- Keep `--exact` where a recipe gives it.
-- `wait --text` matches a substring, so `wait --text "2 suggestions waiting"` also matches *12 suggestions waiting*. Seed few enough suggestions that the count cannot nest.
+- A suggestion is made against the concept as it stood. After one is accepted, a second suggestion on the same concept stays in the list with the note *The concept changed after this was written.*, and accepting it sends it back to its proposer. Seed each recipe's suggestions on different concepts.

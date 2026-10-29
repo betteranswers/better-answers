@@ -9,15 +9,13 @@ This skill drives the SPA's built pages through the api that serves them, so a d
 
 A spec under `apps/web/e2e/` is written and run per `apps/web/.claude/skills/playwright-specs/SKILL.md`. This skill drives the app live.
 
-*The seam* and *Building state* describe the server and the harness that the spec suite and a live drive share. They name the spec suite's fixtures and helpers. A drive reaches the same server and actions only through `scripts/`, and `E2E_PORT` applies only to the spec runner.
+*The seam* and *Building state* describe the server and the harness that the spec suite and a live drive share. They name the spec suite's fixtures and helpers. A drive reaches the same server and actions only through `scripts/`.
 
 ## The seam
 
 The server under the browser is the api's own integration harness, `startApp` in
 `apps/api/tests/support/harness/harness.ts`, over the Testcontainers Postgres and the Garage
-object store that the api's integration tests use. A claim about a store itself, such as
-row-level security, a migration or a lock, is proven in those integration tests, never in a
-spec. The email
+object store that the api's integration tests use. The email
 transport captures codes, Claude's client metadata document is served in process, and a model wire
 answers each workspace's model calls as its spec scripted them and fails any call no script
 answers. Playwright starts it as a **process**, not an import: `apps/web` imports nothing from
@@ -39,25 +37,19 @@ script is the same command for a person to run by hand. Playwright never goes th
 11.27 and later start a script in a process group of its own, which Playwright's kill never
 reaches, so the server outlives the suite and the run hangs on its open output.
 
-The port is 3100 in CI. On a developer's machine the runner takes a free port and hands it to its
-workers in `E2E_PORT`, so two worktrees can run the suite at once. Set `E2E_PORT` to choose the
-port yourself.
-
 ## Building state
 
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
 `request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Each
 action calls `/__harness`, which `apps/api/tests/support/harness/harness-control.ts` mounts, and an area's own
 actions live beside it in `apps/api/tests/support/harness/harness-*.ts`. The same module re-exports the locators
-and browser helpers in `apps/web/e2e/locators.ts`. Most specs sign in with `signIn` or
-`signedInAtHome`, which pass through the product's own sign-in page and its second-factor gate,
-never around them. Each spec provisions its own workspace with `provision` and mints its own
-address with `anAddress`, so two specs running together never share state.
+and browser helpers in `apps/web/e2e/locators.ts`.
 
-A seed the harness cannot write answers 400, naming each field and its rule, and the action's
-failure carries that answer, so read the reason there and not in the server's log. A seed that a
-slice's own action writes can leave part of its rows behind when refused part-way;
-`references/harness.md` says which seeds do. Before adding an action, search that
+A seed the harness refuses answers 400, naming each field and its rule or the constraint it
+tripped, and `harness.sh` prints that answer. A refusal inside a slice's own action or an ops
+command answers 500, and its reason is only in `server.log`. A seed that a slice's own action
+writes can leave part of its rows behind when refused part-way; `references/harness.md` says
+which seeds do. Before adding an action, search that
 file for one that already does the job, and before adding a helper, search
 `apps/web/.claude/skills/playwright-specs/references/helpers.md`.
 
@@ -86,6 +78,7 @@ It reads and changes nothing. It prints `worth driving:` with the origin and the
 - launch.sh started a server on that port, and that process is still alive.
 - The port's listener is that process.
 - `/health` answers 200 and `/__harness` answers.
+- The SPA has a build.
 - No page source changed after the SPA was built, and no api, core, schema or harness source changed after the server started.
 
 When the server has exited, the reason quotes the last three lines of its log. Those lines may predate the exit, such as a trace from an earlier refused request, so read `server.log` in full before you name a cause.
@@ -104,7 +97,7 @@ Every browser command goes through `scripts/browse.sh <port> <agent-browser comm
    .claude/skills/verify/scripts/harness.sh 4610 POST /workspaces '{"name":"Verify people"}'
    ```
 
-   It answers the workspace's `workspaceId`, `name` and `shortName`, and the Admin's `id`, `email` and `name`. Sign in with that `email`. `references/harness.md` lists the actions by the name of their function in `apps/web/e2e/harness.ts`. An action's route is the path that function passes to `/__harness`. The body a route takes is the schema it parses, in `apps/api/tests/support/harness/harness-control.ts` or in the area's `harness-*.ts` file beside it. The function in `apps/web/e2e/harness.ts` may reshape its arguments before it sends them. Each feature file names the routes its pages need.
+   It answers the workspace's `workspaceId`, `name` and `shortName`, and `admin`, the Admin's `id`, `email` and `name`. Sign in with `admin.email`. `references/harness.md` lists the actions and reads by the name of their function in `apps/web/e2e/harness.ts`. An action's route is the path that function passes to `/__harness`. The body a route takes is the schema it parses, in `apps/api/tests/support/harness/harness-control.ts` or in the area's `harness-*.ts` file beside it. The function in `apps/web/e2e/harness.ts` may reshape its arguments before it sends them. Each feature file names the routes its pages need.
 
 2. **Sign in through the product's own page.**
 
@@ -112,7 +105,7 @@ Every browser command goes through `scripts/browse.sh <port> <agent-browser comm
    .claude/skills/verify/scripts/sign-in.sh 4610 <email> [path]
    ```
 
-   It keeps the session's browser open and clears its cookies and storage first, so it also switches from one person to another. It then sets a client address of its own in `cf-connecting-ip`, so sign-ins on one instance do not share the per-address ceiling. Never run `browse.sh <port> close` mid-drive. The next commands relaunch the browser on a blank page, and only cleanup.sh closes it. It opens `path`, `/sign-in` by default, waits for *Email Address*, fills it and presses *Send Code*. It waits for the new email to reach the captured transport and for *Verification Code* to draw, then fills the code. An Admin or the operator then meets the confirm or setup page. The script gives that person the harness's authenticator, opens `/confirm` with the page's own query and types the six digits the authenticator shows. It waits for the landing page's heading, then prints a line that ends with the page's address.
+   It keeps the session's browser open and clears its cookies and storage first, so it also switches from one person to another. It then sets a client address of its own in `cf-connecting-ip`, so sign-ins on one instance do not share the per-address ceiling. Never run `browse.sh <port> close` mid-drive. The next commands relaunch the browser on a blank page, and only cleanup.sh closes it. It opens `path`, `/sign-in` by default, waits for *Email Address*, fills it and presses *Send Code*. It waits for the new email to reach the captured transport and for *Verification Code* to draw, then fills the code. An Admin or the operator then meets the confirm or setup page. The script gives that person the harness's authenticator, which also marks ten recovery codes saved, opens `/confirm` with the page's own query and types the six digits the authenticator shows. It waits for the landing page's heading, then prints a line that ends with the page's address.
 
    With no path, signing in lands on:
 
@@ -131,7 +124,7 @@ Every browser command goes through `scripts/browse.sh <port> <agent-browser comm
    .claude/skills/verify/scripts/browse.sh 4610 wait --fn "location.pathname === '/people/groups'"
    ```
 
-   `snapshot -c` prints the accessibility tree with refs. A name matches as a case-insensitive substring unless the command adds `--exact`. Add it where one name sits inside another on the same page. Never locate by CSS class, coordinates or tab order. Wait on a condition, never for a fixed time.
+   `snapshot -c` prints the accessibility tree with refs. It can leave out text inside status messages, dialogs and description lists, so read a quoted status or a row's values in the full `snapshot`. A name matches as a case-insensitive substring unless the command adds `--exact`. Add it where one name sits inside another on the same page. Never locate by CSS class, coordinates or tab order. Wait on a condition, never for a fixed time.
 
    Move between pages as a person does. The rail is the `navigation` named *Areas*. The menu is the `navigation` named for the open area. To open a page by its address, run `.claude/skills/verify/scripts/browse.sh 4610 open http://localhost:4610<path>`. `open` returns before the page's data arrives, so `wait` for a text or a condition the loaded page draws before the next `find`. A `find` that runs first fails on a page that has not drawn its rows yet.
 
@@ -148,7 +141,7 @@ Save the full `snapshot` as evidence.
 
 - Capture each action and the state it leaves, not only the last screen. Take a snapshot before and after an action that changes something.
 - Prove a write from a second view. Reload the page, or open the page that lists what was written, and read it there.
-- Check a side effect the page cannot show through a harness read, such as `GET /emails?to=<address>` for a sent email or `GET /commit-authors` for a commit.
+- Check a side effect the page cannot show through a harness read, such as `GET /emails?to=<address>` for a sent email or `GET /commit-authors?workspaceId=<id>&iri=<iri>` for a commit.
 - Beside each artifact, report the feature file, the page's address and the role signed in.
 - Report a page the drive cannot reach as `verified-unreachable`, with the prerequisite it lacks and the command it tried. Never report one entry point as proven through another.
 

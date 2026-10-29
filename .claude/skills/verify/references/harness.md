@@ -16,11 +16,12 @@ The api harness's actions, the ceilings a spec or a drive runs into, and what a 
 - **Per person.** `personCeiling` in `apps/api/src/trpc/base.ts` counts a signed-in person's calls
   to one procedure against a rule from the same constants file, `ASK_TO_JOIN_PERSON_RULE` for
   asking to join. Past it the call answers 429 with `Retry-After` and no refusal word. It keys on
-  the session's person, so a flood through the page's own `page.request` reaches it. The knowledge
-  reads, `find` and `open`, share one count a person (`knowledgeReadProcedure` in
-  `apps/api/src/trpc/knowledge.ts`), which `readsCeilingFilled` in `apps/web/e2e/knowledge.ts`
-  fills. The count resets at each minute of the clock, so the helper waits for a fresh minute
-  when too few seconds of the current one are left for the fill and the refusal after it.
+  the session's person, so a flood through the page's own `page.request` reaches it. Every knowledge
+  read and asking a question share one count a person (`KNOWLEDGE_CEILING`, used in
+  `apps/api/src/trpc/knowledge.ts` and `ask.ts`), which `readsCeilingFilled` in
+  `apps/web/e2e/knowledge.ts` fills. The count resets at each minute of the clock, so the helper
+  waits for a fresh minute when too few seconds of the current one are left for the fill and the
+  refusal after it.
 
 Read the numbers off those files rather than from here.
 
@@ -43,11 +44,11 @@ beside `apps/api/tests/support/harness/harness-control.ts`: Sources in `apps/api
 | `ageTheConfirmation` | Moves the second-factor confirmation of every session a person holds to 61 minutes ago |
 | `ageThePendingHour` | Moves the pending clock of every session a person holds to 61 minutes ago |
 | `ageTheCode` | Moves the expiry of the code sent to an address into the past |
-| `withAnAuthenticator` | Gives an address an authenticator and answers the key `authenticatorCodeAt` makes codes from. A second ask answers the same key. It also issues ten recovery codes, marked saved. `enrolledWith` answers those codes too, or issues none with `"none"` |
+| `withAnAuthenticator` | Gives an address an authenticator and answers the key `authenticatorCodeAt` makes codes from. A second ask answers the same key. It also issues ten recovery codes, marked saved, unless the person already holds a set. `enrolledWith` answers those codes too, or issues none with `"none"` |
 | `restored` | The platform operator's restore of a person's sign-in. It answers the restore code |
 | `seedModelChoices` | The model choices a workspace has made. A purpose left out of the list has no model choice |
 | `seedConnectedSources` | Connected sources with documents, passages, findings, a sync status and a concept citing a document. It answers each connected source's and document's id |
-| `moveTheSync` | Moves the workspace's one sync to claimed or done, with no worker process |
+| `moveTheSync` | Moves the workspace's one sync to claimed, then to done, with no worker process |
 | `makeGroups` | Groups made by a named member, every group holding the members `memberIds` names |
 | `askToJoin` | A person's ask to join a workspace by its short name, with a reason, waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name, which then waits on the console's *Names waiting* page |
@@ -58,6 +59,10 @@ beside `apps/api/tests/support/harness/harness-control.ts`: Sources in `apps/api
 | `commitAuthorsOf` | The author lines, `Name <email>`, of the commits in the workspace's repository that touched a concept's file, by its IRI, newest first. A concept the workspace does not hold answers 400 naming `iri` |
 | `seedQuestions` | *Questions asked* records, listed oldest first and a second apart: a verdict, a judge state, the concepts it returned by IRI, the drafted sentences with the concepts each cites, and flags open or closed. It answers each record's id and its flags' ids |
 | `scriptAsking` | A workspace's models set as the owner sets them, through the ops commands (its key, a price, its spending limit and its model choices), and a script for how the suite's model wire answers that workspace: the judge's fits or a failure, the drafter's sentences, each citing a concept by title, or a failure, and a call held until released. A model the script leaves out is not chosen |
+| `codeSentTo` | The sign-in code captured for an address |
+| `linkSentTo` | The sign-in link's token captured for an address |
+| `emailsSentTo` | How many emails the transport captured for an address |
+| `aSessionOn` | A session for a person, with an optional user agent |
 | `releaseTheModel` | Lets a held call go on. Every later call of that workspace's is answered at once |
 | `modelCallsIn` | The judge's and the drafter's calls the wire has had for a workspace |
 
@@ -65,17 +70,18 @@ beside `apps/api/tests/support/harness/harness-control.ts`: Sources in `apps/api
 
 A seed the harness cannot write answers 400. A body or a row that a schema refuses names each
 field and its rule, and a write that trips a constraint names the constraint. The action's failure
-carries that answer, so the reason is read there and not in the server's log. Any other fault of
-the harness stays a 500.
+carries that answer. Any other fault of the harness stays a 500, with its reason in the server's log.
 
 A body is checked before anything is written. What a refusal after that leaves depends on who
 writes the rows:
 
 - **The harness writes them itself**, in one transaction, so a refused seed leaves nothing behind:
   `seedModelChoices`, `seedConnectedSources`, `seedQuestions` and `seedConceptIndex`.
-- **A slice's own action writes them**, and each action opens a transaction of its own, so a
-  refusal part-way leaves what was written before it: `makeGroups`, `seedConcepts`, `scriptAsking`
-  and `nameOwners`. `seedConcepts` reads the workspace before its first write and refuses there, with a
-  400 naming the field, a writer who is no member or no Admin, a title whose file the workspace
-  already holds, and a group member who is no member of the workspace. Any other refusal at one
-  concept leaves the concepts before it whole.
+- **A slice's own action or an ops command writes them**, and each opens a transaction of its own, so a
+  refusal part-way leaves what was written before it: `makeGroups`, `flagTheName`, `seedConcepts`,
+  `scriptAsking` and `nameOwners`. Such a refusal answers 500 and its reason is in `server.log`, except
+  `nameOwners`, which answers 400 naming its place in `owners`, and the checks `seedConcepts` makes before its
+  first write. Those answer 400 naming the field: a writer who is no member or no Admin, a title whose
+  file the workspace already holds, and a group member who is no member of the workspace. Any other
+  refusal at one concept leaves the concepts before it whole. `scriptAsking` sets its model script before
+  any ops command runs, so the script stays set after a failure.
