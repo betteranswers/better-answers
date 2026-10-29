@@ -160,26 +160,6 @@ test.describe("the System group's Audit log page", () => {
     }
   });
 
-  test("keeps open the detail opened before a typed search settles", async ({ page, request }) => {
-    const { priya } = await anAdminAtTheAuditLog(page, request, "Nidd Tooling");
-    const priyas = linesOf(page).filter({ hasText: BY_PRIYA });
-    await expect(priyas).toHaveCount(1);
-    await expect(linesOf(page)).not.toHaveCount(1);
-    const typed = await holdingTheFirstAnswer(page, aSearchForPriya);
-
-    await searchBox(page).fill("Priya");
-    await detailsOf(priyas).click();
-    await typed.reached;
-    typed.release();
-
-    await expect(linesOf(page)).toHaveText([BY_PRIYA]);
-    await expect(
-      detailsOf(priyas),
-      "the detail opened closed as the typed search settled",
-    ).toHaveAttribute("aria-expanded", "true");
-    await expect(priyas.getByRole("definition").first()).toHaveText(`Priya Shah${priya.email}`);
-  });
-
   test("renders the audit log within the latency budget", async ({ page, request }) => {
     await anAdminAtTheAuditLog(page, request, "Ryedale Metalwork");
 

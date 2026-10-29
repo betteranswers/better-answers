@@ -7,9 +7,9 @@ problem_type: test_failure
 component: web
 severity: medium
 applies_when:
-  - "Holding a request with `page.route` in a Playwright spec that also checks an optimistic action's refusal"
+  - "Holding a request with `page.route` in a Playwright spec, or with `heldBack` in a Testing Library test, that also checks an optimistic action's refusal"
   - "Seeing a mutation's mutation-level `onError` run while its per-call `mutate()` `onError` never does"
-  - "Debugging `people-requests.spec.ts` or a spec that passes locally and fails in the merge queue"
+  - "Debugging `requests-tab.test.tsx` or a spec that passes locally and fails in the merge queue"
 symptoms:
   - "A Playwright scenario that refused an optimistic decline failed with \"the alert says nothing\": the row came back, but no refusal line was drawn"
   - "The mutation-level onError ran (the undo restored the row) while the per-call mutate(vars, { onError }) callback that writes the page's line never ran, so the symptom read as a product bug"
@@ -36,7 +36,7 @@ A browser scenario wanted to prove that an optimistic removal is undone by the a
 
 ## Symptoms
 
-- `apps/web/e2e/people/people-requests.spec.ts`, "brings a request back when the api refuses its decline": `saysARefusal(requestsRegion(page).getByRole("alert"))` timed out with no alert in the region, while `rowOf(page, "Priya Shah")` was back.
+- "brings a request back when the api refuses its decline", a case of `apps/web/e2e/people/people-requests.spec.ts` when this was written and now of `apps/web/test/people/requests/requests-tab.test.tsx`: the browser case's `saysARefusal(requestsRegion(page).getByRole("alert"))` timed out with no alert in the region, while `rowOf(page, "Priya Shah")` was back. A held `members.requests` in the Testing Library test shows the same, as a `waitFor` on the alert that times out.
 - A probe with console markers showed the mutation-level `onError` from `useLeavesAtOnce` running and the per-call `onError` in `requests-tab.tsx` never running, with no unmount of the list in between.
 
 ## What Didn't Work
@@ -59,19 +59,22 @@ A browser scenario wanted to prove that an optimistic removal is undone by the a
 
 The observer's `#notify` fires the per-call `mutate()` callbacks only on that dispatch. `useDeclineRequest` gives the mutation `onSettled: () => reconcile()`, and `reconcile` is `queryClient.invalidateQueries({ queryKey })`, a promise that resolves only when the refetch it starts has answered. A route that never answers that read holds the settle for good, so the error state is never dispatched and the page's per-call `onError` never runs. The undo had already run from the options-level `onError`, which is why the row came back.
 
-The fix is in the spec. The held read is releasable, the optimistic effect is asserted before it is released, and the settle's effect after:
+The fix is in the test. The held read is releasable, the optimistic effect is asserted before it is released, and the settle's effect after. `apps/web/test/people/requests/requests-tab.test.tsx` holds both calls with `heldBack` from `apps/web/test/support/stubbed-api.ts`:
 
 ```ts
-const answerTheRead = await holdingTheRequestsRead(page);
-const refuse = await refusingTheDeclineOnRelease(page);
+const decline = heldBack(api, "members.declineRequest");
+const reread = heldBack(api, "members.requests");
 // press Decline; the row leaves before the api answers
-refuse();
-await expect(rowOf(page, "Priya Shah"), "the refused decline left the row gone").toHaveCount(1);
-answerTheRead();
-await saysARefusal(requestsRegion(page).getByRole("alert"));
+decline.reject(aRefusalAnswer("role-forbids", "forbidden", 403));
+await reread.asked;
+expect(rowsOf("Priya Shah"), "the refused decline left the row gone").toHaveLength(1);
+reread.resolve();
+await waitFor(() => {
+  expect(alert().textContent, "the refused decline said nothing").not.toBe("");
+});
 ```
 
-Both holders are one helper, `heldUntilReleased(page, procedure, answer)`, which routes the procedure and awaits a release before it answers.
+The Playwright version of the scenario held both calls with one `page.route` helper that awaited a release before it answered.
 
 ## Why This Works
 
@@ -79,7 +82,7 @@ Asserting the row's return before the read is released proves the undo alone res
 
 ## Prevention
 
-- In a spec, never hold a read for good when an action's `onSettled` invalidates it. Hold it until a returned call, assert the optimistic effect, release, then assert what the settle produces.
+- In a spec or a test, never hold a read for good when an action's `onSettled` invalidates it. Hold it until a returned call, assert the optimistic effect, release, then assert what the settle produces.
 - When a per-call `mutate()` callback seems not to run while the mutation-level one did, check first whether the mutation has settled; the per-call callbacks wait on the mutation's own `onSettled`.
 
 ## Related Issues
