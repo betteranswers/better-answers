@@ -6,7 +6,7 @@ Sign in, display name, no workspace, account, second factor, recovery, workspace
 
 ## Sign in by hand
 
-For `<address>`, client address `198.19.3.<n>` and landing page `<landing>`. Use a new `<n>` for each sign-in.
+For `<address>`, client address `198.19.3.<n>` and landing page `<landing>`.
 
 1. `.claude/skills/verify/scripts/browse.sh <port> cookies clear`, `.claude/skills/verify/scripts/browse.sh <port> set headers '{"cf-connecting-ip":"198.19.3.<n>"}'`, `.claude/skills/verify/scripts/browse.sh <port> open http://localhost:<port>/sign-in`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "document.querySelector('input[type=email]') !== null"`, `.claude/skills/verify/scripts/browse.sh <port> find label "Email Address" fill "<address>"`, `.claude/skills/verify/scripts/browse.sh <port> find role button click --name "Send Code"`, `.claude/skills/verify/scripts/browse.sh <port> wait --text "Verification Code"`.
 2. `.claude/skills/verify/scripts/harness.sh <port> GET "/codes?email=<email%>"` answers `code`. Then `.claude/skills/verify/scripts/browse.sh <port> find label "Verification Code" fill "<code>" --exact`, `.claude/skills/verify/scripts/browse.sh <port> wait --fn "location.pathname === '<landing>'"`.

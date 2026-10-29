@@ -1,6 +1,6 @@
 # The harness routes the recipes call
 
-`scripts/harness.sh` calls these under `/__harness`. A body is the route's schema in `apps/api/tests/support/harness/harness-control.ts` or the `harness-*.ts` file beside it. A refusal usually answers 400 naming the field or constraint. A 500 gives its reason only in `server.log`.
+`scripts/harness.sh` calls these under `/__harness`.
 
 | Route | Body | Answer |
 | --- | --- | --- |

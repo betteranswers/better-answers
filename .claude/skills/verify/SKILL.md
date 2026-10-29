@@ -16,7 +16,7 @@ Docker must be running. Install the browser driver once with `npm install -g age
 .claude/skills/verify/scripts/launch.sh 4610 --no-build  # serves the build already in apps/web/dist
 ```
 
-It starts `apps/api/tests/serve.ts` on the port and returns once `/health` answers 200. A cold Docker pulls its images first, so it waits up to 240 s. It refuses a port that any process holds.
+It starts `apps/api/tests/serve.ts` on the port and returns once `/health` answers 200. A cold Docker pulls its images first, so it waits up to 240 s.
 
 ## Doctor
 
@@ -52,7 +52,7 @@ Build state only through the harness, and act only through the page. Write every
 
 ## Evidence
 
-Save, for each page a recipe ends on, a screenshot and a full snapshot in `/tmp/better-answers-verify/<port>/evidence/`, named for the feature file and the last segment of the page's address, such as `control-centre-members` for `/people/members`.
+Save, for each page a recipe ends on, a screenshot and a full snapshot in `/tmp/better-answers-verify/<port>/evidence/`.
 
 ```bash
 .claude/skills/verify/scripts/browse.sh 4610 screenshot /tmp/better-answers-verify/4610/evidence/control-centre-members.png
@@ -67,8 +67,8 @@ Prove a write from a second view: reload, or open the page that lists what was w
 .claude/skills/verify/scripts/cleanup.sh 4610
 ```
 
-It closes the session's browser and stops the server it launched, then confirms the port is free. It keeps `server.log`, `build.log` and `evidence/`. Run it after the last drive and after every failed launch or drive.
+It closes the session's browser and stops the server it launched, then confirms the port is free. Run it after the last drive and after every failed launch or drive.
 
 ## Two drives side by side
 
-Launch each on its own port, and build once: launch the second with `--no-build`. launch.sh refuses to build while another instance of the same checkout runs.
+Launch each on its own port, and build once: launch the second with `--no-build`.
